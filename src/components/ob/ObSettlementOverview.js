@@ -951,59 +951,66 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
     persistProgress(invoiceStatusRef.current, nextWorkflow);
   };
 
-  const handleDepositComplete = (company) => () => {
+  const handleDepositToggle = (company) => () => {
     const current = companyWorkflowRef.current[company];
-    if (!current.isSaved) {
-      setWorkflowError('계좌 정보를 저장한 후 입금완료를 진행해 주세요.');
-      setWorkflowSuccess('');
-      return;
-    }
-    if (current.depositDone) {
-      setWorkflowError('');
-      setWorkflowSuccess(`${COMPANY_LABELS[company]} 입금 완료가 이미 처리되었습니다.`);
-      return;
+    if (!current) return;
+
+    if (!current.depositDone) {
+      if (!current.isSaved) {
+        setWorkflowError('계좌 정보를 저장한 후 입금완료를 진행해 주세요.');
+        setWorkflowSuccess('');
+        return;
+      }
     }
 
     const nextWorkflow = {
       ...companyWorkflowRef.current,
       [company]: {
         ...current,
-        depositDone: true
+        depositDone: !current.depositDone,
+        confirmDone: current.depositDone ? false : current.confirmDone
       }
     };
 
     setCompanyWorkflow(nextWorkflow);
     companyWorkflowRef.current = nextWorkflow;
     setWorkflowError('');
-    setWorkflowSuccess(`${COMPANY_LABELS[company]} 입금이 확인되었습니다.`);
+    setWorkflowSuccess(
+      nextWorkflow[company].depositDone
+        ? `${COMPANY_LABELS[company]} 입금이 확인되었습니다.`
+        : `${COMPANY_LABELS[company]} 입금 완료 상태를 해제했습니다.`
+    );
     persistProgress(invoiceStatusRef.current, nextWorkflow);
   };
 
-  const handleConfirmComplete = (company) => () => {
+  const handleConfirmToggle = (company) => () => {
     const current = companyWorkflowRef.current[company];
-    if (!current.depositDone) {
-      setWorkflowError('입금완료 후 확인완료를 진행해 주세요.');
-      setWorkflowSuccess('');
-      return;
-    }
-    if (current.confirmDone) {
-      setWorkflowError('');
-      setWorkflowSuccess(`${COMPANY_LABELS[company]} 정산이 이미 확인되었습니다.`);
-      return;
+    if (!current) return;
+
+    if (!current.confirmDone) {
+      if (!current.depositDone) {
+        setWorkflowError('입금완료 후 확인완료를 진행해 주세요.');
+        setWorkflowSuccess('');
+        return;
+      }
     }
 
     const nextWorkflow = {
       ...companyWorkflowRef.current,
       [company]: {
         ...current,
-        confirmDone: true
+        confirmDone: !current.confirmDone
       }
     };
 
     setCompanyWorkflow(nextWorkflow);
     companyWorkflowRef.current = nextWorkflow;
     setWorkflowError('');
-    setWorkflowSuccess(`${COMPANY_LABELS[company]} 정산을 확인했습니다.`);
+    setWorkflowSuccess(
+      nextWorkflow[company].confirmDone
+        ? `${COMPANY_LABELS[company]} 정산을 확인했습니다.`
+        : `${COMPANY_LABELS[company]} 확인 완료 상태를 해제했습니다.`
+    );
     persistProgress(invoiceStatusRef.current, nextWorkflow);
   };
 
@@ -1135,9 +1142,9 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
         bankNameValue || accountValue || state.isSaved || state.depositDone || state.confirmDone
       );
       const resetDisabled = !invoiceChecksDone || !hasAnyProgress;
-      const depositDisabled = !invoiceChecksDone || !state.isSaved || state.depositDone;
+      const depositDisabled = !invoiceChecksDone || (!state.depositDone && !state.isSaved);
       const confirmDisabled =
-        !invoiceChecksDone || !state.depositDone || state.confirmDone;
+        !invoiceChecksDone || (!state.depositDone && !state.confirmDone);
 
       return (
         <Paper
@@ -1226,22 +1233,22 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
             <Divider />
             <Stack direction="row" spacing={1} flexWrap="wrap">
               <Button
-                variant="contained"
+                variant={state.depositDone ? 'contained' : 'outlined'}
                 size="small"
-                color="primary"
-                onClick={handleDepositComplete(companyKey)}
+                color={state.depositDone ? 'success' : 'primary'}
+                onClick={handleDepositToggle(companyKey)}
                 disabled={depositDisabled}
               >
-                입금완료
+                {state.depositDone ? '입금완료 해제' : '입금완료'}
               </Button>
               <Button
-                variant="contained"
+                variant={state.confirmDone ? 'contained' : 'outlined'}
                 size="small"
-                color="success"
-                onClick={handleConfirmComplete(companyKey)}
+                color={state.confirmDone ? 'success' : 'primary'}
+                onClick={handleConfirmToggle(companyKey)}
                 disabled={confirmDisabled}
               >
-                확인완료
+                {state.confirmDone ? '확인완료 해제' : '확인완료'}
               </Button>
             </Stack>
           </Stack>
@@ -1265,51 +1272,67 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
     const recontractPromoterNames = recontractPromoterStats.map((s) => s.name).join(', ');
     const recontractPromoterCount = recontractPromoterStats.reduce((sum, s) => sum + s.count, 0);
 
-    const renderCompanyProgress = (companyKey, isCompleted) => {
-      const toggleHandler = handleCompanyCompletionToggle(companyKey);
-      const stepOneActive = !isCompleted;
+    const renderCompanyProgress = useCallback(
+      (companyKey) => {
+        const state = companyWorkflow[companyKey] || createCompanyWorkflowState();
+        const isCompleted = Boolean(state.completed);
+        const depositDone = Boolean(state.depositDone);
+        const confirmDone = Boolean(state.confirmDone);
+        const toggleHandler = handleCompanyCompletionToggle(companyKey);
+        const stepOneActive = !isCompleted;
 
-      return (
-        <Stack spacing={1.25}>
-          <Box sx={getStepBoxStyles(stepOneActive)}>
-            <FormControlLabel
-              control={<Checkbox checked={stepOneActive} disabled />}
-              label={
-                <StepLabel
-                  step={1}
-                  title="입력중"
-                  description={
-                    stepOneActive
-                      ? '현재 단계입니다. 시트 데이터를 검토하고 입력을 마무리해 주세요.'
-                      : '완료된 단계입니다.'
-                  }
-                  active={stepOneActive}
-                />
-              }
-              sx={{ alignItems: 'flex-start', m: 0 }}
-            />
-          </Box>
-          <Box sx={getStepBoxStyles(!stepOneActive)}>
-            <FormControlLabel
-              control={<Checkbox checked={isCompleted} onChange={toggleHandler} />}
-              label={
-                <StepLabel
-                  step={2}
-                  title="정산확인 및 입력완료"
-                  description={
-                    isCompleted
-                      ? '완료되었습니다. 계좌 저장 → 입금완료 → 확인완료를 이어서 진행하세요.'
-                      : '정산 검토를 마쳤다면 체크해 다음 단계로 이동하세요.'
-                  }
-                  active={!stepOneActive}
-                />
-              }
-              sx={{ alignItems: 'flex-start', m: 0 }}
-            />
-          </Box>
-        </Stack>
-      );
-    };
+        let stepTwoDescription = '정산 검토를 마쳤다면 체크해 다음 단계로 이동하세요.';
+        if (isCompleted) {
+          if (!state.isSaved) {
+            stepTwoDescription = '계좌 정보를 저장해 주세요.';
+          } else if (!depositDone) {
+            stepTwoDescription = '계좌 저장이 끝났다면 입금완료 버튼으로 진행하세요.';
+          } else if (!confirmDone) {
+            stepTwoDescription = '입금 확인 후 확인완료 버튼을 눌러 마무리하세요.';
+          } else {
+            stepTwoDescription = '완료되었습니다. 필요 시 언제든지 상태를 되돌릴 수 있습니다.';
+          }
+        }
+
+        return (
+          <Stack spacing={1.25}>
+            <Box sx={getStepBoxStyles(stepOneActive)}>
+              <FormControlLabel
+                control={<Checkbox checked={!stepOneActive} disabled />}
+                label={
+                  <StepLabel
+                    step={1}
+                    title="입력중"
+                    description={
+                      stepOneActive
+                        ? '현재 단계입니다. 시트 데이터를 검토하고 입력을 마무리해 주세요.'
+                        : '완료된 단계입니다.'
+                    }
+                    active={stepOneActive}
+                  />
+                }
+                sx={{ alignItems: 'flex-start', m: 0 }}
+              />
+            </Box>
+            <Box sx={getStepBoxStyles(!stepOneActive)}>
+              <FormControlLabel
+                control={<Checkbox checked={isCompleted} onChange={toggleHandler} />}
+                label={
+                  <StepLabel
+                    step={2}
+                    title="정산확인 및 입력완료"
+                    description={stepTwoDescription}
+                    active={!stepOneActive}
+                  />
+                }
+                sx={{ alignItems: 'flex-start', m: 0 }}
+              />
+            </Box>
+          </Stack>
+        );
+      },
+      [companyWorkflow, handleCompanyCompletionToggle]
+    );
 
     return (
       <Stack spacing={4}>
@@ -1435,7 +1458,7 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
                 color="#6A1B9A"
                 animate={vipCompleted}
               >
-                {renderCompanyProgress('vip', vipCompleted)}
+                {renderCompanyProgress('vip')}
               </SummaryCard>
             </Grid>
             <Grid item xs={12} md={6}>
@@ -1445,7 +1468,7 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
                 color="#00838F"
                 animate={yaiCompleted}
               >
-                {renderCompanyProgress('yai', yaiCompleted)}
+                {renderCompanyProgress('yai')}
               </SummaryCard>
             </Grid>
           </Grid>
