@@ -46,6 +46,18 @@ const EXCLUSION_TYPE_LABELS = {
   recontract: '재약정'
 };
 
+const SHEET_TARGET_OUTLETS = '대상점';
+const DEFAULT_TARGET_OUTLET_SHEET_NAME = SHEET_TARGET_OUTLETS;
+const HEADERS_TARGET_OUTLETS = [
+  '연월',
+  '대상점명',
+  '사유',
+  'ID',
+  '비고',
+  '등록자',
+  '등록일시'
+];
+
 const PLACEHOLDER_SHEET_TOKENS = [
   '시트이름(맞춤제안)',
   '시트이름(재약정)',
@@ -477,6 +489,113 @@ function buildExclusionConfig(entries = [], month) {
   return result;
 }
 
+async function ensureTargetOutletSheetStructure(sheets, spreadsheetId, sheetName = DEFAULT_TARGET_OUTLET_SHEET_NAME) {
+  const sheetList = await sheets.spreadsheets.get({ spreadsheetId });
+  const existingSheet = sheetList.data.sheets.find((s) => s.properties.title === sheetName);
+
+  if (!existingSheet) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        requests: [
+          {
+            addSheet: {
+              properties: {
+                title: sheetName
+              }
+            }
+          }
+        ]
+      }
+    });
+  }
+
+  const headerRange = `${sheetName}!A1:${String.fromCharCode(65 + HEADERS_TARGET_OUTLETS.length - 1)}2`;
+  const headerResponse = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: headerRange
+  });
+  const headerValues = headerResponse.data.values || [];
+  const firstRow = headerValues[0] || [];
+  const secondRow = headerValues[1] || [];
+  const isFirstRowBlank =
+    firstRow.length === 0 || firstRow.every((cell) => !cell || String(cell).trim() === '');
+  const isSecondRowHeader = HEADERS_TARGET_OUTLETS.every(
+    (header, index) => (secondRow[index] || '') === header
+  );
+
+  if (!isFirstRowBlank || !isSecondRowHeader) {
+    const values = [
+      new Array(HEADERS_TARGET_OUTLETS.length).fill(''),
+      HEADERS_TARGET_OUTLETS
+    ];
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: headerRange,
+      valueInputOption: 'RAW',
+      resource: {
+        values
+      }
+    });
+  }
+}
+
+function mapTargetOutletRow(row = [], index = 0) {
+  const monthRaw = parseString(row[0]);
+  const month = monthRaw.replace(/^'/, '');
+  const outletName = parseString(row[1]);
+  const reason = parseString(row[2]);
+  const id = parseString(row[3]);
+  const note = parseString(row[4]);
+  const registrant = parseString(row[5]);
+  const createdAt = parseString(row[6]);
+
+  return {
+    id,
+    month,
+    outletName,
+    reason,
+    note,
+    registrant,
+    createdAt,
+    rowNumber: index + 3
+  };
+}
+
+async function loadTargetOutletRows(sheets, spreadsheetId, sheetName = DEFAULT_TARGET_OUTLET_SHEET_NAME) {
+  await ensureTargetOutletSheetStructure(sheets, spreadsheetId, sheetName);
+  const values = await loadSheetRows(sheets, spreadsheetId, sheetName);
+  if (!values || values.length <= 2) return [];
+  return values
+    .slice(2)
+    .map((row, index) => mapTargetOutletRow(row, index))
+    .filter((entry) => entry.id);
+}
+
+function buildTargetOutletConfig(entries = [], month) {
+  const targetMonth = parseString(month);
+  const normalizedMonth = targetMonth ? targetMonth : '';
+  const outletNames = [];
+
+  entries.forEach((entry) => {
+    const monthMatches =
+      !normalizedMonth ||
+      !entry.month ||
+      entry.month === normalizedMonth ||
+      entry.month === '전체';
+    if (!monthMatches) return;
+
+    if (entry.outletName) {
+      outletNames.push(entry.outletName.trim());
+    }
+  });
+
+  return {
+    entries,
+    outletNames
+  };
+}
+
 function mapSettlementRow(row = []) {
   const [
     month = '',
@@ -662,29 +781,33 @@ function filterCustomRow(rowObject, excludedIdsSet = new Set(), excludedNamesSet
   return { include: true };
 }
 
-function filterRecontractRow(rowObject, excludedIdsSet = new Set(), excludedNamesSet = new Set()) {
+function filterRecontractRow(rowObject, excludedIdsSet = new Set(), excludedNamesSet = new Set(), targetOutletNames = []) {
   const { row } = rowObject;
-  // 사용자가 이미 -1을 해서 알려준 인덱스 기준: 90(유치자ID), 91(등록직원)
+  // 사용자가 이미 -1을 해서 알려준 인덱스 기준: 90(유치자ID), 91(등록직원), 10(출고처)
   const promoterIdPrimary = normalizeIdentifier(row[90]);
   const promoterIdSecondary = normalizeIdentifier(row[91]);
   const promoterNamePrimary = normalizeIdentifier(row[91]);
   const promoterNameSecondary = normalizeIdentifier(row[90]);
+  const outlet = parseString(row[10]); // 출고처
 
-  if (promoterIdPrimary && excludedIdsSet.has(promoterIdPrimary)) {
-    return { include: false, reason: 'excludedId' };
-  }
-  if (promoterIdSecondary && excludedIdsSet.has(promoterIdSecondary)) {
-    return { include: false, reason: 'excludedId' };
+  // 제외인원 체크: 제외 목록에 있으면 제외
+  const isExcludedById = (promoterIdPrimary && excludedIdsSet.has(promoterIdPrimary)) ||
+    (promoterIdSecondary && excludedIdsSet.has(promoterIdSecondary));
+  const isExcludedByName = (promoterNamePrimary && excludedNamesSet.has(promoterNamePrimary)) ||
+    (promoterNameSecondary && excludedNamesSet.has(promoterNameSecondary));
+  const isExcluded = isExcludedById || isExcludedByName;
+
+  // 출고처에 대상점 문자열이 포함되어 있는지 확인
+  const matchesTargetOutlet = targetOutletNames.length > 0 && targetOutletNames.some(
+    (outletName) => outlet && outlet.includes(outletName.trim())
+  );
+
+  // OR 조건: 제외인원에 없거나, 출고처에 대상점 문자열이 포함된 경우 포함
+  if (!isExcluded || matchesTargetOutlet) {
+    return { include: true };
   }
 
-  if (promoterNamePrimary && excludedNamesSet.has(promoterNamePrimary)) {
-    return { include: false, reason: 'excludedName' };
-  }
-  if (promoterNameSecondary && excludedNamesSet.has(promoterNameSecondary)) {
-    return { include: false, reason: 'excludedName' };
-  }
-
-  return { include: true };
+  return { include: false, reason: 'excluded' };
 }
 
 function calculatePolicy3Payout(totalSales) {
@@ -828,15 +951,16 @@ function buildCustomProposalSummary(rows, exclusionConfig = {}) {
   };
 }
 
-function buildRecontractSummary(rows, exclusionConfig = {}) {
+function buildRecontractSummary(rows, exclusionConfig = {}, targetOutletConfig = {}) {
   const excludedIdsSet = exclusionConfig.idSet || new Set();
   const excludedNamesSet = exclusionConfig.nameSet || new Set();
   const exclusionEntries = exclusionConfig.entries || [];
+  const targetOutletNames = targetOutletConfig.outletNames || [];
   const included = [];
   let excludedCount = 0;
 
   rows.forEach((rowObj) => {
-    const decision = filterRecontractRow(rowObj, excludedIdsSet, excludedNamesSet);
+    const decision = filterRecontractRow(rowObj, excludedIdsSet, excludedNamesSet, targetOutletNames);
     if (decision.include) {
       included.push(rowObj);
     } else {
@@ -1303,13 +1427,18 @@ function setupObRoutes(app) {
       const exclusionRows = await loadExclusionRows(sheets, targetSheetId, exclusionSheetName);
       const exclusionConfig = buildExclusionConfig(exclusionRows, month);
 
+      const targetOutletSheetName =
+        normalizeConfiguredSheetName(extraSheetNames.targetOutlet) || DEFAULT_TARGET_OUTLET_SHEET_NAME;
+      const targetOutletRows = await loadTargetOutletRows(sheets, targetSheetId, targetOutletSheetName);
+      const targetOutletConfig = buildTargetOutletConfig(targetOutletRows, month);
+
       const progressSheetName =
         normalizeConfiguredSheetName(extraSheetNames.progress) || DEFAULT_PROGRESS_SHEET_NAME;
       const progressRows = await loadProgressRows(sheets, targetSheetId, progressSheetName);
       const progressState = buildProgressState(progressRows, month);
 
       const customSummary = buildCustomProposalSummary(customRows, exclusionConfig.custom);
-      const recontractSummary = buildRecontractSummary(recontractRows, exclusionConfig.recontract);
+      const recontractSummary = buildRecontractSummary(recontractRows, exclusionConfig.recontract, targetOutletConfig);
       const totals = buildTotals(customSummary, recontractSummary, manualSummary);
 
       res.json({
@@ -1330,6 +1459,7 @@ function setupObRoutes(app) {
             sheetName: manualSheetName
           },
           exclusions: exclusionConfig,
+          targetOutlets: targetOutletConfig,
           progress: progressState,
           totals
         }
@@ -2006,6 +2136,245 @@ function setupObRoutes(app) {
     } catch (error) {
       console.error('[OB] exclusions DELETE error:', error);
       res.status(500).json({ success: false, error: '제외 인원을 삭제하지 못했습니다.', message: error.message });
+    }
+  });
+
+  // 대상점 관리 API
+  router.get('/target-outlets', async (req, res) => {
+    try {
+      const monthParam = parseString(req.query.month || '');
+
+      if (!monthParam) {
+        return res.status(400).json({ success: false, error: 'month query parameter is required' });
+      }
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      const configEntry = await fetchSettlementConfig(sheets, SPREADSHEET_ID, monthParam);
+
+      if (!configEntry) {
+        return res.status(404).json({ success: false, error: '해당 월의 정산 링크 구성이 존재하지 않습니다.' });
+      }
+
+      const targetSheetId = configEntry.sheetId || SPREADSHEET_ID;
+      const extraSheetNames = configEntry.extraSheetNames || {};
+      const targetOutletSheetName =
+        normalizeConfiguredSheetName(extraSheetNames.targetOutlet) || DEFAULT_TARGET_OUTLET_SHEET_NAME;
+
+      const targetOutletRows = await loadTargetOutletRows(sheets, targetSheetId, targetOutletSheetName);
+      const targetOutletConfig = buildTargetOutletConfig(targetOutletRows, monthParam);
+
+      res.json({
+        success: true,
+        data: targetOutletConfig.entries
+      });
+    } catch (error) {
+      console.error('[OB] target-outlets GET error:', error);
+      res
+        .status(500)
+        .json({ success: false, error: '대상점 정보를 불러오지 못했습니다.', message: error.message });
+    }
+  });
+
+  router.post('/target-outlets', async (req, res) => {
+    try {
+      const {
+        month,
+        outletName = '',
+        reason = '',
+        note = '',
+        registrant = ''
+      } = req.body || {};
+
+      const trimmedMonth = parseString(month);
+      if (!trimmedMonth) {
+        return res.status(400).json({ success: false, error: 'month는 필수값입니다.' });
+      }
+      if (!outletName || !outletName.trim()) {
+        return res.status(400).json({ success: false, error: '대상점명을 입력해주세요.' });
+      }
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      const configEntry = await fetchSettlementConfig(sheets, SPREADSHEET_ID, trimmedMonth);
+
+      if (!configEntry) {
+        return res.status(404).json({ success: false, error: '해당 월의 정산 링크 구성이 존재하지 않습니다.' });
+      }
+
+      const targetSheetId = configEntry.sheetId || SPREADSHEET_ID;
+      const extraSheetNames = configEntry.extraSheetNames || {};
+      const targetOutletSheetName =
+        normalizeConfiguredSheetName(extraSheetNames.targetOutlet) || DEFAULT_TARGET_OUTLET_SHEET_NAME;
+
+      await ensureTargetOutletSheetStructure(sheets, targetSheetId, targetOutletSheetName);
+
+      const id = uuidv4();
+      const nowIso = new Date().toISOString();
+      const monthCellValue = trimmedMonth ? `'${trimmedMonth}` : '';
+
+      const row = [
+        monthCellValue,
+        outletName.trim(),
+        reason.trim(),
+        id,
+        note.trim(),
+        registrant || '',
+        nowIso
+      ];
+
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: targetSheetId,
+        range: `${targetOutletSheetName}!A3`,
+        valueInputOption: 'USER_ENTERED',
+        insertDataOption: 'INSERT_ROWS',
+        resource: { values: [row] }
+      });
+
+      res.json({
+        success: true,
+        data: {
+          id,
+          month: trimmedMonth,
+          outletName: outletName.trim(),
+          reason: reason.trim(),
+          note: note.trim(),
+          registrant: registrant || '',
+          createdAt: nowIso
+        }
+      });
+    } catch (error) {
+      console.error('[OB] target-outlets POST error:', error);
+      res.status(500).json({ success: false, error: '대상점을 등록하지 못했습니다.', message: error.message });
+    }
+  });
+
+  router.put('/target-outlets/:id', async (req, res) => {
+    const idParam = parseString(req.params.id || '');
+    if (!idParam) {
+      return res.status(400).json({ success: false, error: 'id parameter is required' });
+    }
+
+    try {
+      const {
+        month,
+        outletName = '',
+        reason = '',
+        note = '',
+        registrant
+      } = req.body || {};
+
+      const trimmedMonth = parseString(month);
+      if (!trimmedMonth) {
+        return res.status(400).json({ success: false, error: 'month는 필수값입니다.' });
+      }
+      if (!outletName || !outletName.trim()) {
+        return res.status(400).json({ success: false, error: '대상점명을 입력해주세요.' });
+      }
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      const configEntry = await fetchSettlementConfig(sheets, SPREADSHEET_ID, trimmedMonth);
+
+      if (!configEntry) {
+        return res.status(404).json({ success: false, error: '해당 월의 정산 링크 구성이 존재하지 않습니다.' });
+      }
+
+      const targetSheetId = configEntry.sheetId || SPREADSHEET_ID;
+      const extraSheetNames = configEntry.extraSheetNames || {};
+      const targetOutletSheetName =
+        normalizeConfiguredSheetName(extraSheetNames.targetOutlet) || DEFAULT_TARGET_OUTLET_SHEET_NAME;
+
+      const targetOutletRows = await loadTargetOutletRows(sheets, targetSheetId, targetOutletSheetName);
+      const targetEntry = targetOutletRows.find((entry) => entry.id === idParam);
+
+      if (!targetEntry) {
+        return res.status(404).json({ success: false, error: '해당 ID의 대상점이 존재하지 않습니다.' });
+      }
+
+      const range = `${targetOutletSheetName}!A${targetEntry.rowNumber}:${String.fromCharCode(
+        65 + HEADERS_TARGET_OUTLETS.length - 1
+      )}${targetEntry.rowNumber}`;
+      const monthCellValue = trimmedMonth ? `'${trimmedMonth}` : '';
+
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: targetSheetId,
+        range,
+        valueInputOption: 'USER_ENTERED',
+        resource: {
+          values: [[
+            monthCellValue,
+            outletName.trim(),
+            reason.trim(),
+            targetEntry.id,
+            note.trim(),
+            registrant || targetEntry.registrant,
+            targetEntry.createdAt || new Date().toISOString()
+          ]]
+        }
+      });
+
+      res.json({
+        success: true,
+        data: {
+          id: targetEntry.id,
+          month: trimmedMonth,
+          outletName: outletName.trim(),
+          reason: reason.trim(),
+          note: note.trim(),
+          registrant: registrant || targetEntry.registrant,
+          createdAt: targetEntry.createdAt
+        }
+      });
+    } catch (error) {
+      console.error('[OB] target-outlets PUT error:', error);
+      res.status(500).json({ success: false, error: '대상점을 수정하지 못했습니다.', message: error.message });
+    }
+  });
+
+  router.delete('/target-outlets/:id', async (req, res) => {
+    const idParam = parseString(req.params.id || '');
+    const monthParam = parseString(req.query.month || '');
+    if (!idParam) {
+      return res.status(400).json({ success: false, error: 'id parameter is required' });
+    }
+    if (!monthParam) {
+      return res.status(400).json({ success: false, error: 'month query parameter is required' });
+    }
+
+    try {
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      const configEntry = await fetchSettlementConfig(sheets, SPREADSHEET_ID, monthParam);
+
+      if (!configEntry) {
+        return res.status(404).json({ success: false, error: '해당 월의 정산 링크 구성이 존재하지 않습니다.' });
+      }
+
+      const targetSheetId = configEntry.sheetId || SPREADSHEET_ID;
+      const extraSheetNames = configEntry.extraSheetNames || {};
+      const targetOutletSheetName =
+        normalizeConfiguredSheetName(extraSheetNames.targetOutlet) || DEFAULT_TARGET_OUTLET_SHEET_NAME;
+
+      const targetOutletRows = await loadTargetOutletRows(sheets, targetSheetId, targetOutletSheetName);
+      const targetEntry = targetOutletRows.find((entry) => entry.id === idParam);
+
+      if (!targetEntry) {
+        return res.status(404).json({ success: false, error: '해당 ID의 대상점이 존재하지 않습니다.' });
+      }
+
+      const range = `${targetOutletSheetName}!A${targetEntry.rowNumber}:${String.fromCharCode(
+        65 + HEADERS_TARGET_OUTLETS.length - 1
+      )}${targetEntry.rowNumber}`;
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: targetSheetId,
+        range,
+        valueInputOption: 'USER_ENTERED',
+        resource: {
+          values: [new Array(HEADERS_TARGET_OUTLETS.length).fill('')]
+        }
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('[OB] target-outlets DELETE error:', error);
+      res.status(500).json({ success: false, error: '대상점을 삭제하지 못했습니다.', message: error.message });
     }
   });
 

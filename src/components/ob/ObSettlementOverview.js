@@ -814,18 +814,35 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
   // 재약정: 등록직원별 집계
   const recontractPromoterStats = useMemo(() => {
     if (!summary?.recontract?.rows) return [];
+    const targetOutletNames = summary?.targetOutlets?.outletNames || [];
     const stats = {};
+    
     summary.recontract.rows.forEach((row) => {
       const name = row.promoterName || '미지정';
       if (!stats[name]) {
-        stats[name] = { count: 0, feeTotal: 0, offerTotal: 0 };
+        stats[name] = { count: 0, feeTotal: 0, offerTotal: 0, outlets: new Set() };
       }
       stats[name].count += 1;
       stats[name].feeTotal += row.settlementAmount || 0;
       stats[name].offerTotal += (row.offerGiftCard || 0) + (row.offerDeposit || 0);
+      
+      // 출고처와 대상점 매칭
+      if (row.outlet) {
+        const matchedOutlets = targetOutletNames.filter((outletName) =>
+          row.outlet.includes(outletName.trim())
+        );
+        matchedOutlets.forEach((outlet) => stats[name].outlets.add(outlet));
+      }
     });
+    
     return Object.entries(stats)
-      .map(([name, data]) => ({ name, ...data }))
+      .map(([name, data]) => ({
+        name,
+        count: data.count,
+        feeTotal: data.feeTotal,
+        offerTotal: data.offerTotal,
+        targetOutlets: Array.from(data.outlets).sort()
+      }))
       .sort((a, b) => b.feeTotal - a.feeTotal);
   }, [summary]);
 
@@ -1674,6 +1691,7 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
                   <TableHead>
                     <TableRow>
                       <TableCell sx={{ fontWeight: 600 }}>등록직원</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>대상</TableCell>
                       <TableCell align="right" sx={{ fontWeight: 600 }}>건수</TableCell>
                       <TableCell align="right" sx={{ fontWeight: 600 }}>수수료 합계</TableCell>
                       <TableCell align="right" sx={{ fontWeight: 600 }}>오퍼 합계</TableCell>
@@ -1684,6 +1702,11 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
                     {recontractPromoterStats.map((stat) => (
                       <TableRow key={stat.name}>
                         <TableCell>{stat.name}</TableCell>
+                        <TableCell>
+                          {stat.targetOutlets && stat.targetOutlets.length > 0
+                            ? stat.targetOutlets.join(', ')
+                            : '-'}
+                        </TableCell>
                         <TableCell align="right">{numberFormatter.format(stat.count)}건</TableCell>
                         <TableCell align="right">{currencyFormatter.format(stat.feeTotal)}</TableCell>
                         <TableCell align="right">{currencyFormatter.format(stat.offerTotal)}</TableCell>
