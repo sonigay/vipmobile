@@ -581,7 +581,7 @@ async function loadTargetOutletRows(sheets, spreadsheetId, sheetName = DEFAULT_T
     .filter((entry) => entry.id);
 }
 
-function buildTargetOutletConfig(entries = [], month, type = 'recontract') {
+function buildTargetOutletConfig(entries = [], month, type = null) {
   const targetMonth = parseString(month);
   const normalizedMonth = targetMonth ? targetMonth : '';
   const outletNames = [];
@@ -595,8 +595,8 @@ function buildTargetOutletConfig(entries = [], month, type = 'recontract') {
       entry.month === '전체';
     if (!monthMatches) return;
 
-    // 타입 필터링 (재약정 또는 후정산)
-    if (entry.type !== type) return;
+    // 타입 필터링 (type이 지정된 경우에만)
+    if (type !== null && entry.type !== type) return;
 
     filteredEntries.push(entry);
     if (entry.outletName) {
