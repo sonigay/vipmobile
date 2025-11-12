@@ -890,10 +890,15 @@ function filterRecontractRow(rowObject, excludedIdsSet = new Set(), excludedName
     (outletName) => outlet && outlet.includes(outletName.trim())
   );
 
-  // OR 조건: 제외인원에 없거나, 출고처에 대상점 문자열이 포함된 경우 포함
-  // 단, 제외인원에 있고 대상점도 매칭되지 않으면 제외
-  if (isExcluded && !matchesTargetOutlet) {
+  // AND 조건: 제외인원에 없고 AND 대상점에 매칭되는 경우만 포함
+  // 1. 제외인원에 있으면 무조건 제외
+  if (isExcluded) {
     return { include: false, reason: 'excluded' };
+  }
+  
+  // 2. 대상점이 설정되어 있으면 매칭되어야 함
+  if (targetOutletNames.length > 0 && !matchesTargetOutlet) {
+    return { include: false, reason: 'target outlet not matched' };
   }
 
   return { include: true };
