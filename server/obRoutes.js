@@ -50,6 +50,7 @@ const SHEET_TARGET_OUTLETS = '대상점';
 const DEFAULT_TARGET_OUTLET_SHEET_NAME = SHEET_TARGET_OUTLETS;
 const HEADERS_TARGET_OUTLETS = [
   '연월',
+  '구분(재약정/후정산)',
   '대상점명',
   '사유',
   'ID',
@@ -57,6 +58,10 @@ const HEADERS_TARGET_OUTLETS = [
   '등록자',
   '등록일시'
 ];
+const TARGET_OUTLET_TYPE_LABELS = {
+  recontract: '재약정',
+  postSettlement: '후정산'
+};
 
 const PLACEHOLDER_SHEET_TOKENS = [
   '시트이름(맞춤제안)',
@@ -543,16 +548,20 @@ async function ensureTargetOutletSheetStructure(sheets, spreadsheetId, sheetName
 function mapTargetOutletRow(row = [], index = 0) {
   const monthRaw = parseString(row[0]);
   const month = monthRaw.replace(/^'/, '');
-  const outletName = parseString(row[1]);
-  const reason = parseString(row[2]);
-  const id = parseString(row[3]);
-  const note = parseString(row[4]);
-  const registrant = parseString(row[5]);
-  const createdAt = parseString(row[6]);
+  const rawType = parseString(row[1]);
+  const normalizedType =
+    rawType === TARGET_OUTLET_TYPE_LABELS.postSettlement ? 'postSettlement' : 'recontract';
+  const outletName = parseString(row[2]);
+  const reason = parseString(row[3]);
+  const id = parseString(row[4]);
+  const note = parseString(row[5]);
+  const registrant = parseString(row[6]);
+  const createdAt = parseString(row[7]);
 
   return {
     id,
     month,
+    type: normalizedType,
     outletName,
     reason,
     note,
@@ -572,10 +581,11 @@ async function loadTargetOutletRows(sheets, spreadsheetId, sheetName = DEFAULT_T
     .filter((entry) => entry.id);
 }
 
-function buildTargetOutletConfig(entries = [], month) {
+function buildTargetOutletConfig(entries = [], month, type = 'recontract') {
   const targetMonth = parseString(month);
   const normalizedMonth = targetMonth ? targetMonth : '';
   const outletNames = [];
+  const filteredEntries = [];
 
   entries.forEach((entry) => {
     const monthMatches =
@@ -585,13 +595,17 @@ function buildTargetOutletConfig(entries = [], month) {
       entry.month === '전체';
     if (!monthMatches) return;
 
+    // 타입 필터링 (재약정 또는 후정산)
+    if (entry.type !== type) return;
+
+    filteredEntries.push(entry);
     if (entry.outletName) {
       outletNames.push(entry.outletName.trim());
     }
   });
 
   return {
-    entries,
+    entries: filteredEntries,
     outletNames
   };
 }
@@ -762,6 +776,80 @@ function normalizeRecontractRows(values, sourceSheet) {
     rowNumber: index + 3,
     row
   }));
+}
+
+function normalizePostSettlementRows(values, sourceSheet) {
+  if (!values || values.length <= 2) return [];
+  return values.slice(2).map((row, index) => ({
+    sourceSheet,
+    rowNumber: index + 3,
+    row
+  }));
+}
+
+function mapPostSettlementRow(rowObject, targetOutletNames = []) {
+  const { row } = rowObject;
+  // 7인덱스: 항목, 10인덱스: 대상, 15인덱스: 내용, 16인덱스: 금액, 17인덱스: 상세내용
+  const item = parseString(row[7]); // 항목
+  const target = parseString(row[10]); // 대상
+  const content = parseString(row[15]); // 내용
+  const amount = parseNumber(row[16]); // 금액
+  const detail = parseString(row[17]); // 상세내용
+
+  // 대상(10인덱스)에 후정산 대상점이 포함되어 있는지 확인
+  const matchesTargetOutlet = targetOutletNames.length > 0 && targetOutletNames.some(
+    (outletName) => target && target.includes(outletName.trim())
+  );
+
+  // 항목(7인덱스)이 "인건비" 또는 "비용"인지 확인
+  const normalizedItem = item.toLowerCase().trim();
+  const isLabor = normalizedItem === '인건비';
+  const isCost = normalizedItem === '비용';
+
+  return {
+    item,
+    target,
+    content,
+    amount: Number.isFinite(amount) ? amount : 0,
+    detail,
+    type: isLabor ? 'labor' : isCost ? 'cost' : null,
+    matchesTargetOutlet
+  };
+}
+
+function buildPostSettlementSummary(rows, targetOutletConfig = {}) {
+  const targetOutletNames = targetOutletConfig.outletNames || [];
+  const included = [];
+  let excludedCount = 0;
+
+  rows.forEach((rowObj) => {
+    const mapped = mapPostSettlementRow(rowObj, targetOutletNames);
+    // 대상점과 매칭되고, 항목이 인건비 또는 비용인 경우만 포함
+    if (mapped.matchesTargetOutlet && mapped.type) {
+      included.push({
+        ...mapped,
+        sourceSheet: rowObj.sourceSheet,
+        rowNumber: rowObj.rowNumber
+      });
+    } else {
+      excludedCount += 1;
+    }
+  });
+
+  const laborEntries = included.filter((entry) => entry.type === 'labor');
+  const costEntries = included.filter((entry) => entry.type === 'cost');
+
+  const laborTotal = laborEntries.reduce((sum, entry) => sum + entry.amount, 0);
+  const costTotal = costEntries.reduce((sum, entry) => sum + entry.amount, 0);
+
+  return {
+    laborEntries,
+    costEntries,
+    laborTotal,
+    costTotal,
+    excludedCount,
+    rows: included
+  };
 }
 
 function filterCustomRow(rowObject, excludedIdsSet = new Set(), excludedNamesSet = new Set()) {
@@ -1413,6 +1501,26 @@ function setupObRoutes(app) {
         )
       ];
 
+      // 후정산 시트 데이터 읽기
+      const postSettlementMainValues = resolvedSheetNames.postSettlement
+        ? await loadSheetRows(sheets, targetSheetId, resolvedSheetNames.postSettlement)
+        : [];
+      const postSettlementExtraValues = resolvedExtraSheetNames.postSettlement
+        ? await loadSheetRows(sheets, targetSheetId, resolvedExtraSheetNames.postSettlement)
+        : [];
+
+      const postSettlementRows = [
+        ...normalizePostSettlementRows(
+          postSettlementMainValues,
+          resolvedSheetNames.postSettlement || '후정산'
+        ),
+        ...normalizePostSettlementRows(
+          postSettlementExtraValues,
+          resolvedExtraSheetNames.postSettlement || '기타후정산'
+        )
+      ];
+      const postSettlementSummary = buildPostSettlementSummary(postSettlementRows, postSettlementTargetOutletConfig);
+
       // 항상 "기타후정산" 시트를 사용 (extraSheetNames.postSettlement가 있으면 사용, 없으면 기본값)
       const manualSheetName =
         resolvedExtraSheetNames.postSettlement ||
@@ -1420,6 +1528,10 @@ function setupObRoutes(app) {
       const manualRows = await getManualSheetRows(sheets, targetSheetId, manualSheetName);
       const manualRowsForMonth = manualRows.filter((entry) => entry.month === month);
       const manualSummary = buildManualSummary(manualRowsForMonth);
+
+      // 시트 데이터와 수기 입력 데이터 합산
+      const combinedLaborTotal = (postSettlementSummary.laborTotal || 0) + (manualSummary.laborTotal || 0);
+      const combinedCostTotal = (postSettlementSummary.costTotal || 0) + (manualSummary.costTotal || 0);
 
       const exclusionSheetName =
         normalizeConfiguredSheetName(extraSheetNames.exclusion) || DEFAULT_EXCLUSION_SHEET_NAME;
@@ -1430,7 +1542,8 @@ function setupObRoutes(app) {
       const targetOutletSheetName =
         normalizeConfiguredSheetName(extraSheetNames.targetOutlet) || DEFAULT_TARGET_OUTLET_SHEET_NAME;
       const targetOutletRows = await loadTargetOutletRows(sheets, targetSheetId, targetOutletSheetName);
-      const targetOutletConfig = buildTargetOutletConfig(targetOutletRows, month);
+      const recontractTargetOutletConfig = buildTargetOutletConfig(targetOutletRows, month, 'recontract');
+      const postSettlementTargetOutletConfig = buildTargetOutletConfig(targetOutletRows, month, 'postSettlement');
 
       const progressSheetName =
         normalizeConfiguredSheetName(extraSheetNames.progress) || DEFAULT_PROGRESS_SHEET_NAME;
@@ -1438,8 +1551,12 @@ function setupObRoutes(app) {
       const progressState = buildProgressState(progressRows, month);
 
       const customSummary = buildCustomProposalSummary(customRows, exclusionConfig.custom);
-      const recontractSummary = buildRecontractSummary(recontractRows, exclusionConfig.recontract, targetOutletConfig);
-      const totals = buildTotals(customSummary, recontractSummary, manualSummary);
+      const recontractSummary = buildRecontractSummary(recontractRows, exclusionConfig.recontract, recontractTargetOutletConfig);
+      const totals = buildTotals(customSummary, recontractSummary, {
+        ...manualSummary,
+        laborTotal: combinedLaborTotal,
+        costTotal: combinedCostTotal
+      });
 
       res.json({
         success: true,
@@ -1454,14 +1571,22 @@ function setupObRoutes(app) {
           },
           customProposal: customSummary,
           recontract: recontractSummary,
+          postSettlement: postSettlementSummary,
           manual: {
             ...manualSummary,
             sheetName: manualSheetName
           },
           exclusions: exclusionConfig,
-          targetOutlets: targetOutletConfig,
+          targetOutlets: {
+            recontract: recontractTargetOutletConfig,
+            postSettlement: postSettlementTargetOutletConfig
+          },
           progress: progressState,
-          totals
+          totals: {
+            ...totals,
+            combinedLaborTotal,
+            combinedCostTotal
+          }
         }
       });
     } catch (error) {
@@ -2179,6 +2304,7 @@ function setupObRoutes(app) {
     try {
       const {
         month,
+        type = 'recontract',
         outletName = '',
         reason = '',
         note = '',
@@ -2192,6 +2318,12 @@ function setupObRoutes(app) {
       if (!outletName || !outletName.trim()) {
         return res.status(400).json({ success: false, error: '대상점명을 입력해주세요.' });
       }
+
+      const normalizedType = parseString(type).toLowerCase();
+      const typeLabel =
+        normalizedType === 'postsettlement' || normalizedType === 'post_settlement'
+          ? TARGET_OUTLET_TYPE_LABELS.postSettlement
+          : TARGET_OUTLET_TYPE_LABELS.recontract;
 
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
       const configEntry = await fetchSettlementConfig(sheets, SPREADSHEET_ID, trimmedMonth);
@@ -2213,6 +2345,7 @@ function setupObRoutes(app) {
 
       const row = [
         monthCellValue,
+        typeLabel,
         outletName.trim(),
         reason.trim(),
         id,
@@ -2234,6 +2367,7 @@ function setupObRoutes(app) {
         data: {
           id,
           month: trimmedMonth,
+          type: normalizedType === 'postsettlement' || normalizedType === 'post_settlement' ? 'postSettlement' : 'recontract',
           outletName: outletName.trim(),
           reason: reason.trim(),
           note: note.trim(),
@@ -2256,6 +2390,7 @@ function setupObRoutes(app) {
     try {
       const {
         month,
+        type = 'recontract',
         outletName = '',
         reason = '',
         note = '',
@@ -2269,6 +2404,12 @@ function setupObRoutes(app) {
       if (!outletName || !outletName.trim()) {
         return res.status(400).json({ success: false, error: '대상점명을 입력해주세요.' });
       }
+
+      const normalizedType = parseString(type).toLowerCase();
+      const typeLabel =
+        normalizedType === 'postsettlement' || normalizedType === 'post_settlement'
+          ? TARGET_OUTLET_TYPE_LABELS.postSettlement
+          : TARGET_OUTLET_TYPE_LABELS.recontract;
 
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
       const configEntry = await fetchSettlementConfig(sheets, SPREADSHEET_ID, trimmedMonth);
@@ -2301,6 +2442,7 @@ function setupObRoutes(app) {
         resource: {
           values: [[
             monthCellValue,
+            typeLabel,
             outletName.trim(),
             reason.trim(),
             targetEntry.id,
@@ -2316,6 +2458,7 @@ function setupObRoutes(app) {
         data: {
           id: targetEntry.id,
           month: trimmedMonth,
+          type: normalizedType === 'postsettlement' || normalizedType === 'post_settlement' ? 'postSettlement' : 'recontract',
           outletName: outletName.trim(),
           reason: reason.trim(),
           note: note.trim(),

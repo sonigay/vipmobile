@@ -814,7 +814,7 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
   // 재약정: 등록직원별 + 출고처별 집계
   const recontractPromoterStats = useMemo(() => {
     if (!summary?.recontract?.rows) return [];
-    const targetOutletNames = summary?.targetOutlets?.outletNames || [];
+    const targetOutletNames = summary?.targetOutlets?.recontract?.outletNames || [];
     const stats = {};
     
     summary.recontract.rows.forEach((row) => {
@@ -1153,14 +1153,12 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
     const manualData = summary.manual || {};
     const customBase = totals?.customTotal || 0;
     const recontractBase = totals?.recontractTotal || 0;
-    const laborSheetTotal = manualData.laborSheetTotal ?? 0;
-    const costSheetTotal = manualData.costSheetTotal ?? 0;
+    const laborSheetTotal = summary?.postSettlement?.laborTotal ?? 0;
+    const costSheetTotal = summary?.postSettlement?.costTotal ?? 0;
     const laborManualTotalDisplay = manualData.laborManualTotal ?? manualLaborTotal;
     const costManualTotalDisplay = manualData.costManualTotal ?? manualCostTotal;
-    const combinedLaborTotal =
-      manualData.laborTotal ?? laborSheetTotal + laborManualTotalDisplay;
-    const combinedCostTotal =
-      manualData.costTotal ?? costSheetTotal + costManualTotalDisplay;
+    const combinedLaborTotal = summary?.totals?.combinedLaborTotal ?? (laborSheetTotal + laborManualTotalDisplay);
+    const combinedCostTotal = summary?.totals?.combinedCostTotal ?? (costSheetTotal + costManualTotalDisplay);
     const combinedGrandTotal =
       totals.grandTotal ?? customBase + recontractBase + combinedLaborTotal + combinedCostTotal;
     const combinedSplitVip = totals.split?.vip ?? Math.round(combinedGrandTotal * 0.3);
@@ -1736,8 +1734,51 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
             <Typography variant="body2" color="text.secondary">
               <strong>비용 합계:</strong> {currencyFormatter.format(combinedCostTotal)} (시트 {currencyFormatter.format(costSheetTotal)} / 수기 입력 {currencyFormatter.format(costManualTotalDisplay)})
             </Typography>
+            
+            {/* 시트 데이터 상세 목록 */}
+            {summary?.postSettlement && (summary.postSettlement.laborEntries.length > 0 || summary.postSettlement.costEntries.length > 0) && (
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                  시트 데이터 상세 내역
+                </Typography>
+                <TableContainer component={Paper} elevation={0} sx={{ backgroundColor: 'rgba(255,255,255,0.8)' }}>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 600 }}>항목</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>대상</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>내용</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>상세내용</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 600 }}>금액</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {summary.postSettlement.laborEntries.map((entry, index) => (
+                        <TableRow key={`labor-${index}-${entry.rowNumber}`}>
+                          <TableCell>{entry.item || '-'}</TableCell>
+                          <TableCell>{entry.target || '-'}</TableCell>
+                          <TableCell>{entry.content || '-'}</TableCell>
+                          <TableCell>{entry.detail || '-'}</TableCell>
+                          <TableCell align="right">{currencyFormatter.format(entry.amount || 0)}</TableCell>
+                        </TableRow>
+                      ))}
+                      {summary.postSettlement.costEntries.map((entry, index) => (
+                        <TableRow key={`cost-${index}-${entry.rowNumber}`}>
+                          <TableCell>{entry.item || '-'}</TableCell>
+                          <TableCell>{entry.target || '-'}</TableCell>
+                          <TableCell>{entry.content || '-'}</TableCell>
+                          <TableCell>{entry.detail || '-'}</TableCell>
+                          <TableCell align="right">{currencyFormatter.format(entry.amount || 0)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Box>
+            )}
+            
             <Alert severity="info">
-              인건비 및 비용 데이터는 준비 중입니다. 수기 입력 금액은 자동으로 음수(-) 처리되어 최종 합계에 반영됩니다.
+              수기 입력 금액은 자동으로 음수(-) 처리되어 최종 합계에 반영됩니다.
             </Alert>
             <Stack spacing={3} direction={{ xs: 'column', md: 'row' }}>
               <Box sx={{ flex: 1 }}>

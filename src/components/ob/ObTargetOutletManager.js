@@ -26,7 +26,13 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import api from '../../api';
 
+const TYPE_LABELS = {
+  recontract: '재약정',
+  postSettlement: '후정산'
+};
+
 const EMPTY_FORM = {
+  type: 'recontract',
   outletName: '',
   reason: '',
   note: ''
@@ -100,6 +106,7 @@ const ObTargetOutletManager = ({ monthOptions, defaultMonth, currentUser }) => {
       setDialogMode('edit');
       setEditingId(entry.id);
       setFormValues({
+        type: entry.type || 'recontract',
         outletName: entry.outletName || '',
         reason: entry.reason || '',
         note: entry.note || ''
@@ -134,6 +141,7 @@ const ObTargetOutletManager = ({ monthOptions, defaultMonth, currentUser }) => {
 
       const payload = {
         month: selectedMonth,
+        type: formValues.type || 'recontract',
         outletName: formValues.outletName.trim(),
         reason: formValues.reason.trim(),
         note: formValues.note.trim(),
@@ -222,6 +230,7 @@ const ObTargetOutletManager = ({ monthOptions, defaultMonth, currentUser }) => {
           <TableHead>
             <TableRow>
               <TableCell>연월</TableCell>
+              <TableCell>구분</TableCell>
               <TableCell>대상점명</TableCell>
               <TableCell>사유</TableCell>
               <TableCell>비고</TableCell>
@@ -233,13 +242,13 @@ const ObTargetOutletManager = ({ monthOptions, defaultMonth, currentUser }) => {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={7} align="center">
+                <TableCell colSpan={8} align="center">
                   로딩 중...
                 </TableCell>
               </TableRow>
             ) : targetOutlets.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} align="center">
+                <TableCell colSpan={8} align="center">
                   등록된 대상점이 없습니다.
                 </TableCell>
               </TableRow>
@@ -247,6 +256,7 @@ const ObTargetOutletManager = ({ monthOptions, defaultMonth, currentUser }) => {
               targetOutlets.map((entry) => (
                 <TableRow key={entry.id}>
                   <TableCell>{entry.month || '-'}</TableCell>
+                  <TableCell>{TYPE_LABELS[entry.type] || '-'}</TableCell>
                   <TableCell>{entry.outletName || '-'}</TableCell>
                   <TableCell>{entry.reason || '-'}</TableCell>
                   <TableCell>{entry.note || '-'}</TableCell>
@@ -283,6 +293,17 @@ const ObTargetOutletManager = ({ monthOptions, defaultMonth, currentUser }) => {
               size="small"
               disabled
             />
+            <TextField
+              select
+              label="구분"
+              value={formValues.type}
+              onChange={handleFormChange('type')}
+              size="small"
+              required
+            >
+              <MenuItem value="recontract">{TYPE_LABELS.recontract}</MenuItem>
+              <MenuItem value="postSettlement">{TYPE_LABELS.postSettlement}</MenuItem>
+            </TextField>
             <TextField
               label="대상점명"
               value={formValues.outletName}
