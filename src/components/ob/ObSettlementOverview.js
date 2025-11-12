@@ -781,16 +781,24 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
     }
   };
 
-  // 맞춤제안: 유치자명별 집계
+  // 맞춤제안: 유치자명별 + 영업팀/코드별 집계
   const customProposerStats = useMemo(() => {
     if (!summary?.customProposal?.rows) return [];
     const stats = {};
     summary.customProposal.rows.forEach((row) => {
       const name = row.proposerName || '미지정';
+      const team = row.team || '';
+      const code = row.code || '';
+      const teamCodeKey = team && code ? `${team}/${code}` : (team || code || '미지정');
       const sales = row.salesAmount || 0;
       const themeFlag = row.themeFlag;
+      
+      // 유치자명별 집계
       if (!stats[name]) {
         stats[name] = {
+          name,
+          team: '',
+          code: '',
           count: 0,
           policy1Amount: 0,
           policy2Amount: 0
@@ -801,10 +809,20 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
       if (themeFlag === '1') {
         stats[name].policy2Amount += sales;
       }
+      
+      // 영업팀/코드 정보는 첫 번째 값으로 설정 (같은 유치자명이면 동일한 팀/코드일 가능성 높음)
+      if (!stats[name].team && team) {
+        stats[name].team = team;
+      }
+      if (!stats[name].code && code) {
+        stats[name].code = code;
+      }
     });
     return Object.entries(stats)
       .map(([name, data]) => ({
         name,
+        team: data.team,
+        code: data.code,
         ...data,
         totalAmount: (data.policy1Amount || 0) + (data.policy2Amount || 0)
       }))
@@ -1613,6 +1631,8 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
                   <TableHead>
                     <TableRow>
                       <TableCell sx={{ fontWeight: 600 }}>유치자명</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>영업팀</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>코드</TableCell>
                       <TableCell align="right" sx={{ fontWeight: 600 }}>건수</TableCell>
                       <TableCell align="right" sx={{ fontWeight: 600 }}>정책① 기본</TableCell>
                       <TableCell align="right" sx={{ fontWeight: 600 }}>정책② 테마 업셀</TableCell>
@@ -1623,6 +1643,8 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
                     {customProposerStats.map((stat) => (
                       <TableRow key={stat.name}>
                         <TableCell>{stat.name}</TableCell>
+                        <TableCell>{stat.team || '-'}</TableCell>
+                        <TableCell>{stat.code || '-'}</TableCell>
                         <TableCell align="right">{numberFormatter.format(stat.count)}건</TableCell>
                         <TableCell align="right">{currencyFormatter.format(stat.policy1Amount)}</TableCell>
                         <TableCell align="right">{currencyFormatter.format(stat.policy2Amount)}</TableCell>
@@ -1658,7 +1680,7 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
                 title="재약정 오퍼 지급"
                 value={currencyFormatter.format(recontract.offer.total)}
                 count={`${numberFormatter.format(recontract.includedCount)}건`}
-                description={`상품권 ${currencyFormatter.format(recontract.offer.giftCard)} / 입금 ${currencyFormatter.format(recontract.offer.deposit)}`}
+                description="오퍼금액 합계 (19인덱스 기준)"
               />
             </Grid>
             <Grid item xs={12} sm={6} md={4}>

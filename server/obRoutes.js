@@ -793,7 +793,8 @@ function mapPostSettlementRow(rowObject, targetOutletNames = []) {
   const item = parseString(row[7]); // 항목
   const target = parseString(row[10]); // 대상
   const content = parseString(row[15]); // 내용
-  const amount = parseNumber(row[16]); // 금액
+  const rawAmount = parseNumber(row[16]); // 금액
+  const amount = rawAmount * -1; // 시트에 저장된 값에 *-1 적용
   const detail = parseString(row[17]); // 상세내용
 
   // 대상(10인덱스)에 후정산 대상점이 포함되어 있는지 확인
@@ -964,11 +965,14 @@ function buildCustomProposalSummary(rows, exclusionConfig = {}) {
   const resultRows = included.map(({ sourceSheet, rowNumber, row }) => {
     // 사용자가 이미 -1을 해서 알려준 인덱스 기준 (K열=10인덱스=row[10])
     // 10인덱스(맞춤제안인정여부) -> row[10], 11인덱스(당월 맞춤제안 매출) -> row[11]
-    // 23인덱스(테마 업셀) -> row[23], 38인덱스(유치자마당ID) -> row[38], 39인덱스(유치자명) -> row[39]
+    // 23인덱스(테마 업셀) -> row[23], 30인덱스(영업팀) -> row[30], 31인덱스(코드) -> row[31]
+    // 38인덱스(유치자마당ID) -> row[38], 39인덱스(유치자명) -> row[39]
     const proposerId = parseString(row[38]);
     const proposerName = parseString(row[39]);
     const sales = parseNumber(row[11]);
     const themeFlag = parseString(row[23]);
+    const team = parseString(row[30]); // 영업팀
+    const code = parseString(row[31]); // 코드
     const approvalFlagRaw = parseString(row[10]);
     const approvalFlagLower = approvalFlagRaw.toLowerCase();
     const approvalFlagNumber = parseNumber(approvalFlagRaw);
@@ -997,6 +1001,8 @@ function buildCustomProposalSummary(rows, exclusionConfig = {}) {
       proposerName,
       salesAmount: sales,
       themeFlag,
+      team,
+      code,
       approvalFlag
     };
   });
@@ -1087,16 +1093,18 @@ function buildRecontractSummary(rows, exclusionConfig = {}, targetOutletConfig =
       const isCompleted = status === '완료';
       const rawSettlementAmount = parseNumber(row[20]);
       const settlementAmount = rawSettlementAmount * -1; // sheet stores negative values → convert to positive
+      
+      // 19인덱스(오퍼금액) 컬럼 사용
+      const rawOfferAmount = parseNumber(row[19]);
+      const offerAmount = rawOfferAmount * -1; // sheet stores negative values → convert to positive
+      
+      // 기존 비고 필드 추출 로직은 유지 (참고용)
       const remarkPlate = parseString(row[59]);
       const remarkRecontract = parseString(row[74]);
 
-      const remarkPlateAmounts = extractOfferAmounts(remarkPlate);
-      const remarkRecontractAmounts = extractOfferAmounts(remarkRecontract);
-
-      const offerGiftCard =
-        (remarkPlateAmounts.giftCard + remarkRecontractAmounts.giftCard) * -1;
-      const offerDeposit =
-        (remarkPlateAmounts.deposit + remarkRecontractAmounts.deposit) * -1;
+      // 오퍼금액을 상품권과 입금으로 구분하지 않고 전체 금액으로 처리
+      const offerGiftCard = 0; // 19인덱스 사용 시 구분 없음
+      const offerDeposit = offerAmount; // 전체 오퍼금액을 입금으로 처리
 
       const promoterId = parseString(row[90]); // 유치자ID
       const promoterName = parseString(row[91] || ''); // 등록직원/유치자명
@@ -1123,9 +1131,10 @@ function buildRecontractSummary(rows, exclusionConfig = {}, targetOutletConfig =
     .filter((row) => row.isObOutlet && row.isCompleted);
 
   const feeTotal = filteredRows.reduce((sum, row) => sum + row.settlementAmount, 0);
-  const giftCardTotal = filteredRows.reduce((sum, row) => sum + row.offerGiftCard, 0);
+  // 19인덱스 사용 시 offerDeposit에 전체 오퍼금액이 포함됨
+  const giftCardTotal = 0; // 19인덱스 사용 시 구분 없음
   const depositTotal = filteredRows.reduce((sum, row) => sum + row.offerDeposit, 0);
-  const offerTotal = giftCardTotal + depositTotal;
+  const offerTotal = depositTotal; // offerDeposit에 전체 오퍼금액이 포함됨
 
   return {
     includedCount: filteredRows.length,
