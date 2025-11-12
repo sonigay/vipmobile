@@ -1331,6 +1331,30 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
 
         {/* 최종 정산 섹션 - 맨 상단 */}
         <Section title="최종 정산" color={SECTION_COLORS.totals}>
+          <Collapse in={allConfirmed}>
+            <Paper
+              elevation={3}
+              sx={{
+                mb: 3,
+                p: 3,
+                textAlign: 'center',
+                background:
+                  'linear-gradient(135deg, rgba(103,58,183,0.12), rgba(63,81,181,0.18))',
+                border: '1px solid rgba(103,58,183,0.32)',
+                animation: `${glowAnimation} 1.4s ease-in-out`
+              }}
+            >
+              <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
+                대상월 최종 완료!
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                은행 입금 확인과 정산 승인까지 모두 끝났습니다.
+              </Typography>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#512DA8' }}>
+                한 달간 수고하셨습니다. ✨
+              </Typography>
+            </Paper>
+          </Collapse>
           <Grid container spacing={2}>
             <Grid item xs={12}>
               <SummaryCard
@@ -1430,30 +1454,6 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
               <strong>항목별 합계:</strong> 맞춤제안 {currencyFormatter.format(customBase)} | 재약정 {currencyFormatter.format(recontractBase)} | 인건비 {currencyFormatter.format(combinedLaborTotal)} (시트 {currencyFormatter.format(laborSheetTotal)} / 수기 {currencyFormatter.format(manualLaborTotal)}) | 비용 {currencyFormatter.format(combinedCostTotal)} (시트 {currencyFormatter.format(costSheetTotal)} / 수기 {currencyFormatter.format(manualCostTotal)})
             </Typography>
           </Box>
-          <Collapse in={allConfirmed}>
-            <Paper
-              elevation={3}
-              sx={{
-                mt: 3,
-                p: 3,
-                textAlign: 'center',
-                background:
-                  'linear-gradient(135deg, rgba(103,58,183,0.12), rgba(63,81,181,0.18))',
-                border: '1px solid rgba(103,58,183,0.32)',
-                animation: `${glowAnimation} 1.4s ease-in-out`
-              }}
-            >
-              <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
-                대상월 최종 완료!
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                은행 입금 확인과 정산 승인까지 모두 끝났습니다.
-              </Typography>
-              <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#512DA8' }}>
-                한 달간 수고하셨습니다. ✨
-              </Typography>
-            </Paper>
-          </Collapse>
         </Section>
 
         {/* 맞춤제안 섹션 */}
