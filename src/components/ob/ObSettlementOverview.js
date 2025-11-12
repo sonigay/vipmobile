@@ -826,12 +826,15 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
       stats[name].feeTotal += row.settlementAmount || 0;
       stats[name].offerTotal += (row.offerGiftCard || 0) + (row.offerDeposit || 0);
       
-      // 출고처와 대상점 매칭
+      // 출고처와 대상점 매칭 - 실제 출고처 값 저장
       if (row.outlet) {
         const matchedOutlets = targetOutletNames.filter((outletName) =>
           row.outlet.includes(outletName.trim())
         );
-        matchedOutlets.forEach((outlet) => stats[name].outlets.add(outlet));
+        // 매칭된 경우 실제 출고처 값을 추가
+        if (matchedOutlets.length > 0) {
+          stats[name].outlets.add(row.outlet);
+        }
       }
     });
     
