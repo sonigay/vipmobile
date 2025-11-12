@@ -1681,7 +1681,11 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
                 value={currencyFormatter.format(recontract.offer.total)}
                 count={`${numberFormatter.format(recontract.includedCount)}건`}
                 description="오퍼금액 합계 (19인덱스 기준)"
-              />
+              >
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                  💡 오퍼금액은 폰클에서 입력시 홈 추가정책 란에 입력해주세요
+                </Typography>
+              </SummaryCard>
             </Grid>
             <Grid item xs={12} sm={6} md={4}>
               <SummaryCard

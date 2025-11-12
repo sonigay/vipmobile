@@ -1094,9 +1094,8 @@ function buildRecontractSummary(rows, exclusionConfig = {}, targetOutletConfig =
       const rawSettlementAmount = parseNumber(row[20]);
       const settlementAmount = rawSettlementAmount * -1; // sheet stores negative values → convert to positive
       
-      // 19인덱스(오퍼금액) 컬럼 사용
-      const rawOfferAmount = parseNumber(row[19]);
-      const offerAmount = rawOfferAmount * -1; // sheet stores negative values → convert to positive
+      // 19인덱스(오퍼금액) 컬럼 사용 (시트에 이미 -금액으로 입력됨)
+      const offerAmount = parseNumber(row[19]);
       
       // 기존 비고 필드 추출 로직은 유지 (참고용)
       const remarkPlate = parseString(row[59]);
