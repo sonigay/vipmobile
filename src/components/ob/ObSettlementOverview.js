@@ -38,6 +38,16 @@ import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import { keyframes } from '@emotion/react';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  Legend,
+  ResponsiveContainer
+} from 'recharts';
 import api from '../../api';
 
 const currencyFormatter = new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW', maximumFractionDigits: 0 });
@@ -1589,6 +1599,30 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
               <strong>항목별 합계:</strong> 맞춤제안 {currencyFormatter.format(customBase)} | 재약정 {currencyFormatter.format(recontractBase)} | 인건비 {currencyFormatter.format(combinedLaborTotal)} (시트 {currencyFormatter.format(laborSheetTotal)} / 수기 {currencyFormatter.format(manualLaborTotal)}) | 비용 {currencyFormatter.format(combinedCostTotal)} (시트 {currencyFormatter.format(costSheetTotal)} / 수기 {currencyFormatter.format(manualCostTotal)})
             </Typography>
           </Box>
+          {finalSettlementExpanded && (
+            <Box sx={{ mt: 3, p: 2, backgroundColor: 'rgba(255,255,255,0.9)', borderRadius: 2 }}>
+              <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
+                항목별 금액 비교
+              </Typography>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart
+                  data={[
+                    { name: '맞춤제안', 금액: customBase },
+                    { name: '재약정', 금액: recontractBase },
+                    { name: '인건비', 금액: combinedLaborTotal },
+                    { name: '비용', 금액: combinedCostTotal }
+                  ]}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis tickFormatter={(value) => `${(value / 10000).toFixed(0)}만원`} />
+                  <RechartsTooltip formatter={(value) => currencyFormatter.format(value)} />
+                  <Legend />
+                  <Bar dataKey="금액" fill="#1976d2" />
+                </BarChart>
+              </ResponsiveContainer>
+            </Box>
+          )}
         </Section>
 
         {/* 맞춤제안 섹션 */}
@@ -1693,6 +1727,30 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
               </TableContainer>
             </Box>
           )}
+          {customProposalExpanded && (
+            <Box sx={{ mt: 3, p: 2, backgroundColor: 'rgba(255,255,255,0.9)', borderRadius: 2 }}>
+              <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
+                정책별 금액 비교
+              </Typography>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart
+                  data={[
+                    { name: '정책① 기본', 금액: customProposal.policy1.payout },
+                    { name: '정책② 테마 업셀', 금액: customProposal.policy2.qualifyingSales },
+                    { name: '정책③ 인건비 지원', 금액: customProposal.policy3.payout },
+                    { name: '건수 구간별 지급', 금액: customProposal.perCase.payout }
+                  ]}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} />
+                  <YAxis tickFormatter={(value) => `${(value / 10000).toFixed(0)}만원`} />
+                  <RechartsTooltip formatter={(value) => currencyFormatter.format(value)} />
+                  <Legend />
+                  <Bar dataKey="금액" fill="#9c27b0" />
+                </BarChart>
+              </ResponsiveContainer>
+            </Box>
+          )}
         </Section>
 
         {/* 재약정 섹션 */}
@@ -1785,6 +1843,54 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
                   </TableBody>
                 </Table>
               </TableContainer>
+            </Box>
+          )}
+          {recontractExpanded && (
+            <Box sx={{ mt: 3, p: 2, backgroundColor: 'rgba(255,255,255,0.9)', borderRadius: 2 }}>
+              <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
+                수수료/오퍼 비교
+              </Typography>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart
+                  data={[
+                    { name: '수수료', 금액: recontract.feeTotal },
+                    { name: '오퍼', 금액: recontract.offer.total }
+                  ]}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis tickFormatter={(value) => `${(value / 10000).toFixed(0)}만원`} />
+                  <RechartsTooltip formatter={(value) => currencyFormatter.format(value)} />
+                  <Legend />
+                  <Bar dataKey="금액" fill="#f57c00" />
+                </BarChart>
+              </ResponsiveContainer>
+              {recontractPromoterStats.length > 0 && (
+                <>
+                  <Typography variant="subtitle2" sx={{ mt: 4, mb: 2, fontWeight: 600 }}>
+                    등록직원별 금액 (상위 10개)
+                  </Typography>
+                  <ResponsiveContainer width="100%" height={400}>
+                    <BarChart
+                      data={recontractPromoterStats.slice(0, 10).map(stat => ({
+                        name: stat.name.length > 8 ? stat.name.substring(0, 8) + '...' : stat.name,
+                        수수료: stat.feeTotal,
+                        오퍼: stat.offerTotal,
+                        총액: stat.totalAmount
+                      }))}
+                      layout="vertical"
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis type="number" tickFormatter={(value) => `${(value / 10000).toFixed(0)}만원`} />
+                      <YAxis dataKey="name" type="category" width={100} />
+                      <RechartsTooltip formatter={(value) => currencyFormatter.format(value)} />
+                      <Legend />
+                      <Bar dataKey="수수료" stackId="a" fill="#ff9800" />
+                      <Bar dataKey="오퍼" stackId="a" fill="#ff6f00" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </>
+              )}
             </Box>
           )}
         </Section>
@@ -2082,6 +2188,48 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
               </Box>
             </Stack>
           </Stack>
+          {laborCostExpanded && (
+            <Box sx={{ mt: 3, p: 2, backgroundColor: 'rgba(255,255,255,0.9)', borderRadius: 2 }}>
+              <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
+                인건비/비용 비교
+              </Typography>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart
+                  data={[
+                    { name: '인건비', 금액: combinedLaborTotal },
+                    { name: '비용', 금액: combinedCostTotal }
+                  ]}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis tickFormatter={(value) => `${(value / 10000).toFixed(0)}만원`} />
+                  <RechartsTooltip formatter={(value) => currencyFormatter.format(value)} />
+                  <Legend />
+                  <Bar dataKey="금액" fill="#2e7d32" />
+                </BarChart>
+              </ResponsiveContainer>
+              <Typography variant="subtitle2" sx={{ mt: 4, mb: 2, fontWeight: 600 }}>
+                시트/수기 입력 비교
+              </Typography>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart
+                  data={[
+                    { name: '인건비 시트', 금액: laborSheetTotal },
+                    { name: '인건비 수기', 금액: laborManualTotalDisplay },
+                    { name: '비용 시트', 금액: costSheetTotal },
+                    { name: '비용 수기', 금액: costManualTotalDisplay }
+                  ]}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} />
+                  <YAxis tickFormatter={(value) => `${(value / 10000).toFixed(0)}만원`} />
+                  <RechartsTooltip formatter={(value) => currencyFormatter.format(value)} />
+                  <Legend />
+                  <Bar dataKey="금액" fill="#66bb6a" />
+                </BarChart>
+              </ResponsiveContainer>
+            </Box>
+          )}
         </Section>
       </Stack>
     );
