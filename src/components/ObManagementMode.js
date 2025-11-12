@@ -908,7 +908,7 @@ const [sheetConfigs, setSheetConfigs] = useState([]);
       <Box sx={{ flex: 1, overflow: 'auto', backgroundColor: '#f5f5f5' }}>
         {activeTab === TAB_KEYS.CALCULATOR && renderCalculatorSection()}
         {activeTab === TAB_KEYS.OVERVIEW && allowedTabKeys.includes(TAB_KEYS.OVERVIEW) && (
-          <ObSettlementOverview sheetConfigs={sheetConfigs} />
+          <ObSettlementOverview sheetConfigs={sheetConfigs} currentUser={currentUserName} />
         )}
         {activeTab === TAB_KEYS.MANAGEMENT && allowedTabKeys.includes(TAB_KEYS.MANAGEMENT) && (
           <ObSettlementManagementPanel

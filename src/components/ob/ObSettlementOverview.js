@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import PropTypes from 'prop-types';
 import {
   Alert,
@@ -223,6 +223,93 @@ SummaryCard.defaultProps = {
   children: null
 };
 
+const StepLabel = ({ step, title, description, active }) => (
+  <Box sx={{ ml: 0.5 }}>
+    <Typography
+      variant="caption"
+      sx={{
+        fontWeight: 700,
+        color: active ? 'primary.main' : 'text.secondary',
+        letterSpacing: 0.4,
+        display: 'block'
+      }}
+    >
+      STEP {step}
+    </Typography>
+    <Typography
+      variant="subtitle2"
+      sx={{
+        fontWeight: active ? 700 : 500,
+        color: active ? 'primary.main' : 'text.primary',
+        mb: 0.3
+      }}
+    >
+      {title}
+    </Typography>
+    {description ? (
+      <Typography
+        variant="caption"
+        sx={{
+          color: active ? 'primary.main' : 'text.secondary',
+          display: 'block',
+          lineHeight: 1.4
+        }}
+      >
+        {description}
+      </Typography>
+    ) : null}
+  </Box>
+);
+
+StepLabel.propTypes = {
+  step: PropTypes.number.isRequired,
+  title: PropTypes.string.isRequired,
+  description: PropTypes.string,
+  active: PropTypes.bool
+};
+
+StepLabel.defaultProps = {
+  description: '',
+  active: false
+};
+
+const getStepBoxStyles = (active) => ({
+  padding: '12px 14px',
+  borderRadius: 1.5,
+  border: active ? '1px solid rgba(94,53,177,0.35)' : '1px dashed rgba(0,0,0,0.18)',
+  backgroundColor: active ? 'rgba(94,53,177,0.08)' : 'rgba(0,0,0,0.02)',
+  transition: 'all 0.3s ease'
+});
+
+const parseCompanyProgressState = (data = {}) => ({
+  completed: Boolean(data.completed),
+  bankName: data.bankName || '',
+  accountNumber: data.accountNumber || '',
+  isSaved: Boolean(data.isSaved),
+  depositDone: Boolean(data.depositDone),
+  confirmDone: Boolean(data.confirmDone)
+});
+
+const hydrateCompanyWorkflowState = (data = {}) => {
+  const parsed = parseCompanyProgressState(data);
+  return {
+    ...createCompanyWorkflowState(),
+    ...parsed,
+    editing: !parsed.isSaved
+  };
+};
+
+const buildProgressPayload = (invoiceState = {}, workflowState = {}) => ({
+  invoice: {
+    issued: Boolean(invoiceState.issued),
+    approved: Boolean(invoiceState.approved)
+  },
+  companies: {
+    vip: parseCompanyProgressState(workflowState.vip),
+    yai: parseCompanyProgressState(workflowState.yai)
+  }
+});
+
 const Section = ({ title, subtitle, color, children, spacing }) => (
   <Paper
     elevation={0}
@@ -265,7 +352,7 @@ Section.defaultProps = {
   spacing: 3
 };
 
-const ObSettlementOverview = ({ sheetConfigs }) => {
+const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
   const [selectedMonth, setSelectedMonth] = useState('');
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -289,6 +376,17 @@ const ObSettlementOverview = ({ sheetConfigs }) => {
   const [invoiceStatus, setInvoiceStatus] = useState({ issued: false, approved: false });
   const [workflowError, setWorkflowError] = useState('');
   const [workflowSuccess, setWorkflowSuccess] = useState('');
+  const invoiceStatusRef = useRef(invoiceStatus);
+  const companyWorkflowRef = useRef(companyWorkflow);
+  const isApplyingProgressRef = useRef(false);
+
+  useEffect(() => {
+    invoiceStatusRef.current = invoiceStatus;
+  }, [invoiceStatus]);
+
+  useEffect(() => {
+    companyWorkflowRef.current = companyWorkflow;
+  }, [companyWorkflow]);
 
   useEffect(() => {
     if (sheetConfigs && sheetConfigs.length > 0) {
@@ -297,67 +395,18 @@ const ObSettlementOverview = ({ sheetConfigs }) => {
   }, [sheetConfigs]);
 
   useEffect(() => {
-    setCompanyWorkflow({
+    const initialWorkflow = {
       vip: createCompanyWorkflowState(),
       yai: createCompanyWorkflowState()
-    });
-    setInvoiceStatus({ issued: false, approved: false });
+    };
+    const initialInvoice = { issued: false, approved: false };
+    setCompanyWorkflow(initialWorkflow);
+    companyWorkflowRef.current = initialWorkflow;
+    setInvoiceStatus(initialInvoice);
+    invoiceStatusRef.current = initialInvoice;
     setWorkflowError('');
     setWorkflowSuccess('');
   }, [selectedMonth]);
-
-  useEffect(() => {
-    if (!invoiceStatus.issued || !invoiceStatus.approved) {
-      setCompanyWorkflow((prev) => ({
-        vip: {
-          ...prev.vip,
-          isSaved: false,
-          editing: true,
-          depositDone: false,
-          confirmDone: false
-        },
-        yai: {
-          ...prev.yai,
-          isSaved: false,
-          editing: true,
-          depositDone: false,
-          confirmDone: false
-        }
-      }));
-      setWorkflowError('');
-      setWorkflowSuccess('');
-    }
-  }, [invoiceStatus.issued, invoiceStatus.approved]);
-
-  const fetchSummary = useCallback(
-    async (month) => {
-      if (!month) return;
-      setLoading(true);
-      setError('');
-      try {
-        const response = await api.getObSettlementSummary(month);
-        if (response?.success) {
-          setSummary(response.data);
-        } else {
-          setSummary(null);
-          setError(response?.error || '정산 데이터를 불러오지 못했습니다.');
-        }
-      } catch (err) {
-        console.error('[OB] settlement summary fetch error:', err);
-        setSummary(null);
-        setError(err.message || '정산 데이터를 불러오지 못했습니다.');
-      } finally {
-        setLoading(false);
-      }
-    },
-    []
-  );
-
-  useEffect(() => {
-    if (selectedMonth) {
-      fetchSummary(selectedMonth);
-    }
-  }, [selectedMonth, fetchSummary]);
 
   const loadManualEntries = useCallback(
     async (month) => {
@@ -412,10 +461,85 @@ const ObSettlementOverview = ({ sheetConfigs }) => {
     loadManualEntries(selectedMonth);
   }, [selectedMonth, loadManualEntries]);
 
+  const applyProgress = useCallback((progressData) => {
+    if (!progressData) {
+      return;
+    }
+    isApplyingProgressRef.current = true;
+    const nextInvoice = {
+      issued: Boolean(progressData.invoice?.issued),
+      approved: Boolean(progressData.invoice?.approved)
+    };
+    const nextWorkflow = {
+      vip: hydrateCompanyWorkflowState(progressData.companies?.vip),
+      yai: hydrateCompanyWorkflowState(progressData.companies?.yai)
+    };
+    setInvoiceStatus(nextInvoice);
+    invoiceStatusRef.current = nextInvoice;
+    setCompanyWorkflow(nextWorkflow);
+    companyWorkflowRef.current = nextWorkflow;
+    setWorkflowError('');
+    setWorkflowSuccess('');
+    window.setTimeout(() => {
+      isApplyingProgressRef.current = false;
+    }, 0);
+  }, []);
+
+  const persistProgress = useCallback(
+    async (nextInvoiceState, nextWorkflowState, options = {}) => {
+      if (!selectedMonth || isApplyingProgressRef.current) return;
+      try {
+        await api.saveObSettlementProgress({
+          month: selectedMonth,
+          progress: buildProgressPayload(nextInvoiceState, nextWorkflowState),
+          registrant: currentUser || ''
+        });
+        if (options.showSuccess) {
+          setWorkflowSuccess('진행상황을 저장했습니다.');
+        }
+      } catch (error) {
+        console.error('[OB] progress save error:', error);
+        setWorkflowError(error.message || '진행상황을 저장하지 못했습니다.');
+      }
+    },
+    [selectedMonth, currentUser]
+  );
+
   const monthOptions = useMemo(
     () => sheetConfigs.map((config) => ({ value: config.month, label: config.month })),
     [sheetConfigs]
   );
+
+  const fetchSummary = useCallback(
+    async (month) => {
+      if (!month) return;
+      setLoading(true);
+      setError('');
+      try {
+        const response = await api.getObSettlementSummary(month);
+        if (response?.success) {
+          setSummary(response.data);
+          applyProgress(response.data?.progress);
+        } else {
+          setSummary(null);
+          setError(response?.error || '정산 데이터를 불러오지 못했습니다.');
+        }
+      } catch (err) {
+        console.error('[OB] settlement summary fetch error:', err);
+        setSummary(null);
+        setError(err.message || '정산 데이터를 불러오지 못했습니다.');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [applyProgress]
+  );
+
+  useEffect(() => {
+    if (selectedMonth) {
+      fetchSummary(selectedMonth);
+    }
+  }, [selectedMonth, fetchSummary]);
 
   const manualLaborTotal = useMemo(
     () => laborEntries.reduce((sum, entry) => sum + (entry.amount || 0), 0),
@@ -723,155 +847,229 @@ const ObSettlementOverview = ({ sheetConfigs }) => {
 
   const handleCompanyCompletionToggle = (company) => (event) => {
     const checked = event.target.checked;
-    setCompanyWorkflow((prev) => {
-      if (checked) {
-        return {
-          ...prev,
+    const currentWorkflow = companyWorkflowRef.current;
+    const nextWorkflow = checked
+      ? {
+          ...currentWorkflow,
           [company]: {
-            ...prev[company],
+            ...currentWorkflow[company],
             completed: true
           }
+        }
+      : {
+          ...currentWorkflow,
+          [company]: createCompanyWorkflowState()
         };
-      }
-      return {
-        ...prev,
-        [company]: createCompanyWorkflowState()
-      };
-    });
+
+    setCompanyWorkflow(nextWorkflow);
+    companyWorkflowRef.current = nextWorkflow;
+
+    let nextInvoice = invoiceStatusRef.current;
     if (!checked) {
-      setInvoiceStatus({ issued: false, approved: false });
+      nextInvoice = { issued: false, approved: false };
+      setInvoiceStatus(nextInvoice);
+      invoiceStatusRef.current = nextInvoice;
       setWorkflowError('');
       setWorkflowSuccess('');
     }
+
+    persistProgress(nextInvoice, nextWorkflow);
   };
 
   const handleBankFieldChange = (company, field) => (event) => {
     const value = event.target.value;
-    setCompanyWorkflow((prev) => ({
-      ...prev,
-      [company]: {
-        ...prev[company],
-        [field]: value,
-        editing: true,
-        isSaved: false
-      }
-    }));
+    setCompanyWorkflow((prev) => {
+      const next = {
+        ...prev,
+        [company]: {
+          ...prev[company],
+          [field]: value,
+          editing: true,
+          isSaved: false
+        }
+      };
+      companyWorkflowRef.current = next;
+      return next;
+    });
   };
 
   const handleBankSave = (company) => () => {
-    let hasError = false;
-    setCompanyWorkflow((prev) => {
-      const state = prev[company];
-      const bankNameValue = (state.bankName || '').trim();
-      const accountValue = (state.accountNumber || '').trim();
-      if (!bankNameValue || !accountValue) {
-        hasError = true;
-        return prev;
-      }
-      return {
-        ...prev,
-        [company]: {
-          ...state,
-          bankName: bankNameValue,
-          accountNumber: accountValue,
-          isSaved: true,
-          editing: false
-        }
-      };
-    });
-    if (hasError) {
+    const current = companyWorkflowRef.current[company];
+    const bankNameValue = (current.bankName || '').trim();
+    const accountValue = (current.accountNumber || '').trim();
+
+    if (!bankNameValue || !accountValue) {
       setWorkflowError('은행과 계좌번호를 모두 입력해 주세요.');
       setWorkflowSuccess('');
-    } else {
-      setWorkflowError('');
-      setWorkflowSuccess(`${COMPANY_LABELS[company]} 계좌 정보를 저장했습니다.`);
+      return;
     }
+
+    const nextWorkflow = {
+      ...companyWorkflowRef.current,
+      [company]: {
+        ...current,
+        bankName: bankNameValue,
+        accountNumber: accountValue,
+        isSaved: true,
+        editing: false
+      }
+    };
+
+    setCompanyWorkflow(nextWorkflow);
+    companyWorkflowRef.current = nextWorkflow;
+    setWorkflowError('');
+    setWorkflowSuccess(`${COMPANY_LABELS[company]} 계좌 정보를 저장했습니다.`);
+    persistProgress(invoiceStatusRef.current, nextWorkflow);
   };
 
   const handleBankEdit = (company) => () => {
-    setCompanyWorkflow((prev) => ({
-      ...prev,
+    const nextWorkflow = {
+      ...companyWorkflowRef.current,
       [company]: {
-        ...prev[company],
+        ...companyWorkflowRef.current[company],
         editing: true
       }
-    }));
+    };
+    setCompanyWorkflow(nextWorkflow);
+    companyWorkflowRef.current = nextWorkflow;
     setWorkflowSuccess('');
   };
 
   const handleBankReset = (company) => () => {
-    setCompanyWorkflow((prev) => ({
-      ...prev,
+    const current = companyWorkflowRef.current[company];
+    const nextWorkflow = {
+      ...companyWorkflowRef.current,
       [company]: {
         ...createCompanyWorkflowState(),
-        completed: prev[company].completed
+        completed: current.completed
       }
-    }));
+    };
+    setCompanyWorkflow(nextWorkflow);
+    companyWorkflowRef.current = nextWorkflow;
     setWorkflowError('');
     setWorkflowSuccess(`${COMPANY_LABELS[company]} 입력 내용을 초기화했습니다.`);
+    persistProgress(invoiceStatusRef.current, nextWorkflow);
   };
 
   const handleDepositComplete = (company) => () => {
-    let errorMessage = '';
-    let successMessage = '';
-    setCompanyWorkflow((prev) => {
-      const state = prev[company];
-      if (!state.isSaved) {
-        errorMessage = '계좌 정보를 저장한 후 입금완료를 진행해 주세요.';
-        return prev;
-      }
-      if (state.depositDone) {
-        successMessage = `${COMPANY_LABELS[company]} 입금 완료가 이미 처리되었습니다.`;
-        return prev;
-      }
-      successMessage = `${COMPANY_LABELS[company]} 입금이 확인되었습니다.`;
-      return {
-        ...prev,
-        [company]: {
-          ...state,
-          depositDone: true
-        }
-      };
-    });
-    if (errorMessage) {
-      setWorkflowError(errorMessage);
+    const current = companyWorkflowRef.current[company];
+    if (!current.isSaved) {
+      setWorkflowError('계좌 정보를 저장한 후 입금완료를 진행해 주세요.');
       setWorkflowSuccess('');
-    } else if (successMessage) {
-      setWorkflowError('');
-      setWorkflowSuccess(successMessage);
+      return;
     }
+    if (current.depositDone) {
+      setWorkflowError('');
+      setWorkflowSuccess(`${COMPANY_LABELS[company]} 입금 완료가 이미 처리되었습니다.`);
+      return;
+    }
+
+    const nextWorkflow = {
+      ...companyWorkflowRef.current,
+      [company]: {
+        ...current,
+        depositDone: true
+      }
+    };
+
+    setCompanyWorkflow(nextWorkflow);
+    companyWorkflowRef.current = nextWorkflow;
+    setWorkflowError('');
+    setWorkflowSuccess(`${COMPANY_LABELS[company]} 입금이 확인되었습니다.`);
+    persistProgress(invoiceStatusRef.current, nextWorkflow);
   };
 
   const handleConfirmComplete = (company) => () => {
-    let errorMessage = '';
-    let successMessage = '';
-    setCompanyWorkflow((prev) => {
-      const state = prev[company];
-      if (!state.depositDone) {
-        errorMessage = '입금완료 후 확인완료를 진행해 주세요.';
-        return prev;
-      }
-      if (state.confirmDone) {
-        successMessage = `${COMPANY_LABELS[company]} 정산이 이미 확인되었습니다.`;
-        return prev;
-      }
-      successMessage = `${COMPANY_LABELS[company]} 정산을 확인했습니다.`;
-      return {
-        ...prev,
-        [company]: {
-          ...state,
-          confirmDone: true
-        }
-      };
-    });
-    if (errorMessage) {
-      setWorkflowError(errorMessage);
+    const current = companyWorkflowRef.current[company];
+    if (!current.depositDone) {
+      setWorkflowError('입금완료 후 확인완료를 진행해 주세요.');
       setWorkflowSuccess('');
-    } else if (successMessage) {
-      setWorkflowError('');
-      setWorkflowSuccess(successMessage);
+      return;
     }
+    if (current.confirmDone) {
+      setWorkflowError('');
+      setWorkflowSuccess(`${COMPANY_LABELS[company]} 정산이 이미 확인되었습니다.`);
+      return;
+    }
+
+    const nextWorkflow = {
+      ...companyWorkflowRef.current,
+      [company]: {
+        ...current,
+        confirmDone: true
+      }
+    };
+
+    setCompanyWorkflow(nextWorkflow);
+    companyWorkflowRef.current = nextWorkflow;
+    setWorkflowError('');
+    setWorkflowSuccess(`${COMPANY_LABELS[company]} 정산을 확인했습니다.`);
+    persistProgress(invoiceStatusRef.current, nextWorkflow);
   };
+
+  const updateInvoiceStatusField = (field, value) => {
+    const nextInvoice = {
+      ...invoiceStatusRef.current,
+      [field]: Boolean(value)
+    };
+    setInvoiceStatus(nextInvoice);
+    invoiceStatusRef.current = nextInvoice;
+    persistProgress(nextInvoice, companyWorkflowRef.current);
+  };
+
+  const renderCompanyProgress = useCallback(
+    (companyKey, isCompleted) => {
+      const toggleHandler = handleCompanyCompletionToggle(companyKey);
+      const stepOneActive = !isCompleted;
+
+      return (
+        <Stack spacing={1.25}>
+          <Box sx={getStepBoxStyles(stepOneActive)}>
+            <FormControlLabel
+              control={<Checkbox checked={!stepOneActive} disabled />}
+              label={
+                <StepLabel
+                  step={1}
+                  title="입력중"
+                  description={
+                    stepOneActive
+                      ? '현재 단계입니다. 시트 데이터를 검토하고 입력을 마무리해 주세요.'
+                      : '완료된 단계입니다.'
+                  }
+                  active={stepOneActive}
+                />
+              }
+              sx={{ alignItems: 'flex-start', m: 0 }}
+            />
+          </Box>
+          <Box sx={getStepBoxStyles(!stepOneActive)}>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={isCompleted}
+                  onChange={toggleHandler}
+                />
+              }
+              label={
+                <StepLabel
+                  step={2}
+                  title="정산확인 및 입력완료"
+                  description={
+                    isCompleted
+                      ? '완료되었습니다. 계좌 저장 → 입금완료 → 확인완료를 이어서 진행하세요.'
+                      : '정산 검토를 마쳤다면 체크해 다음 단계로 이동하세요.'
+                  }
+                  active={!stepOneActive}
+                />
+              }
+              sx={{ alignItems: 'flex-start', m: 0 }}
+            />
+          </Box>
+        </Stack>
+      );
+    },
+    [handleCompanyCompletionToggle]
+  );
 
   const renderSummary = () => {
     if (loading) {
@@ -1067,6 +1265,52 @@ const ObSettlementOverview = ({ sheetConfigs }) => {
     const recontractPromoterNames = recontractPromoterStats.map((s) => s.name).join(', ');
     const recontractPromoterCount = recontractPromoterStats.reduce((sum, s) => sum + s.count, 0);
 
+    const renderCompanyProgress = (companyKey, isCompleted) => {
+      const toggleHandler = handleCompanyCompletionToggle(companyKey);
+      const stepOneActive = !isCompleted;
+
+      return (
+        <Stack spacing={1.25}>
+          <Box sx={getStepBoxStyles(stepOneActive)}>
+            <FormControlLabel
+              control={<Checkbox checked={stepOneActive} disabled />}
+              label={
+                <StepLabel
+                  step={1}
+                  title="입력중"
+                  description={
+                    stepOneActive
+                      ? '현재 단계입니다. 시트 데이터를 검토하고 입력을 마무리해 주세요.'
+                      : '완료된 단계입니다.'
+                  }
+                  active={stepOneActive}
+                />
+              }
+              sx={{ alignItems: 'flex-start', m: 0 }}
+            />
+          </Box>
+          <Box sx={getStepBoxStyles(!stepOneActive)}>
+            <FormControlLabel
+              control={<Checkbox checked={isCompleted} onChange={toggleHandler} />}
+              label={
+                <StepLabel
+                  step={2}
+                  title="정산확인 및 입력완료"
+                  description={
+                    isCompleted
+                      ? '완료되었습니다. 계좌 저장 → 입금완료 → 확인완료를 이어서 진행하세요.'
+                      : '정산 검토를 마쳤다면 체크해 다음 단계로 이동하세요.'
+                  }
+                  active={!stepOneActive}
+                />
+              }
+              sx={{ alignItems: 'flex-start', m: 0 }}
+            />
+          </Box>
+        </Stack>
+      );
+    };
+
     return (
       <Stack spacing={4}>
         {downloadError ? (
@@ -1121,12 +1365,7 @@ const ObSettlementOverview = ({ sheetConfigs }) => {
                         control={
                           <Checkbox
                             checked={invoiceStatus.issued}
-                            onChange={(event) =>
-                              setInvoiceStatus((prev) => ({
-                                ...prev,
-                                issued: event.target.checked && invoiceControlsEnabled
-                              }))
-                            }
+                            onChange={(event) => updateInvoiceStatusField('issued', event.target.checked)}
                             disabled={!invoiceControlsEnabled}
                           />
                         }
@@ -1137,12 +1376,7 @@ const ObSettlementOverview = ({ sheetConfigs }) => {
                         control={
                           <Checkbox
                             checked={invoiceStatus.approved}
-                            onChange={(event) =>
-                              setInvoiceStatus((prev) => ({
-                                ...prev,
-                                approved: event.target.checked && invoiceControlsEnabled
-                              }))
-                            }
+                            onChange={(event) => updateInvoiceStatusField('approved', event.target.checked)}
                             disabled={!invoiceControlsEnabled}
                           />
                         }
@@ -1175,31 +1409,9 @@ const ObSettlementOverview = ({ sheetConfigs }) => {
                 title="(주)브이아이피플러스 30%"
                 value={currencyFormatter.format(combinedSplitVip)}
                 color="#6A1B9A"
-                activated={vipCompleted}
                 animate={vipCompleted}
               >
-                <Stack
-                  direction={{ xs: 'column', sm: 'row' }}
-                  spacing={1.5}
-                  alignItems={{ xs: 'flex-start', sm: 'center' }}
-                  sx={{ flexWrap: 'wrap' }}
-                >
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        checked={vipCompleted}
-                        onChange={handleCompanyCompletionToggle('vip')}
-                      />
-                    }
-                    label="정산확인 및 입력완료"
-                    sx={{ whiteSpace: 'nowrap' }}
-                  />
-                  <FormControlLabel
-                    control={<Checkbox checked={!vipCompleted} disabled />}
-                    label="입력중"
-                    sx={{ whiteSpace: 'nowrap' }}
-                  />
-                </Stack>
+                {renderCompanyProgress('vip', vipCompleted)}
               </SummaryCard>
             </Grid>
             <Grid item xs={12} md={6}>
@@ -1207,31 +1419,9 @@ const ObSettlementOverview = ({ sheetConfigs }) => {
                 title="(주)와이에이 70%"
                 value={currencyFormatter.format(combinedSplitYai)}
                 color="#00838F"
-                activated={yaiCompleted}
                 animate={yaiCompleted}
               >
-                <Stack
-                  direction={{ xs: 'column', sm: 'row' }}
-                  spacing={1.5}
-                  alignItems={{ xs: 'flex-start', sm: 'center' }}
-                  sx={{ flexWrap: 'wrap' }}
-                >
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        checked={yaiCompleted}
-                        onChange={handleCompanyCompletionToggle('yai')}
-                      />
-                    }
-                    label="정산확인 및 입력완료"
-                    sx={{ whiteSpace: 'nowrap' }}
-                  />
-                  <FormControlLabel
-                    control={<Checkbox checked={!yaiCompleted} disabled />}
-                    label="입력중"
-                    sx={{ whiteSpace: 'nowrap' }}
-                  />
-                </Stack>
+                {renderCompanyProgress('yai', yaiCompleted)}
               </SummaryCard>
             </Grid>
           </Grid>
@@ -1729,7 +1919,12 @@ ObSettlementOverview.propTypes = {
     PropTypes.shape({
       month: PropTypes.string
     })
-  ).isRequired
+  ).isRequired,
+  currentUser: PropTypes.string
+};
+
+ObSettlementOverview.defaultProps = {
+  currentUser: ''
 };
 
 export default ObSettlementOverview;

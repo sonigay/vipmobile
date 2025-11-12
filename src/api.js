@@ -566,6 +566,66 @@ export const api = {
     }
   },
 
+  // OB 정산 진행상황 조회
+  getObSettlementProgress: async (month) => {
+    if (!month) {
+      throw new Error('month is required');
+    }
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/ob/settlement-progress?month=${encodeURIComponent(month)}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          mode: 'cors'
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('OB 정산 진행상황 조회 오류:', error);
+      throw error;
+    }
+  },
+
+  // OB 정산 진행상황 저장
+  saveObSettlementProgress: async ({ month, progress, registrant }) => {
+    if (!month) {
+      throw new Error('month is required');
+    }
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/ob/settlement-progress`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        mode: 'cors',
+        body: JSON.stringify({
+          month,
+          progress,
+          registrant
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('OB 정산 진행상황 저장 오류:', error);
+      throw error;
+    }
+  },
+
   // OB 제외 인원 조회
   getObExclusions: async ({ month, type = 'all' }) => {
     if (!month) {

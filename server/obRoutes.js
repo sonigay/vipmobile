@@ -59,6 +59,7 @@ const PLACEHOLDER_SHEET_TOKENS = [
 ];
 
 const DEFAULT_POST_SETTLEMENT_SHEET_NAME = '기타후정산';
+const DEFAULT_PROGRESS_SHEET_NAME = '정산진행상황';
 const HEADERS_POST_SETTLEMENT = [
   '연월',
   '구분(인건비/비용)',
@@ -72,6 +73,7 @@ const HEADERS_POST_SETTLEMENT = [
   '작성자',
   '작성일시'
 ];
+const HEADERS_PROGRESS = ['연월', '카테고리', '필드', '값', '등록자', '등록일시'];
 
 const OB_RECONTRACT_OFFER_PATTERNS = {
   giftCard: /상품권/i,
@@ -206,6 +208,59 @@ async function ensureManualSheetStructure(sheets, spreadsheetId, sheetName) {
     const values = [
       new Array(HEADERS_POST_SETTLEMENT.length).fill(''),
       HEADERS_POST_SETTLEMENT
+    ];
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: headerRange,
+      valueInputOption: 'RAW',
+      resource: {
+        values
+      }
+    });
+  }
+}
+
+async function ensureProgressSheetStructure(sheets, spreadsheetId, sheetName) {
+  const spreadsheetMeta = await sheets.spreadsheets.get({
+    spreadsheetId
+  });
+  const sheetExists = (spreadsheetMeta.data.sheets || []).some(
+    (sheet) => sheet.properties && sheet.properties.title === sheetName
+  );
+
+  if (!sheetExists) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      resource: {
+        requests: [
+          {
+            addSheet: {
+              properties: {
+                title: sheetName
+              }
+            }
+          }
+        ]
+      }
+    });
+  }
+
+  const headerRange = `${sheetName}!A1:${String.fromCharCode(65 + HEADERS_PROGRESS.length - 1)}2`;
+  const headerResponse = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: headerRange
+  });
+  const headerValues = headerResponse.data.values || [];
+  const firstRow = headerValues[0] || [];
+  const secondRow = headerValues[1] || [];
+  const isFirstRowBlank =
+    firstRow.length === 0 || firstRow.every((cell) => !cell || String(cell).trim() === '');
+  const isSecondRowHeader = HEADERS_PROGRESS.every((header, index) => (secondRow[index] || '') === header);
+
+  if (!isFirstRowBlank || !isSecondRowHeader) {
+    const values = [
+      new Array(HEADERS_PROGRESS.length).fill(''),
+      HEADERS_PROGRESS
     ];
     await sheets.spreadsheets.values.update({
       spreadsheetId,
@@ -897,6 +952,125 @@ async function getManualSheetRows(sheets, spreadsheetId, sheetName) {
   return entries;
 }
 
+function parseBooleanValue(value, defaultValue = false) {
+  const normalized = parseString(value).toLowerCase();
+  if (!normalized) return defaultValue;
+  if (['true', '1', 'y', 'yes', 'on'].includes(normalized)) return true;
+  if (['false', '0', 'n', 'no', 'off'].includes(normalized)) return false;
+  return defaultValue;
+}
+
+function stringifyProgressValue(value) {
+  if (typeof value === 'boolean') {
+    return value ? 'TRUE' : 'FALSE';
+  }
+  return value != null ? String(value) : '';
+}
+
+async function loadProgressRows(sheets, spreadsheetId, sheetName) {
+  await ensureProgressSheetStructure(sheets, spreadsheetId, sheetName);
+  const values = await loadSheetRows(sheets, spreadsheetId, sheetName);
+  if (!values || values.length <= 2) return [];
+  return values
+    .slice(2)
+    .map((row, index) => {
+      const month = parseString(row[0]).replace(/^'/, '');
+      const category = parseString(row[1]);
+      const field = parseString(row[2]);
+      const value = parseString(row[3]);
+      const registrant = parseString(row[4]);
+      const updatedAt = parseString(row[5]);
+      return {
+        month,
+        category,
+        field,
+        value,
+        registrant,
+        updatedAt,
+        rowNumber: index + 3,
+        key: `${month}__${category}__${field}`
+      };
+    })
+    .filter((entry) => entry.month && entry.category && entry.field);
+}
+
+function createDefaultCompanyProgress() {
+  return {
+    completed: false,
+    bankName: '',
+    accountNumber: '',
+    isSaved: false,
+    depositDone: false,
+    confirmDone: false
+  };
+}
+
+function buildProgressState(entries = [], month) {
+  const invoice = {
+    issued: false,
+    approved: false
+  };
+  const companies = {
+    vip: createDefaultCompanyProgress(),
+    yai: createDefaultCompanyProgress()
+  };
+
+  entries
+    .filter((entry) => !month || entry.month === month || entry.month === '전체')
+    .forEach((entry) => {
+      const { category, field, value } = entry;
+      if (category === 'invoice') {
+        if (field === 'issued') invoice.issued = parseBooleanValue(value, false);
+        if (field === 'approved') invoice.approved = parseBooleanValue(value, false);
+      }
+      if (category === 'vip' || category === 'yai') {
+        const target = category === 'vip' ? companies.vip : companies.yai;
+        if (['completed', 'isSaved', 'depositDone', 'confirmDone'].includes(field)) {
+          target[field] = parseBooleanValue(value, false);
+        } else if (field === 'bankName' || field === 'accountNumber') {
+          target[field] = value || '';
+        }
+      }
+    });
+
+  return { invoice, companies };
+}
+
+function buildProgressEntries(month, progressState = {}, registrant = '') {
+  const entries = [];
+  const monthCellValue = month ? `'${month}` : '';
+  const nowIso = new Date().toISOString();
+
+  const addEntry = (category, field, value) => {
+    entries.push({
+      month,
+      category,
+      field,
+      row: [
+        monthCellValue,
+        category,
+        field,
+        stringifyProgressValue(value),
+        registrant || '',
+        nowIso
+      ]
+    });
+  };
+
+  const invoice = progressState.invoice || {};
+  addEntry('invoice', 'issued', !!invoice.issued);
+  addEntry('invoice', 'approved', !!invoice.approved);
+
+  const companies = progressState.companies || {};
+  const vip = { ...createDefaultCompanyProgress(), ...(companies.vip || {}) };
+  const yai = { ...createDefaultCompanyProgress(), ...(companies.yai || {}) };
+
+  Object.entries(vip).forEach(([field, value]) => addEntry('vip', field, value));
+  Object.entries(yai).forEach(([field, value]) => addEntry('yai', field, value));
+
+  return entries;
+}
+
 function buildTotals(customSummary, recontractSummary, manualSummary) {
   const customTotal = customSummary.totalPayout || 0;
   const recontractTotal = recontractSummary.totalPayout || 0;
@@ -1129,6 +1303,11 @@ function setupObRoutes(app) {
       const exclusionRows = await loadExclusionRows(sheets, targetSheetId, exclusionSheetName);
       const exclusionConfig = buildExclusionConfig(exclusionRows, month);
 
+      const progressSheetName =
+        normalizeConfiguredSheetName(extraSheetNames.progress) || DEFAULT_PROGRESS_SHEET_NAME;
+      const progressRows = await loadProgressRows(sheets, targetSheetId, progressSheetName);
+      const progressState = buildProgressState(progressRows, month);
+
       const customSummary = buildCustomProposalSummary(customRows, exclusionConfig.custom);
       const recontractSummary = buildRecontractSummary(recontractRows, exclusionConfig.recontract);
       const totals = buildTotals(customSummary, recontractSummary, manualSummary);
@@ -1141,7 +1320,8 @@ function setupObRoutes(app) {
             ...configEntry,
             sheetNames: resolvedSheetNames,
             extraSheetNames: resolvedExtraSheetNames,
-            manualSheetName
+            manualSheetName,
+            progressSheetName
           },
           customProposal: customSummary,
           recontract: recontractSummary,
@@ -1150,6 +1330,7 @@ function setupObRoutes(app) {
             sheetName: manualSheetName
           },
           exclusions: exclusionConfig,
+          progress: progressState,
           totals
         }
       });
@@ -1291,6 +1472,109 @@ function setupObRoutes(app) {
     } catch (error) {
       console.error('[OB] manual-adjustments POST error:', error);
       res.status(500).json({ success: false, error: '수기 데이터를 저장하지 못했습니다.', message: error.message });
+    }
+  });
+
+  router.get('/settlement-progress', async (req, res) => {
+    const monthParam = parseString(req.query.month || '');
+    if (!monthParam) {
+      return res.status(400).json({ success: false, error: 'month query parameter is required' });
+    }
+
+    try {
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      const configEntry = await fetchSettlementConfig(sheets, SPREADSHEET_ID, monthParam);
+
+      if (!configEntry) {
+        return res.status(404).json({ success: false, error: '해당 월의 정산 링크 구성이 존재하지 않습니다.' });
+      }
+
+      const targetSheetId = configEntry.sheetId || SPREADSHEET_ID;
+      const extraSheetNames = configEntry.extraSheetNames || {};
+      const progressSheetName =
+        normalizeConfiguredSheetName(extraSheetNames.progress) || DEFAULT_PROGRESS_SHEET_NAME;
+
+      const progressRows = await loadProgressRows(sheets, targetSheetId, progressSheetName);
+      const progressState = buildProgressState(progressRows, monthParam);
+
+      res.json({ success: true, data: progressState });
+    } catch (error) {
+      console.error('[OB] settlement-progress GET error:', error);
+      res
+        .status(500)
+        .json({ success: false, error: '정산 진행상황을 불러오지 못했습니다.', message: error.message });
+    }
+  });
+
+  router.post('/settlement-progress', async (req, res) => {
+    try {
+      const { month, progress = {}, registrant = '' } = req.body || {};
+      const trimmedMonth = parseString(month);
+      if (!trimmedMonth) {
+        return res.status(400).json({ success: false, error: 'month는 필수값입니다.' });
+      }
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      const configEntry = await fetchSettlementConfig(sheets, SPREADSHEET_ID, trimmedMonth);
+
+      if (!configEntry) {
+        return res.status(404).json({ success: false, error: '해당 월의 정산 링크 구성이 존재하지 않습니다.' });
+      }
+
+      const targetSheetId = configEntry.sheetId || SPREADSHEET_ID;
+      const extraSheetNames = configEntry.extraSheetNames || {};
+      const progressSheetName =
+        normalizeConfiguredSheetName(extraSheetNames.progress) || DEFAULT_PROGRESS_SHEET_NAME;
+
+      const existingRows = await loadProgressRows(sheets, targetSheetId, progressSheetName);
+      const existingMap = new Map(existingRows.map((entry) => [entry.key, entry]));
+      const entries = buildProgressEntries(trimmedMonth, progress, registrant);
+
+      const updateRequests = [];
+      const appendValues = [];
+      const rangeEndColumn = String.fromCharCode(65 + HEADERS_PROGRESS.length - 1);
+
+      entries.forEach((entry) => {
+        const key = `${entry.month}__${entry.category}__${entry.field}`;
+        const existing = existingMap.get(key);
+        if (existing) {
+          updateRequests.push({
+            range: `${progressSheetName}!A${existing.rowNumber}:${rangeEndColumn}${existing.rowNumber}`,
+            values: [entry.row]
+          });
+        } else {
+          appendValues.push(entry.row);
+        }
+      });
+
+      if (updateRequests.length > 0) {
+        await sheets.spreadsheets.values.batchUpdate({
+          spreadsheetId: targetSheetId,
+          resource: {
+            valueInputOption: 'USER_ENTERED',
+            data: updateRequests
+          }
+        });
+      }
+
+      if (appendValues.length > 0) {
+        await sheets.spreadsheets.values.append({
+          spreadsheetId: targetSheetId,
+          range: `${progressSheetName}!A3`,
+          valueInputOption: 'USER_ENTERED',
+          insertDataOption: 'INSERT_ROWS',
+          resource: {
+            values: appendValues
+          }
+        });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('[OB] settlement-progress POST error:', error);
+      res
+        .status(500)
+        .json({ success: false, error: '정산 진행상황을 저장하지 못했습니다.', message: error.message });
     }
   });
 
