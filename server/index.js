@@ -7699,7 +7699,7 @@ app.get('/api/onsale/activation-info/:sheetId/:rowIndex', async (req, res) => {
     const sheetName = sheetResponse.data.sheets[0].properties.title;
     console.log(`📋 [개통정보조회] 시트명: ${sheetName}`);
     
-    // L~AL열 데이터 읽기 (25개 필드) - 제출일시부터 시작
+    // L~AL열 데이터 읽기 (27개 필드) - 제출일시부터 U+제출데이터까지
     const range = `${sheetName}!L${rowIndex}:AL${rowIndex}`;
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
@@ -7715,33 +7715,35 @@ app.get('/api/onsale/activation-info/:sheetId/:rowIndex', async (req, res) => {
       });
     }
     
-    // 25개 필드 매핑 (L열부터 시작)
+    // 27개 필드 매핑 (L열부터 AL열까지)
     const data = {
-      submittedAt: row[0] || '', // L열: 제출일시
-      storeName: row[1] || '', // M열: 매장명
-      pCode: row[2] || '', // N열: P코드
-      activationType: row[3] || '', // O열: 개통유형
-      previousCarrier: row[4] || '', // P열: 이전통신사
-      customerName: row[5] || '', // Q열: 고객명
-      birthDate: row[6] || '', // R열: 생년월일
-      phoneNumber: row[7] || '', // S열: 개통번호
-      modelName: row[8] || '', // T열: 모델명
-      deviceSerial: row[9] || '', // U열: 기기일련번호
-      color: row[10] || '', // V열: 색상
-      simModel: row[11] || '', // W열: 유심모델
-      simSerial: row[12] || '', // X열: 유심일련번호
-      contractType: row[13] || '', // Y열: 약정유형
-      conversionSupport: row[14] || '', // Z열: 전환지원금
-      distributionSupport: row[15] || '', // AA열: 유통망추가지원금
-      installmentMonths: row[16] || '', // AB열: 할부개월
-      installmentAmount: row[17] || '', // AC열: 할부원금
-      isFree: row[18] || '', // AD열: 프리
-      plan: row[19] || '', // AE열: 요금제
-      mediaService: row[20] || '', // AF열: 미디어서비스
-      additionalService: row[21] || '', // AG열: 부가서비스
-      premierContract: row[22] || '', // AH열: 프리미어약정
-      reservationNumber: row[23] || '', // AI열: 예약번호
-      otherRequests: row[24] || '' // AJ열: 기타요청사항
+      submittedAt: row[0] || '', // L열(11): 제출일시
+      storeName: row[1] || '', // M열(12): 매장명
+      pCode: row[2] || '', // N열(13): P코드
+      activationType: row[3] || '', // O열(14): 개통유형
+      previousCarrier: row[4] || '', // P열(15): 이전통신사
+      customerName: row[5] || '', // Q열(16): 고객명
+      birthDate: row[6] || '', // R열(17): 생년월일
+      phoneNumber: row[7] || '', // S열(18): 개통번호
+      modelName: row[8] || '', // T열(19): 모델명
+      deviceSerial: row[9] || '', // U열(20): 기기일련번호
+      color: row[10] || '', // V열(21): 색상
+      simModel: row[11] || '', // W열(22): 유심모델
+      simSerial: row[12] || '', // X열(23): 유심일련번호
+      contractType: row[13] || '', // Y열(24): 약정유형
+      conversionSubsidy: row[14] || '', // Z열(25): 전환지원금 (이통사지원금)
+      additionalSubsidy: row[15] || '', // AA열(26): 유통망추가지원금
+      installmentMonths: row[16] || '', // AB열(27): 할부개월
+      installmentAmount: row[17] || '', // AC열(28): 할부원금
+      free: row[18] || '', // AD열(29): 프리
+      plan: row[19] || '', // AE열(30): 요금제
+      mediaServices: row[20] ? (typeof row[20] === 'string' && row[20].includes(',') ? row[20].split(',').map(s => s.trim()) : [row[20]]) : [], // AF열(31): 미디어서비스
+      additionalServices: row[21] || '', // AG열(32): 부가서비스
+      premierContract: row[22] || '', // AH열(33): 프리미어약정
+      reservationNumber: row[23] || '', // AI열(34): 예약번호
+      otherRequests: row[24] || '', // AJ열(35): 기타요청사항
+      uplusSubmittedAt: row[25] || '', // AK열(36): U+제출일시
+      uplusSubmissionData: row[26] || '' // AL열(37): U+제출데이터
     };
     
     console.log(`✅ [개통정보조회] 조회 완료`);
@@ -7802,7 +7804,7 @@ app.put('/api/onsale/activation-info/:sheetId/:rowIndex', async (req, res) => {
       }
     });
     
-    // 25개 필드 데이터 업데이트 (L~AL열 - 제출일시부터 시작)
+    // 26개 필드 데이터 업데이트 (L~AJ열 - 제출일시부터 기타요청사항까지, U+제출 필드는 제외)
     const rowData = [
       formData.submittedAt || new Date().toLocaleString('ko-KR'),
       formData.storeName || '',
@@ -7818,22 +7820,23 @@ app.put('/api/onsale/activation-info/:sheetId/:rowIndex', async (req, res) => {
       formData.simModel || '',
       formData.simSerial || '',
       formData.contractType || '',
-      formData.conversionSupport || '',
-      formData.distributionSupport || '',
+      formData.conversionSubsidy || '',
+      formData.additionalSubsidy || '',
       formData.installmentMonths || '',
       formData.installmentAmount || '',
-      formData.isFree || '',
+      formData.free || '',
       formData.plan || '',
-      formData.mediaService || '',
-      formData.additionalService || '',
+      Array.isArray(formData.mediaServices) ? formData.mediaServices.join(', ') : (formData.mediaServices || formData.mediaService || ''),
+      formData.additionalServices || formData.additionalService || '',
       formData.premierContract || '',
       formData.reservationNumber || '',
       formData.otherRequests || ''
     ];
     
+    // L~AJ열만 업데이트 (U+제출일시, U+제출데이터는 U+ 제출 API에서만 업데이트)
     await sheets.spreadsheets.values.update({
       spreadsheetId: sheetId,
-      range: `${sheetName}!L${rowIndex}:AL${rowIndex}`,
+      range: `${sheetName}!L${rowIndex}:AJ${rowIndex}`,
       valueInputOption: 'RAW',
       requestBody: {
         values: [rowData]
@@ -8196,11 +8199,11 @@ app.post('/api/onsale/activation-info', async (req, res) => {
     const simModel = data.simModel || '';
     const simSerial = data.simSerial || '';
     const contractType = data.contractType || '';
-    const conversionSupport = data.conversionSupport || '';
-    const distributionSupport = data.distributionSupport || '';
+    const conversionSupport = data.conversionSubsidy || '';
+    const distributionSupport = data.additionalSubsidy || '';
     const installmentMonths = data.installmentMonths || '';
     const installmentAmount = data.installmentAmount || '';
-    const isFree = data.isFree || '';
+    const isFree = data.free || '';
     const plan = data.plan || '';
     const mediaServices = Array.isArray(data.mediaServices) ? data.mediaServices.join(', ') : (data.mediaServices || '');
     const additionalServices = data.additionalServices || '';
@@ -8299,9 +8302,9 @@ app.post('/api/onsale/uplus-submission', async (req, res) => {
       });
     }
     
-    // 전화번호로 개통양식 데이터 행 찾기 (최근 1시간 이내)
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toLocaleString('ko-KR');
-    const searchRange = `${sheetName}!C:AD`;
+    // 전화번호로 개통양식 데이터 행 찾기
+    // A열부터 전체 데이터 가져오기 (헤더 포함)
+    const searchRange = `${sheetName}!A:AL`;
     const sheetData = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
       range: searchRange
@@ -8310,45 +8313,46 @@ app.post('/api/onsale/uplus-submission', async (req, res) => {
     const rows = sheetData.data.values || [];
     let targetRowIndex = -1;
     
-    // 전화번호로 매칭되는 행 찾기
-    for (let i = 0; i < rows.length; i++) {
+    // 전화번호로 매칭되는 행 찾기 (헤더 제외, 2행부터)
+    // S열(개통번호) = A열 기준 19번째 (0-based로 18)
+    for (let i = 1; i < rows.length; i++) { // 헤더(1행) 제외
       const row = rows[i];
-      if (row[10] === phoneNumber) { // 개통번호 컬럼 (C열 기준 11번째, 0-based)
-        targetRowIndex = i + 1; // 1-based 인덱스
+      if (row[18] === phoneNumber) { // S열: 개통번호 (A열 기준 19번째, 0-based로 18)
+        targetRowIndex = i + 1; // 1-based 인덱스 (구글시트 행 번호)
         break;
       }
     }
     
     if (targetRowIndex === -1) {
-      // 매칭되는 행이 없으면 새 행에 AE열부터 저장
+      // 매칭되는 행이 없으면 새 행에 AK, AL열에 저장
       console.log('📝 [U+제출] 매칭되는 개통양식 없음, 새 행에 저장');
       const timestamp = new Date().toLocaleString('ko-KR');
       const newRowData = [
-        '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', // C~AD열 빈 값 (33개)
-        timestamp, // AE열: 제출일시
-        JSON.stringify(data) // AF열: U+ 제출 데이터 (JSON)
+        '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', // A~AJ열 빈 값 (37개)
+        timestamp, // AK열: U+제출일시
+        JSON.stringify(data) // AL열: U+제출데이터 (JSON)
       ];
       
       await sheets.spreadsheets.values.append({
         spreadsheetId: sheetId,
-        range: `${sheetName}!C:AF`,
+        range: `${sheetName}!A:AL`,
         valueInputOption: 'RAW',
         requestBody: {
           values: [newRowData]
         }
       });
     } else {
-      // 매칭되는 행이 있으면 AE열부터 U+ 데이터 저장
+      // 매칭되는 행이 있으면 AK, AL열에 U+ 데이터 저장
       console.log(`📝 [U+제출] 매칭되는 개통양식 발견, 행 ${targetRowIndex}에 U+ 데이터 추가`);
       const timestamp = new Date().toLocaleString('ko-KR');
       const uplusData = [
-        timestamp, // AE열: 제출일시
-        JSON.stringify(data) // AF열: U+ 제출 데이터 (JSON)
+        timestamp, // AK열: U+제출일시
+        JSON.stringify(data) // AL열: U+제출데이터 (JSON)
       ];
       
       await sheets.spreadsheets.values.update({
         spreadsheetId: sheetId,
-        range: `${sheetName}!AE${targetRowIndex}:AF${targetRowIndex}`,
+        range: `${sheetName}!AK${targetRowIndex}:AL${targetRowIndex}`,
         valueInputOption: 'RAW',
         requestBody: {
           values: [uplusData]
