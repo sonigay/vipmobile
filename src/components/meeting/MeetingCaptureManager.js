@@ -72,7 +72,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
     const waitForReady = () => {
       return new Promise((resolve) => {
         let attempts = 0;
-        const maxAttempts = 100; // 10초 (100 * 100ms)
+        const maxAttempts = 50; // 5초 (50 * 100ms) - 최적화: 10초 -> 5초
         const checkReady = () => {
           attempts++;
           console.log(`🔍 [MeetingCaptureManager] 슬라이드 준비 확인 (${attempts}/${maxAttempts}):`, slideReady);
@@ -90,8 +90,8 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
       });
     };
 
-    // 최소 2초 대기 (데이터 로딩 및 렌더링 시간)
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    // 최소 1초 대기 (데이터 로딩 및 렌더링 시간) - 최적화: 2초 -> 1초
+    await new Promise(resolve => setTimeout(resolve, 1000));
     await waitForReady();
 
     try {
@@ -260,6 +260,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         completed={completed}
         failed={failed}
         onCancel={handleCancel}
+        slides={slidesState}
       />
 
       {slidesState[currentSlideIndex] && (

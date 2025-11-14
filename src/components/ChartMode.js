@@ -160,7 +160,7 @@ function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes, pres
     {
       label: '채권장표',
       icon: <AccountBalanceIcon />,
-      component: <BondChartTab loggedInStore={loggedInStore} initialSubTab={initialSubTab} />,
+      component: <BondChartTab loggedInStore={loggedInStore} initialSubTab={initialSubTab} presentationMode={presentationMode} />,
       hasPermission: loggedInStore?.modePermissions?.bondChart
     },
     {
@@ -361,7 +361,7 @@ function BondChartTab({ loggedInStore, initialSubTab = 0 }) {
 
       {/* 서브 탭 컨텐츠 */}
       {activeSubTab === 0 && <OverdueBondTab />}
-      {activeSubTab === 1 && <RechotanchoBondTab loggedInStore={loggedInStore} />}
+      {activeSubTab === 1 && <RechotanchoBondTab loggedInStore={loggedInStore} presentationMode={presentationMode} initialSubTab={initialSubTab} />}
       {activeSubTab === 2 && <SubscriberIncreaseTab />}
     </Box>
   );
@@ -1853,7 +1853,8 @@ function ClosingChartTab({ initialSubTab = 0, presentationMode = false, detailOp
       component: <TotalClosingTab 
         detailOptions={detailOptions}
         csDetailType={detailOptions?.csDetailType || csDetailType} 
-        csDetailCriteria={detailOptions?.csDetailCriteria || csDetailCriteria} 
+        csDetailCriteria={detailOptions?.csDetailCriteria || csDetailCriteria}
+        presentationMode={presentationMode}
       />
     },
     {
@@ -1911,7 +1912,7 @@ function ClosingChartTab({ initialSubTab = 0, presentationMode = false, detailOp
 }
 
 // 전체총마감 탭 컴포넌트 (기존 마감장표 내용)
-function TotalClosingTab({ detailOptions, csDetailType: propCsDetailType, csDetailCriteria: propCsDetailCriteria }) {
+function TotalClosingTab({ detailOptions, csDetailType: propCsDetailType, csDetailCriteria: propCsDetailCriteria, presentationMode = false }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -1925,12 +1926,12 @@ function TotalClosingTab({ detailOptions, csDetailType: propCsDetailType, csDeta
   const [showMismatchModal, setShowMismatchModal] = useState(false);
   const [matchingMismatches, setMatchingMismatches] = useState([]);
   
-  // 테이블 접기/펼치기 상태
-  const [codeTableOpen, setCodeTableOpen] = useState(false);
-  const [officeTableOpen, setOfficeTableOpen] = useState(false);
-  const [departmentTableOpen, setDepartmentTableOpen] = useState(false);
-  const [agentTableOpen, setAgentTableOpen] = useState(false);
-  const [csSummaryOpen, setCsSummaryOpen] = useState(false); // 기본값: 접기 상태
+  // 테이블 접기/펼치기 상태 - presentationMode일 때는 자동으로 펼치기
+  const [codeTableOpen, setCodeTableOpen] = useState(presentationMode);
+  const [officeTableOpen, setOfficeTableOpen] = useState(presentationMode);
+  const [departmentTableOpen, setDepartmentTableOpen] = useState(presentationMode);
+  const [agentTableOpen, setAgentTableOpen] = useState(presentationMode);
+  const [csSummaryOpen, setCsSummaryOpen] = useState(presentationMode); // presentationMode일 때는 자동 펼치기
   
   // CS 개통 실적 세부 옵션 상태 (props에서 받거나 기본값 사용)
   const [csDetailType, setCsDetailType] = useState(propCsDetailType || 'all'); // 'all', 'code', 'office', 'department', 'agent'
@@ -4142,7 +4143,7 @@ const formatKoreanCurrency = (num) => {
 };
 
 // 재초담초채권 탭 컴포넌트
-function RechotanchoBondTab({ loggedInStore }) {
+function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -4196,9 +4197,20 @@ function RechotanchoBondTab({ loggedInStore }) {
       const result = await response.json();
       
       if (result.success) {
-        setHistory(result.data || []);
-        // 히스토리가 있으면 전체 데이터도 로드 (그래프 표시용)
-        if (result.data && result.data.length > 0) {
+        const historyData = result.data || [];
+        setHistory(historyData);
+        // presentationMode일 때 가장 최근 입력시점 자동 선택
+        if (presentationMode && historyData.length > 0) {
+          // 가장 최근 시점 선택 (timestamp 기준 내림차순 정렬 후 첫 번째)
+          const sortedHistory = [...historyData].sort((a, b) => {
+            return new Date(b.timestamp) - new Date(a.timestamp);
+          });
+          const latestTimestamp = sortedHistory[0].timestamp;
+          setSelectedTimestamp(latestTimestamp);
+          // 해당 시점의 데이터 로드
+          loadDataByTimestamp(latestTimestamp);
+        } else if (historyData.length > 0) {
+          // 일반 모드에서는 전체 데이터 로드 (그래프 표시용)
           loadAllData();
         }
       }
@@ -4807,7 +4819,7 @@ function RechotanchoBondTab({ loggedInStore }) {
 
   return (
     <Box sx={{ p: 3 }}>
-      <Typography variant="h5" sx={{ mb: 3, fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
+      <Typography variant="h5" sx={{ mb: 3, fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1, color: '#1a1a1a' }}>
         <AccountBalanceWalletIcon sx={{ fontSize: 32, color: '#4ecdc4' }} />
         재초담초채권 관리
       </Typography>

@@ -1047,7 +1047,14 @@ function convertExcelToHTML(worksheet) {
   html += 'tr:hover { background-color: #f0f0f0; }';
   html += 'h2 { color: #333; margin-bottom: 20px; }';
   html += '</style></head><body>';
-  html += `<h2>${worksheet.name || 'Sheet'}</h2>`;
+  // 시트 이름도 HTML 이스케이프 처리
+  const sheetName = (worksheet.name || 'Sheet')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+  html += `<h2>${sheetName}</h2>`;
   html += '<table>';
   
   // 헤더 행
@@ -1055,7 +1062,15 @@ function convertExcelToHTML(worksheet) {
   if (headerRow && headerRow.values && headerRow.values.length > 1) {
     html += '<thead><tr>';
     headerRow.eachCell({ includeEmpty: false }, (cell) => {
-      html += `<th>${cell.value || ''}</th>`;
+      const value = cell.value !== null && cell.value !== undefined ? String(cell.value) : '';
+      // HTML 이스케이프 처리 (한글 등 특수문자 보호)
+      const escapedValue = value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+      html += `<th>${escapedValue}</th>`;
     });
     html += '</tr></thead>';
   }
@@ -1068,7 +1083,14 @@ function convertExcelToHTML(worksheet) {
     html += '<tr>';
     row.eachCell({ includeEmpty: false }, (cell) => {
       const value = cell.value !== null && cell.value !== undefined ? String(cell.value) : '';
-      html += `<td>${value}</td>`;
+      // HTML 이스케이프 처리 (한글 등 특수문자 보호)
+      const escapedValue = value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+      html += `<td>${escapedValue}</td>`;
     });
     html += '</tr>';
   });

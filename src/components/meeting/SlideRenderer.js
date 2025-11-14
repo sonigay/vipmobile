@@ -15,27 +15,26 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [contentReady, setContentReady] = useState(false);
-  const [renderKey, setRenderKey] = useState(0); // 강제 리렌더링을 위한 key
-
   useEffect(() => {
     // slide가 변경되면 완전히 리셋
-    console.log('🔍 [SlideRenderer] 슬라이드 렌더링 시작:', {
-      slideId: slide?.slideId,
-      mode: slide?.mode,
-      tab: slide?.tab,
-      subTab: slide?.subTab,
-      type: slide?.type
-    });
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 [SlideRenderer] 슬라이드 렌더링 시작:', {
+        slideId: slide?.slideId,
+        mode: slide?.mode,
+        tab: slide?.tab,
+        subTab: slide?.subTab,
+        type: slide?.type
+      });
+    }
     setLoading(true);
     setContentReady(false);
     setError(null);
-    setRenderKey(prev => prev + 1); // 강제 리렌더링
     
     // 데이터 로딩 완료 대기 함수 - 매우 확실한 방법
     const waitForDataLoad = () => {
       return new Promise((resolve) => {
         let stableCount = 0; // 연속으로 안정적인 상태가 유지된 횟수
-        const requiredStableCount = 50; // 5초 동안 안정적이어야 함 (50 * 100ms)
+        const requiredStableCount = 20; // 2초 동안 안정적이어야 함 (20 * 100ms) - 최적화: 5초 -> 2초
         let checkStartTime = null;
         let lastStableTime = null;
         
@@ -271,8 +270,8 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
             flexDirection: 'column',
             justifyContent: 'space-between',
             alignItems: 'center',
-            background: 'linear-gradient(135deg, #2c2c2c 0%, #1a1a1a 100%)',
-            color: '#ffffff',
+            background: 'linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%)', // 아주 연한 회색
+            color: '#1a1a1a', // 어두운 계열 글자색
             p: { xs: 3, md: 6 },
             overflow: 'auto',
             position: 'relative'
@@ -288,7 +287,7 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
               width: '100%',
               backgroundColor: '#ffffff',
               px: { xs: 2, md: 3 },
-              py: { xs: 1, md: 1.5 },
+              py: { xs: 2, md: 2.5 }, // 높이 증가
               position: 'absolute',
               top: 0,
               left: 0,
@@ -346,7 +345,6 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
                   sx={{
                     fontWeight: 'bold',
                     fontSize: { xs: '1.5rem', md: '2rem' },
-                    textShadow: '2px 2px 4px rgba(0,0,0,0.3)'
                   }}
                 >
                   {slide.meetingNumber}차 회의
@@ -362,7 +360,6 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
                 fontSize: { xs: '2rem', md: '3.5rem' },
                 fontWeight: 'bold',
                 mb: 4,
-                textShadow: '2px 2px 6px rgba(0,0,0,0.4)',
                 lineHeight: 1.2
               }}
             >
@@ -467,8 +464,8 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
             flexDirection: 'column',
             justifyContent: 'space-between',
             alignItems: 'center',
-            background: 'linear-gradient(135deg, #2c2c2c 0%, #1a1a1a 100%)',
-            color: '#ffffff',
+            background: 'linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%)', // 아주 연한 회색
+            color: '#1a1a1a', // 어두운 계열 글자색
             p: { xs: 3, md: 6 },
             overflow: 'auto',
             position: 'relative'
@@ -484,7 +481,7 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
               width: '100%',
               backgroundColor: '#ffffff',
               px: { xs: 2, md: 3 },
-              py: { xs: 1, md: 1.5 },
+              py: { xs: 2, md: 2.5 }, // 높이 증가
               position: 'absolute',
               top: 0,
               left: 0,
@@ -595,7 +592,7 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
                             fontWeight: 'bold',
                             fontSize: { xs: '1.2rem', md: '1.5rem' },
                             mb: 2,
-                            color: '#ffffff',
+                            color: '#1a1a1a', // 어두운 계열 글자색
                             borderBottom: '2px solid rgba(255, 255, 255, 0.3)',
                             pb: 1
                           }}
@@ -742,8 +739,8 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
             flexDirection: 'column',
             justifyContent: 'space-between',
             alignItems: 'center',
-            background: 'linear-gradient(135deg, #2c2c2c 0%, #1a1a1a 100%)',
-            color: '#ffffff',
+            background: 'linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%)', // 아주 연한 회색
+            color: '#1a1a1a', // 어두운 계열 글자색
             p: { xs: 3, md: 6 },
             overflow: 'auto',
             position: 'relative'
@@ -759,7 +756,7 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
               width: '100%',
               backgroundColor: '#ffffff',
               px: { xs: 2, md: 3 },
-              py: { xs: 1, md: 1.5 },
+              py: { xs: 2, md: 2.5 }, // 높이 증가
               position: 'absolute',
               top: 0,
               left: 0,
@@ -813,7 +810,6 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
                 fontSize: { xs: '3rem', md: '5rem' },
                 fontWeight: 'bold',
                 mb: 4,
-                textShadow: '3px 3px 8px rgba(0,0,0,0.4)',
                 lineHeight: 1.2
               }}
             >
@@ -839,7 +835,6 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
                   fontSize: { xs: '1.5rem', md: '2rem' },
                   fontWeight: 600,
                   mb: 2,
-                  textShadow: '1px 1px 3px rgba(0,0,0,0.3)'
                 }}
               >
                 {slide.meetingName || '회의'}
@@ -907,21 +902,29 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
             flexDirection: 'column',
             justifyContent: 'space-between',
             alignItems: 'center',
-            background: 'linear-gradient(135deg, #2c2c2c 0%, #1a1a1a 100%)',
-            color: '#ffffff',
+            background: 'linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%)', // 아주 연한 회색
+            color: '#1a1a1a', // 어두운 계열 글자색
             p: { xs: 3, md: 6 },
             overflow: 'auto',
             position: 'relative'
           }}
         >
-          {/* 상단: 회사 로고 및 이름 */}
+          {/* 상단: 회사 로고 및 이름 - 상단 전체 하얀색 배경 */}
           <Box
             sx={{
               display: 'flex',
-              flexDirection: 'column',
+              flexDirection: 'row',
               alignItems: 'center',
-              mb: { xs: 2, md: 3 },
-              width: '100%'
+              justifyContent: 'flex-start',
+              width: '100%',
+              backgroundColor: '#ffffff',
+              px: { xs: 2, md: 3 },
+              py: { xs: 2, md: 2.5 }, // 높이 증가
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              zIndex: 10
             }}
           >
             <Box
@@ -929,10 +932,10 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
               src="/logo512.png"
               alt="회사 로고"
               sx={{
-                width: { xs: 60, md: 80 },
-                height: { xs: 60, md: 80 },
-                mb: 1,
-                filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.2))'
+                width: { xs: 40, md: 50 },
+                height: { xs: 40, md: 50 },
+                mr: { xs: 1, md: 1.5 },
+                filter: 'brightness(0) invert(0)'
               }}
               onError={(e) => {
                 e.target.style.display = 'none';
@@ -942,9 +945,9 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
               variant="h6"
               sx={{
                 fontWeight: 600,
-                fontSize: { xs: '1rem', md: '1.2rem' },
-                textShadow: '1px 1px 3px rgba(0,0,0,0.3)',
-                letterSpacing: '0.5px'
+                fontSize: { xs: '0.9rem', md: '1.1rem' },
+                color: '#333',
+                letterSpacing: '0.3px'
               }}
             >
               (주)브이아이피플러스
@@ -965,14 +968,14 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
           }}>
             <Box
               sx={{
-                backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                backdropFilter: 'blur(10px)',
+                backgroundColor: 'rgba(245, 245, 245, 0.98)', // 약간 회색 배경 (다른 슬라이드와 통일)
                 borderRadius: 4,
                 p: { xs: 3, md: 4 },
-                boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
+                border: '1px solid rgba(0, 0, 0, 0.1)',
                 width: '100%',
-                maxWidth: 1000
+                maxWidth: 1000,
+                textAlign: 'left' // 왼쪽 정렬
               }}
             >
               {slide.imageUrl && (
@@ -986,7 +989,7 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
                     objectFit: 'contain',
                     mb: 3,
                     borderRadius: 2,
-                    boxShadow: '0 4px 16px rgba(0,0,0,0.2)'
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.15)'
                   }}
                 />
               )}
@@ -996,7 +999,7 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
                   fontSize: { xs: '1.8rem', md: '2.5rem' },
                   fontWeight: 'bold',
                   mb: 2,
-                  textShadow: '2px 2px 4px rgba(0,0,0,0.3)'
+                  color: '#1a1a1a'
                 }}
               >
                 {slide.title || '커스텀 화면'}
@@ -1008,7 +1011,7 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
                     fontSize: { xs: '1rem', md: '1.3rem' },
                     lineHeight: 1.8,
                     whiteSpace: 'pre-wrap',
-                    opacity: 0.95
+                    color: '#1a1a1a'
                   }}
                 >
                   {slide.content}
@@ -1085,8 +1088,8 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
             flexDirection: 'column',
             justifyContent: 'space-between',
             alignItems: 'center',
-            background: 'linear-gradient(135deg, #2c2c2c 0%, #1a1a1a 100%)',
-            color: '#ffffff',
+            background: 'linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%)', // 아주 연한 회색
+            color: '#1a1a1a', // 어두운 계열 글자색
             p: { xs: 2, md: 3 },
             overflow: 'hidden',
             position: 'relative'
@@ -1222,7 +1225,7 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
           flexDirection: 'column',
           justifyContent: 'space-between',
           alignItems: 'center',
-            background: 'linear-gradient(135deg, #2c2c2c 0%, #1a1a1a 100%)',
+            background: 'linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%)', // 아주 연한 회색
           color: '#ffffff',
           p: { xs: 3, md: 6 },
           overflow: 'auto',
@@ -1312,7 +1315,7 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
               severity="info" 
               sx={{ 
                 backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                color: '#ffffff',
+                color: '#1a1a1a', // 어두운 계열 글자색
                 '& .MuiAlert-icon': { color: '#ffffff' }
               }}
             >
