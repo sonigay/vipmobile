@@ -877,9 +877,17 @@ function convertExcelToHTML(worksheet) {
 // Excel 워크시트를 이미지로 변환 (Canvas 사용)
 async function convertExcelToImage(worksheet, filename) {
   try {
-    // Canvas 모듈 동적 로드
-    const canvasModule = require('canvas');
-    const { createCanvas } = canvasModule;
+    // Canvas 모듈 동적 로드 (optional)
+    let canvasModule;
+    let createCanvas;
+    
+    try {
+      canvasModule = require('canvas');
+      createCanvas = canvasModule.createCanvas;
+    } catch (canvasError) {
+      console.error('❌ [Excel 변환] Canvas 모듈을 찾을 수 없습니다:', canvasError.message);
+      throw new Error('Excel 파일을 이미지로 변환하려면 Canvas 모듈이 필요합니다. 서버에 Canvas를 설치해주세요: npm install canvas');
+    }
     
     // Excel 데이터 읽기
     const rows = [];
@@ -1061,7 +1069,19 @@ async function uploadCustomSlideFile(req, res) {
       });
     } else if (detectedFileType === 'excel') {
       // Excel 파일 변환
-      imageBuffers = await convertExcelToImages(file.buffer, file.originalname || 'excel');
+      try {
+        imageBuffers = await convertExcelToImages(file.buffer, file.originalname || 'excel');
+      } catch (excelError) {
+        console.error('Excel 변환 오류:', excelError);
+        // Canvas가 없는 경우 더 명확한 에러 메시지
+        if (excelError.message.includes('Canvas')) {
+          return res.status(503).json({ 
+            success: false, 
+            error: 'Excel 파일 변환 기능을 사용하려면 서버에 Canvas 모듈이 설치되어 있어야 합니다. 관리자에게 문의하세요.' 
+          });
+        }
+        throw excelError;
+      }
     } else if (detectedFileType === 'ppt') {
       // PPT 파일 변환 (나중에 구현)
       return res.status(501).json({ 
