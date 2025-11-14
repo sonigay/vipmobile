@@ -154,7 +154,7 @@ function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes, pres
     {
       label: '채권장표',
       icon: <AccountBalanceIcon />,
-      component: <BondChartTab loggedInStore={loggedInStore} />,
+      component: <BondChartTab loggedInStore={loggedInStore} initialSubTab={initialSubTab} />,
       hasPermission: loggedInStore?.modePermissions?.bondChart
     },
     {
