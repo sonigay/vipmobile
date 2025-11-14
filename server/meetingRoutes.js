@@ -480,13 +480,16 @@ async function saveMeetingConfig(req, res) {
         });
       }
 
+      // subTab이 있으면 tab 필드에 tab/subTab 형식으로 저장
+      const tabValue = slide.subTab ? `${slide.tab || ''}/${slide.subTab}` : (slide.tab || '');
+      
       const newRow = [
         meetingId,
         slideId,
         slide.order || 0,
         slide.type || 'mode-tab',
         slide.mode || '',
-        slide.tab || '',
+        tabValue,
         slide.title || '',
         slide.content || '',
         slide.backgroundColor || '#ffffff',

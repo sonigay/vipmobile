@@ -194,7 +194,7 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess }) {
     
     if (existingSlide) {
       // 제거
-      setSlides(slides.filter(s => s.slideId !== modeSlideId));
+      setSlides(slides.filter(s => !(s.type === 'mode-only' && s.mode === modeKey)));
     } else {
       // 추가
       const modeConfig = getModeConfig(modeKey);
