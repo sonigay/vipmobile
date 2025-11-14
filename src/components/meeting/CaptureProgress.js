@@ -11,11 +11,13 @@ import {
   List,
   ListItem,
   ListItemIcon,
-  ListItemText,
+  ListItemText
+} from '@mui/material';
+import {
   CheckCircle as CheckCircleIcon,
   RadioButtonUnchecked as RadioButtonUncheckedIcon,
   Error as ErrorIcon
-} from '@mui/material';
+} from '@mui/icons-material';
 
 function CaptureProgress({ open, total, current, completed, failed, onCancel }) {
   const progress = total > 0 ? (completed / total) * 100 : 0;
