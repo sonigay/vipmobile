@@ -11,6 +11,7 @@ import {
 import MeetingList from './MeetingList';
 import MeetingEditor from './MeetingEditor';
 import MeetingConfigEditor from './MeetingConfigEditor';
+import MeetingCaptureManager from './MeetingCaptureManager';
 
 function MeetingPreparationTab({ loggedInStore }) {
   const [editorOpen, setEditorOpen] = useState(false);
@@ -54,8 +55,9 @@ function MeetingPreparationTab({ loggedInStore }) {
     setEditorOpen(false);
     setEditingMeeting(null);
     
-    // 새로 생성된 회의인 경우 설정 화면으로 이동
-    if (createdMeeting && !editingMeeting) {
+    // 새로 생성된 회의인 경우 캡처 시작
+    if (createdMeeting && !editingMeeting && createdMeeting.slides) {
+      // MeetingCaptureManager를 사용하여 캡처 시작
       setNewlyCreatedMeeting(createdMeeting);
       setConfigEditing(true);
     } else {
