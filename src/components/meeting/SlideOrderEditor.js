@@ -55,6 +55,9 @@ function SlideOrderEditor({ slides, onReorder, onRemove }) {
   const getSlideLabel = (slide) => {
     if (slide.type === 'custom') {
       return slide.title || '커스텀 화면';
+    } else if (slide.type === 'mode-only') {
+      const modeConfig = getModeConfig(slide.mode);
+      return modeConfig?.title || slide.mode;
     } else {
       const modeConfig = getModeConfig(slide.mode);
       const modeName = modeConfig?.title || slide.mode;

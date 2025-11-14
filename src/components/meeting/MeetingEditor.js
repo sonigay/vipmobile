@@ -148,6 +148,28 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess }) {
     }
   };
 
+  const handleModeOnlyToggle = (modeKey) => {
+    // 탭이 없는 모드의 경우 모드 전체를 슬라이드로 추가
+    const modeSlideId = `mode-${modeKey}`;
+    const existingSlide = slides.find(s => s.type === 'mode-only' && s.mode === modeKey);
+    
+    if (existingSlide) {
+      // 제거
+      setSlides(slides.filter(s => s.slideId !== modeSlideId));
+    } else {
+      // 추가
+      const modeConfig = getModeConfig(modeKey);
+      const newSlide = {
+        slideId: modeSlideId,
+        type: 'mode-only',
+        mode: modeKey,
+        tabLabel: modeConfig?.title || modeKey,
+        order: slides.length + 1
+      };
+      setSlides([...slides, newSlide]);
+    }
+  };
+
   const handleSlideReorder = (newSlides) => {
     setSlides(newSlides);
   };
@@ -255,6 +277,7 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess }) {
                 onModeToggle={handleModeToggle}
                 selectedTabs={selectedTabs}
                 onTabToggle={handleTabToggle}
+                onModeOnlyToggle={handleModeOnlyToggle}
               />
 
               <Divider sx={{ my: 3 }} />

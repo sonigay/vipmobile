@@ -14,7 +14,7 @@ import {
 import { getModeConfig, getModeIcon } from '../../config/modeConfig';
 import { getAvailableTabsForMode } from '../../config/modeTabConfig';
 
-function ModeSelector({ loggedInStore, selectedModes, onModeToggle, selectedTabs, onTabToggle }) {
+function ModeSelector({ loggedInStore, selectedModes, onModeToggle, selectedTabs, onTabToggle, onModeOnlyToggle }) {
   // 사용 가능한 모드 목록 (권한이 있는 모드만)
   const availableModes = useMemo(() => {
     if (!loggedInStore?.modePermissions) {
@@ -28,9 +28,9 @@ function ModeSelector({ loggedInStore, selectedModes, onModeToggle, selectedTabs
       })
       .map(([mode]) => mode)
       .filter(mode => {
-        // 모드 탭 매핑에 있는 모드만 표시
+        // 모드 설정이 있는 모드만 표시 (모든 모드 표시)
         const modeConfig = getModeConfig(mode);
-        return modeConfig && ['obManagement', 'chart', 'budget', 'inspection', 'smsManagement'].includes(mode);
+        return modeConfig && mode !== 'meeting'; // 회의 모드는 제외
       });
   }, [loggedInStore]);
 
@@ -93,36 +93,60 @@ function ModeSelector({ loggedInStore, selectedModes, onModeToggle, selectedTabs
                   </CardContent>
                 </CardActionArea>
 
-                {isModeSelected && availableTabs.length > 0 && (
+                {isModeSelected && (
                   <Box sx={{ px: 2, pb: 2 }}>
-                    <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
-                      탭 선택:
-                    </Typography>
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                      {availableTabs.map((tab) => {
-                        const tabKey = `${modeKey}-${tab.key}`;
-                        const isTabSelected = selectedTabs.includes(tabKey);
+                    {availableTabs.length > 0 ? (
+                      <>
+                        <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+                          탭 선택:
+                        </Typography>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                          {availableTabs.map((tab) => {
+                            const tabKey = `${modeKey}-${tab.key}`;
+                            const isTabSelected = selectedTabs.includes(tabKey);
 
-                        return (
-                          <Chip
-                            key={tab.key}
-                            label={tab.label}
-                            size="small"
-                            clickable
-                            onClick={() => handleTabToggle(modeKey, tab.key)}
-                            color={isTabSelected ? 'primary' : 'default'}
-                            variant={isTabSelected ? 'filled' : 'outlined'}
-                            sx={{
-                              backgroundColor: isTabSelected ? `${modeConfig.color}20` : 'transparent',
-                              borderColor: modeConfig.color,
-                              '&:hover': {
-                                backgroundColor: `${modeConfig.color}30`
-                              }
-                            }}
-                          />
-                        );
-                      })}
-                    </Box>
+                            return (
+                              <Chip
+                                key={tab.key}
+                                label={tab.label}
+                                size="small"
+                                clickable
+                                onClick={() => handleTabToggle(modeKey, tab.key)}
+                                color={isTabSelected ? 'primary' : 'default'}
+                                variant={isTabSelected ? 'filled' : 'outlined'}
+                                sx={{
+                                  backgroundColor: isTabSelected ? `${modeConfig.color}20` : 'transparent',
+                                  borderColor: modeConfig.color,
+                                  '&:hover': {
+                                    backgroundColor: `${modeConfig.color}30`
+                                  }
+                                }}
+                              />
+                            );
+                          })}
+                        </Box>
+                      </>
+                    ) : (
+                      <Box>
+                        <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block', fontStyle: 'italic' }}>
+                          이 모드는 탭이 없습니다.
+                        </Typography>
+                        <Chip
+                          label="모드 전체 추가"
+                          size="small"
+                          clickable
+                          onClick={() => onModeOnlyToggle && onModeOnlyToggle(modeKey)}
+                          color="primary"
+                          variant="outlined"
+                          sx={{
+                            borderColor: modeConfig.color,
+                            '&:hover': {
+                              backgroundColor: `${modeConfig.color}30`
+                            }
+                          }}
+                        />
+                      </Box>
+                    )}
                   </Box>
                 )}
               </Card>
