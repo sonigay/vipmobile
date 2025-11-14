@@ -82,6 +82,21 @@ function MeetingPreparationTab({ loggedInStore }) {
 
   if (configEditing && (selectedMeeting || newlyCreatedMeeting)) {
     const meetingToEdit = selectedMeeting || newlyCreatedMeeting;
+    
+    // 새로 생성된 회의이고 슬라이드가 있으면 바로 캡처 화면으로
+    if (newlyCreatedMeeting && newlyCreatedMeeting.slides && newlyCreatedMeeting.slides.length > 0) {
+      return (
+        <MeetingCaptureManager
+          meeting={newlyCreatedMeeting}
+          slides={newlyCreatedMeeting.slides}
+          loggedInStore={loggedInStore}
+          onComplete={handleConfigSave}
+          onCancel={handleConfigCancel}
+        />
+      );
+    }
+    
+    // 기존 회의 선택 또는 설정 편집인 경우
     return (
       <Container maxWidth="xl" sx={{ py: 3 }}>
         <Button
