@@ -38,6 +38,7 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess }) {
   // 모드/탭 선택 관련
   const [selectedModes, setSelectedModes] = useState([]);
   const [selectedTabs, setSelectedTabs] = useState([]);
+  const [selectedSubTabs, setSelectedSubTabs] = useState([]);
   const [slides, setSlides] = useState([]);
   const [customSlideOpen, setCustomSlideOpen] = useState(false);
 
@@ -62,6 +63,7 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess }) {
         setActiveStep(0);
         setSelectedModes([]);
         setSelectedTabs([]);
+        setSelectedSubTabs([]);
         setSlides([]);
       }
       setErrors({});
@@ -127,22 +129,42 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess }) {
     const tabId = `${modeKey}-${tabKey}`;
     
     if (selectedTabs.includes(tabId)) {
+      // 탭 제거 시 하부 탭도 함께 제거
       setSelectedTabs(selectedTabs.filter(t => t !== tabId));
+      setSelectedSubTabs(selectedSubTabs.filter(st => !st.startsWith(`${modeKey}-${tabKey}-`)));
       setSlides(slides.filter(s => 
         !(s.type === 'mode-tab' && s.mode === modeKey && s.tab === tabKey)
       ));
     } else {
       setSelectedTabs([...selectedTabs, tabId]);
+    }
+  };
+
+  const handleSubTabToggle = (modeKey, tabKey, subTabKey) => {
+    const subTabId = `${modeKey}-${tabKey}-${subTabKey}`;
+    
+    if (selectedSubTabs.includes(subTabId)) {
+      // 하부 탭 제거
+      setSelectedSubTabs(selectedSubTabs.filter(st => st !== subTabId));
+      setSlides(slides.filter(s => 
+        !(s.type === 'mode-tab' && s.mode === modeKey && s.tab === tabKey && s.subTab === subTabKey)
+      ));
+    } else {
+      // 하부 탭 추가
+      setSelectedSubTabs([...selectedSubTabs, subTabId]);
       
       const availableTabs = getAvailableTabsForMode(modeKey, loggedInStore);
       const tabConfig = availableTabs.find(t => t.key === tabKey);
+      const subTabConfig = tabConfig?.subTabs?.find(st => st.key === subTabKey);
       
       const newSlide = {
         slideId: `slide-${Date.now()}-${Math.random()}`,
         type: 'mode-tab',
         mode: modeKey,
         tab: tabKey,
+        subTab: subTabKey,
         tabLabel: tabConfig?.label || tabKey,
+        subTabLabel: subTabConfig?.label || subTabKey,
         order: slides.length + 1
       };
       
@@ -280,6 +302,8 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess }) {
                 selectedTabs={selectedTabs}
                 onTabToggle={handleTabToggle}
                 onModeOnlyToggle={handleModeOnlyToggle}
+                selectedSubTabs={selectedSubTabs}
+                onSubTabToggle={handleSubTabToggle}
               />
 
               <Divider sx={{ my: 3 }} />

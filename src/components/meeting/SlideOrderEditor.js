@@ -62,6 +62,10 @@ function SlideOrderEditor({ slides, onReorder, onRemove }) {
       const modeConfig = getModeConfig(slide.mode);
       const modeName = modeConfig?.title || slide.mode;
       const tabName = slide.tabLabel || slide.tab || '';
+      const subTabName = slide.subTabLabel || slide.subTab || '';
+      if (subTabName) {
+        return `${modeName} > ${tabName} > ${subTabName}`;
+      }
       return `${modeName} > ${tabName}`;
     }
   };

@@ -40,19 +40,34 @@ const CHART_TABS = [
     key: 'closingChart', 
     label: '마감장표', 
     hasPermission: true,
-    checkPermission: () => true
+    checkPermission: () => true,
+    subTabs: [
+      { key: 'totalClosing', label: '전체총마감' },
+      { key: 'agentClosing', label: '담당자별마감' }
+    ]
   },
   { 
     key: 'bondChart', 
     label: '채권장표', 
     hasPermission: (store) => store?.modePermissions?.bondChart,
-    checkPermission: (store) => !!store?.modePermissions?.bondChart
+    checkPermission: (store) => !!store?.modePermissions?.bondChart,
+    subTabs: [
+      { key: 'overdueBond', label: '연체채권' },
+      { key: 'rechotanchoBond', label: '재초담초채권' },
+      { key: 'subscriberIncrease', label: '가입자증감' }
+    ]
   },
   { 
     key: 'indicatorChart', 
     label: '지표장표', 
     hasPermission: true,
-    checkPermission: () => true
+    checkPermission: () => true,
+    subTabs: [
+      { key: 'monthlyAward', label: '월간시상' },
+      { key: 'salesIndicator', label: '매출지표' },
+      { key: 'salesVolume', label: '판매량' },
+      { key: 'structurePolicy', label: '구조정책' }
+    ]
   },
   { 
     key: 'inventoryChart', 
@@ -64,7 +79,16 @@ const CHART_TABS = [
 
 // 예산 모드 탭 정의
 const BUDGET_TABS = [
-  { key: 'faceBudget', label: '액면예산', checkPermission: () => true },
+  { 
+    key: 'faceBudget', 
+    label: '액면예산', 
+    checkPermission: () => true,
+    subTabs: [
+      { key: 'I', label: 'Ⅰ' },
+      { key: 'II', label: 'Ⅱ' },
+      { key: 'summary', label: '종합' }
+    ]
+  },
   { key: 'basicVerbal', label: '기본구두', checkPermission: () => true },
   { key: 'separateAdditional', label: '별도추가', checkPermission: () => true },
   { key: 'additionalSupport', label: '부가추가지원', checkPermission: () => true },
