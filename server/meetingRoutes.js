@@ -611,18 +611,25 @@ async function saveMeetingConfig(req, res) {
   }
 }
 
-// Discord 포럼 게시판에서 년월별 포스트 찾기 또는 생성
-async function findOrCreatePost(channel, yearMonth) {
+// Discord 포럼 게시판에서 년월별 포스트 찾기 또는 생성 (차수별)
+async function findOrCreatePost(channel, yearMonth, meetingNumber) {
   try {
+    // 포스트 이름 생성 (예: "2025-11 회의 - 1차")
+    const postName = meetingNumber 
+      ? `${yearMonth} 회의 - ${meetingNumber}차`
+      : `${yearMonth} 회의`;
+    
     // 포럼 채널의 활성 포스트 가져오기
     const activeThreads = await channel.threads.fetchActive();
     
-    // 활성 스레드에서 년월로 포스트 찾기
+    // 활성 스레드에서 차수별 포스트 찾기
     let post = Array.from(activeThreads.threads.values()).find(thread => 
-      thread.name.includes(yearMonth) || thread.name === `${yearMonth} 회의`
+      thread.name === postName || 
+      (meetingNumber && thread.name === `${yearMonth} 회의 - ${meetingNumber}차`)
     );
     
     if (post) {
+      console.log(`📌 [Discord] 기존 포스트 찾음: ${postName}`);
       return post;
     }
     
@@ -630,10 +637,12 @@ async function findOrCreatePost(channel, yearMonth) {
     try {
       const archivedThreads = await channel.threads.fetchArchived({ limit: 100 });
       post = Array.from(archivedThreads.threads.values()).find(thread => 
-        thread.name.includes(yearMonth) || thread.name === `${yearMonth} 회의`
+        thread.name === postName || 
+        (meetingNumber && thread.name === `${yearMonth} 회의 - ${meetingNumber}차`)
       );
       
       if (post) {
+        console.log(`📌 [Discord] 아카이브된 포스트 찾음: ${postName}`);
         return post;
       }
     } catch (archivedError) {
@@ -642,10 +651,11 @@ async function findOrCreatePost(channel, yearMonth) {
     }
     
     // 포스트 생성 (포럼 채널에서는 스레드 생성)
+    console.log(`📌 [Discord] 새 포스트 생성: ${postName}`);
     const newPost = await channel.threads.create({
-      name: `${yearMonth} 회의`,
+      name: postName,
       message: {
-        content: `${yearMonth} 회의 이미지 저장`
+        content: `${postName} 이미지 저장`
       },
       appliedTags: []
     });
@@ -673,7 +683,7 @@ async function findOrCreateThread(post, meetingId) {
 }
 
 // 이미지 업로드 (Discord)
-async function uploadImageToDiscord(imageBuffer, filename, meetingId, meetingDate) {
+async function uploadImageToDiscord(imageBuffer, filename, meetingId, meetingDate, meetingNumber) {
   if (!DISCORD_LOGGING_ENABLED || !discordBot) {
     throw new Error('Discord 봇이 초기화되지 않았습니다.');
   }
@@ -699,8 +709,8 @@ async function uploadImageToDiscord(imageBuffer, filename, meetingId, meetingDat
     // 년월 추출 (예: "2025-01")
     const yearMonth = meetingDate ? meetingDate.substring(0, 7) : new Date().toISOString().substring(0, 7);
     
-    // 해당 년월의 포스트 찾기 또는 생성
-    let post = await findOrCreatePost(channel, yearMonth);
+    // 해당 년월과 차수의 포스트 찾기 또는 생성
+    let post = await findOrCreatePost(channel, yearMonth, meetingNumber);
     
     // 회의 스레드 찾기 또는 생성 (현재는 포스트를 그대로 사용)
     let thread = post;
@@ -741,12 +751,38 @@ async function uploadMeetingImage(req, res) {
       ? `custom-slide-${Date.now()}.${req.file.originalname?.split('.').pop() || 'png'}`
       : `meeting-${meetingId}-${slideOrder}.png`);
     
+    // 회의 정보 조회 (차수 가져오기)
+    let meetingNumber = null;
+    if (!isTempMeeting) {
+      try {
+        const { sheets, SPREADSHEET_ID } = createSheetsClient();
+        const sheetName = '회의목록';
+        const range = `${sheetName}!A3:G`;
+        const response = await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range
+        });
+        
+        const rows = response.data.values || [];
+        const meetingRow = rows.find(row => row[0] === meetingId);
+        
+        if (meetingRow && meetingRow[3]) {
+          meetingNumber = parseInt(meetingRow[3]);
+          console.log(`📋 [uploadMeetingImage] 회의 차수 조회: ${meetingNumber}차`);
+        }
+      } catch (meetingError) {
+        console.warn('회의 정보 조회 실패 (차수 정보 없이 진행):', meetingError);
+        // 차수 정보가 없어도 계속 진행
+      }
+    }
+    
     // Discord에 업로드
     const result = await uploadImageToDiscord(
       req.file.buffer,
       filename,
       isTempMeeting ? `custom-${Date.now()}` : meetingId, // 임시 ID 사용
-      meetingDate || new Date().toISOString().split('T')[0]
+      meetingDate || new Date().toISOString().split('T')[0],
+      meetingNumber
     );
 
     res.json({

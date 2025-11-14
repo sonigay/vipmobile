@@ -137,7 +137,9 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
       console.log(`✅ [MeetingCaptureManager] 슬라이드 ${index + 1} 업로드 완료:`, uploadResult.imageUrl);
 
       // 현재 상태를 기반으로 슬라이드 배열 업데이트 (이전 슬라이드 정보 유지)
-      let updatedSlides;
+      // setState의 함수형 업데이트를 사용하여 최신 상태 보장
+      let updatedSlides = null;
+      
       setSlidesState(prevSlides => {
         updatedSlides = prevSlides.map((s, i) => 
           i === index ? {
@@ -160,15 +162,59 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         return updatedSlides;
       });
       
+      // setState가 완료될 때까지 대기 (다음 이벤트 루프에서 실행)
+      await new Promise(resolve => setTimeout(resolve, 0));
+      
+      // updatedSlides가 null이면 다시 가져오기
+      if (!updatedSlides) {
+        console.warn(`⚠️ [MeetingCaptureManager] updatedSlides가 null, 재시도...`);
+        await new Promise(resolve => setTimeout(resolve, 100));
+        // 최신 상태를 다시 가져오기
+        setSlidesState(prevSlides => {
+          updatedSlides = prevSlides.map((s, i) => 
+            i === index ? {
+              ...s,
+              imageUrl: uploadResult.imageUrl,
+              capturedAt: new Date().toISOString(),
+              discordPostId: uploadResult.postId || '',
+              discordThreadId: uploadResult.threadId || ''
+            } : s
+          );
+          return updatedSlides;
+        });
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
+      
+      // 검증: updatedSlides가 배열인지 확인
+      if (!Array.isArray(updatedSlides)) {
+        console.error(`❌ [MeetingCaptureManager] updatedSlides가 배열이 아닙니다:`, typeof updatedSlides, updatedSlides);
+        throw new Error('슬라이드 배열을 생성할 수 없습니다.');
+      }
+      
+      // 각 슬라이드에 필수 필드가 있는지 확인
+      const validatedSlides = updatedSlides.map((slide, idx) => {
+        if (!slide.slideId) {
+          console.warn(`⚠️ [MeetingCaptureManager] 슬라이드 ${idx + 1}에 slideId가 없습니다.`, slide);
+          slide.slideId = slide.slideId || `slide-${slide.order || idx + 1}`;
+        }
+        if (slide.order === undefined || slide.order === null) {
+          console.warn(`⚠️ [MeetingCaptureManager] 슬라이드 ${idx + 1}에 order가 없습니다.`, slide);
+          slide.order = slide.order || idx + 1;
+        }
+        return slide;
+      });
+      
       // 전체 슬라이드 배열을 한 번에 저장 (이전 슬라이드 URL 유지)
-      // setState 외부에서 저장하여 최신 상태 보장
       try {
+        console.log(`💾 [MeetingCaptureManager] 슬라이드 ${index + 1} 저장 시작, 검증된 슬라이드 수: ${validatedSlides.length}`);
         await api.saveMeetingConfig(meeting.meetingId, {
-          slides: updatedSlides
+          slides: validatedSlides
         });
         console.log(`✅ [MeetingCaptureManager] 슬라이드 ${index + 1} 저장 완료`);
       } catch (err) {
         console.error(`❌ [MeetingCaptureManager] 슬라이드 ${index + 1} 저장 실패:`, err);
+        console.error(`❌ [MeetingCaptureManager] 저장 시도한 슬라이드 데이터:`, validatedSlides);
+        throw err; // 에러를 다시 throw하여 상위에서 처리할 수 있도록
       }
 
       setCompleted(prev => prev + 1);

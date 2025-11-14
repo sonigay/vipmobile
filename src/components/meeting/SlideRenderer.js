@@ -73,13 +73,27 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
           const isDataReady = dataLoaded && !dataLoading;
           
           // 실제 데이터가 렌더링되었는지 확인 (더 엄격하게)
-          const hasTableRows = containerRef.current?.querySelector('table tbody tr, .MuiTableBody-root tr, tbody tr') !== null;
-          const hasChartContent = containerRef.current?.querySelector('[class*="Chart"], canvas, svg, [class*="chart"]') !== null;
-          const hasPaperContent = containerRef.current?.querySelector('.MuiPaper-root') !== null;
+          // 테이블 행이 실제로 존재하는지 확인 (최소 1개 이상)
+          const tableRows = containerRef.current?.querySelectorAll('table tbody tr, .MuiTableBody-root tr, tbody tr') || [];
+          const hasTableRows = tableRows.length > 0;
+          
+          // 차트나 SVG가 실제로 렌더링되었는지 확인
+          const chartElements = containerRef.current?.querySelectorAll('[class*="Chart"], canvas, svg, [class*="chart"]') || [];
+          const hasChartContent = chartElements.length > 0;
+          
+          // Paper 컴포넌트가 있고 내용이 있는지 확인
+          const paperElements = containerRef.current?.querySelectorAll('.MuiPaper-root') || [];
+          const hasPaperContent = paperElements.length > 0;
+          
+          // 실제 데이터가 있는지 확인 (텍스트 내용이 "로딩", "불러오는 중" 등이 아닌 실제 데이터)
           const hasRealData = hasTableRows || hasChartContent || hasPaperContent;
           
+          // 추가 검증: 테이블이 있으면 최소 1개 이상의 데이터 행이 있어야 함
+          const hasValidTableData = hasTableRows && tableRows.length > 0;
+          
           // 로딩이 완전히 없고, 데이터가 준비되었고, 실제 콘텐츠가 있어야 완료
-          const isContentReady = !isLoading && isDataReady && hasRealData;
+          // 테이블이 있으면 유효한 데이터 행이 있어야 함
+          const isContentReady = !isLoading && isDataReady && hasRealData && (hasTableRows ? hasValidTableData : true);
           
           if (isContentReady) {
             if (lastStableTime === null) {
@@ -94,9 +108,10 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
               dataLoaded,
               hasLoadingText,
               hasRealData,
-              hasTableRows,
-              hasChartContent,
-              hasPaperContent,
+              hasTableRows: tableRows.length,
+              hasValidTableData,
+              hasChartContent: chartElements.length,
+              hasPaperContent: paperElements.length,
               timeSinceStart: Math.round(timeSinceStart / 1000) + '초'
             });
             
@@ -121,8 +136,10 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
               dataLoaded,
               hasLoadingText,
               hasRealData,
-              hasTableRows,
-              hasChartContent,
+              hasTableRows: tableRows.length,
+              hasValidTableData,
+              hasChartContent: chartElements.length,
+              hasPaperContent: paperElements.length,
               isLoading,
               isDataReady,
               isContentReady

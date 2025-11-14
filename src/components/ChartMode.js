@@ -1907,6 +1907,38 @@ function TotalClosingTab() {
   const [csSummaryOpen, setCsSummaryOpen] = useState(false); // 기본값: 접기 상태
   const [error, setError] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
+  const [dataRendered, setDataRendered] = useState(false); // 실제 데이터 렌더링 완료 여부
+  const containerRef = React.useRef(null);
+
+  // 데이터가 로드되고 실제 테이블이 렌더링되었는지 확인
+  React.useEffect(() => {
+    if (data && !loading && containerRef.current) {
+      // 실제 테이블 행이 있는지 확인 (최소 1개 이상의 데이터 행)
+      const hasTableRows = containerRef.current.querySelectorAll('table tbody tr, .MuiTableBody-root tr').length > 0;
+      // 또는 데이터가 있는지 확인 (CS 요약, 코드별, 사무실별, 소속별, 담당자별 데이터)
+      const hasData = data.csSummary || 
+                      (data.codeData && data.codeData.length > 0) ||
+                      (data.officeData && data.officeData.length > 0) ||
+                      (data.departmentData && data.departmentData.length > 0) ||
+                      (data.agentData && data.agentData.length > 0);
+      
+      if (hasData) {
+        // 실제 테이블이 렌더링되기까지 약간의 지연 (DOM 업데이트 대기)
+        const checkRender = setTimeout(() => {
+          const finalCheck = containerRef.current.querySelectorAll('table tbody tr, .MuiTableBody-root tr').length > 0 ||
+                            containerRef.current.querySelector('.MuiPaper-root') !== null;
+          if (finalCheck) {
+            console.log('📊 [TotalClosingTab] 실제 데이터 렌더링 완료 확인, data-loaded="true" 설정');
+            setDataRendered(true);
+          }
+        }, 500);
+        
+        return () => clearTimeout(checkRender);
+      }
+    } else if (loading || !data) {
+      setDataRendered(false);
+    }
+  }, [data, loading]);
 
   // 데이터 로드
   const loadData = useCallback(async (date = selectedDate) => {
@@ -2088,7 +2120,12 @@ function TotalClosingTab() {
   }
 
   return (
-    <Box sx={{ p: 2 }} data-loaded={data ? 'true' : 'false'} data-loading={loading ? 'true' : 'false'}>
+    <Box 
+      ref={containerRef}
+      sx={{ p: 2 }} 
+      data-loaded={dataRendered && data && !loading ? 'true' : 'false'} 
+      data-loading={loading ? 'true' : 'false'}
+    >
       {/* 상단 컨트롤 */}
       <Paper sx={{ p: 2, mb: 2 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
@@ -2790,7 +2827,12 @@ function AgentClosingTab() {
   const groupedAgents = groupAgentNames(availableAgents);
 
   return (
-    <Box sx={{ p: 2 }} data-loaded={data ? 'true' : 'false'} data-loading={loading ? 'true' : 'false'}>
+    <Box 
+      ref={containerRef}
+      sx={{ p: 2 }} 
+      data-loaded={dataRendered && data && !loading ? 'true' : 'false'} 
+      data-loading={loading ? 'true' : 'false'}
+    >
       {/* 상단 필터 */}
       <Paper sx={{ p: 2, mb: 2 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
