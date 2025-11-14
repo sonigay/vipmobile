@@ -93,12 +93,31 @@ function MeetingPresentationTab({ loggedInStore }) {
   const handlePlay = async (meeting) => {
     try {
       setLoading(true);
+      console.log(`▶️ [MeetingPresentationTab] 회의 재생 시작: ${meeting.meetingId}`);
       const response = await api.getMeetingConfig(meeting.meetingId);
-      const loadedSlides = (response.slides || [])
+      console.log(`▶️ [MeetingPresentationTab] 회의 설정 조회 완료:`, {
+        totalSlides: response.slides?.length || 0,
+        slidesWithImage: response.slides?.filter(s => s.imageUrl).length || 0
+      });
+      
+      const allSlides = response.slides || [];
+      console.log(`▶️ [MeetingPresentationTab] 전체 슬라이드 상세:`, allSlides.map(s => ({
+        order: s.order,
+        slideId: s.slideId,
+        mode: s.mode,
+        tab: s.tab,
+        imageUrl: s.imageUrl || '없음',
+        hasImageUrl: !!s.imageUrl
+      })));
+      
+      const loadedSlides = allSlides
         .filter(slide => slide.imageUrl) // 이미지 URL이 있는 슬라이드만
         .sort((a, b) => a.order - b.order); // 순서대로 정렬
 
+      console.log(`▶️ [MeetingPresentationTab] 필터링된 슬라이드 수: ${loadedSlides.length}`);
+
       if (loadedSlides.length === 0) {
+        console.warn(`⚠️ [MeetingPresentationTab] 이미지 URL이 있는 슬라이드가 없음`);
         alert('이 회의에는 캡처된 이미지가 없습니다.');
         setLoading(false);
         return;
@@ -107,8 +126,9 @@ function MeetingPresentationTab({ loggedInStore }) {
       setSelectedMeeting(meeting);
       setSlides(loadedSlides);
       setViewing(true);
+      console.log(`✅ [MeetingPresentationTab] 재생 시작: ${loadedSlides.length}개 슬라이드`);
     } catch (err) {
-      console.error('회의 설정 조회 오류:', err);
+      console.error('❌ [MeetingPresentationTab] 회의 설정 조회 오류:', err);
       alert('회의 정보를 불러오는데 실패했습니다.');
     } finally {
       setLoading(false);
