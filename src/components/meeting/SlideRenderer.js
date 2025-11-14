@@ -79,15 +79,16 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
           }
         };
         
-        // 최소 1초 대기 후 체크 시작
-        setTimeout(checkLoading, 1000);
+        // 최소 2초 대기 후 체크 시작 (데이터 로딩 시간 고려)
+        setTimeout(checkLoading, 2000);
       });
     };
     
-    // 최소 2초 대기 후 데이터 로딩 완료 확인
+    // 최소 3초 대기 후 데이터 로딩 완료 확인
     const timer = setTimeout(async () => {
+      console.log('⏳ [SlideRenderer] 데이터 로딩 대기 시작 (최소 3초)');
       await waitForDataLoad();
-      console.log('✅ [SlideRenderer] 로딩 완료, onReady 호출');
+      console.log('✅ [SlideRenderer] 데이터 로딩 완료 확인됨, onReady 호출 준비');
       setLoading(false);
       setContentReady(true);
       // 추가 대기 후 onReady 호출 (렌더링 완료 보장)
@@ -96,8 +97,8 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
           console.log('✅ [SlideRenderer] onReady 콜백 호출');
           onReady();
         }
-      }, 500);
-    }, 2000);
+      }, 1000); // 1초 추가 대기
+    }, 3000); // 최소 3초 대기
 
     return () => clearTimeout(timer);
   }, [slide, onReady]);

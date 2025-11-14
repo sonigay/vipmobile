@@ -404,15 +404,19 @@ async function getMeetingConfig(req, res) {
     });
 
     const rows = response.data.values || [];
-    const slides = rows
-      .filter(row => row[0] === meetingId)
-      .map(row => {
+    console.log(`📖 [getMeetingConfig] 회의ID ${meetingId}의 전체 행 수: ${rows.length}`);
+    
+    const filteredRows = rows.filter(row => row[0] === meetingId);
+    console.log(`📖 [getMeetingConfig] 필터링된 행 수: ${filteredRows.length}`);
+    
+    const slides = filteredRows
+      .map((row, idx) => {
         const tabValue = row[5] || '';
         // tab/subTab 형식으로 저장된 경우 파싱
         const [tab, subTab] = tabValue.includes('/') ? tabValue.split('/') : [tabValue, ''];
         
-        return {
-          slideId: row[1],
+        const slide = {
+          slideId: row[1] || '',
           order: parseInt(row[2]) || 0,
           type: row[3] || 'mode-tab',
           mode: row[4] || '',
@@ -426,9 +430,22 @@ async function getMeetingConfig(req, res) {
           discordPostId: row[11] || '',
           discordThreadId: row[12] || ''
         };
+        
+        console.log(`📖 [getMeetingConfig] 슬라이드 ${idx + 1}:`, {
+          slideId: slide.slideId,
+          order: slide.order,
+          mode: slide.mode,
+          tab: slide.tab,
+          subTab: slide.subTab,
+          imageUrl: slide.imageUrl || '없음',
+          hasImageUrl: !!slide.imageUrl
+        });
+        
+        return slide;
       })
       .sort((a, b) => a.order - b.order);
 
+    console.log(`📖 [getMeetingConfig] 최종 슬라이드 수: ${slides.length}, 이미지 URL이 있는 슬라이드: ${slides.filter(s => s.imageUrl).length}`);
     res.json({ success: true, slides });
   } catch (error) {
     console.error('회의 설정 조회 오류:', error);
@@ -461,15 +478,30 @@ async function saveMeetingConfig(req, res) {
     });
 
     const existingRows = response.data.values || [];
+    console.log(`📋 [saveMeetingConfig] 기존 행 수: ${existingRows.length}, 저장할 슬라이드 수: ${slides.length}`);
     
     // 각 슬라이드를 개별적으로 업데이트 또는 추가
-    for (const slide of slides) {
+    for (let i = 0; i < slides.length; i++) {
+      const slide = slides[i];
       const slideId = slide.slideId || slide.id || `slide-${slide.order}`;
+      
+      console.log(`\n🔄 [saveMeetingConfig] 슬라이드 ${i + 1}/${slides.length} 처리 시작:`, {
+        slideId,
+        order: slide.order,
+        mode: slide.mode,
+        tab: slide.tab,
+        subTab: slide.subTab,
+        imageUrl: slide.imageUrl || '없음',
+        discordPostId: slide.discordPostId || '없음',
+        discordThreadId: slide.discordThreadId || '없음'
+      });
       
       // 기존 슬라이드 찾기: slideId로 먼저 찾고, 없으면 mode/tab/subTab/order로 찾기
       let existingRowIndex = existingRows.findIndex((row, idx) => 
         row[0] === meetingId && row[1] === slideId
       );
+      
+      console.log(`🔍 [saveMeetingConfig] slideId로 찾기 결과: ${existingRowIndex !== -1 ? `찾음 (행 ${existingRowIndex + 3})` : '없음'}`);
       
       // slideId로 찾지 못한 경우 mode/tab/subTab/order로 찾기
       if (existingRowIndex === -1) {
@@ -481,10 +513,29 @@ async function saveMeetingConfig(req, res) {
           const rowTab = row[5] || '';
           const rowOrder = parseInt(row[2] || 0);
           
-          return rowMode === (slide.mode || '') && 
+          const matches = rowMode === (slide.mode || '') && 
                  rowTab === tabValue && 
                  rowOrder === (slide.order || 0);
+          
+          if (matches) {
+            console.log(`🔍 [saveMeetingConfig] mode/tab/order로 찾음 (행 ${idx + 3}):`, {
+              rowMode,
+              rowTab,
+              rowOrder,
+              slideMode: slide.mode,
+              slideTab: tabValue,
+              slideOrder: slide.order
+            });
+          }
+          
+          return matches;
         });
+        
+        if (existingRowIndex !== -1) {
+          console.log(`✅ [saveMeetingConfig] mode/tab/order로 찾기 성공: 행 ${existingRowIndex + 3}`);
+        } else {
+          console.log(`❌ [saveMeetingConfig] mode/tab/order로도 찾지 못함, 새로 추가`);
+        }
       }
 
       // subTab이 있으면 tab 필드에 tab/subTab 형식으로 저장
@@ -509,7 +560,8 @@ async function saveMeetingConfig(req, res) {
       if (existingRowIndex !== -1) {
         // 기존 슬라이드 업데이트
         const updateRange = `${sheetName}!A${existingRowIndex + 3}:M${existingRowIndex + 3}`;
-        await sheets.spreadsheets.values.update({
+        console.log(`📝 [saveMeetingConfig] 기존 슬라이드 업데이트 시작: 범위 ${updateRange}`);
+        const updateResult = await sheets.spreadsheets.values.update({
           spreadsheetId: SPREADSHEET_ID,
           range: updateRange,
           valueInputOption: 'USER_ENTERED',
@@ -517,12 +569,17 @@ async function saveMeetingConfig(req, res) {
             values: [newRow]
           }
         });
+        console.log(`✅ [saveMeetingConfig] 업데이트 완료:`, {
+          updatedCells: updateResult.data.updatedCells,
+          updatedRange: updateResult.data.updatedRange,
+          imageUrl: slide.imageUrl || '없음'
+        });
         // 기존 행 데이터도 업데이트 (다음 반복을 위해)
         existingRows[existingRowIndex] = newRow;
-        console.log(`✅ [saveMeetingConfig] 슬라이드 ${slideId} 업데이트 완료 (행 ${existingRowIndex + 3}), URL: ${slide.imageUrl || '없음'}`);
       } else {
         // 새 슬라이드 추가
-        await sheets.spreadsheets.values.append({
+        console.log(`📝 [saveMeetingConfig] 새 슬라이드 추가 시작`);
+        const appendResult = await sheets.spreadsheets.values.append({
           spreadsheetId: SPREADSHEET_ID,
           range: `${sheetName}!A3`,
           valueInputOption: 'USER_ENTERED',
@@ -530,11 +587,22 @@ async function saveMeetingConfig(req, res) {
             values: [newRow]
           }
         });
+        console.log(`✅ [saveMeetingConfig] 추가 완료:`, {
+          updatedCells: appendResult.data.updates?.updatedCells,
+          updatedRange: appendResult.data.updates?.updatedRange,
+          imageUrl: slide.imageUrl || '없음'
+        });
         // 기존 행 목록에도 추가 (다음 반복을 위해)
         existingRows.push(newRow);
-        console.log(`✅ [saveMeetingConfig] 슬라이드 ${slideId} 추가 완료, URL: ${slide.imageUrl || '없음'}`);
+      }
+      
+      // 각 슬라이드 저장 후 약간의 지연 (Google Sheets API rate limit 방지)
+      if (i < slides.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 200));
       }
     }
+    
+    console.log(`\n✅ [saveMeetingConfig] 모든 슬라이드 저장 완료 (${slides.length}개)`);
 
     res.json({ success: true });
   } catch (error) {

@@ -1932,7 +1932,9 @@ function TotalClosingTab() {
       }
 
       const result = await response.json();
+      console.log('📊 [TotalClosingTab] 데이터 로드 완료, data 설정 시작');
       setData(result);
+      console.log('📊 [TotalClosingTab] data 상태 업데이트됨:', !!result);
       
       // 매칭 불일치 데이터 처리
       console.log('🔍 [프론트엔드] API 응답 확인:', {
@@ -1952,9 +1954,15 @@ function TotalClosingTab() {
       setLastUpdate(new Date());
       setProgress(100);
 
+      // 로딩 완료를 더 확실하게 하기 위해 약간의 지연 후 loading 상태 변경
       setTimeout(() => {
+        console.log('📊 [TotalClosingTab] loading 상태를 false로 변경');
         setProgress(0);
         setLoading(false);
+        // 추가로 DOM 업데이트를 위한 짧은 지연
+        setTimeout(() => {
+          console.log('📊 [TotalClosingTab] DOM 업데이트 완료, data-loaded 속성 설정됨');
+        }, 100);
       }, 500);
 
     } catch (err) {
