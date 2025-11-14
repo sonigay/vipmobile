@@ -242,6 +242,8 @@ function MeetingConfigEditor({ meeting, loggedInStore, onSave, onCancel }) {
         open={customSlideOpen}
         onClose={() => setCustomSlideOpen(false)}
         onSave={handleCustomSlideSave}
+        meetingDate={meeting?.meetingDate || new Date().toISOString().split('T')[0]}
+        meetingNumber={meeting?.meetingNumber ? parseInt(meeting.meetingNumber) : null}
       />
 
       {capturing && (

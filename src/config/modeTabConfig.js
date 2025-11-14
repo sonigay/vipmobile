@@ -42,7 +42,38 @@ const CHART_TABS = [
     hasPermission: true,
     checkPermission: () => true,
     subTabs: [
-      { key: 'totalClosing', label: '전체총마감' },
+      { 
+        key: 'totalClosing', 
+        label: '전체총마감',
+        detailOptions: {
+          type: 'csDetail',
+          options: [
+            {
+              key: 'csDetailType',
+              label: '구분',
+              type: 'select',
+              values: [
+                { key: 'all', label: '전체' },
+                { key: 'code', label: '코드별 실적' },
+                { key: 'office', label: '사무실별 실적' },
+                { key: 'department', label: '소속별 실적' },
+                { key: 'agent', label: '담당자별 실적' }
+              ],
+              defaultValue: 'all'
+            },
+            {
+              key: 'csDetailCriteria',
+              label: '기준',
+              type: 'select',
+              values: [
+                { key: 'performance', label: '실적 기준' },
+                { key: 'fee', label: '수수료 기준' }
+              ],
+              defaultValue: 'performance'
+            }
+          ]
+        }
+      },
       { key: 'agentClosing', label: '담당자별마감' }
     ]
   },
@@ -98,9 +129,95 @@ const BUDGET_TABS = [
 
 // 검수 모드 탭 정의
 const INSPECTION_TABS = [
-  { key: 'general', label: '일반검수항목', checkPermission: () => true },
-  { key: 'additional', label: '추가검수항목', checkPermission: () => true },
-  { key: 'deduction', label: '차감검수항목', checkPermission: () => true }
+  { 
+    key: 'general', 
+    label: '일반검수항목', 
+    checkPermission: () => true,
+    detailOptions: {
+      type: 'field',
+      options: [
+        {
+          key: 'selectedField',
+          label: '세부 항목',
+          type: 'select',
+          values: [
+            { key: 'all', label: '모든 항목' },
+            { key: 'storeCode', label: '대리점코드' },
+            { key: 'activationDateTime', label: '개통일시분' },
+            { key: 'modelName', label: '모델명(일련번호)' },
+            { key: 'activationType', label: '개통유형' },
+            { key: 'salesPos', label: '실판매POS' },
+            { key: 'ratePlan', label: '요금제' },
+            { key: 'releasePrice', label: '출고가상이' },
+            { key: 'supportPrice', label: '지원금 및 약정상이' },
+            { key: 'freeInstallment', label: '프리할부상이' },
+            { key: 'distributionSupport', label: '유통망지원금 상이' }
+          ],
+          defaultValue: 'all'
+        }
+      ]
+    }
+  },
+  { 
+    key: 'additional', 
+    label: '추가검수항목', 
+    checkPermission: () => true,
+    detailOptions: {
+      type: 'field',
+      options: [
+        {
+          key: 'selectedField',
+          label: '세부 항목',
+          type: 'select',
+          values: [
+            { key: 'all', label: '모든 항목' },
+            { key: 'uplay', label: '유플레이 유치 추가' },
+            { key: 'vcoloring', label: 'V컬러링 음악감상 플러스 유치' },
+            { key: 'phoneExchangePass', label: '폰교체 패스 유치' },
+            { key: 'phoneExchangeSlim', label: '폰교체 슬림 유치' },
+            { key: 'phoneSafePass', label: '폰 안심패스 유치' },
+            { key: 'callTone', label: '통화연결음 유치' },
+            { key: 'youthPlan1', label: '청소년요금제추가정책(1)유치' },
+            { key: 'youthPlan2', label: '청소년요금제추가정책(2)유치' },
+            { key: 'distributionSupport', label: '유통망지원금 활성화정책' }
+          ],
+          defaultValue: 'all'
+        }
+      ]
+    }
+  },
+  { 
+    key: 'deduction', 
+    label: '차감검수항목', 
+    checkPermission: () => true,
+    detailOptions: {
+      type: 'field',
+      options: [
+        {
+          key: 'selectedField',
+          label: '세부 항목',
+          type: 'select',
+          values: [
+            { key: 'all', label: '모든 항목' },
+            { key: 'uplayNo', label: '유플레이 미유치 차감' },
+            { key: 'callToneNo', label: '통화연결음 미유치' },
+            { key: 'insuranceNo', label: '보험 미유치' },
+            { key: 'select115', label: '115군 선택약정 차감' },
+            { key: 'selectS721', label: '선택약정 S721(010신규) 차감' },
+            { key: 'selectS931', label: '선택약정 S931,S938,S937(MNP) 차감' },
+            { key: 'selectIphone16', label: '선택약정 아이폰16류전체(MNP) 차감' },
+            { key: 'a166Mnp', label: 'A166 44군 대상외요금제(MNP) 차감' },
+            { key: 'a166Change', label: 'A166 44군 대상외요금제(기변) 차감' },
+            { key: 'policyChange', label: '정책기변 차감' },
+            { key: 'changeTarget', label: '기변 C타겟 차감' },
+            { key: 'senior33', label: '33군미만, 시니어1군시 차감' },
+            { key: 'onsaleOnline', label: '온세일 전략온라인POS 차감' }
+          ],
+          defaultValue: 'all'
+        }
+      ]
+    }
+  }
 ];
 
 // SMS 관리 모드 탭 정의

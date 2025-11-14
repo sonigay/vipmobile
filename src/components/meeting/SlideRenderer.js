@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Box, CircularProgress, Alert, Typography } from '@mui/material';
+import { Event as EventIcon, LocationOn as LocationIcon, People as PeopleIcon } from '@mui/icons-material';
 import { getModeConfig } from '../../config/modeConfig';
 import ChartMode from '../ChartMode';
+import InspectionMode from '../InspectionMode';
 import { getAvailableTabsForMode } from '../../config/modeTabConfig';
 
 /**
@@ -276,14 +278,20 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
             position: 'relative'
           }}
         >
-          {/* 상단: 회사 로고 및 이름 */}
+          {/* 상단: 회사 로고 및 이름 - 흰색 배경 적용 */}
           <Box
             sx={{
               display: 'flex',
-              flexDirection: 'column',
+              flexDirection: 'row',
               alignItems: 'center',
-              mb: { xs: 2, md: 4 },
-              width: '100%'
+              justifyContent: 'center',
+              mb: { xs: 1.5, md: 2 },
+              width: '100%',
+              backgroundColor: 'rgba(255, 255, 255, 0.95)',
+              borderRadius: 2,
+              px: { xs: 2, md: 3 },
+              py: { xs: 1, md: 1.5 },
+              boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
             }}
           >
             <Box
@@ -291,10 +299,9 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
               src="/logo512.png"
               alt="회사 로고"
               sx={{
-                width: { xs: 80, md: 120 },
-                height: { xs: 80, md: 120 },
-                mb: 2,
-                filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.2))'
+                width: { xs: 40, md: 50 },
+                height: { xs: 40, md: 50 },
+                mr: { xs: 1, md: 1.5 }
               }}
               onError={(e) => {
                 // 로고가 없으면 숨김
@@ -302,12 +309,12 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
               }}
             />
             <Typography
-              variant="h5"
+              variant="h6"
               sx={{
                 fontWeight: 600,
-                fontSize: { xs: '1.2rem', md: '1.5rem' },
-                textShadow: '1px 1px 3px rgba(0,0,0,0.3)',
-                letterSpacing: '0.5px'
+                fontSize: { xs: '0.9rem', md: '1.1rem' },
+                color: '#333',
+                letterSpacing: '0.3px'
               }}
             >
               (주)브이아이피플러스
@@ -372,20 +379,26 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
               }}
             >
               <Box sx={{ mb: 3 }}>
-                <Typography variant="h5" sx={{ mb: 2, fontWeight: 600, fontSize: { xs: '1.1rem', md: '1.5rem' } }}>
-                  📅 일시
-                </Typography>
-                <Typography variant="h6" sx={{ fontWeight: 400, fontSize: { xs: '1rem', md: '1.3rem' } }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5, gap: 1 }}>
+                  <EventIcon sx={{ fontSize: { xs: '1.2rem', md: '1.5rem' }, opacity: 0.9 }} />
+                  <Typography variant="h5" sx={{ fontWeight: 600, fontSize: { xs: '1.1rem', md: '1.5rem' } }}>
+                    일시
+                  </Typography>
+                </Box>
+                <Typography variant="h6" sx={{ fontWeight: 400, fontSize: { xs: '1rem', md: '1.3rem' }, pl: 4 }}>
                   {formattedDate}
                 </Typography>
               </Box>
               
               {slide.meetingLocation && (
                 <Box sx={{ mb: 3 }}>
-                  <Typography variant="h5" sx={{ mb: 2, fontWeight: 600, fontSize: { xs: '1.1rem', md: '1.5rem' } }}>
-                    📍 장소
-                  </Typography>
-                  <Typography variant="h6" sx={{ fontWeight: 400, fontSize: { xs: '1rem', md: '1.3rem' } }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5, gap: 1 }}>
+                    <LocationIcon sx={{ fontSize: { xs: '1.2rem', md: '1.5rem' }, opacity: 0.9 }} />
+                    <Typography variant="h5" sx={{ fontWeight: 600, fontSize: { xs: '1.1rem', md: '1.5rem' } }}>
+                      장소
+                    </Typography>
+                  </Box>
+                  <Typography variant="h6" sx={{ fontWeight: 400, fontSize: { xs: '1rem', md: '1.3rem' }, pl: 4 }}>
                     {slide.meetingLocation}
                   </Typography>
                 </Box>
@@ -393,9 +406,12 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
               
               {participantsList.length > 0 && (
                 <Box>
-                  <Typography variant="h5" sx={{ mb: 2, fontWeight: 600, fontSize: { xs: '1.1rem', md: '1.5rem' } }}>
-                    👥 참석자
-                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5, gap: 1 }}>
+                    <PeopleIcon sx={{ fontSize: { xs: '1.2rem', md: '1.5rem' }, opacity: 0.9 }} />
+                    <Typography variant="h5" sx={{ fontWeight: 600, fontSize: { xs: '1.1rem', md: '1.5rem' } }}>
+                      참석자
+                    </Typography>
+                  </Box>
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 1.5 }}>
                     {participantsList.map((participant, index) => (
                       <Box
@@ -455,14 +471,20 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
             position: 'relative'
           }}
         >
-          {/* 상단: 회사 로고 및 이름 */}
+          {/* 상단: 회사 로고 및 이름 - 흰색 배경 적용 */}
           <Box
             sx={{
               display: 'flex',
-              flexDirection: 'column',
+              flexDirection: 'row',
               alignItems: 'center',
-              mb: { xs: 2, md: 3 },
-              width: '100%'
+              justifyContent: 'center',
+              mb: { xs: 1.5, md: 2 },
+              width: '100%',
+              backgroundColor: 'rgba(255, 255, 255, 0.95)',
+              borderRadius: 2,
+              px: { xs: 2, md: 3 },
+              py: { xs: 1, md: 1.5 },
+              boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
             }}
           >
             <Box
@@ -470,10 +492,9 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
               src="/logo512.png"
               alt="회사 로고"
               sx={{
-                width: { xs: 60, md: 80 },
-                height: { xs: 60, md: 80 },
-                mb: 1,
-                filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.2))'
+                width: { xs: 40, md: 50 },
+                height: { xs: 40, md: 50 },
+                mr: { xs: 1, md: 1.5 }
               }}
               onError={(e) => {
                 e.target.style.display = 'none';
@@ -483,9 +504,9 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
               variant="h6"
               sx={{
                 fontWeight: 600,
-                fontSize: { xs: '1rem', md: '1.2rem' },
-                textShadow: '1px 1px 3px rgba(0,0,0,0.3)',
-                letterSpacing: '0.5px'
+                fontSize: { xs: '0.9rem', md: '1.1rem' },
+                color: '#333',
+                letterSpacing: '0.3px'
               }}
             >
               (주)브이아이피플러스
@@ -721,14 +742,20 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
             position: 'relative'
           }}
         >
-          {/* 상단: 회사 로고 및 이름 */}
+          {/* 상단: 회사 로고 및 이름 - 흰색 배경 적용 */}
           <Box
             sx={{
               display: 'flex',
-              flexDirection: 'column',
+              flexDirection: 'row',
               alignItems: 'center',
-              mb: { xs: 2, md: 4 },
-              width: '100%'
+              justifyContent: 'center',
+              mb: { xs: 1.5, md: 2 },
+              width: '100%',
+              backgroundColor: 'rgba(255, 255, 255, 0.95)',
+              borderRadius: 2,
+              px: { xs: 2, md: 3 },
+              py: { xs: 1, md: 1.5 },
+              boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
             }}
           >
             <Box
@@ -736,22 +763,21 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
               src="/logo512.png"
               alt="회사 로고"
               sx={{
-                width: { xs: 80, md: 120 },
-                height: { xs: 80, md: 120 },
-                mb: 2,
-                filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.2))'
+                width: { xs: 40, md: 50 },
+                height: { xs: 40, md: 50 },
+                mr: { xs: 1, md: 1.5 }
               }}
               onError={(e) => {
                 e.target.style.display = 'none';
               }}
             />
             <Typography
-              variant="h5"
+              variant="h6"
               sx={{
                 fontWeight: 600,
-                fontSize: { xs: '1.2rem', md: '1.5rem' },
-                textShadow: '1px 1px 3px rgba(0,0,0,0.3)',
-                letterSpacing: '0.5px'
+                fontSize: { xs: '0.9rem', md: '1.1rem' },
+                color: '#333',
+                letterSpacing: '0.3px'
               }}
             >
               (주)브이아이피플러스
@@ -1054,15 +1080,21 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
             position: 'relative'
           }}
         >
-          {/* 상단: 회사 로고 및 슬라이드 제목 */}
+          {/* 상단: 회사 로고 및 슬라이드 제목 - 흰색 배경 적용 */}
           <Box
             sx={{
               display: 'flex',
-              flexDirection: 'column',
+              flexDirection: 'row',
               alignItems: 'center',
-              mb: { xs: 1, md: 2 },
+              justifyContent: 'center',
+              mb: { xs: 1, md: 1.5 },
               width: '100%',
-              flexShrink: 0
+              flexShrink: 0,
+              backgroundColor: 'rgba(255, 255, 255, 0.95)',
+              borderRadius: 2,
+              px: { xs: 2, md: 3 },
+              py: { xs: 0.75, md: 1 },
+              boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
             }}
           >
             <Box
@@ -1070,10 +1102,9 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
               src="/logo512.png"
               alt="회사 로고"
               sx={{
-                width: { xs: 50, md: 70 },
-                height: { xs: 50, md: 70 },
-                mb: 1,
-                filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.2))'
+                width: { xs: 35, md: 45 },
+                height: { xs: 35, md: 45 },
+                mr: { xs: 1, md: 1.5 }
               }}
               onError={(e) => {
                 e.target.style.display = 'none';
@@ -1083,10 +1114,9 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
               variant="h6"
               sx={{
                 fontWeight: 600,
-                fontSize: { xs: '0.9rem', md: '1.1rem' },
-                textShadow: '1px 1px 3px rgba(0,0,0,0.3)',
-                letterSpacing: '0.5px',
-                mb: 1
+                fontSize: { xs: '0.85rem', md: '1rem' },
+                color: '#333',
+                letterSpacing: '0.3px'
               }}
             >
               (주)브이아이피플러스
@@ -1138,6 +1168,10 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
                 presentationMode={true}
                 initialTab={tabIndex >= 0 ? tabIndex : 0}
                 initialSubTab={subTabIndex}
+                detailOptions={slide.detailOptions}
+                // 하위 호환성을 위해 기존 필드도 지원
+                csDetailType={slide.detailOptions?.csDetailType || slide.csDetailType}
+                csDetailCriteria={slide.detailOptions?.csDetailCriteria || slide.csDetailCriteria}
               />
             </Box>
           </Box>
@@ -1180,14 +1214,20 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
           position: 'relative'
         }}
       >
-        {/* 상단: 회사 로고 및 슬라이드 제목 */}
+        {/* 상단: 회사 로고 및 슬라이드 제목 - 흰색 배경 적용 */}
         <Box
           sx={{
             display: 'flex',
-            flexDirection: 'column',
+            flexDirection: 'row',
             alignItems: 'center',
-            mb: { xs: 2, md: 3 },
-            width: '100%'
+            justifyContent: 'center',
+            mb: { xs: 1, md: 1.5 },
+            width: '100%',
+            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+            borderRadius: 2,
+            px: { xs: 2, md: 3 },
+            py: { xs: 0.75, md: 1 },
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
           }}
         >
           <Box
@@ -1195,10 +1235,9 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
             src="/logo512.png"
             alt="회사 로고"
             sx={{
-              width: { xs: 60, md: 80 },
-              height: { xs: 60, md: 80 },
-              mb: 1,
-              filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.2))'
+              width: { xs: 35, md: 45 },
+              height: { xs: 35, md: 45 },
+              mr: { xs: 1, md: 1.5 }
             }}
             onError={(e) => {
               e.target.style.display = 'none';
@@ -1208,10 +1247,10 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
             variant="h6"
             sx={{
               fontWeight: 600,
-              fontSize: { xs: '1rem', md: '1.2rem' },
-              textShadow: '1px 1px 3px rgba(0,0,0,0.3)',
-              letterSpacing: '0.5px',
-              mb: 1
+              fontSize: { xs: '0.85rem', md: '1rem' },
+              color: '#333',
+              letterSpacing: '0.3px',
+              mr: 2
             }}
           >
             (주)브이아이피플러스
@@ -1295,9 +1334,10 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
       {/* 로딩 중이어도 콘텐츠를 먼저 렌더링하여 사용자가 볼 수 있도록 함 */}
       {renderSlideContent()}
       
-      {/* 로딩 중일 때 반투명 오버레이 표시 */}
+      {/* 로딩 중일 때 반투명 오버레이 표시 - 캡쳐 시 제외되도록 data-capture-exclude 속성 추가 */}
       {loading && (
         <Box
+          data-capture-exclude="true"
           sx={{
             position: 'absolute',
             top: 0,

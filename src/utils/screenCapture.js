@@ -23,23 +23,50 @@ export async function captureElement(element, options = {}) {
   };
 
   try {
-    // Canvas 생성
-    const canvas = await html2canvas(element, defaultOptions);
+    // 캡쳐에서 제외할 요소들 숨기기
+    const excludeElements = element.querySelectorAll('[data-capture-exclude="true"]');
+    const originalStyles = [];
     
-    // Canvas를 Blob으로 변환
-    return new Promise((resolve, reject) => {
-      canvas.toBlob(
-        (blob) => {
-          if (blob) {
-            resolve(blob);
-          } else {
-            reject(new Error('이미지 변환에 실패했습니다.'));
-          }
-        },
-        'image/png',
-        0.95 // 품질 (0.95 = 95%, 파일 크기와 품질의 균형)
-      );
+    excludeElements.forEach((el) => {
+      originalStyles.push({
+        element: el,
+        display: el.style.display
+      });
+      el.style.display = 'none';
     });
+    
+    try {
+      // Canvas 생성
+      const canvas = await html2canvas(element, defaultOptions);
+      
+      // Canvas를 Blob으로 변환
+      const blob = await new Promise((resolve, reject) => {
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(new Error('이미지 변환에 실패했습니다.'));
+            }
+          },
+          'image/png',
+          0.95 // 품질 (0.95 = 95%, 파일 크기와 품질의 균형)
+        );
+      });
+      
+      // 원래 스타일 복원
+      originalStyles.forEach(({ element, display }) => {
+        element.style.display = display;
+      });
+      
+      return blob;
+    } catch (captureError) {
+      // 에러 발생 시에도 원래 스타일 복원
+      originalStyles.forEach(({ element, display }) => {
+        element.style.display = display;
+      });
+      throw captureError;
+    }
   } catch (error) {
     console.error('화면 캡처 오류:', error);
     throw error;

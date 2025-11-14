@@ -107,7 +107,7 @@ const calculateTotal = (dataArray, field) => {
   return dataArray.reduce((sum, item) => sum + (item[field] || 0), 0);
 };
 
-function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes, presentationMode = false, initialTab = 0, initialSubTab }) {
+function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes, presentationMode = false, initialTab = 0, initialSubTab, detailOptions, csDetailType, csDetailCriteria }) {
   const [activeTab, setActiveTab] = useState(initialTab);
   
   // 업데이트 팝업 상태
@@ -148,7 +148,13 @@ function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes, pres
     {
       label: '마감장표',
       icon: <ReceiptIcon />,
-      component: <ClosingChartTab initialSubTab={initialSubTab} presentationMode={presentationMode} />,
+      component: <ClosingChartTab 
+        initialSubTab={initialSubTab} 
+        presentationMode={presentationMode} 
+        detailOptions={detailOptions}
+        csDetailType={detailOptions?.csDetailType || csDetailType} 
+        csDetailCriteria={detailOptions?.csDetailCriteria || csDetailCriteria} 
+      />,
       hasPermission: true // 마감장표 탭은 모든 사용자에게 표시
     },
     {
@@ -1826,7 +1832,7 @@ function StructurePolicyTab() {
 }
 
 // 마감장표 탭 컴포넌트
-function ClosingChartTab({ initialSubTab = 0, presentationMode = false }) {
+function ClosingChartTab({ initialSubTab = 0, presentationMode = false, detailOptions, csDetailType, csDetailCriteria }) {
   const [activeSubTab, setActiveSubTab] = useState(initialSubTab);
   
   // initialSubTab이 변경되면 activeSubTab 업데이트
@@ -1844,7 +1850,11 @@ function ClosingChartTab({ initialSubTab = 0, presentationMode = false }) {
   const subTabs = [
     {
       label: '전체총마감',
-      component: <TotalClosingTab />
+      component: <TotalClosingTab 
+        detailOptions={detailOptions}
+        csDetailType={detailOptions?.csDetailType || csDetailType} 
+        csDetailCriteria={detailOptions?.csDetailCriteria || csDetailCriteria} 
+      />
     },
     {
       label: '담당자별마감',
@@ -1901,7 +1911,7 @@ function ClosingChartTab({ initialSubTab = 0, presentationMode = false }) {
 }
 
 // 전체총마감 탭 컴포넌트 (기존 마감장표 내용)
-function TotalClosingTab() {
+function TotalClosingTab({ detailOptions, csDetailType: propCsDetailType, csDetailCriteria: propCsDetailCriteria }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -1921,6 +1931,25 @@ function TotalClosingTab() {
   const [departmentTableOpen, setDepartmentTableOpen] = useState(false);
   const [agentTableOpen, setAgentTableOpen] = useState(false);
   const [csSummaryOpen, setCsSummaryOpen] = useState(false); // 기본값: 접기 상태
+  
+  // CS 개통 실적 세부 옵션 상태 (props에서 받거나 기본값 사용)
+  const [csDetailType, setCsDetailType] = useState(propCsDetailType || 'all'); // 'all', 'code', 'office', 'department', 'agent'
+  const [csDetailCriteria, setCsDetailCriteria] = useState(propCsDetailCriteria || 'performance'); // 'performance' or 'fee'
+  
+  // props가 변경되면 상태 업데이트
+  React.useEffect(() => {
+    if (propCsDetailType !== undefined) {
+      setCsDetailType(propCsDetailType);
+      // 세부 옵션이 선택된 경우 CS 개통 실적 섹션 자동 펼치기
+      if (propCsDetailType !== 'all') {
+        setCsSummaryOpen(true);
+      }
+    }
+    if (propCsDetailCriteria !== undefined) {
+      setCsDetailCriteria(propCsDetailCriteria);
+    }
+  }, [propCsDetailType, propCsDetailCriteria]);
+  
   const [error, setError] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
   const [dataRendered, setDataRendered] = useState(false); // 실제 데이터 렌더링 완료 여부
@@ -2218,8 +2247,9 @@ function TotalClosingTab() {
           variant="determinate" 
           value={progress} 
           sx={{ height: 8, borderRadius: 4, mb: 2 }}
+          data-capture-exclude="true"
         />
-        <Typography variant="body2" color="text.secondary">
+        <Typography variant="body2" color="text.secondary" data-capture-exclude="true">
           {progress}% 완료
         </Typography>
       </Box>
@@ -2365,6 +2395,101 @@ function TotalClosingTab() {
                   </Paper>
                 </Grid>
               </Grid>
+
+              {/* 회의 생성 시 선택한 세부 옵션에 따른 데이터 표시 */}
+              {propCsDetailType && propCsDetailType !== 'all' && (
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="subtitle1" sx={{ mb: 2, textAlign: 'center', fontWeight: 'bold' }}>
+                    {propCsDetailType === 'code' ? '코드별' : propCsDetailType === 'office' ? '사무실별' : propCsDetailType === 'department' ? '소속별' : '담당자별'} CS 개통 실적 ({propCsDetailCriteria === 'performance' ? '실적 기준' : '수수료 기준'})
+                  </Typography>
+                  <TableContainer component={Paper} sx={{ background: 'rgba(255,255,255,0.95)', maxHeight: 400 }}>
+                    <Table stickyHeader size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell sx={{ fontWeight: 'bold', background: '#667eea', color: 'white' }}>순위</TableCell>
+                          <TableCell sx={{ fontWeight: 'bold', background: '#667eea', color: 'white' }}>
+                            {propCsDetailType === 'code' ? '코드' : propCsDetailType === 'office' ? '사무실' : propCsDetailType === 'department' ? '소속' : '담당자'}
+                          </TableCell>
+                          {propCsDetailCriteria === 'performance' ? (
+                            <TableCell align="right" sx={{ fontWeight: 'bold', background: '#667eea', color: 'white' }}>
+                              실적 (건)
+                            </TableCell>
+                          ) : (
+                            <>
+                              <TableCell align="right" sx={{ fontWeight: 'bold', background: '#667eea', color: 'white' }}>총 수수료</TableCell>
+                              <TableCell align="right" sx={{ fontWeight: 'bold', background: '#667eea', color: 'white' }}>수수료</TableCell>
+                              <TableCell align="right" sx={{ fontWeight: 'bold', background: '#667eea', color: 'white' }}>지원금</TableCell>
+                            </>
+                          )}
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {(() => {
+                          let detailData = [];
+                          if (propCsDetailType === 'code' && data.codeData) {
+                            detailData = data.codeData.map(item => ({
+                              name: item.code,
+                              performance: item.performance || 0,
+                              fee: (item.fee || 0) + (item.support || 0),
+                              feeOnly: item.fee || 0,
+                              support: item.support || 0
+                            }));
+                          } else if (propCsDetailType === 'office' && data.officeData) {
+                            detailData = data.officeData.map(item => ({
+                              name: item.office,
+                              performance: item.performance || 0,
+                              fee: (item.fee || 0) + (item.support || 0),
+                              feeOnly: item.fee || 0,
+                              support: item.support || 0
+                            }));
+                          } else if (propCsDetailType === 'department' && data.departmentData) {
+                            detailData = data.departmentData.map(item => ({
+                              name: item.department,
+                              performance: item.performance || 0,
+                              fee: (item.fee || 0) + (item.support || 0),
+                              feeOnly: item.fee || 0,
+                              support: item.support || 0
+                            }));
+                          } else if (propCsDetailType === 'agent' && data.agentData) {
+                            detailData = data.agentData.map(item => ({
+                              name: item.agent,
+                              performance: item.performance || 0,
+                              fee: (item.fee || 0) + (item.support || 0),
+                              feeOnly: item.fee || 0,
+                              support: item.support || 0
+                            }));
+                          }
+                          
+                          // 정렬 (기준에 따라)
+                          const sortedData = [...detailData].sort((a, b) => {
+                            if (propCsDetailCriteria === 'performance') {
+                              return (b.performance || 0) - (a.performance || 0);
+                            } else {
+                              return (b.fee || 0) - (a.fee || 0);
+                            }
+                          });
+                          
+                          return sortedData.slice(0, 20).map((item, index) => (
+                            <TableRow key={index} hover>
+                              <TableCell>{index + 1}</TableCell>
+                              <TableCell sx={{ fontWeight: 'bold' }}>{item.name}</TableCell>
+                              {propCsDetailCriteria === 'performance' ? (
+                                <TableCell align="right">{item.performance.toLocaleString()}</TableCell>
+                              ) : (
+                                <>
+                                  <TableCell align="right">{((item.fee || 0) * 1000).toLocaleString()}</TableCell>
+                                  <TableCell align="right">{((item.feeOnly || 0) * 1000).toLocaleString()}</TableCell>
+                                  <TableCell align="right">{((item.support || 0) * 1000).toLocaleString()}</TableCell>
+                                </>
+                              )}
+                            </TableRow>
+                          ));
+                        })()}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </Box>
+              )}
 
               {/* CS 직원별 랭킹 */}
               {data.csSummary?.agents && data.csSummary.agents.length > 0 && (

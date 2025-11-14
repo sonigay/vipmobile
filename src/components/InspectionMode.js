@@ -101,13 +101,15 @@ const INSPECTION_TABS = {
   }
 };
 
-function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
+function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes, presentationMode = false, initialTab = 0, detailOptions }) {
   // 상태 관리
   const [currentView, setCurrentView] = useState('personal'); // 'personal' | 'overview'
   const [inspectionData, setInspectionData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [sortOrder, setSortOrder] = useState('asc'); // 'asc' | 'desc' - 기본값을 오름차순으로 설정
+  const [selectedTab, setSelectedTab] = useState(initialTab);
+  const [selectedField, setSelectedField] = useState(detailOptions?.selectedField || 'all');
 
   
   // 필터 상태
@@ -183,10 +185,28 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
 
 
 
-  // 탭 기반 검수 항목 상태
-  const [selectedTab, setSelectedTab] = useState(0); // 0: 일반검수항목, 1: 추가검수항목, 2: 차감검수항목
+  // 탭 기반 검수 항목 상태 (props에서 받은 값으로 초기화)
   const [fieldOptions, setFieldOptions] = useState([]);
-  const [selectedField, setSelectedField] = useState('all');
+  
+  // initialTab과 detailOptions가 변경되면 상태 업데이트 및 데이터 재로딩
+  React.useEffect(() => {
+    if (initialTab !== undefined && initialTab !== selectedTab) {
+      setSelectedTab(initialTab);
+    }
+  }, [initialTab, selectedTab]);
+  
+  React.useEffect(() => {
+    if (detailOptions?.selectedField !== undefined && detailOptions.selectedField !== selectedField) {
+      setSelectedField(detailOptions.selectedField);
+    }
+  }, [detailOptions?.selectedField, selectedField]);
+  
+  // presentation mode에서 initialTab이나 detailOptions가 변경되면 데이터 재로딩
+  React.useEffect(() => {
+    if (presentationMode && (initialTab !== undefined || detailOptions?.selectedField !== undefined)) {
+      loadInspectionData();
+    }
+  }, [presentationMode, initialTab, detailOptions?.selectedField, loadInspectionData]);
   
   // 컬럼 설정 상태
   const [columnSettings, setColumnSettings] = useState(null);
@@ -235,11 +255,16 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
     setIsLoading(true);
     setError(null);
     
+    // presentation mode에서는 detailOptions의 selectedField 사용
+    const fieldToUse = presentationMode && detailOptions?.selectedField 
+      ? detailOptions.selectedField 
+      : selectedField;
+    
     try {
       const response = await fetchInspectionData(
         currentView, 
         currentView === 'personal' ? loggedInStore.contactId : null,
-        selectedField !== 'all' ? selectedField : undefined
+        fieldToUse !== 'all' ? fieldToUse : undefined
       );
       
       if (response.success) {
@@ -253,7 +278,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
     } finally {
       setIsLoading(false);
     }
-  }, [currentView, loggedInStore?.contactId, selectedField]);
+  }, [currentView, loggedInStore?.contactId, selectedField, presentationMode, detailOptions]);
 
   // 필드 변경 시 데이터 재로딩
   useEffect(() => {
@@ -628,8 +653,9 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
     });
   };
 
-  // 탭 변경 핸들러
+  // 탭 변경 핸들러 (presentation mode에서는 탭 변경 불가)
   const handleTabChange = (event, newValue) => {
+    if (presentationMode) return; // presentation mode에서는 탭 변경 불가
     console.log('탭 변경:', newValue, INSPECTION_TABS[Object.keys(INSPECTION_TABS)[newValue]]?.label);
     setSelectedTab(newValue);
     setSelectedField('all'); // 탭 변경 시 필드 선택 초기화
@@ -688,9 +714,10 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
 
   return (
     <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {/* 헤더 */}
-      <AppBar position="static" sx={{ backgroundColor: '#1976d2' }}>
-        <Toolbar>
+      {/* 헤더 - presentation mode에서는 숨김 */}
+      {!presentationMode && (
+        <AppBar position="static" sx={{ backgroundColor: '#1976d2' }}>
+          <Toolbar>
           <AssignmentIcon sx={{ mr: 2 }} />
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
             검수 모드
@@ -760,7 +787,8 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
             로그아웃
           </Button>
         </Toolbar>
-      </AppBar>
+        </AppBar>
+      )}
 
       {/* 메인 콘텐츠 */}
       <Container maxWidth="xl" sx={{ flex: 1, py: 2, overflow: 'auto' }}>
@@ -804,8 +832,8 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
           </Box>
         )}
 
-        {/* 검수 항목 탭 */}
-        {!isLoading && inspectionData && inspectionData.differences && (
+        {/* 검수 항목 탭 - presentation mode에서는 숨김 */}
+        {!presentationMode && !isLoading && inspectionData && inspectionData.differences && (
           <Paper sx={{ mb: 2 }}>
             <Tabs 
               value={selectedTab} 
@@ -841,8 +869,8 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
           </Paper>
         )}
 
-        {/* 세부 필터 (탭 내에서 특정 항목 선택) */}
-        {!isLoading && inspectionData && inspectionData.differences && (
+        {/* 세부 필터 (탭 내에서 특정 항목 선택) - presentation mode에서는 숨김 */}
+        {!presentationMode && !isLoading && inspectionData && inspectionData.differences && (
           <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
             <FormControl size="small" sx={{ minWidth: 200 }}>
               <InputLabel>세부 항목</InputLabel>

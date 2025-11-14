@@ -13,7 +13,11 @@ import {
   Divider,
   Stepper,
   Step,
-  StepLabel
+  StepLabel,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
 } from '@mui/material';
 import { api } from '../../api';
 import ModeSelector from './ModeSelector';
@@ -41,6 +45,12 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess }) {
   const [selectedSubTabs, setSelectedSubTabs] = useState([]);
   const [slides, setSlides] = useState([]);
   const [customSlideOpen, setCustomSlideOpen] = useState(false);
+  
+  // 세부 옵션 선택 모달 (일반화)
+  const [detailOptionOpen, setDetailOptionOpen] = useState(false);
+  const [detailOptionConfig, setDetailOptionConfig] = useState(null);
+  const [detailOptionValues, setDetailOptionValues] = useState({});
+  const [pendingSubTab, setPendingSubTab] = useState(null);
 
   useEffect(() => {
     if (open) {
@@ -171,26 +181,53 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess }) {
         !(s.type === 'mode-tab' && s.mode === modeKey && s.tab === tabKey && s.subTab === subTabKey)
       ));
     } else {
-      // 하부 탭 추가
-      setSelectedSubTabs([...selectedSubTabs, subTabId]);
-      
+      // 하부 탭의 세부 옵션 확인
       const availableTabs = getAvailableTabsForMode(modeKey, loggedInStore);
       const tabConfig = availableTabs.find(t => t.key === tabKey);
       const subTabConfig = tabConfig?.subTabs?.find(st => st.key === subTabKey);
       
-      const newSlide = {
-        slideId: `slide-${modeKey}-${tabKey}-${subTabKey}-${Date.now()}`,
-        type: 'mode-tab',
-        mode: modeKey,
-        tab: tabKey,
-        subTab: subTabKey,
-        tabLabel: tabConfig?.label || tabKey,
-        subTabLabel: subTabConfig?.label || subTabKey,
-        order: slides.length + 1
-      };
+      // 세부 옵션이 있는 경우 모달 표시
+      if (subTabConfig?.detailOptions) {
+        setDetailOptionConfig(subTabConfig.detailOptions);
+        setDetailOptionValues({});
+        // 기본값 설정
+        subTabConfig.detailOptions.options.forEach(option => {
+          setDetailOptionValues(prev => ({
+            ...prev,
+            [option.key]: option.defaultValue || ''
+          }));
+        });
+        setPendingSubTab({ modeKey, tabKey, subTabKey, subTabId });
+        setDetailOptionOpen(true);
+        return;
+      }
       
-      setSlides([...slides, newSlide]);
+      // 세부 옵션이 없는 경우 바로 추가
+      addSubTabSlide(modeKey, tabKey, subTabKey, subTabId);
     }
+  };
+
+  const addSubTabSlide = (modeKey, tabKey, subTabKey, subTabId, detailOptions = {}) => {
+    setSelectedSubTabs([...selectedSubTabs, subTabId]);
+    
+    const availableTabs = getAvailableTabsForMode(modeKey, loggedInStore);
+    const tabConfig = availableTabs.find(t => t.key === tabKey);
+    const subTabConfig = tabConfig?.subTabs?.find(st => st.key === subTabKey);
+    
+    const newSlide = {
+      slideId: `slide-${modeKey}-${tabKey}-${subTabKey}-${Date.now()}`,
+      type: 'mode-tab',
+      mode: modeKey,
+      tab: tabKey,
+      subTab: subTabKey,
+      tabLabel: tabConfig?.label || tabKey,
+      subTabLabel: subTabConfig?.label || subTabKey,
+      // 세부 옵션 (모든 옵션을 detailOptions 객체에 저장)
+      detailOptions: Object.keys(detailOptions).length > 0 ? detailOptions : undefined,
+      order: slides.length + 1
+    };
+    
+    setSlides([...slides, newSlide]);
   };
 
   const handleModeOnlyToggle = (modeKey) => {
@@ -525,6 +562,64 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess }) {
         meetingDate={formData.meetingDate || new Date().toISOString().split('T')[0]}
         meetingNumber={formData.meetingNumber ? parseInt(formData.meetingNumber) : null}
       />
+
+      {/* 세부 옵션 선택 모달 (일반화) */}
+      <Dialog open={detailOptionOpen} onClose={() => setDetailOptionOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>세부 옵션 선택</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, pt: 2 }}>
+            {detailOptionConfig?.options?.map((option) => (
+              <FormControl key={option.key} fullWidth>
+                <InputLabel>{option.label}</InputLabel>
+                <Select
+                  value={detailOptionValues[option.key] || option.defaultValue || ''}
+                  onChange={(e) => {
+                    setDetailOptionValues(prev => ({
+                      ...prev,
+                      [option.key]: e.target.value
+                    }));
+                  }}
+                  label={option.label}
+                >
+                  {option.values?.map((value) => (
+                    <MenuItem key={value.key} value={value.key}>
+                      {value.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            ))}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => {
+            setDetailOptionOpen(false);
+            setDetailOptionConfig(null);
+            setDetailOptionValues({});
+            setPendingSubTab(null);
+          }}>취소</Button>
+          <Button
+            variant="contained"
+            onClick={() => {
+              if (pendingSubTab) {
+                addSubTabSlide(
+                  pendingSubTab.modeKey,
+                  pendingSubTab.tabKey,
+                  pendingSubTab.subTabKey,
+                  pendingSubTab.subTabId,
+                  detailOptionValues
+                );
+                setPendingSubTab(null);
+              }
+              setDetailOptionOpen(false);
+              setDetailOptionConfig(null);
+              setDetailOptionValues({});
+            }}
+          >
+            확인
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Dialog>
   );
 }

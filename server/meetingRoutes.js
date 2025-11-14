@@ -692,17 +692,28 @@ async function findOrCreatePost(channel, yearMonth, meetingNumber) {
     const activeThreads = await channel.threads.fetchActive();
     
     // 활성 스레드에서 차수별 포스트 찾기
+    // meetingNumber가 있으면 정확히 일치하는 포스트를 찾고, 없으면 yearMonth만 일치하는 포스트를 찾음
     let post = Array.from(activeThreads.threads.values()).find(thread => {
-      const matches = thread.name === postName || 
-        (meetingNumber && thread.name === `${yearMonth} 회의 - ${meetingNumber}차`);
-      if (matches) {
-        console.log(`✅ [findOrCreatePost] 활성 포스트 찾음: ${thread.name} (ID: ${thread.id})`);
+      if (meetingNumber) {
+        // meetingNumber가 있으면 정확히 일치하는 포스트를 찾음
+        const matches = thread.name === postName || 
+          thread.name === `${yearMonth} 회의 - ${meetingNumber}차`;
+        if (matches) {
+          console.log(`✅ [findOrCreatePost] 활성 포스트 찾음 (차수 일치): ${thread.name} (ID: ${thread.id})`);
+        }
+        return matches;
+      } else {
+        // meetingNumber가 없으면 yearMonth만 일치하는 포스트를 찾음 (가장 최근 것)
+        const matches = thread.name.startsWith(`${yearMonth} 회의`);
+        if (matches) {
+          console.log(`✅ [findOrCreatePost] 활성 포스트 찾음 (년월 일치, 차수 없음): ${thread.name} (ID: ${thread.id})`);
+        }
+        return matches;
       }
-      return matches;
     });
     
     if (post) {
-      console.log(`📌 [Discord] 기존 포스트 찾음: ${postName} (ID: ${post.id})`);
+      console.log(`📌 [Discord] 기존 포스트 찾음: ${post.name} (ID: ${post.id})`);
       return post;
     }
     
@@ -710,12 +721,22 @@ async function findOrCreatePost(channel, yearMonth, meetingNumber) {
     try {
       const archivedThreads = await channel.threads.fetchArchived({ limit: 100 });
       post = Array.from(archivedThreads.threads.values()).find(thread => {
-        const matches = thread.name === postName || 
-          (meetingNumber && thread.name === `${yearMonth} 회의 - ${meetingNumber}차`);
-        if (matches) {
-          console.log(`✅ [findOrCreatePost] 아카이브된 포스트 찾음: ${thread.name} (ID: ${thread.id})`);
+        if (meetingNumber) {
+          // meetingNumber가 있으면 정확히 일치하는 포스트를 찾음
+          const matches = thread.name === postName || 
+            thread.name === `${yearMonth} 회의 - ${meetingNumber}차`;
+          if (matches) {
+            console.log(`✅ [findOrCreatePost] 아카이브된 포스트 찾음 (차수 일치): ${thread.name} (ID: ${thread.id})`);
+          }
+          return matches;
+        } else {
+          // meetingNumber가 없으면 yearMonth만 일치하는 포스트를 찾음 (가장 최근 것)
+          const matches = thread.name.startsWith(`${yearMonth} 회의`);
+          if (matches) {
+            console.log(`✅ [findOrCreatePost] 아카이브된 포스트 찾음 (년월 일치, 차수 없음): ${thread.name} (ID: ${thread.id})`);
+          }
+          return matches;
         }
-        return matches;
       });
       
       if (post) {
@@ -1330,10 +1351,16 @@ async function uploadCustomSlideFile(req, res) {
     } else if (isTempMeeting) {
       // 임시 회의인 경우, meetingNumber가 없으면 null로 유지
       console.log('📋 [uploadCustomSlideFile] 임시 회의 (커스텀 슬라이드), meetingNumber 없음');
+      
+      // 임시 회의인 경우에도 meetingDate를 사용하여 같은 포스트를 찾도록 시도
+      // 하지만 meetingNumber가 없으면 다른 포스트가 생성될 수 있음
+      if (!meetingNumber && meetingDate) {
+        console.warn('⚠️ [uploadCustomSlideFile] 임시 회의에서 meetingNumber가 없습니다. meetingDate만 사용하여 포스트를 찾습니다.');
+      }
     }
     
     // 최종 meetingNumber 확인 및 로깅
-    console.log(`📋 [uploadCustomSlideFile] 최종 meetingNumber: ${meetingNumber}, meetingDate: ${meetingDate}`);
+    console.log(`📋 [uploadCustomSlideFile] 최종 meetingNumber: ${meetingNumber}, meetingDate: ${meetingDate}, isTempMeeting: ${isTempMeeting}`);
     
     // 각 이미지를 Discord에 업로드
     // 임시 회의인 경우에도 meetingDate와 meetingNumber를 사용하여 같은 포스트에 저장되도록 함
@@ -1343,14 +1370,20 @@ async function uploadCustomSlideFile(req, res) {
       
       // Discord 업로드 시 meetingId는 실제 meetingId를 사용하되, 
       // meetingNumber와 meetingDate를 명시적으로 전달하여 같은 포스트를 찾도록 함
+      // 임시 회의인 경우, meetingNumber가 있으면 사용하고, 없으면 meetingDate만 사용
       const uploadMeetingId = isTempMeeting 
         ? `temp-${meetingDate || new Date().toISOString().split('T')[0]}` 
         : meetingId;
       
+      // meetingNumber가 없으면 meetingDate만 사용하여 포스트를 찾도록 함
+      // 하지만 이 경우 다른 포스트가 생성될 수 있으므로, 가능하면 meetingNumber를 전달해야 함
+      const finalMeetingNumber = meetingNumber || (isTempMeeting ? null : null);
+      
       console.log(`📤 [uploadCustomSlideFile] Discord 업로드 시작 (${i + 1}/${imageBuffers.length}):`, {
         uploadMeetingId,
         meetingDate,
-        meetingNumber,
+        meetingNumber: finalMeetingNumber,
+        isTempMeeting,
         filename: imageData.filename
       });
       
@@ -1359,7 +1392,7 @@ async function uploadCustomSlideFile(req, res) {
         imageData.filename,
         uploadMeetingId,
         meetingDate || new Date().toISOString().split('T')[0],
-        meetingNumber // meetingNumber를 명시적으로 전달하여 같은 포스트를 찾도록 함
+        finalMeetingNumber // meetingNumber를 명시적으로 전달하여 같은 포스트를 찾도록 함
       );
       
       console.log(`✅ [uploadCustomSlideFile] Discord 업로드 완료 (${i + 1}/${imageBuffers.length}):`, {

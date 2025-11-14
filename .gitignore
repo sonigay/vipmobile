@@ -31,3 +31,8 @@ yarn-error.log*
 
 # npm cache
 .npm-cache/
+
+# Local plan files (로컬에서만 관리)
+*_플랜*.md
+*_구현_플랜*.md
+*_가이드.md
