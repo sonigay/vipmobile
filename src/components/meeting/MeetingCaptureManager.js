@@ -262,7 +262,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
 
       {slidesState[currentSlideIndex] && (
         <SlideRenderer
-          key={slidesState[currentSlideIndex].slideId}
+          key={`slide-${currentSlideIndex}-${slidesState[currentSlideIndex].slideId}`}
           slide={slidesState[currentSlideIndex]}
           loggedInStore={loggedInStore}
           onReady={handleSlideReady}

@@ -86,7 +86,7 @@ function SlideOrderEditor({ slides, onReorder, onRemove }) {
         슬라이드 순서 ({slides.length}개)
       </Typography>
 
-      <List>
+      <List sx={{ maxHeight: '500px', overflowY: 'auto' }}>
         {slides.map((slide, index) => (
           <Paper
             key={slide.slideId || slide.id || index}

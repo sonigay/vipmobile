@@ -13,11 +13,21 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [contentReady, setContentReady] = useState(false);
+  const [renderKey, setRenderKey] = useState(0); // 강제 리렌더링을 위한 key
 
   useEffect(() => {
-    console.log('🔍 [SlideRenderer] 슬라이드 렌더링 시작:', slide);
+    // slide가 변경되면 완전히 리셋
+    console.log('🔍 [SlideRenderer] 슬라이드 렌더링 시작:', {
+      slideId: slide?.slideId,
+      mode: slide?.mode,
+      tab: slide?.tab,
+      subTab: slide?.subTab,
+      type: slide?.type
+    });
     setLoading(true);
     setContentReady(false);
+    setError(null);
+    setRenderKey(prev => prev + 1); // 강제 리렌더링
     
     // 데이터 로딩 완료 대기 함수 - 매우 확실한 방법
     const waitForDataLoad = () => {

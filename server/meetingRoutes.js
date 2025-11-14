@@ -620,30 +620,44 @@ async function findOrCreatePost(channel, yearMonth, meetingNumber) {
       ? `${yearMonth} 회의 - ${meetingNumber}차`
       : `${yearMonth} 회의`;
     
+    console.log(`🔍 [findOrCreatePost] 포스트 찾기 시작:`, {
+      yearMonth,
+      meetingNumber,
+      postName
+    });
+    
     // 포럼 채널의 활성 포스트 가져오기
     const activeThreads = await channel.threads.fetchActive();
     
     // 활성 스레드에서 차수별 포스트 찾기
-    let post = Array.from(activeThreads.threads.values()).find(thread => 
-      thread.name === postName || 
-      (meetingNumber && thread.name === `${yearMonth} 회의 - ${meetingNumber}차`)
-    );
+    let post = Array.from(activeThreads.threads.values()).find(thread => {
+      const matches = thread.name === postName || 
+        (meetingNumber && thread.name === `${yearMonth} 회의 - ${meetingNumber}차`);
+      if (matches) {
+        console.log(`✅ [findOrCreatePost] 활성 포스트 찾음: ${thread.name} (ID: ${thread.id})`);
+      }
+      return matches;
+    });
     
     if (post) {
-      console.log(`📌 [Discord] 기존 포스트 찾음: ${postName}`);
+      console.log(`📌 [Discord] 기존 포스트 찾음: ${postName} (ID: ${post.id})`);
       return post;
     }
     
     // 아카이브된 스레드도 확인
     try {
       const archivedThreads = await channel.threads.fetchArchived({ limit: 100 });
-      post = Array.from(archivedThreads.threads.values()).find(thread => 
-        thread.name === postName || 
-        (meetingNumber && thread.name === `${yearMonth} 회의 - ${meetingNumber}차`)
-      );
+      post = Array.from(archivedThreads.threads.values()).find(thread => {
+        const matches = thread.name === postName || 
+          (meetingNumber && thread.name === `${yearMonth} 회의 - ${meetingNumber}차`);
+        if (matches) {
+          console.log(`✅ [findOrCreatePost] 아카이브된 포스트 찾음: ${thread.name} (ID: ${thread.id})`);
+        }
+        return matches;
+      });
       
       if (post) {
-        console.log(`📌 [Discord] 아카이브된 포스트 찾음: ${postName}`);
+        console.log(`📌 [Discord] 아카이브된 포스트 찾음: ${postName} (ID: ${post.id})`);
         return post;
       }
     } catch (archivedError) {
@@ -661,6 +675,7 @@ async function findOrCreatePost(channel, yearMonth, meetingNumber) {
       appliedTags: []
     });
     
+    console.log(`✅ [Discord] 새 포스트 생성 완료: ${postName} (ID: ${newPost.id})`);
     return newPost;
   } catch (error) {
     console.error('포스트 찾기/생성 오류:', error);
@@ -837,14 +852,16 @@ async function convertExcelToImages(excelBuffer, filename) {
 
 // Excel 워크시트를 HTML로 변환
 function convertExcelToHTML(worksheet) {
-  let html = '<html><head><style>';
-  html += 'body { font-family: Arial, sans-serif; margin: 20px; }';
+  let html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>';
+  html += 'body { font-family: "Malgun Gothic", "AppleGothic", "NanumGothic", "Noto Sans CJK KR", Arial, sans-serif; margin: 20px; }';
   html += 'table { border-collapse: collapse; width: 100%; }';
   html += 'th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }';
-  html += 'th { background-color: #f2f2f2; font-weight: bold; }';
-  html += 'tr:nth-child(even) { background-color: #f9f9f9; }';
+  html += 'th { background-color: #4a90e2; color: white; font-weight: bold; }';
+  html += 'tr:nth-child(even) { background-color: #f8f9fa; }';
+  html += 'tr:hover { background-color: #f0f0f0; }';
+  html += 'h2 { color: #333; margin-bottom: 20px; }';
   html += '</style></head><body>';
-  html += `<h2>${worksheet.name}</h2>`;
+  html += `<h2>${worksheet.name || 'Sheet'}</h2>`;
   html += '<table>';
   
   // 헤더 행
@@ -880,13 +897,40 @@ async function convertExcelToImage(worksheet, filename) {
     // Canvas 모듈 동적 로드 (optional)
     let canvasModule;
     let createCanvas;
+    let registerFont;
     
     try {
       canvasModule = require('canvas');
       createCanvas = canvasModule.createCanvas;
+      registerFont = canvasModule.registerFont;
     } catch (canvasError) {
       console.error('❌ [Excel 변환] Canvas 모듈을 찾을 수 없습니다:', canvasError.message);
       throw new Error('Excel 파일을 이미지로 변환하려면 Canvas 모듈이 필요합니다. 서버에 Canvas를 설치해주세요: npm install canvas');
+    }
+    
+    // 한글 폰트 등록 시도 (시스템 폰트 사용)
+    // Windows: 'Malgun Gothic', 'Gulim', 'Batang'
+    // Linux: 'Noto Sans CJK KR', 'NanumGothic', 'DejaVu Sans'
+    // macOS: 'AppleGothic', 'NanumGothic'
+    const koreanFonts = [
+      'Malgun Gothic',      // Windows
+      'Gulim',              // Windows
+      'Batang',             // Windows
+      'Noto Sans CJK KR',   // Linux
+      'NanumGothic',       // Linux/macOS
+      'AppleGothic',        // macOS
+      'Arial Unicode MS',   // 범용
+      'sans-serif'          // 폴백
+    ];
+    
+    // 한글을 지원하는 폰트 찾기
+    let fontFamily = 'Arial';
+    try {
+      // 시스템 폰트 목록 확인 (canvas는 기본적으로 시스템 폰트를 사용)
+      // 실제로는 첫 번째로 시도할 폰트를 설정
+      fontFamily = koreanFonts[0]; // 기본값으로 Malgun Gothic 시도
+    } catch (fontError) {
+      console.warn('⚠️ [Excel 변환] 폰트 등록 실패, 기본 폰트 사용:', fontError.message);
     }
     
     // Excel 데이터 읽기
@@ -920,15 +964,26 @@ async function convertExcelToImage(worksheet, filename) {
     const canvas = createCanvas(canvasWidth, canvasHeight);
     const ctx = canvas.getContext('2d');
     
+    // 텍스트 인코딩 설정 (UTF-8)
+    ctx.textBaseline = 'top';
+    ctx.textAlign = 'left';
+    
     // 배경
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
     // 제목
     ctx.fillStyle = '#000000';
-    ctx.font = 'bold 36px Arial';
+    ctx.font = `bold 36px "${fontFamily}", Arial, sans-serif`;
     const title = worksheet.name || filename;
-    ctx.fillText(title, padding, 50);
+    // 한글 텍스트 렌더링
+    try {
+      ctx.fillText(title, padding, 50);
+    } catch (textError) {
+      console.warn('⚠️ [Excel 변환] 제목 렌더링 오류, 기본 폰트로 재시도:', textError.message);
+      ctx.font = 'bold 36px Arial';
+      ctx.fillText(title, padding, 50);
+    }
     
     // 테이블 영역
     let yPos = headerHeight;
@@ -941,20 +996,27 @@ async function convertExcelToImage(worksheet, filename) {
       ctx.fillRect(startX, yPos, colWidth * maxCols, rowHeight);
       
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 18px Arial';
+      ctx.font = `bold 18px "${fontFamily}", Arial, sans-serif`;
       let xPos = startX + 10;
       headerRow.forEach((cell, colIndex) => {
         const text = cell.value || '';
         // 텍스트가 너무 길면 자르기
         const displayText = text.length > 25 ? text.substring(0, 22) + '...' : text;
-        ctx.fillText(displayText, xPos, yPos + 25);
+        try {
+          ctx.fillText(displayText, xPos, yPos + 25);
+        } catch (textError) {
+          // 폰트 오류 시 기본 폰트로 재시도
+          ctx.font = 'bold 18px Arial';
+          ctx.fillText(displayText, xPos, yPos + 25);
+          ctx.font = `bold 18px "${fontFamily}", Arial, sans-serif`;
+        }
         xPos += colWidth;
       });
       yPos += rowHeight;
     }
     
     // 데이터 행
-    ctx.font = '16px Arial';
+    ctx.font = `16px "${fontFamily}", Arial, sans-serif`;
     for (let i = 1; i < Math.min(rows.length, maxRows + 1); i++) {
       const row = rows[i];
       
@@ -970,7 +1032,14 @@ async function convertExcelToImage(worksheet, filename) {
         const text = cell.value || '';
         // 텍스트가 너무 길면 자르기
         const displayText = text.length > 25 ? text.substring(0, 22) + '...' : text;
-        ctx.fillText(displayText, xPos, yPos + 25);
+        try {
+          ctx.fillText(displayText, xPos, yPos + 25);
+        } catch (textError) {
+          // 폰트 오류 시 기본 폰트로 재시도
+          ctx.font = '16px Arial';
+          ctx.fillText(displayText, xPos, yPos + 25);
+          ctx.font = `16px "${fontFamily}", Arial, sans-serif`;
+        }
         xPos += colWidth;
       });
       yPos += rowHeight;
@@ -1068,16 +1137,64 @@ async function uploadCustomSlideFile(req, res) {
         sheetName: null
       });
     } else if (detectedFileType === 'excel') {
-      // Excel 파일 변환
+      // Excel 파일 변환 (HTML + Puppeteer 방식으로 한글 지원)
       try {
-        imageBuffers = await convertExcelToImages(file.buffer, file.originalname || 'excel');
+        // 먼저 HTML로 변환 시도
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(file.buffer);
+        
+        const imageBuffersFromHTML = [];
+        for (let i = 0; i < workbook.worksheets.length; i++) {
+          const worksheet = workbook.worksheets[i];
+          const html = convertExcelToHTML(worksheet);
+          
+          // Puppeteer로 HTML을 이미지로 변환
+          try {
+            const puppeteer = require('puppeteer');
+            const browser = await puppeteer.launch({
+              headless: true,
+              args: ['--no-sandbox', '--disable-setuid-sandbox']
+            });
+            const page = await browser.newPage();
+            
+            // HTML 콘텐츠를 data URL로 설정
+            await page.setContent(html, { waitUntil: 'networkidle0' });
+            
+            // 스크린샷 촬영
+            const screenshot = await page.screenshot({
+              type: 'png',
+              fullPage: true,
+              encoding: 'binary'
+            });
+            
+            await browser.close();
+            
+            imageBuffersFromHTML.push({
+              buffer: screenshot,
+              filename: `${file.originalname || 'excel'}_${worksheet.name}.png`,
+              sheetName: worksheet.name
+            });
+          } catch (puppeteerError) {
+            console.warn('⚠️ [Excel 변환] Puppeteer 변환 실패, Canvas로 재시도:', puppeteerError.message);
+            // Puppeteer 실패 시 Canvas로 폴백
+            imageBuffers = await convertExcelToImages(file.buffer, file.originalname || 'excel');
+            break; // Canvas 방식으로 전환했으므로 루프 종료
+          }
+        }
+        
+        if (imageBuffersFromHTML.length > 0) {
+          imageBuffers = imageBuffersFromHTML;
+        } else {
+          // Puppeteer가 없으면 Canvas로 폴백
+          imageBuffers = await convertExcelToImages(file.buffer, file.originalname || 'excel');
+        }
       } catch (excelError) {
         console.error('Excel 변환 오류:', excelError);
         // Canvas가 없는 경우 더 명확한 에러 메시지
         if (excelError.message.includes('Canvas')) {
           return res.status(503).json({ 
             success: false, 
-            error: 'Excel 파일 변환 기능을 사용하려면 서버에 Canvas 모듈이 설치되어 있어야 합니다. 관리자에게 문의하세요.' 
+            error: 'Excel 파일 변환 기능을 사용하려면 서버에 Canvas 모듈 또는 Puppeteer가 설치되어 있어야 합니다. 관리자에게 문의하세요.' 
           });
         }
         throw excelError;
@@ -1098,6 +1215,14 @@ async function uploadCustomSlideFile(req, res) {
     // 회의 정보 조회 (차수 가져오기)
     let meetingNumber = bodyMeetingNumber ? parseInt(bodyMeetingNumber) : null;
     const isTempMeeting = meetingId === 'temp-custom-slide';
+    
+    console.log(`🔍 [uploadCustomSlideFile] 초기 상태:`, {
+      meetingId,
+      bodyMeetingNumber,
+      meetingNumber,
+      isTempMeeting,
+      meetingDate
+    });
     
     // body에서 meetingNumber를 받지 못한 경우, Google Sheets에서 조회
     if (!meetingNumber && !isTempMeeting) {
@@ -1129,18 +1254,41 @@ async function uploadCustomSlideFile(req, res) {
       console.log('📋 [uploadCustomSlideFile] 임시 회의 (커스텀 슬라이드), meetingNumber 없음');
     }
     
+    // 최종 meetingNumber 확인 및 로깅
+    console.log(`📋 [uploadCustomSlideFile] 최종 meetingNumber: ${meetingNumber}, meetingDate: ${meetingDate}`);
+    
     // 각 이미지를 Discord에 업로드
-    // 임시 회의인 경우에도 meetingDate를 사용하여 같은 포스트에 저장되도록 함
+    // 임시 회의인 경우에도 meetingDate와 meetingNumber를 사용하여 같은 포스트에 저장되도록 함
     const imageUrls = [];
     for (let i = 0; i < imageBuffers.length; i++) {
       const imageData = imageBuffers[i];
+      
+      // Discord 업로드 시 meetingId는 실제 meetingId를 사용하되, 
+      // meetingNumber와 meetingDate를 명시적으로 전달하여 같은 포스트를 찾도록 함
+      const uploadMeetingId = isTempMeeting 
+        ? `temp-${meetingDate || new Date().toISOString().split('T')[0]}` 
+        : meetingId;
+      
+      console.log(`📤 [uploadCustomSlideFile] Discord 업로드 시작 (${i + 1}/${imageBuffers.length}):`, {
+        uploadMeetingId,
+        meetingDate,
+        meetingNumber,
+        filename: imageData.filename
+      });
+      
       const result = await uploadImageToDiscord(
         imageData.buffer,
         imageData.filename,
-        isTempMeeting ? `temp-${meetingDate || new Date().toISOString().split('T')[0]}` : meetingId,
+        uploadMeetingId,
         meetingDate || new Date().toISOString().split('T')[0],
-        meetingNumber // 임시 회의인 경우 null이지만, 나중에 실제 회의 생성 시 같은 포스트에 저장됨
+        meetingNumber // meetingNumber를 명시적으로 전달하여 같은 포스트를 찾도록 함
       );
+      
+      console.log(`✅ [uploadCustomSlideFile] Discord 업로드 완료 (${i + 1}/${imageBuffers.length}):`, {
+        imageUrl: result.imageUrl,
+        postId: result.postId,
+        threadId: result.threadId
+      });
       
       imageUrls.push(result.imageUrl);
       console.log(`✅ [uploadCustomSlideFile] 이미지 ${i + 1}/${imageBuffers.length} 업로드 완료: ${result.imageUrl}`);
