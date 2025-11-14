@@ -406,20 +406,27 @@ async function getMeetingConfig(req, res) {
     const rows = response.data.values || [];
     const slides = rows
       .filter(row => row[0] === meetingId)
-      .map(row => ({
-        slideId: row[1],
-        order: parseInt(row[2]) || 0,
-        type: row[3] || 'mode-tab',
-        mode: row[4] || '',
-        tab: row[5] || '',
-        title: row[6] || '',
-        content: row[7] || '',
-        backgroundColor: row[8] || '#ffffff',
-        imageUrl: row[9] || '',
-        capturedAt: row[10] || '',
-        discordPostId: row[11] || '',
-        discordThreadId: row[12] || ''
-      }))
+      .map(row => {
+        const tabValue = row[5] || '';
+        // tab/subTab 형식으로 저장된 경우 파싱
+        const [tab, subTab] = tabValue.includes('/') ? tabValue.split('/') : [tabValue, ''];
+        
+        return {
+          slideId: row[1],
+          order: parseInt(row[2]) || 0,
+          type: row[3] || 'mode-tab',
+          mode: row[4] || '',
+          tab: tab || '',
+          subTab: subTab || '',
+          title: row[6] || '',
+          content: row[7] || '',
+          backgroundColor: row[8] || '#ffffff',
+          imageUrl: row[9] || '',
+          capturedAt: row[10] || '',
+          discordPostId: row[11] || '',
+          discordThreadId: row[12] || ''
+        };
+      })
       .sort((a, b) => a.order - b.order);
 
     res.json({ success: true, slides });
