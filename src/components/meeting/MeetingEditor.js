@@ -189,7 +189,6 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess }) {
 
   const handleModeOnlyToggle = (modeKey) => {
     // 탭이 없는 모드의 경우 모드 전체를 슬라이드로 추가
-    const modeSlideId = `mode-${modeKey}`;
     const existingSlide = slides.find(s => s.type === 'mode-only' && s.mode === modeKey);
     
     if (existingSlide) {
@@ -199,7 +198,7 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess }) {
       // 추가
       const modeConfig = getModeConfig(modeKey);
       const newSlide = {
-        slideId: modeSlideId,
+        slideId: `slide-${modeKey}-mode-${Date.now()}`,
         type: 'mode-only',
         mode: modeKey,
         tabLabel: modeConfig?.title || modeKey,
