@@ -57,36 +57,53 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
           // data-loaded가 true이고 data-loading이 false여야 완료
           const isDataReady = dataLoaded && !dataLoading;
           
+          // 추가 확인: 실제 데이터가 렌더링되었는지 확인 (테이블, 차트 등)
+          const hasDataContent = containerRef.current?.querySelector(
+            'table, [class*="Table"], [class*="Chart"], [class*="Grid"], .MuiTable-root, .MuiDataGrid-root'
+          ) !== null;
+          
+          // 로딩 텍스트가 없고, 데이터 콘텐츠가 있으면 완료로 간주
+          const isContentReady = !hasLoadingText && (hasDataContent || isDataReady);
+          
           console.log(`🔍 [SlideRenderer] 데이터 로딩 확인 (${attempts}/${maxAttempts}):`, {
             hasLoadingIndicator: loadingIndicators?.length > 0,
             dataLoading,
             dataLoaded,
             hasLoadingText,
+            hasDataContent,
             isLoading,
             isDataReady,
+            isContentReady,
             loadingCount: loadingIndicators?.length || 0
           });
           
           // 데이터가 준비되었고 로딩이 완료되었을 때만 진행
-          if (isDataReady && !isLoading) {
+          // 최소 3초는 대기 (데이터 로딩 시간 고려)
+          if (attempts >= 30 && isContentReady && !isLoading) {
             console.log('✅ [SlideRenderer] 데이터 로딩 완료');
             resolve();
           } else if (attempts >= maxAttempts) {
-            console.warn('⚠️ [SlideRenderer] 데이터 로딩 타임아웃, 강제 진행');
-            resolve(); // 타임아웃 시에도 진행
+            // 타임아웃 시에도 최소한의 확인 후 진행
+            if (isContentReady || !hasLoadingText) {
+              console.warn('⚠️ [SlideRenderer] 데이터 로딩 타임아웃, 하지만 콘텐츠 준비됨 - 진행');
+              resolve();
+            } else {
+              console.warn('⚠️ [SlideRenderer] 데이터 로딩 타임아웃, 강제 진행');
+              resolve(); // 타임아웃 시에도 진행
+            }
           } else {
             setTimeout(checkLoading, 100);
           }
         };
         
-        // 최소 2초 대기 후 체크 시작 (데이터 로딩 시간 고려)
-        setTimeout(checkLoading, 2000);
+        // 최소 3초 대기 후 체크 시작 (데이터 로딩 시간 고려)
+        setTimeout(checkLoading, 3000);
       });
     };
     
-    // 최소 3초 대기 후 데이터 로딩 완료 확인
+    // 최소 4초 대기 후 데이터 로딩 완료 확인
     const timer = setTimeout(async () => {
-      console.log('⏳ [SlideRenderer] 데이터 로딩 대기 시작 (최소 3초)');
+      console.log('⏳ [SlideRenderer] 데이터 로딩 대기 시작 (최소 4초)');
       await waitForDataLoad();
       console.log('✅ [SlideRenderer] 데이터 로딩 완료 확인됨, onReady 호출 준비');
       setLoading(false);
@@ -97,8 +114,8 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
           console.log('✅ [SlideRenderer] onReady 콜백 호출');
           onReady();
         }
-      }, 1000); // 1초 추가 대기
-    }, 3000); // 최소 3초 대기
+      }, 1500); // 1.5초 추가 대기
+    }, 4000); // 최소 4초 대기
 
     return () => clearTimeout(timer);
   }, [slide, onReady]);
