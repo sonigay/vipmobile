@@ -18,18 +18,23 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
   const [slidesState, setSlidesState] = useState(slides); // 슬라이드 상태 관리
 
   useEffect(() => {
-    console.log(`📋 [MeetingCaptureManager] 슬라이드 초기화: ${slides.length}개`);
-    setSlidesState(slides);
+    if (slides && Array.isArray(slides)) {
+      console.log(`📋 [MeetingCaptureManager] 슬라이드 초기화: ${slides.length}개`);
+      setSlidesState(slides);
+    } else {
+      console.warn(`⚠️ [MeetingCaptureManager] slides가 배열이 아닙니다:`, slides);
+      setSlidesState([]);
+    }
   }, [slides]);
 
   useEffect(() => {
-    if (slidesState.length > 0 && !capturing) {
+    if (slidesState && Array.isArray(slidesState) && slidesState.length > 0 && !capturing) {
       startCapture();
     }
   }, [slidesState]);
 
   const startCapture = async () => {
-    if (slidesState.length === 0) {
+    if (!slidesState || !Array.isArray(slidesState) || slidesState.length === 0) {
       if (onComplete) onComplete();
       return;
     }
@@ -44,7 +49,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
   };
 
   const captureNextSlide = async (index) => {
-    if (index >= slidesState.length) {
+    if (!slidesState || !Array.isArray(slidesState) || index >= slidesState.length) {
       // 모든 슬라이드 캡처 완료
       setCapturing(false);
       
@@ -75,12 +80,16 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         const maxAttempts = 50; // 5초 (50 * 100ms) - 최적화: 10초 -> 5초
         const checkReady = () => {
           attempts++;
-          console.log(`🔍 [MeetingCaptureManager] 슬라이드 준비 확인 (${attempts}/${maxAttempts}):`, slideReady);
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`🔍 [MeetingCaptureManager] 슬라이드 준비 확인 (${attempts}/${maxAttempts}):`, slideReady);
+          }
           if (slideReady) {
-            console.log('✅ [MeetingCaptureManager] 슬라이드 준비 완료');
+            if (process.env.NODE_ENV === 'development') {
+              console.log('✅ [MeetingCaptureManager] 슬라이드 준비 완료');
+            }
             resolve();
           } else if (attempts >= maxAttempts) {
-            console.warn('⚠️ [MeetingCaptureManager] 슬라이드 준비 타임아웃, 강제 진행');
+            console.warn(`⚠️ [MeetingCaptureManager] 슬라이드 ${index + 1} 준비 타임아웃, 강제 진행`);
             resolve(); // 타임아웃 시에도 진행
           } else {
             setTimeout(checkReady, 100);
@@ -95,23 +104,55 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
     await waitForReady();
 
     try {
+      // 슬라이드 데이터 검증
+      if (!slidesState || !Array.isArray(slidesState) || !slidesState[index]) {
+        throw new Error(`슬라이드 데이터가 없습니다. (index: ${index}, slidesState: ${slidesState ? 'exists' : 'null'})`);
+      }
+      
+      const currentSlide = slidesState[index];
+      if (!currentSlide.slideId) {
+        throw new Error(`슬라이드 ID가 없습니다. (index: ${index}, slide: ${JSON.stringify(currentSlide)})`);
+      }
+      
       // 현재 슬라이드 DOM 요소 찾기 (data-slide-id 속성을 가진 요소만)
-      const slideElement = document.querySelector(`[data-slide-id="${slidesState[index].slideId}"]`);
+      // 여러 번 시도하여 DOM이 마운트될 때까지 대기
+      let slideElement = null;
+      let attempts = 0;
+      const maxAttempts = 20; // 2초 동안 시도
+      
+      while (!slideElement && attempts < maxAttempts) {
+        slideElement = document.querySelector(`[data-slide-id="${currentSlide.slideId}"]`);
+        if (!slideElement) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          attempts++;
+        }
+      }
       
       if (!slideElement) {
-        throw new Error('슬라이드 요소를 찾을 수 없습니다.');
+        // 모든 슬라이드 요소 확인 (디버깅용)
+        const allSlideElements = document.querySelectorAll('[data-slide-id]');
+        console.error(`❌ [MeetingCaptureManager] 슬라이드 요소를 찾을 수 없습니다.`, {
+          slideId: currentSlide.slideId,
+          index: index,
+          totalSlides: slidesState.length,
+          foundElements: Array.from(allSlideElements).map(el => el.getAttribute('data-slide-id'))
+        });
+        throw new Error(`슬라이드 요소를 찾을 수 없습니다. (slideId: ${currentSlide.slideId}, index: ${index})`);
       }
 
       // 캡처 (data-slide-id를 가진 요소 내부의 콘텐츠만 캡처)
       // 헤더와 탭 네비게이션은 이미 숨겨져 있으므로, slideElement 자체를 캡처
+      const slideType = currentSlide.type || 'mode-tab';
+      const backgroundColor = slideType === 'custom' 
+        ? (currentSlide.backgroundColor || '#ffffff')
+        : slideType === 'main' || slideType === 'toc' || slideType === 'ending'
+        ? '#ffffff' // 배경색은 그라데이션이므로 흰색으로 설정
+        : '#ffffff';
+        
       const blob = await captureElement(slideElement, {
         scale: 2,
         useCORS: true,
-        backgroundColor: slidesState[index].type === 'custom' 
-          ? (slidesState[index].backgroundColor || '#ffffff')
-          : slidesState[index].type === 'main' || slidesState[index].type === 'toc' || slidesState[index].type === 'ending'
-          ? '#667eea' // 메인/목차/엔딩 슬라이드 배경색
-          : '#ffffff',
+        backgroundColor: backgroundColor,
         // 스크롤 영역 전체 캡처
         scrollX: 0,
         scrollY: 0
@@ -153,13 +194,15 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
           } : s // 이전 슬라이드는 그대로 유지
         );
         
-        console.log(`💾 [MeetingCaptureManager] 슬라이드 ${index + 1} 상태 업데이트, 전체 슬라이드 수: ${updatedSlides.length}`);
-        console.log(`💾 [MeetingCaptureManager] 저장할 슬라이드 URL들:`, updatedSlides.map(s => ({ 
-          order: s.order, 
-          slideId: s.slideId,
-          url: s.imageUrl || '없음',
-          hasUrl: !!s.imageUrl
-        })));
+        console.log(`💾 [MeetingCaptureManager] 슬라이드 ${index + 1} 상태 업데이트, 전체 슬라이드 수: ${updatedSlides?.length || 0}`);
+        if (updatedSlides && Array.isArray(updatedSlides)) {
+          console.log(`💾 [MeetingCaptureManager] 저장할 슬라이드 URL들:`, updatedSlides.map(s => ({ 
+            order: s.order, 
+            slideId: s.slideId,
+            url: s.imageUrl || '없음',
+            hasUrl: !!s.imageUrl
+          })));
+        }
         
         return updatedSlides;
       });
@@ -226,8 +269,57 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         captureNextSlide(index + 1);
       }, 500);
     } catch (error) {
-      console.error(`슬라이드 ${index + 1} 캡처 오류:`, error);
+      console.error(`❌ [MeetingCaptureManager] 슬라이드 ${index + 1} 캡처 오류:`, error);
+      console.error(`❌ [MeetingCaptureManager] 오류 상세:`, {
+        slideId: slidesState && slidesState[index] ? slidesState[index].slideId : 'unknown',
+        index: index,
+        errorMessage: error.message,
+        errorStack: error.stack
+      });
+      
       setFailed(prev => [...prev, index + 1]);
+      
+      // 오류가 발생해도 슬라이드 상태는 저장 (imageUrl은 없지만)
+      try {
+        if (slidesState && Array.isArray(slidesState) && slidesState[index]) {
+          const currentSlide = slidesState[index];
+          setSlidesState(prevSlides => {
+            const updatedSlides = prevSlides.map((s, i) => 
+              i === index ? {
+                ...s,
+                // imageUrl은 업데이트하지 않음 (오류 발생)
+                capturedAt: new Date().toISOString()
+              } : s
+            );
+            return updatedSlides;
+          });
+          
+          // 슬라이드 상태 저장 (imageUrl 없이)
+          await new Promise(resolve => setTimeout(resolve, 100));
+          setSlidesState(prevSlides => {
+            const validatedSlides = prevSlides.map((slide, idx) => {
+              if (!slide.slideId) {
+                slide.slideId = slide.slideId || `slide-${slide.order || idx + 1}`;
+              }
+              if (slide.order === undefined || slide.order === null) {
+                slide.order = slide.order || idx + 1;
+              }
+              return slide;
+            });
+            
+            // 비동기로 저장 (await 없이)
+            api.saveMeetingConfig(meeting.meetingId, {
+              slides: validatedSlides
+            }).catch(err => {
+              console.error(`❌ [MeetingCaptureManager] 슬라이드 상태 저장 실패:`, err);
+            });
+            
+            return prevSlides;
+          });
+        }
+      } catch (saveError) {
+        console.error(`❌ [MeetingCaptureManager] 오류 처리 중 저장 실패:`, saveError);
+      }
       
       // 실패해도 다음 슬라이드로 진행
       setTimeout(() => {
@@ -255,17 +347,17 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
     <>
       <CaptureProgress
         open={capturing}
-        total={slidesState.length}
+        total={slidesState && Array.isArray(slidesState) ? slidesState.length : 0}
         current={currentSlideIndex + 1}
         completed={completed}
         failed={failed}
         onCancel={handleCancel}
-        slides={slidesState}
+        slides={slidesState || []}
       />
 
-      {slidesState[currentSlideIndex] && (
+      {slidesState && Array.isArray(slidesState) && slidesState[currentSlideIndex] && (
         <SlideRenderer
-          key={`slide-${currentSlideIndex}-${slidesState[currentSlideIndex].slideId}`}
+          key={`slide-${currentSlideIndex}-${slidesState[currentSlideIndex].slideId || currentSlideIndex}`}
           slide={slidesState[currentSlideIndex]}
           loggedInStore={loggedInStore}
           onReady={handleSlideReady}
