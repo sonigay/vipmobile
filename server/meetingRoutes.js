@@ -249,6 +249,11 @@ async function updateMeeting(req, res) {
     const { meetingId } = req.params;
     const { meetingName, meetingDate, meetingNumber, meetingLocation, participants, status } = req.body;
 
+    // 시트 헤더 확인 (회의장소, 참석자 컬럼 포함)
+    await ensureSheetHeaders(sheets, SPREADSHEET_ID, sheetName, [
+      '회의ID', '회의이름', '회의날짜', '차수', '생성자', '생성일시', '상태', '회의장소', '참석자'
+    ]);
+
     // 데이터 조회
     const range = `${sheetName}!A3:I`;
     const response = await sheets.spreadsheets.values.get({
