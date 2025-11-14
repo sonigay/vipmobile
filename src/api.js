@@ -1854,7 +1854,7 @@ export const inventoryRecoveryAPI = {
   },
 
   // 회의 생성
-  createMeeting: async (meetingData) => {
+  createMeeting: async function createMeeting(meetingData) {
     try {
       const response = await fetch(`${API_BASE_URL}/api/meetings`, {
         method: 'POST',
@@ -1870,7 +1870,7 @@ export const inventoryRecoveryAPI = {
   },
 
   // 회의 수정
-  updateMeeting: async (meetingId, meetingData) => {
+  updateMeeting: async function updateMeeting(meetingId, meetingData) {
     try {
       const response = await fetch(`${API_BASE_URL}/api/meetings/${meetingId}`, {
         method: 'PUT',
@@ -1886,7 +1886,7 @@ export const inventoryRecoveryAPI = {
   },
 
   // 회의 삭제
-  deleteMeeting: async (meetingId) => {
+  deleteMeeting: async function deleteMeeting(meetingId) {
     try {
       const response = await fetch(`${API_BASE_URL}/api/meetings/${meetingId}`, {
         method: 'DELETE'
@@ -1900,7 +1900,7 @@ export const inventoryRecoveryAPI = {
   },
 
   // 회의 설정 조회
-  getMeetingConfig: async (meetingId) => {
+  getMeetingConfig: async function getMeetingConfig(meetingId) {
     try {
       const response = await fetch(`${API_BASE_URL}/api/meetings/${meetingId}/config`);
       if (!response.ok) throw new Error('회의 설정 조회 실패');
@@ -1912,7 +1912,7 @@ export const inventoryRecoveryAPI = {
   },
 
   // 회의 설정 저장
-  saveMeetingConfig: async (meetingId, config) => {
+  saveMeetingConfig: async function saveMeetingConfig(meetingId, config) {
     try {
       const response = await fetch(`${API_BASE_URL}/api/meetings/${meetingId}/config`, {
         method: 'POST',
@@ -1928,7 +1928,7 @@ export const inventoryRecoveryAPI = {
   },
 
   // 회의 캡처 시작
-  startMeetingCapture: async (meetingId) => {
+  startMeetingCapture: async function startMeetingCapture(meetingId) {
     try {
       const response = await fetch(`${API_BASE_URL}/api/meetings/${meetingId}/capture`, {
         method: 'POST'
