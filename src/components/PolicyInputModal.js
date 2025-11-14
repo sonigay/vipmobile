@@ -225,6 +225,12 @@ function PolicyInputModal({
     }
   }, [open, loggedInUser, policy]);
 
+  // 금액을 만원 단위로 변환하는 함수
+  const formatAmountToManwon = (amount) => {
+    const manwon = Math.floor(amount / 10000);
+    return `${manwon}만원`;
+  };
+
   // 부가차감지원정책 내용 자동생성
   useEffect(() => {
     if ((categoryId === 'wireless_add_deduct' || categoryId === 'wired_add_deduct') && !formData.isDirectInput) {
@@ -243,19 +249,19 @@ function PolicyInputModal({
       
       // 부가미유치 금액 (조건부가 없거나 부가유치시 조건이 체크되지 않았을 때)
       if ((!hasAnyCondition || !formData.conditionalOptions?.addServiceAcquired) && formData.deductSupport?.addServiceAmount?.trim()) {
-        deductItems.push('📱 부가미유치');
+        deductItems.push({ icon: '📱', name: '부가미유치', amount: Number(formData.deductSupport.addServiceAmount) });
         deductAmounts.push(Number(formData.deductSupport.addServiceAmount));
       }
       
       // 보험미유치 금액 (조건부가 없거나 보험유치시 조건이 체크되지 않았을 때)
       if ((!hasAnyCondition || !formData.conditionalOptions?.insuranceAcquired) && formData.deductSupport?.insuranceAmount?.trim()) {
-        deductItems.push('🛡️ 보험미유치');
+        deductItems.push({ icon: '🛡️', name: '보험미유치', amount: Number(formData.deductSupport.insuranceAmount) });
         deductAmounts.push(Number(formData.deductSupport.insuranceAmount));
       }
       
       // 연결음미유치 금액 (조건부가 없거나 연결음유치시 조건이 체크되지 않았을 때)
       if ((!hasAnyCondition || !formData.conditionalOptions?.connectionAcquired) && formData.deductSupport?.connectionAmount?.trim()) {
-        deductItems.push('🔊 연결음미유치');
+        deductItems.push({ icon: '🔊', name: '연결음미유치', amount: Number(formData.deductSupport.connectionAmount) });
         deductAmounts.push(Number(formData.deductSupport.connectionAmount));
       }
       
@@ -269,19 +275,33 @@ function PolicyInputModal({
       });
       
       if (deductItems.length > 0) {
-        // 모든 금액이 동일한 경우 하나의 금액으로 표시
+        // 모든 금액이 동일한지 확인
         const uniqueAmounts = [...new Set(deductAmounts)];
-        const amountText = uniqueAmounts.length === 1 
-          ? `${uniqueAmounts[0].toLocaleString()}원`
-          : deductAmounts.map(amount => `${amount.toLocaleString()}원`).join('/');
+        const allSame = uniqueAmounts.length === 1;
         
         let content;
         if (conditions.length > 0) {
           // 조건부가 있는 경우
-          content = `🎯 조건부: ${conditions.join(', ')}\n💰 ${deductItems.join('/')} ${amountText} 차감금액지원`;
+          if (allSame) {
+            // 모든 금액이 동일한 경우
+            const amountText = formatAmountToManwon(uniqueAmounts[0]);
+            content = `🎯 조건부: ${conditions.join(', ')}\n💰 ${deductItems.map(item => `${item.icon} ${item.name}`).join('/')} ${amountText} 각각 차감금액지원`;
+          } else {
+            // 금액이 다른 경우
+            const itemsWithAmount = deductItems.map(item => `${item.icon} ${item.name} ${formatAmountToManwon(item.amount)}`).join('/');
+            content = `🎯 조건부: ${conditions.join(', ')}\n💰 ${itemsWithAmount} 각각 차감금액지원`;
+          }
         } else {
-          // 조건부가 없는 경우 - 모든 차감지원 금액 표시 + 조건: 없음 추가
-          content = `💰 ${deductItems.join('/')} ${amountText} 차감금액지원\n📌 조건: 없음`;
+          // 조건부가 없는 경우
+          if (allSame) {
+            // 모든 금액이 동일한 경우
+            const amountText = formatAmountToManwon(uniqueAmounts[0]);
+            content = `💰 ${deductItems.map(item => `${item.icon} ${item.name}`).join('/')} ${amountText} 각각 차감금액지원\n📌 조건: 없음`;
+          } else {
+            // 금액이 다른 경우
+            const itemsWithAmount = deductItems.map(item => `${item.icon} ${item.name} ${formatAmountToManwon(item.amount)}`).join('/');
+            content = `💰 ${itemsWithAmount} 각각 차감금액지원\n📌 조건: 없음`;
+          }
         }
         setFormData(prev => ({ ...prev, policyContent: content }));
       } else {

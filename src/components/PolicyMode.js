@@ -1786,6 +1786,19 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                                   
                                   // 부가차감지원정책인 경우 차감지원 정보 표시
                                   if (policy.category === 'wireless_add_deduct' || policy.category === 'wired_add_deduct') {
+                                    // policyContent가 있으면 그대로 표시 (자동생성된 형식)
+                                    if (policy.policyContent) {
+                                      return (
+                                        <Typography 
+                                          variant="body2" 
+                                          sx={{ whiteSpace: 'pre-line' }}
+                                        >
+                                          {policy.policyContent}
+                                        </Typography>
+                                      );
+                                    }
+                                    
+                                    // policyContent가 없는 경우 (구버전 데이터) 기존 로직 유지
                                     const conditions = [];
                                     if (policy.conditionalOptions?.addServiceAcquired) conditions.push('부가유치시');
                                     if (policy.conditionalOptions?.insuranceAcquired) conditions.push('보험유치시');
@@ -1797,52 +1810,69 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                                     
                                     // 부가유치시 조건이 체크되지 않았을 때만 부가미유치 금액 표시
                                     if (!policy.conditionalOptions?.addServiceAcquired && policy.deductSupport?.addServiceAmount) {
-                                      deductItems.push('📱 부가미유치');
+                                      deductItems.push({ icon: '📱', name: '부가미유치', amount: Number(policy.deductSupport.addServiceAmount) });
                                       deductAmounts.push(Number(policy.deductSupport.addServiceAmount));
                                     }
                                     
                                     // 보험유치시 조건이 체크되지 않았을 때만 보험미유치 금액 표시
                                     if (!policy.conditionalOptions?.insuranceAcquired && policy.deductSupport?.insuranceAmount) {
-                                      deductItems.push('🛡️ 보험미유치');
+                                      deductItems.push({ icon: '🛡️', name: '보험미유치', amount: Number(policy.deductSupport.insuranceAmount) });
                                       deductAmounts.push(Number(policy.deductSupport.insuranceAmount));
                                     }
                                     
                                     // 연결음유치시 조건이 체크되지 않았을 때만 연결음미유치 금액 표시
                                     if (!policy.conditionalOptions?.connectionAcquired && policy.deductSupport?.connectionAmount) {
-                                      deductItems.push('🔊 연결음미유치');
+                                      deductItems.push({ icon: '🔊', name: '연결음미유치', amount: Number(policy.deductSupport.connectionAmount) });
                                       deductAmounts.push(Number(policy.deductSupport.connectionAmount));
                                     }
                                     
-                                    if (conditions.length > 0 && deductItems.length > 0) {
-                                      // 모든 금액이 동일한 경우 하나의 금액으로 표시
+                                    if (deductItems.length > 0) {
+                                      // 금액을 만원 단위로 변환하는 함수
+                                      const formatAmountToManwon = (amount) => {
+                                        const manwon = Math.floor(amount / 10000);
+                                        return `${manwon}만원`;
+                                      };
+                                      
+                                      // 모든 금액이 동일한지 확인
                                       const uniqueAmounts = [...new Set(deductAmounts)];
-                                      const amountText = uniqueAmounts.length === 1 
-                                        ? `${uniqueAmounts[0].toLocaleString()}원`
-                                        : deductAmounts.map(amount => `${amount.toLocaleString()}원`).join('/');
+                                      const allSame = uniqueAmounts.length === 1;
                                       
                                       return (
                                         <Box>
+                                          {conditions.length > 0 && (
+                                            <Typography variant="body2" sx={{ 
+                                              fontWeight: 'bold',
+                                              color: 'primary.main',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              gap: 0.5,
+                                              mb: 0.5
+                                            }}>
+                                              🎯 조건부: {conditions.join(', ')}
+                                            </Typography>
+                                          )}
                                           <Typography variant="body2" sx={{ 
-                                            fontWeight: 'bold',
-                                            color: 'primary.main',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: 0.5
-                                          }}>
-                                            🎯 조건부: {conditions.join(', ')}
-                                          </Typography>
-                                          <Typography variant="body2" sx={{ 
-                                            mt: 0.5,
                                             display: 'flex',
                                             alignItems: 'center',
                                             gap: 0.5,
                                             color: 'success.main'
                                           }}>
-                                            💰 {deductItems.join('/')} {amountText} 차감금액지원
+                                            {allSame ? (
+                                              <>
+                                                💰 {deductItems.map(item => `${item.icon} ${item.name}`).join('/')} {formatAmountToManwon(uniqueAmounts[0])} 각각 차감금액지원
+                                              </>
+                                            ) : (
+                                              <>
+                                                💰 {deductItems.map(item => `${item.icon} ${item.name} ${formatAmountToManwon(item.amount)}`).join('/')} 각각 차감금액지원
+                                              </>
+                                            )}
                                           </Typography>
-                                          {policy.policyContent && policy.policyContent !== `🎯 조건부: ${conditions.join(', ')}\n💰 ${deductItems.join('/')} ${amountText} 차감금액지원` && (
-                                            <Typography variant="body2" sx={{ mt: 1, fontStyle: 'italic', color: 'text.secondary' }}>
-                                              추가내용: {policy.policyContent}
+                                          {conditions.length === 0 && (
+                                            <Typography variant="body2" sx={{ 
+                                              mt: 0.5,
+                                              color: 'text.secondary'
+                                            }}>
+                                              📌 조건: 없음
                                             </Typography>
                                           )}
                                         </Box>
