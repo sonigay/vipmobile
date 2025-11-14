@@ -466,16 +466,16 @@ async function saveMeetingConfig(req, res) {
       
       // slideId로 찾지 못한 경우 mode/tab/subTab/order로 찾기
       if (existingRowIndex === -1) {
+        const tabValue = slide.subTab ? `${slide.tab || ''}/${slide.subTab}` : (slide.tab || '');
         existingRowIndex = existingRows.findIndex((row, idx) => {
           if (row[0] !== meetingId) return false;
-          // mode, tab, subTab, order가 모두 일치하는지 확인
+          // mode, tab, order가 모두 일치하는지 확인 (subTab은 tab 필드에 포함됨)
           const rowMode = row[4] || '';
           const rowTab = row[5] || '';
-          const rowSubTab = slide.subTab ? (row[5] || '') : ''; // subTab은 tab 필드에 저장될 수 있음
           const rowOrder = parseInt(row[2] || 0);
           
           return rowMode === (slide.mode || '') && 
-                 rowTab === (slide.tab || '') && 
+                 rowTab === tabValue && 
                  rowOrder === (slide.order || 0);
         });
       }
