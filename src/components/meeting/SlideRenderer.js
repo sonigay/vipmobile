@@ -377,16 +377,55 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
         overflow: 'auto'
       }}
     >
-      {loading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-          <CircularProgress />
+      {/* 로딩 중이어도 콘텐츠를 먼저 렌더링하여 사용자가 볼 수 있도록 함 */}
+      {renderSlideContent()}
+      
+      {/* 로딩 중일 때 반투명 오버레이 표시 */}
+      {loading && (
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            backgroundColor: 'rgba(255, 255, 255, 0.8)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 10000,
+            pointerEvents: 'none' // 클릭 이벤트는 아래 콘텐츠로 전달
+          }}
+        >
+          <Box sx={{ textAlign: 'center' }}>
+            <CircularProgress size={60} />
+            <Box sx={{ mt: 2, color: '#666', fontSize: '1.1rem', fontWeight: 500 }}>
+              데이터 로딩 중...
+            </Box>
+          </Box>
         </Box>
-      ) : error ? (
-        <Box sx={{ p: 4 }}>
-          <Alert severity="error">{error}</Alert>
+      )}
+      
+      {/* 에러 표시 */}
+      {error && (
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 10001,
+            backgroundColor: 'rgba(255, 255, 255, 0.95)'
+          }}
+        >
+          <Alert severity="error" sx={{ maxWidth: 600 }}>
+            {error}
+          </Alert>
         </Box>
-      ) : (
-        renderSlideContent()
       )}
     </Box>
   );
