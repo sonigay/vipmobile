@@ -878,8 +878,8 @@ function convertExcelToHTML(worksheet) {
 async function convertExcelToImage(worksheet, filename) {
   try {
     // Canvas 모듈 동적 로드
-    const canvas = require('canvas');
-    const { createCanvas } = canvas;
+    const canvasModule = require('canvas');
+    const { createCanvas } = canvasModule;
     
     // Excel 데이터 읽기
     const rows = [];
