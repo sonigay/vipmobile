@@ -785,6 +785,8 @@ async function uploadMeetingImage(req, res) {
         if (meetingRow && meetingRow[3]) {
           meetingNumber = parseInt(meetingRow[3]);
           console.log(`📋 [uploadMeetingImage] 회의 차수 조회: ${meetingNumber}차`);
+        } else {
+          console.warn(`⚠️ [uploadMeetingImage] 회의 정보를 찾을 수 없습니다: ${meetingId}`);
         }
       } catch (meetingError) {
         console.warn('회의 정보 조회 실패 (차수 정보 없이 진행):', meetingError);
@@ -792,14 +794,28 @@ async function uploadMeetingImage(req, res) {
       }
     }
     
+    console.log(`📤 [uploadMeetingImage] Discord 업로드 시작:`, {
+      meetingId,
+      isTempMeeting,
+      meetingDate,
+      meetingNumber,
+      filename
+    });
+    
     // Discord에 업로드
     const result = await uploadImageToDiscord(
       req.file.buffer,
       filename,
-      isTempMeeting ? `custom-${Date.now()}` : meetingId, // 임시 ID 사용
+      isTempMeeting ? `temp-${meetingDate || new Date().toISOString().split('T')[0]}` : meetingId,
       meetingDate || new Date().toISOString().split('T')[0],
-      meetingNumber
+      meetingNumber // meetingNumber를 명시적으로 전달하여 같은 포스트를 찾도록 함
     );
+    
+    console.log(`✅ [uploadMeetingImage] Discord 업로드 완료:`, {
+      imageUrl: result.imageUrl,
+      postId: result.postId,
+      threadId: result.threadId
+    });
 
     res.json({
       success: true,
