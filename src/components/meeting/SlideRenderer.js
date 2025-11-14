@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Box, CircularProgress, Alert } from '@mui/material';
 import { getModeConfig } from '../../config/modeConfig';
-
-// 각 모드 컴포넌트 import (presentation mode 지원 필요)
-// TODO: 각 모드 컴포넌트에 presentationMode prop 추가 필요
+import ChartMode from '../ChartMode';
+import { getAvailableTabsForMode } from '../../config/modeTabConfig';
 
 /**
  * 슬라이드를 렌더링하는 컴포넌트
@@ -13,15 +12,26 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
   const containerRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [contentReady, setContentReady] = useState(false);
 
   useEffect(() => {
-    // 데이터 로딩 완료 대기
+    console.log('🔍 [SlideRenderer] 슬라이드 렌더링 시작:', slide);
+    setLoading(true);
+    setContentReady(false);
+    
+    // 최소 2초 대기 (데이터 로딩 시간 고려)
     const timer = setTimeout(() => {
+      console.log('✅ [SlideRenderer] 로딩 완료, onReady 호출');
       setLoading(false);
-      if (onReady) {
-        onReady();
-      }
-    }, 1000); // 최소 1초 대기 (데이터 로딩 시간 고려)
+      setContentReady(true);
+      // 추가 대기 후 onReady 호출 (렌더링 완료 보장)
+      setTimeout(() => {
+        if (onReady) {
+          console.log('✅ [SlideRenderer] onReady 콜백 호출');
+          onReady();
+        }
+      }, 500);
+    }, 2000);
 
     return () => clearTimeout(timer);
   }, [slide, onReady]);
@@ -65,8 +75,41 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
       );
     }
 
-    // TODO: 각 모드 컴포넌트를 presentation mode로 렌더링
-    // 현재는 임시로 메시지 표시
+    // 장표 모드인 경우 실제 컴포넌트 렌더링
+    if (slide.mode === 'chart') {
+      const availableTabs = getAvailableTabsForMode('chart', loggedInStore);
+      const tabIndex = availableTabs.findIndex(t => t.key === slide.tab);
+      
+      // 하부 탭이 있는 경우 처리
+      let subTabIndex = 0;
+      if (slide.subTab && availableTabs[tabIndex]?.subTabs) {
+        subTabIndex = availableTabs[tabIndex].subTabs.findIndex(st => st.key === slide.subTab);
+      }
+      
+      return (
+        <Box
+          sx={{
+            width: '100vw',
+            height: '100vh',
+            position: 'relative',
+            overflow: 'auto',
+            backgroundColor: '#ffffff'
+          }}
+        >
+          <ChartMode
+            loggedInStore={loggedInStore}
+            onLogout={() => {}}
+            onModeChange={() => {}}
+            availableModes={[]}
+            presentationMode={true}
+            initialTab={tabIndex >= 0 ? tabIndex : 0}
+            initialSubTab={slide.subTab ? subTabIndex : undefined}
+          />
+        </Box>
+      );
+    }
+
+    // 다른 모드는 임시로 메시지 표시 (추후 구현)
     return (
       <Box
         sx={{
@@ -82,6 +125,7 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
       >
         <Alert severity="info" sx={{ maxWidth: 600 }}>
           {modeConfig.title} > {slide.tabLabel || slide.tab}
+          {slide.subTabLabel && ` > ${slide.subTabLabel}`}
           <br />
           <small>Presentation mode 렌더링 준비 중...</small>
         </Alert>

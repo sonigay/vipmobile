@@ -107,8 +107,8 @@ const calculateTotal = (dataArray, field) => {
   return dataArray.reduce((sum, item) => sum + (item[field] || 0), 0);
 };
 
-function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
-  const [activeTab, setActiveTab] = useState(0);
+function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes, presentationMode = false, initialTab = 0, initialSubTab }) {
+  const [activeTab, setActiveTab] = useState(initialTab);
   
   // 업데이트 팝업 상태
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
