@@ -18,6 +18,7 @@ function MeetingPreparationTab({ loggedInStore }) {
   const [selectedMeeting, setSelectedMeeting] = useState(null);
   const [configEditing, setConfigEditing] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [newlyCreatedMeeting, setNewlyCreatedMeeting] = useState(null);
 
   const handleAdd = () => {
     setEditingMeeting(null);
@@ -49,26 +50,36 @@ function MeetingPreparationTab({ loggedInStore }) {
     setEditingMeeting(null);
   };
 
-  const handleEditorSuccess = () => {
+  const handleEditorSuccess = async (createdMeeting) => {
     setEditorOpen(false);
     setEditingMeeting(null);
-    // 목록 새로고침
-    setRefreshTrigger(prev => prev + 1);
+    
+    // 새로 생성된 회의인 경우 설정 화면으로 이동
+    if (createdMeeting && !editingMeeting) {
+      setNewlyCreatedMeeting(createdMeeting);
+      setConfigEditing(true);
+    } else {
+      // 목록 새로고침
+      setRefreshTrigger(prev => prev + 1);
+    }
   };
 
   const handleConfigCancel = () => {
     setConfigEditing(false);
     setSelectedMeeting(null);
+    setNewlyCreatedMeeting(null);
   };
 
   const handleConfigSave = () => {
     setConfigEditing(false);
     setSelectedMeeting(null);
+    setNewlyCreatedMeeting(null);
     // 목록 새로고침
     setRefreshTrigger(prev => prev + 1);
   };
 
-  if (configEditing && selectedMeeting) {
+  if (configEditing && (selectedMeeting || newlyCreatedMeeting)) {
+    const meetingToEdit = selectedMeeting || newlyCreatedMeeting;
     return (
       <Container maxWidth="xl" sx={{ py: 3 }}>
         <Button
@@ -79,7 +90,7 @@ function MeetingPreparationTab({ loggedInStore }) {
           목록으로 돌아가기
         </Button>
         <MeetingConfigEditor
-          meeting={selectedMeeting}
+          meeting={meetingToEdit}
           loggedInStore={loggedInStore}
           onSave={handleConfigSave}
           onCancel={handleConfigCancel}

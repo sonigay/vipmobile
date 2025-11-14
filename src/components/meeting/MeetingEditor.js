@@ -93,13 +93,16 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess }) {
       if (meeting) {
         // 수정
         await api.updateMeeting(meeting.meetingId, meetingData);
+        if (onSuccess) {
+          onSuccess();
+        }
       } else {
         // 생성
-        await api.createMeeting(meetingData);
-      }
-
-      if (onSuccess) {
-        onSuccess();
+        const result = await api.createMeeting(meetingData);
+        if (onSuccess) {
+          // 생성된 회의 정보를 전달
+          onSuccess(result.meeting);
+        }
       }
     } catch (err) {
       console.error('회의 저장 오류:', err);
