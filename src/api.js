@@ -1008,6 +1008,11 @@ export const api = {
   }
 };
 
+// 디버깅: api 객체 확인
+console.log('🔍 [api.js] api 객체 export:', api);
+console.log('🔍 [api.js] api.getMeetings:', api.getMeetings);
+console.log('🔍 [api.js] api 객체의 모든 키:', Object.keys(api));
+
 export default api;
 
 // 프론트엔드 캐싱 시스템
@@ -1840,15 +1845,22 @@ export const inventoryRecoveryAPI = {
 
   // 회의 목록 조회
   getMeetings: async function getMeetings() {
+    console.log('🔍 [api.getMeetings] 함수 호출됨');
+    console.log('🔍 [api.getMeetings] API_BASE_URL:', API_BASE_URL);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/meetings`);
+      const url = `${API_BASE_URL}/api/meetings`;
+      console.log('🔍 [api.getMeetings] 요청 URL:', url);
+      const response = await fetch(url);
+      console.log('🔍 [api.getMeetings] 응답 상태:', response.status, response.statusText);
       const data = await response.json();
+      console.log('🔍 [api.getMeetings] 응답 데이터:', data);
       if (!response.ok) {
         throw new Error(data.error || '회의 목록 조회 실패');
       }
       return data;
     } catch (error) {
-      console.error('회의 목록 조회 오류:', error);
+      console.error('❌ [api.getMeetings] 회의 목록 조회 오류:', error);
+      console.error('❌ [api.getMeetings] 에러 스택:', error.stack);
       throw error;
     }
   },
