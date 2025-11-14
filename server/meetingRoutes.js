@@ -4,6 +4,7 @@ const { Client, GatewayIntentBits, AttachmentBuilder } = require('discord.js');
 const multer = require('multer');
 const path = require('path');
 const ExcelJS = require('exceljs');
+const sharp = require('sharp');
 
 // Discord 봇 설정
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
@@ -781,8 +782,64 @@ async function findOrCreateThread(post, meetingId) {
   }
 }
 
+/**
+ * 이미지에서 데이터가 없는 영역을 자동으로 크롭합니다.
+ * 흰색 배경이나 투명 영역을 감지하여 실제 콘텐츠 영역만 남깁니다.
+ * @param {Buffer} imageBuffer - 원본 이미지 버퍼
+ * @returns {Promise<{buffer: Buffer, originalWidth: number, originalHeight: number, croppedWidth: number, croppedHeight: number}>}
+ */
+async function autoCropImage(imageBuffer) {
+  try {
+    // 원본 이미지 메타데이터 가져오기
+    const metadata = await sharp(imageBuffer).metadata();
+    const originalWidth = metadata.width || 0;
+    const originalHeight = metadata.height || 0;
+    
+    console.log(`🔍 [autoCropImage] 원본 이미지 크기: ${originalWidth}x${originalHeight}`);
+    
+    // 이미지를 분석하여 실제 콘텐츠 영역 찾기
+    // sharp의 trim 기능을 사용하여 가장자리의 흰색/투명 영역 제거
+    // threshold: 10 (약간의 색상 차이도 감지)
+    // lineArt: false (일반 이미지 처리)
+    const trimmedImage = await sharp(imageBuffer)
+      .trim({
+        threshold: 10, // 픽셀 값 차이 임계값 (0-255, 낮을수록 민감)
+        lineArt: false // 일반 이미지 처리
+      })
+      .png()
+      .toBuffer();
+    
+    // 크롭된 이미지 메타데이터 가져오기
+    const croppedMetadata = await sharp(trimmedImage).metadata();
+    const croppedWidth = croppedMetadata.width || originalWidth;
+    const croppedHeight = croppedMetadata.height || originalHeight;
+    
+    console.log(`✂️ [autoCropImage] 크롭된 이미지 크기: ${croppedWidth}x${croppedHeight}`);
+    console.log(`📊 [autoCropImage] 크롭 비율: ${((1 - (croppedWidth * croppedHeight) / (originalWidth * originalHeight)) * 100).toFixed(2)}% 제거됨`);
+    
+    return {
+      buffer: trimmedImage,
+      originalWidth,
+      originalHeight,
+      croppedWidth,
+      croppedHeight
+    };
+  } catch (error) {
+    console.error('❌ [autoCropImage] 이미지 크롭 오류:', error);
+    // 크롭 실패 시 원본 이미지 반환
+    const metadata = await sharp(imageBuffer).metadata();
+    return {
+      buffer: imageBuffer,
+      originalWidth: metadata.width || 0,
+      originalHeight: metadata.height || 0,
+      croppedWidth: metadata.width || 0,
+      croppedHeight: metadata.height || 0
+    };
+  }
+}
+
 // 이미지 업로드 (Discord)
-async function uploadImageToDiscord(imageBuffer, filename, meetingId, meetingDate, meetingNumber) {
+async function uploadImageToDiscord(imageBuffer, filename, meetingId, meetingDate, meetingNumber, metadata = null) {
   if (!DISCORD_LOGGING_ENABLED || !discordBot) {
     throw new Error('Discord 봇이 초기화되지 않았습니다.');
   }
@@ -818,11 +875,21 @@ async function uploadImageToDiscord(imageBuffer, filename, meetingId, meetingDat
     const attachment = new AttachmentBuilder(imageBuffer, { name: filename });
     const message = await thread.send({ files: [attachment] });
     
-    return {
+    const result = {
       imageUrl: message.attachments.first().url,
       postId: post.id,
       threadId: thread.id
     };
+    
+    // 메타데이터가 있으면 추가
+    if (metadata) {
+      result.originalWidth = metadata.originalWidth;
+      result.originalHeight = metadata.originalHeight;
+      result.croppedWidth = metadata.croppedWidth;
+      result.croppedHeight = metadata.croppedHeight;
+    }
+    
+    return result;
   } catch (error) {
     console.error('Discord 이미지 업로드 오류:', error);
     throw error;
@@ -885,13 +952,28 @@ async function uploadMeetingImage(req, res) {
       filename
     });
     
-    // Discord에 업로드
+    // 이미지 자동 크롭 처리
+    console.log(`✂️ [uploadMeetingImage] 이미지 자동 크롭 시작`);
+    const croppedResult = await autoCropImage(req.file.buffer);
+    console.log(`✅ [uploadMeetingImage] 이미지 자동 크롭 완료:`, {
+      originalSize: `${croppedResult.originalWidth}x${croppedResult.originalHeight}`,
+      croppedSize: `${croppedResult.croppedWidth}x${croppedResult.croppedHeight}`,
+      reduction: `${((1 - (croppedResult.croppedWidth * croppedResult.croppedHeight) / (croppedResult.originalWidth * croppedResult.originalHeight)) * 100).toFixed(2)}%`
+    });
+    
+    // Discord에 업로드 (크롭된 이미지 사용)
     const result = await uploadImageToDiscord(
-      req.file.buffer,
+      croppedResult.buffer,
       filename,
       isTempMeeting ? `temp-${meetingDate || new Date().toISOString().split('T')[0]}` : meetingId,
       meetingDate || new Date().toISOString().split('T')[0],
-      meetingNumber // meetingNumber를 명시적으로 전달하여 같은 포스트를 찾도록 함
+      meetingNumber, // meetingNumber를 명시적으로 전달하여 같은 포스트를 찾도록 함
+      {
+        originalWidth: croppedResult.originalWidth,
+        originalHeight: croppedResult.originalHeight,
+        croppedWidth: croppedResult.croppedWidth,
+        croppedHeight: croppedResult.croppedHeight
+      }
     );
     
     console.log(`✅ [uploadMeetingImage] Discord 업로드 완료:`, {
@@ -904,7 +986,12 @@ async function uploadMeetingImage(req, res) {
       success: true,
       imageUrl: result.imageUrl,
       postId: result.postId,
-      threadId: result.threadId
+      threadId: result.threadId,
+      // 원본 크기 정보 포함
+      originalWidth: result.originalWidth,
+      originalHeight: result.originalHeight,
+      croppedWidth: result.croppedWidth,
+      croppedHeight: result.croppedHeight
     });
   } catch (error) {
     console.error('이미지 업로드 오류:', error);
@@ -1229,11 +1316,24 @@ async function uploadCustomSlideFile(req, res) {
     let imageBuffers = [];
     
     if (detectedFileType === 'image') {
-      // 이미지 파일은 그대로 사용
+      // 이미지 파일 자동 크롭 처리
+      console.log(`✂️ [uploadCustomSlideFile] 이미지 자동 크롭 시작`);
+      const croppedResult = await autoCropImage(file.buffer);
+      console.log(`✅ [uploadCustomSlideFile] 이미지 자동 크롭 완료:`, {
+        originalSize: `${croppedResult.originalWidth}x${croppedResult.originalHeight}`,
+        croppedSize: `${croppedResult.croppedWidth}x${croppedResult.croppedHeight}`,
+        reduction: `${((1 - (croppedResult.croppedWidth * croppedResult.croppedHeight) / (croppedResult.originalWidth * croppedResult.originalHeight)) * 100).toFixed(2)}%`
+      });
       imageBuffers.push({
-        buffer: file.buffer,
+        buffer: croppedResult.buffer,
         filename: file.originalname || `image-${Date.now()}.png`,
-        sheetName: null
+        sheetName: null,
+        metadata: {
+          originalWidth: croppedResult.originalWidth,
+          originalHeight: croppedResult.originalHeight,
+          croppedWidth: croppedResult.croppedWidth,
+          croppedHeight: croppedResult.croppedHeight
+        }
       });
     } else if (detectedFileType === 'excel') {
       // Excel 파일 변환 (HTML + Puppeteer 방식으로 한글 지원)
@@ -1268,15 +1368,37 @@ async function uploadCustomSlideFile(req, res) {
             
             await browser.close();
             
+            // Excel 변환 이미지도 자동 크롭 처리
+            const croppedResult = await autoCropImage(screenshot);
             imageBuffersFromHTML.push({
-              buffer: screenshot,
+              buffer: croppedResult.buffer,
               filename: `${file.originalname || 'excel'}_${worksheet.name}.png`,
-              sheetName: worksheet.name
+              sheetName: worksheet.name,
+              metadata: {
+                originalWidth: croppedResult.originalWidth,
+                originalHeight: croppedResult.originalHeight,
+                croppedWidth: croppedResult.croppedWidth,
+                croppedHeight: croppedResult.croppedHeight
+              }
             });
           } catch (puppeteerError) {
             console.warn('⚠️ [Excel 변환] Puppeteer 변환 실패, Canvas로 재시도:', puppeteerError.message);
             // Puppeteer 실패 시 Canvas로 폴백
-            imageBuffers = await convertExcelToImages(file.buffer, file.originalname || 'excel');
+            const canvasImages = await convertExcelToImages(file.buffer, file.originalname || 'excel');
+            // Canvas로 변환된 이미지들도 자동 크롭 처리
+            imageBuffers = await Promise.all(canvasImages.map(async (img) => {
+              const croppedResult = await autoCropImage(img.buffer);
+              return {
+                ...img,
+                buffer: croppedResult.buffer,
+                metadata: {
+                  originalWidth: croppedResult.originalWidth,
+                  originalHeight: croppedResult.originalHeight,
+                  croppedWidth: croppedResult.croppedWidth,
+                  croppedHeight: croppedResult.croppedHeight
+                }
+              };
+            }));
             break; // Canvas 방식으로 전환했으므로 루프 종료
           }
         }
@@ -1285,7 +1407,21 @@ async function uploadCustomSlideFile(req, res) {
           imageBuffers = imageBuffersFromHTML;
         } else {
           // Puppeteer가 없으면 Canvas로 폴백
-          imageBuffers = await convertExcelToImages(file.buffer, file.originalname || 'excel');
+          const canvasImages = await convertExcelToImages(file.buffer, file.originalname || 'excel');
+          // Canvas로 변환된 이미지들도 자동 크롭 처리
+          imageBuffers = await Promise.all(canvasImages.map(async (img) => {
+            const croppedResult = await autoCropImage(img.buffer);
+            return {
+              ...img,
+              buffer: croppedResult.buffer,
+              metadata: {
+                originalWidth: croppedResult.originalWidth,
+                originalHeight: croppedResult.originalHeight,
+                croppedWidth: croppedResult.croppedWidth,
+                croppedHeight: croppedResult.croppedHeight
+              }
+            };
+          }));
         }
       } catch (excelError) {
         console.error('Excel 변환 오류:', excelError);
@@ -1392,7 +1528,8 @@ async function uploadCustomSlideFile(req, res) {
         imageData.filename,
         uploadMeetingId,
         meetingDate || new Date().toISOString().split('T')[0],
-        finalMeetingNumber // meetingNumber를 명시적으로 전달하여 같은 포스트를 찾도록 함
+        finalMeetingNumber, // meetingNumber를 명시적으로 전달하여 같은 포스트를 찾도록 함
+        imageData.metadata || null // 메타데이터 전달
       );
       
       console.log(`✅ [uploadCustomSlideFile] Discord 업로드 완료 (${i + 1}/${imageBuffers.length}):`, {
@@ -1401,7 +1538,13 @@ async function uploadCustomSlideFile(req, res) {
         threadId: result.threadId
       });
       
-      imageUrls.push(result.imageUrl);
+      imageUrls.push({
+        imageUrl: result.imageUrl,
+        originalWidth: result.originalWidth,
+        originalHeight: result.originalHeight,
+        croppedWidth: result.croppedWidth,
+        croppedHeight: result.croppedHeight
+      });
       console.log(`✅ [uploadCustomSlideFile] 이미지 ${i + 1}/${imageBuffers.length} 업로드 완료: ${result.imageUrl}`);
     }
     
@@ -1409,14 +1552,21 @@ async function uploadCustomSlideFile(req, res) {
     if (imageUrls.length === 1) {
       res.json({
         success: true,
-        imageUrl: imageUrls[0],
-        imageUrls: imageUrls
+        imageUrl: imageUrls[0].imageUrl,
+        imageUrls: imageUrls.map(img => img.imageUrl),
+        // 메타데이터 포함
+        originalWidth: imageUrls[0].originalWidth,
+        originalHeight: imageUrls[0].originalHeight,
+        croppedWidth: imageUrls[0].croppedWidth,
+        croppedHeight: imageUrls[0].croppedHeight,
+        metadata: imageUrls
       });
     } else {
       res.json({
         success: true,
-        imageUrls: imageUrls,
-        imageUrl: imageUrls[0] // 첫 번째 이미지를 기본으로
+        imageUrls: imageUrls.map(img => img.imageUrl),
+        imageUrl: imageUrls[0]?.imageUrl || null, // 첫 번째 이미지를 기본으로
+        metadata: imageUrls // 모든 이미지의 메타데이터
       });
     }
   } catch (error) {
