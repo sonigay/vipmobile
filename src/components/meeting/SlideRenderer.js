@@ -270,14 +270,14 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
             flexDirection: 'column',
             justifyContent: 'space-between',
             alignItems: 'center',
-            background: 'linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%)', // 아주 연한 회색
-            color: '#1a1a1a', // 어두운 계열 글자색
+            background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 50%, #f1f3f5 100%)', // 전문적인 그라데이션
+            color: '#212529', // 어두운 계열 글자색
             p: { xs: 3, md: 6 },
             overflow: 'auto',
             position: 'relative'
           }}
         >
-          {/* 상단: 회사 로고 및 이름 - 상단 전체 하얀색 배경 */}
+          {/* 상단: 회사 로고 및 이름 - 전문적인 헤더 디자인 */}
           <Box
             sx={{
               display: 'flex',
@@ -286,13 +286,15 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
               justifyContent: 'flex-start',
               width: '100%',
               backgroundColor: '#ffffff',
-              px: { xs: 2, md: 3 },
-              py: { xs: 2, md: 2.5 }, // 높이 증가
+              px: { xs: 3, md: 4 },
+              py: { xs: 2.5, md: 3 },
               position: 'absolute',
               top: 0,
               left: 0,
               right: 0,
-              zIndex: 10
+              zIndex: 10,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.08)', // 미묘한 그림자
+              borderBottom: '1px solid rgba(0,0,0,0.05)'
             }}
           >
             <Box
@@ -313,10 +315,11 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
             <Typography
               variant="h6"
               sx={{
-                fontWeight: 600,
-                fontSize: { xs: '0.9rem', md: '1.1rem' },
-                color: '#333',
-                letterSpacing: '0.3px'
+                fontWeight: 700,
+                fontSize: { xs: '1rem', md: '1.2rem' },
+                color: '#212529',
+                letterSpacing: '0.5px',
+                fontFamily: '"Noto Sans KR", "Roboto", "Helvetica", "Arial", sans-serif'
               }}
             >
               (주)브이아이피플러스
@@ -325,26 +328,29 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
 
           {/* 중앙: 회의 정보 */}
           <Box sx={{ textAlign: 'center', maxWidth: 1000, width: '100%', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', pt: { xs: 10, md: 12 } }}>
-            {/* 차수 배지 */}
+            {/* 차수 배지 - 전문적인 디자인 */}
             {slide.meetingNumber && (
               <Box
                 sx={{
                   display: 'inline-block',
-                  backgroundColor: 'rgba(255, 255, 255, 0.25)',
-                  backdropFilter: 'blur(10px)',
-                  px: 4,
-                  py: 1.5,
-                  borderRadius: 5,
-                  mb: 3,
-                  border: '2px solid rgba(255, 255, 255, 0.3)',
-                  boxShadow: '0 4px 16px rgba(0,0,0,0.2)'
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  px: { xs: 3, md: 4 },
+                  py: { xs: 1.2, md: 1.5 },
+                  borderRadius: '50px',
+                  mb: 4,
+                  boxShadow: '0 8px 24px rgba(102, 126, 234, 0.3)',
+                  transform: 'translateY(0)',
+                  transition: 'transform 0.3s ease'
                 }}
               >
                 <Typography
                   variant="h4"
                   sx={{
-                    fontWeight: 'bold',
-                    fontSize: { xs: '1.5rem', md: '2rem' },
+                    fontWeight: 700,
+                    fontSize: { xs: '1.3rem', md: '1.8rem' },
+                    color: '#ffffff',
+                    letterSpacing: '1px',
+                    fontFamily: '"Noto Sans KR", "Roboto", sans-serif'
                   }}
                 >
                   {slide.meetingNumber}차 회의
@@ -352,53 +358,102 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
               </Box>
             )}
 
-            {/* 회의 제목 */}
+            {/* 회의 제목 - 전문적인 타이포그래피 */}
             <Typography
               variant="h2"
               component="h1"
               sx={{
-                fontSize: { xs: '2rem', md: '3.5rem' },
-                fontWeight: 'bold',
-                mb: 4,
-                lineHeight: 1.2
+                fontSize: { xs: '2.5rem', md: '4rem' },
+                fontWeight: 800,
+                mb: 5,
+                lineHeight: 1.1,
+                color: '#212529',
+                letterSpacing: '-0.5px',
+                fontFamily: '"Noto Sans KR", "Roboto", sans-serif',
+                background: 'linear-gradient(135deg, #212529 0%, #495057 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text'
               }}
             >
               {slide.title || '회의'}
             </Typography>
             
-            {/* 회의 정보 카드 */}
+            {/* 회의 정보 카드 - 전문적인 카드 디자인 */}
             <Box
               sx={{
-                backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                backdropFilter: 'blur(10px)',
-                borderRadius: 4,
-                p: { xs: 3, md: 4 },
+                backgroundColor: '#ffffff',
+                borderRadius: '16px',
+                p: { xs: 3, md: 4.5 },
                 mb: 3,
-                boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
-                border: '1px solid rgba(255, 255, 255, 0.2)'
+                boxShadow: '0 4px 20px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.05)',
+                border: '1px solid rgba(0,0,0,0.06)',
+                maxWidth: '800px',
+                mx: 'auto',
+                width: '100%'
               }}
             >
-              <Box sx={{ mb: 3 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5, gap: 1 }}>
-                  <EventIcon sx={{ fontSize: { xs: '1.2rem', md: '1.5rem' }, opacity: 0.9 }} />
-                  <Typography variant="h5" sx={{ fontWeight: 600, fontSize: { xs: '1.1rem', md: '1.5rem' } }}>
+              <Box sx={{ mb: 3.5, pb: 3, borderBottom: '1px solid #e9ecef' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5, gap: 1.5 }}>
+                  <Box sx={{ 
+                    backgroundColor: '#667eea', 
+                    borderRadius: '8px', 
+                    p: 1, 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center' 
+                  }}>
+                    <EventIcon sx={{ fontSize: { xs: '1.2rem', md: '1.5rem' }, color: '#ffffff' }} />
+                  </Box>
+                  <Typography variant="h5" sx={{ 
+                    fontWeight: 700, 
+                    fontSize: { xs: '1.1rem', md: '1.4rem' },
+                    color: '#212529',
+                    fontFamily: '"Noto Sans KR", sans-serif'
+                  }}>
                     일시
                   </Typography>
                 </Box>
-                <Typography variant="h6" sx={{ fontWeight: 400, fontSize: { xs: '1rem', md: '1.3rem' }, pl: 4 }}>
+                <Typography variant="h6" sx={{ 
+                  fontWeight: 500, 
+                  fontSize: { xs: '1rem', md: '1.25rem' }, 
+                  pl: { xs: 5.5, md: 6 },
+                  color: '#495057',
+                  fontFamily: '"Noto Sans KR", sans-serif'
+                }}>
                   {formattedDate}
                 </Typography>
               </Box>
               
               {slide.meetingLocation && (
-                <Box sx={{ mb: 3 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5, gap: 1 }}>
-                    <LocationIcon sx={{ fontSize: { xs: '1.2rem', md: '1.5rem' }, opacity: 0.9 }} />
-                    <Typography variant="h5" sx={{ fontWeight: 600, fontSize: { xs: '1.1rem', md: '1.5rem' } }}>
+                <Box sx={{ mb: 3.5, pb: 3, borderBottom: '1px solid #e9ecef' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5, gap: 1.5 }}>
+                    <Box sx={{ 
+                      backgroundColor: '#764ba2', 
+                      borderRadius: '8px', 
+                      p: 1, 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center' 
+                    }}>
+                      <LocationIcon sx={{ fontSize: { xs: '1.2rem', md: '1.5rem' }, color: '#ffffff' }} />
+                    </Box>
+                    <Typography variant="h5" sx={{ 
+                      fontWeight: 700, 
+                      fontSize: { xs: '1.1rem', md: '1.4rem' },
+                      color: '#212529',
+                      fontFamily: '"Noto Sans KR", sans-serif'
+                    }}>
                       장소
                     </Typography>
                   </Box>
-                  <Typography variant="h6" sx={{ fontWeight: 400, fontSize: { xs: '1rem', md: '1.3rem' }, pl: 4 }}>
+                  <Typography variant="h6" sx={{ 
+                    fontWeight: 500, 
+                    fontSize: { xs: '1rem', md: '1.25rem' }, 
+                    pl: { xs: 5.5, md: 6 },
+                    color: '#495057',
+                    fontFamily: '"Noto Sans KR", sans-serif'
+                  }}>
                     {slide.meetingLocation}
                   </Typography>
                 </Box>
@@ -406,26 +461,47 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
               
               {participantsList.length > 0 && (
                 <Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5, gap: 1 }}>
-                    <PeopleIcon sx={{ fontSize: { xs: '1.2rem', md: '1.5rem' }, opacity: 0.9 }} />
-                    <Typography variant="h5" sx={{ fontWeight: 600, fontSize: { xs: '1.1rem', md: '1.5rem' } }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5, gap: 1.5 }}>
+                    <Box sx={{ 
+                      backgroundColor: '#f5576c', 
+                      borderRadius: '8px', 
+                      p: 1, 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center' 
+                    }}>
+                      <PeopleIcon sx={{ fontSize: { xs: '1.2rem', md: '1.5rem' }, color: '#ffffff' }} />
+                    </Box>
+                    <Typography variant="h5" sx={{ 
+                      fontWeight: 700, 
+                      fontSize: { xs: '1.1rem', md: '1.4rem' },
+                      color: '#212529',
+                      fontFamily: '"Noto Sans KR", sans-serif'
+                    }}>
                       참석자
                     </Typography>
                   </Box>
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 1.5 }}>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 1.5, pl: { xs: 5.5, md: 6 } }}>
                     {participantsList.map((participant, index) => (
                       <Box
                         key={index}
                         sx={{
-                          backgroundColor: 'rgba(255, 255, 255, 0.25)',
-                          backdropFilter: 'blur(5px)',
-                          px: 3,
-                          py: 1.5,
-                          borderRadius: 3,
-                          fontSize: { xs: '0.9rem', md: '1.1rem' },
+                          backgroundColor: '#f8f9fa',
+                          px: { xs: 2, md: 2.5 },
+                          py: { xs: 1, md: 1.2 },
+                          borderRadius: '8px',
+                          fontSize: { xs: '0.9rem', md: '1.05rem' },
                           fontWeight: 500,
-                          border: '1px solid rgba(255, 255, 255, 0.3)',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                          border: '1px solid #e9ecef',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.04)',
+                          color: '#495057',
+                          fontFamily: '"Noto Sans KR", sans-serif',
+                          transition: 'all 0.2s ease',
+                          '&:hover': { 
+                            backgroundColor: '#e9ecef',
+                            transform: 'translateY(-2px)',
+                            boxShadow: '0 4px 8px rgba(0,0,0,0.08)'
+                          }
                         }}
                       >
                         {participant}
@@ -437,10 +513,21 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
             </Box>
           </Box>
 
-          {/* 하단: 생성자 정보 */}
+          {/* 하단: 생성자 정보 - 전문적인 푸터 디자인 */}
           {slide.createdBy && (
-            <Box sx={{ mt: { xs: 2, md: 3 }, width: '100%', textAlign: 'center' }}>
-              <Typography variant="body2" sx={{ opacity: 0.8, fontSize: { xs: '0.8rem', md: '0.9rem' } }}>
+            <Box sx={{ 
+              mt: { xs: 2, md: 3 }, 
+              width: '100%', 
+              textAlign: 'center',
+              pt: 2,
+              borderTop: '1px solid rgba(0,0,0,0.05)'
+            }}>
+              <Typography variant="body2" sx={{ 
+                color: '#6c757d', 
+                fontSize: { xs: '0.85rem', md: '0.95rem' },
+                fontWeight: 500,
+                fontFamily: '"Noto Sans KR", sans-serif'
+              }}>
                 생성자: {slide.createdBy}
               </Typography>
             </Box>
@@ -464,14 +551,14 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
             flexDirection: 'column',
             justifyContent: 'space-between',
             alignItems: 'center',
-            background: 'linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%)', // 아주 연한 회색
-            color: '#1a1a1a', // 어두운 계열 글자색
+            background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 50%, #f1f3f5 100%)', // 전문적인 그라데이션
+            color: '#212529', // 어두운 계열 글자색
             p: { xs: 3, md: 6 },
             overflow: 'auto',
             position: 'relative'
           }}
         >
-          {/* 상단: 회사 로고 및 이름 - 상단 전체 하얀색 배경 */}
+          {/* 상단: 회사 로고 및 이름 - 전문적인 헤더 디자인 */}
           <Box
             sx={{
               display: 'flex',
@@ -480,13 +567,15 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
               justifyContent: 'flex-start',
               width: '100%',
               backgroundColor: '#ffffff',
-              px: { xs: 2, md: 3 },
-              py: { xs: 2, md: 2.5 }, // 높이 증가
+              px: { xs: 3, md: 4 },
+              py: { xs: 2.5, md: 3 },
               position: 'absolute',
               top: 0,
               left: 0,
               right: 0,
-              zIndex: 10
+              zIndex: 10,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.08)', // 미묘한 그림자
+              borderBottom: '1px solid rgba(0,0,0,0.05)'
             }}
           >
             <Box
@@ -506,10 +595,11 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
             <Typography
               variant="h6"
               sx={{
-                fontWeight: 600,
-                fontSize: { xs: '0.9rem', md: '1.1rem' },
-                color: '#333',
-                letterSpacing: '0.3px'
+                fontWeight: 700,
+                fontSize: { xs: '1rem', md: '1.2rem' },
+                color: '#212529',
+                letterSpacing: '0.5px',
+                fontFamily: '"Noto Sans KR", "Roboto", "Helvetica", "Arial", sans-serif'
               }}
             >
               (주)브이아이피플러스
@@ -533,10 +623,16 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
               variant="h3"
               component="h1"
               sx={{
-                fontSize: { xs: '2rem', md: '3rem' },
-                fontWeight: 'bold',
-                mb: 4,
-                textShadow: '2px 2px 6px rgba(0,0,0,0.4)'
+                fontSize: { xs: '2.5rem', md: '3.5rem' },
+                fontWeight: 800,
+                mb: 5,
+                color: '#212529',
+                letterSpacing: '-0.5px',
+                fontFamily: '"Noto Sans KR", "Roboto", sans-serif',
+                background: 'linear-gradient(135deg, #212529 0%, #495057 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text'
               }}
             >
               회의 목차
@@ -544,14 +640,16 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
             
             <Box
               sx={{
-                backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                backdropFilter: 'blur(10px)',
-                borderRadius: 4,
-                p: { xs: 3, md: 4 },
-                boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
+                backgroundColor: '#ffffff',
+                borderRadius: '16px',
+                p: { xs: 3, md: 4.5 },
+                boxShadow: '0 4px 20px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.05)',
+                border: '1px solid rgba(0,0,0,0.06)',
                 maxHeight: '60vh',
-                overflowY: 'auto'
+                overflowY: 'auto',
+                maxWidth: '1000px',
+                mx: 'auto',
+                width: '100%'
               }}
             >
               {modeKeys.length === 0 && customSlides.length === 0 ? (
@@ -589,14 +687,24 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
                         <Typography
                           variant="h5"
                           sx={{
-                            fontWeight: 'bold',
-                            fontSize: { xs: '1.2rem', md: '1.5rem' },
-                            mb: 2,
-                            color: '#1a1a1a', // 어두운 계열 글자색
-                            borderBottom: '2px solid rgba(255, 255, 255, 0.3)',
-                            pb: 1
+                            fontWeight: 700,
+                            fontSize: { xs: '1.3rem', md: '1.6rem' },
+                            mb: 2.5,
+                            color: '#212529',
+                            borderBottom: '3px solid #667eea',
+                            pb: 1.5,
+                            fontFamily: '"Noto Sans KR", sans-serif',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1.5
                           }}
                         >
+                          <Box sx={{
+                            width: '8px',
+                            height: '8px',
+                            borderRadius: '50%',
+                            backgroundColor: '#667eea'
+                          }} />
                           {modeIndex + 1}. {modeTitle}
                         </Typography>
                         
@@ -610,11 +718,23 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
                                 <Typography
                                   variant="body1"
                                   sx={{
-                                    fontSize: { xs: '0.9rem', md: '1.1rem' },
-                                    opacity: 0.9
+                                    fontSize: { xs: '1rem', md: '1.2rem' },
+                                    fontWeight: 600,
+                                    color: '#495057',
+                                    fontFamily: '"Noto Sans KR", sans-serif',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 1,
+                                    pl: 1
                                   }}
                                 >
-                                  • {modeTitle} 전체
+                                  <Box sx={{
+                                    width: '6px',
+                                    height: '6px',
+                                    borderRadius: '50%',
+                                    backgroundColor: '#764ba2'
+                                  }} />
+                                  {modeTitle} 전체
                                 </Typography>
                               </Box>
                             );
@@ -633,12 +753,23 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
                               <Typography
                                 variant="body1"
                                 sx={{
-                                  fontSize: { xs: '0.9rem', md: '1.1rem' },
+                                  fontSize: { xs: '1rem', md: '1.2rem' },
                                   fontWeight: 600,
-                                  opacity: 0.95,
-                                  mb: hasSubTabs ? 0.5 : 0
+                                  color: '#495057',
+                                  mb: hasSubTabs ? 1 : 0.5,
+                                  fontFamily: '"Noto Sans KR", sans-serif',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 1,
+                                  pl: 1
                                 }}
                               >
+                                <Box sx={{
+                                  width: '6px',
+                                  height: '6px',
+                                  borderRadius: '50%',
+                                  backgroundColor: '#764ba2'
+                                }} />
                                 {modeIndex + 1}.{tabIndex + 1} {tabLabel}
                               </Typography>
                               
@@ -655,12 +786,23 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
                                           key={subSlide.slideId}
                                           variant="body2"
                                           sx={{
-                                            fontSize: { xs: '0.85rem', md: '1rem' },
-                                            opacity: 0.85,
-                                            mb: 0.5
+                                            fontSize: { xs: '0.9rem', md: '1.05rem' },
+                                            color: '#6c757d',
+                                            mb: 0.5,
+                                            fontFamily: '"Noto Sans KR", sans-serif',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 0.8,
+                                            pl: 2
                                           }}
                                         >
-                                          - {subTabLabel}
+                                          <Box sx={{
+                                            width: '4px',
+                                            height: '4px',
+                                            borderRadius: '50%',
+                                            backgroundColor: '#adb5bd'
+                                          }} />
+                                          {subTabLabel}
                                         </Typography>
                                       );
                                     })}
@@ -707,10 +849,21 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
             </Box>
           </Box>
 
-          {/* 하단: 생성자 정보 */}
+          {/* 하단: 생성자 정보 - 전문적인 푸터 디자인 */}
           {slide.createdBy && (
-            <Box sx={{ mt: { xs: 2, md: 3 }, width: '100%', textAlign: 'center' }}>
-              <Typography variant="body2" sx={{ opacity: 0.8, fontSize: { xs: '0.8rem', md: '0.9rem' } }}>
+            <Box sx={{ 
+              mt: { xs: 2, md: 3 }, 
+              width: '100%', 
+              textAlign: 'center',
+              pt: 2,
+              borderTop: '1px solid rgba(0,0,0,0.05)'
+            }}>
+              <Typography variant="body2" sx={{ 
+                color: '#6c757d', 
+                fontSize: { xs: '0.85rem', md: '0.95rem' },
+                fontWeight: 500,
+                fontFamily: '"Noto Sans KR", sans-serif'
+              }}>
                 생성자: {slide.createdBy}
               </Typography>
             </Box>
@@ -739,14 +892,14 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
             flexDirection: 'column',
             justifyContent: 'space-between',
             alignItems: 'center',
-            background: 'linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%)', // 아주 연한 회색
-            color: '#1a1a1a', // 어두운 계열 글자색
+            background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 50%, #f1f3f5 100%)', // 전문적인 그라데이션
+            color: '#212529', // 어두운 계열 글자색
             p: { xs: 3, md: 6 },
             overflow: 'auto',
             position: 'relative'
           }}
         >
-          {/* 상단: 회사 로고 및 이름 - 상단 전체 하얀색 배경 */}
+          {/* 상단: 회사 로고 및 이름 - 전문적인 헤더 디자인 */}
           <Box
             sx={{
               display: 'flex',
@@ -755,13 +908,15 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
               justifyContent: 'flex-start',
               width: '100%',
               backgroundColor: '#ffffff',
-              px: { xs: 2, md: 3 },
-              py: { xs: 2, md: 2.5 }, // 높이 증가
+              px: { xs: 3, md: 4 },
+              py: { xs: 2.5, md: 3 },
               position: 'absolute',
               top: 0,
               left: 0,
               right: 0,
-              zIndex: 10
+              zIndex: 10,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.08)', // 미묘한 그림자
+              borderBottom: '1px solid rgba(0,0,0,0.05)'
             }}
           >
             <Box
@@ -781,10 +936,11 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
             <Typography
               variant="h6"
               sx={{
-                fontWeight: 600,
-                fontSize: { xs: '0.9rem', md: '1.1rem' },
-                color: '#333',
-                letterSpacing: '0.3px'
+                fontWeight: 700,
+                fontSize: { xs: '1rem', md: '1.2rem' },
+                color: '#212529',
+                letterSpacing: '0.5px',
+                fontFamily: '"Noto Sans KR", "Roboto", "Helvetica", "Arial", sans-serif'
               }}
             >
               (주)브이아이피플러스
@@ -807,10 +963,17 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
               variant="h1"
               component="h1"
               sx={{
-                fontSize: { xs: '3rem', md: '5rem' },
-                fontWeight: 'bold',
-                mb: 4,
-                lineHeight: 1.2
+                fontSize: { xs: '3.5rem', md: '5.5rem' },
+                fontWeight: 800,
+                mb: 5,
+                lineHeight: 1.1,
+                color: '#212529',
+                letterSpacing: '-1px',
+                fontFamily: '"Noto Sans KR", "Roboto", sans-serif',
+                background: 'linear-gradient(135deg, #212529 0%, #495057 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text'
               }}
             >
               감사합니다
@@ -818,23 +981,30 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
             
             <Box
               sx={{
-                backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                backdropFilter: 'blur(10px)',
-                borderRadius: 4,
-                p: { xs: 3, md: 4 },
+                backgroundColor: '#ffffff',
+                borderRadius: '16px',
+                p: { xs: 3, md: 4.5 },
                 mb: 3,
-                boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                maxWidth: 600,
-                width: '100%'
+                boxShadow: '0 4px 20px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.05)',
+                border: '1px solid rgba(0,0,0,0.06)',
+                maxWidth: 700,
+                width: '100%',
+                mx: 'auto'
               }}
             >
               <Typography
                 variant="h4"
                 sx={{
-                  fontSize: { xs: '1.5rem', md: '2rem' },
-                  fontWeight: 600,
-                  mb: 2,
+                  fontSize: { xs: '1.8rem', md: '2.5rem' },
+                  fontWeight: 800,
+                  mb: 2.5,
+                  color: '#212529',
+                  letterSpacing: '-0.5px',
+                  fontFamily: '"Noto Sans KR", "Roboto", sans-serif',
+                  background: 'linear-gradient(135deg, #212529 0%, #495057 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text'
                 }}
               >
                 {slide.meetingName || '회의'}
@@ -843,46 +1013,80 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
               <Typography
                 variant="h6"
                 sx={{
-                  fontSize: { xs: '1rem', md: '1.3rem' },
-                  fontWeight: 400,
-                  opacity: 0.9,
-                  mb: 1
+                  fontSize: { xs: '1.1rem', md: '1.4rem' },
+                  fontWeight: 500,
+                  color: '#495057',
+                  mb: 1.5,
+                  fontFamily: '"Noto Sans KR", sans-serif'
                 }}
               >
                 {formattedDate}
               </Typography>
               
               {slide.meetingNumber && (
-                <Typography
-                  variant="body1"
-                  sx={{
-                    fontSize: { xs: '0.9rem', md: '1.1rem' },
-                    opacity: 0.8
-                  }}
-                >
-                  {slide.meetingNumber}차 회의
-                </Typography>
+                <Box sx={{
+                  display: 'inline-block',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  px: { xs: 2.5, md: 3 },
+                  py: { xs: 1, md: 1.2 },
+                  borderRadius: '50px',
+                  boxShadow: '0 4px 12px rgba(102, 126, 234, 0.25)'
+                }}>
+                  <Typography
+                    variant="body1"
+                    sx={{
+                      fontSize: { xs: '0.9rem', md: '1.05rem' },
+                      fontWeight: 600,
+                      color: '#ffffff',
+                      fontFamily: '"Noto Sans KR", sans-serif'
+                    }}
+                  >
+                    {slide.meetingNumber}차 회의
+                  </Typography>
+                </Box>
               )}
             </Box>
             
-            <Typography
-              variant="h5"
-              sx={{
-                fontSize: { xs: '1.2rem', md: '1.8rem' },
-                fontWeight: 500,
-                mt: 4,
-                opacity: 0.9,
-                textShadow: '1px 1px 3px rgba(0,0,0,0.3)'
-              }}
-            >
-              회의가 종료되었습니다
-            </Typography>
+            <Box sx={{
+              backgroundColor: '#ffffff',
+              borderRadius: '16px',
+              p: { xs: 3, md: 4 },
+              boxShadow: '0 4px 20px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.05)',
+              border: '1px solid rgba(0,0,0,0.06)',
+              maxWidth: '600px',
+              mx: 'auto',
+              mt: 4
+            }}>
+              <Typography
+                variant="h4"
+                sx={{
+                  fontSize: { xs: '1.3rem', md: '1.8rem' },
+                  fontWeight: 600,
+                  color: '#495057',
+                  fontFamily: '"Noto Sans KR", sans-serif',
+                  textAlign: 'center'
+                }}
+              >
+                회의가 종료되었습니다
+              </Typography>
+            </Box>
           </Box>
 
-          {/* 하단: 생성자 정보 */}
+          {/* 하단: 생성자 정보 - 전문적인 푸터 디자인 */}
           {slide.createdBy && (
-            <Box sx={{ mt: { xs: 2, md: 3 }, width: '100%', textAlign: 'center' }}>
-              <Typography variant="body2" sx={{ opacity: 0.8, fontSize: { xs: '0.8rem', md: '0.9rem' } }}>
+            <Box sx={{ 
+              mt: { xs: 2, md: 3 }, 
+              width: '100%', 
+              textAlign: 'center',
+              pt: 2,
+              borderTop: '1px solid rgba(0,0,0,0.05)'
+            }}>
+              <Typography variant="body2" sx={{ 
+                color: '#6c757d', 
+                fontSize: { xs: '0.85rem', md: '0.95rem' },
+                fontWeight: 500,
+                fontFamily: '"Noto Sans KR", sans-serif'
+              }}>
                 생성자: {slide.createdBy}
               </Typography>
             </Box>
@@ -902,14 +1106,14 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
             flexDirection: 'column',
             justifyContent: 'space-between',
             alignItems: 'center',
-            background: 'linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%)', // 아주 연한 회색
-            color: '#1a1a1a', // 어두운 계열 글자색
+            background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 50%, #f1f3f5 100%)', // 전문적인 그라데이션
+            color: '#212529', // 어두운 계열 글자색
             p: { xs: 3, md: 6 },
             overflow: 'auto',
             position: 'relative'
           }}
         >
-          {/* 상단: 회사 로고 및 이름 - 상단 전체 하얀색 배경 */}
+          {/* 상단: 회사 로고 및 이름 - 전문적인 헤더 디자인 */}
           <Box
             sx={{
               display: 'flex',
@@ -918,13 +1122,15 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
               justifyContent: 'flex-start',
               width: '100%',
               backgroundColor: '#ffffff',
-              px: { xs: 2, md: 3 },
-              py: { xs: 2, md: 2.5 }, // 높이 증가
+              px: { xs: 3, md: 4 },
+              py: { xs: 2.5, md: 3 },
               position: 'absolute',
               top: 0,
               left: 0,
               right: 0,
-              zIndex: 10
+              zIndex: 10,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.08)', // 미묘한 그림자
+              borderBottom: '1px solid rgba(0,0,0,0.05)'
             }}
           >
             <Box
@@ -944,10 +1150,11 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
             <Typography
               variant="h6"
               sx={{
-                fontWeight: 600,
-                fontSize: { xs: '0.9rem', md: '1.1rem' },
-                color: '#333',
-                letterSpacing: '0.3px'
+                fontWeight: 700,
+                fontSize: { xs: '1rem', md: '1.2rem' },
+                color: '#212529',
+                letterSpacing: '0.5px',
+                fontFamily: '"Noto Sans KR", "Roboto", "Helvetica", "Arial", sans-serif'
               }}
             >
               (주)브이아이피플러스
@@ -968,14 +1175,14 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
           }}>
             <Box
               sx={{
-                backgroundColor: 'rgba(245, 245, 245, 0.98)', // 약간 회색 배경 (다른 슬라이드와 통일)
-                borderRadius: 4,
-                p: { xs: 3, md: 4 },
-                boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
-                border: '1px solid rgba(0, 0, 0, 0.1)',
+                backgroundColor: '#ffffff',
+                borderRadius: '16px',
+                p: { xs: 3, md: 4.5 },
+                boxShadow: '0 4px 20px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.05)',
+                border: '1px solid rgba(0,0,0,0.06)',
                 width: '100%',
                 maxWidth: 1000,
-                textAlign: 'left' // 왼쪽 정렬
+                textAlign: 'left'
               }}
             >
               {slide.imageUrl && (
@@ -996,10 +1203,16 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
               <Typography
                 variant="h4"
                 sx={{
-                  fontSize: { xs: '1.8rem', md: '2.5rem' },
-                  fontWeight: 'bold',
-                  mb: 2,
-                  color: '#1a1a1a'
+                  fontSize: { xs: '2rem', md: '3rem' },
+                  fontWeight: 800,
+                  mb: 3,
+                  color: '#212529',
+                  letterSpacing: '-0.5px',
+                  fontFamily: '"Noto Sans KR", "Roboto", sans-serif',
+                  background: 'linear-gradient(135deg, #212529 0%, #495057 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text'
                 }}
               >
                 {slide.title || '커스텀 화면'}
@@ -1020,10 +1233,21 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
             </Box>
           </Box>
 
-          {/* 하단: 생성자 정보 */}
+          {/* 하단: 생성자 정보 - 전문적인 푸터 디자인 */}
           {slide.createdBy && (
-            <Box sx={{ mt: { xs: 2, md: 3 }, width: '100%', textAlign: 'center' }}>
-              <Typography variant="body2" sx={{ opacity: 0.8, fontSize: { xs: '0.8rem', md: '0.9rem' } }}>
+            <Box sx={{ 
+              mt: { xs: 2, md: 3 }, 
+              width: '100%', 
+              textAlign: 'center',
+              pt: 2,
+              borderTop: '1px solid rgba(0,0,0,0.05)'
+            }}>
+              <Typography variant="body2" sx={{ 
+                color: '#6c757d', 
+                fontSize: { xs: '0.85rem', md: '0.95rem' },
+                fontWeight: 500,
+                fontFamily: '"Noto Sans KR", sans-serif'
+              }}>
                 생성자: {slide.createdBy}
               </Typography>
             </Box>
@@ -1088,8 +1312,8 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
             flexDirection: 'column',
             justifyContent: 'space-between',
             alignItems: 'center',
-            background: 'linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%)', // 아주 연한 회색
-            color: '#1a1a1a', // 어두운 계열 글자색
+            background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 50%, #f1f3f5 100%)', // 전문적인 그라데이션
+            color: '#212529', // 어두운 계열 글자색
             p: { xs: 2, md: 3 },
             overflow: 'hidden',
             position: 'relative'
@@ -1104,8 +1328,10 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
               justifyContent: 'flex-start',
               width: '100%',
               backgroundColor: '#ffffff',
-              px: { xs: 2, md: 3 },
-              py: { xs: 0.75, md: 1 },
+              px: { xs: 3, md: 4 },
+              py: { xs: 2.5, md: 3 },
+              boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+              borderBottom: '1px solid rgba(0,0,0,0.05)',
               position: 'absolute',
               top: 0,
               left: 0,
@@ -1130,22 +1356,32 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
             <Typography
               variant="h6"
               sx={{
-                fontWeight: 600,
-                fontSize: { xs: '0.85rem', md: '1rem' },
-                color: '#333',
-                letterSpacing: '0.3px',
-                mr: 2
+                fontWeight: 700,
+                fontSize: { xs: '0.95rem', md: '1.1rem' },
+                color: '#212529',
+                letterSpacing: '0.5px',
+                mr: 3,
+                fontFamily: '"Noto Sans KR", "Roboto", "Helvetica", "Arial", sans-serif'
               }}
             >
               (주)브이아이피플러스
             </Typography>
+            <Box sx={{
+              height: '24px',
+              width: '1px',
+              backgroundColor: '#dee2e6',
+              mr: 3
+            }} />
             <Typography
               variant="h5"
               sx={{
-                fontWeight: 600,
-                fontSize: { xs: '1rem', md: '1.3rem' },
-                color: '#333',
-                textAlign: 'left'
+                fontWeight: 700,
+                fontSize: { xs: '1.1rem', md: '1.4rem' },
+                color: '#212529',
+                textAlign: 'left',
+                fontFamily: '"Noto Sans KR", "Roboto", sans-serif',
+                letterSpacing: '0.3px',
+                flex: 1
               }}
             >
               {slideTitle}
@@ -1169,11 +1405,11 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
               sx={{
                 width: '100%',
                 height: '100%',
-                backgroundColor: 'rgba(245, 245, 245, 0.98)', // 약간 회색 배경 (하얀색 텍스트도 잘 보이도록)
-                borderRadius: 2,
+                backgroundColor: '#ffffff', // 전문적인 흰색 카드 배경
+                borderRadius: '16px',
                 overflow: 'auto',
-                boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.05)',
+                border: '1px solid rgba(0,0,0,0.06)',
                 '& .MuiAppBar-root': { display: 'none' },
                 '& .MuiTabs-root': { display: 'none' }
               }}
