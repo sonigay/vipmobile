@@ -1005,6 +1005,116 @@ export const api = {
       console.error('정규화 제안 오류:', error);
       throw error;
     }
+  },
+
+  // 회의 목록 조회
+  getMeetings: async function getMeetings() {
+    console.log('🔍 [api.getMeetings] 함수 호출됨');
+    console.log('🔍 [api.getMeetings] API_BASE_URL:', API_BASE_URL);
+    try {
+      const url = `${API_BASE_URL}/api/meetings`;
+      console.log('🔍 [api.getMeetings] 요청 URL:', url);
+      const response = await fetch(url);
+      console.log('🔍 [api.getMeetings] 응답 상태:', response.status, response.statusText);
+      const data = await response.json();
+      console.log('🔍 [api.getMeetings] 응답 데이터:', data);
+      if (!response.ok) {
+        throw new Error(data.error || '회의 목록 조회 실패');
+      }
+      return data;
+    } catch (error) {
+      console.error('❌ [api.getMeetings] 회의 목록 조회 오류:', error);
+      console.error('❌ [api.getMeetings] 에러 스택:', error.stack);
+      throw error;
+    }
+  },
+
+  // 회의 생성
+  createMeeting: async function createMeeting(meetingData) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/meetings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(meetingData)
+      });
+      if (!response.ok) throw new Error('회의 생성 실패');
+      return response.json();
+    } catch (error) {
+      console.error('회의 생성 오류:', error);
+      throw error;
+    }
+  },
+
+  // 회의 수정
+  updateMeeting: async function updateMeeting(meetingId, meetingData) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/meetings/${meetingId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(meetingData)
+      });
+      if (!response.ok) throw new Error('회의 수정 실패');
+      return response.json();
+    } catch (error) {
+      console.error('회의 수정 오류:', error);
+      throw error;
+    }
+  },
+
+  // 회의 삭제
+  deleteMeeting: async function deleteMeeting(meetingId) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/meetings/${meetingId}`, {
+        method: 'DELETE'
+      });
+      if (!response.ok) throw new Error('회의 삭제 실패');
+      return response.json();
+    } catch (error) {
+      console.error('회의 삭제 오류:', error);
+      throw error;
+    }
+  },
+
+  // 회의 설정 조회
+  getMeetingConfig: async function getMeetingConfig(meetingId) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/meetings/${meetingId}/config`);
+      if (!response.ok) throw new Error('회의 설정 조회 실패');
+      return response.json();
+    } catch (error) {
+      console.error('회의 설정 조회 오류:', error);
+      throw error;
+    }
+  },
+
+  // 회의 설정 저장
+  saveMeetingConfig: async function saveMeetingConfig(meetingId, config) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/meetings/${meetingId}/config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config)
+      });
+      if (!response.ok) throw new Error('회의 설정 저장 실패');
+      return response.json();
+    } catch (error) {
+      console.error('회의 설정 저장 오류:', error);
+      throw error;
+    }
+  },
+
+  // 회의 캡처 시작
+  startMeetingCapture: async function startMeetingCapture(meetingId) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/meetings/${meetingId}/capture`, {
+        method: 'POST'
+      });
+      if (!response.ok) throw new Error('회의 캡처 시작 실패');
+      return response.json();
+    } catch (error) {
+      console.error('회의 캡처 시작 오류:', error);
+      throw error;
+    }
   }
 };
 
