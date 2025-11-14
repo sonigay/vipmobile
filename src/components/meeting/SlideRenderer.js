@@ -19,14 +19,16 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
     setLoading(true);
     setContentReady(false);
     
-    // 데이터 로딩 완료 대기 함수
+    // 데이터 로딩 완료 대기 함수 - 더 확실한 방법
     const waitForDataLoad = () => {
       return new Promise((resolve) => {
-        let attempts = 0;
-        const maxAttempts = 50; // 최대 5초 (50 * 100ms)
+        let stableCount = 0; // 연속으로 안정적인 상태가 유지된 횟수
+        const requiredStableCount = 20; // 2초 동안 안정적이어야 함 (20 * 100ms)
+        let lastCheckTime = Date.now();
         
         const checkLoading = () => {
-          attempts++;
+          const now = Date.now();
+          const timeSinceStart = now - lastCheckTime;
           
           // 로딩 인디케이터가 있는지 확인
           const loadingIndicators = containerRef.current?.querySelectorAll(
@@ -45,7 +47,7 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
           if (loadingTexts) {
             Array.from(loadingTexts).forEach(el => {
               const text = el.textContent || '';
-              if (text.includes('로딩') || text.includes('불러오는 중') || text.includes('데이터를 불러오는 중')) {
+              if (text.includes('로딩') || text.includes('불러오는 중') || text.includes('데이터를 불러오는 중') || text.includes('마감장표 데이터 로딩 중')) {
                 hasLoadingText = true;
               }
             });
@@ -59,63 +61,102 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
           
           // 추가 확인: 실제 데이터가 렌더링되었는지 확인 (테이블, 차트 등)
           const hasDataContent = containerRef.current?.querySelector(
-            'table, [class*="Table"], [class*="Chart"], [class*="Grid"], .MuiTable-root, .MuiDataGrid-root'
+            'table, [class*="Table"], [class*="Chart"], [class*="Grid"], .MuiTable-root, .MuiDataGrid-root, .MuiPaper-root'
           ) !== null;
           
-          // 로딩 텍스트가 없고, 데이터 콘텐츠가 있으면 완료로 간주
-          const isContentReady = !hasLoadingText && (hasDataContent || isDataReady);
+          // 더 엄격한 확인: 테이블 행이나 실제 데이터가 있는지 확인
+          const hasTableRows = containerRef.current?.querySelector('table tbody tr, .MuiTableBody-root tr') !== null;
+          const hasChartContent = containerRef.current?.querySelector('[class*="Chart"], canvas, svg') !== null;
+          const hasRealData = hasTableRows || hasChartContent || hasDataContent;
           
-          console.log(`🔍 [SlideRenderer] 데이터 로딩 확인 (${attempts}/${maxAttempts}):`, {
-            hasLoadingIndicator: loadingIndicators?.length > 0,
-            dataLoading,
-            dataLoaded,
-            hasLoadingText,
-            hasDataContent,
-            isLoading,
-            isDataReady,
-            isContentReady,
-            loadingCount: loadingIndicators?.length || 0
-          });
+          // 로딩이 완전히 없고, 데이터가 준비되었고, 실제 콘텐츠가 있어야 완료
+          const isContentReady = !isLoading && isDataReady && hasRealData;
           
-          // 데이터가 준비되었고 로딩이 완료되었을 때만 진행
-          // 최소 3초는 대기 (데이터 로딩 시간 고려)
-          if (attempts >= 30 && isContentReady && !isLoading) {
-            console.log('✅ [SlideRenderer] 데이터 로딩 완료');
-            resolve();
-          } else if (attempts >= maxAttempts) {
-            // 타임아웃 시에도 최소한의 확인 후 진행
-            if (isContentReady || !hasLoadingText) {
-              console.warn('⚠️ [SlideRenderer] 데이터 로딩 타임아웃, 하지만 콘텐츠 준비됨 - 진행');
+          if (isContentReady) {
+            stableCount++;
+            console.log(`✅ [SlideRenderer] 안정적인 상태 확인 (${stableCount}/${requiredStableCount}):`, {
+              hasLoadingIndicator: loadingIndicators?.length > 0,
+              dataLoading,
+              dataLoaded,
+              hasLoadingText,
+              hasRealData,
+              hasTableRows,
+              hasChartContent,
+              timeSinceStart: Math.round(timeSinceStart / 1000) + '초'
+            });
+            
+            // 연속으로 안정적인 상태가 2초 이상 유지되면 완료
+            if (stableCount >= requiredStableCount) {
+              console.log('✅ [SlideRenderer] 데이터 로딩 완료 (안정적인 상태 유지됨)');
               resolve();
-            } else {
-              console.warn('⚠️ [SlideRenderer] 데이터 로딩 타임아웃, 강제 진행');
-              resolve(); // 타임아웃 시에도 진행
+              return;
             }
           } else {
-            setTimeout(checkLoading, 100);
+            // 안정적이지 않으면 카운터 리셋
+            if (stableCount > 0) {
+              console.log(`⚠️ [SlideRenderer] 안정적인 상태가 깨짐, 카운터 리셋 (이전: ${stableCount})`);
+              stableCount = 0;
+            }
+            
+            console.log(`🔍 [SlideRenderer] 데이터 로딩 확인 (${Math.round(timeSinceStart / 1000)}초 경과):`, {
+              hasLoadingIndicator: loadingIndicators?.length > 0,
+              dataLoading,
+              dataLoaded,
+              hasLoadingText,
+              hasRealData,
+              hasTableRows,
+              hasChartContent,
+              isLoading,
+              isDataReady,
+              isContentReady
+            });
           }
+          
+          // 최대 15초 대기 (150 * 100ms)
+          if (timeSinceStart >= 15000) {
+            if (isContentReady) {
+              console.warn('⚠️ [SlideRenderer] 타임아웃, 하지만 콘텐츠 준비됨 - 진행');
+            } else {
+              console.warn('⚠️ [SlideRenderer] 타임아웃 (15초), 강제 진행');
+            }
+            resolve();
+            return;
+          }
+          
+          setTimeout(checkLoading, 100);
         };
         
-        // 최소 3초 대기 후 체크 시작 (데이터 로딩 시간 고려)
-        setTimeout(checkLoading, 3000);
+        // 최소 5초 대기 후 체크 시작 (데이터 로딩 시간 고려)
+        console.log('⏳ [SlideRenderer] 초기 대기 시작 (5초)');
+        setTimeout(() => {
+          console.log('⏳ [SlideRenderer] 데이터 로딩 체크 시작');
+          lastCheckTime = Date.now();
+          checkLoading();
+        }, 5000);
       });
     };
     
-    // 최소 4초 대기 후 데이터 로딩 완료 확인
+    // 최소 5초 대기 후 데이터 로딩 완료 확인
     const timer = setTimeout(async () => {
-      console.log('⏳ [SlideRenderer] 데이터 로딩 대기 시작 (최소 4초)');
+      console.log('⏳ [SlideRenderer] 데이터 로딩 대기 시작');
       await waitForDataLoad();
-      console.log('✅ [SlideRenderer] 데이터 로딩 완료 확인됨, onReady 호출 준비');
+      console.log('✅ [SlideRenderer] 데이터 로딩 완료 확인됨, 추가 안정화 대기 (10초)');
+      
+      // 추가로 10초 대기하여 완전히 안정화
+      await new Promise(resolve => setTimeout(resolve, 10000));
+      
+      console.log('✅ [SlideRenderer] 안정화 완료, onReady 호출 준비');
       setLoading(false);
       setContentReady(true);
+      
       // 추가 대기 후 onReady 호출 (렌더링 완료 보장)
       setTimeout(() => {
         if (onReady) {
           console.log('✅ [SlideRenderer] onReady 콜백 호출');
           onReady();
         }
-      }, 1500); // 1.5초 추가 대기
-    }, 4000); // 최소 4초 대기
+      }, 1000);
+    }, 5000); // 최소 5초 대기
 
     return () => clearTimeout(timer);
   }, [slide, onReady]);
