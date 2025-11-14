@@ -97,10 +97,12 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess }) {
 
   const handleNext = () => {
     if (activeStep === 0) {
-      // 첫 번째 단계: 회의 정보 검증
-      if (!validate()) {
+      // 첫 번째 단계: 모드/탭 선택 검증
+      if (slides.length === 0) {
+        setError('최소 1개 이상의 슬라이드를 선택해주세요.');
         return;
       }
+      setError(null);
       setActiveStep(1);
     }
   };
@@ -167,13 +169,13 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess }) {
 
   const handleSubmit = async () => {
     if (activeStep === 0) {
+      // 첫 번째 단계: 다음 단계로 이동
       handleNext();
       return;
     }
 
-    // 두 번째 단계: 회의 생성 및 설정 저장
-    if (slides.length === 0) {
-      setError('최소 1개 이상의 슬라이드를 선택해주세요.');
+    // 두 번째 단계: 회의 정보 검증 및 생성
+    if (!validate()) {
       return;
     }
 
@@ -220,7 +222,7 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess }) {
     }
   };
 
-  const steps = meeting ? ['회의 정보'] : ['회의 정보', '모드/탭 선택'];
+  const steps = meeting ? ['회의 정보'] : ['모드/탭 선택', '회의 정보'];
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
@@ -245,7 +247,42 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess }) {
             </Alert>
           )}
 
-          {activeStep === 0 && (
+          {activeStep === 0 && !meeting && (
+            <Box>
+              <ModeSelector
+                loggedInStore={loggedInStore}
+                selectedModes={selectedModes}
+                onModeToggle={handleModeToggle}
+                selectedTabs={selectedTabs}
+                onTabToggle={handleTabToggle}
+              />
+
+              <Divider sx={{ my: 3 }} />
+
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                  슬라이드 순서
+                </Typography>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={handleAddCustomSlide}
+                >
+                  커스텀 화면 추가
+                </Button>
+              </Box>
+              <SlideOrderEditor
+                slides={slides}
+                onReorder={handleSlideReorder}
+              />
+
+              <Alert severity="info" sx={{ mt: 2 }}>
+                다음 단계에서 회의 정보를 입력하세요.
+              </Alert>
+            </Box>
+          )}
+
+          {(activeStep === 1 || (activeStep === 0 && meeting)) && (
             <Box>
               <TextField
                 fullWidth
@@ -284,43 +321,6 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess }) {
                 margin="normal"
                 required
                 inputProps={{ min: 1 }}
-              />
-
-              {!meeting && (
-                <Alert severity="info" sx={{ mt: 2 }}>
-                  다음 단계에서 모드와 탭을 선택하고 슬라이드 순서를 설정할 수 있습니다.
-                </Alert>
-              )}
-            </Box>
-          )}
-
-          {activeStep === 1 && !meeting && (
-            <Box>
-              <ModeSelector
-                loggedInStore={loggedInStore}
-                selectedModes={selectedModes}
-                onModeToggle={handleModeToggle}
-                selectedTabs={selectedTabs}
-                onTabToggle={handleTabToggle}
-              />
-
-              <Divider sx={{ my: 3 }} />
-
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                  슬라이드 순서
-                </Typography>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  onClick={handleAddCustomSlide}
-                >
-                  커스텀 화면 추가
-                </Button>
-              </Box>
-              <SlideOrderEditor
-                slides={slides}
-                onReorder={handleSlideReorder}
               />
             </Box>
           )}
