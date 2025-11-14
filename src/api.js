@@ -1839,7 +1839,7 @@ export const inventoryRecoveryAPI = {
   },
 
   // 회의 목록 조회
-  getMeetings: async () => {
+  getMeetings: async function getMeetings() {
     try {
       const response = await fetch(`${API_BASE_URL}/api/meetings`);
       const data = await response.json();
