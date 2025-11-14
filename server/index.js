@@ -11,6 +11,7 @@ const setupTeamRoutes = require('./teamRoutes');
 const UserSheetManager = require('./UserSheetManager');
 const PhoneklDataManager = require('./PhoneklDataManager');
 const setupObRoutes = require('./obRoutes');
+const meetingRoutes = require('./meetingRoutes');
 
 // 기본 설정
 const app = express();
@@ -5038,6 +5039,20 @@ try {
   console.log('✅ [OB] OB routes mounted at /api/ob');
 } catch (e) {
   console.error('❌ [OB] Failed to mount OB routes:', e.message);
+}
+
+// 회의 모드 라우트 설정
+try {
+  app.get('/api/meetings', meetingRoutes.getMeetings);
+  app.post('/api/meetings', meetingRoutes.createMeeting);
+  app.put('/api/meetings/:meetingId', meetingRoutes.updateMeeting);
+  app.delete('/api/meetings/:meetingId', meetingRoutes.deleteMeeting);
+  app.get('/api/meetings/:meetingId/config', meetingRoutes.getMeetingConfig);
+  app.post('/api/meetings/:meetingId/config', meetingRoutes.saveMeetingConfig);
+  app.post('/api/meetings/:meetingId/upload-image', meetingRoutes.upload.single('image'), meetingRoutes.uploadMeetingImage);
+  console.log('✅ [회의] Meeting routes mounted at /api/meetings');
+} catch (e) {
+  console.error('❌ [회의] Failed to mount meeting routes:', e.message);
 }
 
 // 정책그룹 목록 가져오기 API

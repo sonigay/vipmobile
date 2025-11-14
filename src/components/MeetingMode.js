@@ -5,21 +5,25 @@ import {
   Toolbar,
   Typography,
   Button,
-  Container,
-  Paper
+  Tabs,
+  Tab
 } from '@mui/material';
 import {
-  MeetingRoom as MeetingRoomIcon,
   SwapHoriz as SwapHorizIcon,
-  Update as UpdateIcon
+  Update as UpdateIcon,
+  EventNote as EventNoteIcon,
+  PlayArrow as PlayArrowIcon
 } from '@mui/icons-material';
 
 import AppUpdatePopup from './AppUpdatePopup';
-
+import MeetingPreparationTab from './meeting/MeetingPreparationTab';
+import MeetingPresentationTab from './meeting/MeetingPresentationTab';
 
 function MeetingMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   // 업데이트 팝업 상태
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
+  // 탭 상태
+  const [activeTab, setActiveTab] = useState(0);
   
   // 회의모드 진입 시 업데이트 팝업 표시 (숨김 설정 확인 후)
   useEffect(() => {
@@ -33,22 +37,50 @@ function MeetingMode({ onLogout, loggedInStore, onModeChange, availableModes }) 
     }
   }, []);
 
-
   const handleBackToMain = () => {
     // 메인 화면으로 돌아가기 (모드 선택 팝업 표시)
     window.location.reload();
   };
 
+  const handleTabChange = (event, newValue) => {
+    setActiveTab(newValue);
+  };
+
   return (
     <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <AppBar position="static">
+      <AppBar position="static" sx={{ backgroundColor: '#3949AB' }}>
         <Toolbar>
           <Button color="inherit" onClick={handleBackToMain} sx={{ mr: 2 }}>
             ← 뒤로가기
           </Button>
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+          <Typography variant="h6" component="div" sx={{ fontWeight: 600, mr: 3 }}>
             회의 모드
           </Typography>
+          
+          {/* 탭 네비게이션 */}
+          <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center' }}>
+            <Tabs
+              value={activeTab}
+              onChange={handleTabChange}
+              textColor="inherit"
+              indicatorColor="secondary"
+              variant="scrollable"
+              scrollButtons="auto"
+            >
+              <Tab 
+                icon={<EventNoteIcon />} 
+                iconPosition="start"
+                label="회의준비" 
+                sx={{ textTransform: 'none', fontWeight: 'bold' }}
+              />
+              <Tab 
+                icon={<PlayArrowIcon />} 
+                iconPosition="start"
+                label="회의진행" 
+                sx={{ textTransform: 'none', fontWeight: 'bold' }}
+              />
+            </Tabs>
+          </Box>
           
           {/* 모드 전환 버튼 - 2개 이상 권한이 있는 사용자에게만 표시 */}
           {onModeChange && availableModes && availableModes.length > 1 && (
@@ -89,23 +121,21 @@ function MeetingMode({ onLogout, loggedInStore, onModeChange, availableModes }) 
             업데이트 확인
           </Button>
           
-          <Button color="inherit" onClick={onLogout}>
+          <Button color="inherit" onClick={onLogout} sx={{ ml: 2 }}>
             로그아웃
           </Button>
         </Toolbar>
       </AppBar>
       
-      <Container maxWidth="lg" sx={{ flex: 1, py: 4 }}>
-        <Paper sx={{ p: 4, textAlign: 'center' }}>
-          <MeetingRoomIcon sx={{ fontSize: 64, color: 'primary.main', mb: 2 }} />
-          <Typography variant="h4" component="h1" gutterBottom>
-            회의 모드
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            회의 관련 기능이 준비 중입니다.
-          </Typography>
-        </Paper>
-      </Container>
+      {/* 탭 컨텐츠 */}
+      <Box sx={{ flex: 1, overflow: 'auto', backgroundColor: '#f5f5f5' }}>
+        {activeTab === 0 && (
+          <MeetingPreparationTab loggedInStore={loggedInStore} />
+        )}
+        {activeTab === 1 && (
+          <MeetingPresentationTab loggedInStore={loggedInStore} />
+        )}
+      </Box>
       
       {/* 업데이트 팝업 */}
       <AppUpdatePopup

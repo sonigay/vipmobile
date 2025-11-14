@@ -1,0 +1,658 @@
+require('dotenv').config();
+const { google } = require('googleapis');
+const { Client, GatewayIntentBits, AttachmentBuilder } = require('discord.js');
+const multer = require('multer');
+const path = require('path');
+
+// Discord 봇 설정
+const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
+const DISCORD_MEETING_CHANNEL_ID = process.env.DISCORD_MEETING_CHANNEL_ID || '1438813568374931578';
+const DISCORD_LOGGING_ENABLED = process.env.DISCORD_LOGGING_ENABLED === 'true';
+
+// Discord 봇 초기화
+let discordBot = null;
+if (DISCORD_LOGGING_ENABLED && DISCORD_BOT_TOKEN) {
+  discordBot = new Client({ 
+    intents: [
+      GatewayIntentBits.Guilds, 
+      GatewayIntentBits.GuildMessages,
+      GatewayIntentBits.MessageContent
+    ]
+  });
+  
+  discordBot.once('ready', () => {
+    console.log(`✅ [회의] Discord 봇이 준비되었습니다: ${discordBot.user.tag}`);
+  });
+  
+  discordBot.login(DISCORD_BOT_TOKEN)
+    .then(() => console.log('✅ [회의] Discord 봇 로그인 성공'))
+    .catch(error => console.error('❌ [회의] Discord 봇 로그인 실패:', error));
+}
+
+// Google Sheets 클라이언트 생성
+function createSheetsClient() {
+  const GOOGLE_SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+  const GOOGLE_PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY;
+  const SPREADSHEET_ID = process.env.SHEET_ID;
+
+  if (!GOOGLE_SERVICE_ACCOUNT_EMAIL || !GOOGLE_PRIVATE_KEY || !SPREADSHEET_ID) {
+    throw new Error('Missing Google Sheets environment variables');
+  }
+
+  const auth = new google.auth.JWT({
+    email: GOOGLE_SERVICE_ACCOUNT_EMAIL,
+    key: GOOGLE_PRIVATE_KEY.includes('\\n') ? GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n') : GOOGLE_PRIVATE_KEY,
+    scopes: ['https://www.googleapis.com/auth/spreadsheets']
+  });
+  const sheets = google.sheets({ version: 'v4', auth });
+  return { sheets, SPREADSHEET_ID };
+}
+
+// 시트 헤더 확인 및 생성
+async function ensureSheetHeaders(sheets, spreadsheetId, sheetName, headers) {
+  try {
+    // 시트 존재 여부 확인
+    const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
+    const sheetExists = spreadsheet.data.sheets.some(sheet => sheet.properties.title === sheetName);
+
+    if (!sheetExists) {
+      // 시트 생성
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId,
+        resource: {
+          requests: [{
+            addSheet: {
+              properties: {
+                title: sheetName
+              }
+            }
+          }]
+        }
+      });
+    }
+
+    // 헤더 확인 및 설정
+    const headerRange = `${sheetName}!A2:${String.fromCharCode(64 + headers.length)}2`;
+    const headerResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: headerRange
+    });
+
+    const existingHeaders = headerResponse.data.values?.[0] || [];
+    if (existingHeaders.length === 0 || existingHeaders.join('|') !== headers.join('|')) {
+      // 헤더 설정 (1행은 비우고 2행에 헤더)
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: headerRange,
+        valueInputOption: 'USER_ENTERED',
+        resource: {
+          values: [headers]
+        }
+      });
+    }
+  } catch (error) {
+    console.error(`시트 헤더 확인 오류 (${sheetName}):`, error);
+    throw error;
+  }
+}
+
+// 회의 ID 생성
+function generateMeetingId(meetingDate, meetingNumber) {
+  const dateStr = meetingDate.replace(/-/g, '');
+  return `meeting-${dateStr}-${String(meetingNumber).padStart(3, '0')}`;
+}
+
+// 회의 목록 조회
+async function getMeetings(req, res) {
+  try {
+    const { sheets, SPREADSHEET_ID } = createSheetsClient();
+    const sheetName = '회의목록';
+
+    // 시트 헤더 확인
+    await ensureSheetHeaders(sheets, SPREADSHEET_ID, sheetName, [
+      '회의ID', '회의이름', '회의날짜', '차수', '생성자', '생성일시', '상태'
+    ]);
+
+    // 데이터 조회 (3행부터)
+    const range = `${sheetName}!A3:G`;
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range
+    });
+
+    const rows = response.data.values || [];
+    const meetings = rows
+      .filter(row => row[0]) // 회의ID가 있는 행만
+      .map(row => ({
+        meetingId: row[0],
+        meetingName: row[1] || '',
+        meetingDate: row[2] || '',
+        meetingNumber: parseInt(row[3]) || 0,
+        createdBy: row[4] || '',
+        createdAt: row[5] || '',
+        status: row[6] || 'preparing'
+      }))
+      .sort((a, b) => {
+        // 날짜 내림차순, 차수 내림차순
+        if (a.meetingDate !== b.meetingDate) {
+          return b.meetingDate.localeCompare(a.meetingDate);
+        }
+        return b.meetingNumber - a.meetingNumber;
+      });
+
+    res.json({ success: true, meetings });
+  } catch (error) {
+    console.error('회의 목록 조회 오류:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+}
+
+// 회의 생성
+async function createMeeting(req, res) {
+  try {
+    const { sheets, SPREADSHEET_ID } = createSheetsClient();
+    const sheetName = '회의목록';
+    const { meetingName, meetingDate, meetingNumber, createdBy } = req.body;
+
+    // 필수 필드 검증
+    if (!meetingName || !meetingDate || !meetingNumber || !createdBy) {
+      return res.status(400).json({ 
+        success: false, 
+        error: '필수 필드가 누락되었습니다.' 
+      });
+    }
+
+    // 시트 헤더 확인
+    await ensureSheetHeaders(sheets, SPREADSHEET_ID, sheetName, [
+      '회의ID', '회의이름', '회의날짜', '차수', '생성자', '생성일시', '상태'
+    ]);
+
+    // 차수 중복 확인
+    const range = `${sheetName}!A3:G`;
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range
+    });
+
+    const rows = response.data.values || [];
+    const duplicate = rows.find(row => 
+      row[2] === meetingDate && parseInt(row[3]) === parseInt(meetingNumber)
+    );
+
+    if (duplicate) {
+      return res.status(400).json({ 
+        success: false, 
+        error: `해당 날짜(${meetingDate})에 차수 ${meetingNumber}가 이미 존재합니다.` 
+      });
+    }
+
+    // 회의 ID 생성
+    const meetingId = generateMeetingId(meetingDate, meetingNumber);
+    const createdAt = new Date().toISOString();
+
+    // 데이터 추가 (3행부터)
+    const newRow = [
+      meetingId,
+      meetingName,
+      meetingDate,
+      meetingNumber,
+      createdBy,
+      createdAt,
+      'preparing'
+    ];
+
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${sheetName}!A3`,
+      valueInputOption: 'USER_ENTERED',
+      resource: {
+        values: [newRow]
+      }
+    });
+
+    res.json({ 
+      success: true, 
+      meeting: {
+        meetingId,
+        meetingName,
+        meetingDate,
+        meetingNumber,
+        createdBy,
+        createdAt,
+        status: 'preparing'
+      }
+    });
+  } catch (error) {
+    console.error('회의 생성 오류:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+}
+
+// 회의 수정
+async function updateMeeting(req, res) {
+  try {
+    const { sheets, SPREADSHEET_ID } = createSheetsClient();
+    const sheetName = '회의목록';
+    const { meetingId } = req.params;
+    const { meetingName, meetingDate, meetingNumber } = req.body;
+
+    // 데이터 조회
+    const range = `${sheetName}!A3:G`;
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range
+    });
+
+    const rows = response.data.values || [];
+    const rowIndex = rows.findIndex(row => row[0] === meetingId);
+
+    if (rowIndex === -1) {
+      return res.status(404).json({ success: false, error: '회의를 찾을 수 없습니다.' });
+    }
+
+    // 차수 중복 확인 (자신 제외)
+    if (meetingDate && meetingNumber) {
+      const duplicate = rows.find((row, idx) => 
+        idx !== rowIndex && row[2] === meetingDate && parseInt(row[3]) === parseInt(meetingNumber)
+      );
+
+      if (duplicate) {
+        return res.status(400).json({ 
+          success: false, 
+          error: `해당 날짜(${meetingDate})에 차수 ${meetingNumber}가 이미 존재합니다.` 
+        });
+      }
+    }
+
+    // 데이터 업데이트
+    const updateRow = rows[rowIndex];
+    if (meetingName) updateRow[1] = meetingName;
+    if (meetingDate) updateRow[2] = meetingDate;
+    if (meetingNumber) updateRow[3] = meetingNumber;
+
+    const updateRange = `${sheetName}!A${rowIndex + 3}:G${rowIndex + 3}`;
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: updateRange,
+      valueInputOption: 'USER_ENTERED',
+      resource: {
+        values: [updateRow]
+      }
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('회의 수정 오류:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+}
+
+// 회의 삭제
+async function deleteMeeting(req, res) {
+  try {
+    const { sheets, SPREADSHEET_ID } = createSheetsClient();
+    const sheetName = '회의목록';
+    const { meetingId } = req.params;
+
+    // 데이터 조회
+    const range = `${sheetName}!A3:G`;
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range
+    });
+
+    const rows = response.data.values || [];
+    const rowIndex = rows.findIndex(row => row[0] === meetingId);
+
+    if (rowIndex === -1) {
+      return res.status(404).json({ success: false, error: '회의를 찾을 수 없습니다.' });
+    }
+
+    // 행 삭제
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: SPREADSHEET_ID,
+      resource: {
+        requests: [{
+          deleteDimension: {
+            range: {
+              sheetId: (await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID }))
+                .data.sheets.find(s => s.properties.title === sheetName).properties.sheetId,
+              dimension: 'ROWS',
+              startIndex: rowIndex + 2, // 1행(빈 행) + 1행(헤더) + rowIndex
+              endIndex: rowIndex + 3
+            }
+          }
+        }]
+      }
+    });
+
+    // 회의설정 시트에서도 해당 회의 데이터 삭제
+    const configSheetName = '회의설정';
+    const configRange = `${configSheetName}!A3:M`;
+    const configResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: configRange
+    });
+
+    const configRows = configResponse.data.values || [];
+    const configRowIndices = configRows
+      .map((row, idx) => row[0] === meetingId ? idx : -1)
+      .filter(idx => idx !== -1)
+      .reverse(); // 역순으로 삭제 (인덱스 변경 방지)
+
+    if (configRowIndices.length > 0) {
+      const configSheetId = (await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID }))
+        .data.sheets.find(s => s.properties.title === configSheetName).properties.sheetId;
+
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId: SPREADSHEET_ID,
+        resource: {
+          requests: configRowIndices.map(rowIndex => ({
+            deleteDimension: {
+              range: {
+                sheetId: configSheetId,
+                dimension: 'ROWS',
+                startIndex: rowIndex + 2,
+                endIndex: rowIndex + 3
+              }
+            }
+          }))
+        }
+      });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('회의 삭제 오류:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+}
+
+// 회의 설정 조회
+async function getMeetingConfig(req, res) {
+  try {
+    const { sheets, SPREADSHEET_ID } = createSheetsClient();
+    const { meetingId } = req.params;
+    const sheetName = '회의설정';
+
+    // 시트 헤더 확인
+    await ensureSheetHeaders(sheets, SPREADSHEET_ID, sheetName, [
+      '회의ID', '슬라이드ID', '순서', '타입', '모드', '탭', '제목', '내용', '배경색', '이미지URL', '캡처시간', 'Discord포스트ID', 'Discord스레드ID'
+    ]);
+
+    // 데이터 조회
+    const range = `${sheetName}!A3:M`;
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range
+    });
+
+    const rows = response.data.values || [];
+    const slides = rows
+      .filter(row => row[0] === meetingId)
+      .map(row => ({
+        slideId: row[1],
+        order: parseInt(row[2]) || 0,
+        type: row[3] || 'mode-tab',
+        mode: row[4] || '',
+        tab: row[5] || '',
+        title: row[6] || '',
+        content: row[7] || '',
+        backgroundColor: row[8] || '#ffffff',
+        imageUrl: row[9] || '',
+        capturedAt: row[10] || '',
+        discordPostId: row[11] || '',
+        discordThreadId: row[12] || ''
+      }))
+      .sort((a, b) => a.order - b.order);
+
+    res.json({ success: true, slides });
+  } catch (error) {
+    console.error('회의 설정 조회 오류:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+}
+
+// 회의 설정 저장
+async function saveMeetingConfig(req, res) {
+  try {
+    const { sheets, SPREADSHEET_ID } = createSheetsClient();
+    const { meetingId } = req.params;
+    const { slides } = req.body;
+    const sheetName = '회의설정';
+
+    if (!Array.isArray(slides)) {
+      return res.status(400).json({ success: false, error: '슬라이드 배열이 필요합니다.' });
+    }
+
+    // 시트 헤더 확인
+    await ensureSheetHeaders(sheets, SPREADSHEET_ID, sheetName, [
+      '회의ID', '슬라이드ID', '순서', '타입', '모드', '탭', '제목', '내용', '배경색', '이미지URL', '캡처시간', 'Discord포스트ID', 'Discord스레드ID'
+    ]);
+
+    // 기존 데이터 삭제
+    const range = `${sheetName}!A3:M`;
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range
+    });
+
+    const existingRows = response.data.values || [];
+    const rowsToDelete = existingRows
+      .map((row, idx) => row[0] === meetingId ? idx : -1)
+      .filter(idx => idx !== -1)
+      .reverse();
+
+    if (rowsToDelete.length > 0) {
+      const sheetId = (await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID }))
+        .data.sheets.find(s => s.properties.title === sheetName).properties.sheetId;
+
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId: SPREADSHEET_ID,
+        resource: {
+          requests: rowsToDelete.map(rowIndex => ({
+            deleteDimension: {
+              range: {
+                sheetId,
+                dimension: 'ROWS',
+                startIndex: rowIndex + 2,
+                endIndex: rowIndex + 3
+              }
+            }
+          }))
+        }
+      });
+    }
+
+    // 새 데이터 추가
+    const newRows = slides.map(slide => [
+      meetingId,
+      slide.slideId || slide.id || `slide-${slide.order}`,
+      slide.order || 0,
+      slide.type || 'mode-tab',
+      slide.mode || '',
+      slide.tab || '',
+      slide.title || '',
+      slide.content || '',
+      slide.backgroundColor || '#ffffff',
+      slide.imageUrl || '',
+      slide.capturedAt || '',
+      slide.discordPostId || '',
+      slide.discordThreadId || ''
+    ]);
+
+    if (newRows.length > 0) {
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${sheetName}!A3`,
+        valueInputOption: 'USER_ENTERED',
+        resource: {
+          values: newRows
+        }
+      });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('회의 설정 저장 오류:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+}
+
+// Discord 포럼 게시판에서 년월별 포스트 찾기 또는 생성
+async function findOrCreatePost(channel, yearMonth) {
+  try {
+    // 포럼 채널의 활성 포스트 가져오기
+    const activeThreads = await channel.threads.fetchActive();
+    
+    // 활성 스레드에서 년월로 포스트 찾기
+    let post = Array.from(activeThreads.threads.values()).find(thread => 
+      thread.name.includes(yearMonth) || thread.name === `${yearMonth} 회의`
+    );
+    
+    if (post) {
+      return post;
+    }
+    
+    // 아카이브된 스레드도 확인
+    try {
+      const archivedThreads = await channel.threads.fetchArchived({ limit: 100 });
+      post = Array.from(archivedThreads.threads.values()).find(thread => 
+        thread.name.includes(yearMonth) || thread.name === `${yearMonth} 회의`
+      );
+      
+      if (post) {
+        return post;
+      }
+    } catch (archivedError) {
+      console.warn('아카이브된 스레드 조회 실패:', archivedError);
+      // 계속 진행
+    }
+    
+    // 포스트 생성 (포럼 채널에서는 스레드 생성)
+    const newPost = await channel.threads.create({
+      name: `${yearMonth} 회의`,
+      message: {
+        content: `${yearMonth} 회의 이미지 저장`
+      },
+      appliedTags: []
+    });
+    
+    return newPost;
+  } catch (error) {
+    console.error('포스트 찾기/생성 오류:', error);
+    throw error;
+  }
+}
+
+// 회의 스레드 찾기 또는 생성
+async function findOrCreateThread(post, meetingId) {
+  try {
+    // 포스트(스레드) 내의 하위 스레드 찾기
+    // Discord 포럼에서는 포스트 자체가 스레드이므로, 여기서는 포스트를 그대로 사용
+    // 또는 포스트 내에 메시지로 회의 정보를 저장하고, 이미지는 해당 포스트에 업로드
+    
+    // 일단 포스트를 스레드로 사용 (나중에 필요시 수정)
+    return post;
+  } catch (error) {
+    console.error('스레드 찾기/생성 오류:', error);
+    throw error;
+  }
+}
+
+// 이미지 업로드 (Discord)
+async function uploadImageToDiscord(imageBuffer, filename, meetingId, meetingDate) {
+  if (!DISCORD_LOGGING_ENABLED || !discordBot) {
+    throw new Error('Discord 봇이 초기화되지 않았습니다.');
+  }
+
+  // 봇이 준비될 때까지 대기
+  if (!discordBot.isReady()) {
+    for (let i = 0; i < 10; i++) {
+      if (discordBot.isReady()) break;
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+
+  if (!discordBot.isReady()) {
+    throw new Error('Discord 봇이 준비되지 않았습니다.');
+  }
+
+  try {
+    const channel = await discordBot.channels.fetch(DISCORD_MEETING_CHANNEL_ID);
+    if (!channel) {
+      throw new Error(`채널을 찾을 수 없습니다: ${DISCORD_MEETING_CHANNEL_ID}`);
+    }
+
+    // 년월 추출 (예: "2025-01")
+    const yearMonth = meetingDate ? meetingDate.substring(0, 7) : new Date().toISOString().substring(0, 7);
+    
+    // 해당 년월의 포스트 찾기 또는 생성
+    let post = await findOrCreatePost(channel, yearMonth);
+    
+    // 회의 스레드 찾기 또는 생성 (현재는 포스트를 그대로 사용)
+    let thread = post;
+    
+    // 이미지 업로드
+    const attachment = new AttachmentBuilder(imageBuffer, { name: filename });
+    const message = await thread.send({ files: [attachment] });
+    
+    return {
+      imageUrl: message.attachments.first().url,
+      postId: post.id,
+      threadId: thread.id
+    };
+  } catch (error) {
+    console.error('Discord 이미지 업로드 오류:', error);
+    throw error;
+  }
+}
+
+// 이미지 업로드 API
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024 } // 25MB 제한
+});
+
+async function uploadMeetingImage(req, res) {
+  try {
+    const { meetingId } = req.params;
+    const { meetingDate, slideOrder } = req.body;
+    
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: '이미지 파일이 없습니다.' });
+    }
+
+    const filename = req.file.originalname || `meeting-${meetingId}-${slideOrder}.png`;
+    
+    // Discord에 업로드
+    const result = await uploadImageToDiscord(
+      req.file.buffer,
+      filename,
+      meetingId,
+      meetingDate
+    );
+
+    res.json({
+      success: true,
+      imageUrl: result.imageUrl,
+      postId: result.postId,
+      threadId: result.threadId
+    });
+  } catch (error) {
+    console.error('이미지 업로드 오류:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+}
+
+module.exports = {
+  getMeetings,
+  createMeeting,
+  updateMeeting,
+  deleteMeeting,
+  getMeetingConfig,
+  saveMeetingConfig,
+  uploadMeetingImage,
+  upload // multer middleware
+};
+
