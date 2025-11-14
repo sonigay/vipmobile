@@ -74,14 +74,21 @@ function MeetingList({ onAdd, onEdit, onDelete, onSelect, refreshTrigger }) {
     setLoading(true);
     setError(null);
     try {
+      // api 객체 확인
+      if (!api || typeof api.getMeetings !== 'function') {
+        throw new Error('API 함수를 찾을 수 없습니다.');
+      }
+      
       const response = await api.getMeetings();
-      if (response.success === false) {
+      if (response && response.success === false) {
         throw new Error(response.error || '회의 목록 조회 실패');
       }
-      setMeetings(response.meetings || []);
+      setMeetings((response && response.meetings) || []);
     } catch (err) {
       console.error('회의 목록 조회 오류:', err);
       setError(err.message || '회의 목록을 불러오는데 실패했습니다.');
+      // 에러 발생 시 빈 배열로 설정
+      setMeetings([]);
     } finally {
       setLoading(false);
     }

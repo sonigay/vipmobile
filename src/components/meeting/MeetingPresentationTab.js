@@ -51,13 +51,23 @@ function MeetingPresentationTab({ loggedInStore }) {
     setLoading(true);
     setError(null);
     try {
+      // api 객체 확인
+      if (!api || typeof api.getMeetings !== 'function') {
+        throw new Error('API 함수를 찾을 수 없습니다.');
+      }
+      
       const response = await api.getMeetings();
+      if (response && response.success === false) {
+        throw new Error(response.error || '회의 목록 조회 실패');
+      }
       // 완료된 회의만 필터링
-      const completedMeetings = (response.meetings || []).filter(m => m.status === 'completed');
+      const completedMeetings = ((response && response.meetings) || []).filter(m => m.status === 'completed');
       setMeetings(completedMeetings);
     } catch (err) {
       console.error('회의 목록 조회 오류:', err);
-      setError('회의 목록을 불러오는데 실패했습니다.');
+      setError(err.message || '회의 목록을 불러오는데 실패했습니다.');
+      // 에러 발생 시 빈 배열로 설정
+      setMeetings([]);
     } finally {
       setLoading(false);
     }

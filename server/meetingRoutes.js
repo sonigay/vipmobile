@@ -116,14 +116,21 @@ async function getMeetings(req, res) {
 
     // 데이터 조회 (3행부터)
     const range = `${sheetName}!A3:G`;
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range
-    });
+    let response;
+    try {
+      response = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range
+      });
+    } catch (rangeError) {
+      // 범위에 데이터가 없을 수 있음 (정상적인 경우)
+      console.log('회의 목록 범위 조회 결과 없음 (정상):', rangeError.message);
+      return res.json({ success: true, meetings: [] });
+    }
 
     const rows = response.data.values || [];
     const meetings = rows
-      .filter(row => row[0]) // 회의ID가 있는 행만
+      .filter(row => row && row[0] && row[0].trim()) // 회의ID가 있는 행만
       .map(row => ({
         meetingId: row[0],
         meetingName: row[1] || '',
