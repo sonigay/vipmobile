@@ -22,9 +22,15 @@ import {
   Delete as DeleteIcon,
   PlayArrow as PlayArrowIcon
 } from '@mui/icons-material';
-// api import - named export와 default export 모두 지원
-import apiObj, { api as namedApi } from '../../api';
-const api = namedApi || apiObj.default || apiObj.api || apiObj;
+// api import - 안전한 방식
+import * as apiModule from '../../api';
+const api = apiModule.api || apiModule.default || apiModule;
+
+// 디버깅용
+if (typeof window !== 'undefined') {
+  window.__meetingApiModule = apiModule;
+  window.__meetingApi = api;
+}
 
 const formatDateTime = (value) => {
   if (!value) return '-';

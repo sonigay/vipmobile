@@ -17,9 +17,9 @@ import ModeSelector from './ModeSelector';
 import SlideOrderEditor from './SlideOrderEditor';
 import CustomSlideEditor from './CustomSlideEditor';
 import MeetingCaptureManager from './MeetingCaptureManager';
-// api import - named export와 default export 모두 지원
-import apiObj, { api as namedApi } from '../../api';
-const api = namedApi || apiObj.default || apiObj.api || apiObj;
+// api import - 안전한 방식
+import * as apiModule from '../../api';
+const api = apiModule.api || apiModule.default || apiModule;
 import { getModeConfig } from '../../config/modeConfig';
 import { getAvailableTabsForMode } from '../../config/modeTabConfig';
 
