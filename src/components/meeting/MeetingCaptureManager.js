@@ -18,6 +18,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
   const [slidesState, setSlidesState] = useState(slides); // 슬라이드 상태 관리
 
   useEffect(() => {
+    console.log(`📋 [MeetingCaptureManager] 슬라이드 초기화: ${slides.length}개`);
     setSlidesState(slides);
   }, [slides]);
 
@@ -135,27 +136,37 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
       const uploadResult = await uploadResponse.json();
       console.log(`✅ [MeetingCaptureManager] 슬라이드 ${index + 1} 업로드 완료:`, uploadResult.imageUrl);
 
-      // 슬라이드 배열 업데이트
-      const updatedSlides = slidesState.map((s, i) => 
-        i === index ? {
-          ...s,
-          imageUrl: uploadResult.imageUrl,
-          capturedAt: new Date().toISOString(),
-          discordPostId: uploadResult.postId || '',
-          discordThreadId: uploadResult.threadId || ''
-        } : s
-      );
-      
-      // 상태 업데이트
-      setSlidesState(updatedSlides);
-      
-      // 전체 슬라이드 배열을 한 번에 저장 (이전 슬라이드 URL 유지)
-      console.log(`💾 [MeetingCaptureManager] 슬라이드 ${index + 1} 저장 시작, 전체 슬라이드 수: ${updatedSlides.length}`);
-      console.log(`💾 [MeetingCaptureManager] 저장할 슬라이드 URL들:`, updatedSlides.map(s => ({ order: s.order, url: s.imageUrl || '없음' })));
-      await api.saveMeetingConfig(meeting.meetingId, {
-        slides: updatedSlides
+      // 현재 상태를 기반으로 슬라이드 배열 업데이트 (이전 슬라이드 정보 유지)
+      setSlidesState(prevSlides => {
+        const updatedSlides = prevSlides.map((s, i) => 
+          i === index ? {
+            ...s,
+            imageUrl: uploadResult.imageUrl,
+            capturedAt: new Date().toISOString(),
+            discordPostId: uploadResult.postId || '',
+            discordThreadId: uploadResult.threadId || ''
+          } : s // 이전 슬라이드는 그대로 유지
+        );
+        
+        console.log(`💾 [MeetingCaptureManager] 슬라이드 ${index + 1} 상태 업데이트, 전체 슬라이드 수: ${updatedSlides.length}`);
+        console.log(`💾 [MeetingCaptureManager] 저장할 슬라이드 URL들:`, updatedSlides.map(s => ({ 
+          order: s.order, 
+          slideId: s.slideId,
+          url: s.imageUrl || '없음',
+          hasUrl: !!s.imageUrl
+        })));
+        
+        // 전체 슬라이드 배열을 한 번에 저장 (이전 슬라이드 URL 유지)
+        api.saveMeetingConfig(meeting.meetingId, {
+          slides: updatedSlides
+        }).then(() => {
+          console.log(`✅ [MeetingCaptureManager] 슬라이드 ${index + 1} 저장 완료`);
+        }).catch(err => {
+          console.error(`❌ [MeetingCaptureManager] 슬라이드 ${index + 1} 저장 실패:`, err);
+        });
+        
+        return updatedSlides;
       });
-      console.log(`✅ [MeetingCaptureManager] 슬라이드 ${index + 1} 저장 완료`);
 
       setCompleted(prev => prev + 1);
       
