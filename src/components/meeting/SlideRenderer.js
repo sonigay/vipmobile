@@ -19,62 +19,76 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
     setLoading(true);
     setContentReady(false);
     
-    // 데이터 로딩 완료 대기 함수 - 더 확실한 방법
+    // 데이터 로딩 완료 대기 함수 - 매우 확실한 방법
     const waitForDataLoad = () => {
       return new Promise((resolve) => {
         let stableCount = 0; // 연속으로 안정적인 상태가 유지된 횟수
-        const requiredStableCount = 20; // 2초 동안 안정적이어야 함 (20 * 100ms)
-        let lastCheckTime = Date.now();
+        const requiredStableCount = 50; // 5초 동안 안정적이어야 함 (50 * 100ms)
+        let checkStartTime = null;
+        let lastStableTime = null;
+        
+        // MutationObserver로 DOM 변화 감지
+        const observer = new MutationObserver(() => {
+          // DOM이 변경되면 안정성 카운터 리셋
+          if (stableCount > 0) {
+            console.log(`🔄 [SlideRenderer] DOM 변화 감지, 안정성 카운터 리셋 (이전: ${stableCount})`);
+            stableCount = 0;
+            lastStableTime = null;
+          }
+        });
         
         const checkLoading = () => {
-          const now = Date.now();
-          const timeSinceStart = now - lastCheckTime;
-          
-          // 로딩 인디케이터가 있는지 확인
-          const loadingIndicators = containerRef.current?.querySelectorAll(
-            '.MuiCircularProgress-root, .MuiLinearProgress-root, [class*="loading"], [class*="Loading"], [class*="spinner"]'
-          );
-          
-          // 데이터 로딩 상태 확인 (data-loaded와 data-loading 속성)
-          const dataLoaded = containerRef.current?.querySelector('[data-loaded="true"]') !== null;
-          const dataLoading = containerRef.current?.querySelector('[data-loading="true"]') !== null;
-          
-          // "로딩 중", "불러오는 중" 등의 텍스트가 있는지 확인
-          const loadingTexts = containerRef.current?.querySelectorAll(
-            '*:not(script):not(style)'
-          );
-          let hasLoadingText = false;
-          if (loadingTexts) {
-            Array.from(loadingTexts).forEach(el => {
-              const text = el.textContent || '';
-              if (text.includes('로딩') || text.includes('불러오는 중') || text.includes('데이터를 불러오는 중') || text.includes('마감장표 데이터 로딩 중')) {
-                hasLoadingText = true;
-              }
-            });
+          if (!checkStartTime) {
+            checkStartTime = Date.now();
           }
           
-          // 로딩 인디케이터가 없고, data-loading이 false이고, data-loaded가 true이면 완료
-          const isLoading = (loadingIndicators && loadingIndicators.length > 0) || dataLoading || hasLoadingText;
+          const timeSinceStart = Date.now() - checkStartTime;
+          
+          // 로딩 인디케이터가 있는지 확인 (더 엄격하게)
+          const loadingIndicators = containerRef.current?.querySelectorAll(
+            '.MuiCircularProgress-root, .MuiLinearProgress-root, [class*="loading"], [class*="Loading"], [class*="spinner"], [class*="Loading"]'
+          );
+          
+          // data-loading 속성이 있는 요소 확인
+          const dataLoadingElements = containerRef.current?.querySelectorAll('[data-loading="true"]');
+          
+          // 데이터 로딩 상태 확인
+          const dataLoaded = containerRef.current?.querySelector('[data-loaded="true"]') !== null;
+          const dataLoading = dataLoadingElements && dataLoadingElements.length > 0;
+          
+          // "로딩 중", "불러오는 중" 등의 텍스트가 있는지 확인 (더 엄격하게)
+          const allText = containerRef.current?.textContent || '';
+          const hasLoadingText = 
+            allText.includes('로딩') || 
+            allText.includes('불러오는 중') || 
+            allText.includes('데이터를 불러오는 중') || 
+            allText.includes('마감장표 데이터 로딩 중') ||
+            allText.includes('데이터 로딩 중');
+          
+          // 로딩 인디케이터가 없고, data-loading이 false이고, 로딩 텍스트가 없어야 함
+          const hasAnyLoadingIndicator = (loadingIndicators && loadingIndicators.length > 0) || dataLoading;
+          const isLoading = hasAnyLoadingIndicator || hasLoadingText;
           
           // data-loaded가 true이고 data-loading이 false여야 완료
           const isDataReady = dataLoaded && !dataLoading;
           
-          // 추가 확인: 실제 데이터가 렌더링되었는지 확인 (테이블, 차트 등)
-          const hasDataContent = containerRef.current?.querySelector(
-            'table, [class*="Table"], [class*="Chart"], [class*="Grid"], .MuiTable-root, .MuiDataGrid-root, .MuiPaper-root'
-          ) !== null;
-          
-          // 더 엄격한 확인: 테이블 행이나 실제 데이터가 있는지 확인
-          const hasTableRows = containerRef.current?.querySelector('table tbody tr, .MuiTableBody-root tr') !== null;
-          const hasChartContent = containerRef.current?.querySelector('[class*="Chart"], canvas, svg') !== null;
-          const hasRealData = hasTableRows || hasChartContent || hasDataContent;
+          // 실제 데이터가 렌더링되었는지 확인 (더 엄격하게)
+          const hasTableRows = containerRef.current?.querySelector('table tbody tr, .MuiTableBody-root tr, tbody tr') !== null;
+          const hasChartContent = containerRef.current?.querySelector('[class*="Chart"], canvas, svg, [class*="chart"]') !== null;
+          const hasPaperContent = containerRef.current?.querySelector('.MuiPaper-root') !== null;
+          const hasRealData = hasTableRows || hasChartContent || hasPaperContent;
           
           // 로딩이 완전히 없고, 데이터가 준비되었고, 실제 콘텐츠가 있어야 완료
           const isContentReady = !isLoading && isDataReady && hasRealData;
           
           if (isContentReady) {
+            if (lastStableTime === null) {
+              lastStableTime = Date.now();
+            }
             stableCount++;
-            console.log(`✅ [SlideRenderer] 안정적인 상태 확인 (${stableCount}/${requiredStableCount}):`, {
+            
+            const stableDuration = (Date.now() - lastStableTime) / 1000;
+            console.log(`✅ [SlideRenderer] 안정적인 상태 확인 (${stableCount}/${requiredStableCount}, ${stableDuration.toFixed(1)}초 유지):`, {
               hasLoadingIndicator: loadingIndicators?.length > 0,
               dataLoading,
               dataLoaded,
@@ -82,12 +96,14 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
               hasRealData,
               hasTableRows,
               hasChartContent,
+              hasPaperContent,
               timeSinceStart: Math.round(timeSinceStart / 1000) + '초'
             });
             
-            // 연속으로 안정적인 상태가 2초 이상 유지되면 완료
+            // 연속으로 안정적인 상태가 5초 이상 유지되면 완료
             if (stableCount >= requiredStableCount) {
-              console.log('✅ [SlideRenderer] 데이터 로딩 완료 (안정적인 상태 유지됨)');
+              console.log('✅ [SlideRenderer] 데이터 로딩 완료 (5초 이상 안정적인 상태 유지됨)');
+              observer.disconnect();
               resolve();
               return;
             }
@@ -96,6 +112,7 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
             if (stableCount > 0) {
               console.log(`⚠️ [SlideRenderer] 안정적인 상태가 깨짐, 카운터 리셋 (이전: ${stableCount})`);
               stableCount = 0;
+              lastStableTime = null;
             }
             
             console.log(`🔍 [SlideRenderer] 데이터 로딩 확인 (${Math.round(timeSinceStart / 1000)}초 경과):`, {
@@ -112,13 +129,14 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
             });
           }
           
-          // 최대 15초 대기 (150 * 100ms)
-          if (timeSinceStart >= 15000) {
+          // 최대 30초 대기
+          if (timeSinceStart >= 30000) {
             if (isContentReady) {
-              console.warn('⚠️ [SlideRenderer] 타임아웃, 하지만 콘텐츠 준비됨 - 진행');
+              console.warn('⚠️ [SlideRenderer] 타임아웃 (30초), 하지만 콘텐츠 준비됨 - 진행');
             } else {
-              console.warn('⚠️ [SlideRenderer] 타임아웃 (15초), 강제 진행');
+              console.warn('⚠️ [SlideRenderer] 타임아웃 (30초), 강제 진행');
             }
+            observer.disconnect();
             resolve();
             return;
           }
@@ -126,17 +144,26 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
           setTimeout(checkLoading, 100);
         };
         
-        // 최소 5초 대기 후 체크 시작 (데이터 로딩 시간 고려)
-        console.log('⏳ [SlideRenderer] 초기 대기 시작 (5초)');
+        // MutationObserver 시작
+        if (containerRef.current) {
+          observer.observe(containerRef.current, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['data-loading', 'data-loaded', 'class']
+          });
+        }
+        
+        // 최소 8초 대기 후 체크 시작 (데이터 로딩 시간 충분히 고려)
+        console.log('⏳ [SlideRenderer] 초기 대기 시작 (8초)');
         setTimeout(() => {
           console.log('⏳ [SlideRenderer] 데이터 로딩 체크 시작');
-          lastCheckTime = Date.now();
           checkLoading();
-        }, 5000);
+        }, 8000);
       });
     };
     
-    // 최소 5초 대기 후 데이터 로딩 완료 확인
+    // 최소 8초 대기 후 데이터 로딩 완료 확인
     const timer = setTimeout(async () => {
       console.log('⏳ [SlideRenderer] 데이터 로딩 대기 시작');
       await waitForDataLoad();
@@ -156,7 +183,7 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
           onReady();
         }
       }, 1000);
-    }, 5000); // 최소 5초 대기
+    }, 8000); // 최소 8초 대기
 
     return () => clearTimeout(timer);
   }, [slide, onReady]);
