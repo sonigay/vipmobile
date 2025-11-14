@@ -75,10 +75,13 @@ function MeetingList({ onAdd, onEdit, onDelete, onSelect, refreshTrigger }) {
     setError(null);
     try {
       const response = await api.getMeetings();
+      if (response.success === false) {
+        throw new Error(response.error || '회의 목록 조회 실패');
+      }
       setMeetings(response.meetings || []);
     } catch (err) {
       console.error('회의 목록 조회 오류:', err);
-      setError('회의 목록을 불러오는데 실패했습니다.');
+      setError(err.message || '회의 목록을 불러오는데 실패했습니다.');
     } finally {
       setLoading(false);
     }

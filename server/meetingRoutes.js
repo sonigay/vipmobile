@@ -33,7 +33,8 @@ if (DISCORD_LOGGING_ENABLED && DISCORD_BOT_TOKEN) {
 function createSheetsClient() {
   const GOOGLE_SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
   const GOOGLE_PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY;
-  const SPREADSHEET_ID = process.env.SHEET_ID;
+  // MEETING_SHEET_ID가 있으면 사용, 없으면 기본 SHEET_ID 사용
+  const SPREADSHEET_ID = process.env.MEETING_SHEET_ID || process.env.SHEET_ID;
 
   if (!GOOGLE_SERVICE_ACCOUNT_EMAIL || !GOOGLE_PRIVATE_KEY || !SPREADSHEET_ID) {
     throw new Error('Missing Google Sheets environment variables');

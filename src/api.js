@@ -1842,8 +1842,11 @@ export const inventoryRecoveryAPI = {
   getMeetings: async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/meetings`);
-      if (!response.ok) throw new Error('회의 목록 조회 실패');
-      return response.json();
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || '회의 목록 조회 실패');
+      }
+      return data;
     } catch (error) {
       console.error('회의 목록 조회 오류:', error);
       throw error;
