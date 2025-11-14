@@ -974,7 +974,7 @@ async function getSheetValuesWithoutCache(sheetName) {
     // 시트 이름을 안전하게 처리
     const safeSheetName = `'${sheetName}'`; // 작은따옴표로 감싸서 특수문자 처리
     
-    // raw데이터 시트는 A:AB 범위 필요 (AB열까지), 폰클개통데이터는 A:BZ 범위 필요 (BZ열까지), 정책_기본정보는 A:AC 범위 필요 (AC열까지), 대리점아이디관리는 A:AF 범위 필요 (AF열까지), 나머지는 A:AA 범위
+    // raw데이터 시트는 A:AB 범위 필요 (AB열까지), 폰클개통데이터는 A:BZ 범위 필요 (BZ열까지), 정책_기본정보는 A:AC 범위 필요 (AC열까지), 대리점아이디관리는 A:AF 범위 필요 (AF열까지), 정책모드공지사항은 A:I 범위 필요 (I열까지), 나머지는 A:AA 범위
     let range;
     if (sheetName === 'raw데이터') {
       range = `${safeSheetName}!A:AB`;
@@ -988,6 +988,8 @@ async function getSheetValuesWithoutCache(sheetName) {
       range = `${safeSheetName}!A:AF`;
     } else if (sheetName === '어플업데이트') {
       range = `${safeSheetName}!A:Y`;
+    } else if (sheetName === '정책모드공지사항') {
+      range = `${safeSheetName}!A:I`;
     } else {
       range = `${safeSheetName}!A:AA`;
     }
@@ -22681,6 +22683,361 @@ app.put('/api/policies/:policyId/approve', async (req, res) => {
   }
 });
 
+// 공지사항 관리 API
+const NOTICE_SHEET_NAME = '정책모드공지사항';
+const NOTICE_HEADERS = [
+  '연월',
+  '카테고리',
+  '제목',
+  '내용',
+  '작성자',
+  '작성일시',
+  '수정일시',
+  'ID',
+  '비고'
+];
+
+// 공지사항 시트 구조 확인 및 초기화
+async function ensureNoticeSheetStructure() {
+  try {
+    const spreadsheetMeta = await sheets.spreadsheets.get({
+      spreadsheetId: SPREADSHEET_ID
+    });
+    const sheetExists = (spreadsheetMeta.data.sheets || []).some(
+      (sheet) => sheet.properties && sheet.properties.title === NOTICE_SHEET_NAME
+    );
+
+    if (!sheetExists) {
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId: SPREADSHEET_ID,
+        resource: {
+          requests: [
+            {
+              addSheet: {
+                properties: {
+                  title: NOTICE_SHEET_NAME
+                }
+              }
+            }
+          ]
+        }
+      });
+    }
+
+    // 헤더는 1행: 빈 행, 2행: 실제 헤더
+    const headerRange = `${NOTICE_SHEET_NAME}!A1:${String.fromCharCode(65 + NOTICE_HEADERS.length - 1)}2`;
+    const headerResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: headerRange
+    });
+    const headerValues = headerResponse.data.values || [];
+    const firstRow = headerValues[0] || [];
+    const secondRow = headerValues[1] || [];
+
+    const isFirstRowBlank = firstRow.length === 0 || firstRow.every((cell) => !cell || String(cell).trim() === '');
+    const isSecondRowHeader = NOTICE_HEADERS.every(
+      (header, index) => (secondRow[index] || '') === header
+    );
+
+    if (!isFirstRowBlank || !isSecondRowHeader) {
+      const values = [
+        new Array(NOTICE_HEADERS.length).fill(''),
+        NOTICE_HEADERS
+      ];
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: headerRange,
+        valueInputOption: 'RAW',
+        resource: {
+          values
+        }
+      });
+    }
+  } catch (error) {
+    console.error('공지사항 시트 구조 확인 실패:', error);
+    throw error;
+  }
+}
+
+// GET /api/policy-notices - 공지사항 목록 조회
+app.get('/api/policy-notices', async (req, res) => {
+  try {
+    const { yearMonth, category } = req.query;
+    
+    console.log('공지사항 목록 조회 요청:', { yearMonth, category });
+    
+    await ensureNoticeSheetStructure();
+    
+    const values = await getSheetValuesWithoutCache(NOTICE_SHEET_NAME);
+    
+    if (!values || values.length <= 2) {
+      return res.json({ success: true, notices: [] });
+    }
+    
+    // 헤더 제외 (1행: 빈 행, 2행: 헤더)
+    const dataRows = values.slice(2);
+    
+    // 필터링 적용
+    let filteredNotices = dataRows
+      .filter(row => {
+        if (row.length < 9) return false; // 최소 컬럼 수 확인
+        
+        const noticeYearMonth = (row[0] || '').toString().trim(); // 연월
+        const noticeCategory = (row[1] || '').toString().trim(); // 카테고리
+        
+        // 연월 필터
+        if (yearMonth && noticeYearMonth !== yearMonth) {
+          return false;
+        }
+        
+        // 카테고리 필터
+        if (category) {
+          // "전체"가 아니고, 카테고리가 일치하지 않으면 제외
+          if (noticeCategory !== '전체' && noticeCategory !== category) {
+            return false;
+          }
+        }
+        
+        return true;
+      })
+      .map((row, index) => {
+        const noticeId = row[7] || `NOTICE_${Date.now()}_${index}`; // ID (없으면 생성)
+        return {
+          id: noticeId,
+          yearMonth: row[0] || '',
+          category: row[1] || '',
+          title: row[2] || '',
+          content: row[3] || '',
+          author: row[4] || '',
+          createdAt: row[5] || '',
+          updatedAt: row[6] || '',
+          note: row[8] || '',
+          rowIndex: index + 3 // 실제 시트 행 번호 (1행 빈 행, 2행 헤더, 3행부터 데이터)
+        };
+      });
+    
+    res.json({
+      success: true,
+      notices: filteredNotices
+    });
+    
+  } catch (error) {
+    console.error('공지사항 목록 조회 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// POST /api/policy-notices - 공지사항 생성
+app.post('/api/policy-notices', async (req, res) => {
+  try {
+    const { yearMonth, category, title, content, author, note } = req.body;
+    
+    console.log('공지사항 생성 요청:', { yearMonth, category, title, author });
+    
+    if (!yearMonth || !title || !content || !author) {
+      return res.status(400).json({
+        success: false,
+        error: '필수 필드가 누락되었습니다. (연월, 제목, 내용, 작성자)'
+      });
+    }
+    
+    await ensureNoticeSheetStructure();
+    
+    const noticeId = `NOTICE_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    
+    const newNoticeRow = [
+      yearMonth || '',
+      category || '전체',
+      title || '',
+      content || '',
+      author || '',
+      now, // 작성일시
+      now, // 수정일시
+      noticeId,
+      note || ''
+    ];
+    
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${NOTICE_SHEET_NAME}!A3:I3`,
+      valueInputOption: 'RAW',
+      insertDataOption: 'INSERT_ROWS',
+      resource: {
+        values: [newNoticeRow]
+      }
+    });
+    
+    // 캐시 무효화
+    cacheUtils.delete(`sheet_${NOTICE_SHEET_NAME}_${SPREADSHEET_ID}`);
+    
+    res.json({
+      success: true,
+      message: '공지사항이 생성되었습니다.',
+      notice: {
+        id: noticeId,
+        yearMonth,
+        category: category || '전체',
+        title,
+        content,
+        author,
+        createdAt: now,
+        updatedAt: now,
+        note: note || ''
+      }
+    });
+    
+  } catch (error) {
+    console.error('공지사항 생성 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// PUT /api/policy-notices/:id - 공지사항 수정
+app.put('/api/policy-notices/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { yearMonth, category, title, content, author, note } = req.body;
+    
+    console.log('공지사항 수정 요청:', { id, title, author });
+    
+    await ensureNoticeSheetStructure();
+    
+    const values = await getSheetValuesWithoutCache(NOTICE_SHEET_NAME);
+    
+    if (!values || values.length <= 2) {
+      return res.status(404).json({
+        success: false,
+        error: '공지사항을 찾을 수 없습니다.'
+      });
+    }
+    
+    const dataRows = values.slice(2);
+    const noticeIndex = dataRows.findIndex(row => (row[7] || '').toString() === id);
+    
+    if (noticeIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        error: '공지사항을 찾을 수 없습니다.'
+      });
+    }
+    
+    const noticeRow = dataRows[noticeIndex];
+    const rowNumber = noticeIndex + 3; // 1행 빈 행, 2행 헤더, 3행부터 데이터
+    
+    const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    
+    const updatedRow = [
+      yearMonth !== undefined ? yearMonth : noticeRow[0] || '',
+      category !== undefined ? (category || '전체') : noticeRow[1] || '전체',
+      title !== undefined ? title : noticeRow[2] || '',
+      content !== undefined ? content : noticeRow[3] || '',
+      author !== undefined ? author : noticeRow[4] || '',
+      noticeRow[5] || now, // 작성일시는 유지
+      now, // 수정일시 업데이트
+      id, // ID 유지
+      note !== undefined ? note : noticeRow[8] || ''
+    ];
+    
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${NOTICE_SHEET_NAME}!A${rowNumber}:I${rowNumber}`,
+      valueInputOption: 'RAW',
+      resource: {
+        values: [updatedRow]
+      }
+    });
+    
+    // 캐시 무효화
+    cacheUtils.delete(`sheet_${NOTICE_SHEET_NAME}_${SPREADSHEET_ID}`);
+    
+    res.json({
+      success: true,
+      message: '공지사항이 수정되었습니다.',
+      notice: {
+        id,
+        yearMonth: updatedRow[0],
+        category: updatedRow[1],
+        title: updatedRow[2],
+        content: updatedRow[3],
+        author: updatedRow[4],
+        createdAt: updatedRow[5],
+        updatedAt: updatedRow[6],
+        note: updatedRow[8]
+      }
+    });
+    
+  } catch (error) {
+    console.error('공지사항 수정 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// DELETE /api/policy-notices/:id - 공지사항 삭제
+app.delete('/api/policy-notices/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    console.log('공지사항 삭제 요청:', { id });
+    
+    await ensureNoticeSheetStructure();
+    
+    const values = await getSheetValuesWithoutCache(NOTICE_SHEET_NAME);
+    
+    if (!values || values.length <= 2) {
+      return res.status(404).json({
+        success: false,
+        error: '공지사항을 찾을 수 없습니다.'
+      });
+    }
+    
+    const dataRows = values.slice(2);
+    const noticeIndex = dataRows.findIndex(row => (row[7] || '').toString() === id);
+    
+    if (noticeIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        error: '공지사항을 찾을 수 없습니다.'
+      });
+    }
+    
+    const rowNumber = noticeIndex + 3; // 1행 빈 행, 2행 헤더, 3행부터 데이터
+    
+    // 행 삭제
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: SPREADSHEET_ID,
+      resource: {
+        requests: [
+          {
+            deleteDimension: {
+              range: {
+                sheetId: (await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID })).data.sheets.find(
+                  s => s.properties.title === NOTICE_SHEET_NAME
+                ).properties.sheetId,
+                dimension: 'ROWS',
+                startIndex: rowNumber - 1, // 0-based index
+                endIndex: rowNumber
+              }
+            }
+          }
+        ]
+      }
+    });
+    
+    // 캐시 무효화
+    cacheUtils.delete(`sheet_${NOTICE_SHEET_NAME}_${SPREADSHEET_ID}`);
+    
+    res.json({
+      success: true,
+      message: '공지사항이 삭제되었습니다.'
+    });
+    
+  } catch (error) {
+    console.error('공지사항 삭제 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // 카테고리 관리 API
 app.get('/api/policy-categories', async (req, res) => {
   try {
@@ -22859,6 +23216,371 @@ async function initializeDefaultCategories() {
   
   console.log('기본 카테고리 초기화 완료');
 }
+
+// 공지사항 시트 구조 확인 및 초기화 함수
+async function ensurePolicyNoticeSheetStructure() {
+  try {
+    const sheetName = '정책모드공지사항';
+    const spreadsheetMeta = await sheets.spreadsheets.get({
+      spreadsheetId: SPREADSHEET_ID
+    });
+    
+    const sheetExists = (spreadsheetMeta.data.sheets || []).some(
+      (sheet) => sheet.properties && sheet.properties.title === sheetName
+    );
+    
+    if (!sheetExists) {
+      // 시트가 없으면 생성
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId: SPREADSHEET_ID,
+        resource: {
+          requests: [
+            {
+              addSheet: {
+                properties: {
+                  title: sheetName
+                }
+              }
+            }
+          ]
+        }
+      });
+      console.log(`📋 [공지사항] 시트 생성: ${sheetName}`);
+    }
+    
+    // 헤더 구조 확인 (1행은 비워두고 2행에 헤더)
+    const headerRange = `${sheetName}!A1:I2`;
+    const headerResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: headerRange
+    });
+    const headerValues = headerResponse.data.values || [];
+    const firstRow = headerValues[0] || [];
+    const secondRow = headerValues[1] || [];
+    
+    const headers = ['연월', '카테고리', '제목', '내용', '작성자', '작성일시', '수정일시', 'ID', '비고'];
+    const isFirstRowBlank = firstRow.length === 0 || firstRow.every((cell) => !cell || String(cell).trim() === '');
+    const isSecondRowHeader = headers.every((header, index) => (secondRow[index] || '') === header);
+    
+    if (!isFirstRowBlank || !isSecondRowHeader) {
+      const values = [
+        new Array(headers.length).fill(''), // 1행: 빈 행
+        headers // 2행: 헤더
+      ];
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: headerRange,
+        valueInputOption: 'RAW',
+        resource: {
+          values
+        }
+      });
+      console.log(`📋 [공지사항] 헤더 설정 완료: ${sheetName}`);
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('공지사항 시트 구조 확인 실패:', error);
+    throw error;
+  }
+}
+
+// 공지사항 목록 조회 API
+app.get('/api/policy/notices', async (req, res) => {
+  try {
+    console.log('공지사항 목록 조회 요청:', req.query);
+    
+    const { yearMonth, category } = req.query;
+    
+    // 시트 구조 확인
+    await ensurePolicyNoticeSheetStructure();
+    
+    // 공지사항 데이터 가져오기
+    const values = await getSheetValuesWithoutCache('정책모드공지사항');
+    
+    if (!values || values.length <= 2) {
+      return res.json({ success: true, notices: [] });
+    }
+    
+    // 헤더 제외 (1행 빈 행, 2행 헤더 제외)
+    const dataRows = values.slice(2);
+    
+    // 필터링 적용
+    let filteredNotices = dataRows.filter(row => {
+      if (row.length < 9) return false;
+      
+      const noticeYearMonth = row[0] || ''; // A열: 연월
+      const noticeCategory = row[1] || '';  // B열: 카테고리
+      const noticeId = row[7] || '';        // H열: ID
+      
+      // ID가 없으면 제외
+      if (!noticeId) return false;
+      
+      // 연월 필터
+      if (yearMonth && noticeYearMonth !== yearMonth) {
+        return false;
+      }
+      
+      // 카테고리 필터 (전체 또는 특정 카테고리)
+      if (category && noticeCategory !== '전체' && noticeCategory !== category) {
+        return false;
+      }
+      
+      return true;
+    });
+    
+    // 공지사항 목록 변환
+    const notices = filteredNotices.map(row => ({
+      id: row[7] || '',              // H열: ID
+      yearMonth: row[0] || '',       // A열: 연월
+      category: row[1] || '',        // B열: 카테고리
+      title: row[2] || '',           // C열: 제목
+      content: row[3] || '',         // D열: 내용
+      author: row[4] || '',          // E열: 작성자
+      createdAt: row[5] || '',       // F열: 작성일시
+      updatedAt: row[6] || '',       // G열: 수정일시
+      note: row[8] || ''             // I열: 비고
+    }));
+    
+    // 최신순으로 정렬 (수정일시 기준)
+    notices.sort((a, b) => {
+      const dateA = new Date(a.updatedAt || a.createdAt);
+      const dateB = new Date(b.updatedAt || b.createdAt);
+      return dateB - dateA;
+    });
+    
+    console.log(`공지사항 목록 조회 완료: ${notices.length}건`);
+    res.json({ success: true, notices });
+    
+  } catch (error) {
+    console.error('공지사항 목록 조회 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 공지사항 생성 API
+app.post('/api/policy/notices', async (req, res) => {
+  try {
+    console.log('공지사항 생성 요청:', req.body);
+    
+    const { yearMonth, category, title, content, author, note } = req.body;
+    
+    // 필수 필드 검증
+    if (!yearMonth || !title || !content || !author) {
+      return res.status(400).json({
+        success: false,
+        error: '필수 필드가 누락되었습니다.'
+      });
+    }
+    
+    // 시트 구조 확인
+    await ensurePolicyNoticeSheetStructure();
+    
+    // 공지사항 ID 생성
+    const noticeId = `NOTICE_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const now = new Date().toISOString();
+    
+    // 새 공지사항 데이터 생성
+    const newNoticeRow = [
+      yearMonth,           // A열: 연월
+      category || '전체',  // B열: 카테고리
+      title,               // C열: 제목
+      content,             // D열: 내용
+      author,              // E열: 작성자
+      now,                 // F열: 작성일시
+      now,                 // G열: 수정일시
+      noticeId,            // H열: ID
+      note || ''           // I열: 비고
+    ];
+    
+    // 시트에 추가
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '정책모드공지사항!A:I',
+      valueInputOption: 'RAW',
+      insertDataOption: 'INSERT_ROWS',
+      resource: {
+        values: [newNoticeRow]
+      }
+    });
+    
+    // 캐시 무효화
+    cacheUtils.delete('sheet_정책모드공지사항');
+    
+    console.log('공지사항 생성 완료:', noticeId);
+    res.json({
+      success: true,
+      message: '공지사항이 성공적으로 생성되었습니다.',
+      notice: {
+        id: noticeId,
+        yearMonth,
+        category: category || '전체',
+        title,
+        content,
+        author,
+        createdAt: now,
+        updatedAt: now,
+        note: note || ''
+      }
+    });
+    
+  } catch (error) {
+    console.error('공지사항 생성 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 공지사항 수정 API
+app.put('/api/policy/notices/:id', async (req, res) => {
+  try {
+    console.log('공지사항 수정 요청:', req.params.id, req.body);
+    
+    const { id } = req.params;
+    const { title, content, author, note, category } = req.body;
+    
+    // 필수 필드 검증
+    if (!title || !content || !author) {
+      return res.status(400).json({
+        success: false,
+        error: '필수 필드가 누락되었습니다.'
+      });
+    }
+    
+    // 시트 구조 확인
+    await ensurePolicyNoticeSheetStructure();
+    
+    // 공지사항 데이터 가져오기
+    const values = await getSheetValuesWithoutCache('정책모드공지사항');
+    
+    if (!values || values.length <= 2) {
+      return res.status(404).json({ success: false, error: '공지사항을 찾을 수 없습니다.' });
+    }
+    
+    // 헤더 제외
+    const dataRows = values.slice(2);
+    const noticeIndex = dataRows.findIndex(row => row[7] === id); // H열: ID
+    
+    if (noticeIndex === -1) {
+      return res.status(404).json({ success: false, error: '공지사항을 찾을 수 없습니다.' });
+    }
+    
+    const noticeRow = dataRows[noticeIndex];
+    const rowNumber = noticeIndex + 3; // 1행 빈 행 + 2행 헤더 + 데이터 시작 (1-based)
+    
+    // 수정할 데이터 준비
+    const updatedAt = new Date().toISOString();
+    const updateValues = [
+      [
+        noticeRow[0],                    // A열: 연월 (변경 불가)
+        category !== undefined ? category : noticeRow[1], // B열: 카테고리
+        title,                           // C열: 제목
+        content,                         // D열: 내용
+        author,                          // E열: 작성자
+        noticeRow[5],                    // F열: 작성일시 (변경 불가)
+        updatedAt,                       // G열: 수정일시
+        id,                              // H열: ID (변경 불가)
+        note !== undefined ? note : noticeRow[8] // I열: 비고
+      ]
+    ];
+    
+    // 시트 업데이트
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `정책모드공지사항!A${rowNumber}:I${rowNumber}`,
+      valueInputOption: 'RAW',
+      resource: {
+        values: updateValues
+      }
+    });
+    
+    // 캐시 무효화
+    cacheUtils.delete('sheet_정책모드공지사항');
+    
+    console.log('공지사항 수정 완료:', id);
+    res.json({
+      success: true,
+      message: '공지사항이 성공적으로 수정되었습니다.',
+      notice: {
+        id,
+        yearMonth: noticeRow[0],
+        category: category !== undefined ? category : noticeRow[1],
+        title,
+        content,
+        author,
+        createdAt: noticeRow[5],
+        updatedAt,
+        note: note !== undefined ? note : noticeRow[8]
+      }
+    });
+    
+  } catch (error) {
+    console.error('공지사항 수정 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 공지사항 삭제 API
+app.delete('/api/policy/notices/:id', async (req, res) => {
+  try {
+    console.log('공지사항 삭제 요청:', req.params.id);
+    
+    const { id } = req.params;
+    
+    // 시트 구조 확인
+    await ensurePolicyNoticeSheetStructure();
+    
+    // 공지사항 데이터 가져오기
+    const values = await getSheetValuesWithoutCache('정책모드공지사항');
+    
+    if (!values || values.length <= 2) {
+      return res.status(404).json({ success: false, error: '공지사항을 찾을 수 없습니다.' });
+    }
+    
+    // 헤더 제외
+    const dataRows = values.slice(2);
+    const noticeIndex = dataRows.findIndex(row => row[7] === id); // H열: ID
+    
+    if (noticeIndex === -1) {
+      return res.status(404).json({ success: false, error: '공지사항을 찾을 수 없습니다.' });
+    }
+    
+    const rowNumber = noticeIndex + 3; // 1행 빈 행 + 2행 헤더 + 데이터 시작 (1-based)
+    
+    // 시트에서 행 삭제
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: SPREADSHEET_ID,
+      resource: {
+        requests: [
+          {
+            deleteDimension: {
+              range: {
+                sheetId: (await sheets.spreadsheets.get({
+                  spreadsheetId: SPREADSHEET_ID
+                })).data.sheets.find(s => s.properties.title === '정책모드공지사항').properties.sheetId,
+                dimension: 'ROWS',
+                startIndex: rowNumber - 1, // 0-based
+                endIndex: rowNumber
+              }
+            }
+          }
+        ]
+      }
+    });
+    
+    // 캐시 무효화
+    cacheUtils.delete('sheet_정책모드공지사항');
+    
+    console.log('공지사항 삭제 완료:', id);
+    res.json({
+      success: true,
+      message: '공지사항이 성공적으로 삭제되었습니다.'
+    });
+    
+  } catch (error) {
+    console.error('공지사항 삭제 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 
 // 운영모델 시트에서 모델 순서 가져오기 API
 app.get('/api/operation-models', async (req, res) => {

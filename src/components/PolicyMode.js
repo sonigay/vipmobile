@@ -29,7 +29,11 @@ import {
   CircularProgress,
   Checkbox,
   Alert,
-  Backdrop
+  Backdrop,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  TextField
 } from '@mui/material';
 import {
   Policy as PolicyIcon,
@@ -43,7 +47,8 @@ import {
   CancelOutlined as CancelOutlinedIcon,
   AccountBalance as AccountBalanceIcon,
   ContentCopy as ContentCopyIcon,
-  Delete as DeleteIcon
+  Delete as DeleteIcon,
+  Edit as EditIcon
 } from '@mui/icons-material';
 
 import AppUpdatePopup from './AppUpdatePopup';
@@ -163,6 +168,13 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const [showBulkCopyModal, setShowBulkCopyModal] = useState(false);
   const [bulkProcessing, setBulkProcessing] = useState(false);
   const [bulkProcessingMessage, setBulkProcessingMessage] = useState('');
+
+  // 공지사항 관련 상태
+  const [notices, setNotices] = useState([]);
+  const [noticesLoading, setNoticesLoading] = useState(false);
+  const [showNoticeModal, setShowNoticeModal] = useState(false);
+  const [selectedNotice, setSelectedNotice] = useState(null);
+  const [editingNotice, setEditingNotice] = useState(null);
   
   // 정책모드 진입 시 업데이트 팝업 표시 (숨김 설정 확인 후)
   useEffect(() => {
@@ -190,6 +202,15 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     // 정책 데이터 로드
     loadPolicyData();
   }, [policyType, selectedYearMonth, selectedManager]);
+
+  // 공지사항 조회 (카테고리 선택 시)
+  useEffect(() => {
+    if (selectedCategoryForList && selectedYearMonth) {
+      loadNotices();
+    } else {
+      setNotices([]);
+    }
+  }, [selectedCategoryForList, selectedYearMonth]);
 
   const loadStores = async () => {
     try {
@@ -262,6 +283,98 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       setCategories(DEFAULT_POLICY_CATEGORIES);
     } finally {
       setCategoriesLoading(false);
+    }
+  };
+
+  // 공지사항 조회 함수
+  const loadNotices = async () => {
+    if (!selectedCategoryForList || !selectedYearMonth) {
+      setNotices([]);
+      return;
+    }
+    
+    setNoticesLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/policy-notices?yearMonth=${selectedYearMonth}&category=${selectedCategoryForList}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setNotices(data.notices || []);
+      } else {
+        console.error('공지사항 조회 실패:', data.error);
+        setNotices([]);
+      }
+    } catch (error) {
+      console.error('공지사항 조회 실패:', error);
+      setNotices([]);
+    } finally {
+      setNoticesLoading(false);
+    }
+  };
+
+  // 공지사항 작성/수정 핸들러
+  const handleNoticeSave = async (noticeData) => {
+    try {
+      const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://vipmobile-backend.cloudtype.app';
+      const url = editingNotice 
+        ? `${API_BASE_URL}/api/policy-notices/${editingNotice.id}`
+        : `${API_BASE_URL}/api/policy-notices`;
+      const method = editingNotice ? 'PUT' : 'POST';
+      
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          ...noticeData,
+          yearMonth: selectedYearMonth,
+          category: selectedCategoryForList,
+          author: loggedInStore?.target || loggedInStore?.name || '알 수 없음'
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        await loadNotices();
+        setShowNoticeModal(false);
+        setEditingNotice(null);
+        setSelectedNotice(null);
+      } else {
+        alert('공지사항 저장에 실패했습니다: ' + (data.error || '알 수 없는 오류'));
+      }
+    } catch (error) {
+      console.error('공지사항 저장 실패:', error);
+      alert('공지사항 저장에 실패했습니다.');
+    }
+  };
+
+  // 공지사항 삭제 핸들러
+  const handleNoticeDelete = async (noticeId) => {
+    if (!window.confirm('공지사항을 삭제하시겠습니까?')) {
+      return;
+    }
+    
+    try {
+      const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://vipmobile-backend.cloudtype.app';
+      const response = await fetch(`${API_BASE_URL}/api/policy-notices/${noticeId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        await loadNotices();
+      } else {
+        alert('공지사항 삭제에 실패했습니다: ' + (data.error || '알 수 없는 오류'));
+      }
+    } catch (error) {
+      console.error('공지사항 삭제 실패:', error);
+      alert('공지사항 삭제에 실패했습니다.');
     }
   };
 
@@ -1562,6 +1675,95 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
               </Box>
             )}
             
+            {/* 공지사항 섹션 */}
+            {selectedCategoryForList && (
+              <Box sx={{ mb: 2 }}>
+                <Paper sx={{ p: 2, bgcolor: '#fff3cd', borderRadius: 2 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                    <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#856404' }}>
+                      📢 공지사항 및 안내사항
+                    </Typography>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      color="primary"
+                      startIcon={<AddIcon />}
+                      onClick={() => {
+                        setEditingNotice(null);
+                        setShowNoticeModal(true);
+                      }}
+                    >
+                      공지사항 작성
+                    </Button>
+                  </Box>
+                  {noticesLoading ? (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+                      <CircularProgress size={24} />
+                    </Box>
+                  ) : notices.length === 0 ? (
+                    <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
+                      등록된 공지사항이 없습니다.
+                    </Typography>
+                  ) : (
+                    <Box>
+                      {notices.map((notice) => (
+                        <Box
+                          key={notice.id}
+                          sx={{
+                            mb: 2,
+                            p: 2,
+                            bgcolor: 'white',
+                            borderRadius: 1,
+                            border: '1px solid #dee2e6'
+                          }}
+                        >
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                            <Box>
+                              <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 0.5 }}>
+                                {notice.title}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                작성자: {notice.author} | 작성일: {new Date(notice.createdAt).toLocaleString('ko-KR')}
+                                {notice.updatedAt !== notice.createdAt && ` | 수정일: ${new Date(notice.updatedAt).toLocaleString('ko-KR')}`}
+                              </Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', gap: 1 }}>
+                              <IconButton
+                                size="small"
+                                onClick={() => {
+                                  setEditingNotice(notice);
+                                  setShowNoticeModal(true);
+                                }}
+                              >
+                                <EditIcon />
+                              </IconButton>
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => handleNoticeDelete(notice.id)}
+                              >
+                                <DeleteIcon />
+                              </IconButton>
+                            </Box>
+                          </Box>
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              whiteSpace: 'pre-line',
+                              color: 'text.primary',
+                              lineHeight: 1.6
+                            }}
+                          >
+                            {notice.content}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Box>
+                  )}
+                </Paper>
+              </Box>
+            )}
+            
             {/* 정책 목록 테이블 */}
             {loading ? (
               <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
@@ -2267,6 +2469,33 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
               selectedPolicies={selectedPolicies}
             />
 
+            {/* 공지사항 작성/수정 모달 */}
+            <Dialog
+              open={showNoticeModal}
+              onClose={() => {
+                setShowNoticeModal(false);
+                setEditingNotice(null);
+                setSelectedNotice(null);
+              }}
+              maxWidth="md"
+              fullWidth
+            >
+              <DialogTitle>
+                {editingNotice ? '공지사항 수정' : '공지사항 작성'}
+              </DialogTitle>
+              <DialogContent>
+                <NoticeForm
+                  notice={editingNotice}
+                  onSave={handleNoticeSave}
+                  onCancel={() => {
+                    setShowNoticeModal(false);
+                    setEditingNotice(null);
+                    setSelectedNotice(null);
+                  }}
+                />
+              </DialogContent>
+            </Dialog>
+
             {/* 일괄 처리 로딩 오버레이 */}
             <Backdrop
               sx={{ 
@@ -2283,6 +2512,85 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
               </Typography>
             </Backdrop>
                     </Box>
+  );
+}
+
+// 공지사항 작성/수정 폼 컴포넌트
+function NoticeForm({ notice, onSave, onCancel }) {
+  const [title, setTitle] = useState(notice?.title || '');
+  const [content, setContent] = useState(notice?.content || '');
+  const [note, setNote] = useState(notice?.note || '');
+  const [category, setCategory] = useState(notice?.category || '전체');
+
+  useEffect(() => {
+    if (notice) {
+      setTitle(notice.title || '');
+      setContent(notice.content || '');
+      setNote(notice.note || '');
+      setCategory(notice.category || '전체');
+    } else {
+      setTitle('');
+      setContent('');
+      setNote('');
+      setCategory('전체');
+    }
+  }, [notice]);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!title.trim() || !content.trim()) {
+      alert('제목과 내용을 입력해주세요.');
+      return;
+    }
+    onSave({ title, content, note, category });
+  };
+
+  return (
+    <Box component="form" onSubmit={handleSubmit} sx={{ mt: 2 }}>
+      <TextField
+        fullWidth
+        label="제목"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        required
+        sx={{ mb: 2 }}
+      />
+      <TextField
+        fullWidth
+        label="내용"
+        value={content}
+        onChange={(e) => setContent(e.target.value)}
+        required
+        multiline
+        rows={6}
+        sx={{ mb: 2 }}
+      />
+      <TextField
+        fullWidth
+        label="비고"
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        multiline
+        rows={2}
+        sx={{ mb: 2 }}
+      />
+      <FormControl fullWidth sx={{ mb: 2 }}>
+        <InputLabel>카테고리</InputLabel>
+        <Select
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          label="카테고리"
+        >
+          <MenuItem value="전체">전체</MenuItem>
+        </Select>
+      </FormControl>
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 3 }}>
+        <Button onClick={onCancel}>취소</Button>
+        <Button type="submit" variant="contained" color="primary">
+          저장
+        </Button>
+      </Box>
+    </Box>
   );
 }
 
