@@ -112,11 +112,11 @@ async function getMeetings(req, res) {
 
     // 시트 헤더 확인
     await ensureSheetHeaders(sheets, SPREADSHEET_ID, sheetName, [
-      '회의ID', '회의이름', '회의날짜', '차수', '생성자', '생성일시', '상태'
+      '회의ID', '회의이름', '회의날짜', '차수', '생성자', '생성일시', '상태', '회의장소', '참석자'
     ]);
 
     // 데이터 조회 (3행부터)
-    const range = `${sheetName}!A3:G`;
+    const range = `${sheetName}!A3:I`;
     let response;
     try {
       response = await sheets.spreadsheets.values.get({
@@ -139,7 +139,9 @@ async function getMeetings(req, res) {
         meetingNumber: parseInt(row[3]) || 0,
         createdBy: row[4] || '',
         createdAt: row[5] || '',
-        status: row[6] || 'preparing'
+        status: row[6] || 'preparing',
+        meetingLocation: row[7] || '',
+        participants: row[8] || ''
       }))
       .sort((a, b) => {
         // 날짜 내림차순, 차수 내림차순
@@ -161,7 +163,7 @@ async function createMeeting(req, res) {
   try {
     const { sheets, SPREADSHEET_ID } = createSheetsClient();
     const sheetName = '회의목록';
-    const { meetingName, meetingDate, meetingNumber, createdBy } = req.body;
+    const { meetingName, meetingDate, meetingNumber, meetingLocation, participants, createdBy } = req.body;
 
     // 필수 필드 검증
     if (!meetingName || !meetingDate || !meetingNumber || !createdBy) {
@@ -173,11 +175,11 @@ async function createMeeting(req, res) {
 
     // 시트 헤더 확인
     await ensureSheetHeaders(sheets, SPREADSHEET_ID, sheetName, [
-      '회의ID', '회의이름', '회의날짜', '차수', '생성자', '생성일시', '상태'
+      '회의ID', '회의이름', '회의날짜', '차수', '생성자', '생성일시', '상태', '회의장소', '참석자'
     ]);
 
     // 차수 중복 확인
-    const range = `${sheetName}!A3:G`;
+    const range = `${sheetName}!A3:I`;
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
       range
@@ -207,7 +209,9 @@ async function createMeeting(req, res) {
       meetingNumber,
       createdBy,
       createdAt,
-      'preparing'
+      'preparing',
+      meetingLocation || '',
+      participants || ''
     ];
 
     await sheets.spreadsheets.values.append({
@@ -243,10 +247,10 @@ async function updateMeeting(req, res) {
     const { sheets, SPREADSHEET_ID } = createSheetsClient();
     const sheetName = '회의목록';
     const { meetingId } = req.params;
-    const { meetingName, meetingDate, meetingNumber, status } = req.body;
+    const { meetingName, meetingDate, meetingNumber, meetingLocation, participants, status } = req.body;
 
     // 데이터 조회
-    const range = `${sheetName}!A3:G`;
+    const range = `${sheetName}!A3:I`;
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
       range
@@ -275,19 +279,21 @@ async function updateMeeting(req, res) {
 
     // 데이터 업데이트 (배열 길이 보장)
     const updateRow = [...rows[rowIndex]];
-    // 배열 길이가 7 미만이면 확장
-    while (updateRow.length < 7) {
+    // 배열 길이가 9 미만이면 확장 (회의장소, 참석자 포함)
+    while (updateRow.length < 9) {
       updateRow.push('');
     }
     if (meetingName !== undefined) updateRow[1] = meetingName;
     if (meetingDate !== undefined) updateRow[2] = meetingDate;
     if (meetingNumber !== undefined) updateRow[3] = meetingNumber;
     if (status !== undefined) updateRow[6] = status; // 상태 업데이트 (인덱스 6)
+    if (meetingLocation !== undefined) updateRow[7] = meetingLocation;
+    if (participants !== undefined) updateRow[8] = participants;
     
     console.log(`🔄 [updateMeeting] 회의 상태 업데이트: ${meetingId} -> ${status}`);
     console.log(`🔄 [updateMeeting] 업데이트할 행:`, updateRow);
 
-    const updateRange = `${sheetName}!A${rowIndex + 3}:G${rowIndex + 3}`;
+    const updateRange = `${sheetName}!A${rowIndex + 3}:I${rowIndex + 3}`;
     await sheets.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_ID,
       range: updateRange,
@@ -429,12 +435,19 @@ async function getMeetingConfig(req, res) {
           imageUrl: row[9] || '',
           capturedAt: row[10] || '',
           discordPostId: row[11] || '',
-          discordThreadId: row[12] || ''
+          discordThreadId: row[12] || '',
+          // 메인 슬라이드 필드 (있으면 사용)
+          meetingDate: row[13] || '',
+          meetingNumber: row[14] ? parseInt(row[14]) : undefined,
+          meetingLocation: row[15] || '',
+          participants: row[16] || '',
+          createdBy: row[17] || ''
         };
         
         console.log(`📖 [getMeetingConfig] 슬라이드 ${idx + 1}:`, {
           slideId: slide.slideId,
           order: slide.order,
+          type: slide.type,
           mode: slide.mode,
           tab: slide.tab,
           subTab: slide.subTab,
@@ -445,6 +458,44 @@ async function getMeetingConfig(req, res) {
         return slide;
       })
       .sort((a, b) => a.order - b.order);
+    
+    // 목차 슬라이드가 있으면 modeGroups 재구성
+    const tocSlideIndex = slides.findIndex(s => s.type === 'toc');
+    if (tocSlideIndex !== -1) {
+      const tocSlide = slides[tocSlideIndex];
+      const modeGroups = {};
+      
+      // 모든 슬라이드를 순회하며 모드별로 그룹화
+      slides.forEach(slide => {
+        if (slide.type === 'mode-tab' && slide.mode) {
+          const modeKey = slide.mode;
+          if (!modeGroups[modeKey]) {
+            modeGroups[modeKey] = [];
+          }
+          modeGroups[modeKey].push(slide);
+        } else if (slide.type === 'mode-only' && slide.mode) {
+          const modeKey = slide.mode;
+          if (!modeGroups[modeKey]) {
+            modeGroups[modeKey] = [];
+          }
+          modeGroups[modeKey].push(slide);
+        } else if (slide.type === 'custom') {
+          if (!modeGroups['custom']) {
+            modeGroups['custom'] = [];
+          }
+          modeGroups['custom'].push(slide);
+        }
+      });
+      
+      // 목차 슬라이드에 modeGroups 추가
+      tocSlide.modeGroups = modeGroups;
+      slides[tocSlideIndex] = tocSlide;
+      
+      console.log(`📖 [getMeetingConfig] 목차 슬라이드 modeGroups 재구성 완료:`, {
+        modeCount: Object.keys(modeGroups).length,
+        customCount: modeGroups['custom']?.length || 0
+      });
+    }
 
     console.log(`📖 [getMeetingConfig] 최종 슬라이드 수: ${slides.length}, 이미지 URL이 있는 슬라이드: ${slides.filter(s => s.imageUrl).length}`);
     res.json({ success: true, slides });
@@ -471,8 +522,8 @@ async function saveMeetingConfig(req, res) {
       '회의ID', '슬라이드ID', '순서', '타입', '모드', '탭', '제목', '내용', '배경색', '이미지URL', '캡처시간', 'Discord포스트ID', 'Discord스레드ID'
     ]);
 
-    // 기존 데이터 조회
-    const range = `${sheetName}!A3:M`;
+    // 기존 데이터 조회 (메인 슬라이드 필드 포함)
+    const range = `${sheetName}!A3:R`;
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
       range
@@ -542,6 +593,7 @@ async function saveMeetingConfig(req, res) {
       // subTab이 있으면 tab 필드에 tab/subTab 형식으로 저장
       const tabValue = slide.subTab ? `${slide.tab || ''}/${slide.subTab}` : (slide.tab || '');
       
+      // 메인 슬라이드의 경우 추가 필드 포함
       const newRow = [
         meetingId,
         slideId,
@@ -555,12 +607,17 @@ async function saveMeetingConfig(req, res) {
         slide.imageUrl || '',
         slide.capturedAt || '',
         slide.discordPostId || '',
-        slide.discordThreadId || ''
+        slide.discordThreadId || '',
+        slide.meetingDate || '', // 메인 슬라이드용
+        slide.meetingNumber || '', // 메인 슬라이드용
+        slide.meetingLocation || '', // 메인 슬라이드용
+        slide.participants || '', // 메인 슬라이드용
+        slide.createdBy || '' // 메인 슬라이드용
       ];
 
       if (existingRowIndex !== -1) {
-        // 기존 슬라이드 업데이트
-        const updateRange = `${sheetName}!A${existingRowIndex + 3}:M${existingRowIndex + 3}`;
+        // 기존 슬라이드 업데이트 (메인 슬라이드 필드 포함)
+        const updateRange = `${sheetName}!A${existingRowIndex + 3}:R${existingRowIndex + 3}`;
         console.log(`📝 [saveMeetingConfig] 기존 슬라이드 업데이트 시작: 범위 ${updateRange}`);
         const updateResult = await sheets.spreadsheets.values.update({
           spreadsheetId: SPREADSHEET_ID,

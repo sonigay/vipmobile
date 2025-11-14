@@ -109,6 +109,8 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         useCORS: true,
         backgroundColor: slidesState[index].type === 'custom' 
           ? (slidesState[index].backgroundColor || '#ffffff')
+          : slidesState[index].type === 'main' || slidesState[index].type === 'toc' || slidesState[index].type === 'ending'
+          ? '#667eea' // 메인/목차/엔딩 슬라이드 배경색
           : '#ffffff',
         // 스크롤 영역 전체 캡처
         scrollX: 0,

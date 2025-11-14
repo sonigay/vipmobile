@@ -27,7 +27,9 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess }) {
   const [formData, setFormData] = useState({
     meetingName: '',
     meetingDate: '',
-    meetingNumber: ''
+    meetingNumber: '',
+    meetingLocation: '',
+    participants: ''
   });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
@@ -47,7 +49,9 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess }) {
         setFormData({
           meetingName: meeting.meetingName || '',
           meetingDate: meeting.meetingDate || '',
-          meetingNumber: meeting.meetingNumber || ''
+          meetingNumber: meeting.meetingNumber || '',
+          meetingLocation: meeting.meetingLocation || '',
+          participants: meeting.participants || ''
         });
         setActiveStep(0);
       } else {
@@ -56,7 +60,9 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess }) {
         setFormData({
           meetingName: '',
           meetingDate: today,
-          meetingNumber: ''
+          meetingNumber: '',
+          meetingLocation: '',
+          participants: ''
         });
         setActiveStep(0);
         setSelectedModes([]);
@@ -247,8 +253,82 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess }) {
         meetingName: formData.meetingName.trim(),
         meetingDate: formData.meetingDate,
         meetingNumber: parseInt(formData.meetingNumber),
+        meetingLocation: formData.meetingLocation.trim(),
+        participants: formData.participants.trim(),
         createdBy: loggedInStore?.name || loggedInStore?.target || 'Unknown'
       };
+      
+      // 회의 메인 화면 슬라이드 생성 (첫 번째 슬라이드로 자동 추가)
+      const mainSlide = {
+        slideId: `main-slide-${Date.now()}`,
+        type: 'main',
+        order: 0, // 첫 번째 슬라이드
+        title: formData.meetingName.trim(),
+        meetingDate: formData.meetingDate,
+        meetingNumber: parseInt(formData.meetingNumber),
+        meetingLocation: formData.meetingLocation.trim(),
+        participants: formData.participants.trim(),
+        createdBy: loggedInStore?.name || loggedInStore?.target || 'Unknown'
+      };
+      
+      // 목차 슬라이드 생성 (두 번째 슬라이드로 자동 추가)
+      // mode-tab 타입의 슬라이드들을 모드별로 그룹화
+      const modeGroups = {};
+      slides.forEach(slide => {
+        if (slide.type === 'mode-tab' && slide.mode) {
+          const modeKey = slide.mode;
+          if (!modeGroups[modeKey]) {
+            modeGroups[modeKey] = [];
+          }
+          modeGroups[modeKey].push(slide);
+        } else if (slide.type === 'mode-only' && slide.mode) {
+          const modeKey = slide.mode;
+          if (!modeGroups[modeKey]) {
+            modeGroups[modeKey] = [];
+          }
+          modeGroups[modeKey].push(slide);
+        } else if (slide.type === 'custom') {
+          // 커스텀 슬라이드도 별도로 표시
+          if (!modeGroups['custom']) {
+            modeGroups['custom'] = [];
+          }
+          modeGroups['custom'].push(slide);
+        }
+      });
+      
+      const tocSlide = {
+        slideId: `toc-slide-${Date.now()}`,
+        type: 'toc',
+        order: 1, // 두 번째 슬라이드
+        title: '회의 목차',
+        meetingName: formData.meetingName.trim(),
+        modeGroups: modeGroups, // 모드별 그룹화된 슬라이드 정보
+        createdBy: loggedInStore?.name || loggedInStore?.target || 'Unknown'
+      };
+      
+      // 기존 슬라이드들의 order를 2씩 증가시키고 메인 슬라이드와 목차 슬라이드를 맨 앞에 추가
+      const updatedSlides = slides.map(slide => ({
+        ...slide,
+        order: slide.order + 2
+      }));
+      
+      // 엔딩 슬라이드 생성 (마지막 슬라이드로 자동 추가)
+      const maxOrder = updatedSlides.length > 0 
+        ? Math.max(...updatedSlides.map(s => s.order))
+        : 1;
+      
+      const endingSlide = {
+        slideId: `ending-slide-${Date.now()}`,
+        type: 'ending',
+        order: maxOrder + 1, // 마지막 슬라이드
+        title: '회의 종료',
+        meetingName: formData.meetingName.trim(),
+        meetingDate: formData.meetingDate,
+        meetingNumber: parseInt(formData.meetingNumber),
+        createdBy: loggedInStore?.name || loggedInStore?.target || 'Unknown'
+      };
+      
+      const finalSlides = [mainSlide, tocSlide, ...updatedSlides, endingSlide];
 
       if (meeting) {
         // 수정: 회의 정보만 업데이트
@@ -261,8 +341,8 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess }) {
         const result = await api.createMeeting(meetingData);
         const createdMeeting = result.meeting;
         
-        // 설정 저장
-        await api.saveMeetingConfig(createdMeeting.meetingId, { slides });
+        // 설정 저장 (메인 슬라이드 포함)
+        await api.saveMeetingConfig(createdMeeting.meetingId, { slides: finalSlides });
         
         // 회의 상태를 capturing으로 변경
         await api.updateMeeting(createdMeeting.meetingId, {
@@ -271,7 +351,7 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess }) {
 
         if (onSuccess) {
           // 생성된 회의 정보와 슬라이드를 전달 (캡처 시작을 위해)
-          onSuccess({ ...createdMeeting, slides });
+          onSuccess({ ...createdMeeting, slides: finalSlides });
         }
       }
     } catch (err) {
@@ -384,6 +464,30 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess }) {
                 margin="normal"
                 required
                 inputProps={{ min: 1 }}
+              />
+
+              <TextField
+                fullWidth
+                label="회의 장소"
+                value={formData.meetingLocation}
+                onChange={handleChange('meetingLocation')}
+                error={!!errors.meetingLocation}
+                helperText={errors.meetingLocation}
+                margin="normal"
+                placeholder="예: 본사 회의실, 온라인 등"
+              />
+
+              <TextField
+                fullWidth
+                label="참석자"
+                value={formData.participants}
+                onChange={handleChange('participants')}
+                error={!!errors.participants}
+                helperText={errors.participants || '참석자 이름을 쉼표로 구분하여 입력하세요'}
+                margin="normal"
+                placeholder="예: 홍길동, 김철수, 이영희"
+                multiline
+                rows={3}
               />
             </Box>
           )}
