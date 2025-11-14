@@ -137,8 +137,9 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
       console.log(`✅ [MeetingCaptureManager] 슬라이드 ${index + 1} 업로드 완료:`, uploadResult.imageUrl);
 
       // 현재 상태를 기반으로 슬라이드 배열 업데이트 (이전 슬라이드 정보 유지)
+      let updatedSlides;
       setSlidesState(prevSlides => {
-        const updatedSlides = prevSlides.map((s, i) => 
+        updatedSlides = prevSlides.map((s, i) => 
           i === index ? {
             ...s,
             imageUrl: uploadResult.imageUrl,
@@ -156,21 +157,19 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
           hasUrl: !!s.imageUrl
         })));
         
-        // 전체 슬라이드 배열을 한 번에 저장 (이전 슬라이드 URL 유지)
-        // setState 외부에서 저장하여 최신 상태 보장
-        setTimeout(async () => {
-          try {
-            await api.saveMeetingConfig(meeting.meetingId, {
-              slides: updatedSlides
-            });
-            console.log(`✅ [MeetingCaptureManager] 슬라이드 ${index + 1} 저장 완료`);
-          } catch (err) {
-            console.error(`❌ [MeetingCaptureManager] 슬라이드 ${index + 1} 저장 실패:`, err);
-          }
-        }, 0);
-        
         return updatedSlides;
       });
+      
+      // 전체 슬라이드 배열을 한 번에 저장 (이전 슬라이드 URL 유지)
+      // setState 외부에서 저장하여 최신 상태 보장
+      try {
+        await api.saveMeetingConfig(meeting.meetingId, {
+          slides: updatedSlides
+        });
+        console.log(`✅ [MeetingCaptureManager] 슬라이드 ${index + 1} 저장 완료`);
+      } catch (err) {
+        console.error(`❌ [MeetingCaptureManager] 슬라이드 ${index + 1} 저장 실패:`, err);
+      }
 
       setCompleted(prev => prev + 1);
       
