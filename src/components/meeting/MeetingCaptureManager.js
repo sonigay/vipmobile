@@ -15,15 +15,20 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
   const [capturing, setCapturing] = useState(false);
   const slideRefs = useRef([]);
   const [slideReady, setSlideReady] = useState(false);
+  const [slidesState, setSlidesState] = useState(slides); // 슬라이드 상태 관리
 
   useEffect(() => {
-    if (slides.length > 0 && !capturing) {
-      startCapture();
-    }
+    setSlidesState(slides);
   }, [slides]);
 
+  useEffect(() => {
+    if (slidesState.length > 0 && !capturing) {
+      startCapture();
+    }
+  }, [slidesState]);
+
   const startCapture = async () => {
-    if (slides.length === 0) {
+    if (slidesState.length === 0) {
       if (onComplete) onComplete();
       return;
     }
@@ -38,7 +43,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
   };
 
   const captureNextSlide = async (index) => {
-    if (index >= slides.length) {
+    if (index >= slidesState.length) {
       // 모든 슬라이드 캡처 완료
       setCapturing(false);
       
@@ -87,24 +92,29 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
     await waitForReady();
 
     try {
-      // 현재 슬라이드 DOM 요소 찾기
-      const slideElement = document.querySelector(`[data-slide-id="${slides[index].slideId}"]`);
+      // 현재 슬라이드 DOM 요소 찾기 (data-slide-id 속성을 가진 요소만)
+      const slideElement = document.querySelector(`[data-slide-id="${slidesState[index].slideId}"]`);
       
       if (!slideElement) {
         throw new Error('슬라이드 요소를 찾을 수 없습니다.');
       }
 
-      // 캡처
+      // 캡처 (data-slide-id를 가진 요소 내부의 콘텐츠만 캡처)
+      // 헤더와 탭 네비게이션은 이미 숨겨져 있으므로, slideElement 자체를 캡처
       const blob = await captureElement(slideElement, {
         scale: 2,
         useCORS: true,
-        backgroundColor: slides[index].type === 'custom' 
-          ? (slides[index].backgroundColor || '#ffffff')
-          : '#ffffff'
+        backgroundColor: slidesState[index].type === 'custom' 
+          ? (slidesState[index].backgroundColor || '#ffffff')
+          : '#ffffff',
+        // 스크롤 영역 전체 캡처
+        scrollX: 0,
+        scrollY: 0
       });
 
       // Discord에 업로드
       const filename = generateImageFilename(meeting.meetingId, index + 1);
+      console.log(`📸 [MeetingCaptureManager] 슬라이드 ${index + 1} 캡처 완료, 업로드 시작`);
       const formData = new FormData();
       formData.append('image', blob, filename);
       formData.append('meetingId', meeting.meetingId);
@@ -121,18 +131,25 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
       }
 
       const uploadResult = await uploadResponse.json();
+      console.log(`✅ [MeetingCaptureManager] 슬라이드 ${index + 1} 업로드 완료:`, uploadResult.imageUrl);
 
-      // 구글시트에 URL 저장
-      const updatedSlide = {
-        ...slides[index],
-        imageUrl: uploadResult.imageUrl,
-        capturedAt: new Date().toISOString(),
-        discordPostId: uploadResult.postId || '',
-        discordThreadId: uploadResult.threadId || ''
-      };
-
+      // 슬라이드 배열 업데이트
+      const updatedSlides = slidesState.map((s, i) => 
+        i === index ? {
+          ...s,
+          imageUrl: uploadResult.imageUrl,
+          capturedAt: new Date().toISOString(),
+          discordPostId: uploadResult.postId || '',
+          discordThreadId: uploadResult.threadId || ''
+        } : s
+      );
+      
+      // 상태 업데이트
+      setSlidesState(updatedSlides);
+      
+      // 전체 슬라이드 배열을 한 번에 저장 (이전 슬라이드 URL 유지)
       await api.saveMeetingConfig(meeting.meetingId, {
-        slides: slides.map((s, i) => i === index ? updatedSlide : s)
+        slides: updatedSlides
       });
 
       setCompleted(prev => prev + 1);
@@ -171,17 +188,17 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
     <>
       <CaptureProgress
         open={capturing}
-        total={slides.length}
+        total={slidesState.length}
         current={currentSlideIndex + 1}
         completed={completed}
         failed={failed}
         onCancel={handleCancel}
       />
 
-      {slides[currentSlideIndex] && (
+      {slidesState[currentSlideIndex] && (
         <SlideRenderer
-          key={slides[currentSlideIndex].slideId}
-          slide={slides[currentSlideIndex]}
+          key={slidesState[currentSlideIndex].slideId}
+          slide={slidesState[currentSlideIndex]}
           loggedInStore={loggedInStore}
           onReady={handleSlideReady}
         />

@@ -292,8 +292,8 @@ function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes, pres
 }
 
 // 채권장표 탭 컴포넌트
-function BondChartTab({ loggedInStore }) {
-  const [activeSubTab, setActiveSubTab] = useState(0);
+function BondChartTab({ loggedInStore, initialSubTab = 0 }) {
+  const [activeSubTab, setActiveSubTab] = useState(initialSubTab);
 
   const subTabs = [
     { label: '연체채권', icon: <WarningIcon /> },

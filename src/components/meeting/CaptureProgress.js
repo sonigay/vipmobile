@@ -23,7 +23,7 @@ function CaptureProgress({ open, total, current, completed, failed, onCancel }) 
   const progress = total > 0 ? (completed / total) * 100 : 0;
 
   return (
-    <Dialog open={open} maxWidth="sm" fullWidth>
+    <Dialog open={open} maxWidth="sm" fullWidth sx={{ zIndex: 10000 }}>
       <DialogTitle>
         화면 캡처 진행 중...
       </DialogTitle>

@@ -87,25 +87,27 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
       }
       
       return (
-        <Box
-          sx={{
-            width: '100vw',
-            height: '100vh',
-            position: 'relative',
-            overflow: 'auto',
-            backgroundColor: '#ffffff'
-          }}
-        >
-          <ChartMode
-            loggedInStore={loggedInStore}
-            onLogout={() => {}}
-            onModeChange={() => {}}
-            availableModes={[]}
-            presentationMode={true}
-            initialTab={tabIndex >= 0 ? tabIndex : 0}
-            initialSubTab={slide.subTab ? subTabIndex : undefined}
-          />
-        </Box>
+      <Box
+        sx={{
+          width: '100vw',
+          height: '100vh',
+          position: 'relative',
+          overflow: 'auto',
+          backgroundColor: '#ffffff',
+          '& .MuiAppBar-root': { display: 'none' }, // 헤더 숨기기
+          '& .MuiTabs-root': { display: 'none' } // 탭 네비게이션 숨기기
+        }}
+      >
+        <ChartMode
+          loggedInStore={loggedInStore}
+          onLogout={() => {}}
+          onModeChange={() => {}}
+          availableModes={[]}
+          presentationMode={true}
+          initialTab={tabIndex >= 0 ? tabIndex : 0}
+          initialSubTab={slide.subTab ? subTabIndex : undefined}
+        />
+      </Box>
       );
     }
 
