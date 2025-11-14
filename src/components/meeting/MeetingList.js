@@ -22,15 +22,7 @@ import {
   Delete as DeleteIcon,
   PlayArrow as PlayArrowIcon
 } from '@mui/icons-material';
-// api import - 안전한 방식
-import * as apiModule from '../../api';
-const api = apiModule.api || apiModule.default || apiModule;
-
-// 디버깅용
-if (typeof window !== 'undefined') {
-  window.__meetingApiModule = apiModule;
-  window.__meetingApi = api;
-}
+import { api } from '../../api';
 
 const formatDateTime = (value) => {
   if (!value) return '-';
@@ -82,11 +74,6 @@ function MeetingList({ onAdd, onEdit, onDelete, onSelect, refreshTrigger }) {
     setLoading(true);
     setError(null);
     try {
-      // api 객체 확인
-      if (!api || typeof api.getMeetings !== 'function') {
-        throw new Error('API 함수를 찾을 수 없습니다.');
-      }
-      
       const response = await api.getMeetings();
       if (response && response.success === false) {
         throw new Error(response.error || '회의 목록 조회 실패');

@@ -17,9 +17,7 @@ import ModeSelector from './ModeSelector';
 import SlideOrderEditor from './SlideOrderEditor';
 import CustomSlideEditor from './CustomSlideEditor';
 import MeetingCaptureManager from './MeetingCaptureManager';
-// api import - 안전한 방식
-import * as apiModule from '../../api';
-const api = apiModule.api || apiModule.default || apiModule;
+import { api } from '../../api';
 import { getModeConfig } from '../../config/modeConfig';
 import { getAvailableTabsForMode } from '../../config/modeTabConfig';
 

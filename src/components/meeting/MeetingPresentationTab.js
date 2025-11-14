@@ -17,9 +17,7 @@ import {
 import {
   PlayArrow as PlayArrowIcon
 } from '@mui/icons-material';
-// api import - 안전한 방식
-import * as apiModule from '../../api';
-const api = apiModule.api || apiModule.default || apiModule;
+import { api } from '../../api';
 import ImageSlideViewer from './ImageSlideViewer';
 
 const formatDateTime = (value) => {
@@ -53,11 +51,6 @@ function MeetingPresentationTab({ loggedInStore }) {
     setLoading(true);
     setError(null);
     try {
-      // api 객체 확인
-      if (!api || typeof api.getMeetings !== 'function') {
-        throw new Error('API 함수를 찾을 수 없습니다.');
-      }
-      
       const response = await api.getMeetings();
       if (response && response.success === false) {
         throw new Error(response.error || '회의 목록 조회 실패');

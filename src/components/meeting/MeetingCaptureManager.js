@@ -1,8 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { captureElement, generateImageFilename } from '../../utils/screenCapture';
-// api import - 안전한 방식
-import * as apiModule from '../../api';
-const api = apiModule.api || apiModule.default || apiModule;
+import { api } from '../../api';
 import CaptureProgress from './CaptureProgress';
 import SlideRenderer from './SlideRenderer';
 

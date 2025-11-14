@@ -15,9 +15,7 @@ import {
   Step,
   StepLabel
 } from '@mui/material';
-// api import - 안전한 방식
-import * as apiModule from '../../api';
-const api = apiModule.api || apiModule.default || apiModule;
+import { api } from '../../api';
 import ModeSelector from './ModeSelector';
 import SlideOrderEditor from './SlideOrderEditor';
 import CustomSlideEditor from './CustomSlideEditor';
