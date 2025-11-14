@@ -1088,13 +1088,16 @@ export const api = {
   },
 
   // 커스텀 슬라이드 파일 업로드 (이미지, Excel, PPT 지원)
-  uploadCustomSlideFile: async function uploadCustomSlideFile(file, meetingDate, fileType) {
+  uploadCustomSlideFile: async function uploadCustomSlideFile(file, meetingDate, fileType, meetingNumber) {
     try {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('meetingDate', meetingDate || new Date().toISOString().split('T')[0]);
       formData.append('fileType', fileType || 'image');
       formData.append('slideOrder', 0); // 커스텀 슬라이드는 임시로 0 사용
+      if (meetingNumber) {
+        formData.append('meetingNumber', meetingNumber);
+      }
       
       // 임시 meetingId 사용 (실제 회의 생성 전)
       const tempMeetingId = 'temp-custom-slide';

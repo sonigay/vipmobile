@@ -148,7 +148,7 @@ function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes, pres
     {
       label: '마감장표',
       icon: <ReceiptIcon />,
-      component: <ClosingChartTab />,
+      component: <ClosingChartTab initialSubTab={initialSubTab} presentationMode={presentationMode} />,
       hasPermission: true // 마감장표 탭은 모든 사용자에게 표시
     },
     {
@@ -176,114 +176,120 @@ function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes, pres
 
   return (
     <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <AppBar position="static">
-        <Toolbar>
-          <Button color="inherit" onClick={handleBackToMain} sx={{ mr: 2 }}>
-            ← 뒤로가기
-          </Button>
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            장표 모드
-          </Typography>
-          
-          {/* 모드 전환 버튼 - 2개 이상 권한이 있는 사용자에게만 표시 */}
-          {onModeChange && availableModes && availableModes.length > 1 && (
-            <Button
-              color="inherit"
-              onClick={() => {
-                console.log('ChartMode 모드 전환 버튼 클릭됨');
-                console.log('onModeChange 존재:', !!onModeChange);
-                console.log('availableModes:', availableModes);
-                onModeChange();
-              }}
-              startIcon={<SwapHorizIcon />}
-              sx={{ 
-                mr: 2,
-                backgroundColor: 'rgba(255,255,255,0.1)',
-                '&:hover': {
-                  backgroundColor: 'rgba(255,255,255,0.2)'
-                }
-              }}
-            >
-              모드 변경
-            </Button>
-          )}
-          
-          {/* 업데이트 확인 버튼 */}
-          <Button
-            color="inherit"
-            startIcon={<UpdateIcon />}
-            onClick={() => setShowUpdatePopup(true)}
-            sx={{ 
-              mr: 2,
-              backgroundColor: 'rgba(255,255,255,0.1)',
-              '&:hover': {
-                backgroundColor: 'rgba(255,255,255,0.2)'
-              }
-            }}
-          >
-            업데이트 확인
-          </Button>
-          
-          <Button color="inherit" onClick={onLogout}>
-            로그아웃
-          </Button>
-        </Toolbar>
-      </AppBar>
-
-      {/* 탭 네비게이션 */}
-      <Box sx={{ borderBottom: 1, borderColor: 'divider', backgroundColor: 'white' }}>
-        <Container maxWidth={false} sx={{ px: 2 }}>
-          <Tabs 
-            value={activeTab} 
-            onChange={handleTabChange}
-            variant="scrollable"
-            scrollButtons="auto"
-            sx={{
-              '& .MuiTab-root': {
-                minHeight: 64,
-                fontSize: '1rem',
-                fontWeight: 'bold',
-                color: '#666',
-                '&.Mui-selected': {
-                  color: '#f5576c',
-                  fontWeight: 'bold'
-                }
-              },
-              '& .MuiTabs-indicator': {
-                backgroundColor: '#f5576c',
-                height: 3
-              }
-            }}
-          >
-            {availableTabs.map((tab, index) => (
-              <Tab
-                key={index}
-                label={tab.label}
-                icon={tab.icon}
-                iconPosition="start"
+      {!presentationMode && (
+        <>
+          <AppBar position="static">
+            <Toolbar>
+              <Button color="inherit" onClick={handleBackToMain} sx={{ mr: 2 }}>
+                ← 뒤로가기
+              </Button>
+              <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+                장표 모드
+              </Typography>
+              
+              {/* 모드 전환 버튼 - 2개 이상 권한이 있는 사용자에게만 표시 */}
+              {onModeChange && availableModes && availableModes.length > 1 && (
+                <Button
+                  color="inherit"
+                  onClick={() => {
+                    console.log('ChartMode 모드 전환 버튼 클릭됨');
+                    console.log('onModeChange 존재:', !!onModeChange);
+                    console.log('availableModes:', availableModes);
+                    onModeChange();
+                  }}
+                  startIcon={<SwapHorizIcon />}
+                  sx={{ 
+                    mr: 2,
+                    backgroundColor: 'rgba(255,255,255,0.1)',
+                    '&:hover': {
+                      backgroundColor: 'rgba(255,255,255,0.2)'
+                    }
+                  }}
+                >
+                  모드 변경
+                </Button>
+              )}
+              
+              {/* 업데이트 확인 버튼 */}
+              <Button
+                color="inherit"
+                startIcon={<UpdateIcon />}
+                onClick={() => setShowUpdatePopup(true)}
                 sx={{ 
-                  textTransform: 'none',
-                  minHeight: 64,
-                  py: 1
+                  mr: 2,
+                  backgroundColor: 'rgba(255,255,255,0.1)',
+                  '&:hover': {
+                    backgroundColor: 'rgba(255,255,255,0.2)'
+                  }
                 }}
-              />
-            ))}
-          </Tabs>
-        </Container>
-      </Box>
+              >
+                업데이트 확인
+              </Button>
+              
+              <Button color="inherit" onClick={onLogout}>
+                로그아웃
+              </Button>
+            </Toolbar>
+          </AppBar>
+
+          {/* 탭 네비게이션 */}
+          <Box sx={{ borderBottom: 1, borderColor: 'divider', backgroundColor: 'white' }}>
+            <Container maxWidth={false} sx={{ px: 2 }}>
+              <Tabs 
+                value={activeTab} 
+                onChange={handleTabChange}
+                variant="scrollable"
+                scrollButtons="auto"
+                sx={{
+                  '& .MuiTab-root': {
+                    minHeight: 64,
+                    fontSize: '1rem',
+                    fontWeight: 'bold',
+                    color: '#666',
+                    '&.Mui-selected': {
+                      color: '#f5576c',
+                      fontWeight: 'bold'
+                    }
+                  },
+                  '& .MuiTabs-indicator': {
+                    backgroundColor: '#f5576c',
+                    height: 3
+                  }
+                }}
+              >
+                {availableTabs.map((tab, index) => (
+                  <Tab
+                    key={index}
+                    label={tab.label}
+                    icon={tab.icon}
+                    iconPosition="start"
+                    sx={{ 
+                      textTransform: 'none',
+                      minHeight: 64,
+                      py: 1
+                    }}
+                  />
+                ))}
+              </Tabs>
+            </Container>
+          </Box>
+        </>
+      )}
       
       {/* 탭 컨텐츠 */}
-      <Container maxWidth={false} sx={{ flex: 1, py: 3, overflow: 'auto', px: 2 }}>
+      <Container maxWidth={false} sx={{ flex: 1, py: presentationMode ? 0 : 3, overflow: 'auto', px: presentationMode ? 0 : 2 }}>
         {/* 업데이트 팝업 */}
-        <AppUpdatePopup
-          open={showUpdatePopup}
-          onClose={() => setShowUpdatePopup(false)}
-          mode="chart"
-          loggedInStore={loggedInStore}
-          onUpdateAdded={() => {
-            console.log('장표모드 새 업데이트가 추가되었습니다.');
-          }}
-        />
+        {!presentationMode && (
+          <AppUpdatePopup
+            open={showUpdatePopup}
+            onClose={() => setShowUpdatePopup(false)}
+            mode="chart"
+            loggedInStore={loggedInStore}
+            onUpdateAdded={() => {
+              console.log('장표모드 새 업데이트가 추가되었습니다.');
+            }}
+          />
+        )}
         
         {availableTabs[activeTab].component}
       </Container>
@@ -1820,8 +1826,16 @@ function StructurePolicyTab() {
 }
 
 // 마감장표 탭 컴포넌트
-function ClosingChartTab() {
-  const [activeSubTab, setActiveSubTab] = useState(0);
+function ClosingChartTab({ initialSubTab = 0, presentationMode = false }) {
+  const [activeSubTab, setActiveSubTab] = useState(initialSubTab);
+  
+  // initialSubTab이 변경되면 activeSubTab 업데이트
+  React.useEffect(() => {
+    if (initialSubTab !== undefined && initialSubTab !== activeSubTab) {
+      console.log(`🔄 [ClosingChartTab] initialSubTab 변경: ${activeSubTab} -> ${initialSubTab}`);
+      setActiveSubTab(initialSubTab);
+    }
+  }, [initialSubTab]);
   
   const handleSubTabChange = (event, newValue) => {
     setActiveSubTab(newValue);
@@ -1840,44 +1854,46 @@ function ClosingChartTab() {
 
   return (
     <Box>
-      {/* 서브 탭 네비게이션 */}
-      <Box sx={{ borderBottom: 1, borderColor: 'divider', backgroundColor: 'white' }}>
-        <Tabs 
-          value={activeSubTab} 
-          onChange={handleSubTabChange}
-          sx={{
-            '& .MuiTab-root': {
-              minHeight: 48,
-              fontSize: '0.95rem',
-              fontWeight: 'bold',
-              color: '#666',
-              '&.Mui-selected': {
-                color: '#1976d2',
-                fontWeight: 'bold'
-              }
-            },
-            '& .MuiTabs-indicator': {
-              backgroundColor: '#1976d2',
-              height: 3
-            }
-          }}
-        >
-          {subTabs.map((tab, index) => (
-            <Tab
-              key={index}
-              label={tab.label}
-              sx={{ 
-                textTransform: 'none',
+      {/* 서브 탭 네비게이션 - presentation mode에서는 숨김 */}
+      {!presentationMode && (
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', backgroundColor: 'white' }}>
+          <Tabs 
+            value={activeSubTab} 
+            onChange={handleSubTabChange}
+            sx={{
+              '& .MuiTab-root': {
                 minHeight: 48,
-                py: 1
-              }}
-            />
-          ))}
-        </Tabs>
-      </Box>
+                fontSize: '0.95rem',
+                fontWeight: 'bold',
+                color: '#666',
+                '&.Mui-selected': {
+                  color: '#1976d2',
+                  fontWeight: 'bold'
+                }
+              },
+              '& .MuiTabs-indicator': {
+                backgroundColor: '#1976d2',
+                height: 3
+              }
+            }}
+          >
+            {subTabs.map((tab, index) => (
+              <Tab
+                key={index}
+                label={tab.label}
+                sx={{ 
+                  textTransform: 'none',
+                  minHeight: 48,
+                  py: 1
+                }}
+              />
+            ))}
+          </Tabs>
+        </Box>
+      )}
       
       {/* 서브 탭 컨텐츠 */}
-      <Box sx={{ pt: 2 }}>
+      <Box sx={{ pt: presentationMode ? 0 : 2 }}>
         {subTabs[activeSubTab].component}
       </Box>
     </Box>
@@ -1912,95 +1928,128 @@ function TotalClosingTab() {
 
   // 데이터가 로드되고 실제 테이블이 렌더링되었는지 확인 (강화된 버전)
   React.useEffect(() => {
-    if (data && !loading && containerRef.current) {
-      // 데이터가 있는지 확인
-      const hasData = data.csSummary || 
-                      (data.codeData && data.codeData.length > 0) ||
-                      (data.officeData && data.officeData.length > 0) ||
-                      (data.departmentData && data.departmentData.length > 0) ||
-                      (data.agentData && data.agentData.length > 0);
+    // 로딩 중이거나 데이터가 없으면 즉시 false
+    if (loading || !data) {
+      console.log('🔄 [TotalClosingTab] 로딩 중이거나 데이터 없음, data-loaded="false" 설정');
+      setDataRendered(false);
+      return;
+    }
+    
+    if (!containerRef.current) {
+      console.log('⚠️ [TotalClosingTab] containerRef가 없음');
+      return;
+    }
+    
+    // 데이터가 있는지 확인
+    const hasData = data.csSummary || 
+                    (data.codeData && data.codeData.length > 0) ||
+                    (data.officeData && data.officeData.length > 0) ||
+                    (data.departmentData && data.departmentData.length > 0) ||
+                    (data.agentData && data.agentData.length > 0);
+    
+    if (!hasData) {
+      console.log('⚠️ [TotalClosingTab] 데이터가 없습니다.');
+      setDataRendered(false);
+      return;
+    }
+    
+    console.log('🔍 [TotalClosingTab] 데이터 로드 완료, 렌더링 확인 시작');
+    
+    // 여러 번 확인하여 확실하게 데이터가 렌더링되었는지 확인
+    let checkCount = 0;
+    const maxChecks = 40; // 최대 20초 (40 * 500ms) - 더 긴 대기
+    let stableCount = 0;
+    const requiredStableCount = 10; // 5초 동안 안정적이어야 함 (10 * 500ms)
+    
+    const checkRender = () => {
+      checkCount++;
       
-      if (!hasData) {
-        console.log('⚠️ [TotalClosingTab] 데이터가 없습니다.');
-        setDataRendered(false);
-        return;
-      }
+      // 실제 테이블 행이 있는지 확인 (최소 3개 이상의 데이터 행 - 로딩 화면과 구분)
+      const tableRows = containerRef.current.querySelectorAll('table tbody tr, .MuiTableBody-root tr, tbody tr');
+      const hasTableRows = tableRows.length >= 3; // 최소 3개 행 필요
       
-      // 여러 번 확인하여 확실하게 데이터가 렌더링되었는지 확인
-      let checkCount = 0;
-      const maxChecks = 20; // 최대 10초 (20 * 500ms)
+      // Paper 컴포넌트가 있고 내용이 있는지 확인
+      const hasPaper = containerRef.current.querySelector('.MuiPaper-root') !== null;
       
-      const checkRender = () => {
-        checkCount++;
+      // 로딩 인디케이터가 없는지 확인
+      const loadingIndicators = containerRef.current.querySelectorAll('.MuiCircularProgress-root, .MuiLinearProgress-root, [class*="loading"], [class*="Loading"]');
+      const hasNoLoadingIndicator = loadingIndicators.length === 0;
+      
+      // 프로그레스 바가 없는지 확인
+      const progressBars = containerRef.current.querySelectorAll('.MuiLinearProgress-root, [class*="progress"]');
+      const hasNoProgressBar = progressBars.length === 0;
+      
+      // 로딩 텍스트가 없는지 확인
+      const allText = containerRef.current.textContent || '';
+      const hasNoLoadingText = !allText.includes('로딩') && 
+                               !allText.includes('불러오는 중') && 
+                               !allText.includes('데이터를 불러오는 중') &&
+                               !allText.includes('마감장표 데이터 로딩 중') &&
+                               !allText.includes('데이터 로딩 중');
+      
+      // 실제 데이터 텍스트가 있는지 확인 (숫자, 한글 등)
+      const hasDataText = /[\d가-힣]/.test(allText) && allText.length > 100; // 최소 100자 이상의 텍스트
+      
+      // 모든 조건이 만족되면 데이터 렌더링 완료
+      const isReady = (hasTableRows || (hasPaper && hasDataText)) && 
+                      hasNoLoadingIndicator && 
+                      hasNoProgressBar &&
+                      hasNoLoadingText &&
+                      hasDataText;
+      
+      if (isReady) {
+        stableCount++;
+        console.log(`✅ [TotalClosingTab] 안정적인 상태 확인 (${stableCount}/${requiredStableCount}, ${checkCount}번째 확인):`, {
+          hasTableRows: tableRows.length,
+          hasPaper,
+          hasNoLoadingIndicator,
+          hasNoProgressBar,
+          hasNoLoadingText,
+          hasDataText,
+          textLength: allText.length
+        });
         
-        // 실제 테이블 행이 있는지 확인 (최소 1개 이상의 데이터 행)
-        const tableRows = containerRef.current.querySelectorAll('table tbody tr, .MuiTableBody-root tr, tbody tr');
-        const hasTableRows = tableRows.length > 0;
+        // 연속으로 안정적인 상태가 5초 이상 유지되면 완료
+        if (stableCount >= requiredStableCount) {
+          console.log('✅ [TotalClosingTab] 최종 확인 완료 (5초 이상 안정적), data-loaded="true" 설정');
+          setDataRendered(true);
+          return;
+        }
+      } else {
+        // 안정적이지 않으면 카운터 리셋
+        if (stableCount > 0) {
+          console.log(`⚠️ [TotalClosingTab] 안정적인 상태가 깨짐, 카운터 리셋 (이전: ${stableCount})`);
+          stableCount = 0;
+        }
         
-        // Paper 컴포넌트가 있는지 확인
-        const hasPaper = containerRef.current.querySelector('.MuiPaper-root') !== null;
-        
-        // 로딩 인디케이터가 없는지 확인
-        const loadingIndicators = containerRef.current.querySelectorAll('.MuiCircularProgress-root, .MuiLinearProgress-root, [class*="loading"], [class*="Loading"]');
-        const hasNoLoadingIndicator = loadingIndicators.length === 0;
-        
-        // 로딩 텍스트가 없는지 확인
-        const allText = containerRef.current.textContent || '';
-        const hasNoLoadingText = !allText.includes('로딩') && 
-                                 !allText.includes('불러오는 중') && 
-                                 !allText.includes('데이터를 불러오는 중') &&
-                                 !allText.includes('마감장표 데이터 로딩 중');
-        
-        // 모든 조건이 만족되면 데이터 렌더링 완료
-        const isReady = (hasTableRows || hasPaper) && hasNoLoadingIndicator && hasNoLoadingText;
-        
-        if (isReady) {
-          console.log(`✅ [TotalClosingTab] 실제 데이터 렌더링 완료 확인 (${checkCount}번째 확인):`, {
+        if (checkCount < maxChecks) {
+          console.log(`🔍 [TotalClosingTab] 데이터 렌더링 확인 중 (${checkCount}/${maxChecks}):`, {
             hasTableRows: tableRows.length,
             hasPaper,
             hasNoLoadingIndicator,
-            hasNoLoadingText
+            hasNoProgressBar,
+            hasNoLoadingText,
+            hasDataText,
+            textLength: allText.length,
+            isReady: false
           });
-          
-          // 추가로 1초 더 대기하여 완전히 안정화
-          setTimeout(() => {
-            // 최종 확인
-            const finalTableRows = containerRef.current.querySelectorAll('table tbody tr, .MuiTableBody-root tr, tbody tr');
-            const finalHasTableRows = finalTableRows.length > 0;
-            const finalHasPaper = containerRef.current.querySelector('.MuiPaper-root') !== null;
-            const finalLoadingIndicators = containerRef.current.querySelectorAll('.MuiCircularProgress-root, .MuiLinearProgress-root');
-            
-            if ((finalHasTableRows || finalHasPaper) && finalLoadingIndicators.length === 0) {
-              console.log('✅ [TotalClosingTab] 최종 확인 완료, data-loaded="true" 설정');
-              setDataRendered(true);
-            } else {
-              console.warn('⚠️ [TotalClosingTab] 최종 확인 실패, 다시 확인 필요');
-              setDataRendered(false);
-            }
-          }, 1000);
+          setTimeout(checkRender, 500);
         } else {
-          if (checkCount < maxChecks) {
-            console.log(`🔍 [TotalClosingTab] 데이터 렌더링 확인 중 (${checkCount}/${maxChecks}):`, {
-              hasTableRows: tableRows.length,
-              hasPaper,
-              hasNoLoadingIndicator,
-              hasNoLoadingText,
-              isReady: false
-            });
-            setTimeout(checkRender, 500);
+          console.warn('⚠️ [TotalClosingTab] 최대 확인 횟수 도달, 강제로 data-loaded 설정');
+          // 최대 확인 횟수 도달 시에도 테이블 행이 있으면 설정
+          if (tableRows.length >= 3) {
+            setDataRendered(true);
           } else {
-            console.warn('⚠️ [TotalClosingTab] 최대 확인 횟수 도달, 강제로 data-loaded 설정');
-            setDataRendered(true); // 타임아웃 시에도 설정 (데이터는 있으므로)
+            console.error('❌ [TotalClosingTab] 테이블 행이 부족하여 data-loaded 설정 실패');
+            setDataRendered(false);
           }
         }
-      };
-      
-      // 첫 확인은 1초 후에 시작 (DOM 업데이트 시간 확보)
-      setTimeout(checkRender, 1000);
-    } else if (loading || !data) {
-      console.log('🔄 [TotalClosingTab] 로딩 중이거나 데이터 없음, data-loaded="false" 설정');
-      setDataRendered(false);
-    }
+      }
+    };
+    
+    // 첫 확인은 3초 후에 시작 (DOM 업데이트 시간 충분히 확보)
+    console.log('⏳ [TotalClosingTab] 3초 대기 후 렌더링 확인 시작');
+    setTimeout(checkRender, 3000);
   }, [data, loading]);
 
   // 데이터 로드
@@ -2028,6 +2077,26 @@ function TotalClosingTab() {
 
       const result = await response.json();
       console.log('📊 [TotalClosingTab] 데이터 로드 완료, data 설정 시작');
+      
+      // 데이터가 실제로 있는지 확인
+      const hasRealData = result.csSummary || 
+                          (result.codeData && result.codeData.length > 0) ||
+                          (result.officeData && result.officeData.length > 0) ||
+                          (result.departmentData && result.departmentData.length > 0) ||
+                          (result.agentData && result.agentData.length > 0);
+      
+      if (!hasRealData) {
+        console.warn('⚠️ [TotalClosingTab] 로드된 데이터에 실제 내용이 없습니다.');
+      } else {
+        console.log('✅ [TotalClosingTab] 실제 데이터 확인됨:', {
+          hasCsSummary: !!result.csSummary,
+          codeDataCount: result.codeData?.length || 0,
+          officeDataCount: result.officeData?.length || 0,
+          departmentDataCount: result.departmentData?.length || 0,
+          agentDataCount: result.agentData?.length || 0
+        });
+      }
+      
       setData(result);
       console.log('📊 [TotalClosingTab] data 상태 업데이트됨:', !!result);
       
@@ -2048,17 +2117,15 @@ function TotalClosingTab() {
       
       setLastUpdate(new Date());
       setProgress(100);
-
-      // 로딩 완료를 더 확실하게 하기 위해 약간의 지연 후 loading 상태 변경
+      clearInterval(progressInterval);
+      
+      // 데이터 설정 후 약간의 지연을 두고 loading을 false로 설정 (DOM 업데이트 시간 확보)
+      // 최소 2초 대기하여 데이터가 완전히 렌더링되도록 함
       setTimeout(() => {
-        console.log('📊 [TotalClosingTab] loading 상태를 false로 변경');
+        console.log('📊 [TotalClosingTab] loading 상태를 false로 변경 (2초 대기 완료)');
         setProgress(0);
         setLoading(false);
-        // 추가로 DOM 업데이트를 위한 짧은 지연
-        setTimeout(() => {
-          console.log('📊 [TotalClosingTab] DOM 업데이트 완료, data-loaded 속성 설정됨');
-        }, 100);
-      }, 500);
+      }, 2000);
 
     } catch (err) {
       setError(err.message);

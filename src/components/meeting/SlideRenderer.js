@@ -171,32 +171,51 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
           });
         }
         
-        // 최소 8초 대기 후 체크 시작 (데이터 로딩 시간 충분히 고려)
-        console.log('⏳ [SlideRenderer] 초기 대기 시작 (8초)');
+        // 최소 15초 대기 후 체크 시작 (데이터 로딩 시간 충분히 고려)
+        console.log('⏳ [SlideRenderer] 초기 대기 시작 (15초)');
         setTimeout(() => {
           console.log('⏳ [SlideRenderer] 데이터 로딩 체크 시작');
           checkLoading();
-        }, 8000);
+        }, 15000);
       });
     };
     
-    // 최소 10초 대기 후 데이터 로딩 완료 확인 (더 긴 대기 시간)
+    // 최소 15초 대기 후 데이터 로딩 완료 확인 (더 긴 대기 시간)
     const timer = setTimeout(async () => {
-      console.log('⏳ [SlideRenderer] 데이터 로딩 대기 시작 (10초 초기 대기 완료)');
+      console.log('⏳ [SlideRenderer] 데이터 로딩 대기 시작 (15초 초기 대기 완료)');
       await waitForDataLoad();
-      console.log('✅ [SlideRenderer] 데이터 로딩 완료 확인됨, 추가 안정화 대기 (5초)');
+      console.log('✅ [SlideRenderer] 데이터 로딩 완료 확인됨, 추가 안정화 대기 (10초)');
       
-      // 추가로 5초 대기하여 완전히 안정화 (10초에서 5초로 단축)
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      // 추가로 10초 대기하여 완전히 안정화
+      await new Promise(resolve => setTimeout(resolve, 10000));
       
       // 최종 확인: data-loaded 속성이 여전히 true인지 확인
       const finalCheck = containerRef.current?.querySelector('[data-loaded="true"]') !== null;
       const finalLoadingIndicators = containerRef.current?.querySelectorAll('.MuiCircularProgress-root, .MuiLinearProgress-root, [class*="loading"]');
-      const finalHasNoLoading = finalLoadingIndicators.length === 0;
+      const finalProgressBars = containerRef.current?.querySelectorAll('.MuiLinearProgress-root, [class*="progress"]');
+      const finalHasNoLoading = finalLoadingIndicators.length === 0 && finalProgressBars.length === 0;
       
-      if (!finalCheck || !finalHasNoLoading) {
-        console.warn('⚠️ [SlideRenderer] 최종 확인 실패, 추가 대기 (3초)');
-        await new Promise(resolve => setTimeout(resolve, 3000));
+      // 최종 테이블 행 확인 (최소 3개 이상)
+      const finalTableRows = containerRef.current?.querySelectorAll('table tbody tr, .MuiTableBody-root tr, tbody tr') || [];
+      const finalHasTableRows = finalTableRows.length >= 3;
+      
+      if (!finalCheck || !finalHasNoLoading || !finalHasTableRows) {
+        console.warn('⚠️ [SlideRenderer] 최종 확인 실패:', {
+          dataLoaded: finalCheck,
+          hasNoLoading: finalHasNoLoading,
+          hasTableRows: finalTableRows.length,
+          required: '>= 3'
+        });
+        console.warn('⚠️ [SlideRenderer] 추가 대기 (5초)');
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        
+        // 재확인
+        const retryCheck = containerRef.current?.querySelector('[data-loaded="true"]') !== null;
+        const retryTableRows = containerRef.current?.querySelectorAll('table tbody tr, .MuiTableBody-root tr, tbody tr') || [];
+        if (!retryCheck || retryTableRows.length < 3) {
+          console.error('❌ [SlideRenderer] 재확인 실패, 로딩 화면일 가능성 높음');
+          // 그래도 진행 (타임아웃 방지)
+        }
       }
       
       console.log('✅ [SlideRenderer] 안정화 완료, onReady 호출 준비');
@@ -209,8 +228,8 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
           console.log('✅ [SlideRenderer] onReady 콜백 호출');
           onReady();
         }
-      }, 1000);
-    }, 10000); // 8초에서 10초로 증가 // 최소 8초 대기
+      }, 2000); // 1초에서 2초로 증가
+    }, 15000); // 10초에서 15초로 증가
 
     return () => clearTimeout(timer);
   }, [slide, onReady]);
@@ -275,10 +294,24 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
       const tabIndex = availableTabs.findIndex(t => t.key === slide.tab);
       
       // 하부 탭이 있는 경우 처리
-      let subTabIndex = 0;
+      let subTabIndex = undefined;
       if (slide.subTab && availableTabs[tabIndex]?.subTabs) {
-        subTabIndex = availableTabs[tabIndex].subTabs.findIndex(st => st.key === slide.subTab);
+        const foundIndex = availableTabs[tabIndex].subTabs.findIndex(st => st.key === slide.subTab);
+        if (foundIndex >= 0) {
+          subTabIndex = foundIndex;
+          console.log(`🔍 [SlideRenderer] 하부 탭 인덱스 계산: ${slide.subTab} -> ${subTabIndex}`);
+        } else {
+          console.warn(`⚠️ [SlideRenderer] 하부 탭을 찾을 수 없음: ${slide.subTab}`);
+        }
       }
+      
+      console.log(`🔍 [SlideRenderer] ChartMode 렌더링:`, {
+        tab: slide.tab,
+        tabIndex,
+        subTab: slide.subTab,
+        subTabIndex,
+        slideId: slide.slideId
+      });
       
       return (
       <Box
@@ -299,7 +332,7 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
           availableModes={[]}
           presentationMode={true}
           initialTab={tabIndex >= 0 ? tabIndex : 0}
-          initialSubTab={slide.subTab ? subTabIndex : undefined}
+          initialSubTab={subTabIndex}
         />
       </Box>
       );

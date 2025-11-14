@@ -1047,7 +1047,7 @@ async function convertPPTToImages(pptBuffer, filename) {
 async function uploadCustomSlideFile(req, res) {
   try {
     const { meetingId } = req.params;
-    const { meetingDate, fileType } = req.body;
+    const { meetingDate, fileType, meetingNumber: bodyMeetingNumber } = req.body;
     
     if (!req.file) {
       return res.status(400).json({ success: false, error: '파일이 없습니다.' });
@@ -1096,11 +1096,11 @@ async function uploadCustomSlideFile(req, res) {
     }
     
     // 회의 정보 조회 (차수 가져오기)
-    let meetingNumber = null;
-    let actualMeetingId = meetingId;
+    let meetingNumber = bodyMeetingNumber ? parseInt(bodyMeetingNumber) : null;
     const isTempMeeting = meetingId === 'temp-custom-slide';
     
-    if (!isTempMeeting) {
+    // body에서 meetingNumber를 받지 못한 경우, Google Sheets에서 조회
+    if (!meetingNumber && !isTempMeeting) {
       try {
         const { sheets, SPREADSHEET_ID } = createSheetsClient();
         const sheetName = '회의목록';
@@ -1115,17 +1115,18 @@ async function uploadCustomSlideFile(req, res) {
         
         if (meetingRow && meetingRow[3]) {
           meetingNumber = parseInt(meetingRow[3]);
-          console.log(`📋 [uploadCustomSlideFile] 회의 차수 조회: ${meetingNumber}차`);
+          console.log(`📋 [uploadCustomSlideFile] 회의 차수 조회 (Google Sheets): ${meetingNumber}차`);
         } else {
           console.warn(`⚠️ [uploadCustomSlideFile] 회의 정보를 찾을 수 없습니다: ${meetingId}`);
         }
       } catch (meetingError) {
         console.warn('회의 정보 조회 실패:', meetingError);
       }
-    } else {
-      // 임시 회의인 경우, meetingDate를 사용하여 포스트 이름 생성
-      // 하지만 실제 회의가 생성되면 같은 포스트에 저장되어야 함
-      console.log('📋 [uploadCustomSlideFile] 임시 회의 (커스텀 슬라이드), meetingDate 사용:', meetingDate);
+    } else if (meetingNumber) {
+      console.log(`📋 [uploadCustomSlideFile] 회의 차수 (요청 본문에서): ${meetingNumber}차`);
+    } else if (isTempMeeting) {
+      // 임시 회의인 경우, meetingNumber가 없으면 null로 유지
+      console.log('📋 [uploadCustomSlideFile] 임시 회의 (커스텀 슬라이드), meetingNumber 없음');
     }
     
     // 각 이미지를 Discord에 업로드

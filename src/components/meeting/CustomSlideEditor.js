@@ -39,7 +39,7 @@ const getFileType = (file) => {
   return 'unknown';
 };
 
-function CustomSlideEditor({ open, onClose, onSave, slide, meetingDate }) {
+function CustomSlideEditor({ open, onClose, onSave, slide, meetingDate, meetingNumber }) {
   const [formData, setFormData] = useState({
     title: '',
     content: '',
@@ -112,7 +112,7 @@ function CustomSlideEditor({ open, onClose, onSave, slide, meetingDate }) {
       }
 
       // 파일 업로드 및 변환
-      const result = await api.uploadCustomSlideFile(file, meetingDate, fileType);
+      const result = await api.uploadCustomSlideFile(file, meetingDate, fileType, meetingNumber);
       
       if (result.success) {
         // 여러 이미지가 반환될 수 있음 (Excel/PPT의 경우)
