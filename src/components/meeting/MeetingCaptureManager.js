@@ -49,11 +49,13 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
       
       // 회의 상태를 completed로 업데이트
       try {
+        console.log(`🔄 [MeetingCaptureManager] 회의 상태를 completed로 업데이트 시작: ${meeting.meetingId}`);
         await api.updateMeeting(meeting.meetingId, {
           status: 'completed'
         });
+        console.log(`✅ [MeetingCaptureManager] 회의 상태 업데이트 완료`);
       } catch (err) {
-        console.error('회의 상태 업데이트 오류:', err);
+        console.error('❌ [MeetingCaptureManager] 회의 상태 업데이트 오류:', err);
       }
 
       if (onComplete) {

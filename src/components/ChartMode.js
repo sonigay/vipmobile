@@ -2080,7 +2080,7 @@ function TotalClosingTab() {
   }
 
   return (
-    <Box sx={{ p: 2 }}>
+    <Box sx={{ p: 2 }} data-loaded={data ? 'true' : 'false'} data-loading={loading ? 'true' : 'false'}>
       {/* 상단 컨트롤 */}
       <Paper sx={{ p: 2, mb: 2 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>

@@ -19,8 +19,69 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
     setLoading(true);
     setContentReady(false);
     
-    // 최소 2초 대기 (데이터 로딩 시간 고려)
-    const timer = setTimeout(() => {
+    // 데이터 로딩 완료 대기 함수
+    const waitForDataLoad = () => {
+      return new Promise((resolve) => {
+        let attempts = 0;
+        const maxAttempts = 50; // 최대 5초 (50 * 100ms)
+        
+        const checkLoading = () => {
+          attempts++;
+          
+          // 로딩 인디케이터가 있는지 확인
+          const loadingIndicators = containerRef.current?.querySelectorAll(
+            '.MuiCircularProgress-root, .MuiLinearProgress-root, [class*="loading"], [class*="Loading"], [class*="spinner"]'
+          );
+          
+          // 데이터 로딩 상태 확인 (data-loaded와 data-loading 속성)
+          const dataLoaded = containerRef.current?.querySelector('[data-loaded="true"]') !== null;
+          const dataLoading = containerRef.current?.querySelector('[data-loading="true"]') !== null;
+          
+          // "로딩 중", "불러오는 중" 등의 텍스트가 있는지 확인
+          const loadingTexts = containerRef.current?.querySelectorAll(
+            '*:not(script):not(style)'
+          );
+          let hasLoadingText = false;
+          if (loadingTexts) {
+            Array.from(loadingTexts).forEach(el => {
+              const text = el.textContent || '';
+              if (text.includes('로딩') || text.includes('불러오는 중') || text.includes('데이터를 불러오는 중')) {
+                hasLoadingText = true;
+              }
+            });
+          }
+          
+          // 로딩 인디케이터가 없고, data-loading이 false이고, data-loaded가 true이면 완료
+          const isLoading = (loadingIndicators && loadingIndicators.length > 0) || dataLoading || hasLoadingText;
+          
+          console.log(`🔍 [SlideRenderer] 데이터 로딩 확인 (${attempts}/${maxAttempts}):`, {
+            hasLoadingIndicator: loadingIndicators?.length > 0,
+            dataLoading,
+            dataLoaded,
+            hasLoadingText,
+            isLoading,
+            loadingCount: loadingIndicators?.length || 0
+          });
+          
+          if (!isLoading && (dataLoaded || attempts >= maxAttempts)) {
+            console.log('✅ [SlideRenderer] 데이터 로딩 완료');
+            resolve();
+          } else if (attempts >= maxAttempts) {
+            console.warn('⚠️ [SlideRenderer] 데이터 로딩 타임아웃, 강제 진행');
+            resolve(); // 타임아웃 시에도 진행
+          } else {
+            setTimeout(checkLoading, 100);
+          }
+        };
+        
+        // 최소 1초 대기 후 체크 시작
+        setTimeout(checkLoading, 1000);
+      });
+    };
+    
+    // 최소 2초 대기 후 데이터 로딩 완료 확인
+    const timer = setTimeout(async () => {
+      await waitForDataLoad();
       console.log('✅ [SlideRenderer] 로딩 완료, onReady 호출');
       setLoading(false);
       setContentReady(true);
