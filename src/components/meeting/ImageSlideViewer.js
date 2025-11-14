@@ -201,7 +201,7 @@ function ImageSlideViewer({ slides, onClose }) {
         </Typography>
       </Box>
 
-      {/* 이미지 표시 */}
+      {/* 이미지 표시 - 가로 기준 맞추고 세로 스크롤 */}
       {loading && !loadedImages.has(currentIndex) ? (
         <CircularProgress sx={{ color: 'white' }} />
       ) : error ? (
@@ -210,18 +210,31 @@ function ImageSlideViewer({ slides, onClose }) {
         </Alert>
       ) : (
         <Box
-          component="img"
-          src={currentSlide.imageUrl}
-          alt={`슬라이드 ${currentIndex + 1}`}
           sx={{
-            maxWidth: '100%',
-            maxHeight: '100%',
-            objectFit: 'contain',
-            opacity: loadedImages.has(currentIndex) ? 1 : 0.5,
-            transition: 'opacity 0.3s'
+            width: '100vw',
+            height: '100vh',
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'flex-start'
           }}
-          onError={() => setError('이미지를 불러올 수 없습니다.')}
-        />
+        >
+          <Box
+            component="img"
+            src={currentSlide.imageUrl}
+            alt={`슬라이드 ${currentIndex + 1}`}
+            sx={{
+              width: '100%',
+              height: 'auto',
+              objectFit: 'contain',
+              opacity: loadedImages.has(currentIndex) ? 1 : 0.5,
+              transition: 'opacity 0.3s',
+              display: 'block'
+            }}
+            onError={() => setError('이미지를 불러올 수 없습니다.')}
+          />
+        </Box>
       )}
     </Box>
   );

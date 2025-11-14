@@ -19,6 +19,10 @@ export async function captureElement(element, options = {}) {
     width: element.scrollWidth || window.innerWidth,
     height: element.scrollHeight || window.innerHeight,
     logging: false,
+    scrollX: 0,
+    scrollY: 0,
+    windowWidth: element.scrollWidth || window.innerWidth,
+    windowHeight: element.scrollHeight || window.innerHeight,
     ...options
   };
 

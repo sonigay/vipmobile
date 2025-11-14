@@ -271,27 +271,29 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
             flexDirection: 'column',
             justifyContent: 'space-between',
             alignItems: 'center',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            background: 'linear-gradient(135deg, #2c2c2c 0%, #1a1a1a 100%)',
             color: '#ffffff',
             p: { xs: 3, md: 6 },
             overflow: 'auto',
             position: 'relative'
           }}
         >
-          {/* 상단: 회사 로고 및 이름 - 흰색 배경 적용 */}
+          {/* 상단: 회사 로고 및 이름 - 상단 전체 하얀색 배경 */}
           <Box
             sx={{
               display: 'flex',
               flexDirection: 'row',
               alignItems: 'center',
-              justifyContent: 'center',
-              mb: { xs: 1.5, md: 2 },
+              justifyContent: 'flex-start',
               width: '100%',
-              backgroundColor: 'rgba(255, 255, 255, 0.95)',
-              borderRadius: 2,
+              backgroundColor: '#ffffff',
               px: { xs: 2, md: 3 },
               py: { xs: 1, md: 1.5 },
-              boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              zIndex: 10
             }}
           >
             <Box
@@ -301,7 +303,8 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
               sx={{
                 width: { xs: 40, md: 50 },
                 height: { xs: 40, md: 50 },
-                mr: { xs: 1, md: 1.5 }
+                mr: { xs: 1, md: 1.5 },
+                filter: 'brightness(0) invert(0)'
               }}
               onError={(e) => {
                 // 로고가 없으면 숨김
@@ -322,7 +325,7 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
           </Box>
 
           {/* 중앙: 회의 정보 */}
-          <Box sx={{ textAlign: 'center', maxWidth: 1000, width: '100%', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <Box sx={{ textAlign: 'center', maxWidth: 1000, width: '100%', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', pt: { xs: 10, md: 12 } }}>
             {/* 차수 배지 */}
             {slide.meetingNumber && (
               <Box
@@ -464,27 +467,29 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
             flexDirection: 'column',
             justifyContent: 'space-between',
             alignItems: 'center',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            background: 'linear-gradient(135deg, #2c2c2c 0%, #1a1a1a 100%)',
             color: '#ffffff',
             p: { xs: 3, md: 6 },
             overflow: 'auto',
             position: 'relative'
           }}
         >
-          {/* 상단: 회사 로고 및 이름 - 흰색 배경 적용 */}
+          {/* 상단: 회사 로고 및 이름 - 상단 전체 하얀색 배경 */}
           <Box
             sx={{
               display: 'flex',
               flexDirection: 'row',
               alignItems: 'center',
-              justifyContent: 'center',
-              mb: { xs: 1.5, md: 2 },
+              justifyContent: 'flex-start',
               width: '100%',
-              backgroundColor: 'rgba(255, 255, 255, 0.95)',
-              borderRadius: 2,
+              backgroundColor: '#ffffff',
               px: { xs: 2, md: 3 },
               py: { xs: 1, md: 1.5 },
-              boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              zIndex: 10
             }}
           >
             <Box
@@ -494,7 +499,8 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
               sx={{
                 width: { xs: 40, md: 50 },
                 height: { xs: 40, md: 50 },
-                mr: { xs: 1, md: 1.5 }
+                mr: { xs: 1, md: 1.5 },
+                filter: 'brightness(0) invert(0)'
               }}
               onError={(e) => {
                 e.target.style.display = 'none';
@@ -523,7 +529,8 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
             flexDirection: 'column', 
             justifyContent: 'center',
             overflowY: 'auto',
-            py: 2
+            py: 2,
+            pt: { xs: 10, md: 12 }
           }}>
             <Typography
               variant="h3"
@@ -735,27 +742,29 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
             flexDirection: 'column',
             justifyContent: 'space-between',
             alignItems: 'center',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            background: 'linear-gradient(135deg, #2c2c2c 0%, #1a1a1a 100%)',
             color: '#ffffff',
             p: { xs: 3, md: 6 },
             overflow: 'auto',
             position: 'relative'
           }}
         >
-          {/* 상단: 회사 로고 및 이름 - 흰색 배경 적용 */}
+          {/* 상단: 회사 로고 및 이름 - 상단 전체 하얀색 배경 */}
           <Box
             sx={{
               display: 'flex',
               flexDirection: 'row',
               alignItems: 'center',
-              justifyContent: 'center',
-              mb: { xs: 1.5, md: 2 },
+              justifyContent: 'flex-start',
               width: '100%',
-              backgroundColor: 'rgba(255, 255, 255, 0.95)',
-              borderRadius: 2,
+              backgroundColor: '#ffffff',
               px: { xs: 2, md: 3 },
               py: { xs: 1, md: 1.5 },
-              boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              zIndex: 10
             }}
           >
             <Box
@@ -765,7 +774,8 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
               sx={{
                 width: { xs: 40, md: 50 },
                 height: { xs: 40, md: 50 },
-                mr: { xs: 1, md: 1.5 }
+                mr: { xs: 1, md: 1.5 },
+                filter: 'brightness(0) invert(0)'
               }}
               onError={(e) => {
                 e.target.style.display = 'none';
@@ -793,7 +803,8 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
             display: 'flex', 
             flexDirection: 'column', 
             justifyContent: 'center',
-            alignItems: 'center'
+            alignItems: 'center',
+            pt: { xs: 10, md: 12 }
           }}>
             <Typography
               variant="h1"
@@ -896,7 +907,7 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
             flexDirection: 'column',
             justifyContent: 'space-between',
             alignItems: 'center',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            background: 'linear-gradient(135deg, #2c2c2c 0%, #1a1a1a 100%)',
             color: '#ffffff',
             p: { xs: 3, md: 6 },
             overflow: 'auto',
@@ -949,7 +960,8 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
             display: 'flex', 
             flexDirection: 'column', 
             justifyContent: 'center',
-            alignItems: 'center'
+            alignItems: 'center',
+            pt: { xs: 10, md: 12 }
           }}>
             <Box
               sx={{
@@ -1073,28 +1085,29 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
             flexDirection: 'column',
             justifyContent: 'space-between',
             alignItems: 'center',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            background: 'linear-gradient(135deg, #2c2c2c 0%, #1a1a1a 100%)',
             color: '#ffffff',
             p: { xs: 2, md: 3 },
             overflow: 'hidden',
             position: 'relative'
           }}
         >
-          {/* 상단: 회사 로고 및 슬라이드 제목 - 흰색 배경 적용 */}
+          {/* 상단: 회사 로고 및 슬라이드 제목 - 상단 전체 하얀색 배경 */}
           <Box
             sx={{
               display: 'flex',
               flexDirection: 'row',
               alignItems: 'center',
-              justifyContent: 'center',
-              mb: { xs: 1, md: 1.5 },
+              justifyContent: 'flex-start',
               width: '100%',
-              flexShrink: 0,
-              backgroundColor: 'rgba(255, 255, 255, 0.95)',
-              borderRadius: 2,
+              backgroundColor: '#ffffff',
               px: { xs: 2, md: 3 },
               py: { xs: 0.75, md: 1 },
-              boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              zIndex: 10
             }}
           >
             <Box
@@ -1104,7 +1117,8 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
               sx={{
                 width: { xs: 35, md: 45 },
                 height: { xs: 35, md: 45 },
-                mr: { xs: 1, md: 1.5 }
+                mr: { xs: 1, md: 1.5 },
+                filter: 'brightness(0) invert(0)'
               }}
               onError={(e) => {
                 e.target.style.display = 'none';
@@ -1116,7 +1130,8 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
                 fontWeight: 600,
                 fontSize: { xs: '0.85rem', md: '1rem' },
                 color: '#333',
-                letterSpacing: '0.3px'
+                letterSpacing: '0.3px',
+                mr: 2
               }}
             >
               (주)브이아이피플러스
@@ -1126,9 +1141,8 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
               sx={{
                 fontWeight: 600,
                 fontSize: { xs: '1rem', md: '1.3rem' },
-                textShadow: '1px 1px 3px rgba(0,0,0,0.3)',
-                textAlign: 'center',
-                px: 2
+                color: '#333',
+                textAlign: 'left'
               }}
             >
               {slideTitle}
@@ -1144,7 +1158,8 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
               justifyContent: 'center',
               alignItems: 'center',
               overflow: 'hidden',
-              position: 'relative'
+              position: 'relative',
+              pt: { xs: 8, md: 10 } // 상단 헤더 공간 확보
             }}
           >
             <Box
@@ -1207,27 +1222,29 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
           flexDirection: 'column',
           justifyContent: 'space-between',
           alignItems: 'center',
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            background: 'linear-gradient(135deg, #2c2c2c 0%, #1a1a1a 100%)',
           color: '#ffffff',
           p: { xs: 3, md: 6 },
           overflow: 'auto',
           position: 'relative'
         }}
       >
-        {/* 상단: 회사 로고 및 슬라이드 제목 - 흰색 배경 적용 */}
+        {/* 상단: 회사 로고 및 슬라이드 제목 - 상단 전체 하얀색 배경 */}
         <Box
           sx={{
             display: 'flex',
             flexDirection: 'row',
             alignItems: 'center',
-            justifyContent: 'center',
-            mb: { xs: 1, md: 1.5 },
+            justifyContent: 'flex-start',
             width: '100%',
-            backgroundColor: 'rgba(255, 255, 255, 0.95)',
-            borderRadius: 2,
+            backgroundColor: '#ffffff',
             px: { xs: 2, md: 3 },
             py: { xs: 0.75, md: 1 },
-            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 10
           }}
         >
           <Box
@@ -1237,7 +1254,8 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
             sx={{
               width: { xs: 35, md: 45 },
               height: { xs: 35, md: 45 },
-              mr: { xs: 1, md: 1.5 }
+              mr: { xs: 1, md: 1.5 },
+              filter: 'brightness(0) invert(0)'
             }}
             onError={(e) => {
               e.target.style.display = 'none';
@@ -1260,8 +1278,8 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
             sx={{
               fontWeight: 600,
               fontSize: { xs: '1.1rem', md: '1.4rem' },
-              textShadow: '1px 1px 3px rgba(0,0,0,0.3)',
-              textAlign: 'center'
+              color: '#333',
+              textAlign: 'left'
             }}
           >
             {slideTitle}
@@ -1277,7 +1295,8 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
           display: 'flex', 
           flexDirection: 'column', 
           justifyContent: 'center',
-          alignItems: 'center'
+          alignItems: 'center',
+          pt: { xs: 10, md: 12 }
         }}>
           <Box
             sx={{

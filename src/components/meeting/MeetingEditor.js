@@ -17,7 +17,10 @@ import {
   FormControl,
   InputLabel,
   Select,
-  MenuItem
+  MenuItem,
+  Checkbox,
+  FormControlLabel,
+  FormGroup
 } from '@mui/material';
 import { api } from '../../api';
 import ModeSelector from './ModeSelector';
@@ -50,6 +53,7 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess }) {
   const [detailOptionOpen, setDetailOptionOpen] = useState(false);
   const [detailOptionConfig, setDetailOptionConfig] = useState(null);
   const [detailOptionValues, setDetailOptionValues] = useState({});
+  const [detailOptionMultipleSelections, setDetailOptionMultipleSelections] = useState({}); // 여러 개 선택을 위한 상태
   const [pendingSubTab, setPendingSubTab] = useState(null);
 
   useEffect(() => {
@@ -190,12 +194,20 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess }) {
       if (subTabConfig?.detailOptions) {
         setDetailOptionConfig(subTabConfig.detailOptions);
         setDetailOptionValues({});
+        setDetailOptionMultipleSelections({});
         // 기본값 설정
         subTabConfig.detailOptions.options.forEach(option => {
           setDetailOptionValues(prev => ({
             ...prev,
             [option.key]: option.defaultValue || ''
           }));
+          // 여러 개 선택 가능한 옵션인 경우 배열로 초기화
+          if (option.multiple) {
+            setDetailOptionMultipleSelections(prev => ({
+              ...prev,
+              [option.key]: []
+            }));
+          }
         });
         setPendingSubTab({ modeKey, tabKey, subTabKey, subTabId });
         setDetailOptionOpen(true);
@@ -568,27 +580,61 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess }) {
         <DialogTitle>세부 옵션 선택</DialogTitle>
         <DialogContent>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, pt: 2 }}>
-            {detailOptionConfig?.options?.map((option) => (
-              <FormControl key={option.key} fullWidth>
-                <InputLabel>{option.label}</InputLabel>
-                <Select
-                  value={detailOptionValues[option.key] || option.defaultValue || ''}
-                  onChange={(e) => {
-                    setDetailOptionValues(prev => ({
-                      ...prev,
-                      [option.key]: e.target.value
-                    }));
-                  }}
-                  label={option.label}
-                >
-                  {option.values?.map((value) => (
-                    <MenuItem key={value.key} value={value.key}>
-                      {value.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            ))}
+            {detailOptionConfig?.options?.map((option) => {
+              // 여러 개 선택 가능한 옵션인 경우 체크박스로 표시
+              if (option.multiple) {
+                const selectedValues = detailOptionMultipleSelections[option.key] || [];
+                return (
+                  <FormControl key={option.key} fullWidth>
+                    <Typography variant="subtitle2" sx={{ mb: 1 }}>{option.label}</Typography>
+                    <FormGroup>
+                      {option.values?.filter(v => v.key !== 'all').map((value) => (
+                        <FormControlLabel
+                          key={value.key}
+                          control={
+                            <Checkbox
+                              checked={selectedValues.includes(value.key)}
+                              onChange={(e) => {
+                                const newValues = e.target.checked
+                                  ? [...selectedValues, value.key]
+                                  : selectedValues.filter(v => v !== value.key);
+                                setDetailOptionMultipleSelections(prev => ({
+                                  ...prev,
+                                  [option.key]: newValues
+                                }));
+                              }}
+                            />
+                          }
+                          label={value.label}
+                        />
+                      ))}
+                    </FormGroup>
+                  </FormControl>
+                );
+              }
+              // 단일 선택 옵션
+              return (
+                <FormControl key={option.key} fullWidth>
+                  <InputLabel>{option.label}</InputLabel>
+                  <Select
+                    value={detailOptionValues[option.key] || option.defaultValue || ''}
+                    onChange={(e) => {
+                      setDetailOptionValues(prev => ({
+                        ...prev,
+                        [option.key]: e.target.value
+                      }));
+                    }}
+                    label={option.label}
+                  >
+                    {option.values?.map((value) => (
+                      <MenuItem key={value.key} value={value.key}>
+                        {value.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              );
+            })}
           </Box>
         </DialogContent>
         <DialogActions>
@@ -596,24 +642,74 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess }) {
             setDetailOptionOpen(false);
             setDetailOptionConfig(null);
             setDetailOptionValues({});
+            setDetailOptionMultipleSelections({});
             setPendingSubTab(null);
           }}>취소</Button>
           <Button
             variant="contained"
             onClick={() => {
               if (pendingSubTab) {
-                addSubTabSlide(
-                  pendingSubTab.modeKey,
-                  pendingSubTab.tabKey,
-                  pendingSubTab.subTabKey,
-                  pendingSubTab.subTabId,
-                  detailOptionValues
-                );
+                // 여러 개 선택 가능한 옵션이 있는 경우 각각 슬라이드 생성
+                const multipleOptionKeys = detailOptionConfig?.options
+                  ?.filter(opt => opt.multiple)
+                  .map(opt => opt.key) || [];
+                
+                if (multipleOptionKeys.length > 0) {
+                  // 여러 개 선택된 값이 있는 경우 각각 슬라이드 생성
+                  const firstMultipleOption = detailOptionConfig.options.find(opt => opt.multiple);
+                  if (firstMultipleOption) {
+                    const selectedValues = detailOptionMultipleSelections[firstMultipleOption.key] || [];
+                    if (selectedValues.length > 0) {
+                      // 각 선택값에 대해 슬라이드 생성
+                      selectedValues.forEach(selectedValue => {
+                        const combinedOptions = {
+                          ...detailOptionValues,
+                          [firstMultipleOption.key]: selectedValue
+                        };
+                        // 다른 여러 개 선택 옵션도 처리
+                        multipleOptionKeys.forEach(key => {
+                          if (key !== firstMultipleOption.key) {
+                            const otherSelected = detailOptionMultipleSelections[key] || [];
+                            if (otherSelected.length > 0) {
+                              combinedOptions[key] = otherSelected[0]; // 첫 번째 값 사용
+                            }
+                          }
+                        });
+                        addSubTabSlide(
+                          pendingSubTab.modeKey,
+                          pendingSubTab.tabKey,
+                          pendingSubTab.subTabKey,
+                          `${pendingSubTab.subTabId}-${selectedValue}-${Date.now()}`,
+                          combinedOptions
+                        );
+                      });
+                    } else {
+                      // 선택된 값이 없으면 기본값으로 슬라이드 생성
+                      addSubTabSlide(
+                        pendingSubTab.modeKey,
+                        pendingSubTab.tabKey,
+                        pendingSubTab.subTabKey,
+                        pendingSubTab.subTabId,
+                        detailOptionValues
+                      );
+                    }
+                  }
+                } else {
+                  // 여러 개 선택 옵션이 없는 경우 기존대로 처리
+                  addSubTabSlide(
+                    pendingSubTab.modeKey,
+                    pendingSubTab.tabKey,
+                    pendingSubTab.subTabKey,
+                    pendingSubTab.subTabId,
+                    detailOptionValues
+                  );
+                }
                 setPendingSubTab(null);
               }
               setDetailOptionOpen(false);
               setDetailOptionConfig(null);
               setDetailOptionValues({});
+              setDetailOptionMultipleSelections({});
             }}
           >
             확인

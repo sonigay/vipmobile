@@ -52,6 +52,7 @@ const CHART_TABS = [
               key: 'csDetailType',
               label: '구분',
               type: 'select',
+              multiple: true, // 여러 개 선택 가능
               values: [
                 { key: 'all', label: '전체' },
                 { key: 'code', label: '코드별 실적' },
