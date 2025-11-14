@@ -272,12 +272,19 @@ async function updateMeeting(req, res) {
       }
     }
 
-    // 데이터 업데이트
-    const updateRow = [...rows[rowIndex]]; // 배열 복사
+    // 데이터 업데이트 (배열 길이 보장)
+    const updateRow = [...rows[rowIndex]];
+    // 배열 길이가 7 미만이면 확장
+    while (updateRow.length < 7) {
+      updateRow.push('');
+    }
     if (meetingName !== undefined) updateRow[1] = meetingName;
     if (meetingDate !== undefined) updateRow[2] = meetingDate;
     if (meetingNumber !== undefined) updateRow[3] = meetingNumber;
-    if (status !== undefined) updateRow[6] = status; // 상태 업데이트
+    if (status !== undefined) updateRow[6] = status; // 상태 업데이트 (인덱스 6)
+    
+    console.log(`🔄 [updateMeeting] 회의 상태 업데이트: ${meetingId} -> ${status}`);
+    console.log(`🔄 [updateMeeting] 업데이트할 행:`, updateRow);
 
     const updateRange = `${sheetName}!A${rowIndex + 3}:G${rowIndex + 3}`;
     await sheets.spreadsheets.values.update({
@@ -452,14 +459,8 @@ async function saveMeetingConfig(req, res) {
     for (const slide of slides) {
       const slideId = slide.slideId || slide.id || `slide-${slide.order}`;
       
-      // 매번 최신 데이터를 조회하여 기존 슬라이드 찾기 (새로 추가된 행도 포함)
-      const currentResponse = await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range
-      });
-      const currentRows = currentResponse.data.values || [];
-      
-      const existingRowIndex = currentRows.findIndex(row => 
+      // 기존 슬라이드 찾기 (초기 조회한 데이터에서)
+      const existingRowIndex = existingRows.findIndex((row, idx) => 
         row[0] === meetingId && row[1] === slideId
       );
 
@@ -490,7 +491,9 @@ async function saveMeetingConfig(req, res) {
             values: [newRow]
           }
         });
-        console.log(`✅ [saveMeetingConfig] 슬라이드 ${slideId} 업데이트 완료 (행 ${existingRowIndex + 3})`);
+        // 기존 행 데이터도 업데이트 (다음 반복을 위해)
+        existingRows[existingRowIndex] = newRow;
+        console.log(`✅ [saveMeetingConfig] 슬라이드 ${slideId} 업데이트 완료 (행 ${existingRowIndex + 3}), URL: ${slide.imageUrl || '없음'}`);
       } else {
         // 새 슬라이드 추가
         await sheets.spreadsheets.values.append({
@@ -501,7 +504,9 @@ async function saveMeetingConfig(req, res) {
             values: [newRow]
           }
         });
-        console.log(`✅ [saveMeetingConfig] 슬라이드 ${slideId} 추가 완료`);
+        // 기존 행 목록에도 추가 (다음 반복을 위해)
+        existingRows.push(newRow);
+        console.log(`✅ [saveMeetingConfig] 슬라이드 ${slideId} 추가 완료, URL: ${slide.imageUrl || '없음'}`);
       }
     }
 

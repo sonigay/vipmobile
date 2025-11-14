@@ -150,9 +150,12 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
       setSlidesState(updatedSlides);
       
       // 전체 슬라이드 배열을 한 번에 저장 (이전 슬라이드 URL 유지)
+      console.log(`💾 [MeetingCaptureManager] 슬라이드 ${index + 1} 저장 시작, 전체 슬라이드 수: ${updatedSlides.length}`);
+      console.log(`💾 [MeetingCaptureManager] 저장할 슬라이드 URL들:`, updatedSlides.map(s => ({ order: s.order, url: s.imageUrl || '없음' })));
       await api.saveMeetingConfig(meeting.meetingId, {
         slides: updatedSlides
       });
+      console.log(`✅ [MeetingCaptureManager] 슬라이드 ${index + 1} 저장 완료`);
 
       setCompleted(prev => prev + 1);
       
