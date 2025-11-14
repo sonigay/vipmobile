@@ -735,14 +735,18 @@ async function uploadMeetingImage(req, res) {
       return res.status(400).json({ success: false, error: '이미지 파일이 없습니다.' });
     }
 
-    const filename = req.file.originalname || `meeting-${meetingId}-${slideOrder}.png`;
+    // 임시 meetingId인 경우 (커스텀 슬라이드 이미지 업로드)
+    const isTempMeeting = meetingId === 'temp-custom-slide';
+    const filename = req.file.originalname || (isTempMeeting 
+      ? `custom-slide-${Date.now()}.${req.file.originalname?.split('.').pop() || 'png'}`
+      : `meeting-${meetingId}-${slideOrder}.png`);
     
     // Discord에 업로드
     const result = await uploadImageToDiscord(
       req.file.buffer,
       filename,
-      meetingId,
-      meetingDate
+      isTempMeeting ? `custom-${Date.now()}` : meetingId, // 임시 ID 사용
+      meetingDate || new Date().toISOString().split('T')[0]
     );
 
     res.json({

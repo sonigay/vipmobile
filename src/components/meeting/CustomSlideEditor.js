@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -7,15 +7,24 @@ import {
   Button,
   TextField,
   Box,
-  Typography
+  Typography,
+  CircularProgress,
+  Alert
 } from '@mui/material';
+import { Image as ImageIcon, Delete as DeleteIcon } from '@mui/icons-material';
+import { api } from '../../api';
 
-function CustomSlideEditor({ open, onClose, onSave, slide }) {
+function CustomSlideEditor({ open, onClose, onSave, slide, meetingDate }) {
   const [formData, setFormData] = useState({
     title: '',
     content: '',
-    backgroundColor: '#ffffff'
+    backgroundColor: '#ffffff',
+    imageUrl: ''
   });
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const fileInputRef = useRef(null);
 
   React.useEffect(() => {
     if (open) {
@@ -23,20 +32,82 @@ function CustomSlideEditor({ open, onClose, onSave, slide }) {
         setFormData({
           title: slide.title || '',
           content: slide.content || '',
-          backgroundColor: slide.backgroundColor || '#ffffff'
+          backgroundColor: slide.backgroundColor || '#ffffff',
+          imageUrl: slide.imageUrl || ''
         });
+        setPreviewUrl(slide.imageUrl || null);
       } else {
         setFormData({
           title: '',
           content: '',
-          backgroundColor: '#ffffff'
+          backgroundColor: '#ffffff',
+          imageUrl: ''
         });
+        setPreviewUrl(null);
       }
+      setUploadError(null);
     }
   }, [open, slide]);
 
   const handleChange = (field) => (event) => {
     setFormData(prev => ({ ...prev, [field]: event.target.value }));
+  };
+
+  const handleImageSelect = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // 이미지 파일만 허용
+    if (!file.type.startsWith('image/')) {
+      setUploadError('이미지 파일만 업로드할 수 있습니다.');
+      return;
+    }
+
+    // 파일 크기 제한 (10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      setUploadError('이미지 파일 크기는 10MB 이하여야 합니다.');
+      return;
+    }
+
+    setUploading(true);
+    setUploadError(null);
+
+    try {
+      // 미리보기 생성
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setPreviewUrl(e.target.result);
+      };
+      reader.readAsDataURL(file);
+
+      // Discord에 업로드
+      const result = await api.uploadCustomSlideImage(file, meetingDate);
+      
+      if (result.success) {
+        setFormData(prev => ({ ...prev, imageUrl: result.imageUrl }));
+        console.log('✅ [CustomSlideEditor] 이미지 업로드 완료:', result.imageUrl);
+      } else {
+        throw new Error(result.error || '이미지 업로드 실패');
+      }
+    } catch (error) {
+      console.error('❌ [CustomSlideEditor] 이미지 업로드 오류:', error);
+      setUploadError(error.message || '이미지 업로드에 실패했습니다.');
+      setPreviewUrl(null);
+    } finally {
+      setUploading(false);
+      // 파일 입력 리셋
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setFormData(prev => ({ ...prev, imageUrl: '' }));
+    setPreviewUrl(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const handleSubmit = () => {
@@ -94,6 +165,67 @@ function CustomSlideEditor({ open, onClose, onSave, slide }) {
               shrink: true
             }}
           />
+
+          <Box sx={{ mt: 3 }}>
+            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+              이미지 (선택사항)
+            </Typography>
+            
+            {uploadError && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {uploadError}
+              </Alert>
+            )}
+
+            {previewUrl && (
+              <Box sx={{ mb: 2, position: 'relative' }}>
+                <Box
+                  component="img"
+                  src={previewUrl}
+                  alt="미리보기"
+                  sx={{
+                    maxWidth: '100%',
+                    maxHeight: 300,
+                    borderRadius: 1,
+                    border: '1px solid #e0e0e0'
+                  }}
+                />
+                <Button
+                  size="small"
+                  color="error"
+                  startIcon={<DeleteIcon />}
+                  onClick={handleRemoveImage}
+                  sx={{ mt: 1 }}
+                >
+                  이미지 제거
+                </Button>
+              </Box>
+            )}
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageSelect}
+              style={{ display: 'none' }}
+            />
+            
+            <Button
+              variant="outlined"
+              startIcon={uploading ? <CircularProgress size={16} /> : <ImageIcon />}
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              fullWidth
+            >
+              {uploading ? '업로드 중...' : previewUrl ? '이미지 변경' : '이미지 선택'}
+            </Button>
+            
+            {formData.imageUrl && !previewUrl && (
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                이미지 URL: {formData.imageUrl.substring(0, 50)}...
+              </Typography>
+            )}
+          </Box>
         </Box>
       </DialogContent>
       <DialogActions>

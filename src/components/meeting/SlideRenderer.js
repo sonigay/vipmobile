@@ -200,10 +200,25 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
             justifyContent: 'center',
             alignItems: 'center',
             backgroundColor: slide.backgroundColor || '#ffffff',
-            p: 4
+            p: 4,
+            overflow: 'auto'
           }}
         >
-          <Box sx={{ textAlign: 'center', maxWidth: 1200 }}>
+          <Box sx={{ textAlign: 'center', maxWidth: 1200, width: '100%' }}>
+            {slide.imageUrl && (
+              <Box
+                component="img"
+                src={slide.imageUrl}
+                alt={slide.title || '커스텀 이미지'}
+                sx={{
+                  maxWidth: '100%',
+                  maxHeight: '60vh',
+                  objectFit: 'contain',
+                  mb: 3,
+                  borderRadius: 1
+                }}
+              />
+            )}
             <h1 style={{ fontSize: '3rem', marginBottom: '2rem' }}>
               {slide.title || '커스텀 화면'}
             </h1>
