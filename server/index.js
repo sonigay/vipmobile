@@ -22787,6 +22787,14 @@ app.get('/api/policy-notices', async (req, res) => {
     
     // 필터링 적용
     let filteredNotices = dataRows
+      .map((row, index) => {
+        // 구글시트에서 마지막 컬럼이 비어있으면 배열 길이가 짧을 수 있으므로
+        // 최소 9개 컬럼이 되도록 빈 값으로 채움
+        while (row.length < 9) {
+          row.push('');
+        }
+        return row;
+      })
       .filter((row, index) => {
         // 최소 필수 컬럼 확인 (연월, 카테고리, 제목, 내용, 작성자 - 5개 이상)
         // ID는 없어도 자동 생성 가능하므로 5개 이상이면 OK
