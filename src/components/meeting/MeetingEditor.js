@@ -369,7 +369,7 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess }) {
       <DialogTitle>
         {meeting ? '회의 수정' : '새 회의 생성'}
       </DialogTitle>
-      <DialogContent>
+      <DialogContent sx={{ maxHeight: '80vh', overflowY: 'auto' }}>
         <Box sx={{ pt: 2 }}>
           {!meeting && (
             <Stepper activeStep={activeStep} sx={{ mb: 3 }}>
