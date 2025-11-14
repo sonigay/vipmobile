@@ -438,7 +438,7 @@ async function saveMeetingConfig(req, res) {
       '회의ID', '슬라이드ID', '순서', '타입', '모드', '탭', '제목', '내용', '배경색', '이미지URL', '캡처시간', 'Discord포스트ID', 'Discord스레드ID'
     ]);
 
-    // 기존 데이터 삭제
+    // 기존 데이터 조회
     const range = `${sheetName}!A3:M`;
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
@@ -446,58 +446,58 @@ async function saveMeetingConfig(req, res) {
     });
 
     const existingRows = response.data.values || [];
-    const rowsToDelete = existingRows
-      .map((row, idx) => row[0] === meetingId ? idx : -1)
-      .filter(idx => idx !== -1)
-      .reverse();
+    
+    // 각 슬라이드를 개별적으로 업데이트 또는 추가
+    for (const slide of slides) {
+      const slideId = slide.slideId || slide.id || `slide-${slide.order}`;
+      
+      // 기존 슬라이드 찾기
+      const existingRowIndex = existingRows.findIndex(row => 
+        row[0] === meetingId && row[1] === slideId
+      );
 
-    if (rowsToDelete.length > 0) {
-      const sheetId = (await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID }))
-        .data.sheets.find(s => s.properties.title === sheetName).properties.sheetId;
+      const newRow = [
+        meetingId,
+        slideId,
+        slide.order || 0,
+        slide.type || 'mode-tab',
+        slide.mode || '',
+        slide.tab || '',
+        slide.title || '',
+        slide.content || '',
+        slide.backgroundColor || '#ffffff',
+        slide.imageUrl || '',
+        slide.capturedAt || '',
+        slide.discordPostId || '',
+        slide.discordThreadId || ''
+      ];
 
-      await sheets.spreadsheets.batchUpdate({
-        spreadsheetId: SPREADSHEET_ID,
-        resource: {
-          requests: rowsToDelete.map(rowIndex => ({
-            deleteDimension: {
-              range: {
-                sheetId,
-                dimension: 'ROWS',
-                startIndex: rowIndex + 2,
-                endIndex: rowIndex + 3
-              }
-            }
-          }))
-        }
-      });
-    }
-
-    // 새 데이터 추가
-    const newRows = slides.map(slide => [
-      meetingId,
-      slide.slideId || slide.id || `slide-${slide.order}`,
-      slide.order || 0,
-      slide.type || 'mode-tab',
-      slide.mode || '',
-      slide.tab || '',
-      slide.title || '',
-      slide.content || '',
-      slide.backgroundColor || '#ffffff',
-      slide.imageUrl || '',
-      slide.capturedAt || '',
-      slide.discordPostId || '',
-      slide.discordThreadId || ''
-    ]);
-
-    if (newRows.length > 0) {
-      await sheets.spreadsheets.values.append({
-        spreadsheetId: SPREADSHEET_ID,
-        range: `${sheetName}!A3`,
-        valueInputOption: 'USER_ENTERED',
-        resource: {
-          values: newRows
-        }
-      });
+      if (existingRowIndex !== -1) {
+        // 기존 슬라이드 업데이트
+        const updateRange = `${sheetName}!A${existingRowIndex + 3}:M${existingRowIndex + 3}`;
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: updateRange,
+          valueInputOption: 'USER_ENTERED',
+          resource: {
+            values: [newRow]
+          }
+        });
+        // 기존 행 데이터도 업데이트 (다음 반복을 위해)
+        existingRows[existingRowIndex] = newRow;
+      } else {
+        // 새 슬라이드 추가
+        await sheets.spreadsheets.values.append({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${sheetName}!A3`,
+          valueInputOption: 'USER_ENTERED',
+          resource: {
+            values: [newRow]
+          }
+        });
+        // 기존 행 목록에도 추가 (다음 반복을 위해)
+        existingRows.push(newRow);
+      }
     }
 
     res.json({ success: true });
