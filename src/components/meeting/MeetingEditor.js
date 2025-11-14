@@ -135,6 +135,23 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess }) {
       ));
     } else {
       setSelectedTabs([...selectedTabs, tabId]);
+      
+      // 탭 추가 시 슬라이드 생성 (하부 탭이 없는 경우)
+      const availableTabs = getAvailableTabsForMode(modeKey, loggedInStore);
+      const tabConfig = availableTabs.find(t => t.key === tabKey);
+      
+      // 하부 탭이 있는 경우는 하부 탭 선택 시 슬라이드가 생성되므로 여기서는 생성하지 않음
+      if (!tabConfig?.subTabs || tabConfig.subTabs.length === 0) {
+        const newSlide = {
+          slideId: `slide-${modeKey}-${tabKey}-${Date.now()}`,
+          type: 'mode-tab',
+          mode: modeKey,
+          tab: tabKey,
+          tabLabel: tabConfig?.label || tabKey,
+          order: slides.length + 1
+        };
+        setSlides([...slides, newSlide]);
+      }
     }
   };
 
@@ -156,7 +173,7 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess }) {
       const subTabConfig = tabConfig?.subTabs?.find(st => st.key === subTabKey);
       
       const newSlide = {
-        slideId: `slide-${Date.now()}-${Math.random()}`,
+        slideId: `slide-${modeKey}-${tabKey}-${subTabKey}-${Date.now()}`,
         type: 'mode-tab',
         mode: modeKey,
         tab: tabKey,

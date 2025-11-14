@@ -459,10 +459,26 @@ async function saveMeetingConfig(req, res) {
     for (const slide of slides) {
       const slideId = slide.slideId || slide.id || `slide-${slide.order}`;
       
-      // 기존 슬라이드 찾기 (초기 조회한 데이터에서)
-      const existingRowIndex = existingRows.findIndex((row, idx) => 
+      // 기존 슬라이드 찾기: slideId로 먼저 찾고, 없으면 mode/tab/subTab/order로 찾기
+      let existingRowIndex = existingRows.findIndex((row, idx) => 
         row[0] === meetingId && row[1] === slideId
       );
+      
+      // slideId로 찾지 못한 경우 mode/tab/subTab/order로 찾기
+      if (existingRowIndex === -1) {
+        existingRowIndex = existingRows.findIndex((row, idx) => {
+          if (row[0] !== meetingId) return false;
+          // mode, tab, subTab, order가 모두 일치하는지 확인
+          const rowMode = row[4] || '';
+          const rowTab = row[5] || '';
+          const rowSubTab = slide.subTab ? (row[5] || '') : ''; // subTab은 tab 필드에 저장될 수 있음
+          const rowOrder = parseInt(row[2] || 0);
+          
+          return rowMode === (slide.mode || '') && 
+                 rowTab === (slide.tab || '') && 
+                 rowOrder === (slide.order || 0);
+        });
+      }
 
       const newRow = [
         meetingId,

@@ -54,16 +54,21 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
           // 로딩 인디케이터가 없고, data-loading이 false이고, data-loaded가 true이면 완료
           const isLoading = (loadingIndicators && loadingIndicators.length > 0) || dataLoading || hasLoadingText;
           
+          // data-loaded가 true이고 data-loading이 false여야 완료
+          const isDataReady = dataLoaded && !dataLoading;
+          
           console.log(`🔍 [SlideRenderer] 데이터 로딩 확인 (${attempts}/${maxAttempts}):`, {
             hasLoadingIndicator: loadingIndicators?.length > 0,
             dataLoading,
             dataLoaded,
             hasLoadingText,
             isLoading,
+            isDataReady,
             loadingCount: loadingIndicators?.length || 0
           });
           
-          if (!isLoading && (dataLoaded || attempts >= maxAttempts)) {
+          // 데이터가 준비되었고 로딩이 완료되었을 때만 진행
+          if (isDataReady && !isLoading) {
             console.log('✅ [SlideRenderer] 데이터 로딩 완료');
             resolve();
           } else if (attempts >= maxAttempts) {

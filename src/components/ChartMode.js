@@ -2040,7 +2040,7 @@ function TotalClosingTab() {
 
   if (loading && progress > 0) {
     return (
-      <Box sx={{ p: 4, textAlign: 'center' }}>
+      <Box sx={{ p: 4, textAlign: 'center' }} data-loading="true" data-loaded="false">
         <Typography variant="h6" sx={{ mb: 2 }}>
           마감장표 데이터 로딩 중...
         </Typography>
@@ -2070,7 +2070,7 @@ function TotalClosingTab() {
 
   if (!data) {
     return (
-      <Box sx={{ p: 4, textAlign: 'center' }}>
+      <Box sx={{ p: 4, textAlign: 'center' }} data-loading="true" data-loaded="false">
         <CircularProgress />
         <Typography variant="h6" sx={{ mt: 2 }}>
           데이터를 불러오는 중...
@@ -2764,7 +2764,7 @@ function AgentClosingTab() {
 
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }} data-loading="true" data-loaded="false">
         <CircularProgress />
       </Box>
     );
