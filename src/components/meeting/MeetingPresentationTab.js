@@ -17,7 +17,9 @@ import {
 import {
   PlayArrow as PlayArrowIcon
 } from '@mui/icons-material';
-import { api } from '../../api';
+// api import - named export와 default export 모두 지원
+import apiObj, { api as namedApi } from '../../api';
+const api = namedApi || apiObj.default || apiObj.api || apiObj;
 import ImageSlideViewer from './ImageSlideViewer';
 
 const formatDateTime = (value) => {
