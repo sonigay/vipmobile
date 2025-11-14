@@ -22788,19 +22788,28 @@ app.get('/api/policy-notices', async (req, res) => {
     // 필터링 적용
     let filteredNotices = dataRows
       .filter((row, index) => {
-        if (row.length < 9) {
-          console.log(`📢 [공지사항] 행 ${index + 3} 컬럼 수 부족:`, row.length);
-          return false; // 최소 컬럼 수 확인
+        // 최소 필수 컬럼 확인 (연월, 카테고리, 제목, 내용, 작성자 - 5개 이상)
+        // ID는 없어도 자동 생성 가능하므로 5개 이상이면 OK
+        if (row.length < 5) {
+          console.log(`📢 [공지사항] 행 ${index + 3} 필수 컬럼 수 부족:`, row.length);
+          return false;
         }
         
         const noticeYearMonth = (row[0] || '').toString().trim(); // 연월
         const noticeCategory = (row[1] || '').toString().trim(); // 카테고리
         
+        // 연월과 카테고리가 모두 비어있으면 유효하지 않은 데이터로 간주
+        if (!noticeYearMonth && !noticeCategory) {
+          console.log(`📢 [공지사항] 행 ${index + 3} 연월/카테고리 모두 비어있음`);
+          return false;
+        }
+        
         console.log(`📢 [공지사항] 행 ${index + 3} 필터링:`, {
           noticeYearMonth,
           noticeCategory,
           requestYearMonth: yearMonth,
-          requestCategory: category
+          requestCategory: category,
+          rowLength: row.length
         });
         
         // 연월 필터
@@ -22831,17 +22840,18 @@ app.get('/api/policy-notices', async (req, res) => {
         return true;
       })
       .map((row, index) => {
-        const noticeId = row[7] || `NOTICE_${Date.now()}_${index}`; // ID (없으면 생성)
+        // ID는 7번째 컬럼(인덱스 7)이지만, 컬럼이 부족할 수 있으므로 안전하게 처리
+        const noticeId = (row[7] || '').toString().trim() || `NOTICE_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         return {
           id: noticeId,
-          yearMonth: row[0] || '',
-          category: row[1] || '',
-          title: row[2] || '',
-          content: row[3] || '',
-          author: row[4] || '',
-          createdAt: row[5] || '',
-          updatedAt: row[6] || '',
-          note: row[8] || '',
+          yearMonth: (row[0] || '').toString().trim(),
+          category: (row[1] || '').toString().trim(),
+          title: (row[2] || '').toString().trim(),
+          content: (row[3] || '').toString().trim(),
+          author: (row[4] || '').toString().trim(),
+          createdAt: (row[5] || '').toString().trim(),
+          updatedAt: (row[6] || '').toString().trim(),
+          note: (row[8] || '').toString().trim(), // 8번째 컬럼(인덱스 8) - 비고
           rowIndex: index + 3 // 실제 시트 행 번호 (1행 빈 행, 2행 헤더, 3행부터 데이터)
         };
       });
