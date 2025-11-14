@@ -418,6 +418,7 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess }) {
         open={customSlideOpen}
         onClose={() => setCustomSlideOpen(false)}
         onSave={handleCustomSlideSave}
+        meetingDate={formData.meetingDate || new Date().toISOString().split('T')[0]}
       />
     </Dialog>
   );
