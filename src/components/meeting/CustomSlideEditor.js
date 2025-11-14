@@ -11,8 +11,33 @@ import {
   CircularProgress,
   Alert
 } from '@mui/material';
-import { Image as ImageIcon, Delete as DeleteIcon } from '@mui/icons-material';
+import { Image as ImageIcon, Delete as DeleteIcon, Description as DescriptionIcon } from '@mui/icons-material';
 import { api } from '../../api';
+
+// 파일 타입 감지 함수
+const getFileType = (file) => {
+  const fileName = file.name.toLowerCase();
+  const mimeType = file.type;
+  
+  if (mimeType.startsWith('image/')) {
+    return 'image';
+  } else if (
+    fileName.endsWith('.xlsx') || 
+    fileName.endsWith('.xls') || 
+    mimeType.includes('spreadsheet') ||
+    mimeType.includes('excel')
+  ) {
+    return 'excel';
+  } else if (
+    fileName.endsWith('.pptx') || 
+    fileName.endsWith('.ppt') || 
+    mimeType.includes('presentation') ||
+    mimeType.includes('powerpoint')
+  ) {
+    return 'ppt';
+  }
+  return 'unknown';
+};
 
 function CustomSlideEditor({ open, onClose, onSave, slide, meetingDate }) {
   const [formData, setFormData] = useState({
@@ -24,6 +49,7 @@ function CustomSlideEditor({ open, onClose, onSave, slide, meetingDate }) {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
+  const [uploadedFileType, setUploadedFileType] = useState(null);
   const fileInputRef = useRef(null);
 
   React.useEffect(() => {
@@ -53,46 +79,61 @@ function CustomSlideEditor({ open, onClose, onSave, slide, meetingDate }) {
     setFormData(prev => ({ ...prev, [field]: event.target.value }));
   };
 
-  const handleImageSelect = async (event) => {
+  const handleFileSelect = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // 이미지 파일만 허용
-    if (!file.type.startsWith('image/')) {
-      setUploadError('이미지 파일만 업로드할 수 있습니다.');
+    // 파일 타입 감지
+    const fileType = getFileType(file);
+    
+    if (fileType === 'unknown') {
+      setUploadError('지원하지 않는 파일 형식입니다. (이미지, Excel, PPT만 가능)');
       return;
     }
 
-    // 파일 크기 제한 (10MB)
-    if (file.size > 10 * 1024 * 1024) {
-      setUploadError('이미지 파일 크기는 10MB 이하여야 합니다.');
+    // 파일 크기 제한 (25MB - Discord 제한)
+    if (file.size > 25 * 1024 * 1024) {
+      setUploadError('파일 크기는 25MB 이하여야 합니다.');
       return;
     }
 
     setUploading(true);
     setUploadError(null);
+    setUploadedFileType(fileType);
 
     try {
-      // 미리보기 생성
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setPreviewUrl(e.target.result);
-      };
-      reader.readAsDataURL(file);
+      // 이미지 파일인 경우 미리보기 생성
+      if (fileType === 'image') {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setPreviewUrl(e.target.result);
+        };
+        reader.readAsDataURL(file);
+      }
 
-      // Discord에 업로드
-      const result = await api.uploadCustomSlideImage(file, meetingDate);
+      // 파일 업로드 및 변환
+      const result = await api.uploadCustomSlideFile(file, meetingDate, fileType);
       
       if (result.success) {
-        setFormData(prev => ({ ...prev, imageUrl: result.imageUrl }));
-        console.log('✅ [CustomSlideEditor] 이미지 업로드 완료:', result.imageUrl);
+        // 여러 이미지가 반환될 수 있음 (Excel/PPT의 경우)
+        if (result.imageUrls && result.imageUrls.length > 0) {
+          // 첫 번째 이미지를 미리보기로 사용
+          setPreviewUrl(result.imageUrls[0]);
+          // 첫 번째 이미지 URL 저장 (나중에 여러 이미지 처리 개선 가능)
+          setFormData(prev => ({ ...prev, imageUrl: result.imageUrls[0] }));
+          console.log(`✅ [CustomSlideEditor] ${fileType} 파일 업로드 완료: ${result.imageUrls.length}개 이미지 생성`);
+        } else if (result.imageUrl) {
+          setFormData(prev => ({ ...prev, imageUrl: result.imageUrl }));
+          console.log('✅ [CustomSlideEditor] 파일 업로드 완료:', result.imageUrl);
+        }
       } else {
-        throw new Error(result.error || '이미지 업로드 실패');
+        throw new Error(result.error || '파일 업로드 실패');
       }
     } catch (error) {
-      console.error('❌ [CustomSlideEditor] 이미지 업로드 오류:', error);
-      setUploadError(error.message || '이미지 업로드에 실패했습니다.');
+      console.error('❌ [CustomSlideEditor] 파일 업로드 오류:', error);
+      setUploadError(error.message || '파일 업로드에 실패했습니다.');
       setPreviewUrl(null);
+      setUploadedFileType(null);
     } finally {
       setUploading(false);
       // 파일 입력 리셋
@@ -105,6 +146,7 @@ function CustomSlideEditor({ open, onClose, onSave, slide, meetingDate }) {
   const handleRemoveImage = () => {
     setFormData(prev => ({ ...prev, imageUrl: '' }));
     setPreviewUrl(null);
+    setUploadedFileType(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -168,7 +210,10 @@ function CustomSlideEditor({ open, onClose, onSave, slide, meetingDate }) {
 
           <Box sx={{ mt: 3 }}>
             <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
-              이미지 (선택사항)
+              파일 첨부 (선택사항)
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block' }}>
+              이미지, Excel, PPT 파일을 업로드할 수 있습니다. Excel과 PPT는 자동으로 이미지로 변환됩니다.
             </Typography>
             
             {uploadError && (
@@ -190,6 +235,11 @@ function CustomSlideEditor({ open, onClose, onSave, slide, meetingDate }) {
                     border: '1px solid #e0e0e0'
                   }}
                 />
+                {uploadedFileType && uploadedFileType !== 'image' && (
+                  <Alert severity="info" sx={{ mt: 1 }}>
+                    {uploadedFileType === 'excel' ? 'Excel' : 'PPT'} 파일이 이미지로 변환되었습니다.
+                  </Alert>
+                )}
                 <Button
                   size="small"
                   color="error"
@@ -197,7 +247,7 @@ function CustomSlideEditor({ open, onClose, onSave, slide, meetingDate }) {
                   onClick={handleRemoveImage}
                   sx={{ mt: 1 }}
                 >
-                  이미지 제거
+                  파일 제거
                 </Button>
               </Box>
             )}
@@ -205,19 +255,23 @@ function CustomSlideEditor({ open, onClose, onSave, slide, meetingDate }) {
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
-              onChange={handleImageSelect}
+              accept="image/*,.xlsx,.xls,.pptx,.ppt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.ms-powerpoint"
+              onChange={handleFileSelect}
               style={{ display: 'none' }}
             />
             
             <Button
               variant="outlined"
-              startIcon={uploading ? <CircularProgress size={16} /> : <ImageIcon />}
+              startIcon={uploading ? <CircularProgress size={16} /> : <DescriptionIcon />}
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
               fullWidth
             >
-              {uploading ? '업로드 중...' : previewUrl ? '이미지 변경' : '이미지 선택'}
+              {uploading 
+                ? `업로드 중... (${uploadedFileType === 'excel' ? 'Excel 변환 중' : uploadedFileType === 'ppt' ? 'PPT 변환 중' : '처리 중'})` 
+                : previewUrl 
+                  ? '파일 변경' 
+                  : '파일 선택 (이미지/Excel/PPT)'}
             </Button>
             
             {formData.imageUrl && !previewUrl && (

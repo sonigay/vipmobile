@@ -3,6 +3,7 @@ const { google } = require('googleapis');
 const { Client, GatewayIntentBits, AttachmentBuilder } = require('discord.js');
 const multer = require('multer');
 const path = require('path');
+const ExcelJS = require('exceljs');
 
 // Discord 봇 설정
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
@@ -797,6 +798,308 @@ async function uploadMeetingImage(req, res) {
   }
 }
 
+// Excel 파일을 이미지로 변환
+async function convertExcelToImages(excelBuffer, filename) {
+  try {
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(excelBuffer);
+    
+    const imageBuffers = [];
+    
+    // 각 워크시트를 이미지로 변환
+    for (let i = 0; i < workbook.worksheets.length; i++) {
+      const worksheet = workbook.worksheets[i];
+      const sheetName = worksheet.name;
+      
+      console.log(`📊 [Excel 변환] 시트 "${sheetName}" 처리 중...`);
+      
+      // Excel 데이터를 이미지로 변환
+      const imageBuffer = await convertExcelToImage(worksheet, `${filename}_${sheetName}`);
+      
+      if (!imageBuffer) {
+        // Canvas가 없는 경우 HTML로 변환하여 반환 (나중에 puppeteer로 처리 가능)
+        console.warn(`⚠️ [Excel 변환] Canvas가 없어 시트 "${sheetName}"을 이미지로 변환할 수 없습니다.`);
+        continue;
+      }
+      imageBuffers.push({
+        buffer: imageBuffer,
+        filename: `${filename}_${sheetName}.png`,
+        sheetName: sheetName
+      });
+    }
+    
+    return imageBuffers;
+  } catch (error) {
+    console.error('Excel 변환 오류:', error);
+    throw new Error(`Excel 파일 변환 실패: ${error.message}`);
+  }
+}
+
+// Excel 워크시트를 HTML로 변환
+function convertExcelToHTML(worksheet) {
+  let html = '<html><head><style>';
+  html += 'body { font-family: Arial, sans-serif; margin: 20px; }';
+  html += 'table { border-collapse: collapse; width: 100%; }';
+  html += 'th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }';
+  html += 'th { background-color: #f2f2f2; font-weight: bold; }';
+  html += 'tr:nth-child(even) { background-color: #f9f9f9; }';
+  html += '</style></head><body>';
+  html += `<h2>${worksheet.name}</h2>`;
+  html += '<table>';
+  
+  // 헤더 행
+  const headerRow = worksheet.getRow(1);
+  if (headerRow && headerRow.values && headerRow.values.length > 1) {
+    html += '<thead><tr>';
+    headerRow.eachCell({ includeEmpty: false }, (cell) => {
+      html += `<th>${cell.value || ''}</th>`;
+    });
+    html += '</tr></thead>';
+  }
+  
+  // 데이터 행
+  html += '<tbody>';
+  worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+    if (rowNumber === 1) return; // 헤더는 이미 처리됨
+    
+    html += '<tr>';
+    row.eachCell({ includeEmpty: false }, (cell) => {
+      const value = cell.value !== null && cell.value !== undefined ? String(cell.value) : '';
+      html += `<td>${value}</td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table></body></html>';
+  
+  return html;
+}
+
+// Excel 워크시트를 이미지로 변환 (Canvas 사용)
+async function convertExcelToImage(worksheet, filename) {
+  try {
+    // Canvas 모듈 동적 로드
+    const canvas = require('canvas');
+    const { createCanvas } = canvas;
+    
+    // Excel 데이터 읽기
+    const rows = [];
+    worksheet.eachRow({ includeEmpty: false }, (row) => {
+      const rowData = [];
+      row.eachCell({ includeEmpty: false }, (cell) => {
+        rowData.push({
+          value: cell.value !== null && cell.value !== undefined ? String(cell.value) : '',
+          type: cell.type
+        });
+      });
+      rows.push(rowData);
+    });
+    
+    if (rows.length === 0) {
+      throw new Error('Excel 시트에 데이터가 없습니다.');
+    }
+    
+    // 동적 크기 계산
+    const maxCols = Math.max(...rows.map(r => r.length));
+    const maxRows = Math.min(rows.length, 50); // 최대 50행
+    const colWidth = 180;
+    const rowHeight = 35;
+    const padding = 50;
+    const headerHeight = 80;
+    
+    const canvasWidth = Math.max(1920, padding * 2 + colWidth * maxCols);
+    const canvasHeight = Math.max(1080, headerHeight + padding * 2 + rowHeight * maxRows);
+    
+    const canvas = createCanvas(canvasWidth, canvasHeight);
+    const ctx = canvas.getContext('2d');
+    
+    // 배경
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // 제목
+    ctx.fillStyle = '#000000';
+    ctx.font = 'bold 36px Arial';
+    const title = worksheet.name || filename;
+    ctx.fillText(title, padding, 50);
+    
+    // 테이블 영역
+    let yPos = headerHeight;
+    const startX = padding;
+    
+    // 헤더 행 (첫 번째 행)
+    if (rows.length > 0) {
+      const headerRow = rows[0];
+      ctx.fillStyle = '#4a90e2';
+      ctx.fillRect(startX, yPos, colWidth * maxCols, rowHeight);
+      
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 18px Arial';
+      let xPos = startX + 10;
+      headerRow.forEach((cell, colIndex) => {
+        const text = cell.value || '';
+        // 텍스트가 너무 길면 자르기
+        const displayText = text.length > 25 ? text.substring(0, 22) + '...' : text;
+        ctx.fillText(displayText, xPos, yPos + 25);
+        xPos += colWidth;
+      });
+      yPos += rowHeight;
+    }
+    
+    // 데이터 행
+    ctx.font = '16px Arial';
+    for (let i = 1; i < Math.min(rows.length, maxRows + 1); i++) {
+      const row = rows[i];
+      
+      // 짝수 행 배경색
+      if (i % 2 === 0) {
+        ctx.fillStyle = '#f8f9fa';
+        ctx.fillRect(startX, yPos, colWidth * maxCols, rowHeight);
+      }
+      
+      ctx.fillStyle = '#000000';
+      let xPos = startX + 10;
+      row.forEach((cell, colIndex) => {
+        const text = cell.value || '';
+        // 텍스트가 너무 길면 자르기
+        const displayText = text.length > 25 ? text.substring(0, 22) + '...' : text;
+        ctx.fillText(displayText, xPos, yPos + 25);
+        xPos += colWidth;
+      });
+      yPos += rowHeight;
+      
+      if (yPos > canvas.height - padding) break;
+    }
+    
+    // 그리드 라인
+    ctx.strokeStyle = '#e0e0e0';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= maxCols; i++) {
+      ctx.beginPath();
+      ctx.moveTo(startX + i * colWidth, headerHeight);
+      ctx.lineTo(startX + i * colWidth, yPos);
+      ctx.stroke();
+    }
+    for (let i = 0; i <= Math.min(rows.length, maxRows + 1); i++) {
+      ctx.beginPath();
+      ctx.moveTo(startX, headerHeight + i * rowHeight);
+      ctx.lineTo(startX + maxCols * colWidth, headerHeight + i * rowHeight);
+      ctx.stroke();
+    }
+    
+    // Canvas를 Buffer로 변환
+    return canvas.toBuffer('image/png');
+  } catch (error) {
+    console.error('Excel 이미지 변환 오류:', error);
+    throw error;
+  }
+}
+
+// PPT 파일을 이미지로 변환 (나중에 구현)
+async function convertPPTToImages(pptBuffer, filename) {
+  // TODO: PPT 변환 구현 (LibreOffice 또는 puppeteer 사용)
+  throw new Error('PPT 변환 기능은 아직 구현되지 않았습니다.');
+}
+
+// 커스텀 슬라이드 파일 업로드 (이미지, Excel, PPT 지원)
+async function uploadCustomSlideFile(req, res) {
+  try {
+    const { meetingId } = req.params;
+    const { meetingDate, fileType } = req.body;
+    
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: '파일이 없습니다.' });
+    }
+
+    const file = req.file;
+    const detectedFileType = fileType || (file.mimetype.startsWith('image/') ? 'image' : 'unknown');
+    
+    console.log(`📤 [uploadCustomSlideFile] 파일 업로드 시작: ${file.originalname}, 타입: ${detectedFileType}`);
+    
+    let imageBuffers = [];
+    
+    if (detectedFileType === 'image') {
+      // 이미지 파일은 그대로 사용
+      imageBuffers.push({
+        buffer: file.buffer,
+        filename: file.originalname || `image-${Date.now()}.png`,
+        sheetName: null
+      });
+    } else if (detectedFileType === 'excel') {
+      // Excel 파일 변환
+      imageBuffers = await convertExcelToImages(file.buffer, file.originalname || 'excel');
+    } else if (detectedFileType === 'ppt') {
+      // PPT 파일 변환 (나중에 구현)
+      return res.status(501).json({ 
+        success: false, 
+        error: 'PPT 변환 기능은 아직 구현되지 않았습니다.' 
+      });
+    } else {
+      return res.status(400).json({ 
+        success: false, 
+        error: '지원하지 않는 파일 형식입니다.' 
+      });
+    }
+    
+    // 회의 정보 조회 (차수 가져오기)
+    let meetingNumber = null;
+    const isTempMeeting = meetingId === 'temp-custom-slide';
+    if (!isTempMeeting) {
+      try {
+        const { sheets, SPREADSHEET_ID } = createSheetsClient();
+        const sheetName = '회의목록';
+        const range = `${sheetName}!A3:G`;
+        const response = await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range
+        });
+        
+        const rows = response.data.values || [];
+        const meetingRow = rows.find(row => row[0] === meetingId);
+        
+        if (meetingRow && meetingRow[3]) {
+          meetingNumber = parseInt(meetingRow[3]);
+        }
+      } catch (meetingError) {
+        console.warn('회의 정보 조회 실패:', meetingError);
+      }
+    }
+    
+    // 각 이미지를 Discord에 업로드
+    const imageUrls = [];
+    for (let i = 0; i < imageBuffers.length; i++) {
+      const imageData = imageBuffers[i];
+      const result = await uploadImageToDiscord(
+        imageData.buffer,
+        imageData.filename,
+        isTempMeeting ? `custom-${Date.now()}` : meetingId,
+        meetingDate || new Date().toISOString().split('T')[0],
+        meetingNumber
+      );
+      
+      imageUrls.push(result.imageUrl);
+      console.log(`✅ [uploadCustomSlideFile] 이미지 ${i + 1}/${imageBuffers.length} 업로드 완료: ${result.imageUrl}`);
+    }
+    
+    // 여러 이미지인 경우 imageUrls 배열 반환, 단일 이미지인 경우 imageUrl 반환
+    if (imageUrls.length === 1) {
+      res.json({
+        success: true,
+        imageUrl: imageUrls[0],
+        imageUrls: imageUrls
+      });
+    } else {
+      res.json({
+        success: true,
+        imageUrls: imageUrls,
+        imageUrl: imageUrls[0] // 첫 번째 이미지를 기본으로
+      });
+    }
+  } catch (error) {
+    console.error('파일 업로드 오류:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+}
+
 module.exports = {
   getMeetings,
   createMeeting,
@@ -805,6 +1108,7 @@ module.exports = {
   getMeetingConfig,
   saveMeetingConfig,
   uploadMeetingImage,
+  uploadCustomSlideFile,
   upload // multer middleware
 };
 

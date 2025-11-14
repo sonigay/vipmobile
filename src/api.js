@@ -1087,31 +1087,37 @@ export const api = {
     }
   },
 
-  // 커스텀 슬라이드 이미지 업로드 (회의 생성 전에도 가능)
-  uploadCustomSlideImage: async function uploadCustomSlideImage(imageFile, meetingDate) {
+  // 커스텀 슬라이드 파일 업로드 (이미지, Excel, PPT 지원)
+  uploadCustomSlideFile: async function uploadCustomSlideFile(file, meetingDate, fileType) {
     try {
       const formData = new FormData();
-      formData.append('image', imageFile);
+      formData.append('file', file);
       formData.append('meetingDate', meetingDate || new Date().toISOString().split('T')[0]);
+      formData.append('fileType', fileType || 'image');
       formData.append('slideOrder', 0); // 커스텀 슬라이드는 임시로 0 사용
       
       // 임시 meetingId 사용 (실제 회의 생성 전)
       const tempMeetingId = 'temp-custom-slide';
-      const response = await fetch(`${API_BASE_URL}/api/meetings/${tempMeetingId}/upload-image`, {
+      const response = await fetch(`${API_BASE_URL}/api/meetings/${tempMeetingId}/upload-file`, {
         method: 'POST',
         body: formData
       });
       
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: '이미지 업로드 실패' }));
-        throw new Error(errorData.error || '이미지 업로드 실패');
+        const errorData = await response.json().catch(() => ({ error: '파일 업로드 실패' }));
+        throw new Error(errorData.error || '파일 업로드 실패');
       }
       
       return await response.json();
     } catch (error) {
-      console.error('커스텀 슬라이드 이미지 업로드 오류:', error);
+      console.error('커스텀 슬라이드 파일 업로드 오류:', error);
       throw error;
     }
+  },
+
+  // 커스텀 슬라이드 이미지 업로드 (회의 생성 전에도 가능) - 하위 호환성 유지
+  uploadCustomSlideImage: async function uploadCustomSlideImage(imageFile, meetingDate) {
+    return this.uploadCustomSlideFile(imageFile, meetingDate, 'image');
   },
 
   // 회의 설정 저장

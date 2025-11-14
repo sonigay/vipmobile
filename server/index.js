@@ -5050,6 +5050,7 @@ try {
   app.get('/api/meetings/:meetingId/config', meetingRoutes.getMeetingConfig);
   app.post('/api/meetings/:meetingId/config', meetingRoutes.saveMeetingConfig);
   app.post('/api/meetings/:meetingId/upload-image', meetingRoutes.upload.single('image'), meetingRoutes.uploadMeetingImage);
+  app.post('/api/meetings/:meetingId/upload-file', meetingRoutes.upload.single('file'), meetingRoutes.uploadCustomSlideFile);
   console.log('✅ [회의] Meeting routes mounted at /api/meetings');
 } catch (e) {
   console.error('❌ [회의] Failed to mount meeting routes:', e.message);
