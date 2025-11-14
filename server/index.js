@@ -22764,40 +22764,70 @@ app.get('/api/policy-notices', async (req, res) => {
   try {
     const { yearMonth, category } = req.query;
     
-    console.log('공지사항 목록 조회 요청:', { yearMonth, category });
+    console.log('📢 [공지사항] 목록 조회 요청:', { yearMonth, category });
     
     await ensureNoticeSheetStructure();
     
     const values = await getSheetValuesWithoutCache(NOTICE_SHEET_NAME);
     
+    console.log('📢 [공지사항] 시트 데이터:', {
+      totalRows: values ? values.length : 0,
+      hasData: values && values.length > 2
+    });
+    
     if (!values || values.length <= 2) {
+      console.log('📢 [공지사항] 데이터 없음 (헤더만 있거나 빈 시트)');
       return res.json({ success: true, notices: [] });
     }
     
     // 헤더 제외 (1행: 빈 행, 2행: 헤더)
     const dataRows = values.slice(2);
     
+    console.log('📢 [공지사항] 데이터 행 수:', dataRows.length);
+    
     // 필터링 적용
     let filteredNotices = dataRows
-      .filter(row => {
-        if (row.length < 9) return false; // 최소 컬럼 수 확인
+      .filter((row, index) => {
+        if (row.length < 9) {
+          console.log(`📢 [공지사항] 행 ${index + 3} 컬럼 수 부족:`, row.length);
+          return false; // 최소 컬럼 수 확인
+        }
         
         const noticeYearMonth = (row[0] || '').toString().trim(); // 연월
         const noticeCategory = (row[1] || '').toString().trim(); // 카테고리
         
+        console.log(`📢 [공지사항] 행 ${index + 3} 필터링:`, {
+          noticeYearMonth,
+          noticeCategory,
+          requestYearMonth: yearMonth,
+          requestCategory: category
+        });
+        
         // 연월 필터
         if (yearMonth && noticeYearMonth !== yearMonth) {
+          console.log(`📢 [공지사항] 행 ${index + 3} 연월 불일치로 제외`);
           return false;
         }
         
         // 카테고리 필터
         if (category) {
-          // "전체"가 아니고, 카테고리가 일치하지 않으면 제외
-          if (noticeCategory !== '전체' && noticeCategory !== category) {
-            return false;
+          // "전체"이거나 빈 값이면 모든 카테고리에 표시
+          if (noticeCategory === '전체' || noticeCategory === '' || !noticeCategory) {
+            console.log(`📢 [공지사항] 행 ${index + 3} 전체 카테고리로 포함 (카테고리: "${noticeCategory}")`);
+            return true;
           }
+          // 카테고리가 일치하면 포함
+          if (noticeCategory === category) {
+            console.log(`📢 [공지사항] 행 ${index + 3} 카테고리 일치로 포함 (${noticeCategory} === ${category})`);
+            return true;
+          }
+          // 그 외는 제외
+          console.log(`📢 [공지사항] 행 ${index + 3} 카테고리 불일치로 제외 (${noticeCategory} !== ${category})`);
+          return false;
         }
         
+        // 카테고리 필터가 없으면 모두 포함
+        console.log(`📢 [공지사항] 행 ${index + 3} 필터 없음으로 포함`);
         return true;
       })
       .map((row, index) => {
@@ -22816,13 +22846,19 @@ app.get('/api/policy-notices', async (req, res) => {
         };
       });
     
+    console.log('📢 [공지사항] 필터링 결과:', {
+      total: dataRows.length,
+      filtered: filteredNotices.length,
+      notices: filteredNotices.map(n => ({ id: n.id, title: n.title, category: n.category, yearMonth: n.yearMonth }))
+    });
+    
     res.json({
       success: true,
       notices: filteredNotices
     });
     
   } catch (error) {
-    console.error('공지사항 목록 조회 실패:', error);
+    console.error('❌ [공지사항] 목록 조회 실패:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -22846,9 +22882,19 @@ app.post('/api/policy-notices', async (req, res) => {
     const noticeId = `NOTICE_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
     
+    // 카테고리 처리: 빈 문자열이면 그대로 저장 (모든 카테고리에 표시)
+    const categoryValue = category === '전체' ? '' : (category || '');
+    
+    console.log('📢 [공지사항] 생성 데이터:', {
+      yearMonth,
+      category: categoryValue,
+      title,
+      author
+    });
+    
     const newNoticeRow = [
       yearMonth || '',
-      category || '전체',
+      categoryValue, // 빈 문자열이면 모든 카테고리에 표시
       title || '',
       content || '',
       author || '',
@@ -22927,9 +22973,21 @@ app.put('/api/policy-notices/:id', async (req, res) => {
     
     const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
     
+    // 카테고리 처리: "전체"면 빈 문자열로 저장
+    const categoryValue = category !== undefined 
+      ? (category === '전체' ? '' : category)
+      : (noticeRow[1] || '');
+    
+    console.log('📢 [공지사항] 수정 데이터:', {
+      id,
+      yearMonth: yearMonth !== undefined ? yearMonth : noticeRow[0],
+      category: categoryValue,
+      title: title !== undefined ? title : noticeRow[2]
+    });
+    
     const updatedRow = [
       yearMonth !== undefined ? yearMonth : noticeRow[0] || '',
-      category !== undefined ? (category || '전체') : noticeRow[1] || '전체',
+      categoryValue, // 빈 문자열이면 모든 카테고리에 표시
       title !== undefined ? title : noticeRow[2] || '',
       content !== undefined ? content : noticeRow[3] || '',
       author !== undefined ? author : noticeRow[4] || '',

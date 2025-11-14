@@ -289,23 +289,36 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   // 공지사항 조회 함수
   const loadNotices = async () => {
     if (!selectedCategoryForList || !selectedYearMonth) {
+      console.log('📢 [공지사항] 조회 조건 불충족:', { selectedCategoryForList, selectedYearMonth });
       setNotices([]);
       return;
     }
     
     setNoticesLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/policy-notices?yearMonth=${selectedYearMonth}&category=${selectedCategoryForList}`);
+      const url = `${API_BASE_URL}/api/policy-notices?yearMonth=${selectedYearMonth}&category=${selectedCategoryForList}`;
+      console.log('📢 [공지사항] 조회 요청:', url);
+      
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        console.error('📢 [공지사항] HTTP 오류:', response.status, response.statusText);
+        setNotices([]);
+        return;
+      }
+      
       const data = await response.json();
+      console.log('📢 [공지사항] 조회 응답:', data);
       
       if (data.success) {
+        console.log('📢 [공지사항] 조회 성공, 공지사항 수:', data.notices?.length || 0);
         setNotices(data.notices || []);
       } else {
-        console.error('공지사항 조회 실패:', data.error);
+        console.error('📢 [공지사항] 조회 실패:', data.error);
         setNotices([]);
       }
     } catch (error) {
-      console.error('공지사항 조회 실패:', error);
+      console.error('📢 [공지사항] 조회 예외:', error);
       setNotices([]);
     } finally {
       setNoticesLoading(false);
@@ -321,6 +334,17 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         : `${API_BASE_URL}/api/policy-notices`;
       const method = editingNotice ? 'PUT' : 'POST';
       
+      // 카테고리 처리: noticeData에 category가 있으면 사용, 없으면 selectedCategoryForList 사용
+      // "전체"를 선택한 경우 빈 문자열로 저장 (모든 카테고리에 표시)
+      const categoryValue = noticeData.category === '전체' ? '' : (noticeData.category || selectedCategoryForList);
+      
+      console.log('📢 [공지사항] 저장 요청:', {
+        yearMonth: selectedYearMonth,
+        category: categoryValue,
+        title: noticeData.title,
+        editing: !!editingNotice
+      });
+      
       const response = await fetch(url, {
         method,
         headers: {
@@ -329,7 +353,7 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         body: JSON.stringify({
           ...noticeData,
           yearMonth: selectedYearMonth,
-          category: selectedCategoryForList,
+          category: categoryValue,
           author: loggedInStore?.target || loggedInStore?.name || '알 수 없음'
         })
       });
@@ -2492,6 +2516,8 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                     setEditingNotice(null);
                     setSelectedNotice(null);
                   }}
+                  categories={categories[policyType] || []}
+                  defaultCategory={selectedCategoryForList || ''}
                 />
               </DialogContent>
             </Dialog>
@@ -2516,25 +2542,27 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
 }
 
 // 공지사항 작성/수정 폼 컴포넌트
-function NoticeForm({ notice, onSave, onCancel }) {
+function NoticeForm({ notice, onSave, onCancel, categories = [], defaultCategory = '' }) {
+  // 수정 모드일 때는 notice의 category 사용, 새로 작성할 때는 defaultCategory 또는 '전체' 사용
+  const initialCategory = notice?.category || defaultCategory || '전체';
   const [title, setTitle] = useState(notice?.title || '');
   const [content, setContent] = useState(notice?.content || '');
   const [note, setNote] = useState(notice?.note || '');
-  const [category, setCategory] = useState(notice?.category || '전체');
+  const [category, setCategory] = useState(initialCategory);
 
   useEffect(() => {
     if (notice) {
       setTitle(notice.title || '');
       setContent(notice.content || '');
       setNote(notice.note || '');
-      setCategory(notice.category || '전체');
+      setCategory(notice.category || defaultCategory || '전체');
     } else {
       setTitle('');
       setContent('');
       setNote('');
-      setCategory('전체');
+      setCategory(defaultCategory || '전체');
     }
-  }, [notice]);
+  }, [notice, defaultCategory]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -2581,7 +2609,12 @@ function NoticeForm({ notice, onSave, onCancel }) {
           onChange={(e) => setCategory(e.target.value)}
           label="카테고리"
         >
-          <MenuItem value="전체">전체</MenuItem>
+          <MenuItem value="전체">전체 (모든 카테고리에 표시)</MenuItem>
+          {categories.map((cat) => (
+            <MenuItem key={cat.id} value={cat.id}>
+              {cat.icon} {cat.name}
+            </MenuItem>
+          ))}
         </Select>
       </FormControl>
       <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 3 }}>
