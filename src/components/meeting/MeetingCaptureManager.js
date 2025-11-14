@@ -157,13 +157,17 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         })));
         
         // 전체 슬라이드 배열을 한 번에 저장 (이전 슬라이드 URL 유지)
-        api.saveMeetingConfig(meeting.meetingId, {
-          slides: updatedSlides
-        }).then(() => {
-          console.log(`✅ [MeetingCaptureManager] 슬라이드 ${index + 1} 저장 완료`);
-        }).catch(err => {
-          console.error(`❌ [MeetingCaptureManager] 슬라이드 ${index + 1} 저장 실패:`, err);
-        });
+        // setState 외부에서 저장하여 최신 상태 보장
+        setTimeout(async () => {
+          try {
+            await api.saveMeetingConfig(meeting.meetingId, {
+              slides: updatedSlides
+            });
+            console.log(`✅ [MeetingCaptureManager] 슬라이드 ${index + 1} 저장 완료`);
+          } catch (err) {
+            console.error(`❌ [MeetingCaptureManager] 슬라이드 ${index + 1} 저장 실패:`, err);
+          }
+        }, 0);
         
         return updatedSlides;
       });
