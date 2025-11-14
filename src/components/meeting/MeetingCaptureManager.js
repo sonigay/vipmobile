@@ -60,12 +60,20 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
     setCurrentSlideIndex(index);
     setSlideReady(false);
 
-    // 슬라이드가 준비될 때까지 대기
+    // 슬라이드가 준비될 때까지 대기 (최대 10초)
     const waitForReady = () => {
       return new Promise((resolve) => {
+        let attempts = 0;
+        const maxAttempts = 100; // 10초 (100 * 100ms)
         const checkReady = () => {
+          attempts++;
+          console.log(`🔍 [MeetingCaptureManager] 슬라이드 준비 확인 (${attempts}/${maxAttempts}):`, slideReady);
           if (slideReady) {
+            console.log('✅ [MeetingCaptureManager] 슬라이드 준비 완료');
             resolve();
+          } else if (attempts >= maxAttempts) {
+            console.warn('⚠️ [MeetingCaptureManager] 슬라이드 준비 타임아웃, 강제 진행');
+            resolve(); // 타임아웃 시에도 진행
           } else {
             setTimeout(checkReady, 100);
           }
