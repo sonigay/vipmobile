@@ -180,14 +180,24 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
       });
     };
     
-    // 최소 8초 대기 후 데이터 로딩 완료 확인
+    // 최소 10초 대기 후 데이터 로딩 완료 확인 (더 긴 대기 시간)
     const timer = setTimeout(async () => {
-      console.log('⏳ [SlideRenderer] 데이터 로딩 대기 시작');
+      console.log('⏳ [SlideRenderer] 데이터 로딩 대기 시작 (10초 초기 대기 완료)');
       await waitForDataLoad();
-      console.log('✅ [SlideRenderer] 데이터 로딩 완료 확인됨, 추가 안정화 대기 (10초)');
+      console.log('✅ [SlideRenderer] 데이터 로딩 완료 확인됨, 추가 안정화 대기 (5초)');
       
-      // 추가로 10초 대기하여 완전히 안정화
-      await new Promise(resolve => setTimeout(resolve, 10000));
+      // 추가로 5초 대기하여 완전히 안정화 (10초에서 5초로 단축)
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      
+      // 최종 확인: data-loaded 속성이 여전히 true인지 확인
+      const finalCheck = containerRef.current?.querySelector('[data-loaded="true"]') !== null;
+      const finalLoadingIndicators = containerRef.current?.querySelectorAll('.MuiCircularProgress-root, .MuiLinearProgress-root, [class*="loading"]');
+      const finalHasNoLoading = finalLoadingIndicators.length === 0;
+      
+      if (!finalCheck || !finalHasNoLoading) {
+        console.warn('⚠️ [SlideRenderer] 최종 확인 실패, 추가 대기 (3초)');
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      }
       
       console.log('✅ [SlideRenderer] 안정화 완료, onReady 호출 준비');
       setLoading(false);
@@ -200,7 +210,7 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
           onReady();
         }
       }, 1000);
-    }, 8000); // 최소 8초 대기
+    }, 10000); // 8초에서 10초로 증가 // 최소 8초 대기
 
     return () => clearTimeout(timer);
   }, [slide, onReady]);

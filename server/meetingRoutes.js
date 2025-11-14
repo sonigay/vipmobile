@@ -994,10 +994,45 @@ async function convertExcelToImage(worksheet, filename) {
   }
 }
 
-// PPT 파일을 이미지로 변환 (나중에 구현)
+// PPT 파일을 이미지로 변환
 async function convertPPTToImages(pptBuffer, filename) {
-  // TODO: PPT 변환 구현 (LibreOffice 또는 puppeteer 사용)
-  throw new Error('PPT 변환 기능은 아직 구현되지 않았습니다.');
+  try {
+    // 방법 1: LibreOffice 사용 (서버에 LibreOffice 설치 필요)
+    // const { exec } = require('child_process');
+    // const fs = require('fs');
+    // const path = require('path');
+    // const os = require('os');
+    // 
+    // const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ppt-convert-'));
+    // const inputPath = path.join(tempDir, `${filename}.pptx`);
+    // const outputPath = path.join(tempDir, 'output');
+    // 
+    // fs.writeFileSync(inputPath, pptBuffer);
+    // 
+    // return new Promise((resolve, reject) => {
+    //   exec(`libreoffice --headless --convert-to pdf --outdir "${outputPath}" "${inputPath}"`, (error) => {
+    //     if (error) reject(error);
+    //     // PDF를 이미지로 변환하는 로직 추가
+    //   });
+    // });
+
+    // 방법 2: puppeteer 사용 (HTML로 변환 후 스크린샷)
+    // const puppeteer = require('puppeteer');
+    // const browser = await puppeteer.launch();
+    // const page = await browser.newPage();
+    // // PPT를 HTML로 변환하는 로직 필요
+    // await page.goto('data:text/html,...');
+    // const screenshot = await page.screenshot({ type: 'png', fullPage: true });
+    // await browser.close();
+    // return screenshot;
+
+    // 임시: 에러 메시지 개선
+    console.warn('⚠️ [PPT 변환] PPT 변환 기능은 아직 구현되지 않았습니다. LibreOffice 또는 puppeteer 설치가 필요합니다.');
+    throw new Error('PPT 변환 기능은 아직 구현되지 않았습니다. 서버에 LibreOffice를 설치하거나 puppeteer를 사용하여 구현할 수 있습니다.');
+  } catch (error) {
+    console.error('PPT 변환 오류:', error);
+    throw error;
+  }
 }
 
 // 커스텀 슬라이드 파일 업로드 (이미지, Excel, PPT 지원)
@@ -1042,7 +1077,9 @@ async function uploadCustomSlideFile(req, res) {
     
     // 회의 정보 조회 (차수 가져오기)
     let meetingNumber = null;
+    let actualMeetingId = meetingId;
     const isTempMeeting = meetingId === 'temp-custom-slide';
+    
     if (!isTempMeeting) {
       try {
         const { sheets, SPREADSHEET_ID } = createSheetsClient();
@@ -1058,22 +1095,30 @@ async function uploadCustomSlideFile(req, res) {
         
         if (meetingRow && meetingRow[3]) {
           meetingNumber = parseInt(meetingRow[3]);
+          console.log(`📋 [uploadCustomSlideFile] 회의 차수 조회: ${meetingNumber}차`);
+        } else {
+          console.warn(`⚠️ [uploadCustomSlideFile] 회의 정보를 찾을 수 없습니다: ${meetingId}`);
         }
       } catch (meetingError) {
         console.warn('회의 정보 조회 실패:', meetingError);
       }
+    } else {
+      // 임시 회의인 경우, meetingDate를 사용하여 포스트 이름 생성
+      // 하지만 실제 회의가 생성되면 같은 포스트에 저장되어야 함
+      console.log('📋 [uploadCustomSlideFile] 임시 회의 (커스텀 슬라이드), meetingDate 사용:', meetingDate);
     }
     
     // 각 이미지를 Discord에 업로드
+    // 임시 회의인 경우에도 meetingDate를 사용하여 같은 포스트에 저장되도록 함
     const imageUrls = [];
     for (let i = 0; i < imageBuffers.length; i++) {
       const imageData = imageBuffers[i];
       const result = await uploadImageToDiscord(
         imageData.buffer,
         imageData.filename,
-        isTempMeeting ? `custom-${Date.now()}` : meetingId,
+        isTempMeeting ? `temp-${meetingDate || new Date().toISOString().split('T')[0]}` : meetingId,
         meetingDate || new Date().toISOString().split('T')[0],
-        meetingNumber
+        meetingNumber // 임시 회의인 경우 null이지만, 나중에 실제 회의 생성 시 같은 포스트에 저장됨
       );
       
       imageUrls.push(result.imageUrl);

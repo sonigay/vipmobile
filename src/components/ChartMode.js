@@ -1910,32 +1910,95 @@ function TotalClosingTab() {
   const [dataRendered, setDataRendered] = useState(false); // 실제 데이터 렌더링 완료 여부
   const containerRef = React.useRef(null);
 
-  // 데이터가 로드되고 실제 테이블이 렌더링되었는지 확인
+  // 데이터가 로드되고 실제 테이블이 렌더링되었는지 확인 (강화된 버전)
   React.useEffect(() => {
     if (data && !loading && containerRef.current) {
-      // 실제 테이블 행이 있는지 확인 (최소 1개 이상의 데이터 행)
-      const hasTableRows = containerRef.current.querySelectorAll('table tbody tr, .MuiTableBody-root tr').length > 0;
-      // 또는 데이터가 있는지 확인 (CS 요약, 코드별, 사무실별, 소속별, 담당자별 데이터)
+      // 데이터가 있는지 확인
       const hasData = data.csSummary || 
                       (data.codeData && data.codeData.length > 0) ||
                       (data.officeData && data.officeData.length > 0) ||
                       (data.departmentData && data.departmentData.length > 0) ||
                       (data.agentData && data.agentData.length > 0);
       
-      if (hasData) {
-        // 실제 테이블이 렌더링되기까지 약간의 지연 (DOM 업데이트 대기)
-        const checkRender = setTimeout(() => {
-          const finalCheck = containerRef.current.querySelectorAll('table tbody tr, .MuiTableBody-root tr').length > 0 ||
-                            containerRef.current.querySelector('.MuiPaper-root') !== null;
-          if (finalCheck) {
-            console.log('📊 [TotalClosingTab] 실제 데이터 렌더링 완료 확인, data-loaded="true" 설정');
-            setDataRendered(true);
-          }
-        }, 500);
-        
-        return () => clearTimeout(checkRender);
+      if (!hasData) {
+        console.log('⚠️ [TotalClosingTab] 데이터가 없습니다.');
+        setDataRendered(false);
+        return;
       }
+      
+      // 여러 번 확인하여 확실하게 데이터가 렌더링되었는지 확인
+      let checkCount = 0;
+      const maxChecks = 20; // 최대 10초 (20 * 500ms)
+      
+      const checkRender = () => {
+        checkCount++;
+        
+        // 실제 테이블 행이 있는지 확인 (최소 1개 이상의 데이터 행)
+        const tableRows = containerRef.current.querySelectorAll('table tbody tr, .MuiTableBody-root tr, tbody tr');
+        const hasTableRows = tableRows.length > 0;
+        
+        // Paper 컴포넌트가 있는지 확인
+        const hasPaper = containerRef.current.querySelector('.MuiPaper-root') !== null;
+        
+        // 로딩 인디케이터가 없는지 확인
+        const loadingIndicators = containerRef.current.querySelectorAll('.MuiCircularProgress-root, .MuiLinearProgress-root, [class*="loading"], [class*="Loading"]');
+        const hasNoLoadingIndicator = loadingIndicators.length === 0;
+        
+        // 로딩 텍스트가 없는지 확인
+        const allText = containerRef.current.textContent || '';
+        const hasNoLoadingText = !allText.includes('로딩') && 
+                                 !allText.includes('불러오는 중') && 
+                                 !allText.includes('데이터를 불러오는 중') &&
+                                 !allText.includes('마감장표 데이터 로딩 중');
+        
+        // 모든 조건이 만족되면 데이터 렌더링 완료
+        const isReady = (hasTableRows || hasPaper) && hasNoLoadingIndicator && hasNoLoadingText;
+        
+        if (isReady) {
+          console.log(`✅ [TotalClosingTab] 실제 데이터 렌더링 완료 확인 (${checkCount}번째 확인):`, {
+            hasTableRows: tableRows.length,
+            hasPaper,
+            hasNoLoadingIndicator,
+            hasNoLoadingText
+          });
+          
+          // 추가로 1초 더 대기하여 완전히 안정화
+          setTimeout(() => {
+            // 최종 확인
+            const finalTableRows = containerRef.current.querySelectorAll('table tbody tr, .MuiTableBody-root tr, tbody tr');
+            const finalHasTableRows = finalTableRows.length > 0;
+            const finalHasPaper = containerRef.current.querySelector('.MuiPaper-root') !== null;
+            const finalLoadingIndicators = containerRef.current.querySelectorAll('.MuiCircularProgress-root, .MuiLinearProgress-root');
+            
+            if ((finalHasTableRows || finalHasPaper) && finalLoadingIndicators.length === 0) {
+              console.log('✅ [TotalClosingTab] 최종 확인 완료, data-loaded="true" 설정');
+              setDataRendered(true);
+            } else {
+              console.warn('⚠️ [TotalClosingTab] 최종 확인 실패, 다시 확인 필요');
+              setDataRendered(false);
+            }
+          }, 1000);
+        } else {
+          if (checkCount < maxChecks) {
+            console.log(`🔍 [TotalClosingTab] 데이터 렌더링 확인 중 (${checkCount}/${maxChecks}):`, {
+              hasTableRows: tableRows.length,
+              hasPaper,
+              hasNoLoadingIndicator,
+              hasNoLoadingText,
+              isReady: false
+            });
+            setTimeout(checkRender, 500);
+          } else {
+            console.warn('⚠️ [TotalClosingTab] 최대 확인 횟수 도달, 강제로 data-loaded 설정');
+            setDataRendered(true); // 타임아웃 시에도 설정 (데이터는 있으므로)
+          }
+        }
+      };
+      
+      // 첫 확인은 1초 후에 시작 (DOM 업데이트 시간 확보)
+      setTimeout(checkRender, 1000);
     } else if (loading || !data) {
+      console.log('🔄 [TotalClosingTab] 로딩 중이거나 데이터 없음, data-loaded="false" 설정');
       setDataRendered(false);
     }
   }, [data, loading]);
