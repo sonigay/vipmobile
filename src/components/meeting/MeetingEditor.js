@@ -448,7 +448,9 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess }) {
         }
       }
     } catch (err) {
-      console.error('회의 저장 오류:', err);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('회의 저장 오류:', err);
+      }
       setError(err.message || '회의 저장에 실패했습니다.');
     } finally {
       setLoading(false);

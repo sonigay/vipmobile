@@ -121,18 +121,24 @@ function CustomSlideEditor({ open, onClose, onSave, slide, meetingDate, meetingN
           setPreviewUrl(result.imageUrls[0]);
           // 첫 번째 이미지 URL 저장 (나중에 여러 이미지 처리 개선 가능)
           setFormData(prev => ({ ...prev, imageUrl: result.imageUrls[0] }));
-          console.log(`✅ [CustomSlideEditor] ${fileType} 파일 업로드 완료: ${result.imageUrls.length}개 이미지 생성`);
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`✅ [CustomSlideEditor] ${fileType} 파일 업로드 완료: ${result.imageUrls.length}개 이미지 생성`);
+          }
         } else if (result.imageUrl) {
           // 단일 이미지인 경우 미리보기 URL 설정
           setPreviewUrl(result.imageUrl);
           setFormData(prev => ({ ...prev, imageUrl: result.imageUrl }));
-          console.log('✅ [CustomSlideEditor] 파일 업로드 완료:', result.imageUrl);
+          if (process.env.NODE_ENV === 'development') {
+            console.log('✅ [CustomSlideEditor] 파일 업로드 완료:', result.imageUrl);
+          }
         }
       } else {
         throw new Error(result.error || '파일 업로드 실패');
       }
     } catch (error) {
-      console.error('❌ [CustomSlideEditor] 파일 업로드 오류:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('❌ [CustomSlideEditor] 파일 업로드 오류:', error);
+      }
       setUploadError(error.message || '파일 업로드에 실패했습니다.');
       setPreviewUrl(null);
       setUploadedFileType(null);

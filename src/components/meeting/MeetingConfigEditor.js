@@ -85,7 +85,9 @@ function MeetingConfigEditor({ meeting, loggedInStore, onSave, onCancel }) {
       setSelectedTabs(tabs);
     } catch (err) {
       if (process.env.NODE_ENV === 'development') {
-        console.error('회의 설정 조회 오류:', err);
+        if (process.env.NODE_ENV === 'development') {
+          console.error('회의 설정 조회 오류:', err);
+        }
       }
       setError('회의 설정을 불러오는데 실패했습니다.');
     } finally {
@@ -144,7 +146,9 @@ function MeetingConfigEditor({ meeting, loggedInStore, onSave, onCancel }) {
       }
     } catch (err) {
       if (process.env.NODE_ENV === 'development') {
-        console.error('회의 정보 저장 오류:', err);
+        if (process.env.NODE_ENV === 'development') {
+          console.error('회의 정보 저장 오류:', err);
+        }
       }
       setError('회의 정보 저장에 실패했습니다.');
     } finally {
@@ -236,7 +240,9 @@ function MeetingConfigEditor({ meeting, loggedInStore, onSave, onCancel }) {
       setCapturing(true);
     } catch (err) {
       if (process.env.NODE_ENV === 'development') {
-        console.error('회의 설정 저장 오류:', err);
+        if (process.env.NODE_ENV === 'development') {
+          console.error('회의 설정 저장 오류:', err);
+        }
       }
       setError('회의 설정 저장에 실패했습니다.');
       setSaving(false);
@@ -265,7 +271,9 @@ function MeetingConfigEditor({ meeting, loggedInStore, onSave, onCancel }) {
       setCapturing(true);
     } catch (err) {
       if (process.env.NODE_ENV === 'development') {
-        console.error('재캡처 시작 오류:', err);
+        if (process.env.NODE_ENV === 'development') {
+          console.error('재캡처 시작 오류:', err);
+        }
       }
       setError('재캡처 시작에 실패했습니다.');
       setSaving(false);
