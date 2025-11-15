@@ -18,6 +18,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
   const [slidesState, setSlidesState] = useState(slides); // 슬라이드 상태 관리
   const [startTime, setStartTime] = useState(null); // 캡처 시작 시간
   const [retryingSlides, setRetryingSlides] = useState(new Set()); // 재시도 중인 슬라이드
+  const [isPaused, setIsPaused] = useState(false); // 일시정지 상태
 
   useEffect(() => {
     if (slides && Array.isArray(slides)) {
