@@ -1387,7 +1387,7 @@ async function convertPPTToImages(pptBuffer, filename) {
       const slideData = await parser.parseStringPromise(slideXml);
       
       // 슬라이드 내용 추출 (텍스트, 이미지 등)
-      const slideContent = extractSlideContent(slideData, zipContent);
+      const slideContent = await extractSlideContent(slideData, zipContent);
       
       // HTML 생성
       const html = generateSlideHTML(slideContent, i + 1, slideFiles.length);
