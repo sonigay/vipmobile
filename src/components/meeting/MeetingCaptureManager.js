@@ -151,12 +151,14 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
       if (!slideElement) {
         // 모든 슬라이드 요소 확인 (디버깅용)
         const allSlideElements = document.querySelectorAll('[data-slide-id]');
-        console.error(`❌ [MeetingCaptureManager] 슬라이드 요소를 찾을 수 없습니다.`, {
-          slideId: currentSlide.slideId,
-          index: index,
-          totalSlides: slidesState.length,
-          foundElements: Array.from(allSlideElements).map(el => el.getAttribute('data-slide-id'))
-        });
+        if (process.env.NODE_ENV === 'development') {
+          console.error(`❌ [MeetingCaptureManager] 슬라이드 요소를 찾을 수 없습니다.`, {
+            slideId: currentSlide.slideId,
+            index: index,
+            totalSlides: slidesState.length,
+            foundElements: Array.from(allSlideElements).map(el => el.getAttribute('data-slide-id'))
+          });
+        }
         throw new Error(`슬라이드 요소를 찾을 수 없습니다. (slideId: ${currentSlide.slideId}, index: ${index})`);
       }
 
