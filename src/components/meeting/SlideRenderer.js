@@ -14,42 +14,66 @@ import { getAvailableTabsForMode } from '../../config/modeTabConfig';
  */
 /**
  * 세부 옵션 중 마지막 항목의 라벨을 반환하는 헬퍼 함수
+ * detailOptions가 없으면 subTab의 label을 반환
  */
 const getLastDetailOptionLabel = (slide, loggedInStore) => {
-  if (!slide?.detailOptions) return null;
-  
   const availableTabs = getAvailableTabsForMode(slide.mode, loggedInStore || {});
   const tabConfig = availableTabs.find(t => t.key === slide.tab);
   
-  let detailOptions = null;
-  let allOptionLabels = [];
+  // 하부 탭 정보 가져오기
+  let subTabConfig = null;
+  if (slide.subTab && tabConfig?.subTabs) {
+    subTabConfig = tabConfig.subTabs.find(st => st.key === slide.subTab);
+  }
   
-  // 탭에 detailOptions가 있는 경우 (검수 모드 등)
-  if (tabConfig?.detailOptions) {
-    detailOptions = tabConfig.detailOptions;
-  } else if (slide.subTab && tabConfig?.subTabs) {
-    // 하부 탭에 detailOptions가 있는 경우 (장표 모드 등)
-    const subTabConfig = tabConfig.subTabs.find(st => st.key === slide.subTab);
-    if (subTabConfig?.detailOptions) {
+  // detailOptions가 있는 경우 처리
+  if (slide?.detailOptions) {
+    let detailOptions = null;
+    let allOptionLabels = [];
+    
+    // 탭에 detailOptions가 있는 경우 (검수 모드 등)
+    if (tabConfig?.detailOptions) {
+      detailOptions = tabConfig.detailOptions;
+    } else if (subTabConfig?.detailOptions) {
+      // 하부 탭에 detailOptions가 있는 경우 (장표 모드 등)
       detailOptions = subTabConfig.detailOptions;
+    }
+    
+    if (detailOptions) {
+      // 모든 세부 옵션 라벨 수집
+      detailOptions.options?.forEach(option => {
+        const value = slide.detailOptions[option.key];
+        // multiple 옵션인 경우 배열로 처리
+        if (Array.isArray(value)) {
+          value.forEach(v => {
+            if (v && v !== 'all' && v !== option.defaultValue) {
+              const selectedValue = option.values?.find(val => val.key === v);
+              if (selectedValue) {
+                allOptionLabels.push(selectedValue.label);
+              }
+            }
+          });
+        } else if (value && value !== 'all' && value !== option.defaultValue) {
+          const selectedValue = option.values?.find(v => v.key === value);
+          if (selectedValue) {
+            allOptionLabels.push(selectedValue.label);
+          }
+        }
+      });
+      
+      // 마지막 항목만 반환
+      if (allOptionLabels.length > 0) {
+        return allOptionLabels[allOptionLabels.length - 1];
+      }
     }
   }
   
-  if (!detailOptions) return null;
+  // detailOptions가 없거나 값이 없으면 subTab의 label 반환
+  if (subTabConfig?.label) {
+    return subTabConfig.label;
+  }
   
-  // 모든 세부 옵션 라벨 수집
-  detailOptions.options?.forEach(option => {
-    const value = slide.detailOptions[option.key];
-    if (value && value !== 'all' && value !== option.defaultValue) {
-      const selectedValue = option.values?.find(v => v.key === value);
-      if (selectedValue) {
-        allOptionLabels.push(selectedValue.label);
-      }
-    }
-  });
-  
-  // 마지막 항목만 반환
-  return allOptionLabels.length > 0 ? allOptionLabels[allOptionLabels.length - 1] : null;
+  return null;
 };
 
 const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, onReady }) {
