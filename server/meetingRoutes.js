@@ -1452,7 +1452,7 @@ async function convertPPTToImages(pptBuffer, filename) {
 }
 
 // 슬라이드 내용 추출
-function extractSlideContent(slideData, zipContent) {
+async function extractSlideContent(slideData, zipContent) {
   const content = {
     texts: [],
     images: []
