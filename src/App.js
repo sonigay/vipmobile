@@ -271,14 +271,14 @@ function AppContent() {
             return false;
           }
           
-          // 회의 모드의 경우 M 권한만 접속 가능 (문자열 비교 명확히)
+          // 회의 모드의 경우 M 권한만 접속 가능
           if (mode === 'meeting') {
-            const permissionStr = String(hasPermission).toUpperCase();
-            return permissionStr === 'M' || hasPermission === true;
+            // 문자열 "M" 또는 boolean true 모두 허용
+            return hasPermission === 'M' || hasPermission === true || String(hasPermission).trim().toUpperCase() === 'M';
           }
           
           // 다른 모드는 권한이 있으면 포함 (true 또는 'O')
-          return hasPermission === true || String(hasPermission).toUpperCase() === 'O';
+          return hasPermission === true || hasPermission === 'O' || String(hasPermission).trim().toUpperCase() === 'O';
         })
         .map(([mode]) => mode);
       
