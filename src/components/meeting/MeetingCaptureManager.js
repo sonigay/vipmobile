@@ -357,10 +357,21 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
       
       // 사용자 친화적인 에러 메시지 생성
       let userFriendlyMessage = `슬라이드 ${index + 1} 캡처 실패`;
-      if (error.message.includes('업로드')) {
-        userFriendlyMessage += ': 이미지 업로드 중 오류가 발생했습니다. 네트워크 연결을 확인해주세요.';
-      } else if (error.message.includes('캡처')) {
-        userFriendlyMessage += ': 화면 캡처 중 오류가 발생했습니다.';
+      
+      if (error.message.includes('네트워크') || error.message.includes('연결')) {
+        userFriendlyMessage += ': 네트워크 연결 오류가 발생했습니다. 인터넷 연결을 확인하고 다시 시도해주세요.';
+      } else if (error.message.includes('업로드')) {
+        if (error.message.includes('너무 큽니다')) {
+          userFriendlyMessage += ': 이미지 파일이 너무 큽니다. 파일 크기를 줄여주세요.';
+        } else if (error.message.includes('서버 오류')) {
+          userFriendlyMessage += ': 서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
+        } else {
+          userFriendlyMessage += ': 이미지 업로드 중 오류가 발생했습니다. 네트워크 연결을 확인해주세요.';
+        }
+      } else if (error.message.includes('캡처') || error.message.includes('요소를 찾을 수 없습니다')) {
+        userFriendlyMessage += ': 화면 캡처 중 오류가 발생했습니다. 페이지를 새로고침하고 다시 시도해주세요.';
+      } else if (error.message.includes('슬라이드 데이터가 없습니다')) {
+        userFriendlyMessage += ': 슬라이드 데이터를 찾을 수 없습니다. 회의 설정을 확인해주세요.';
       } else {
         userFriendlyMessage += `: ${error.message}`;
       }
