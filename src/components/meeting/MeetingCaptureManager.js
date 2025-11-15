@@ -294,10 +294,36 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         slideId: slidesState && slidesState[index] ? slidesState[index].slideId : 'unknown',
         index: index,
         errorMessage: error.message,
-        errorStack: error.stack
+        errorStack: error.stack,
+        slideType: slidesState && slidesState[index] ? slidesState[index].type : 'unknown',
+        slideMode: slidesState && slidesState[index] ? slidesState[index].mode : 'unknown'
       });
       
-      setFailed(prev => [...prev, index + 1]);
+      // 사용자 친화적인 에러 메시지 생성
+      let userFriendlyMessage = `슬라이드 ${index + 1} 캡처 실패`;
+      if (error.message.includes('업로드')) {
+        userFriendlyMessage += ': 이미지 업로드 중 오류가 발생했습니다. 네트워크 연결을 확인해주세요.';
+      } else if (error.message.includes('캡처')) {
+        userFriendlyMessage += ': 화면 캡처 중 오류가 발생했습니다.';
+      } else {
+        userFriendlyMessage += `: ${error.message}`;
+      }
+      
+      setFailed(prev => {
+        // 기존 실패 항목 제거 (같은 슬라이드가 다시 실패한 경우)
+        const filtered = prev.filter(f => {
+          if (typeof f === 'object') {
+            return f.slideIndex !== index + 1;
+          }
+          return f !== index + 1;
+        });
+        return [...filtered, {
+          slideIndex: index + 1,
+          slideId: slidesState && slidesState[index] ? slidesState[index].slideId : 'unknown',
+          error: userFriendlyMessage,
+          timestamp: new Date().toISOString()
+        }];
+      });
       
       // 오류가 발생해도 슬라이드 상태는 저장 (imageUrl은 없지만)
       try {
