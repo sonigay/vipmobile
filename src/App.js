@@ -1279,21 +1279,16 @@ function AppContent() {
               return false;
             }
             
-            // 회의 모드의 경우 M 권한만 접속 가능 (문자열 비교 명확히)
+            // 회의 모드의 경우 M 권한만 접속 가능
             if (mode === 'meeting') {
-              const permissionStr = String(hasPermission || '').trim().toUpperCase();
-              const result = permissionStr === 'M' || hasPermission === true;
-              console.log(`🔍 [필터링] meeting 모드: hasPermission="${hasPermission}", permissionStr="${permissionStr}", result=${result}`);
-              return result;
+              // 문자열 "M" 또는 boolean true 모두 허용
+              return hasPermission === 'M' || hasPermission === true || String(hasPermission).trim().toUpperCase() === 'M';
             }
             
             // 다른 모드는 권한이 있으면 포함 (true 또는 'O')
-            return hasPermission === true || String(hasPermission || '').trim().toUpperCase() === 'O';
+            return hasPermission === true || hasPermission === 'O' || String(hasPermission).trim().toUpperCase() === 'O';
           })
           .map(([mode]) => mode);
-        
-        console.log('🔍 [필터링 후] availableModes:', availableModes);
-        console.log('🔍 [디버깅] meeting이 포함되어 있는가?', availableModes.includes('meeting'));
         
         // 단일 권한인 경우 (agent만 있거나, 하나만 있는 경우)
         if (availableModes.length === 1) {
