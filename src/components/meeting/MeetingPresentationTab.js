@@ -19,10 +19,6 @@ import {
 } from '@mui/icons-material';
 import { api } from '../../api';
 
-// 디버깅: import 확인
-console.log('🔍 [MeetingPresentationTab] api import 결과:', api);
-console.log('🔍 [MeetingPresentationTab] api.getMeetings:', api?.getMeetings);
-
 import ImageSlideViewer from './ImageSlideViewer';
 
 const formatDateTime = (value) => {
@@ -63,22 +59,29 @@ function MeetingPresentationTab({ loggedInStore, initialSelectedMeeting, onMeeti
     setLoading(true);
     setError(null);
     try {
-      // 디버깅: api 객체 확인
-      console.log('🔍 [MeetingPresentationTab] api 객체:', api);
-      console.log('🔍 [MeetingPresentationTab] api.getMeetings 타입:', typeof api?.getMeetings);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔍 [MeetingPresentationTab] api 객체:', api);
+        console.log('🔍 [MeetingPresentationTab] api.getMeetings 타입:', typeof api?.getMeetings);
+      }
       
       if (!api) {
         throw new Error('API 객체가 없습니다.');
       }
       
       if (typeof api.getMeetings !== 'function') {
-        console.error('❌ [MeetingPresentationTab] getMeetings가 함수가 아닙니다:', api.getMeetings);
+        if (process.env.NODE_ENV === 'development') {
+          console.error('❌ [MeetingPresentationTab] getMeetings가 함수가 아닙니다:', api.getMeetings);
+        }
         throw new Error(`getMeetings 함수를 찾을 수 없습니다.`);
       }
       
-      console.log('✅ [MeetingPresentationTab] getMeetings 호출 시작');
+      if (process.env.NODE_ENV === 'development') {
+        console.log('✅ [MeetingPresentationTab] getMeetings 호출 시작');
+      }
       const response = await api.getMeetings();
-      console.log('✅ [MeetingPresentationTab] getMeetings 응답:', response);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('✅ [MeetingPresentationTab] getMeetings 응답:', response);
+      }
       
       if (response && response.success === false) {
         throw new Error(response.error || '회의 목록 조회 실패');
@@ -87,8 +90,10 @@ function MeetingPresentationTab({ loggedInStore, initialSelectedMeeting, onMeeti
       const completedMeetings = ((response && response.meetings) || []).filter(m => m.status === 'completed');
       setMeetings(completedMeetings);
     } catch (err) {
-      console.error('❌ [MeetingPresentationTab] 회의 목록 조회 오류:', err);
-      console.error('❌ [MeetingPresentationTab] 에러 스택:', err.stack);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('❌ [MeetingPresentationTab] 회의 목록 조회 오류:', err);
+        console.error('❌ [MeetingPresentationTab] 에러 스택:', err.stack);
+      }
       setError(err.message || '회의 목록을 불러오는데 실패했습니다.');
       // 에러 발생 시 빈 배열로 설정
       setMeetings([]);

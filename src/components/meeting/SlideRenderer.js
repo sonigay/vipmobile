@@ -1564,19 +1564,25 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
         const foundIndex = availableTabs[tabIndex].subTabs.findIndex(st => st.key === slide.subTab);
         if (foundIndex >= 0) {
           subTabIndex = foundIndex;
-          console.log(`🔍 [SlideRenderer] 하부 탭 인덱스 계산: ${slide.subTab} -> ${subTabIndex}`);
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`🔍 [SlideRenderer] 하부 탭 인덱스 계산: ${slide.subTab} -> ${subTabIndex}`);
+          }
         } else {
-          console.warn(`⚠️ [SlideRenderer] 하부 탭을 찾을 수 없음: ${slide.subTab}`);
+          if (process.env.NODE_ENV === 'development') {
+            console.warn(`⚠️ [SlideRenderer] 하부 탭을 찾을 수 없음: ${slide.subTab}`);
+          }
         }
       }
       
-      console.log(`🔍 [SlideRenderer] ChartMode 렌더링:`, {
-        tab: slide.tab,
-        tabIndex,
-        subTab: slide.subTab,
-        subTabIndex,
-        slideId: slide.slideId
-      });
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`🔍 [SlideRenderer] ChartMode 렌더링:`, {
+          tab: slide.tab,
+          tabIndex,
+          subTab: slide.subTab,
+          subTabIndex,
+          slideId: slide.slideId
+        });
+      }
       
       // 모드/탭 제목 구성 (역순으로)
       const modeTitle = modeConfig?.title || slide.mode;

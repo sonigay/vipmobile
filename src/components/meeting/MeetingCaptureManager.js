@@ -67,13 +67,19 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
       
       // 회의 상태를 completed로 업데이트
       try {
-        console.log(`🔄 [MeetingCaptureManager] 회의 상태를 completed로 업데이트 시작: ${meeting.meetingId}`);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`🔄 [MeetingCaptureManager] 회의 상태를 completed로 업데이트 시작: ${meeting.meetingId}`);
+        }
         await api.updateMeeting(meeting.meetingId, {
           status: 'completed'
         });
-        console.log(`✅ [MeetingCaptureManager] 회의 상태 업데이트 완료`);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`✅ [MeetingCaptureManager] 회의 상태 업데이트 완료`);
+        }
       } catch (err) {
-        console.error('❌ [MeetingCaptureManager] 회의 상태 업데이트 오류:', err);
+        if (process.env.NODE_ENV === 'development') {
+          console.error('❌ [MeetingCaptureManager] 회의 상태 업데이트 오류:', err);
+        }
       }
 
       if (onComplete) {
@@ -307,11 +313,15 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
       // 각 슬라이드에 필수 필드가 있는지 확인
       const validatedSlides = updatedSlides.map((slide, idx) => {
         if (!slide.slideId) {
-          console.warn(`⚠️ [MeetingCaptureManager] 슬라이드 ${idx + 1}에 slideId가 없습니다.`, slide);
+          if (process.env.NODE_ENV === 'development') {
+            console.warn(`⚠️ [MeetingCaptureManager] 슬라이드 ${idx + 1}에 slideId가 없습니다.`, slide);
+          }
           slide.slideId = slide.slideId || `slide-${slide.order || idx + 1}`;
         }
         if (slide.order === undefined || slide.order === null) {
-          console.warn(`⚠️ [MeetingCaptureManager] 슬라이드 ${idx + 1}에 order가 없습니다.`, slide);
+          if (process.env.NODE_ENV === 'development') {
+            console.warn(`⚠️ [MeetingCaptureManager] 슬라이드 ${idx + 1}에 order가 없습니다.`, slide);
+          }
           slide.order = slide.order || idx + 1;
         }
         return slide;
