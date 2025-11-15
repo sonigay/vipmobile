@@ -1267,20 +1267,21 @@ function AppContent() {
         // getCurrentUserAvailableModes와 동일한 방식으로 필터링 (서브 권한 제외)
         const availableModes = Object.entries(store.modePermissions)
           .filter(([mode, hasPermission]) => {
-            // 회의 모드의 경우 M 권한만 접속 가능
-            if (mode === 'meeting') {
-              const result = hasPermission === 'M' || hasPermission === true;
-              console.log(`🔍 [필터링] meeting 모드 체크: hasPermission=${hasPermission}, result=${result}`);
-              return result;
+            // 서브 권한은 제외
+            if (subPermissions.includes(mode)) {
+              return false;
             }
-            // 권한이 있고, 서브 권한이 아닌 경우만 포함
-            return (hasPermission === true || hasPermission === 'O') && !subPermissions.includes(mode);
+            
+            // 회의 모드의 경우 M 권한만 접속 가능 (문자열 비교 명확히)
+            if (mode === 'meeting') {
+              const permissionStr = String(hasPermission).toUpperCase();
+              return permissionStr === 'M' || hasPermission === true;
+            }
+            
+            // 다른 모드는 권한이 있으면 포함 (true 또는 'O')
+            return hasPermission === true || String(hasPermission).toUpperCase() === 'O';
           })
           .map(([mode]) => mode);
-        
-        console.log('🔍 대리점 관리자 - 사용 가능한 모드:', availableModes);
-        console.log('🔍 [디버깅] meeting 권한 값:', store.modePermissions?.meeting);
-        console.log('🔍 [디버깅] meeting 권한 타입:', typeof store.modePermissions?.meeting);
         
         // 단일 권한인 경우 (agent만 있거나, 하나만 있는 경우)
         if (availableModes.length === 1) {
