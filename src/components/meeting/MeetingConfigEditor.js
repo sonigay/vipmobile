@@ -7,12 +7,17 @@ import {
   Divider,
   Alert,
   CircularProgress,
-  Stack
+  Stack,
+  TextField,
+  Collapse
 } from '@mui/material';
 import {
   Save as SaveIcon,
   Add as AddIcon,
-  Refresh as RefreshIcon
+  Refresh as RefreshIcon,
+  Edit as EditIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon
 } from '@mui/icons-material';
 import ModeSelector from './ModeSelector';
 import SlideOrderEditor from './SlideOrderEditor';
@@ -31,11 +36,28 @@ function MeetingConfigEditor({ meeting, loggedInStore, onSave, onCancel }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [capturing, setCapturing] = useState(false);
+  const [editingInfo, setEditingInfo] = useState(false);
+  const [meetingInfo, setMeetingInfo] = useState({
+    meetingName: '',
+    meetingDate: '',
+    meetingNumber: '',
+    meetingLocation: '',
+    participants: ''
+  });
+  const [infoErrors, setInfoErrors] = useState({});
 
   // 회의 설정 불러오기
   useEffect(() => {
     if (meeting?.meetingId) {
       loadMeetingConfig();
+      // 회의 정보 초기화
+      setMeetingInfo({
+        meetingName: meeting.meetingName || '',
+        meetingDate: meeting.meetingDate || '',
+        meetingNumber: meeting.meetingNumber || '',
+        meetingLocation: meeting.meetingLocation || '',
+        participants: meeting.participants || ''
+      });
     }
   }, [meeting]);
 
@@ -62,10 +84,71 @@ function MeetingConfigEditor({ meeting, loggedInStore, onSave, onCancel }) {
       setSelectedModes(Array.from(modes));
       setSelectedTabs(tabs);
     } catch (err) {
-      console.error('회의 설정 조회 오류:', err);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('회의 설정 조회 오류:', err);
+      }
       setError('회의 설정을 불러오는데 실패했습니다.');
     } finally {
       setLoading(false);
+    }
+  };
+  
+  const handleInfoChange = (field) => (event) => {
+    const value = event.target.value;
+    setMeetingInfo(prev => ({ ...prev, [field]: value }));
+    // 에러 초기화
+    if (infoErrors[field]) {
+      setInfoErrors(prev => ({ ...prev, [field]: '' }));
+    }
+  };
+  
+  const validateInfo = () => {
+    const newErrors = {};
+    
+    if (!meetingInfo.meetingName.trim()) {
+      newErrors.meetingName = '회의 이름을 입력해주세요.';
+    }
+    
+    if (!meetingInfo.meetingDate) {
+      newErrors.meetingDate = '회의 날짜를 선택해주세요.';
+    }
+    
+    if (!meetingInfo.meetingNumber || parseInt(meetingInfo.meetingNumber) <= 0) {
+      newErrors.meetingNumber = '차수를 입력해주세요. (1 이상)';
+    }
+    
+    setInfoErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+  
+  const handleSaveInfo = async () => {
+    if (!validateInfo()) {
+      return;
+    }
+    
+    setSaving(true);
+    setError(null);
+    
+    try {
+      await api.updateMeeting(meeting.meetingId, {
+        meetingName: meetingInfo.meetingName,
+        meetingDate: meetingInfo.meetingDate,
+        meetingNumber: meetingInfo.meetingNumber,
+        meetingLocation: meetingInfo.meetingLocation,
+        participants: meetingInfo.participants
+      });
+      
+      setEditingInfo(false);
+      if (onSave) {
+        onSave(); // 목록 새로고침
+      }
+    } catch (err) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('회의 정보 저장 오류:', err);
+      }
+      setError('회의 정보 저장에 실패했습니다.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -152,7 +235,9 @@ function MeetingConfigEditor({ meeting, loggedInStore, onSave, onCancel }) {
       // 캡처 시작
       setCapturing(true);
     } catch (err) {
-      console.error('회의 설정 저장 오류:', err);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('회의 설정 저장 오류:', err);
+      }
       setError('회의 설정 저장에 실패했습니다.');
       setSaving(false);
     }
@@ -179,7 +264,9 @@ function MeetingConfigEditor({ meeting, loggedInStore, onSave, onCancel }) {
       // 재캡처 시작
       setCapturing(true);
     } catch (err) {
-      console.error('재캡처 시작 오류:', err);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('재캡처 시작 오류:', err);
+      }
       setError('재캡처 시작에 실패했습니다.');
       setSaving(false);
     }
@@ -242,6 +329,115 @@ function MeetingConfigEditor({ meeting, loggedInStore, onSave, onCancel }) {
           {error}
         </Alert>
       )}
+
+      {/* 회의 정보 수정 섹션 */}
+      <Paper sx={{ p: 3, mb: 3 }}>
+        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+            회의 정보
+          </Typography>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={editingInfo ? <ExpandLessIcon /> : <EditIcon />}
+            onClick={() => setEditingInfo(!editingInfo)}
+            disabled={saving || capturing}
+          >
+            {editingInfo ? '접기' : '수정'}
+          </Button>
+        </Stack>
+        
+        <Collapse in={editingInfo}>
+          <Stack spacing={2} sx={{ mt: 2 }}>
+            <TextField
+              label="회의 이름"
+              value={meetingInfo.meetingName}
+              onChange={handleInfoChange('meetingName')}
+              error={!!infoErrors.meetingName}
+              helperText={infoErrors.meetingName}
+              fullWidth
+              required
+            />
+            <TextField
+              label="회의 날짜"
+              type="date"
+              value={meetingInfo.meetingDate}
+              onChange={handleInfoChange('meetingDate')}
+              error={!!infoErrors.meetingDate}
+              helperText={infoErrors.meetingDate}
+              fullWidth
+              required
+              InputLabelProps={{ shrink: true }}
+            />
+            <TextField
+              label="차수"
+              type="number"
+              value={meetingInfo.meetingNumber}
+              onChange={handleInfoChange('meetingNumber')}
+              error={!!infoErrors.meetingNumber}
+              helperText={infoErrors.meetingNumber}
+              fullWidth
+              required
+              inputProps={{ min: 1 }}
+            />
+            <TextField
+              label="회의 장소"
+              value={meetingInfo.meetingLocation}
+              onChange={handleInfoChange('meetingLocation')}
+              fullWidth
+            />
+            <TextField
+              label="참석자"
+              value={meetingInfo.participants}
+              onChange={handleInfoChange('participants')}
+              fullWidth
+              multiline
+              rows={2}
+              placeholder="참석자 목록을 입력하세요 (쉼표로 구분)"
+            />
+            <Stack direction="row" spacing={2} justifyContent="flex-end">
+              <Button onClick={() => {
+                setEditingInfo(false);
+                setMeetingInfo({
+                  meetingName: meeting.meetingName || '',
+                  meetingDate: meeting.meetingDate || '',
+                  meetingNumber: meeting.meetingNumber || '',
+                  meetingLocation: meeting.meetingLocation || '',
+                  participants: meeting.participants || ''
+                });
+                setInfoErrors({});
+              }}>
+                취소
+              </Button>
+              <Button
+                variant="contained"
+                onClick={handleSaveInfo}
+                disabled={saving}
+              >
+                저장
+              </Button>
+            </Stack>
+          </Stack>
+        </Collapse>
+        
+        {!editingInfo && (
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="body2" color="text.secondary">
+              날짜: {meetingInfo.meetingDate || '-'} | 차수: {meetingInfo.meetingNumber || '-'}
+            </Typography>
+            {meetingInfo.meetingLocation && (
+              <Typography variant="body2" color="text.secondary">
+                장소: {meetingInfo.meetingLocation}
+              </Typography>
+            )}
+            {meetingInfo.participants && (
+              <Typography variant="body2" color="text.secondary">
+                참석자: {meetingInfo.participants}
+              </Typography>
+            )}
+          </Box>
+        )}
+      </Paper>
 
       <Paper sx={{ p: 3, mb: 3 }}>
         <ModeSelector

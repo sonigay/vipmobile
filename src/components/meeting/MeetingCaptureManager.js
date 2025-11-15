@@ -17,13 +17,18 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
   const [slideReady, setSlideReady] = useState(false);
   const [slidesState, setSlidesState] = useState(slides); // 슬라이드 상태 관리
   const [startTime, setStartTime] = useState(null); // 캡처 시작 시간
+  const [retryingSlides, setRetryingSlides] = useState(new Set()); // 재시도 중인 슬라이드
 
   useEffect(() => {
     if (slides && Array.isArray(slides)) {
-      console.log(`📋 [MeetingCaptureManager] 슬라이드 초기화: ${slides.length}개`);
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`📋 [MeetingCaptureManager] 슬라이드 초기화: ${slides.length}개`);
+      }
       setSlidesState(slides);
     } else {
-      console.warn(`⚠️ [MeetingCaptureManager] slides가 배열이 아닙니다:`, slides);
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`⚠️ [MeetingCaptureManager] slides가 배열이 아닙니다:`, slides);
+      }
       setSlidesState([]);
     }
   }, [slides]);
@@ -91,7 +96,9 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             }
             resolve();
           } else if (attempts >= maxAttempts) {
-            console.warn(`⚠️ [MeetingCaptureManager] 슬라이드 ${index + 1} 준비 타임아웃, 강제 진행`);
+            if (process.env.NODE_ENV === 'development') {
+              console.warn(`⚠️ [MeetingCaptureManager] 슬라이드 ${index + 1} 준비 타임아웃, 강제 진행`);
+            }
             resolve(); // 타임아웃 시에도 진행
           } else {
             setTimeout(checkReady, 100);
@@ -188,7 +195,9 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             if (attempt === retries) {
               throw new Error(`이미지 업로드 실패 (${retries}회 시도): ${error.message}`);
             }
-            console.warn(`⚠️ [MeetingCaptureManager] 슬라이드 ${index + 1} 업로드 재시도 ${attempt}/${retries}:`, error.message);
+            if (process.env.NODE_ENV === 'development') {
+              console.warn(`⚠️ [MeetingCaptureManager] 슬라이드 ${index + 1} 업로드 재시도 ${attempt}/${retries}:`, error.message);
+            }
             await new Promise(resolve => setTimeout(resolve, delay * attempt));
           }
         }
@@ -197,7 +206,9 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
       const uploadResponse = await uploadWithRetry();
 
       const uploadResult = await uploadResponse.json();
-      console.log(`✅ [MeetingCaptureManager] 슬라이드 ${index + 1} 업로드 완료:`, uploadResult.imageUrl);
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`✅ [MeetingCaptureManager] 슬라이드 ${index + 1} 업로드 완료:`, uploadResult.imageUrl);
+      }
 
       // 현재 상태를 기반으로 슬라이드 배열 업데이트 (이전 슬라이드 정보 유지)
       // setState의 함수형 업데이트를 사용하여 최신 상태 보장
@@ -232,7 +243,9 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
       
       // updatedSlides가 null이면 다시 가져오기
       if (!updatedSlides) {
-        console.warn(`⚠️ [MeetingCaptureManager] updatedSlides가 null, 재시도...`);
+        if (process.env.NODE_ENV === 'development') {
+          console.warn(`⚠️ [MeetingCaptureManager] updatedSlides가 null, 재시도...`);
+        }
         await new Promise(resolve => setTimeout(resolve, 100));
         // 최신 상태를 다시 가져오기
         setSlidesState(prevSlides => {
@@ -252,7 +265,9 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
       
       // 검증: updatedSlides가 배열인지 확인
       if (!Array.isArray(updatedSlides)) {
-        console.error(`❌ [MeetingCaptureManager] updatedSlides가 배열이 아닙니다:`, typeof updatedSlides, updatedSlides);
+        if (process.env.NODE_ENV === 'development') {
+          console.error(`❌ [MeetingCaptureManager] updatedSlides가 배열이 아닙니다:`, typeof updatedSlides, updatedSlides);
+        }
         throw new Error('슬라이드 배열을 생성할 수 없습니다.');
       }
       
@@ -271,14 +286,20 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
       
       // 전체 슬라이드 배열을 한 번에 저장 (이전 슬라이드 URL 유지)
       try {
-        console.log(`💾 [MeetingCaptureManager] 슬라이드 ${index + 1} 저장 시작, 검증된 슬라이드 수: ${validatedSlides.length}`);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`💾 [MeetingCaptureManager] 슬라이드 ${index + 1} 저장 시작, 검증된 슬라이드 수: ${validatedSlides.length}`);
+        }
         await api.saveMeetingConfig(meeting.meetingId, {
           slides: validatedSlides
         });
-        console.log(`✅ [MeetingCaptureManager] 슬라이드 ${index + 1} 저장 완료`);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`✅ [MeetingCaptureManager] 슬라이드 ${index + 1} 저장 완료`);
+        }
       } catch (err) {
         console.error(`❌ [MeetingCaptureManager] 슬라이드 ${index + 1} 저장 실패:`, err);
-        console.error(`❌ [MeetingCaptureManager] 저장 시도한 슬라이드 데이터:`, validatedSlides);
+        if (process.env.NODE_ENV === 'development') {
+          console.error(`❌ [MeetingCaptureManager] 저장 시도한 슬라이드 데이터:`, validatedSlides);
+        }
         throw err; // 에러를 다시 throw하여 상위에서 처리할 수 있도록
       }
 
@@ -290,14 +311,16 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
       }, 500);
     } catch (error) {
       console.error(`❌ [MeetingCaptureManager] 슬라이드 ${index + 1} 캡처 오류:`, error);
-      console.error(`❌ [MeetingCaptureManager] 오류 상세:`, {
-        slideId: slidesState && slidesState[index] ? slidesState[index].slideId : 'unknown',
-        index: index,
-        errorMessage: error.message,
-        errorStack: error.stack,
-        slideType: slidesState && slidesState[index] ? slidesState[index].type : 'unknown',
-        slideMode: slidesState && slidesState[index] ? slidesState[index].mode : 'unknown'
-      });
+      if (process.env.NODE_ENV === 'development') {
+        console.error(`❌ [MeetingCaptureManager] 오류 상세:`, {
+          slideId: slidesState && slidesState[index] ? slidesState[index].slideId : 'unknown',
+          index: index,
+          errorMessage: error.message,
+          errorStack: error.stack,
+          slideType: slidesState && slidesState[index] ? slidesState[index].type : 'unknown',
+          slideMode: slidesState && slidesState[index] ? slidesState[index].mode : 'unknown'
+        });
+      }
       
       // 사용자 친화적인 에러 메시지 생성
       let userFriendlyMessage = `슬라이드 ${index + 1} 캡처 실패`;
@@ -385,6 +408,53 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
     }
   };
 
+  // 실패한 슬라이드 재시도
+  const handleRetryFailed = async (slideIndex) => {
+    if (slideIndex < 0 || slideIndex >= (slidesState?.length || 0)) {
+      return;
+    }
+
+    // 재시도 중인 슬라이드에 추가
+    setRetryingSlides(prev => new Set([...prev, slideIndex]));
+
+    // 실패 목록에서 제거
+    setFailed(prev => prev.filter(f => {
+      if (typeof f === 'object') {
+        return f.slideIndex !== slideIndex + 1;
+      }
+      return f !== slideIndex + 1;
+    }));
+
+    // 해당 슬라이드 재캡처
+    try {
+      await captureNextSlide(slideIndex);
+    } catch (error) {
+      console.error(`❌ [MeetingCaptureManager] 슬라이드 ${slideIndex + 1} 재시도 실패:`, error);
+      // 재시도 실패 시 다시 실패 목록에 추가
+      setFailed(prev => {
+        const filtered = prev.filter(f => {
+          if (typeof f === 'object') {
+            return f.slideIndex !== slideIndex + 1;
+          }
+          return f !== slideIndex + 1;
+        });
+        return [...filtered, {
+          slideIndex: slideIndex + 1,
+          slideId: slidesState && slidesState[slideIndex] ? slidesState[slideIndex].slideId : 'unknown',
+          error: `재시도 실패: ${error.message}`,
+          timestamp: new Date().toISOString()
+        }];
+      });
+    } finally {
+      // 재시도 완료
+      setRetryingSlides(prev => {
+        const next = new Set(prev);
+        next.delete(slideIndex);
+        return next;
+      });
+    }
+  };
+
   if (!capturing) {
     return null;
   }
@@ -400,6 +470,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         onCancel={handleCancel}
         slides={slidesState || []}
         startTime={startTime}
+        onRetryFailed={handleRetryFailed}
       />
 
       {slidesState && Array.isArray(slidesState) && slidesState[currentSlideIndex] && (

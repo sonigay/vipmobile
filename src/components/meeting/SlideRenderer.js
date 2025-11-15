@@ -19,13 +19,13 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
   const [contentReady, setContentReady] = useState(false);
   useEffect(() => {
     // slide가 변경되면 완전히 리셋
-    if (process.env.NODE_ENV === 'development') {
+    if (process.env.NODE_ENV === 'development' && slide) {
       console.log('🔍 [SlideRenderer] 슬라이드 렌더링 시작:', {
-        slideId: slide?.slideId,
-        mode: slide?.mode,
-        tab: slide?.tab,
-        subTab: slide?.subTab,
-        type: slide?.type
+        slideId: slide.slideId,
+        mode: slide.mode,
+        tab: slide.tab,
+        subTab: slide.subTab,
+        type: slide.type
       });
     }
     setLoading(true);

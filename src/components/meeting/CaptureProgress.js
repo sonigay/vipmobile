@@ -16,10 +16,11 @@ import {
 import {
   CheckCircle as CheckCircleIcon,
   RadioButtonUnchecked as RadioButtonUncheckedIcon,
-  Error as ErrorIcon
+  Error as ErrorIcon,
+  Refresh as RefreshIcon
 } from '@mui/icons-material';
 
-function CaptureProgress({ open, total, current, completed, failed, onCancel, slides = [], startTime }) {
+function CaptureProgress({ open, total, current, completed, failed, onCancel, slides = [], startTime, onRetryFailed }) {
   const progress = total > 0 ? (completed / total) * 100 : 0;
   
   // 예상 소요 시간 계산
@@ -203,10 +204,40 @@ function CaptureProgress({ open, total, current, completed, failed, onCancel, sl
                   primary={`슬라이드 ${slideIndex}${getSlideInfo(index) ? ` - ${getSlideInfo(index)}` : ''}`}
                   secondary={isFailed ? (failedItem?.error || '캡처 실패') : isCompleted ? '완료' : isCurrent ? '캡처 중...' : '대기 중'}
                 />
+                {isFailed && onRetryFailed && (
+                  <Button
+                    size="small"
+                    startIcon={<RefreshIcon />}
+                    onClick={() => onRetryFailed(slideIndex - 1)}
+                    variant="outlined"
+                    color="primary"
+                    sx={{ ml: 2 }}
+                  >
+                    재시도
+                  </Button>
+                )}
               </ListItem>
             );
           })}
         </List>
+        {failed && failed.length > 0 && completed === total && onRetryFailed && (
+          <Box sx={{ mt: 2, textAlign: 'center' }}>
+            <Button
+              variant="contained"
+              startIcon={<RefreshIcon />}
+              onClick={() => {
+                // 모든 실패한 슬라이드 재시도
+                const failedIndices = failed
+                  .map(f => typeof f === 'object' ? f.slideIndex - 1 : f - 1)
+                  .filter(idx => idx >= 0);
+                failedIndices.forEach(idx => onRetryFailed(idx));
+              }}
+              color="primary"
+            >
+              모든 실패 항목 재시도
+            </Button>
+          </Box>
+        )}
       </DialogContent>
       <DialogActions>
         <Button onClick={onCancel} disabled={completed === total}>

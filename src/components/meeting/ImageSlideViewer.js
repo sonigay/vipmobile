@@ -50,18 +50,37 @@ function ImageSlideViewer({ slides, onClose }) {
     }
   }, [slides]);
 
-  // 다음 이미지 preload
+  // 다음/이전 이미지 preload (성능 최적화)
   useEffect(() => {
-    if (currentIndex < slides.length - 1) {
-      const nextIndex = currentIndex + 1;
-      if (!loadedImages.has(nextIndex)) {
-        const img = new Image();
-        img.onload = () => {
-          setLoadedImages(prev => new Set([...prev, nextIndex]));
-        };
-        img.src = slides[nextIndex].imageUrl;
+    const preloadAdjacent = () => {
+      // 다음 이미지 preload
+      if (currentIndex < slides.length - 1) {
+        const nextIndex = currentIndex + 1;
+        if (!loadedImages.has(nextIndex)) {
+          const img = new Image();
+          img.onload = () => {
+            setLoadedImages(prev => new Set([...prev, nextIndex]));
+          };
+          img.onerror = () => {}; // 에러 무시
+          img.src = slides[nextIndex].imageUrl;
+        }
       }
-    }
+      
+      // 이전 이미지 preload (뒤로 가는 경우 대비)
+      if (currentIndex > 0) {
+        const prevIndex = currentIndex - 1;
+        if (!loadedImages.has(prevIndex)) {
+          const img = new Image();
+          img.onload = () => {
+            setLoadedImages(prev => new Set([...prev, prevIndex]));
+          };
+          img.onerror = () => {}; // 에러 무시
+          img.src = slides[prevIndex].imageUrl;
+        }
+      }
+    };
+    
+    preloadAdjacent();
   }, [currentIndex, slides, loadedImages]);
 
   // 키보드 이벤트
