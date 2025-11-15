@@ -3111,7 +3111,8 @@ app.post('/api/login', async (req, res) => {
         const hasBondChartPermission = agent[10] === 'O'; // K열: 채권장표 메뉴 권한 (기존 I열)
         const hasPolicyPermission = agent[11] === 'O'; // L열 (기존 J열)
         const hasInspectionOverviewPermission = agent[12] === 'O'; // M열 (기존 K열)
-        const hasMeetingPermission = agent[13] === 'O'; // N열 (기존 L열)
+        const meetingPermissionRaw = (agent[13] || '').toString().trim().toUpperCase(); // N열: 회의모드 권한 (M 또는 O)
+        const hasMeetingPermission = ['M', 'O'].includes(meetingPermissionRaw); // N열: 회의모드 권한 (M 또는 O)
         const hasReservationPermission = agent[14] === 'O'; // O열 (기존 M열)
         const hasChartPermission = agent[15] === 'O'; // P열: 장표모드 권한 (기존 N열)
         const teamCode = agent[16] || ''; // Q열: 팀코드
@@ -3160,7 +3161,7 @@ app.post('/api/login', async (req, res) => {
           chart: hasChartPermission, // 장표모드 권한
           policy: hasPolicyPermission,
           inspectionOverview: hasInspectionOverviewPermission,
-          meeting: hasMeetingPermission,
+          meeting: hasMeetingPermission ? meetingPermissionRaw : false, // M 또는 O 권한 값 저장
           reservation: hasReservationPermission,
           budget: hasBudgetPermission, // 예산모드 권한
           sales: hasSalesPermission, // 영업모드 권한
@@ -3211,6 +3212,7 @@ app.post('/api/login', async (req, res) => {
           isAgent: true,
           modePermissions: modePermissions,
           obManagementRole: obManagementPermissionRaw || '',
+          meetingRole: meetingPermissionRaw || '', // 회의 모드 권한 추가
           agentInfo: {
             target: agent[0] || '',       // A열: 대상
             qualification: agent[1] || '', // B열: 자격
@@ -3222,6 +3224,7 @@ app.post('/api/login', async (req, res) => {
             department: agent[6] || '',    // G열: 소속 (기존 E열)
             userRole: agent[17] || '',     // R열: 권한 (기존 P열)
             obManagementRole: obManagementPermissionRaw || '',
+            meetingRole: meetingPermissionRaw || '', // 회의 모드 권한 추가
             onSaleLink: hasOnSaleLinkPermission || hasOnSalePolicyPermission, // AA열: 온세일 링크관리 권한 (S 또는 M)
             onSalePolicy: hasOnSalePolicyPermission // AA열: 온세일 정책게시판 권한 (M 권한만)
           }
