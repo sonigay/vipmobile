@@ -17,10 +17,12 @@ import {
   CheckCircle as CheckCircleIcon,
   RadioButtonUnchecked as RadioButtonUncheckedIcon,
   Error as ErrorIcon,
-  Refresh as RefreshIcon
+  Refresh as RefreshIcon,
+  Pause as PauseIcon,
+  PlayArrow as PlayArrowIcon
 } from '@mui/icons-material';
 
-function CaptureProgress({ open, total, current, completed, failed, onCancel, slides = [], startTime, onRetryFailed }) {
+function CaptureProgress({ open, total, current, completed, failed, onCancel, slides = [], startTime, onRetryFailed, isPaused, onPause, onResume }) {
   const progress = total > 0 ? (completed / total) * 100 : 0;
   
   // 예상 소요 시간 계산
@@ -240,7 +242,16 @@ function CaptureProgress({ open, total, current, completed, failed, onCancel, sl
         )}
       </DialogContent>
       <DialogActions>
-        <Button onClick={onCancel} disabled={completed === total}>
+        {onPause && onResume && current < total && (
+          <Button
+            onClick={isPaused ? onResume : onPause}
+            startIcon={isPaused ? <PlayArrowIcon /> : <PauseIcon />}
+            variant="outlined"
+          >
+            {isPaused ? '재개' : '일시정지'}
+          </Button>
+        )}
+        <Button onClick={onCancel} disabled={completed === total || isPaused}>
           취소
         </Button>
       </DialogActions>

@@ -56,6 +56,11 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
   };
 
   const captureNextSlide = async (index) => {
+    // 일시정지 상태면 대기
+    while (isPaused) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
     if (!slidesState || !Array.isArray(slidesState) || index >= slidesState.length) {
       // 모든 슬라이드 캡처 완료
       setCapturing(false);
@@ -408,6 +413,15 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
     }
   };
 
+  // 일시정지/재개
+  const handlePause = () => {
+    setIsPaused(true);
+  };
+
+  const handleResume = () => {
+    setIsPaused(false);
+  };
+
   // 실패한 슬라이드 재시도
   const handleRetryFailed = async (slideIndex) => {
     if (slideIndex < 0 || slideIndex >= (slidesState?.length || 0)) {
@@ -471,6 +485,9 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         slides={slidesState || []}
         startTime={startTime}
         onRetryFailed={handleRetryFailed}
+        isPaused={isPaused}
+        onPause={handlePause}
+        onResume={handleResume}
       />
 
       {slidesState && Array.isArray(slidesState) && slidesState[currentSlideIndex] && (
