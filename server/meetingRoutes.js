@@ -1346,6 +1346,17 @@ async function convertPPTToImages(pptBuffer, filename) {
     const parser = new xml2js.Parser();
     const imageBuffers = [];
     
+    // Puppeteer 브라우저 초기화 (한 번만 생성하여 재사용)
+    const puppeteer = require('puppeteer');
+    let browser;
+    if (!global.pptBrowser) {
+      global.pptBrowser = await puppeteer.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+      });
+    }
+    browser = global.pptBrowser;
+    
     // 각 슬라이드를 HTML로 변환 후 이미지로 변환
     for (let i = 0; i < slideFiles.length; i++) {
       const slideFile = slideFiles[i];
@@ -1361,49 +1372,54 @@ async function convertPPTToImages(pptBuffer, filename) {
       const html = generateSlideHTML(slideContent, i + 1, slideFiles.length);
       
       // Puppeteer로 이미지 변환
-      const puppeteer = require('puppeteer');
-      const browser = await puppeteer.launch({
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
-      });
       const page = await browser.newPage();
       
-      await page.setContent(html, { 
-        waitUntil: 'networkidle0',
-        timeout: 30000
-      });
-      
-      // 한글 폰트가 로드되도록 대기
-      await page.evaluateHandle(() => {
-        return document.fonts.ready;
-      });
-      
-      // 스크린샷 촬영
-      const screenshot = await page.screenshot({
-        type: 'png',
-        fullPage: true,
-        encoding: 'binary'
-      });
-      
-      await browser.close();
-      
-      // 이미지 자동 크롭 처리
-      const croppedResult = await autoCropImage(screenshot);
-      
-      imageBuffers.push({
-        buffer: croppedResult.buffer,
-        filename: `${filename}_slide${i + 1}.png`,
-        sheetName: `슬라이드 ${i + 1}`,
-        metadata: {
-          originalWidth: croppedResult.originalWidth,
-          originalHeight: croppedResult.originalHeight,
-          croppedWidth: croppedResult.croppedWidth,
-          croppedHeight: croppedResult.croppedHeight
-        }
-      });
-      
-      console.log(`✅ [PPT 변환] 슬라이드 ${i + 1}/${slideFiles.length} 변환 완료`);
+      try {
+        await page.setContent(html, { 
+          waitUntil: 'networkidle0',
+          timeout: 30000
+        });
+        
+        // 한글 폰트가 로드되도록 대기
+        await page.evaluateHandle(() => {
+          return document.fonts.ready;
+        });
+        
+        // 추가 대기 시간 (폰트 렌더링 완료 보장)
+        await page.waitForTimeout(2000);
+        
+        // 스크린샷 촬영
+        const screenshot = await page.screenshot({
+          type: 'png',
+          fullPage: true,
+          encoding: 'binary'
+        });
+        
+        // 이미지 자동 크롭 처리
+        const croppedResult = await autoCropImage(screenshot);
+        
+        imageBuffers.push({
+          buffer: croppedResult.buffer,
+          filename: `${filename}_slide${i + 1}.png`,
+          sheetName: `슬라이드 ${i + 1}`,
+          metadata: {
+            originalWidth: croppedResult.originalWidth,
+            originalHeight: croppedResult.originalHeight,
+            croppedWidth: croppedResult.croppedWidth,
+            croppedHeight: croppedResult.croppedHeight
+          }
+        });
+        
+        console.log(`✅ [PPT 변환] 슬라이드 ${i + 1}/${slideFiles.length} 변환 완료`);
+      } catch (error) {
+        console.error(`❌ [PPT 변환] 슬라이드 ${i + 1} 변환 실패:`, error);
+        throw error;
+      } finally {
+        await page.close();
+      }
     }
+    
+    // 브라우저는 유지 (다음 변환을 위해)
     
     console.log(`✅ [PPT 변환] PPT 파일 변환 완료: ${filename} (${imageBuffers.length}개 슬라이드)`);
     

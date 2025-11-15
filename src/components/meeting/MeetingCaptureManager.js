@@ -169,14 +169,32 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
       formData.append('meetingDate', meeting.meetingDate);
       formData.append('slideOrder', index + 1);
 
-      const uploadResponse = await fetch(`${process.env.REACT_APP_API_URL || 'https://vipmobile-backend.cloudtype.app'}/api/meetings/${meeting.meetingId}/upload-image`, {
-        method: 'POST',
-        body: formData
-      });
+      // 재시도 로직이 포함된 업로드 함수
+      const uploadWithRetry = async (retries = 3, delay = 1000) => {
+        for (let attempt = 1; attempt <= retries; attempt++) {
+          try {
+            const uploadResponse = await fetch(`${process.env.REACT_APP_API_URL || 'https://vipmobile-backend.cloudtype.app'}/api/meetings/${meeting.meetingId}/upload-image`, {
+              method: 'POST',
+              body: formData
+            });
 
-      if (!uploadResponse.ok) {
-        throw new Error('이미지 업로드 실패');
-      }
+            if (!uploadResponse.ok) {
+              const errorText = await uploadResponse.text();
+              throw new Error(`이미지 업로드 실패 (HTTP ${uploadResponse.status}): ${errorText}`);
+            }
+
+            return uploadResponse;
+          } catch (error) {
+            if (attempt === retries) {
+              throw new Error(`이미지 업로드 실패 (${retries}회 시도): ${error.message}`);
+            }
+            console.warn(`⚠️ [MeetingCaptureManager] 슬라이드 ${index + 1} 업로드 재시도 ${attempt}/${retries}:`, error.message);
+            await new Promise(resolve => setTimeout(resolve, delay * attempt));
+          }
+        }
+      };
+
+      const uploadResponse = await uploadWithRetry();
 
       const uploadResult = await uploadResponse.json();
       console.log(`✅ [MeetingCaptureManager] 슬라이드 ${index + 1} 업로드 완료:`, uploadResult.imageUrl);
