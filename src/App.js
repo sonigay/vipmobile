@@ -1370,8 +1370,10 @@ function AppContent() {
   // 실제 로그인 처리 함수
   const processLogin = (store) => {
     resetNewModeFlags();
-    // 회의모드인지 확인
-    if (store.isMeeting) {
+    // 회의모드인지 확인 (isMeeting 플래그 또는 modePermissions.meeting이 M 또는 O인 경우)
+    const hasMeetingPermission = store.isMeeting || 
+                                  (store.modePermissions?.meeting === 'M' || store.modePermissions?.meeting === 'O');
+    if (hasMeetingPermission) {
       // console.log('로그인: 회의모드');
       setIsMeetingMode(true);
       setIsAgentMode(false);

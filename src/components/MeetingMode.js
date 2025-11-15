@@ -32,10 +32,10 @@ function MeetingMode({ onLogout, loggedInStore, onModeChange, availableModes }) 
     const candidates = [
       loggedInStore?.meetingRole,
       loggedInStore?.agentInfo?.meetingRole,
-      loggedInStore?.modePermissions?.meeting // modePermissions에서도 확인
+      loggedInStore?.modePermissions?.meeting // modePermissions에서도 확인 (M 또는 O)
     ]
       .map((role) => {
-        if (role === true) return 'M'; // true는 M 권한으로 간주
+        if (role === true) return 'M'; // true는 M 권한으로 간주 (하위 호환성)
         if (role === 'M' || role === 'O') return role.toString().toUpperCase();
         return (role || '').toString().toUpperCase();
       })
