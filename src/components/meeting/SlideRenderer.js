@@ -1539,134 +1539,24 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
       );
     }
 
-    // 다른 모드는 임시로 메시지 표시 (추후 구현)
-    const modeTitle = modeConfig?.title || slide.mode;
-    const tabTitle = slide.tabLabel || slide.tab || '';
-    const subTabTitle = slide.subTabLabel || slide.subTab || '';
-    const slideTitle = subTabTitle 
-      ? `${modeTitle} > ${tabTitle} > ${subTabTitle}`
-      : tabTitle 
-      ? `${modeTitle} > ${tabTitle}`
-      : modeTitle;
-    
+    // 지원되지 않는 모드 타입: 빈 화면 반환 (캡처되지 않도록)
+    console.warn(`⚠️ [SlideRenderer] 지원되지 않는 슬라이드 타입: ${slide.type || 'unknown'}, 모드: ${slide.mode || 'unknown'}`);
     return (
       <Box
         sx={{
           width: '100vw',
           height: '100vh',
           display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
           alignItems: 'center',
-            background: 'linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%)', // 아주 연한 회색
-          color: '#ffffff',
-          p: { xs: 3, md: 6 },
-          overflow: 'auto',
+          justifyContent: 'center',
+          backgroundColor: '#ffffff',
           position: 'relative'
         }}
+        data-capture-exclude="true"
       >
-        {/* 상단: 회사 로고 및 슬라이드 제목 - 상단 전체 하얀색 배경 */}
-        <Box
-          sx={{
-            display: 'flex',
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'flex-start',
-            width: '100%',
-            backgroundColor: '#ffffff',
-            px: { xs: 2, md: 3 },
-            py: { xs: 0.75, md: 1 },
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            zIndex: 10
-          }}
-        >
-          <Box
-            component="img"
-            src="/logo512.png"
-            alt="회사 로고"
-            sx={{
-              width: { xs: 35, md: 45 },
-              height: { xs: 35, md: 45 },
-              mr: { xs: 1, md: 1.5 },
-              filter: 'brightness(0) invert(0)'
-            }}
-            onError={(e) => {
-              e.target.style.display = 'none';
-            }}
-          />
-          <Typography
-            variant="h6"
-            sx={{
-              fontWeight: 600,
-              fontSize: { xs: '0.85rem', md: '1rem' },
-              color: '#333',
-              letterSpacing: '0.3px',
-              mr: 2
-            }}
-          >
-            (주)브이아이피플러스
-          </Typography>
-          <Typography
-            variant="h5"
-            sx={{
-              fontWeight: 600,
-              fontSize: { xs: '1.1rem', md: '1.4rem' },
-              color: '#333',
-              textAlign: 'left'
-            }}
-          >
-            {slideTitle}
-          </Typography>
-        </Box>
-
-        {/* 중앙: 메시지 */}
-        <Box sx={{ 
-          textAlign: 'center', 
-          maxWidth: 800, 
-          width: '100%', 
-          flex: 1, 
-          display: 'flex', 
-          flexDirection: 'column', 
-          justifyContent: 'center',
-          alignItems: 'center',
-          pt: { xs: 10, md: 12 }
-        }}>
-          <Box
-            sx={{
-              backgroundColor: 'rgba(255, 255, 255, 0.15)',
-              backdropFilter: 'blur(10px)',
-              borderRadius: 4,
-              p: { xs: 3, md: 4 },
-              boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
-              border: '1px solid rgba(255, 255, 255, 0.2)'
-            }}
-          >
-            <Alert 
-              severity="info" 
-              sx={{ 
-                backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                color: '#1a1a1a', // 어두운 계열 글자색
-                '& .MuiAlert-icon': { color: '#ffffff' }
-              }}
-            >
-              {modeTitle} 모드는 아직 구현되지 않았습니다.
-              <br />
-              <small>Presentation mode 렌더링 준비 중...</small>
-            </Alert>
-          </Box>
-        </Box>
-
-        {/* 하단: 생성자 정보 */}
-        {slide.createdBy && (
-          <Box sx={{ mt: { xs: 2, md: 3 }, width: '100%', textAlign: 'center' }}>
-            <Typography variant="body2" sx={{ opacity: 0.8, fontSize: { xs: '0.8rem', md: '0.9rem' } }}>
-              생성자: {slide.createdBy}
-            </Typography>
-          </Box>
-        )}
+        <Typography variant="body2" sx={{ color: '#999', opacity: 0.5 }}>
+          지원되지 않는 슬라이드 타입입니다.
+        </Typography>
       </Box>
     );
   }, [slide, loggedInStore]);
