@@ -121,7 +121,12 @@ function ImageSlideViewer({ slides, onClose }) {
         justifyContent: 'center',
         cursor: 'pointer'
       }}
-      onClick={handleClick}
+      onClick={(e) => {
+        // 확대된 상태에서는 클릭으로 다음 슬라이드로 이동하지 않음
+        if (scale === 1 && position.x === 0 && position.y === 0) {
+          handleNext();
+        }
+      }}
     >
       {/* 종료 버튼 */}
       <IconButton
