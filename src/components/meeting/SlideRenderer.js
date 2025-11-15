@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Box, CircularProgress, Alert, Typography } from '@mui/material';
 import { Event as EventIcon, LocationOn as LocationIcon, People as PeopleIcon } from '@mui/icons-material';
 import { getModeConfig } from '../../config/modeConfig';
@@ -10,7 +10,7 @@ import { getAvailableTabsForMode } from '../../config/modeTabConfig';
  * 슬라이드를 렌더링하는 컴포넌트
  * presentation mode로 렌더링하여 헤더 없이 콘텐츠만 표시
  */
-function SlideRenderer({ slide, loggedInStore, onReady }) {
+const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, onReady }) {
   const containerRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -30,11 +30,30 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
     setContentReady(false);
     setError(null);
     
+    // 모드별 최소 대기 시간 설정 (초)
+    const getModeWaitTime = () => {
+      if (!slide || !slide.mode) return 5; // 기본값: 5초
+      
+      // 모드별 대기 시간 설정
+      const modeWaitTimes = {
+        'chart': 20, // 마감장표: 20초 (데이터가 많음)
+        'inventoryChart': 15, // 재고장표: 15초
+        'custom': 5, // 커스텀: 5초
+        'main': 2, // 메인 슬라이드: 2초
+        'toc': 2, // 목차: 2초
+        'ending': 2 // 엔딩: 2초
+      };
+      
+      return modeWaitTimes[slide.mode] || modeWaitTimes[slide.type] || 10; // 기본값: 10초
+    };
+    
+    const modeWaitTime = getModeWaitTime();
+    const requiredStableCount = Math.max(10, Math.floor(modeWaitTime * 5)); // 모드별 안정성 확인 횟수 (0.2초 간격)
+    
     // 데이터 로딩 완료 대기 함수 - 매우 확실한 방법
     const waitForDataLoad = () => {
       return new Promise((resolve) => {
         let stableCount = 0; // 연속으로 안정적인 상태가 유지된 횟수
-        const requiredStableCount = 20; // 2초 동안 안정적이어야 함 (20 * 100ms) - 최적화: 5초 -> 2초
         let checkStartTime = null;
         let lastStableTime = null;
         
@@ -182,23 +201,26 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
           });
         }
         
-        // 최소 15초 대기 후 체크 시작 (데이터 로딩 시간 충분히 고려)
-        console.log('⏳ [SlideRenderer] 초기 대기 시작 (15초)');
+        // 모드별 최소 대기 시간 후 체크 시작
+        console.log(`⏳ [SlideRenderer] 초기 대기 시작 (${modeWaitTime}초, 모드: ${slide?.mode || slide?.type || 'unknown'})`);
         setTimeout(() => {
           console.log('⏳ [SlideRenderer] 데이터 로딩 체크 시작');
           checkLoading();
-        }, 15000);
+        }, modeWaitTime * 1000);
       });
     };
     
-    // 최소 15초 대기 후 데이터 로딩 완료 확인 (더 긴 대기 시간)
+    // 모드별 최소 대기 시간 후 데이터 로딩 완료 확인
     const timer = setTimeout(async () => {
-      console.log('⏳ [SlideRenderer] 데이터 로딩 대기 시작 (15초 초기 대기 완료)');
+      console.log(`⏳ [SlideRenderer] 데이터 로딩 대기 시작 (${modeWaitTime}초 초기 대기 완료, 모드: ${slide?.mode || slide?.type || 'unknown'})`);
       await waitForDataLoad();
-      console.log('✅ [SlideRenderer] 데이터 로딩 완료 확인됨, 추가 안정화 대기 (10초)');
       
-      // 추가로 10초 대기하여 완전히 안정화
-      await new Promise(resolve => setTimeout(resolve, 10000));
+      // 모드별 추가 안정화 대기 시간 (초)
+      const additionalWaitTime = Math.max(2, Math.floor(modeWaitTime * 0.5)); // 모드별 대기 시간의 50%
+      console.log(`✅ [SlideRenderer] 데이터 로딩 완료 확인됨, 추가 안정화 대기 (${additionalWaitTime}초)`);
+      
+      // 추가로 대기하여 완전히 안정화
+      await new Promise(resolve => setTimeout(resolve, additionalWaitTime * 1000));
       
       // 최종 확인: data-loaded 속성이 여전히 true인지 확인
       const finalCheck = containerRef.current?.querySelector('[data-loaded="true"]') !== null;
@@ -239,13 +261,14 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
           console.log('✅ [SlideRenderer] onReady 콜백 호출');
           onReady();
         }
-      }, 2000); // 1초에서 2초로 증가
-    }, 15000); // 10초에서 15초로 증가
+      }, 2000); // 2초 대기
+    }, modeWaitTime * 1000); // 모드별 최소 대기 시간
 
     return () => clearTimeout(timer);
   }, [slide, onReady]);
 
-  const renderSlideContent = () => {
+  // renderSlideContent를 useMemo로 메모이제이션하여 불필요한 재렌더링 방지
+  const renderSlideContent = useCallback(() => {
     // 회의 메인 화면 타입
     if (slide.type === 'main') {
       const meetingDate = slide.meetingDate || '';
@@ -370,10 +393,8 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
                 color: '#212529',
                 letterSpacing: '-0.5px',
                 fontFamily: '"Noto Sans KR", "Roboto", sans-serif',
-                background: 'linear-gradient(135deg, #212529 0%, #495057 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text'
+                backgroundColor: 'transparent', // 배경색 제거
+                background: 'none' // 그라데이션 배경 완전 제거
               }}
             >
               {slide.title || '회의'}
@@ -743,7 +764,8 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
                           // 탭 정보 가져오기
                           const availableTabs = getAvailableTabsForMode(modeKey, null);
                           const tabConfig = availableTabs.find(t => t.key === tabKey);
-                          const tabLabel = tabConfig?.label || tabKey;
+                          // slide에 저장된 tabLabel을 우선 사용, 없으면 tabConfig에서 가져오기
+                          const tabLabel = tabSlides[0]?.tabLabel || tabConfig?.label || tabKey;
                           
                           // 서브탭이 있는지 확인
                           const hasSubTabs = tabSlides.some(s => s.subTab);
@@ -780,7 +802,8 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
                                     .filter(s => s.subTab)
                                     .map((subSlide, subIndex) => {
                                       const subTabConfig = tabConfig?.subTabs?.find(st => st.key === subSlide.subTab);
-                                      const subTabLabel = subTabConfig?.label || subSlide.subTab;
+                                      // slide에 저장된 subTabLabel을 우선 사용, 없으면 subTabConfig에서 가져오기
+                                      const subTabLabel = subSlide.subTabLabel || subTabConfig?.label || subSlide.subTab;
                                       return (
                                         <Typography
                                           key={subSlide.slideId}
@@ -1381,7 +1404,8 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
                 textAlign: 'left',
                 fontFamily: '"Noto Sans KR", "Roboto", sans-serif',
                 letterSpacing: '0.3px',
-                flex: 1
+                flex: 1,
+                backgroundColor: 'transparent' // 배경색 제거
               }}
             >
               {slideTitle}
@@ -1572,7 +1596,7 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
         )}
       </Box>
     );
-  };
+  }, [slide, loggedInStore]);
 
   return (
     <Box
@@ -1642,7 +1666,12 @@ function SlideRenderer({ slide, loggedInStore, onReady }) {
       )}
     </Box>
   );
-}
+}, (prevProps, nextProps) => {
+  // React.memo 비교 함수: slide와 loggedInStore가 변경되지 않으면 재렌더링 방지
+  return prevProps.slide?.slideId === nextProps.slide?.slideId &&
+         prevProps.loggedInStore?.storeId === nextProps.loggedInStore?.storeId &&
+         prevProps.onReady === nextProps.onReady;
+});
 
 export default SlideRenderer;
 

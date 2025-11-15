@@ -19,8 +19,42 @@ import {
   Error as ErrorIcon
 } from '@mui/icons-material';
 
-function CaptureProgress({ open, total, current, completed, failed, onCancel, slides = [] }) {
+function CaptureProgress({ open, total, current, completed, failed, onCancel, slides = [], startTime }) {
   const progress = total > 0 ? (completed / total) * 100 : 0;
+  
+  // 예상 소요 시간 계산
+  const [elapsedTime, setElapsedTime] = React.useState(0);
+  const [estimatedTime, setEstimatedTime] = React.useState(0);
+  
+  React.useEffect(() => {
+    if (!open || !startTime) return;
+    
+    const interval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000);
+      setElapsedTime(elapsed);
+      
+      // 완료된 슬라이드가 있으면 평균 시간을 계산하여 예상 시간 추정
+      if (completed > 0 && current > 0) {
+        const avgTimePerSlide = elapsed / completed;
+        const remainingSlides = total - completed;
+        const estimated = Math.ceil(avgTimePerSlide * remainingSlides);
+        setEstimatedTime(estimated);
+      } else {
+        // 아직 완료된 슬라이드가 없으면 기본 예상 시간 (슬라이드당 평균 30초)
+        setEstimatedTime((total - completed) * 30);
+      }
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [open, startTime, completed, current, total]);
+  
+  // 시간 포맷팅
+  const formatTime = (seconds) => {
+    if (seconds < 60) return `${seconds}초`;
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${minutes}분 ${secs}초`;
+  };
   
   // 슬라이드 정보 가져오기 헬퍼 함수
   const getSlideInfo = (index) => {
@@ -56,14 +90,33 @@ function CaptureProgress({ open, total, current, completed, failed, onCancel, sl
       </DialogTitle>
       <DialogContent>
         <Box sx={{ mb: 3 }}>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            {completed} / {total} 완료
-          </Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              {completed} / {total} 완료 ({Math.round(progress)}%)
+            </Typography>
+            {startTime && (
+              <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                <Typography variant="caption" color="text.secondary">
+                  경과: {formatTime(elapsedTime)}
+                </Typography>
+                {estimatedTime > 0 && current < total && (
+                  <Typography variant="caption" color="primary" sx={{ fontWeight: 600 }}>
+                    예상 남은 시간: {formatTime(estimatedTime)}
+                  </Typography>
+                )}
+              </Box>
+            )}
+          </Box>
           <LinearProgress 
             variant="determinate" 
             value={progress} 
             sx={{ height: 8, borderRadius: 4 }}
           />
+          {current > 0 && current <= total && (
+            <Typography variant="caption" color="primary" sx={{ mt: 1, display: 'block', fontWeight: 500 }}>
+              현재 캡처 중: {getSlideInfo(current - 1) || `슬라이드 ${current}`}
+            </Typography>
+          )}
         </Box>
 
         <List dense>

@@ -675,6 +675,10 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess }) {
                             }
                           }
                         });
+                        // csDetailType이 여러 개 선택된 경우, 각 선택값을 csDetailType으로 명시적으로 설정
+                        if (firstMultipleOption.key === 'csDetailType') {
+                          combinedOptions.csDetailType = selectedValue;
+                        }
                         addSubTabSlide(
                           pendingSubTab.modeKey,
                           pendingSubTab.tabKey,

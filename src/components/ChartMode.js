@@ -1927,11 +1927,18 @@ function TotalClosingTab({ detailOptions, csDetailType: propCsDetailType, csDeta
   const [matchingMismatches, setMatchingMismatches] = useState([]);
   
   // 테이블 접기/펼치기 상태 - presentationMode일 때는 자동으로 펼치기
-  const [codeTableOpen, setCodeTableOpen] = useState(presentationMode);
-  const [officeTableOpen, setOfficeTableOpen] = useState(presentationMode);
-  const [departmentTableOpen, setDepartmentTableOpen] = useState(presentationMode);
-  const [agentTableOpen, setAgentTableOpen] = useState(presentationMode);
-  const [csSummaryOpen, setCsSummaryOpen] = useState(presentationMode); // presentationMode일 때는 자동 펼치기
+  // propCsDetailType에 따라 해당 테이블도 자동 펼치기
+  const shouldOpenCodeTable = presentationMode || propCsDetailType === 'code';
+  const shouldOpenOfficeTable = presentationMode || propCsDetailType === 'office';
+  const shouldOpenDepartmentTable = presentationMode || propCsDetailType === 'department';
+  const shouldOpenAgentTable = presentationMode || propCsDetailType === 'agent';
+  const shouldOpenCsSummary = presentationMode || (propCsDetailType !== undefined && propCsDetailType !== 'all');
+  
+  const [codeTableOpen, setCodeTableOpen] = useState(shouldOpenCodeTable);
+  const [officeTableOpen, setOfficeTableOpen] = useState(shouldOpenOfficeTable);
+  const [departmentTableOpen, setDepartmentTableOpen] = useState(shouldOpenDepartmentTable);
+  const [agentTableOpen, setAgentTableOpen] = useState(shouldOpenAgentTable);
+  const [csSummaryOpen, setCsSummaryOpen] = useState(shouldOpenCsSummary);
   
   // CS 개통 실적 세부 옵션 상태 (props에서 받거나 기본값 사용)
   const [csDetailType, setCsDetailType] = useState(propCsDetailType || 'all'); // 'all', 'code', 'office', 'department', 'agent'
@@ -1941,8 +1948,20 @@ function TotalClosingTab({ detailOptions, csDetailType: propCsDetailType, csDeta
   React.useEffect(() => {
     if (propCsDetailType !== undefined) {
       setCsDetailType(propCsDetailType);
-      // 세부 옵션이 선택된 경우 CS 개통 실적 섹션 자동 펼치기
-      if (propCsDetailType !== 'all') {
+      // 세부 옵션이 선택된 경우 해당 테이블 및 CS 개통 실적 섹션 자동 펼치기
+      if (propCsDetailType === 'code') {
+        setCodeTableOpen(true);
+        setCsSummaryOpen(true);
+      } else if (propCsDetailType === 'office') {
+        setOfficeTableOpen(true);
+        setCsSummaryOpen(true);
+      } else if (propCsDetailType === 'department') {
+        setDepartmentTableOpen(true);
+        setCsSummaryOpen(true);
+      } else if (propCsDetailType === 'agent') {
+        setAgentTableOpen(true);
+        setCsSummaryOpen(true);
+      } else if (propCsDetailType !== 'all') {
         setCsSummaryOpen(true);
       }
     }
@@ -1950,6 +1969,23 @@ function TotalClosingTab({ detailOptions, csDetailType: propCsDetailType, csDeta
       setCsDetailCriteria(propCsDetailCriteria);
     }
   }, [propCsDetailType, propCsDetailCriteria]);
+  
+  // presentationMode나 propCsDetailType 변경 시 테이블 상태 업데이트
+  React.useEffect(() => {
+    if (presentationMode) {
+      setCodeTableOpen(true);
+      setOfficeTableOpen(true);
+      setDepartmentTableOpen(true);
+      setAgentTableOpen(true);
+      setCsSummaryOpen(true);
+    } else if (propCsDetailType) {
+      setCodeTableOpen(propCsDetailType === 'code');
+      setOfficeTableOpen(propCsDetailType === 'office');
+      setDepartmentTableOpen(propCsDetailType === 'department');
+      setAgentTableOpen(propCsDetailType === 'agent');
+      setCsSummaryOpen(propCsDetailType !== 'all');
+    }
+  }, [presentationMode, propCsDetailType]);
   
   const [error, setError] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
@@ -1998,6 +2034,17 @@ function TotalClosingTab({ detailOptions, csDetailType: propCsDetailType, csDeta
       const tableRows = containerRef.current.querySelectorAll('table tbody tr, .MuiTableBody-root tr, tbody tr');
       const hasTableRows = tableRows.length >= 3; // 최소 3개 행 필요
       
+      // 담당자별 실적 테이블이 펼쳐져 있는 경우, 해당 테이블의 행도 확인
+      let hasAgentTableRows = false;
+      if (agentTableOpen || propCsDetailType === 'agent') {
+        // 담당자별 실적 섹션 찾기
+        const agentSection = containerRef.current.querySelector('[data-agent-section="true"]');
+        if (agentSection) {
+          const agentTableRows = agentSection.querySelectorAll('table tbody tr, .MuiTableBody-root tr, tbody tr');
+          hasAgentTableRows = agentTableRows.length >= 1; // 담당자별 실적 테이블에 최소 1개 행
+        }
+      }
+      
       // Paper 컴포넌트가 있고 내용이 있는지 확인
       const hasPaper = containerRef.current.querySelector('.MuiPaper-root') !== null;
       
@@ -2020,12 +2067,18 @@ function TotalClosingTab({ detailOptions, csDetailType: propCsDetailType, csDeta
       // 실제 데이터 텍스트가 있는지 확인 (숫자, 한글 등)
       const hasDataText = /[\d가-힣]/.test(allText) && allText.length > 100; // 최소 100자 이상의 텍스트
       
+      // 담당자별 실적이 선택된 경우, 해당 테이블이 렌더링되었는지 확인
+      const agentTableReady = propCsDetailType === 'agent' 
+        ? (hasAgentTableRows || hasTableRows) // 담당자별 실적 테이블 또는 일반 테이블
+        : true; // 담당자별 실적이 선택되지 않은 경우는 항상 true
+      
       // 모든 조건이 만족되면 데이터 렌더링 완료
       const isReady = (hasTableRows || (hasPaper && hasDataText)) && 
                       hasNoLoadingIndicator && 
                       hasNoProgressBar &&
                       hasNoLoadingText &&
-                      hasDataText;
+                      hasDataText &&
+                      agentTableReady;
       
       if (isReady) {
         stableCount++;
@@ -2240,8 +2293,13 @@ function TotalClosingTab({ detailOptions, csDetailType: propCsDetailType, csDeta
 
   if (loading && progress > 0) {
     return (
-      <Box sx={{ p: 4, textAlign: 'center' }} data-loading="true" data-loaded="false">
-        <Typography variant="h6" sx={{ mb: 2 }}>
+      <Box 
+        sx={{ p: 4, textAlign: 'center' }} 
+        data-loading="true" 
+        data-loaded="false"
+        data-capture-exclude="true"
+      >
+        <Typography variant="h6" sx={{ mb: 2 }} data-capture-exclude="true">
           마감장표 데이터 로딩 중...
         </Typography>
         <LinearProgress 
@@ -2271,9 +2329,14 @@ function TotalClosingTab({ detailOptions, csDetailType: propCsDetailType, csDeta
 
   if (!data) {
     return (
-      <Box sx={{ p: 4, textAlign: 'center' }} data-loading="true" data-loaded="false">
-        <CircularProgress />
-        <Typography variant="h6" sx={{ mt: 2 }}>
+      <Box 
+        sx={{ p: 4, textAlign: 'center' }} 
+        data-loading="true" 
+        data-loaded="false"
+        data-capture-exclude="true"
+      >
+        <CircularProgress data-capture-exclude="true" />
+        <Typography variant="h6" sx={{ mt: 2 }} data-capture-exclude="true">
           데이터를 불러오는 중...
         </Typography>
       </Box>
@@ -2724,12 +2787,14 @@ function TotalClosingTab({ detailOptions, csDetailType: propCsDetailType, csDeta
       </Paper>
 
       {/* 담당자별 실적 테이블 */}
-      <Paper sx={{ 
-        mb: 2, 
-        borderRadius: 2,
-        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-        overflow: 'hidden'
-      }}>
+      <Paper 
+        data-agent-section="true"
+        sx={{ 
+          mb: 2, 
+          borderRadius: 2,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+          overflow: 'hidden'
+        }}>
         <Box sx={{ 
           display: 'flex', 
           alignItems: 'center', 

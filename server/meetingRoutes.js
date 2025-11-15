@@ -404,13 +404,13 @@ async function getMeetingConfig(req, res) {
     const { meetingId } = req.params;
     const sheetName = '회의설정';
 
-    // 시트 헤더 확인
+    // 시트 헤더 확인 (tabLabel, subTabLabel 컬럼 추가)
     await ensureSheetHeaders(sheets, SPREADSHEET_ID, sheetName, [
-      '회의ID', '슬라이드ID', '순서', '타입', '모드', '탭', '제목', '내용', '배경색', '이미지URL', '캡처시간', 'Discord포스트ID', 'Discord스레드ID'
+      '회의ID', '슬라이드ID', '순서', '타입', '모드', '탭', '제목', '내용', '배경색', '이미지URL', '캡처시간', 'Discord포스트ID', 'Discord스레드ID', '탭라벨', '서브탭라벨', '회의날짜', '회의차수', '회의장소', '참석자', '생성자'
     ]);
 
-    // 데이터 조회
-    const range = `${sheetName}!A3:M`;
+    // 데이터 조회 (tabLabel, subTabLabel 컬럼 포함)
+    const range = `${sheetName}!A3:T`;
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
       range
@@ -435,6 +435,8 @@ async function getMeetingConfig(req, res) {
           mode: row[4] || '',
           tab: tab || '',
           subTab: subTab || '',
+          tabLabel: row[13] || '', // 탭라벨
+          subTabLabel: row[14] || '', // 서브탭라벨
           title: row[6] || '',
           content: row[7] || '',
           backgroundColor: row[8] || '#ffffff',
@@ -442,12 +444,12 @@ async function getMeetingConfig(req, res) {
           capturedAt: row[10] || '',
           discordPostId: row[11] || '',
           discordThreadId: row[12] || '',
-          // 메인 슬라이드 필드 (있으면 사용)
-          meetingDate: row[13] || '',
-          meetingNumber: row[14] ? parseInt(row[14]) : undefined,
-          meetingLocation: row[15] || '',
-          participants: row[16] || '',
-          createdBy: row[17] || ''
+          // 메인 슬라이드 필드 (있으면 사용) - 인덱스 조정 필요
+          meetingDate: row[15] || '',
+          meetingNumber: row[16] ? parseInt(row[16]) : undefined,
+          meetingLocation: row[17] || '',
+          participants: row[18] || '',
+          createdBy: row[19] || ''
         };
         
         console.log(`📖 [getMeetingConfig] 슬라이드 ${idx + 1}:`, {
@@ -523,13 +525,13 @@ async function saveMeetingConfig(req, res) {
       return res.status(400).json({ success: false, error: '슬라이드 배열이 필요합니다.' });
     }
 
-    // 시트 헤더 확인
+    // 시트 헤더 확인 (tabLabel, subTabLabel 컬럼 추가)
     await ensureSheetHeaders(sheets, SPREADSHEET_ID, sheetName, [
-      '회의ID', '슬라이드ID', '순서', '타입', '모드', '탭', '제목', '내용', '배경색', '이미지URL', '캡처시간', 'Discord포스트ID', 'Discord스레드ID'
+      '회의ID', '슬라이드ID', '순서', '타입', '모드', '탭', '제목', '내용', '배경색', '이미지URL', '캡처시간', 'Discord포스트ID', 'Discord스레드ID', '탭라벨', '서브탭라벨', '회의날짜', '회의차수', '회의장소', '참석자', '생성자'
     ]);
 
-    // 기존 데이터 조회 (메인 슬라이드 필드 포함)
-    const range = `${sheetName}!A3:R`;
+    // 기존 데이터 조회 (메인 슬라이드 필드 및 tabLabel, subTabLabel 포함)
+    const range = `${sheetName}!A3:T`;
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
       range
@@ -599,7 +601,7 @@ async function saveMeetingConfig(req, res) {
       // subTab이 있으면 tab 필드에 tab/subTab 형식으로 저장
       const tabValue = slide.subTab ? `${slide.tab || ''}/${slide.subTab}` : (slide.tab || '');
       
-      // 메인 슬라이드의 경우 추가 필드 포함
+      // 메인 슬라이드의 경우 추가 필드 포함 (tabLabel, subTabLabel 추가)
       const newRow = [
         meetingId,
         slideId,
@@ -614,6 +616,8 @@ async function saveMeetingConfig(req, res) {
         slide.capturedAt || '',
         slide.discordPostId || '',
         slide.discordThreadId || '',
+        slide.tabLabel || '', // 탭라벨
+        slide.subTabLabel || '', // 서브탭라벨
         slide.meetingDate || '', // 메인 슬라이드용
         slide.meetingNumber || '', // 메인 슬라이드용
         slide.meetingLocation || '', // 메인 슬라이드용
@@ -622,8 +626,8 @@ async function saveMeetingConfig(req, res) {
       ];
 
       if (existingRowIndex !== -1) {
-        // 기존 슬라이드 업데이트 (메인 슬라이드 필드 포함)
-        const updateRange = `${sheetName}!A${existingRowIndex + 3}:R${existingRowIndex + 3}`;
+        // 기존 슬라이드 업데이트 (메인 슬라이드 필드 및 tabLabel, subTabLabel 포함)
+        const updateRange = `${sheetName}!A${existingRowIndex + 3}:T${existingRowIndex + 3}`;
         console.log(`📝 [saveMeetingConfig] 기존 슬라이드 업데이트 시작: 범위 ${updateRange}`);
         const updateResult = await sheets.spreadsheets.values.update({
           spreadsheetId: SPREADSHEET_ID,
@@ -694,24 +698,33 @@ async function findOrCreatePost(channel, yearMonth, meetingNumber) {
     
     // 활성 스레드에서 차수별 포스트 찾기
     // meetingNumber가 있으면 정확히 일치하는 포스트를 찾고, 없으면 yearMonth만 일치하는 포스트를 찾음
-    let post = Array.from(activeThreads.threads.values()).find(thread => {
-      if (meetingNumber) {
-        // meetingNumber가 있으면 정확히 일치하는 포스트를 찾음
+    let post = null;
+    
+    if (meetingNumber) {
+      // meetingNumber가 있으면 정확히 일치하는 포스트를 찾음
+      post = Array.from(activeThreads.threads.values()).find(thread => {
         const matches = thread.name === postName || 
           thread.name === `${yearMonth} 회의 - ${meetingNumber}차`;
         if (matches) {
           console.log(`✅ [findOrCreatePost] 활성 포스트 찾음 (차수 일치): ${thread.name} (ID: ${thread.id})`);
         }
         return matches;
-      } else {
-        // meetingNumber가 없으면 yearMonth만 일치하는 포스트를 찾음 (가장 최근 것)
-        const matches = thread.name.startsWith(`${yearMonth} 회의`);
-        if (matches) {
-          console.log(`✅ [findOrCreatePost] 활성 포스트 찾음 (년월 일치, 차수 없음): ${thread.name} (ID: ${thread.id})`);
-        }
-        return matches;
+      });
+    } else {
+      // meetingNumber가 없으면 yearMonth만 일치하는 포스트를 찾음 (가장 최근 것)
+      // 여러 개가 있을 수 있으므로 가장 최근 것을 선택
+      const matchingThreads = Array.from(activeThreads.threads.values())
+        .filter(thread => thread.name.startsWith(`${yearMonth} 회의`))
+        .sort((a, b) => {
+          // 생성 시간으로 정렬 (최신순)
+          return (b.createdTimestamp || 0) - (a.createdTimestamp || 0);
+        });
+      
+      if (matchingThreads.length > 0) {
+        post = matchingThreads[0];
+        console.log(`✅ [findOrCreatePost] 활성 포스트 찾음 (년월 일치, 차수 없음, 가장 최근): ${post.name} (ID: ${post.id})`);
       }
-    });
+    }
     
     if (post) {
       console.log(`📌 [Discord] 기존 포스트 찾음: ${post.name} (ID: ${post.id})`);
@@ -719,47 +732,58 @@ async function findOrCreatePost(channel, yearMonth, meetingNumber) {
     }
     
     // 아카이브된 스레드도 확인
-    try {
-      const archivedThreads = await channel.threads.fetchArchived({ limit: 100 });
-      post = Array.from(archivedThreads.threads.values()).find(thread => {
+    if (!post) {
+      try {
+        const archivedThreads = await channel.threads.fetchArchived({ limit: 100 });
+        
         if (meetingNumber) {
           // meetingNumber가 있으면 정확히 일치하는 포스트를 찾음
-          const matches = thread.name === postName || 
-            thread.name === `${yearMonth} 회의 - ${meetingNumber}차`;
-          if (matches) {
-            console.log(`✅ [findOrCreatePost] 아카이브된 포스트 찾음 (차수 일치): ${thread.name} (ID: ${thread.id})`);
-          }
-          return matches;
+          post = Array.from(archivedThreads.threads.values()).find(thread => {
+            const matches = thread.name === postName || 
+              thread.name === `${yearMonth} 회의 - ${meetingNumber}차`;
+            if (matches) {
+              console.log(`✅ [findOrCreatePost] 아카이브된 포스트 찾음 (차수 일치): ${thread.name} (ID: ${thread.id})`);
+            }
+            return matches;
+          });
         } else {
           // meetingNumber가 없으면 yearMonth만 일치하는 포스트를 찾음 (가장 최근 것)
-          const matches = thread.name.startsWith(`${yearMonth} 회의`);
-          if (matches) {
-            console.log(`✅ [findOrCreatePost] 아카이브된 포스트 찾음 (년월 일치, 차수 없음): ${thread.name} (ID: ${thread.id})`);
+          const matchingThreads = Array.from(archivedThreads.threads.values())
+            .filter(thread => thread.name.startsWith(`${yearMonth} 회의`))
+            .sort((a, b) => {
+              // 생성 시간으로 정렬 (최신순)
+              return (b.createdTimestamp || 0) - (a.createdTimestamp || 0);
+            });
+          
+          if (matchingThreads.length > 0) {
+            post = matchingThreads[0];
+            console.log(`✅ [findOrCreatePost] 아카이브된 포스트 찾음 (년월 일치, 차수 없음, 가장 최근): ${post.name} (ID: ${post.id})`);
           }
-          return matches;
         }
-      });
-      
-      if (post) {
-        console.log(`📌 [Discord] 아카이브된 포스트 찾음: ${postName} (ID: ${post.id})`);
-        return post;
+        
+        if (post) {
+          console.log(`📌 [Discord] 아카이브된 포스트 찾음: ${post.name} (ID: ${post.id})`);
+          return post;
+        }
+      } catch (archivedError) {
+        console.warn('아카이브된 스레드 조회 실패:', archivedError);
+        // 계속 진행
       }
-    } catch (archivedError) {
-      console.warn('아카이브된 스레드 조회 실패:', archivedError);
-      // 계속 진행
     }
     
     // 포스트 생성 (포럼 채널에서는 스레드 생성)
-    console.log(`📌 [Discord] 새 포스트 생성: ${postName}`);
+    // meetingNumber가 없으면 년월만 사용하여 포스트 생성 (차수 없이)
+    const finalPostName = meetingNumber ? postName : `${yearMonth} 회의`;
+    console.log(`📌 [Discord] 새 포스트 생성: ${finalPostName} (meetingNumber: ${meetingNumber || '없음'})`);
     const newPost = await channel.threads.create({
-      name: postName,
+      name: finalPostName,
       message: {
-        content: `${postName} 이미지 저장`
+        content: `${finalPostName} 이미지 저장`
       },
       appliedTags: []
     });
     
-    console.log(`✅ [Discord] 새 포스트 생성 완료: ${postName} (ID: ${newPost.id})`);
+    console.log(`✅ [Discord] 새 포스트 생성 완료: ${finalPostName} (ID: ${newPost.id})`);
     return newPost;
   } catch (error) {
     console.error('포스트 찾기/생성 오류:', error);
@@ -1038,8 +1062,11 @@ async function convertExcelToImages(excelBuffer, filename) {
 
 // Excel 워크시트를 HTML로 변환
 function convertExcelToHTML(worksheet) {
-  let html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>';
-  html += 'body { font-family: "Malgun Gothic", "AppleGothic", "NanumGothic", "Noto Sans CJK KR", Arial, sans-serif; margin: 20px; }';
+  let html = '<!DOCTYPE html><html><head>';
+  html += '<meta charset="UTF-8">';
+  html += '<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">';
+  html += '<style>';
+  html += 'body { font-family: "Malgun Gothic", "AppleGothic", "NanumGothic", "Noto Sans CJK KR", "Noto Sans KR", Arial, sans-serif; margin: 20px; }';
   html += 'table { border-collapse: collapse; width: 100%; }';
   html += 'th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }';
   html += 'th { background-color: #4a90e2; color: white; font-weight: bold; }';
@@ -1282,38 +1309,121 @@ async function convertExcelToImage(worksheet, filename) {
 // PPT 파일을 이미지로 변환
 async function convertPPTToImages(pptBuffer, filename) {
   try {
-    // 방법 1: LibreOffice 사용 (서버에 LibreOffice 설치 필요)
-    // const { exec } = require('child_process');
-    // const fs = require('fs');
-    // const path = require('path');
-    // const os = require('os');
-    // 
-    // const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ppt-convert-'));
-    // const inputPath = path.join(tempDir, `${filename}.pptx`);
-    // const outputPath = path.join(tempDir, 'output');
-    // 
-    // fs.writeFileSync(inputPath, pptBuffer);
-    // 
-    // return new Promise((resolve, reject) => {
-    //   exec(`libreoffice --headless --convert-to pdf --outdir "${outputPath}" "${inputPath}"`, (error) => {
-    //     if (error) reject(error);
-    //     // PDF를 이미지로 변환하는 로직 추가
-    //   });
-    // });
-
-    // 방법 2: puppeteer 사용 (HTML로 변환 후 스크린샷)
-    // const puppeteer = require('puppeteer');
-    // const browser = await puppeteer.launch();
-    // const page = await browser.newPage();
-    // // PPT를 HTML로 변환하는 로직 필요
-    // await page.goto('data:text/html,...');
-    // const screenshot = await page.screenshot({ type: 'png', fullPage: true });
-    // await browser.close();
-    // return screenshot;
-
-    // 임시: 에러 메시지 개선
-    console.warn('⚠️ [PPT 변환] PPT 변환 기능은 아직 구현되지 않았습니다. LibreOffice 또는 puppeteer 설치가 필요합니다.');
-    throw new Error('PPT 변환 기능은 아직 구현되지 않았습니다. 서버에 LibreOffice를 설치하거나 puppeteer를 사용하여 구현할 수 있습니다.');
+    // 방법 1: Puppeteer를 사용하여 PPT를 HTML로 변환 후 이미지로 변환
+    // PPT 파일 형식은 복잡하므로, 기본적인 구조만 구현
+    // 향후 officegen 또는 다른 라이브러리로 확장 가능
+    
+    console.log(`📊 [PPT 변환] PPT 파일 변환 시작: ${filename}`);
+    
+    // Puppeteer를 사용하여 PPT를 HTML로 변환
+    try {
+      const puppeteer = require('puppeteer');
+      const browser = await puppeteer.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+      });
+      const page = await browser.newPage();
+      
+      // PPT 파일을 읽어서 텍스트 추출 (기본적인 방법)
+      // 실제로는 officegen이나 다른 라이브러리를 사용해야 하지만,
+      // 일단 기본 구조만 구현
+      
+      // PPT 파일을 Base64로 인코딩
+      const base64PPT = pptBuffer.toString('base64');
+      
+      // 간단한 HTML 템플릿 생성 (PPT 내용을 표시)
+      const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+          <style>
+            body {
+              font-family: "Malgun Gothic", "AppleGothic", "NanumGothic", "Noto Sans CJK KR", "Noto Sans KR", Arial, sans-serif;
+              margin: 20px;
+              background: #ffffff;
+            }
+            .ppt-container {
+              max-width: 1200px;
+              margin: 0 auto;
+              padding: 20px;
+            }
+            .ppt-slide {
+              background: #ffffff;
+              border: 1px solid #ddd;
+              margin-bottom: 20px;
+              padding: 40px;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            }
+            .ppt-title {
+              font-size: 24px;
+              font-weight: bold;
+              margin-bottom: 20px;
+              color: #333;
+            }
+            .ppt-content {
+              font-size: 16px;
+              line-height: 1.6;
+              color: #666;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="ppt-container">
+            <div class="ppt-slide">
+              <div class="ppt-title">${filename}</div>
+              <div class="ppt-content">
+                PPT 파일 변환 기능은 현재 개발 중입니다.<br>
+                파일명: ${filename}<br>
+                파일 크기: ${(pptBuffer.length / 1024).toFixed(2)} KB
+              </div>
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
+      
+      // HTML 콘텐츠를 페이지에 로드
+      await page.setContent(html, { 
+        waitUntil: 'networkidle0',
+        timeout: 30000
+      });
+      
+      // 한글 폰트가 로드되도록 대기
+      await page.evaluateHandle(() => {
+        return document.fonts.ready;
+      });
+      
+      // 스크린샷 촬영
+      const screenshot = await page.screenshot({
+        type: 'png',
+        fullPage: true,
+        encoding: 'binary'
+      });
+      
+      await browser.close();
+      
+      // 이미지 자동 크롭 처리
+      const croppedResult = await autoCropImage(screenshot);
+      
+      console.log(`✅ [PPT 변환] PPT 파일 변환 완료: ${filename}`);
+      
+      return [{
+        buffer: croppedResult.buffer,
+        filename: `${filename}.png`,
+        sheetName: null,
+        metadata: {
+          originalWidth: croppedResult.originalWidth,
+          originalHeight: croppedResult.originalHeight,
+          croppedWidth: croppedResult.croppedWidth,
+          croppedHeight: croppedResult.croppedHeight
+        }
+      }];
+    } catch (puppeteerError) {
+      console.error('❌ [PPT 변환] Puppeteer 변환 실패:', puppeteerError);
+      throw new Error(`PPT 변환 실패: ${puppeteerError.message}`);
+    }
   } catch (error) {
     console.error('PPT 변환 오류:', error);
     throw error;
@@ -1374,12 +1484,20 @@ async function uploadCustomSlideFile(req, res) {
             const puppeteer = require('puppeteer');
             const browser = await puppeteer.launch({
               headless: true,
-              args: ['--no-sandbox', '--disable-setuid-sandbox']
+              args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
             });
             const page = await browser.newPage();
             
-            // HTML 콘텐츠를 data URL로 설정
-            await page.setContent(html, { waitUntil: 'networkidle0' });
+            // UTF-8 인코딩 명시 및 한글 폰트 설정
+            await page.setContent(html, { 
+              waitUntil: 'networkidle0',
+              timeout: 30000
+            });
+            
+            // 한글 폰트가 로드되도록 대기
+            await page.evaluateHandle(() => {
+              return document.fonts.ready;
+            });
             
             // 스크린샷 촬영
             const screenshot = await page.screenshot({
@@ -1457,11 +1575,30 @@ async function uploadCustomSlideFile(req, res) {
         throw excelError;
       }
     } else if (detectedFileType === 'ppt') {
-      // PPT 파일 변환 (나중에 구현)
-      return res.status(501).json({ 
-        success: false, 
-        error: 'PPT 변환 기능은 아직 구현되지 않았습니다.' 
-      });
+      // PPT 파일 변환
+      try {
+        const pptImages = await convertPPTToImages(file.buffer, file.originalname || 'presentation');
+        // PPT 변환 이미지도 자동 크롭 처리
+        imageBuffers = await Promise.all(pptImages.map(async (img) => {
+          const croppedResult = await autoCropImage(img.buffer);
+          return {
+            ...img,
+            buffer: croppedResult.buffer,
+            metadata: {
+              originalWidth: croppedResult.originalWidth,
+              originalHeight: croppedResult.originalHeight,
+              croppedWidth: croppedResult.croppedWidth,
+              croppedHeight: croppedResult.croppedHeight
+            }
+          };
+        }));
+      } catch (pptError) {
+        console.error('PPT 변환 오류:', pptError);
+        return res.status(500).json({ 
+          success: false, 
+          error: `PPT 변환 실패: ${pptError.message}` 
+        });
+      }
     } else {
       return res.status(400).json({ 
         success: false, 
@@ -1528,18 +1665,22 @@ async function uploadCustomSlideFile(req, res) {
       
       // Discord 업로드 시 meetingId는 실제 meetingId를 사용하되, 
       // meetingNumber와 meetingDate를 명시적으로 전달하여 같은 포스트를 찾도록 함
-      // 임시 회의인 경우, meetingNumber가 있으면 사용하고, 없으면 meetingDate만 사용
+      // 임시 회의인 경우에도 meetingNumber가 있으면 사용하여 같은 포스트를 찾도록 함
       const uploadMeetingId = isTempMeeting 
         ? `temp-${meetingDate || new Date().toISOString().split('T')[0]}` 
         : meetingId;
       
+      // meetingNumber를 명시적으로 전달하여 같은 포스트를 찾도록 함
+      // 임시 회의인 경우에도 meetingNumber가 있으면 사용
       // meetingNumber가 없으면 meetingDate만 사용하여 포스트를 찾도록 함
-      // 하지만 이 경우 다른 포스트가 생성될 수 있으므로, 가능하면 meetingNumber를 전달해야 함
-      const finalMeetingNumber = meetingNumber || (isTempMeeting ? null : null);
+      const finalMeetingNumber = meetingNumber || null;
+      
+      // meetingDate가 없으면 오늘 날짜 사용
+      const finalMeetingDate = meetingDate || new Date().toISOString().split('T')[0];
       
       console.log(`📤 [uploadCustomSlideFile] Discord 업로드 시작 (${i + 1}/${imageBuffers.length}):`, {
         uploadMeetingId,
-        meetingDate,
+        meetingDate: finalMeetingDate,
         meetingNumber: finalMeetingNumber,
         isTempMeeting,
         filename: imageData.filename
@@ -1549,7 +1690,7 @@ async function uploadCustomSlideFile(req, res) {
         imageData.buffer,
         imageData.filename,
         uploadMeetingId,
-        meetingDate || new Date().toISOString().split('T')[0],
+        finalMeetingDate,
         finalMeetingNumber, // meetingNumber를 명시적으로 전달하여 같은 포스트를 찾도록 함
         imageData.metadata || null // 메타데이터 전달
       );

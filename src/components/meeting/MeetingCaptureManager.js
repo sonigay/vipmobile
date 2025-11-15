@@ -16,6 +16,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
   const slideRefs = useRef([]);
   const [slideReady, setSlideReady] = useState(false);
   const [slidesState, setSlidesState] = useState(slides); // 슬라이드 상태 관리
+  const [startTime, setStartTime] = useState(null); // 캡처 시작 시간
 
   useEffect(() => {
     if (slides && Array.isArray(slides)) {
@@ -43,6 +44,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
     setCurrentSlideIndex(0);
     setCompleted(0);
     setFailed([]);
+    setStartTime(Date.now()); // 캡처 시작 시간 기록
 
     // 첫 번째 슬라이드 렌더링 시작
     await captureNextSlide(0);
@@ -353,6 +355,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         failed={failed}
         onCancel={handleCancel}
         slides={slidesState || []}
+        startTime={startTime}
       />
 
       {slidesState && Array.isArray(slidesState) && slidesState[currentSlideIndex] && (

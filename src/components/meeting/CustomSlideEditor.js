@@ -123,6 +123,8 @@ function CustomSlideEditor({ open, onClose, onSave, slide, meetingDate, meetingN
           setFormData(prev => ({ ...prev, imageUrl: result.imageUrls[0] }));
           console.log(`✅ [CustomSlideEditor] ${fileType} 파일 업로드 완료: ${result.imageUrls.length}개 이미지 생성`);
         } else if (result.imageUrl) {
+          // 단일 이미지인 경우 미리보기 URL 설정
+          setPreviewUrl(result.imageUrl);
           setFormData(prev => ({ ...prev, imageUrl: result.imageUrl }));
           console.log('✅ [CustomSlideEditor] 파일 업로드 완료:', result.imageUrl);
         }
