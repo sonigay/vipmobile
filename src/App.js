@@ -1297,6 +1297,7 @@ function AppContent() {
         
         console.log('🔍 [필터링 결과] availableModes:', availableModes);
         console.log('🔍 [디버깅] meeting 포함 여부:', availableModes.includes('meeting'));
+        console.log('🔍 [디버깅] store.modePermissions.meeting:', store.modePermissions?.meeting);
         
         // 단일 권한인 경우 (agent만 있거나, 하나만 있는 경우)
         if (availableModes.length === 1) {
