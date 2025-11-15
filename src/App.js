@@ -1267,6 +1267,10 @@ function AppContent() {
         // getCurrentUserAvailableModes와 동일한 방식으로 필터링 (서브 권한 제외)
         const availableModes = Object.entries(store.modePermissions)
           .filter(([mode, hasPermission]) => {
+            // 회의 모드의 경우 M 권한만 접속 가능
+            if (mode === 'meeting') {
+              return hasPermission === 'M' || hasPermission === true; // true는 하위 호환성을 위해
+            }
             // 권한이 있고, 서브 권한이 아닌 경우만 포함
             return (hasPermission === true || hasPermission === 'O') && !subPermissions.includes(mode);
           })
