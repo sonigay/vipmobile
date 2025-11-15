@@ -4,6 +4,8 @@ import { Event as EventIcon, LocationOn as LocationIcon, People as PeopleIcon } 
 import { getModeConfig } from '../../config/modeConfig';
 import ChartMode from '../ChartMode';
 import InspectionMode from '../InspectionMode';
+import BudgetMode from '../BudgetMode';
+import ObManagementMode from '../ObManagementMode';
 import { getAvailableTabsForMode } from '../../config/modeTabConfig';
 
 /**
