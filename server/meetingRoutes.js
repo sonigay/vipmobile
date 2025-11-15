@@ -1029,7 +1029,28 @@ async function uploadMeetingImage(req, res) {
     });
   } catch (error) {
     console.error('이미지 업로드 오류:', error);
-    res.status(500).json({ success: false, error: error.message });
+    
+    // 에러 타입에 따라 적절한 HTTP 상태 코드 반환
+    let statusCode = 500;
+    let errorMessage = error.message || '이미지 업로드 중 오류가 발생했습니다.';
+    
+    if (error.message.includes('Discord')) {
+      statusCode = 503; // Service Unavailable
+      errorMessage = 'Discord 서비스에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.';
+    } else if (error.message.includes('크롭') || error.message.includes('이미지 처리')) {
+      statusCode = 422; // Unprocessable Entity
+      errorMessage = '이미지 처리 중 오류가 발생했습니다. 이미지 파일 형식을 확인해주세요.';
+    } else if (error.message.includes('파일이 없습니다')) {
+      statusCode = 400; // Bad Request
+      errorMessage = '이미지 파일이 없습니다.';
+    }
+    
+    res.status(statusCode).json({ 
+      success: false, 
+      error: errorMessage,
+      errorType: error.name || 'UnknownError',
+      timestamp: new Date().toISOString()
+    });
   }
 }
 

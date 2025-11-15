@@ -181,8 +181,10 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
       formData.append('meetingDate', meeting.meetingDate);
       formData.append('slideOrder', index + 1);
 
-      // 재시도 로직이 포함된 업로드 함수
-      const uploadWithRetry = async (retries = 3, delay = 1000) => {
+      // 재시도 로직이 포함된 업로드 함수 (지수 백오프 적용)
+      const uploadWithRetry = async (retries = 3, baseDelay = 1000) => {
+        let lastError = null;
+        
         for (let attempt = 1; attempt <= retries; attempt++) {
           try {
             const uploadResponse = await fetch(`${process.env.REACT_APP_API_URL || 'https://vipmobile-backend.cloudtype.app'}/api/meetings/${meeting.meetingId}/upload-image`, {
@@ -192,20 +194,46 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
 
             if (!uploadResponse.ok) {
               const errorText = await uploadResponse.text();
-              throw new Error(`이미지 업로드 실패 (HTTP ${uploadResponse.status}): ${errorText}`);
+              const error = new Error(`이미지 업로드 실패 (HTTP ${uploadResponse.status}): ${errorText}`);
+              error.status = uploadResponse.status;
+              error.isNetworkError = false;
+              throw error;
             }
 
             return uploadResponse;
           } catch (error) {
+            lastError = error;
+            
+            // 네트워크 에러인지 확인
+            const isNetworkError = error.message.includes('fetch') || 
+                                   error.message.includes('network') || 
+                                   error.message.includes('Failed to fetch') ||
+                                   !error.status;
+            
             if (attempt === retries) {
-              throw new Error(`이미지 업로드 실패 (${retries}회 시도): ${error.message}`);
+              // 마지막 시도 실패 시 상세한 에러 메시지
+              if (isNetworkError) {
+                throw new Error(`네트워크 연결 오류로 이미지 업로드에 실패했습니다. (${retries}회 시도) 인터넷 연결을 확인해주세요.`);
+              } else if (error.status === 413) {
+                throw new Error(`이미지 파일이 너무 큽니다. 파일 크기를 줄여주세요.`);
+              } else if (error.status === 500) {
+                throw new Error(`서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.`);
+              } else {
+                throw new Error(`이미지 업로드 실패 (${retries}회 시도): ${error.message}`);
+              }
             }
+            
+            // 지수 백오프: delay * 2^(attempt-1)
+            const delay = baseDelay * Math.pow(2, attempt - 1);
             if (process.env.NODE_ENV === 'development') {
-              console.warn(`⚠️ [MeetingCaptureManager] 슬라이드 ${index + 1} 업로드 재시도 ${attempt}/${retries}:`, error.message);
+              console.warn(`⚠️ [MeetingCaptureManager] 슬라이드 ${index + 1} 업로드 재시도 ${attempt}/${retries} (${delay}ms 대기):`, error.message);
             }
-            await new Promise(resolve => setTimeout(resolve, delay * attempt));
+            await new Promise(resolve => setTimeout(resolve, delay));
           }
         }
+        
+        // 이 코드는 실행되지 않아야 하지만 타입 안전성을 위해
+        throw lastError || new Error('알 수 없는 오류가 발생했습니다.');
       };
 
       const uploadResponse = await uploadWithRetry();
