@@ -551,11 +551,6 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         />
       )}
       
-      {/* 완료된 슬라이드는 언마운트하여 메모리 해제 */}
-      {slidesState && Array.isArray(slidesState) && currentSlideIndex > 0 && (
-        // 이전 슬라이드는 key 변경으로 언마운트 (React가 자동으로 처리)
-        null
-      )}
     </>
   );
 }
