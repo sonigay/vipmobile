@@ -1478,14 +1478,86 @@ function extractSlideContent(slideData, zipContent) {
     const imageIds = extractImages(slideData);
     
     // 이미지 파일 찾기 및 Base64 변환
-    imageIds.forEach(async (imageId) => {
-      // ppt/media/ 또는 ppt/slides/_rels/에서 이미지 찾기
-      const mediaFiles = Object.keys(zipContent.files)
-        .filter(name => name.includes(imageId) || name.includes('media'));
-      
-      // 실제로는 관계 파일(ppt/slides/_rels/slide*.xml.rels)을 파싱해야 함
-      // 여기서는 간단히 처리
+    const imagePromises = imageIds.map(async (imageId) => {
+      try {
+        // 관계 파일에서 이미지 경로 찾기
+        // ppt/slides/_rels/slide*.xml.rels 파일들을 확인
+        const relsFiles = Object.keys(zipContent.files)
+          .filter(name => name.includes('_rels') && name.endsWith('.rels'));
+        
+        let imagePath = null;
+        for (const relsFile of relsFiles) {
+          try {
+            const relsContent = await zipContent.files[relsFile].async('string');
+            const relsData = await parser.parseStringPromise(relsContent);
+            
+            // Relationship 요소에서 이미지 찾기
+            const relationships = relsData['Relationships']?.['Relationship'] || [];
+            for (const rel of relationships) {
+              if (rel['$'] && rel['$']['Id'] === imageId) {
+                const target = rel['$']['Target'];
+                if (target) {
+                  // 상대 경로를 절대 경로로 변환
+                  if (target.startsWith('../')) {
+                    imagePath = target.replace('../', 'ppt/');
+                  } else if (target.startsWith('media/')) {
+                    imagePath = `ppt/${target}`;
+                  } else {
+                    imagePath = target;
+                  }
+                  break;
+                }
+              }
+            }
+            if (imagePath) break;
+          } catch (err) {
+            // 관계 파일 파싱 실패 시 무시하고 계속
+            continue;
+          }
+        }
+        
+        // 이미지 파일 찾기
+        if (imagePath) {
+          const imageFile = zipContent.files[imagePath];
+          if (imageFile && !imageFile.dir) {
+            const imageBuffer = await imageFile.async('nodebuffer');
+            const base64 = imageBuffer.toString('base64');
+            const mimeType = getImageMimeType(imagePath);
+            return {
+              id: imageId,
+              data: `data:${mimeType};base64,${base64}`,
+              path: imagePath
+            };
+          }
+        }
+        
+        // 직접 media 폴더에서 찾기
+        const mediaFiles = Object.keys(zipContent.files)
+          .filter(name => name.startsWith('ppt/media/') && !name.endsWith('/'));
+        
+        for (const mediaFile of mediaFiles) {
+          const fileName = mediaFile.split('/').pop();
+          if (fileName.includes(imageId) || imageId.includes(fileName)) {
+            const imageBuffer = await zipContent.files[mediaFile].async('nodebuffer');
+            const base64 = imageBuffer.toString('base64');
+            const mimeType = getImageMimeType(mediaFile);
+            return {
+              id: imageId,
+              data: `data:${mimeType};base64,${base64}`,
+              path: mediaFile
+            };
+          }
+        }
+        
+        return null;
+      } catch (error) {
+        console.warn(`⚠️ [PPT 변환] 이미지 ${imageId} 추출 실패:`, error.message);
+        return null;
+      }
     });
+    
+    const extractedImages = await Promise.all(imagePromises);
+    content.images = extractedImages.filter(img => img !== null);
     
   } catch (error) {
     console.warn('⚠️ [PPT 변환] 슬라이드 내용 추출 중 오류:', error);
@@ -1494,11 +1566,32 @@ function extractSlideContent(slideData, zipContent) {
   return content;
 }
 
+// 이미지 MIME 타입 추출
+function getImageMimeType(filePath) {
+  const ext = filePath.split('.').pop().toLowerCase();
+  const mimeTypes = {
+    'png': 'image/png',
+    'jpg': 'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'gif': 'image/gif',
+    'bmp': 'image/bmp',
+    'svg': 'image/svg+xml',
+    'webp': 'image/webp'
+  };
+  return mimeTypes[ext] || 'image/png';
+}
+
 // 슬라이드 HTML 생성
 function generateSlideHTML(slideContent, slideNumber, totalSlides) {
   const texts = slideContent.texts || [];
+  const images = slideContent.images || [];
   const title = texts[0] || `슬라이드 ${slideNumber}`;
   const bodyTexts = texts.slice(1);
+  
+  // 이미지 HTML 생성
+  const imagesHTML = images.map((img, idx) => {
+    return `<img src="${img.data}" alt="이미지 ${idx + 1}" style="max-width: 100%; height: auto; margin: 10px 0;" />`;
+  }).join('');
   
   return `
     <!DOCTYPE html>
@@ -1569,6 +1662,7 @@ function generateSlideHTML(slideContent, slideNumber, totalSlides) {
         <div class="ppt-title">${escapeHtml(title)}</div>
         <div class="ppt-content">
           ${bodyTexts.map(text => `<p>${escapeHtml(text)}</p>`).join('')}
+          ${imagesHTML}
         </div>
         <div class="slide-number">${slideNumber} / ${totalSlides}</div>
       </div>
