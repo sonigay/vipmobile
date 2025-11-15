@@ -636,13 +636,16 @@ const InventoryStatusScreen = () => {
 
       {/* 로딩 */}
       {loading && (
-        <Box sx={{ 
-          display: 'flex', 
-          justifyContent: 'center', 
-          p: 4,
-          backgroundColor: '#ffffff',
-          borderRadius: 2
-        }}>
+        <Box 
+          data-capture-exclude="true"
+          sx={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            p: 4,
+            backgroundColor: '#ffffff',
+            borderRadius: 2
+          }}
+        >
           <CircularProgress sx={{ color: '#1976d2' }} />
         </Box>
       )}

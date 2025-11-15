@@ -1075,8 +1075,10 @@ function convertExcelToHTML(worksheet) {
   let html = '<!DOCTYPE html><html><head>';
   html += '<meta charset="UTF-8">';
   html += '<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">';
+  html += '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">';
   html += '<style>';
-  html += 'body { font-family: "Malgun Gothic", "AppleGothic", "NanumGothic", "Noto Sans CJK KR", "Noto Sans KR", Arial, sans-serif; margin: 20px; }';
+  html += '* { font-family: "Noto Sans KR", "Malgun Gothic", "AppleGothic", "NanumGothic", "Noto Sans CJK KR", Arial, sans-serif !important; }';
+  html += 'body { margin: 20px; }';
   html += 'table { border-collapse: collapse; width: 100%; }';
   html += 'th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }';
   html += 'th { background-color: #4a90e2; color: white; font-weight: bold; }';
@@ -1629,15 +1631,65 @@ async function uploadCustomSlideFile(req, res) {
             const page = await browser.newPage();
             
             // UTF-8 인코딩 명시 및 한글 폰트 설정
+            // 폰트를 먼저 로드
+            await page.goto('data:text/html,<html><head><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet"></head><body></body></html>', {
+              waitUntil: 'networkidle0',
+              timeout: 30000
+            });
+            
+            // HTML 콘텐츠 설정
             await page.setContent(html, { 
               waitUntil: 'networkidle0',
               timeout: 30000
             });
             
-            // 한글 폰트가 로드되도록 대기
+            // 한글 폰트가 로드되도록 대기 (더 확실하게)
             await page.evaluateHandle(() => {
               return document.fonts.ready;
             });
+            
+            // 추가 대기 시간 (폰트 렌더링 완료 보장)
+            await page.waitForTimeout(3000);
+            
+            // 한글 텍스트가 제대로 렌더링되었는지 확인
+            const textRendered = await page.evaluate(() => {
+              // 모든 텍스트 노드 확인
+              const walker = document.createTreeWalker(
+                document.body,
+                NodeFilter.SHOW_TEXT,
+                null,
+                false
+              );
+              
+              let hasKorean = false;
+              let allRendered = true;
+              let node;
+              while (node = walker.nextNode()) {
+                const text = node.textContent;
+                // 한글이 포함된 경우 폰트가 로드되었는지 확인
+                if (/[가-힣]/.test(text)) {
+                  hasKorean = true;
+                  const range = document.createRange();
+                  range.selectNodeContents(node);
+                  const rect = range.getBoundingClientRect();
+                  // 텍스트가 보이지 않으면 폰트 로딩 대기
+                  if (rect.width === 0 || rect.height === 0) {
+                    allRendered = false;
+                    break;
+                  }
+                }
+              }
+              
+              return { hasKorean, allRendered };
+            });
+            
+            // 한글이 있지만 렌더링되지 않은 경우 추가 대기
+            if (textRendered.hasKorean && !textRendered.allRendered) {
+              await page.waitForTimeout(2000);
+              await page.evaluateHandle(() => {
+                return document.fonts.ready;
+              });
+            }
             
             // 스크린샷 촬영
             const screenshot = await page.screenshot({

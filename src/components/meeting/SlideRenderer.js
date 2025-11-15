@@ -1033,17 +1033,15 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               variant="h1"
               component="h1"
               sx={{
-                fontSize: { xs: '3.5rem', md: '5.5rem' },
+                fontSize: { xs: '4rem', md: '6rem' },
                 fontWeight: 800,
                 mb: 5,
                 lineHeight: 1.1,
                 color: '#212529',
                 letterSpacing: '-1px',
                 fontFamily: '"Noto Sans KR", "Roboto", sans-serif',
-                background: 'linear-gradient(135deg, #212529 0%, #495057 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text'
+                backgroundColor: 'transparent',
+                background: 'none'
               }}
             >
               감사합니다
@@ -1065,16 +1063,14 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               <Typography
                 variant="h4"
                 sx={{
-                  fontSize: { xs: '1.8rem', md: '2.5rem' },
+                  fontSize: { xs: '2rem', md: '2.8rem' },
                   fontWeight: 800,
                   mb: 2.5,
                   color: '#212529',
                   letterSpacing: '-0.5px',
                   fontFamily: '"Noto Sans KR", "Roboto", sans-serif',
-                  background: 'linear-gradient(135deg, #212529 0%, #495057 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  backgroundClip: 'text'
+                  backgroundColor: 'transparent',
+                  background: 'none'
                 }}
               >
                 {slide.meetingName || '회의'}
@@ -1370,7 +1366,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             sx={{
               display: 'flex',
               flexDirection: 'row',
-              alignItems: 'center',
+              alignItems: 'flex-end',
               justifyContent: 'space-between',
               width: '100%',
               backgroundColor: '#ffffff',
@@ -1405,7 +1401,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                 variant="h6"
                 sx={{
                   fontWeight: 700,
-                  fontSize: { xs: '0.95rem', md: '1.1rem' },
+                  fontSize: { xs: '1.1rem', md: '1.3rem' },
                   color: '#212529',
                   letterSpacing: '0.5px',
                   fontFamily: '"Noto Sans KR", "Roboto", "Helvetica", "Arial", sans-serif'
@@ -1420,12 +1416,13 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               variant="h5"
               sx={{
                 fontWeight: 700,
-                fontSize: { xs: '1.1rem', md: '1.4rem' },
+                fontSize: { xs: '1.3rem', md: '1.6rem' },
                 color: '#212529',
                 textAlign: 'right',
                 fontFamily: '"Noto Sans KR", "Roboto", sans-serif',
                 letterSpacing: '0.3px',
-                backgroundColor: 'transparent'
+                backgroundColor: 'transparent',
+                background: 'none'
               }}
             >
               {slideTitle}
@@ -1569,7 +1566,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             sx={{
               display: 'flex',
               flexDirection: 'row',
-              alignItems: 'center',
+              alignItems: 'flex-end',
               justifyContent: 'space-between',
               width: '100%',
               backgroundColor: '#ffffff',
@@ -1604,7 +1601,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                 variant="h6"
                 sx={{
                   fontWeight: 700,
-                  fontSize: { xs: '0.95rem', md: '1.1rem' },
+                  fontSize: { xs: '1.1rem', md: '1.3rem' },
                   color: '#212529',
                   letterSpacing: '0.5px',
                   fontFamily: '"Noto Sans KR", "Roboto", "Helvetica", "Arial", sans-serif'

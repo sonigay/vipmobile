@@ -30,6 +30,17 @@ export async function captureElement(element, options = {}) {
       maxHeight = Math.max(maxHeight, childBottom, childHeight);
     });
     
+    // 테이블이나 스크롤 가능한 컨테이너의 경우 추가 계산
+    const scrollableContainers = el.querySelectorAll('[style*="overflow"], .MuiTableContainer-root, .MuiPaper-root');
+    scrollableContainers.forEach(container => {
+      if (container.scrollHeight > container.clientHeight) {
+        maxHeight = Math.max(maxHeight, container.scrollHeight);
+      }
+      if (container.scrollWidth > container.clientWidth) {
+        maxWidth = Math.max(maxWidth, container.scrollWidth);
+      }
+    });
+    
     return { width: maxWidth, height: maxHeight };
   };
   

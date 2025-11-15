@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Box,
   IconButton,
@@ -17,6 +17,12 @@ function ImageSlideViewer({ slides, onClose }) {
   const [loadedImages, setLoadedImages] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [scale, setScale] = useState(1);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const imageRef = useRef(null);
+  const containerRef = useRef(null);
 
   // 이미지 preload
   useEffect(() => {
@@ -201,7 +207,7 @@ function ImageSlideViewer({ slides, onClose }) {
         </Typography>
       </Box>
 
-      {/* 이미지 표시 - 가로 기준 맞추고 세로 스크롤 */}
+      {/* 이미지 표시 - 모바일 확대/축소 지원 */}
       {loading && !loadedImages.has(currentIndex) ? (
         <CircularProgress sx={{ color: 'white' }} />
       ) : error ? (
@@ -210,32 +216,149 @@ function ImageSlideViewer({ slides, onClose }) {
         </Alert>
       ) : (
         <Box
+          ref={containerRef}
           sx={{
             width: '100vw',
             height: '100vh',
-            overflowY: 'auto',
-            overflowX: 'hidden',
+            overflow: 'hidden',
             display: 'flex',
             justifyContent: 'center',
-            alignItems: 'flex-start'
+            alignItems: 'center',
+            position: 'relative',
+            touchAction: 'none' // 모바일 기본 제스처 비활성화
+          }}
+          onWheel={(e) => {
+            // 데스크톱: 마우스 휠로 확대/축소
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? -0.1 : 0.1;
+            setScale(prev => Math.max(0.5, Math.min(3, prev + delta)));
+          }}
+          onTouchStart={(e) => {
+            // 모바일: 두 손가락 핀치 제스처
+            if (e.touches.length === 2) {
+              const touch1 = e.touches[0];
+              const touch2 = e.touches[1];
+              const distance = Math.hypot(
+                touch2.clientX - touch1.clientX,
+                touch2.clientY - touch1.clientY
+              );
+              setDragStart({ distance, scale });
+            } else if (e.touches.length === 1) {
+              // 한 손가락: 드래그
+              setIsDragging(true);
+              setDragStart({
+                x: e.touches[0].clientX - position.x,
+                y: e.touches[0].clientY - position.y
+              });
+            }
+          }}
+          onTouchMove={(e) => {
+            e.preventDefault();
+            if (e.touches.length === 2) {
+              // 핀치 제스처
+              const touch1 = e.touches[0];
+              const touch2 = e.touches[1];
+              const distance = Math.hypot(
+                touch2.clientX - touch1.clientX,
+                touch2.clientY - touch1.clientY
+              );
+              const scaleChange = distance / dragStart.distance;
+              setScale(dragStart.scale * scaleChange);
+            } else if (e.touches.length === 1 && isDragging) {
+              // 드래그
+              setPosition({
+                x: e.touches[0].clientX - dragStart.x,
+                y: e.touches[0].clientY - dragStart.y
+              });
+            }
+          }}
+          onTouchEnd={() => {
+            setIsDragging(false);
           }}
         >
           <Box
+            ref={imageRef}
             component="img"
             src={currentSlide.imageUrl}
             alt={`슬라이드 ${currentIndex + 1}`}
             sx={{
-              width: '100%',
+              maxWidth: '100%',
+              maxHeight: '100%',
+              width: 'auto',
               height: 'auto',
               objectFit: 'contain',
               opacity: loadedImages.has(currentIndex) ? 1 : 0.5,
-              transition: 'opacity 0.3s',
-              display: 'block'
+              transition: scale !== 1 ? 'none' : 'opacity 0.3s',
+              display: 'block',
+              transform: `scale(${scale}) translate(${position.x / scale}px, ${position.y / scale}px)`,
+              transformOrigin: 'center center',
+              userSelect: 'none',
+              WebkitUserSelect: 'none',
+              touchAction: 'none'
             }}
             onError={() => setError('이미지를 불러올 수 없습니다.')}
+            onLoad={() => {
+              // 이미지 로드 시 초기화
+              setScale(1);
+              setPosition({ x: 0, y: 0 });
+            }}
           />
         </Box>
       )}
+      
+      {/* 확대/축소 컨트롤 (모바일용) */}
+      <Box
+        sx={{
+          position: 'absolute',
+          bottom: 80,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          display: 'flex',
+          gap: 1,
+          zIndex: 10002
+        }}
+      >
+        <IconButton
+          onClick={(e) => {
+            e.stopPropagation();
+            setScale(prev => Math.max(0.5, prev - 0.2));
+          }}
+          sx={{
+            color: 'white',
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.7)' }
+          }}
+        >
+          <Typography variant="h6">−</Typography>
+        </IconButton>
+        <IconButton
+          onClick={(e) => {
+            e.stopPropagation();
+            setScale(1);
+            setPosition({ x: 0, y: 0 });
+          }}
+          sx={{
+            color: 'white',
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.7)' }
+          }}
+        >
+          <Typography variant="body2">리셋</Typography>
+        </IconButton>
+        <IconButton
+          onClick={(e) => {
+            e.stopPropagation();
+            setScale(prev => Math.min(3, prev + 0.2));
+          }}
+          sx={{
+            color: 'white',
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.7)' }
+          }}
+        >
+          <Typography variant="h6">+</Typography>
+        </IconButton>
+      </Box>
     </Box>
   );
 }
