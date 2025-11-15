@@ -53,46 +53,76 @@ function createSheetsClient() {
   return { sheets, SPREADSHEET_ID };
 }
 
+// Google Sheets API 재시도 헬퍼 함수
+async function retrySheetsOperation(operation, maxRetries = 3, delay = 1000) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      const isQuotaError = error.code === 429 || 
+        (error.message && error.message.includes('Quota exceeded')) ||
+        (error.response && error.response.status === 429);
+      
+      if (isQuotaError && attempt < maxRetries) {
+        const waitTime = delay * Math.pow(2, attempt - 1); // Exponential backoff
+        console.warn(`⚠️ [Sheets API] 할당량 초과, ${waitTime}ms 후 재시도 (${attempt}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        continue;
+      }
+      throw error;
+    }
+  }
+}
+
 // 시트 헤더 확인 및 생성
 async function ensureSheetHeaders(sheets, spreadsheetId, sheetName, headers) {
   try {
-    // 시트 존재 여부 확인
-    const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
+    // 시트 존재 여부 확인 (재시도 포함)
+    const spreadsheet = await retrySheetsOperation(async () => {
+      return await sheets.spreadsheets.get({ spreadsheetId });
+    });
+
     const sheetExists = spreadsheet.data.sheets.some(sheet => sheet.properties.title === sheetName);
 
     if (!sheetExists) {
-      // 시트 생성
-      await sheets.spreadsheets.batchUpdate({
-        spreadsheetId,
-        resource: {
-          requests: [{
-            addSheet: {
-              properties: {
-                title: sheetName
+      // 시트 생성 (재시도 포함)
+      await retrySheetsOperation(async () => {
+        return await sheets.spreadsheets.batchUpdate({
+          spreadsheetId,
+          resource: {
+            requests: [{
+              addSheet: {
+                properties: {
+                  title: sheetName
+                }
               }
-            }
-          }]
-        }
+            }]
+          }
+        });
       });
     }
 
-    // 헤더 확인 및 설정
+    // 헤더 확인 및 설정 (재시도 포함)
     const headerRange = `${sheetName}!A2:${String.fromCharCode(64 + headers.length)}2`;
-    const headerResponse = await sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range: headerRange
+    const headerResponse = await retrySheetsOperation(async () => {
+      return await sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: headerRange
+      });
     });
 
     const existingHeaders = headerResponse.data.values?.[0] || [];
     if (existingHeaders.length === 0 || existingHeaders.join('|') !== headers.join('|')) {
-      // 헤더 설정 (1행은 비우고 2행에 헤더)
-      await sheets.spreadsheets.values.update({
-        spreadsheetId,
-        range: headerRange,
-        valueInputOption: 'USER_ENTERED',
-        resource: {
-          values: [headers]
-        }
+      // 헤더 설정 (1행은 비우고 2행에 헤더, 재시도 포함)
+      await retrySheetsOperation(async () => {
+        return await sheets.spreadsheets.values.update({
+          spreadsheetId,
+          range: headerRange,
+          valueInputOption: 'USER_ENTERED',
+          resource: {
+            values: [headers]
+          }
+        });
       });
     }
   } catch (error) {
@@ -532,11 +562,13 @@ async function saveMeetingConfig(req, res) {
       '회의ID', '슬라이드ID', '순서', '타입', '모드', '탭', '제목', '내용', '배경색', '이미지URL', '캡처시간', 'Discord포스트ID', 'Discord스레드ID', '탭라벨', '서브탭라벨', '회의날짜', '회의차수', '회의장소', '참석자', '생성자'
     ]);
 
-    // 기존 데이터 조회 (메인 슬라이드 필드 및 tabLabel, subTabLabel 포함)
+    // 기존 데이터 조회 (메인 슬라이드 필드 및 tabLabel, subTabLabel 포함, 재시도 포함)
     const range = `${sheetName}!A3:T`;
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range
+    const response = await retrySheetsOperation(async () => {
+      return await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range
+      });
     });
 
     const existingRows = response.data.values || [];
@@ -628,16 +660,18 @@ async function saveMeetingConfig(req, res) {
       ];
 
       if (existingRowIndex !== -1) {
-        // 기존 슬라이드 업데이트 (메인 슬라이드 필드 및 tabLabel, subTabLabel 포함)
+        // 기존 슬라이드 업데이트 (메인 슬라이드 필드 및 tabLabel, subTabLabel 포함, 재시도 포함)
         const updateRange = `${sheetName}!A${existingRowIndex + 3}:T${existingRowIndex + 3}`;
         console.log(`📝 [saveMeetingConfig] 기존 슬라이드 업데이트 시작: 범위 ${updateRange}`);
-        const updateResult = await sheets.spreadsheets.values.update({
-          spreadsheetId: SPREADSHEET_ID,
-          range: updateRange,
-          valueInputOption: 'USER_ENTERED',
-          resource: {
-            values: [newRow]
-          }
+        const updateResult = await retrySheetsOperation(async () => {
+          return await sheets.spreadsheets.values.update({
+            spreadsheetId: SPREADSHEET_ID,
+            range: updateRange,
+            valueInputOption: 'USER_ENTERED',
+            resource: {
+              values: [newRow]
+            }
+          });
         });
         console.log(`✅ [saveMeetingConfig] 업데이트 완료:`, {
           updatedCells: updateResult.data.updatedCells,
@@ -647,15 +681,17 @@ async function saveMeetingConfig(req, res) {
         // 기존 행 데이터도 업데이트 (다음 반복을 위해)
         existingRows[existingRowIndex] = newRow;
       } else {
-        // 새 슬라이드 추가
+        // 새 슬라이드 추가 (재시도 포함)
         console.log(`📝 [saveMeetingConfig] 새 슬라이드 추가 시작`);
-        const appendResult = await sheets.spreadsheets.values.append({
-          spreadsheetId: SPREADSHEET_ID,
-          range: `${sheetName}!A3`,
-          valueInputOption: 'USER_ENTERED',
-          resource: {
-            values: [newRow]
-          }
+        const appendResult = await retrySheetsOperation(async () => {
+          return await sheets.spreadsheets.values.append({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${sheetName}!A3`,
+            valueInputOption: 'USER_ENTERED',
+            resource: {
+              values: [newRow]
+            }
+          });
         });
         console.log(`✅ [saveMeetingConfig] 추가 완료:`, {
           updatedCells: appendResult.data.updates?.updatedCells,
@@ -668,7 +704,7 @@ async function saveMeetingConfig(req, res) {
       
       // 각 슬라이드 저장 후 약간의 지연 (Google Sheets API rate limit 방지)
       if (i < slides.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 200));
+        await new Promise(resolve => setTimeout(resolve, 500)); // 200ms -> 500ms로 증가
       }
     }
     
@@ -1371,10 +1407,27 @@ async function convertPPTToImages(pptBuffer, filename) {
     const puppeteer = require('puppeteer');
     let browser;
     if (!global.pptBrowser) {
-      global.pptBrowser = await puppeteer.launch({
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
-      });
+      try {
+        global.pptBrowser = await puppeteer.launch({
+          headless: true,
+          args: [
+            '--no-sandbox', 
+            '--disable-setuid-sandbox', 
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--disable-software-rasterizer'
+          ],
+          // 서버 환경에서 Chrome 경로 자동 감지
+          executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
+        });
+      } catch (launchError) {
+        console.error('❌ [PPT 변환] Puppeteer 브라우저 실행 실패:', launchError.message);
+        // Chrome이 없는 경우 에러 메시지 개선
+        if (launchError.message.includes('Could not find Chrome')) {
+          throw new Error('PPT 변환을 위해 서버에 Chrome이 설치되어 있어야 합니다. 관리자에게 문의하세요.');
+        }
+        throw launchError;
+      }
     }
     browser = global.pptBrowser;
     
@@ -1757,7 +1810,15 @@ async function uploadCustomSlideFile(req, res) {
             const puppeteer = require('puppeteer');
             const browser = await puppeteer.launch({
               headless: true,
-              args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+              args: [
+                '--no-sandbox', 
+                '--disable-setuid-sandbox', 
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+                '--disable-software-rasterizer'
+              ],
+              // 서버 환경에서 Chrome 경로 자동 감지
+              executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
             });
             const page = await browser.newPage();
             
