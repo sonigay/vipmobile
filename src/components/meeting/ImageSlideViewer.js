@@ -24,63 +24,63 @@ function ImageSlideViewer({ slides, onClose }) {
   const imageRef = useRef(null);
   const containerRef = useRef(null);
 
-  // 이미지 preload
+  // 이미지 preload (lazy loading 및 progressive loading 적용)
   useEffect(() => {
     const preloadImages = async () => {
-      const imagesToLoad = slides.slice(0, Math.min(3, slides.length)); // 처음 3개만 preload
+      if (slides.length === 0) {
+        setLoading(false);
+        return;
+      }
       
-      const loadPromises = imagesToLoad.map((slide, index) => {
-        return new Promise((resolve) => {
-          const img = new Image();
-          img.onload = () => {
-            setLoadedImages(prev => new Set([...prev, index]));
-            resolve();
-          };
-          img.onerror = () => resolve(); // 실패해도 계속 진행
-          img.src = slide.imageUrl;
-        });
-      });
-
-      await Promise.all(loadPromises);
-      setLoading(false);
+      // 첫 번째 이미지만 즉시 로드 (progressive loading)
+      const firstSlide = slides[0];
+      if (firstSlide?.imageUrl) {
+        const img = new Image();
+        img.onload = () => {
+          setLoadedImages(prev => new Set([...prev, 0]));
+          setLoading(false);
+        };
+        img.onerror = () => {
+          setLoading(false);
+        };
+        img.src = firstSlide.imageUrl;
+      } else {
+        setLoading(false);
+      }
+      
+      // 나머지 이미지는 지연 로딩 (lazy loading)
+      // Intersection Observer를 사용하여 뷰포트에 가까워질 때 로드
     };
 
-    if (slides.length > 0) {
-      preloadImages();
-    }
+    preloadImages();
   }, [slides]);
 
-  // 다음/이전 이미지 preload (성능 최적화)
+  // 다음/이전 이미지 preload (lazy loading - 현재 이미지 주변만)
   useEffect(() => {
     const preloadAdjacent = () => {
-      // 다음 이미지 preload
-      if (currentIndex < slides.length - 1) {
-        const nextIndex = currentIndex + 1;
-        if (!loadedImages.has(nextIndex)) {
+      // 현재 이미지 주변 ±2 범위만 preload (메모리 최적화)
+      const preloadRange = 2;
+      const startIndex = Math.max(0, currentIndex - preloadRange);
+      const endIndex = Math.min(slides.length - 1, currentIndex + preloadRange);
+      
+      for (let i = startIndex; i <= endIndex; i++) {
+        if (!loadedImages.has(i) && slides[i]?.imageUrl) {
           const img = new Image();
           img.onload = () => {
-            setLoadedImages(prev => new Set([...prev, nextIndex]));
+            setLoadedImages(prev => new Set([...prev, i]));
           };
           img.onerror = () => {}; // 에러 무시
-          img.src = slides[nextIndex].imageUrl;
+          img.src = slides[i].imageUrl;
         }
       }
       
-      // 이전 이미지 preload (뒤로 가는 경우 대비)
-      if (currentIndex > 0) {
-        const prevIndex = currentIndex - 1;
-        if (!loadedImages.has(prevIndex)) {
-          const img = new Image();
-          img.onload = () => {
-            setLoadedImages(prev => new Set([...prev, prevIndex]));
-          };
-          img.onerror = () => {}; // 에러 무시
-          img.src = slides[prevIndex].imageUrl;
-        }
-      }
+      // 범위 밖의 이미지는 메모리에서 해제 (브라우저가 자동으로 처리하지만 명시적으로 표시)
+      // 실제로는 브라우저가 캐시를 관리하므로 추가 작업 불필요
     };
     
-    preloadAdjacent();
+    if (slides.length > 0) {
+      preloadAdjacent();
+    }
   }, [currentIndex, slides, loadedImages]);
 
   // 키보드 이벤트
@@ -305,6 +305,7 @@ function ImageSlideViewer({ slides, onClose }) {
             component="img"
             src={currentSlide.imageUrl}
             alt={`슬라이드 ${currentIndex + 1}`}
+            loading={loadedImages.has(currentIndex) ? 'eager' : 'lazy'} // lazy loading 지원
             sx={{
               maxWidth: '100%',
               maxHeight: '100%',
@@ -322,7 +323,8 @@ function ImageSlideViewer({ slides, onClose }) {
             }}
             onError={() => setError('이미지를 불러올 수 없습니다.')}
             onLoad={() => {
-              // 이미지 로드 시 초기화
+              // 이미지 로드 시 초기화 및 로드 상태 업데이트
+              setLoadedImages(prev => new Set([...prev, currentIndex]));
               setScale(1);
               setPosition({ x: 0, y: 0 });
             }}

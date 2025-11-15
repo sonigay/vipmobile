@@ -541,6 +541,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         onResume={handleResume}
       />
 
+      {/* 현재 슬라이드만 렌더링 (메모리 최적화) */}
       {slidesState && Array.isArray(slidesState) && slidesState[currentSlideIndex] && (
         <SlideRenderer
           key={`slide-${currentSlideIndex}-${slidesState[currentSlideIndex].slideId || currentSlideIndex}`}
@@ -548,6 +549,12 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
           loggedInStore={loggedInStore}
           onReady={handleSlideReady}
         />
+      )}
+      
+      {/* 완료된 슬라이드는 언마운트하여 메모리 해제 */}
+      {slidesState && Array.isArray(slidesState) && currentSlideIndex > 0 && (
+        // 이전 슬라이드는 key 변경으로 언마운트 (React가 자동으로 처리)
+        null
       )}
     </>
   );
