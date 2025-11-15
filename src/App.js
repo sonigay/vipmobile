@@ -1287,7 +1287,7 @@ function AppContent() {
                           String(hasPermission || '').trim().toUpperCase() === 'M' ||
                           (typeof hasPermission === 'string' && hasPermission.trim().toUpperCase() === 'M');
               console.log(`🔍 [필터링] meeting 모드 체크: mode="${mode}", hasPermission="${hasPermission}", type=${typeof hasPermission}, isM=${isM}`);
-              return isM;
+              return isM; // M 권한 체크 완료
             }
             
             // 다른 모드는 권한이 있으면 포함 (true 또는 'O')
