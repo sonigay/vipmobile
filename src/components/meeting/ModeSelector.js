@@ -24,13 +24,27 @@ function ModeSelector({ loggedInStore, selectedModes, onModeToggle, selectedTabs
     const subPermissions = ['onSalePolicy', 'onSaleLink', 'bondChart', 'inspectionOverview'];
     return Object.entries(loggedInStore.modePermissions)
       .filter(([mode, hasPermission]) => {
-        return (hasPermission === true || hasPermission === 'O') && !subPermissions.includes(mode);
+        // 서브 권한은 제외
+        if (subPermissions.includes(mode)) {
+          return false;
+        }
+        // 회의 모드의 경우 M 또는 O 권한 허용
+        if (mode === 'meeting') {
+          const permission = String(hasPermission || '').trim().toUpperCase();
+          return hasPermission === 'M' || 
+                 hasPermission === 'O' ||
+                 hasPermission === true || 
+                 permission === 'M' ||
+                 permission === 'O';
+        }
+        // 다른 모드는 권한이 있으면 포함 (true 또는 'O')
+        return hasPermission === true || hasPermission === 'O' || String(hasPermission || '').trim().toUpperCase() === 'O';
       })
       .map(([mode]) => mode)
       .filter(mode => {
-        // 모드 설정이 있는 모드만 표시 (모든 모드 표시)
+        // 모드 설정이 있는 모드만 표시 (회의 모드 포함)
         const modeConfig = getModeConfig(mode);
-        return modeConfig && mode !== 'meeting'; // 회의 모드는 제외
+        return modeConfig;
       });
   }, [loggedInStore]);
 

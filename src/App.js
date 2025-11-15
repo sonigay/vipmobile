@@ -1279,15 +1279,18 @@ function AppContent() {
               return false;
             }
             
-            // 회의 모드의 경우 M 권한만 접속 가능
+            // 회의 모드의 경우 M 또는 O 권한 허용
             if (mode === 'meeting') {
-              // 문자열 "M" 또는 boolean true 모두 허용 (여러 조건 체크)
-              const isM = hasPermission === 'M' || 
-                          hasPermission === true || 
-                          String(hasPermission || '').trim().toUpperCase() === 'M' ||
-                          (typeof hasPermission === 'string' && hasPermission.trim().toUpperCase() === 'M');
-              console.log(`🔍 [필터링] meeting 모드 체크: mode="${mode}", hasPermission="${hasPermission}", type=${typeof hasPermission}, isM=${isM}`);
-              return isM; // M 권한 체크 완료
+              // 문자열 "M", "O" 또는 boolean true 모두 허용 (여러 조건 체크)
+              const permission = String(hasPermission || '').trim().toUpperCase();
+              const hasAccess = hasPermission === 'M' || 
+                                hasPermission === 'O' ||
+                                hasPermission === true || 
+                                permission === 'M' ||
+                                permission === 'O' ||
+                                (typeof hasPermission === 'string' && (hasPermission.trim().toUpperCase() === 'M' || hasPermission.trim().toUpperCase() === 'O'));
+              console.log(`🔍 [필터링] meeting 모드 체크: mode="${mode}", hasPermission="${hasPermission}", type=${typeof hasPermission}, hasAccess=${hasAccess}`);
+              return hasAccess; // M 또는 O 권한 체크 완료
             }
             
             // 다른 모드는 권한이 있으면 포함 (true 또는 'O')
