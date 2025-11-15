@@ -177,7 +177,13 @@ function CaptureProgress({ open, total, current, completed, failed, onCancel, sl
           {Array.from({ length: total }, (_, index) => {
             const slideIndex = index + 1;
             const isCompleted = slideIndex <= completed;
-            const isFailed = failed.includes(slideIndex);
+            // failed가 객체 배열인 경우와 숫자 배열인 경우 모두 처리
+            const failedItem = Array.isArray(failed) && failed.length > 0 
+              ? (typeof failed[0] === 'object' 
+                  ? failed.find(f => f.slideIndex === slideIndex)
+                  : failed.includes(slideIndex) ? { slideIndex, error: '캡처 실패' } : null)
+              : null;
+            const isFailed = !!failedItem;
             const isCurrent = slideIndex === current;
 
             return (
@@ -195,7 +201,7 @@ function CaptureProgress({ open, total, current, completed, failed, onCancel, sl
                 </ListItemIcon>
                 <ListItemText
                   primary={`슬라이드 ${slideIndex}${getSlideInfo(index) ? ` - ${getSlideInfo(index)}` : ''}`}
-                  secondary={isFailed ? '캡처 실패' : isCompleted ? '완료' : isCurrent ? '캡처 중...' : '대기 중'}
+                  secondary={isFailed ? (failedItem?.error || '캡처 실패') : isCompleted ? '완료' : isCurrent ? '캡처 중...' : '대기 중'}
                 />
               </ListItem>
             );
