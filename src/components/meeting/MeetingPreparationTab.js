@@ -13,7 +13,7 @@ import MeetingEditor from './MeetingEditor';
 import MeetingConfigEditor from './MeetingConfigEditor';
 import MeetingCaptureManager from './MeetingCaptureManager';
 
-function MeetingPreparationTab({ loggedInStore }) {
+function MeetingPreparationTab({ loggedInStore, onMeetingSelectForPresentation }) {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingMeeting, setEditingMeeting] = useState(null);
   const [selectedMeeting, setSelectedMeeting] = useState(null);
@@ -38,8 +38,12 @@ function MeetingPreparationTab({ loggedInStore }) {
 
   const handleSelect = (meeting) => {
     if (meeting.status === 'completed') {
-      // 완료된 회의는 회의진행 탭으로 이동 (추후 구현)
-      alert('회의 재생 기능은 회의진행 탭에서 이용하실 수 있습니다.');
+      // 완료된 회의는 회의진행 탭으로 이동
+      if (onMeetingSelectForPresentation) {
+        onMeetingSelectForPresentation(meeting);
+      } else {
+        alert('회의 재생 기능은 회의진행 탭에서 이용하실 수 있습니다.');
+      }
       return;
     }
     setSelectedMeeting(meeting);

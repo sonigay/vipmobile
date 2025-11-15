@@ -40,7 +40,7 @@ const formatDateTime = (value) => {
   }
 };
 
-function MeetingPresentationTab({ loggedInStore }) {
+function MeetingPresentationTab({ loggedInStore, initialSelectedMeeting, onMeetingDeselect }) {
   const [meetings, setMeetings] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -51,6 +51,13 @@ function MeetingPresentationTab({ loggedInStore }) {
   useEffect(() => {
     loadMeetings();
   }, []);
+
+  // initialSelectedMeeting이 변경되면 자동으로 재생 시작
+  useEffect(() => {
+    if (initialSelectedMeeting && initialSelectedMeeting.status === 'completed') {
+      handlePlay(initialSelectedMeeting);
+    }
+  }, [initialSelectedMeeting]);
 
   const loadMeetings = async () => {
     setLoading(true);
@@ -139,6 +146,10 @@ function MeetingPresentationTab({ loggedInStore }) {
     setViewing(false);
     setSelectedMeeting(null);
     setSlides([]);
+    // 부모 컴포넌트에 선택 해제 알림
+    if (onMeetingDeselect) {
+      onMeetingDeselect();
+    }
   };
 
   if (viewing && slides.length > 0) {

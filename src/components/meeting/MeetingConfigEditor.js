@@ -11,7 +11,8 @@ import {
 } from '@mui/material';
 import {
   Save as SaveIcon,
-  Add as AddIcon
+  Add as AddIcon,
+  Refresh as RefreshIcon
 } from '@mui/icons-material';
 import ModeSelector from './ModeSelector';
 import SlideOrderEditor from './SlideOrderEditor';
@@ -157,6 +158,33 @@ function MeetingConfigEditor({ meeting, loggedInStore, onSave, onCancel }) {
     }
   };
 
+  const handleRecapture = async () => {
+    if (slides.length === 0) {
+      setError('최소 1개 이상의 슬라이드를 선택해주세요.');
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+
+    try {
+      // 설정 저장 (변경사항이 있을 수 있으므로)
+      await api.saveMeetingConfig(meeting.meetingId, { slides });
+      
+      // 회의 상태를 capturing으로 변경
+      await api.updateMeeting(meeting.meetingId, {
+        status: 'capturing'
+      });
+
+      // 재캡처 시작
+      setCapturing(true);
+    } catch (err) {
+      console.error('재캡처 시작 오류:', err);
+      setError('재캡처 시작에 실패했습니다.');
+      setSaving(false);
+    }
+  };
+
   const handleCaptureComplete = () => {
     setCapturing(false);
     setSaving(false);
@@ -185,17 +213,26 @@ function MeetingConfigEditor({ meeting, loggedInStore, onSave, onCancel }) {
           회의 설정: {meeting?.meetingName || ''}
         </Typography>
         <Stack direction="row" spacing={2}>
-          <Button onClick={onCancel} disabled={saving}>
+          <Button onClick={onCancel} disabled={saving || capturing}>
             취소
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            onClick={handleRecapture}
+            disabled={saving || capturing || slides.length === 0}
+            sx={{ borderColor: '#FB8C00', color: '#FB8C00', '&:hover': { borderColor: '#F57C00', backgroundColor: 'rgba(251, 140, 0, 0.04)' } }}
+          >
+            재캡처
           </Button>
           <Button
             variant="contained"
             startIcon={saving ? <CircularProgress size={20} /> : <SaveIcon />}
             onClick={handleSave}
-            disabled={saving || slides.length === 0}
+            disabled={saving || capturing || slides.length === 0}
             sx={{ backgroundColor: '#3949AB', '&:hover': { backgroundColor: '#303F9F' } }}
           >
-            저장
+            저장 및 캡처
           </Button>
         </Stack>
       </Stack>

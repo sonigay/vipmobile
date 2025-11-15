@@ -5,6 +5,8 @@ const multer = require('multer');
 const path = require('path');
 const ExcelJS = require('exceljs');
 const sharp = require('sharp');
+const JSZip = require('jszip');
+const xml2js = require('xml2js');
 
 // Discord 봇 설정
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
@@ -702,11 +704,15 @@ async function findOrCreatePost(channel, yearMonth, meetingNumber) {
     
     if (meetingNumber) {
       // meetingNumber가 있으면 정확히 일치하는 포스트를 찾음
+      // 여러 패턴으로 매칭 시도
       post = Array.from(activeThreads.threads.values()).find(thread => {
-        const matches = thread.name === postName || 
-          thread.name === `${yearMonth} 회의 - ${meetingNumber}차`;
+        const threadName = thread.name;
+        const matches = 
+          threadName === postName || 
+          threadName === `${yearMonth} 회의 - ${meetingNumber}차` ||
+          threadName.includes(`${yearMonth} 회의`) && threadName.includes(`${meetingNumber}차`);
         if (matches) {
-          console.log(`✅ [findOrCreatePost] 활성 포스트 찾음 (차수 일치): ${thread.name} (ID: ${thread.id})`);
+          console.log(`✅ [findOrCreatePost] 활성 포스트 찾음 (차수 일치): ${threadName} (ID: ${thread.id})`);
         }
         return matches;
       });
@@ -738,11 +744,15 @@ async function findOrCreatePost(channel, yearMonth, meetingNumber) {
         
         if (meetingNumber) {
           // meetingNumber가 있으면 정확히 일치하는 포스트를 찾음
+          // 여러 패턴으로 매칭 시도
           post = Array.from(archivedThreads.threads.values()).find(thread => {
-            const matches = thread.name === postName || 
-              thread.name === `${yearMonth} 회의 - ${meetingNumber}차`;
+            const threadName = thread.name;
+            const matches = 
+              threadName === postName || 
+              threadName === `${yearMonth} 회의 - ${meetingNumber}차` ||
+              threadName.includes(`${yearMonth} 회의`) && threadName.includes(`${meetingNumber}차`);
             if (matches) {
-              console.log(`✅ [findOrCreatePost] 아카이브된 포스트 찾음 (차수 일치): ${thread.name} (ID: ${thread.id})`);
+              console.log(`✅ [findOrCreatePost] 아카이브된 포스트 찾음 (차수 일치): ${threadName} (ID: ${thread.id})`);
             }
             return matches;
           });
@@ -1309,14 +1319,46 @@ async function convertExcelToImage(worksheet, filename) {
 // PPT 파일을 이미지로 변환
 async function convertPPTToImages(pptBuffer, filename) {
   try {
-    // 방법 1: Puppeteer를 사용하여 PPT를 HTML로 변환 후 이미지로 변환
-    // PPT 파일 형식은 복잡하므로, 기본적인 구조만 구현
-    // 향후 officegen 또는 다른 라이브러리로 확장 가능
-    
     console.log(`📊 [PPT 변환] PPT 파일 변환 시작: ${filename}`);
     
-    // Puppeteer를 사용하여 PPT를 HTML로 변환
-    try {
+    // PPTX 파일은 ZIP 파일이므로 압축 해제
+    const zip = new JSZip();
+    const zipContent = await zip.loadAsync(pptBuffer);
+    
+    // 슬라이드 파일 목록 가져오기 (ppt/slides/slide*.xml)
+    const slideFiles = Object.keys(zipContent.files)
+      .filter(name => name.startsWith('ppt/slides/slide') && name.endsWith('.xml'))
+      .sort((a, b) => {
+        // slide1.xml, slide2.xml 순서로 정렬
+        const numA = parseInt(a.match(/slide(\d+)\.xml/)?.[1] || '0');
+        const numB = parseInt(b.match(/slide(\d+)\.xml/)?.[1] || '0');
+        return numA - numB;
+      });
+    
+    if (slideFiles.length === 0) {
+      throw new Error('PPTX 파일에서 슬라이드를 찾을 수 없습니다.');
+    }
+    
+    console.log(`📊 [PPT 변환] ${slideFiles.length}개의 슬라이드 발견`);
+    
+    const parser = new xml2js.Parser();
+    const imageBuffers = [];
+    
+    // 각 슬라이드를 HTML로 변환 후 이미지로 변환
+    for (let i = 0; i < slideFiles.length; i++) {
+      const slideFile = slideFiles[i];
+      const slideXml = await zipContent.files[slideFile].async('string');
+      
+      // XML 파싱
+      const slideData = await parser.parseStringPromise(slideXml);
+      
+      // 슬라이드 내용 추출 (텍스트, 이미지 등)
+      const slideContent = extractSlideContent(slideData, zipContent);
+      
+      // HTML 생성
+      const html = generateSlideHTML(slideContent, i + 1, slideFiles.length);
+      
+      // Puppeteer로 이미지 변환
       const puppeteer = require('puppeteer');
       const browser = await puppeteer.launch({
         headless: true,
@@ -1324,67 +1366,6 @@ async function convertPPTToImages(pptBuffer, filename) {
       });
       const page = await browser.newPage();
       
-      // PPT 파일을 읽어서 텍스트 추출 (기본적인 방법)
-      // 실제로는 officegen이나 다른 라이브러리를 사용해야 하지만,
-      // 일단 기본 구조만 구현
-      
-      // PPT 파일을 Base64로 인코딩
-      const base64PPT = pptBuffer.toString('base64');
-      
-      // 간단한 HTML 템플릿 생성 (PPT 내용을 표시)
-      const html = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="UTF-8">
-          <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-          <style>
-            body {
-              font-family: "Malgun Gothic", "AppleGothic", "NanumGothic", "Noto Sans CJK KR", "Noto Sans KR", Arial, sans-serif;
-              margin: 20px;
-              background: #ffffff;
-            }
-            .ppt-container {
-              max-width: 1200px;
-              margin: 0 auto;
-              padding: 20px;
-            }
-            .ppt-slide {
-              background: #ffffff;
-              border: 1px solid #ddd;
-              margin-bottom: 20px;
-              padding: 40px;
-              box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            }
-            .ppt-title {
-              font-size: 24px;
-              font-weight: bold;
-              margin-bottom: 20px;
-              color: #333;
-            }
-            .ppt-content {
-              font-size: 16px;
-              line-height: 1.6;
-              color: #666;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="ppt-container">
-            <div class="ppt-slide">
-              <div class="ppt-title">${filename}</div>
-              <div class="ppt-content">
-                PPT 파일 변환 기능은 현재 개발 중입니다.<br>
-                파일명: ${filename}<br>
-                파일 크기: ${(pptBuffer.length / 1024).toFixed(2)} KB
-              </div>
-            </div>
-          </div>
-        </body>
-        </html>
-      `;
-      
-      // HTML 콘텐츠를 페이지에 로드
       await page.setContent(html, { 
         waitUntil: 'networkidle0',
         timeout: 30000
@@ -1407,27 +1388,186 @@ async function convertPPTToImages(pptBuffer, filename) {
       // 이미지 자동 크롭 처리
       const croppedResult = await autoCropImage(screenshot);
       
-      console.log(`✅ [PPT 변환] PPT 파일 변환 완료: ${filename}`);
-      
-      return [{
+      imageBuffers.push({
         buffer: croppedResult.buffer,
-        filename: `${filename}.png`,
-        sheetName: null,
+        filename: `${filename}_slide${i + 1}.png`,
+        sheetName: `슬라이드 ${i + 1}`,
         metadata: {
           originalWidth: croppedResult.originalWidth,
           originalHeight: croppedResult.originalHeight,
           croppedWidth: croppedResult.croppedWidth,
           croppedHeight: croppedResult.croppedHeight
         }
-      }];
-    } catch (puppeteerError) {
-      console.error('❌ [PPT 변환] Puppeteer 변환 실패:', puppeteerError);
-      throw new Error(`PPT 변환 실패: ${puppeteerError.message}`);
+      });
+      
+      console.log(`✅ [PPT 변환] 슬라이드 ${i + 1}/${slideFiles.length} 변환 완료`);
     }
+    
+    console.log(`✅ [PPT 변환] PPT 파일 변환 완료: ${filename} (${imageBuffers.length}개 슬라이드)`);
+    
+    return imageBuffers;
   } catch (error) {
-    console.error('PPT 변환 오류:', error);
-    throw error;
+    console.error('❌ [PPT 변환] PPT 변환 오류:', error);
+    throw new Error(`PPT 변환 실패: ${error.message}`);
   }
+}
+
+// 슬라이드 내용 추출
+function extractSlideContent(slideData, zipContent) {
+  const content = {
+    texts: [],
+    images: []
+  };
+  
+  try {
+    // 텍스트 추출 (a:t 요소)
+    const extractText = (obj, texts = []) => {
+      if (typeof obj === 'string') {
+        if (obj.trim()) texts.push(obj.trim());
+      } else if (Array.isArray(obj)) {
+        obj.forEach(item => extractText(item, texts));
+      } else if (typeof obj === 'object' && obj !== null) {
+        Object.keys(obj).forEach(key => {
+          if (key === 'a:t' || key === 't') {
+            extractText(obj[key], texts);
+          } else {
+            extractText(obj[key], texts);
+          }
+        });
+      }
+      return texts;
+    };
+    
+    content.texts = extractText(slideData);
+    
+    // 이미지 추출 (a:blip 요소의 r:embed 속성)
+    const extractImages = (obj, images = []) => {
+      if (typeof obj === 'object' && obj !== null) {
+        Object.keys(obj).forEach(key => {
+          if (key === 'a:blip' && obj[key] && obj[key]['$'] && obj[key]['$']['r:embed']) {
+            const imageId = obj[key]['$']['r:embed'];
+            images.push(imageId);
+          } else {
+            extractImages(obj[key], images);
+          }
+        });
+      } else if (Array.isArray(obj)) {
+        obj.forEach(item => extractImages(item, images));
+      }
+      return images;
+    };
+    
+    const imageIds = extractImages(slideData);
+    
+    // 이미지 파일 찾기 및 Base64 변환
+    imageIds.forEach(async (imageId) => {
+      // ppt/media/ 또는 ppt/slides/_rels/에서 이미지 찾기
+      const mediaFiles = Object.keys(zipContent.files)
+        .filter(name => name.includes(imageId) || name.includes('media'));
+      
+      // 실제로는 관계 파일(ppt/slides/_rels/slide*.xml.rels)을 파싱해야 함
+      // 여기서는 간단히 처리
+    });
+    
+  } catch (error) {
+    console.warn('⚠️ [PPT 변환] 슬라이드 내용 추출 중 오류:', error);
+  }
+  
+  return content;
+}
+
+// 슬라이드 HTML 생성
+function generateSlideHTML(slideContent, slideNumber, totalSlides) {
+  const texts = slideContent.texts || [];
+  const title = texts[0] || `슬라이드 ${slideNumber}`;
+  const bodyTexts = texts.slice(1);
+  
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+      <style>
+        * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+        }
+        body {
+          font-family: "Malgun Gothic", "AppleGothic", "NanumGothic", "Noto Sans CJK KR", "Noto Sans KR", Arial, sans-serif;
+          background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 50%, #f1f3f5 100%);
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          min-height: 100vh;
+          padding: 40px 20px;
+        }
+        .ppt-slide {
+          background: #ffffff;
+          border-radius: 16px;
+          box-shadow: 0 4px 20px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.05);
+          padding: 60px 80px;
+          max-width: 1200px;
+          width: 100%;
+          min-height: 600px;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+        }
+        .ppt-title {
+          font-size: 36px;
+          font-weight: 700;
+          margin-bottom: 30px;
+          color: #212529;
+          line-height: 1.4;
+        }
+        .ppt-content {
+          font-size: 20px;
+          line-height: 1.8;
+          color: #495057;
+        }
+        .ppt-content p {
+          margin-bottom: 16px;
+        }
+        .ppt-content ul, .ppt-content ol {
+          margin-left: 30px;
+          margin-bottom: 16px;
+        }
+        .ppt-content li {
+          margin-bottom: 8px;
+        }
+        .slide-number {
+          position: absolute;
+          bottom: 20px;
+          right: 20px;
+          font-size: 14px;
+          color: #6c757d;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="ppt-slide">
+        <div class="ppt-title">${escapeHtml(title)}</div>
+        <div class="ppt-content">
+          ${bodyTexts.map(text => `<p>${escapeHtml(text)}</p>`).join('')}
+        </div>
+        <div class="slide-number">${slideNumber} / ${totalSlides}</div>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
+// HTML 이스케이프
+function escapeHtml(text) {
+  if (!text) return '';
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 
 // 커스텀 슬라이드 파일 업로드 (이미지, Excel, PPT 지원)

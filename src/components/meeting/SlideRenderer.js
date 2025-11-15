@@ -1336,6 +1336,152 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
       );
     }
 
+    // 검수 모드인 경우 실제 컴포넌트 렌더링
+    if (slide.mode === 'inspection') {
+      const availableTabs = getAvailableTabsForMode('inspection', loggedInStore);
+      const tabIndex = availableTabs.findIndex(t => t.key === slide.tab);
+      
+      // 모드/탭 제목 구성 (역순으로)
+      const modeTitle = modeConfig?.title || slide.mode;
+      const tabConfig = availableTabs[tabIndex];
+      const tabTitle = tabConfig?.label || slide.tab;
+      
+      // 역순으로 제목 구성: "일반검수항목 < 검수 모드"
+      const slideTitle = `${tabTitle} < ${modeTitle}`;
+      
+      return (
+        <Box
+          sx={{
+            width: '100vw',
+            height: '100vh',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 50%, #f1f3f5 100%)',
+            color: '#212529',
+            p: { xs: 2, md: 3 },
+            overflow: 'hidden',
+            position: 'relative'
+          }}
+        >
+          {/* 상단: 회사 로고 및 슬라이드 제목 - 상단 전체 하얀색 배경 */}
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              width: '100%',
+              backgroundColor: '#ffffff',
+              px: { xs: 3, md: 4 },
+              py: { xs: 2.5, md: 3 },
+              boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+              borderBottom: '1px solid rgba(0,0,0,0.05)',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              zIndex: 10
+            }}
+          >
+            {/* 왼쪽: 로고와 회사 이름 */}
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <Box
+                component="img"
+                src="/logo512.png"
+                alt="회사 로고"
+                sx={{
+                  width: { xs: 35, md: 45 },
+                  height: { xs: 35, md: 45 },
+                  mr: { xs: 1, md: 1.5 },
+                  filter: 'brightness(0) invert(0)'
+                }}
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                }}
+              />
+              <Typography
+                variant="h6"
+                sx={{
+                  fontWeight: 700,
+                  fontSize: { xs: '0.95rem', md: '1.1rem' },
+                  color: '#212529',
+                  letterSpacing: '0.5px',
+                  fontFamily: '"Noto Sans KR", "Roboto", "Helvetica", "Arial", sans-serif'
+                }}
+              >
+                (주)브이아이피플러스
+              </Typography>
+            </Box>
+            
+            {/* 오른쪽: 슬라이드 제목 (역순) */}
+            <Typography
+              variant="h5"
+              sx={{
+                fontWeight: 700,
+                fontSize: { xs: '1.1rem', md: '1.4rem' },
+                color: '#212529',
+                textAlign: 'right',
+                fontFamily: '"Noto Sans KR", "Roboto", sans-serif',
+                letterSpacing: '0.3px',
+                backgroundColor: 'transparent'
+              }}
+            >
+              {slideTitle}
+            </Typography>
+          </Box>
+
+          {/* 중앙: 실제 콘텐츠 */}
+          <Box
+            sx={{
+              flex: 1,
+              width: '100%',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              overflow: 'hidden',
+              position: 'relative',
+              pt: { xs: 8, md: 10 }
+            }}
+          >
+            <Box
+              sx={{
+                width: '100%',
+                height: '100%',
+                backgroundColor: '#ffffff',
+                borderRadius: '16px',
+                overflow: 'auto',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.05)',
+                border: '1px solid rgba(0,0,0,0.06)',
+                '& .MuiAppBar-root': { display: 'none' },
+                '& .MuiTabs-root': { display: 'none' }
+              }}
+            >
+              <InspectionMode
+                loggedInStore={loggedInStore}
+                onLogout={() => {}}
+                onModeChange={() => {}}
+                availableModes={[]}
+                presentationMode={true}
+                initialTab={tabIndex >= 0 ? tabIndex : 0}
+                detailOptions={slide.detailOptions}
+              />
+            </Box>
+          </Box>
+
+          {/* 하단: 생성자 정보 */}
+          {slide.createdBy && (
+            <Box sx={{ mt: 1, width: '100%', textAlign: 'center', flexShrink: 0 }}>
+              <Typography variant="body2" sx={{ opacity: 0.8, fontSize: { xs: '0.7rem', md: '0.8rem' } }}>
+                생성자: {slide.createdBy}
+              </Typography>
+            </Box>
+          )}
+        </Box>
+      );
+    }
+
     // 장표 모드인 경우 실제 컴포넌트 렌더링
     if (slide.mode === 'chart') {
       const availableTabs = getAvailableTabsForMode('chart', loggedInStore);
@@ -1537,6 +1683,409 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
           )}
         </Box>
       );
+    }
+
+    // mode-only 타입 슬라이드 렌더링
+    if (slide.type === 'mode-only' && slide.mode) {
+      const modeTitle = modeConfig?.title || slide.mode;
+      const slideTitle = modeTitle;
+      
+      // 지원되는 모드인지 확인
+      const supportedModes = ['chart', 'inspection'];
+      if (!supportedModes.includes(slide.mode)) {
+        // 지원되지 않는 모드는 PlaceholderModeScreen 사용
+        const PlaceholderModeScreen = require('../PlaceholderModeScreen').default;
+        return (
+          <Box
+            sx={{
+              width: '100vw',
+              height: '100vh',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 50%, #f1f3f5 100%)',
+              color: '#212529',
+              p: { xs: 2, md: 3 },
+              overflow: 'hidden',
+              position: 'relative'
+            }}
+          >
+            {/* 상단: 회사 로고 및 슬라이드 제목 */}
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                width: '100%',
+                backgroundColor: '#ffffff',
+                px: { xs: 3, md: 4 },
+                py: { xs: 2.5, md: 3 },
+                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                borderBottom: '1px solid rgba(0,0,0,0.05)',
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                zIndex: 10
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <Box
+                  component="img"
+                  src="/logo512.png"
+                  alt="회사 로고"
+                  sx={{
+                    width: { xs: 35, md: 45 },
+                    height: { xs: 35, md: 45 },
+                    mr: { xs: 1, md: 1.5 },
+                    filter: 'brightness(0) invert(0)'
+                  }}
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                  }}
+                />
+                <Typography
+                  variant="h6"
+                  sx={{
+                    fontWeight: 700,
+                    fontSize: { xs: '0.95rem', md: '1.1rem' },
+                    color: '#212529',
+                    letterSpacing: '0.5px',
+                    fontFamily: '"Noto Sans KR", "Roboto", "Helvetica", "Arial", sans-serif'
+                  }}
+                >
+                  (주)브이아이피플러스
+                </Typography>
+              </Box>
+              
+              <Typography
+                variant="h5"
+                sx={{
+                  fontWeight: 700,
+                  fontSize: { xs: '1.1rem', md: '1.4rem' },
+                  color: '#212529',
+                  textAlign: 'right',
+                  fontFamily: '"Noto Sans KR", "Roboto", sans-serif',
+                  letterSpacing: '0.3px',
+                  backgroundColor: 'transparent'
+                }}
+              >
+                {slideTitle}
+              </Typography>
+            </Box>
+
+            {/* 중앙: 실제 콘텐츠 */}
+            <Box
+              sx={{
+                flex: 1,
+                width: '100%',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                overflow: 'hidden',
+                position: 'relative',
+                pt: { xs: 8, md: 10 }
+              }}
+            >
+              <Box
+                sx={{
+                  width: '100%',
+                  height: '100%',
+                  backgroundColor: '#ffffff',
+                  borderRadius: '16px',
+                  overflow: 'auto',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.05)',
+                  border: '1px solid rgba(0,0,0,0.06)',
+                  '& .MuiAppBar-root': { display: 'none' },
+                  '& .MuiTabs-root': { display: 'none' }
+                }}
+              >
+                <PlaceholderModeScreen
+                  modeKey={slide.mode}
+                  onLogout={() => {}}
+                  onModeChange={() => {}}
+                  availableModes={[]}
+                  loggedInStore={loggedInStore}
+                />
+              </Box>
+            </Box>
+
+            {/* 하단: 생성자 정보 */}
+            {slide.createdBy && (
+              <Box sx={{ mt: 1, width: '100%', textAlign: 'center', flexShrink: 0 }}>
+                <Typography variant="body2" sx={{ opacity: 0.8, fontSize: { xs: '0.7rem', md: '0.8rem' } }}>
+                  생성자: {slide.createdBy}
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        );
+      }
+      
+      // 지원되는 모드의 경우 실제 컴포넌트 렌더링
+      if (slide.mode === 'chart') {
+        return (
+          <Box
+            sx={{
+              width: '100vw',
+              height: '100vh',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 50%, #f1f3f5 100%)',
+              color: '#212529',
+              p: { xs: 2, md: 3 },
+              overflow: 'hidden',
+              position: 'relative'
+            }}
+          >
+            {/* 상단: 회사 로고 및 슬라이드 제목 */}
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                width: '100%',
+                backgroundColor: '#ffffff',
+                px: { xs: 3, md: 4 },
+                py: { xs: 2.5, md: 3 },
+                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                borderBottom: '1px solid rgba(0,0,0,0.05)',
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                zIndex: 10
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <Box
+                  component="img"
+                  src="/logo512.png"
+                  alt="회사 로고"
+                  sx={{
+                    width: { xs: 35, md: 45 },
+                    height: { xs: 35, md: 45 },
+                    mr: { xs: 1, md: 1.5 },
+                    filter: 'brightness(0) invert(0)'
+                  }}
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                  }}
+                />
+                <Typography
+                  variant="h6"
+                  sx={{
+                    fontWeight: 700,
+                    fontSize: { xs: '0.95rem', md: '1.1rem' },
+                    color: '#212529',
+                    letterSpacing: '0.5px',
+                    fontFamily: '"Noto Sans KR", "Roboto", "Helvetica", "Arial", sans-serif'
+                  }}
+                >
+                  (주)브이아이피플러스
+                </Typography>
+              </Box>
+              
+              <Typography
+                variant="h5"
+                sx={{
+                  fontWeight: 700,
+                  fontSize: { xs: '1.1rem', md: '1.4rem' },
+                  color: '#212529',
+                  textAlign: 'right',
+                  fontFamily: '"Noto Sans KR", "Roboto", sans-serif',
+                  letterSpacing: '0.3px',
+                  backgroundColor: 'transparent'
+                }}
+              >
+                {slideTitle}
+              </Typography>
+            </Box>
+
+            {/* 중앙: 실제 콘텐츠 */}
+            <Box
+              sx={{
+                flex: 1,
+                width: '100%',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                overflow: 'hidden',
+                position: 'relative',
+                pt: { xs: 8, md: 10 }
+              }}
+            >
+              <Box
+                sx={{
+                  width: '100%',
+                  height: '100%',
+                  backgroundColor: '#ffffff',
+                  borderRadius: '16px',
+                  overflow: 'auto',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.05)',
+                  border: '1px solid rgba(0,0,0,0.06)',
+                  '& .MuiAppBar-root': { display: 'none' },
+                  '& .MuiTabs-root': { display: 'none' }
+                }}
+              >
+                <ChartMode
+                  loggedInStore={loggedInStore}
+                  onLogout={() => {}}
+                  onModeChange={() => {}}
+                  availableModes={[]}
+                  presentationMode={true}
+                  initialTab={0}
+                />
+              </Box>
+            </Box>
+
+            {/* 하단: 생성자 정보 */}
+            {slide.createdBy && (
+              <Box sx={{ mt: 1, width: '100%', textAlign: 'center', flexShrink: 0 }}>
+                <Typography variant="body2" sx={{ opacity: 0.8, fontSize: { xs: '0.7rem', md: '0.8rem' } }}>
+                  생성자: {slide.createdBy}
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        );
+      }
+      
+      if (slide.mode === 'inspection') {
+        return (
+          <Box
+            sx={{
+              width: '100vw',
+              height: '100vh',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 50%, #f1f3f5 100%)',
+              color: '#212529',
+              p: { xs: 2, md: 3 },
+              overflow: 'hidden',
+              position: 'relative'
+            }}
+          >
+            {/* 상단: 회사 로고 및 슬라이드 제목 */}
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                width: '100%',
+                backgroundColor: '#ffffff',
+                px: { xs: 3, md: 4 },
+                py: { xs: 2.5, md: 3 },
+                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                borderBottom: '1px solid rgba(0,0,0,0.05)',
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                zIndex: 10
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <Box
+                  component="img"
+                  src="/logo512.png"
+                  alt="회사 로고"
+                  sx={{
+                    width: { xs: 35, md: 45 },
+                    height: { xs: 35, md: 45 },
+                    mr: { xs: 1, md: 1.5 },
+                    filter: 'brightness(0) invert(0)'
+                  }}
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                  }}
+                />
+                <Typography
+                  variant="h6"
+                  sx={{
+                    fontWeight: 700,
+                    fontSize: { xs: '0.95rem', md: '1.1rem' },
+                    color: '#212529',
+                    letterSpacing: '0.5px',
+                    fontFamily: '"Noto Sans KR", "Roboto", "Helvetica", "Arial", sans-serif'
+                  }}
+                >
+                  (주)브이아이피플러스
+                </Typography>
+              </Box>
+              
+              <Typography
+                variant="h5"
+                sx={{
+                  fontWeight: 700,
+                  fontSize: { xs: '1.1rem', md: '1.4rem' },
+                  color: '#212529',
+                  textAlign: 'right',
+                  fontFamily: '"Noto Sans KR", "Roboto", sans-serif',
+                  letterSpacing: '0.3px',
+                  backgroundColor: 'transparent'
+                }}
+              >
+                {slideTitle}
+              </Typography>
+            </Box>
+
+            {/* 중앙: 실제 콘텐츠 */}
+            <Box
+              sx={{
+                flex: 1,
+                width: '100%',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                overflow: 'hidden',
+                position: 'relative',
+                pt: { xs: 8, md: 10 }
+              }}
+            >
+              <Box
+                sx={{
+                  width: '100%',
+                  height: '100%',
+                  backgroundColor: '#ffffff',
+                  borderRadius: '16px',
+                  overflow: 'auto',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.05)',
+                  border: '1px solid rgba(0,0,0,0.06)',
+                  '& .MuiAppBar-root': { display: 'none' },
+                  '& .MuiTabs-root': { display: 'none' }
+                }}
+              >
+                <InspectionMode
+                  loggedInStore={loggedInStore}
+                  onLogout={() => {}}
+                  onModeChange={() => {}}
+                  availableModes={[]}
+                  presentationMode={true}
+                  initialTab={0}
+                />
+              </Box>
+            </Box>
+
+            {/* 하단: 생성자 정보 */}
+            {slide.createdBy && (
+              <Box sx={{ mt: 1, width: '100%', textAlign: 'center', flexShrink: 0 }}>
+                <Typography variant="body2" sx={{ opacity: 0.8, fontSize: { xs: '0.7rem', md: '0.8rem' } }}>
+                  생성자: {slide.createdBy}
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        );
+      }
     }
 
     // 지원되지 않는 모드 타입: 빈 화면 반환 (캡처되지 않도록)

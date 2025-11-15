@@ -24,6 +24,8 @@ function MeetingMode({ onLogout, loggedInStore, onModeChange, availableModes }) 
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
   // 탭 상태
   const [activeTab, setActiveTab] = useState(0);
+  // 선택된 회의 (회의진행 탭으로 전달)
+  const [selectedMeetingForPresentation, setSelectedMeetingForPresentation] = useState(null);
   
   // 회의모드 진입 시 업데이트 팝업 표시 (숨김 설정 확인 후)
   useEffect(() => {
@@ -130,10 +132,25 @@ function MeetingMode({ onLogout, loggedInStore, onModeChange, availableModes }) 
       {/* 탭 컨텐츠 */}
       <Box sx={{ flex: 1, overflow: 'auto', backgroundColor: '#f5f5f5' }}>
         {activeTab === 0 && (
-          <MeetingPreparationTab loggedInStore={loggedInStore} />
+          <MeetingPreparationTab 
+            loggedInStore={loggedInStore}
+            onMeetingSelectForPresentation={(meeting) => {
+              // 완료된 회의 선택 시 회의진행 탭으로 이동
+              if (meeting && meeting.status === 'completed') {
+                setSelectedMeetingForPresentation(meeting);
+                setActiveTab(1);
+              }
+            }}
+          />
         )}
         {activeTab === 1 && (
-          <MeetingPresentationTab loggedInStore={loggedInStore} />
+          <MeetingPresentationTab 
+            loggedInStore={loggedInStore}
+            initialSelectedMeeting={selectedMeetingForPresentation}
+            onMeetingDeselect={() => {
+              setSelectedMeetingForPresentation(null);
+            }}
+          />
         )}
       </Box>
       
