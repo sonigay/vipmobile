@@ -250,28 +250,40 @@ function AppContent() {
   // 현재 사용자의 사용 가능한 모드 목록 가져오기 (모드 변경 시 사용)
   const getCurrentUserAvailableModes = () => {
     if (!loggedInStore) {
-      console.log('🔍 getCurrentUserAvailableModes: loggedInStore가 없음');
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔍 getCurrentUserAvailableModes: loggedInStore가 없음');
+      }
       return [];
     }
     
-    console.log('🔍 getCurrentUserAvailableModes: loggedInStore =', loggedInStore);
-    console.log('🔍 getCurrentUserAvailableModes: modePermissions =', loggedInStore.modePermissions);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 getCurrentUserAvailableModes: loggedInStore =', loggedInStore);
+      console.log('🔍 getCurrentUserAvailableModes: modePermissions =', loggedInStore.modePermissions);
+    }
     
     if (loggedInStore.modePermissions) {
       // 서브 권한 제외 목록 (모드 선택에 표시하지 않을 권한들)
       const subPermissions = ['onSalePolicy', 'onSaleLink', 'bondChart', 'inspectionOverview'];
       const availableModes = Object.entries(loggedInStore.modePermissions)
         .filter(([mode, hasPermission]) => {
+          // 회의 모드의 경우 M 권한만 접속 가능
+          if (mode === 'meeting') {
+            return hasPermission === 'M' || hasPermission === true; // true는 하위 호환성을 위해
+          }
           // 권한이 있고, 서브 권한이 아닌 경우만 포함
           return (hasPermission === true || hasPermission === 'O') && !subPermissions.includes(mode);
         })
         .map(([mode]) => mode);
       
-      console.log('✅ getCurrentUserAvailableModes: 사용 가능한 모드 =', availableModes);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('✅ getCurrentUserAvailableModes: 사용 가능한 모드 =', availableModes);
+      }
       return availableModes;
     }
     
-    console.log('⚠️ getCurrentUserAvailableModes: modePermissions가 없음');
+    if (process.env.NODE_ENV === 'development') {
+      console.log('⚠️ getCurrentUserAvailableModes: modePermissions가 없음');
+    }
     return [];
   };
   

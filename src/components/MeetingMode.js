@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   AppBar,
@@ -26,6 +26,40 @@ function MeetingMode({ onLogout, loggedInStore, onModeChange, availableModes }) 
   const [activeTab, setActiveTab] = useState(0);
   // 선택된 회의 (회의진행 탭으로 전달)
   const [selectedMeetingForPresentation, setSelectedMeetingForPresentation] = useState(null);
+  
+  // 회의 모드 권한 확인 (OB 관리 모드와 동일한 방식)
+  const meetingRole = useMemo(() => {
+    const candidates = [
+      loggedInStore?.meetingRole,
+      loggedInStore?.agentInfo?.meetingRole,
+      loggedInStore?.modePermissions?.meeting // modePermissions에서도 확인
+    ]
+      .map((role) => {
+        if (role === true) return 'M'; // true는 M 권한으로 간주
+        if (role === 'M' || role === 'O') return role.toString().toUpperCase();
+        return (role || '').toString().toUpperCase();
+      })
+      .filter(Boolean);
+    const matched = candidates.find((role) => ['M', 'O'].includes(role));
+    return matched || 'O'; // 기본값은 O (회의진행만 가능)
+  }, [loggedInStore]);
+  
+  // 접근 가능한 탭 확인
+  const allowedTabs = useMemo(() => {
+    if (meetingRole === 'M') {
+      return [0, 1]; // 회의준비, 회의진행 모두 가능
+    } else {
+      return [1]; // 회의진행만 가능
+    }
+  }, [meetingRole]);
+  
+  // 초기 탭 설정 (권한에 따라)
+  useEffect(() => {
+    if (!allowedTabs.includes(activeTab)) {
+      // 현재 탭에 접근 권한이 없으면 첫 번째 허용된 탭으로 이동
+      setActiveTab(allowedTabs[0]);
+    }
+  }, [allowedTabs, activeTab]);
   
   // 회의모드 진입 시 업데이트 팝업 표시 (숨김 설정 확인 후)
   useEffect(() => {
@@ -69,18 +103,22 @@ function MeetingMode({ onLogout, loggedInStore, onModeChange, availableModes }) 
               variant="scrollable"
               scrollButtons="auto"
             >
-              <Tab 
-                icon={<EventNoteIcon />} 
-                iconPosition="start"
-                label="회의준비" 
-                sx={{ textTransform: 'none', fontWeight: 'bold' }}
-              />
-              <Tab 
-                icon={<PlayArrowIcon />} 
-                iconPosition="start"
-                label="회의진행" 
-                sx={{ textTransform: 'none', fontWeight: 'bold' }}
-              />
+              {allowedTabs.includes(0) && (
+                <Tab 
+                  icon={<EventNoteIcon />} 
+                  iconPosition="start"
+                  label="회의준비" 
+                  sx={{ textTransform: 'none', fontWeight: 'bold' }}
+                />
+              )}
+              {allowedTabs.includes(1) && (
+                <Tab 
+                  icon={<PlayArrowIcon />} 
+                  iconPosition="start"
+                  label="회의진행" 
+                  sx={{ textTransform: 'none', fontWeight: 'bold' }}
+                />
+              )}
             </Tabs>
           </Box>
           
@@ -131,19 +169,19 @@ function MeetingMode({ onLogout, loggedInStore, onModeChange, availableModes }) 
       
       {/* 탭 컨텐츠 */}
       <Box sx={{ flex: 1, overflow: 'auto', backgroundColor: '#f5f5f5' }}>
-        {activeTab === 0 && (
+        {activeTab === 0 && allowedTabs.includes(0) && (
           <MeetingPreparationTab 
             loggedInStore={loggedInStore}
             onMeetingSelectForPresentation={(meeting) => {
               // 완료된 회의 선택 시 회의진행 탭으로 이동
-              if (meeting && meeting.status === 'completed') {
+              if (meeting && meeting.status === 'completed' && allowedTabs.includes(1)) {
                 setSelectedMeetingForPresentation(meeting);
                 setActiveTab(1);
               }
             }}
           />
         )}
-        {activeTab === 1 && (
+        {activeTab === 1 && allowedTabs.includes(1) && (
           <MeetingPresentationTab 
             loggedInStore={loggedInStore}
             initialSelectedMeeting={selectedMeetingForPresentation}
