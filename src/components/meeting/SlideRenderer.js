@@ -1361,7 +1361,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
         slideId: slide.slideId
       });
       
-      // 모드/탭 제목 구성
+      // 모드/탭 제목 구성 (역순으로)
       const modeTitle = modeConfig?.title || slide.mode;
       const tabConfig = availableTabs[tabIndex];
       const tabTitle = tabConfig?.label || slide.tab;
@@ -1369,9 +1369,38 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
         ? tabConfig.subTabs.find(st => st.key === slide.subTab)?.label || slide.subTab
         : null;
       
-      const slideTitle = subTabTitle 
-        ? `${modeTitle} > ${tabTitle} > ${subTabTitle}`
-        : `${modeTitle} > ${tabTitle}`;
+      // 세부 옵션 정보 추가
+      let detailOptionLabel = '';
+      if (slide.detailOptions && tabConfig?.subTabs) {
+        const subTabConfig = tabConfig.subTabs.find(st => st.key === slide.subTab);
+        if (subTabConfig?.detailOptions) {
+          const detailOptions = subTabConfig.detailOptions;
+          const detailOptionLabels = [];
+          
+          if (slide.detailOptions.csDetailType && slide.detailOptions.csDetailType !== 'all') {
+            const csDetailTypeOption = detailOptions.options?.find(opt => opt.key === 'csDetailType');
+            if (csDetailTypeOption) {
+              const selectedValue = csDetailTypeOption.values?.find(v => v.key === slide.detailOptions.csDetailType);
+              if (selectedValue) {
+                detailOptionLabels.push(selectedValue.label);
+              }
+            }
+          }
+          
+          if (detailOptionLabels.length > 0) {
+            detailOptionLabel = detailOptionLabels.join(', ');
+          }
+        }
+      }
+      
+      // 역순으로 제목 구성: "가입자증감 < 채권장표 < 장표 모드"
+      const titleParts = [];
+      if (detailOptionLabel) titleParts.push(detailOptionLabel);
+      if (subTabTitle) titleParts.push(subTabTitle);
+      if (tabTitle) titleParts.push(tabTitle);
+      if (modeTitle) titleParts.push(modeTitle);
+      
+      const slideTitle = titleParts.join(' < ');
       
       return (
         <Box
@@ -1395,7 +1424,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               display: 'flex',
               flexDirection: 'row',
               alignItems: 'center',
-              justifyContent: 'flex-start',
+              justifyContent: 'space-between',
               width: '100%',
               backgroundColor: '#ffffff',
               px: { xs: 3, md: 4 },
@@ -1409,49 +1438,46 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               zIndex: 10
             }}
           >
-            <Box
-              component="img"
-              src="/logo512.png"
-              alt="회사 로고"
-              sx={{
-                width: { xs: 35, md: 45 },
-                height: { xs: 35, md: 45 },
-                mr: { xs: 1, md: 1.5 },
-                filter: 'brightness(0) invert(0)'
-              }}
-              onError={(e) => {
-                e.target.style.display = 'none';
-              }}
-            />
-            <Typography
-              variant="h6"
-              sx={{
-                fontWeight: 700,
-                fontSize: { xs: '0.95rem', md: '1.1rem' },
-                color: '#212529',
-                letterSpacing: '0.5px',
-                mr: 3,
-                fontFamily: '"Noto Sans KR", "Roboto", "Helvetica", "Arial", sans-serif'
-              }}
-            >
-              (주)브이아이피플러스
-            </Typography>
-            <Box sx={{
-              height: '24px',
-              width: '1px',
-              backgroundColor: '#dee2e6',
-              mr: 3
-            }} />
+            {/* 왼쪽: 로고와 회사 이름 */}
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <Box
+                component="img"
+                src="/logo512.png"
+                alt="회사 로고"
+                sx={{
+                  width: { xs: 35, md: 45 },
+                  height: { xs: 35, md: 45 },
+                  mr: { xs: 1, md: 1.5 },
+                  filter: 'brightness(0) invert(0)'
+                }}
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                }}
+              />
+              <Typography
+                variant="h6"
+                sx={{
+                  fontWeight: 700,
+                  fontSize: { xs: '0.95rem', md: '1.1rem' },
+                  color: '#212529',
+                  letterSpacing: '0.5px',
+                  fontFamily: '"Noto Sans KR", "Roboto", "Helvetica", "Arial", sans-serif'
+                }}
+              >
+                (주)브이아이피플러스
+              </Typography>
+            </Box>
+            
+            {/* 오른쪽: 슬라이드 제목 (역순) */}
             <Typography
               variant="h5"
               sx={{
                 fontWeight: 700,
                 fontSize: { xs: '1.1rem', md: '1.4rem' },
                 color: '#212529',
-                textAlign: 'left',
+                textAlign: 'right',
                 fontFamily: '"Noto Sans KR", "Roboto", sans-serif',
                 letterSpacing: '0.3px',
-                flex: 1,
                 backgroundColor: 'transparent' // 배경색 제거
               }}
             >
