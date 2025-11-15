@@ -79,7 +79,6 @@ app.use(cors({
     // 기본 허용 도메인 (개발용 및 프로덕션)
     const defaultOrigins = [
       'https://vipmobile.vercel.app',
-      'https://vipmobile.netlify.app',
       'http://localhost:3000',
       'http://localhost:3001',
       'http://localhost:4000'
@@ -117,14 +116,12 @@ app.options('*', (req, res) => {
   const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
   
   // 기본 허용 도메인 (개발용 및 프로덕션)
-  const defaultOrigins = [
-    'https://vipmobile.vercel.app',
-    'https://vipmobile.netlify.app',
-    'https://vipmobile.netlify.app/',
-    'http://localhost:3000',
-    'http://localhost:3001',
-    'http://localhost:4000'
-  ];
+    const defaultOrigins = [
+      'https://vipmobile.vercel.app',
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://localhost:4000'
+    ];
   
   // 환경 변수 도메인과 기본 도메인 합치기
   const allowedOrigins = [...corsOrigins, ...defaultOrigins];
@@ -146,7 +143,7 @@ app.options('*', (req, res) => {
 
 // 특정 API 엔드포인트에 대한 OPTIONS 요청 처리
 app.options('/api/budget/user-sheets-v2', (req, res) => {
-  res.header('Access-Control-Allow-Origin', 'https://vipmobile.netlify.app');
+  res.header('Access-Control-Allow-Origin', 'https://vipmobile.vercel.app');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept');
   res.header('Access-Control-Allow-Credentials', 'true');
@@ -1995,7 +1992,7 @@ app.get('/api/stores', async (req, res) => {
 app.get('/api/sales-data', async (req, res) => {
   // CORS 헤더 명시적 설정
   const allowedOrigins = [
-    'https://vipmobile.netlify.app',
+    'https://vipmobile.vercel.app',
     'http://localhost:3000',
     'http://localhost:3001'
   ];
@@ -2262,7 +2259,7 @@ async function processSalesData(spreadsheetId = process.env.SALES_SHEET_ID) {
 app.get('/api/sales-mode-access', async (req, res) => {
   // CORS 헤더 명시적 설정
   const allowedOrigins = [
-    'https://vipmobile.netlify.app',
+    'https://vipmobile.vercel.app',
     'http://localhost:3000',
     'http://localhost:3001'
   ];
@@ -6058,7 +6055,7 @@ app.use((error, req, res, next) => {
 app.get('/api/subscriber-increase/access', async (req, res) => {
   // CORS 헤더 설정
   const allowedOrigins = [
-    'https://vipmobile.netlify.app',
+    'https://vipmobile.vercel.app',
     'http://localhost:3000',
     'http://localhost:3001'
   ];
@@ -6114,7 +6111,7 @@ app.get('/api/subscriber-increase/access', async (req, res) => {
 app.post('/api/subscriber-increase/init-sheet', async (req, res) => {
   // CORS 헤더 설정
   const allowedOrigins = [
-    'https://vipmobile.netlify.app',
+    'https://vipmobile.vercel.app',
     'http://localhost:3000',
     'http://localhost:3001'
   ];
@@ -6300,7 +6297,7 @@ app.post('/api/subscriber-increase/init-sheet', async (req, res) => {
 app.post('/api/subscriber-increase/add-excluded-row', async (req, res) => {
   // CORS 헤더 설정
   const allowedOrigins = [
-    'https://vipmobile.netlify.app',
+    'https://vipmobile.vercel.app',
     'http://localhost:3000',
     'http://localhost:3001'
   ];
@@ -6375,7 +6372,7 @@ app.post('/api/subscriber-increase/add-excluded-row', async (req, res) => {
 app.get('/api/subscriber-increase/data', async (req, res) => {
   // CORS 헤더 설정
   const allowedOrigins = [
-    'https://vipmobile.netlify.app',
+    'https://vipmobile.vercel.app',
     'http://localhost:3000',
     'http://localhost:3001'
   ];
@@ -6411,7 +6408,7 @@ app.get('/api/subscriber-increase/data', async (req, res) => {
 app.post('/api/subscriber-increase/save', async (req, res) => {
   // CORS 헤더 설정
   const allowedOrigins = [
-    'https://vipmobile.netlify.app',
+    'https://vipmobile.vercel.app',
     'http://localhost:3000',
     'http://localhost:3001'
   ];
@@ -6526,7 +6523,7 @@ app.post('/api/subscriber-increase/save', async (req, res) => {
 app.post('/api/subscriber-increase/bulk-save', async (req, res) => {
   // CORS 헤더 설정
   const allowedOrigins = [
-    'https://vipmobile.netlify.app',
+    'https://vipmobile.vercel.app',
     'http://localhost:3000',
     'http://localhost:3001'
   ];
@@ -6692,7 +6689,7 @@ app.post('/api/subscriber-increase/bulk-save', async (req, res) => {
 app.post('/api/subscriber-increase/delete', async (req, res) => {
   // CORS 헤더 설정
   const allowedOrigins = [
-    'https://vipmobile.netlify.app',
+    'https://vipmobile.vercel.app',
     'http://localhost:3000',
     'http://localhost:3001'
   ];
@@ -16672,8 +16669,8 @@ app.get('/api/reservation/assignment-memory', async (req, res) => {
 // 배정 상태 변경 감지 API OPTIONS 요청 처리
 app.options('/api/reservation/assignment-changes', (req, res) => {
   const allowedOrigins = [
-    'https://vipmobile.netlify.app',
-    'https://vipmobile.netlify.app/',
+    'https://vipmobile.vercel.app',
+    'https://vipmobile.vercel.app/',
     'http://localhost:3000'
   ];
   
@@ -16694,8 +16691,8 @@ app.options('/api/reservation/assignment-changes', (req, res) => {
 app.get('/api/reservation/assignment-changes', async (req, res) => {
   // CORS 헤더 설정
   const allowedOrigins = [
-    'https://vipmobile.netlify.app',
-    'https://vipmobile.netlify.app/',
+    'https://vipmobile.vercel.app',
+    'https://vipmobile.vercel.app/',
     'http://localhost:3000'
   ];
   
@@ -24815,7 +24812,7 @@ app.post('/api/budget/user-sheets/:sheetId/update-usage', async (req, res) => {
 // 새로운 사용자 시트 조회 API (UserSheetManager 사용) - 계산 로직 제거
 app.get('/api/budget/user-sheets-v2', async (req, res) => {
   // CORS 헤더 명시적 설정
-  res.header('Access-Control-Allow-Origin', 'https://vipmobile.netlify.app');
+  res.header('Access-Control-Allow-Origin', 'https://vipmobile.vercel.app');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept');
   res.header('Access-Control-Allow-Credentials', 'true');
@@ -29845,8 +29842,8 @@ app.get('/api/inventory-recovery/data', async (req, res) => {
   
   // CORS 헤더 설정
   const allowedOrigins = [
-    'https://vipmobile.netlify.app',
-    'https://vipmobile.netlify.app/',
+    'https://vipmobile.vercel.app',
+    'https://vipmobile.vercel.app/',
     'http://localhost:3000',
     'http://localhost:3001',
     'http://localhost:4000'
@@ -29979,8 +29976,8 @@ app.get('/api/inventory-recovery/data', async (req, res) => {
 app.post('/api/inventory-recovery/update-status', async (req, res) => {
   // CORS 헤더 설정
   const allowedOrigins = [
-    'https://vipmobile.netlify.app',
-    'https://vipmobile.netlify.app/',
+    'https://vipmobile.vercel.app',
+    'https://vipmobile.vercel.app/',
     'http://localhost:3000',
     'http://localhost:3001',
     'http://localhost:4000'
@@ -30068,8 +30065,8 @@ app.post('/api/inventory-recovery/update-status', async (req, res) => {
 app.post('/api/inventory-recovery/priority-models', async (req, res) => {
   // CORS 헤더 설정
   const allowedOrigins = [
-    'https://vipmobile.netlify.app',
-    'https://vipmobile.netlify.app/',
+    'https://vipmobile.vercel.app',
+    'https://vipmobile.vercel.app/',
     'http://localhost:3000',
     'http://localhost:3001',
     'http://localhost:4000'
@@ -30147,8 +30144,8 @@ app.post('/api/inventory-recovery/priority-models', async (req, res) => {
 app.get('/api/inventory-recovery/priority-models', async (req, res) => {
   // CORS 헤더 설정
   const allowedOrigins = [
-    'https://vipmobile.netlify.app',
-    'https://vipmobile.netlify.app/',
+    'https://vipmobile.vercel.app',
+    'https://vipmobile.vercel.app/',
     'http://localhost:3000',
     'http://localhost:3001',
     'http://localhost:4000'

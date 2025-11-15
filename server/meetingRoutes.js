@@ -429,9 +429,34 @@ async function deleteMeeting(req, res) {
   }
 }
 
+// CORS 헤더 설정 헬퍼 함수
+function setCORSHeaders(req, res) {
+  const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
+  const defaultOrigins = [
+    'https://vipmobile.vercel.app',
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:4000'
+  ];
+  const allowedOrigins = [...corsOrigins, ...defaultOrigins];
+  const origin = req.headers.origin;
+  
+  if (origin && allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  } else if (allowedOrigins.length > 0) {
+    res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
+  }
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key');
+  res.header('Access-Control-Allow-Credentials', 'true');
+}
+
 // 회의 설정 조회
 async function getMeetingConfig(req, res) {
   try {
+    // CORS 헤더 설정
+    setCORSHeaders(req, res);
+    
     const { sheets, SPREADSHEET_ID } = createSheetsClient();
     const { meetingId } = req.params;
     const sheetName = '회의설정';
@@ -548,6 +573,9 @@ async function getMeetingConfig(req, res) {
 // 회의 설정 저장
 async function saveMeetingConfig(req, res) {
   try {
+    // CORS 헤더 설정
+    setCORSHeaders(req, res);
+    
     const { sheets, SPREADSHEET_ID } = createSheetsClient();
     const { meetingId } = req.params;
     const { slides } = req.body;
@@ -974,6 +1002,9 @@ const upload = multer({
 
 async function uploadMeetingImage(req, res) {
   try {
+    // CORS 헤더 설정
+    setCORSHeaders(req, res);
+    
     const { meetingId } = req.params;
     const { meetingDate, slideOrder } = req.body;
     
@@ -1064,6 +1095,9 @@ async function uploadMeetingImage(req, res) {
       croppedHeight: result.croppedHeight
     });
   } catch (error) {
+    // CORS 헤더 설정 (에러 응답에도 포함)
+    setCORSHeaders(req, res);
+    
     console.error('이미지 업로드 오류:', error);
     
     // 에러 타입에 따라 적절한 HTTP 상태 코드 반환
@@ -1759,6 +1793,9 @@ function escapeHtml(text) {
 // 커스텀 슬라이드 파일 업로드 (이미지, Excel, PPT 지원)
 async function uploadCustomSlideFile(req, res) {
   try {
+    // CORS 헤더 설정
+    setCORSHeaders(req, res);
+    
     const { meetingId } = req.params;
     const { meetingDate, fileType, meetingNumber: bodyMeetingNumber } = req.body;
     
@@ -2117,6 +2154,9 @@ async function uploadCustomSlideFile(req, res) {
       });
     }
   } catch (error) {
+    // CORS 헤더 설정 (에러 응답에도 포함)
+    setCORSHeaders(req, res);
+    
     console.error('파일 업로드 오류:', error);
     res.status(500).json({ success: false, error: error.message });
   }

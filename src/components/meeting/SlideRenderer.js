@@ -280,12 +280,28 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
       const finalTableRows = containerRef.current?.querySelectorAll('table tbody tr, .MuiTableBody-root tr, tbody tr') || [];
       const finalHasTableRows = (finalTableRows?.length || 0) >= 3;
       
-      if (!finalCheck || !finalHasNoLoading || !finalHasTableRows) {
+      // 차트나 SVG 요소 확인 (차트 기반 슬라이드의 경우)
+      const finalChartElements = containerRef.current?.querySelectorAll('[class*="Chart"], canvas, svg, [class*="chart"], [class*="recharts"]') || [];
+      const finalHasChartContent = (finalChartElements?.length || 0) > 0;
+      
+      // Paper나 Box 컴포넌트 확인 (일반 콘텐츠)
+      const finalPaperElements = containerRef.current?.querySelectorAll('.MuiPaper-root, .MuiBox-root') || [];
+      const finalHasPaperContent = (finalPaperElements?.length || 0) > 0;
+      
+      // 실제 콘텐츠가 있는지 확인 (테이블, 차트, 또는 Paper 중 하나라도 있으면 OK)
+      const hasAnyContent = finalHasTableRows || finalHasChartContent || finalHasPaperContent;
+      
+      // 로딩 인디케이터가 없고, 콘텐츠가 있으면 OK (data-loaded는 선택사항)
+      const isReady = finalHasNoLoading && hasAnyContent;
+      
+      if (!isReady) {
         console.warn('⚠️ [SlideRenderer] 최종 확인 실패:', {
           dataLoaded: finalCheck,
           hasNoLoading: finalHasNoLoading,
           hasTableRows: finalTableRows.length,
-          required: '>= 3'
+          hasChartContent: finalChartElements.length,
+          hasPaperContent: finalPaperElements.length,
+          hasAnyContent
         });
         console.warn('⚠️ [SlideRenderer] 추가 대기 (5초)');
         await new Promise(resolve => setTimeout(resolve, 5000));
@@ -293,9 +309,21 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
         // 재확인
         const retryCheck = containerRef.current?.querySelector('[data-loaded="true"]') !== null;
         const retryTableRows = containerRef.current?.querySelectorAll('table tbody tr, .MuiTableBody-root tr, tbody tr') || [];
-        if (!retryCheck || (retryTableRows?.length || 0) < 3) {
-          console.error('❌ [SlideRenderer] 재확인 실패, 로딩 화면일 가능성 높음');
-          // 그래도 진행 (타임아웃 방지)
+        const retryChartElements = containerRef.current?.querySelectorAll('[class*="Chart"], canvas, svg, [class*="chart"], [class*="recharts"]') || [];
+        const retryPaperElements = containerRef.current?.querySelectorAll('.MuiPaper-root, .MuiBox-root') || [];
+        const retryLoadingIndicators = containerRef.current?.querySelectorAll('.MuiCircularProgress-root, .MuiLinearProgress-root, [class*="loading"]') || [];
+        const retryHasNoLoading = (retryLoadingIndicators?.length || 0) === 0;
+        const retryHasContent = (retryTableRows?.length || 0) >= 3 || (retryChartElements?.length || 0) > 0 || (retryPaperElements?.length || 0) > 0;
+        
+        if (!retryHasNoLoading || !retryHasContent) {
+          console.warn('⚠️ [SlideRenderer] 재확인 실패, 하지만 로딩 인디케이터가 없으므로 진행:', {
+            hasNoLoading: retryHasNoLoading,
+            hasContent: retryHasContent,
+            tableRows: retryTableRows.length,
+            chartElements: retryChartElements.length,
+            paperElements: retryPaperElements.length
+          });
+          // 그래도 진행 (로딩 인디케이터가 없으면 데이터가 준비된 것으로 간주)
         }
       }
       
