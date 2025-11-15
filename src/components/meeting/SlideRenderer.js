@@ -135,7 +135,13 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             allText.includes('불러오는 중') || 
             allText.includes('데이터를 불러오는 중') || 
             allText.includes('마감장표 데이터 로딩 중') ||
-            allText.includes('데이터 로딩 중');
+            allText.includes('데이터 로딩 중') ||
+            allText.includes('Loading') ||
+            allText.includes('loading');
+          
+          // data-capture-exclude 속성이 있는 로딩 요소 확인
+          const excludedLoadingElements = containerRef.current?.querySelectorAll('[data-capture-exclude="true"]');
+          const hasExcludedLoading = excludedLoadingElements && excludedLoadingElements.length > 0;
           
           // 로딩 인디케이터가 없고, data-loading이 false이고, 로딩 텍스트가 없어야 함
           const hasAnyLoadingIndicator = (loadingIndicators && loadingIndicators.length > 0) || dataLoading;
