@@ -24,9 +24,11 @@ import {
 } from '@mui/icons-material';
 import { api } from '../../api';
 
-// 디버깅: import 확인
-console.log('🔍 [MeetingList] api import 결과:', api);
-console.log('🔍 [MeetingList] api.getMeetings:', api?.getMeetings);
+// 디버깅: import 확인 (개발 모드에서만)
+if (process.env.NODE_ENV === 'development') {
+  console.log('🔍 [MeetingList] api import 결과:', api);
+  console.log('🔍 [MeetingList] api.getMeetings:', api?.getMeetings);
+}
 
 const formatDateTime = (value) => {
   if (!value) return '-';
@@ -78,32 +80,42 @@ function MeetingList({ onAdd, onEdit, onDelete, onSelect, refreshTrigger }) {
     setLoading(true);
     setError(null);
     try {
-      // 디버깅: api 객체 확인
-      console.log('🔍 [MeetingList] api 객체:', api);
-      console.log('🔍 [MeetingList] api.getMeetings 타입:', typeof api?.getMeetings);
-      console.log('🔍 [MeetingList] api 객체의 키들:', api ? Object.keys(api) : 'api is null/undefined');
+      // 디버깅: api 객체 확인 (개발 모드에서만)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔍 [MeetingList] api 객체:', api);
+        console.log('🔍 [MeetingList] api.getMeetings 타입:', typeof api?.getMeetings);
+        console.log('🔍 [MeetingList] api 객체의 키들:', api ? Object.keys(api) : 'api is null/undefined');
+      }
       
       if (!api) {
         throw new Error('API 객체가 없습니다.');
       }
       
       if (typeof api.getMeetings !== 'function') {
-        console.error('❌ [MeetingList] getMeetings가 함수가 아닙니다:', api.getMeetings);
-        console.error('❌ [MeetingList] 사용 가능한 함수들:', Object.keys(api).filter(key => typeof api[key] === 'function'));
+        if (process.env.NODE_ENV === 'development') {
+          console.error('❌ [MeetingList] getMeetings가 함수가 아닙니다:', api.getMeetings);
+          console.error('❌ [MeetingList] 사용 가능한 함수들:', Object.keys(api).filter(key => typeof api[key] === 'function'));
+        }
         throw new Error(`getMeetings 함수를 찾을 수 없습니다. 사용 가능한 함수: ${Object.keys(api).filter(key => typeof api[key] === 'function').join(', ')}`);
       }
       
-      console.log('✅ [MeetingList] getMeetings 호출 시작');
+      if (process.env.NODE_ENV === 'development') {
+        console.log('✅ [MeetingList] getMeetings 호출 시작');
+      }
       const response = await api.getMeetings();
-      console.log('✅ [MeetingList] getMeetings 응답:', response);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('✅ [MeetingList] getMeetings 응답:', response);
+      }
       
       if (response && response.success === false) {
         throw new Error(response.error || '회의 목록 조회 실패');
       }
       setMeetings((response && response.meetings) || []);
     } catch (err) {
-      console.error('❌ [MeetingList] 회의 목록 조회 오류:', err);
-      console.error('❌ [MeetingList] 에러 스택:', err.stack);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('❌ [MeetingList] 회의 목록 조회 오류:', err);
+        console.error('❌ [MeetingList] 에러 스택:', err.stack);
+      }
       setError(err.message || '회의 목록을 불러오는데 실패했습니다.');
       // 에러 발생 시 빈 배열로 설정
       setMeetings([]);
@@ -126,7 +138,9 @@ function MeetingList({ onAdd, onEdit, onDelete, onSelect, refreshTrigger }) {
       await loadMeetings();
       if (onDelete) onDelete();
     } catch (err) {
-      console.error('회의 삭제 오류:', err);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('회의 삭제 오류:', err);
+      }
       alert('회의 삭제에 실패했습니다.');
     }
   };
