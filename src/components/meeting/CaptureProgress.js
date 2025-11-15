@@ -71,14 +71,68 @@ function CaptureProgress({ open, total, current, completed, failed, onCancel, sl
       }
       // mode-tab 타입
       const { getModeConfig } = require('../../config/modeConfig');
+      const { getAvailableTabsForMode } = require('../../config/modeTabConfig');
       const modeConfig = getModeConfig(slide.mode);
       const modeName = modeConfig?.title || slide.mode;
       const tabName = slide.tabLabel || slide.tab || '';
       const subTabName = slide.subTabLabel || slide.subTab || '';
-      if (subTabName) {
-        return `${modeName} > ${tabName} > ${subTabName}`;
+      
+      // 세부 옵션 정보 가져오기
+      let detailOptionLabel = '';
+      if (slide.detailOptions) {
+        const availableTabs = getAvailableTabsForMode(slide.mode, {});
+        const tabConfig = availableTabs.find(t => t.key === slide.tab);
+        const subTabConfig = tabConfig?.subTabs?.find(st => st.key === slide.subTab);
+        
+        if (subTabConfig?.detailOptions) {
+          const detailOptions = subTabConfig.detailOptions;
+          const detailOptionLabels = [];
+          
+          // csDetailType 옵션 처리
+          if (slide.detailOptions.csDetailType && slide.detailOptions.csDetailType !== 'all') {
+            const csDetailTypeOption = detailOptions.options?.find(opt => opt.key === 'csDetailType');
+            if (csDetailTypeOption) {
+              const selectedValue = csDetailTypeOption.values?.find(v => v.key === slide.detailOptions.csDetailType);
+              if (selectedValue) {
+                detailOptionLabels.push(selectedValue.label);
+              }
+            }
+          }
+          
+          // csDetailCriteria 옵션 처리
+          if (slide.detailOptions.csDetailCriteria && slide.detailOptions.csDetailCriteria !== 'performance') {
+            const csDetailCriteriaOption = detailOptions.options?.find(opt => opt.key === 'csDetailCriteria');
+            if (csDetailCriteriaOption) {
+              const selectedValue = csDetailCriteriaOption.values?.find(v => v.key === slide.detailOptions.csDetailCriteria);
+              if (selectedValue) {
+                detailOptionLabels.push(selectedValue.label);
+              }
+            }
+          }
+          
+          // 다른 세부 옵션들도 처리
+          Object.keys(slide.detailOptions).forEach(key => {
+            if (key !== 'csDetailType' && key !== 'csDetailCriteria') {
+              const option = detailOptions.options?.find(opt => opt.key === key);
+              if (option) {
+                const selectedValue = option.values?.find(v => v.key === slide.detailOptions[key]);
+                if (selectedValue && selectedValue.key !== 'all' && selectedValue.key !== option.defaultValue) {
+                  detailOptionLabels.push(selectedValue.label);
+                }
+              }
+            }
+          });
+          
+          if (detailOptionLabels.length > 0) {
+            detailOptionLabel = ` > ${detailOptionLabels.join(', ')}`;
+          }
+        }
       }
-      return `${modeName} > ${tabName}`;
+      
+      if (subTabName) {
+        return `${modeName} > ${tabName} > ${subTabName}${detailOptionLabel}`;
+      }
+      return `${modeName} > ${tabName}${detailOptionLabel}`;
     }
     return '';
   };

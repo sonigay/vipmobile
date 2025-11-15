@@ -804,6 +804,53 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                                       const subTabConfig = tabConfig?.subTabs?.find(st => st.key === subSlide.subTab);
                                       // slide에 저장된 subTabLabel을 우선 사용, 없으면 subTabConfig에서 가져오기
                                       const subTabLabel = subSlide.subTabLabel || subTabConfig?.label || subSlide.subTab;
+                                      
+                                      // 세부 옵션 정보 가져오기
+                                      let detailOptionLabel = '';
+                                      if (subSlide.detailOptions && subTabConfig?.detailOptions) {
+                                        const detailOptions = subTabConfig.detailOptions;
+                                        const detailOptionLabels = [];
+                                        
+                                        // csDetailType 옵션 처리
+                                        if (subSlide.detailOptions.csDetailType && subSlide.detailOptions.csDetailType !== 'all') {
+                                          const csDetailTypeOption = detailOptions.options?.find(opt => opt.key === 'csDetailType');
+                                          if (csDetailTypeOption) {
+                                            const selectedValue = csDetailTypeOption.values?.find(v => v.key === subSlide.detailOptions.csDetailType);
+                                            if (selectedValue) {
+                                              detailOptionLabels.push(selectedValue.label);
+                                            }
+                                          }
+                                        }
+                                        
+                                        // csDetailCriteria 옵션 처리
+                                        if (subSlide.detailOptions.csDetailCriteria && subSlide.detailOptions.csDetailCriteria !== 'performance') {
+                                          const csDetailCriteriaOption = detailOptions.options?.find(opt => opt.key === 'csDetailCriteria');
+                                          if (csDetailCriteriaOption) {
+                                            const selectedValue = csDetailCriteriaOption.values?.find(v => v.key === subSlide.detailOptions.csDetailCriteria);
+                                            if (selectedValue) {
+                                              detailOptionLabels.push(selectedValue.label);
+                                            }
+                                          }
+                                        }
+                                        
+                                        // 다른 세부 옵션들도 처리
+                                        Object.keys(subSlide.detailOptions).forEach(key => {
+                                          if (key !== 'csDetailType' && key !== 'csDetailCriteria') {
+                                            const option = detailOptions.options?.find(opt => opt.key === key);
+                                            if (option) {
+                                              const selectedValue = option.values?.find(v => v.key === subSlide.detailOptions[key]);
+                                              if (selectedValue && selectedValue.key !== 'all' && selectedValue.key !== option.defaultValue) {
+                                                detailOptionLabels.push(selectedValue.label);
+                                              }
+                                            }
+                                          }
+                                        });
+                                        
+                                        if (detailOptionLabels.length > 0) {
+                                          detailOptionLabel = ` > ${detailOptionLabels.join(', ')}`;
+                                        }
+                                      }
+                                      
                                       return (
                                         <Typography
                                           key={subSlide.slideId}
@@ -825,7 +872,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                                             borderRadius: '50%',
                                             backgroundColor: '#adb5bd'
                                           }} />
-                                          {subTabLabel}
+                                          {subTabLabel}{detailOptionLabel}
                                         </Typography>
                                       );
                                     })}
