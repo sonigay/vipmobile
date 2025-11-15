@@ -224,13 +224,13 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
       
       // 최종 확인: data-loaded 속성이 여전히 true인지 확인
       const finalCheck = containerRef.current?.querySelector('[data-loaded="true"]') !== null;
-      const finalLoadingIndicators = containerRef.current?.querySelectorAll('.MuiCircularProgress-root, .MuiLinearProgress-root, [class*="loading"]');
-      const finalProgressBars = containerRef.current?.querySelectorAll('.MuiLinearProgress-root, [class*="progress"]');
-      const finalHasNoLoading = finalLoadingIndicators.length === 0 && finalProgressBars.length === 0;
+      const finalLoadingIndicators = containerRef.current?.querySelectorAll('.MuiCircularProgress-root, .MuiLinearProgress-root, [class*="loading"]') || [];
+      const finalProgressBars = containerRef.current?.querySelectorAll('.MuiLinearProgress-root, [class*="progress"]') || [];
+      const finalHasNoLoading = (finalLoadingIndicators?.length || 0) === 0 && (finalProgressBars?.length || 0) === 0;
       
       // 최종 테이블 행 확인 (최소 3개 이상)
       const finalTableRows = containerRef.current?.querySelectorAll('table tbody tr, .MuiTableBody-root tr, tbody tr') || [];
-      const finalHasTableRows = finalTableRows.length >= 3;
+      const finalHasTableRows = (finalTableRows?.length || 0) >= 3;
       
       if (!finalCheck || !finalHasNoLoading || !finalHasTableRows) {
         console.warn('⚠️ [SlideRenderer] 최종 확인 실패:', {
@@ -245,7 +245,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
         // 재확인
         const retryCheck = containerRef.current?.querySelector('[data-loaded="true"]') !== null;
         const retryTableRows = containerRef.current?.querySelectorAll('table tbody tr, .MuiTableBody-root tr, tbody tr') || [];
-        if (!retryCheck || retryTableRows.length < 3) {
+        if (!retryCheck || (retryTableRows?.length || 0) < 3) {
           console.error('❌ [SlideRenderer] 재확인 실패, 로딩 화면일 가능성 높음');
           // 그래도 진행 (타임아웃 방지)
         }
@@ -280,7 +280,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
         weekday: 'long'
       });
       
-      const participantsList = slide.participants 
+      const participantsList = (slide?.participants && typeof slide.participants === 'string')
         ? slide.participants.split(',').map(p => p.trim()).filter(p => p)
         : [];
       
@@ -480,7 +480,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                 </Box>
               )}
               
-              {participantsList.length > 0 && (
+              {participantsList && participantsList.length > 0 && (
                 <Box>
                   <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5, gap: 1.5 }}>
                     <Box sx={{ 
@@ -559,9 +559,9 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
     
     // 목차 슬라이드 타입
     if (slide.type === 'toc') {
-      const modeGroups = slide.modeGroups || {};
-      const modeKeys = Object.keys(modeGroups).filter(key => key !== 'custom');
-      const customSlides = modeGroups['custom'] || [];
+      const modeGroups = slide?.modeGroups || {};
+      const modeKeys = Array.isArray(Object.keys(modeGroups)) ? Object.keys(modeGroups).filter(key => key !== 'custom') : [];
+      const customSlides = Array.isArray(modeGroups['custom']) ? modeGroups['custom'] : [];
       
       return (
         <Box
@@ -673,7 +673,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                 width: '100%'
               }}
             >
-              {modeKeys.length === 0 && customSlides.length === 0 ? (
+              {(!modeKeys || modeKeys.length === 0) && (!customSlides || customSlides.length === 0) ? (
                 <Typography variant="h6" sx={{ opacity: 0.8 }}>
                   등록된 슬라이드가 없습니다.
                 </Typography>
@@ -886,7 +886,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                   })}
                   
                   {/* 커스텀 슬라이드 */}
-                  {customSlides.length > 0 && (
+                  {customSlides && customSlides.length > 0 && (
                     <Box sx={{ mt: 4, pt: 3, borderTop: '2px solid rgba(255, 255, 255, 0.3)' }}>
                       <Typography
                         variant="h5"

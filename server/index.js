@@ -105,7 +105,12 @@ app.use(cors({
 
 // OPTIONS 요청 명시적 처리
 app.options('*', (req, res) => {
-  const allowedOrigins = [
+  // 환경 변수에서 허용할 도메인 목록 가져오기
+  const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
+  
+  // 기본 허용 도메인 (개발용 및 프로덕션)
+  const defaultOrigins = [
+    'https://vipmobile.vercel.app',
     'https://vipmobile.netlify.app',
     'https://vipmobile.netlify.app/',
     'http://localhost:3000',
@@ -113,8 +118,14 @@ app.options('*', (req, res) => {
     'http://localhost:4000'
   ];
   
+  // 환경 변수 도메인과 기본 도메인 합치기
+  const allowedOrigins = [...corsOrigins, ...defaultOrigins];
+  
   const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin)) {
+  if (origin && allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  } else if (origin) {
+    // 환경 변수에 있는 경우도 허용
     res.header('Access-Control-Allow-Origin', origin);
   }
   
