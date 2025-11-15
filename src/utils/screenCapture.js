@@ -1,6 +1,92 @@
 import html2canvas from 'html2canvas';
 
 /**
+ * Canvas에서 하단 공백을 자동으로 제거합니다.
+ * 실제 콘텐츠 영역만 남기고 하얀 공백을 제거합니다.
+ * @param {HTMLCanvasElement} canvas - 원본 Canvas
+ * @returns {Promise<HTMLCanvasElement>} 크롭된 Canvas
+ */
+async function autoCropCanvas(canvas) {
+  try {
+    const ctx = canvas.getContext('2d');
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+    
+    // 배경색 (흰색) 임계값 설정
+    const backgroundColorThreshold = 250; // RGB 값이 모두 250 이상이면 배경으로 간주
+    const alphaThreshold = 10; // 알파값이 10 이하면 투명으로 간주
+    
+    let minX = canvas.width;
+    let minY = canvas.height;
+    let maxX = 0;
+    let maxY = 0;
+    
+    // 실제 콘텐츠 영역 찾기 (상단, 좌측, 우측, 하단 모두)
+    for (let y = 0; y < canvas.height; y++) {
+      for (let x = 0; x < canvas.width; x++) {
+        const index = (y * canvas.width + x) * 4;
+        const r = data[index];
+        const g = data[index + 1];
+        const b = data[index + 2];
+        const a = data[index + 3];
+        
+        // 배경이 아닌 픽셀인지 확인
+        const isBackground = 
+          (r >= backgroundColorThreshold && 
+           g >= backgroundColorThreshold && 
+           b >= backgroundColorThreshold) ||
+          a < alphaThreshold;
+        
+        if (!isBackground) {
+          minX = Math.min(minX, x);
+          minY = Math.min(minY, y);
+          maxX = Math.max(maxX, x);
+          maxY = Math.max(maxY, y);
+        }
+      }
+    }
+    
+    // 콘텐츠가 없는 경우 원본 반환
+    if (minX >= maxX || minY >= maxY) {
+      return canvas;
+    }
+    
+    // 여유 공간 추가 (상하좌우 10px씩)
+    const padding = 10;
+    minX = Math.max(0, minX - padding);
+    minY = Math.max(0, minY - padding);
+    maxX = Math.min(canvas.width, maxX + padding);
+    maxY = Math.min(canvas.height, maxY + padding);
+    
+    const width = maxX - minX;
+    const height = maxY - minY;
+    
+    // 크롭된 Canvas 생성
+    const croppedCanvas = document.createElement('canvas');
+    croppedCanvas.width = width;
+    croppedCanvas.height = height;
+    const croppedCtx = croppedCanvas.getContext('2d');
+    
+    // 원본 Canvas에서 크롭된 영역만 복사
+    croppedCtx.drawImage(
+      canvas,
+      minX, minY, width, height,
+      0, 0, width, height
+    );
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`✂️ [autoCropCanvas] 크롭 완료: ${canvas.width}x${canvas.height} → ${width}x${height}`);
+    }
+    
+    return croppedCanvas;
+  } catch (error) {
+    console.warn('⚠️ [autoCropCanvas] 크롭 실패, 원본 반환:', error);
+    // 크롭 실패 시 원본 반환
+    return canvas;
+  }
+}
+
+/**
  * DOM 요소를 이미지로 캡처합니다.
  * @param {HTMLElement} element - 캡처할 DOM 요소
  * @param {Object} options - 캡처 옵션
@@ -166,9 +252,12 @@ export async function captureElement(element, options = {}) {
       // Canvas 생성
       const canvas = await html2canvas(element, defaultOptions);
       
+      // 하단 공백 자동 제거를 위한 크롭 처리
+      const croppedCanvas = await autoCropCanvas(canvas);
+      
       // Canvas를 Blob으로 변환
       const blob = await new Promise((resolve, reject) => {
-        canvas.toBlob(
+        croppedCanvas.toBlob(
           (blob) => {
             if (blob) {
               resolve(blob);
