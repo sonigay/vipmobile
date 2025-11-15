@@ -85,28 +85,17 @@ function CaptureProgress({ open, total, current, completed, failed, onCancel, sl
       if (slide.detailOptions) {
         const availableTabs = getAvailableTabsForMode(slide.mode, {});
         const tabConfig = availableTabs.find(t => t.key === slide.tab);
-        const subTabConfig = tabConfig?.subTabs?.find(st => st.key === slide.subTab);
         
-        if (subTabConfig?.detailOptions) {
-          const detailOptions = subTabConfig.detailOptions;
+        // 탭에 detailOptions가 있는 경우 (검수 모드 등)
+        if (tabConfig?.detailOptions) {
+          const detailOptions = tabConfig.detailOptions;
           const detailOptionLabels = [];
           
-          // csDetailType 옵션 처리
-          if (slide.detailOptions.csDetailType && slide.detailOptions.csDetailType !== 'all') {
-            const csDetailTypeOption = detailOptions.options?.find(opt => opt.key === 'csDetailType');
-            if (csDetailTypeOption) {
-              const selectedValue = csDetailTypeOption.values?.find(v => v.key === slide.detailOptions.csDetailType);
-              if (selectedValue) {
-                detailOptionLabels.push(selectedValue.label);
-              }
-            }
-          }
-          
-          // csDetailCriteria 옵션 처리
-          if (slide.detailOptions.csDetailCriteria && slide.detailOptions.csDetailCriteria !== 'performance') {
-            const csDetailCriteriaOption = detailOptions.options?.find(opt => opt.key === 'csDetailCriteria');
-            if (csDetailCriteriaOption) {
-              const selectedValue = csDetailCriteriaOption.values?.find(v => v.key === slide.detailOptions.csDetailCriteria);
+          // selectedField 옵션 처리 (검수 모드)
+          if (slide.detailOptions.selectedField && slide.detailOptions.selectedField !== 'all') {
+            const selectedFieldOption = detailOptions.options?.find(opt => opt.key === 'selectedField');
+            if (selectedFieldOption) {
+              const selectedValue = selectedFieldOption.values?.find(v => v.key === slide.detailOptions.selectedField);
               if (selectedValue) {
                 detailOptionLabels.push(selectedValue.label);
               }
@@ -115,7 +104,7 @@ function CaptureProgress({ open, total, current, completed, failed, onCancel, sl
           
           // 다른 세부 옵션들도 처리
           Object.keys(slide.detailOptions).forEach(key => {
-            if (key !== 'csDetailType' && key !== 'csDetailCriteria') {
+            if (key !== 'selectedField') {
               const option = detailOptions.options?.find(opt => opt.key === key);
               if (option) {
                 const selectedValue = option.values?.find(v => v.key === slide.detailOptions[key]);
@@ -128,6 +117,53 @@ function CaptureProgress({ open, total, current, completed, failed, onCancel, sl
           
           if (detailOptionLabels.length > 0) {
             detailOptionLabel = ` > ${detailOptionLabels.join(', ')}`;
+          }
+        } else if (slide.subTab) {
+          // 하부 탭에 detailOptions가 있는 경우 (장표 모드 등)
+          const subTabConfig = tabConfig?.subTabs?.find(st => st.key === slide.subTab);
+          
+          if (subTabConfig?.detailOptions) {
+            const detailOptions = subTabConfig.detailOptions;
+            const detailOptionLabels = [];
+            
+            // csDetailType 옵션 처리
+            if (slide.detailOptions.csDetailType && slide.detailOptions.csDetailType !== 'all') {
+              const csDetailTypeOption = detailOptions.options?.find(opt => opt.key === 'csDetailType');
+              if (csDetailTypeOption) {
+                const selectedValue = csDetailTypeOption.values?.find(v => v.key === slide.detailOptions.csDetailType);
+                if (selectedValue) {
+                  detailOptionLabels.push(selectedValue.label);
+                }
+              }
+            }
+            
+            // csDetailCriteria 옵션 처리
+            if (slide.detailOptions.csDetailCriteria && slide.detailOptions.csDetailCriteria !== 'performance') {
+              const csDetailCriteriaOption = detailOptions.options?.find(opt => opt.key === 'csDetailCriteria');
+              if (csDetailCriteriaOption) {
+                const selectedValue = csDetailCriteriaOption.values?.find(v => v.key === slide.detailOptions.csDetailCriteria);
+                if (selectedValue) {
+                  detailOptionLabels.push(selectedValue.label);
+                }
+              }
+            }
+            
+            // 다른 세부 옵션들도 처리
+            Object.keys(slide.detailOptions).forEach(key => {
+              if (key !== 'csDetailType' && key !== 'csDetailCriteria') {
+                const option = detailOptions.options?.find(opt => opt.key === key);
+                if (option) {
+                  const selectedValue = option.values?.find(v => v.key === slide.detailOptions[key]);
+                  if (selectedValue && selectedValue.key !== 'all' && selectedValue.key !== option.defaultValue) {
+                    detailOptionLabels.push(selectedValue.label);
+                  }
+                }
+              }
+            });
+            
+            if (detailOptionLabels.length > 0) {
+              detailOptionLabel = ` > ${detailOptionLabels.join(', ')}`;
+            }
           }
         }
       }

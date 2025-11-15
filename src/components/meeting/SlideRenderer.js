@@ -12,6 +12,46 @@ import { getAvailableTabsForMode } from '../../config/modeTabConfig';
  * 슬라이드를 렌더링하는 컴포넌트
  * presentation mode로 렌더링하여 헤더 없이 콘텐츠만 표시
  */
+/**
+ * 세부 옵션 중 마지막 항목의 라벨을 반환하는 헬퍼 함수
+ */
+const getLastDetailOptionLabel = (slide, loggedInStore) => {
+  if (!slide?.detailOptions) return null;
+  
+  const availableTabs = getAvailableTabsForMode(slide.mode, loggedInStore || {});
+  const tabConfig = availableTabs.find(t => t.key === slide.tab);
+  
+  let detailOptions = null;
+  let allOptionLabels = [];
+  
+  // 탭에 detailOptions가 있는 경우 (검수 모드 등)
+  if (tabConfig?.detailOptions) {
+    detailOptions = tabConfig.detailOptions;
+  } else if (slide.subTab && tabConfig?.subTabs) {
+    // 하부 탭에 detailOptions가 있는 경우 (장표 모드 등)
+    const subTabConfig = tabConfig.subTabs.find(st => st.key === slide.subTab);
+    if (subTabConfig?.detailOptions) {
+      detailOptions = subTabConfig.detailOptions;
+    }
+  }
+  
+  if (!detailOptions) return null;
+  
+  // 모든 세부 옵션 라벨 수집
+  detailOptions.options?.forEach(option => {
+    const value = slide.detailOptions[option.key];
+    if (value && value !== 'all' && value !== option.defaultValue) {
+      const selectedValue = option.values?.find(v => v.key === value);
+      if (selectedValue) {
+        allOptionLabels.push(selectedValue.label);
+      }
+    }
+  });
+  
+  // 마지막 항목만 반환
+  return allOptionLabels.length > 0 ? allOptionLabels[allOptionLabels.length - 1] : null;
+};
+
 const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, onReady }) {
   const containerRef = useRef(null);
   const [loading, setLoading] = useState(true);
@@ -772,6 +812,41 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                           // 서브탭이 있는지 확인
                           const hasSubTabs = tabSlides.some(s => s.subTab);
                           
+                          // 탭에 detailOptions가 있는 경우 세부 옵션 정보 가져오기 (검수 모드 등)
+                          let tabDetailOptionLabel = '';
+                          if (tabConfig?.detailOptions && tabSlides[0]?.detailOptions) {
+                            const detailOptions = tabConfig.detailOptions;
+                            const detailOptionLabels = [];
+                            
+                            // selectedField 옵션 처리 (검수 모드)
+                            if (tabSlides[0].detailOptions.selectedField && tabSlides[0].detailOptions.selectedField !== 'all') {
+                              const selectedFieldOption = detailOptions.options?.find(opt => opt.key === 'selectedField');
+                              if (selectedFieldOption) {
+                                const selectedValue = selectedFieldOption.values?.find(v => v.key === tabSlides[0].detailOptions.selectedField);
+                                if (selectedValue) {
+                                  detailOptionLabels.push(selectedValue.label);
+                                }
+                              }
+                            }
+                            
+                            // 다른 세부 옵션들도 처리
+                            Object.keys(tabSlides[0].detailOptions).forEach(key => {
+                              if (key !== 'selectedField') {
+                                const option = detailOptions.options?.find(opt => opt.key === key);
+                                if (option) {
+                                  const selectedValue = option.values?.find(v => v.key === tabSlides[0].detailOptions[key]);
+                                  if (selectedValue && selectedValue.key !== 'all' && selectedValue.key !== option.defaultValue) {
+                                    detailOptionLabels.push(selectedValue.label);
+                                  }
+                                }
+                              }
+                            });
+                            
+                            if (detailOptionLabels.length > 0) {
+                              tabDetailOptionLabel = ` > ${detailOptionLabels.join(', ')}`;
+                            }
+                          }
+                          
                           return (
                             <Box key={tabKey} sx={{ ml: 2, mb: 1.5 }}>
                               <Typography
@@ -794,7 +869,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                                   borderRadius: '50%',
                                   backgroundColor: '#764ba2'
                                 }} />
-                                {modeIndex + 1}.{tabIndex + 1} {tabLabel}
+                                {modeIndex + 1}.{tabIndex + 1} {tabLabel}{tabDetailOptionLabel}
                               </Typography>
                               
                               {/* 서브탭 목록 */}
@@ -1339,13 +1414,8 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
       const availableTabs = getAvailableTabsForMode('inspection', loggedInStore);
       const tabIndex = availableTabs.findIndex(t => t.key === slide.tab);
       
-      // 모드/탭 제목 구성 (역순으로)
-      const modeTitle = modeConfig?.title || slide.mode;
-      const tabConfig = availableTabs[tabIndex];
-      const tabTitle = tabConfig?.label || slide.tab;
-      
-      // 역순으로 제목 구성: "일반검수항목 < 검수 모드"
-      const slideTitle = `${tabTitle} < ${modeTitle}`;
+      // 세부 옵션 중 마지막 항목만 가져오기
+      const lastDetailOption = getLastDetailOptionLabel(slide, loggedInStore);
       
       return (
         <Box
@@ -1413,22 +1483,24 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               </Typography>
             </Box>
             
-            {/* 오른쪽: 슬라이드 제목 (역순) */}
-            <Typography
-              variant="h5"
-              sx={{
-                fontWeight: 700,
-                fontSize: { xs: '1.3rem', md: '1.6rem' },
-                color: '#212529',
-                textAlign: 'right',
-                fontFamily: '"Noto Sans KR", "Roboto", sans-serif',
-                letterSpacing: '0.3px',
-                backgroundColor: 'transparent',
-                background: 'none'
-              }}
-            >
-              {slideTitle}
-            </Typography>
+            {/* 오른쪽: 세부 옵션 마지막 항목만 표시 */}
+            {lastDetailOption && (
+              <Typography
+                variant="h5"
+                sx={{
+                  fontWeight: 900,
+                  fontSize: { xs: '1.4rem', md: '1.8rem' },
+                  color: '#212529',
+                  textAlign: 'right',
+                  fontFamily: '"Noto Sans KR", "Roboto", sans-serif',
+                  letterSpacing: '0.3px',
+                  backgroundColor: 'transparent',
+                  background: 'none'
+                }}
+              >
+                {lastDetailOption}
+              </Typography>
+            )}
           </Box>
 
           {/* 중앙: 실제 콘텐츠 */}
@@ -1514,38 +1586,8 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
         ? tabConfig.subTabs.find(st => st.key === slide.subTab)?.label || slide.subTab
         : null;
       
-      // 세부 옵션 정보 추가
-      let detailOptionLabel = '';
-      if (slide.detailOptions && tabConfig?.subTabs) {
-        const subTabConfig = tabConfig.subTabs.find(st => st.key === slide.subTab);
-        if (subTabConfig?.detailOptions) {
-          const detailOptions = subTabConfig.detailOptions;
-          const detailOptionLabels = [];
-          
-          if (slide.detailOptions.csDetailType && slide.detailOptions.csDetailType !== 'all') {
-            const csDetailTypeOption = detailOptions.options?.find(opt => opt.key === 'csDetailType');
-            if (csDetailTypeOption) {
-              const selectedValue = csDetailTypeOption.values?.find(v => v.key === slide.detailOptions.csDetailType);
-              if (selectedValue) {
-                detailOptionLabels.push(selectedValue.label);
-              }
-            }
-          }
-          
-          if (detailOptionLabels.length > 0) {
-            detailOptionLabel = detailOptionLabels.join(', ');
-          }
-        }
-      }
-      
-      // 역순으로 제목 구성: "가입자증감 < 채권장표 < 장표 모드"
-      const titleParts = [];
-      if (detailOptionLabel) titleParts.push(detailOptionLabel);
-      if (subTabTitle) titleParts.push(subTabTitle);
-      if (tabTitle) titleParts.push(tabTitle);
-      if (modeTitle) titleParts.push(modeTitle);
-      
-      const slideTitle = titleParts.join(' < ');
+      // 세부 옵션 중 마지막 항목만 가져오기
+      const lastDetailOption = getLastDetailOptionLabel(slide, loggedInStore);
       
       return (
         <Box
@@ -1613,21 +1655,24 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               </Typography>
             </Box>
             
-            {/* 오른쪽: 슬라이드 제목 (역순) */}
-            <Typography
-              variant="h5"
-              sx={{
-                fontWeight: 700,
-                fontSize: { xs: '1.1rem', md: '1.4rem' },
-                color: '#212529',
-                textAlign: 'right',
-                fontFamily: '"Noto Sans KR", "Roboto", sans-serif',
-                letterSpacing: '0.3px',
-                backgroundColor: 'transparent' // 배경색 제거
-              }}
-            >
-              {slideTitle}
-            </Typography>
+            {/* 오른쪽: 세부 옵션 마지막 항목만 표시 */}
+            {lastDetailOption && (
+              <Typography
+                variant="h5"
+                sx={{
+                  fontWeight: 900,
+                  fontSize: { xs: '1.4rem', md: '1.8rem' },
+                  color: '#212529',
+                  textAlign: 'right',
+                  fontFamily: '"Noto Sans KR", "Roboto", sans-serif',
+                  letterSpacing: '0.3px',
+                  backgroundColor: 'transparent',
+                  background: 'none'
+                }}
+              >
+                {lastDetailOption}
+              </Typography>
+            )}
           </Box>
 
           {/* 중앙: 실제 콘텐츠 */}
@@ -1687,8 +1732,8 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
     // mode-only 타입 슬라이드 렌더링
     if (slide.type === 'mode-only' && slide.mode) {
       const modeConfig = getModeConfig(slide.mode);
-      const modeTitle = modeConfig?.title || slide.mode;
-      const slideTitle = modeTitle;
+      // 세부 옵션 중 마지막 항목만 가져오기
+      const lastDetailOption = getLastDetailOptionLabel(slide, loggedInStore);
       
       // Budget 모드 지원
       if (slide.mode === 'budget') {
@@ -1757,20 +1802,24 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                 </Typography>
               </Box>
               
-              <Typography
-                variant="h5"
-                sx={{
-                  fontWeight: 700,
-                  fontSize: { xs: '1.1rem', md: '1.4rem' },
-                  color: '#212529',
-                  textAlign: 'right',
-                  fontFamily: '"Noto Sans KR", "Roboto", sans-serif',
-                  letterSpacing: '0.3px',
-                  backgroundColor: 'transparent'
-                }}
-              >
-                {slideTitle}
-              </Typography>
+              {/* 오른쪽: 세부 옵션 마지막 항목만 표시 */}
+              {lastDetailOption && (
+                <Typography
+                  variant="h5"
+                  sx={{
+                    fontWeight: 900,
+                    fontSize: { xs: '1.4rem', md: '1.8rem' },
+                    color: '#212529',
+                    textAlign: 'right',
+                    fontFamily: '"Noto Sans KR", "Roboto", sans-serif',
+                    letterSpacing: '0.3px',
+                    backgroundColor: 'transparent',
+                    background: 'none'
+                  }}
+                >
+                  {lastDetailOption}
+                </Typography>
+              )}
             </Box>
 
             {/* 중앙: 실제 콘텐츠 */}
@@ -1887,20 +1936,24 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                 </Typography>
               </Box>
               
-              <Typography
-                variant="h5"
-                sx={{
-                  fontWeight: 700,
-                  fontSize: { xs: '1.1rem', md: '1.4rem' },
-                  color: '#212529',
-                  textAlign: 'right',
-                  fontFamily: '"Noto Sans KR", "Roboto", sans-serif',
-                  letterSpacing: '0.3px',
-                  backgroundColor: 'transparent'
-                }}
-              >
-                {slideTitle}
-              </Typography>
+              {/* 오른쪽: 세부 옵션 마지막 항목만 표시 */}
+              {lastDetailOption && (
+                <Typography
+                  variant="h5"
+                  sx={{
+                    fontWeight: 900,
+                    fontSize: { xs: '1.4rem', md: '1.8rem' },
+                    color: '#212529',
+                    textAlign: 'right',
+                    fontFamily: '"Noto Sans KR", "Roboto", sans-serif',
+                    letterSpacing: '0.3px',
+                    backgroundColor: 'transparent',
+                    background: 'none'
+                  }}
+                >
+                  {lastDetailOption}
+                </Typography>
+              )}
             </Box>
 
             {/* 중앙: 실제 콘텐츠 */}
@@ -2020,20 +2073,24 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                 </Typography>
               </Box>
               
-              <Typography
-                variant="h5"
-                sx={{
-                  fontWeight: 700,
-                  fontSize: { xs: '1.1rem', md: '1.4rem' },
-                  color: '#212529',
-                  textAlign: 'right',
-                  fontFamily: '"Noto Sans KR", "Roboto", sans-serif',
-                  letterSpacing: '0.3px',
-                  backgroundColor: 'transparent'
-                }}
-              >
-                {slideTitle}
-              </Typography>
+              {/* 오른쪽: 세부 옵션 마지막 항목만 표시 */}
+              {lastDetailOption && (
+                <Typography
+                  variant="h5"
+                  sx={{
+                    fontWeight: 900,
+                    fontSize: { xs: '1.4rem', md: '1.8rem' },
+                    color: '#212529',
+                    textAlign: 'right',
+                    fontFamily: '"Noto Sans KR", "Roboto", sans-serif',
+                    letterSpacing: '0.3px',
+                    backgroundColor: 'transparent',
+                    background: 'none'
+                  }}
+                >
+                  {lastDetailOption}
+                </Typography>
+              )}
             </Box>
 
             {/* 중앙: 실제 콘텐츠 */}

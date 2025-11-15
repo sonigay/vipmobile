@@ -55,6 +55,7 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess }) {
   const [detailOptionValues, setDetailOptionValues] = useState({});
   const [detailOptionMultipleSelections, setDetailOptionMultipleSelections] = useState({}); // 여러 개 선택을 위한 상태
   const [pendingSubTab, setPendingSubTab] = useState(null);
+  const [pendingTab, setPendingTab] = useState(null); // 탭 선택 시 세부 옵션이 있는 경우 대기
 
   useEffect(() => {
     if (open) {
@@ -162,6 +163,31 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess }) {
       
       // 하부 탭이 있는 경우는 하부 탭 선택 시 슬라이드가 생성되므로 여기서는 생성하지 않음
       if (!tabConfig?.subTabs || tabConfig.subTabs.length === 0) {
+        // 탭에 세부 옵션이 있는 경우 모달 표시
+        if (tabConfig?.detailOptions) {
+          setDetailOptionConfig(tabConfig.detailOptions);
+          setDetailOptionValues({});
+          setDetailOptionMultipleSelections({});
+          // 기본값 설정
+          tabConfig.detailOptions.options.forEach(option => {
+            setDetailOptionValues(prev => ({
+              ...prev,
+              [option.key]: option.defaultValue || ''
+            }));
+            // 여러 개 선택 가능한 옵션인 경우 배열로 초기화
+            if (option.multiple) {
+              setDetailOptionMultipleSelections(prev => ({
+                ...prev,
+                [option.key]: []
+              }));
+            }
+          });
+          setPendingTab({ modeKey, tabKey, tabId });
+          setDetailOptionOpen(true);
+          return;
+        }
+        
+        // 세부 옵션이 없는 경우 바로 슬라이드 생성
         const newSlide = {
           slideId: `slide-${modeKey}-${tabKey}-${Date.now()}`,
           type: 'mode-tab',
@@ -173,6 +199,24 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess }) {
         setSlides([...slides, newSlide]);
       }
     }
+  };
+  
+  const addTabSlide = (modeKey, tabKey, tabId, detailOptions = {}) => {
+    const availableTabs = getAvailableTabsForMode(modeKey, loggedInStore);
+    const tabConfig = availableTabs.find(t => t.key === tabKey);
+    
+    const newSlide = {
+      slideId: `slide-${modeKey}-${tabKey}-${Date.now()}`,
+      type: 'mode-tab',
+      mode: modeKey,
+      tab: tabKey,
+      tabLabel: tabConfig?.label || tabKey,
+      // 세부 옵션 (모든 옵션을 detailOptions 객체에 저장)
+      detailOptions: Object.keys(detailOptions).length > 0 ? detailOptions : undefined,
+      order: slides.length + 1
+    };
+    
+    setSlides([...slides, newSlide]);
   };
 
   const handleSubTabToggle = (modeKey, tabKey, subTabKey) => {
@@ -644,11 +688,22 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess }) {
             setDetailOptionValues({});
             setDetailOptionMultipleSelections({});
             setPendingSubTab(null);
+            setPendingTab(null);
           }}>취소</Button>
           <Button
             variant="contained"
             onClick={() => {
-              if (pendingSubTab) {
+              // 탭 선택 시 세부 옵션 처리
+              if (pendingTab) {
+                // 탭의 경우 여러 개 선택 옵션이 없으므로 바로 슬라이드 생성
+                addTabSlide(
+                  pendingTab.modeKey,
+                  pendingTab.tabKey,
+                  pendingTab.tabId,
+                  detailOptionValues
+                );
+                setPendingTab(null);
+              } else if (pendingSubTab) {
                 // 여러 개 선택 가능한 옵션이 있는 경우 각각 슬라이드 생성
                 const multipleOptionKeys = detailOptionConfig?.options
                   ?.filter(opt => opt.multiple)
@@ -715,6 +770,7 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess }) {
               setDetailOptionValues({});
               setDetailOptionMultipleSelections({});
             }}
+            disabled={!pendingTab && !pendingSubTab}
           >
             확인
           </Button>
