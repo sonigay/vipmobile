@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Paper,
@@ -18,6 +18,10 @@ import {
 import { getModeConfig } from '../../config/modeConfig';
 
 function SlideOrderEditor({ slides, onReorder, onRemove }) {
+  const [draggedIndex, setDraggedIndex] = useState(null);
+  const [dragOverIndex, setDragOverIndex] = useState(null);
+  const [touchStartY, setTouchStartY] = useState(null);
+  const [touchCurrentIndex, setTouchCurrentIndex] = useState(null);
   const handleMoveUp = (index) => {
     if (index === 0) return;
     const newSlides = [...slides];
@@ -50,6 +54,124 @@ function SlideOrderEditor({ slides, onReorder, onRemove }) {
     if (onRemove) {
       onRemove(index);
     }
+  };
+
+  // 드래그 시작
+  const handleDragStart = (e, index) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', e.target);
+    // 모바일 터치 지원
+    if (e.dataTransfer.setDragImage) {
+      const dragImage = document.createElement('div');
+      dragImage.style.position = 'absolute';
+      dragImage.style.top = '-1000px';
+      dragImage.textContent = '드래그 중...';
+      document.body.appendChild(dragImage);
+      e.dataTransfer.setDragImage(dragImage, 0, 0);
+      setTimeout(() => document.body.removeChild(dragImage), 0);
+    }
+  };
+
+  // 드래그 오버
+  const handleDragOver = (e, index) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (draggedIndex !== null && draggedIndex !== index) {
+      setDragOverIndex(index);
+    }
+  };
+
+  // 드래그 리브
+  const handleDragLeave = () => {
+    setDragOverIndex(null);
+  };
+
+  // 드롭
+  const handleDrop = (e, dropIndex) => {
+    e.preventDefault();
+    setDragOverIndex(null);
+    
+    if (draggedIndex === null || draggedIndex === dropIndex) {
+      setDraggedIndex(null);
+      return;
+    }
+
+    const newSlides = [...slides];
+    const draggedSlide = newSlides[draggedIndex];
+    
+    // 슬라이드 이동
+    newSlides.splice(draggedIndex, 1);
+    newSlides.splice(dropIndex, 0, draggedSlide);
+    
+    // 순서 재설정
+    newSlides.forEach((slide, idx) => {
+      slide.order = idx + 1;
+    });
+    
+    onReorder(newSlides);
+    setDraggedIndex(null);
+  };
+
+  // 드래그 종료
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  // 모바일 터치 시작
+  const handleTouchStart = (e, index) => {
+    setTouchStartY(e.touches[0].clientY);
+    setTouchCurrentIndex(index);
+    setDraggedIndex(index);
+  };
+
+  // 모바일 터치 이동
+  const handleTouchMove = (e) => {
+    if (touchStartY === null || touchCurrentIndex === null) return;
+    
+    const touchY = e.touches[0].clientY;
+    const deltaY = touchY - touchStartY;
+    
+    // 드래그 중인 아이템의 위치 계산
+    const itemHeight = 80; // 대략적인 아이템 높이
+    const newIndex = Math.round(touchCurrentIndex + (deltaY / itemHeight));
+    
+    if (newIndex >= 0 && newIndex < slides.length && newIndex !== touchCurrentIndex) {
+      setDragOverIndex(newIndex);
+    }
+  };
+
+  // 모바일 터치 종료
+  const handleTouchEnd = (e) => {
+    if (touchCurrentIndex === null || dragOverIndex === null) {
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+      setTouchStartY(null);
+      setTouchCurrentIndex(null);
+      return;
+    }
+
+    if (touchCurrentIndex !== dragOverIndex) {
+      const newSlides = [...slides];
+      const draggedSlide = newSlides[touchCurrentIndex];
+      
+      // 슬라이드 이동
+      newSlides.splice(touchCurrentIndex, 1);
+      newSlides.splice(dragOverIndex, 0, draggedSlide);
+      
+      // 순서 재설정
+      newSlides.forEach((slide, idx) => {
+        slide.order = idx + 1;
+      });
+      
+      onReorder(newSlides);
+    }
+    
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+    setTouchStartY(null);
+    setTouchCurrentIndex(null);
   };
 
   const getSlideLabel = (slide) => {
@@ -97,14 +219,42 @@ function SlideOrderEditor({ slides, onReorder, onRemove }) {
           <Paper
             key={slide.slideId || slide.id || index}
             variant="outlined"
-            sx={{ mb: 1 }}
+            sx={{
+              mb: 1,
+              cursor: 'grab',
+              opacity: draggedIndex === index ? 0.5 : 1,
+              transform: dragOverIndex === index ? 'translateY(-4px)' : 'translateY(0)',
+              transition: 'transform 0.2s, opacity 0.2s',
+              border: dragOverIndex === index ? '2px solid #3949AB' : '1px solid rgba(0, 0, 0, 0.12)',
+              boxShadow: dragOverIndex === index ? '0 4px 8px rgba(57, 73, 171, 0.3)' : 'none',
+              '&:active': {
+                cursor: 'grabbing'
+              }
+            }}
+            draggable
+            onDragStart={(e) => handleDragStart(e, index)}
+            onDragOver={(e) => handleDragOver(e, index)}
+            onDragLeave={handleDragLeave}
+            onDrop={(e) => handleDrop(e, index)}
+            onDragEnd={handleDragEnd}
+            onTouchStart={(e) => handleTouchStart(e, index)}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            sx={{
+              ...(draggedIndex === index && {
+                touchAction: 'none'
+              })
+            }}
           >
             <ListItem
               secondaryAction={
                 <Box sx={{ display: 'flex', gap: 0.5 }}>
                   <IconButton
                     edge="end"
-                    onClick={() => handleMoveUp(index)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleMoveUp(index);
+                    }}
                     disabled={index === 0}
                     size="small"
                   >
@@ -112,7 +262,10 @@ function SlideOrderEditor({ slides, onReorder, onRemove }) {
                   </IconButton>
                   <IconButton
                     edge="end"
-                    onClick={() => handleMoveDown(index)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleMoveDown(index);
+                    }}
                     disabled={index === slides.length - 1}
                     size="small"
                   >
@@ -120,7 +273,10 @@ function SlideOrderEditor({ slides, onReorder, onRemove }) {
                   </IconButton>
                   <IconButton
                     edge="end"
-                    onClick={() => handleRemove(index)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRemove(index);
+                    }}
                     size="small"
                     sx={{ color: 'error.main' }}
                   >
@@ -129,7 +285,16 @@ function SlideOrderEditor({ slides, onReorder, onRemove }) {
                 </Box>
               }
             >
-              <DragIndicatorIcon sx={{ mr: 2, color: 'text.secondary' }} />
+              <DragIndicatorIcon 
+                sx={{ 
+                  mr: 2, 
+                  color: 'text.secondary',
+                  cursor: 'grab',
+                  '&:active': {
+                    cursor: 'grabbing'
+                  }
+                }} 
+              />
               <ListItemText
                 primary={
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
