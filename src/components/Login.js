@@ -282,6 +282,7 @@ function Login({ onLogin }) {
         contactId: data.agentInfo.contactId,
         userRole: data.agentInfo.userRole,
         obManagementRole: data.agentInfo.obManagementRole,
+        meetingRole: data.agentInfo.meetingRole, // 회의 모드 권한 추가
         modePermissions: data.modePermissions
       });
     } else if (data.isInventory) {
