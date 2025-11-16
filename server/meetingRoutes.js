@@ -2186,9 +2186,117 @@ async function uploadCustomSlideFile(req, res) {
         }
       });
     } else if (detectedFileType === 'excel') {
-      // Excel 파일 변환 (HTML + Puppeteer 방식으로 한글 지원)
+      // Excel 파일 변환
       try {
-        // 먼저 HTML로 변환 시도
+        const os = require('os');
+        const fs = require('fs');
+        const path = require('path');
+        const { exec } = require('child_process');
+
+        // 1) LibreOffice(soffice) 우선 시도 → PNG 직변환 또는 PDF 변환 후 래스터
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'excel-conv-'));
+        const srcPath = path.join(tmpDir, file.originalname || `excel-${Date.now()}.xlsx`);
+        fs.writeFileSync(srcPath, file.buffer);
+
+        const whichCmd = (cmd) => new Promise(resolve => {
+          exec(`which ${cmd}`, (err, stdout) => resolve(!err && stdout ? stdout.trim() : null));
+        });
+        const runCmd = (cmd, cwd = undefined, timeout = 120000) => new Promise((resolve, reject) => {
+          exec(cmd, { cwd, timeout }, (err, stdout, stderr) => {
+            if (err) return reject(new Error(stderr || err.message));
+            resolve({ stdout, stderr });
+          });
+        });
+
+        const pngOutputs = [];
+        const pdfOutputs = [];
+
+        const sofficePath = await whichCmd('soffice');
+        const gsPath = await whichCmd('gs');
+
+        if (sofficePath) {
+          try {
+            // a) PNG 직접 변환 시도
+            await runCmd(`"${sofficePath}" --headless --convert-to png --outdir "${tmpDir}" "${srcPath}"`, tmpDir, 180000);
+            const base = path.basename(srcPath, path.extname(srcPath));
+            const pngCandidates = fs.readdirSync(tmpDir)
+              .filter(f => f.toLowerCase().endsWith('.png') && f.startsWith(base))
+              .map(f => path.join(tmpDir, f));
+            if (pngCandidates.length > 0) {
+              for (const p of pngCandidates.sort()) {
+                const buf = fs.readFileSync(p);
+                pngOutputs.push({ buffer: buf, filename: `${file.originalname || 'excel'}_${path.basename(p, '.png')}.png`, sheetName: path.basename(p, '.png') });
+              }
+            }
+          } catch (e) {
+            console.warn('⚠️ [Excel 변환] soffice PNG 변환 실패, PDF 경유 시도:', e.message);
+          }
+
+          // b) PDF 변환 후 PNG 추출 시도(soffice 또는 ghostscript)
+          if (pngOutputs.length === 0) {
+            try {
+              await runCmd(`"${sofficePath}" --headless --convert-to pdf --outdir "${tmpDir}" "${srcPath}"`, tmpDir, 180000);
+              const base = path.basename(srcPath, path.extname(srcPath));
+              const pdfFile = fs.readdirSync(tmpDir).find(f => f.toLowerCase().endsWith('.pdf') && f.startsWith(base));
+              if (pdfFile) {
+                const pdfPath = path.join(tmpDir, pdfFile);
+                // 우선 ghostscript로 래스터
+                if (gsPath) {
+                  try {
+                    const outPattern = path.join(tmpDir, `${base}-page-%03d.png`);
+                    await runCmd(`"${gsPath}" -dSAFER -dBATCH -dNOPAUSE -sDEVICE=pngalpha -r200 -o "${outPattern}" "${pdfPath}"`, tmpDir, 180000);
+                    const gsPngs = fs.readdirSync(tmpDir)
+                      .filter(f => f.startsWith(`${base}-page-`) && f.endsWith('.png'))
+                      .map(f => path.join(tmpDir, f))
+                      .sort();
+                    for (const p of gsPngs) {
+                      const buf = fs.readFileSync(p);
+                      pngOutputs.push({ buffer: buf, filename: `${file.originalname || 'excel'}_${path.basename(p, '.png')}.png`, sheetName: path.basename(p, '.png') });
+                    }
+                  } catch (gsErr) {
+                    console.warn('⚠️ [Excel 변환] ghostscript 래스터 실패:', gsErr.message);
+                  }
+                }
+
+                // ghostscript가 없거나 실패하면 sharp로 페이지별 시도
+                if (pngOutputs.length === 0) {
+                  try {
+                    // 일부 환경의 sharp는 PDF 지원이 없을 수 있음
+                    const sharp = require('sharp');
+                    // 페이지 수를 알 수 없으니 0..n 범위를 시도하며 실패 시 중단
+                    for (let page = 0; page < 20; page++) {
+                      try {
+                        const buf = await sharp(pdfPath, { page, density: 200 }).png().toBuffer();
+                        if (buf && buf.length > 0) {
+                          pngOutputs.push({ buffer: buf, filename: `${file.originalname || 'excel'}_page-${String(page + 1).padStart(2, '0')}.png`, sheetName: `page-${page + 1}` });
+                        } else {
+                          break;
+                        }
+                      } catch {
+                        // 더 이상 페이지가 없으면 중단
+                        if (page === 0) throw new Error('sharp PDF 렌더 실패');
+                        break;
+                      }
+                    }
+                  } catch (sharpErr) {
+                    console.warn('⚠️ [Excel 변환] sharp PDF 렌더 실패:', sharpErr.message);
+                  }
+                }
+              }
+            } catch (pdfErr) {
+              console.warn('⚠️ [Excel 변환] soffice PDF 변환 실패:', pdfErr.message);
+            }
+          }
+        }
+
+        if (pngOutputs.length > 0) {
+          // LibreOffice/GS/Sharp 경로 중 하나로 성공했으면 그 결과 사용
+          imageBuffers = pngOutputs;
+        }
+
+        // 2) LibreOffice 경로가 실패하면 기존 HTML→Puppeteer → Canvas 폴백으로 진행
+        if (imageBuffers.length === 0) {
+          // 먼저 HTML로 변환 시도 (기존 로직)
         const workbook = new ExcelJS.Workbook();
         await workbook.xlsx.load(file.buffer);
         
@@ -2348,25 +2456,26 @@ async function uploadCustomSlideFile(req, res) {
           }
         }
         
-        if (imageBuffersFromHTML.length > 0) {
-          imageBuffers = imageBuffersFromHTML;
-        } else {
-          // Puppeteer가 없으면 Canvas로 폴백
-          const canvasImages = await convertExcelToImages(file.buffer, file.originalname || 'excel');
-          // Canvas로 변환된 이미지들도 자동 크롭 처리
-          imageBuffers = await Promise.all(canvasImages.map(async (img) => {
-            const croppedResult = await autoCropImage(img.buffer);
-            return {
-              ...img,
-              buffer: croppedResult.buffer,
-              metadata: {
-                originalWidth: croppedResult.originalWidth,
-                originalHeight: croppedResult.originalHeight,
-                croppedWidth: croppedResult.croppedWidth,
-                croppedHeight: croppedResult.croppedHeight
-              }
-            };
-          }));
+          if (imageBuffersFromHTML.length > 0) {
+            imageBuffers = imageBuffersFromHTML;
+          } else {
+            // Puppeteer가 없으면 Canvas로 폴백
+            const canvasImages = await convertExcelToImages(file.buffer, file.originalname || 'excel');
+            // Canvas로 변환된 이미지들도 자동 크롭 처리
+            imageBuffers = await Promise.all(canvasImages.map(async (img) => {
+              const croppedResult = await autoCropImage(img.buffer);
+              return {
+                ...img,
+                buffer: croppedResult.buffer,
+                metadata: {
+                  originalWidth: croppedResult.originalWidth,
+                  originalHeight: croppedResult.originalHeight,
+                  croppedWidth: croppedResult.croppedWidth,
+                  croppedHeight: croppedResult.croppedHeight
+                }
+              };
+            }));
+          }
         }
       } catch (excelError) {
         // CORS 헤더 설정 (에러 응답에도 포함)
