@@ -78,6 +78,30 @@ const getLastDetailOptionLabel = (slide, loggedInStore) => {
   return null;
 };
 
+// 통합 슬라이드 제목 생성기: 모든 슬라이드에서 동일한 규칙으로 제목을 구성
+const getUnifiedTitle = (slide, loggedInStore) => {
+  try {
+    if (!slide) return '슬라이드';
+    if (slide.type === 'main') return '회의 메인 화면';
+    if (slide.type === 'toc') return '회의 목차';
+    if (slide.type === 'ending') return '회의 종료';
+    if (slide.type === 'custom') return slide.title || '커스텀 화면';
+    const modeCfg = getModeConfig(slide.mode);
+    const modeName = modeCfg?.title || slide.mode || '';
+    const availableTabs = getAvailableTabsForMode(slide.mode, loggedInStore || {});
+    const tabCfg = availableTabs?.find(t => t.key === slide.tab);
+    const tabName = slide.tabLabel || tabCfg?.label || slide.tab || '';
+    const subTabName = slide.subTab
+      ? (slide.subTabLabel || (tabCfg?.subTabs?.find(st => st.key === slide.subTab)?.label) || slide.subTab)
+      : '';
+    const lastDetail = getLastDetailOptionLabel(slide, loggedInStore);
+    const parts = [modeName, tabName, subTabName || lastDetail].filter(Boolean);
+    return parts.join(' > ') || (slide.title || '슬라이드');
+  } catch {
+    return slide?.title || '슬라이드';
+  }
+};
+
 const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, onReady }) {
   const containerRef = useRef(null);
   const [loading, setLoading] = useState(true);
@@ -491,20 +515,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                 letterSpacing: '0.2px'
               }}
             >
-              {(() => {
-                try {
-                  if (slide.type === 'main') return '회의 메인 화면';
-                  if (slide.type === 'toc') return '회의 목차';
-                  if (slide.type === 'ending') return '회의 종료';
-                  if (slide.type === 'custom') return slide.title || '커스텀 화면';
-                  const modeName = getModeConfig(slide.mode)?.title || slide.mode;
-                  const tabName = slide.tabLabel || slide.tab || '';
-                  const subTabName = slide.subTabLabel || slide.subTab || '';
-                  return [modeName, tabName, subTabName].filter(Boolean).join(' > ');
-                } catch {
-                  return slide.title || '슬라이드';
-                }
-              })()}
+              {getUnifiedTitle(slide, loggedInStore)}
             </Typography>
           </Box>
 
@@ -773,7 +784,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                 letterSpacing: '0.2px'
               }}
             >
-              회의 목차
+              {getUnifiedTitle(slide, loggedInStore)}
             </Typography>
           </Box>
 
@@ -1135,51 +1146,59 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             position: 'relative'
           }}
         >
-          {/* 상단: 회사 로고 및 이름 - 전문적인 헤더 디자인 */}
+          {/* 상단바: 좌→우 그라데이션, 좌측 로고/회사명 + 우측 제목(흰색) */}
           <Box
             sx={{
-              display: 'flex',
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'flex-start',
-              width: '100%',
-              backgroundColor: '#ffffff',
-              px: { xs: 3, md: 4 },
-              py: { xs: 2.5, md: 3 },
               position: 'absolute',
               top: 0,
               left: 0,
               right: 0,
-              zIndex: 10,
-              boxShadow: '0 2px 8px rgba(0,0,0,0.08)', // 미묘한 그림자
-              borderBottom: '1px solid rgba(0,0,0,0.05)'
+              zIndex: 15,
+              background: 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #868e96 100%)',
+              borderBottom: '1px solid rgba(0,0,0,0.06)',
+              boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              px: { xs: 2.5, md: 4 },
+              py: { xs: 1.6, md: 2 },
+              pointerEvents: 'none'
             }}
           >
-            <Box
-              component="img"
-              src="/logo512.png"
-              alt="회사 로고"
-              sx={{
-                width: { xs: 40, md: 50 },
-                height: { xs: 40, md: 50 },
-                mr: { xs: 1, md: 1.5 },
-                filter: 'brightness(0) invert(0)'
-              }}
-              onError={(e) => {
-                e.target.style.display = 'none';
-              }}
-            />
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Box
+                component="img"
+                src="/logo512.png"
+                alt="회사 로고"
+                sx={{
+                  width: { xs: 48, md: 60 },
+                  height: { xs: 48, md: 60 },
+                  filter: 'brightness(0) invert(0)'
+                }}
+                onError={(e) => { e.target.style.display = 'none'; }}
+              />
+              <Typography
+                sx={{
+                  fontWeight: 800,
+                  fontSize: { xs: '1.25rem', md: '1.6rem' },
+                  color: '#212529',
+                  letterSpacing: '0.2px',
+                  fontFamily: '"Noto Sans KR","Roboto",sans-serif'
+                }}
+              >
+                (주)브이아이피플러스
+              </Typography>
+            </Box>
             <Typography
-              variant="h6"
               sx={{
-                fontWeight: 700,
-                fontSize: { xs: '1rem', md: '1.2rem' },
-                color: '#212529',
-                letterSpacing: '0.5px',
-                fontFamily: '"Noto Sans KR", "Roboto", "Helvetica", "Arial", sans-serif'
+                fontSize: { xs: '1rem', md: '1.25rem' },
+                fontWeight: 800,
+                color: '#ffffff',
+                textShadow: '0 1px 2px rgba(0,0,0,0.15)',
+                letterSpacing: '0.2px'
               }}
             >
-              (주)브이아이피플러스
+              {getUnifiedTitle(slide, loggedInStore)}
             </Typography>
           </Box>
 
@@ -1255,7 +1274,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                 {formattedDate}
               </Typography>
               
-              {slide.meetingNumber && (
+              {Number(slide.meetingNumber) > 0 && (
                 <Box sx={{
                   display: 'inline-block',
                   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -1345,51 +1364,59 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             position: 'relative'
           }}
         >
-          {/* 상단: 회사 로고 및 이름 - 전문적인 헤더 디자인 */}
+          {/* 상단바: 좌→우 그라데이션, 좌측 로고/회사명 + 우측 제목(흰색) */}
           <Box
             sx={{
-              display: 'flex',
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'flex-start',
-              width: '100%',
-              backgroundColor: '#ffffff',
-              px: { xs: 3, md: 4 },
-              py: { xs: 2.5, md: 3 },
               position: 'absolute',
               top: 0,
               left: 0,
               right: 0,
-              zIndex: 10,
-              boxShadow: '0 2px 8px rgba(0,0,0,0.08)', // 미묘한 그림자
-              borderBottom: '1px solid rgba(0,0,0,0.05)'
+              zIndex: 15,
+              background: 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #868e96 100%)',
+              borderBottom: '1px solid rgba(0,0,0,0.06)',
+              boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              px: { xs: 2.5, md: 4 },
+              py: { xs: 1.6, md: 2 },
+              pointerEvents: 'none'
             }}
           >
-            <Box
-              component="img"
-              src="/logo512.png"
-              alt="회사 로고"
-              sx={{
-                width: { xs: 40, md: 50 },
-                height: { xs: 40, md: 50 },
-                mr: { xs: 1, md: 1.5 },
-                filter: 'brightness(0) invert(0)'
-              }}
-              onError={(e) => {
-                e.target.style.display = 'none';
-              }}
-            />
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Box
+                component="img"
+                src="/logo512.png"
+                alt="회사 로고"
+                sx={{
+                  width: { xs: 48, md: 60 },
+                  height: { xs: 48, md: 60 },
+                  filter: 'brightness(0) invert(0)'
+                }}
+                onError={(e) => { e.target.style.display = 'none'; }}
+              />
+              <Typography
+                sx={{
+                  fontWeight: 800,
+                  fontSize: { xs: '1.25rem', md: '1.6rem' },
+                  color: '#212529',
+                  letterSpacing: '0.2px',
+                  fontFamily: '"Noto Sans KR","Roboto",sans-serif'
+                }}
+              >
+                (주)브이아이피플러스
+              </Typography>
+            </Box>
             <Typography
-              variant="h6"
               sx={{
-                fontWeight: 700,
-                fontSize: { xs: '1rem', md: '1.2rem' },
-                color: '#212529',
-                letterSpacing: '0.5px',
-                fontFamily: '"Noto Sans KR", "Roboto", "Helvetica", "Arial", sans-serif'
+                fontSize: { xs: '1rem', md: '1.25rem' },
+                fontWeight: 800,
+                color: '#ffffff',
+                textShadow: '0 1px 2px rgba(0,0,0,0.15)',
+                letterSpacing: '0.2px'
               }}
             >
-              (주)브이아이피플러스
+              {getUnifiedTitle(slide, loggedInStore)}
             </Typography>
           </Box>
 
@@ -1417,6 +1444,33 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                 textAlign: 'left'
               }}
             >
+              <Typography
+                variant="h4"
+                sx={{
+                  fontSize: { xs: '2rem', md: '3rem' },
+                  fontWeight: 800,
+                  mb: 2,
+                  color: '#212529',
+                  letterSpacing: '-0.5px',
+                  fontFamily: '"Noto Sans KR", "Roboto", sans-serif'
+                }}
+              >
+                {slide.title || '커스텀 화면'}
+              </Typography>
+              {slide.content && (
+                <Typography
+                  variant="h6"
+                  sx={{
+                    fontSize: { xs: '1rem', md: '1.3rem' },
+                    lineHeight: 1.8,
+                    whiteSpace: 'pre-wrap',
+                    color: '#1a1a1a',
+                    mb: 3
+                  }}
+                >
+                  {slide.content}
+                </Typography>
+              )}
               {slide.imageUrl && (
                 <Box
                   component="img"
@@ -1426,7 +1480,6 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                     maxWidth: '100%',
                     maxHeight: '50vh',
                     objectFit: 'contain',
-                    mb: 3,
                     borderRadius: 2,
                     boxShadow: '0 4px 16px rgba(0,0,0,0.15)'
                   }}
@@ -1440,36 +1493,6 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                     } catch {}
                   }}
                 />
-              )}
-              <Typography
-                variant="h4"
-                sx={{
-                  fontSize: { xs: '2rem', md: '3rem' },
-                  fontWeight: 800,
-                  mb: 3,
-                  color: '#212529',
-                  letterSpacing: '-0.5px',
-                  fontFamily: '"Noto Sans KR", "Roboto", sans-serif',
-                  background: 'linear-gradient(135deg, #212529 0%, #495057 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  backgroundClip: 'text'
-                }}
-              >
-                {slide.title || '커스텀 화면'}
-              </Typography>
-              {slide.content && (
-                <Typography
-                  variant="h6"
-                  sx={{
-                    fontSize: { xs: '1rem', md: '1.3rem' },
-                    lineHeight: 1.8,
-                    whiteSpace: 'pre-wrap',
-                    color: '#1a1a1a'
-                  }}
-                >
-                  {slide.content}
-                </Typography>
               )}
             </Box>
           </Box>
@@ -1531,36 +1554,34 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             position: 'relative'
           }}
         >
-          {/* 상단: 회사 로고 및 슬라이드 제목 - 상단 전체 하얀색 배경 */}
+          {/* 상단바: 좌→우 그라데이션, 좌측 로고/회사명 + 우측 제목(흰색) */}
           <Box
             sx={{
-              display: 'flex',
-              flexDirection: 'row',
-              alignItems: 'flex-end',
-              justifyContent: 'space-between',
-              width: '100%',
-              backgroundColor: '#ffffff',
-              px: { xs: 3, md: 4 },
-              py: { xs: 2.5, md: 3 },
-              boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-              borderBottom: '1px solid rgba(0,0,0,0.05)',
               position: 'absolute',
               top: 0,
               left: 0,
               right: 0,
-              zIndex: 10
+              zIndex: 15,
+              background: 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #868e96 100%)',
+              borderBottom: '1px solid rgba(0,0,0,0.06)',
+              boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              px: { xs: 2.5, md: 4 },
+              py: { xs: 1.6, md: 2 },
+              pointerEvents: 'none'
             }}
           >
             {/* 왼쪽: 로고와 회사 이름 */}
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
               <Box
                 component="img"
                 src="/logo512.png"
                 alt="회사 로고"
                 sx={{
-                  width: { xs: 35, md: 45 },
-                  height: { xs: 35, md: 45 },
-                  mr: { xs: 1, md: 1.5 },
+                  width: { xs: 48, md: 60 },
+                  height: { xs: 48, md: 60 },
                   filter: 'brightness(0) invert(0)'
                 }}
                 onError={(e) => {
@@ -1568,37 +1589,30 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                 }}
               />
               <Typography
-                variant="h6"
                 sx={{
-                  fontWeight: 700,
-                  fontSize: { xs: '1.1rem', md: '1.3rem' },
+                  fontWeight: 800,
+                  fontSize: { xs: '1.25rem', md: '1.6rem' },
                   color: '#212529',
-                  letterSpacing: '0.5px',
-                  fontFamily: '"Noto Sans KR", "Roboto", "Helvetica", "Arial", sans-serif'
+                  letterSpacing: '0.2px',
+                  fontFamily: '"Noto Sans KR","Roboto",sans-serif'
                 }}
               >
                 (주)브이아이피플러스
               </Typography>
             </Box>
             
-            {/* 오른쪽: 세부 옵션 마지막 항목만 표시 */}
-            {lastDetailOption && (
-              <Typography
-                variant="h5"
-                sx={{
-                  fontWeight: 900,
-                  fontSize: { xs: '1.4rem', md: '1.8rem' },
-                  color: '#212529',
-                  textAlign: 'right',
-                  fontFamily: '"Noto Sans KR", "Roboto", sans-serif',
-                  letterSpacing: '0.3px',
-                  backgroundColor: 'transparent',
-                  background: 'none'
-                }}
-              >
-                {lastDetailOption}
-              </Typography>
-            )}
+            {/* 오른쪽: 통합 제목 */}
+            <Typography
+              sx={{
+                fontSize: { xs: '1rem', md: '1.25rem' },
+                fontWeight: 800,
+                color: '#ffffff',
+                textShadow: '0 1px 2px rgba(0,0,0,0.15)',
+                letterSpacing: '0.2px'
+              }}
+            >
+              {getUnifiedTitle(slide, loggedInStore)}
+            </Typography>
           </Box>
 
           {/* 중앙: 실제 콘텐츠 */}
