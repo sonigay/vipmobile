@@ -1412,6 +1412,12 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
     
     // 엔딩 슬라이드 타입
     if (slide.type === 'ending') {
+      // 회의 차수 보강: 슬라이드에 누락된 경우 전역 컨텍스트(window)에 기록된 값을 사용
+      try {
+        if (typeof window !== 'undefined' && slide.meetingNumber == null && window.__MEETING_NUMBER != null) {
+          slide.meetingNumber = window.__MEETING_NUMBER;
+        }
+      } catch {}
       const meetingDate = slide.meetingDate || '';
       const dateObj = meetingDate ? new Date(meetingDate + 'T00:00:00') : new Date();
       const formattedDate = dateObj.toLocaleDateString('ko-KR', {

@@ -48,6 +48,11 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         return s;
       });
       setSlidesState(normalized);
+      try {
+        if (typeof window !== 'undefined') {
+          window.__MEETING_NUMBER = meeting?.meetingNumber ?? normalized.find(sl=>sl.type==='main')?.meetingNumber ?? null;
+        }
+      } catch {}
     } else {
       if (process.env.NODE_ENV === 'development') {
         console.warn(`⚠️ [MeetingCaptureManager] slides가 배열이 아닙니다:`, slides);
@@ -321,7 +326,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               const headers = Array.from(document.querySelectorAll('h6, .MuiTypography-h6, .MuiBox-root, div'))
                 .filter(el => {
                   const txt = (el.textContent || '').trim();
-                  return txt.startsWith(headerText);
+                  return txt.includes(headerText);
                 });
               if (headers.length > 0) {
                 let paperElement = headers[0].parentElement;
@@ -354,13 +359,13 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             if (t === 'agent') await expandSection(tableSectionMap['agent']);
           }
           
-          const findHeader = (startsWithList) => {
+          const findHeader = (includesList) => {
             const candidates = Array.from(document.querySelectorAll('h6, .MuiTypography-h6, .MuiBox-root, div'));
             for (const el of candidates) {
               const txt = (el.textContent || '').trim();
               if (!txt) continue;
-              for (const s of (Array.isArray(startsWithList) ? startsWithList : [startsWithList])) {
-                if (txt.startsWith(s)) return el;
+              for (const s of (Array.isArray(includesList) ? includesList : [includesList])) {
+                if (txt.includes(s)) return el;
               }
             }
             return null;
@@ -626,6 +631,22 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             // 1) 테이블만 우선 캡처
             let tableOnlyBlob = null;
             try {
+              // 데이터가 실제 채워질 때까지 추가 대기 (최대 3초)
+              try {
+                const maxWait = 3000;
+                const start = Date.now();
+                while (Date.now() - start < maxWait) {
+                  const text = (tableContainer.textContent || '').replace(/\s+/g, ' ');
+                  // 숫자/한글 제조사명이 일정 개수 이상 보이면 로드 완료로 간주
+                  const hasVendors =
+                    text.includes('삼성') || text.includes('애플') || text.includes('LG') || /\d+/.test(text);
+                  // 최소 행 수 확인
+                  const rowCount = tableContainer.querySelectorAll('tbody tr').length;
+                  if (hasVendors && rowCount >= 10) break;
+                  await new Promise(r => setTimeout(r, 200));
+                }
+              } catch {}
+
               tableOnlyBlob = await captureElement(tableContainer, {
                 scale: 2,
                 useCORS: true,
@@ -703,8 +724,11 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                 const ctx = canvas.getContext('2d');
                 ctx.fillStyle = '#ffffff';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
+                // 헤더는 좌측 정렬 (보통 전체 폭)
                 ctx.drawImage(imgHeader, 0, 0);
-                ctx.drawImage(imgTable, 0, imgHeader.height + gap);
+                // 테이블을 수평 중앙 정렬
+                const tableX = Math.max(0, Math.floor((canvas.width - imgTable.width) / 2));
+                ctx.drawImage(imgTable, tableX, imgHeader.height + gap);
                 inventoryCompositeBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
               } else if (tableOnlyBlob) {
                 // 헤더를 못 찾으면 테이블만 사용
@@ -937,7 +961,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
           }
         }
 
-        // 채권장표 > 가입자증감: '년단위' 토글 + 최신 연도 선택 (이 부분은 캡처 타겟 선택에만 사용)
+        // 채권장표 > 가입자증감: '년단위' 토글 + 2025년 우선 선택 (없으면 최신) (이 부분은 캡처 타겟 선택에만 사용)
         if (
           currentSlide?.mode === 'chart' &&
           (currentSlide?.tab === 'bondChart' || currentSlide?.tab === 'bond') &&
@@ -945,11 +969,26 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         ) {
           // 1) '년단위' 토글 보장
           try {
-            const yearBtn = Array.from(document.querySelectorAll('button, [role="button"]'))
-              .find(el => (el.textContent || '').includes('년단위'));
-            if (yearBtn && yearBtn.getAttribute('aria-pressed') !== 'true') {
-              (yearBtn instanceof HTMLElement) && yearBtn.click();
-              await new Promise(r => setTimeout(r, 300));
+            const findYearToggle = () => {
+              const cands = Array.from(document.querySelectorAll('button, [role="button"], .MuiToggleButton-root, .MuiTab-root'));
+              return cands.find(el => {
+                const t = (el.textContent || '').trim();
+                return t.includes('년단위') || t.includes('년 단위') || t.includes('연단위');
+              });
+            };
+            const yearBtn = findYearToggle();
+            if (yearBtn) {
+              const pressed = yearBtn.getAttribute('aria-pressed');
+              if (pressed !== 'true') {
+                (yearBtn instanceof HTMLElement) && yearBtn.click();
+                await new Promise(r => setTimeout(r, 500));
+              }
+            } else {
+              const fallback = Array.from(document.querySelectorAll('*')).find(el => (el.textContent || '').includes('년단위'));
+              if (fallback && fallback instanceof HTMLElement) {
+                fallback.click();
+                await new Promise(r => setTimeout(r, 500));
+              }
             }
           } catch (e) {
             if (process.env.NODE_ENV === 'development') {
@@ -957,7 +996,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             }
           }
           
-          // 2) 대상 년도 선택 (더 정확한 선택)
+          // 2) 대상 년도 선택 (2025년 우선, 없으면 최신)
           let selectedYearText = '';
           try {
             // "대상 년도:" 텍스트를 찾고 그 근처의 Select 찾기
@@ -984,7 +1023,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               
               // 직접 찾기 시도
               if (!selectElement) {
-                selectElement = Array.from(document.querySelectorAll('[role="combobox"], .MuiSelect-select'))
+                selectElement = Array.from(document.querySelectorAll('[role="combobox"], .MuiSelect-select, select'))
                   .find(el => {
                     const parentText = (el.closest('.MuiFormControl-root')?.textContent || '') + 
                                      (el.parentElement?.textContent || '');
@@ -996,18 +1035,29 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                 selectElement.click();
                 await new Promise(r => setTimeout(r, 300));
                 
-                // 첫 번째 옵션 선택 (가장 최근 연도)
+                // 2025년 우선 선택, 없으면 최신(첫 번째)
                 const listbox = document.querySelector('[role="listbox"]');
                 if (listbox) {
-                  const firstOpt = listbox.querySelector('[role="option"]');
-                  if (firstOpt && firstOpt instanceof HTMLElement) {
-                    selectedYearText = (firstOpt.textContent || '').trim();
-                    firstOpt.click();
-                    await new Promise(r => setTimeout(r, 800)); // 데이터 로드 대기
-                    
+                  const options = Array.from(listbox.querySelectorAll('[role="option"], li, div'));
+                  let targetOpt = options.find(opt => (opt.textContent || '').includes('2025'));
+                  if (!targetOpt) targetOpt = options[0];
+                  if (targetOpt && targetOpt instanceof HTMLElement) {
+                    selectedYearText = (targetOpt.textContent || '').trim();
+                    targetOpt.click();
+                    await new Promise(r => setTimeout(r, 1000)); // 데이터 로드 대기
                     if (process.env.NODE_ENV === 'development') {
                       console.log(`✅ [MeetingCaptureManager] 가입자증감 연도 선택 완료: ${selectedYearText}`);
                     }
+                  }
+                } else if (selectElement.tagName.toLowerCase() === 'select') {
+                  const opts = Array.from(selectElement.querySelectorAll('option'));
+                  let target = opts.find(o => (o.textContent || '').includes('2025'));
+                  if (!target) target = opts[0];
+                  if (target) {
+                    selectElement.value = target.value;
+                    selectElement.dispatchEvent(new Event('change', { bubbles: true }));
+                    selectedYearText = (target.textContent || '').trim();
+                    await new Promise(r => setTimeout(r, 1000));
                   }
                 }
               } else {
@@ -1021,6 +1071,18 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               console.warn('⚠️ [MeetingCaptureManager] 연도 선택 중 경고:', e?.message);
             }
           }
+
+          // 3) 페이지 텍스트에 선택 연도(또는 2025)가 나타날 때까지 대기
+          try {
+            const want = (selectedYearText && /\d{4}/.test(selectedYearText)) ? selectedYearText.match(/\d{4}/)[0] : '2025';
+            const maxWait = 4000;
+            const start = Date.now();
+            while (Date.now() - start < maxWait) {
+              const pageText = (document.body.textContent || '').replace(/\s+/g, ' ');
+              if (pageText.includes(want)) break;
+              await new Promise(r => setTimeout(r, 200));
+            }
+          } catch {}
           
           // 이 부분은 캡처 타겟 선택에만 사용 (실제 캡처는 아래 compositeBlob 부분에서 처리)
           // captureTargetElement는 아래에서 설정하지 않음 (compositeBlob 사용)
@@ -1494,7 +1556,8 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         ? '#ffffff' // 배경색은 그라데이션이므로 흰색으로 설정
         : '#ffffff';
         
-      const blob = monthlyAwardCompositeBlob || inventoryCompositeBlob || compositeBlob || await captureElement(captureTargetElement, {
+      // 최종 Blob 결정
+      let blob = monthlyAwardCompositeBlob || inventoryCompositeBlob || compositeBlob || await captureElement(captureTargetElement, {
         scale: 2,
         useCORS: true,
         fixedBottomPaddingPx: 96,
@@ -1503,6 +1566,29 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         scrollX: 0,
         scrollY: 0
       });
+
+      // 안전 장치: 어떤 경로로 오든 하단 여백이 보장되도록 최종 한 번 더 패딩 적용
+      // (합성(canvas.toBlob)로 생성된 compositeBlob 경로는 fixedBottomPaddingPx가 적용되지 않을 수 있음)
+      try {
+        const ensureBottomPadding = async (srcBlob, padding = 96) => {
+          if (!srcBlob || padding <= 0) return srcBlob;
+          const img = await blobToImage(srcBlob);
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height + padding;
+          const ctx = canvas.getContext('2d');
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0);
+          return await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+        };
+        blob = await ensureBottomPadding(blob, 96);
+      } catch (e) {
+        // 패딩 보강 실패 시 원본 blob 사용
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('⚠️ [MeetingCaptureManager] 하단 여백 보강 실패, 원본 사용:', e?.message);
+        }
+      }
       // 임시 배지 제거
       try {
         if (captureTargetElement && captureTargetElement.__tempTsBadge) {

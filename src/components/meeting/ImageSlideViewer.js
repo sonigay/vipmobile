@@ -138,6 +138,7 @@ function ImageSlideViewer({ slides, onClose }) {
   }
 
   const currentSlide = slides[currentIndex];
+  const isVideo = !!currentSlide?.videoUrl;
 
   return (
     <Box
@@ -276,7 +277,7 @@ function ImageSlideViewer({ slides, onClose }) {
         </Typography>
       </Box>
 
-      {/* 이미지 표시 - 모바일 확대/축소 지원 */}
+      {/* 이미지/비디오 표시 */}
       {loading && !loadedImages.has(currentIndex) ? (
         <CircularProgress sx={{ color: 'white' }} />
       ) : error ? (
@@ -298,11 +299,13 @@ function ImageSlideViewer({ slides, onClose }) {
           }}
           onWheel={(e) => {
             // 데스크톱: 마우스 휠로 확대/축소
+            if (isVideo) return;
             e.preventDefault();
             const delta = e.deltaY > 0 ? -0.1 : 0.1;
             setScale(prev => Math.max(0.5, Math.min(3, prev + delta)));
           }}
           onTouchStart={(e) => {
+            if (isVideo) return;
             // 모바일: 두 손가락 핀치 제스처
             if (e.touches.length === 2) {
               const touch1 = e.touches[0];
@@ -322,6 +325,7 @@ function ImageSlideViewer({ slides, onClose }) {
             }
           }}
           onTouchMove={(e) => {
+            if (isVideo) return;
             e.preventDefault();
             if (e.touches.length === 2) {
               // 핀치 제스처
@@ -345,35 +349,52 @@ function ImageSlideViewer({ slides, onClose }) {
             setIsDragging(false);
           }}
         >
-          <Box
-            ref={imageRef}
-            component="img"
-            src={getProxyImageUrl(currentSlide.imageUrl)}
-            alt={`슬라이드 ${currentIndex + 1}`}
-            loading={loadedImages.has(currentIndex) ? 'eager' : 'lazy'} // lazy loading 지원
-            sx={{
-              maxWidth: '100%',
-              maxHeight: '100%',
-              width: 'auto',
-              height: 'auto',
-              objectFit: 'contain',
-              opacity: loadedImages.has(currentIndex) ? 1 : 0.5,
-              transition: scale !== 1 ? 'none' : 'opacity 0.3s',
-              display: 'block',
-              transform: `scale(${scale}) translate(${position.x / scale}px, ${position.y / scale}px)`,
-              transformOrigin: 'center center',
-              userSelect: 'none',
-              WebkitUserSelect: 'none',
-              touchAction: 'none'
-            }}
-            onError={() => setError('이미지를 불러올 수 없습니다.')}
-            onLoad={() => {
-              // 이미지 로드 시 초기화 및 로드 상태 업데이트
-              setLoadedImages(prev => new Set([...prev, currentIndex]));
-              setScale(1);
-              setPosition({ x: 0, y: 0 });
-            }}
-          />
+          {isVideo ? (
+            <Box
+              component="video"
+              src={currentSlide.videoUrl}
+              controls
+              autoPlay
+              sx={{
+                maxWidth: '95%',
+                maxHeight: '95%',
+                borderRadius: 1,
+                boxShadow: '0 4px 24px rgba(0,0,0,0.6)',
+                outline: 'none'
+              }}
+              poster={currentSlide.imageUrl ? getProxyImageUrl(currentSlide.imageUrl) : undefined}
+            />
+          ) : (
+            <Box
+              ref={imageRef}
+              component="img"
+              src={getProxyImageUrl(currentSlide.imageUrl)}
+              alt={`슬라이드 ${currentIndex + 1}`}
+              loading={loadedImages.has(currentIndex) ? 'eager' : 'lazy'} // lazy loading 지원
+              sx={{
+                maxWidth: '100%',
+                maxHeight: '100%',
+                width: 'auto',
+                height: 'auto',
+                objectFit: 'contain',
+                opacity: loadedImages.has(currentIndex) ? 1 : 0.5,
+                transition: scale !== 1 ? 'none' : 'opacity 0.3s',
+                display: 'block',
+                transform: `scale(${scale}) translate(${position.x / scale}px, ${position.y / scale}px)`,
+                transformOrigin: 'center center',
+                userSelect: 'none',
+                WebkitUserSelect: 'none',
+                touchAction: 'none'
+              }}
+              onError={() => setError('이미지를 불러올 수 없습니다.')}
+              onLoad={() => {
+                // 이미지 로드 시 초기화 및 로드 상태 업데이트
+                setLoadedImages(prev => new Set([...prev, currentIndex]));
+                setScale(1);
+                setPosition({ x: 0, y: 0 });
+              }}
+            />
+          )}
         </Box>
       )}
       
@@ -389,7 +410,7 @@ function ImageSlideViewer({ slides, onClose }) {
           zIndex: 10002
         }}
       >
-        <IconButton
+        {!isVideo && <IconButton
           onClick={(e) => {
             e.stopPropagation();
             setScale(prev => Math.max(0.5, prev - 0.2));
@@ -401,8 +422,8 @@ function ImageSlideViewer({ slides, onClose }) {
           }}
         >
           <Typography variant="h6">−</Typography>
-        </IconButton>
-        <IconButton
+        </IconButton>}
+        {!isVideo && <IconButton
           onClick={(e) => {
             e.stopPropagation();
             setScale(1);
@@ -415,8 +436,8 @@ function ImageSlideViewer({ slides, onClose }) {
           }}
         >
           <Typography variant="body2">리셋</Typography>
-        </IconButton>
-        <IconButton
+        </IconButton>}
+        {!isVideo && <IconButton
           onClick={(e) => {
             e.stopPropagation();
             setScale(prev => Math.min(3, prev + 0.2));
@@ -428,7 +449,7 @@ function ImageSlideViewer({ slides, onClose }) {
           }}
         >
           <Typography variant="h6">+</Typography>
-        </IconButton>
+        </IconButton>}
       </Box>
     </Box>
   );
