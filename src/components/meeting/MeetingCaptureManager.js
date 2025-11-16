@@ -270,6 +270,62 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
       // 메인/목차는 헤더 포함 전체 슬라이드를 캡처 (공백은 autoCropCanvas로 처리)
       let captureTargetElement = slideElement;
       try {
+        // 전체총마감 슬라이드: 모든 섹션 펼치기 및 전체 슬라이드 캡처
+        if (currentSlide?.mode === 'chart' && currentSlide?.tab === 'closingChart' && currentSlide?.subTab === 'totalClosing') {
+          // 모든 "펼치기" 버튼 클릭
+          const expandButtons = Array.from(document.querySelectorAll('button, .MuiButton-root'))
+            .filter(btn => {
+              const text = (btn.textContent || '').trim();
+              return text === '펼치기';
+            });
+          
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`✅ [MeetingCaptureManager] 전체총마감: ${expandButtons.length}개의 펼치기 버튼 발견`);
+          }
+          
+          // 모든 펼치기 버튼 클릭
+          for (const btn of expandButtons) {
+            btn.click();
+            await new Promise(r => setTimeout(r, 300));
+          }
+          
+          // 모든 섹션이 펼쳐질 때까지 대기
+          await new Promise(r => setTimeout(r, 1500));
+          
+          // 테이블이 렌더링될 때까지 추가 대기
+          let tableCount = 0;
+          let attempts = 0;
+          while (attempts < 30) {
+            tableCount = slideElement.querySelectorAll('.MuiTableContainer-root').length;
+            if (tableCount >= 5) break; // 최소 5개 테이블이 있어야 함
+            await new Promise(r => setTimeout(r, 200));
+            attempts++;
+          }
+          
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`✅ [MeetingCaptureManager] 전체총마감: ${tableCount}개 테이블 발견, 전체 슬라이드 캡처`);
+          }
+          
+          // 전체 슬라이드 캡처
+          captureTargetElement = slideElement;
+          
+          // 타겟 가시성/높이 확보까지 대기
+          const ensureVisible = async (el) => {
+            if (!el || !(el instanceof HTMLElement)) return;
+            el.scrollIntoView({ block: 'start', behavior: 'instant' });
+            const maxWait = 3000;
+            const start = Date.now();
+            while (Date.now() - start < maxWait) {
+              const rect = el.getBoundingClientRect();
+              const hasSize = rect.height > 200 && rect.width > 200;
+              const hasTables = el.querySelectorAll('.MuiTableContainer-root').length >= 5;
+              if (hasSize && hasTables) break;
+              await new Promise(r => setTimeout(r, 200));
+            }
+          };
+          await ensureVisible(captureTargetElement);
+        }
+        
         // csDetailType: 단일 값 또는 배열(복수 결합) 지원
         const csDetailTypeRaw = currentSlide?.detailOptions?.csDetailType;
         const csDetailTypes = Array.isArray(csDetailTypeRaw)
@@ -1394,12 +1450,26 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             tablePaper.scrollIntoView({ block: 'center', behavior: 'instant' });
             await new Promise(r => setTimeout(r, 500));
             
+            // 가로 스크롤이 있는 경우 끝까지 스크롤하여 전체 데이터 캡처
+            const tableContainer = tablePaper.querySelector('.MuiTableContainer-root, [style*="overflow"]');
+            if (tableContainer && tableContainer.scrollWidth > tableContainer.clientWidth) {
+              // 오른쪽 끝까지 스크롤
+              tableContainer.scrollLeft = tableContainer.scrollWidth;
+              await new Promise(r => setTimeout(r, 300));
+              // 다시 왼쪽 끝으로 스크롤 (전체 렌더링 보장)
+              tableContainer.scrollLeft = 0;
+              await new Promise(r => setTimeout(r, 300));
+              // 다시 오른쪽 끝으로 스크롤하여 12월까지 보이도록
+              tableContainer.scrollLeft = tableContainer.scrollWidth;
+              await new Promise(r => setTimeout(r, 300));
+            }
+            
             tableBlob = await captureElement(tablePaper, {
               scale: 2,
               useCORS: true,
               fixedBottomPaddingPx: 96,
               backgroundColor: '#ffffff',
-              scrollX: 0,
+              scrollX: tableContainer ? tableContainer.scrollLeft : 0,
               scrollY: 0
             });
             
@@ -1485,22 +1555,43 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             // 안전을 위해 항상 개별 캡처 후 합성 (조상 캡처 시 월별 테이블이 포함될 수 있음)
             subscriberChartPaper.scrollIntoView({ block: 'center', behavior: 'instant' });
             await new Promise(r => setTimeout(r, 500));
+            
+            // 가입자수 추이 그래프의 가로 스크롤 처리
+            const chart1Container = subscriberChartPaper.querySelector('.MuiTableContainer-root, [style*="overflow"], .recharts-wrapper');
+            let chart1ScrollX = 0;
+            if (chart1Container && chart1Container.scrollWidth > chart1Container.clientWidth) {
+              chart1Container.scrollLeft = chart1Container.scrollWidth;
+              await new Promise(r => setTimeout(r, 300));
+              chart1ScrollX = chart1Container.scrollLeft;
+            }
+            
             const chart1Blob = await captureElement(subscriberChartPaper, {
               scale: 2,
               useCORS: true,
               fixedBottomPaddingPx: 96,
               backgroundColor: '#ffffff',
-              scrollX: 0,
+              scrollX: chart1ScrollX,
               scrollY: 0
             });
+            
             feeChartPaper.scrollIntoView({ block: 'center', behavior: 'instant' });
             await new Promise(r => setTimeout(r, 500));
+            
+            // 관리수수료 추이 그래프의 가로 스크롤 처리
+            const chart2Container = feeChartPaper.querySelector('.MuiTableContainer-root, [style*="overflow"], .recharts-wrapper');
+            let chart2ScrollX = 0;
+            if (chart2Container && chart2Container.scrollWidth > chart2Container.clientWidth) {
+              chart2Container.scrollLeft = chart2Container.scrollWidth;
+              await new Promise(r => setTimeout(r, 300));
+              chart2ScrollX = chart2Container.scrollLeft;
+            }
+            
             const chart2Blob = await captureElement(feeChartPaper, {
               scale: 2,
               useCORS: true,
               fixedBottomPaddingPx: 96,
               backgroundColor: '#ffffff',
-              scrollX: 0,
+              scrollX: chart2ScrollX,
               scrollY: 0
             });
             const img1 = await blobToImage(chart1Blob);

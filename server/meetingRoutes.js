@@ -461,13 +461,13 @@ async function getMeetingConfig(req, res) {
     const { meetingId } = req.params;
     const sheetName = '회의설정';
 
-    // 시트 헤더 확인 (tabLabel, subTabLabel, 세부항목옵션 컬럼 추가)
+    // 시트 헤더 확인 (tabLabel, subTabLabel, 세부항목옵션, videoUrl 컬럼 추가)
     await ensureSheetHeaders(sheets, SPREADSHEET_ID, sheetName, [
-      '회의ID', '슬라이드ID', '순서', '타입', '모드', '탭', '제목', '내용', '배경색', '이미지URL', '캡처시간', 'Discord포스트ID', 'Discord스레드ID', '탭라벨', '서브탭라벨', '세부항목옵션', '회의날짜', '회의차수', '회의장소', '참석자', '생성자'
+      '회의ID', '슬라이드ID', '순서', '타입', '모드', '탭', '제목', '내용', '배경색', '이미지URL', '동영상URL', '캡처시간', 'Discord포스트ID', 'Discord스레드ID', '탭라벨', '서브탭라벨', '세부항목옵션', '회의날짜', '회의차수', '회의장소', '참석자', '생성자'
     ]);
 
-    // 데이터 조회 (tabLabel, subTabLabel, 세부항목옵션 컬럼 포함)
-    const range = `${sheetName}!A3:U`;
+    // 데이터 조회 (tabLabel, subTabLabel, 세부항목옵션, videoUrl 컬럼 포함)
+    const range = `${sheetName}!A3:V`;
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
       range
@@ -492,22 +492,23 @@ async function getMeetingConfig(req, res) {
           mode: row[4] || '',
           tab: tab || '',
           subTab: subTab || '',
-          tabLabel: row[13] || '', // 탭라벨
-          subTabLabel: row[14] || '', // 서브탭라벨
-          detailLabel: row[15] || '', // 세부항목옵션
+          tabLabel: row[14] || '', // 탭라벨
+          subTabLabel: row[15] || '', // 서브탭라벨
+          detailLabel: row[16] || '', // 세부항목옵션
           title: row[6] || '',
           content: row[7] || '',
           backgroundColor: row[8] || '#ffffff',
           imageUrl: row[9] || '',
-          capturedAt: row[10] || '',
-          discordPostId: row[11] || '',
-          discordThreadId: row[12] || '',
+          videoUrl: row[10] || '',
+          capturedAt: row[11] || '',
+          discordPostId: row[12] || '',
+          discordThreadId: row[13] || '',
           // 메인 슬라이드 필드 (있으면 사용) - 인덱스 조정 필요
-          meetingDate: row[16] || '',
-          meetingNumber: row[17] ? parseInt(row[17]) : undefined,
-          meetingLocation: row[18] || '',
-          participants: row[19] || '',
-          createdBy: row[20] || ''
+          meetingDate: row[17] || '',
+          meetingNumber: row[18] ? parseInt(row[18]) : undefined,
+          meetingLocation: row[19] || '',
+          participants: row[20] || '',
+          createdBy: row[21] || ''
         };
         
         console.log(`📖 [getMeetingConfig] 슬라이드 ${idx + 1}:`, {
@@ -586,13 +587,13 @@ async function saveMeetingConfig(req, res) {
       return res.status(400).json({ success: false, error: '슬라이드 배열이 필요합니다.' });
     }
 
-    // 시트 헤더 확인 (tabLabel, subTabLabel, 세부항목옵션 컬럼 추가)
+    // 시트 헤더 확인 (tabLabel, subTabLabel, 세부항목옵션, videoUrl 컬럼 추가)
     await ensureSheetHeaders(sheets, SPREADSHEET_ID, sheetName, [
-      '회의ID', '슬라이드ID', '순서', '타입', '모드', '탭', '제목', '내용', '배경색', '이미지URL', '캡처시간', 'Discord포스트ID', 'Discord스레드ID', '탭라벨', '서브탭라벨', '세부항목옵션', '회의날짜', '회의차수', '회의장소', '참석자', '생성자'
+      '회의ID', '슬라이드ID', '순서', '타입', '모드', '탭', '제목', '내용', '배경색', '이미지URL', '동영상URL', '캡처시간', 'Discord포스트ID', 'Discord스레드ID', '탭라벨', '서브탭라벨', '세부항목옵션', '회의날짜', '회의차수', '회의장소', '참석자', '생성자'
     ]);
 
-    // 기존 데이터 조회 (메인 슬라이드 필드 및 tabLabel, subTabLabel, 세부항목옵션 포함, 재시도 포함)
-    const range = `${sheetName}!A3:U`;
+    // 기존 데이터 조회 (메인 슬라이드 필드 및 tabLabel, subTabLabel, 세부항목옵션, videoUrl 포함, 재시도 포함)
+    const range = `${sheetName}!A3:V`;
     const response = await retrySheetsOperation(async () => {
       return await sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
@@ -688,14 +689,16 @@ async function saveMeetingConfig(req, res) {
       const slideType = typeof slide.type === 'string' ? slide.type : 'mode-tab';
       const slideMode = typeof slide.mode === 'string' ? slide.mode : '';
 
-      // 기존 행이 있는 경우, imageUrl/캡처시간/Discord ID가 비어 있으면 기존 값을 보존
+      // 기존 행이 있는 경우, imageUrl/videoUrl/캡처시간/Discord ID가 비어 있으면 기존 값을 보존
       const existingRow = existingRowIndex !== -1 ? existingRows[existingRowIndex] : null;
       const existingImageUrl = existingRow ? (existingRow[9] || '') : '';
-      const existingCapturedAt = existingRow ? (existingRow[10] || '') : '';
-      const existingDiscordPostId = existingRow ? (existingRow[11] || '') : '';
-      const existingDiscordThreadId = existingRow ? (existingRow[12] || '') : '';
+      const existingVideoUrl = existingRow ? (existingRow[10] || '') : '';
+      const existingCapturedAt = existingRow ? (existingRow[11] || '') : '';
+      const existingDiscordPostId = existingRow ? (existingRow[12] || '') : '';
+      const existingDiscordThreadId = existingRow ? (existingRow[13] || '') : '';
 
       const incomingImageUrl = slide.imageUrl && slide.imageUrl !== '없음' ? slide.imageUrl : '';
+      const incomingVideoUrl = slide.videoUrl && slide.videoUrl !== '없음' ? slide.videoUrl : '';
       const incomingCapturedAt = slide.capturedAt || '';
       const incomingDiscordPostId = slide.discordPostId && slide.discordPostId !== '없음' ? slide.discordPostId : '';
       const incomingDiscordThreadId = slide.discordThreadId && slide.discordThreadId !== '없음' ? slide.discordThreadId : '';
@@ -703,6 +706,9 @@ async function saveMeetingConfig(req, res) {
       const mergedImageUrl =
         incomingImageUrl ||
         (existingImageUrl && existingImageUrl !== '없음' ? existingImageUrl : '');
+      const mergedVideoUrl =
+        incomingVideoUrl ||
+        (existingVideoUrl && existingVideoUrl !== '없음' ? existingVideoUrl : '');
       const mergedCapturedAt = incomingCapturedAt || existingCapturedAt;
       const mergedDiscordPostId =
         incomingDiscordPostId ||
@@ -722,6 +728,7 @@ async function saveMeetingConfig(req, res) {
         slide.content || '',
         slide.backgroundColor || '#ffffff',
         mergedImageUrl,
+        mergedVideoUrl,
         mergedCapturedAt,
         mergedDiscordPostId,
         mergedDiscordThreadId,
@@ -736,8 +743,8 @@ async function saveMeetingConfig(req, res) {
       ];
 
       if (existingRowIndex !== -1) {
-        // 기존 슬라이드 업데이트 (메인 슬라이드 필드 및 tabLabel, subTabLabel, 세부항목옵션 포함, 재시도 포함)
-        const updateRange = `${sheetName}!A${existingRowIndex + 3}:U${existingRowIndex + 3}`;
+        // 기존 슬라이드 업데이트 (메인 슬라이드 필드 및 tabLabel, subTabLabel, 세부항목옵션, videoUrl 포함, 재시도 포함)
+        const updateRange = `${sheetName}!A${existingRowIndex + 3}:V${existingRowIndex + 3}`;
         console.log(`📝 [saveMeetingConfig] 기존 슬라이드 업데이트 시작: 범위 ${updateRange}`);
         const updateResult = await retrySheetsOperation(async () => {
           return await sheets.spreadsheets.values.update({
@@ -1767,6 +1774,55 @@ async function convertPPTToImages(pptBuffer, filename) {
     let browser;
     if (!global.pptBrowser) {
       try {
+        // Chrome 경로 찾기 (여러 경로 시도)
+        let chromePath = process.env.PUPPETEER_EXECUTABLE_PATH || process.env.CHROME_PATH || null;
+        if (!chromePath) {
+          try {
+            const { executablePath } = require('puppeteer');
+            chromePath = executablePath();
+            console.log(`✅ [PPT 변환] Puppeteer 기본 Chrome 경로 발견: ${chromePath}`);
+          } catch (e) {
+            console.warn('⚠️ [PPT 변환] Puppeteer 기본 executablePath 탐색 실패:', e.message);
+            // 추가 경로 시도
+            const fs = require('fs');
+            const os = require('os');
+            const path = require('path');
+            const possiblePaths = [
+              '/usr/bin/google-chrome',
+              '/usr/bin/chromium-browser',
+              '/usr/bin/chromium',
+              '/opt/google/chrome/chrome',
+              '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+            ];
+            // Puppeteer 캐시 디렉토리도 확인
+            const puppeteerCacheDir = process.env.PUPPETEER_CACHE_DIR || path.join(os.homedir(), '.cache', 'puppeteer');
+            const chromeDir = path.join(puppeteerCacheDir, 'chrome');
+            if (fs.existsSync(chromeDir)) {
+              const versions = fs.readdirSync(chromeDir);
+              for (const version of versions) {
+                const chromePathCandidate = path.join(chromeDir, version, 'chrome-linux64', 'chrome');
+                if (fs.existsSync(chromePathCandidate)) {
+                  chromePath = chromePathCandidate;
+                  console.log(`✅ [PPT 변환] Puppeteer 캐시에서 Chrome 발견: ${chromePath}`);
+                  break;
+                }
+              }
+            }
+            // 시스템 경로 확인
+            if (!chromePath) {
+              for (const p of possiblePaths) {
+                if (fs.existsSync(p)) {
+                  chromePath = p;
+                  console.log(`✅ [PPT 변환] 시스템 Chrome 경로 발견: ${chromePath}`);
+                  break;
+                }
+              }
+            }
+          }
+        } else {
+          console.log(`✅ [PPT 변환] 환경 변수에서 Chrome 경로 사용: ${chromePath}`);
+        }
+        
         // Puppeteer 설정: Chrome 자동 다운로드 허용
         const launchOptions = {
           headless: true,
@@ -1779,13 +1835,13 @@ async function convertPPTToImages(pptBuffer, filename) {
           ]
         };
         
-        // 환경 변수로 Chrome 경로가 지정된 경우에만 사용
-        // 지정되지 않으면 Puppeteer가 자동으로 Chrome을 다운로드
-        if (process.env.PUPPETEER_EXECUTABLE_PATH) {
-          launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+        if (chromePath) {
+          launchOptions.executablePath = chromePath;
+        } else {
+          console.warn('⚠️ [PPT 변환] Chrome 경로를 찾을 수 없습니다. Puppeteer가 자동으로 다운로드할 수 있습니다.');
         }
         
-        console.log('🚀 [PPT 변환] Puppeteer 브라우저 실행 시도...');
+        console.log(`🚀 [PPT 변환] Puppeteer 브라우저 실행 시도... (Chrome: ${chromePath || '자동'})`);
         global.pptBrowser = await puppeteer.launch(launchOptions);
         console.log('✅ [PPT 변환] Puppeteer 브라우저 실행 성공');
       } catch (launchError) {
@@ -2413,18 +2469,52 @@ async function uploadCustomSlideFile(req, res) {
 
         // 2) LibreOffice 경로가 실패하면 기존 HTML→Puppeteer → Canvas 폴백으로 진행
         if (imageBuffers.length === 0) {
+          console.log('📊 [Excel 변환] HTML→Puppeteer 파이프라인 시작 (한글 지원)');
           // 먼저 HTML로 변환 시도 (기존 로직)
         const workbook = new ExcelJS.Workbook();
         await workbook.xlsx.load(file.buffer);
+        console.log(`📊 [Excel 변환] Excel 파일 로드 완료: ${workbook.worksheets.length}개 시트`);
         
         const imageBuffersFromHTML = [];
         for (let i = 0; i < workbook.worksheets.length; i++) {
           const worksheet = workbook.worksheets[i];
+          const sheetName = worksheet.name || `Sheet${i + 1}`;
+          console.log(`📊 [Excel 변환] 시트 "${sheetName}" HTML 변환 중...`);
           const html = convertExcelToHTML(worksheet);
           
           // Puppeteer로 HTML을 이미지로 변환 (한글 폰트 확실히 로드)
           try {
             const puppeteer = require('puppeteer');
+            
+            // Chrome 경로 찾기 (여러 경로 시도)
+            let chromePath = process.env.PUPPETEER_EXECUTABLE_PATH || process.env.CHROME_PATH || null;
+            if (!chromePath) {
+              try {
+                const { executablePath } = require('puppeteer');
+                chromePath = executablePath();
+                console.log(`✅ [Excel 변환] Puppeteer 기본 Chrome 경로 발견: ${chromePath}`);
+              } catch (e) {
+                console.warn('⚠️ [Excel 변환] Puppeteer 기본 executablePath 탐색 실패:', e.message);
+                // 추가 경로 시도
+                const fs = require('fs');
+                const possiblePaths = [
+                  '/usr/bin/google-chrome',
+                  '/usr/bin/chromium-browser',
+                  '/usr/bin/chromium',
+                  '/opt/google/chrome/chrome',
+                  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+                ];
+                for (const p of possiblePaths) {
+                  if (fs.existsSync(p)) {
+                    chromePath = p;
+                    console.log(`✅ [Excel 변환] 시스템 Chrome 경로 발견: ${chromePath}`);
+                    break;
+                  }
+                }
+              }
+            } else {
+              console.log(`✅ [Excel 변환] 환경 변수에서 Chrome 경로 사용: ${chromePath}`);
+            }
             
             // Puppeteer 설정: Chrome 자동 다운로드 허용
             const launchOptions = {
@@ -2440,12 +2530,15 @@ async function uploadCustomSlideFile(req, res) {
               ]
             };
             
-            // 환경 변수로 Chrome 경로가 지정된 경우에만 사용
-            if (process.env.PUPPETEER_EXECUTABLE_PATH) {
-              launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+            if (chromePath) {
+              launchOptions.executablePath = chromePath;
+            } else {
+              console.warn('⚠️ [Excel 변환] Chrome 경로를 찾을 수 없습니다. Puppeteer가 자동으로 다운로드할 수 있습니다.');
             }
             
+            console.log(`🚀 [Excel 변환] Puppeteer 브라우저 실행 시도... (Chrome: ${chromePath || '자동'})`);
             const browser = await puppeteer.launch(launchOptions);
+            console.log(`✅ [Excel 변환] Puppeteer 브라우저 실행 성공`);
             const page = await browser.newPage();
             
             // 뷰포트 설정 (한글 렌더링 개선)
@@ -2540,6 +2633,7 @@ async function uploadCustomSlideFile(req, res) {
             
             // Excel 변환 이미지도 자동 크롭 처리
             const croppedResult = await autoCropImage(screenshot);
+            console.log(`✅ [Excel 변환] 시트 "${sheetName}" Puppeteer 변환 완료 (크기: ${croppedResult.croppedWidth}x${croppedResult.croppedHeight})`);
             imageBuffersFromHTML.push({
               buffer: croppedResult.buffer,
               filename: `${file.originalname || 'excel'}_${worksheet.name}.png`,
@@ -2552,7 +2646,9 @@ async function uploadCustomSlideFile(req, res) {
               }
             });
           } catch (puppeteerError) {
-            console.warn('⚠️ [Excel 변환] Puppeteer 변환 실패, Canvas로 재시도:', puppeteerError.message);
+            console.error('❌ [Excel 변환] Puppeteer 변환 실패:', puppeteerError.message);
+            console.error('❌ [Excel 변환] 스택:', puppeteerError.stack);
+            console.warn('⚠️ [Excel 변환] Canvas로 재시도...');
             // Puppeteer 실패 시 Canvas로 폴백
             const canvasImages = await convertExcelToImages(file.buffer, file.originalname || 'excel');
             // Canvas로 변환된 이미지들도 자동 크롭 처리

@@ -66,8 +66,8 @@ const CHART_TABS = [
             {
               key: 'bondHistoryTimestamp',
               label: '저장 시점 (선택 안하면 최신)',
-              type: 'text',
-              placeholder: '예: 2025-11-16 12:30',
+              type: 'select',
+              values: [], // 동적으로 로드됨 (MeetingEditor에서 처리)
               defaultValue: ''
             }
           ]
