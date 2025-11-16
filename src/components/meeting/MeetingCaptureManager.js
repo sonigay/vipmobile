@@ -556,7 +556,29 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         if (process.env.NODE_ENV === 'development') {
           console.log(`💾 [MeetingCaptureManager] 슬라이드 ${index + 1} 저장 시작, 검증된 슬라이드 수: ${validatedSlides.length}`);
         }
-        await api.saveMeetingConfig(meeting.meetingId, {
+        // 저장 재시도 래퍼
+        const saveWithRetry = async (payload, retries = 3, baseDelay = 800) => {
+          let lastErr = null;
+          for (let attempt = 1; attempt <= retries; attempt++) {
+            try {
+              return await api.saveMeetingConfig(meeting.meetingId, payload);
+            } catch (e) {
+              lastErr = e;
+              // 5xx 또는 네트워크 계열만 백오프 재시도
+              const msg = (e && e.message) ? e.message : '';
+              const isNetworkOr5xx = /Failed to fetch|network|5\d\d|서버 오류|저장 실패/i.test(msg);
+              if (attempt === retries || !isNetworkOr5xx) break;
+              const delay = baseDelay * Math.pow(2, attempt - 1);
+              if (process.env.NODE_ENV === 'development') {
+                console.warn(`⚠️ [MeetingCaptureManager] 슬라이드 저장 재시도 ${attempt}/${retries} (${delay}ms 대기):`, msg);
+              }
+              await new Promise(r => setTimeout(r, delay));
+            }
+          }
+          throw lastErr || new Error('회의 설정 저장 실패');
+        };
+
+        await saveWithRetry({
           slides: validatedSlides
         });
         if (process.env.NODE_ENV === 'development') {
@@ -654,12 +676,21 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               return slide;
             });
             
-            // 비동기로 저장 (await 없이)
-            api.saveMeetingConfig(meeting.meetingId, {
-              slides: validatedSlides
-            }).catch(err => {
-              console.error(`❌ [MeetingCaptureManager] 슬라이드 상태 저장 실패:`, err);
-            });
+            // 비동기로 저장 (await 없이) + 간단 재시도
+            (async () => {
+              const max = 3;
+              for (let a = 1; a <= max; a++) {
+                try {
+                  await api.saveMeetingConfig(meeting.meetingId, { slides: validatedSlides });
+                  break;
+                } catch (err) {
+                  const delay = 600 * Math.pow(2, a - 1);
+                  console.error(`❌ [MeetingCaptureManager] 슬라이드 상태 저장 실패 (재시도 ${a}/${max}):`, err?.message || err);
+                  if (a === max) break;
+                  await new Promise(r => setTimeout(r, delay));
+                }
+              }
+            })();
             
             return prevSlides;
           });

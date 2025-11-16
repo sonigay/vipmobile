@@ -85,8 +85,8 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
   const [contentReady, setContentReady] = useState(false);
   useEffect(() => {
     // slide가 변경되면 완전히 리셋
-    if (process.env.NODE_ENV === 'development' && slide) {
-      console.log('🔍 [SlideRenderer] 슬라이드 렌더링 시작:', {
+    if (slide) {
+      logger.debug('🔍 [SlideRenderer] 슬라이드 렌더링 시작', {
         slideId: slide.slideId,
         mode: slide.mode,
         tab: slide.tab,
@@ -98,18 +98,18 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
     setContentReady(false);
     setError(null);
     
-    // 모드별 최소 대기 시간 설정 (초)
+    // 모드별 최소 대기 시간 설정 (초) - 빠른 시작을 위해 단축
     const getModeWaitTime = () => {
       if (!slide || !slide.mode) return 5; // 기본값: 5초
       
       // 모드별 대기 시간 설정
       const modeWaitTimes = {
-        'chart': 20, // 마감장표: 20초 (데이터가 많음)
-        'inventoryChart': 15, // 재고장표: 15초
-        'custom': 5, // 커스텀: 5초
-        'main': 2, // 메인 슬라이드: 2초
-        'toc': 2, // 목차: 2초
-        'ending': 2 // 엔딩: 2초
+        'chart': 12, // 마감장표: 12초
+        'inventoryChart': 10, // 재고장표: 10초
+        'custom': 2, // 커스텀: 2초
+        'main': 1, // 메인 슬라이드: 1초
+        'toc': 1, // 목차: 1초
+        'ending': 1 // 엔딩: 1초
       };
       // 특정 상세옵션(코드별 실적)은 로딩이 길어 추가 여유를 준다
       const isCodeDetail =
@@ -117,20 +117,21 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
         (slide?.tab === 'closingChart' || slide?.tab === 'closing') &&
         (slide?.subTab === 'totalClosing' || !slide?.subTab) &&
         slide?.detailOptions?.csDetailType === 'code';
-      const base = modeWaitTimes[slide.mode] || modeWaitTimes[slide.type] || 10;
-      return isCodeDetail ? base + 10 : base; // 코드별 실적은 +10초
+      const base = modeWaitTimes[slide.mode] || modeWaitTimes[slide.type] || 6;
+      return isCodeDetail ? base + 8 : base; // 코드별 실적은 +8초
     };
     
     const modeWaitTime = getModeWaitTime();
-    const requiredStableCount = Math.max(10, Math.floor(modeWaitTime * 5)); // 모드별 안정성 확인 횟수 (0.2초 간격)
-    // 최대 대기 시간(밀리초) - 코드별 실적은 45초로 확대
+    // 안정성 확인 횟수 감소 (체크 간격을 늘리는 대신 횟수 절감)
+    const requiredStableCount = 8; // 8회 연속 안정 (체크 간격 300ms → 약 2.4초)
+    // 최대 대기 시간(밀리초) - 코드별 실적은 40초로, 기본은 25초
     const maxWaitMs = (() => {
       const isCodeDetail =
         slide?.mode === 'chart' &&
         (slide?.tab === 'closingChart' || slide?.tab === 'closing') &&
         (slide?.subTab === 'totalClosing' || !slide?.subTab) &&
         slide?.detailOptions?.csDetailType === 'code';
-      return isCodeDetail ? 45000 : 30000;
+      return isCodeDetail ? 40000 : 25000;
     })();
     
     // 데이터 로딩 완료 대기 함수 - 매우 확실한 방법
@@ -144,7 +145,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
         const observer = new MutationObserver(() => {
           // DOM이 변경되면 안정성 카운터 리셋
           if (stableCount > 0) {
-            console.log(`🔄 [SlideRenderer] DOM 변화 감지, 안정성 카운터 리셋 (이전: ${stableCount})`);
+            logger.debug('🔄 [SlideRenderer] DOM 변화 감지, 안정성 카운터 리셋', { previousStableCount: stableCount });
             stableCount = 0;
             lastStableTime = null;
           }
@@ -221,7 +222,10 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             stableCount++;
             
             const stableDuration = (Date.now() - lastStableTime) / 1000;
-            console.log(`✅ [SlideRenderer] 안정적인 상태 확인 (${stableCount}/${requiredStableCount}, ${stableDuration.toFixed(1)}초 유지):`, {
+            logger.debug('✅ [SlideRenderer] 안정적인 상태 확인', {
+              stableCount,
+              requiredStableCount,
+              stableDuration: `${stableDuration.toFixed(1)}s`,
               hasLoadingIndicator: loadingIndicators?.length > 0,
               dataLoading,
               dataLoaded,
@@ -236,7 +240,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             
             // 연속으로 안정적인 상태가 5초 이상 유지되면 완료
             if (stableCount >= requiredStableCount) {
-              console.log('✅ [SlideRenderer] 데이터 로딩 완료 (5초 이상 안정적인 상태 유지됨)');
+              logger.info('✅ [SlideRenderer] 데이터 로딩 완료 (안정 상태 누적 충족)');
               observer.disconnect();
               resolve();
               return;
@@ -244,12 +248,13 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
           } else {
             // 안정적이지 않으면 카운터 리셋
             if (stableCount > 0) {
-              console.log(`⚠️ [SlideRenderer] 안정적인 상태가 깨짐, 카운터 리셋 (이전: ${stableCount})`);
+              logger.debug('⚠️ [SlideRenderer] 안정적인 상태가 깨짐, 카운터 리셋', { previousStableCount: stableCount });
               stableCount = 0;
               lastStableTime = null;
             }
             
-            logger.debug(`🔍 [SlideRenderer] 데이터 로딩 확인 (${Math.round(timeSinceStart / 1000)}초 경과)`, {
+            logger.debug('🔍 [SlideRenderer] 데이터 로딩 확인', {
+              secondsElapsed: Math.round(timeSinceStart / 1000),
               hasLoadingIndicator: loadingIndicators?.length > 0,
               dataLoading,
               dataLoaded,
@@ -268,16 +273,17 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
           // 최대 대기 시간 도달 시 진행
           if (timeSinceStart >= maxWaitMs) {
             if (isContentReady) {
-            logger.warn(`⚠️ [SlideRenderer] 타임아웃 (${Math.round(maxWaitMs/1000)}초), 하지만 콘텐츠 준비됨 - 진행`);
+              logger.warn('⚠️ [SlideRenderer] 타임아웃, 하지만 콘텐츠 준비됨 - 진행', { timeoutSec: Math.round(maxWaitMs/1000) });
             } else {
-              logger.warn(`⚠️ [SlideRenderer] 타임아웃 (${Math.round(maxWaitMs/1000)}초), 강제 진행`);
+              logger.warn('⚠️ [SlideRenderer] 타임아웃, 강제 진행', { timeoutSec: Math.round(maxWaitMs/1000) });
             }
             observer.disconnect();
             resolve();
             return;
           }
           
-          setTimeout(checkLoading, 100);
+          // 체크 주기 완화 (로그/타이머 부하 감소)
+          setTimeout(checkLoading, 300);
         };
         
         // MutationObserver 시작
@@ -291,9 +297,9 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
         }
         
         // 모드별 최소 대기 시간 후 체크 시작
-        console.log(`⏳ [SlideRenderer] 초기 대기 시작 (${modeWaitTime}초, 모드: ${slide?.mode || slide?.type || 'unknown'})`);
+        logger.debug('⏳ [SlideRenderer] 초기 대기 시작', { waitSec: modeWaitTime, mode: slide?.mode || slide?.type || 'unknown' });
         setTimeout(() => {
-          console.log('⏳ [SlideRenderer] 데이터 로딩 체크 시작');
+          logger.debug('⏳ [SlideRenderer] 데이터 로딩 체크 시작');
           checkLoading();
         }, modeWaitTime * 1000);
       });
@@ -301,7 +307,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
     
     // 모드별 최소 대기 시간 후 데이터 로딩 완료 확인
     const timer = setTimeout(async () => {
-      console.log(`⏳ [SlideRenderer] 데이터 로딩 대기 시작 (${modeWaitTime}초 초기 대기 완료, 모드: ${slide?.mode || slide?.type || 'unknown'})`);
+      logger.debug('⏳ [SlideRenderer] 데이터 로딩 대기 시작 (초기 대기 완료)', { waitSec: modeWaitTime, mode: slide?.mode || slide?.type || 'unknown' });
       await waitForDataLoad();
       
       // 특수 처리: 월간시상 화면 확대 버튼 자동 클릭 (데이터량이 많아 가독성 확보)
@@ -310,18 +316,18 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
           (el) => typeof el.textContent === 'string' && el.textContent.trim() === '확대'
         );
         if (expandBtn) {
-          console.log('🔎 [SlideRenderer] 월간시상 확대 버튼 발견 → 자동 클릭');
+          logger.info('🔎 [SlideRenderer] 월간시상 확대 버튼 발견 → 자동 클릭');
           expandBtn.click();
           // 클릭 후 렌더링 안정화 대기
-          await new Promise((r) => setTimeout(r, 800));
+          await new Promise((r) => setTimeout(r, 600));
         }
       } catch (e) {
-        console.warn('⚠️ [SlideRenderer] 확대 버튼 자동 클릭 중 오류:', e?.message);
+        logger.warn('⚠️ [SlideRenderer] 확대 버튼 자동 클릭 중 오류', { error: e?.message });
       }
       
-      // 모드별 추가 안정화 대기 시간 (초)
-      const additionalWaitTime = Math.max(2, Math.floor(modeWaitTime * 0.5)); // 모드별 대기 시간의 50%
-      console.log(`✅ [SlideRenderer] 데이터 로딩 완료 확인됨, 추가 안정화 대기 (${additionalWaitTime}초)`);
+      // 추가 안정화 대기 시간 (고정 2초)
+      const additionalWaitTime = 2;
+      logger.debug('✅ [SlideRenderer] 데이터 로딩 완료 확인됨, 추가 안정화 대기', { waitSec: additionalWaitTime });
       
       // 추가로 대기하여 완전히 안정화
       await new Promise(resolve => setTimeout(resolve, additionalWaitTime * 1000));
@@ -351,7 +357,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
       const isReady = finalHasNoLoading && hasAnyContent;
       
       if (!isReady) {
-        console.warn('⚠️ [SlideRenderer] 최종 확인 실패:', {
+        logger.debug('⚠️ [SlideRenderer] 최종 확인 실패', {
           dataLoaded: finalCheck,
           hasNoLoading: finalHasNoLoading,
           hasTableRows: finalTableRows.length,
@@ -359,8 +365,8 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
           hasPaperContent: finalPaperElements.length,
           hasAnyContent
         });
-        console.warn('⚠️ [SlideRenderer] 추가 대기 (5초)');
-        await new Promise(resolve => setTimeout(resolve, 5000));
+        logger.debug('⚠️ [SlideRenderer] 추가 대기 (3초)');
+        await new Promise(resolve => setTimeout(resolve, 3000));
         
         // 재확인
         const retryCheck = containerRef.current?.querySelector('[data-loaded="true"]') !== null;
@@ -372,7 +378,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
         const retryHasContent = (retryTableRows?.length || 0) >= 3 || (retryChartElements?.length || 0) > 0 || (retryPaperElements?.length || 0) > 0;
         
         if (!retryHasNoLoading || !retryHasContent) {
-          console.warn('⚠️ [SlideRenderer] 재확인 실패, 하지만 로딩 인디케이터가 없으므로 진행:', {
+          logger.debug('⚠️ [SlideRenderer] 재확인 실패, 하지만 로딩 인디케이터가 없으므로 진행', {
             hasNoLoading: retryHasNoLoading,
             hasContent: retryHasContent,
             tableRows: retryTableRows.length,
@@ -383,17 +389,17 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
         }
       }
       
-      console.log('✅ [SlideRenderer] 안정화 완료, onReady 호출 준비');
+      logger.info('✅ [SlideRenderer] 안정화 완료, onReady 호출 준비');
       setLoading(false);
       setContentReady(true);
       
       // 추가 대기 후 onReady 호출 (렌더링 완료 보장)
       setTimeout(() => {
         if (onReady) {
-          console.log('✅ [SlideRenderer] onReady 콜백 호출');
+          logger.debug('✅ [SlideRenderer] onReady 콜백 호출');
           onReady();
         }
-      }, 2000); // 2초 대기
+      }, 1200); // 1.2초 대기
     }, modeWaitTime * 1000); // 모드별 최소 대기 시간
 
     return () => clearTimeout(timer);
@@ -432,7 +438,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             position: 'relative'
           }}
         >
-          {/* 상단바: 좌→우 그라데이션, 우측에 슬라이드 제목(흰색) */}
+          {/* 상단바: 좌→우 그라데이션, 좌측 로고/회사명 + 우측 슬라이드 제목(흰색) */}
           <Box
             sx={{
               position: 'absolute',
@@ -445,15 +451,40 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'flex-end',
-              px: { xs: 2, md: 3 },
-              py: { xs: 1.2, md: 1.6 },
+              justifyContent: 'space-between',
+              px: { xs: 2.5, md: 4 },
+              py: { xs: 1.6, md: 2 },
               pointerEvents: 'none' // 상단바가 UI 선택을 가리지 않도록
             }}
           >
+            {/* 왼쪽: 로고와 회사 이름 */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Box
+                component="img"
+                src="/logo512.png"
+                alt="회사 로고"
+                sx={{
+                  width: { xs: 48, md: 60 },
+                  height: { xs: 48, md: 60 },
+                  filter: 'brightness(0) invert(0)'
+                }}
+                onError={(e) => { e.target.style.display = 'none'; }}
+              />
+              <Typography
+                sx={{
+                  fontWeight: 800,
+                  fontSize: { xs: '1.25rem', md: '1.6rem' },
+                  color: '#212529',
+                  letterSpacing: '0.2px',
+                  fontFamily: '"Noto Sans KR","Roboto",sans-serif'
+                }}
+              >
+                (주)브이아이피플러스
+              </Typography>
+            </Box>
             <Typography
               sx={{
-                fontSize: { xs: '0.9rem', md: '1.1rem' },
+                fontSize: { xs: '1rem', md: '1.25rem' },
                 fontWeight: 800,
                 color: '#ffffff',
                 textShadow: '0 1px 2px rgba(0,0,0,0.15)',
@@ -662,63 +693,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             </Box>
           </Box>
 
-          {/* 하단: 로고/회사명 + 생성자 표시 (하단 정렬, 배경바 높이 확대) */}
-          <Box
-            sx={{
-              position: 'absolute',
-              bottom: 0,
-              left: 0,
-              right: 0,
-              backgroundColor: '#ffffff',
-              borderTop: '1px solid rgba(0,0,0,0.06)',
-              boxShadow: '0 -4px 16px rgba(0,0,0,0.06)',
-              px: { xs: 3, md: 5 },
-              py: { xs: 3, md: 4.5 }, // 높이 확장
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              zIndex: 12
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <Box
-                component="img"
-                src="/logo512.png"
-                alt="회사 로고"
-                sx={{
-                  width: { xs: 44, md: 60 },
-                  height: { xs: 44, md: 60 },
-                  mr: { xs: 1.5, md: 2 },
-                  filter: 'brightness(0) invert(0)'
-                }}
-                onError={(e) => { e.target.style.display = 'none'; }}
-              />
-              <Typography
-                sx={{
-                  fontWeight: 800,
-                  fontSize: { xs: '1.1rem', md: '1.4rem' },
-                  color: '#212529',
-                  letterSpacing: '0.2px',
-                  fontFamily: '"Noto Sans KR","Roboto",sans-serif'
-                }}
-              >
-                (주)브이아이피플러스
-              </Typography>
-            </Box>
-            <Box>
-              {slide.createdBy && (
-                <Typography
-                  sx={{
-                    color: '#6c757d',
-                    fontSize: { xs: '0.95rem', md: '1.05rem' },
-                    fontWeight: 600
-                  }}
-                >
-                  생성자: {slide.createdBy}
-                </Typography>
-              )}
-            </Box>
-          </Box>
+          {/* 하단 푸터 제거: 로고/회사명은 상단바에 표시 */}
         </Box>
       );
     }
@@ -745,7 +720,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             position: 'relative'
           }}
         >
-          {/* 상단바: 좌→우 그라데이션, 우측에 슬라이드 제목(흰색) */}
+          {/* 상단바: 좌→우 그라데이션, 좌측 로고/회사명 + 우측 제목(흰색) */}
           <Box
             sx={{
               position: 'absolute',
@@ -758,15 +733,40 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'flex-end',
-              px: { xs: 2, md: 3 },
-              py: { xs: 1.2, md: 1.6 },
+              justifyContent: 'space-between',
+              px: { xs: 2.5, md: 4 },
+              py: { xs: 1.6, md: 2 },
               pointerEvents: 'none' // 상단바가 UI 선택을 가리지 않도록
             }}
           >
+            {/* 왼쪽: 로고와 회사 이름 */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Box
+                component="img"
+                src="/logo512.png"
+                alt="회사 로고"
+                sx={{
+                  width: { xs: 48, md: 60 },
+                  height: { xs: 48, md: 60 },
+                  filter: 'brightness(0) invert(0)'
+                }}
+                onError={(e) => { e.target.style.display = 'none'; }}
+              />
+              <Typography
+                sx={{
+                  fontWeight: 800,
+                  fontSize: { xs: '1.25rem', md: '1.6rem' },
+                  color: '#212529',
+                  letterSpacing: '0.2px',
+                  fontFamily: '"Noto Sans KR","Roboto",sans-serif'
+                }}
+              >
+                (주)브이아이피플러스
+              </Typography>
+            </Box>
             <Typography
               sx={{
-                fontSize: { xs: '0.9rem', md: '1.1rem' },
+                fontSize: { xs: '1rem', md: '1.25rem' },
                 fontWeight: 800,
                 color: '#ffffff',
                 textShadow: '0 1px 2px rgba(0,0,0,0.15)',
@@ -1103,82 +1103,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             </Box>
           </Box>
 
-          {/* 하단: 생성자 정보 - 전문적인 푸터 디자인 */}
-          {slide.createdBy && (
-            <Box sx={{ 
-              mt: { xs: 2, md: 3 }, 
-              width: '100%', 
-              textAlign: 'center',
-              pt: 2,
-              borderTop: '1px solid rgba(0,0,0,0.05)'
-            }}>
-              <Typography variant="body2" sx={{ 
-                color: '#6c757d', 
-                fontSize: { xs: '0.85rem', md: '0.95rem' },
-                fontWeight: 500,
-                fontFamily: '"Noto Sans KR", sans-serif'
-              }}>
-                생성자: {slide.createdBy}
-              </Typography>
-            </Box>
-          )}
-          {/* 하단: 로고/회사명 + 생성자 (메인과 동일 구조) */}
-          <Box
-            sx={{
-              position: 'absolute',
-              bottom: 0,
-              left: 0,
-              right: 0,
-              backgroundColor: '#ffffff',
-              borderTop: '1px solid rgba(0,0,0,0.06)',
-              boxShadow: '0 -4px 16px rgba(0,0,0,0.06)',
-              px: { xs: 3, md: 5 },
-              py: { xs: 3, md: 4.5 },
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              zIndex: 12
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <Box
-                component="img"
-                src="/logo512.png"
-                alt="회사 로고"
-                sx={{
-                  width: { xs: 44, md: 60 },
-                  height: { xs: 44, md: 60 },
-                  mr: { xs: 1.5, md: 2 },
-                  filter: 'brightness(0) invert(0)'
-                }}
-                onError={(e) => { e.target.style.display = 'none'; }}
-              />
-              <Typography
-                sx={{
-                  fontWeight: 800,
-                  fontSize: { xs: '1.1rem', md: '1.4rem' },
-                  color: '#212529',
-                  letterSpacing: '0.2px',
-                  fontFamily: '"Noto Sans KR","Roboto",sans-serif'
-                }}
-              >
-                (주)브이아이피플러스
-              </Typography>
-            </Box>
-            <Box>
-              {slide.createdBy && (
-                <Typography
-                  sx={{
-                    color: '#6c757d',
-                    fontSize: { xs: '0.95rem', md: '1.05rem' },
-                    fontWeight: 600
-                  }}
-                >
-                  생성자: {slide.createdBy}
-                </Typography>
-              )}
-            </Box>
-          </Box>
+          {/* 하단 푸터 제거: 로고/회사명은 상단바에 표시 */}
         </Box>
       );
     }
@@ -1504,6 +1429,15 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                     mb: 3,
                     borderRadius: 2,
                     boxShadow: '0 4px 16px rgba(0,0,0,0.15)'
+                  }}
+                  onError={(e) => {
+                    // 프록시 실패 시 원본 URL로 폴백
+                    try {
+                      const original = slide.imageUrl;
+                      if (original && e.currentTarget.src !== original) {
+                        e.currentTarget.src = original;
+                      }
+                    } catch {}
                   }}
                 />
               )}

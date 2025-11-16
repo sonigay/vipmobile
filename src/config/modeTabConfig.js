@@ -95,7 +95,7 @@ const CHART_TABS = [
           options: [
             {
               key: 'bondHistoryTimestamp',
-              label: '저장 시점 (YYYY-MM-DD HH:mm)',
+              label: '저장 시점 (선택 안하면 최신)',
               type: 'text',
               placeholder: '예: 2025-11-16 12:30',
               defaultValue: ''
