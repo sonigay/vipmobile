@@ -1351,11 +1351,14 @@ function convertExcelToHTML(worksheet) {
   let html = '<!DOCTYPE html><html><head>';
   html += '<meta charset="UTF-8">';
   html += '<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">';
+  // Google Fonts에서 Noto Sans KR 폰트 로드 (Linux 서버에서도 한글 폰트 사용 가능)
+  html += '<link rel="preconnect" href="https://fonts.googleapis.com">';
+  html += '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>';
+  html += '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">';
   html += '<style>';
-  // 시스템 폰트를 우선 사용 (네트워크 의존성 완전 제거)
-  // Windows, macOS, Linux 모두에서 작동하는 한글 폰트 우선순위
+  // Google Fonts Noto Sans KR을 우선 사용하고, 시스템 폰트를 폴백으로 사용
   html += '* { ';
-  html += 'font-family: "Malgun Gothic", "맑은 고딕", "AppleGothic", "Apple SD Gothic Neo", "NanumGothic", "Nanum Gothic", "Noto Sans CJK KR", "Noto Sans KR", "Gulim", "굴림", "Batang", "바탕", "Gungsuh", "궁서", "Dotum", "돋움", Arial, sans-serif !important; ';
+  html += 'font-family: "Noto Sans KR", "Malgun Gothic", "맑은 고딕", "AppleGothic", "Apple SD Gothic Neo", "NanumGothic", "Nanum Gothic", "Noto Sans CJK KR", "Gulim", "굴림", "Batang", "바탕", "Gungsuh", "궁서", "Dotum", "돋움", Arial, sans-serif !important; ';
   html += 'font-feature-settings: normal !important; ';
   html += 'font-variant: normal !important; ';
   html += 'text-rendering: optimizeLegibility !important; ';
@@ -2182,15 +2185,35 @@ async function uploadCustomSlideFile(req, res) {
               timeout: 60000 // 타임아웃 증가
             });
             
-            // 시스템 폰트 강제 적용 및 한글 렌더링 보장
-            await page.evaluate(() => {
-              // 모든 요소에 시스템 한글 폰트 강제 적용
-              const systemKoreanFonts = '"Malgun Gothic", "맑은 고딕", "AppleGothic", "Apple SD Gothic Neo", "NanumGothic", "Nanum Gothic", "Noto Sans CJK KR", "Gulim", "굴림", "Batang", "바탕", sans-serif';
+            // Google Fonts 로드 대기
+            await page.evaluateHandle(() => {
+              return document.fonts.ready;
+            });
+            
+            // 폰트가 실제로 로드되었는지 확인
+            await page.evaluate(async () => {
+              // Noto Sans KR 폰트가 로드되었는지 확인
+              const checkFont = async () => {
+                try {
+                  await document.fonts.load('400 16px "Noto Sans KR"');
+                  await document.fonts.load('500 16px "Noto Sans KR"');
+                  await document.fonts.load('700 16px "Noto Sans KR"');
+                  return true;
+                } catch (e) {
+                  return false;
+                }
+              };
               
-              // 모든 텍스트 요소에 폰트 강제 적용
+              const fontLoaded = await checkFont();
+              if (!fontLoaded) {
+                console.warn('⚠️ [Excel 변환] Noto Sans KR 폰트 로드 실패, 시스템 폰트 사용');
+              }
+              
+              // 모든 요소에 폰트 강제 적용
+              const koreanFonts = '"Noto Sans KR", "Malgun Gothic", "맑은 고딕", "AppleGothic", "Apple SD Gothic Neo", "NanumGothic", "Nanum Gothic", "Noto Sans CJK KR", "Gulim", "굴림", "Batang", "바탕", sans-serif';
               const allElements = document.querySelectorAll('*');
               allElements.forEach(el => {
-                el.style.fontFamily = systemKoreanFonts;
+                el.style.fontFamily = koreanFonts;
                 el.style.fontFeatureSettings = 'normal';
                 el.style.fontVariant = 'normal';
                 el.style.textRendering = 'optimizeLegibility';
@@ -2209,8 +2232,8 @@ async function uploadCustomSlideFile(req, res) {
               forceReflow();
             });
             
-            // 폰트 적용 후 충분한 대기 시간 (시스템 폰트는 즉시 사용 가능)
-            await page.waitForTimeout(1500);
+            // 폰트 적용 후 충분한 대기 시간 (Google Fonts 로드 대기)
+            await page.waitForTimeout(2000);
             
             // 한글 텍스트가 제대로 렌더링되었는지 확인
             await page.evaluate(() => {
