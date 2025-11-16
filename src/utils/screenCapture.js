@@ -116,12 +116,14 @@ async function autoCropCanvas(canvas) {
       return canvas;
     }
     
-    // 여유 공간 추가 (좌우 10px, 하단 10px, 상단은 0 유지)
-    const padding = 10;
-    minX = Math.max(0, minX - padding);
+    // 여유 공간 추가 (좌우 10px, 하단 40px, 상단은 0 유지)
+    // 하단에 충분한 여유 공간을 주어 컨텐츠가 잘려 보이지 않도록 개선
+    const paddingX = 10; // 좌우 여유 공간
+    const paddingBottom = 40; // 하단 여유 공간 (기존 10px에서 40px로 증가)
+    minX = Math.max(0, minX - paddingX);
     minY = 0; // 상단은 항상 0부터 시작
-    maxX = Math.min(canvas.width, maxX + padding);
-    maxY = Math.min(canvas.height, maxY + padding);
+    maxX = Math.min(canvas.width, maxX + paddingX);
+    maxY = Math.min(canvas.height, maxY + paddingBottom);
     
     const width = maxX - minX;
     const height = maxY - minY;
