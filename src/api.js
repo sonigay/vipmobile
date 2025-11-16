@@ -1162,20 +1162,75 @@ export const api = {
     return this.uploadCustomSlideFile(imageFile, meetingDate, 'image');
   },
 
-  // 회의 설정 저장
-  saveMeetingConfig: async function saveMeetingConfig(meetingId, config) {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/meetings/${meetingId}/config`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config)
-      });
-      if (!response.ok) throw new Error('회의 설정 저장 실패');
-      return response.json();
-    } catch (error) {
-      console.error('회의 설정 저장 오류:', error);
-      throw error;
+  // 회의 설정 저장 (재시도 로직 포함)
+  saveMeetingConfig: async function saveMeetingConfig(meetingId, config, retries = 3, baseDelay = 1000) {
+    let lastError = null;
+    
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/meetings/${meetingId}/config`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify(config),
+          // CORS 에러 방지를 위한 옵션
+          mode: 'cors',
+          credentials: 'omit'
+        });
+
+        // 응답이 없거나 CORS 에러인 경우
+        if (!response || response.type === 'opaque' || response.type === 'opaqueredirect') {
+          throw new Error('CORS 정책으로 인해 요청이 차단되었습니다.');
+        }
+
+        if (!response.ok) {
+          // 502, 503, 504는 재시도 가능한 에러
+          if ([502, 503, 504].includes(response.status)) {
+            throw new Error(`서버 오류 (HTTP ${response.status})`);
+          }
+          const errorText = await response.text().catch(() => '알 수 없는 오류');
+          throw new Error(`회의 설정 저장 실패 (HTTP ${response.status}): ${errorText}`);
+        }
+
+        return await response.json();
+      } catch (error) {
+        lastError = error;
+        
+        // 네트워크 에러 또는 CORS 에러인지 확인
+        const isNetworkError = error.message.includes('fetch') || 
+                               error.message.includes('network') || 
+                               error.message.includes('Failed to fetch') ||
+                               error.message.includes('CORS') ||
+                               !error.status;
+        
+        // 마지막 시도이거나 재시도 불가능한 에러인 경우
+        if (attempt === retries || (!isNetworkError && error.status && ![502, 503, 504].includes(error.status))) {
+          // 더 상세한 에러 메시지 제공
+          if (isNetworkError || error.message.includes('CORS')) {
+            throw new Error(`네트워크 연결 오류로 회의 설정 저장에 실패했습니다. (${attempt}회 시도) 서버 연결을 확인해주세요.`);
+          } else if (error.status === 502) {
+            throw new Error(`서버 게이트웨이 오류가 발생했습니다. 잠시 후 다시 시도해주세요.`);
+          } else if (error.status === 503) {
+            throw new Error(`서버가 일시적으로 사용할 수 없습니다. 잠시 후 다시 시도해주세요.`);
+          } else if (error.status === 504) {
+            throw new Error(`서버 응답 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.`);
+          } else {
+            throw error;
+          }
+        }
+        
+        // 지수 백오프: delay * 2^(attempt-1)
+        const delay = baseDelay * Math.pow(2, attempt - 1);
+        if (process.env.NODE_ENV === 'development') {
+          console.warn(`⚠️ [api.saveMeetingConfig] 재시도 ${attempt}/${retries} (${delay}ms 대기):`, error.message);
+        }
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
     }
+    
+    throw lastError || new Error('회의 설정 저장 실패');
   },
 
   // 회의 캡처 시작

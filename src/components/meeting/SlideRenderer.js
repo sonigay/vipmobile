@@ -110,22 +110,22 @@ const getUnifiedTitle = (slide, loggedInStore) => {
   }
 };
 
+// 헤더 그라데이션 오른쪽 색상 결정 (커스텀 슬라이드는 배경색 선택값을 사용)
+const getHeaderGradient = (s) => {
+  try {
+    const right = (s?.type === 'custom' && s?.backgroundColor) ? s.backgroundColor : '#868e96';
+    return `linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, ${right} 100%)`;
+  } catch {
+    return 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #868e96 100%)';
+  }
+};
+
 const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, onReady }) {
   const containerRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [contentReady, setContentReady] = useState(false);
   const isMountedRef = useRef(true); // 컴포넌트 마운트 상태 추적
-  
-  // 헤더 그라데이션 오른쪽 색상 결정 (커스텀 슬라이드는 배경색 선택값을 사용)
-  const getHeaderGradient = (s) => {
-    try {
-      const right = (s?.type === 'custom' && s?.backgroundColor) ? s.backgroundColor : '#868e96';
-      return `linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, ${right} 100%)`;
-    } catch {
-      return 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #868e96 100%)';
-    }
-  };
   
   useEffect(() => {
     // 컴포넌트 마운트 상태 초기화
@@ -577,7 +577,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             height: '100vh',
             display: 'flex',
             flexDirection: 'column',
-            justifyContent: 'space-between',
+            justifyContent: 'flex-start',
             alignItems: 'center',
             background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 50%, #f1f3f5 100%)', // 전문적인 그라데이션
             color: '#212529', // 어두운 계열 글자색
@@ -602,7 +602,8 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               justifyContent: 'space-between',
               px: { xs: 2.5, md: 4 },
               py: { xs: 1.6, md: 2 },
-              pointerEvents: 'none' // 상단바가 UI 선택을 가리지 않도록
+              pointerEvents: 'none', // 상단바가 UI 선택을 가리지 않도록
+              height: { xs: 56, md: 68 } // 헤더 높이 명시적 설정
             }}
           >
             {/* 왼쪽: 로고와 회사 이름 */}
@@ -643,11 +644,11 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             </Typography>
           </Box>
 
-          {/* 생성자 정보: 상단 헤더 오른쪽 바로 밑 */}
+          {/* 생성자 정보: 상단 헤더 바로 밑 */}
           {slide.createdBy && (
             <Box sx={{ 
               position: 'absolute',
-              top: { xs: 56, md: 68 }, // 헤더 높이만큼 아래
+              top: { xs: 56, md: 68 }, // 헤더 높이 바로 아래
               right: { xs: 2.5, md: 4 },
               zIndex: 14,
               textAlign: 'right'
@@ -659,13 +660,23 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                 fontFamily: '"Noto Sans KR", sans-serif',
                 opacity: 0.8
               }}>
-                생성자: {slide.createdBy}
+                작성자: {slide.createdBy}
               </Typography>
             </Box>
           )}
 
-          {/* 중앙: 회의 정보 */}
-          <Box sx={{ textAlign: 'center', maxWidth: 1000, width: '100%', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', pt: { xs: 10, md: 12 } }}>
+          {/* 상단 정렬: 회의 정보 */}
+          <Box sx={{ 
+            textAlign: 'center', 
+            maxWidth: 1000, 
+            width: '100%', 
+            flex: 1, 
+            display: 'flex', 
+            flexDirection: 'column', 
+            justifyContent: 'flex-start', 
+            pt: { xs: 10, md: 12 },
+            mt: { xs: 2, md: 3 } // 헤더와 작성자 아래 여백
+          }}>
             {/* 차수 배지 - 전문적인 디자인 */}
             {slide.meetingNumber && (
               <Box
@@ -867,7 +878,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             height: '100vh',
             display: 'flex',
             flexDirection: 'column',
-            justifyContent: 'space-between',
+            justifyContent: 'flex-start',
             alignItems: 'center',
             background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 50%, #f1f3f5 100%)', // 전문적인 그라데이션
             color: '#212529', // 어두운 계열 글자색
@@ -892,7 +903,8 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               justifyContent: 'space-between',
               px: { xs: 2.5, md: 4 },
               py: { xs: 1.6, md: 2 },
-              pointerEvents: 'none' // 상단바가 UI 선택을 가리지 않도록
+              pointerEvents: 'none', // 상단바가 UI 선택을 가리지 않도록
+              height: { xs: 56, md: 68 } // 헤더 높이 명시적 설정
             }}
           >
             {/* 왼쪽: 로고와 회사 이름 */}
@@ -933,11 +945,11 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             </Typography>
           </Box>
 
-          {/* 생성자 정보: 상단 헤더 오른쪽 바로 밑 */}
+          {/* 작성자 정보: 상단 헤더 바로 밑 */}
           {slide.createdBy && (
             <Box sx={{ 
               position: 'absolute',
-              top: { xs: 56, md: 68 }, // 헤더 높이만큼 아래
+              top: { xs: 56, md: 68 }, // 헤더 높이 바로 아래
               right: { xs: 2.5, md: 4 },
               zIndex: 14,
               textAlign: 'right'
@@ -949,12 +961,12 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                 fontFamily: '"Noto Sans KR", sans-serif',
                 opacity: 0.8
               }}>
-                생성자: {slide.createdBy}
+                작성자: {slide.createdBy}
               </Typography>
             </Box>
           )}
 
-          {/* 중앙: 목차 내용 */}
+          {/* 상단 정렬: 목차 내용 */}
           <Box sx={{ 
             textAlign: 'center', 
             maxWidth: 1200, 
@@ -962,10 +974,11 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             flex: 1, 
             display: 'flex', 
             flexDirection: 'column', 
-            justifyContent: 'center',
+            justifyContent: 'flex-start',
             overflowY: 'auto',
             py: 2,
-            pt: { xs: 10, md: 12 }
+            pt: { xs: 10, md: 12 },
+            mt: { xs: 2, md: 3 } // 헤더와 작성자 아래 여백
           }}>
             <Typography
               variant="h2"
@@ -1303,7 +1316,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             height: '100vh',
             display: 'flex',
             flexDirection: 'column',
-            justifyContent: 'space-between',
+            justifyContent: 'flex-start',
             alignItems: 'center',
             background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 50%, #f1f3f5 100%)', // 전문적인 그라데이션
             color: '#212529', // 어두운 계열 글자색
@@ -1328,7 +1341,8 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               justifyContent: 'space-between',
               px: { xs: 2.5, md: 4 },
               py: { xs: 1.6, md: 2 },
-              pointerEvents: 'none'
+              pointerEvents: 'none',
+              height: { xs: 56, md: 68 } // 헤더 높이 명시적 설정
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -1368,11 +1382,11 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             </Typography>
           </Box>
 
-          {/* 생성자 정보: 상단 헤더 오른쪽 바로 밑 */}
+          {/* 작성자 정보: 상단 헤더 바로 밑 */}
           {slide.createdBy && (
             <Box sx={{ 
               position: 'absolute',
-              top: { xs: 56, md: 68 }, // 헤더 높이만큼 아래
+              top: { xs: 56, md: 68 }, // 헤더 높이 바로 아래
               right: { xs: 2.5, md: 4 },
               zIndex: 14,
               textAlign: 'right'
@@ -1384,12 +1398,12 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                 fontFamily: '"Noto Sans KR", sans-serif',
                 opacity: 0.8
               }}>
-                생성자: {slide.createdBy}
+                작성자: {slide.createdBy}
               </Typography>
             </Box>
           )}
 
-          {/* 중앙: 종료 메시지 */}
+          {/* 상단 정렬: 종료 메시지 */}
           <Box sx={{ 
             textAlign: 'center', 
             maxWidth: 1000, 
@@ -1397,9 +1411,10 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             flex: 1, 
             display: 'flex', 
             flexDirection: 'column', 
-            justifyContent: 'center',
+            justifyContent: 'flex-start',
             alignItems: 'center',
-            pt: { xs: 10, md: 12 }
+            pt: { xs: 10, md: 12 },
+            mt: { xs: 2, md: 3 } // 헤더와 작성자 아래 여백
           }}>
             <Typography
               variant="h1"
@@ -1524,7 +1539,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             height: '100vh',
             display: 'flex',
             flexDirection: 'column',
-            justifyContent: 'space-between',
+            justifyContent: 'flex-start',
             alignItems: 'center',
             background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 50%, #f1f3f5 100%)', // 전문적인 그라데이션
             color: '#212529', // 어두운 계열 글자색
@@ -1549,7 +1564,8 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               justifyContent: 'space-between',
               px: { xs: 2.5, md: 4 },
               py: { xs: 1.6, md: 2 },
-              pointerEvents: 'none'
+              pointerEvents: 'none',
+              height: { xs: 56, md: 68 } // 헤더 높이 명시적 설정
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -1589,11 +1605,11 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             </Typography>
           </Box>
 
-          {/* 생성자 정보: 상단 헤더 오른쪽 바로 밑 */}
+          {/* 작성자 정보: 상단 헤더 바로 밑 */}
           {slide.createdBy && (
             <Box sx={{ 
               position: 'absolute',
-              top: { xs: 56, md: 68 }, // 헤더 높이만큼 아래
+              top: { xs: 56, md: 68 }, // 헤더 높이 바로 아래
               right: { xs: 2.5, md: 4 },
               zIndex: 14,
               textAlign: 'right'
@@ -1605,12 +1621,12 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                 fontFamily: '"Noto Sans KR", sans-serif',
                 opacity: 0.8
               }}>
-                생성자: {slide.createdBy}
+                작성자: {slide.createdBy}
               </Typography>
             </Box>
           )}
 
-          {/* 중앙: 커스텀 콘텐츠 */}
+          {/* 상단 정렬: 커스텀 콘텐츠 */}
           <Box sx={{ 
             textAlign: 'center', 
             maxWidth: 1200, 
@@ -1618,9 +1634,10 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             flex: 1, 
             display: 'flex', 
             flexDirection: 'column', 
-            justifyContent: 'center',
+            justifyContent: 'flex-start',
             alignItems: 'center',
-            pt: { xs: 10, md: 12 }
+            pt: { xs: 10, md: 12 },
+            mt: { xs: 2, md: 3 } // 헤더와 작성자 아래 여백
           }}>
             <Box
               sx={{

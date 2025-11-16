@@ -790,19 +790,58 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
       formData.append('meetingDate', meeting.meetingDate);
       formData.append('slideOrder', index + 1);
 
-      // 재시도 로직이 포함된 업로드 함수 (지수 백오프 적용)
+      // 재시도 로직이 포함된 업로드 함수 (지수 백오프 적용, CORS 에러 처리 개선)
       const uploadWithRetry = async (retries = 3, baseDelay = 1000) => {
         let lastError = null;
         
         for (let attempt = 1; attempt <= retries; attempt++) {
           try {
+            // 타임아웃 설정 (30초)
+            const abortController = new AbortController();
+            const timeoutId = setTimeout(() => abortController.abort(), 30000);
+            
+            // FormData를 사용할 때는 Content-Type 헤더를 설정하지 않음 (브라우저가 자동으로 설정)
             const uploadResponse = await fetch(`${API_BASE_URL}/api/meetings/${meeting.meetingId}/upload-image`, {
               method: 'POST',
-              body: formData
+              body: formData,
+              // CORS 에러 방지를 위한 옵션
+              mode: 'cors',
+              credentials: 'omit',
+              signal: abortController.signal
+            }).catch((fetchError) => {
+              clearTimeout(timeoutId);
+              // 네트워크 에러를 명시적으로 처리
+              if (fetchError.name === 'AbortError' || fetchError.name === 'TimeoutError') {
+                const timeoutError = new Error('요청 시간이 초과되었습니다.');
+                timeoutError.status = 504;
+                timeoutError.isNetworkError = true;
+                throw timeoutError;
+              }
+              const networkError = new Error(`네트워크 오류: ${fetchError.message}`);
+              networkError.isNetworkError = true;
+              networkError.originalError = fetchError;
+              throw networkError;
             });
+            
+            clearTimeout(timeoutId);
+
+            // 응답이 없거나 CORS 에러인 경우
+            if (!uploadResponse || uploadResponse.type === 'opaque' || uploadResponse.type === 'opaqueredirect') {
+              const corsError = new Error('CORS 정책으로 인해 요청이 차단되었습니다.');
+              corsError.isNetworkError = true;
+              throw corsError;
+            }
 
             if (!uploadResponse.ok) {
-              const errorText = await uploadResponse.text();
+              // 502, 503, 504는 재시도 가능한 에러
+              if ([502, 503, 504].includes(uploadResponse.status)) {
+                const serverError = new Error(`서버 오류 (HTTP ${uploadResponse.status})`);
+                serverError.status = uploadResponse.status;
+                serverError.isNetworkError = false;
+                throw serverError;
+              }
+              
+              const errorText = await uploadResponse.text().catch(() => '알 수 없는 오류');
               const error = new Error(`이미지 업로드 실패 (HTTP ${uploadResponse.status}): ${errorText}`);
               error.status = uploadResponse.status;
               error.isNetworkError = false;
@@ -813,22 +852,35 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
           } catch (error) {
             lastError = error;
             
-            // 네트워크 에러인지 확인
-            const isNetworkError = error.message.includes('fetch') || 
+            // 네트워크 에러 또는 CORS 에러인지 확인
+            const isNetworkError = error.isNetworkError || 
+                                   error.message.includes('fetch') || 
                                    error.message.includes('network') || 
                                    error.message.includes('Failed to fetch') ||
-                                   !error.status;
+                                   error.message.includes('CORS') ||
+                                   error.message.includes('시간이 초과') ||
+                                   (!error.status && error.name !== 'AbortError');
             
-            if (attempt === retries) {
+            // 재시도 가능한 에러인지 확인 (502, 503, 504 또는 네트워크 에러)
+            const isRetryableError = isNetworkError || 
+                                     (error.status && [502, 503, 504].includes(error.status));
+            
+            if (attempt === retries || !isRetryableError) {
               // 마지막 시도 실패 시 상세한 에러 메시지
-              if (isNetworkError) {
-                throw new Error(`네트워크 연결 오류로 이미지 업로드에 실패했습니다. (${retries}회 시도) 인터넷 연결을 확인해주세요.`);
+              if (isNetworkError || error.message.includes('CORS')) {
+                throw new Error(`네트워크 연결 오류로 이미지 업로드에 실패했습니다. (${attempt}회 시도) 인터넷 연결을 확인해주세요.`);
               } else if (error.status === 413) {
                 throw new Error(`이미지 파일이 너무 큽니다. 파일 크기를 줄여주세요.`);
+              } else if (error.status === 502) {
+                throw new Error(`서버 게이트웨이 오류가 발생했습니다. 잠시 후 다시 시도해주세요.`);
+              } else if (error.status === 503) {
+                throw new Error(`서버가 일시적으로 사용할 수 없습니다. 잠시 후 다시 시도해주세요.`);
+              } else if (error.status === 504) {
+                throw new Error(`서버 응답 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.`);
               } else if (error.status === 500) {
                 throw new Error(`서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.`);
               } else {
-                throw new Error(`이미지 업로드 실패 (${retries}회 시도): ${error.message}`);
+                throw new Error(`이미지 업로드 실패 (${attempt}회 시도): ${error.message}`);
               }
             }
             
@@ -935,17 +987,19 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         if (process.env.NODE_ENV === 'development') {
           console.log(`💾 [MeetingCaptureManager] 슬라이드 ${index + 1} 저장 시작, 검증된 슬라이드 수: ${validatedSlides.length}`);
         }
-        // 저장 재시도 래퍼
+        // 저장 재시도 래퍼 (api.saveMeetingConfig에 이미 재시도 로직이 있지만, 추가 안전장치)
         const saveWithRetry = async (payload, retries = 3, baseDelay = 800) => {
           let lastErr = null;
           for (let attempt = 1; attempt <= retries; attempt++) {
             try {
-              return await api.saveMeetingConfig(meeting.meetingId, payload);
+              // api.saveMeetingConfig는 이미 내부적으로 재시도 로직을 가지고 있음
+              // 하지만 여기서도 추가 재시도를 제공하여 더 안정적인 저장 보장
+              return await api.saveMeetingConfig(meeting.meetingId, payload, 2, baseDelay);
             } catch (e) {
               lastErr = e;
               // 5xx 또는 네트워크 계열만 백오프 재시도
               const msg = (e && e.message) ? e.message : '';
-              const isNetworkOr5xx = /Failed to fetch|network|5\d\d|서버 오류|저장 실패/i.test(msg);
+              const isNetworkOr5xx = /Failed to fetch|network|5\d\d|서버 오류|저장 실패|CORS|게이트웨이|일시적으로|응답 시간/i.test(msg);
               if (attempt === retries || !isNetworkOr5xx) break;
               const delay = baseDelay * Math.pow(2, attempt - 1);
               if (process.env.NODE_ENV === 'development') {

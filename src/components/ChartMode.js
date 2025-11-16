@@ -362,7 +362,7 @@ function BondChartTab({ loggedInStore, initialSubTab = 0, presentationMode = fal
       {/* 서브 탭 컨텐츠 */}
       {activeSubTab === 0 && <OverdueBondTab />}
       {activeSubTab === 1 && <RechotanchoBondTab loggedInStore={loggedInStore} presentationMode={presentationMode} initialSubTab={initialSubTab} />}
-      {activeSubTab === 2 && <SubscriberIncreaseTab />}
+      {activeSubTab === 2 && <SubscriberIncreaseTab presentationMode={presentationMode} />}
     </Box>
   );
 }
@@ -2131,9 +2131,11 @@ function TotalClosingTab({ detailOptions, csDetailType: propCsDetailType, csDeta
     };
     
     // 첫 확인은 3초 후에 시작 (DOM 업데이트 시간 충분히 확보)
-    console.log('⏳ [TotalClosingTab] 3초 대기 후 렌더링 확인 시작');
-    setTimeout(checkRender, 3000);
-  }, [data, loading]);
+    // presentationMode일 때는 더 긴 대기 시간 필요 (권한 확인 등 추가 시간)
+    const initialDelay = presentationMode ? 5000 : 3000;
+    console.log(`⏳ [TotalClosingTab] ${initialDelay/1000}초 대기 후 렌더링 확인 시작`, { presentationMode });
+    setTimeout(checkRender, initialDelay);
+  }, [data, loading, presentationMode]);
 
   // 데이터 로드
   const loadData = useCallback(async (date = selectedDate) => {
@@ -5077,7 +5079,7 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
 }
 
 // 가입자증감 탭 컴포넌트
-function SubscriberIncreaseTab() {
+function SubscriberIncreaseTab({ presentationMode = false }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -5085,7 +5087,7 @@ function SubscriberIncreaseTab() {
   const [inputData, setInputData] = useState({});
   const [saving, setSaving] = useState(false);
   const [viewMode, setViewMode] = useState('table'); // 'table' 또는 'chart'
-  const [hasPermission, setHasPermission] = useState(false);
+  const [hasPermission, setHasPermission] = useState(presentationMode); // presentationMode일 때는 기본적으로 권한 있음으로 설정
   const [timeUnit, setTimeUnit] = useState('month'); // 'month' 또는 'year'
 
   // 숫자 포맷팅 함수
@@ -5264,15 +5266,22 @@ function SubscriberIncreaseTab() {
       setError(null);
       
       try {
-        console.log('🔍 [가입자증감] 컴포넌트 초기화 시작');
+        console.log('🔍 [가입자증감] 컴포넌트 초기화 시작', { presentationMode });
         
-        const hasAccess = await checkPermission();
-        console.log('🔍 [가입자증감] 권한 확인 결과:', hasAccess);
-        
-        if (!hasAccess) {
-          setError('가입자증감 기능에 접근할 권한이 없습니다.');
-          setLoading(false);
-          return;
+        // presentationMode일 때는 권한 확인을 건너뛰고 바로 데이터 로드
+        if (!presentationMode) {
+          const hasAccess = await checkPermission();
+          console.log('🔍 [가입자증감] 권한 확인 결과:', hasAccess);
+          
+          if (!hasAccess) {
+            setError('가입자증감 기능에 접근할 권한이 없습니다.');
+            setLoading(false);
+            return;
+          }
+        } else {
+          // presentationMode일 때는 권한이 있다고 가정하고 바로 데이터 로드
+          console.log('🔍 [가입자증감] presentationMode: 권한 확인 건너뛰고 데이터 로드 시작');
+          setHasPermission(true);
         }
 
         // 먼저 데이터 조회 시도

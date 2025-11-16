@@ -17,12 +17,14 @@ async function autoCropCanvas(canvas) {
     const alphaThreshold = 10; // 알파값이 10 이하면 투명으로 간주
     
     let minX = canvas.width;
-    let minY = canvas.height;
+    let minY = 0; // 상단은 0부터 시작 (상단 공백 유지)
     let maxX = 0;
     let maxY = 0;
     
-    // 실제 콘텐츠 영역 찾기 (상단, 좌측, 우측, 하단 모두)
-    for (let y = 0; y < canvas.height; y++) {
+    // 실제 콘텐츠 영역 찾기 (하단부터 역순으로 스캔하여 마지막 콘텐츠 라인 찾기)
+    // 하단 공백만 제거하기 위해 하단부터 스캔
+    for (let y = canvas.height - 1; y >= 0; y--) {
+      let hasContent = false;
       for (let x = 0; x < canvas.width; x++) {
         const index = (y * canvas.width + x) * 4;
         const r = data[index];
@@ -38,23 +40,51 @@ async function autoCropCanvas(canvas) {
           a < alphaThreshold;
         
         if (!isBackground) {
+          hasContent = true;
           minX = Math.min(minX, x);
-          minY = Math.min(minY, y);
           maxX = Math.max(maxX, x);
-          maxY = Math.max(maxY, y);
+          if (maxY === 0) {
+            maxY = y; // 첫 번째 콘텐츠 라인 (하단부터)
+          }
+        }
+      }
+      // 콘텐츠가 있는 라인을 찾으면 중단 (하단부터 역순 스캔)
+      if (hasContent && maxY > 0) {
+        break;
+      }
+    }
+    
+    // 좌우 경계를 정확히 찾기 위해 전체 높이에서 스캔 (상단부터 maxY까지)
+    for (let y = 0; y <= maxY; y++) {
+      for (let x = 0; x < canvas.width; x++) {
+        const index = (y * canvas.width + x) * 4;
+        const r = data[index];
+        const g = data[index + 1];
+        const b = data[index + 2];
+        const a = data[index + 3];
+        
+        const isBackground = 
+          (r >= backgroundColorThreshold && 
+           g >= backgroundColorThreshold && 
+           b >= backgroundColorThreshold) ||
+          a < alphaThreshold;
+        
+        if (!isBackground) {
+          minX = Math.min(minX, x);
+          maxX = Math.max(maxX, x);
         }
       }
     }
     
     // 콘텐츠가 없는 경우 원본 반환
-    if (minX >= maxX || minY >= maxY) {
+    if (minX >= maxX || maxY <= 0) {
       return canvas;
     }
     
-    // 여유 공간 추가 (상하좌우 10px씩)
+    // 여유 공간 추가 (좌우 10px, 하단 10px, 상단은 0 유지)
     const padding = 10;
     minX = Math.max(0, minX - padding);
-    minY = Math.max(0, minY - padding);
+    minY = 0; // 상단은 항상 0부터 시작
     maxX = Math.min(canvas.width, maxX + padding);
     maxY = Math.min(canvas.height, maxY + padding);
     
@@ -208,6 +238,51 @@ export async function captureElement(element, options = {}) {
         clonedElement.style.width = `${targetWidth}px`;
         // 세로는 표준 폭에 따른 스케일로 재흐름된 콘텐츠의 최대치 확보
         clonedElement.style.minHeight = `${targetHeight}px`;
+        
+        // 캡처 시 상단 정렬로 변경 (하단 공백 제거를 위해)
+        // flex 컨테이너의 경우 상단 정렬로 변경
+        const flexContainers = clonedElement.querySelectorAll('[style*="justify-content"], [style*="justifyContent"]');
+        flexContainers.forEach(container => {
+          const style = container.getAttribute('style') || '';
+          // center, space-between, space-around 등을 flex-start로 변경
+          if (style.includes('justify-content: center') || 
+              style.includes('justifyContent: center') ||
+              style.includes('justify-content:space-between') ||
+              style.includes('justifyContent:space-between') ||
+              style.includes('justify-content: space-between') ||
+              style.includes('justifyContent: space-between')) {
+            container.style.justifyContent = 'flex-start';
+          }
+        });
+        
+        // 직접 스타일이 있는 요소들도 확인 (클론된 문서의 요소들)
+        const allFlexElements = clonedElement.querySelectorAll('*');
+        allFlexElements.forEach(el => {
+          // 인라인 스타일 확인
+          const inlineStyle = el.getAttribute('style') || '';
+          const hasFlexDisplay = inlineStyle.includes('display: flex') || 
+                                inlineStyle.includes('display:flex') ||
+                                inlineStyle.includes('display: inline-flex') ||
+                                inlineStyle.includes('display:inline-flex');
+          
+          // sx prop이나 MUI 스타일은 이미 인라인 스타일로 변환되어 있을 수 있음
+          if (hasFlexDisplay || el.style.display === 'flex' || el.style.display === 'inline-flex') {
+            // justifyContent가 center나 space-between인 경우 flex-start로 변경
+            if (inlineStyle.includes('justify-content: center') ||
+                inlineStyle.includes('justifyContent: center') ||
+                inlineStyle.includes('justify-content:space-between') ||
+                inlineStyle.includes('justifyContent:space-between') ||
+                inlineStyle.includes('justify-content: space-between') ||
+                inlineStyle.includes('justifyContent: space-between') ||
+                inlineStyle.includes('justify-content:space-around') ||
+                inlineStyle.includes('justify-content: space-around') ||
+                el.style.justifyContent === 'center' ||
+                el.style.justifyContent === 'space-between' ||
+                el.style.justifyContent === 'space-around') {
+              el.style.justifyContent = 'flex-start';
+            }
+          }
+        });
         
         // 모든 자식 요소의 overflow와 높이 확인 및 조정
         const allChildren = clonedElement.querySelectorAll('*');
