@@ -110,17 +110,17 @@ const getUnifiedTitle = (slide, loggedInStore) => {
   }
 };
 
-// 헤더 그라데이션 오른쪽 색상 결정 (커스텀 슬라이드는 배경색 선택값을 사용)
-const getHeaderGradient = (s) => {
-  try {
-    const right = (s?.type === 'custom' && s?.backgroundColor) ? s.backgroundColor : '#868e96';
-    return `linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, ${right} 100%)`;
-  } catch {
-    return 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #868e96 100%)';
-  }
-};
-
 const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, onReady }) {
+  // 헤더 그라데이션 오른쪽 색상 결정 (커스텀 슬라이드는 배경색 선택값을 사용)
+  // 컴포넌트 내부로 이동하여 초기화 순서 문제 해결
+  const getHeaderGradient = useCallback((s) => {
+    try {
+      const right = (s?.type === 'custom' && s?.backgroundColor) ? s.backgroundColor : '#868e96';
+      return `linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, ${right} 100%)`;
+    } catch {
+      return 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #868e96 100%)';
+    }
+  }, []);
   const containerRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -2541,7 +2541,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
         </Box>
       );
     }
-  }, [slide, loggedInStore]);
+  }, [slide, loggedInStore, getHeaderGradient]);
 
   return (
     <Box
