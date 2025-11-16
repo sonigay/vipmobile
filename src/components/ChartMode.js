@@ -4673,6 +4673,17 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
   const barChartOptions = {
     responsive: true,
     maintainAspectRatio: false,
+    ...(presentationMode && {
+      // presentationMode일 때 그래프가 잘리지 않도록 레이아웃 설정
+      layout: {
+        padding: {
+          left: 10,
+          right: 10,
+          top: 10,
+          bottom: 10
+        }
+      }
+    }),
     plugins: {
       legend: {
         position: 'top',
@@ -4776,6 +4787,17 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
   const lineChartOptions = {
     responsive: true,
     maintainAspectRatio: false,
+    ...(presentationMode && {
+      // presentationMode일 때 그래프가 잘리지 않도록 레이아웃 설정
+      layout: {
+        padding: {
+          left: 10,
+          right: 10,
+          top: 10,
+          bottom: 10
+        }
+      }
+    }),
     plugins: {
       legend: {
         position: 'top',
@@ -4836,6 +4858,9 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
     );
   }
 
+  // presentationMode일 때 그래프와 테이블의 가로 비율을 통일하기 위한 최대 너비
+  const maxContentWidth = presentationMode ? 1200 : '100%';
+  
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h5" sx={{ mb: 3, fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1, color: '#1a1a1a' }}>
@@ -4850,15 +4875,44 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
       )}
 
       {/* 상단: 막대 그래프 */}
-      <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
-        <Box sx={{ height: 400 }}>
+      <Paper 
+        elevation={3} 
+        sx={{ 
+          p: 3, 
+          mb: 3,
+          ...(presentationMode && {
+            maxWidth: maxContentWidth,
+            mx: 'auto',
+            width: '100%'
+          })
+        }}
+      >
+        <Box sx={{ 
+          height: 400,
+          width: '100%',
+          ...(presentationMode && {
+            minWidth: 0, // 그래프가 잘리지 않도록
+            overflow: 'hidden'
+          })
+        }}>
           <Bar data={getBarChartData()} options={barChartOptions} />
         </Box>
       </Paper>
 
       {/* 중단: 선 그래프 */}
       {allData.length > 0 && (
-        <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
+        <Paper 
+          elevation={3} 
+          sx={{ 
+            p: 3, 
+            mb: 3,
+            ...(presentationMode && {
+              maxWidth: maxContentWidth,
+              mx: 'auto',
+              width: '100%'
+            })
+          }}
+        >
           {/* 월 선택 UI */}
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', mb: 2 }}>
             <FormControl sx={{ minWidth: 200 }}>
@@ -4886,14 +4940,31 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
             </FormControl>
           </Box>
           
-          <Box sx={{ height: 500 }}>
+          <Box sx={{ 
+            height: 500,
+            width: '100%',
+            ...(presentationMode && {
+              minWidth: 0, // 그래프가 잘리지 않도록
+              overflow: 'hidden'
+            })
+          }}>
             <Line data={getLineChartData()} options={lineChartOptions} />
           </Box>
         </Paper>
       )}
 
       {/* 하단: 데이터 입력 테이블 */}
-      <Paper elevation={3} sx={{ p: 3 }}>
+      <Paper 
+        elevation={3} 
+        sx={{ 
+          p: 3,
+          ...(presentationMode && {
+            maxWidth: maxContentWidth,
+            mx: 'auto',
+            width: '100%'
+          })
+        }}
+      >
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
             데이터 입력
@@ -5953,23 +6024,24 @@ function SubscriberIncreaseTab({ presentationMode = false }) {
 
   return (
     <Box sx={{ width: '100%', maxWidth: 'none' }} id="printable-content">
-      {/* 헤더 */}
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" component="h1" sx={{ mb: 2, fontWeight: 'bold', color: '#f5576c' }}>
-          가입자증감 관리
-        </Typography>
-        
-        {/* 통합 선택 영역 */}
-        <Box sx={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: 3, 
-          mb: 3,
-          p: 2,
-          backgroundColor: '#f8f9fa',
-          borderRadius: 2,
-          border: '1px solid #e0e0e0'
-        }}>
+      {/* 헤더 - presentationMode일 때 숨김 */}
+      {!presentationMode && (
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="h4" component="h1" sx={{ mb: 2, fontWeight: 'bold', color: '#f5576c' }}>
+            가입자증감 관리
+          </Typography>
+          
+          {/* 통합 선택 영역 */}
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 3, 
+            mb: 3,
+            p: 2,
+            backgroundColor: '#f8f9fa',
+            borderRadius: 2,
+            border: '1px solid #e0e0e0'
+          }}>
           {/* 시간 단위 선택 */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Typography variant="subtitle1" sx={{ fontWeight: 'bold', minWidth: 'fit-content' }}>
@@ -6032,26 +6104,30 @@ function SubscriberIncreaseTab({ presentationMode = false }) {
           </ToggleButtonGroup>
           </Box>
         </Box>
-      </Box>
+        </Box>
+      )}
 
-      {viewMode === 'table' ? (
+      {/* presentationMode일 때는 테이블과 그래프를 모두 표시 */}
+      {(viewMode === 'table' || presentationMode) ? (
         <Box>
-          {/* 인쇄 버튼 */}
-          <Box sx={{ mb: 3, textAlign: 'right' }} className="no-print">
-            <Button
-              variant="contained"
-              onClick={handlePrint}
-              sx={{
-                backgroundColor: '#ff9800',
-                color: 'white',
-                '&:hover': {
-                  backgroundColor: '#f57c00'
-                }
-              }}
-            >
-              🖨️ 인쇄하기
-            </Button>
-          </Box>
+          {/* 인쇄 버튼 - presentationMode일 때는 숨김 */}
+          {!presentationMode && (
+            <Box sx={{ mb: 3, textAlign: 'right' }} className="no-print">
+              <Button
+                variant="contained"
+                onClick={handlePrint}
+                sx={{
+                  backgroundColor: '#ff9800',
+                  color: 'white',
+                  '&:hover': {
+                    backgroundColor: '#f57c00'
+                  }
+                }}
+              >
+                🖨️ 인쇄하기
+              </Button>
+            </Box>
+          )}
           
           {/* 합계 테이블 */}
           {(timeUnit === 'month' ? totalData : getYearlyData(selectedYearMonth).totalData) && (
@@ -6783,6 +6859,437 @@ function SubscriberIncreaseTab({ presentationMode = false }) {
                 </TableContainer>
             </CardContent>
           </Card>
+          )}
+          
+          {/* presentationMode일 때는 그래프도 함께 표시 */}
+          {presentationMode && (
+            <>
+              {/* 가입자수 추이 그래프 */}
+              <Card sx={{ mb: 3, width: '100%' }}>
+                <CardContent sx={{ width: '100%' }}>
+                  <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', color: '#388e3c' }}>
+                    📈 가입자수 추이 {timeUnit === 'year' ? '(월별 흐름)' : '(막대 그래프)'}
+                  </Typography>
+                  <Box sx={{ height: 500, width: '100%' }}>
+                    {timeUnit === 'year' && selectedYearMonth ? (
+                      <Line 
+                        data={{
+                          labels: Array.from({length: 12}, (_, i) => `${i + 1}월`),
+                          datasets: agentData.map((agent, index) => {
+                            const colors = [
+                              'rgba(54, 162, 235, 1)',   // 파란색
+                              'rgba(255, 99, 132, 1)',   // 빨간색
+                              'rgba(75, 192, 192, 1)',   // 청록색
+                              'rgba(255, 205, 86, 1)',   // 노란색
+                              'rgba(153, 102, 255, 1)'   // 보라색
+                            ];
+                            const monthData = Array.from({length: 12}, (_, i) => {
+                              const yearMonthKey = `${selectedYearMonth}년 ${i + 1}월`;
+                              const colIndex = data[0].findIndex(header => header === yearMonthKey);
+                              if (colIndex !== -1) {
+                                const value = agent.subscriberData[colIndex];
+                                return value !== '' && value !== null && value !== undefined ? (parseFloat(value) || 0) : 0;
+                              }
+                              return 0;
+                            });
+                            
+                            return {
+                              label: `${agent.name} (${agent.code})`,
+                              data: monthData,
+                              borderColor: colors[index % colors.length],
+                              backgroundColor: colors[index % colors.length] + '20',
+                              borderWidth: 2,
+                              borderDash: [5, 5],
+                              fill: false,
+                              tension: 0.1
+                            };
+                          })
+                        }}
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          plugins: {
+                            legend: {
+                              position: 'top',
+                              labels: {
+                                font: {
+                                  size: 12,
+                                  weight: 'bold'
+                                },
+                                padding: 15
+                              }
+                            },
+                            title: {
+                              display: true,
+                              text: `가입자수 월별 흐름 - ${selectedYearMonth}년`,
+                              font: {
+                                size: 16,
+                                weight: 'bold'
+                              },
+                              padding: {
+                                top: 10,
+                                bottom: 15
+                              }
+                            },
+                            datalabels: {
+                              display: true,
+                              color: function(context) {
+                                return context.dataset.borderColor || '#1976d2';
+                              },
+                              font: {
+                                size: 10,
+                                weight: 'bold'
+                              },
+                              formatter: function(value) {
+                                return value > 0 ? value.toLocaleString() : '';
+                              },
+                              anchor: function(context) {
+                                return context.datasetIndex % 2 === 0 ? 'end' : 'start';
+                              },
+                              align: function(context) {
+                                if (context.datasetIndex <= 1) return 'top';
+                                if (context.datasetIndex <= 3) return 'bottom';
+                                return 'top';
+                              },
+                              offset: function(context) {
+                                return 10 + (context.datasetIndex * 12);
+                              },
+                              backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                              borderColor: function(context) {
+                                return context.dataset.borderColor || '#1976d2';
+                              },
+                              borderRadius: 4,
+                              borderWidth: 1,
+                              padding: 6
+                            }
+                          },
+                          scales: {
+                            x: {
+                              title: {
+                                display: true,
+                                text: '월',
+                                font: {
+                                  size: 12,
+                                  weight: 'bold'
+                                }
+                              },
+                              ticks: {
+                                font: {
+                                  size: 10,
+                                  weight: 'bold'
+                                }
+                              }
+                            },
+                            y: {
+                              beginAtZero: true,
+                              title: {
+                                display: true,
+                                text: '가입자수 (명)',
+                                font: {
+                                  size: 12,
+                                  weight: 'bold'
+                                }
+                              },
+                              ticks: {
+                                font: {
+                                  size: 10,
+                                  weight: 'bold'
+                                },
+                                callback: function(value) {
+                                  return value.toLocaleString() + '명';
+                                }
+                              }
+                            }
+                          }
+                        }}
+                      />
+                    ) : (
+                      <Bar 
+                        data={{
+                          labels: agentData.map(agent => `${agent.name}\n(${agent.code})`),
+                          datasets: [{
+                            label: '가입자수',
+                            data: agentData.map(agent => {
+                              if (!selectedYearMonth) return 0;
+                              const index = agent.subscriberData.findIndex((_, i) => data[0][i] === selectedYearMonth);
+                              const value = agent.subscriberData[index];
+                              return index !== -1 && value !== '' ? (parseFloat(value) || 0) : 0;
+                            }),
+                            backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            borderWidth: 1
+                          }]
+                        }}
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          plugins: {
+                            legend: {
+                              position: 'top',
+                              labels: {
+                                font: {
+                                  size: 12,
+                                  weight: 'bold'
+                                },
+                                padding: 15
+                              }
+                            },
+                            title: {
+                              display: true,
+                              text: `가입자수 현황 - ${selectedYearMonth || '년월 선택'}`,
+                              font: {
+                                size: 16,
+                                weight: 'bold'
+                              },
+                              padding: {
+                                top: 10,
+                                bottom: 15
+                              }
+                            }
+                          },
+                          scales: {
+                            y: {
+                              beginAtZero: true,
+                              title: {
+                                display: true,
+                                text: '가입자수 (명)',
+                                font: {
+                                  size: 12,
+                                  weight: 'bold'
+                                }
+                              },
+                              ticks: {
+                                font: {
+                                  size: 10,
+                                  weight: 'bold'
+                                },
+                                callback: function(value) {
+                                  return value.toLocaleString() + '명';
+                                }
+                              }
+                            }
+                          }
+                        }}
+                      />
+                    )}
+                  </Box>
+                </CardContent>
+              </Card>
+
+              {/* 관리수수료 추이 그래프 */}
+              <Card sx={{ mb: 3, width: '100%' }}>
+                <CardContent sx={{ width: '100%' }}>
+                  <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', color: '#388e3c' }}>
+                    📊 관리수수료 추이 {timeUnit === 'year' ? '(월별 흐름)' : '(선 그래프)'}
+                  </Typography>
+                  <Box sx={{ height: 500, width: '100%' }}>
+                    {timeUnit === 'year' && selectedYearMonth ? (
+                      <Line 
+                        data={{
+                          labels: Array.from({length: 12}, (_, i) => `${i + 1}월`),
+                          datasets: agentData.map((agent, index) => {
+                            const colors = [
+                              'rgba(54, 162, 235, 1)',   // 파란색
+                              'rgba(255, 99, 132, 1)',   // 빨간색
+                              'rgba(75, 192, 192, 1)',   // 청록색
+                              'rgba(255, 205, 86, 1)',   // 노란색
+                              'rgba(153, 102, 255, 1)'   // 보라색
+                            ];
+                            const monthData = Array.from({length: 12}, (_, i) => {
+                              const yearMonthKey = `${selectedYearMonth}년 ${i + 1}월`;
+                              const colIndex = data[0].findIndex(header => header === yearMonthKey);
+                              if (colIndex !== -1) {
+                                const value = agent.feeData[colIndex];
+                                return value !== '' && value !== null && value !== undefined ? (parseFloat(value) || 0) : 0;
+                              }
+                              return 0;
+                            });
+                            
+                            return {
+                              label: `${agent.name} (${agent.code})`,
+                              data: monthData,
+                              borderColor: colors[index % colors.length],
+                              backgroundColor: colors[index % colors.length] + '20',
+                              borderWidth: 2,
+                              borderDash: [5, 5],
+                              fill: false,
+                              tension: 0.1
+                            };
+                          })
+                        }}
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          plugins: {
+                            legend: {
+                              position: 'top',
+                              labels: {
+                                font: {
+                                  size: 12,
+                                  weight: 'bold'
+                                },
+                                padding: 15
+                              }
+                            },
+                            title: {
+                              display: true,
+                              text: `관리수수료 월별 흐름 - ${selectedYearMonth}년`,
+                              font: {
+                                size: 16,
+                                weight: 'bold'
+                              },
+                              padding: {
+                                top: 10,
+                                bottom: 15
+                              }
+                            },
+                            datalabels: {
+                              display: true,
+                              color: function(context) {
+                                return context.dataset.borderColor || '#388e3c';
+                              },
+                              font: {
+                                size: 10,
+                                weight: 'bold'
+                              },
+                              formatter: function(value) {
+                                return value > 0 ? value.toLocaleString() : '';
+                              },
+                              anchor: function(context) {
+                                return context.datasetIndex % 2 === 0 ? 'end' : 'start';
+                              },
+                              align: function(context) {
+                                if (context.datasetIndex <= 1) return 'top';
+                                if (context.datasetIndex <= 3) return 'bottom';
+                                return 'top';
+                              },
+                              offset: function(context) {
+                                return 10 + (context.datasetIndex * 12);
+                              },
+                              backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                              borderColor: function(context) {
+                                return context.dataset.borderColor || '#388e3c';
+                              },
+                              borderRadius: 4,
+                              borderWidth: 1,
+                              padding: 6
+                            }
+                          },
+                          scales: {
+                            x: {
+                              title: {
+                                display: true,
+                                text: '월',
+                                font: {
+                                  size: 12,
+                                  weight: 'bold'
+                                }
+                              },
+                              ticks: {
+                                font: {
+                                  size: 10,
+                                  weight: 'bold'
+                                }
+                              }
+                            },
+                            y: {
+                              beginAtZero: true,
+                              title: {
+                                display: true,
+                                text: '관리수수료 (원)',
+                                font: {
+                                  size: 12,
+                                  weight: 'bold'
+                                }
+                              },
+                              ticks: {
+                                font: {
+                                  size: 10,
+                                  weight: 'bold'
+                                },
+                                callback: function(value) {
+                                  return value.toLocaleString() + '원';
+                                }
+                              }
+                            }
+                          }
+                        }}
+                      />
+                    ) : (
+                      <Line 
+                        data={{
+                          labels: agentData.map(agent => `${agent.name}\n(${agent.code})`),
+                          datasets: [{
+                            label: '관리수수료',
+                            data: agentData.map(agent => {
+                              if (!selectedYearMonth) return 0;
+                              const index = agent.feeData.findIndex((_, i) => data[0][i] === selectedYearMonth);
+                              const value = agent.feeData[index];
+                              return index !== -1 && value !== '' ? (parseFloat(value) || 0) : 0;
+                            }),
+                            backgroundColor: 'rgba(153, 102, 255, 0.2)',
+                            borderColor: 'rgba(153, 102, 255, 1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.1
+                          }]
+                        }}
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          plugins: {
+                            legend: {
+                              position: 'top',
+                              labels: {
+                                font: {
+                                  size: 12,
+                                  weight: 'bold'
+                                },
+                                padding: 15
+                              }
+                            },
+                            title: {
+                              display: true,
+                              text: `관리수수료 현황 - ${selectedYearMonth || '년월 선택'}`,
+                              font: {
+                                size: 16,
+                                weight: 'bold'
+                              },
+                              padding: {
+                                top: 10,
+                                bottom: 15
+                              }
+                            }
+                          },
+                          scales: {
+                            y: {
+                              beginAtZero: true,
+                              title: {
+                                display: true,
+                                text: '관리수수료 (원)',
+                                font: {
+                                  size: 12,
+                                  weight: 'bold'
+                                }
+                              },
+                              ticks: {
+                                font: {
+                                  size: 10,
+                                  weight: 'bold'
+                                },
+                                callback: function(value) {
+                                  return value.toLocaleString() + '원';
+                                }
+                              }
+                            }
+                          }
+                        }}
+                      />
+                    )}
+                  </Box>
+                </CardContent>
+              </Card>
+            </>
           )}
         </Box>
       ) : (

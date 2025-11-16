@@ -230,11 +230,121 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         // csDetailType이 배열인 경우 첫 번째 값 사용, 단일 값인 경우 그대로 사용
         const csDetailTypeRaw = currentSlide?.detailOptions?.csDetailType;
         const csDetailType = Array.isArray(csDetailTypeRaw) ? csDetailTypeRaw[0] : csDetailTypeRaw;
+        // csDetailCriteria: "performance" 또는 "fee"
+        const csDetailCriteria = currentSlide?.detailOptions?.csDetailCriteria || 'performance';
+        
         if (currentSlide?.mode === 'chart' && csDetailType && csDetailType !== 'all') {
-          // 모든 '펼치기' 버튼 클릭 시도 (중복 클릭은 안전)
-          Array.from(document.querySelectorAll('button, .MuiButton-root'))
-            .filter(el => typeof el.textContent === 'string' && el.textContent.includes('펼치기'))
-            .forEach(el => el.click());
+          // 1단계: 랭킹 기준 탭 선택 (실적 기준 또는 수수료 기준)
+          // 랭킹 기준 탭은 "실적 기준" 또는 "수수료 기준" 텍스트를 가진 Tab 버튼
+          const rankingTabs = Array.from(document.querySelectorAll('button[role="tab"]'));
+          const targetRankingTab = rankingTabs.find(tab => {
+            const text = (tab.textContent || '').trim();
+            if (csDetailCriteria === 'performance') {
+              return text === '실적 기준';
+            } else if (csDetailCriteria === 'fee') {
+              return text === '수수료 기준';
+            }
+            return false;
+          });
+          
+          if (targetRankingTab) {
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`✅ [MeetingCaptureManager] 랭킹 기준 탭 선택: ${csDetailCriteria}`, {
+                slideId: currentSlide.slideId,
+                csDetailType,
+                tabText: targetRankingTab.textContent
+              });
+            }
+            targetRankingTab.click();
+            // 랭킹 기준 변경 후 데이터 업데이트 대기
+            await new Promise(r => setTimeout(r, 500));
+          } else {
+            if (process.env.NODE_ENV === 'development') {
+              console.warn(`⚠️ [MeetingCaptureManager] 랭킹 기준 탭을 찾을 수 없습니다.`, {
+                slideId: currentSlide.slideId,
+                csDetailCriteria,
+                foundTabs: rankingTabs.map(t => t.textContent)
+              });
+            }
+          }
+          
+          // 2단계: CS 개통 실적 요약 섹션의 "펼치기" 버튼 클릭 (csDetailType === 'cs'일 때만)
+          if (csDetailType === 'cs') {
+            const csSummaryButtons = Array.from(document.querySelectorAll('button'))
+              .filter(btn => {
+                const text = (btn.textContent || '').trim();
+                // CS 개통 실적 섹션 내의 "펼치기" 버튼 찾기
+                const parent = btn.closest('[class*="MuiPaper-root"]');
+                if (!parent) return false;
+                const parentText = (parent.textContent || '').trim();
+                return parentText.includes('CS 개통 실적') && text === '펼치기';
+              });
+            
+            if (csSummaryButtons.length > 0) {
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`✅ [MeetingCaptureManager] CS 개통 실적 요약 섹션 펼치기`, {
+                  slideId: currentSlide.slideId
+                });
+              }
+              csSummaryButtons[0].click();
+              await new Promise(r => setTimeout(r, 300));
+            }
+          }
+          
+          // 3단계: 각 테이블 섹션의 "펼치기" 버튼 클릭 (해당 csDetailType에 맞게)
+          const tableSectionMap = {
+            'code': '📊 코드별 실적',
+            'office': '🏢 사무실별 실적',
+            'department': '👥 소속별 실적',
+            'agent': ['🧑 담당자별 실적', '👤 담당자별 실적']
+          };
+          
+          const targetSectionHeader = tableSectionMap[csDetailType];
+          if (targetSectionHeader) {
+            const headerTexts = Array.isArray(targetSectionHeader) ? targetSectionHeader : [targetSectionHeader];
+            // 해당 섹션의 Paper 컴포넌트 찾기
+            let targetPaper = null;
+            for (const headerText of headerTexts) {
+              const headers = Array.from(document.querySelectorAll('h6, .MuiTypography-h6, .MuiBox-root, div'))
+                .filter(el => {
+                  const txt = (el.textContent || '').trim();
+                  return txt.startsWith(headerText);
+                });
+              
+              if (headers.length > 0) {
+                let paperElement = headers[0].parentElement;
+                while (paperElement && !paperElement.classList.contains('MuiPaper-root')) {
+                  paperElement = paperElement.parentElement;
+                }
+                if (paperElement) {
+                  targetPaper = paperElement;
+                  break;
+                }
+              }
+            }
+            
+            if (targetPaper) {
+              // 해당 Paper 내의 "펼치기" 버튼 찾기
+              const expandButton = targetPaper.querySelector('button')
+                ? Array.from(targetPaper.querySelectorAll('button')).find(btn => {
+                    const text = (btn.textContent || '').trim();
+                    return text === '펼치기';
+                  })
+                : null;
+              
+              if (expandButton) {
+                if (process.env.NODE_ENV === 'development') {
+                  console.log(`✅ [MeetingCaptureManager] ${csDetailType} 테이블 섹션 펼치기`, {
+                    slideId: currentSlide.slideId,
+                    csDetailType
+                  });
+                }
+                expandButton.click();
+                // 테이블 렌더링 대기
+                await new Promise(r => setTimeout(r, 500));
+              }
+            }
+          }
           
           const findHeader = (startsWithList) => {
             const candidates = Array.from(document.querySelectorAll('h6, .MuiTypography-h6, .MuiBox-root, div'));
@@ -406,97 +516,108 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
           // captureTargetElement는 아래에서 설정하지 않음 (compositeBlob 사용)
         }
 
-        // 재고장표: "총계" 헤더부터 스크롤 밑단까지 모든 데이터 캡처
+        // 재고장표: 테이블 컨테이너만 캡처 (로딩 화면 및 불필요한 부분 제외)
         if (
           (currentSlide?.mode === 'inventoryChart') ||
           (currentSlide?.mode === 'chart' && (currentSlide?.tab === 'inventoryChart' || currentSlide?.subTab === 'inventoryChart'))
         ) {
+          // 로딩 화면이 사라질 때까지 대기
+          const maxWait = 10000; // 최대 10초 대기
+          const start = Date.now();
+          while (Date.now() - start < maxWait) {
+            const loadingElements = slideElement.querySelectorAll('[data-capture-exclude="true"]');
+            const hasLoading = Array.from(loadingElements).some(el => {
+              const text = el.textContent || '';
+              return text.includes('로딩') || text.includes('불러오는 중') || 
+                     el.querySelector('.MuiCircularProgress-root') !== null;
+            });
+            if (!hasLoading) break;
+            await new Promise(r => setTimeout(r, 200));
+          }
+          
           // 모든 '펼치기' 버튼 클릭
           Array.from(document.querySelectorAll('button, .MuiButton-root'))
             .filter(el => typeof el.textContent === 'string' && el.textContent.includes('펼치기'))
             .forEach(el => el.click());
           
-          await new Promise(r => setTimeout(r, 300)); // 펼치기 후 렌더링 대기
+          await new Promise(r => setTimeout(r, 500)); // 펼치기 후 렌더링 대기
 
-          // "총계" 헤더를 찾아서 그 테이블 컨테이너 찾기
-          const totalHeader = Array.from(slideElement.querySelectorAll('th, .MuiTableCell-head'))
-            .find(el => {
-              const text = (el.textContent || '').trim();
-              return text === '총계';
-            });
+          // 테이블 컨테이너 찾기 (data-capture-exclude가 없는 것만)
+          let tableContainer = slideElement.querySelector('.MuiTableContainer-root');
           
-          let tableContainer = null;
-          
-          if (totalHeader) {
-            // "총계" 헤더가 속한 테이블 컨테이너 찾기
-            let current = totalHeader.parentElement; // TableRow
+          // data-capture-exclude가 있는 요소는 제외
+          if (tableContainer) {
+            let current = tableContainer;
             while (current && current !== slideElement) {
-              // TableHead 또는 TableContainer 찾기
-              if (current.classList.contains('MuiTableContainer-root') || 
-                  current.querySelector('.MuiTableContainer-root')) {
-                tableContainer = current.classList.contains('MuiTableContainer-root') 
-                  ? current 
-                  : current.querySelector('.MuiTableContainer-root');
+              if (current.getAttribute('data-capture-exclude') === 'true') {
+                tableContainer = null;
                 break;
-              }
-              // TableHead의 부모인 Table 찾기
-              if (current.tagName === 'TABLE' || current.classList.contains('MuiTable-root')) {
-                // Table의 부모인 TableContainer 찾기
-                let parent = current.parentElement;
-                while (parent && parent !== slideElement) {
-                  if (parent.classList.contains('MuiTableContainer-root')) {
-                    tableContainer = parent;
-                    break;
-                  }
-                  parent = parent.parentElement;
-                }
-                if (tableContainer) break;
               }
               current = current.parentElement;
             }
           }
           
-          // "총계" 헤더를 찾지 못한 경우, 일반 테이블 컨테이너 찾기
+          // 테이블 컨테이너를 찾지 못한 경우, 직접 찾기
           if (!tableContainer) {
-            tableContainer = slideElement.querySelector('.MuiTableContainer-root') || slideElement.querySelector('table');
+            const allContainers = Array.from(slideElement.querySelectorAll('.MuiTableContainer-root'));
+            tableContainer = allContainers.find(container => {
+              // data-capture-exclude가 없는 컨테이너만 선택
+              let current = container;
+              while (current && current !== slideElement) {
+                if (current.getAttribute('data-capture-exclude') === 'true') {
+                  return false;
+                }
+                current = current.parentElement;
+              }
+              // "총계" 또는 테이블 데이터가 있는 컨테이너인지 확인
+              const text = container.textContent || '';
+              return text.includes('총계') || text.includes('모델명') || container.querySelector('table') !== null;
+            });
           }
           
           if (tableContainer) {
-            // 스크롤 가능한 테이블의 경우, 전체 스크롤 영역 캡처를 위해 스타일 조정
-            if (tableContainer.classList.contains('MuiTableContainer-root')) {
-              // 스크롤을 없애고 전체 높이로 확장하여 모든 데이터 표시
-              const originalMaxHeight = tableContainer.style.maxHeight;
-              const originalOverflow = tableContainer.style.overflow;
-              
-              tableContainer.style.maxHeight = 'none';
-              tableContainer.style.overflow = 'visible';
-              
-              // 스타일 변경 후 렌더링 대기
-              await new Promise(r => setTimeout(r, 300));
-              
-              // "총계" 헤더로 스크롤
-              if (totalHeader) {
-                try {
-                  totalHeader.scrollIntoView({ block: 'start', behavior: 'instant' });
-                  await new Promise(r => setTimeout(r, 200));
-                } catch {}
+            // 테이블의 실제 높이만큼만 캡처하기 위해 스타일 조정
+            const originalMaxHeight = tableContainer.style.maxHeight;
+            const originalOverflow = tableContainer.style.overflow;
+            const originalHeight = tableContainer.style.height;
+            
+            // 스크롤을 없애고 전체 높이로 확장
+            tableContainer.style.maxHeight = 'none';
+            tableContainer.style.overflow = 'visible';
+            tableContainer.style.height = 'auto';
+            
+            // 테이블 내부의 실제 높이 계산
+            const table = tableContainer.querySelector('table');
+            if (table) {
+              // 테이블의 실제 높이 계산 (마지막 행까지)
+              const tableRect = table.getBoundingClientRect();
+              const lastRow = table.querySelector('tbody tr:last-child');
+              if (lastRow) {
+                const lastRowRect = lastRow.getBoundingClientRect();
+                const tableTop = tableRect.top;
+                const tableBottom = lastRowRect.bottom;
+                const actualHeight = tableBottom - tableTop + 20; // 여유 공간 20px
+                
+                // 컨테이너 높이를 테이블 실제 높이로 설정
+                tableContainer.style.height = `${actualHeight}px`;
               }
-              
-              captureTargetElement = tableContainer;
-              
-              // 캡처 후 원래 스타일 복원 (선택사항)
-              // tableContainer.style.maxHeight = originalMaxHeight;
-              // tableContainer.style.overflow = originalOverflow;
-            } else {
-              captureTargetElement = tableContainer;
-              try { 
-                if (totalHeader) {
-                  totalHeader.scrollIntoView({ block: 'start', behavior: 'instant' });
-                } else {
-                  tableContainer.scrollIntoView({ block: 'center', behavior: 'instant' });
-                }
-              } catch {}
-              await new Promise(r => setTimeout(r, 400));
+            }
+            
+            // 스타일 변경 후 렌더링 대기
+            await new Promise(r => setTimeout(r, 500));
+            
+            // 테이블 상단으로 스크롤
+            tableContainer.scrollIntoView({ block: 'start', behavior: 'instant' });
+            await new Promise(r => setTimeout(r, 300));
+            
+            captureTargetElement = tableContainer;
+            
+            if (process.env.NODE_ENV === 'development') {
+              console.log('✅ [MeetingCaptureManager] 재고장표 테이블 컨테이너 캡처 준비 완료');
+            }
+          } else {
+            if (process.env.NODE_ENV === 'development') {
+              console.warn('⚠️ [MeetingCaptureManager] 재고장표 테이블 컨테이너를 찾을 수 없습니다.');
             }
           }
         }
@@ -602,12 +723,15 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
 
           // 그래프 2개가 모두 렌더링될 때까지 대기 (최대 7초)
           // 막대 그래프(Bar)와 선 그래프(Line) 모두 포함
+          // 그래프가 잘리지 않았는지 확인 (너비와 높이가 0이 아닌지)
           try {
             const maxWait = 7000; // 대기 시간 증가 (5초 → 7초)
             const start = Date.now();
             let chartCount = 0;
             let barChartFound = false;
             let lineChartFound = false;
+            let barChartValid = false;
+            let lineChartValid = false;
             
             while (Date.now() - start < maxWait) {
               // 모든 차트 요소 찾기 (canvas, svg, recharts)
@@ -623,6 +747,9 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                   const barChart = paper.querySelector('canvas, svg, [class*="recharts"], [class*="Bar"]');
                   if (barChart) {
                     barChartFound = true;
+                    // 그래프가 잘리지 않았는지 확인 (너비와 높이가 0이 아닌지)
+                    const rect = barChart.getBoundingClientRect();
+                    barChartValid = rect.width > 100 && rect.height > 100;
                   }
                 }
                 // 선 그래프 확인 (Line 차트는 "조회 월 선택" 텍스트가 있는 Paper에 있음)
@@ -630,20 +757,23 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                   const lineChart = paper.querySelector('canvas, svg, [class*="recharts"], [class*="Line"]');
                   if (lineChart) {
                     lineChartFound = true;
+                    // 그래프가 잘리지 않았는지 확인 (너비와 높이가 0이 아닌지)
+                    const rect = lineChart.getBoundingClientRect();
+                    lineChartValid = rect.width > 100 && rect.height > 100;
                   }
                 }
               }
               
-              // 막대 그래프와 선 그래프가 모두 렌더링되었는지 확인
-              if (barChartFound && lineChartFound && chartCount >= 2) {
+              // 막대 그래프와 선 그래프가 모두 렌더링되었고, 잘리지 않았는지 확인
+              if (barChartFound && lineChartFound && barChartValid && lineChartValid && chartCount >= 2) {
                 if (process.env.NODE_ENV === 'development') {
-                  console.log('✅ [MeetingCaptureManager] 재초담초채권 그래프 모두 렌더링 완료');
+                  console.log('✅ [MeetingCaptureManager] 재초담초채권 그래프 모두 렌더링 완료 (잘림 없음)');
                 }
                 break;
               }
               
               // 선 그래프 Paper로 스크롤하여 강제 렌더링 유도
-              if (!lineChartFound) {
+              if (!lineChartFound || !lineChartValid) {
                 try { 
                   const linePaper = Array.from(papers).find(p => (p.textContent || '').includes('조회 월 선택'));
                   if (linePaper) {
@@ -654,23 +784,40 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                 } catch {}
               }
               
+              // 막대 그래프 Paper로 스크롤하여 강제 렌더링 유도
+              if (!barChartFound || !barChartValid) {
+                try {
+                  const barPaper = Array.from(papers).find(p => 
+                    (p.textContent || '').includes('대리점별 채권 현황') || 
+                    (p.textContent || '').includes('대리점별 현재 채권 현황')
+                  );
+                  if (barPaper) {
+                    barPaper.scrollIntoView({ block: 'center', behavior: 'instant' });
+                    await new Promise(r => setTimeout(r, 300));
+                  }
+                } catch {}
+              }
+              
               await new Promise(r => setTimeout(r, 200));
             }
             
-            // 최종 확인: 선 그래프가 없으면 추가 대기 및 경고
-            if (!lineChartFound) {
+            // 최종 확인: 그래프가 없거나 잘렸으면 추가 대기 및 경고
+            if (!barChartFound || !barChartValid || !lineChartFound || !lineChartValid) {
               if (process.env.NODE_ENV === 'development') {
-                console.warn('⚠️ [MeetingCaptureManager] 재초담초채권 선 그래프를 찾을 수 없습니다. 추가 대기 중...');
+                console.warn('⚠️ [MeetingCaptureManager] 재초담초채권 그래프 렌더링 문제:', {
+                  barChartFound,
+                  barChartValid,
+                  lineChartFound,
+                  lineChartValid
+                });
               }
-              // 선 그래프 Paper로 다시 스크롤하고 추가 대기
+              // 모든 Paper로 스크롤하고 추가 대기
               const papers = slideElement.querySelectorAll('.MuiPaper-root');
-              const linePaper = Array.from(papers).find(p => (p.textContent || '').includes('조회 월 선택'));
-              if (linePaper) {
-                linePaper.scrollIntoView({ block: 'center', behavior: 'instant' });
-                await new Promise(r => setTimeout(r, 1500));
-              } else {
-                await new Promise(r => setTimeout(r, 1000));
+              for (const paper of papers) {
+                paper.scrollIntoView({ block: 'center', behavior: 'instant' });
+                await new Promise(r => setTimeout(r, 200));
               }
+              await new Promise(r => setTimeout(r, 1000));
             }
           } catch (e) {
             if (process.env.NODE_ENV === 'development') {
@@ -771,26 +918,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         console.warn('⚠️ [MeetingCaptureManager] 상세옵션 타겟 선택 중 경고:', e?.message);
       }
 
-      // 재고장표 특수 처리: 모든 '펼치기' 확장 및 표 전체 보이도록 스타일 조정
-      try {
-        if (currentSlide?.mode === 'inventoryChart') {
-          Array.from(document.querySelectorAll('button, .MuiButton-root'))
-            .filter(el => typeof el.textContent === 'string' && el.textContent.includes('펼치기'))
-            .forEach(el => el.click());
-          // 표 컨테이너 찾기
-          const invTable = slideElement.querySelector('.MuiTableContainer-root') || slideElement.querySelector('table');
-          if (invTable) {
-            captureTargetElement = invTable;
-            // 스크롤을 없애고 전체 높이로 확장
-            invTable.style.maxHeight = 'none';
-            invTable.style.overflow = 'visible';
-          }
-          // 확장 후 렌더 안정화 짧게 대기
-          await new Promise(r => setTimeout(r, 500));
-        }
-      } catch (e) {
-        console.warn('⚠️ [MeetingCaptureManager] 재고장표 확장 처리 중 경고:', e?.message);
-      }
+      // 재고장표 특수 처리는 위에서 이미 처리됨 (로딩 화면 제외 및 테이블만 캡처)
 
       // 지표장표 > 월간시상: 확대 후 5개 테이블 모두 캡처 (슬라이드 헤더 포함)
       let monthlyAwardCompositeBlob = null;
@@ -1062,36 +1190,48 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
           }
           
           // 그래프 Paper만 찾기 (필터와 중복 헤더 제외, 슬라이드 헤더는 유지) - 그래프형식으로 전환 후 다시 찾기
-          const chartPapersAll = Array.from(slideElement.querySelectorAll('.MuiPaper-root, .MuiCardContent-root'));
+          // 더 정확한 선택: Card 컴포넌트를 직접 찾기
+          const chartPapersAll = Array.from(slideElement.querySelectorAll('.MuiPaper-root, .MuiCard-root, .MuiCardContent-root'));
           const chartPapers = chartPapersAll.filter(paper => {
             const text = paper.textContent || '';
-            return (text.includes('가입자수 추이') || text.includes('관리수수료 추이')) &&
+            // 가입자수 추이 또는 관리수수료 추이를 포함하고, 그래프(canvas 또는 svg)가 있는 Paper만 선택
+            const hasChart = paper.querySelector('canvas, svg, [class*="recharts"]');
+            return hasChart && 
+                   (text.includes('가입자수 추이') || text.includes('관리수수료 추이')) &&
                    !text.includes('대상 년도') && 
                    !text.includes('시간 단위') &&
                    !text.includes('표시 모드') &&
                    !text.includes('가입자증감 관리'); // 중복 헤더 제외
           });
           
+          // 정확히 2개의 그래프 Paper가 있는지 확인 (가입자수 추이 1개, 관리수수료 추이 1개)
+          const subscriberChartPaper = chartPapers.find(p => p.textContent?.includes('가입자수 추이'));
+          const feeChartPaper = chartPapers.find(p => p.textContent?.includes('관리수수료 추이'));
+          
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`🔍 [MeetingCaptureManager] 가입자증감 그래프 찾기: 전체 ${chartPapersAll.length}개, 필터링 후 ${chartPapers.length}개`);
+            console.log(`🔍 [MeetingCaptureManager] 가입자수 추이: ${subscriberChartPaper ? '찾음' : '없음'}`);
+            console.log(`🔍 [MeetingCaptureManager] 관리수수료 추이: ${feeChartPaper ? '찾음' : '없음'}`);
+          }
+          
           let graphBlob = null;
-          if (chartPapers.length >= 2) {
+          // 가입자수 추이와 관리수수료 추이 그래프가 모두 있는지 확인
+          if (subscriberChartPaper && feeChartPaper) {
             // 두 그래프 Paper의 공통 조상 찾기
-            const findCommonAncestor = (elements) => {
-              if (!elements || elements.length === 0) return null;
+            const findCommonAncestor = (el1, el2) => {
+              if (!el1 || !el2) return null;
               const getAncestors = (el) => {
                 const list = [];
                 let cur = el;
                 while (cur) { list.push(cur); cur = cur.parentElement; }
                 return list;
               };
-              let common = getAncestors(elements[0]);
-              for (let i = 1; i < elements.length; i++) {
-                const ancestors = new Set(getAncestors(elements[i]));
-                common = common.filter(a => ancestors.has(a));
-              }
-              return common.find(el => el !== document.body && slideElement.contains(el)) || slideElement;
+              const ancestors1 = getAncestors(el1);
+              const ancestors2 = new Set(getAncestors(el2));
+              return ancestors1.find(a => ancestors2.has(a) && a !== document.body && slideElement.contains(a)) || slideElement;
             };
             
-            const graphAncestor = findCommonAncestor(chartPapers);
+            const graphAncestor = findCommonAncestor(subscriberChartPaper, feeChartPaper);
             
             if (graphAncestor) {
               // 그래프 영역으로 스크롤
@@ -1115,7 +1255,10 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                 console.warn('⚠️ [MeetingCaptureManager] 공통 조상을 찾지 못해 각각 캡처합니다.');
               }
               
-              const chart1Blob = await captureElement(chartPapers[0], {
+              subscriberChartPaper.scrollIntoView({ block: 'center', behavior: 'instant' });
+              await new Promise(r => setTimeout(r, 500));
+              
+              const chart1Blob = await captureElement(subscriberChartPaper, {
                 scale: 2,
                 useCORS: true,
                 backgroundColor: '#ffffff',
@@ -1123,10 +1266,10 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                 scrollY: 0
               });
               
-              chartPapers[1].scrollIntoView({ block: 'center', behavior: 'instant' });
+              feeChartPaper.scrollIntoView({ block: 'center', behavior: 'instant' });
               await new Promise(r => setTimeout(r, 500));
               
-              const chart2Blob = await captureElement(chartPapers[1], {
+              const chart2Blob = await captureElement(feeChartPaper, {
                 scale: 2,
                 useCORS: true,
                 backgroundColor: '#ffffff',
@@ -1150,11 +1293,15 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             }
           } else {
             if (process.env.NODE_ENV === 'development') {
-              console.warn(`⚠️ [MeetingCaptureManager] 가입자증감 그래프 Paper를 찾을 수 없습니다. (찾은 개수: ${chartPapers.length})`);
+              console.warn(`⚠️ [MeetingCaptureManager] 가입자증감 그래프 Paper를 찾을 수 없습니다.`);
+              console.warn(`  - 가입자수 추이: ${subscriberChartPaper ? '찾음' : '없음'}`);
+              console.warn(`  - 관리수수료 추이: ${feeChartPaper ? '찾음' : '없음'}`);
+              console.warn(`  - 전체 Paper 수: ${chartPapersAll.length}`);
             }
           }
           
           // 3) 테이블과 그래프를 세로로 합치기
+          let contentBlob = null;
           if (tableBlob && graphBlob) {
             const imgTable = await blobToImage(tableBlob);
             const imgGraph = await blobToImage(graphBlob);
@@ -1168,17 +1315,96 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             ctx.drawImage(imgTable, 0, 0);
             ctx.drawImage(imgGraph, 0, imgTable.height + gap);
             
-            compositeBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+            contentBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
             
             if (process.env.NODE_ENV === 'development') {
               console.log('✅ [MeetingCaptureManager] 가입자증감 테이블+그래프 합성 완료');
             }
           } else if (tableBlob) {
             // 테이블만 있는 경우
-            compositeBlob = tableBlob;
+            contentBlob = tableBlob;
           } else if (graphBlob) {
             // 그래프만 있는 경우
-            compositeBlob = graphBlob;
+            contentBlob = graphBlob;
+          }
+          
+          // 4) 슬라이드 헤더 캡처 및 합성
+          if (contentBlob) {
+            try {
+              // 슬라이드 헤더 찾기 (SlideRenderer에서 렌더링된 헤더)
+              // 헤더는 position: absolute, top: 0, 그리고 (주)브이아이피플러스 텍스트를 포함
+              let headerElement = null;
+              
+              // 방법 1: 모든 요소를 순회하며 헤더 찾기
+              const allElements = Array.from(slideElement.querySelectorAll('*'));
+              for (const el of allElements) {
+                const style = window.getComputedStyle(el);
+                const text = el.textContent || '';
+                if (style.position === 'absolute' && 
+                    (parseInt(style.top) === 0 || style.top === '0px') &&
+                    text.includes('(주)브이아이피플러스')) {
+                  headerElement = el;
+                  break;
+                }
+              }
+              
+              // 방법 2: slideElement의 직접 자식 중에서 찾기
+              if (!headerElement) {
+                for (const child of Array.from(slideElement.children)) {
+                  const style = window.getComputedStyle(child);
+                  const text = child.textContent || '';
+                  if (style.position === 'absolute' && 
+                      (parseInt(style.top) === 0 || style.top === '0px') &&
+                      text.includes('(주)브이아이피플러스')) {
+                    headerElement = child;
+                    break;
+                  }
+                }
+              }
+              
+              if (headerElement) {
+                headerElement.scrollIntoView({ block: 'start', behavior: 'instant' });
+                await new Promise(r => setTimeout(r, 300));
+                
+                const headerBlob = await captureElement(headerElement, {
+                  scale: 2,
+                  useCORS: true,
+                  backgroundColor: 'transparent',
+                  scrollX: 0,
+                  scrollY: 0
+                });
+                
+                const imgHeader = await blobToImage(headerBlob);
+                const imgContent = await blobToImage(contentBlob);
+                const gap = 0; // 헤더와 콘텐츠 사이 간격 없음
+                const canvas = document.createElement('canvas');
+                canvas.width = Math.max(imgHeader.width, imgContent.width);
+                canvas.height = imgHeader.height + gap + imgContent.height;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(imgHeader, 0, 0);
+                ctx.drawImage(imgContent, 0, imgHeader.height + gap);
+                
+                compositeBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+                
+                if (process.env.NODE_ENV === 'development') {
+                  console.log('✅ [MeetingCaptureManager] 가입자증감 헤더+콘텐츠 합성 완료');
+                }
+              } else {
+                // 헤더를 찾지 못한 경우 콘텐츠만 사용
+                compositeBlob = contentBlob;
+                if (process.env.NODE_ENV === 'development') {
+                  console.warn('⚠️ [MeetingCaptureManager] 슬라이드 헤더를 찾을 수 없습니다.');
+                }
+              }
+            } catch (e) {
+              // 헤더 캡처 실패 시 콘텐츠만 사용
+              compositeBlob = contentBlob;
+              if (process.env.NODE_ENV === 'development') {
+                console.warn('⚠️ [MeetingCaptureManager] 헤더 캡처 실패:', e?.message);
+              }
+            }
           }
         } catch (e) {
           console.error('❌ [MeetingCaptureManager] 가입자증감 캡처 실패:', e);

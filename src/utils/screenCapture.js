@@ -33,10 +33,15 @@ async function autoCropCanvas(canvas) {
     
     // 실제 콘텐츠 영역 찾기 (하단부터 역순으로 스캔하여 마지막 콘텐츠 라인 찾기)
     // 하단 공백만 제거하기 위해 하단부터 스캔
-    // 연속된 빈 라인을 더 정확하게 감지하기 위해 개선
+    // 근본적 개선: 마지막 콘텐츠 라인을 찾은 후, 그 아래에 최소 여유 공간을 강제로 보장
     let consecutiveEmptyLines = 0;
     const requiredEmptyLines = 20; // 연속으로 20줄 이상 빈 공간이면 하단 공백으로 간주
+    const minBottomPadding = 80; // 마지막 콘텐츠 라인 아래 최소 여유 공간 (헤더-내용 간격과 비슷)
     
+    // 마지막 콘텐츠 라인을 찾기 위한 변수 (하단에서 가장 가까운 콘텐츠 라인)
+    let lastContentLine = 0;
+    
+    // 하단부터 스캔: y는 canvas.height - 1부터 0까지 감소
     for (let y = canvas.height - 1; y >= 0; y--) {
       let contentPixels = 0;
       
@@ -61,9 +66,6 @@ async function autoCropCanvas(canvas) {
           contentPixels++;
           minX = Math.min(minX, x);
           maxX = Math.max(maxX, x);
-          if (maxY === 0) {
-            maxY = y; // 첫 번째 콘텐츠 라인 (하단부터)
-          }
         }
       }
       
@@ -72,15 +74,54 @@ async function autoCropCanvas(canvas) {
       if (contentRatio > 0.05) {
         // 실제 콘텐츠가 있는 라인
         consecutiveEmptyLines = 0;
+        // 하단부터 스캔하므로, 첫 번째로 만나는 콘텐츠 라인이 하단에서 가장 가까운 콘텐츠 = 마지막 콘텐츠 라인
+        if (lastContentLine === 0) {
+          lastContentLine = y; // 마지막 콘텐츠 라인 기록
+        }
         if (maxY === 0) {
-          maxY = y;
+          maxY = y; // 첫 번째 콘텐츠 라인 (하단부터)
         }
       } else {
         // 빈 라인
         consecutiveEmptyLines++;
         // 연속된 빈 라인이 충분히 많으면 하단 공백으로 간주하고 중단
-        if (consecutiveEmptyLines >= requiredEmptyLines && maxY > 0) {
+        // 단, 마지막 콘텐츠 라인 아래 최소 여유 공간은 보장
+        if (consecutiveEmptyLines >= requiredEmptyLines && lastContentLine > 0) {
+          // 하단(canvas.height - 1)에서 마지막 콘텐츠 라인(lastContentLine)까지의 거리
+          // 이 거리가 최소 여유 공간보다 작으면, 최소 여유 공간을 보장
+          const bottomSpace = (canvas.height - 1) - lastContentLine;
+          if (bottomSpace < minBottomPadding) {
+            // 최소 여유 공간보다 적으면, 마지막 콘텐츠 라인 + 최소 여유 공간으로 설정
+            maxY = Math.min(canvas.height - 1, lastContentLine + minBottomPadding);
+          } else {
+            // 충분한 공백이 있으면 현재 위치(y)에서 중단
+            // 하지만 마지막 콘텐츠 라인 아래 최소 여유 공간은 보장
+            maxY = Math.min(canvas.height - 1, lastContentLine + minBottomPadding);
+          }
           break;
+        }
+      }
+    }
+    
+    // 마지막 콘텐츠 라인을 찾았지만 충분한 공백이 없는 경우, 최소 여유 공간 보장
+    // (연속된 빈 라인을 만나지 못한 경우에도 보장)
+    if (lastContentLine > 0) {
+      if (maxY === 0) {
+        // 콘텐츠는 찾았지만 maxY가 설정되지 않은 경우
+        maxY = Math.min(canvas.height - 1, lastContentLine + minBottomPadding);
+      } else {
+        // 하단에서 마지막 콘텐츠 라인까지의 거리 확인
+        const bottomSpace = (canvas.height - 1) - lastContentLine;
+        if (bottomSpace < minBottomPadding) {
+          // 마지막 콘텐츠 라인 아래 최소 여유 공간을 강제로 보장
+          maxY = Math.min(canvas.height - 1, lastContentLine + minBottomPadding);
+        } else {
+          // 충분한 공백이 있어도, 마지막 콘텐츠 라인 기준으로 최소 여유 공간 보장
+          // (너무 많은 공백을 제거하지 않도록)
+          const currentBottomSpace = maxY - lastContentLine;
+          if (currentBottomSpace < minBottomPadding) {
+            maxY = Math.min(canvas.height - 1, lastContentLine + minBottomPadding);
+          }
         }
       }
     }
@@ -116,14 +157,15 @@ async function autoCropCanvas(canvas) {
       return canvas;
     }
     
-    // 여유 공간 추가 (좌우 10px, 하단 40px, 상단은 0 유지)
-    // 하단에 충분한 여유 공간을 주어 컨텐츠가 잘려 보이지 않도록 개선
+    // 여유 공간 추가 (좌우 10px, 하단은 이미 위에서 최소 여유 공간 보장됨)
+    // 하단 여유 공간은 이미 마지막 콘텐츠 라인 기준으로 최소 80px 보장되었으므로
+    // 추가 패딩은 필요 없지만, 좌우 여유 공간만 추가
     const paddingX = 10; // 좌우 여유 공간
-    const paddingBottom = 40; // 하단 여유 공간 (기존 10px에서 40px로 증가)
     minX = Math.max(0, minX - paddingX);
     minY = 0; // 상단은 항상 0부터 시작
     maxX = Math.min(canvas.width, maxX + paddingX);
-    maxY = Math.min(canvas.height, maxY + paddingBottom);
+    // maxY는 이미 마지막 콘텐츠 라인 + 최소 여유 공간(80px)으로 설정되었으므로 그대로 사용
+    maxY = Math.min(canvas.height, maxY);
     
     const width = maxX - minX;
     const height = maxY - minY;
