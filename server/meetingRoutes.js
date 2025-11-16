@@ -1686,6 +1686,17 @@ async function convertPPTToImages(pptBuffer, filename) {
           const path = require('path');
           const fs = require('fs');
           
+          // 공통 경로 후보
+          const commonCandidates = [
+            process.env.PUPPETEER_EXECUTABLE_PATH,
+            process.env.CHROME_PATH,
+            '/usr/bin/google-chrome-stable',
+            '/usr/bin/google-chrome',
+            '/usr/bin/chromium-browser',
+            '/usr/bin/chromium',
+            '/opt/google/chrome/chrome'
+          ].filter(Boolean);
+          
           const puppeteerCacheDir = process.env.PUPPETEER_CACHE_DIR || path.join(os.homedir(), '.cache', 'puppeteer');
           const chromePaths = [
             path.join(puppeteerCacheDir, 'chrome', 'linux-142.0.7444.162', 'chrome-linux64', 'chrome'),
@@ -1714,6 +1725,18 @@ async function convertPPTToImages(pptBuffer, filename) {
                   }
                 }
               }
+              // 시스템 공통 경로도 확인
+              if (!foundChromePath) {
+                for (const candidate of commonCandidates) {
+                  try {
+                    if (candidate && fs.existsSync(candidate)) {
+                      foundChromePath = candidate;
+                      console.log(`✅ [PPT 변환] 시스템 Chrome 발견: ${foundChromePath}`);
+                      break;
+                    }
+                  } catch (_) {}
+                }
+              }
             }
           } catch (pathError) {
             console.warn('⚠️ [PPT 변환] Chrome 경로 확인 실패:', pathError.message);
@@ -1740,7 +1763,8 @@ async function convertPPTToImages(pptBuffer, filename) {
               throw new Error(`PPT 변환을 위해 Chrome이 필요합니다. Chrome이 설치되어 있지만 실행에 실패했습니다.\n\n` +
                 `해결 방법:\n` +
                 `1. 서버를 재시작하세요.\n` +
-                `2. 또는 환경 변수 PUPPETEER_EXECUTABLE_PATH에 Chrome 실행 파일 경로를 설정하세요: ${foundChromePath}\n\n` +
+                `2. 환경 변수 PUPPETEER_EXECUTABLE_PATH 또는 CHROME_PATH에 Chrome 경로를 설정하세요: ${foundChromePath}\n` +
+                `3. 또는 package.json postinstall에서 'npx puppeteer browsers install chrome'을 실행해 캐시에 설치하세요.\n\n` +
                 `원본 에러: ${launchError.message}\n` +
                 `재시도 에러: ${retryError.message}`);
             }
