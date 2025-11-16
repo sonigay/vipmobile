@@ -461,13 +461,13 @@ async function getMeetingConfig(req, res) {
     const { meetingId } = req.params;
     const sheetName = '회의설정';
 
-    // 시트 헤더 확인 (tabLabel, subTabLabel 컬럼 추가)
+    // 시트 헤더 확인 (tabLabel, subTabLabel, 세부항목옵션 컬럼 추가)
     await ensureSheetHeaders(sheets, SPREADSHEET_ID, sheetName, [
-      '회의ID', '슬라이드ID', '순서', '타입', '모드', '탭', '제목', '내용', '배경색', '이미지URL', '캡처시간', 'Discord포스트ID', 'Discord스레드ID', '탭라벨', '서브탭라벨', '회의날짜', '회의차수', '회의장소', '참석자', '생성자'
+      '회의ID', '슬라이드ID', '순서', '타입', '모드', '탭', '제목', '내용', '배경색', '이미지URL', '캡처시간', 'Discord포스트ID', 'Discord스레드ID', '탭라벨', '서브탭라벨', '세부항목옵션', '회의날짜', '회의차수', '회의장소', '참석자', '생성자'
     ]);
 
-    // 데이터 조회 (tabLabel, subTabLabel 컬럼 포함)
-    const range = `${sheetName}!A3:T`;
+    // 데이터 조회 (tabLabel, subTabLabel, 세부항목옵션 컬럼 포함)
+    const range = `${sheetName}!A3:U`;
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
       range
@@ -494,6 +494,7 @@ async function getMeetingConfig(req, res) {
           subTab: subTab || '',
           tabLabel: row[13] || '', // 탭라벨
           subTabLabel: row[14] || '', // 서브탭라벨
+          detailLabel: row[15] || '', // 세부항목옵션
           title: row[6] || '',
           content: row[7] || '',
           backgroundColor: row[8] || '#ffffff',
@@ -502,11 +503,11 @@ async function getMeetingConfig(req, res) {
           discordPostId: row[11] || '',
           discordThreadId: row[12] || '',
           // 메인 슬라이드 필드 (있으면 사용) - 인덱스 조정 필요
-          meetingDate: row[15] || '',
-          meetingNumber: row[16] ? parseInt(row[16]) : undefined,
-          meetingLocation: row[17] || '',
-          participants: row[18] || '',
-          createdBy: row[19] || ''
+          meetingDate: row[16] || '',
+          meetingNumber: row[17] ? parseInt(row[17]) : undefined,
+          meetingLocation: row[18] || '',
+          participants: row[19] || '',
+          createdBy: row[20] || ''
         };
         
         console.log(`📖 [getMeetingConfig] 슬라이드 ${idx + 1}:`, {
@@ -585,13 +586,13 @@ async function saveMeetingConfig(req, res) {
       return res.status(400).json({ success: false, error: '슬라이드 배열이 필요합니다.' });
     }
 
-    // 시트 헤더 확인 (tabLabel, subTabLabel 컬럼 추가)
+    // 시트 헤더 확인 (tabLabel, subTabLabel, 세부항목옵션 컬럼 추가)
     await ensureSheetHeaders(sheets, SPREADSHEET_ID, sheetName, [
-      '회의ID', '슬라이드ID', '순서', '타입', '모드', '탭', '제목', '내용', '배경색', '이미지URL', '캡처시간', 'Discord포스트ID', 'Discord스레드ID', '탭라벨', '서브탭라벨', '회의날짜', '회의차수', '회의장소', '참석자', '생성자'
+      '회의ID', '슬라이드ID', '순서', '타입', '모드', '탭', '제목', '내용', '배경색', '이미지URL', '캡처시간', 'Discord포스트ID', 'Discord스레드ID', '탭라벨', '서브탭라벨', '세부항목옵션', '회의날짜', '회의차수', '회의장소', '참석자', '생성자'
     ]);
 
-    // 기존 데이터 조회 (메인 슬라이드 필드 및 tabLabel, subTabLabel 포함, 재시도 포함)
-    const range = `${sheetName}!A3:T`;
+    // 기존 데이터 조회 (메인 슬라이드 필드 및 tabLabel, subTabLabel, 세부항목옵션 포함, 재시도 포함)
+    const range = `${sheetName}!A3:U`;
     const response = await retrySheetsOperation(async () => {
       return await sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
@@ -663,7 +664,7 @@ async function saveMeetingConfig(req, res) {
       // subTab이 있으면 tab 필드에 tab/subTab 형식으로 저장
       const tabValue = slide.subTab ? `${slide.tab || ''}/${slide.subTab}` : (slide.tab || '');
       
-      // 메인 슬라이드의 경우 추가 필드 포함 (tabLabel, subTabLabel 추가)
+      // 메인 슬라이드의 경우 추가 필드 포함 (tabLabel, subTabLabel, 세부항목옵션 추가)
       const newRow = [
         meetingId,
         slideId,
@@ -680,6 +681,7 @@ async function saveMeetingConfig(req, res) {
         slide.discordThreadId || '',
         slide.tabLabel || '', // 탭라벨
         slide.subTabLabel || '', // 서브탭라벨
+        slide.detailLabel || '', // 세부항목옵션 (예: "코드별 실적", "사무실별 실적" 등)
         slide.meetingDate || '', // 메인 슬라이드용
         slide.meetingNumber || '', // 메인 슬라이드용
         slide.meetingLocation || '', // 메인 슬라이드용
@@ -688,8 +690,8 @@ async function saveMeetingConfig(req, res) {
       ];
 
       if (existingRowIndex !== -1) {
-        // 기존 슬라이드 업데이트 (메인 슬라이드 필드 및 tabLabel, subTabLabel 포함, 재시도 포함)
-        const updateRange = `${sheetName}!A${existingRowIndex + 3}:T${existingRowIndex + 3}`;
+        // 기존 슬라이드 업데이트 (메인 슬라이드 필드 및 tabLabel, subTabLabel, 세부항목옵션 포함, 재시도 포함)
+        const updateRange = `${sheetName}!A${existingRowIndex + 3}:U${existingRowIndex + 3}`;
         console.log(`📝 [saveMeetingConfig] 기존 슬라이드 업데이트 시작: 범위 ${updateRange}`);
         const updateResult = await retrySheetsOperation(async () => {
           return await sheets.spreadsheets.values.update({

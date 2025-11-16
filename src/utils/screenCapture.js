@@ -151,13 +151,23 @@ export async function captureElement(element, options = {}) {
   const BASE_CAPTURE_WIDTH = 1280; // 표준 캡처 폭(px)
   const widthScale = BASE_CAPTURE_WIDTH / Math.max(scrollWidth, 1);
   const targetWidth = BASE_CAPTURE_WIDTH;
-  // 폭이 줄어들수록(레이아웃 재흐름) 세로가 급증할 수 있으므로 여유 배율을 적용
-  const reflowBoost = widthScale < 1 ? (1 / widthScale) : 1; // 폭 0.5x -> 높이 2x 이상 필요
   // 메인/목차는 헤더 포함 전체를 캡처하므로 충분한 높이 보장
   const slideId = element.getAttribute('data-slide-id') || '';
   const isMainOrToc = slideId.includes('main') || slideId.includes('toc');
-  const minHeight = isMainOrToc ? 1200 : 1040;
-  const targetHeight = Math.max(Math.ceil(scrollHeight * reflowBoost * 1.35), minHeight); // 최소 높이 및 여유치
+  
+  // 메인/목차 슬라이드: 고정 가로폭(1280px) 적용 시 세로 재흐름으로 인한 하단 잘림 방지
+  // 높이 = scrollHeight × (1/widthScale) × 1.2, 최소 900px 보장
+  // autoCrop 유지로 과도 여백은 자동 제거
+  let targetHeight;
+  if (isMainOrToc) {
+    const heightScale = widthScale < 1 ? (1 / widthScale) : 1;
+    targetHeight = Math.max(Math.ceil(scrollHeight * heightScale * 1.2), 900);
+  } else {
+    // 기타 슬라이드: 기존 로직 유지
+    const reflowBoost = widthScale < 1 ? (1 / widthScale) : 1;
+    const minHeight = 1040;
+    targetHeight = Math.max(Math.ceil(scrollHeight * reflowBoost * 1.35), minHeight);
+  }
 
   const defaultOptions = {
     scale: 2, // 고해상도 (2배)

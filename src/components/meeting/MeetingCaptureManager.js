@@ -195,34 +195,105 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             captureTargetElement = (metricsBox || header?.parentElement || captureTargetElement);
           } else if (csDetailType === 'code') {
             const header = findHeader('📊 코드별 실적');
-            // 표 컨테이너(.MuiTableContainer-root)가 뒤따름
-            const table = header
-              ? header.parentElement?.querySelector('.MuiTableContainer-root') ||
-                header.nextElementSibling?.classList?.contains('MuiTableContainer-root') ? header.nextElementSibling : null
-              : null;
-            if (table) captureTargetElement = table;
+            if (header) {
+              // 헤더가 속한 Paper 컴포넌트 찾기
+              let paperElement = header.parentElement;
+              while (paperElement && !paperElement.classList.contains('MuiPaper-root')) {
+                paperElement = paperElement.parentElement;
+              }
+              // Paper 내부에서 테이블 컨테이너 찾기 (펼치기 후 렌더링됨)
+              if (paperElement) {
+                // 테이블이 렌더링될 때까지 대기
+                let table = null;
+                let attempts = 0;
+                while (!table && attempts < 20) {
+                  table = paperElement.querySelector('.MuiTableContainer-root');
+                  if (!table) {
+                    await new Promise(r => setTimeout(r, 100));
+                    attempts++;
+                  }
+                }
+                if (table) {
+                  captureTargetElement = table;
+                } else {
+                  // 테이블을 찾지 못하면 Paper 전체를 캡처
+                  captureTargetElement = paperElement;
+                }
+              }
+            }
           } else if (csDetailType === 'office') {
             const header = findHeader('🏢 사무실별 실적');
-            const table = header
-              ? header.parentElement?.querySelector('.MuiTableContainer-root') ||
-                header.nextElementSibling?.classList?.contains('MuiTableContainer-root') ? header.nextElementSibling : null
-              : null;
-            if (table) captureTargetElement = table;
+            if (header) {
+              let paperElement = header.parentElement;
+              while (paperElement && !paperElement.classList.contains('MuiPaper-root')) {
+                paperElement = paperElement.parentElement;
+              }
+              if (paperElement) {
+                let table = null;
+                let attempts = 0;
+                while (!table && attempts < 20) {
+                  table = paperElement.querySelector('.MuiTableContainer-root');
+                  if (!table) {
+                    await new Promise(r => setTimeout(r, 100));
+                    attempts++;
+                  }
+                }
+                if (table) {
+                  captureTargetElement = table;
+                } else {
+                  captureTargetElement = paperElement;
+                }
+              }
+            }
           } else if (csDetailType === 'department') {
             const header = findHeader('👥 소속별 실적');
-            const table = header
-              ? header.parentElement?.querySelector('.MuiTableContainer-root') ||
-                header.nextElementSibling?.classList?.contains('MuiTableContainer-root') ? header.nextElementSibling : null
-              : null;
-            if (table) captureTargetElement = table;
+            if (header) {
+              let paperElement = header.parentElement;
+              while (paperElement && !paperElement.classList.contains('MuiPaper-root')) {
+                paperElement = paperElement.parentElement;
+              }
+              if (paperElement) {
+                let table = null;
+                let attempts = 0;
+                while (!table && attempts < 20) {
+                  table = paperElement.querySelector('.MuiTableContainer-root');
+                  if (!table) {
+                    await new Promise(r => setTimeout(r, 100));
+                    attempts++;
+                  }
+                }
+                if (table) {
+                  captureTargetElement = table;
+                } else {
+                  captureTargetElement = paperElement;
+                }
+              }
+            }
           } else if (csDetailType === 'agent') {
             // 환경에 따라 아이콘이 '🧑' 또는 '👤'로 표시됨
             const header = findHeader(['🧑 담당자별 실적', '👤 담당자별 실적']);
-            const table = header
-              ? header.parentElement?.querySelector('.MuiTableContainer-root') ||
-                header.nextElementSibling?.classList?.contains('MuiTableContainer-root') ? header.nextElementSibling : null
-              : null;
-            if (table) captureTargetElement = table;
+            if (header) {
+              let paperElement = header.parentElement;
+              while (paperElement && !paperElement.classList.contains('MuiPaper-root')) {
+                paperElement = paperElement.parentElement;
+              }
+              if (paperElement) {
+                let table = null;
+                let attempts = 0;
+                while (!table && attempts < 20) {
+                  table = paperElement.querySelector('.MuiTableContainer-root');
+                  if (!table) {
+                    await new Promise(r => setTimeout(r, 100));
+                    attempts++;
+                  }
+                }
+                if (table) {
+                  captureTargetElement = table;
+                } else {
+                  captureTargetElement = paperElement;
+                }
+              }
+            }
           }
 
           // 타겟 가시성/높이 확보까지 대기
