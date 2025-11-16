@@ -7,6 +7,8 @@ import InspectionMode from '../InspectionMode';
 import BudgetMode from '../BudgetMode';
 import ObManagementMode from '../ObManagementMode';
 import { getAvailableTabsForMode } from '../../config/modeTabConfig';
+import { getProxyImageUrl } from '../../api';
+import { logger } from '../../utils/logger';
 
 /**
  * 슬라이드를 렌더링하는 컴포넌트
@@ -109,12 +111,27 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
         'toc': 2, // 목차: 2초
         'ending': 2 // 엔딩: 2초
       };
-      
-      return modeWaitTimes[slide.mode] || modeWaitTimes[slide.type] || 10; // 기본값: 10초
+      // 특정 상세옵션(코드별 실적)은 로딩이 길어 추가 여유를 준다
+      const isCodeDetail =
+        slide?.mode === 'chart' &&
+        (slide?.tab === 'closingChart' || slide?.tab === 'closing') &&
+        (slide?.subTab === 'totalClosing' || !slide?.subTab) &&
+        slide?.detailOptions?.csDetailType === 'code';
+      const base = modeWaitTimes[slide.mode] || modeWaitTimes[slide.type] || 10;
+      return isCodeDetail ? base + 10 : base; // 코드별 실적은 +10초
     };
     
     const modeWaitTime = getModeWaitTime();
     const requiredStableCount = Math.max(10, Math.floor(modeWaitTime * 5)); // 모드별 안정성 확인 횟수 (0.2초 간격)
+    // 최대 대기 시간(밀리초) - 코드별 실적은 45초로 확대
+    const maxWaitMs = (() => {
+      const isCodeDetail =
+        slide?.mode === 'chart' &&
+        (slide?.tab === 'closingChart' || slide?.tab === 'closing') &&
+        (slide?.subTab === 'totalClosing' || !slide?.subTab) &&
+        slide?.detailOptions?.csDetailType === 'code';
+      return isCodeDetail ? 45000 : 30000;
+    })();
     
     // 데이터 로딩 완료 대기 함수 - 매우 확실한 방법
     const waitForDataLoad = () => {
@@ -232,7 +249,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               lastStableTime = null;
             }
             
-            console.log(`🔍 [SlideRenderer] 데이터 로딩 확인 (${Math.round(timeSinceStart / 1000)}초 경과):`, {
+            logger.debug(`🔍 [SlideRenderer] 데이터 로딩 확인 (${Math.round(timeSinceStart / 1000)}초 경과)`, {
               hasLoadingIndicator: loadingIndicators?.length > 0,
               dataLoading,
               dataLoaded,
@@ -248,12 +265,12 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             });
           }
           
-          // 최대 30초 대기
-          if (timeSinceStart >= 30000) {
+          // 최대 대기 시간 도달 시 진행
+          if (timeSinceStart >= maxWaitMs) {
             if (isContentReady) {
-              console.warn('⚠️ [SlideRenderer] 타임아웃 (30초), 하지만 콘텐츠 준비됨 - 진행');
+            logger.warn(`⚠️ [SlideRenderer] 타임아웃 (${Math.round(maxWaitMs/1000)}초), 하지만 콘텐츠 준비됨 - 진행`);
             } else {
-              console.warn('⚠️ [SlideRenderer] 타임아웃 (30초), 강제 진행');
+              logger.warn(`⚠️ [SlideRenderer] 타임아웃 (${Math.round(maxWaitMs/1000)}초), 강제 진행`);
             }
             observer.disconnect();
             resolve();
@@ -286,6 +303,21 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
     const timer = setTimeout(async () => {
       console.log(`⏳ [SlideRenderer] 데이터 로딩 대기 시작 (${modeWaitTime}초 초기 대기 완료, 모드: ${slide?.mode || slide?.type || 'unknown'})`);
       await waitForDataLoad();
+      
+      // 특수 처리: 월간시상 화면 확대 버튼 자동 클릭 (데이터량이 많아 가독성 확보)
+      try {
+        const expandBtn = Array.from(document.querySelectorAll('button, .MuiButton-root')).find(
+          (el) => typeof el.textContent === 'string' && el.textContent.trim() === '확대'
+        );
+        if (expandBtn) {
+          console.log('🔎 [SlideRenderer] 월간시상 확대 버튼 발견 → 자동 클릭');
+          expandBtn.click();
+          // 클릭 후 렌더링 안정화 대기
+          await new Promise((r) => setTimeout(r, 800));
+        }
+      } catch (e) {
+        console.warn('⚠️ [SlideRenderer] 확대 버튼 자동 클릭 중 오류:', e?.message);
+      }
       
       // 모드별 추가 안정화 대기 시간 (초)
       const additionalWaitTime = Math.max(2, Math.floor(modeWaitTime * 0.5)); // 모드별 대기 시간의 50%
@@ -400,52 +432,48 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             position: 'relative'
           }}
         >
-          {/* 상단: 회사 로고 및 이름 - 전문적인 헤더 디자인 */}
+          {/* 상단바: 좌→우 그라데이션, 우측에 슬라이드 제목(흰색) */}
           <Box
             sx={{
-              display: 'flex',
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'flex-start',
-              width: '100%',
-              backgroundColor: '#ffffff',
-              px: { xs: 3, md: 4 },
-              py: { xs: 2.5, md: 3 },
               position: 'absolute',
               top: 0,
               left: 0,
               right: 0,
-              zIndex: 10,
-              boxShadow: '0 2px 8px rgba(0,0,0,0.08)', // 미묘한 그림자
-              borderBottom: '1px solid rgba(0,0,0,0.05)'
+              zIndex: 15,
+              background: 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #868e96 100%)',
+              borderBottom: '1px solid rgba(0,0,0,0.06)',
+              boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              px: { xs: 2, md: 3 },
+              py: { xs: 1.2, md: 1.6 },
+              pointerEvents: 'none' // 상단바가 UI 선택을 가리지 않도록
             }}
           >
-            <Box
-              component="img"
-              src="/logo512.png"
-              alt="회사 로고"
-              sx={{
-                width: { xs: 40, md: 50 },
-                height: { xs: 40, md: 50 },
-                mr: { xs: 1, md: 1.5 },
-                filter: 'brightness(0) invert(0)'
-              }}
-              onError={(e) => {
-                // 로고가 없으면 숨김
-                e.target.style.display = 'none';
-              }}
-            />
             <Typography
-              variant="h6"
               sx={{
-                fontWeight: 700,
-                fontSize: { xs: '1rem', md: '1.2rem' },
-                color: '#212529',
-                letterSpacing: '0.5px',
-                fontFamily: '"Noto Sans KR", "Roboto", "Helvetica", "Arial", sans-serif'
+                fontSize: { xs: '0.9rem', md: '1.1rem' },
+                fontWeight: 800,
+                color: '#ffffff',
+                textShadow: '0 1px 2px rgba(0,0,0,0.15)',
+                letterSpacing: '0.2px'
               }}
             >
-              (주)브이아이피플러스
+              {(() => {
+                try {
+                  if (slide.type === 'main') return '회의 메인 화면';
+                  if (slide.type === 'toc') return '회의 목차';
+                  if (slide.type === 'ending') return '회의 종료';
+                  if (slide.type === 'custom') return slide.title || '커스텀 화면';
+                  const modeName = getModeConfig(slide.mode)?.title || slide.mode;
+                  const tabName = slide.tabLabel || slide.tab || '';
+                  const subTabName = slide.subTabLabel || slide.subTab || '';
+                  return [modeName, tabName, subTabName].filter(Boolean).join(' > ');
+                } catch {
+                  return slide.title || '슬라이드';
+                }
+              })()}
             </Typography>
           </Box>
 
@@ -634,25 +662,63 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             </Box>
           </Box>
 
-          {/* 하단: 생성자 정보 - 전문적인 푸터 디자인 */}
-          {slide.createdBy && (
-            <Box sx={{ 
-              mt: { xs: 2, md: 3 }, 
-              width: '100%', 
-              textAlign: 'center',
-              pt: 2,
-              borderTop: '1px solid rgba(0,0,0,0.05)'
-            }}>
-              <Typography variant="body2" sx={{ 
-                color: '#6c757d', 
-                fontSize: { xs: '0.85rem', md: '0.95rem' },
-                fontWeight: 500,
-                fontFamily: '"Noto Sans KR", sans-serif'
-              }}>
-                생성자: {slide.createdBy}
+          {/* 하단: 로고/회사명 + 생성자 표시 (하단 정렬, 배경바 높이 확대) */}
+          <Box
+            sx={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              backgroundColor: '#ffffff',
+              borderTop: '1px solid rgba(0,0,0,0.06)',
+              boxShadow: '0 -4px 16px rgba(0,0,0,0.06)',
+              px: { xs: 3, md: 5 },
+              py: { xs: 3, md: 4.5 }, // 높이 확장
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              zIndex: 12
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <Box
+                component="img"
+                src="/logo512.png"
+                alt="회사 로고"
+                sx={{
+                  width: { xs: 44, md: 60 },
+                  height: { xs: 44, md: 60 },
+                  mr: { xs: 1.5, md: 2 },
+                  filter: 'brightness(0) invert(0)'
+                }}
+                onError={(e) => { e.target.style.display = 'none'; }}
+              />
+              <Typography
+                sx={{
+                  fontWeight: 800,
+                  fontSize: { xs: '1.1rem', md: '1.4rem' },
+                  color: '#212529',
+                  letterSpacing: '0.2px',
+                  fontFamily: '"Noto Sans KR","Roboto",sans-serif'
+                }}
+              >
+                (주)브이아이피플러스
               </Typography>
             </Box>
-          )}
+            <Box>
+              {slide.createdBy && (
+                <Typography
+                  sx={{
+                    color: '#6c757d',
+                    fontSize: { xs: '0.95rem', md: '1.05rem' },
+                    fontWeight: 600
+                  }}
+                >
+                  생성자: {slide.createdBy}
+                </Typography>
+              )}
+            </Box>
+          </Box>
         </Box>
       );
     }
@@ -679,51 +745,35 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             position: 'relative'
           }}
         >
-          {/* 상단: 회사 로고 및 이름 - 전문적인 헤더 디자인 */}
+          {/* 상단바: 좌→우 그라데이션, 우측에 슬라이드 제목(흰색) */}
           <Box
             sx={{
-              display: 'flex',
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'flex-start',
-              width: '100%',
-              backgroundColor: '#ffffff',
-              px: { xs: 3, md: 4 },
-              py: { xs: 2.5, md: 3 },
               position: 'absolute',
               top: 0,
               left: 0,
               right: 0,
-              zIndex: 10,
-              boxShadow: '0 2px 8px rgba(0,0,0,0.08)', // 미묘한 그림자
-              borderBottom: '1px solid rgba(0,0,0,0.05)'
+              zIndex: 15,
+              background: 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #868e96 100%)',
+              borderBottom: '1px solid rgba(0,0,0,0.06)',
+              boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              px: { xs: 2, md: 3 },
+              py: { xs: 1.2, md: 1.6 },
+              pointerEvents: 'none' // 상단바가 UI 선택을 가리지 않도록
             }}
           >
-            <Box
-              component="img"
-              src="/logo512.png"
-              alt="회사 로고"
-              sx={{
-                width: { xs: 40, md: 50 },
-                height: { xs: 40, md: 50 },
-                mr: { xs: 1, md: 1.5 },
-                filter: 'brightness(0) invert(0)'
-              }}
-              onError={(e) => {
-                e.target.style.display = 'none';
-              }}
-            />
             <Typography
-              variant="h6"
               sx={{
-                fontWeight: 700,
-                fontSize: { xs: '1rem', md: '1.2rem' },
-                color: '#212529',
-                letterSpacing: '0.5px',
-                fontFamily: '"Noto Sans KR", "Roboto", "Helvetica", "Arial", sans-serif'
+                fontSize: { xs: '0.9rem', md: '1.1rem' },
+                fontWeight: 800,
+                color: '#ffffff',
+                textShadow: '0 1px 2px rgba(0,0,0,0.15)',
+                letterSpacing: '0.2px'
               }}
             >
-              (주)브이아이피플러스
+              회의 목차
             </Typography>
           </Box>
 
@@ -741,19 +791,18 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             pt: { xs: 10, md: 12 }
           }}>
             <Typography
-              variant="h3"
+              variant="h2"
               component="h1"
               sx={{
-                fontSize: { xs: '2.5rem', md: '3.5rem' },
+                fontSize: { xs: '2.5rem', md: '4rem' },
                 fontWeight: 800,
                 mb: 5,
+                lineHeight: 1.1,
                 color: '#212529',
                 letterSpacing: '-0.5px',
                 fontFamily: '"Noto Sans KR", "Roboto", sans-serif',
-                background: 'linear-gradient(135deg, #212529 0%, #495057 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text'
+                backgroundColor: 'transparent',
+                background: 'none'
               }}
             >
               회의 목차
@@ -1073,6 +1122,63 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               </Typography>
             </Box>
           )}
+          {/* 하단: 로고/회사명 + 생성자 (메인과 동일 구조) */}
+          <Box
+            sx={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              backgroundColor: '#ffffff',
+              borderTop: '1px solid rgba(0,0,0,0.06)',
+              boxShadow: '0 -4px 16px rgba(0,0,0,0.06)',
+              px: { xs: 3, md: 5 },
+              py: { xs: 3, md: 4.5 },
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              zIndex: 12
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <Box
+                component="img"
+                src="/logo512.png"
+                alt="회사 로고"
+                sx={{
+                  width: { xs: 44, md: 60 },
+                  height: { xs: 44, md: 60 },
+                  mr: { xs: 1.5, md: 2 },
+                  filter: 'brightness(0) invert(0)'
+                }}
+                onError={(e) => { e.target.style.display = 'none'; }}
+              />
+              <Typography
+                sx={{
+                  fontWeight: 800,
+                  fontSize: { xs: '1.1rem', md: '1.4rem' },
+                  color: '#212529',
+                  letterSpacing: '0.2px',
+                  fontFamily: '"Noto Sans KR","Roboto",sans-serif'
+                }}
+              >
+                (주)브이아이피플러스
+              </Typography>
+            </Box>
+            <Box>
+              {slide.createdBy && (
+                <Typography
+                  sx={{
+                    color: '#6c757d',
+                    fontSize: { xs: '0.95rem', md: '1.05rem' },
+                    fontWeight: 600
+                  }}
+                >
+                  생성자: {slide.createdBy}
+                </Typography>
+              )}
+            </Box>
+          </Box>
         </Box>
       );
     }
@@ -1389,7 +1495,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               {slide.imageUrl && (
                 <Box
                   component="img"
-                  src={slide.imageUrl}
+                  src={getProxyImageUrl(slide.imageUrl)}
                   alt={slide.title || '커스텀 이미지'}
                   sx={{
                     maxWidth: '100%',

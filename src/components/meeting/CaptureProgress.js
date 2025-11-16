@@ -11,7 +11,8 @@ import {
   List,
   ListItem,
   ListItemIcon,
-  ListItemText
+  ListItemText,
+  TextField
 } from '@mui/material';
 import {
   CheckCircle as CheckCircleIcon,
@@ -22,7 +23,7 @@ import {
   PlayArrow as PlayArrowIcon
 } from '@mui/icons-material';
 
-function CaptureProgress({ open, total, current, completed, failed, onCancel, slides = [], startTime, onRetryFailed, isPaused, onPause, onResume }) {
+function CaptureProgress({ open, total, current, completed, failed, onCancel, slides = [], startTime, onRetryFailed, isPaused, onPause, onResume, onEditImageLink }) {
   const progress = total > 0 ? (completed / total) * 100 : 0;
   
   // 예상 소요 시간 계산
@@ -57,6 +58,31 @@ function CaptureProgress({ open, total, current, completed, failed, onCancel, sl
     const minutes = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${minutes}분 ${secs}초`;
+  };
+
+  // 이미지 링크 수정 모달 상태
+  const [editOpen, setEditOpen] = React.useState(false);
+  const [editIndex, setEditIndex] = React.useState(-1);
+  const [oldUrl, setOldUrl] = React.useState('');
+  const [newUrl, setNewUrl] = React.useState('');
+  const openEdit = (idx) => {
+    const slide = slides?.[idx];
+    setEditIndex(idx);
+    setOldUrl(slide?.imageUrl || '');
+    setNewUrl(slide?.imageUrl || '');
+    setEditOpen(true);
+  };
+  const closeEdit = () => {
+    setEditOpen(false);
+    setEditIndex(-1);
+    setOldUrl('');
+    setNewUrl('');
+  };
+  const submitEdit = () => {
+    if (onEditImageLink && editIndex >= 0 && newUrl) {
+      onEditImageLink(editIndex, newUrl);
+      closeEdit();
+    }
   };
   
   // 슬라이드 정보 가져오기 헬퍼 함수
@@ -242,7 +268,7 @@ function CaptureProgress({ open, total, current, completed, failed, onCancel, sl
                   primary={`슬라이드 ${slideIndex}${getSlideInfo(index) ? ` - ${getSlideInfo(index)}` : ''}`}
                   secondary={isFailed ? (failedItem?.error || '캡처 실패') : isCompleted ? '완료' : isCurrent ? '캡처 중...' : '대기 중'}
                 />
-                {isFailed && onRetryFailed && (
+                {onRetryFailed && (
                   <Button
                     size="small"
                     startIcon={<RefreshIcon />}
@@ -251,7 +277,17 @@ function CaptureProgress({ open, total, current, completed, failed, onCancel, sl
                     color="primary"
                     sx={{ ml: 2 }}
                   >
-                    재시도
+                    {isFailed ? '재시도' : '재생성'}
+                  </Button>
+                )}
+                {onEditImageLink && (
+                  <Button
+                    size="small"
+                    onClick={() => openEdit(index)}
+                    variant="text"
+                    sx={{ ml: 1 }}
+                  >
+                    링크 수정
                   </Button>
                 )}
               </ListItem>
@@ -291,6 +327,34 @@ function CaptureProgress({ open, total, current, completed, failed, onCancel, sl
           취소
         </Button>
       </DialogActions>
+
+      {/* 이미지 링크 수정 모달 */}
+      <Dialog open={editOpen} onClose={closeEdit} maxWidth="sm" fullWidth>
+        <DialogTitle>이미지 링크 수정</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+            <TextField
+              label="기존 이미지 링크"
+              value={oldUrl}
+              InputProps={{ readOnly: true }}
+              fullWidth
+              size="small"
+            />
+            <TextField
+              label="새 이미지 링크"
+              value={newUrl}
+              onChange={(e) => setNewUrl(e.target.value)}
+              placeholder="https://cdn.discordapp.com/attachments/.../image.png"
+              fullWidth
+              size="small"
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeEdit}>취소</Button>
+          <Button onClick={submitEdit} variant="contained" disabled={!newUrl}>저장</Button>
+        </DialogActions>
+      </Dialog>
     </Dialog>
   );
 }

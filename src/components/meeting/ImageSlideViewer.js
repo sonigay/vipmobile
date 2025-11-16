@@ -11,6 +11,7 @@ import {
   ArrowForward as ArrowForwardIcon,
   Close as CloseIcon
 } from '@mui/icons-material';
+import { getProxyImageUrl } from '../../api';
 
 function ImageSlideViewer({ slides, onClose }) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -43,7 +44,7 @@ function ImageSlideViewer({ slides, onClose }) {
         img.onerror = () => {
           setLoading(false);
         };
-        img.src = firstSlide.imageUrl;
+        img.src = getProxyImageUrl(firstSlide.imageUrl);
       } else {
         setLoading(false);
       }
@@ -303,7 +304,7 @@ function ImageSlideViewer({ slides, onClose }) {
           <Box
             ref={imageRef}
             component="img"
-            src={currentSlide.imageUrl}
+            src={getProxyImageUrl(currentSlide.imageUrl)}
             alt={`슬라이드 ${currentIndex + 1}`}
             loading={loadedImages.has(currentIndex) ? 'eager' : 'lazy'} // lazy loading 지원
             sx={{

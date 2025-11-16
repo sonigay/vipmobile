@@ -55,6 +55,7 @@ const CHART_TABS = [
               multiple: true, // 여러 개 선택 가능
               values: [
                 { key: 'all', label: '전체' },
+                { key: 'cs', label: 'CS 개통 실적' },
                 { key: 'code', label: '코드별 실적' },
                 { key: 'office', label: '사무실별 실적' },
                 { key: 'department', label: '소속별 실적' },
@@ -85,7 +86,23 @@ const CHART_TABS = [
     checkPermission: (store) => !!store?.modePermissions?.bondChart,
     subTabs: [
       { key: 'overdueBond', label: '연체채권' },
-      { key: 'rechotanchoBond', label: '재초담초채권' },
+      { 
+        key: 'rechotanchoBond', 
+        label: '재초담초채권',
+        // 상세 옵션: 저장 시점 문자열 지정(선택 시 해당 옵션을 자동선택)
+        detailOptions: {
+          type: 'bondHistory',
+          options: [
+            {
+              key: 'bondHistoryTimestamp',
+              label: '저장 시점 (YYYY-MM-DD HH:mm)',
+              type: 'text',
+              placeholder: '예: 2025-11-16 12:30',
+              defaultValue: ''
+            }
+          ]
+        }
+      },
       { key: 'subscriberIncrease', label: '가입자증감' }
     ]
   },

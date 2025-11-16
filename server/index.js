@@ -5070,6 +5070,12 @@ try {
   app.post('/api/meetings/:meetingId/config', meetingRoutes.saveMeetingConfig);
   app.post('/api/meetings/:meetingId/upload-image', meetingRoutes.upload.single('image'), meetingRoutes.uploadMeetingImage);
   app.post('/api/meetings/:meetingId/upload-file', meetingRoutes.upload.single('file'), meetingRoutes.uploadCustomSlideFile);
+  app.get('/api/meetings/proxy-image', meetingRoutes.proxyDiscordImage);
+  // Discord thread title APIs
+  app.get('/api/meetings/discord-thread/:threadId', express.json(), meetingRoutes.getDiscordThreadInfo);
+  app.patch('/api/meetings/discord-thread/:threadId', express.json(), meetingRoutes.renameDiscordThread);
+  // 단일 슬라이드 이미지 링크 업데이트
+  app.patch('/api/meetings/:meetingId/slide-image', express.json(), meetingRoutes.updateSlideImageUrl);
   console.log('✅ [회의] Meeting routes mounted at /api/meetings');
 } catch (e) {
   console.error('❌ [회의] Failed to mount meeting routes:', e.message);
@@ -6909,6 +6915,26 @@ app.post('/api/rechotancho-bond/save', async (req, res) => {
 
 // 재초담초채권 저장 시점 목록 조회
 app.get('/api/rechotancho-bond/history', async (req, res) => {
+  // CORS 헤더 설정
+  const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
+  const defaultOrigins = [
+    'https://vipmobile.vercel.app',
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:4000'
+  ];
+  const allowedOrigins = [...corsOrigins, ...defaultOrigins];
+  const origin = req.headers.origin;
+  
+  if (origin && allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  } else if (allowedOrigins.length > 0) {
+    res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
+  }
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
   try {
     const spreadsheetId = process.env.GOOGLE_SHEET_ID || process.env.SHEET_ID;
     const sheetName = '재초담초채권_내역';
@@ -6961,6 +6987,26 @@ app.get('/api/rechotancho-bond/history', async (req, res) => {
     
   } catch (error) {
     console.error('❌ 재초담초채권 저장 시점 조회 실패:', error);
+    // CORS 헤더 설정 (에러 응답에도 포함)
+    const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
+    const defaultOrigins = [
+      'https://vipmobile.vercel.app',
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://localhost:4000'
+    ];
+    const allowedOrigins = [...corsOrigins, ...defaultOrigins];
+    const origin = req.headers.origin;
+    
+    if (origin && allowedOrigins.includes(origin)) {
+      res.header('Access-Control-Allow-Origin', origin);
+    } else if (allowedOrigins.length > 0) {
+      res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
+    }
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    
     res.status(500).json({
       success: false,
       error: '저장 시점 조회에 실패했습니다.',

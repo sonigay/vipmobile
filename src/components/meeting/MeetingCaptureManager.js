@@ -163,8 +163,218 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         throw new Error(`슬라이드 요소를 찾을 수 없습니다. (slideId: ${currentSlide.slideId}, index: ${index})`);
       }
 
-      // 캡처 (data-slide-id를 가진 요소 내부의 콘텐츠만 캡처)
-      // 헤더와 탭 네비게이션은 이미 숨겨져 있으므로, slideElement 자체를 캡처
+      // 특정 상세옵션 선택 시: 섹션 펼치기 및 타겟 요소만 캡처
+      let captureTargetElement = slideElement;
+      try {
+        const csDetailType = currentSlide?.detailOptions?.csDetailType;
+        if (currentSlide?.mode === 'chart' && csDetailType) {
+          // 모든 '펼치기' 버튼 클릭 시도 (중복 클릭은 안전)
+          Array.from(document.querySelectorAll('button, .MuiButton-root'))
+            .filter(el => typeof el.textContent === 'string' && el.textContent.includes('펼치기'))
+            .forEach(el => el.click());
+          
+          const findHeader = (startsWith) => {
+            return Array.from(document.querySelectorAll('.MuiBox-root, div'))
+              .find(el => typeof el.textContent === 'string' && el.textContent.trim().startsWith(startsWith));
+          };
+          
+          if (csDetailType === 'cs') {
+            const header = findHeader('📞 CS 개통 실적');
+            const metricsBox = header?.nextElementSibling;
+            if (metricsBox) captureTargetElement = metricsBox;
+          } else if (csDetailType === 'code') {
+            const header = findHeader('📊 코드별 실적');
+            // 표 컨테이너(.MuiTableContainer-root)가 뒤따름
+            const table = header ? header.parentElement?.querySelector('.MuiTableContainer-root') || header.nextElementSibling : null;
+            if (table) captureTargetElement = table;
+          } else if (csDetailType === 'office') {
+            const header = findHeader('🏢 사무실별 실적');
+            const table = header ? header.parentElement?.querySelector('.MuiTableContainer-root') || header.nextElementSibling : null;
+            if (table) captureTargetElement = table;
+          } else if (csDetailType === 'department') {
+            const header = findHeader('👥 소속별 실적');
+            const table = header ? header.parentElement?.querySelector('.MuiTableContainer-root') || header.nextElementSibling : null;
+            if (table) captureTargetElement = table;
+          } else if (csDetailType === 'agent') {
+            const header = findHeader('🧑 담당자별 실적');
+            const table = header ? header.parentElement?.querySelector('.MuiTableContainer-root') || header.nextElementSibling : null;
+            if (table) captureTargetElement = table;
+          }
+        }
+
+        // 채권장표 > 재초담초채권: 저장 시점 콤보박스를 최신 시점으로 자동 선택
+        if (
+          currentSlide?.mode === 'chart' &&
+          (currentSlide?.tab === 'bondChart' || currentSlide?.tab === 'bond') &&
+          (currentSlide?.subTab === 'rechotanchoBond')
+        ) {
+          let selectedTimestampText = '';
+          const desiredTs = (currentSlide?.detailOptions?.bondHistoryTimestamp || '').trim();
+          // 콤보박스 열기
+          const combo = Array.from(document.querySelectorAll('[role="combobox"], .MuiSelect-select'))
+            .find(el => {
+              // 주변 텍스트에 '저장 시점' 문구가 있는지 대략적으로 판단
+              const parentText = (el.closest('.MuiFormControl-root')?.textContent || '') + (el.parentElement?.textContent || '');
+              return parentText.includes('저장 시점') || parentText.includes('저장 시점 선택');
+            }) || document.querySelector('[aria-haspopup="listbox"]');
+          if (combo) {
+            (combo instanceof HTMLElement) && combo.click();
+            await new Promise(r => setTimeout(r, 200));
+            const listbox = document.querySelector('[role="listbox"]');
+            let targetOption = null;
+            if (desiredTs && listbox) {
+              targetOption = Array.from(listbox.querySelectorAll('[role="option"]'))
+                .find(opt => (opt.textContent || '').includes(desiredTs));
+            }
+            if (!targetOption) {
+              targetOption = document.querySelector('[role="listbox"] [role="option"]');
+            }
+            if (targetOption && targetOption instanceof HTMLElement) {
+              selectedTimestampText = (targetOption.textContent || '').trim();
+              targetOption.click();
+              await new Promise(r => setTimeout(r, 800)); // 데이터 갱신 대기
+            }
+          }
+          // 이 화면은 상단 그래프 2개 + 하단 입력 테이블 모두 포함해야 하므로 슬라이드 전체 캡쳐 유지
+          captureTargetElement = slideElement;
+
+          // 우상단 배지로 선택된 시점 표시 (캡쳐에 포함되도록 임시로 DOM 추가)
+          try {
+            if (selectedTimestampText) {
+              slideElement.style.position = slideElement.style.position || 'relative';
+              var tsBadge = document.createElement('div');
+              tsBadge.textContent = `저장 시점: ${selectedTimestampText}`;
+              tsBadge.style.position = 'absolute';
+              tsBadge.style.top = '8px';
+              tsBadge.style.right = '16px';
+              tsBadge.style.background = 'rgba(0,0,0,0.6)';
+              tsBadge.style.color = '#fff';
+              tsBadge.style.padding = '6px 10px';
+              tsBadge.style.borderRadius = '8px';
+              tsBadge.style.fontSize = '12px';
+              tsBadge.style.fontWeight = '700';
+              tsBadge.style.zIndex = '20';
+              tsBadge.style.pointerEvents = 'none';
+              slideElement.appendChild(tsBadge);
+              // 캡쳐 후 제거를 위해 참조 보관
+              captureTargetElement.__tempTsBadge = tsBadge;
+            }
+          } catch (e) {
+            console.warn('⚠️ [MeetingCaptureManager] 시점 배지 표시 중 경고:', e?.message);
+          }
+        }
+
+        // 채권장표 > 가입자증감: '년단위' 토글 + 최신 연도 선택 + 필요한 3개 섹션만 포함 캡처
+        if (
+          currentSlide?.mode === 'chart' &&
+          (currentSlide?.tab === 'bondChart' || currentSlide?.tab === 'bond') &&
+          (currentSlide?.subTab === 'subscriberIncrease')
+        ) {
+          // 1) '년단위' 토글 보장
+          try {
+            const yearBtn = Array.from(document.querySelectorAll('button, [role="button"]'))
+              .find(el => (el.textContent || '').includes('년단위'));
+            if (yearBtn && yearBtn.getAttribute('aria-pressed') !== 'true') {
+              (yearBtn instanceof HTMLElement) && yearBtn.click();
+              await new Promise(r => setTimeout(r, 200));
+            }
+          } catch (e) {
+            console.warn('⚠️ [MeetingCaptureManager] 년단위 토글 중 경고:', e?.message);
+          }
+          // 2) 최근 연도 선택 (콤보박스 첫 옵션)
+          let selectedYearText = '';
+          try {
+            const yearCombo = Array.from(document.querySelectorAll('[role="combobox"], .MuiSelect-select'))
+              .find(el => (el.textContent || '').includes('년'));
+            if (yearCombo) {
+              (yearCombo instanceof HTMLElement) && yearCombo.click();
+              await new Promise(r => setTimeout(r, 200));
+              const firstOpt = document.querySelector('[role="listbox"] [role="option"]');
+              if (firstOpt && firstOpt instanceof HTMLElement) {
+                selectedYearText = (firstOpt.textContent || '').trim();
+                firstOpt.click();
+                await new Promise(r => setTimeout(r, 600));
+              }
+            }
+          } catch (e) {
+            console.warn('⚠️ [MeetingCaptureManager] 연도 선택 중 경고:', e?.message);
+          }
+          // 3) 필요한 섹션들 찾기
+          const hasText = (el, t) => el && typeof el.textContent === 'string' && el.textContent.includes(t);
+          const candidates = Array.from(slideElement.querySelectorAll('.MuiCardContent-root, .MuiBox-root, div'));
+          const monthlyInput = candidates.find(el => hasText(el, '월별 데이터 입력'));
+          const chart1 = candidates.find(el => hasText(el, '가입자수 추이'));
+          const chart2 = candidates.find(el => hasText(el, '관리수수료 추이'));
+          const targets = [monthlyInput, chart1, chart2].filter(Boolean);
+          // 4) 공통 상위 컨테이너 계산
+          const findCommonAncestor = (elements) => {
+            if (!elements || elements.length === 0) return null;
+            const getAncestors = (el) => {
+              const list = [];
+              let cur = el;
+              while (cur) { list.push(cur); cur = cur.parentElement; }
+              return list;
+            };
+            let common = getAncestors(elements[0]);
+            for (let i = 1; i < elements.length; i++) {
+              const ancestors = new Set(getAncestors(elements[i]));
+              common = common.filter(a => ancestors.has(a));
+            }
+            // slideElement 내부의 가장 가까운 공통 조상 선택
+            return common.find(el => el !== document.body && slideElement.contains(el)) || slideElement;
+          };
+          const ancestor = findCommonAncestor(targets) || slideElement;
+          captureTargetElement = ancestor;
+          // 5) 우상단에 선택 연도 배지 표시
+          try {
+            if (selectedYearText) {
+              captureTargetElement.style.position = captureTargetElement.style.position || 'relative';
+              var yBadge = document.createElement('div');
+              yBadge.textContent = `선택 연도: ${selectedYearText}`;
+              yBadge.style.position = 'absolute';
+              yBadge.style.top = '8px';
+              yBadge.style.right = '16px';
+              yBadge.style.background = 'rgba(0,0,0,0.6)';
+              yBadge.style.color = '#fff';
+              yBadge.style.padding = '6px 10px';
+              yBadge.style.borderRadius = '8px';
+              yBadge.style.fontSize = '12px';
+              yBadge.style.fontWeight = '700';
+              yBadge.style.zIndex = '20';
+              yBadge.style.pointerEvents = 'none';
+              captureTargetElement.appendChild(yBadge);
+              captureTargetElement.__tempYearBadge = yBadge;
+            }
+          } catch (e) {
+            console.warn('⚠️ [MeetingCaptureManager] 연도 배지 표시 중 경고:', e?.message);
+          }
+        }
+      } catch (e) {
+        console.warn('⚠️ [MeetingCaptureManager] 상세옵션 타겟 선택 중 경고:', e?.message);
+      }
+
+      // 재고장표 특수 처리: 모든 '펼치기' 확장 및 표 전체 보이도록 스타일 조정
+      try {
+        if (currentSlide?.mode === 'inventoryChart') {
+          Array.from(document.querySelectorAll('button, .MuiButton-root'))
+            .filter(el => typeof el.textContent === 'string' && el.textContent.includes('펼치기'))
+            .forEach(el => el.click());
+          // 표 컨테이너 찾기
+          const invTable = slideElement.querySelector('.MuiTableContainer-root') || slideElement.querySelector('table');
+          if (invTable) {
+            captureTargetElement = invTable;
+            // 스크롤을 없애고 전체 높이로 확장
+            invTable.style.maxHeight = 'none';
+            invTable.style.overflow = 'visible';
+          }
+          // 확장 후 렌더 안정화 짧게 대기
+          await new Promise(r => setTimeout(r, 500));
+        }
+      } catch (e) {
+        console.warn('⚠️ [MeetingCaptureManager] 재고장표 확장 처리 중 경고:', e?.message);
+      }
+
+      // 캡처 (선정된 타겟 요소만 캡처)
       const slideType = currentSlide.type || 'mode-tab';
       const backgroundColor = slideType === 'custom' 
         ? (currentSlide.backgroundColor || '#ffffff')
@@ -172,7 +382,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         ? '#ffffff' // 배경색은 그라데이션이므로 흰색으로 설정
         : '#ffffff';
         
-      const blob = await captureElement(slideElement, {
+      const blob = await captureElement(captureTargetElement, {
         scale: 2,
         useCORS: true,
         backgroundColor: backgroundColor,
@@ -180,6 +390,17 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         scrollX: 0,
         scrollY: 0
       });
+      // 임시 배지 제거
+      try {
+        if (captureTargetElement && captureTargetElement.__tempTsBadge) {
+          captureTargetElement.__tempTsBadge.remove();
+          delete captureTargetElement.__tempTsBadge;
+        }
+        if (captureTargetElement && captureTargetElement.__tempYearBadge) {
+          captureTargetElement.__tempYearBadge.remove();
+          delete captureTargetElement.__tempYearBadge;
+        }
+      } catch (_) {}
 
       // Discord에 업로드
       const filename = generateImageFilename(meeting.meetingId, index + 1);
@@ -540,6 +761,17 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         isPaused={isPaused}
         onPause={handlePause}
         onResume={handleResume}
+        onEditImageLink={async (slideIndex, newUrl) => {
+          try {
+            const slide = slidesState?.[slideIndex];
+            if (!slide) return;
+            await api.updateSlideImageUrl(meeting.meetingId, slide.slideId, newUrl);
+            // 로컬 상태 갱신
+            setSlidesState(prev => prev.map((s, i) => i === slideIndex ? { ...s, imageUrl: newUrl } : s));
+          } catch (e) {
+            alert(`링크 수정 실패: ${e.message}`);
+          }
+        }}
       />
 
       {/* 현재 슬라이드만 렌더링 (메모리 최적화) */}

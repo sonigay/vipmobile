@@ -738,6 +738,21 @@ async function saveMeetingConfig(req, res) {
     
     console.log(`\n✅ [saveMeetingConfig] 모든 슬라이드 저장 완료 (${slides.length}개)`);
 
+    // 회의 날짜와 차수 추출 후 준비중 스레드 rename 시도
+    try {
+      const mainSlide = slides.find(s => s.type === 'main') || {};
+      const meetingDate = mainSlide.meetingDate || req.body.meetingDate || new Date().toISOString().split('T')[0];
+      const meetingNumber = mainSlide.meetingNumber || req.body.meetingNumber;
+      const yearMonth = meetingDate.substring(0, 7);
+      if (meetingNumber) {
+        await renamePreparedPostToNumber(yearMonth, meetingNumber);
+      } else {
+        console.log('ℹ️ [saveMeetingConfig] meetingNumber가 없어 스레드 rename을 건너뜁니다.');
+      }
+    } catch (renameErr) {
+      console.warn('⚠️ [saveMeetingConfig] 준비중 스레드 rename 중 오류:', renameErr.message);
+    }
+
     res.json({ success: true });
   } catch (error) {
     console.error('회의 설정 저장 오류:', error);
@@ -745,13 +760,14 @@ async function saveMeetingConfig(req, res) {
   }
 }
 
-// Discord 포럼 게시판에서 년월별 포스트 찾기 또는 생성 (차수별)
-async function findOrCreatePost(channel, yearMonth, meetingNumber) {
+// Discord 포럼 게시판에서 년월별 포스트 찾기 또는 생성 (차수별, 모드 라벨 구분)
+async function findOrCreatePost(channel, yearMonth, meetingNumber, modeLabel) {
   try {
-    // 포스트 이름 생성 (예: "2025-11 회의 - 1차")
-    const postName = meetingNumber 
-      ? `${yearMonth} 회의 - ${meetingNumber}차`
-      : `${yearMonth} 회의`;
+    // 포스트 이름 생성
+    // 예: "2025-11 회의 - 1차(어플모드)" 또는 "2025-11 회의 - 1차(커스텀)"
+    const suffix = modeLabel ? `(${modeLabel})` : '';
+    const baseWithNumber = meetingNumber ? `${yearMonth} 회의 - ${meetingNumber}차` : `${yearMonth} 회의 - 준비중`;
+    const postName = `${baseWithNumber}${suffix}`;
     
     console.log(`🔍 [findOrCreatePost] 포스트 찾기 시작:`, {
       yearMonth,
@@ -772,9 +788,12 @@ async function findOrCreatePost(channel, yearMonth, meetingNumber) {
       post = Array.from(activeThreads.threads.values()).find(thread => {
         const threadName = thread.name;
         const matches = 
-          threadName === postName || 
-          threadName === `${yearMonth} 회의 - ${meetingNumber}차` ||
-          threadName.includes(`${yearMonth} 회의`) && threadName.includes(`${meetingNumber}차`);
+          // 새 포맷(모드 라벨 포함) 또는 구 포맷(모드 라벨 없이)
+          threadName === postName ||
+          threadName === `${baseWithNumber}` ||
+          threadName === `${baseWithNumber}(어플모드)` ||
+          threadName === `${baseWithNumber}(커스텀)` ||
+          (threadName.includes(`${yearMonth} 회의`) && threadName.includes(`${meetingNumber}차`));
         if (matches) {
           console.log(`✅ [findOrCreatePost] 활성 포스트 찾음 (차수 일치): ${threadName} (ID: ${thread.id})`);
         }
@@ -813,8 +832,10 @@ async function findOrCreatePost(channel, yearMonth, meetingNumber) {
             const threadName = thread.name;
             const matches = 
               threadName === postName || 
-              threadName === `${yearMonth} 회의 - ${meetingNumber}차` ||
-              threadName.includes(`${yearMonth} 회의`) && threadName.includes(`${meetingNumber}차`);
+              threadName === `${baseWithNumber}` ||
+              threadName === `${baseWithNumber}(어플모드)` ||
+              threadName === `${baseWithNumber}(커스텀)` ||
+              (threadName.includes(`${yearMonth} 회의`) && threadName.includes(`${meetingNumber}차`));
             if (matches) {
               console.log(`✅ [findOrCreatePost] 아카이브된 포스트 찾음 (차수 일치): ${threadName} (ID: ${thread.id})`);
             }
@@ -847,7 +868,7 @@ async function findOrCreatePost(channel, yearMonth, meetingNumber) {
     
     // 포스트 생성 (포럼 채널에서는 스레드 생성)
     // meetingNumber가 없으면 년월만 사용하여 포스트 생성 (차수 없이)
-    const finalPostName = meetingNumber ? postName : `${yearMonth} 회의`;
+    const finalPostName = meetingNumber ? postName : `${yearMonth} 회의 - 준비중${suffix}`;
     console.log(`📌 [Discord] 새 포스트 생성: ${finalPostName} (meetingNumber: ${meetingNumber || '없음'})`);
     const newPost = await channel.threads.create({
       name: finalPostName,
@@ -937,7 +958,7 @@ async function autoCropImage(imageBuffer) {
 }
 
 // 이미지 업로드 (Discord)
-async function uploadImageToDiscord(imageBuffer, filename, meetingId, meetingDate, meetingNumber, metadata = null) {
+async function uploadImageToDiscord(imageBuffer, filename, meetingId, meetingDate, meetingNumber, modeLabel, metadata = null) {
   if (!DISCORD_LOGGING_ENABLED || !discordBot) {
     throw new Error('Discord 봇이 초기화되지 않았습니다.');
   }
@@ -964,7 +985,7 @@ async function uploadImageToDiscord(imageBuffer, filename, meetingId, meetingDat
     const yearMonth = meetingDate ? meetingDate.substring(0, 7) : new Date().toISOString().substring(0, 7);
     
     // 해당 년월과 차수의 포스트 찾기 또는 생성
-    let post = await findOrCreatePost(channel, yearMonth, meetingNumber);
+    let post = await findOrCreatePost(channel, yearMonth, meetingNumber, modeLabel);
     
     // 회의 스레드 찾기 또는 생성 (현재는 포스트를 그대로 사용)
     let thread = post;
@@ -991,6 +1012,41 @@ async function uploadImageToDiscord(imageBuffer, filename, meetingId, meetingDat
   } catch (error) {
     console.error('Discord 이미지 업로드 오류:', error);
     throw error;
+  }
+}
+
+// "준비중" 포스트를 확정 차수 포스트로 rename
+async function renamePreparedPostToNumber(yearMonth, meetingNumber) {
+  try {
+    if (!DISCORD_LOGGING_ENABLED || !discordBot) {
+      return;
+    }
+    if (!meetingNumber) return;
+    if (!discordBot.isReady()) return;
+    const channel = await discordBot.channels.fetch(DISCORD_MEETING_CHANNEL_ID);
+    if (!channel) return;
+    const labels = ['어플모드', '커스텀'];
+    const activeThreads = await channel.threads.fetchActive();
+    const archivedThreads = await channel.threads.fetchArchived({ limit: 100 });
+    const allThreads = [
+      ...Array.from(activeThreads.threads.values()),
+      ...Array.from(archivedThreads.threads.values())
+    ];
+    for (const modeLabel of labels) {
+      const preparedName = `${yearMonth} 회의 - 준비중(${modeLabel})`;
+      const finalName = `${yearMonth} 회의 - ${meetingNumber}차(${modeLabel})`;
+      const thread = allThreads.find(t => t.name === preparedName);
+      if (thread && thread.editable !== false) {
+        try {
+          await thread.setName(finalName);
+          console.log(`✅ [Discord] 스레드 이름 변경: ${preparedName} → ${finalName}`);
+        } catch (e) {
+          console.warn(`⚠️ [Discord] 스레드 이름 변경 실패 (${preparedName}):`, e.message);
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('⚠️ [Discord] 준비중 스레드 rename 처리 중 오류:', e.message);
   }
 }
 
@@ -1069,6 +1125,7 @@ async function uploadMeetingImage(req, res) {
       isTempMeeting ? `temp-${meetingDate || new Date().toISOString().split('T')[0]}` : meetingId,
       meetingDate || new Date().toISOString().split('T')[0],
       meetingNumber, // meetingNumber를 명시적으로 전달하여 같은 포스트를 찾도록 함
+      '어플모드',
       {
         originalWidth: croppedResult.originalWidth,
         originalHeight: croppedResult.originalHeight,
@@ -2107,12 +2164,15 @@ async function uploadCustomSlideFile(req, res) {
         filename: imageData.filename
       });
       
+      // 검색을 위한 추적 강화를 위해 파일명 개선
+      const generatedFilename = `custom-${finalMeetingDate}-${uploadMeetingId}-${i + 1}.png`;
       const result = await uploadImageToDiscord(
         imageData.buffer,
-        imageData.filename,
+        generatedFilename,
         uploadMeetingId,
         finalMeetingDate,
         finalMeetingNumber, // meetingNumber를 명시적으로 전달하여 같은 포스트를 찾도록 함
+        '커스텀',
         imageData.metadata || null // 메타데이터 전달
       );
       
@@ -2162,6 +2222,79 @@ async function uploadCustomSlideFile(req, res) {
   }
 }
 
+// Discord CDN 이미지 프록시 (CORS 문제 해결)
+async function proxyDiscordImage(req, res) {
+  try {
+    // CORS 헤더 설정
+    setCORSHeaders(req, res);
+    
+    const imageUrl = req.query.url;
+    
+    if (!imageUrl) {
+      return res.status(400).json({ 
+        success: false, 
+        error: '이미지 URL이 필요합니다.' 
+      });
+    }
+    
+    // Discord CDN URL인지 확인
+    if (!imageUrl.includes('cdn.discordapp.com')) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Discord CDN URL만 허용됩니다.' 
+      });
+    }
+    
+    // Discord CDN에서 이미지 가져오기 (Node.js 내장 https 모듈 사용)
+    const https = require('https');
+    const http = require('http');
+    const url = require('url');
+    
+    let contentType = 'image/png'; // 기본값
+    
+    const imageBuffer = await new Promise((resolve, reject) => {
+      const parsedUrl = new URL(imageUrl);
+      const protocol = parsedUrl.protocol === 'https:' ? https : http;
+      
+      const request = protocol.get(imageUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      }, (response) => {
+        if (response.statusCode !== 200) {
+          reject(new Error(`이미지 가져오기 실패: ${response.statusCode} ${response.statusMessage}`));
+          return;
+        }
+        
+        // Content-Type 가져오기
+        contentType = response.headers['content-type'] || 'image/png';
+        
+        const chunks = [];
+        response.on('data', (chunk) => chunks.push(chunk));
+        response.on('end', () => resolve(Buffer.concat(chunks)));
+        response.on('error', reject);
+      });
+      
+      request.on('error', reject);
+      request.end();
+    });
+    
+    // 이미지 응답 전송
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'public, max-age=31536000'); // 1년 캐시
+    res.send(imageBuffer);
+  } catch (error) {
+    console.error('Discord 이미지 프록시 오류:', error);
+    // CORS 헤더 설정 (에러 응답에도 포함)
+    setCORSHeaders(req, res);
+    res.status(500).json({ 
+      success: false, 
+      error: '이미지를 가져오는데 실패했습니다.',
+      message: error.message 
+    });
+  }
+}
+
 module.exports = {
   getMeetings,
   createMeeting,
@@ -2171,6 +2304,121 @@ module.exports = {
   saveMeetingConfig,
   uploadMeetingImage,
   uploadCustomSlideFile,
+  proxyDiscordImage,
   upload // multer middleware
 };
 
+// ========== Discord Thread Title Utilities (GET/RENAME) ==========
+
+// 스레드 정보 조회 (제목 확인)
+async function getDiscordThreadInfo(req, res) {
+  try {
+    setCORSHeaders(req, res);
+    if (!DISCORD_LOGGING_ENABLED || !discordBot) {
+      return res.status(503).json({ success: false, error: 'Discord 봇이 활성화되지 않았습니다.' });
+    }
+    const { threadId } = req.params;
+    if (!threadId) {
+      return res.status(400).json({ success: false, error: 'threadId가 필요합니다.' });
+    }
+    if (!discordBot.isReady()) {
+      return res.status(503).json({ success: false, error: 'Discord 봇 준비 중입니다.' });
+    }
+    const thread = await discordBot.channels.fetch(threadId);
+    if (!thread) {
+      return res.status(404).json({ success: false, error: '해당 스레드를 찾을 수 없습니다.' });
+    }
+    return res.json({
+      success: true,
+      threadId: thread.id,
+      name: thread.name
+    });
+  } catch (error) {
+    setCORSHeaders(req, res);
+    console.error('Discord 스레드 조회 오류:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+}
+
+// 스레드 제목 변경
+async function renameDiscordThread(req, res) {
+  try {
+    setCORSHeaders(req, res);
+    if (!DISCORD_LOGGING_ENABLED || !discordBot) {
+      return res.status(503).json({ success: false, error: 'Discord 봇이 활성화되지 않았습니다.' });
+    }
+    const { threadId } = req.params;
+    const { desiredTitle } = req.body || {};
+    if (!threadId) {
+      return res.status(400).json({ success: false, error: 'threadId가 필요합니다.' });
+    }
+    if (!desiredTitle || typeof desiredTitle !== 'string' || !desiredTitle.trim()) {
+      return res.status(400).json({ success: false, error: 'desiredTitle이 필요합니다.' });
+    }
+    const title = desiredTitle.trim().slice(0, 100); // Discord 스레드명 길이 제한 보호
+    if (!discordBot.isReady()) {
+      return res.status(503).json({ success: false, error: 'Discord 봇 준비 중입니다.' });
+    }
+    const thread = await discordBot.channels.fetch(threadId);
+    if (!thread) {
+      return res.status(404).json({ success: false, error: '해당 스레드를 찾을 수 없습니다.' });
+    }
+    await thread.setName(title);
+    console.log(`✅ [Discord] 스레드 이름 변경 완료: ${threadId} → ${title}`);
+    return res.json({ success: true, threadId, name: title });
+  } catch (error) {
+    setCORSHeaders(req, res);
+    console.error('Discord 스레드 제목 변경 오류:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+}
+
+// 내보내기
+module.exports.getDiscordThreadInfo = getDiscordThreadInfo;
+module.exports.renameDiscordThread = renameDiscordThread;
+
+// 단일 슬라이드 이미지 URL 업데이트
+async function updateSlideImageUrl(req, res) {
+  try {
+    setCORSHeaders(req, res);
+    const { sheets, SPREADSHEET_ID } = createSheetsClient();
+    const { meetingId } = req.params;
+    const { slideId, imageUrl } = req.body || {};
+    const sheetName = '회의설정';
+    if (!meetingId || !slideId || !imageUrl) {
+      return res.status(400).json({ success: false, error: 'meetingId, slideId, imageUrl가 필요합니다.' });
+    }
+    // 데이터 조회
+    const range = `${sheetName}!A3:T`;
+    const response = await retrySheetsOperation(async () => {
+      return await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range
+      });
+    });
+    const rows = response.data.values || [];
+    // 행 찾기 (A:회의ID, B:슬라이드ID)
+    const rowIndex = rows.findIndex(row => row[0] === meetingId && row[1] === slideId);
+    if (rowIndex === -1) {
+      return res.status(404).json({ success: false, error: '해당 슬라이드를 찾을 수 없습니다.' });
+    }
+    // 이미지URL은 10번째 컬럼(J) → zero-based index 9
+    const targetRowNumber = 3 + rowIndex; // 데이터 시작이 3행
+    const targetCell = `${sheetName}!J${targetRowNumber}`;
+    await retrySheetsOperation(async () => {
+      return await sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: targetCell,
+        valueInputOption: 'USER_ENTERED',
+        resource: { values: [[imageUrl]] }
+      });
+    });
+    return res.json({ success: true, row: targetRowNumber, imageUrl });
+  } catch (error) {
+    setCORSHeaders(req, res);
+    console.error('단일 슬라이드 이미지 URL 업데이트 오류:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+}
+
+module.exports.updateSlideImageUrl = updateSlideImageUrl;

@@ -135,8 +135,33 @@ function invalidateCache(sheetName = null) {
   }
 }
 
+// CORS 헤더 설정 헬퍼 함수
+function setCORSHeaders(req, res) {
+  const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
+  const defaultOrigins = [
+    'https://vipmobile.vercel.app',
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:4000'
+  ];
+  const allowedOrigins = [...corsOrigins, ...defaultOrigins];
+  const origin = req.headers.origin;
+  
+  if (origin && allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  } else if (allowedOrigins.length > 0) {
+    res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
+  }
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key');
+  res.header('Access-Control-Allow-Credentials', 'true');
+}
+
 // 월간시상 데이터 계산 API
 async function getMonthlyAwardData(req, res) {
+  // CORS 헤더 설정
+  setCORSHeaders(req, res);
+  
   try {
     console.log('월간시상 데이터 구글시트에서 로드');
 
@@ -1352,6 +1377,8 @@ async function getMonthlyAwardData(req, res) {
     res.json(result);
   } catch (error) {
     console.error('월간시상 데이터 계산 오류:', error);
+    // CORS 헤더 설정 (에러 응답에도 포함)
+    setCORSHeaders(req, res);
     res.status(500).json({
       success: false,
       error: 'Failed to calculate monthly award data',
@@ -1362,6 +1389,9 @@ async function getMonthlyAwardData(req, res) {
 
 // 월간시상 셋팅 저장 API
 async function saveMonthlyAwardSettings(req, res) {
+  // CORS 헤더 설정
+  setCORSHeaders(req, res);
+  
   try {
     const { type } = req.body;
     let { data } = req.body;
@@ -1683,6 +1713,8 @@ async function saveMonthlyAwardSettings(req, res) {
     });
   } catch (error) {
     console.error('월간시상 셋팅 저장 오류:', error);
+    // CORS 헤더 설정 (에러 응답에도 포함)
+    setCORSHeaders(req, res);
     res.status(500).json({
       success: false,
       error: 'Failed to save monthly award settings',

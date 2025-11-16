@@ -13,6 +13,7 @@ import {
 } from '@mui/material';
 import { getModeConfig, getModeIcon } from '../../config/modeConfig';
 import { getAvailableTabsForMode } from '../../config/modeTabConfig';
+import { hasCaptureSupport } from '../../config/captureTargets';
 
 function ModeSelector({ loggedInStore, selectedModes, onModeToggle, selectedTabs, onTabToggle, onModeOnlyToggle, selectedSubTabs, onSubTabToggle }) {
   // 사용 가능한 모드 목록 (권한이 있는 모드만)
@@ -44,7 +45,8 @@ function ModeSelector({ loggedInStore, selectedModes, onModeToggle, selectedTabs
       .filter(mode => {
         // 모드 설정이 있는 모드만 표시 (회의 모드 포함)
         const modeConfig = getModeConfig(mode);
-        return modeConfig;
+        // 캡쳐 타겟이 정의된 모드만 노출 (정확한 캡쳐 지원 모드 한정)
+        return modeConfig && hasCaptureSupport(mode);
       });
   }, [loggedInStore]);
 

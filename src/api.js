@@ -10,6 +10,45 @@ export const api = {
     return response.json();
   },
 
+  // 슬라이드 단일 이미지 URL 업데이트
+  updateSlideImageUrl: async function updateSlideImageUrl(meetingId, slideId, imageUrl) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/meetings/${encodeURIComponent(meetingId)}/slide-image`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slideId, imageUrl })
+      });
+      if (!response.ok) {
+        const txt = await response.text().catch(() => '');
+        throw new Error(`슬라이드 이미지 링크 업데이트 실패: ${txt || response.status}`);
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('슬라이드 이미지 링크 업데이트 오류:', error);
+      throw error;
+    }
+  },
+
+  // ===== Discord Thread Title APIs =====
+  getDiscordThreadInfo: async (threadId) => {
+    const response = await fetch(`${API_BASE_URL}/api/meetings/discord-thread/${encodeURIComponent(threadId)}`);
+    if (!response.ok) throw new Error('Discord thread info fetch failed');
+    return response.json();
+  },
+
+  renameDiscordThread: async (threadId, desiredTitle) => {
+    const response = await fetch(`${API_BASE_URL}/api/meetings/discord-thread/${encodeURIComponent(threadId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ desiredTitle })
+    });
+    if (!response.ok) {
+      const msg = await response.text().catch(() => '');
+      throw new Error(`Discord thread rename failed: ${msg || response.status}`);
+    }
+    return response.json();
+  },
+
   // OB: 할인 데이터
   getObDiscountData: async () => {
     const response = await fetch(`${API_BASE_URL}/api/ob/discount-data`);
