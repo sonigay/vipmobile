@@ -851,6 +851,38 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess, autoE
                   </FormControl>
                 );
               }
+              // 채권장표 > 가입자증감: 대상 년도는 동적 셀렉트로 제공 (현재 연도를 기준으로 범위 생성)
+              if (option.key === 'targetYear') {
+                const currentYear = new Date().getFullYear();
+                const years = [];
+                for (let y = currentYear - 3; y <= currentYear + 1; y++) {
+                  years.push(y);
+                }
+                return (
+                  <FormControl key={option.key} fullWidth>
+                    <InputLabel>{option.label}</InputLabel>
+                    <Select
+                      value={detailOptionValues[option.key] ?? ''}
+                      onChange={(e) => {
+                        setDetailOptionValues(prev => ({
+                          ...prev,
+                          [option.key]: e.target.value
+                        }));
+                      }}
+                      label={option.label}
+                    >
+                      <MenuItem value="">
+                        <em>최신 (자동 선택)</em>
+                      </MenuItem>
+                      {years.map(year => (
+                        <MenuItem key={year} value={String(year)}>
+                          {year}년
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                );
+              }
               // 텍스트 입력 옵션 (예: 가입자증감 대상 년도 등)
               if (option.type === 'text') {
                 return (

@@ -796,27 +796,6 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
           }
         }
 
-        // 마감장표 > 전체총마감: 모든 섹션을 펼친 뒤 전체 슬라이드 한 장으로 캡처
-        if (
-          currentSlide?.mode === 'chart' &&
-          currentSlide?.tab === 'closingChart' &&
-          (currentSlide?.subTab === 'totalClosing' || !currentSlide?.subTab)
-        ) {
-          try {
-            // 가능한 모든 "펼치기" 버튼 클릭 (CS/코드/사무실/소속/담당자 섹션)
-            const labelsToFind = ['펼치기'];
-            const buttons = Array.from(document.querySelectorAll('button, .MuiButton-root'));
-            buttons.forEach(btn => {
-              const t = (btn.textContent || '').trim();
-              if (labelsToFind.some(k => t === k)) {
-                (btn instanceof HTMLElement) && btn.click();
-              }
-            });
-            await new Promise(r => setTimeout(r, 700));
-          } catch {}
-          captureTargetElement = slideElement; // 전체 한 장으로
-        }
-
         // 채권장표 > 재초담초채권: 저장 시점 콤보박스를 최신 시점으로 자동 선택
         if (
           currentSlide?.mode === 'chart' &&

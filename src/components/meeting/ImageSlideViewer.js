@@ -139,6 +139,9 @@ function ImageSlideViewer({ slides, onClose }) {
 
   const currentSlide = slides[currentIndex];
   const isVideo = !!currentSlide?.videoUrl;
+  const isYouTube =
+    currentSlide?.videoUrl &&
+    (currentSlide.videoUrl.includes('youtube.com') || currentSlide.videoUrl.includes('youtu.be'));
 
   return (
     <Box
@@ -350,20 +353,63 @@ function ImageSlideViewer({ slides, onClose }) {
           }}
         >
           {isVideo ? (
-            <Box
-              component="video"
-              src={currentSlide.videoUrl}
-              controls
-              autoPlay
-              sx={{
-                maxWidth: '95%',
-                maxHeight: '95%',
-                borderRadius: 1,
-                boxShadow: '0 4px 24px rgba(0,0,0,0.6)',
-                outline: 'none'
-              }}
-              poster={currentSlide.imageUrl ? getProxyImageUrl(currentSlide.imageUrl) : undefined}
-            />
+            isYouTube ? (
+              // YouTube 동영상은 iframe으로 전체화면 뷰어에 표시
+              <Box
+                sx={{
+                  position: 'relative',
+                  width: '90vw',
+                  maxWidth: 960,
+                  pt: '56.25%', // 16:9 비율
+                  boxShadow: '0 4px 24px rgba(0,0,0,0.6)',
+                  borderRadius: 1,
+                  overflow: 'hidden'
+                }}
+              >
+                <Box
+                  component="iframe"
+                  src={(() => {
+                    const url = currentSlide.videoUrl;
+                    let videoId = '';
+                    try {
+                      if (url.includes('youtu.be/')) {
+                        videoId = url.split('youtu.be/')[1].split(/[?&]/)[0];
+                      } else {
+                        const u = new URL(url);
+                        videoId = u.searchParams.get('v') || '';
+                      }
+                    } catch {}
+                    return videoId ? `https://www.youtube.com/embed/${videoId}` : url;
+                  })()}
+                  title={currentSlide.title || 'YouTube 동영상'}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  sx={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    border: 0
+                  }}
+                />
+              </Box>
+            ) : (
+              <Box
+                component="video"
+                src={currentSlide.videoUrl}
+                controls
+                autoPlay
+                sx={{
+                  maxWidth: '95%',
+                  maxHeight: '95%',
+                  borderRadius: 1,
+                  boxShadow: '0 4px 24px rgba(0,0,0,0.6)',
+                  outline: 'none'
+                }}
+                poster={currentSlide.imageUrl ? getProxyImageUrl(currentSlide.imageUrl) : undefined}
+              />
+            )
           ) : (
             <Box
               ref={imageRef}

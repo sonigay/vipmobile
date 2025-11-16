@@ -327,6 +327,33 @@ function CustomSlideEditor({ open, onClose, onSave, slide, meetingDate, meetingN
               </Typography>
             )}
           </Box>
+
+          {/* 동영상 URL 직접 입력 (예: YouTube 링크) */}
+          <Box sx={{ mt: 3 }}>
+            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+              동영상 URL (선택사항)
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+              YouTube 주소 또는 직접 재생 가능한 동영상 URL을 입력하면, 파일 업로드 없이도 슬라이드에서 재생됩니다.
+            </Typography>
+            <TextField
+              fullWidth
+              placeholder="예: https://www.youtube.com/watch?v=..."
+              value={formData.videoUrl}
+              onChange={(e) => {
+                const url = e.target.value.trim();
+                setFormData(prev => ({
+                  ...prev,
+                  videoUrl: url,
+                  // URL을 직접 입력하면 이미지 업로드는 비워둠
+                  imageUrl: prev.imageUrl
+                }));
+                setPreviewUrl(url || prev?.imageUrl || null);
+                setUploadedFileType(url ? 'video' : uploadedFileType);
+              }}
+              size="small"
+            />
+          </Box>
         </Box>
       </DialogContent>
       <DialogActions>

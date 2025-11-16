@@ -160,7 +160,12 @@ function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes, pres
     {
       label: '채권장표',
       icon: <AccountBalanceIcon />,
-      component: <BondChartTab loggedInStore={loggedInStore} initialSubTab={initialSubTab} presentationMode={presentationMode} />,
+      component: <BondChartTab 
+        loggedInStore={loggedInStore} 
+        initialSubTab={initialSubTab} 
+        presentationMode={presentationMode}
+        detailOptions={detailOptions}
+      />,
       hasPermission: loggedInStore?.modePermissions?.bondChart
     },
     {
@@ -304,7 +309,7 @@ function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes, pres
 }
 
 // 채권장표 탭 컴포넌트
-function BondChartTab({ loggedInStore, initialSubTab = 0, presentationMode = false }) {
+function BondChartTab({ loggedInStore, initialSubTab = 0, presentationMode = false, detailOptions }) {
   const [activeSubTab, setActiveSubTab] = useState(initialSubTab);
 
   const subTabs = [
@@ -361,8 +366,19 @@ function BondChartTab({ loggedInStore, initialSubTab = 0, presentationMode = fal
 
       {/* 서브 탭 컨텐츠 */}
       {activeSubTab === 0 && <OverdueBondTab />}
-      {activeSubTab === 1 && <RechotanchoBondTab loggedInStore={loggedInStore} presentationMode={presentationMode} initialSubTab={initialSubTab} />}
-      {activeSubTab === 2 && <SubscriberIncreaseTab presentationMode={presentationMode} />}
+      {activeSubTab === 1 && (
+        <RechotanchoBondTab 
+          loggedInStore={loggedInStore} 
+          presentationMode={presentationMode} 
+          initialSubTab={initialSubTab} 
+        />
+      )}
+      {activeSubTab === 2 && (
+        <SubscriberIncreaseTab 
+          presentationMode={presentationMode} 
+          detailOptions={detailOptions} 
+        />
+      )}
     </Box>
   );
 }
@@ -5152,7 +5168,7 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
 }
 
 // 가입자증감 탭 컴포넌트
-function SubscriberIncreaseTab({ presentationMode = false }) {
+function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -5370,10 +5386,30 @@ function SubscriberIncreaseTab({ presentationMode = false }) {
         if (sheetData && sheetData.length > 0) {
           console.log('🔍 [가입자증감] 데이터 로드 성공:', sheetData.length, '행');
           setData(sheetData);
-          // 기본 년월 설정 (첫 번째 데이터 컬럼)
+          // 기본 년월/년도 설정
           if (sheetData[0] && sheetData[0].length > 3) {
-            setSelectedYearMonth(sheetData[0][3]);
-            console.log('🔍 [가입자증감] 기본 년월 설정:', sheetData[0][3]);
+            let initialYearOrYearMonth = sheetData[0][3];
+            // presentationMode + detailOptions가 있으면 선택값을 우선 적용
+            if (presentationMode && detailOptions) {
+              try {
+                const desiredPeriod = (detailOptions.subscriberPeriod || 'year').toLowerCase();
+                const desiredYear = (detailOptions.targetYear || '').trim();
+                // 시간 단위: year/month
+                if (desiredPeriod === 'year') {
+                  setTimeUnit('year');
+                } else if (desiredPeriod === 'month') {
+                  setTimeUnit('month');
+                }
+                // 대상 년도: 4자리 숫자가 detailOptions에 있으면 우선 사용
+                if (desiredYear && /^\d{4}$/.test(desiredYear)) {
+                  initialYearOrYearMonth = desiredYear;
+                }
+              } catch (e) {
+                console.warn('⚠️ [가입자증감] detailOptions 기반 초기값 설정 중 경고:', e?.message);
+              }
+            }
+            setSelectedYearMonth(initialYearOrYearMonth);
+            console.log('🔍 [가입자증감] 기본 년월/년도 설정:', initialYearOrYearMonth);
           }
         } else {
           console.error('🔍 [가입자증감] 데이터 로드 실패');

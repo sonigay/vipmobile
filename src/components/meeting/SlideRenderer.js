@@ -1797,18 +1797,75 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                 </Typography>
               )}
               {slide.videoUrl && (
-                <Box
-                  component="video"
-                  src={slide.videoUrl}
-                  controls
-                  sx={{
-                    maxWidth: '100%',
-                    maxHeight: '60vh',
-                    borderRadius: 2,
-                    boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
-                    mt: 2
-                  }}
-                />
+                <>
+                  {/**********************
+                   * 동영상 슬라이드 렌더링
+                   * - YouTube 링크: iframe으로 임베드
+                   * - 그 외: HTML5 video 태그로 재생
+                   **********************/}
+                  {(() => {
+                    const url = slide.videoUrl || '';
+                    const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
+                    if (isYouTube) {
+                      // YouTube URL을 embed URL로 변환
+                      let videoId = '';
+                      try {
+                        if (url.includes('youtu.be/')) {
+                          videoId = url.split('youtu.be/')[1].split(/[?&]/)[0];
+                        } else {
+                          const u = new URL(url);
+                          videoId = u.searchParams.get('v') || '';
+                        }
+                      } catch {}
+                      const embedUrl = videoId ? `https://www.youtube.com/embed/${videoId}` : url;
+                      return (
+                        <Box
+                          sx={{
+                            position: 'relative',
+                            width: '100%',
+                            maxWidth: 800,
+                            pt: '56.25%', // 16:9 비율
+                            mt: 2,
+                            boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+                            borderRadius: 2,
+                            overflow: 'hidden'
+                          }}
+                        >
+                          <Box
+                            component="iframe"
+                            src={embedUrl}
+                            title={slide.title || 'YouTube 동영상'}
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                            sx={{
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              width: '100%',
+                              height: '100%',
+                              border: 0
+                            }}
+                          />
+                        </Box>
+                      );
+                    }
+                    // 일반 동영상 URL
+                    return (
+                      <Box
+                        component="video"
+                        src={url}
+                        controls
+                        sx={{
+                          maxWidth: '100%',
+                          maxHeight: '60vh',
+                          borderRadius: 2,
+                          boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+                          mt: 2
+                        }}
+                      />
+                    );
+                  })()}
+                </>
               )}
               {slide.imageUrl && !slide.videoUrl && (
                 <Box

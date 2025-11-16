@@ -687,6 +687,29 @@ async function saveMeetingConfig(req, res) {
       // 타입 검증 및 정규화
       const slideType = typeof slide.type === 'string' ? slide.type : 'mode-tab';
       const slideMode = typeof slide.mode === 'string' ? slide.mode : '';
+
+      // 기존 행이 있는 경우, imageUrl/캡처시간/Discord ID가 비어 있으면 기존 값을 보존
+      const existingRow = existingRowIndex !== -1 ? existingRows[existingRowIndex] : null;
+      const existingImageUrl = existingRow ? (existingRow[9] || '') : '';
+      const existingCapturedAt = existingRow ? (existingRow[10] || '') : '';
+      const existingDiscordPostId = existingRow ? (existingRow[11] || '') : '';
+      const existingDiscordThreadId = existingRow ? (existingRow[12] || '') : '';
+
+      const incomingImageUrl = slide.imageUrl && slide.imageUrl !== '없음' ? slide.imageUrl : '';
+      const incomingCapturedAt = slide.capturedAt || '';
+      const incomingDiscordPostId = slide.discordPostId && slide.discordPostId !== '없음' ? slide.discordPostId : '';
+      const incomingDiscordThreadId = slide.discordThreadId && slide.discordThreadId !== '없음' ? slide.discordThreadId : '';
+
+      const mergedImageUrl =
+        incomingImageUrl ||
+        (existingImageUrl && existingImageUrl !== '없음' ? existingImageUrl : '');
+      const mergedCapturedAt = incomingCapturedAt || existingCapturedAt;
+      const mergedDiscordPostId =
+        incomingDiscordPostId ||
+        (existingDiscordPostId && existingDiscordPostId !== '없음' ? existingDiscordPostId : '');
+      const mergedDiscordThreadId =
+        incomingDiscordThreadId ||
+        (existingDiscordThreadId && existingDiscordThreadId !== '없음' ? existingDiscordThreadId : '');
       
       const newRow = [
         meetingId,
@@ -698,10 +721,10 @@ async function saveMeetingConfig(req, res) {
         slide.title || '',
         slide.content || '',
         slide.backgroundColor || '#ffffff',
-        slide.imageUrl || '',
-        slide.capturedAt || '',
-        slide.discordPostId || '',
-        slide.discordThreadId || '',
+        mergedImageUrl,
+        mergedCapturedAt,
+        mergedDiscordPostId,
+        mergedDiscordThreadId,
         slide.tabLabel || '', // 탭라벨
         slide.subTabLabel || '', // 서브탭라벨
         slide.detailLabel || '', // 세부항목옵션 (예: "코드별 실적", "사무실별 실적" 등)
@@ -928,11 +951,13 @@ async function findOrCreateThread(post, meetingId) {
 
 /**
  * 이미지에서 하단 공백만 자동으로 제거합니다.
- * 상단 헤더와 작성자 정보는 유지하고, 하단의 흰색/투명 공백만 제거합니다.
+ * 상단 헤더와 작성자 정보는 유지하고, 하단의 공백만 제거/보정합니다.
  * @param {Buffer} imageBuffer - 원본 이미지 버퍼
+ * @param {Object} options
+ * @param {'white'|'pink'} options.bottomColor - 하단을 확장할 때 사용할 배경 색상 (기본: white)
  * @returns {Promise<{buffer: Buffer, originalWidth: number, originalHeight: number, croppedWidth: number, croppedHeight: number}>}
  */
-async function autoCropImage(imageBuffer) {
+async function autoCropImage(imageBuffer, options = {}) {
   try {
     // 원본 이미지 메타데이터 가져오기
     const metadata = await sharp(imageBuffer).metadata();
@@ -994,8 +1019,8 @@ async function autoCropImage(imageBuffer) {
       };
     }
     
-    // 최소 하단 여백 보장 (클라이언트와 일치: 기본 96px)
-    const minBottomPadding = 96;
+    // 최소 하단 여백 보장 (클라이언트와 일치: 기본 96px, 커스텀 업로드 등에서는 0으로 줄일 수 있음)
+    const minBottomPadding = typeof options.minBottomPadding === 'number' ? options.minBottomPadding : 96;
     const desiredBottom = lastContentY + minBottomPadding + 1;
     let finalBuffer;
     let croppedHeight;
@@ -1013,13 +1038,16 @@ async function autoCropImage(imageBuffer) {
         .png()
         .toBuffer();
     } else {
-      // 원본 끝까지 내용이 닿아 여백이 부족 → 아래로 파스텔톤 핫핑크 영역을 확장
+      // 원본 끝까지 내용이 닿아 여백이 부족 → 아래로 지정된 색상 영역을 확장
       const extra = desiredBottom - originalHeight;
       croppedHeight = originalHeight + extra;
+      const bottomColor = options.bottomColor === 'pink'
+        ? { r: 255, g: 182, b: 193, alpha: 1 } // #FFB6C1 파스텔 핫핑크
+        : { r: 255, g: 255, b: 255, alpha: 1 }; // 기본 흰색
       finalBuffer = await sharp(imageBuffer)
         .extend({
           bottom: extra,
-          background: { r: 255, g: 182, b: 193, alpha: 1 } // #FFB6C1 파스텔 핫핑크
+          background: bottomColor
         })
         .png()
         .toBuffer();
@@ -1252,9 +1280,9 @@ async function uploadMeetingImage(req, res) {
       filename
     });
     
-    // 이미지 자동 크롭 처리
+    // 이미지 자동 크롭 처리 (회의 캡처본은 하단 여백을 파스텔 핫핑크로 확장)
     console.log(`✂️ [uploadMeetingImage] 이미지 자동 크롭 시작`);
-    const croppedResult = await autoCropImage(req.file.buffer);
+    const croppedResult = await autoCropImage(req.file.buffer, { bottomColor: 'pink' });
     console.log(`✅ [uploadMeetingImage] 이미지 자동 크롭 완료:`, {
       originalSize: `${croppedResult.originalWidth}x${croppedResult.originalHeight}`,
       croppedSize: `${croppedResult.croppedWidth}x${croppedResult.croppedHeight}`,
@@ -1324,24 +1352,25 @@ async function uploadMeetingImage(req, res) {
   }
 }
 
-// Excel 파일을 이미지로 변환 (신규 방식: ExcelJS → HTML → Puppeteer 스크린샷, 한글 우선)
+// Excel 파일을 이미지로 변환
+// 1순위: ExcelJS → HTML → Puppeteer 스크린샷 (한글 렌더링 품질 우선)
+// 실패 시: Canvas 기반 `convertExcelToImage`로 폴백하여 Chrome 없이도 동작하도록 보장
 async function convertExcelToImages(excelBuffer, filename) {
-  try {
-    const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(excelBuffer);
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(excelBuffer);
 
+  // 1) HTML + Puppeteer 파이프라인 시도
+  try {
     const imageBuffers = [];
 
-    // 동적으로 Puppeteer 로드
     let puppeteer;
     try {
       puppeteer = require('puppeteer');
     } catch (e) {
-      console.error('❌ [Excel 변환] puppeteer 모듈을 로드할 수 없습니다:', e.message);
-      throw new Error('Excel 파일을 이미지로 변환하려면 puppeteer가 필요합니다. 서버에 puppeteer를 설치해주세요.');
+      console.error('❌ [Excel 변환] puppeteer 모듈을 로드할 수 없습니다 (HTML 파이프라인 건너뜀):', e.message);
+      throw e;
     }
 
-    // 크롬 실행 파일 경로 탐색 (이미 PPT 변환에서 사용하던 로직 재사용)
     const { executablePath } = require('puppeteer');
     let chromePath = process.env.PUPPETEER_EXECUTABLE_PATH || process.env.CHROME_PATH || null;
     if (!chromePath) {
@@ -1368,14 +1397,10 @@ async function convertExcelToImages(excelBuffer, filename) {
         const sheetName = worksheet.name || `Sheet${i + 1}`;
         console.log(`📊 [Excel 변환] (HTML/Puppeteer) 시트 "${sheetName}" 처리 중...`);
 
-        // Excel 시트를 HTML로 변환 (Noto Sans KR + UTF-8)
         const html = convertExcelToHTML(worksheet);
-
         const page = await browser.newPage();
         await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: 2 });
         await page.setContent(html, { waitUntil: 'networkidle0' });
-
-        // 폰트 로딩 및 렌더링 안정화 대기
         await page.waitForTimeout(800);
 
         const elementHandle = await page.$('body');
@@ -1389,7 +1414,6 @@ async function convertExcelToImages(excelBuffer, filename) {
           type: 'png',
           fullPage: true
         });
-
         await page.close();
 
         imageBuffers.push({
@@ -1408,8 +1432,33 @@ async function convertExcelToImages(excelBuffer, filename) {
 
     return imageBuffers;
   } catch (error) {
-    console.error('❌ [Excel 변환] 신규 HTML/Puppeteer 방식 오류:', error);
-    throw new Error(`Excel 파일 변환 실패: ${error.message}`);
+    console.warn('⚠️ [Excel 변환] HTML/Puppeteer 방식 실패, Canvas 기반 변환으로 폴백:', error.message);
+  }
+
+  // 2) Puppeteer가 없거나 Chrome을 찾지 못하면 Canvas 기반 폴백 사용
+  try {
+    console.log('📊 [Excel 변환] Canvas 폴백 파이프라인 시작...');
+    const imageBuffers = [];
+    for (let i = 0; i < workbook.worksheets.length; i++) {
+      const worksheet = workbook.worksheets[i];
+      const sheetName = worksheet.name || `Sheet${i + 1}`;
+      console.log(`📊 [Excel 변환] (Canvas) 시트 "${sheetName}" 처리 중...`);
+      const imageBuffer = await convertExcelToImage(worksheet, `${filename}_${sheetName}`);
+      if (imageBuffer) {
+        imageBuffers.push({
+          buffer: imageBuffer,
+          filename: `${filename}_${sheetName}.png`,
+          sheetName
+        });
+      }
+    }
+    if (imageBuffers.length === 0) {
+      throw new Error('Canvas를 이용한 Excel 변환에도 실패했습니다.');
+    }
+    return imageBuffers;
+  } catch (fallbackError) {
+    console.error('❌ [Excel 변환] Canvas 폴백 파이프라인도 실패:', fallbackError);
+    throw new Error(`Excel 파일 변환 실패: ${fallbackError.message}`);
   }
 }
 
@@ -2235,7 +2284,8 @@ async function uploadCustomSlideFile(req, res) {
     if (detectedFileType === 'image') {
       // 이미지 파일 자동 크롭 처리
       console.log(`✂️ [uploadCustomSlideFile] 이미지 자동 크롭 시작`);
-      const croppedResult = await autoCropImage(file.buffer);
+      // 커스텀 업로드 이미지는 하단 여백 확장 없이, 순수 하단 공백만 잘라낸다 (minBottomPadding: 0, 색상: 흰색)
+      const croppedResult = await autoCropImage(file.buffer, { minBottomPadding: 0, bottomColor: 'white' });
       console.log(`✅ [uploadCustomSlideFile] 이미지 자동 크롭 완료:`, {
         originalSize: `${croppedResult.originalWidth}x${croppedResult.originalHeight}`,
         croppedSize: `${croppedResult.croppedWidth}x${croppedResult.croppedHeight}`,
