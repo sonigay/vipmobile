@@ -29,7 +29,7 @@ import CustomSlideEditor from './CustomSlideEditor';
 import { getAvailableTabsForMode } from '../../config/modeTabConfig';
 import { getModeConfig } from '../../config/modeConfig';
 
-function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess }) {
+function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess, autoE2E = false }) {
   const [activeStep, setActiveStep] = useState(0);
   const [formData, setFormData] = useState({
     meetingName: '',
@@ -89,6 +89,53 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess }) {
       setError(null);
     }
   }, [open, meeting]);
+
+  // E2E 자동 실행: 최소 슬라이드 구성 + 자동 제출
+  useEffect(() => {
+    if (!open || meeting || !autoE2E) return;
+    // 1) 기본 폼 자동 채움
+    const today = new Date().toISOString().split('T')[0];
+    setFormData({
+      meetingName: `자동테스트-${new Date().toLocaleTimeString('ko-KR', { hour12: false })}`,
+      meetingDate: today,
+      meetingNumber: '1',
+      meetingLocation: '본사 회의실',
+      participants: '자동테스트'
+    });
+    // 2) 최소 슬라이드 구성: main/toc + chart > closingChart > totalClosing (csDetailType: cs)
+    const minimalSlides = [
+      // 메인/목차/엔딩은 handleSubmit에서 자동 생성되므로 여기서는 mode-tab만 넣어도 됨
+      {
+        slideId: `slide-chart-closing-total-${Date.now()}`,
+        type: 'mode-tab',
+        mode: 'chart',
+        tab: 'closingChart',
+        tabLabel: '마감장표',
+        subTab: 'totalClosing',
+        subTabLabel: '전체총마감',
+        detailOptions: { csDetailType: 'cs' },
+        order: 1
+      }
+    ];
+    setSlides(minimalSlides);
+    setSelectedModes(['chart']);
+    setSelectedTabs(['chart-closingChart']);
+    setSelectedSubTabs(['chart-closingChart-totalClosing']);
+
+    // 3) 자동 진행: 다음 → 생성 및 저장
+    const timer = setTimeout(() => {
+      try {
+        setActiveStep(1);
+        setTimeout(() => {
+          handleSubmit();
+        }, 200);
+      } catch (e) {
+        console.warn('E2E 자동 진행 중 오류:', e?.message);
+      }
+    }, 200);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, autoE2E, meeting]);
 
   const handleChange = (field) => (event) => {
     const value = event.target.value;

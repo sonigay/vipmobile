@@ -12,6 +12,7 @@ import MeetingList from './MeetingList';
 import MeetingEditor from './MeetingEditor';
 import MeetingConfigEditor from './MeetingConfigEditor';
 import MeetingCaptureManager from './MeetingCaptureManager';
+import { enableRemoteLogger } from '../../utils/remoteLogger';
 
 function MeetingPreparationTab({ loggedInStore, onMeetingSelectForPresentation }) {
   const [editorOpen, setEditorOpen] = useState(false);
@@ -20,9 +21,13 @@ function MeetingPreparationTab({ loggedInStore, onMeetingSelectForPresentation }
   const [configEditing, setConfigEditing] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [newlyCreatedMeeting, setNewlyCreatedMeeting] = useState(null);
+  const [remoteLogOn, setRemoteLogOn] = useState(false);
+  const [e2eMode, setE2eMode] = useState(false);
+  const [disableLogger, setDisableLogger] = useState(null);
 
   const handleAdd = () => {
     setEditingMeeting(null);
+    setE2eMode(false);
     setEditorOpen(true);
   };
 
@@ -48,6 +53,28 @@ function MeetingPreparationTab({ loggedInStore, onMeetingSelectForPresentation }
     }
     setSelectedMeeting(meeting);
     setConfigEditing(true);
+  };
+
+  const handleToggleRemoteLog = () => {
+    if (!remoteLogOn) {
+      const off = enableRemoteLogger({
+        enabled: true,
+        level: 'warn',
+        sessionId: `meeting-${Date.now()}`,
+      });
+      setDisableLogger(() => off);
+      setRemoteLogOn(true);
+    } else {
+      try { disableLogger && disableLogger(); } catch {}
+      setRemoteLogOn(false);
+    }
+  };
+
+  const handleRunE2ETest = () => {
+    // 자동 생성 모드로 에디터 오픈
+    setEditingMeeting(null);
+    setE2eMode(true);
+    setEditorOpen(true);
   };
 
   const handleEditorClose = () => {
@@ -122,6 +149,14 @@ function MeetingPreparationTab({ loggedInStore, onMeetingSelectForPresentation }
 
   return (
     <Container maxWidth="xl" sx={{ py: 3 }}>
+      <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+        <Button size="small" variant={remoteLogOn ? 'contained' : 'outlined'} onClick={handleToggleRemoteLog}>
+          {remoteLogOn ? '원격 로그: ON' : '원격 로그: OFF'}
+        </Button>
+        <Button size="small" variant="contained" color="secondary" onClick={handleRunE2ETest}>
+          E2E 테스트 실행
+        </Button>
+      </Stack>
       <MeetingList
         onAdd={handleAdd}
         onEdit={handleEdit}
@@ -136,6 +171,7 @@ function MeetingPreparationTab({ loggedInStore, onMeetingSelectForPresentation }
         loggedInStore={loggedInStore}
         onClose={handleEditorClose}
         onSuccess={handleEditorSuccess}
+        autoE2E={e2eMode}
       />
     </Container>
   );
