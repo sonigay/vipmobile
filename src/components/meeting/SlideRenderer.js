@@ -563,6 +563,22 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
 
   // renderSlideContent를 useCallback으로 메모이제이션하여 불필요한 재렌더링 방지
   const renderSlideContent = useCallback(() => {
+    // getHeaderGradient를 내부에서 직접 정의하여 초기화 순서 문제 완전 해결
+    const getHeaderGradientLocal = (s) => {
+      try {
+        if (!s) {
+          return 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #868e96 100%)';
+        }
+        const right = (s?.type === 'custom' && s?.backgroundColor) ? s.backgroundColor : '#868e96';
+        return `linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, ${right} 100%)`;
+      } catch (err) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error('❌ [SlideRenderer] getHeaderGradientLocal 에러:', err);
+        }
+        return 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #868e96 100%)';
+      }
+    };
+    
     try {
       logger.debug('🔍 [SlideRenderer] renderSlideContent 시작', {
         slideId: slide?.slideId,
@@ -619,7 +635,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               left: 0,
               right: 0,
               zIndex: 15,
-              background: getHeaderGradient(slide),
+              background: getHeaderGradientLocal(slide),
               borderBottom: '1px solid rgba(0,0,0,0.06)',
               boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
               display: 'flex',
@@ -920,7 +936,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               left: 0,
               right: 0,
               zIndex: 15,
-              background: getHeaderGradient(slide),
+              background: getHeaderGradientLocal(slide),
               borderBottom: '1px solid rgba(0,0,0,0.06)',
               boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
               display: 'flex',
@@ -1358,7 +1374,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               left: 0,
               right: 0,
               zIndex: 15,
-              background: getHeaderGradient(slide),
+              background: getHeaderGradientLocal(slide),
               borderBottom: '1px solid rgba(0,0,0,0.06)',
               boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
               display: 'flex',
@@ -1581,7 +1597,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               left: 0,
               right: 0,
               zIndex: 15,
-              background: getHeaderGradient(slide),
+              background: getHeaderGradientLocal(slide),
               borderBottom: '1px solid rgba(0,0,0,0.06)',
               boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
               display: 'flex',
@@ -1776,7 +1792,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               left: 0,
               right: 0,
               zIndex: 15,
-              background: getHeaderGradient(slide),
+              background: getHeaderGradientLocal(slide),
               borderBottom: '1px solid rgba(0,0,0,0.06)',
               boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
               display: 'flex',
@@ -1957,7 +1973,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               left: 0,
               right: 0,
               zIndex: 15,
-              background: getHeaderGradient(slide),
+              background: getHeaderGradientLocal(slide),
               borderBottom: '1px solid rgba(0,0,0,0.06)',
               boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
               display: 'flex',
