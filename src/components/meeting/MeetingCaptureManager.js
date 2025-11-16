@@ -165,19 +165,13 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
       }
 
       // 특정 상세옵션 선택 시: 섹션 펼치기 및 타겟 요소만 캡처
+      // 메인/목차는 헤더 포함 전체 슬라이드를 캡처 (공백은 autoCropCanvas로 처리)
       let captureTargetElement = slideElement;
-
-      // 메인/목차는 중앙 콘텐츠만 캡처하여 상하 공백 최소화
-      if (currentSlide?.type === 'main') {
-        const mainBody = slideElement.querySelector('[data-capture-target="main-body"]');
-        if (mainBody) captureTargetElement = mainBody;
-      } else if (currentSlide?.type === 'toc') {
-        const tocBody = slideElement.querySelector('[data-capture-target="toc-body"]');
-        if (tocBody) captureTargetElement = tocBody;
-      }
       try {
-        const csDetailType = currentSlide?.detailOptions?.csDetailType;
-        if (currentSlide?.mode === 'chart' && csDetailType) {
+        // csDetailType이 배열인 경우 첫 번째 값 사용, 단일 값인 경우 그대로 사용
+        const csDetailTypeRaw = currentSlide?.detailOptions?.csDetailType;
+        const csDetailType = Array.isArray(csDetailTypeRaw) ? csDetailTypeRaw[0] : csDetailTypeRaw;
+        if (currentSlide?.mode === 'chart' && csDetailType && csDetailType !== 'all') {
           // 모든 '펼치기' 버튼 클릭 시도 (중복 클릭은 안전)
           Array.from(document.querySelectorAll('button, .MuiButton-root'))
             .filter(el => typeof el.textContent === 'string' && el.textContent.includes('펼치기'))

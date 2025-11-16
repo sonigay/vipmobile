@@ -528,8 +528,8 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             </Typography>
           </Box>
 
-          {/* 중앙: 회의 정보 (캡처 타깃) */}
-          <Box data-capture-target="main-body" sx={{ textAlign: 'center', maxWidth: 1000, width: '100%', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', pt: { xs: 10, md: 12 } }}>
+          {/* 중앙: 회의 정보 */}
+          <Box sx={{ textAlign: 'center', maxWidth: 1000, width: '100%', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', pt: { xs: 10, md: 12 } }}>
             {/* 차수 배지 - 전문적인 디자인 */}
             {slide.meetingNumber && (
               <Box
@@ -797,8 +797,8 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             </Typography>
           </Box>
 
-          {/* 중앙: 목차 내용 (캡처 타깃) */}
-          <Box data-capture-target="toc-body" sx={{ 
+          {/* 중앙: 목차 내용 */}
+          <Box sx={{ 
             textAlign: 'center', 
             maxWidth: 1200, 
             width: '100%', 
@@ -1732,36 +1732,34 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             position: 'relative'
           }}
         >
-          {/* 상단: 회사 로고 및 슬라이드 제목 - 상단 전체 하얀색 배경 */}
+          {/* 상단바: 좌→우 그라데이션, 좌측 로고/회사명 + 우측 통합 제목(흰색) */}
           <Box
             sx={{
-              display: 'flex',
-              flexDirection: 'row',
-              alignItems: 'flex-end',
-              justifyContent: 'space-between',
-              width: '100%',
-              backgroundColor: '#ffffff',
-              px: { xs: 3, md: 4 },
-              py: { xs: 2.5, md: 3 },
-              boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-              borderBottom: '1px solid rgba(0,0,0,0.05)',
               position: 'absolute',
               top: 0,
               left: 0,
               right: 0,
-              zIndex: 10
+              zIndex: 15,
+              background: getHeaderGradient(slide),
+              borderBottom: '1px solid rgba(0,0,0,0.06)',
+              boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              px: { xs: 2.5, md: 4 },
+              py: { xs: 1.6, md: 2 },
+              pointerEvents: 'none'
             }}
           >
             {/* 왼쪽: 로고와 회사 이름 */}
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
               <Box
                 component="img"
                 src="/logo512.png"
                 alt="회사 로고"
                 sx={{
-                  width: { xs: 35, md: 45 },
-                  height: { xs: 35, md: 45 },
-                  mr: { xs: 1, md: 1.5 },
+                  width: { xs: 48, md: 60 },
+                  height: { xs: 48, md: 60 },
                   filter: 'brightness(0) invert(0)'
                 }}
                 onError={(e) => {
@@ -1769,37 +1767,29 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                 }}
               />
               <Typography
-                variant="h6"
                 sx={{
-                  fontWeight: 700,
-                  fontSize: { xs: '1.1rem', md: '1.3rem' },
+                  fontWeight: 800,
+                  fontSize: { xs: '1.25rem', md: '1.6rem' },
                   color: '#212529',
-                  letterSpacing: '0.5px',
-                  fontFamily: '"Noto Sans KR", "Roboto", "Helvetica", "Arial", sans-serif'
+                  letterSpacing: '0.2px',
+                  fontFamily: '"Noto Sans KR","Roboto",sans-serif'
                 }}
               >
                 (주)브이아이피플러스
               </Typography>
             </Box>
-            
-            {/* 오른쪽: 세부 옵션 마지막 항목만 표시 */}
-            {lastDetailOption && (
-              <Typography
-                variant="h5"
-                sx={{
-                  fontWeight: 900,
-                  fontSize: { xs: '1.4rem', md: '1.8rem' },
-                  color: '#212529',
-                  textAlign: 'right',
-                  fontFamily: '"Noto Sans KR", "Roboto", sans-serif',
-                  letterSpacing: '0.3px',
-                  backgroundColor: 'transparent',
-                  background: 'none'
-                }}
-              >
-                {lastDetailOption}
-              </Typography>
-            )}
+            {/* 오른쪽: 통합 제목 */}
+            <Typography
+              sx={{
+                fontSize: { xs: '1rem', md: '1.25rem' },
+                fontWeight: 800,
+                color: '#ffffff',
+                textShadow: '0 1px 2px rgba(0,0,0,0.15)',
+                letterSpacing: '0.2px'
+              }}
+            >
+              {getUnifiedTitle(slide, loggedInStore)}
+            </Typography>
           </Box>
 
           {/* 중앙: 실제 콘텐츠 */}

@@ -357,7 +357,23 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess, autoE
   };
 
   const addSubTabSlide = (modeKey, tabKey, subTabKey, subTabId, detailOptions = {}) => {
-    setSelectedSubTabs(prev => [...prev, subTabId]);
+    // 동일한 detailOptions를 가진 슬라이드가 이미 존재하는지 확인 (중복 방지)
+    const existingSlide = slides.find(s => 
+      s.type === 'mode-tab' && 
+      s.mode === modeKey && 
+      s.tab === tabKey && 
+      s.subTab === subTabKey &&
+      JSON.stringify(s.detailOptions || {}) === JSON.stringify(detailOptions || {})
+    );
+    if (existingSlide) {
+      // 동일한 슬라이드가 이미 존재하면 추가하지 않음
+      return;
+    }
+    
+    // subTabId는 선택 목록에만 추가 (중복 체크)
+    if (!selectedSubTabs.includes(subTabId)) {
+      setSelectedSubTabs(prev => [...prev, subTabId]);
+    }
     
     const availableTabs = getAvailableTabsForMode(modeKey, loggedInStore);
     const tabConfig = availableTabs.find(t => t.key === tabKey);
@@ -378,9 +394,11 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess, autoE
     };
     
     const rand = Math.random().toString(36).slice(2, 8);
+    const timestamp = Date.now();
     const csSuffix = detailOptions && detailOptions.csDetailType ? `-${detailOptions.csDetailType}` : '';
+    // 고유한 slideId 생성 (타임스탬프 + 랜덤 문자열로 중복 방지)
     const newSlide = {
-      slideId: `slide-${modeKey}-${tabKey}-${subTabKey}${csSuffix}-${Date.now()}-${rand}`,
+      slideId: `slide-${modeKey}-${tabKey}-${subTabKey}${csSuffix}-${timestamp}-${rand}`,
       type: 'mode-tab',
       mode: modeKey,
       tab: tabKey,
@@ -393,6 +411,7 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess, autoE
       order: 0
     };
     
+    // 함수형 업데이트로 모든 선택값이 정확히 추가되도록 보장
     setSlides(prev => {
       const next = [...prev, { ...newSlide, order: prev.length + 1 }];
       return next;
@@ -884,11 +903,12 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess, autoE
                         if (firstMultipleOption.key === 'csDetailType') {
                           combinedOptions.csDetailType = selectedValue;
                         }
+                        // 각 선택값마다 고유한 슬라이드 생성 (subTabId는 원본 유지, slideId만 고유하게)
                         addSubTabSlide(
                           pendingSubTab.modeKey,
                           pendingSubTab.tabKey,
                           pendingSubTab.subTabKey,
-                          `${pendingSubTab.subTabId}-${selectedValue}-${Date.now()}`,
+                          pendingSubTab.subTabId, // 원본 subTabId 유지
                           combinedOptions
                         );
                       });
