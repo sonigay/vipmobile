@@ -1679,53 +1679,80 @@ async function convertPPTToImages(pptBuffer, filename) {
         if (launchError.message.includes('Could not find Chrome') || 
             launchError.message.includes('Browser was not found') ||
             launchError.message.includes('Executable doesn\'t exist')) {
-          console.log('📥 [PPT 변환] Chrome을 찾을 수 없습니다. 자동 설치 시도...');
+          console.log('📥 [PPT 변환] Chrome을 찾을 수 없습니다. 설치된 Chrome 경로 확인 중...');
+          
+          // 이미 설치된 Chrome 경로 확인 (Puppeteer 캐시 디렉토리에서)
+          const os = require('os');
+          const path = require('path');
+          const fs = require('fs');
+          
+          const puppeteerCacheDir = process.env.PUPPETEER_CACHE_DIR || path.join(os.homedir(), '.cache', 'puppeteer');
+          const chromePaths = [
+            path.join(puppeteerCacheDir, 'chrome', 'linux-142.0.7444.162', 'chrome-linux64', 'chrome'),
+            path.join(puppeteerCacheDir, 'chrome', 'linux-*', 'chrome-linux64', 'chrome'),
+          ];
+          
+          // 실제 설치된 Chrome 경로 찾기
+          let foundChromePath = null;
           try {
-            // Puppeteer의 브라우저 설치 명령 실행 (비동기로 처리)
-            const { execSync } = require('child_process');
-            console.log('📥 [PPT 변환] Chrome 다운로드 시작... (이 작업은 몇 분이 걸릴 수 있습니다)');
-            
-            // 환경 변수 설정: Puppeteer가 Chrome을 다운로드할 수 있도록
-            const env = { ...process.env };
-            if (!env.PUPPETEER_CACHE_DIR) {
-              // 기본 캐시 디렉토리 사용 (홈 디렉토리)
-              env.PUPPETEER_CACHE_DIR = require('os').homedir() + '/.cache/puppeteer';
+            // 특정 버전 경로 확인
+            const specificPath = chromePaths[0];
+            if (fs.existsSync(specificPath)) {
+              foundChromePath = specificPath;
+              console.log(`✅ [PPT 변환] 설치된 Chrome 발견: ${foundChromePath}`);
+            } else {
+              // 와일드카드 경로 검색
+              const chromeDir = path.join(puppeteerCacheDir, 'chrome');
+              if (fs.existsSync(chromeDir)) {
+                const versions = fs.readdirSync(chromeDir);
+                for (const version of versions) {
+                  const chromePath = path.join(chromeDir, version, 'chrome-linux64', 'chrome');
+                  if (fs.existsSync(chromePath)) {
+                    foundChromePath = chromePath;
+                    console.log(`✅ [PPT 변환] 설치된 Chrome 발견: ${foundChromePath}`);
+                    break;
+                  }
+                }
+              }
             }
-            
-            execSync('npx puppeteer browsers install chrome', { 
-              stdio: 'inherit',
-              timeout: 600000, // 10분 타임아웃 (Chrome 다운로드는 시간이 걸릴 수 있음)
-              env: env
-            });
-            console.log('✅ [PPT 변환] Chrome 설치 완료, 재시도...');
-            
-            // 재시도 (executablePath 없이 자동 감지)
-            const retryOptions = {
-              headless: true,
-              args: [
-                '--no-sandbox', 
-                '--disable-setuid-sandbox', 
-                '--disable-dev-shm-usage',
-                '--disable-gpu',
-                '--disable-software-rasterizer'
-              ]
-            };
-            global.pptBrowser = await puppeteer.launch(retryOptions);
-            console.log('✅ [PPT 변환] Puppeteer 브라우저 실행 성공 (재시도)');
-          } catch (installError) {
-            console.error('❌ [PPT 변환] Chrome 자동 설치 실패:', installError.message);
-            console.error('❌ [PPT 변환] 설치 에러 상세:', installError);
-            
-            // 더 자세한 안내 메시지
-            const errorMsg = `PPT 변환을 위해 Chrome이 필요합니다.\n\n` +
+          } catch (pathError) {
+            console.warn('⚠️ [PPT 변환] Chrome 경로 확인 실패:', pathError.message);
+          }
+          
+          if (foundChromePath) {
+            // 설치된 Chrome 경로로 재시도
+            try {
+              const retryOptions = {
+                headless: true,
+                executablePath: foundChromePath,
+                args: [
+                  '--no-sandbox', 
+                  '--disable-setuid-sandbox', 
+                  '--disable-dev-shm-usage',
+                  '--disable-gpu',
+                  '--disable-software-rasterizer'
+                ]
+              };
+              global.pptBrowser = await puppeteer.launch(retryOptions);
+              console.log('✅ [PPT 변환] Puppeteer 브라우저 실행 성공 (설치된 Chrome 사용)');
+            } catch (retryError) {
+              console.error('❌ [PPT 변환] 설치된 Chrome으로 실행 실패:', retryError.message);
+              throw new Error(`PPT 변환을 위해 Chrome이 필요합니다. Chrome이 설치되어 있지만 실행에 실패했습니다.\n\n` +
+                `해결 방법:\n` +
+                `1. 서버를 재시작하세요.\n` +
+                `2. 또는 환경 변수 PUPPETEER_EXECUTABLE_PATH에 Chrome 실행 파일 경로를 설정하세요: ${foundChromePath}\n\n` +
+                `원본 에러: ${launchError.message}\n` +
+                `재시도 에러: ${retryError.message}`);
+            }
+          } else {
+            // Chrome이 설치되지 않은 경우
+            throw new Error(`PPT 변환을 위해 Chrome이 필요합니다.\n\n` +
               `해결 방법:\n` +
-              `1. 서버에서 다음 명령을 실행하세요:\n` +
+              `1. 서버 터미널에서 다음 명령을 실행하세요:\n` +
+              `   cd server\n` +
               `   npx puppeteer browsers install chrome\n\n` +
-              `2. 또는 환경 변수 PUPPETEER_EXECUTABLE_PATH에 Chrome 실행 파일 경로를 설정하세요.\n\n` +
-              `원본 에러: ${launchError.message}\n` +
-              `설치 에러: ${installError.message}`;
-            
-            throw new Error(errorMsg);
+              `2. 설치 완료 후 서버를 재시작하세요.\n\n` +
+              `원본 에러: ${launchError.message}`);
           }
         } else {
           throw launchError;
@@ -2318,6 +2345,8 @@ async function uploadCustomSlideFile(req, res) {
           }));
         }
       } catch (excelError) {
+        // CORS 헤더 설정 (에러 응답에도 포함)
+        setCORSHeaders(req, res);
         console.error('Excel 변환 오류:', excelError);
         // Canvas가 없는 경우 더 명확한 에러 메시지
         if (excelError.message.includes('Canvas')) {
@@ -2326,7 +2355,10 @@ async function uploadCustomSlideFile(req, res) {
             error: 'Excel 파일 변환 기능을 사용하려면 서버에 Canvas 모듈 또는 Puppeteer가 설치되어 있어야 합니다. 관리자에게 문의하세요.' 
           });
         }
-        throw excelError;
+        return res.status(500).json({ 
+          success: false, 
+          error: `Excel 변환 실패: ${excelError.message}` 
+        });
       }
     } else if (detectedFileType === 'ppt') {
       // PPT 파일 변환
@@ -2347,6 +2379,8 @@ async function uploadCustomSlideFile(req, res) {
           };
         }));
       } catch (pptError) {
+        // CORS 헤더 설정 (에러 응답에도 포함)
+        setCORSHeaders(req, res);
         console.error('PPT 변환 오류:', pptError);
         return res.status(500).json({ 
           success: false, 
