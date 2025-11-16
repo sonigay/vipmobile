@@ -4201,6 +4201,8 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
           const latestTimestamp = sortedHistory[0].timestamp;
           setSelectedTimestamp(latestTimestamp);
           await loadDataByTimestamp(latestTimestamp);
+          // presentationMode에서도 선 그래프를 위해 allData 로드
+          await loadAllData();
         } else if (historyData.length > 0) {
           await loadAllData();
         } else {
@@ -4225,12 +4227,12 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
         const timestamps = [...new Set(data.map(d => d && d.timestamp).filter(Boolean))].sort().reverse();
         const derived = timestamps.map(ts => ({ timestamp: ts }));
         setHistory(derived);
+        // presentationMode에서도 선 그래프를 위해 allData 설정
+        setAllData(data);
+        setCurrentData(data);
         if (presentationMode && derived.length > 0) {
           setSelectedTimestamp(derived[0].timestamp);
           await loadDataByTimestamp(derived[0].timestamp);
-        } else {
-          setAllData(data);
-          setCurrentData(data);
         }
       }
     } catch (e) {

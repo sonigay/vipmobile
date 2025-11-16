@@ -1301,16 +1301,21 @@ function convertExcelToHTML(worksheet) {
   let html = '<!DOCTYPE html><html><head>';
   html += '<meta charset="UTF-8">';
   html += '<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">';
-  html += '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">';
+  // 여러 한글 폰트 소스 추가 (CDN + 시스템 폰트)
+  html += '<link rel="preconnect" href="https://fonts.googleapis.com">';
+  html += '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>';
+  html += '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Nanum+Gothic:wght@400;700;800&display=swap" rel="stylesheet">';
   html += '<style>';
-  html += '* { font-family: "Noto Sans KR", "Malgun Gothic", "AppleGothic", "NanumGothic", "Noto Sans CJK KR", Arial, sans-serif !important; }';
-  html += 'body { margin: 20px; }';
-  html += 'table { border-collapse: collapse; width: 100%; }';
-  html += 'th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }';
+  // 한글 폰트를 우선순위로 설정하고, 시스템 폰트를 폴백으로 사용
+  html += '@font-face { font-family: "Noto Sans KR"; font-style: normal; font-weight: 400; font-display: swap; src: url(https://fonts.gstatic.com/s/notosanskr/v36/PbykFmXiEBPT4ITbgNA5Cgm20HTs4JMMuA.woff2) format("woff2"); unicode-range: U+AC00-D7A3, U+1100-11FF, U+3130-318F, U+A960-A97F, U+D7B0-D7FF; }';
+  html += '* { font-family: "Noto Sans KR", "Nanum Gothic", "Malgun Gothic", "AppleGothic", "NanumGothic", "Noto Sans CJK KR", "맑은 고딕", "Apple SD Gothic Neo", Arial, sans-serif !important; }';
+  html += 'body { margin: 20px; font-size: 14px; line-height: 1.5; }';
+  html += 'table { border-collapse: collapse; width: 100%; font-family: "Noto Sans KR", "Malgun Gothic", "AppleGothic", sans-serif !important; }';
+  html += 'th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-family: inherit !important; }';
   html += 'th { background-color: #4a90e2; color: white; font-weight: bold; }';
   html += 'tr:nth-child(even) { background-color: #f8f9fa; }';
   html += 'tr:hover { background-color: #f0f0f0; }';
-  html += 'h2 { color: #333; margin-bottom: 20px; }';
+  html += 'h2 { color: #333; margin-bottom: 20px; font-family: inherit !important; }';
   html += '</style></head><body>';
   // 시트 이름도 HTML 이스케이프 처리
   const sheetName = (worksheet.name || 'Sheet')
@@ -1977,7 +1982,7 @@ async function uploadCustomSlideFile(req, res) {
           const worksheet = workbook.worksheets[i];
           const html = convertExcelToHTML(worksheet);
           
-          // Puppeteer로 HTML을 이미지로 변환
+          // Puppeteer로 HTML을 이미지로 변환 (한글 폰트 확실히 로드)
           try {
             const puppeteer = require('puppeteer');
             const browser = await puppeteer.launch({
@@ -1987,75 +1992,77 @@ async function uploadCustomSlideFile(req, res) {
                 '--disable-setuid-sandbox', 
                 '--disable-dev-shm-usage',
                 '--disable-gpu',
-                '--disable-software-rasterizer'
+                '--disable-software-rasterizer',
+                '--font-render-hinting=none', // 폰트 렌더링 힌팅 비활성화
+                '--disable-font-subpixel-positioning' // 폰트 서브픽셀 위치 지정 비활성화
               ],
               // 서버 환경에서 Chrome 경로 자동 감지
               executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
             });
             const page = await browser.newPage();
             
-            // UTF-8 인코딩 명시 및 한글 폰트 설정
-            // 폰트를 먼저 로드
-            await page.goto('data:text/html,<html><head><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet"></head><body></body></html>', {
-              waitUntil: 'networkidle0',
-              timeout: 30000
+            // 뷰포트 설정 (한글 렌더링 개선)
+            await page.setViewport({
+              width: 1920,
+              height: 1080,
+              deviceScaleFactor: 2 // 고해상도로 렌더링
             });
             
-            // HTML 콘텐츠 설정
+            // HTML 콘텐츠 설정 (폰트 로드 대기)
             await page.setContent(html, { 
               waitUntil: 'networkidle0',
-              timeout: 30000
+              timeout: 60000 // 타임아웃 증가
             });
             
-            // 한글 폰트가 로드되도록 대기 (더 확실하게)
-            await page.evaluateHandle(() => {
-              return document.fonts.ready;
+            // 폰트가 완전히 로드될 때까지 대기
+            await page.evaluate(async () => {
+              // 모든 폰트가 로드될 때까지 대기
+              await document.fonts.ready;
+              
+              // 추가로 폰트 로드 확인
+              const fontCheck = setInterval(() => {
+                if (document.fonts.check('16px "Noto Sans KR"') || 
+                    document.fonts.check('16px "Malgun Gothic"') ||
+                    document.fonts.check('16px "AppleGothic"')) {
+                  clearInterval(fontCheck);
+                }
+              }, 100);
+              
+              // 최대 5초 대기
+              setTimeout(() => clearInterval(fontCheck), 5000);
+            });
+            
+            // 폰트 로드 대기 (더 확실하게)
+            await page.waitForFunction(() => {
+              return document.fonts.ready && document.fonts.size > 0;
+            }, { timeout: 10000 }).catch(() => {
+              console.warn('⚠️ [Excel 변환] 폰트 로드 확인 타임아웃, 계속 진행');
             });
             
             // 추가 대기 시간 (폰트 렌더링 완료 보장)
-            await page.waitForTimeout(3000);
+            await page.waitForTimeout(2000);
             
-            // 한글 텍스트가 제대로 렌더링되었는지 확인
-            const textRendered = await page.evaluate(() => {
-              // 모든 텍스트 노드 확인
-              const walker = document.createTreeWalker(
-                document.body,
-                NodeFilter.SHOW_TEXT,
-                null,
-                false
-              );
-              
-              let hasKorean = false;
-              let allRendered = true;
-              let node;
-              while (node = walker.nextNode()) {
-                const text = node.textContent;
-                // 한글이 포함된 경우 폰트가 로드되었는지 확인
-                if (/[가-힣]/.test(text)) {
-                  hasKorean = true;
-                  const range = document.createRange();
-                  range.selectNodeContents(node);
-                  const rect = range.getBoundingClientRect();
-                  // 텍스트가 보이지 않으면 폰트 로딩 대기
-                  if (rect.width === 0 || rect.height === 0) {
-                    allRendered = false;
-                    break;
-                  }
+            // 한글 텍스트 렌더링 확인 및 강제 재렌더링
+            await page.evaluate(() => {
+              // 모든 텍스트 요소에 폰트 강제 적용
+              const allElements = document.querySelectorAll('*');
+              allElements.forEach(el => {
+                const computedStyle = window.getComputedStyle(el);
+                const fontFamily = computedStyle.fontFamily;
+                // 한글 폰트가 없으면 강제로 추가
+                if (!fontFamily.includes('Noto') && !fontFamily.includes('Malgun') && !fontFamily.includes('Apple')) {
+                  el.style.fontFamily = '"Noto Sans KR", "Malgun Gothic", "AppleGothic", sans-serif';
                 }
-              }
+              });
               
-              return { hasKorean, allRendered };
+              // 강제 리플로우 트리거
+              document.body.offsetHeight;
             });
             
-            // 한글이 있지만 렌더링되지 않은 경우 추가 대기
-            if (textRendered.hasKorean && !textRendered.allRendered) {
-              await page.waitForTimeout(2000);
-              await page.evaluateHandle(() => {
-                return document.fonts.ready;
-              });
-            }
+            // 추가 대기 (리플로우 후 렌더링)
+            await page.waitForTimeout(1000);
             
-            // 스크린샷 촬영
+            // 스크린샷 촬영 (고해상도)
             const screenshot = await page.screenshot({
               type: 'png',
               fullPage: true,

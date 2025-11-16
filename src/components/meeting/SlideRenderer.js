@@ -551,12 +551,22 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
         clearTimeout(onReadyTimer);
       }
     };
-  }, [slide, onReady]);
+  }, [slide]); // onReady는 의존성에서 제거 (초기화 순서 문제 방지)
 
-  // renderSlideContent를 useMemo로 메모이제이션하여 불필요한 재렌더링 방지
+  // renderSlideContent를 useCallback으로 메모이제이션하여 불필요한 재렌더링 방지
   const renderSlideContent = useCallback(() => {
-    // 회의 메인 화면 타입
-    if (slide.type === 'main') {
+    try {
+      // slide가 없으면 빈 화면 반환
+      if (!slide) {
+        return (
+          <Box sx={{ p: 4, textAlign: 'center' }}>
+            <Alert severity="warning">슬라이드 데이터가 없습니다.</Alert>
+          </Box>
+        );
+      }
+      
+      // 회의 메인 화면 타입
+      if (slide.type === 'main') {
       const meetingDate = slide.meetingDate || '';
       const dateObj = meetingDate ? new Date(meetingDate + 'T00:00:00') : new Date();
       const formattedDate = dateObj.toLocaleDateString('ko-KR', {
@@ -644,7 +654,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             </Typography>
           </Box>
 
-          {/* 생성자 정보: 상단 헤더 바로 밑 */}
+          {/* 작성자 정보: 상단 헤더 바로 밑 */}
           {slide.createdBy && (
             <Box sx={{ 
               position: 'absolute',
@@ -1525,7 +1535,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             </Box>
           </Box>
 
-          {/* 하단 푸터 제거: 생성자 정보는 상단 헤더 오른쪽 밑으로 이동 */}
+          {/* 하단 푸터 제거: 작성자 정보는 상단 헤더 오른쪽 밑으로 이동 */}
         </Box>
       );
     }
@@ -1704,7 +1714,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             </Box>
           </Box>
 
-          {/* 하단 푸터 제거: 생성자 정보는 상단 헤더 오른쪽 밑으로 이동 */}
+          {/* 하단 푸터 제거: 작성자 정보는 상단 헤더 오른쪽 밑으로 이동 */}
         </Box>
       );
     }
@@ -1804,7 +1814,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             </Typography>
           </Box>
 
-          {/* 생성자 정보: 상단 헤더 오른쪽 바로 밑 */}
+          {/* 작성자 정보: 상단 헤더 오른쪽 바로 밑 */}
           {slide.createdBy && (
             <Box sx={{ 
               position: 'absolute',
@@ -1820,7 +1830,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                 fontFamily: '"Noto Sans KR", sans-serif',
                 opacity: 0.8
               }}>
-                생성자: {slide.createdBy}
+                작성자: {slide.createdBy}
               </Typography>
             </Box>
           )}
@@ -1984,7 +1994,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             </Typography>
           </Box>
 
-          {/* 생성자 정보: 상단 헤더 오른쪽 바로 밑 */}
+          {/* 작성자 정보: 상단 헤더 오른쪽 바로 밑 */}
           {slide.createdBy && (
             <Box sx={{ 
               position: 'absolute',
@@ -2000,7 +2010,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                 fontFamily: '"Noto Sans KR", sans-serif',
                 opacity: 0.8
               }}>
-                생성자: {slide.createdBy}
+                작성자: {slide.createdBy}
               </Typography>
             </Box>
           )}
@@ -2143,7 +2153,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               )}
             </Box>
 
-            {/* 생성자 정보: 상단 헤더 오른쪽 바로 밑 */}
+            {/* 작성자 정보: 상단 헤더 오른쪽 바로 밑 */}
             {slide.createdBy && (
               <Box sx={{ 
                 position: 'absolute',
@@ -2159,7 +2169,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                   fontFamily: '"Noto Sans KR", sans-serif',
                   opacity: 0.8
                 }}>
-                  생성자: {slide.createdBy}
+                  작성자: {slide.createdBy}
                 </Typography>
               </Box>
             )}
@@ -2289,7 +2299,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               )}
             </Box>
 
-            {/* 생성자 정보: 상단 헤더 오른쪽 바로 밑 */}
+            {/* 작성자 정보: 상단 헤더 오른쪽 바로 밑 */}
             {slide.createdBy && (
               <Box sx={{ 
                 position: 'absolute',
@@ -2305,7 +2315,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                   fontFamily: '"Noto Sans KR", sans-serif',
                   opacity: 0.8
                 }}>
-                  생성자: {slide.createdBy}
+                  작성자: {slide.createdBy}
                 </Typography>
               </Box>
             )}
@@ -2438,7 +2448,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               )}
             </Box>
 
-            {/* 생성자 정보: 상단 헤더 오른쪽 바로 밑 */}
+            {/* 작성자 정보: 상단 헤더 오른쪽 바로 밑 */}
             {slide.createdBy && (
               <Box sx={{ 
                 position: 'absolute',
@@ -2454,7 +2464,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                   fontFamily: '"Noto Sans KR", sans-serif',
                   opacity: 0.8
                 }}>
-                  생성자: {slide.createdBy}
+                  작성자: {slide.createdBy}
                 </Typography>
               </Box>
             )}
@@ -2520,6 +2530,17 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
         </Typography>
       </Box>
     );
+    } catch (error) {
+      // 에러 발생 시 안전하게 처리
+      console.error('❌ [SlideRenderer] 렌더링 오류:', error);
+      return (
+        <Box sx={{ p: 4, textAlign: 'center' }}>
+          <Alert severity="error">
+            슬라이드 렌더링 중 오류가 발생했습니다: {error.message || '알 수 없는 오류'}
+          </Alert>
+        </Box>
+      );
+    }
   }, [slide, loggedInStore]);
 
   return (
@@ -2538,7 +2559,11 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
       }}
     >
       {/* 로딩 중이어도 콘텐츠를 먼저 렌더링하여 사용자가 볼 수 있도록 함 */}
-      {renderSlideContent()}
+      {slide && renderSlideContent ? renderSlideContent() : (
+        <Box sx={{ p: 4, textAlign: 'center' }}>
+          <CircularProgress />
+        </Box>
+      )}
       
       {/* 로딩 중일 때 반투명 오버레이 표시 - 캡쳐 시 제외되도록 data-capture-exclude 속성 추가 */}
       {loading && (
