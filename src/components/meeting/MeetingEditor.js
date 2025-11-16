@@ -241,9 +241,15 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess, autoE
           mode: modeKey,
           tab: tabKey,
           tabLabel: tabConfig?.label || tabKey,
-          order: slides.length + 1
+          // order는 실제 추가 시점의 길이를 기준으로 계산
+          // (동시 다중 추가에서도 정확한 순서 유지)
+          // 임시값은 나중에 setSlides 함수형 업데이트에서 재계산
+          order: 0
         };
-        setSlides([...slides, newSlide]);
+        setSlides(prev => {
+          const next = [...prev, { ...newSlide, order: prev.length + 1 }];
+          return next;
+        });
       }
     }
   };
@@ -275,10 +281,13 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess, autoE
       detailLabel: buildDetailLabel() || undefined,
       // 세부 옵션 (모든 옵션을 detailOptions 객체에 저장)
       detailOptions: Object.keys(detailOptions).length > 0 ? detailOptions : undefined,
-      order: slides.length + 1
+      order: 0
     };
     
-    setSlides([...slides, newSlide]);
+    setSlides(prev => {
+      const next = [...prev, { ...newSlide, order: prev.length + 1 }];
+      return next;
+    });
   };
 
   const handleSubTabToggle = (modeKey, tabKey, subTabKey) => {
@@ -326,7 +335,7 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess, autoE
   };
 
   const addSubTabSlide = (modeKey, tabKey, subTabKey, subTabId, detailOptions = {}) => {
-    setSelectedSubTabs([...selectedSubTabs, subTabId]);
+    setSelectedSubTabs(prev => [...prev, subTabId]);
     
     const availableTabs = getAvailableTabsForMode(modeKey, loggedInStore);
     const tabConfig = availableTabs.find(t => t.key === tabKey);
@@ -357,10 +366,13 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess, autoE
       detailLabel: buildDetailLabel() || undefined,
       // 세부 옵션 (모든 옵션을 detailOptions 객체에 저장)
       detailOptions: Object.keys(detailOptions).length > 0 ? detailOptions : undefined,
-      order: slides.length + 1
+      order: 0
     };
     
-    setSlides([...slides, newSlide]);
+    setSlides(prev => {
+      const next = [...prev, { ...newSlide, order: prev.length + 1 }];
+      return next;
+    });
   };
 
   const handleModeOnlyToggle = (modeKey) => {
