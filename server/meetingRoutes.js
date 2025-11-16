@@ -606,14 +606,33 @@ async function saveMeetingConfig(req, res) {
     // 각 슬라이드를 개별적으로 업데이트 또는 추가
     for (let i = 0; i < slides.length; i++) {
       const slide = slides[i];
-      const slideId = slide.slideId || slide.id || `slide-${slide.order}`;
+      
+      // 필수 필드 검증
+      if (!slide || typeof slide !== 'object') {
+        console.error(`❌ [saveMeetingConfig] 슬라이드 ${i + 1}이 유효하지 않습니다.`, slide);
+        continue;
+      }
+      
+      // slideId 생성 (유효성 검증 포함)
+      const slideId = slide.slideId || slide.id || `slide-${slide.order || i + 1}`;
+      if (!slideId || typeof slideId !== 'string') {
+        console.error(`❌ [saveMeetingConfig] 슬라이드 ${i + 1}의 slideId가 유효하지 않습니다.`, slide);
+        continue;
+      }
+      
+      // order 검증 및 정규화
+      const order = typeof slide.order === 'number' && slide.order >= 0 
+        ? slide.order 
+        : (typeof slide.order === 'string' && !isNaN(parseInt(slide.order)))
+          ? parseInt(slide.order)
+          : i + 1;
       
       console.log(`\n🔄 [saveMeetingConfig] 슬라이드 ${i + 1}/${slides.length} 처리 시작:`, {
         slideId,
-        order: slide.order,
-        mode: slide.mode,
-        tab: slide.tab,
-        subTab: slide.subTab,
+        order,
+        mode: slide.mode || '',
+        tab: slide.tab || '',
+        subTab: slide.subTab || '',
         imageUrl: slide.imageUrl || '없음',
         discordPostId: slide.discordPostId || '없음',
         discordThreadId: slide.discordThreadId || '없음'
@@ -665,12 +684,16 @@ async function saveMeetingConfig(req, res) {
       const tabValue = slide.subTab ? `${slide.tab || ''}/${slide.subTab}` : (slide.tab || '');
       
       // 메인 슬라이드의 경우 추가 필드 포함 (tabLabel, subTabLabel, 세부항목옵션 추가)
+      // 타입 검증 및 정규화
+      const slideType = typeof slide.type === 'string' ? slide.type : 'mode-tab';
+      const slideMode = typeof slide.mode === 'string' ? slide.mode : '';
+      
       const newRow = [
         meetingId,
         slideId,
-        slide.order || 0,
-        slide.type || 'mode-tab',
-        slide.mode || '',
+        order,
+        slideType,
+        slideMode,
         tabValue,
         slide.title || '',
         slide.content || '',

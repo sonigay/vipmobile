@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { captureElement, generateImageFilename } from '../../utils/screenCapture';
 import { api } from '../../api';
 import { API_BASE_URL } from '../../api';
@@ -20,6 +20,14 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
   const [startTime, setStartTime] = useState(null); // 캡처 시작 시간
   const [retryingSlides, setRetryingSlides] = useState(new Set()); // 재시도 중인 슬라이드
   const [isPaused, setIsPaused] = useState(false); // 일시정지 상태 (캡처 일시정지/재개용)
+  const isMountedRef = useRef(true); // 컴포넌트 마운트 상태 추적
+
+  // 컴포넌트 언마운트 시 정리
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (slides && Array.isArray(slides)) {
@@ -35,13 +43,10 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
     }
   }, [slides]);
 
-  useEffect(() => {
-    if (slidesState && Array.isArray(slidesState) && slidesState.length > 0 && !capturing) {
-      startCapture();
-    }
-  }, [slidesState]);
-
-  const startCapture = async () => {
+  // startCapture를 useCallback으로 메모이제이션하여 의존성 문제 해결
+  const startCapture = useCallback(async () => {
+    if (!isMountedRef.current) return;
+    
     if (!slidesState || !Array.isArray(slidesState) || slidesState.length === 0) {
       if (onComplete) onComplete();
       return;
@@ -55,15 +60,64 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
 
     // 첫 번째 슬라이드 렌더링 시작
     await captureNextSlide(0);
-  };
+  }, [slidesState, onComplete]);
+
+  useEffect(() => {
+    if (slidesState && Array.isArray(slidesState) && slidesState.length > 0 && !capturing) {
+      startCapture();
+    }
+  }, [slidesState, capturing, startCapture]);
 
   const captureNextSlide = async (index) => {
-    // 일시정지 상태면 대기
-    while (isPaused) {
+    // 언마운트 체크
+    if (!isMountedRef.current) {
+      return;
+    }
+
+    // 배열 인덱스 범위 체크
+    if (!slidesState || !Array.isArray(slidesState) || index < 0 || index >= slidesState.length) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`⚠️ [MeetingCaptureManager] 유효하지 않은 인덱스: ${index}, 배열 길이: ${slidesState?.length || 0}`);
+      }
+      // 모든 슬라이드 캡처 완료
+      if (isMountedRef.current) {
+        setCapturing(false);
+        
+        // 회의 상태를 completed로 업데이트
+        try {
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`🔄 [MeetingCaptureManager] 회의 상태를 completed로 업데이트 시작: ${meeting.meetingId}`);
+          }
+          await api.updateMeeting(meeting.meetingId, {
+            status: 'completed'
+          });
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`✅ [MeetingCaptureManager] 회의 상태 업데이트 완료`);
+          }
+        } catch (err) {
+          if (process.env.NODE_ENV === 'development') {
+            console.error('❌ [MeetingCaptureManager] 회의 상태 업데이트 오류:', err);
+          }
+        }
+
+        if (onComplete) {
+          onComplete();
+        }
+      }
+      return;
+    }
+
+    // 일시정지 상태면 대기 (언마운트 체크 포함)
+    while (isPaused && isMountedRef.current) {
       await new Promise(resolve => setTimeout(resolve, 500));
     }
 
-    if (!slidesState || !Array.isArray(slidesState) || index >= slidesState.length) {
+    // 언마운트 체크 (일시정지 대기 중 언마운트될 수 있음)
+    if (!isMountedRef.current) {
+      return;
+    }
+
+    if (index >= slidesState.length) {
       // 모든 슬라이드 캡처 완료
       setCapturing(false);
       
@@ -126,9 +180,14 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
     await waitForReady();
 
     try {
-      // 슬라이드 데이터 검증
-      if (!slidesState || !Array.isArray(slidesState) || !slidesState[index]) {
-        throw new Error(`슬라이드 데이터가 없습니다. (index: ${index}, slidesState: ${slidesState ? 'exists' : 'null'})`);
+      // 언마운트 체크
+      if (!isMountedRef.current) {
+        return;
+      }
+
+      // 슬라이드 데이터 검증 및 배열 범위 체크
+      if (!slidesState || !Array.isArray(slidesState) || index < 0 || index >= slidesState.length || !slidesState[index]) {
+        throw new Error(`슬라이드 데이터가 없습니다. (index: ${index}, slidesState: ${slidesState ? 'exists' : 'null'}, length: ${slidesState?.length || 0})`);
       }
       
       const currentSlide = slidesState[index];
@@ -191,11 +250,27 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
           
           if (csDetailType === 'cs') {
             const header = findHeader('📞 CS 개통 실적');
-            const metricsBox = header?.nextElementSibling;
-            captureTargetElement = (metricsBox || header?.parentElement || captureTargetElement);
+            if (!header) {
+              const errorMsg = 'CS 개통 실적 헤더를 찾을 수 없습니다.';
+              if (process.env.NODE_ENV === 'development') {
+                console.error(`❌ [MeetingCaptureManager] ${errorMsg}`, { csDetailType, slideId: currentSlide.slideId });
+              }
+              // 기본 타겟 요소 사용
+              captureTargetElement = slideElement;
+            } else {
+              const metricsBox = header?.nextElementSibling;
+              captureTargetElement = (metricsBox || header?.parentElement || captureTargetElement);
+            }
           } else if (csDetailType === 'code') {
             const header = findHeader('📊 코드별 실적');
-            if (header) {
+            if (!header) {
+              const errorMsg = '코드별 실적 헤더를 찾을 수 없습니다.';
+              if (process.env.NODE_ENV === 'development') {
+                console.error(`❌ [MeetingCaptureManager] ${errorMsg}`, { csDetailType, slideId: currentSlide.slideId });
+              }
+              // 기본 타겟 요소 사용
+              captureTargetElement = slideElement;
+            } else if (header) {
               // 헤더가 속한 Paper 컴포넌트 찾기
               let paperElement = header.parentElement;
               while (paperElement && !paperElement.classList.contains('MuiPaper-root')) {
@@ -223,7 +298,14 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             }
           } else if (csDetailType === 'office') {
             const header = findHeader('🏢 사무실별 실적');
-            if (header) {
+            if (!header) {
+              const errorMsg = '사무실별 실적 헤더를 찾을 수 없습니다.';
+              if (process.env.NODE_ENV === 'development') {
+                console.error(`❌ [MeetingCaptureManager] ${errorMsg}`, { csDetailType, slideId: currentSlide.slideId });
+              }
+              // 기본 타겟 요소 사용
+              captureTargetElement = slideElement;
+            } else if (header) {
               let paperElement = header.parentElement;
               while (paperElement && !paperElement.classList.contains('MuiPaper-root')) {
                 paperElement = paperElement.parentElement;
@@ -247,7 +329,14 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             }
           } else if (csDetailType === 'department') {
             const header = findHeader('👥 소속별 실적');
-            if (header) {
+            if (!header) {
+              const errorMsg = '소속별 실적 헤더를 찾을 수 없습니다.';
+              if (process.env.NODE_ENV === 'development') {
+                console.error(`❌ [MeetingCaptureManager] ${errorMsg}`, { csDetailType, slideId: currentSlide.slideId });
+              }
+              // 기본 타겟 요소 사용
+              captureTargetElement = slideElement;
+            } else if (header) {
               let paperElement = header.parentElement;
               while (paperElement && !paperElement.classList.contains('MuiPaper-root')) {
                 paperElement = paperElement.parentElement;
@@ -272,7 +361,14 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
           } else if (csDetailType === 'agent') {
             // 환경에 따라 아이콘이 '🧑' 또는 '👤'로 표시됨
             const header = findHeader(['🧑 담당자별 실적', '👤 담당자별 실적']);
-            if (header) {
+            if (!header) {
+              const errorMsg = '담당자별 실적 헤더를 찾을 수 없습니다.';
+              if (process.env.NODE_ENV === 'development') {
+                console.error(`❌ [MeetingCaptureManager] ${errorMsg}`, { csDetailType, slideId: currentSlide.slideId });
+              }
+              // 기본 타겟 요소 사용
+              captureTargetElement = slideElement;
+            } else if (header) {
               let paperElement = header.parentElement;
               while (paperElement && !paperElement.classList.contains('MuiPaper-root')) {
                 paperElement = paperElement.parentElement;
@@ -875,12 +971,17 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         throw err; // 에러를 다시 throw하여 상위에서 처리할 수 있도록
       }
 
-      setCompleted(prev => prev + 1);
-      
-      // 다음 슬라이드로 이동
-      setTimeout(() => {
-        captureNextSlide(index + 1);
-      }, 500);
+      // 언마운트 체크 후 상태 업데이트
+      if (isMountedRef.current) {
+        setCompleted(prev => prev + 1);
+        
+        // 다음 슬라이드로 이동
+        setTimeout(() => {
+          if (isMountedRef.current) {
+            captureNextSlide(index + 1);
+          }
+        }, 500);
+      }
     } catch (error) {
       console.error(`❌ [MeetingCaptureManager] 슬라이드 ${index + 1} 캡처 오류:`, error);
       if (process.env.NODE_ENV === 'development') {
@@ -982,9 +1083,11 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         console.error(`❌ [MeetingCaptureManager] 오류 처리 중 저장 실패:`, saveError);
       }
       
-      // 실패해도 다음 슬라이드로 진행
+      // 실패해도 다음 슬라이드로 진행 (언마운트 체크 포함)
       setTimeout(() => {
-        captureNextSlide(index + 1);
+        if (isMountedRef.current) {
+          captureNextSlide(index + 1);
+        }
       }, 1000);
     }
   };
@@ -1011,7 +1114,11 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
 
   // 실패한 슬라이드 재시도
   const handleRetryFailed = async (slideIndex) => {
-    if (slideIndex < 0 || slideIndex >= (slidesState?.length || 0)) {
+    // 배열 범위 체크 강화
+    if (!slidesState || !Array.isArray(slidesState) || slideIndex < 0 || slideIndex >= slidesState.length) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`⚠️ [MeetingCaptureManager] 유효하지 않은 재시도 인덱스: ${slideIndex}, 배열 길이: ${slidesState?.length || 0}`);
+      }
       return;
     }
 
@@ -1077,11 +1184,21 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         onResume={handleResume}
         onEditImageLink={async (slideIndex, newUrl) => {
           try {
-            const slide = slidesState?.[slideIndex];
+            // 배열 범위 체크
+            if (!slidesState || !Array.isArray(slidesState) || slideIndex < 0 || slideIndex >= slidesState.length) {
+              alert('유효하지 않은 슬라이드 인덱스입니다.');
+              return;
+            }
+            
+            const slide = slidesState[slideIndex];
             if (!slide) return;
+            
             await api.updateSlideImageUrl(meeting.meetingId, slide.slideId, newUrl);
-            // 로컬 상태 갱신
-            setSlidesState(prev => prev.map((s, i) => i === slideIndex ? { ...s, imageUrl: newUrl } : s));
+            
+            // 언마운트 체크 후 상태 갱신
+            if (isMountedRef.current) {
+              setSlidesState(prev => prev.map((s, i) => i === slideIndex ? { ...s, imageUrl: newUrl } : s));
+            }
           } catch (e) {
             alert(`링크 수정 실패: ${e.message}`);
           }

@@ -884,21 +884,22 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess, autoE
                   if (firstMultipleOption) {
                     const selectedValues = detailOptionMultipleSelections[firstMultipleOption.key] || [];
                     if (selectedValues.length > 0) {
-                      // 각 선택값에 대해 슬라이드 생성
-                      selectedValues.forEach(selectedValue => {
+                      // 각 선택값에 대해 슬라이드 생성 (순차 처리로 경합 조건 방지)
+                      // React 18의 자동 배칭이 있지만, 명시적으로 순차 처리하여 안정성 확보
+                      for (const selectedValue of selectedValues) {
                         const combinedOptions = {
                           ...detailOptionValues,
                           [firstMultipleOption.key]: selectedValue
                         };
                         // 다른 여러 개 선택 옵션도 처리
-                        multipleOptionKeys.forEach(key => {
+                        for (const key of multipleOptionKeys) {
                           if (key !== firstMultipleOption.key) {
                             const otherSelected = detailOptionMultipleSelections[key] || [];
                             if (otherSelected.length > 0) {
                               combinedOptions[key] = otherSelected[0]; // 첫 번째 값 사용
                             }
                           }
-                        });
+                        }
                         // csDetailType이 여러 개 선택된 경우, 각 선택값을 csDetailType으로 명시적으로 설정
                         if (firstMultipleOption.key === 'csDetailType') {
                           combinedOptions.csDetailType = selectedValue;
@@ -911,7 +912,7 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess, autoE
                           pendingSubTab.subTabId, // 원본 subTabId 유지
                           combinedOptions
                         );
-                      });
+                      }
                     } else {
                       // 선택된 값이 없으면 기본값으로 슬라이드 생성
                       addSubTabSlide(

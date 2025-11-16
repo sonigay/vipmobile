@@ -107,6 +107,8 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [contentReady, setContentReady] = useState(false);
+  const isMountedRef = useRef(true); // 컴포넌트 마운트 상태 추적
+  
   // 헤더 그라데이션 오른쪽 색상 결정 (커스텀 슬라이드는 배경색 선택값을 사용)
   const getHeaderGradient = (s) => {
     try {
@@ -116,6 +118,16 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
       return 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #868e96 100%)';
     }
   };
+  
+  useEffect(() => {
+    // 컴포넌트 마운트 상태 초기화
+    isMountedRef.current = true;
+    
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+  
   useEffect(() => {
     // slide가 변경되면 완전히 리셋
     if (slide) {
@@ -167,15 +179,33 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
       return isCodeDetail ? 40000 : 25000;
     })();
     
+    // cleanup을 위해 외부에서 접근 가능한 변수들
+    let observer = null;
+    let checkLoadingTimer = null;
+    let mainTimer = null;
+    let onReadyTimer = null;
+    
     // 데이터 로딩 완료 대기 함수 - 매우 확실한 방법
     const waitForDataLoad = () => {
       return new Promise((resolve) => {
+        // 이미 언마운트되었으면 즉시 resolve
+        if (!isMountedRef.current) {
+          resolve();
+          return;
+        }
+        
         let stableCount = 0; // 연속으로 안정적인 상태가 유지된 횟수
         let checkStartTime = null;
         let lastStableTime = null;
         
         // MutationObserver로 DOM 변화 감지
-        const observer = new MutationObserver(() => {
+        observer = new MutationObserver(() => {
+          // 언마운트 체크
+          if (!isMountedRef.current) {
+            observer?.disconnect();
+            return;
+          }
+          
           // DOM이 변경되면 안정성 카운터 리셋
           if (stableCount > 0) {
             logger.debug('🔄 [SlideRenderer] DOM 변화 감지, 안정성 카운터 리셋', { previousStableCount: stableCount });
@@ -185,6 +215,15 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
         });
         
         const checkLoading = () => {
+          // 언마운트 체크
+          if (!isMountedRef.current) {
+            observer?.disconnect();
+            if (checkLoadingTimer) {
+              clearTimeout(checkLoadingTimer);
+            }
+            return;
+          }
+          
           if (!checkStartTime) {
             checkStartTime = Date.now();
           }
@@ -316,11 +355,11 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
           }
           
           // 체크 주기 완화 (로그/타이머 부하 감소)
-          setTimeout(checkLoading, 300);
+          checkLoadingTimer = setTimeout(checkLoading, 300);
         };
         
         // MutationObserver 시작
-        if (containerRef.current) {
+        if (containerRef.current && isMountedRef.current) {
           observer.observe(containerRef.current, {
             childList: true,
             subtree: true,
@@ -331,20 +370,41 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
         
         // 모드별 최소 대기 시간 후 체크 시작
         logger.debug('⏳ [SlideRenderer] 초기 대기 시작', { waitSec: modeWaitTime, mode: slide?.mode || slide?.type || 'unknown' });
-        setTimeout(() => {
+        const initialTimer = setTimeout(() => {
+          if (!isMountedRef.current) {
+            observer?.disconnect();
+            return;
+          }
           logger.debug('⏳ [SlideRenderer] 데이터 로딩 체크 시작');
           checkLoading();
         }, modeWaitTime * 1000);
+        
+        // cleanup 함수: Promise가 resolve되기 전에 언마운트될 경우를 대비
+        return () => {
+          clearTimeout(initialTimer);
+        };
       });
     };
     
     // 모드별 최소 대기 시간 후 데이터 로딩 완료 확인
-    const timer = setTimeout(async () => {
+    mainTimer = setTimeout(async () => {
+      // 언마운트 체크
+      if (!isMountedRef.current) {
+        return;
+      }
       logger.debug('⏳ [SlideRenderer] 데이터 로딩 대기 시작 (초기 대기 완료)', { waitSec: modeWaitTime, mode: slide?.mode || slide?.type || 'unknown' });
       await waitForDataLoad();
       
+      // 언마운트 체크
+      if (!isMountedRef.current) {
+        return;
+      }
+      
       // 특수 처리: 월간시상 화면 확대 버튼 자동 클릭 (데이터량이 많아 가독성 확보)
       try {
+        if (!isMountedRef.current) {
+          return;
+        }
         const expandBtn = Array.from(document.querySelectorAll('button, .MuiButton-root')).find(
           (el) => typeof el.textContent === 'string' && el.textContent.trim() === '확대'
         );
@@ -358,12 +418,22 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
         logger.warn('⚠️ [SlideRenderer] 확대 버튼 자동 클릭 중 오류', { error: e?.message });
       }
       
+      // 언마운트 체크
+      if (!isMountedRef.current) {
+        return;
+      }
+      
       // 추가 안정화 대기 시간 (고정 2초)
       const additionalWaitTime = 2;
       logger.debug('✅ [SlideRenderer] 데이터 로딩 완료 확인됨, 추가 안정화 대기', { waitSec: additionalWaitTime });
       
       // 추가로 대기하여 완전히 안정화
       await new Promise(resolve => setTimeout(resolve, additionalWaitTime * 1000));
+      
+      // 언마운트 체크
+      if (!isMountedRef.current) {
+        return;
+      }
       
       // 최종 확인: data-loaded 속성이 여전히 true인지 확인
       const finalCheck = containerRef.current?.querySelector('[data-loaded="true"]') !== null;
@@ -401,6 +471,11 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
         logger.debug('⚠️ [SlideRenderer] 추가 대기 (3초)');
         await new Promise(resolve => setTimeout(resolve, 3000));
         
+        // 언마운트 체크
+        if (!isMountedRef.current) {
+          return;
+        }
+        
         // 재확인
         const retryCheck = containerRef.current?.querySelector('[data-loaded="true"]') !== null;
         const retryTableRows = containerRef.current?.querySelectorAll('table tbody tr, .MuiTableBody-root tr, tbody tr') || [];
@@ -422,12 +497,20 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
         }
       }
       
+      // 언마운트 체크
+      if (!isMountedRef.current) {
+        return;
+      }
+      
       logger.info('✅ [SlideRenderer] 안정화 완료, onReady 호출 준비');
       setLoading(false);
       setContentReady(true);
       
       // 추가 대기 후 onReady 호출 (렌더링 완료 보장)
-      setTimeout(() => {
+      onReadyTimer = setTimeout(() => {
+        if (!isMountedRef.current) {
+          return;
+        }
         if (onReady) {
           logger.debug('✅ [SlideRenderer] onReady 콜백 호출');
           onReady();
@@ -435,7 +518,24 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
       }, 1200); // 1.2초 대기
     }, modeWaitTime * 1000); // 모드별 최소 대기 시간
 
-    return () => clearTimeout(timer);
+    // cleanup 함수: 모든 타이머와 observer 정리
+    return () => {
+      // observer 정리
+      if (observer) {
+        observer.disconnect();
+      }
+      
+      // 모든 타이머 정리
+      if (mainTimer) {
+        clearTimeout(mainTimer);
+      }
+      if (checkLoadingTimer) {
+        clearTimeout(checkLoadingTimer);
+      }
+      if (onReadyTimer) {
+        clearTimeout(onReadyTimer);
+      }
+    };
   }, [slide, onReady]);
 
   // renderSlideContent를 useMemo로 메모이제이션하여 불필요한 재렌더링 방지

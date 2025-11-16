@@ -98,7 +98,7 @@ function ImageSlideViewer({ slides, onClose }) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentIndex, slides.length]);
+  }, [currentIndex, slides.length, onClose, handleNext, handlePrevious]);
 
   const handleNext = useCallback(() => {
     if (currentIndex < slides.length - 1) {
