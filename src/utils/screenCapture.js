@@ -145,19 +145,26 @@ export async function captureElement(element, options = {}) {
     element.clientHeight,
     window.innerHeight
   );
+  
+  // 공통 헤더 위치/크기 일관성을 위해 가로 폭을 표준화(고정)하고,
+  // 세로는 콘텐츠에 따라 가변(좁은 폭으로 재흐름되어 길어질 수 있음)
+  const BASE_CAPTURE_WIDTH = 1280; // 표준 캡처 폭(px)
+  const widthScale = BASE_CAPTURE_WIDTH / Math.max(scrollWidth, 1);
+  const targetWidth = BASE_CAPTURE_WIDTH;
+  const targetHeight = Math.max(Math.ceil(scrollHeight * widthScale), 720); // 최소 높이 안전값
 
   const defaultOptions = {
     scale: 2, // 고해상도 (2배)
     useCORS: true,
     allowTaint: false,
     backgroundColor: '#ffffff',
-    width: scrollWidth,
-    height: scrollHeight,
+    width: targetWidth,
+    height: targetHeight,
     logging: false,
     scrollX: 0,
     scrollY: 0,
-    windowWidth: scrollWidth,
-    windowHeight: scrollHeight,
+    windowWidth: targetWidth,
+    windowHeight: targetHeight,
     removeContainer: false, // 컨테이너 제거하지 않음
     onclone: (clonedDoc, element) => {
       // 클론된 문서에서 요소 찾기
@@ -181,8 +188,10 @@ export async function captureElement(element, options = {}) {
         clonedElement.style.overflow = 'visible';
         clonedElement.style.height = 'auto';
         clonedElement.style.maxHeight = 'none';
-        clonedElement.style.minHeight = `${scrollHeight}px`; // 명시적 높이 설정
-        clonedElement.style.width = `${scrollWidth}px`; // 명시적 너비 설정
+        // 표준 폭으로 고정
+        clonedElement.style.width = `${targetWidth}px`;
+        // 세로는 표준 폭에 따른 스케일로 재흐름된 콘텐츠의 최대치 확보
+        clonedElement.style.minHeight = `${targetHeight}px`;
         
         // 모든 자식 요소의 overflow와 높이 확인 및 조정
         const allChildren = clonedElement.querySelectorAll('*');
@@ -227,9 +236,9 @@ export async function captureElement(element, options = {}) {
         
         // body와 html의 높이도 조정
         clonedDoc.body.style.height = 'auto';
-        clonedDoc.body.style.minHeight = `${scrollHeight}px`;
+        clonedDoc.body.style.minHeight = `${targetHeight}px`;
         clonedDoc.documentElement.style.height = 'auto';
-        clonedDoc.documentElement.style.minHeight = `${scrollHeight}px`;
+        clonedDoc.documentElement.style.minHeight = `${targetHeight}px`;
       }
     },
     ...options
