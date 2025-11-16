@@ -1,11 +1,12 @@
 // 간단한 원격 로거: console 출력의 일부를 서버로 전송
 // 사용: enableRemoteLogger({ enabled: true, sessionId, level: 'warn' })
+import { API_BASE_URL } from '../api';
 export function enableRemoteLogger(options = {}) {
   const {
     enabled = true,
     sessionId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     level = 'warn', // 'debug' | 'info' | 'warn' | 'error'
-    apiBaseUrl = (typeof process !== 'undefined' && process.env && process.env.REACT_APP_API_URL) || 'https://vipmobile-backend.cloudtype.app',
+    apiBaseUrl = API_BASE_URL,
   } = options;
   if (!enabled) return () => {};
   const levels = ['debug', 'info', 'warn', 'error'];

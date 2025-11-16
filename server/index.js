@@ -618,6 +618,38 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
+// 클라이언트 원격 로그 수집 (비차단, CORS 적용)
+app.post('/api/client-logs', (req, res) => {
+  try {
+    const origin = req.headers.origin;
+    if (origin) {
+      res.header('Access-Control-Allow-Origin', origin);
+    }
+    res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key');
+    res.header('Access-Control-Allow-Credentials', 'true');
+
+    const { sessionId, userAgent, ts, logs } = req.body || {};
+    if (Array.isArray(logs) && logs.length > 0) {
+      console.log('🛰️ [CLIENT LOGS]', {
+        sessionId,
+        userAgent,
+        ts,
+        count: logs.length
+      });
+      // 상세 로그는 너무 많을 수 있으니 일부만 미리보기
+      const preview = logs.slice(0, 5);
+      preview.forEach((l, i) => {
+        console.log(`📝 [${i + 1}/${logs.length}] ${l.lv} ${new Date(l.ts).toISOString()} ${l.path} :: ${l.msg}`);
+      });
+    }
+    res.status(200).json({ success: true });
+  } catch (e) {
+    console.error('❌ [CLIENT LOGS] 수집 오류:', e?.message || e);
+    res.status(200).json({ success: true }); // 로깅 실패는 무시
+  }
+});
+
 // ==================== API 라우트들 ====================
 
 // 테스트 API
