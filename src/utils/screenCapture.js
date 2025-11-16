@@ -291,8 +291,10 @@ export async function captureElement(element, options = {}) {
   // autoCrop 유지로 과도 여백은 자동 제거
   let targetHeight;
   if (isMainOrToc) {
+    // 메인/목차 슬라이드는 목차 항목이 많을 수 있으므로 여유를 더 크게 잡는다.
+    // 가로 폭 축소 비율을 보정한 뒤 2.0배까지 여유를 주고, 최소 높이도 상향.
     const heightScale = widthScale < 1 ? (1 / widthScale) : 1;
-    targetHeight = Math.max(Math.ceil(scrollHeight * heightScale * 1.6), 1100);
+    targetHeight = Math.max(Math.ceil(scrollHeight * heightScale * 2.0), 1400);
   } else {
     // 기타 슬라이드: 기존 로직 유지
     const reflowBoost = widthScale < 1 ? (1 / widthScale) : 1;
