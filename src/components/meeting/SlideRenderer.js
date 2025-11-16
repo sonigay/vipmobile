@@ -107,6 +107,15 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [contentReady, setContentReady] = useState(false);
+  // 헤더 그라데이션 오른쪽 색상 결정 (커스텀 슬라이드는 배경색 선택값을 사용)
+  const getHeaderGradient = (s) => {
+    try {
+      const right = (s?.type === 'custom' && s?.backgroundColor) ? s.backgroundColor : '#868e96';
+      return `linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, ${right} 100%)`;
+    } catch {
+      return 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #868e96 100%)';
+    }
+  };
   useEffect(() => {
     // slide가 변경되면 완전히 리셋
     if (slide) {
@@ -470,7 +479,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               left: 0,
               right: 0,
               zIndex: 15,
-              background: 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #868e96 100%)',
+              background: getHeaderGradient(slide),
               borderBottom: '1px solid rgba(0,0,0,0.06)',
               boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
               display: 'flex',
@@ -519,8 +528,8 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             </Typography>
           </Box>
 
-          {/* 중앙: 회의 정보 */}
-          <Box sx={{ textAlign: 'center', maxWidth: 1000, width: '100%', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', pt: { xs: 10, md: 12 } }}>
+          {/* 중앙: 회의 정보 (캡처 타깃) */}
+          <Box data-capture-target="main-body" sx={{ textAlign: 'center', maxWidth: 1000, width: '100%', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', pt: { xs: 10, md: 12 } }}>
             {/* 차수 배지 - 전문적인 디자인 */}
             {slide.meetingNumber && (
               <Box
@@ -739,7 +748,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               left: 0,
               right: 0,
               zIndex: 15,
-              background: 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #868e96 100%)',
+              background: getHeaderGradient(slide),
               borderBottom: '1px solid rgba(0,0,0,0.06)',
               boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
               display: 'flex',
@@ -788,8 +797,8 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             </Typography>
           </Box>
 
-          {/* 중앙: 목차 내용 */}
-          <Box sx={{ 
+          {/* 중앙: 목차 내용 (캡처 타깃) */}
+          <Box data-capture-target="toc-body" sx={{ 
             textAlign: 'center', 
             maxWidth: 1200, 
             width: '100%', 
@@ -1154,7 +1163,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               left: 0,
               right: 0,
               zIndex: 15,
-              background: 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #868e96 100%)',
+              background: getHeaderGradient(slide),
               borderBottom: '1px solid rgba(0,0,0,0.06)',
               boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
               display: 'flex',
@@ -1372,7 +1381,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               left: 0,
               right: 0,
               zIndex: 15,
-              background: 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #868e96 100%)',
+              background: getHeaderGradient(slide),
               borderBottom: '1px solid rgba(0,0,0,0.06)',
               boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
               display: 'flex',
@@ -1562,7 +1571,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               left: 0,
               right: 0,
               zIndex: 15,
-              background: 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #868e96 100%)',
+              background: getHeaderGradient(slide),
               borderBottom: '1px solid rgba(0,0,0,0.06)',
               boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
               display: 'flex',

@@ -166,6 +166,15 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
 
       // 특정 상세옵션 선택 시: 섹션 펼치기 및 타겟 요소만 캡처
       let captureTargetElement = slideElement;
+
+      // 메인/목차는 중앙 콘텐츠만 캡처하여 상하 공백 최소화
+      if (currentSlide?.type === 'main') {
+        const mainBody = slideElement.querySelector('[data-capture-target="main-body"]');
+        if (mainBody) captureTargetElement = mainBody;
+      } else if (currentSlide?.type === 'toc') {
+        const tocBody = slideElement.querySelector('[data-capture-target="toc-body"]');
+        if (tocBody) captureTargetElement = tocBody;
+      }
       try {
         const csDetailType = currentSlide?.detailOptions?.csDetailType;
         if (currentSlide?.mode === 'chart' && csDetailType) {
