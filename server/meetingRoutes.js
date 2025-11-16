@@ -927,8 +927,8 @@ async function findOrCreateThread(post, meetingId) {
 }
 
 /**
- * 이미지에서 데이터가 없는 영역을 자동으로 크롭합니다.
- * 흰색 배경이나 투명 영역을 감지하여 실제 콘텐츠 영역만 남깁니다.
+ * 이미지에서 하단 공백만 자동으로 제거합니다.
+ * 상단 헤더와 작성자 정보는 유지하고, 하단의 흰색/투명 공백만 제거합니다.
  * @param {Buffer} imageBuffer - 원본 이미지 버퍼
  * @returns {Promise<{buffer: Buffer, originalWidth: number, originalHeight: number, croppedWidth: number, croppedHeight: number}>}
  */
@@ -941,24 +941,77 @@ async function autoCropImage(imageBuffer) {
     
     console.log(`🔍 [autoCropImage] 원본 이미지 크기: ${originalWidth}x${originalHeight}`);
     
-    // 이미지를 분석하여 실제 콘텐츠 영역 찾기
-    // sharp의 trim 기능을 사용하여 가장자리의 흰색/투명 영역 제거
-    // threshold: 10 (약간의 색상 차이도 감지)
-    // lineArt: false (일반 이미지 처리)
+    // 이미지의 raw 픽셀 데이터 읽기 (RGBA)
+    const { data } = await sharp(imageBuffer)
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    
+    // 배경색 (흰색) 임계값 설정
+    const backgroundColorThreshold = 250; // RGB 값이 모두 250 이상이면 배경으로 간주
+    const alphaThreshold = 10; // 알파값이 10 이하면 투명으로 간주
+    
+    let lastContentY = -1; // 마지막 콘텐츠가 있는 Y 좌표 (하단부터 스캔, -1은 아직 찾지 못함)
+    
+    // 하단부터 역순으로 스캔하여 마지막 콘텐츠 라인 찾기
+    for (let y = originalHeight - 1; y >= 0; y--) {
+      let hasContent = false;
+      for (let x = 0; x < originalWidth; x++) {
+        const index = (y * originalWidth + x) * 4;
+        const r = data[index];
+        const g = data[index + 1];
+        const b = data[index + 2];
+        const a = data[index + 3];
+        
+        // 배경이 아닌 픽셀인지 확인
+        const isBackground = 
+          (r >= backgroundColorThreshold && 
+           g >= backgroundColorThreshold && 
+           b >= backgroundColorThreshold) ||
+          a < alphaThreshold;
+        
+        if (!isBackground) {
+          hasContent = true;
+          lastContentY = y;
+          break; // 이 라인에 콘텐츠가 있으면 중단
+        }
+      }
+      // 콘텐츠가 있는 라인을 찾으면 중단 (하단부터 역순 스캔)
+      if (hasContent) {
+        break;
+      }
+    }
+    
+    // 콘텐츠가 없는 경우 원본 반환
+    if (lastContentY === -1) {
+      console.log(`⚠️ [autoCropImage] 콘텐츠가 없는 이미지로 판단, 원본 반환`);
+      return {
+        buffer: imageBuffer,
+        originalWidth,
+        originalHeight,
+        croppedWidth: originalWidth,
+        croppedHeight: originalHeight
+      };
+    }
+    
+    // 여유 공간 추가 (하단 10px)
+    const padding = 10;
+    const croppedHeight = Math.min(originalHeight, lastContentY + padding + 1);
+    
+    // 상단은 0부터 시작, 하단만 크롭
     const trimmedImage = await sharp(imageBuffer)
-      .trim({
-        threshold: 10, // 픽셀 값 차이 임계값 (0-255, 낮을수록 민감)
-        lineArt: false // 일반 이미지 처리
+      .extract({
+        left: 0,
+        top: 0,
+        width: originalWidth,
+        height: croppedHeight
       })
       .png()
       .toBuffer();
     
-    // 크롭된 이미지 메타데이터 가져오기
-    const croppedMetadata = await sharp(trimmedImage).metadata();
-    const croppedWidth = croppedMetadata.width || originalWidth;
-    const croppedHeight = croppedMetadata.height || originalHeight;
+    const croppedWidth = originalWidth;
     
-    console.log(`✂️ [autoCropImage] 크롭된 이미지 크기: ${croppedWidth}x${croppedHeight}`);
+    console.log(`✂️ [autoCropImage] 하단 공백 제거 완료: ${originalWidth}x${originalHeight} → ${croppedWidth}x${croppedHeight}`);
     console.log(`📊 [autoCropImage] 크롭 비율: ${((1 - (croppedWidth * croppedHeight) / (originalWidth * originalHeight)) * 100).toFixed(2)}% 제거됨`);
     
     return {

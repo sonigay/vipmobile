@@ -91,6 +91,14 @@ const getUnifiedTitle = (slide, loggedInStore) => {
     const availableTabs = getAvailableTabsForMode(slide.mode, loggedInStore || {});
     const tabCfg = availableTabs?.find(t => t.key === slide.tab);
     const tabName = slide.tabLabel || tabCfg?.label || slide.tab || '';
+    
+    // 세부항목옵션(detailLabel)이 있으면 우선 사용
+    if (slide.detailLabel) {
+      const parts = [modeName, tabName, slide.detailLabel].filter(Boolean);
+      return parts.join(' > ') || (slide.title || '슬라이드');
+    }
+    
+    // detailLabel이 없으면 기존 로직 사용
     const subTabName = slide.subTab
       ? (slide.subTabLabel || (tabCfg?.subTabs?.find(st => st.key === slide.subTab)?.label) || slide.subTab)
       : '';
@@ -283,9 +291,16 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
           // 추가 검증: 테이블이 있으면 최소 1개 이상의 데이터 행이 있어야 함
           const hasValidTableData = hasTableRows && tableRows.length > 0;
           
-          // 로딩이 완전히 없고, 데이터가 준비되었고, 실제 콘텐츠가 있어야 완료
+          // 권한 에러 메시지가 있는지 확인 (권한이 없어서 데이터가 없는 경우)
+          const hasPermissionError = allText.includes('권한') && 
+                                    (allText.includes('없습니다') || allText.includes('없음') || allText.includes('접근'));
+          
+          // 권한 에러가 있으면 완료로 간주하지 않음 (다시 시도 필요)
+          const hasNoPermissionError = !hasPermissionError;
+          
+          // 로딩이 완전히 없고, 데이터가 준비되었고, 실제 콘텐츠가 있고, 권한 에러가 없어야 완료
           // 테이블이 있으면 유효한 데이터 행이 있어야 함
-          const isContentReady = !isLoading && isDataReady && hasRealData && (hasTableRows ? hasValidTableData : true);
+          const isContentReady = !isLoading && isDataReady && hasRealData && hasNoPermissionError && (hasTableRows ? hasValidTableData : true);
           
           if (isContentReady) {
             if (lastStableTime === null) {
@@ -628,6 +643,27 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             </Typography>
           </Box>
 
+          {/* 생성자 정보: 상단 헤더 오른쪽 바로 밑 */}
+          {slide.createdBy && (
+            <Box sx={{ 
+              position: 'absolute',
+              top: { xs: 56, md: 68 }, // 헤더 높이만큼 아래
+              right: { xs: 2.5, md: 4 },
+              zIndex: 14,
+              textAlign: 'right'
+            }}>
+              <Typography variant="body2" sx={{ 
+                color: '#6c757d', 
+                fontSize: { xs: '0.75rem', md: '0.85rem' },
+                fontWeight: 500,
+                fontFamily: '"Noto Sans KR", sans-serif',
+                opacity: 0.8
+              }}>
+                생성자: {slide.createdBy}
+              </Typography>
+            </Box>
+          )}
+
           {/* 중앙: 회의 정보 */}
           <Box sx={{ textAlign: 'center', maxWidth: 1000, width: '100%', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', pt: { xs: 10, md: 12 } }}>
             {/* 차수 배지 - 전문적인 디자인 */}
@@ -896,6 +932,27 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               {getUnifiedTitle(slide, loggedInStore)}
             </Typography>
           </Box>
+
+          {/* 생성자 정보: 상단 헤더 오른쪽 바로 밑 */}
+          {slide.createdBy && (
+            <Box sx={{ 
+              position: 'absolute',
+              top: { xs: 56, md: 68 }, // 헤더 높이만큼 아래
+              right: { xs: 2.5, md: 4 },
+              zIndex: 14,
+              textAlign: 'right'
+            }}>
+              <Typography variant="body2" sx={{ 
+                color: '#6c757d', 
+                fontSize: { xs: '0.75rem', md: '0.85rem' },
+                fontWeight: 500,
+                fontFamily: '"Noto Sans KR", sans-serif',
+                opacity: 0.8
+              }}>
+                생성자: {slide.createdBy}
+              </Typography>
+            </Box>
+          )}
 
           {/* 중앙: 목차 내용 */}
           <Box sx={{ 
@@ -1311,6 +1368,27 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             </Typography>
           </Box>
 
+          {/* 생성자 정보: 상단 헤더 오른쪽 바로 밑 */}
+          {slide.createdBy && (
+            <Box sx={{ 
+              position: 'absolute',
+              top: { xs: 56, md: 68 }, // 헤더 높이만큼 아래
+              right: { xs: 2.5, md: 4 },
+              zIndex: 14,
+              textAlign: 'right'
+            }}>
+              <Typography variant="body2" sx={{ 
+                color: '#6c757d', 
+                fontSize: { xs: '0.75rem', md: '0.85rem' },
+                fontWeight: 500,
+                fontFamily: '"Noto Sans KR", sans-serif',
+                opacity: 0.8
+              }}>
+                생성자: {slide.createdBy}
+              </Typography>
+            </Box>
+          )}
+
           {/* 중앙: 종료 메시지 */}
           <Box sx={{ 
             textAlign: 'center', 
@@ -1432,25 +1510,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             </Box>
           </Box>
 
-          {/* 하단: 생성자 정보 - 전문적인 푸터 디자인 */}
-          {slide.createdBy && (
-            <Box sx={{ 
-              mt: { xs: 2, md: 3 }, 
-              width: '100%', 
-              textAlign: 'center',
-              pt: 2,
-              borderTop: '1px solid rgba(0,0,0,0.05)'
-            }}>
-              <Typography variant="body2" sx={{ 
-                color: '#6c757d', 
-                fontSize: { xs: '0.85rem', md: '0.95rem' },
-                fontWeight: 500,
-                fontFamily: '"Noto Sans KR", sans-serif'
-              }}>
-                생성자: {slide.createdBy}
-              </Typography>
-            </Box>
-          )}
+          {/* 하단 푸터 제거: 생성자 정보는 상단 헤더 오른쪽 밑으로 이동 */}
         </Box>
       );
     }
@@ -1529,6 +1589,27 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             </Typography>
           </Box>
 
+          {/* 생성자 정보: 상단 헤더 오른쪽 바로 밑 */}
+          {slide.createdBy && (
+            <Box sx={{ 
+              position: 'absolute',
+              top: { xs: 56, md: 68 }, // 헤더 높이만큼 아래
+              right: { xs: 2.5, md: 4 },
+              zIndex: 14,
+              textAlign: 'right'
+            }}>
+              <Typography variant="body2" sx={{ 
+                color: '#6c757d', 
+                fontSize: { xs: '0.75rem', md: '0.85rem' },
+                fontWeight: 500,
+                fontFamily: '"Noto Sans KR", sans-serif',
+                opacity: 0.8
+              }}>
+                생성자: {slide.createdBy}
+              </Typography>
+            </Box>
+          )}
+
           {/* 중앙: 커스텀 콘텐츠 */}
           <Box sx={{ 
             textAlign: 'center', 
@@ -1606,25 +1687,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             </Box>
           </Box>
 
-          {/* 하단: 생성자 정보 - 전문적인 푸터 디자인 */}
-          {slide.createdBy && (
-            <Box sx={{ 
-              mt: { xs: 2, md: 3 }, 
-              width: '100%', 
-              textAlign: 'center',
-              pt: 2,
-              borderTop: '1px solid rgba(0,0,0,0.05)'
-            }}>
-              <Typography variant="body2" sx={{ 
-                color: '#6c757d', 
-                fontSize: { xs: '0.85rem', md: '0.95rem' },
-                fontWeight: 500,
-                fontFamily: '"Noto Sans KR", sans-serif'
-              }}>
-                생성자: {slide.createdBy}
-              </Typography>
-            </Box>
-          )}
+          {/* 하단 푸터 제거: 생성자 정보는 상단 헤더 오른쪽 밑으로 이동 */}
         </Box>
       );
     }
@@ -1724,6 +1787,27 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             </Typography>
           </Box>
 
+          {/* 생성자 정보: 상단 헤더 오른쪽 바로 밑 */}
+          {slide.createdBy && (
+            <Box sx={{ 
+              position: 'absolute',
+              top: { xs: 56, md: 68 }, // 헤더 높이만큼 아래
+              right: { xs: 2.5, md: 4 },
+              zIndex: 14,
+              textAlign: 'right'
+            }}>
+              <Typography variant="body2" sx={{ 
+                color: '#6c757d', 
+                fontSize: { xs: '0.75rem', md: '0.85rem' },
+                fontWeight: 500,
+                fontFamily: '"Noto Sans KR", sans-serif',
+                opacity: 0.8
+              }}>
+                생성자: {slide.createdBy}
+              </Typography>
+            </Box>
+          )}
+
           {/* 중앙: 실제 콘텐츠 */}
           <Box
             sx={{
@@ -1761,15 +1845,6 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               />
             </Box>
           </Box>
-
-          {/* 하단: 생성자 정보 */}
-          {slide.createdBy && (
-            <Box sx={{ mt: 1, width: '100%', textAlign: 'center', flexShrink: 0 }}>
-              <Typography variant="body2" sx={{ opacity: 0.8, fontSize: { xs: '0.7rem', md: '0.8rem' } }}>
-                생성자: {slide.createdBy}
-              </Typography>
-            </Box>
-          )}
         </Box>
       );
     }
@@ -1892,6 +1967,27 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             </Typography>
           </Box>
 
+          {/* 생성자 정보: 상단 헤더 오른쪽 바로 밑 */}
+          {slide.createdBy && (
+            <Box sx={{ 
+              position: 'absolute',
+              top: { xs: 56, md: 68 }, // 헤더 높이만큼 아래
+              right: { xs: 2.5, md: 4 },
+              zIndex: 14,
+              textAlign: 'right'
+            }}>
+              <Typography variant="body2" sx={{ 
+                color: '#6c757d', 
+                fontSize: { xs: '0.75rem', md: '0.85rem' },
+                fontWeight: 500,
+                fontFamily: '"Noto Sans KR", sans-serif',
+                opacity: 0.8
+              }}>
+                생성자: {slide.createdBy}
+              </Typography>
+            </Box>
+          )}
+
           {/* 중앙: 실제 콘텐츠 */}
           <Box
             sx={{
@@ -1933,15 +2029,6 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               />
             </Box>
           </Box>
-
-          {/* 하단: 생성자 정보 */}
-          {slide.createdBy && (
-            <Box sx={{ mt: 1, width: '100%', textAlign: 'center', flexShrink: 0 }}>
-              <Typography variant="body2" sx={{ opacity: 0.8, fontSize: { xs: '0.7rem', md: '0.8rem' } }}>
-                생성자: {slide.createdBy}
-              </Typography>
-            </Box>
-          )}
         </Box>
       );
     }
@@ -2039,6 +2126,27 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               )}
             </Box>
 
+            {/* 생성자 정보: 상단 헤더 오른쪽 바로 밑 */}
+            {slide.createdBy && (
+              <Box sx={{ 
+                position: 'absolute',
+                top: { xs: 56, md: 68 }, // 헤더 높이만큼 아래
+                right: { xs: 2.5, md: 4 },
+                zIndex: 14,
+                textAlign: 'right'
+              }}>
+                <Typography variant="body2" sx={{ 
+                  color: '#6c757d', 
+                  fontSize: { xs: '0.75rem', md: '0.85rem' },
+                  fontWeight: 500,
+                  fontFamily: '"Noto Sans KR", sans-serif',
+                  opacity: 0.8
+                }}>
+                  생성자: {slide.createdBy}
+                </Typography>
+              </Box>
+            )}
+
             {/* 중앙: 실제 콘텐츠 */}
             <Box
               sx={{
@@ -2073,15 +2181,6 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                 />
               </Box>
             </Box>
-
-            {/* 하단: 생성자 정보 */}
-            {slide.createdBy && (
-              <Box sx={{ mt: 1, width: '100%', textAlign: 'center', flexShrink: 0 }}>
-                <Typography variant="body2" sx={{ opacity: 0.8, fontSize: { xs: '0.7rem', md: '0.8rem' } }}>
-                  생성자: {slide.createdBy}
-                </Typography>
-              </Box>
-            )}
           </Box>
         );
       }
@@ -2173,6 +2272,27 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               )}
             </Box>
 
+            {/* 생성자 정보: 상단 헤더 오른쪽 바로 밑 */}
+            {slide.createdBy && (
+              <Box sx={{ 
+                position: 'absolute',
+                top: { xs: 56, md: 68 }, // 헤더 높이만큼 아래
+                right: { xs: 2.5, md: 4 },
+                zIndex: 14,
+                textAlign: 'right'
+              }}>
+                <Typography variant="body2" sx={{ 
+                  color: '#6c757d', 
+                  fontSize: { xs: '0.75rem', md: '0.85rem' },
+                  fontWeight: 500,
+                  fontFamily: '"Noto Sans KR", sans-serif',
+                  opacity: 0.8
+                }}>
+                  생성자: {slide.createdBy}
+                </Typography>
+              </Box>
+            )}
+
             {/* 중앙: 실제 콘텐츠 */}
             <Box
               sx={{
@@ -2207,15 +2327,6 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                 />
               </Box>
             </Box>
-
-            {/* 하단: 생성자 정보 */}
-            {slide.createdBy && (
-              <Box sx={{ mt: 1, width: '100%', textAlign: 'center', flexShrink: 0 }}>
-                <Typography variant="body2" sx={{ opacity: 0.8, fontSize: { xs: '0.7rem', md: '0.8rem' } }}>
-                  생성자: {slide.createdBy}
-                </Typography>
-              </Box>
-            )}
           </Box>
         );
       }
@@ -2310,6 +2421,27 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               )}
             </Box>
 
+            {/* 생성자 정보: 상단 헤더 오른쪽 바로 밑 */}
+            {slide.createdBy && (
+              <Box sx={{ 
+                position: 'absolute',
+                top: { xs: 56, md: 68 }, // 헤더 높이만큼 아래
+                right: { xs: 2.5, md: 4 },
+                zIndex: 14,
+                textAlign: 'right'
+              }}>
+                <Typography variant="body2" sx={{ 
+                  color: '#6c757d', 
+                  fontSize: { xs: '0.75rem', md: '0.85rem' },
+                  fontWeight: 500,
+                  fontFamily: '"Noto Sans KR", sans-serif',
+                  opacity: 0.8
+                }}>
+                  생성자: {slide.createdBy}
+                </Typography>
+              </Box>
+            )}
+
             {/* 중앙: 실제 콘텐츠 */}
             <Box
               sx={{
@@ -2345,15 +2477,6 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                 />
               </Box>
             </Box>
-
-            {/* 하단: 생성자 정보 */}
-            {slide.createdBy && (
-              <Box sx={{ mt: 1, width: '100%', textAlign: 'center', flexShrink: 0 }}>
-                <Typography variant="body2" sx={{ opacity: 0.8, fontSize: { xs: '0.7rem', md: '0.8rem' } }}>
-                  생성자: {slide.createdBy}
-                </Typography>
-              </Box>
-            )}
           </Box>
         );
       }
