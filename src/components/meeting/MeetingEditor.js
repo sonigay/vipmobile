@@ -22,7 +22,7 @@ import {
   FormControlLabel,
   FormGroup
 } from '@mui/material';
-import { api } from '../../api';
+import { api, API_BASE_URL } from '../../api';
 import ModeSelector from './ModeSelector';
 import SlideOrderEditor from './SlideOrderEditor';
 import CustomSlideEditor from './CustomSlideEditor';
@@ -54,6 +54,7 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess, autoE
   const [detailOptionConfig, setDetailOptionConfig] = useState(null);
   const [detailOptionValues, setDetailOptionValues] = useState({});
   const [detailOptionMultipleSelections, setDetailOptionMultipleSelections] = useState({}); // 여러 개 선택을 위한 상태
+  const [detailOptionDynamicValues, setDetailOptionDynamicValues] = useState({}); // 원격 옵션 목록(예: 저장 시점)
   const [pendingSubTab, setPendingSubTab] = useState(null);
   const [pendingTab, setPendingTab] = useState(null); // 탭 선택 시 세부 옵션이 있는 경우 대기
 
@@ -310,6 +311,7 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess, autoE
         setDetailOptionConfig(subTabConfig.detailOptions);
         setDetailOptionValues({});
         setDetailOptionMultipleSelections({});
+        setDetailOptionDynamicValues({});
         // 기본값 설정
         subTabConfig.detailOptions.options.forEach(option => {
           setDetailOptionValues(prev => ({
@@ -324,6 +326,23 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess, autoE
             }));
           }
         });
+        // 재초담초채권: 저장 시점 선택 목록 로드
+        if (subTabKey === 'rechotanchoBond') {
+          (async () => {
+            try {
+              const resp = await fetch(`${API_BASE_URL}/api/rechotancho-bond/history`);
+              const json = await resp.json();
+              const list = (json?.data || [])
+                .map(item => item?.timestamp)
+                .filter(Boolean)
+                .sort((a, b) => new Date(b) - new Date(a))
+                .map(ts => ({ key: ts, label: ts }));
+              setDetailOptionDynamicValues(prev => ({ ...prev, bondHistoryTimestamp: list }));
+            } catch {
+              setDetailOptionDynamicValues(prev => ({ ...prev, bondHistoryTimestamp: [] }));
+            }
+          })();
+        }
         setPendingSubTab({ modeKey, tabKey, subTabKey, subTabId });
         setDetailOptionOpen(true);
         return;
@@ -747,7 +766,42 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess, autoE
                   </FormControl>
                 );
               }
-              // 단일 선택 옵션
+              // 저장 시점(재초담초채권) - 동적 Select
+              if (option.key === 'bondHistoryTimestamp') {
+                const values = detailOptionDynamicValues.bondHistoryTimestamp || [];
+                return (
+                  <FormControl key={option.key} fullWidth size="small">
+                    <InputLabel>{option.label}</InputLabel>
+                    <Select
+                      value={detailOptionValues[option.key] || ''}
+                      onChange={(e) => {
+                        setDetailOptionValues(prev => ({
+                          ...prev,
+                          [option.key]: e.target.value
+                        }));
+                      }}
+                      label={option.label}
+                      displayEmpty
+                      renderValue={(val) => {
+                        if (!val) return '선택 안함 (최신 시점 자동)';
+                        return val;
+                      }}
+                    >
+                      <MenuItem value="">
+                        <em>선택 안함 (최신 시점 자동)</em>
+                      </MenuItem>
+                      {values.length === 0 ? (
+                        <MenuItem value="" disabled>목록 불러오는 중 또는 없음</MenuItem>
+                      ) : (
+                        values.map(v => (
+                          <MenuItem key={v.key} value={v.key}>{v.label}</MenuItem>
+                        ))
+                      )}
+                    </Select>
+                  </FormControl>
+                );
+              }
+              // 단일 선택 옵션(셀렉트)
               return (
                 <FormControl key={option.key} fullWidth>
                   <InputLabel>{option.label}</InputLabel>
