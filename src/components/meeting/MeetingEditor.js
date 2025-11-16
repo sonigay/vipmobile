@@ -251,6 +251,20 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess, autoE
   const addTabSlide = (modeKey, tabKey, tabId, detailOptions = {}) => {
     const availableTabs = getAvailableTabsForMode(modeKey, loggedInStore);
     const tabConfig = availableTabs.find(t => t.key === tabKey);
+    const buildDetailLabel = () => {
+      try {
+        const cfg = tabConfig?.detailOptions;
+        if (!cfg || !cfg.options) return '';
+        const labels = [];
+        cfg.options.forEach(opt => {
+          const val = detailOptions[opt.key];
+          if (!val || val === 'all' || val === opt.defaultValue) return;
+          const found = (opt.values || []).find(v => v.key === val);
+          if (found) labels.push(found.label);
+        });
+        return labels.join(', ');
+      } catch { return ''; }
+    };
     
     const newSlide = {
       slideId: `slide-${modeKey}-${tabKey}-${Date.now()}`,
@@ -258,6 +272,7 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess, autoE
       mode: modeKey,
       tab: tabKey,
       tabLabel: tabConfig?.label || tabKey,
+      detailLabel: buildDetailLabel() || undefined,
       // 세부 옵션 (모든 옵션을 detailOptions 객체에 저장)
       detailOptions: Object.keys(detailOptions).length > 0 ? detailOptions : undefined,
       order: slides.length + 1
@@ -316,6 +331,20 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess, autoE
     const availableTabs = getAvailableTabsForMode(modeKey, loggedInStore);
     const tabConfig = availableTabs.find(t => t.key === tabKey);
     const subTabConfig = tabConfig?.subTabs?.find(st => st.key === subTabKey);
+    const buildDetailLabel = () => {
+      try {
+        const cfg = subTabConfig?.detailOptions;
+        if (!cfg || !cfg.options) return '';
+        const labels = [];
+        cfg.options.forEach(opt => {
+          const val = detailOptions[opt.key];
+          if (!val || val === 'all' || val === opt.defaultValue) return;
+          const found = (opt.values || []).find(v => v.key === val);
+          if (found) labels.push(found.label);
+        });
+        return labels.join(', ');
+      } catch { return ''; }
+    };
     
     const newSlide = {
       slideId: `slide-${modeKey}-${tabKey}-${subTabKey}-${Date.now()}`,
@@ -325,6 +354,7 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess, autoE
       subTab: subTabKey,
       tabLabel: tabConfig?.label || tabKey,
       subTabLabel: subTabConfig?.label || subTabKey,
+      detailLabel: buildDetailLabel() || undefined,
       // 세부 옵션 (모든 옵션을 detailOptions 객체에 저장)
       detailOptions: Object.keys(detailOptions).length > 0 ? detailOptions : undefined,
       order: slides.length + 1

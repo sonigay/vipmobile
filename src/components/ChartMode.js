@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { api } from '../api';
+import { api, API_BASE_URL } from '../api';
 import {
   Box,
   AppBar,
@@ -4171,30 +4171,68 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
 
   // 저장 시점 목록 로드
   const loadHistory = async () => {
+    const fetchWithRetry = async (url, opts = {}, retries = 3, baseDelay = 800) => {
+      let lastErr = null;
+      for (let i = 1; i <= retries; i++) {
+        try {
+          const res = await fetch(url, opts);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return await res.json();
+        } catch (e) {
+          lastErr = e;
+          const msg = (e && e.message) ? e.message : '';
+          const isNetworkOr5xx = /Failed to fetch|network|5\d\d|HTTP 5\d\d/i.test(msg);
+          if (i === retries || !isNetworkOr5xx) break;
+          const delay = baseDelay * Math.pow(2, i - 1);
+          await new Promise(r => setTimeout(r, delay));
+        }
+      }
+      throw lastErr || new Error('fetch failed');
+    };
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/rechotancho-bond/history`);
-      const result = await response.json();
-      
+      const result = await fetchWithRetry(`${API_BASE_URL}/api/rechotancho-bond/history`);
       if (result.success) {
         const historyData = result.data || [];
         setHistory(historyData);
-        // presentationMode일 때 가장 최근 입력시점 자동 선택
         if (presentationMode && historyData.length > 0) {
-          // 가장 최근 시점 선택 (timestamp 기준 내림차순 정렬 후 첫 번째)
-          const sortedHistory = [...historyData].sort((a, b) => {
-            return new Date(b.timestamp) - new Date(a.timestamp);
-          });
+          const sortedHistory = [...historyData].sort((a, b) => (new Date(b.timestamp) - new Date(a.timestamp)));
           const latestTimestamp = sortedHistory[0].timestamp;
           setSelectedTimestamp(latestTimestamp);
-          // 해당 시점의 데이터 로드
-          loadDataByTimestamp(latestTimestamp);
+          await loadDataByTimestamp(latestTimestamp);
         } else if (historyData.length > 0) {
-          // 일반 모드에서는 전체 데이터 로드 (그래프 표시용)
-          loadAllData();
+          await loadAllData();
+        } else {
+          await fallbackLoadHistoryFromAllData();
         }
+      } else {
+        await fallbackLoadHistoryFromAllData();
       }
     } catch (error) {
       console.error('저장 시점 목록 로드 실패:', error);
+      await fallbackLoadHistoryFromAllData();
+    }
+  };
+
+  const fallbackLoadHistoryFromAllData = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/rechotancho-bond/all-data`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const result = await response.json();
+      if (result.success) {
+        const data = Array.isArray(result.data) ? result.data : [];
+        const timestamps = [...new Set(data.map(d => d && d.timestamp).filter(Boolean))].sort().reverse();
+        const derived = timestamps.map(ts => ({ timestamp: ts }));
+        setHistory(derived);
+        if (presentationMode && derived.length > 0) {
+          setSelectedTimestamp(derived[0].timestamp);
+          await loadDataByTimestamp(derived[0].timestamp);
+        } else {
+          setAllData(data);
+          setCurrentData(data);
+        }
+      }
+    } catch (e) {
+      console.error('폴백 all-data 로드 실패:', e);
     }
   };
 
@@ -4202,7 +4240,7 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
   const loadAllData = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/rechotancho-bond/all-data`);
+      const response = await fetch(`${API_BASE_URL}/api/rechotancho-bond/all-data`);
       const result = await response.json();
       
       if (result.success) {
@@ -4235,9 +4273,7 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
   const loadDataByTimestamp = async (timestamp) => {
     try {
       setLoading(true);
-      const response = await fetch(
-        `${process.env.REACT_APP_API_URL}/api/rechotancho-bond/data/${encodeURIComponent(timestamp)}`
-      );
+      const response = await fetch(`${API_BASE_URL}/api/rechotancho-bond/data/${encodeURIComponent(timestamp)}`);
       const result = await response.json();
       
       if (result.success && result.data.length > 0) {
