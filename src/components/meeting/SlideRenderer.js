@@ -110,6 +110,24 @@ const getUnifiedTitle = (slide, loggedInStore) => {
   }
 };
 
+// 헤더 그라데이션 오른쪽 색상 결정 (커스텀 슬라이드는 배경색 선택값을 사용)
+// 컴포넌트 외부로 이동하여 초기화 순서 문제 완전 해결
+const getHeaderGradient = (s) => {
+  try {
+    if (!s) {
+      return 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #868e96 100%)';
+    }
+    const right = (s?.type === 'custom' && s?.backgroundColor) ? s.backgroundColor : '#868e96';
+    return `linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, ${right} 100%)`;
+  } catch (err) {
+    // logger는 컴포넌트 외부에서 사용 불가하므로 console 사용
+    if (process.env.NODE_ENV === 'development') {
+      console.error('❌ [SlideRenderer] getHeaderGradient 에러:', err);
+    }
+    return 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #868e96 100%)';
+  }
+};
+
 const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, onReady }) {
   const containerRef = useRef(null);
   const [loading, setLoading] = useState(true);
@@ -542,22 +560,6 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
       }
     };
   }, [slide]); // onReady는 의존성에서 제거 (초기화 순서 문제 방지)
-
-  // 헤더 그라데이션 오른쪽 색상 결정 (커스텀 슬라이드는 배경색 선택값을 사용)
-  // 일반 함수로 정의하여 초기화 순서 문제 해결
-  const getHeaderGradient = (s) => {
-    try {
-      if (!s) {
-        logger.warn('⚠️ [SlideRenderer] getHeaderGradient: slide가 없습니다');
-        return 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #868e96 100%)';
-      }
-      const right = (s?.type === 'custom' && s?.backgroundColor) ? s.backgroundColor : '#868e96';
-      return `linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, ${right} 100%)`;
-    } catch (err) {
-      logger.error('❌ [SlideRenderer] getHeaderGradient 에러:', err);
-      return 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #868e96 100%)';
-    }
-  };
 
   // renderSlideContent를 useCallback으로 메모이제이션하여 불필요한 재렌더링 방지
   const renderSlideContent = useCallback(() => {
