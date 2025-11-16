@@ -96,6 +96,19 @@ function ImageSlideViewer({ slides, onClose }) {
     }
   }, [currentIndex, slides, loadedImages]);
 
+  // handleNext와 handlePrevious를 먼저 정의 (useEffect에서 사용하기 전에)
+  const handleNext = useCallback(() => {
+    if (currentIndex < slides.length - 1) {
+      setCurrentIndex(prev => prev + 1);
+    }
+  }, [currentIndex, slides.length]);
+
+  const handlePrevious = useCallback(() => {
+    if (currentIndex > 0) {
+      setCurrentIndex(prev => prev - 1);
+    }
+  }, [currentIndex]);
+
   // 키보드 이벤트
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -111,18 +124,6 @@ function ImageSlideViewer({ slides, onClose }) {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [currentIndex, slides.length, onClose, handleNext, handlePrevious]);
-
-  const handleNext = useCallback(() => {
-    if (currentIndex < slides.length - 1) {
-      setCurrentIndex(prev => prev + 1);
-    }
-  }, [currentIndex, slides.length]);
-
-  const handlePrevious = useCallback(() => {
-    if (currentIndex > 0) {
-      setCurrentIndex(prev => prev - 1);
-    }
-  }, [currentIndex]);
 
   const handleClick = useCallback(() => {
     handleNext();
