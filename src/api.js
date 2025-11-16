@@ -1201,6 +1201,22 @@ console.log('🔍 [api.js] api 객체의 모든 키:', Object.keys(api));
 export default api;
 
 // 프론트엔드 캐싱 시스템
+// 이미지 프록시 URL 변환 (Discord CDN → 서버 프록시 경유)
+export function getProxyImageUrl(imageUrl) {
+  try {
+    if (!imageUrl) return imageUrl;
+    const isDiscordCdn = imageUrl.includes('cdn.discordapp.com') || imageUrl.includes('media.discordapp.net');
+    if (isDiscordCdn) {
+      const encoded = encodeURIComponent(imageUrl);
+      return `${API_BASE_URL}/api/meetings/proxy-image?url=${encoded}`;
+    }
+    return imageUrl;
+  } catch {
+    return imageUrl;
+  }
+}
+
+// 프론트엔드 캐싱 시스템
 const clientCache = new Map();
 const CLIENT_CACHE_TTL = 5 * 60 * 1000; // 5분
 
