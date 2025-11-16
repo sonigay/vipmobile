@@ -1588,7 +1588,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                 {formattedDate}
               </Typography>
               
-              {Number(slide.meetingNumber) > 0 && (
+              {slide.meetingNumber && (
                 <Box sx={{
                   display: 'inline-block',
                   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -1790,7 +1790,21 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                   {slide.content}
                 </Typography>
               )}
-              {slide.imageUrl && (
+              {slide.videoUrl && (
+                <Box
+                  component="video"
+                  src={slide.videoUrl}
+                  controls
+                  sx={{
+                    maxWidth: '100%',
+                    maxHeight: '60vh',
+                    borderRadius: 2,
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+                    mt: 2
+                  }}
+                />
+              )}
+              {slide.imageUrl && !slide.videoUrl && (
                 <Box
                   component="img"
                   src={getProxyImageUrl(slide.imageUrl)}

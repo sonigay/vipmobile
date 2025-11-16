@@ -35,6 +35,15 @@ const getFileType = (file) => {
     mimeType.includes('powerpoint')
   ) {
     return 'ppt';
+  } else if (
+    fileName.endsWith('.mp4') ||
+    fileName.endsWith('.mov') ||
+    fileName.endsWith('.avi') ||
+    fileName.endsWith('.webm') ||
+    fileName.endsWith('.mkv') ||
+    mimeType.startsWith('video/')
+  ) {
+    return 'video';
   }
   return 'unknown';
 };
@@ -44,7 +53,8 @@ function CustomSlideEditor({ open, onClose, onSave, slide, meetingDate, meetingN
     title: '',
     content: '',
     backgroundColor: '#ffffff',
-    imageUrl: ''
+    imageUrl: '',
+    videoUrl: ''
   });
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
@@ -59,15 +69,17 @@ function CustomSlideEditor({ open, onClose, onSave, slide, meetingDate, meetingN
           title: slide.title || '',
           content: slide.content || '',
           backgroundColor: slide.backgroundColor || '#ffffff',
-          imageUrl: slide.imageUrl || ''
+          imageUrl: slide.imageUrl || '',
+          videoUrl: slide.videoUrl || ''
         });
-        setPreviewUrl(slide.imageUrl || null);
+        setPreviewUrl(slide.imageUrl || slide.videoUrl || null);
       } else {
         setFormData({
           title: '',
           content: '',
           backgroundColor: '#ffffff',
-          imageUrl: ''
+          imageUrl: '',
+          videoUrl: ''
         });
         setPreviewUrl(null);
       }
@@ -87,7 +99,7 @@ function CustomSlideEditor({ open, onClose, onSave, slide, meetingDate, meetingN
     const fileType = getFileType(file);
     
     if (fileType === 'unknown') {
-      setUploadError('지원하지 않는 파일 형식입니다. (이미지, Excel, PPT만 가능)');
+      setUploadError('지원하지 않는 파일 형식입니다. (이미지, Excel, PPT, 동영상만 가능)');
       return;
     }
 
@@ -115,19 +127,27 @@ function CustomSlideEditor({ open, onClose, onSave, slide, meetingDate, meetingN
       const result = await api.uploadCustomSlideFile(file, meetingDate, fileType, meetingNumber);
       
       if (result.success) {
+        // 동영상 파일인 경우
+        if (fileType === 'video' && result.videoUrl) {
+          setPreviewUrl(result.videoUrl);
+          setFormData(prev => ({ ...prev, videoUrl: result.videoUrl, imageUrl: '' }));
+          if (process.env.NODE_ENV === 'development') {
+            console.log('✅ [CustomSlideEditor] 동영상 업로드 완료:', result.videoUrl);
+          }
+        }
         // 여러 이미지가 반환될 수 있음 (Excel/PPT의 경우)
-        if (result.imageUrls && result.imageUrls.length > 0) {
+        else if (result.imageUrls && result.imageUrls.length > 0) {
           // 첫 번째 이미지를 미리보기로 사용
           setPreviewUrl(result.imageUrls[0]);
           // 첫 번째 이미지 URL 저장 (나중에 여러 이미지 처리 개선 가능)
-          setFormData(prev => ({ ...prev, imageUrl: result.imageUrls[0] }));
+          setFormData(prev => ({ ...prev, imageUrl: result.imageUrls[0], videoUrl: '' }));
           if (process.env.NODE_ENV === 'development') {
             console.log(`✅ [CustomSlideEditor] ${fileType} 파일 업로드 완료: ${result.imageUrls.length}개 이미지 생성`);
           }
         } else if (result.imageUrl) {
           // 단일 이미지인 경우 미리보기 URL 설정
           setPreviewUrl(result.imageUrl);
-          setFormData(prev => ({ ...prev, imageUrl: result.imageUrl }));
+          setFormData(prev => ({ ...prev, imageUrl: result.imageUrl, videoUrl: '' }));
           if (process.env.NODE_ENV === 'development') {
             console.log('✅ [CustomSlideEditor] 파일 업로드 완료:', result.imageUrl);
           }
@@ -152,7 +172,7 @@ function CustomSlideEditor({ open, onClose, onSave, slide, meetingDate, meetingN
   };
 
   const handleRemoveImage = () => {
-    setFormData(prev => ({ ...prev, imageUrl: '' }));
+    setFormData(prev => ({ ...prev, imageUrl: '', videoUrl: '' }));
     setPreviewUrl(null);
     setUploadedFileType(null);
     if (fileInputRef.current) {
@@ -221,7 +241,7 @@ function CustomSlideEditor({ open, onClose, onSave, slide, meetingDate, meetingN
               파일 첨부 (선택사항)
             </Typography>
             <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block' }}>
-              이미지, Excel, PPT 파일을 업로드할 수 있습니다. Excel과 PPT는 자동으로 이미지로 변환됩니다.
+              이미지, Excel, PPT, 동영상 파일을 업로드할 수 있습니다. Excel과 PPT는 자동으로 이미지로 변환됩니다.
             </Typography>
             
             {uploadError && (
@@ -232,20 +252,39 @@ function CustomSlideEditor({ open, onClose, onSave, slide, meetingDate, meetingN
 
             {previewUrl && (
               <Box sx={{ mb: 2, position: 'relative' }}>
-                <Box
-                  component="img"
-                  src={previewUrl}
-                  alt="미리보기"
-                  sx={{
-                    maxWidth: '100%',
-                    maxHeight: 300,
-                    borderRadius: 1,
-                    border: '1px solid #e0e0e0'
-                  }}
-                />
-                {uploadedFileType && uploadedFileType !== 'image' && (
+                {uploadedFileType === 'video' ? (
+                  <Box
+                    component="video"
+                    src={previewUrl}
+                    controls
+                    sx={{
+                      maxWidth: '100%',
+                      maxHeight: 300,
+                      borderRadius: 1,
+                      border: '1px solid #e0e0e0'
+                    }}
+                  />
+                ) : (
+                  <Box
+                    component="img"
+                    src={previewUrl}
+                    alt="미리보기"
+                    sx={{
+                      maxWidth: '100%',
+                      maxHeight: 300,
+                      borderRadius: 1,
+                      border: '1px solid #e0e0e0'
+                    }}
+                  />
+                )}
+                {uploadedFileType && uploadedFileType !== 'image' && uploadedFileType !== 'video' && (
                   <Alert severity="info" sx={{ mt: 1 }}>
                     {uploadedFileType === 'excel' ? 'Excel' : 'PPT'} 파일이 이미지로 변환되었습니다.
+                  </Alert>
+                )}
+                {uploadedFileType === 'video' && (
+                  <Alert severity="info" sx={{ mt: 1 }}>
+                    동영상 파일이 업로드되었습니다. 슬라이드에서 재생할 수 있습니다.
                   </Alert>
                 )}
                 <Button
@@ -263,7 +302,7 @@ function CustomSlideEditor({ open, onClose, onSave, slide, meetingDate, meetingN
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*,.xlsx,.xls,.pptx,.ppt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.ms-powerpoint"
+              accept="image/*,.xlsx,.xls,.pptx,.ppt,video/*,.mp4,.mov,.avi,.webm,.mkv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.ms-powerpoint"
               onChange={handleFileSelect}
               style={{ display: 'none' }}
             />
@@ -276,15 +315,15 @@ function CustomSlideEditor({ open, onClose, onSave, slide, meetingDate, meetingN
               fullWidth
             >
               {uploading 
-                ? `업로드 중... (${uploadedFileType === 'excel' ? 'Excel 변환 중' : uploadedFileType === 'ppt' ? 'PPT 변환 중' : '처리 중'})` 
+                ? `업로드 중... (${uploadedFileType === 'excel' ? 'Excel 변환 중' : uploadedFileType === 'ppt' ? 'PPT 변환 중' : uploadedFileType === 'video' ? '동영상 업로드 중' : '처리 중'})` 
                 : previewUrl 
                   ? '파일 변경' 
-                  : '파일 선택 (이미지/Excel/PPT)'}
+                  : '파일 선택 (이미지/Excel/PPT/동영상)'}
             </Button>
             
-            {formData.imageUrl && !previewUrl && (
+            {((formData.imageUrl || formData.videoUrl) && !previewUrl) && (
               <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                이미지 URL: {formData.imageUrl.substring(0, 50)}...
+                {formData.videoUrl ? '동영상' : '이미지'} URL: {(formData.videoUrl || formData.imageUrl).substring(0, 50)}...
               </Typography>
             )}
           </Box>

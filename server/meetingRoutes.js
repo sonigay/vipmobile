@@ -1035,6 +1035,56 @@ async function autoCropImage(imageBuffer) {
   }
 }
 
+// 동영상 업로드 (Discord)
+async function uploadVideoToDiscord(videoBuffer, filename, meetingId, meetingDate, meetingNumber, modeLabel) {
+  if (!DISCORD_LOGGING_ENABLED || !discordBot) {
+    throw new Error('Discord 봇이 초기화되지 않았습니다.');
+  }
+
+  // 봇이 준비될 때까지 대기
+  if (!discordBot.isReady()) {
+    for (let i = 0; i < 10; i++) {
+      if (discordBot.isReady()) break;
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+
+  if (!discordBot.isReady()) {
+    throw new Error('Discord 봇이 준비되지 않았습니다.');
+  }
+
+  try {
+    const channel = await discordBot.channels.fetch(DISCORD_MEETING_CHANNEL_ID);
+    if (!channel) {
+      throw new Error(`채널을 찾을 수 없습니다: ${DISCORD_MEETING_CHANNEL_ID}`);
+    }
+
+    // 년월 추출 (예: "2025-01")
+    const yearMonth = meetingDate ? meetingDate.substring(0, 7) : new Date().toISOString().substring(0, 7);
+    
+    // 해당 년월과 차수의 포스트 찾기 또는 생성
+    let post = await findOrCreatePost(channel, yearMonth, meetingNumber, modeLabel);
+    
+    // 회의 스레드 찾기 또는 생성 (현재는 포스트를 그대로 사용)
+    let thread = post;
+    
+    // 동영상 업로드
+    const attachment = new AttachmentBuilder(videoBuffer, { name: filename });
+    const message = await thread.send({ files: [attachment] });
+    
+    const result = {
+      videoUrl: message.attachments.first().url,
+      postId: post.id,
+      threadId: thread.id
+    };
+    
+    return result;
+  } catch (error) {
+    console.error('Discord 동영상 업로드 오류:', error);
+    throw error;
+  }
+}
+
 // 이미지 업로드 (Discord)
 async function uploadImageToDiscord(imageBuffer, filename, meetingId, meetingDate, meetingNumber, modeLabel, metadata = null) {
   if (!DISCORD_LOGGING_ENABLED || !discordBot) {
@@ -1301,16 +1351,19 @@ function convertExcelToHTML(worksheet) {
   let html = '<!DOCTYPE html><html><head>';
   html += '<meta charset="UTF-8">';
   html += '<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">';
-  // 여러 한글 폰트 소스 추가 (CDN + 시스템 폰트)
-  html += '<link rel="preconnect" href="https://fonts.googleapis.com">';
-  html += '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>';
-  html += '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Nanum+Gothic:wght@400;700;800&display=swap" rel="stylesheet">';
   html += '<style>';
-  // 한글 폰트를 우선순위로 설정하고, 시스템 폰트를 폴백으로 사용
-  html += '@font-face { font-family: "Noto Sans KR"; font-style: normal; font-weight: 400; font-display: swap; src: url(https://fonts.gstatic.com/s/notosanskr/v36/PbykFmXiEBPT4ITbgNA5Cgm20HTs4JMMuA.woff2) format("woff2"); unicode-range: U+AC00-D7A3, U+1100-11FF, U+3130-318F, U+A960-A97F, U+D7B0-D7FF; }';
-  html += '* { font-family: "Noto Sans KR", "Nanum Gothic", "Malgun Gothic", "AppleGothic", "NanumGothic", "Noto Sans CJK KR", "맑은 고딕", "Apple SD Gothic Neo", Arial, sans-serif !important; }';
+  // 시스템 폰트를 우선 사용 (네트워크 의존성 완전 제거)
+  // Windows, macOS, Linux 모두에서 작동하는 한글 폰트 우선순위
+  html += '* { ';
+  html += 'font-family: "Malgun Gothic", "맑은 고딕", "AppleGothic", "Apple SD Gothic Neo", "NanumGothic", "Nanum Gothic", "Noto Sans CJK KR", "Noto Sans KR", "Gulim", "굴림", "Batang", "바탕", "Gungsuh", "궁서", "Dotum", "돋움", Arial, sans-serif !important; ';
+  html += 'font-feature-settings: normal !important; ';
+  html += 'font-variant: normal !important; ';
+  html += 'text-rendering: optimizeLegibility !important; ';
+  html += '-webkit-font-smoothing: antialiased !important; ';
+  html += '-moz-osx-font-smoothing: grayscale !important; ';
+  html += '}';
   html += 'body { margin: 20px; font-size: 14px; line-height: 1.5; }';
-  html += 'table { border-collapse: collapse; width: 100%; font-family: "Noto Sans KR", "Malgun Gothic", "AppleGothic", sans-serif !important; }';
+  html += 'table { border-collapse: collapse; width: 100%; font-family: inherit !important; }';
   html += 'th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-family: inherit !important; }';
   html += 'th { background-color: #4a90e2; color: white; font-weight: bold; }';
   html += 'tr:nth-child(even) { background-color: #f8f9fa; }';
@@ -1386,30 +1439,26 @@ async function convertExcelToImage(worksheet, filename) {
       throw new Error('Excel 파일을 이미지로 변환하려면 Canvas 모듈이 필요합니다. 서버에 Canvas를 설치해주세요: npm install canvas');
     }
     
-    // 한글 폰트 등록 시도 (시스템 폰트 사용)
-    // Windows: 'Malgun Gothic', 'Gulim', 'Batang'
-    // Linux: 'Noto Sans CJK KR', 'NanumGothic', 'DejaVu Sans'
-    // macOS: 'AppleGothic', 'NanumGothic'
-    const koreanFonts = [
-      'Malgun Gothic',      // Windows
-      'Gulim',              // Windows
-      'Batang',             // Windows
-      'Noto Sans CJK KR',   // Linux
-      'NanumGothic',       // Linux/macOS
-      'AppleGothic',        // macOS
-      'Arial Unicode MS',   // 범용
-      'sans-serif'          // 폴백
-    ];
+    // 시스템 한글 폰트 우선순위 (OS별)
+    // Canvas는 시스템 폰트를 직접 사용하므로 폰트 이름만 지정
+    const os = require('os');
+    const platform = os.platform();
     
-    // 한글을 지원하는 폰트 찾기
-    let fontFamily = 'Arial';
-    try {
-      // 시스템 폰트 목록 확인 (canvas는 기본적으로 시스템 폰트를 사용)
-      // 실제로는 첫 번째로 시도할 폰트를 설정
-      fontFamily = koreanFonts[0]; // 기본값으로 Malgun Gothic 시도
-    } catch (fontError) {
-      console.warn('⚠️ [Excel 변환] 폰트 등록 실패, 기본 폰트 사용:', fontError.message);
+    let fontFamily = 'Arial'; // 기본값
+    
+    // OS별 한글 폰트 우선순위
+    if (platform === 'win32') {
+      // Windows: 맑은 고딕 우선
+      fontFamily = 'Malgun Gothic';
+    } else if (platform === 'darwin') {
+      // macOS: AppleGothic 우선
+      fontFamily = 'AppleGothic';
+    } else {
+      // Linux: Noto Sans CJK KR 또는 NanumGothic
+      fontFamily = 'Noto Sans CJK KR';
     }
+    
+    console.log(`📝 [Excel 변환] OS: ${platform}, 사용 폰트: ${fontFamily}`);
     
     // Excel 데이터 읽기
     const rows = [];
@@ -1452,15 +1501,18 @@ async function convertExcelToImage(worksheet, filename) {
     
     // 제목
     ctx.fillStyle = '#000000';
-    ctx.font = `bold 36px "${fontFamily}", Arial, sans-serif`;
-    const title = worksheet.name || filename;
-    // 한글 텍스트 렌더링
+    ctx.font = `bold 36px ${fontFamily}, Arial, sans-serif`;
+    ctx.textBaseline = 'top';
+    ctx.textAlign = 'left';
+    const title = String(worksheet.name || filename);
+    // 한글 텍스트 렌더링 (UTF-8 인코딩 보장)
     try {
       ctx.fillText(title, padding, 50);
     } catch (textError) {
-      console.warn('⚠️ [Excel 변환] 제목 렌더링 오류, 기본 폰트로 재시도:', textError.message);
+      console.warn(`⚠️ [Excel 변환] 제목 렌더링 오류 (${title.substring(0, 10)}...), 기본 폰트로 재시도:`, textError.message);
       ctx.font = 'bold 36px Arial';
       ctx.fillText(title, padding, 50);
+      ctx.font = `bold 36px ${fontFamily}, Arial, sans-serif`;
     }
     
     // 테이블 영역
@@ -1474,19 +1526,27 @@ async function convertExcelToImage(worksheet, filename) {
       ctx.fillRect(startX, yPos, colWidth * maxCols, rowHeight);
       
       ctx.fillStyle = '#ffffff';
-      ctx.font = `bold 18px "${fontFamily}", Arial, sans-serif`;
+      ctx.font = `bold 18px ${fontFamily}, Arial, sans-serif`;
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'left';
       let xPos = startX + 10;
       headerRow.forEach((cell, colIndex) => {
-        const text = cell.value || '';
+        const text = String(cell.value || '');
         // 텍스트가 너무 길면 자르기
-        const displayText = text.length > 25 ? text.substring(0, 22) + '...' : text;
+        let displayText = text.length > 25 ? text.substring(0, 22) + '...' : text;
+        
+        // 한글 텍스트 렌더링 (UTF-8 인코딩 보장)
         try {
-          ctx.fillText(displayText, xPos, yPos + 25);
+          // 텍스트 측정
+          const metrics = ctx.measureText(displayText);
+          const textY = yPos + rowHeight / 2;
+          ctx.fillText(displayText, xPos, textY);
         } catch (textError) {
           // 폰트 오류 시 기본 폰트로 재시도
+          console.warn(`⚠️ [Excel 변환] 헤더 텍스트 렌더링 오류 (${displayText.substring(0, 10)}...):`, textError.message);
           ctx.font = 'bold 18px Arial';
-          ctx.fillText(displayText, xPos, yPos + 25);
-          ctx.font = `bold 18px "${fontFamily}", Arial, sans-serif`;
+          ctx.fillText(displayText, xPos, yPos + rowHeight / 2);
+          ctx.font = `bold 18px ${fontFamily}, Arial, sans-serif`;
         }
         xPos += colWidth;
       });
@@ -1494,7 +1554,9 @@ async function convertExcelToImage(worksheet, filename) {
     }
     
     // 데이터 행
-    ctx.font = `16px "${fontFamily}", Arial, sans-serif`;
+    ctx.font = `16px ${fontFamily}, Arial, sans-serif`;
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
     for (let i = 1; i < Math.min(rows.length, maxRows + 1); i++) {
       const row = rows[i];
       
@@ -1507,16 +1569,20 @@ async function convertExcelToImage(worksheet, filename) {
       ctx.fillStyle = '#000000';
       let xPos = startX + 10;
       row.forEach((cell, colIndex) => {
-        const text = cell.value || '';
+        const text = String(cell.value || '');
         // 텍스트가 너무 길면 자르기
-        const displayText = text.length > 25 ? text.substring(0, 22) + '...' : text;
+        let displayText = text.length > 25 ? text.substring(0, 22) + '...' : text;
+        
+        // 한글 텍스트 렌더링 (UTF-8 인코딩 보장)
         try {
-          ctx.fillText(displayText, xPos, yPos + 25);
+          const textY = yPos + rowHeight / 2;
+          ctx.fillText(displayText, xPos, textY);
         } catch (textError) {
           // 폰트 오류 시 기본 폰트로 재시도
+          console.warn(`⚠️ [Excel 변환] 데이터 텍스트 렌더링 오류 (${displayText.substring(0, 10)}...):`, textError.message);
           ctx.font = '16px Arial';
-          ctx.fillText(displayText, xPos, yPos + 25);
-          ctx.font = `16px "${fontFamily}", Arial, sans-serif`;
+          ctx.fillText(displayText, xPos, yPos + rowHeight / 2);
+          ctx.font = `16px ${fontFamily}, Arial, sans-serif`;
         }
         xPos += colWidth;
       });
@@ -1582,7 +1648,8 @@ async function convertPPTToImages(pptBuffer, filename) {
     let browser;
     if (!global.pptBrowser) {
       try {
-        global.pptBrowser = await puppeteer.launch({
+        // Puppeteer 설정: Chrome 자동 다운로드 허용
+        const launchOptions = {
           headless: true,
           args: [
             '--no-sandbox', 
@@ -1590,17 +1657,76 @@ async function convertPPTToImages(pptBuffer, filename) {
             '--disable-dev-shm-usage',
             '--disable-gpu',
             '--disable-software-rasterizer'
-          ],
-          // 서버 환경에서 Chrome 경로 자동 감지
-          executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
-        });
+          ]
+        };
+        
+        // 환경 변수로 Chrome 경로가 지정된 경우에만 사용
+        // 지정되지 않으면 Puppeteer가 자동으로 Chrome을 다운로드
+        if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+          launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+        }
+        
+        console.log('🚀 [PPT 변환] Puppeteer 브라우저 실행 시도...');
+        global.pptBrowser = await puppeteer.launch(launchOptions);
+        console.log('✅ [PPT 변환] Puppeteer 브라우저 실행 성공');
       } catch (launchError) {
         console.error('❌ [PPT 변환] Puppeteer 브라우저 실행 실패:', launchError.message);
-        // Chrome이 없는 경우 에러 메시지 개선
-        if (launchError.message.includes('Could not find Chrome')) {
-          throw new Error('PPT 변환을 위해 서버에 Chrome이 설치되어 있어야 합니다. 관리자에게 문의하세요.');
+        
+        // Chrome을 찾을 수 없는 경우 처리
+        if (launchError.message.includes('Could not find Chrome') || 
+            launchError.message.includes('Browser was not found') ||
+            launchError.message.includes('Executable doesn\'t exist')) {
+          console.log('📥 [PPT 변환] Chrome을 찾을 수 없습니다. 자동 설치 시도...');
+          try {
+            // Puppeteer의 브라우저 설치 명령 실행 (비동기로 처리)
+            const { execSync } = require('child_process');
+            console.log('📥 [PPT 변환] Chrome 다운로드 시작... (이 작업은 몇 분이 걸릴 수 있습니다)');
+            
+            // 환경 변수 설정: Puppeteer가 Chrome을 다운로드할 수 있도록
+            const env = { ...process.env };
+            if (!env.PUPPETEER_CACHE_DIR) {
+              // 기본 캐시 디렉토리 사용 (홈 디렉토리)
+              env.PUPPETEER_CACHE_DIR = require('os').homedir() + '/.cache/puppeteer';
+            }
+            
+            execSync('npx puppeteer browsers install chrome', { 
+              stdio: 'inherit',
+              timeout: 600000, // 10분 타임아웃 (Chrome 다운로드는 시간이 걸릴 수 있음)
+              env: env
+            });
+            console.log('✅ [PPT 변환] Chrome 설치 완료, 재시도...');
+            
+            // 재시도 (executablePath 없이 자동 감지)
+            const retryOptions = {
+              headless: true,
+              args: [
+                '--no-sandbox', 
+                '--disable-setuid-sandbox', 
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+                '--disable-software-rasterizer'
+              ]
+            };
+            global.pptBrowser = await puppeteer.launch(retryOptions);
+            console.log('✅ [PPT 변환] Puppeteer 브라우저 실행 성공 (재시도)');
+          } catch (installError) {
+            console.error('❌ [PPT 변환] Chrome 자동 설치 실패:', installError.message);
+            console.error('❌ [PPT 변환] 설치 에러 상세:', installError);
+            
+            // 더 자세한 안내 메시지
+            const errorMsg = `PPT 변환을 위해 Chrome이 필요합니다.\n\n` +
+              `해결 방법:\n` +
+              `1. 서버에서 다음 명령을 실행하세요:\n` +
+              `   npx puppeteer browsers install chrome\n\n` +
+              `2. 또는 환경 변수 PUPPETEER_EXECUTABLE_PATH에 Chrome 실행 파일 경로를 설정하세요.\n\n` +
+              `원본 에러: ${launchError.message}\n` +
+              `설치 에러: ${installError.message}`;
+            
+            throw new Error(errorMsg);
+          }
+        } else {
+          throw launchError;
         }
-        throw launchError;
       }
     }
     browser = global.pptBrowser;
@@ -1944,7 +2070,42 @@ async function uploadCustomSlideFile(req, res) {
     }
 
     const file = req.file;
-    const detectedFileType = fileType || (file.mimetype.startsWith('image/') ? 'image' : 'unknown');
+    
+    // 파일 타입 자동 감지 (fileType이 제공되지 않은 경우)
+    let detectedFileType = fileType;
+    if (!detectedFileType) {
+      const fileName = (file.originalname || '').toLowerCase();
+      const mimeType = file.mimetype || '';
+      
+      if (mimeType.startsWith('image/')) {
+        detectedFileType = 'image';
+      } else if (
+        fileName.endsWith('.xlsx') || 
+        fileName.endsWith('.xls') || 
+        mimeType.includes('spreadsheet') ||
+        mimeType.includes('excel')
+      ) {
+        detectedFileType = 'excel';
+      } else if (
+        fileName.endsWith('.pptx') || 
+        fileName.endsWith('.ppt') || 
+        mimeType.includes('presentation') ||
+        mimeType.includes('powerpoint')
+      ) {
+        detectedFileType = 'ppt';
+      } else if (
+        fileName.endsWith('.mp4') ||
+        fileName.endsWith('.mov') ||
+        fileName.endsWith('.avi') ||
+        fileName.endsWith('.webm') ||
+        fileName.endsWith('.mkv') ||
+        mimeType.startsWith('video/')
+      ) {
+        detectedFileType = 'video';
+      } else {
+        detectedFileType = 'unknown';
+      }
+    }
     
     console.log(`📤 [uploadCustomSlideFile] 파일 업로드 시작: ${file.originalname}, 타입: ${detectedFileType}`);
     
@@ -1985,7 +2146,9 @@ async function uploadCustomSlideFile(req, res) {
           // Puppeteer로 HTML을 이미지로 변환 (한글 폰트 확실히 로드)
           try {
             const puppeteer = require('puppeteer');
-            const browser = await puppeteer.launch({
+            
+            // Puppeteer 설정: Chrome 자동 다운로드 허용
+            const launchOptions = {
               headless: true,
               args: [
                 '--no-sandbox', 
@@ -1995,10 +2158,15 @@ async function uploadCustomSlideFile(req, res) {
                 '--disable-software-rasterizer',
                 '--font-render-hinting=none', // 폰트 렌더링 힌팅 비활성화
                 '--disable-font-subpixel-positioning' // 폰트 서브픽셀 위치 지정 비활성화
-              ],
-              // 서버 환경에서 Chrome 경로 자동 감지
-              executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
-            });
+              ]
+            };
+            
+            // 환경 변수로 Chrome 경로가 지정된 경우에만 사용
+            if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+              launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+            }
+            
+            const browser = await puppeteer.launch(launchOptions);
             const page = await browser.newPage();
             
             // 뷰포트 설정 (한글 렌더링 개선)
@@ -2014,53 +2182,53 @@ async function uploadCustomSlideFile(req, res) {
               timeout: 60000 // 타임아웃 증가
             });
             
-            // 폰트가 완전히 로드될 때까지 대기
-            await page.evaluate(async () => {
-              // 모든 폰트가 로드될 때까지 대기
-              await document.fonts.ready;
-              
-              // 추가로 폰트 로드 확인
-              const fontCheck = setInterval(() => {
-                if (document.fonts.check('16px "Noto Sans KR"') || 
-                    document.fonts.check('16px "Malgun Gothic"') ||
-                    document.fonts.check('16px "AppleGothic"')) {
-                  clearInterval(fontCheck);
-                }
-              }, 100);
-              
-              // 최대 5초 대기
-              setTimeout(() => clearInterval(fontCheck), 5000);
-            });
-            
-            // 폰트 로드 대기 (더 확실하게)
-            await page.waitForFunction(() => {
-              return document.fonts.ready && document.fonts.size > 0;
-            }, { timeout: 10000 }).catch(() => {
-              console.warn('⚠️ [Excel 변환] 폰트 로드 확인 타임아웃, 계속 진행');
-            });
-            
-            // 추가 대기 시간 (폰트 렌더링 완료 보장)
-            await page.waitForTimeout(2000);
-            
-            // 한글 텍스트 렌더링 확인 및 강제 재렌더링
+            // 시스템 폰트 강제 적용 및 한글 렌더링 보장
             await page.evaluate(() => {
+              // 모든 요소에 시스템 한글 폰트 강제 적용
+              const systemKoreanFonts = '"Malgun Gothic", "맑은 고딕", "AppleGothic", "Apple SD Gothic Neo", "NanumGothic", "Nanum Gothic", "Noto Sans CJK KR", "Gulim", "굴림", "Batang", "바탕", sans-serif';
+              
               // 모든 텍스트 요소에 폰트 강제 적용
               const allElements = document.querySelectorAll('*');
               allElements.forEach(el => {
-                const computedStyle = window.getComputedStyle(el);
-                const fontFamily = computedStyle.fontFamily;
-                // 한글 폰트가 없으면 강제로 추가
-                if (!fontFamily.includes('Noto') && !fontFamily.includes('Malgun') && !fontFamily.includes('Apple')) {
-                  el.style.fontFamily = '"Noto Sans KR", "Malgun Gothic", "AppleGothic", sans-serif';
+                el.style.fontFamily = systemKoreanFonts;
+                el.style.fontFeatureSettings = 'normal';
+                el.style.fontVariant = 'normal';
+                el.style.textRendering = 'optimizeLegibility';
+                el.style.webkitFontSmoothing = 'antialiased';
+                el.style.mozOsxFontSmoothing = 'grayscale';
+              });
+              
+              // 강제 리플로우 트리거 (렌더링 강제)
+              const forceReflow = () => {
+                document.body.offsetHeight;
+                document.body.style.display = 'none';
+                document.body.offsetHeight;
+                document.body.style.display = '';
+                document.body.offsetHeight;
+              };
+              forceReflow();
+            });
+            
+            // 폰트 적용 후 충분한 대기 시간 (시스템 폰트는 즉시 사용 가능)
+            await page.waitForTimeout(1500);
+            
+            // 한글 텍스트가 제대로 렌더링되었는지 확인
+            await page.evaluate(() => {
+              // 테이블의 모든 텍스트 확인
+              const cells = document.querySelectorAll('th, td');
+              let hasKorean = false;
+              cells.forEach(cell => {
+                const text = cell.textContent || '';
+                // 한글 유니코드 범위 확인 (AC00-D7A3)
+                if (/[\uAC00-\uD7A3]/.test(text)) {
+                  hasKorean = true;
                 }
               });
               
-              // 강제 리플로우 트리거
-              document.body.offsetHeight;
+              if (!hasKorean) {
+                console.warn('⚠️ [Excel 변환] 한글 텍스트가 감지되지 않았습니다.');
+              }
             });
-            
-            // 추가 대기 (리플로우 후 렌더링)
-            await page.waitForTimeout(1000);
             
             // 스크린샷 촬영 (고해상도)
             const screenshot = await page.screenshot({
@@ -2160,6 +2328,69 @@ async function uploadCustomSlideFile(req, res) {
         return res.status(500).json({ 
           success: false, 
           error: `PPT 변환 실패: ${pptError.message}` 
+        });
+      }
+    } else if (detectedFileType === 'video') {
+      // 동영상 파일 업로드
+      try {
+        console.log(`🎬 [uploadCustomSlideFile] 동영상 파일 업로드 시작: ${file.originalname}`);
+        
+        // 회의 정보 조회 (차수 가져오기) - 동영상 업로드 전에 필요
+        let meetingNumber = bodyMeetingNumber ? parseInt(bodyMeetingNumber) : null;
+        const isTempMeeting = meetingId === 'temp-custom-slide';
+        
+        if (!meetingNumber && !isTempMeeting) {
+          try {
+            const { sheets, SPREADSHEET_ID } = createSheetsClient();
+            const sheetName = '회의목록';
+            const range = `${sheetName}!A3:G`;
+            const response = await sheets.spreadsheets.values.get({
+              spreadsheetId: SPREADSHEET_ID,
+              range
+            });
+            
+            const rows = response.data.values || [];
+            const meetingRow = rows.find(row => row[0] === meetingId);
+            
+            if (meetingRow && meetingRow[3]) {
+              meetingNumber = parseInt(meetingRow[3]);
+            }
+          } catch (meetingError) {
+            console.warn('회의 정보 조회 실패:', meetingError);
+          }
+        }
+        
+        const uploadMeetingId = isTempMeeting 
+          ? `temp-${meetingDate || new Date().toISOString().split('T')[0]}` 
+          : meetingId;
+        const finalMeetingDate = meetingDate || new Date().toISOString().split('T')[0];
+        
+        // Discord에 동영상 업로드
+        const result = await uploadVideoToDiscord(
+          file.buffer,
+          file.originalname || `video-${Date.now()}.mp4`,
+          uploadMeetingId,
+          finalMeetingDate,
+          meetingNumber,
+          '커스텀'
+        );
+        
+        console.log(`✅ [uploadCustomSlideFile] 동영상 업로드 완료: ${result.videoUrl}`);
+        
+        // 동영상 URL 반환
+        res.json({
+          success: true,
+          videoUrl: result.videoUrl,
+          postId: result.postId,
+          threadId: result.threadId,
+          fileType: 'video'
+        });
+        return;
+      } catch (videoError) {
+        console.error('동영상 업로드 오류:', videoError);
+        return res.status(500).json({ 
+          success: false, 
+          error: `동영상 업로드 실패: ${videoError.message}` 
         });
       }
     } else {
