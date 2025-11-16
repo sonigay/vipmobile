@@ -135,23 +135,24 @@ function MeetingPresentationTab({ loggedInStore, initialSelectedMeeting, onMeeti
           mode: s.mode,
           tab: s.tab,
           imageUrl: s.imageUrl || '없음',
-          hasImageUrl: !!s.imageUrl
+          videoUrl: s.videoUrl || '없음',
+          hasMedia: !!(s.imageUrl || s.videoUrl)
         })));
       }
       
       const loadedSlides = allSlides
-        .filter(slide => slide.imageUrl) // 이미지 URL이 있는 슬라이드만
-        .sort((a, b) => a.order - b.order); // 순서대로 정렬
+        .filter(slide => slide.imageUrl || slide.videoUrl) // 이미지 또는 동영상이 있는 슬라이드만
+        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0)); // 순서대로 정렬
 
       if (process.env.NODE_ENV === 'development') {
-        console.log(`▶️ [MeetingPresentationTab] 필터링된 슬라이드 수: ${loadedSlides.length}`);
+        console.log(`▶️ [MeetingPresentationTab] 필터링된 슬라이드 수(이미지/비디오): ${loadedSlides.length}`);
       }
 
       if (loadedSlides.length === 0) {
         if (process.env.NODE_ENV === 'development') {
-          console.warn(`⚠️ [MeetingPresentationTab] 이미지 URL이 있는 슬라이드가 없음`);
+          console.warn(`⚠️ [MeetingPresentationTab] 재생 가능한(이미지/비디오) 슬라이드가 없음`);
         }
-        alert('이 회의에는 캡처된 이미지가 없습니다.');
+        alert('이 회의에는 재생 가능한 슬라이드(이미지/동영상)가 없습니다.');
         setLoading(false);
         return;
       }

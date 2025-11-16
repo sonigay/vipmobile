@@ -44,37 +44,7 @@ const CHART_TABS = [
     subTabs: [
       { 
         key: 'totalClosing', 
-        label: '전체총마감',
-        detailOptions: {
-          type: 'csDetail',
-          options: [
-            {
-              key: 'csDetailType',
-              label: '구분',
-              type: 'select',
-              multiple: true, // 여러 개 선택 가능
-              values: [
-                { key: 'all', label: '전체' },
-                { key: 'cs', label: 'CS 개통 실적' },
-                { key: 'code', label: '코드별 실적' },
-                { key: 'office', label: '사무실별 실적' },
-                { key: 'department', label: '소속별 실적' },
-                { key: 'agent', label: '담당자별 실적' }
-              ],
-              defaultValue: 'all'
-            },
-            {
-              key: 'csDetailCriteria',
-              label: '기준',
-              type: 'select',
-              values: [
-                { key: 'performance', label: '실적 기준' },
-                { key: 'fee', label: '수수료 기준' }
-              ],
-              defaultValue: 'performance'
-            }
-          ]
-        }
+        label: '전체총마감'
       },
       { key: 'agentClosing', label: '담당자별마감' }
     ]
@@ -103,7 +73,33 @@ const CHART_TABS = [
           ]
         }
       },
-      { key: 'subscriberIncrease', label: '가입자증감' }
+      { 
+        key: 'subscriberIncrease', 
+        label: '가입자증감',
+        // 상세 옵션: 표시 단위(년/월) 및 대상 연도 선택
+        detailOptions: {
+          type: 'subscriberIncrease',
+          options: [
+            {
+              key: 'subscriberPeriod',
+              label: '표시 단위',
+              type: 'select',
+              values: [
+                { key: 'year', label: '년단위' },
+                { key: 'month', label: '월단위' }
+              ],
+              defaultValue: 'year'
+            },
+            {
+              key: 'targetYear',
+              label: '대상 년도',
+              type: 'text',
+              placeholder: '예: 2025 (비워두면 최신)',
+              defaultValue: ''
+            }
+          ]
+        }
+      }
     ]
   },
   { 

@@ -1,5 +1,8 @@
 import html2canvas from 'html2canvas';
 
+// 슬라이드 하단 여백 색상 (파스텔톤 핫핑크)
+const BOTTOM_PADDING_COLOR = '#FFB6C1';
+
 /**
  * Canvas에서 하단 공백을 자동으로 제거합니다.
  * 실제 콘텐츠 영역만 남기고 하얀 공백을 제거합니다.
@@ -184,6 +187,7 @@ async function autoCropCanvas(canvas) {
     const croppedCtx = croppedCanvas.getContext('2d');
     
     // 배경 흰색으로 초기화 (추가 여백 영역이 투명해지지 않도록)
+    // 여기서는 기본 배경을 유지하고, 실제 하단 고정 여백은 captureElement 단계에서 별도 색상으로 처리
     croppedCtx.fillStyle = '#ffffff';
     croppedCtx.fillRect(0, 0, croppedCanvas.width, croppedCanvas.height);
     
@@ -283,12 +287,12 @@ export async function captureElement(element, options = {}) {
   const isMainOrToc = slideId.includes('main') || slideId.includes('toc');
   
   // 메인/목차 슬라이드: 고정 가로폭(1280px) 적용 시 세로 재흐름으로 인한 하단 잘림 방지
-  // 높이 = scrollHeight × (1/widthScale) × 1.2, 최소 900px 보장
+  // 높이 = scrollHeight × (1/widthScale) × 1.6, 최소 1100px 보장 (목차 항목이 많은 경우 대비)
   // autoCrop 유지로 과도 여백은 자동 제거
   let targetHeight;
   if (isMainOrToc) {
     const heightScale = widthScale < 1 ? (1 / widthScale) : 1;
-    targetHeight = Math.max(Math.ceil(scrollHeight * heightScale * 1.2), 900);
+    targetHeight = Math.max(Math.ceil(scrollHeight * heightScale * 1.6), 1100);
   } else {
     // 기타 슬라이드: 기존 로직 유지
     const reflowBoost = widthScale < 1 ? (1 / widthScale) : 1;
@@ -459,7 +463,9 @@ export async function captureElement(element, options = {}) {
         padded.width = croppedCanvas.width;
         padded.height = croppedCanvas.height + fixedBottomPaddingPx;
         const pctx = padded.getContext('2d');
-        pctx.fillStyle = '#ffffff';
+        // 전체를 파스텔톤 핫핑크로 채우고, 위쪽에 원본 이미지를 그려
+        // 최종적으로 하단 여백 영역만 핫핑크가 보이도록 함
+        pctx.fillStyle = BOTTOM_PADDING_COLOR;
         pctx.fillRect(0, 0, padded.width, padded.height);
         pctx.drawImage(croppedCanvas, 0, 0);
         finalCanvas = padded;

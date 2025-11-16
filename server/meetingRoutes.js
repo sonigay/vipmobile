@@ -994,28 +994,43 @@ async function autoCropImage(imageBuffer) {
       };
     }
     
-    // 여유 공간 추가 (하단 10px)
-    const padding = 10;
-    const croppedHeight = Math.min(originalHeight, lastContentY + padding + 1);
-    
-    // 상단은 0부터 시작, 하단만 크롭
-    const trimmedImage = await sharp(imageBuffer)
-      .extract({
-        left: 0,
-        top: 0,
-        width: originalWidth,
-        height: croppedHeight
-      })
-      .png()
-      .toBuffer();
+    // 최소 하단 여백 보장 (클라이언트와 일치: 기본 96px)
+    const minBottomPadding = 96;
+    const desiredBottom = lastContentY + minBottomPadding + 1;
+    let finalBuffer;
+    let croppedHeight;
+
+    if (desiredBottom <= originalHeight) {
+      // 원본 내부에서 여백 보장 가능 → 해당 높이까지 크롭
+      croppedHeight = desiredBottom;
+      finalBuffer = await sharp(imageBuffer)
+        .extract({
+          left: 0,
+          top: 0,
+          width: originalWidth,
+          height: croppedHeight
+        })
+        .png()
+        .toBuffer();
+    } else {
+      // 원본 끝까지 내용이 닿아 여백이 부족 → 아래로 파스텔톤 핫핑크 영역을 확장
+      const extra = desiredBottom - originalHeight;
+      croppedHeight = originalHeight + extra;
+      finalBuffer = await sharp(imageBuffer)
+        .extend({
+          bottom: extra,
+          background: { r: 255, g: 182, b: 193, alpha: 1 } // #FFB6C1 파스텔 핫핑크
+        })
+        .png()
+        .toBuffer();
+    }
     
     const croppedWidth = originalWidth;
     
-    console.log(`✂️ [autoCropImage] 하단 공백 제거 완료: ${originalWidth}x${originalHeight} → ${croppedWidth}x${croppedHeight}`);
-    console.log(`📊 [autoCropImage] 크롭 비율: ${((1 - (croppedWidth * croppedHeight) / (originalWidth * originalHeight)) * 100).toFixed(2)}% 제거됨`);
+    console.log(`✂️ [autoCropImage] 하단 공백 처리: ${originalWidth}x${originalHeight} → ${croppedWidth}x${croppedHeight}`);
     
     return {
-      buffer: trimmedImage,
+      buffer: finalBuffer,
       originalWidth,
       originalHeight,
       croppedWidth,
@@ -1309,39 +1324,91 @@ async function uploadMeetingImage(req, res) {
   }
 }
 
-// Excel 파일을 이미지로 변환
+// Excel 파일을 이미지로 변환 (신규 방식: ExcelJS → HTML → Puppeteer 스크린샷, 한글 우선)
 async function convertExcelToImages(excelBuffer, filename) {
   try {
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(excelBuffer);
-    
+
     const imageBuffers = [];
-    
-    // 각 워크시트를 이미지로 변환
-    for (let i = 0; i < workbook.worksheets.length; i++) {
-      const worksheet = workbook.worksheets[i];
-      const sheetName = worksheet.name;
-      
-      console.log(`📊 [Excel 변환] 시트 "${sheetName}" 처리 중...`);
-      
-      // Excel 데이터를 이미지로 변환
-      const imageBuffer = await convertExcelToImage(worksheet, `${filename}_${sheetName}`);
-      
-      if (!imageBuffer) {
-        // Canvas가 없는 경우 HTML로 변환하여 반환 (나중에 puppeteer로 처리 가능)
-        console.warn(`⚠️ [Excel 변환] Canvas가 없어 시트 "${sheetName}"을 이미지로 변환할 수 없습니다.`);
-        continue;
-      }
-      imageBuffers.push({
-        buffer: imageBuffer,
-        filename: `${filename}_${sheetName}.png`,
-        sheetName: sheetName
-      });
+
+    // 동적으로 Puppeteer 로드
+    let puppeteer;
+    try {
+      puppeteer = require('puppeteer');
+    } catch (e) {
+      console.error('❌ [Excel 변환] puppeteer 모듈을 로드할 수 없습니다:', e.message);
+      throw new Error('Excel 파일을 이미지로 변환하려면 puppeteer가 필요합니다. 서버에 puppeteer를 설치해주세요.');
     }
-    
+
+    // 크롬 실행 파일 경로 탐색 (이미 PPT 변환에서 사용하던 로직 재사용)
+    const { executablePath } = require('puppeteer');
+    let chromePath = process.env.PUPPETEER_EXECUTABLE_PATH || process.env.CHROME_PATH || null;
+    if (!chromePath) {
+      try {
+        chromePath = executablePath();
+      } catch (e) {
+        console.warn('⚠️ [Excel 변환] Puppeteer 기본 executablePath 탐색 실패:', e.message);
+      }
+    }
+
+    const launchOptions = {
+      headless: 'new',
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    };
+    if (chromePath) {
+      launchOptions.executablePath = chromePath;
+    }
+
+    const browser = await puppeteer.launch(launchOptions);
+
+    try {
+      for (let i = 0; i < workbook.worksheets.length; i++) {
+        const worksheet = workbook.worksheets[i];
+        const sheetName = worksheet.name || `Sheet${i + 1}`;
+        console.log(`📊 [Excel 변환] (HTML/Puppeteer) 시트 "${sheetName}" 처리 중...`);
+
+        // Excel 시트를 HTML로 변환 (Noto Sans KR + UTF-8)
+        const html = convertExcelToHTML(worksheet);
+
+        const page = await browser.newPage();
+        await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: 2 });
+        await page.setContent(html, { waitUntil: 'networkidle0' });
+
+        // 폰트 로딩 및 렌더링 안정화 대기
+        await page.waitForTimeout(800);
+
+        const elementHandle = await page.$('body');
+        if (!elementHandle) {
+          console.warn(`⚠️ [Excel 변환] body 요소를 찾을 수 없습니다. 시트: ${sheetName}`);
+          await page.close();
+          continue;
+        }
+
+        const screenshotBuffer = await elementHandle.screenshot({
+          type: 'png',
+          fullPage: true
+        });
+
+        await page.close();
+
+        imageBuffers.push({
+          buffer: screenshotBuffer,
+          filename: `${filename}_${sheetName}.png`,
+          sheetName
+        });
+      }
+    } finally {
+      await browser.close();
+    }
+
+    if (imageBuffers.length === 0) {
+      throw new Error('변환된 시트가 없습니다. Excel 내용이 비어있거나 렌더링에 실패했습니다.');
+    }
+
     return imageBuffers;
   } catch (error) {
-    console.error('Excel 변환 오류:', error);
+    console.error('❌ [Excel 변환] 신규 HTML/Puppeteer 방식 오류:', error);
     throw new Error(`Excel 파일 변환 실패: ${error.message}`);
   }
 }

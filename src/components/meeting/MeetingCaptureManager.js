@@ -241,6 +241,31 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         throw new Error(`슬라이드 요소를 찾을 수 없습니다. (slideId: ${currentSlide.slideId}, index: ${index})`);
       }
 
+      // 동영상 슬라이드는 캡처/업로드를 건너뛰고 비주얼은 재생 단계에서 처리
+      if ((currentSlide.type === 'custom' || currentSlide.type === 'mode-tab' || currentSlide.type === 'video') && currentSlide.videoUrl && !currentSlide.imageUrl) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`⏭️ [MeetingCaptureManager] 동영상 슬라이드 캡처 생략: ${currentSlide.slideId}`);
+        }
+        // 슬라이드 상태만 저장하고 다음으로 진행
+        try {
+          const toSave = slidesState.map((s, i) => (i === index ? { ...s, capturedAt: new Date().toISOString() } : s));
+          await api.saveMeetingConfig(meeting.meetingId, { slides: toSave });
+          setSlidesState(toSave);
+        } catch (e) {
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('⚠️ [MeetingCaptureManager] 동영상 슬라이드 저장 중 경고:', e?.message);
+          }
+        }
+        // 완료 카운트 업데이트 및 다음 슬라이드로
+        setCompleted(prev => prev + 1);
+        setTimeout(() => {
+          if (isMountedRef.current) {
+            captureNextSlide(index + 1);
+          }
+        }, 300);
+        return;
+      }
+
       // 특정 상세옵션 선택 시: 섹션 펼치기 및 타겟 요소만 캡처
       // 메인/목차는 헤더 포함 전체 슬라이드를 캡처 (공백은 autoCropCanvas로 처리)
       let captureTargetElement = slideElement;
@@ -645,6 +670,20 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                   if (hasVendors && rowCount >= 10) break;
                   await new Promise(r => setTimeout(r, 200));
                 }
+                // 가로 스크롤을 좌우로 한번 움직여 가상 렌더링/고정열(sticky) 강제 갱신
+                try {
+                  const scrollable = tableContainer;
+                  if (scrollable && typeof scrollable.scrollLeft === 'number') {
+                    const original = scrollable.scrollLeft;
+                    scrollable.scrollLeft = scrollable.scrollWidth; // 오른쪽 끝
+                    await new Promise(r => setTimeout(r, 120));
+                    scrollable.scrollLeft = 0; // 왼쪽 끝(구분열 노출)
+                    await new Promise(r => setTimeout(r, 200));
+                    // 원래 위치로 복원 (보통 0이지만 방어)
+                    scrollable.scrollLeft = original || 0;
+                    await new Promise(r => setTimeout(r, 100));
+                  }
+                } catch (_) {}
               } catch {}
 
               tableOnlyBlob = await captureElement(tableContainer, {
@@ -755,6 +794,27 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               console.warn('⚠️ [MeetingCaptureManager] 재고장표 테이블 컨테이너를 찾을 수 없습니다.');
             }
           }
+        }
+
+        // 마감장표 > 전체총마감: 모든 섹션을 펼친 뒤 전체 슬라이드 한 장으로 캡처
+        if (
+          currentSlide?.mode === 'chart' &&
+          currentSlide?.tab === 'closingChart' &&
+          (currentSlide?.subTab === 'totalClosing' || !currentSlide?.subTab)
+        ) {
+          try {
+            // 가능한 모든 "펼치기" 버튼 클릭 (CS/코드/사무실/소속/담당자 섹션)
+            const labelsToFind = ['펼치기'];
+            const buttons = Array.from(document.querySelectorAll('button, .MuiButton-root'));
+            buttons.forEach(btn => {
+              const t = (btn.textContent || '').trim();
+              if (labelsToFind.some(k => t === k)) {
+                (btn instanceof HTMLElement) && btn.click();
+              }
+            });
+            await new Promise(r => setTimeout(r, 700));
+          } catch {}
+          captureTargetElement = slideElement; // 전체 한 장으로
         }
 
         // 채권장표 > 재초담초채권: 저장 시점 콤보박스를 최신 시점으로 자동 선택
@@ -967,7 +1027,11 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
           (currentSlide?.tab === 'bondChart' || currentSlide?.tab === 'bond') &&
           (currentSlide?.subTab === 'subscriberIncrease')
         ) {
-          // 1) '년단위' 토글 보장
+          // 선택 옵션 반영
+          const desiredPeriod = (currentSlide?.detailOptions?.subscriberPeriod || 'year').toLowerCase();
+          const desiredYear = (currentSlide?.detailOptions?.targetYear || '').trim();
+
+          // 1) 표시 단위 토글 보장 (년단위/월단위)
           try {
             const findYearToggle = () => {
               const cands = Array.from(document.querySelectorAll('button, [role="button"], .MuiToggleButton-root, .MuiTab-root'));
@@ -979,7 +1043,9 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             const yearBtn = findYearToggle();
             if (yearBtn) {
               const pressed = yearBtn.getAttribute('aria-pressed');
-              if (pressed !== 'true') {
+              // 년단위가 목표일 때는 눌린 상태가 되도록, 월단위가 목표면 꺼지도록
+              const shouldBePressed = desiredPeriod === 'year';
+              if ((shouldBePressed && pressed !== 'true') || (!shouldBePressed && pressed === 'true')) {
                 (yearBtn instanceof HTMLElement) && yearBtn.click();
                 await new Promise(r => setTimeout(r, 500));
               }
@@ -996,7 +1062,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             }
           }
           
-          // 2) 대상 년도 선택 (2025년 우선, 없으면 최신)
+          // 2) 대상 년도 선택 (사용자 지정 > 2025 우선 > 최신)
           let selectedYearText = '';
           try {
             // "대상 년도:" 텍스트를 찾고 그 근처의 Select 찾기
@@ -1039,7 +1105,13 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                 const listbox = document.querySelector('[role="listbox"]');
                 if (listbox) {
                   const options = Array.from(listbox.querySelectorAll('[role="option"], li, div'));
-                  let targetOpt = options.find(opt => (opt.textContent || '').includes('2025'));
+                  let targetOpt = null;
+                  if (desiredYear && /\d{4}/.test(desiredYear)) {
+                    targetOpt = options.find(opt => (opt.textContent || '').includes(desiredYear));
+                  }
+                  if (!targetOpt) {
+                    targetOpt = options.find(opt => (opt.textContent || '').includes('2025'));
+                  }
                   if (!targetOpt) targetOpt = options[0];
                   if (targetOpt && targetOpt instanceof HTMLElement) {
                     selectedYearText = (targetOpt.textContent || '').trim();
@@ -1051,7 +1123,11 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                   }
                 } else if (selectElement.tagName.toLowerCase() === 'select') {
                   const opts = Array.from(selectElement.querySelectorAll('option'));
-                  let target = opts.find(o => (o.textContent || '').includes('2025'));
+                  let target = null;
+                  if (desiredYear && /\d{4}/.test(desiredYear)) {
+                    target = opts.find(o => (o.textContent || '').includes(desiredYear));
+                  }
+                  if (!target) target = opts.find(o => (o.textContent || '').includes('2025'));
                   if (!target) target = opts[0];
                   if (target) {
                     selectElement.value = target.value;
@@ -1074,7 +1150,9 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
 
           // 3) 페이지 텍스트에 선택 연도(또는 2025)가 나타날 때까지 대기
           try {
-            const want = (selectedYearText && /\d{4}/.test(selectedYearText)) ? selectedYearText.match(/\d{4}/)[0] : '2025';
+            const want = (selectedYearText && /\d{4}/.test(selectedYearText))
+              ? selectedYearText.match(/\d{4}/)[0]
+              : ((desiredYear && /\d{4}/.test(desiredYear)) ? desiredYear.match(/\d{4}/)[0] : '2025');
             const maxWait = 4000;
             const start = Date.now();
             while (Date.now() - start < maxWait) {
@@ -1082,6 +1160,29 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               if (pageText.includes(want)) break;
               await new Promise(r => setTimeout(r, 200));
             }
+          } catch {}
+
+          // 선택된 단위/연도 배지를 우상단에 임시 표시(캡쳐 포함)
+          try {
+            slideElement.style.position = slideElement.style.position || 'relative';
+            const badge = document.createElement('div');
+            const yearText = (selectedYearText && /\d{4}/.test(selectedYearText))
+              ? selectedYearText.match(/\d{4}/)[0]
+              : (desiredYear || '');
+            badge.textContent = `${desiredPeriod === 'year' ? '년단위' : '월단위'}${yearText ? ` • ${yearText}` : ''}`;
+            badge.style.position = 'absolute';
+            badge.style.top = '8px';
+            badge.style.right = '16px';
+            badge.style.background = 'rgba(0,0,0,0.6)';
+            badge.style.color = '#fff';
+            badge.style.padding = '6px 10px';
+            badge.style.borderRadius = '8px';
+            badge.style.fontSize = '12px';
+            badge.style.fontWeight = '700';
+            badge.style.zIndex = '20';
+            badge.style.pointerEvents = 'none';
+            slideElement.appendChild(badge);
+            captureTargetElement.__tempYearBadge = badge;
           } catch {}
           
           // 이 부분은 캡처 타겟 선택에만 사용 (실제 캡처는 아래 compositeBlob 부분에서 처리)
@@ -1807,6 +1908,16 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         if (process.env.NODE_ENV === 'development') {
           console.log(`💾 [MeetingCaptureManager] 슬라이드 ${index + 1} 저장 시작, 검증된 슬라이드 수: ${validatedSlides.length}`);
         }
+        // 메인/엔딩 슬라이드는 항상 현재 회의 차수로 덮어쓰기 (차수 누락/불일치 방지)
+        const slidesToSave = validatedSlides.map(s => {
+          if (s && (s.type === 'main' || s.type === 'ending')) {
+            return {
+              ...s,
+              meetingNumber: s.meetingNumber != null ? s.meetingNumber : (meeting?.meetingNumber ?? null)
+            };
+          }
+          return s;
+        });
         // 저장 재시도 래퍼 (api.saveMeetingConfig에 이미 재시도 로직이 있지만, 추가 안전장치)
         const saveWithRetry = async (payload, retries = 3, baseDelay = 800) => {
           let lastErr = null;
@@ -1832,7 +1943,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         };
 
         await saveWithRetry({
-          slides: validatedSlides
+          slides: slidesToSave
         });
         if (process.env.NODE_ENV === 'development') {
           console.log(`✅ [MeetingCaptureManager] 슬라이드 ${index + 1} 저장 완료`);
