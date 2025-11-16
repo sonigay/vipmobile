@@ -111,16 +111,6 @@ const getUnifiedTitle = (slide, loggedInStore) => {
 };
 
 const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, onReady }) {
-  // 헤더 그라데이션 오른쪽 색상 결정 (커스텀 슬라이드는 배경색 선택값을 사용)
-  // 컴포넌트 내부로 이동하여 초기화 순서 문제 해결
-  const getHeaderGradient = useCallback((s) => {
-    try {
-      const right = (s?.type === 'custom' && s?.backgroundColor) ? s.backgroundColor : '#868e96';
-      return `linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, ${right} 100%)`;
-    } catch {
-      return 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #868e96 100%)';
-    }
-  }, []);
   const containerRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -553,11 +543,34 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
     };
   }, [slide]); // onReady는 의존성에서 제거 (초기화 순서 문제 방지)
 
+  // 헤더 그라데이션 오른쪽 색상 결정 (커스텀 슬라이드는 배경색 선택값을 사용)
+  // 일반 함수로 정의하여 초기화 순서 문제 해결
+  const getHeaderGradient = (s) => {
+    try {
+      if (!s) {
+        logger.warn('⚠️ [SlideRenderer] getHeaderGradient: slide가 없습니다');
+        return 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #868e96 100%)';
+      }
+      const right = (s?.type === 'custom' && s?.backgroundColor) ? s.backgroundColor : '#868e96';
+      return `linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, ${right} 100%)`;
+    } catch (err) {
+      logger.error('❌ [SlideRenderer] getHeaderGradient 에러:', err);
+      return 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #868e96 100%)';
+    }
+  };
+
   // renderSlideContent를 useCallback으로 메모이제이션하여 불필요한 재렌더링 방지
   const renderSlideContent = useCallback(() => {
     try {
+      logger.debug('🔍 [SlideRenderer] renderSlideContent 시작', {
+        slideId: slide?.slideId,
+        slideType: slide?.type,
+        hasSlide: !!slide
+      });
+      
       // slide가 없으면 빈 화면 반환
       if (!slide) {
+        logger.warn('⚠️ [SlideRenderer] renderSlideContent: slide가 없습니다');
         return (
           <Box sx={{ p: 4, textAlign: 'center' }}>
             <Alert severity="warning">슬라이드 데이터가 없습니다.</Alert>
@@ -2530,18 +2543,22 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
         </Typography>
       </Box>
     );
-    } catch (error) {
-      // 에러 발생 시 안전하게 처리
-      console.error('❌ [SlideRenderer] 렌더링 오류:', error);
+    } catch (err) {
+      logger.error('❌ [SlideRenderer] renderSlideContent 에러:', err, {
+        slideId: slide?.slideId,
+        slideType: slide?.type,
+        errorMessage: err?.message,
+        errorStack: err?.stack
+      });
       return (
         <Box sx={{ p: 4, textAlign: 'center' }}>
           <Alert severity="error">
-            슬라이드 렌더링 중 오류가 발생했습니다: {error.message || '알 수 없는 오류'}
+            슬라이드 렌더링 중 오류가 발생했습니다: {err.message || '알 수 없는 오류'}
           </Alert>
         </Box>
       );
     }
-  }, [slide, loggedInStore, getHeaderGradient]);
+  }, [slide, loggedInStore]);
 
   return (
     <Box
