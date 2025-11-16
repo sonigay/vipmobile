@@ -14,6 +14,18 @@ import {
 import { getProxyImageUrl } from '../../api';
 
 function ImageSlideViewer({ slides, onClose }) {
+  // 디버깅: 컴포넌트 초기화 시작
+  try {
+    console.log('🔍 [ImageSlideViewer] 컴포넌트 초기화 시작', {
+      slidesCount: slides?.length || 0,
+      hasOnClose: typeof onClose === 'function',
+      firstSlideId: slides?.[0]?.slideId,
+      firstSlideImageUrl: slides?.[0]?.imageUrl ? '있음' : '없음'
+    });
+  } catch (err) {
+    console.error('❌ [ImageSlideViewer] 컴포넌트 초기화 에러:', err, err?.stack);
+  }
+  
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loadedImages, setLoadedImages] = useState(new Set());
   const [loading, setLoading] = useState(true);

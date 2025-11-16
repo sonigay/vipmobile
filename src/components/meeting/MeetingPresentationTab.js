@@ -37,6 +37,17 @@ const formatDateTime = (value) => {
 };
 
 function MeetingPresentationTab({ loggedInStore, initialSelectedMeeting, onMeetingDeselect }) {
+  // 디버깅: 컴포넌트 초기화 시작
+  try {
+    console.log('🔍 [MeetingPresentationTab] 컴포넌트 초기화 시작', {
+      hasLoggedInStore: !!loggedInStore,
+      hasInitialSelectedMeeting: !!initialSelectedMeeting,
+      initialMeetingId: initialSelectedMeeting?.meetingId
+    });
+  } catch (err) {
+    console.error('❌ [MeetingPresentationTab] 컴포넌트 초기화 에러:', err, err?.stack);
+  }
+  
   const [meetings, setMeetings] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -171,7 +182,18 @@ function MeetingPresentationTab({ loggedInStore, initialSelectedMeeting, onMeeti
     }
   };
 
+  // 디버깅: ImageSlideViewer 렌더링 전
   if (viewing && slides.length > 0) {
+    try {
+      console.log('🔍 [MeetingPresentationTab] ImageSlideViewer 렌더링 시작', {
+        slidesCount: slides.length,
+        firstSlideId: slides[0]?.slideId,
+        firstSlideImageUrl: slides[0]?.imageUrl ? '있음' : '없음'
+      });
+    } catch (err) {
+      console.error('❌ [MeetingPresentationTab] ImageSlideViewer 렌더링 전 에러:', err, err?.stack);
+    }
+    
     return (
       <ImageSlideViewer
         slides={slides}

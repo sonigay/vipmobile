@@ -10,6 +10,18 @@ import { getAvailableTabsForMode } from '../../config/modeTabConfig';
 import { getProxyImageUrl } from '../../api';
 import { logger } from '../../utils/logger';
 
+// 디버깅: 모듈 import 완료 후 (import는 최상단에 있어야 하므로 여기서 로그)
+try {
+  console.log('✅ [SlideRenderer] 모든 모듈 import 완료', {
+    hasChartMode: typeof ChartMode !== 'undefined',
+    hasInspectionMode: typeof InspectionMode !== 'undefined',
+    hasBudgetMode: typeof BudgetMode !== 'undefined',
+    hasObManagementMode: typeof ObManagementMode !== 'undefined'
+  });
+} catch (err) {
+  console.error('❌ [SlideRenderer] 모듈 import 완료 단계 에러:', err, err?.stack);
+}
+
 /**
  * 슬라이드를 렌더링하는 컴포넌트
  * presentation mode로 렌더링하여 헤더 없이 콘텐츠만 표시
@@ -129,18 +141,17 @@ const getHeaderGradient = (s) => {
 };
 
 const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, onReady }) {
-  // 디버깅: 컴포넌트 초기화 시작
+  // 디버깅: 컴포넌트 초기화 시작 (항상 출력)
   try {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('🔍 [SlideRenderer] 컴포넌트 초기화 시작', {
-        slideId: slide?.slideId,
-        slideType: slide?.type,
-        hasSlide: !!slide,
-        hasLoggedInStore: !!loggedInStore
-      });
-    }
+    console.log('🔍 [SlideRenderer] 컴포넌트 초기화 시작', {
+      slideId: slide?.slideId,
+      slideType: slide?.type,
+      hasSlide: !!slide,
+      hasLoggedInStore: !!loggedInStore,
+      slideKeys: slide ? Object.keys(slide) : []
+    });
   } catch (err) {
-    console.error('❌ [SlideRenderer] 컴포넌트 초기화 단계 에러:', err);
+    console.error('❌ [SlideRenderer] 컴포넌트 초기화 단계 에러:', err, err?.stack);
   }
   
   const containerRef = useRef(null);
@@ -575,39 +586,37 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
     };
   }, [slide]); // onReady는 의존성에서 제거 (초기화 순서 문제 방지)
 
-  // 디버깅: getHeaderGradientLocal 정의 전
+  // 디버깅: getHeaderGradientLocal 정의 전 (항상 출력)
   try {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('🔍 [SlideRenderer] getHeaderGradientLocal 정의 전');
-    }
+    console.log('🔍 [SlideRenderer] getHeaderGradientLocal 정의 전');
   } catch (err) {
-    console.error('❌ [SlideRenderer] getHeaderGradientLocal 정의 전 에러:', err);
+    console.error('❌ [SlideRenderer] getHeaderGradientLocal 정의 전 에러:', err, err?.stack);
   }
 
   // getHeaderGradient를 useCallback 외부로 이동하여 초기화 순서 문제 완전 해결
   let getHeaderGradientLocal;
   try {
+    console.log('🔍 [SlideRenderer] getHeaderGradientLocal useCallback 시작');
     getHeaderGradientLocal = useCallback((s) => {
       try {
-        if (process.env.NODE_ENV === 'development') {
-          console.log('🔍 [SlideRenderer] getHeaderGradientLocal 호출됨', { slideType: s?.type });
-        }
+        console.log('🔍 [SlideRenderer] getHeaderGradientLocal 호출됨', { slideType: s?.type });
         if (!s) {
           return 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #868e96 100%)';
         }
         const right = (s?.type === 'custom' && s?.backgroundColor) ? s.backgroundColor : '#868e96';
         return `linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, ${right} 100%)`;
       } catch (err) {
-        console.error('❌ [SlideRenderer] getHeaderGradientLocal 내부 에러:', err);
+        console.error('❌ [SlideRenderer] getHeaderGradientLocal 내부 에러:', err, err?.stack);
         return 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #868e96 100%)';
       }
     }, []);
     
-    if (process.env.NODE_ENV === 'development') {
-      console.log('✅ [SlideRenderer] getHeaderGradientLocal 정의 완료');
-    }
+    console.log('✅ [SlideRenderer] getHeaderGradientLocal 정의 완료', {
+      type: typeof getHeaderGradientLocal,
+      isFunction: typeof getHeaderGradientLocal === 'function'
+    });
   } catch (err) {
-    console.error('❌ [SlideRenderer] getHeaderGradientLocal 정의 중 에러:', err);
+    console.error('❌ [SlideRenderer] getHeaderGradientLocal 정의 중 에러:', err, err?.stack);
     // 폴백 함수
     getHeaderGradientLocal = (s) => {
       const right = (s?.type === 'custom' && s?.backgroundColor) ? s.backgroundColor : '#868e96';
@@ -615,34 +624,32 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
     };
   }
 
-  // 디버깅: renderSlideContent 정의 전
+  // 디버깅: renderSlideContent 정의 전 (항상 출력)
   try {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('🔍 [SlideRenderer] renderSlideContent 정의 전', {
-        hasGetHeaderGradientLocal: typeof getHeaderGradientLocal === 'function',
-        slideId: slide?.slideId
-      });
-    }
+    console.log('🔍 [SlideRenderer] renderSlideContent 정의 전', {
+      hasGetHeaderGradientLocal: typeof getHeaderGradientLocal === 'function',
+      slideId: slide?.slideId,
+      slideType: slide?.type
+    });
   } catch (err) {
-    console.error('❌ [SlideRenderer] renderSlideContent 정의 전 에러:', err);
+    console.error('❌ [SlideRenderer] renderSlideContent 정의 전 에러:', err, err?.stack);
   }
 
   // renderSlideContent를 useCallback으로 메모이제이션하여 불필요한 재렌더링 방지
   let renderSlideContent;
   try {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('🔍 [SlideRenderer] renderSlideContent useCallback 시작');
-    }
+    console.log('🔍 [SlideRenderer] renderSlideContent useCallback 시작', {
+      hasGetHeaderGradientLocal: typeof getHeaderGradientLocal === 'function',
+      slideId: slide?.slideId
+    });
     renderSlideContent = useCallback(() => {
       try {
-        if (process.env.NODE_ENV === 'development') {
-          console.log('🔍 [SlideRenderer] renderSlideContent 호출됨', {
-            slideId: slide?.slideId,
-            slideType: slide?.type,
-            hasSlide: !!slide,
-            hasGetHeaderGradientLocal: typeof getHeaderGradientLocal === 'function'
-          });
-        }
+        console.log('🔍 [SlideRenderer] renderSlideContent 호출됨', {
+          slideId: slide?.slideId,
+          slideType: slide?.type,
+          hasSlide: !!slide,
+          hasGetHeaderGradientLocal: typeof getHeaderGradientLocal === 'function'
+        });
         
         logger.debug('🔍 [SlideRenderer] renderSlideContent 시작', {
           slideId: slide?.slideId,
@@ -2648,11 +2655,14 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
     }
   }, [slide, loggedInStore, getHeaderGradientLocal]);
     
-    if (process.env.NODE_ENV === 'development') {
-      console.log('✅ [SlideRenderer] renderSlideContent useCallback 완료');
-    }
+    console.log('✅ [SlideRenderer] renderSlideContent useCallback 완료', {
+      hasRenderSlideContent: typeof renderSlideContent === 'function'
+    });
   } catch (err) {
-    console.error('❌ [SlideRenderer] renderSlideContent useCallback 정의 중 에러:', err);
+    console.error('❌ [SlideRenderer] renderSlideContent useCallback 정의 중 에러:', err, err?.stack, {
+      errorMessage: err?.message,
+      errorName: err?.name
+    });
     // 폴백 함수
     renderSlideContent = () => (
       <Box sx={{ p: 4, textAlign: 'center' }}>
@@ -2663,28 +2673,26 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
     );
   }
   
-  // 디버깅: renderSlideContent 정의 후
+  // 디버깅: renderSlideContent 정의 후 (항상 출력)
   try {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('✅ [SlideRenderer] renderSlideContent 정의 완료', {
-        hasRenderSlideContent: typeof renderSlideContent === 'function'
-      });
-    }
+    console.log('✅ [SlideRenderer] renderSlideContent 정의 완료', {
+      hasRenderSlideContent: typeof renderSlideContent === 'function',
+      slideId: slide?.slideId
+    });
   } catch (err) {
-    console.error('❌ [SlideRenderer] renderSlideContent 정의 후 에러:', err);
+    console.error('❌ [SlideRenderer] renderSlideContent 정의 후 에러:', err, err?.stack);
   }
 
-  // 디버깅: return 전
+  // 디버깅: return 전 (항상 출력)
   try {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('🔍 [SlideRenderer] return 전', {
-        hasSlide: !!slide,
-        hasRenderSlideContent: typeof renderSlideContent === 'function',
-        slideId: slide?.slideId
-      });
-    }
+    console.log('🔍 [SlideRenderer] return 전', {
+      hasSlide: !!slide,
+      hasRenderSlideContent: typeof renderSlideContent === 'function',
+      slideId: slide?.slideId,
+      slideType: slide?.type
+    });
   } catch (err) {
-    console.error('❌ [SlideRenderer] return 전 에러:', err);
+    console.error('❌ [SlideRenderer] return 전 에러:', err, err?.stack);
   }
 
   // renderSlideContent가 없으면 에러 표시
@@ -2789,9 +2797,28 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
   );
 }, (prevProps, nextProps) => {
   // React.memo 비교 함수: slide와 loggedInStore가 변경되지 않으면 재렌더링 방지
-  return prevProps.slide?.slideId === nextProps.slide?.slideId &&
-         prevProps.loggedInStore?.storeId === nextProps.loggedInStore?.storeId &&
-         prevProps.onReady === nextProps.onReady;
+  try {
+    console.log('🔍 [SlideRenderer] React.memo 비교 함수 실행', {
+      prevSlideId: prevProps.slide?.slideId,
+      nextSlideId: nextProps.slide?.slideId,
+      prevStoreId: prevProps.loggedInStore?.storeId,
+      nextStoreId: nextProps.loggedInStore?.storeId,
+      prevOnReady: typeof prevProps.onReady,
+      nextOnReady: typeof nextProps.onReady
+    });
+    const result = prevProps.slide?.slideId === nextProps.slide?.slideId &&
+                   prevProps.loggedInStore?.storeId === nextProps.loggedInStore?.storeId &&
+                   prevProps.onReady === nextProps.onReady;
+    console.log('✅ [SlideRenderer] React.memo 비교 결과:', result);
+    return result;
+  } catch (err) {
+    console.error('❌ [SlideRenderer] React.memo 비교 함수 에러:', err, err?.stack, {
+      errorMessage: err?.message,
+      errorName: err?.name
+    });
+    // 에러 발생 시 재렌더링 허용
+    return false;
+  }
 });
 
 export default SlideRenderer;
