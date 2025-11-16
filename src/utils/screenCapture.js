@@ -153,7 +153,7 @@ export async function captureElement(element, options = {}) {
   const targetWidth = BASE_CAPTURE_WIDTH;
   // 폭이 줄어들수록(레이아웃 재흐름) 세로가 급증할 수 있으므로 여유 배율을 적용
   const reflowBoost = widthScale < 1 ? (1 / widthScale) : 1; // 폭 0.5x -> 높이 2x 이상 필요
-  const targetHeight = Math.max(Math.ceil(scrollHeight * reflowBoost * 1.2), 900); // 최소 높이 및 여유치
+  const targetHeight = Math.max(Math.ceil(scrollHeight * reflowBoost * 1.35), 1040); // 최소 높이 및 여유치 상향 (잘림 방지)
 
   const defaultOptions = {
     scale: 2, // 고해상도 (2배)

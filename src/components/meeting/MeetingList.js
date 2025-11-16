@@ -218,6 +218,7 @@ function MeetingList({ onAdd, onEdit, onDelete, onSelect, refreshTrigger }) {
                   </TableCell>
                   <TableCell align="right">
                     <Stack direction="row" spacing={1} justifyContent="flex-end">
+                      {/* 재생/설정 화면으로 이동 */}
                       <IconButton
                         size="small"
                         onClick={() => onSelect && onSelect(meeting)}
@@ -230,15 +231,15 @@ function MeetingList({ onAdd, onEdit, onDelete, onSelect, refreshTrigger }) {
                           <EditIcon fontSize="small" />
                         )}
                       </IconButton>
-                      {meeting.status !== 'completed' && (
-                        <IconButton
-                          size="small"
-                          onClick={() => onEdit && onEdit(meeting)}
-                          title="회의 정보 수정"
-                        >
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                      )}
+                      {/* 회의 정보 수정 버튼: 상태와 무관하게 항상 노출 */}
+                      <IconButton
+                        size="small"
+                        onClick={() => onEdit && onEdit(meeting)}
+                        title="회의 정보 수정"
+                      >
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                      {/* 삭제 */}
                       <IconButton
                         size="small"
                         onClick={() => handleDelete(meeting.meetingId, meeting.meetingName)}

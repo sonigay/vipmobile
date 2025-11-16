@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { captureElement, generateImageFilename } from '../../utils/screenCapture';
 import { api } from '../../api';
+import { API_BASE_URL } from '../../api';
 import CaptureProgress from './CaptureProgress';
 import SlideRenderer from './SlideRenderer';
 
@@ -625,7 +626,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         
         for (let attempt = 1; attempt <= retries; attempt++) {
           try {
-            const uploadResponse = await fetch(`${process.env.REACT_APP_API_URL || 'https://vipmobile-backend.cloudtype.app'}/api/meetings/${meeting.meetingId}/upload-image`, {
+            const uploadResponse = await fetch(`${API_BASE_URL}/api/meetings/${meeting.meetingId}/upload-image`, {
               method: 'POST',
               body: formData
             });
