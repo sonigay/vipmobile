@@ -236,8 +236,9 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess, autoE
         }
         
         // 세부 옵션이 없는 경우 바로 슬라이드 생성
+        const rand = Math.random().toString(36).slice(2, 8);
         const newSlide = {
-          slideId: `slide-${modeKey}-${tabKey}-${Date.now()}`,
+          slideId: `slide-${modeKey}-${tabKey}-${Date.now()}-${rand}`,
           type: 'mode-tab',
           mode: modeKey,
           tab: tabKey,
@@ -273,8 +274,10 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess, autoE
       } catch { return ''; }
     };
     
+    const rand = Math.random().toString(36).slice(2, 8);
+    const csSuffix = detailOptions && detailOptions.csDetailType ? `-${detailOptions.csDetailType}` : '';
     const newSlide = {
-      slideId: `slide-${modeKey}-${tabKey}-${Date.now()}`,
+      slideId: `slide-${modeKey}-${tabKey}${csSuffix}-${Date.now()}-${rand}`,
       type: 'mode-tab',
       mode: modeKey,
       tab: tabKey,
@@ -374,8 +377,10 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess, autoE
       } catch { return ''; }
     };
     
+    const rand = Math.random().toString(36).slice(2, 8);
+    const csSuffix = detailOptions && detailOptions.csDetailType ? `-${detailOptions.csDetailType}` : '';
     const newSlide = {
-      slideId: `slide-${modeKey}-${tabKey}-${subTabKey}-${Date.now()}`,
+      slideId: `slide-${modeKey}-${tabKey}-${subTabKey}${csSuffix}-${Date.now()}-${rand}`,
       type: 'mode-tab',
       mode: modeKey,
       tab: tabKey,
