@@ -385,7 +385,25 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess, autoE
         const labels = [];
         cfg.options.forEach(opt => {
           const val = detailOptions[opt.key];
-          if (!val || val === 'all' || val === opt.defaultValue) return;
+          if (val == null || val === '' || val === opt.defaultValue) return;
+          // csDetailType 처리: 배열 지원, all → 전체총마감
+          if (opt.key === 'csDetailType') {
+            if (Array.isArray(val)) {
+              const valueLabels = val
+                .map(v => (opt.values || []).find(item => item.key === v))
+                .filter(Boolean)
+                .map(item => item.label)
+                .filter(Boolean);
+              if (valueLabels.length > 0) {
+                labels.push(valueLabels.join('/'));
+              }
+              return;
+            }
+            if (val === 'all') {
+              labels.push('전체총마감');
+              return;
+            }
+          }
           const found = (opt.values || []).find(v => v.key === val);
           if (found) labels.push(found.label);
         });
@@ -405,7 +423,21 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess, autoE
       subTab: subTabKey,
       tabLabel: tabConfig?.label || tabKey,
       subTabLabel: subTabConfig?.label || subTabKey,
-      detailLabel: buildDetailLabel() || undefined,
+      detailLabel: (() => {
+        const label = buildDetailLabel();
+        // 전체 선택(혹은 전체에 준하는 배열)인 경우 명시적으로 전체총마감으로 표시
+        if (Array.isArray(detailOptions?.csDetailType)) {
+          const values = detailOptions.csDetailType;
+          const allSet = ['cs','code','office','department','agent'];
+          const isAll = allSet.every(v => values.includes(v));
+          if (isAll) return '전체총마감';
+          if (label) return label;
+        }
+        if (detailOptions?.csDetailType === 'all') {
+          return '전체총마감';
+        }
+        return label || undefined;
+      })(),
       // 세부 옵션 (모든 옵션을 detailOptions 객체에 저장)
       detailOptions: Object.keys(detailOptions).length > 0 ? detailOptions : undefined,
       order: 0
@@ -766,6 +798,31 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess, autoE
                   <FormControl key={option.key} fullWidth>
                     <Typography variant="subtitle2" sx={{ mb: 1 }}>{option.label}</Typography>
                     <FormGroup>
+                      {/* 전체 선택 토글 (csDetailType 전용) */}
+                      {option.key === 'csDetailType' && (
+                        <FormControlLabel
+                          control={
+                            <Checkbox
+                              checked={(detailOptionValues.__selectAllCs || false)}
+                              onChange={(e) => {
+                                const checked = e.target.checked;
+                                // 전체 선택이 켜지면 개별 선택은 초기화
+                                setDetailOptionValues(prev => ({ ...prev, __selectAllCs: checked }));
+                                if (checked) {
+                                  setDetailOptionMultipleSelections(prev => ({ ...prev, [option.key]: [] }));
+                                }
+                              }}
+                            />
+                          }
+                          label="전체 선택"
+                        />
+                      )}
+                      {/* 안내 문구 */}
+                      {option.key === 'csDetailType' && (
+                        <Typography variant="caption" sx={{ mb: 1, display: 'block', color: 'text.secondary' }}>
+                          개별슬라이드를 생성을 원할시 하나씩 체크해서 확인버튼을 눌러야합니다. 전체선택을 하게되면 하나의 슬라이드에 모두 표시됩니다.
+                        </Typography>
+                      )}
                       {option.values?.filter(v => v.key !== 'all').map((value) => (
                         <FormControlLabel
                           key={value.key}
@@ -773,6 +830,10 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess, autoE
                             <Checkbox
                               checked={selectedValues.includes(value.key)}
                               onChange={(e) => {
+                                // 전체 선택이 켜져 있으면 끈다
+                                if (detailOptionValues.__selectAllCs) {
+                                  setDetailOptionValues(prev => ({ ...prev, __selectAllCs: false }));
+                                }
                                 const newValues = e.target.checked
                                   ? [...selectedValues, value.key]
                                   : selectedValues.filter(v => v !== value.key);
@@ -862,7 +923,7 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess, autoE
           <Button
             variant="contained"
             onClick={() => {
-              // 탭 선택 시 세부 옵션 처리
+              // 탭/하부탭 선택 시 세부 옵션 처리
               if (pendingTab) {
                 // 탭의 경우 여러 개 선택 옵션이 없으므로 바로 슬라이드 생성
                 addTabSlide(
@@ -873,57 +934,35 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess, autoE
                 );
                 setPendingTab(null);
               } else if (pendingSubTab) {
-                // 여러 개 선택 가능한 옵션이 있는 경우 각각 슬라이드 생성
-                const multipleOptionKeys = detailOptionConfig?.options
-                  ?.filter(opt => opt.multiple)
-                  .map(opt => opt.key) || [];
-                
-                if (multipleOptionKeys.length > 0) {
-                  // 여러 개 선택된 값이 있는 경우 각각 슬라이드 생성
-                  const firstMultipleOption = detailOptionConfig.options.find(opt => opt.multiple);
-                  if (firstMultipleOption) {
-                    const selectedValues = detailOptionMultipleSelections[firstMultipleOption.key] || [];
-                    if (selectedValues.length > 0) {
-                      // 각 선택값에 대해 슬라이드 생성 (순차 처리로 경합 조건 방지)
-                      // React 18의 자동 배칭이 있지만, 명시적으로 순차 처리하여 안정성 확보
-                      for (const selectedValue of selectedValues) {
-                        const combinedOptions = {
-                          ...detailOptionValues,
-                          [firstMultipleOption.key]: selectedValue
-                        };
-                        // 다른 여러 개 선택 옵션도 처리
-                        for (const key of multipleOptionKeys) {
-                          if (key !== firstMultipleOption.key) {
-                            const otherSelected = detailOptionMultipleSelections[key] || [];
-                            if (otherSelected.length > 0) {
-                              combinedOptions[key] = otherSelected[0]; // 첫 번째 값 사용
-                            }
-                          }
-                        }
-                        // csDetailType이 여러 개 선택된 경우, 각 선택값을 csDetailType으로 명시적으로 설정
-                        if (firstMultipleOption.key === 'csDetailType') {
-                          combinedOptions.csDetailType = selectedValue;
-                        }
-                        // 각 선택값마다 고유한 슬라이드 생성 (subTabId는 원본 유지, slideId만 고유하게)
-                        addSubTabSlide(
-                          pendingSubTab.modeKey,
-                          pendingSubTab.tabKey,
-                          pendingSubTab.subTabKey,
-                          pendingSubTab.subTabId, // 원본 subTabId 유지
-                          combinedOptions
-                        );
-                      }
-                    } else {
-                      // 선택된 값이 없으면 기본값으로 슬라이드 생성
-                      addSubTabSlide(
-                        pendingSubTab.modeKey,
-                        pendingSubTab.tabKey,
-                        pendingSubTab.subTabKey,
-                        pendingSubTab.subTabId,
-                        detailOptionValues
-                      );
-                    }
+                // csDetailType 확장 로직: 전체선택이면 하나의 슬라이드에 모두 표시, 여러 개 선택도 하나의 슬라이드로 결합
+                const firstMultipleOption = detailOptionConfig?.options?.find(opt => opt.multiple);
+                const isCsDetail = firstMultipleOption && firstMultipleOption.key === 'csDetailType';
+                if (isCsDetail) {
+                  const selectedValues = detailOptionMultipleSelections['csDetailType'] || [];
+                  const selectAll = !!detailOptionValues.__selectAllCs;
+                  let csValues;
+                  if (selectAll) {
+                    csValues = ['cs','code','office','department','agent'];
+                  } else if (selectedValues.length > 0) {
+                    csValues = selectedValues;
+                  } else {
+                    // 아무 것도 선택 안했으면 기본값 하나로 처리(기존과 동일)
+                    csValues = (detailOptionValues.csDetailType && detailOptionValues.csDetailType !== 'all')
+                      ? [detailOptionValues.csDetailType]
+                      : ['cs'];
                   }
+                  const combinedOptions = {
+                    ...detailOptionValues,
+                    csDetailType: csValues
+                  };
+                  // 단일 결합 슬라이드 생성
+                  addSubTabSlide(
+                    pendingSubTab.modeKey,
+                    pendingSubTab.tabKey,
+                    pendingSubTab.subTabKey,
+                    pendingSubTab.subTabId,
+                    combinedOptions
+                  );
                 } else {
                   // 여러 개 선택 옵션이 없는 경우 기존대로 처리
                   addSubTabSlide(

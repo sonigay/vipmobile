@@ -814,7 +814,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                     fontFamily: '"Noto Sans KR", "Roboto", sans-serif'
                   }}
                 >
-                  {slide.meetingNumber}차 회의
+                  {slide.meetingNumber}차
                 </Typography>
               </Box>
             )}
@@ -1606,7 +1606,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                       fontFamily: '"Noto Sans KR", sans-serif'
                     }}
                   >
-                    {slide.meetingNumber}차 회의
+                    {slide.meetingNumber}차
                   </Typography>
                 </Box>
               )}

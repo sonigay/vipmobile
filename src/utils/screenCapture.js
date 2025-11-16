@@ -157,24 +157,35 @@ async function autoCropCanvas(canvas) {
       return canvas;
     }
     
-    // 여유 공간 추가 (좌우 10px, 하단은 이미 위에서 최소 여유 공간 보장됨)
-    // 하단 여유 공간은 이미 마지막 콘텐츠 라인 기준으로 최소 80px 보장되었으므로
-    // 추가 패딩은 필요 없지만, 좌우 여유 공간만 추가
+    // 여유 공간 추가 (좌우 10px)
+    // 하단은 마지막 콘텐츠 라인 기준으로 최소 여유 공간을 보장해야 하는데,
+    // 콘텐츠가 캔버스의 맨 아래까지 차는 경우 기존 높이에서는 여유 공간을 확보할 수 없음.
+    // 이 경우 잘라낼 영역의 출력 높이를 늘려서(아래쪽에 흰색 영역을 추가) 최소 여유 공간을 보장한다.
     const paddingX = 10; // 좌우 여유 공간
     minX = Math.max(0, minX - paddingX);
     minY = 0; // 상단은 항상 0부터 시작
     maxX = Math.min(canvas.width, maxX + paddingX);
-    // maxY는 이미 마지막 콘텐츠 라인 + 최소 여유 공간(80px)으로 설정되었으므로 그대로 사용
     maxY = Math.min(canvas.height, maxY);
     
     const width = maxX - minX;
     const height = maxY - minY;
     
+    // 콘텐츠가 캔버스 하단까지 닿아 최소 여유 공간을 캔버스 내부에서 확보하지 못한 경우를 보정
+    // lastContentLine은 하단에서 가장 가까운 실제 콘텐츠 y좌표
+    // desiredMaxYRaw = 마지막 콘텐츠 라인 + 최소 여유 공간
+    const desiredMaxYRaw = lastContentLine > 0 ? (lastContentLine + minBottomPadding) : maxY;
+    const extraBottomPadding = Math.max(0, desiredMaxYRaw - (canvas.height - 1));
+    
     // 크롭된 Canvas 생성
     const croppedCanvas = document.createElement('canvas');
     croppedCanvas.width = width;
-    croppedCanvas.height = height;
+    // 필요한 경우 하단에 추가 여백을 포함하여 출력 높이를 확장
+    croppedCanvas.height = height + extraBottomPadding;
     const croppedCtx = croppedCanvas.getContext('2d');
+    
+    // 배경 흰색으로 초기화 (추가 여백 영역이 투명해지지 않도록)
+    croppedCtx.fillStyle = '#ffffff';
+    croppedCtx.fillRect(0, 0, croppedCanvas.width, croppedCanvas.height);
     
     // 원본 Canvas에서 크롭된 영역만 복사
     croppedCtx.drawImage(
@@ -205,6 +216,13 @@ export async function captureElement(element, options = {}) {
   if (!element) {
     throw new Error('캡처할 요소가 없습니다.');
   }
+
+  // 호출 측에서 고정 하단 여백(px)을 지정할 수 있도록 옵션 분리
+  const fixedBottomPaddingPx = typeof options.fixedBottomPaddingPx === 'number'
+    ? Math.max(0, Math.floor(options.fixedBottomPaddingPx))
+    : 0;
+  // html2canvas에는 전달하지 않을 커스텀 옵션을 제거한 사본을 사용할 것
+  const { fixedBottomPaddingPx: _omitFixed, ...html2CanvasOptions } = options || {};
 
   // 요소의 실제 스크롤 크기 계산 (더 정확하게)
   // 모든 자식 요소를 포함한 실제 크기 계산
@@ -411,7 +429,7 @@ export async function captureElement(element, options = {}) {
         clonedDoc.documentElement.style.minHeight = `${targetHeight}px`;
       }
     },
-    ...options
+    ...html2CanvasOptions
   };
 
   try {
@@ -434,9 +452,22 @@ export async function captureElement(element, options = {}) {
       // 하단 공백 자동 제거를 위한 크롭 처리
       const croppedCanvas = await autoCropCanvas(canvas);
       
+      // 고정 하단 여백 추가(요청된 경우): 크롭 결과 캔버스 높이를 늘리고 아래를 흰색으로 채움
+      let finalCanvas = croppedCanvas;
+      if (fixedBottomPaddingPx > 0) {
+        const padded = document.createElement('canvas');
+        padded.width = croppedCanvas.width;
+        padded.height = croppedCanvas.height + fixedBottomPaddingPx;
+        const pctx = padded.getContext('2d');
+        pctx.fillStyle = '#ffffff';
+        pctx.fillRect(0, 0, padded.width, padded.height);
+        pctx.drawImage(croppedCanvas, 0, 0);
+        finalCanvas = padded;
+      }
+      
       // Canvas를 Blob으로 변환
       const blob = await new Promise((resolve, reject) => {
-        croppedCanvas.toBlob(
+        finalCanvas.toBlob(
           (blob) => {
             if (blob) {
               resolve(blob);

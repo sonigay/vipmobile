@@ -152,13 +152,44 @@ function ImageSlideViewer({ slides, onClose }) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        cursor: 'pointer'
+        cursor: isDragging ? 'grabbing' : (scale > 1 ? 'grab' : 'pointer'),
       }}
+      ref={containerRef}
       onClick={(e) => {
         // 확대된 상태에서는 클릭으로 다음 슬라이드로 이동하지 않음
         if (scale === 1 && position.x === 0 && position.y === 0) {
           handleNext();
         }
+      }}
+      onMouseDown={(e) => {
+        // 데스크톱 드래그로 패닝
+        if (scale <= 1) return;
+        e.preventDefault();
+        setIsDragging(true);
+        setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y });
+      }}
+      onMouseMove={(e) => {
+        if (!isDragging) return;
+        e.preventDefault();
+        const nextX = e.clientX - dragStart.x;
+        const nextY = e.clientY - dragStart.y;
+        setPosition({ x: nextX, y: nextY });
+      }}
+      onMouseUp={() => {
+        if (isDragging) setIsDragging(false);
+      }}
+      onMouseLeave={() => {
+        if (isDragging) setIsDragging(false);
+      }}
+      onWheel={(e) => {
+        // 휠로 확대/축소 (데스크톱)
+        const delta = -e.deltaY;
+        if (delta === 0) return;
+        const step = delta > 0 ? 0.1 : -0.1;
+        setScale(prev => {
+          const next = Math.min(3, Math.max(0.5, prev + step));
+          return next;
+        });
       }}
     >
       {/* 종료 버튼 */}

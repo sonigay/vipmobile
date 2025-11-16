@@ -34,14 +34,27 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
       if (process.env.NODE_ENV === 'development') {
         console.log(`📋 [MeetingCaptureManager] 슬라이드 초기화: ${slides.length}개`);
       }
-      setSlidesState(slides);
+      // 엔딩/메인 슬라이드에 meeting 필드가 누락되어 저장된 케이스 보정
+      const normalized = slides.map(s => {
+        if (!s || !s.type) return s;
+        if (s.type === 'ending' || s.type === 'main') {
+          return {
+            ...s,
+            meetingName: s.meetingName != null ? s.meetingName : (meeting?.meetingName),
+            meetingDate: s.meetingDate != null ? s.meetingDate : (meeting?.meetingDate),
+            meetingNumber: s.meetingNumber != null ? s.meetingNumber : (meeting?.meetingNumber)
+          };
+        }
+        return s;
+      });
+      setSlidesState(normalized);
     } else {
       if (process.env.NODE_ENV === 'development') {
         console.warn(`⚠️ [MeetingCaptureManager] slides가 배열이 아닙니다:`, slides);
       }
       setSlidesState([]);
     }
-  }, [slides]);
+  }, [slides, meeting]);
 
   // startCapture를 useCallback으로 메모이제이션하여 의존성 문제 해결
   const startCapture = useCallback(async () => {
@@ -227,13 +240,15 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
       // 메인/목차는 헤더 포함 전체 슬라이드를 캡처 (공백은 autoCropCanvas로 처리)
       let captureTargetElement = slideElement;
       try {
-        // csDetailType이 배열인 경우 첫 번째 값 사용, 단일 값인 경우 그대로 사용
+        // csDetailType: 단일 값 또는 배열(복수 결합) 지원
         const csDetailTypeRaw = currentSlide?.detailOptions?.csDetailType;
-        const csDetailType = Array.isArray(csDetailTypeRaw) ? csDetailTypeRaw[0] : csDetailTypeRaw;
+        const csDetailTypes = Array.isArray(csDetailTypeRaw)
+          ? csDetailTypeRaw
+          : (csDetailTypeRaw ? [csDetailTypeRaw] : []);
         // csDetailCriteria: "performance" 또는 "fee"
         const csDetailCriteria = currentSlide?.detailOptions?.csDetailCriteria || 'performance';
         
-        if (currentSlide?.mode === 'chart' && csDetailType && csDetailType !== 'all') {
+        if (currentSlide?.mode === 'chart' && csDetailTypes.length > 0 && !csDetailTypes.includes('all')) {
           // 1단계: 랭킹 기준 탭 선택 (실적 기준 또는 수수료 기준)
           // 랭킹 기준 탭은 "실적 기준" 또는 "수수료 기준" 텍스트를 가진 Tab 버튼
           const rankingTabs = Array.from(document.querySelectorAll('button[role="tab"]'));
@@ -251,7 +266,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             if (process.env.NODE_ENV === 'development') {
               console.log(`✅ [MeetingCaptureManager] 랭킹 기준 탭 선택: ${csDetailCriteria}`, {
                 slideId: currentSlide.slideId,
-                csDetailType,
+                csDetailTypes,
                 tabText: targetRankingTab.textContent
               });
             }
@@ -269,7 +284,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
           }
           
           // 2단계: CS 개통 실적 요약 섹션의 "펼치기" 버튼 클릭 (csDetailType === 'cs'일 때만)
-          if (csDetailType === 'cs') {
+          if (csDetailTypes.includes('cs')) {
             const csSummaryButtons = Array.from(document.querySelectorAll('button'))
               .filter(btn => {
                 const text = (btn.textContent || '').trim();
@@ -291,7 +306,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             }
           }
           
-          // 3단계: 각 테이블 섹션의 "펼치기" 버튼 클릭 (해당 csDetailType에 맞게)
+          // 3단계: 각 테이블 섹션의 "펼치기" 버튼 클릭 (선택된 모든 타입에 대해)
           const tableSectionMap = {
             'code': '📊 코드별 실적',
             'office': '🏢 사무실별 실적',
@@ -299,10 +314,8 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             'agent': ['🧑 담당자별 실적', '👤 담당자별 실적']
           };
           
-          const targetSectionHeader = tableSectionMap[csDetailType];
-          if (targetSectionHeader) {
-            const headerTexts = Array.isArray(targetSectionHeader) ? targetSectionHeader : [targetSectionHeader];
-            // 해당 섹션의 Paper 컴포넌트 찾기
+          const expandSection = async (headerKey) => {
+            const headerTexts = Array.isArray(headerKey) ? headerKey : [headerKey];
             let targetPaper = null;
             for (const headerText of headerTexts) {
               const headers = Array.from(document.querySelectorAll('h6, .MuiTypography-h6, .MuiBox-root, div'))
@@ -310,7 +323,6 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                   const txt = (el.textContent || '').trim();
                   return txt.startsWith(headerText);
                 });
-              
               if (headers.length > 0) {
                 let paperElement = headers[0].parentElement;
                 while (paperElement && !paperElement.classList.contains('MuiPaper-root')) {
@@ -322,28 +334,24 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                 }
               }
             }
-            
-            if (targetPaper) {
-              // 해당 Paper 내의 "펼치기" 버튼 찾기
-              const expandButton = targetPaper.querySelector('button')
-                ? Array.from(targetPaper.querySelectorAll('button')).find(btn => {
-                    const text = (btn.textContent || '').trim();
-                    return text === '펼치기';
-                  })
-                : null;
-              
-              if (expandButton) {
-                if (process.env.NODE_ENV === 'development') {
-                  console.log(`✅ [MeetingCaptureManager] ${csDetailType} 테이블 섹션 펼치기`, {
-                    slideId: currentSlide.slideId,
-                    csDetailType
-                  });
-                }
-                expandButton.click();
-                // 테이블 렌더링 대기
-                await new Promise(r => setTimeout(r, 500));
-              }
+            if (!targetPaper) return;
+            const expandButton = targetPaper.querySelector('button')
+              ? Array.from(targetPaper.querySelectorAll('button')).find(btn => {
+                  const text = (btn.textContent || '').trim();
+                  return text === '펼치기';
+                })
+              : null;
+            if (expandButton) {
+              expandButton.click();
+              await new Promise(r => setTimeout(r, 500));
             }
+          };
+          
+          for (const t of csDetailTypes) {
+            if (t === 'code') await expandSection(tableSectionMap['code']);
+            if (t === 'office') await expandSection(tableSectionMap['office']);
+            if (t === 'department') await expandSection(tableSectionMap['department']);
+            if (t === 'agent') await expandSection(tableSectionMap['agent']);
           }
           
           const findHeader = (startsWithList) => {
@@ -383,26 +391,27 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             return paperElement;
           };
           
-          if (csDetailType === 'cs') {
+          // 단일 선택이면 해당 Paper만 캡처, 복수 선택이면 전체 슬라이드 캡처
+          if (csDetailTypes.length === 1 && csDetailTypes[0] !== 'all' && csDetailTypes[0] === 'cs') {
             // CS 개통 실적: 헤더 + 카드들 + 직원 랭킹 전체를 포함하는 Paper 컴포넌트 캡처
             const paperElement = findSectionPaper('📞 CS 개통 실적');
             if (!paperElement) {
               const errorMsg = 'CS 개통 실적 섹션을 찾을 수 없습니다.';
               if (process.env.NODE_ENV === 'development') {
-                console.error(`❌ [MeetingCaptureManager] ${errorMsg}`, { csDetailType, slideId: currentSlide.slideId });
+                console.error(`❌ [MeetingCaptureManager] ${errorMsg}`, { csDetailTypes, slideId: currentSlide.slideId });
               }
               captureTargetElement = slideElement;
             } else {
               // Paper 전체를 캡처 (헤더 + 카드들 + 직원 랭킹 모두 포함)
               captureTargetElement = paperElement;
             }
-          } else if (csDetailType === 'code') {
+          } else if (csDetailTypes.length === 1 && csDetailTypes[0] !== 'all' && csDetailTypes[0] === 'code') {
             // 코드별 실적: 헤더 + 테이블 전체를 포함하는 Paper 컴포넌트 캡처
             const paperElement = findSectionPaper('📊 코드별 실적');
             if (!paperElement) {
               const errorMsg = '코드별 실적 섹션을 찾을 수 없습니다.';
               if (process.env.NODE_ENV === 'development') {
-                console.error(`❌ [MeetingCaptureManager] ${errorMsg}`, { csDetailType, slideId: currentSlide.slideId });
+                console.error(`❌ [MeetingCaptureManager] ${errorMsg}`, { csDetailTypes, slideId: currentSlide.slideId });
               }
               captureTargetElement = slideElement;
             } else {
@@ -419,13 +428,13 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               // Paper 전체를 캡처 (헤더 + 테이블 모두 포함)
               captureTargetElement = paperElement;
             }
-          } else if (csDetailType === 'office') {
+          } else if (csDetailTypes.length === 1 && csDetailTypes[0] !== 'all' && csDetailTypes[0] === 'office') {
             // 사무실별 실적: 헤더 + 테이블 전체를 포함하는 Paper 컴포넌트 캡처
             const paperElement = findSectionPaper('🏢 사무실별 실적');
             if (!paperElement) {
               const errorMsg = '사무실별 실적 섹션을 찾을 수 없습니다.';
               if (process.env.NODE_ENV === 'development') {
-                console.error(`❌ [MeetingCaptureManager] ${errorMsg}`, { csDetailType, slideId: currentSlide.slideId });
+                console.error(`❌ [MeetingCaptureManager] ${errorMsg}`, { csDetailTypes, slideId: currentSlide.slideId });
               }
               captureTargetElement = slideElement;
             } else {
@@ -442,13 +451,13 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               // Paper 전체를 캡처 (헤더 + 테이블 모두 포함)
               captureTargetElement = paperElement;
             }
-          } else if (csDetailType === 'department') {
+          } else if (csDetailTypes.length === 1 && csDetailTypes[0] !== 'all' && csDetailTypes[0] === 'department') {
             // 소속별 실적: 헤더 + 테이블 전체를 포함하는 Paper 컴포넌트 캡처
             const paperElement = findSectionPaper('👥 소속별 실적');
             if (!paperElement) {
               const errorMsg = '소속별 실적 섹션을 찾을 수 없습니다.';
               if (process.env.NODE_ENV === 'development') {
-                console.error(`❌ [MeetingCaptureManager] ${errorMsg}`, { csDetailType, slideId: currentSlide.slideId });
+                console.error(`❌ [MeetingCaptureManager] ${errorMsg}`, { csDetailTypes, slideId: currentSlide.slideId });
               }
               captureTargetElement = slideElement;
             } else {
@@ -465,13 +474,13 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               // Paper 전체를 캡처 (헤더 + 테이블 모두 포함)
               captureTargetElement = paperElement;
             }
-          } else if (csDetailType === 'agent') {
+          } else if (csDetailTypes.length === 1 && csDetailTypes[0] !== 'all' && csDetailTypes[0] === 'agent') {
             // 담당자별 실적: 헤더 + 테이블 전체를 포함하는 Paper 컴포넌트 캡처
             const paperElement = findSectionPaperArray(['🧑 담당자별 실적', '👤 담당자별 실적']);
             if (!paperElement) {
               const errorMsg = '담당자별 실적 섹션을 찾을 수 없습니다.';
               if (process.env.NODE_ENV === 'development') {
-                console.error(`❌ [MeetingCaptureManager] ${errorMsg}`, { csDetailType, slideId: currentSlide.slideId });
+                console.error(`❌ [MeetingCaptureManager] ${errorMsg}`, { csDetailTypes, slideId: currentSlide.slideId });
               }
               captureTargetElement = slideElement;
             } else {
@@ -488,6 +497,9 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               // Paper 전체를 캡처 (헤더 + 테이블 모두 포함)
               captureTargetElement = paperElement;
             }
+          } else {
+            // 복수 선택 또는 all: 확장된 섹션들이 포함되도록 전체 슬라이드 캡처
+            captureTargetElement = slideElement;
           }
 
           // 타겟 가시성/높이 확보까지 대기
@@ -521,6 +533,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
           (currentSlide?.mode === 'inventoryChart') ||
           (currentSlide?.mode === 'chart' && (currentSlide?.tab === 'inventoryChart' || currentSlide?.subTab === 'inventoryChart'))
         ) {
+          let inventoryCompositeBlob = null;
           // 로딩 화면이 사라질 때까지 대기
           const maxWait = 10000; // 최대 10초 대기
           const start = Date.now();
@@ -610,7 +623,105 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             tableContainer.scrollIntoView({ block: 'start', behavior: 'instant' });
             await new Promise(r => setTimeout(r, 300));
             
-            captureTargetElement = tableContainer;
+            // 1) 테이블만 우선 캡처
+            let tableOnlyBlob = null;
+            try {
+              tableOnlyBlob = await captureElement(tableContainer, {
+                scale: 2,
+                useCORS: true,
+                fixedBottomPaddingPx: 0,
+                backgroundColor: '#ffffff',
+                scrollX: 0,
+                scrollY: 0
+              });
+            } catch (e) {
+              // 실패 시 fallback 으로 테이블 컨테이너를 최종 타겟으로 사용
+              captureTargetElement = tableContainer;
+            }
+            
+            // 2) 슬라이드 상단 헤더 캡처 시도 (회사 로고/이름 + 경로 타이틀)
+            let headerBlob = null;
+            try {
+              let headerElement = null;
+              const allElements = Array.from(slideElement.querySelectorAll('*'));
+              for (const el of allElements) {
+                const style = window.getComputedStyle(el);
+                const text = (el.textContent || '').trim();
+                if (style.position === 'absolute' &&
+                    (parseInt(style.top) === 0 || style.top === '0px') &&
+                    text.includes('(주)브이아이피플러스')) {
+                  headerElement = el;
+                  break;
+                }
+              }
+              if (!headerElement) {
+                for (const child of Array.from(slideElement.children)) {
+                  const style = window.getComputedStyle(child);
+                  const text = (child.textContent || '').trim();
+                  if (style.position === 'absolute' &&
+                      (parseInt(style.top) === 0 || style.top === '0px') &&
+                      text.includes('(주)브이아이피플러스')) {
+                    headerElement = child;
+                    break;
+                  }
+                }
+              }
+              if (headerElement) {
+                headerElement.scrollIntoView({ block: 'start', behavior: 'instant' });
+                await new Promise(r => setTimeout(r, 200));
+                headerBlob = await captureElement(headerElement, {
+                  scale: 2,
+                  useCORS: true,
+                  fixedBottomPaddingPx: 0,
+                  backgroundColor: 'transparent',
+                  scrollX: 0,
+                  scrollY: 0
+                });
+              }
+            } catch (_) {}
+            
+            // 3) 헤더 + 테이블 합성 (가능 시)
+            try {
+              if (headerBlob && tableOnlyBlob) {
+                const blobToImage = (blob) => new Promise((resolve, reject) => {
+                  const url = URL.createObjectURL(blob);
+                  const img = new Image();
+                  img.onload = () => {
+                    URL.revokeObjectURL(url);
+                    resolve(img);
+                  };
+                  img.onerror = reject;
+                  img.src = url;
+                });
+                const imgHeader = await blobToImage(headerBlob);
+                const imgTable = await blobToImage(tableOnlyBlob);
+                const gap = 8;
+                const extraBottom = 96; // 요청된 얇은 하단 여백
+                const canvas = document.createElement('canvas');
+                canvas.width = Math.max(imgHeader.width, imgTable.width);
+                canvas.height = imgHeader.height + gap + imgTable.height + extraBottom;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(imgHeader, 0, 0);
+                ctx.drawImage(imgTable, 0, imgHeader.height + gap);
+                inventoryCompositeBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+              } else if (tableOnlyBlob) {
+                // 헤더를 못 찾으면 테이블만 사용
+                inventoryCompositeBlob = tableOnlyBlob;
+              }
+            } catch (_) {
+              // 합성 실패 시 테이블만 캡처 대상으로
+              captureTargetElement = tableContainer;
+            }
+            
+            // 합성이 성공했으면 이후 최종 업로드 단계에서 사용
+            if (inventoryCompositeBlob) {
+              // 업로드 단계에서 사용하기 위해 임시 저장
+              slideElement.__inventoryCompositeBlob = inventoryCompositeBlob;
+            } else {
+              captureTargetElement = tableContainer;
+            }
             
             if (process.env.NODE_ENV === 'development') {
               console.log('✅ [MeetingCaptureManager] 재고장표 테이블 컨테이너 캡처 준비 완료');
@@ -918,7 +1029,8 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         console.warn('⚠️ [MeetingCaptureManager] 상세옵션 타겟 선택 중 경고:', e?.message);
       }
 
-      // 재고장표 특수 처리는 위에서 이미 처리됨 (로딩 화면 제외 및 테이블만 캡처)
+      // 재고장표 특수 처리: 위에서 헤더+테이블 합성 결과가 있으면 사용
+      let inventoryCompositeBlob = slideElement && slideElement.__inventoryCompositeBlob ? slideElement.__inventoryCompositeBlob : null;
 
       // 지표장표 > 월간시상: 확대 후 5개 테이블 모두 캡처 (슬라이드 헤더 포함)
       let monthlyAwardCompositeBlob = null;
@@ -1015,6 +1127,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               monthlyAwardCompositeBlob = await captureElement(commonAncestor, {
                 scale: 2,
                 useCORS: true,
+                fixedBottomPaddingPx: 96,
                 backgroundColor: '#ffffff',
                 scrollX: 0,
                 scrollY: 0
@@ -1037,6 +1150,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                   const blob = await captureElement(table, {
                     scale: 2,
                     useCORS: true,
+                    fixedBottomPaddingPx: 96,
                     backgroundColor: '#ffffff',
                     scrollX: 0,
                     scrollY: 0
@@ -1133,6 +1247,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             tableBlob = await captureElement(tablePaper, {
               scale: 2,
               useCORS: true,
+              fixedBottomPaddingPx: 96,
               backgroundColor: '#ffffff',
               scrollX: 0,
               scrollY: 0
@@ -1217,80 +1332,39 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
           let graphBlob = null;
           // 가입자수 추이와 관리수수료 추이 그래프가 모두 있는지 확인
           if (subscriberChartPaper && feeChartPaper) {
-            // 두 그래프 Paper의 공통 조상 찾기
-            const findCommonAncestor = (el1, el2) => {
-              if (!el1 || !el2) return null;
-              const getAncestors = (el) => {
-                const list = [];
-                let cur = el;
-                while (cur) { list.push(cur); cur = cur.parentElement; }
-                return list;
-              };
-              const ancestors1 = getAncestors(el1);
-              const ancestors2 = new Set(getAncestors(el2));
-              return ancestors1.find(a => ancestors2.has(a) && a !== document.body && slideElement.contains(a)) || slideElement;
-            };
-            
-            const graphAncestor = findCommonAncestor(subscriberChartPaper, feeChartPaper);
-            
-            if (graphAncestor) {
-              // 그래프 영역으로 스크롤
-              graphAncestor.scrollIntoView({ block: 'center', behavior: 'instant' });
-              await new Promise(r => setTimeout(r, 500));
-              
-              graphBlob = await captureElement(graphAncestor, {
-                scale: 2,
-                useCORS: true,
-                backgroundColor: '#ffffff',
-                scrollX: 0,
-                scrollY: 0
-              });
-              
-              if (process.env.NODE_ENV === 'development') {
-                console.log('✅ [MeetingCaptureManager] 가입자증감 그래프 캡처 완료');
-              }
-            } else {
-              // 공통 조상을 찾지 못한 경우, 두 Paper를 각각 캡처 후 합치기
-              if (process.env.NODE_ENV === 'development') {
-                console.warn('⚠️ [MeetingCaptureManager] 공통 조상을 찾지 못해 각각 캡처합니다.');
-              }
-              
-              subscriberChartPaper.scrollIntoView({ block: 'center', behavior: 'instant' });
-              await new Promise(r => setTimeout(r, 500));
-              
-              const chart1Blob = await captureElement(subscriberChartPaper, {
-                scale: 2,
-                useCORS: true,
-                backgroundColor: '#ffffff',
-                scrollX: 0,
-                scrollY: 0
-              });
-              
-              feeChartPaper.scrollIntoView({ block: 'center', behavior: 'instant' });
-              await new Promise(r => setTimeout(r, 500));
-              
-              const chart2Blob = await captureElement(feeChartPaper, {
-                scale: 2,
-                useCORS: true,
-                backgroundColor: '#ffffff',
-                scrollX: 0,
-                scrollY: 0
-              });
-              
-              const img1 = await blobToImage(chart1Blob);
-              const img2 = await blobToImage(chart2Blob);
-              const gap = 16;
-              const canvas = document.createElement('canvas');
-              canvas.width = Math.max(img1.width, img2.width);
-              canvas.height = img1.height + gap + img2.height;
-              const ctx = canvas.getContext('2d');
-              ctx.fillStyle = '#ffffff';
-              ctx.fillRect(0, 0, canvas.width, canvas.height);
-              ctx.drawImage(img1, 0, 0);
-              ctx.drawImage(img2, 0, img1.height + gap);
-              
-              graphBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-            }
+            // 안전을 위해 항상 개별 캡처 후 합성 (조상 캡처 시 월별 테이블이 포함될 수 있음)
+            subscriberChartPaper.scrollIntoView({ block: 'center', behavior: 'instant' });
+            await new Promise(r => setTimeout(r, 500));
+            const chart1Blob = await captureElement(subscriberChartPaper, {
+              scale: 2,
+              useCORS: true,
+              fixedBottomPaddingPx: 96,
+              backgroundColor: '#ffffff',
+              scrollX: 0,
+              scrollY: 0
+            });
+            feeChartPaper.scrollIntoView({ block: 'center', behavior: 'instant' });
+            await new Promise(r => setTimeout(r, 500));
+            const chart2Blob = await captureElement(feeChartPaper, {
+              scale: 2,
+              useCORS: true,
+              fixedBottomPaddingPx: 96,
+              backgroundColor: '#ffffff',
+              scrollX: 0,
+              scrollY: 0
+            });
+            const img1 = await blobToImage(chart1Blob);
+            const img2 = await blobToImage(chart2Blob);
+            const gap = 16;
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(img1.width, img2.width);
+            canvas.height = img1.height + gap + img2.height;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img1, 0, 0);
+            ctx.drawImage(img2, 0, img1.height + gap);
+            graphBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
           } else {
             if (process.env.NODE_ENV === 'development') {
               console.warn(`⚠️ [MeetingCaptureManager] 가입자증감 그래프 Paper를 찾을 수 없습니다.`);
@@ -1369,6 +1443,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                 const headerBlob = await captureElement(headerElement, {
                   scale: 2,
                   useCORS: true,
+                  fixedBottomPaddingPx: 96,
                   backgroundColor: 'transparent',
                   scrollX: 0,
                   scrollY: 0
@@ -1419,9 +1494,10 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         ? '#ffffff' // 배경색은 그라데이션이므로 흰색으로 설정
         : '#ffffff';
         
-      const blob = monthlyAwardCompositeBlob || compositeBlob || await captureElement(captureTargetElement, {
+      const blob = monthlyAwardCompositeBlob || inventoryCompositeBlob || compositeBlob || await captureElement(captureTargetElement, {
         scale: 2,
         useCORS: true,
+        fixedBottomPaddingPx: 96,
         backgroundColor: backgroundColor,
         // 스크롤 영역 전체 캡처
         scrollX: 0,
