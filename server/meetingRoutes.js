@@ -2444,6 +2444,8 @@ async function uploadCustomSlideFile(req, res) {
         });
         return;
       } catch (videoError) {
+        // CORS 헤더 설정 (에러 응답에도 포함)
+        setCORSHeaders(req, res);
         console.error('동영상 업로드 오류:', videoError);
         return res.status(500).json({ 
           success: false, 
@@ -2451,6 +2453,8 @@ async function uploadCustomSlideFile(req, res) {
         });
       }
     } else {
+      // CORS 헤더 설정 (에러 응답에도 포함)
+      setCORSHeaders(req, res);
       return res.status(400).json({ 
         success: false, 
         error: '지원하지 않는 파일 형식입니다.' 
