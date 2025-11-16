@@ -851,6 +851,25 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess, autoE
                   </FormControl>
                 );
               }
+              // 텍스트 입력 옵션 (예: 가입자증감 대상 년도 등)
+              if (option.type === 'text') {
+                return (
+                  <TextField
+                    key={option.key}
+                    fullWidth
+                    label={option.label}
+                    value={detailOptionValues[option.key] || ''}
+                    onChange={(e) => {
+                      setDetailOptionValues(prev => ({
+                        ...prev,
+                        [option.key]: e.target.value
+                      }));
+                    }}
+                    margin="normal"
+                    placeholder={option.placeholder || ''}
+                  />
+                );
+              }
               // 저장 시점(재초담초채권) - 동적 Select
               if (option.key === 'bondHistoryTimestamp') {
                 const values = detailOptionDynamicValues.bondHistoryTimestamp || [];

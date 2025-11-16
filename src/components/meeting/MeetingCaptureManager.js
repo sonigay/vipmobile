@@ -1089,12 +1089,20 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               
               // 직접 찾기 시도
               if (!selectElement) {
-                selectElement = Array.from(document.querySelectorAll('[role="combobox"], .MuiSelect-select, select'))
-                  .find(el => {
-                    const parentText = (el.closest('.MuiFormControl-root')?.textContent || '') + 
-                                     (el.parentElement?.textContent || '');
-                    return parentText.includes('대상') && parentText.includes('년도');
-                  });
+                // 1순위: 가입자증감 화면 내부의 printable-content 컨테이너 기준으로 검색
+                const printable = document.querySelector('#printable-content');
+                if (printable) {
+                  selectElement = printable.querySelector('div[role="combobox"][aria-haspopup="listbox"], .MuiSelect-select[role="combobox"]');
+                }
+                // 2순위: 화면 전체에서 combobox / MuiSelect-select 검색
+                if (!selectElement) {
+                  selectElement = Array.from(document.querySelectorAll('[role="combobox"], .MuiSelect-select, select'))
+                    .find(el => {
+                      const parentText = (el.closest('.MuiFormControl-root')?.textContent || '') + 
+                                       (el.parentElement?.textContent || '');
+                      return parentText.includes('대상') && parentText.includes('년도');
+                    });
+                }
               }
               
               if (selectElement && selectElement instanceof HTMLElement) {
