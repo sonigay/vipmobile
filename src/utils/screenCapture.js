@@ -12,9 +12,19 @@ async function autoCropCanvas(canvas) {
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const data = imageData.data;
     
-    // 배경색 (흰색) 임계값 설정
-    const backgroundColorThreshold = 250; // RGB 값이 모두 250 이상이면 배경으로 간주
+    // 배경색 감지 개선: 그라데이션 배경도 감지할 수 있도록 임계값 조정
+    // 메인/목차 슬라이드의 그라데이션 배경: #f8f9fa(248,249,250), #e9ecef(233,236,239), #f1f3f5(241,243,245)
+    // 평균 밝기가 높고 색상 차이가 적은 영역을 배경으로 간주
+    const backgroundColorThreshold = 230; // RGB 값이 모두 230 이상이면 배경으로 간주 (기존 250에서 낮춤)
     const alphaThreshold = 10; // 알파값이 10 이하면 투명으로 간주
+    
+    // 그라데이션 배경 감지를 위한 추가 로직
+    const isLightBackground = (r, g, b) => {
+      // 밝은 회색 계열 배경 감지 (RGB 평균이 230 이상이고, 색상 차이가 20 이하)
+      const avg = (r + g + b) / 3;
+      const maxDiff = Math.max(r, g, b) - Math.min(r, g, b);
+      return avg >= 230 && maxDiff <= 20;
+    };
     
     let minX = canvas.width;
     let minY = 0; // 상단은 0부터 시작 (상단 공백 유지)
@@ -23,8 +33,13 @@ async function autoCropCanvas(canvas) {
     
     // 실제 콘텐츠 영역 찾기 (하단부터 역순으로 스캔하여 마지막 콘텐츠 라인 찾기)
     // 하단 공백만 제거하기 위해 하단부터 스캔
+    // 연속된 빈 라인을 더 정확하게 감지하기 위해 개선
+    let consecutiveEmptyLines = 0;
+    const requiredEmptyLines = 20; // 연속으로 20줄 이상 빈 공간이면 하단 공백으로 간주
+    
     for (let y = canvas.height - 1; y >= 0; y--) {
-      let hasContent = false;
+      let contentPixels = 0;
+      
       for (let x = 0; x < canvas.width; x++) {
         const index = (y * canvas.width + x) * 4;
         const r = data[index];
@@ -32,15 +47,18 @@ async function autoCropCanvas(canvas) {
         const b = data[index + 2];
         const a = data[index + 3];
         
-        // 배경이 아닌 픽셀인지 확인
-        const isBackground = 
+        // 배경이 아닌 픽셀인지 확인 (기존 로직 + 그라데이션 배경 감지)
+        const isStandardBackground = 
           (r >= backgroundColorThreshold && 
            g >= backgroundColorThreshold && 
            b >= backgroundColorThreshold) ||
           a < alphaThreshold;
         
+        const isGradientBackground = isLightBackground(r, g, b);
+        const isBackground = isStandardBackground || isGradientBackground;
+        
         if (!isBackground) {
-          hasContent = true;
+          contentPixels++;
           minX = Math.min(minX, x);
           maxX = Math.max(maxX, x);
           if (maxY === 0) {
@@ -48,9 +66,22 @@ async function autoCropCanvas(canvas) {
           }
         }
       }
-      // 콘텐츠가 있는 라인을 찾으면 중단 (하단부터 역순 스캔)
-      if (hasContent && maxY > 0) {
-        break;
+      
+      // 콘텐츠가 있는 라인인지 확인 (라인의 5% 이상이 콘텐츠면 콘텐츠 라인으로 간주)
+      const contentRatio = contentPixels / canvas.width;
+      if (contentRatio > 0.05) {
+        // 실제 콘텐츠가 있는 라인
+        consecutiveEmptyLines = 0;
+        if (maxY === 0) {
+          maxY = y;
+        }
+      } else {
+        // 빈 라인
+        consecutiveEmptyLines++;
+        // 연속된 빈 라인이 충분히 많으면 하단 공백으로 간주하고 중단
+        if (consecutiveEmptyLines >= requiredEmptyLines && maxY > 0) {
+          break;
+        }
       }
     }
     
@@ -63,11 +94,15 @@ async function autoCropCanvas(canvas) {
         const b = data[index + 2];
         const a = data[index + 3];
         
-        const isBackground = 
+        // 배경 감지 로직 통일 (기존 로직 + 그라데이션 배경 감지)
+        const isStandardBackground = 
           (r >= backgroundColorThreshold && 
            g >= backgroundColorThreshold && 
            b >= backgroundColorThreshold) ||
           a < alphaThreshold;
+        
+        const isGradientBackground = isLightBackground(r, g, b);
+        const isBackground = isStandardBackground || isGradientBackground;
         
         if (!isBackground) {
           minX = Math.min(minX, x);
