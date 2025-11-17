@@ -588,6 +588,15 @@ app.use((req, res, next) => {
   next();
 });
 
+// CORS 설정 (더 구체적으로) - 모든 origin 허용 (개발 환경)
+// 이 설정은 첫 번째 CORS 설정을 보완하여 모든 요청에 대해 CORS 헤더를 보장합니다
+app.use(cors({
+  origin: true, // 모든 origin 허용 (개발 환경)
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Origin', 'Accept', 'X-API-Key']
+}));
+
 // 모든 요청 로깅 미들웨어
 app.use((req, res, next) => {
   const timestamp = new Date().toISOString();
