@@ -1032,7 +1032,8 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               captureTargetElement = tableContainer;
             }
             
-            // 2) 슬라이드 상단 헤더 캡처 시도 (회사 로고/이름 + 경로 타이틀)
+            // 2) 슬라이드 상단 헤더만 캡처 시도 (회사 로고/이름 + 경로 타이틀)
+            // 중간 불필요한 컨텐츠 헤더는 제외하기 위해 더 엄격한 조건 사용
             let headerBlob = null;
             try {
               let headerElement = null;
@@ -1040,9 +1041,13 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               for (const el of allElements) {
                 const style = window.getComputedStyle(el);
                 const text = (el.textContent || '').trim();
+                const rect = el.getBoundingClientRect();
+                // 슬라이드 상단 헤더: absolute 위치, top이 0 근처, 회사명 포함, 테이블 헤더가 아닌 것
                 if (style.position === 'absolute' &&
                     (parseInt(style.top) === 0 || style.top === '0px') &&
-                    text.includes('(주)브이아이피플러스')) {
+                    text.includes('(주)브이아이피플러스') &&
+                    !text.includes('재고장표') && // 중간 컨텐츠 헤더 제외
+                    rect.top < 200) { // 상단 200px 이내에만 (중간 헤더 제외)
                   headerElement = el;
                   break;
                 }
@@ -1051,9 +1056,13 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                 for (const child of Array.from(slideElement.children)) {
                   const style = window.getComputedStyle(child);
                   const text = (child.textContent || '').trim();
+                  const rect = child.getBoundingClientRect();
+                  // 슬라이드 상단 헤더: absolute 위치, top이 0 근처, 회사명 포함, 테이블 헤더가 아닌 것
                   if (style.position === 'absolute' &&
                       (parseInt(style.top) === 0 || style.top === '0px') &&
-                      text.includes('(주)브이아이피플러스')) {
+                      text.includes('(주)브이아이피플러스') &&
+                      !text.includes('재고장표') && // 중간 컨텐츠 헤더 제외
+                      rect.top < 200) { // 상단 200px 이내에만 (중간 헤더 제외)
                     headerElement = child;
                     break;
                   }
