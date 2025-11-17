@@ -2764,6 +2764,37 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         captureOptions.height = (targetHeight + 96) * 2; // fixedBottomPadding 포함
       }
       
+      // 전체총마감 슬라이드: 실제 콘텐츠 높이에 맞춰 크롭 (월간시상 슬라이드와 유사)
+      const isTotalClosing = currentSlide?.mode === 'chart' && 
+                             currentSlide?.tab === 'closingChart' && 
+                             currentSlide?.subTab === 'totalClosing';
+      if (isTotalClosing && captureTargetElement) {
+        try {
+          // 위에서 설정된 높이 사용 (measuredHeight가 style.height에 설정됨)
+          const measuredHeight = parseFloat(captureTargetElement.style.height);
+          
+          if (measuredHeight && measuredHeight > 0) {
+            // 측정된 높이 사용하여 불필요한 여백 제거
+            captureOptions.skipAutoCrop = true; // 크롭 로직 제거 (실제 높이로만 캡처)
+            captureOptions.fixedBottomPaddingPx = 0; // 핑크 바 제거
+            captureOptions.height = measuredHeight * 2; // scale 고려
+            
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`📐 [MeetingCaptureManager] 전체총마감: 크롭 옵션 설정`, {
+                measuredHeight,
+                captureHeight: captureOptions.height,
+                skipAutoCrop: true,
+                fixedBottomPaddingPx: 0
+              });
+            }
+          }
+        } catch (e) {
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('⚠️ [MeetingCaptureManager] 전체총마감 크롭 옵션 설정 중 경고:', e?.message);
+          }
+        }
+      }
+      
       let blob = monthlyAwardCompositeBlob || inventoryCompositeBlob || compositeBlob || await captureElement(captureTargetElement, captureOptions);
       
       // 스타일 복원
