@@ -11,6 +11,19 @@ const BOTTOM_PADDING_COLOR = '#FFB6C1';
  */
 async function autoCropCanvas(canvas) {
   try {
+    // 메모리 부족 방지: 캔버스가 너무 크면 자동 크롭을 건너뛰고 원본 반환
+    // 일반적으로 width * height * 4 (RGBA)가 약 268MB 이상이면 메모리 부족 발생
+    // 안전 마진을 고려하여 약 200MB (50,000,000 픽셀) 미만일 때만 크롭 수행
+    const pixelCount = canvas.width * canvas.height;
+    const MAX_PIXELS_FOR_CROP = 50000000; // 50M 픽셀 (약 200MB)
+    
+    if (pixelCount > MAX_PIXELS_FOR_CROP) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`⚠️ [autoCropCanvas] 캔버스가 너무 커서 자동 크롭 건너뜀: ${canvas.width}x${canvas.height} (${(pixelCount / 1000000).toFixed(2)}M 픽셀)`);
+      }
+      return canvas; // 원본 반환 (크롭 없음)
+    }
+    
     const ctx = canvas.getContext('2d');
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const data = imageData.data;
