@@ -22,13 +22,37 @@ const slideSpecificHandlers = {
    * 월간시상 슬라이드 처리
    */
   async monthlyAward(slideElement, slide) {
-    // 1) 확대 버튼 클릭
-    const expandBtn = Array.from(document.querySelectorAll('button, .MuiButton-root')).find(
-      (el) => typeof el.textContent === 'string' && el.textContent.trim() === '확대'
+    // 1) 확대 버튼 클릭 (더 강력한 선택자 사용)
+    let expandBtn = null;
+    
+    // 방법 1: slideElement 내부에서 찾기
+    expandBtn = Array.from(slideElement.querySelectorAll('button, .MuiButton-root')).find(
+      (el) => {
+        const text = (el.textContent || '').trim();
+        return text === '확대' || text.includes('확대');
+      }
     );
+    
+    // 방법 2: 전체 문서에서 찾기 (slideElement 내부에 없을 경우)
+    if (!expandBtn) {
+      expandBtn = Array.from(document.querySelectorAll('button, .MuiButton-root')).find(
+        (el) => {
+          const text = (el.textContent || '').trim();
+          return (text === '확대' || text.includes('확대')) && 
+                 slideElement.contains(el);
+        }
+      );
+    }
+    
     if (expandBtn) {
+      expandBtn.scrollIntoView({ behavior: 'instant', block: 'center' });
+      await new Promise(r => setTimeout(r, 200));
       expandBtn.click();
-      await new Promise(r => setTimeout(r, 800));
+      await new Promise(r => setTimeout(r, 1200)); // 확대 후 충분한 렌더링 대기
+    } else {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('⚠️ [월간시상] 확대 버튼을 찾지 못했습니다.');
+      }
     }
 
     // 2) 5개 테이블 찾기
@@ -125,16 +149,21 @@ const slideSpecificHandlers = {
 
       await new Promise(r => setTimeout(r, 300));
 
+      // 이미지 크기 제한 (너무 크면 업로드 실패)
+      const MAX_HEIGHT = 8000;
+      const measuredHeight = Math.min(sizeInfo.measuredHeight, MAX_HEIGHT);
+      
       // 콘텐츠 밑 여백 제거를 위해 크롭 활성화
       const blob = await captureElement(commonAncestor, {
         scale: 2,
         useCORS: true,
-        fixedBottomPaddingPx: 0,
+        fixedBottomPaddingPx: 0, // 핑크바 제거
         backgroundColor: '#ffffff',
         scrollX: 0,
         scrollY: 0,
         skipAutoCrop: false, // 크롭 활성화 (콘텐츠 밑 여백 제거)
-        height: sizeInfo.measuredHeight * 2
+        height: measuredHeight * 2,
+        width: Math.min(sizeInfo.measuredWidth * 2, 5120) // 최대 너비 제한
       });
 
       // 스타일 복원
@@ -232,6 +261,17 @@ const slideSpecificHandlers = {
         );
       }
 
+      // 이미지 크기 제한 (너무 크면 업로드 실패 및 CORS 에러 발생)
+      const MAX_WIDTH = 2560; // 최대 너비 (픽셀)
+      const MAX_HEIGHT = 8000; // 최대 높이 (픽셀)
+      
+      if (sizeInfo.measuredWidth > MAX_WIDTH) {
+        sizeInfo.measuredWidth = MAX_WIDTH;
+      }
+      if (sizeInfo.measuredHeight > MAX_HEIGHT) {
+        sizeInfo.measuredHeight = MAX_HEIGHT;
+      }
+
       // 슬라이드 헤더 너비를 콘텐츠 가로길이에 맞춰 조정 (전체총마감)
       const slideHeader = slideElement.querySelector('[class*="header"], [class*="Header"], .MuiAppBar-root, .MuiToolbar-root, header, [role="banner"]');
       const originalHeaderStyles = new Map();
@@ -239,33 +279,54 @@ const slideSpecificHandlers = {
         const headerRect = slideHeader.getBoundingClientRect();
         const contentWidth = sizeInfo.measuredWidth;
         
+        // 헤더가 콘텐츠보다 작으면 콘텐츠 크기에 맞춤
         if (headerRect.width < contentWidth) {
           originalHeaderStyles.set(slideHeader, {
             width: slideHeader.style.width,
             maxWidth: slideHeader.style.maxWidth,
-            minWidth: slideHeader.style.minWidth
+            minWidth: slideHeader.style.minWidth,
+            display: slideHeader.style.display,
+            justifyContent: slideHeader.style.justifyContent
           });
           
-          // 헤더 너비를 콘텐츠 너비에 맞춤
+          // 헤더 너비를 콘텐츠 너비에 맞춤 (명시적 설정)
           slideHeader.style.width = `${contentWidth}px`;
           slideHeader.style.maxWidth = `${contentWidth}px`;
           slideHeader.style.minWidth = `${contentWidth}px`;
+          slideHeader.style.display = 'block';
           
           // 헤더 내부 요소들도 비율 조정
           const headerChildren = slideHeader.querySelectorAll('*');
           headerChildren.forEach(child => {
-            const childStyle = window.getComputedStyle(child);
-            if (childStyle.width && childStyle.width.includes('%')) {
-              // 비율 기반이면 그대로 유지
-            } else if (childStyle.width && !childStyle.width.includes('auto')) {
-              // 고정 너비면 비율로 조정
-              const currentWidth = parseFloat(childStyle.width) || 0;
-              if (currentWidth > 0 && headerRect.width > 0) {
-                const ratio = contentWidth / headerRect.width;
-                child.style.width = `${currentWidth * ratio}px`;
+            try {
+              const childStyle = window.getComputedStyle(child);
+              const childRect = child.getBoundingClientRect();
+              
+              // 비율 기반이 아닌 고정 너비 요소만 조정
+              if (childStyle.width && !childStyle.width.includes('%') && !childStyle.width.includes('auto')) {
+                const currentWidth = parseFloat(childStyle.width) || childRect.width;
+                if (currentWidth > 0 && headerRect.width > 0) {
+                  const ratio = contentWidth / headerRect.width;
+                  const newWidth = currentWidth * ratio;
+                  child.style.width = `${newWidth}px`;
+                }
               }
+              
+              // 컨테이너 요소는 width 100%로 설정
+              if (child.classList.contains('MuiContainer-root') || 
+                  child.classList.contains('MuiBox-root') ||
+                  childStyle.display === 'flex' || 
+                  childStyle.display === 'grid') {
+                child.style.width = '100%';
+                child.style.maxWidth = '100%';
+              }
+            } catch (e) {
+              // 개별 요소 조정 실패 시 무시
             }
           });
+          
+          // 렌더링 안정화 대기
+          await new Promise(r => setTimeout(r, 200));
         }
       }
 
@@ -283,6 +344,10 @@ const slideSpecificHandlers = {
 
       await new Promise(r => setTimeout(r, 300));
 
+      // 캡처 크기 제한
+      const captureWidth = Math.min(sizeInfo.measuredWidth * 2, MAX_WIDTH * 2);
+      const captureHeight = Math.min(sizeInfo.measuredHeight * 2, MAX_HEIGHT * 2);
+
       const blob = await captureElement(captureTargetElement, {
         scale: 2,
         useCORS: true,
@@ -291,8 +356,8 @@ const slideSpecificHandlers = {
         scrollX: 0,
         scrollY: 0,
         skipAutoCrop: false, // 크롭 활성화 (콘텐츠 밑 여백 제거)
-        height: sizeInfo.measuredHeight * 2,
-        width: sizeInfo.measuredWidth * 2 // 너비도 명시적으로 설정
+        width: captureWidth,
+        height: captureHeight
       });
 
       // 스타일 복원
@@ -318,7 +383,7 @@ const slideSpecificHandlers = {
       }
       captureTargetElement.style.removeProperty('overflow');
 
-      // 헤더 스타일 복원
+      // 헤더 스타일 복원 (전체총마감)
       if (originalHeaderStyles.size > 0) {
         originalHeaderStyles.forEach((styles, header) => {
           if (!header || !header.style) return;
@@ -328,6 +393,20 @@ const slideSpecificHandlers = {
           else header.style.removeProperty('max-width');
           if (styles.minWidth) header.style.minWidth = styles.minWidth;
           else header.style.removeProperty('min-width');
+          if (styles.display) header.style.display = styles.display;
+          else header.style.removeProperty('display');
+          if (styles.justifyContent) header.style.justifyContent = styles.justifyContent;
+          else header.style.removeProperty('justify-content');
+          
+          // 헤더 내부 요소들도 복원
+          const headerChildren = header.querySelectorAll('*');
+          headerChildren.forEach(child => {
+            try {
+              child.style.removeProperty('width');
+            } catch (e) {
+              // 무시
+            }
+          });
         });
       }
 
@@ -399,6 +478,17 @@ const slideSpecificHandlers = {
         );
       }
 
+      // 이미지 크기 제한 (너무 크면 업로드 실패 및 렌더링 불가)
+      const MAX_WIDTH = 2560; // 최대 너비 (픽셀)
+      const MAX_HEIGHT = 8000; // 최대 높이 (픽셀)
+      
+      if (sizeInfo.measuredWidth > MAX_WIDTH) {
+        sizeInfo.measuredWidth = MAX_WIDTH;
+      }
+      if (sizeInfo.measuredHeight > MAX_HEIGHT) {
+        sizeInfo.measuredHeight = MAX_HEIGHT;
+      }
+
       // 슬라이드 헤더 너비를 콘텐츠 가로길이에 맞춰 조정 (가입자증감)
       const slideHeader = slideElement.querySelector('[class*="header"], [class*="Header"], .MuiAppBar-root, .MuiToolbar-root, header, [role="banner"]');
       const originalHeaderStyles = new Map();
@@ -406,16 +496,28 @@ const slideSpecificHandlers = {
         const headerRect = slideHeader.getBoundingClientRect();
         const contentWidth = sizeInfo.measuredWidth;
         
+        // 헤더가 콘텐츠보다 작으면 콘텐츠 크기에 맞춤
         if (headerRect.width < contentWidth) {
           originalHeaderStyles.set(slideHeader, {
             width: slideHeader.style.width,
             maxWidth: slideHeader.style.maxWidth,
-            minWidth: slideHeader.style.minWidth
+            minWidth: slideHeader.style.minWidth,
+            display: slideHeader.style.display
           });
           
           slideHeader.style.width = `${contentWidth}px`;
           slideHeader.style.maxWidth = `${contentWidth}px`;
           slideHeader.style.minWidth = `${contentWidth}px`;
+          slideHeader.style.display = 'block';
+          
+          // 헤더 내부 컨테이너 요소들도 조정
+          const headerContainers = slideHeader.querySelectorAll('.MuiContainer-root, .MuiBox-root');
+          headerContainers.forEach(container => {
+            container.style.width = '100%';
+            container.style.maxWidth = '100%';
+          });
+          
+          await new Promise(r => setTimeout(r, 200)); // 렌더링 안정화
         }
       }
 
@@ -473,6 +575,10 @@ const slideSpecificHandlers = {
 
       await new Promise(r => setTimeout(r, 300));
 
+      // 캡처 크기 제한
+      const captureWidth = Math.min(sizeInfo.measuredWidth * 2, MAX_WIDTH * 2);
+      const captureHeight = Math.min(sizeInfo.measuredHeight * 2, MAX_HEIGHT * 2);
+
       const blob = await captureElement(captureTargetElement, {
         scale: 2,
         useCORS: true,
@@ -481,8 +587,8 @@ const slideSpecificHandlers = {
         scrollX: 0,
         scrollY: 0,
         skipAutoCrop: false, // 크롭 활성화 (콘텐츠 밑 여백 제거)
-        height: sizeInfo.measuredHeight * 2,
-        width: sizeInfo.measuredWidth * 2
+        width: captureWidth,
+        height: captureHeight
       });
 
       // 스타일 복원
@@ -506,6 +612,15 @@ const slideSpecificHandlers = {
           else header.style.removeProperty('max-width');
           if (styles.minWidth) header.style.minWidth = styles.minWidth;
           else header.style.removeProperty('min-width');
+          if (styles.display) header.style.display = styles.display;
+          else header.style.removeProperty('display');
+          
+          // 헤더 내부 컨테이너 요소들도 복원
+          const headerContainers = header.querySelectorAll('.MuiContainer-root, .MuiBox-root');
+          headerContainers.forEach(container => {
+            container.style.removeProperty('width');
+            container.style.removeProperty('max-width');
+          });
         });
       }
 
@@ -559,9 +674,10 @@ const slideSpecificHandlers = {
 
     // 헤더 크기 조정
     const originalHeaderStyles = new Map();
+    let elementRect = null;
     if (config.needsHeaderSizeAdjustment && captureTargetElement) {
       const dataInputHeaders = captureTargetElement.querySelectorAll('h6, .MuiTypography-h6, .MuiTypography-h5');
-      const elementRect = captureTargetElement.getBoundingClientRect();
+      elementRect = captureTargetElement.getBoundingClientRect();
 
       for (const header of dataInputHeaders) {
         try {
@@ -571,7 +687,7 @@ const slideSpecificHandlers = {
                headerText.includes('채권') || headerText.includes('현황')) &&
               !headerText.includes('조회') && !headerText.includes('선택')) {
             const headerRect = header.getBoundingClientRect();
-            if (headerRect.width > elementRect.width * 0.95) {
+            if (elementRect && headerRect.width > elementRect.width * 0.95) {
               originalHeaderStyles.set(header, {
                 width: header.style.width,
                 maxWidth: header.style.maxWidth,
@@ -618,28 +734,56 @@ const slideSpecificHandlers = {
         );
       }
 
-      // 재초담초채권: 콘텐츠 박스 너비 통일 (슬라이드 콘텐츠 박스 비율에 맞춤)
-      const contentBoxes = captureTargetElement.querySelectorAll('.MuiPaper-root, .MuiCard-root, [class*="Paper"], [class*="Card"]');
-      let originalContentBoxStyles = new Map();
-      const slideContentBoxWidth = captureTargetElement.getBoundingClientRect().width;
+      // 이미지 크기 제한 (너무 크면 업로드 실패 및 CORS 에러 발생)
+      const MAX_WIDTH = 2560; // 최대 너비 (픽셀)
+      const MAX_HEIGHT = 8000; // 최대 높이 (픽셀)
       
-      // 모든 콘텐츠 박스를 동일한 너비로 통일
-      contentBoxes.forEach(box => {
-        const boxRect = box.getBoundingClientRect();
-        if (boxRect.width > 0) {
-          originalContentBoxStyles.set(box, {
-            width: box.style.width,
-            maxWidth: box.style.maxWidth,
-            minWidth: box.style.minWidth
-          });
-          
-          // 슬라이드 콘텐츠 박스 너비의 95%로 통일 (여유 공간 확보)
-          const unifiedWidth = slideContentBoxWidth * 0.95;
-          box.style.width = `${unifiedWidth}px`;
-          box.style.maxWidth = `${unifiedWidth}px`;
-          box.style.minWidth = `${unifiedWidth}px`;
-        }
-      });
+      if (sizeInfo.measuredWidth > MAX_WIDTH) {
+        sizeInfo.measuredWidth = MAX_WIDTH;
+      }
+      if (sizeInfo.measuredHeight > MAX_HEIGHT) {
+        sizeInfo.measuredHeight = MAX_HEIGHT;
+      }
+
+      // 재초담초채권: 콘텐츠 박스 너비 통일 (그래프/테이블 박스만 선택적으로 적용)
+      let originalContentBoxStyles = new Map();
+      const elementRect = captureTargetElement.getBoundingClientRect();
+      const slideContentBoxWidth = Math.min(elementRect.width, MAX_WIDTH);
+      
+      // 그래프와 테이블이 들어있는 Paper만 선택
+      const graphPapers = Array.from(captureTargetElement.querySelectorAll('.MuiPaper-root, .MuiCard-root'))
+        .filter(box => {
+          const text = (box.textContent || '').toLowerCase();
+          const hasChart = box.querySelector('canvas, svg, [class*="recharts"], [class*="Chart"]') !== null;
+          const hasTable = box.querySelector('table, .MuiTable-root') !== null;
+          // 그래프나 테이블이 있는 Paper만 선택, 데이터입력 헤더는 제외
+          return (hasChart || hasTable) && !text.includes('조회') && !text.includes('선택');
+        });
+      
+      // 모든 그래프/테이블 박스를 동일한 너비로 통일 (최대 너비 제한)
+      if (graphPapers.length > 0) {
+        const unifiedWidth = Math.min(slideContentBoxWidth * 0.95, sizeInfo.measuredWidth || slideContentBoxWidth);
+        
+        graphPapers.forEach(box => {
+          const boxRect = box.getBoundingClientRect();
+          if (boxRect.width > 0) {
+            originalContentBoxStyles.set(box, {
+              width: box.style.width,
+              maxWidth: box.style.maxWidth,
+              minWidth: box.style.minWidth
+            });
+            
+            // 통일 너비 적용 (기존 너비보다 크게 확장하지 않음)
+            const targetWidth = Math.min(unifiedWidth, boxRect.width * 1.1); // 기존 너비의 110% 이내로 제한
+            box.style.width = `${targetWidth}px`;
+            box.style.maxWidth = `${targetWidth}px`;
+            box.style.minWidth = `${targetWidth}px`;
+          }
+        });
+        
+        // 렌더링 안정화 대기
+        await new Promise(r => setTimeout(r, 200));
+      }
 
       // 스타일 적용
       const originalHeight = captureTargetElement.style.height;
@@ -655,6 +799,10 @@ const slideSpecificHandlers = {
 
       await new Promise(r => setTimeout(r, 300));
 
+      // 캡처 크기 제한
+      const captureWidth = Math.min(sizeInfo.measuredWidth * 2, MAX_WIDTH * 2);
+      const captureHeight = Math.min(sizeInfo.measuredHeight * 2, MAX_HEIGHT * 2);
+
       const blob = await captureElement(captureTargetElement, {
         scale: 2,
         useCORS: true,
@@ -663,7 +811,8 @@ const slideSpecificHandlers = {
         scrollX: 0,
         scrollY: 0,
         skipAutoCrop: false, // 크롭 활성화 (콘텐츠 밑 여백 제거)
-        height: sizeInfo.measuredHeight * 2
+        width: captureWidth,
+        height: captureHeight
       });
 
       // 스타일 복원
@@ -954,12 +1103,21 @@ const slideSpecificHandlers = {
             skipAutoCrop: true, // 헤더는 크롭하지 않음
           });
 
+          // 이미지 크기 제한
+          const MAX_WIDTH = 2560;
+          const MAX_HEIGHT = 8000;
+          const tableRect = tableBox.getBoundingClientRect();
+          const tableWidth = Math.min(tableRect.width * 2, MAX_WIDTH * 2);
+          const tableHeight = Math.min(tableRect.height * 2, MAX_HEIGHT * 2);
+          
           const tableBlob = await captureElement(tableBox, {
             scale: 2,
             useCORS: true,
             fixedBottomPaddingPx: 0, // 핑크바 제거
             backgroundColor: '#ffffff',
             skipAutoCrop: false, // 크롭 활성화 (하단 여백 제거)
+            width: tableWidth,
+            height: tableHeight
           });
 
           const headerImg = await blobToImage(headerBlob);
@@ -970,14 +1128,18 @@ const slideSpecificHandlers = {
             if (process.env.NODE_ENV === 'development') {
               console.warn('⚠️ [재고장표] 헤더 이미지가 너무 작습니다:', { width: headerImg.width, height: headerImg.height });
             }
-            // 헤더가 없으면 테이블만 반환
-            const blob = await captureElement(tableBox, {
+            // 헤더가 없으면 테이블만 반환 (하단 여백 제거 및 핑크바 제거)
+            const tableOnlyBlob = await captureElement(tableBox, {
               scale: 2,
               useCORS: true,
-              fixedBottomPaddingPx: 0,
+              fixedBottomPaddingPx: 0, // 핑크바 제거
               backgroundColor: '#ffffff',
-              skipAutoCrop: false,
+              skipAutoCrop: false, // 크롭 활성화 (하단 여백 제거)
+              width: tableWidth,
+              height: tableHeight
             });
+            
+            const blob = tableOnlyBlob;
             
             // 스타일 복원 후 반환
             if (originalTableBoxWidth) tableBox.style.width = originalTableBoxWidth;
@@ -1051,14 +1213,26 @@ const slideSpecificHandlers = {
 
           return compositeBlob;
         } else {
-          // 헤더 없이 테이블만 캡처
+          // 헤더 없이 테이블만 캡처 (하단 여백 제거 및 핑크바 제거)
+          const MAX_WIDTH = 2560;
+          const MAX_HEIGHT = 8000;
+          const tableRect = tableBox.getBoundingClientRect();
+          const tableOnlyWidth = Math.min(tableRect.width * 2, MAX_WIDTH * 2);
+          const tableOnlyHeight = Math.min(tableRect.height * 2, MAX_HEIGHT * 2);
+          
           const blob = await captureElement(tableBox, {
             scale: 2,
             useCORS: true,
             fixedBottomPaddingPx: 0, // 핑크바 제거
             backgroundColor: '#ffffff',
             skipAutoCrop: false, // 크롭 활성화 (하단 여백 제거)
+            width: tableOnlyWidth,
+            height: tableOnlyHeight
           });
+          
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('⚠️ [재고장표] 헤더를 찾지 못해 테이블만 캡처했습니다.');
+          }
 
           // 스타일 복원
           if (originalTableBoxWidth) tableBox.style.width = originalTableBoxWidth;
