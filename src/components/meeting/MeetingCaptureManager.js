@@ -1037,36 +1037,58 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             let headerBlob = null;
             try {
               let headerElement = null;
-              const allElements = Array.from(slideElement.querySelectorAll('*'));
-              for (const el of allElements) {
-                const style = window.getComputedStyle(el);
-                const text = (el.textContent || '').trim();
-                const rect = el.getBoundingClientRect();
-                // 슬라이드 상단 헤더: absolute 위치, top이 0 근처, 회사명 포함, 테이블 헤더가 아닌 것
-                if (style.position === 'absolute' &&
-                    (parseInt(style.top) === 0 || style.top === '0px') &&
+              
+              // 재고장표 슬라이드 헤더 찾기: 더 넓은 범위로 검색
+              // 1순위: slideElement의 직접 자식 중에서 찾기
+              for (const child of Array.from(slideElement.children)) {
+                const style = window.getComputedStyle(child);
+                const text = (child.textContent || '').trim();
+                const rect = child.getBoundingClientRect();
+                // 슬라이드 상단 헤더: absolute 또는 fixed 위치, top이 0 근처, 회사명 포함
+                if ((style.position === 'absolute' || style.position === 'fixed') &&
+                    (parseInt(style.top) === 0 || style.top === '0px' || rect.top < 100) &&
                     text.includes('(주)브이아이피플러스') &&
                     !text.includes('재고장표') && // 중간 컨텐츠 헤더 제외
-                    rect.top < 200) { // 상단 200px 이내에만 (중간 헤더 제외)
-                  headerElement = el;
+                    rect.top >= 0 && rect.top < 200) { // 상단 200px 이내에만 (중간 헤더 제외)
+                  headerElement = child;
+                  if (process.env.NODE_ENV === 'development') {
+                    console.log('✅ [재고장표] 헤더 찾음 (직접 자식):', text.substring(0, 50));
+                  }
                   break;
                 }
               }
+              
+              // 2순위: 모든 요소 중에서 찾기
               if (!headerElement) {
-                for (const child of Array.from(slideElement.children)) {
-                  const style = window.getComputedStyle(child);
-                  const text = (child.textContent || '').trim();
-                  const rect = child.getBoundingClientRect();
-                  // 슬라이드 상단 헤더: absolute 위치, top이 0 근처, 회사명 포함, 테이블 헤더가 아닌 것
-                  if (style.position === 'absolute' &&
-                      (parseInt(style.top) === 0 || style.top === '0px') &&
+                const allElements = Array.from(slideElement.querySelectorAll('*'));
+                for (const el of allElements) {
+                  const style = window.getComputedStyle(el);
+                  const text = (el.textContent || '').trim();
+                  const rect = el.getBoundingClientRect();
+                  // 슬라이드 상단 헤더: absolute 또는 fixed 위치, top이 0 근처, 회사명 포함
+                  if ((style.position === 'absolute' || style.position === 'fixed') &&
+                      (parseInt(style.top) === 0 || style.top === '0px' || rect.top < 100) &&
                       text.includes('(주)브이아이피플러스') &&
                       !text.includes('재고장표') && // 중간 컨텐츠 헤더 제외
-                      rect.top < 200) { // 상단 200px 이내에만 (중간 헤더 제외)
-                    headerElement = child;
+                      rect.top >= 0 && rect.top < 200) { // 상단 200px 이내에만 (중간 헤더 제외)
+                    headerElement = el;
+                    if (process.env.NODE_ENV === 'development') {
+                      console.log('✅ [재고장표] 헤더 찾음 (전체 검색):', text.substring(0, 50));
+                    }
                     break;
                   }
                 }
+              }
+              
+              if (!headerElement && process.env.NODE_ENV === 'development') {
+                console.warn('⚠️ [재고장표] 헤더를 찾을 수 없습니다. slideElement 자식 확인:', 
+                  Array.from(slideElement.children).map(c => ({
+                    tag: c.tagName,
+                    text: (c.textContent || '').substring(0, 50),
+                    position: window.getComputedStyle(c).position,
+                    top: window.getComputedStyle(c).top
+                  }))
+                );
               }
               if (headerElement) {
                 headerElement.scrollIntoView({ block: 'start', behavior: 'instant' });
@@ -2034,8 +2056,44 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               actualTable.style.setProperty('min-width', `${actualScrollWidth}px`, 'important');
               
               // 각 셀의 너비도 충분히 확보 (숫자가 잘리지 않도록)
+              // 단, 가입자증감 컴포넌트의 데이터 로딩에 영향을 주지 않도록 주의
               const allCells = actualTable.querySelectorAll('td, th');
               const originalCellStyles = new Map();
+              
+              // 셀 스타일 변경 전에 데이터 로딩이 완료되었는지 확인
+              // 가입자증감 컴포넌트가 데이터를 로드하는 동안 DOM 조작을 최소화
+              let dataLoaded = false;
+              try {
+                // 데이터가 로드되었는지 확인 (테이블에 실제 데이터가 있는지)
+                const hasDataRows = actualTable.querySelectorAll('tbody tr').length > 0;
+                const hasDataCells = Array.from(actualTable.querySelectorAll('td')).some(cell => {
+                  const text = (cell.textContent || '').trim();
+                  return text && text !== '-' && /[\d,]+/.test(text);
+                });
+                dataLoaded = hasDataRows && hasDataCells;
+                
+                if (!dataLoaded && process.env.NODE_ENV === 'development') {
+                  console.warn('⚠️ [가입자증감] 데이터 로딩 대기 중... 셀 스타일 변경 지연');
+                  // 데이터 로딩 대기 (최대 2초)
+                  for (let i = 0; i < 20; i++) {
+                    await new Promise(r => setTimeout(r, 100));
+                    const checkHasData = Array.from(actualTable.querySelectorAll('td')).some(cell => {
+                      const text = (cell.textContent || '').trim();
+                      return text && text !== '-' && /[\d,]+/.test(text);
+                    });
+                    if (checkHasData) {
+                      dataLoaded = true;
+                      break;
+                    }
+                  }
+                }
+              } catch (e) {
+                // 데이터 확인 실패해도 계속 진행
+                if (process.env.NODE_ENV === 'development') {
+                  console.warn('⚠️ [가입자증감] 데이터 로딩 확인 중 오류:', e?.message);
+                }
+              }
+              
               allCells.forEach(cell => {
                 // 원본 스타일 저장
                 originalCellStyles.set(cell, {
@@ -2906,7 +2964,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         }
       }
       
-      // 전체총마감 슬라이드: 실제 콘텐츠 높이에 맞춰 크롭 (월간시상 슬라이드와 유사)
+      // 전체총마감 슬라이드: 실제 콘텐츠 높이에 맞춰 크롭 (월간시상 슬라이드와 동일한 로직)
       const isTotalClosing = currentSlide?.mode === 'chart' && 
                              currentSlide?.tab === 'closingChart' && 
                              currentSlide?.subTab === 'totalClosing';
@@ -2916,17 +2974,19 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
           const measuredHeight = parseFloat(captureTargetElement.style.height);
           
           if (measuredHeight && measuredHeight > 0) {
-            // 측정된 높이 사용하여 불필요한 여백 제거
+            // 월간시상 슬라이드와 동일한 방식으로 실제 배경색 안에 컨텐츠가 들어가는 부분만 크롭
             captureOptions.skipAutoCrop = true; // 크롭 로직 제거 (실제 높이로만 캡처)
             captureOptions.fixedBottomPaddingPx = 0; // 핑크 바 제거
-            captureOptions.height = measuredHeight * 2; // scale 고려
+            captureOptions.height = measuredHeight * 2; // scale 고려 (월간시상과 동일)
+            captureOptions.backgroundColor = '#ffffff'; // 배경색 명시 (월간시상과 동일)
             
             if (process.env.NODE_ENV === 'development') {
-              console.log(`📐 [MeetingCaptureManager] 전체총마감: 크롭 옵션 설정`, {
+              console.log(`📐 [MeetingCaptureManager] 전체총마감: 크롭 옵션 설정 (월간시상 로직 참고)`, {
                 measuredHeight,
                 captureHeight: captureOptions.height,
                 skipAutoCrop: true,
-                fixedBottomPaddingPx: 0
+                fixedBottomPaddingPx: 0,
+                backgroundColor: '#ffffff'
               });
             }
           }
