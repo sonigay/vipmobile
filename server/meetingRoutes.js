@@ -1323,15 +1323,39 @@ async function uploadMeetingImage(req, res) {
           const slideType = currentSlide[3]; // '타입' 컬럼
           isMainTocEnding = slideType === 'main' || slideType === 'toc' || slideType === 'ending';
         }
+        
+        // 월간시상 슬라이드 확인 (탭: indicatorChart, 서브탭: monthlyAward)
+        let isMonthlyAward = false;
+        if (currentSlide && currentSlide[5]) { // '탭' 컬럼
+          const tab = currentSlide[5];
+          const subTab = currentSlide[6]; // '서브탭' 컬럼
+          isMonthlyAward = tab === 'indicatorChart' && subTab === 'monthlyAward';
+        }
+        
+        // 가입자 증감 슬라이드 확인 (탭: bondChart, 서브탭: subscriberIncrease)
+        let isSubscriberIncrease = false;
+        if (currentSlide && currentSlide[5]) { // '탭' 컬럼
+          const tab = currentSlide[5];
+          const subTab = currentSlide[6]; // '서브탭' 컬럼
+          // tab/subTab 형식으로 저장된 경우 파싱
+          const [parsedTab, parsedSubTab] = tab.includes('/') ? tab.split('/') : [tab, subTab];
+          isSubscriberIncrease = (parsedTab === 'bondChart' || parsedTab === 'bond') && 
+                                 (parsedSubTab === 'subscriberIncrease' || subTab === 'subscriberIncrease');
+        }
+        
+        // 메인/목차/엔딩/월간시상/가입자증감 슬라이드는 핑크 바 제거 (minBottomPadding: 0, bottomColor: white)
+        const cropOptions = (isMainTocEnding || isMonthlyAward || isSubscriberIncrease)
+          ? { minBottomPadding: 0, bottomColor: 'white' }
+          : { bottomColor: 'pink' };
       } catch (typeError) {
         console.warn('⚠️ [uploadMeetingImage] 슬라이드 타입 확인 실패, 기본값 사용:', typeError.message);
+        // 타입 확인 실패 시 기본값 (핑크 바 추가)
+        var cropOptions = { bottomColor: 'pink' };
       }
+    } else {
+      // 임시 회의나 slideOrder가 없는 경우 기본값 (핑크 바 추가)
+      var cropOptions = { bottomColor: 'pink' };
     }
-    
-    // 메인/목차/엔딩 슬라이드는 핑크 바 제거 (minBottomPadding: 0, bottomColor: white)
-    const cropOptions = isMainTocEnding 
-      ? { minBottomPadding: 0, bottomColor: 'white' }
-      : { bottomColor: 'pink' };
     
     const croppedResult = await autoCropImage(req.file.buffer, cropOptions);
     console.log(`✅ [uploadMeetingImage] 이미지 자동 크롭 완료:`, {

@@ -1833,11 +1833,37 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             const actualTable = tablePaper.querySelector('table');
             
             // 테이블의 실제 scrollWidth 측정 (12월까지 포함한 전체 너비)
+            // 각 셀의 실제 너비를 확인하여 충분한 너비 확보
             let actualScrollWidth = 1200; // 기본값
-            if (tableContainer && tableContainer.scrollWidth) {
+            if (actualTable) {
+              // 모든 셀의 너비를 확인하여 가장 넓은 셀 기준으로 계산
+              const allCells = actualTable.querySelectorAll('td, th');
+              let maxCellWidth = 0;
+              let totalWidth = 0;
+              
+              // 첫 번째 행의 셀 너비 확인 (헤더)
+              const firstRowCells = actualTable.querySelectorAll('thead tr:first-child th, thead tr:first-child td, tbody tr:first-child td');
+              firstRowCells.forEach(cell => {
+                const cellRect = cell.getBoundingClientRect();
+                const cellWidth = cellRect.width;
+                maxCellWidth = Math.max(maxCellWidth, cellWidth);
+                totalWidth += cellWidth;
+              });
+              
+              // 숫자가 큰 셀을 고려하여 최소 셀 너비 보장 (예: 113,635,306 같은 큰 숫자)
+              const minCellWidth = 120; // 최소 셀 너비 (큰 숫자를 표시하기 위해)
+              const estimatedWidth = Math.max(totalWidth, maxCellWidth * (firstRowCells.length || 13)); // 13개 컬럼 (코드, 대리점, 1월~12월)
+              
+              // scrollWidth와 비교하여 더 큰 값 사용
+              if (tableContainer && tableContainer.scrollWidth) {
+                actualScrollWidth = Math.max(tableContainer.scrollWidth, estimatedWidth, 1200);
+              } else if (actualTable.scrollWidth) {
+                actualScrollWidth = Math.max(actualTable.scrollWidth, estimatedWidth, 1200);
+              } else {
+                actualScrollWidth = Math.max(estimatedWidth, 1200);
+              }
+            } else if (tableContainer && tableContainer.scrollWidth) {
               actualScrollWidth = Math.max(tableContainer.scrollWidth, 1200);
-            } else if (actualTable && actualTable.scrollWidth) {
-              actualScrollWidth = Math.max(actualTable.scrollWidth, 1200);
             } else {
               const tableRect = tablePaper.getBoundingClientRect();
               actualScrollWidth = Math.max(tableRect.width, 1200);
@@ -1874,6 +1900,37 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               actualTable.style.minWidth = `${actualScrollWidth}px`;
               actualTable.style.setProperty('width', `${actualScrollWidth}px`, 'important');
               actualTable.style.setProperty('min-width', `${actualScrollWidth}px`, 'important');
+              
+              // 각 셀의 너비도 충분히 확보 (숫자가 잘리지 않도록)
+              const allCells = actualTable.querySelectorAll('td, th');
+              const originalCellStyles = new Map();
+              allCells.forEach(cell => {
+                // 원본 스타일 저장
+                originalCellStyles.set(cell, {
+                  minWidth: cell.style.minWidth,
+                  whiteSpace: cell.style.whiteSpace
+                });
+                
+                // 셀의 현재 너비 확인
+                const cellRect = cell.getBoundingClientRect();
+                const cellText = (cell.textContent || '').trim();
+                // 큰 숫자가 있는 셀은 최소 너비 보장
+                if (cellText && /[\d,]+/.test(cellText)) {
+                  const minCellWidth = 100; // 최소 셀 너비
+                  if (cellRect.width < minCellWidth) {
+                    cell.style.minWidth = `${minCellWidth}px`;
+                    cell.style.setProperty('min-width', `${minCellWidth}px`, 'important');
+                  }
+                }
+                // 셀의 white-space를 nowrap로 설정하여 텍스트가 잘리지 않도록
+                cell.style.whiteSpace = 'nowrap';
+                cell.style.setProperty('white-space', 'nowrap', 'important');
+              });
+              
+              // 원본 셀 스타일 복원 함수 저장 (나중에 복원하기 위해)
+              if (!tablePaper.__originalCellStyles) {
+                tablePaper.__originalCellStyles = originalCellStyles;
+              }
             }
             
             // 스크롤을 맨 왼쪽으로 이동 (앞부분이 보이도록)
@@ -1881,12 +1938,42 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               tableContainer.scrollLeft = 0;
             }
             
-            // 스타일 변경 후 렌더링 대기
-            await new Promise(r => setTimeout(r, 500));
+            // 스타일 변경 후 렌더링 대기 (셀 너비 조정을 위해 더 긴 대기 시간)
+            await new Promise(r => setTimeout(r, 800));
             
             // 최종 scrollWidth 재확인 (확장 후)
+            // 셀 너비 조정 후 실제 테이블 너비 재측정
+            if (actualTable) {
+              // 모든 셀의 실제 렌더링된 너비 확인
+              const allCells = actualTable.querySelectorAll('td, th');
+              let totalCellWidth = 0;
+              allCells.forEach(cell => {
+                const cellRect = cell.getBoundingClientRect();
+                totalCellWidth = Math.max(totalCellWidth, cellRect.right - cellRect.left);
+              });
+              
+              // 첫 번째 행의 모든 셀 너비 합계로 전체 테이블 너비 추정
+              const firstRowCells = actualTable.querySelectorAll('thead tr:first-child th, thead tr:first-child td, tbody tr:first-child td');
+              if (firstRowCells.length > 0) {
+                let firstRowTotalWidth = 0;
+                firstRowCells.forEach(cell => {
+                  const cellRect = cell.getBoundingClientRect();
+                  firstRowTotalWidth += cellRect.width;
+                });
+                // 첫 번째 행 너비 합계와 scrollWidth 중 더 큰 값 사용
+                actualScrollWidth = Math.max(actualScrollWidth, firstRowTotalWidth, tableContainer?.scrollWidth || 0, actualTable.scrollWidth || 0);
+              }
+            }
+            
             if (tableContainer && tableContainer.scrollWidth > actualScrollWidth) {
               actualScrollWidth = tableContainer.scrollWidth;
+            }
+            if (actualTable && actualTable.scrollWidth > actualScrollWidth) {
+              actualScrollWidth = actualTable.scrollWidth;
+            }
+            
+            // 재확인된 너비로 다시 설정
+            if (actualScrollWidth > tablePaper.getBoundingClientRect().width) {
               tablePaper.style.width = `${actualScrollWidth}px`;
               tablePaper.style.minWidth = `${actualScrollWidth}px`;
               if (tableContainer !== tablePaper) {
@@ -1937,6 +2024,28 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               tablePaper.style.maxWidth = originalTablePaperStyle.maxWidth;
             } else {
               tablePaper.style.removeProperty('max-width');
+            }
+            
+            // 셀 스타일 복원
+            if (actualTable && tablePaper.__originalCellStyles) {
+              const originalCellStyles = tablePaper.__originalCellStyles;
+              const allCells = actualTable.querySelectorAll('td, th');
+              allCells.forEach(cell => {
+                const originalStyle = originalCellStyles.get(cell);
+                if (originalStyle) {
+                  if (originalStyle.minWidth) {
+                    cell.style.minWidth = originalStyle.minWidth;
+                  } else {
+                    cell.style.removeProperty('min-width');
+                  }
+                  if (originalStyle.whiteSpace) {
+                    cell.style.whiteSpace = originalStyle.whiteSpace;
+                  } else {
+                    cell.style.removeProperty('white-space');
+                  }
+                }
+              });
+              delete tablePaper.__originalCellStyles;
             }
             
             if (process.env.NODE_ENV === 'development') {
@@ -2560,9 +2669,13 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
       // 안전 장치: 메인/목차/엔딩 슬라이드가 아닌 경우에만 하단 여백 패딩 적용
       // (메인/목차/엔딩 슬라이드는 크롭 및 패딩 로직 제거)
       // 월간 시상 슬라이드는 핑크 바 제거 및 크롭 로직 사용하므로 패딩 제거
+      // 가입자 증감 슬라이드는 핑크 바 제거하므로 패딩 제거
       const isMonthlyAward = currentSlide?.mode === 'chart' && 
                              (currentSlide?.tab === 'indicatorChart' || currentSlide?.subTab === 'monthlyAward');
-      if (!isMainTocEnding && !isMonthlyAward) {
+      const isSubscriberIncrease = currentSlide?.mode === 'chart' && 
+                                   (currentSlide?.tab === 'bondChart' || currentSlide?.tab === 'bond') &&
+                                   (currentSlide?.subTab === 'subscriberIncrease');
+      if (!isMainTocEnding && !isMonthlyAward && !isSubscriberIncrease) {
         try {
           const ensureBottomPadding = async (srcBlob, padding = 96) => {
             if (!srcBlob || padding <= 0) return srcBlob;
