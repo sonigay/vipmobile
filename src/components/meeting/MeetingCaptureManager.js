@@ -1897,9 +1897,12 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                 }
               }
             }
-          } else {
+          }
+          
+          // commonAncestor가 없거나 테이블을 찾지 못한 경우 경고
+          if (!commonAncestor || commonAncestor === slideElement) {
             if (process.env.NODE_ENV === 'development') {
-              console.warn('⚠️ [MeetingCaptureManager] 월간시상 테이블을 찾을 수 없습니다.');
+              console.warn('⚠️ [MeetingCaptureManager] 월간시상: commonAncestor를 찾지 못해 전체 슬라이드를 캡처합니다.');
             }
           }
         } catch (e) {
