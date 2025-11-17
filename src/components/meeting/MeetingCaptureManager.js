@@ -476,6 +476,12 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
           await ensureVisible(captureTargetElement);
           
           // 전체총마감 슬라이드: 실제 콘텐츠 높이 측정 및 불필요한 여백 제거 (월간시상 슬라이드와 유사한 로직)
+          // 전체총마감 슬라이드가 아닌 경우 이 로직을 건너뛰기
+          const isTotalClosingSlide = currentSlide?.mode === 'chart' && 
+                                     currentSlide?.tab === 'closingChart' && 
+                                     currentSlide?.subTab === 'totalClosing';
+          
+          if (isTotalClosingSlide) {
           try {
             const rect = captureTargetElement.getBoundingClientRect();
             const allChildren = captureTargetElement.querySelectorAll('*');
@@ -558,6 +564,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               console.warn('⚠️ [MeetingCaptureManager] 전체총마감 높이 측정 중 경고:', e?.message);
             }
           }
+          } // isTotalClosingSlide 체크 종료
         }
         
         // csDetailType: 단일 값 또는 배열(복수 결합) 지원
