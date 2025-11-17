@@ -2754,11 +2754,21 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
       const uploadWithRetry = async (retries = 3, baseDelay = 1000) => {
         let lastError = null;
         
+        // 전체총마감 슬라이드는 이미지가 크므로 타임아웃을 더 길게 설정
+        const isTotalClosing = currentSlide?.mode === 'chart' && 
+                               currentSlide?.tab === 'closingChart' && 
+                               currentSlide?.subTab === 'totalClosing';
+        const uploadTimeout = isTotalClosing ? 120000 : 30000; // 전체총마감: 120초, 기타: 30초
+        
+        if (process.env.NODE_ENV === 'development' && isTotalClosing) {
+          console.log(`⏱️ [MeetingCaptureManager] 전체총마감 슬라이드: 업로드 타임아웃 ${uploadTimeout / 1000}초로 설정`);
+        }
+        
         for (let attempt = 1; attempt <= retries; attempt++) {
           try {
-            // 타임아웃 설정 (30초)
+            // 타임아웃 설정 (전체총마감 슬라이드는 더 긴 타임아웃)
             const abortController = new AbortController();
-            const timeoutId = setTimeout(() => abortController.abort(), 30000);
+            const timeoutId = setTimeout(() => abortController.abort(), uploadTimeout);
             
             // FormData를 사용할 때는 Content-Type 헤더를 설정하지 않음 (브라우저가 자동으로 설정)
             const uploadResponse = await fetch(`${API_BASE_URL}/api/meetings/${meeting.meetingId}/upload-image`, {
