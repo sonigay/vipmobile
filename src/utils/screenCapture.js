@@ -284,15 +284,22 @@ export async function captureElement(element, options = {}) {
   const targetWidth = BASE_CAPTURE_WIDTH;
   // 메인/목차는 헤더 포함 전체를 캡처하므로 충분한 높이 보장
   const slideId = element.getAttribute('data-slide-id') || '';
-  const isMainOrToc = slideId.includes('main') || slideId.includes('toc');
+  const isMain = slideId.includes('main') && !slideId.includes('toc');
+  const isToc = slideId.includes('toc');
+  const isMainOrToc = isMain || isToc;
   
   // 메인/목차 슬라이드: 고정 가로폭(1280px) 적용 시 세로 재흐름으로 인한 하단 잘림 방지
-  // 높이 = scrollHeight × (1/widthScale) × 1.6, 최소 1100px 보장 (목차 항목이 많은 경우 대비)
+  // 높이 = scrollHeight × (1/widthScale) × 배율, 최소 높이 보장
   // autoCrop 유지로 과도 여백은 자동 제거
   let targetHeight;
-  if (isMainOrToc) {
-    // 메인/목차 슬라이드는 목차 항목이 매우 길어질 수 있으므로 더 큰 여유를 잡는다.
-    // 가로 폭 축소 비율을 보정한 뒤 3.5배까지 여유를 주고, 최소 높이도 2500px로 상향.
+  if (isToc) {
+    // 목차 슬라이드는 항목이 매우 많을 수 있으므로 넉넉한 고정 높이 보장
+    // 계산된 높이와 고정 최소 높이 중 큰 값 사용 (최소 4500px 보장)
+    const heightScale = widthScale < 1 ? (1 / widthScale) : 1;
+    const calculatedHeight = Math.ceil(scrollHeight * heightScale * 5.0);
+    targetHeight = Math.max(calculatedHeight, 4500); // 목차는 최소 4500px 보장
+  } else if (isMain) {
+    // 메인 슬라이드는 목차보다 짧지만 충분한 여유를 준다.
     const heightScale = widthScale < 1 ? (1 / widthScale) : 1;
     targetHeight = Math.max(Math.ceil(scrollHeight * heightScale * 3.5), 2500);
   } else {

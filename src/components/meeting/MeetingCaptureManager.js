@@ -272,38 +272,138 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
       try {
         // 전체총마감 슬라이드: 모든 섹션 펼치기 및 전체 슬라이드 캡처
         if (currentSlide?.mode === 'chart' && currentSlide?.tab === 'closingChart' && currentSlide?.subTab === 'totalClosing') {
-          // 모든 "펼치기" 버튼 클릭
-          const expandButtons = Array.from(document.querySelectorAll('button, .MuiButton-root'))
-            .filter(btn => {
-              const text = (btn.textContent || '').trim();
-              return text === '펼치기';
+          // 섹션별 헤더 텍스트와 해당 섹션의 테이블 확인 함수
+          const sectionHeaders = [
+            { text: 'CS 개통 실적', key: 'cs' },
+            { text: '코드별 실적', key: 'code' },
+            { text: '사무실별 실적', key: 'office' },
+            { text: '소속별 실적', key: 'department' },
+            { text: '담당자별 실적', key: 'agent' }
+          ];
+          
+          // 각 섹션별로 펼치기 버튼 찾기 및 클릭
+          const expandedSections = new Set();
+          
+          for (const section of sectionHeaders) {
+            // 섹션 헤더 찾기
+            const headerElements = Array.from(document.querySelectorAll('h6, .MuiTypography-h6, .MuiBox-root, div, span'))
+              .filter(el => {
+                const text = (el.textContent || '').trim();
+                return text.includes(section.text);
+              });
+            
+            if (headerElements.length === 0) {
+              if (process.env.NODE_ENV === 'development') {
+                console.warn(`⚠️ [MeetingCaptureManager] 전체총마감: "${section.text}" 섹션 헤더를 찾을 수 없습니다.`);
+              }
+              continue;
+            }
+            
+            // 헤더가 속한 Paper 컴포넌트 찾기
+            let paperElement = headerElements[0].parentElement;
+            while (paperElement && !paperElement.classList.contains('MuiPaper-root')) {
+              paperElement = paperElement.parentElement;
+            }
+            
+            if (!paperElement) {
+              if (process.env.NODE_ENV === 'development') {
+                console.warn(`⚠️ [MeetingCaptureManager] 전체총마감: "${section.text}" 섹션의 Paper를 찾을 수 없습니다.`);
+              }
+              continue;
+            }
+            
+            // 해당 Paper 내부의 "펼치기" 버튼 찾기
+            const expandButton = Array.from(paperElement.querySelectorAll('button, .MuiButton-root'))
+              .find(btn => {
+                const text = (btn.textContent || '').trim();
+                return text === '펼치기';
+              });
+            
+            if (expandButton) {
+              // 펼치기 버튼 클릭
+              expandButton.click();
+              await new Promise(r => setTimeout(r, 500)); // 각 버튼 클릭 후 충분한 대기
+              
+              // 해당 섹션의 테이블이 나타날 때까지 대기 (최대 5초)
+              let tableFound = false;
+              let attempts = 0;
+              while (attempts < 25) {
+                const table = paperElement.querySelector('.MuiTableContainer-root');
+                if (table) {
+                  // 테이블에 실제 데이터가 있는지 확인 (최소 1개 행)
+                  const rows = table.querySelectorAll('tbody tr, tbody > tr');
+                  if (rows.length > 0) {
+                    tableFound = true;
+                    expandedSections.add(section.key);
+                    if (process.env.NODE_ENV === 'development') {
+                      console.log(`✅ [MeetingCaptureManager] 전체총마감: "${section.text}" 섹션 펼치기 완료 (${rows.length}개 행)`);
+                    }
+                    break;
+                  }
+                }
+                await new Promise(r => setTimeout(r, 200));
+                attempts++;
+              }
+              
+              if (!tableFound) {
+                if (process.env.NODE_ENV === 'development') {
+                  console.warn(`⚠️ [MeetingCaptureManager] 전체총마감: "${section.text}" 섹션 테이블을 찾을 수 없습니다.`);
+                }
+              }
+            } else {
+              // 이미 펼쳐져 있는지 확인 (접기 버튼이 있으면 펼쳐진 상태)
+              const collapseButton = Array.from(paperElement.querySelectorAll('button, .MuiButton-root'))
+                .find(btn => {
+                  const text = (btn.textContent || '').trim();
+                  return text === '접기';
+                });
+              
+              if (collapseButton) {
+                // 이미 펼쳐져 있음
+                const table = paperElement.querySelector('.MuiTableContainer-root');
+                if (table) {
+                  const rows = table.querySelectorAll('tbody tr, tbody > tr');
+                  if (rows.length > 0) {
+                    expandedSections.add(section.key);
+                    if (process.env.NODE_ENV === 'development') {
+                      console.log(`✅ [MeetingCaptureManager] 전체총마감: "${section.text}" 섹션 이미 펼쳐져 있음 (${rows.length}개 행)`);
+                    }
+                  }
+                }
+              }
+            }
+          }
+          
+          // 모든 섹션이 펼쳐질 때까지 추가 대기 (최대 3초)
+          const maxWait = 3000;
+          const start = Date.now();
+          while (Date.now() - start < maxWait) {
+            const allTables = slideElement.querySelectorAll('.MuiTableContainer-root');
+            let tablesWithData = 0;
+            allTables.forEach(table => {
+              const rows = table.querySelectorAll('tbody tr, tbody > tr');
+              if (rows.length > 0) tablesWithData++;
             });
-          
-          if (process.env.NODE_ENV === 'development') {
-            console.log(`✅ [MeetingCaptureManager] 전체총마감: ${expandButtons.length}개의 펼치기 버튼 발견`);
-          }
-          
-          // 모든 펼치기 버튼 클릭
-          for (const btn of expandButtons) {
-            btn.click();
-            await new Promise(r => setTimeout(r, 300));
-          }
-          
-          // 모든 섹션이 펼쳐질 때까지 대기
-          await new Promise(r => setTimeout(r, 1500));
-          
-          // 테이블이 렌더링될 때까지 추가 대기
-          let tableCount = 0;
-          let attempts = 0;
-          while (attempts < 30) {
-            tableCount = slideElement.querySelectorAll('.MuiTableContainer-root').length;
-            if (tableCount >= 5) break; // 최소 5개 테이블이 있어야 함
+            
+            if (tablesWithData >= 5) {
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`✅ [MeetingCaptureManager] 전체총마감: 모든 섹션 펼치기 완료 (${tablesWithData}개 테이블)`);
+              }
+              break;
+            }
             await new Promise(r => setTimeout(r, 200));
-            attempts++;
           }
           
+          // 최종 확인: 최소 5개 테이블이 있는지 확인
+          const finalTables = slideElement.querySelectorAll('.MuiTableContainer-root');
+          let finalTablesWithData = 0;
+          finalTables.forEach(table => {
+            const rows = table.querySelectorAll('tbody tr, tbody > tr');
+            if (rows.length > 0) finalTablesWithData++;
+          });
+          
           if (process.env.NODE_ENV === 'development') {
-            console.log(`✅ [MeetingCaptureManager] 전체총마감: ${tableCount}개 테이블 발견, 전체 슬라이드 캡처`);
+            console.log(`📊 [MeetingCaptureManager] 전체총마감: 최종 확인 - ${finalTablesWithData}개 테이블 (데이터 포함)`);
           }
           
           // 전체 슬라이드 캡처
@@ -318,8 +418,13 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             while (Date.now() - start < maxWait) {
               const rect = el.getBoundingClientRect();
               const hasSize = rect.height > 200 && rect.width > 200;
-              const hasTables = el.querySelectorAll('.MuiTableContainer-root').length >= 5;
-              if (hasSize && hasTables) break;
+              const allTables = el.querySelectorAll('.MuiTableContainer-root');
+              let tablesWithData = 0;
+              allTables.forEach(table => {
+                const rows = table.querySelectorAll('tbody tr, tbody > tr');
+                if (rows.length > 0) tablesWithData++;
+              });
+              if (hasSize && tablesWithData >= 5) break;
               await new Promise(r => setTimeout(r, 200));
             }
           };
