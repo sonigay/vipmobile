@@ -474,6 +474,90 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             }
           };
           await ensureVisible(captureTargetElement);
+          
+          // 전체총마감 슬라이드: 실제 콘텐츠 높이 측정 및 불필요한 여백 제거 (월간시상 슬라이드와 유사한 로직)
+          try {
+            const rect = captureTargetElement.getBoundingClientRect();
+            const allChildren = captureTargetElement.querySelectorAll('*');
+            let maxRelativeBottom = 0;
+            let actualContentHeight = captureTargetElement.scrollHeight || rect.height;
+            
+            // 모든 자식 요소의 실제 렌더링 위치 확인
+            for (const child of allChildren) {
+              try {
+                const childRect = child.getBoundingClientRect();
+                const relativeBottom = childRect.bottom - rect.top;
+                if (relativeBottom > 0 && relativeBottom < actualContentHeight * 3) {
+                  maxRelativeBottom = Math.max(maxRelativeBottom, relativeBottom);
+                }
+              } catch (e) {
+                // 무시
+              }
+            }
+            
+            // 실제 콘텐츠 높이에 맞춰서 설정 (불필요한 여백 제거)
+            // scrollHeight와 실제 렌더링된 최대 위치 중 작은 값 사용
+            const measuredHeight = Math.min(
+              Math.max(maxRelativeBottom + 40, actualContentHeight), // 최소 40px 여유공간
+              actualContentHeight * 1.1 // scrollHeight의 110%를 넘지 않도록 제한
+            );
+            
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`📐 [MeetingCaptureManager] 전체총마감: 실제 콘텐츠 높이 측정`, {
+                maxRelativeBottom,
+                actualContentHeight,
+                measuredHeight,
+                scrollHeight: captureTargetElement.scrollHeight,
+                offsetHeight: captureTargetElement.offsetHeight
+              });
+            }
+            
+            // 요소의 높이를 실제 콘텐츠 높이로 제한하여 불필요한 여백 제거
+            const originalHeight = captureTargetElement.style.height;
+            const originalMaxHeight = captureTargetElement.style.maxHeight;
+            captureTargetElement.style.height = `${measuredHeight}px`;
+            captureTargetElement.style.maxHeight = `${measuredHeight}px`;
+            captureTargetElement.style.overflow = 'visible';
+            
+            // 높이 제한을 위해 restoreStylesFunction에 추가
+            if (restoreStylesFunction) {
+              const originalRestore = restoreStylesFunction;
+              restoreStylesFunction = () => {
+                originalRestore();
+                if (originalHeight) {
+                  captureTargetElement.style.height = originalHeight;
+                } else {
+                  captureTargetElement.style.removeProperty('height');
+                }
+                if (originalMaxHeight) {
+                  captureTargetElement.style.maxHeight = originalMaxHeight;
+                } else {
+                  captureTargetElement.style.removeProperty('max-height');
+                }
+                captureTargetElement.style.removeProperty('overflow');
+              };
+            } else {
+              restoreStylesFunction = () => {
+                if (originalHeight) {
+                  captureTargetElement.style.height = originalHeight;
+                } else {
+                  captureTargetElement.style.removeProperty('height');
+                }
+                if (originalMaxHeight) {
+                  captureTargetElement.style.maxHeight = originalMaxHeight;
+                } else {
+                  captureTargetElement.style.removeProperty('max-height');
+                }
+                captureTargetElement.style.removeProperty('overflow');
+              };
+            }
+            
+            await new Promise(r => setTimeout(r, 300)); // 스타일 변경 후 렌더링 대기
+          } catch (e) {
+            if (process.env.NODE_ENV === 'development') {
+              console.warn('⚠️ [MeetingCaptureManager] 전체총마감 높이 측정 중 경고:', e?.message);
+            }
+          }
         }
         
         // csDetailType: 단일 값 또는 배열(복수 결합) 지원
