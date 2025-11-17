@@ -7217,6 +7217,26 @@ app.get('/api/rechotancho-bond/data/:timestamp', async (req, res) => {
 
 // 모든 재초담초채권 데이터 조회 (그래프용)
 app.get('/api/rechotancho-bond/all-data', async (req, res) => {
+  // CORS 헤더 설정
+  const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
+  const defaultOrigins = [
+    'https://vipmobile.vercel.app',
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:4000'
+  ];
+  const allowedOrigins = [...corsOrigins, ...defaultOrigins];
+  const origin = req.headers.origin;
+  
+  if (origin && allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  } else if (allowedOrigins.length > 0) {
+    res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
+  }
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
   try {
     const spreadsheetId = process.env.GOOGLE_SHEET_ID || process.env.SHEET_ID;
     const sheetName = '재초담초채권_내역';
