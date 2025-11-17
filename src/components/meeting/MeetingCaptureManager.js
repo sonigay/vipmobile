@@ -1779,130 +1779,127 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
           
           // commonAncestor가 있으면 캡처 진행 (slideElement이든 아니든)
           if (commonAncestor) {
-              // 공통 조상이 있으면 전체를 한 번에 캡처 (슬라이드 헤더 포함)
-              commonAncestor.scrollIntoView({ block: 'start', behavior: 'instant' });
-              await new Promise(r => setTimeout(r, 500));
-              
-              // 실제 콘텐츠 높이 측정 (모든 자식 요소의 최대 bottom 위치 확인)
-              const rect = commonAncestor.getBoundingClientRect();
-              const allChildren = commonAncestor.querySelectorAll('*');
-              let maxRelativeBottom = 0;
-              let actualContentHeight = commonAncestor.scrollHeight || rect.height;
-              
-              // 모든 자식 요소의 실제 렌더링 위치 확인
-              for (const child of allChildren) {
-                const childRect = child.getBoundingClientRect();
-                const relativeBottom = childRect.bottom - rect.top;
-                if (relativeBottom > 0 && relativeBottom < actualContentHeight * 3) {
-                  maxRelativeBottom = Math.max(maxRelativeBottom, relativeBottom);
-                }
+            // 공통 조상이 있으면 전체를 한 번에 캡처 (슬라이드 헤더 포함)
+            commonAncestor.scrollIntoView({ block: 'start', behavior: 'instant' });
+            await new Promise(r => setTimeout(r, 500));
+            
+            // 실제 콘텐츠 높이 측정 (모든 자식 요소의 최대 bottom 위치 확인)
+            const rect = commonAncestor.getBoundingClientRect();
+            const allChildren = commonAncestor.querySelectorAll('*');
+            let maxRelativeBottom = 0;
+            let actualContentHeight = commonAncestor.scrollHeight || rect.height;
+            
+            // 모든 자식 요소의 실제 렌더링 위치 확인
+            for (const child of allChildren) {
+              const childRect = child.getBoundingClientRect();
+              const relativeBottom = childRect.bottom - rect.top;
+              if (relativeBottom > 0 && relativeBottom < actualContentHeight * 3) {
+                maxRelativeBottom = Math.max(maxRelativeBottom, relativeBottom);
               }
-              
-              // 실제 콘텐츠 높이에 맞춰서 설정 (불필요한 여백 제거)
-              // scrollHeight와 실제 렌더링된 최대 위치 중 작은 값 사용 (불필요한 여백 제거)
-              const measuredHeight = Math.min(
-                Math.max(maxRelativeBottom + 20, actualContentHeight), // 최소 20px 여유공간
-                actualContentHeight * 1.1 // scrollHeight의 110%를 넘지 않도록 제한
-              );
-              
-              // 요소의 높이를 실제 콘텐츠 높이로 제한하여 불필요한 여백 제거
-              const originalHeight = commonAncestor.style.height;
-              const originalMaxHeight = commonAncestor.style.maxHeight;
-              commonAncestor.style.height = `${measuredHeight}px`;
-              commonAncestor.style.maxHeight = `${measuredHeight}px`;
-              commonAncestor.style.overflow = 'visible';
-              
-              await new Promise(r => setTimeout(r, 300)); // 스타일 변경 후 렌더링 대기
-              
-              monthlyAwardCompositeBlob = await captureElement(commonAncestor, {
-                scale: 2,
-                useCORS: true,
-                fixedBottomPaddingPx: 0, // 핑크 바 제거
-                backgroundColor: '#ffffff',
-                scrollX: 0,
-                scrollY: 0,
-                skipAutoCrop: true, // 크롭 로직 제거 (실제 높이로만 캡처)
-                height: measuredHeight * 2 // scale 고려
-              });
-              
-              // 원본 스타일 복원
-              if (originalHeight) {
-                commonAncestor.style.height = originalHeight;
-              } else {
-                commonAncestor.style.removeProperty('height');
-              }
-              if (originalMaxHeight) {
-                commonAncestor.style.maxHeight = originalMaxHeight;
-              } else {
-                commonAncestor.style.removeProperty('max-height');
-              }
-              commonAncestor.style.removeProperty('overflow');
-              
-              if (process.env.NODE_ENV === 'development') {
-                console.log('✅ [MeetingCaptureManager] 월간시상 전체 영역 캡처 완료 (슬라이드 헤더 포함)');
-              }
+            }
+            
+            // 실제 콘텐츠 높이에 맞춰서 설정 (불필요한 여백 제거)
+            // scrollHeight와 실제 렌더링된 최대 위치 중 작은 값 사용 (불필요한 여백 제거)
+            const measuredHeight = Math.min(
+              Math.max(maxRelativeBottom + 20, actualContentHeight), // 최소 20px 여유공간
+              actualContentHeight * 1.1 // scrollHeight의 110%를 넘지 않도록 제한
+            );
+            
+            // 요소의 높이를 실제 콘텐츠 높이로 제한하여 불필요한 여백 제거
+            const originalHeight = commonAncestor.style.height;
+            const originalMaxHeight = commonAncestor.style.maxHeight;
+            commonAncestor.style.height = `${measuredHeight}px`;
+            commonAncestor.style.maxHeight = `${measuredHeight}px`;
+            commonAncestor.style.overflow = 'visible';
+            
+            await new Promise(r => setTimeout(r, 300)); // 스타일 변경 후 렌더링 대기
+            
+            monthlyAwardCompositeBlob = await captureElement(commonAncestor, {
+              scale: 2,
+              useCORS: true,
+              fixedBottomPaddingPx: 0, // 핑크 바 제거
+              backgroundColor: '#ffffff',
+              scrollX: 0,
+              scrollY: 0,
+              skipAutoCrop: true, // 크롭 로직 제거 (실제 높이로만 캡처)
+              height: measuredHeight * 2 // scale 고려
+            });
+            
+            // 원본 스타일 복원
+            if (originalHeight) {
+              commonAncestor.style.height = originalHeight;
             } else {
-              // 공통 조상을 찾지 못한 경우, 각 테이블을 개별 캡처 후 합치기
-              const tableBlobs = [];
-              
-              // 각 테이블을 순서대로 캡처
-              for (let i = 0; i < tables.length; i++) {
-                const table = tables[i];
-                if (table) {
-                  table.scrollIntoView({ block: 'center', behavior: 'instant' });
-                  await new Promise(r => setTimeout(r, 400));
-                  
-                  const blob = await captureElement(table, {
-                    scale: 2,
-                    useCORS: true,
-                    fixedBottomPaddingPx: 0, // 핑크 바 제거
-                    backgroundColor: '#ffffff',
-                    scrollX: 0,
-                    scrollY: 0,
-                    skipAutoCrop: false // 크롭 로직 사용 (일정 하단 여유공간 제외하고 크롭)
-                  });
-                  tableBlobs.push(blob);
-                  
-                  if (process.env.NODE_ENV === 'development') {
-                    console.log(`✅ [MeetingCaptureManager] 월간시상 테이블 ${i + 1}/${tables.length} 캡처 완료`);
-                  }
-                }
-              }
-              
-              // 모든 테이블을 세로로 합치기
-              if (tableBlobs.length > 0) {
-                const images = await Promise.all(tableBlobs.map(blobToImage));
-                const gap = 16;
+              commonAncestor.style.removeProperty('height');
+            }
+            if (originalMaxHeight) {
+              commonAncestor.style.maxHeight = originalMaxHeight;
+            } else {
+              commonAncestor.style.removeProperty('max-height');
+            }
+            commonAncestor.style.removeProperty('overflow');
+            
+            if (process.env.NODE_ENV === 'development') {
+              console.log('✅ [MeetingCaptureManager] 월간시상 전체 영역 캡처 완료 (슬라이드 헤더 포함)');
+            }
+          } else if (tables.length > 0) {
+            // commonAncestor를 찾지 못했지만 테이블이 있는 경우, 각 테이블을 개별 캡처 후 합치기
+            const tableBlobs = [];
+            
+            // 각 테이블을 순서대로 캡처
+            for (let i = 0; i < tables.length; i++) {
+              const table = tables[i];
+              if (table) {
+                table.scrollIntoView({ block: 'center', behavior: 'instant' });
+                await new Promise(r => setTimeout(r, 400));
                 
-                let totalHeight = images.reduce((sum, img) => sum + img.height, 0) + (gap * (images.length - 1));
-                let maxWidth = Math.max(...images.map(img => img.width));
-                
-                const canvas = document.createElement('canvas');
-                canvas.width = maxWidth;
-                canvas.height = totalHeight;
-                const ctx = canvas.getContext('2d');
-                ctx.fillStyle = '#ffffff';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                
-                let currentY = 0;
-                images.forEach((img, index) => {
-                  ctx.drawImage(img, 0, currentY);
-                  currentY += img.height + gap;
+                const blob = await captureElement(table, {
+                  scale: 2,
+                  useCORS: true,
+                  fixedBottomPaddingPx: 0, // 핑크 바 제거
+                  backgroundColor: '#ffffff',
+                  scrollX: 0,
+                  scrollY: 0,
+                  skipAutoCrop: false // 크롭 로직 사용 (일정 하단 여유공간 제외하고 크롭)
                 });
-                
-                monthlyAwardCompositeBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+                tableBlobs.push(blob);
                 
                 if (process.env.NODE_ENV === 'development') {
-                  console.log(`✅ [MeetingCaptureManager] 월간시상 ${tables.length}개 테이블 합성 완료`);
+                  console.log(`✅ [MeetingCaptureManager] 월간시상 테이블 ${i + 1}/${tables.length} 캡처 완료`);
                 }
               }
             }
-          }
-          
-          // commonAncestor가 없거나 테이블을 찾지 못한 경우 경고
-          if (!commonAncestor || commonAncestor === slideElement) {
+            
+            // 모든 테이블을 세로로 합치기
+            if (tableBlobs.length > 0) {
+              const images = await Promise.all(tableBlobs.map(blobToImage));
+              const gap = 16;
+              
+              let totalHeight = images.reduce((sum, img) => sum + img.height, 0) + (gap * (images.length - 1));
+              let maxWidth = Math.max(...images.map(img => img.width));
+              
+              const canvas = document.createElement('canvas');
+              canvas.width = maxWidth;
+              canvas.height = totalHeight;
+              const ctx = canvas.getContext('2d');
+              ctx.fillStyle = '#ffffff';
+              ctx.fillRect(0, 0, canvas.width, canvas.height);
+              
+              let currentY = 0;
+              images.forEach((img, index) => {
+                ctx.drawImage(img, 0, currentY);
+                currentY += img.height + gap;
+              });
+              
+              monthlyAwardCompositeBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+              
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`✅ [MeetingCaptureManager] 월간시상 ${tables.length}개 테이블 합성 완료`);
+              }
+            }
+          } else {
+            // commonAncestor도 없고 테이블도 없는 경우 경고
             if (process.env.NODE_ENV === 'development') {
-              console.warn('⚠️ [MeetingCaptureManager] 월간시상: commonAncestor를 찾지 못해 전체 슬라이드를 캡처합니다.');
+              console.warn('⚠️ [MeetingCaptureManager] 월간시상: commonAncestor와 테이블을 모두 찾지 못했습니다.');
             }
           }
         } catch (e) {
