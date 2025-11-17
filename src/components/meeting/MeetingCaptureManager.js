@@ -484,29 +484,81 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
           if (isTotalClosingSlide) {
           try {
             const rect = captureTargetElement.getBoundingClientRect();
-            const allChildren = captureTargetElement.querySelectorAll('*');
-            let maxRelativeBottom = 0;
-            let actualContentHeight = captureTargetElement.scrollHeight || rect.height;
             
-            // 모든 자식 요소의 실제 렌더링 위치 확인
-            for (const child of allChildren) {
+            // 실제 테이블 콘텐츠만 찾아서 측정 (박스 라인 제외)
+            // 테이블 요소들을 직접 찾기
+            const tables = captureTargetElement.querySelectorAll('table, .MuiTable-root, [class*="Table"]');
+            const tableContainers = captureTargetElement.querySelectorAll('.MuiTableContainer-root, [class*="TableContainer"], .MuiPaper-root, .MuiCard-root');
+            
+            let maxRelativeBottom = 0;
+            let actualContentHeight = 0;
+            
+            // 테이블 요소들의 실제 위치 확인 (박스 라인 제외)
+            for (const table of tables) {
               try {
-                const childRect = child.getBoundingClientRect();
-                const relativeBottom = childRect.bottom - rect.top;
-                if (relativeBottom > 0 && relativeBottom < actualContentHeight * 3) {
+                const tableRect = table.getBoundingClientRect();
+                const relativeBottom = tableRect.bottom - rect.top;
+                if (relativeBottom > 0) {
                   maxRelativeBottom = Math.max(maxRelativeBottom, relativeBottom);
+                  actualContentHeight = Math.max(actualContentHeight, tableRect.height);
                 }
               } catch (e) {
                 // 무시
               }
             }
             
-            // 실제 콘텐츠 높이에 맞춰서 설정 (불필요한 여백 제거)
-            // 모든 섹션(5개 테이블)의 높이를 제대로 고려하면서도 불필요한 여백 제거
-            // maxRelativeBottom + 기본 여유공간(40px)과 scrollHeight 중 더 큰 값 사용
+            // 테이블 컨테이너의 실제 콘텐츠 높이 확인 (박스 라인 제외)
+            for (const container of tableContainers) {
+              try {
+                // 컨테이너 내부의 실제 테이블이 있는지 확인
+                const innerTable = container.querySelector('table, .MuiTable-root');
+                if (innerTable) {
+                  const containerRect = container.getBoundingClientRect();
+                  const relativeBottom = containerRect.bottom - rect.top;
+                  // 테이블의 실제 높이만 사용 (컨테이너의 패딩/보더 제외)
+                  const tableRect = innerTable.getBoundingClientRect();
+                  const tableRelativeBottom = tableRect.bottom - rect.top;
+                  
+                  if (tableRelativeBottom > 0) {
+                    maxRelativeBottom = Math.max(maxRelativeBottom, tableRelativeBottom);
+                    actualContentHeight = Math.max(actualContentHeight, tableRect.height);
+                  }
+                }
+              } catch (e) {
+                // 무시
+              }
+            }
+            
+            // 테이블을 찾지 못한 경우에만 전체 자식 요소 확인 (fallback)
+            if (maxRelativeBottom === 0) {
+              const allChildren = captureTargetElement.querySelectorAll('*');
+              for (const child of allChildren) {
+                try {
+                  const childRect = child.getBoundingClientRect();
+                  const relativeBottom = childRect.bottom - rect.top;
+                  // 박스 라인을 가진 요소는 제외 (border가 있는 큰 컨테이너 제외)
+                  const style = window.getComputedStyle(child);
+                  const hasBorder = style.borderWidth && style.borderWidth !== '0px';
+                  const isLargeContainer = childRect.width > rect.width * 0.8 && childRect.height > 200;
+                  
+                  // 박스 라인이 있는 큰 컨테이너는 제외하고, 실제 콘텐츠만 측정
+                  if (relativeBottom > 0 && !(hasBorder && isLargeContainer)) {
+                    maxRelativeBottom = Math.max(maxRelativeBottom, relativeBottom);
+                  }
+                } catch (e) {
+                  // 무시
+                }
+              }
+            }
+            
+            // scrollHeight도 확인하되, 박스 라인을 제외한 실제 콘텐츠 높이 우선 사용
+            const scrollHeight = captureTargetElement.scrollHeight || rect.height;
+            
+            // 실제 콘텐츠 높이에 맞춰서 설정 (박스 라인 제외)
+            // maxRelativeBottom + 기본 여유공간(40px)과 실제 테이블 높이 중 더 큰 값 사용
             const measuredHeight = Math.max(
               maxRelativeBottom + 40, // 기본 여유공간 (40px) - 불필요한 여백 최소화
-              actualContentHeight // scrollHeight도 고려
+              actualContentHeight > 0 ? actualContentHeight + 40 : scrollHeight // 실제 테이블 높이가 있으면 사용, 없으면 scrollHeight
             );
             
             if (process.env.NODE_ENV === 'development') {
@@ -951,8 +1003,27 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             tableContainer.scrollIntoView({ block: 'start', behavior: 'instant' });
             await new Promise(r => setTimeout(r, 300));
             
-            // 1) 테이블만 우선 캡처
-            let tableOnlyBlob = null;
+            // 1) 테이블 박스 크기를 콘텐츠에 맞춰 조정 (콘텐츠가 박스를 넘어서지 않도록)
+            const originalTableContainerStyles = {
+              height: tableContainer.style.height,
+              maxHeight: tableContainer.style.maxHeight,
+              width: tableContainer.style.width,
+              maxWidth: tableContainer.style.maxWidth,
+              overflow: tableContainer.style.overflow
+            };
+            
+            // 테이블 박스 컨테이너 찾기 (MuiPaper-root 또는 MuiCard-root)
+            const tableBox = tableContainer.closest('.MuiPaper-root, .MuiCard-root') || tableContainer.parentElement;
+            const originalTableBoxStyles = tableBox ? {
+              height: tableBox.style.height,
+              maxHeight: tableBox.style.maxHeight,
+              width: tableBox.style.width,
+              maxWidth: tableBox.style.maxWidth,
+              overflow: tableBox.style.overflow,
+              padding: tableBox.style.padding,
+              margin: tableBox.style.margin
+            } : null;
+            
             try {
               // 데이터가 실제 채워질 때까지 추가 대기 (최대 5초)
               try {
@@ -1018,14 +1089,84 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                   console.warn('⚠️ [MeetingCaptureManager] 재고장표 데이터 로딩 확인 중 오류:', e);
                 }
               }
+              
+              // 테이블 실제 콘텐츠 크기 측정 (박스 라인 제외)
+              const table = tableContainer.querySelector('table');
+              let actualTableWidth = 0;
+              let actualTableHeight = 0;
+              
+              if (table) {
+                const tableRect = table.getBoundingClientRect();
+                actualTableWidth = tableRect.width;
+                actualTableHeight = tableRect.height;
+                
+                // 테이블 박스 크기를 콘텐츠에 맞춰 조정
+                if (tableBox) {
+                  const boxStyle = window.getComputedStyle(tableBox);
+                  const boxRect = tableBox.getBoundingClientRect();
+                  const hasBorder = boxStyle.borderWidth && boxStyle.borderWidth !== '0px';
+                  
+                  if (hasBorder) {
+                    // 박스 패딩/보더 고려
+                    const boxPaddingLeft = parseInt(boxStyle.paddingLeft || '0') || 16;
+                    const boxPaddingRight = parseInt(boxStyle.paddingRight || '0') || 16;
+                    const boxPaddingTop = parseInt(boxStyle.paddingTop || '0') || 16;
+                    const boxPaddingBottom = parseInt(boxStyle.paddingBottom || '0') || 16;
+                    const boxBorderLeft = parseInt(boxStyle.borderLeftWidth || '0') || 1;
+                    const boxBorderRight = parseInt(boxStyle.borderRightWidth || '0') || 1;
+                    const boxBorderTop = parseInt(boxStyle.borderTopWidth || '0') || 1;
+                    const boxBorderBottom = parseInt(boxStyle.borderBottomWidth || '0') || 1;
+                    
+                    const adjustedBoxWidth = actualTableWidth + boxPaddingLeft + boxPaddingRight + boxBorderLeft + boxBorderRight + 20; // 여유공간 20px
+                    const adjustedBoxHeight = actualTableHeight + boxPaddingTop + boxPaddingBottom + boxBorderTop + boxBorderBottom + 20; // 여유공간 20px
+                    
+                    // 박스 크기가 콘텐츠보다 크면 조정
+                    if (boxRect.width > adjustedBoxWidth) {
+                      tableBox.style.width = `${adjustedBoxWidth}px`;
+                      tableBox.style.maxWidth = `${adjustedBoxWidth}px`;
+                      if (process.env.NODE_ENV === 'development') {
+                        console.log(`📦 [재고장표] 박스 너비 조정: ${boxRect.width}px → ${adjustedBoxWidth}px`);
+                      }
+                    }
+                    
+                    if (boxRect.height > adjustedBoxHeight) {
+                      tableBox.style.height = `${adjustedBoxHeight}px`;
+                      tableBox.style.maxHeight = `${adjustedBoxHeight}px`;
+                      if (process.env.NODE_ENV === 'development') {
+                        console.log(`📦 [재고장표] 박스 높이 조정: ${boxRect.height}px → ${adjustedBoxHeight}px`);
+                      }
+                    }
+                    
+                    // 박스 중앙 정렬을 위한 스타일 설정
+                    tableBox.style.margin = '0 auto';
+                    tableBox.style.display = 'flex';
+                    tableBox.style.flexDirection = 'column';
+                    tableBox.style.alignItems = 'center';
+                    tableBox.style.justifyContent = 'center';
+                  }
+                }
+                
+                // 테이블 컨테이너도 콘텐츠에 맞춰 조정
+                tableContainer.style.width = `${actualTableWidth}px`;
+                tableContainer.style.maxWidth = `${actualTableWidth}px`;
+                tableContainer.style.height = `${actualTableHeight}px`;
+                tableContainer.style.maxHeight = `${actualTableHeight}px`;
+                tableContainer.style.overflow = 'visible';
+                tableContainer.style.margin = '0 auto';
+              }
+              
+              await new Promise(r => setTimeout(r, 300)); // 박스 크기 조정 후 렌더링 대기
 
-              tableOnlyBlob = await captureElement(tableContainer, {
+              // 테이블만 우선 캡처
+              let tableOnlyBlob = null;
+              tableOnlyBlob = await captureElement(tableBox || tableContainer, {
                 scale: 2,
                 useCORS: true,
                 fixedBottomPaddingPx: 0,
                 backgroundColor: '#ffffff',
                 scrollX: 0,
-                scrollY: 0
+                scrollY: 0,
+                skipAutoCrop: true // 크롭 로직 제거 (실제 크기로만 캡처)
               });
             } catch (e) {
               // 실패 시 fallback 으로 테이블 컨테이너를 최종 타겟으로 사용
@@ -1038,42 +1179,102 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             try {
               let headerElement = null;
               
-              // 재고장표 슬라이드 헤더 찾기: 더 넓은 범위로 검색
-              // 1순위: slideElement의 직접 자식 중에서 찾기
-              for (const child of Array.from(slideElement.children)) {
-                const style = window.getComputedStyle(child);
-                const text = (child.textContent || '').trim();
-                const rect = child.getBoundingClientRect();
-                // 슬라이드 상단 헤더: absolute 또는 fixed 위치, top이 0 근처, 회사명 포함
-                if ((style.position === 'absolute' || style.position === 'fixed') &&
-                    (parseInt(style.top) === 0 || style.top === '0px' || rect.top < 100) &&
-                    text.includes('(주)브이아이피플러스') &&
-                    !text.includes('재고장표') && // 중간 컨텐츠 헤더 제외
-                    rect.top >= 0 && rect.top < 200) { // 상단 200px 이내에만 (중간 헤더 제외)
-                  headerElement = child;
-                  if (process.env.NODE_ENV === 'development') {
-                    console.log('✅ [재고장표] 헤더 찾음 (직접 자식):', text.substring(0, 50));
+              // 재고장표 슬라이드 헤더 찾기: 다양한 방법으로 시도
+              // 방법 1: 데이터 속성으로 찾기
+              headerElement = slideElement.querySelector('[data-slide-header], [class*="slide-header"], [class*="header"]');
+              
+              // 방법 2: slideElement의 직접 자식 중에서 찾기 (회사명 포함, 상단 위치)
+              if (!headerElement) {
+                for (const child of Array.from(slideElement.children)) {
+                  const style = window.getComputedStyle(child);
+                  const text = (child.textContent || '').trim();
+                  const rect = child.getBoundingClientRect();
+                  const slideRect = slideElement.getBoundingClientRect();
+                  const relativeTop = rect.top - slideRect.top;
+                  
+                  // 슬라이드 상단 헤더: absolute/fixed 위치이거나, 상단에 위치하고, 회사명 포함
+                  if (((style.position === 'absolute' || style.position === 'fixed') || relativeTop < 150) &&
+                      (relativeTop >= -20 && relativeTop < 200) && // 슬라이드 상단 200px 이내
+                      text.includes('(주)브이아이피플러스') &&
+                      !text.includes('재고장표') && // 중간 컨텐츠 헤더 제외
+                      rect.height > 50 && rect.width > 200) { // 최소 크기 확인 (헤더는 충분히 큰 요소)
+                    headerElement = child;
+                    if (process.env.NODE_ENV === 'development') {
+                      console.log('✅ [재고장표] 헤더 찾음 (직접 자식):', text.substring(0, 50), { position: style.position, relativeTop, rect: { width: rect.width, height: rect.height } });
+                    }
+                    break;
                   }
-                  break;
                 }
               }
               
-              // 2순위: 모든 요소 중에서 찾기
+              // 방법 3: 모든 요소 중에서 찾기 (더 넓은 조건)
               if (!headerElement) {
                 const allElements = Array.from(slideElement.querySelectorAll('*'));
                 for (const el of allElements) {
                   const style = window.getComputedStyle(el);
                   const text = (el.textContent || '').trim();
                   const rect = el.getBoundingClientRect();
-                  // 슬라이드 상단 헤더: absolute 또는 fixed 위치, top이 0 근처, 회사명 포함
-                  if ((style.position === 'absolute' || style.position === 'fixed') &&
-                      (parseInt(style.top) === 0 || style.top === '0px' || rect.top < 100) &&
+                  const slideRect = slideElement.getBoundingClientRect();
+                  const relativeTop = rect.top - slideRect.top;
+                  
+                  // 슬라이드 상단 헤더: absolute/fixed 위치이거나, 상단에 위치하고, 회사명 포함
+                  if (((style.position === 'absolute' || style.position === 'fixed') || relativeTop < 150) &&
+                      (relativeTop >= -20 && relativeTop < 250) && // 슬라이드 상단 250px 이내로 확대
                       text.includes('(주)브이아이피플러스') &&
                       !text.includes('재고장표') && // 중간 컨텐츠 헤더 제외
-                      rect.top >= 0 && rect.top < 200) { // 상단 200px 이내에만 (중간 헤더 제외)
+                      rect.height > 50 && rect.width > 200) { // 최소 크기 확인
                     headerElement = el;
                     if (process.env.NODE_ENV === 'development') {
-                      console.log('✅ [재고장표] 헤더 찾음 (전체 검색):', text.substring(0, 50));
+                      console.log('✅ [재고장표] 헤더 찾음 (전체 검색):', text.substring(0, 50), { position: style.position, relativeTop, rect: { width: rect.width, height: rect.height } });
+                    }
+                    break;
+                  }
+                }
+              }
+              
+              // 방법 4: 클래스 이름으로 찾기
+              if (!headerElement) {
+                const candidates = slideElement.querySelectorAll('[class*="header"], [class*="Header"], [class*="appbar"], [class*="AppBar"]');
+                for (const candidate of candidates) {
+                  const text = (candidate.textContent || '').trim();
+                  const rect = candidate.getBoundingClientRect();
+                  const slideRect = slideElement.getBoundingClientRect();
+                  const relativeTop = rect.top - slideRect.top;
+                  
+                  if (text.includes('(주)브이아이피플러스') &&
+                      !text.includes('재고장표') &&
+                      relativeTop >= -20 && relativeTop < 250 &&
+                      rect.height > 30 && rect.width > 100) {
+                    headerElement = candidate;
+                    if (process.env.NODE_ENV === 'development') {
+                      console.log('✅ [재고장표] 헤더 찾음 (클래스 검색):', text.substring(0, 50));
+                    }
+                    break;
+                  }
+                }
+              }
+              
+              // 방법 5: 첫 번째 큰 자식 요소 중에서 회사명이 포함된 것 찾기
+              if (!headerElement) {
+                const largeChildren = Array.from(slideElement.children).filter(child => {
+                  const rect = child.getBoundingClientRect();
+                  const slideRect = slideElement.getBoundingClientRect();
+                  const relativeTop = rect.top - slideRect.top;
+                  return relativeTop >= -20 && relativeTop < 250 && 
+                         rect.width > 200 && rect.height > 30;
+                }).sort((a, b) => {
+                  // 상단에 가까운 순서로 정렬
+                  const aTop = a.getBoundingClientRect().top;
+                  const bTop = b.getBoundingClientRect().top;
+                  return aTop - bTop;
+                });
+                
+                for (const child of largeChildren) {
+                  const text = (child.textContent || '').trim();
+                  if (text.includes('(주)브이아이피플러스') && !text.includes('재고장표')) {
+                    headerElement = child;
+                    if (process.env.NODE_ENV === 'development') {
+                      console.log('✅ [재고장표] 헤더 찾음 (큰 자식 요소):', text.substring(0, 50));
                     }
                     break;
                   }
@@ -1082,12 +1283,19 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               
               if (!headerElement && process.env.NODE_ENV === 'development') {
                 console.warn('⚠️ [재고장표] 헤더를 찾을 수 없습니다. slideElement 자식 확인:', 
-                  Array.from(slideElement.children).map(c => ({
-                    tag: c.tagName,
-                    text: (c.textContent || '').substring(0, 50),
-                    position: window.getComputedStyle(c).position,
-                    top: window.getComputedStyle(c).top
-                  }))
+                  Array.from(slideElement.children).map(c => {
+                    const rect = c.getBoundingClientRect();
+                    const slideRect = slideElement.getBoundingClientRect();
+                    return {
+                      tag: c.tagName,
+                      text: (c.textContent || '').substring(0, 50),
+                      position: window.getComputedStyle(c).position,
+                      top: window.getComputedStyle(c).top,
+                      relativeTop: rect.top - slideRect.top,
+                      size: { width: rect.width, height: rect.height },
+                      classes: c.className
+                    };
+                  })
                 );
               }
               if (headerElement) {
@@ -1104,7 +1312,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               }
             } catch (_) {}
             
-            // 3) 헤더 + 테이블 합성 (가능 시)
+            // 3) 헤더 + 테이블 합성 (가능 시) - 헤더와 테이블 모두 중앙 정렬
             try {
               if (headerBlob && tableOnlyBlob) {
                 const blobToImage = (blob) => new Promise((resolve, reject) => {
@@ -1119,32 +1327,149 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                 });
                 const imgHeader = await blobToImage(headerBlob);
                 const imgTable = await blobToImage(tableOnlyBlob);
-                const gap = 8;
-                // 핑크바 제거: extraBottom 제거하여 불필요한 하단 여백 없음
+                const gap = 20; // 헤더와 테이블 사이 간격
                 // 캔버스 너비는 헤더와 테이블 중 더 넓은 것을 기준으로 하되, 최소 1280px
                 const BASE_CAPTURE_WIDTH = 1280;
                 const canvasWidth = Math.max(BASE_CAPTURE_WIDTH, Math.max(imgHeader.width, imgTable.width));
                 const canvas = document.createElement('canvas');
                 canvas.width = canvasWidth;
-                canvas.height = imgHeader.height + gap + imgTable.height; // extraBottom 제거
+                canvas.height = imgHeader.height + gap + imgTable.height;
                 const ctx = canvas.getContext('2d');
                 ctx.fillStyle = '#ffffff';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
-                // 헤더는 좌측 정렬 (보통 전체 폭)
-                ctx.drawImage(imgHeader, 0, 0);
+                
+                // 헤더도 중앙 정렬 (슬라이드 헤더를 정확히 중앙에 배치)
+                const headerX = Math.max(0, Math.floor((canvasWidth - imgHeader.width) / 2));
+                ctx.drawImage(imgHeader, headerX, 0);
+                
                 // 테이블을 수평 중앙 정렬 (캔버스 너비 기준)
                 // 테이블이 캔버스보다 넓은 경우에도 중앙 정렬 유지
                 const tableX = Math.max(0, Math.floor((canvasWidth - imgTable.width) / 2));
-                // 테이블이 캔버스보다 넓으면 캔버스 너비로 제한하지 않고 그대로 중앙 정렬
                 ctx.drawImage(imgTable, tableX, imgHeader.height + gap);
+                
+                if (process.env.NODE_ENV === 'development') {
+                  console.log('✅ [재고장표] 헤더와 테이블 중앙 정렬 합성 완료', {
+                    canvasWidth,
+                    canvasHeight: canvas.height,
+                    headerWidth: imgHeader.width,
+                    headerHeight: imgHeader.height,
+                    headerX,
+                    tableWidth: imgTable.width,
+                    tableHeight: imgTable.height,
+                    tableX,
+                    gap
+                  });
+                }
+                
                 inventoryCompositeBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
               } else if (tableOnlyBlob) {
                 // 헤더를 못 찾으면 테이블만 사용
                 inventoryCompositeBlob = tableOnlyBlob;
               }
-            } catch (_) {
+              
+              // 박스 스타일 복원
+              if (tableBox && originalTableBoxStyles) {
+                if (originalTableBoxStyles.height) {
+                  tableBox.style.height = originalTableBoxStyles.height;
+                } else {
+                  tableBox.style.removeProperty('height');
+                }
+                if (originalTableBoxStyles.maxHeight) {
+                  tableBox.style.maxHeight = originalTableBoxStyles.maxHeight;
+                } else {
+                  tableBox.style.removeProperty('max-height');
+                }
+                if (originalTableBoxStyles.width) {
+                  tableBox.style.width = originalTableBoxStyles.width;
+                } else {
+                  tableBox.style.removeProperty('width');
+                }
+                if (originalTableBoxStyles.maxWidth) {
+                  tableBox.style.maxWidth = originalTableBoxStyles.maxWidth;
+                } else {
+                  tableBox.style.removeProperty('max-width');
+                }
+                if (originalTableBoxStyles.overflow) {
+                  tableBox.style.overflow = originalTableBoxStyles.overflow;
+                } else {
+                  tableBox.style.removeProperty('overflow');
+                }
+                if (originalTableBoxStyles.padding) {
+                  tableBox.style.padding = originalTableBoxStyles.padding;
+                } else {
+                  tableBox.style.removeProperty('padding');
+                }
+                if (originalTableBoxStyles.margin) {
+                  tableBox.style.margin = originalTableBoxStyles.margin;
+                } else {
+                  tableBox.style.removeProperty('margin');
+                }
+                tableBox.style.removeProperty('display');
+                tableBox.style.removeProperty('flex-direction');
+                tableBox.style.removeProperty('align-items');
+                tableBox.style.removeProperty('justify-content');
+              }
+              
+              // 테이블 컨테이너 스타일 복원
+              if (originalTableContainerStyles.height) {
+                tableContainer.style.height = originalTableContainerStyles.height;
+              } else {
+                tableContainer.style.removeProperty('height');
+              }
+              if (originalTableContainerStyles.maxHeight) {
+                tableContainer.style.maxHeight = originalTableContainerStyles.maxHeight;
+              } else {
+                tableContainer.style.removeProperty('max-height');
+              }
+              if (originalTableContainerStyles.width) {
+                tableContainer.style.width = originalTableContainerStyles.width;
+              } else {
+                tableContainer.style.removeProperty('width');
+              }
+              if (originalTableContainerStyles.maxWidth) {
+                tableContainer.style.maxWidth = originalTableContainerStyles.maxWidth;
+              } else {
+                tableContainer.style.removeProperty('max-width');
+              }
+              if (originalTableContainerStyles.overflow) {
+                tableContainer.style.overflow = originalTableContainerStyles.overflow;
+              } else {
+                tableContainer.style.removeProperty('overflow');
+              }
+              tableContainer.style.removeProperty('margin');
+            } catch (e) {
               // 합성 실패 시 테이블만 캡처 대상으로
               captureTargetElement = tableContainer;
+              
+              // 스타일 복원
+              if (tableBox && originalTableBoxStyles) {
+                Object.keys(originalTableBoxStyles).forEach(key => {
+                  if (originalTableBoxStyles[key]) {
+                    tableBox.style[key] = originalTableBoxStyles[key];
+                  } else {
+                    tableBox.style.removeProperty(key);
+                  }
+                });
+                tableBox.style.removeProperty('display');
+                tableBox.style.removeProperty('flex-direction');
+                tableBox.style.removeProperty('align-items');
+                tableBox.style.removeProperty('justify-content');
+              }
+              
+              if (originalTableContainerStyles) {
+                Object.keys(originalTableContainerStyles).forEach(key => {
+                  if (originalTableContainerStyles[key]) {
+                    tableContainer.style[key] = originalTableContainerStyles[key];
+                  } else {
+                    tableContainer.style.removeProperty(key);
+                  }
+                });
+                tableContainer.style.removeProperty('margin');
+              }
+              
+              if (process.env.NODE_ENV === 'development') {
+                console.warn('⚠️ [재고장표] 합성 실패:', e?.message || e);
+              }
             }
             
             // 합성이 성공했으면 이후 최종 업로드 단계에서 사용
@@ -1938,12 +2263,399 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         }
       }
 
-      // 가입자증감(특수): 숫자형식 테이블 + 그래프형식 그래프 2개를 각각 캡처 후 합치기 (헤더/필터 제외)
-      let compositeBlob = null;
+      // 가입자증감: 월간시상 슬라이드와 동일한 방식으로 전체를 한 번에 캡처 (합성 방식 제거)
+      let subscriberIncreaseCompositeBlob = null;
       if (
         currentSlide?.mode === 'chart' &&
         (currentSlide?.tab === 'bondChart' || currentSlide?.tab === 'bond') &&
         (currentSlide?.subTab === 'subscriberIncrease')
+      ) {
+        try {
+          // 월간시상 슬라이드와 동일한 방식으로 commonAncestor 찾기
+          // 테이블과 그래프를 모두 포함하는 공통 조상 요소 찾기
+          let commonAncestor = null;
+          
+          // 먼저 테이블과 그래프가 모두 있는 Paper 또는 Card 찾기
+          const papers = Array.from(slideElement.querySelectorAll('.MuiPaper-root, .MuiCard-root'));
+          const tablePaper = papers.find(p => {
+            const text = p.textContent || '';
+            return (text.includes('월별 데이터 입력') || text.includes('년간 데이터 일괄 저장')) &&
+                   !text.includes('대상 년도') && !text.includes('시간 단위') && 
+                   !text.includes('표시 모드') && !text.includes('가입자증감 관리');
+          });
+          
+          // 그래프형식으로 전환하여 그래프 Paper 찾기
+          const chartBtn = Array.from(document.querySelectorAll('button, [role="button"]'))
+            .find(el => (el.getAttribute?.('value') === 'chart') || (el.textContent || '').includes('그래프형식'));
+          if (chartBtn && chartBtn.getAttribute('aria-pressed') !== 'true') {
+            (chartBtn instanceof HTMLElement) && chartBtn.click();
+            await new Promise(r => setTimeout(r, 800)); // 그래프 렌더링 대기
+          }
+          
+          // 그래프 Paper 찾기
+          const chartPapers = papers.filter(p => {
+            const text = p.textContent || '';
+            const hasChart = p.querySelector('canvas, svg, [class*="recharts"]');
+            return hasChart && (text.includes('가입자수 추이') || text.includes('관리수수료 추이')) &&
+                   !text.includes('대상 년도') && !text.includes('시간 단위') && 
+                   !text.includes('표시 모드') && !text.includes('가입자증감 관리');
+          });
+          
+          // 테이블과 그래프의 공통 조상 찾기
+          if (tablePaper || chartPapers.length > 0) {
+            const elementsToFind = [tablePaper, ...chartPapers].filter(Boolean);
+            
+            if (elementsToFind.length > 0) {
+              // 첫 번째 요소를 기준으로 공통 조상 찾기
+              let currentAncestor = elementsToFind[0].parentElement;
+              
+              while (currentAncestor && currentAncestor !== slideElement && currentAncestor !== document.body) {
+                // 모든 요소가 이 조상에 포함되어 있는지 확인
+                const allIncluded = elementsToFind.every(el => currentAncestor.contains(el));
+                if (allIncluded) {
+                  commonAncestor = currentAncestor;
+                  break;
+                }
+                currentAncestor = currentAncestor.parentElement;
+              }
+            }
+          }
+          
+          // commonAncestor를 찾지 못했으면 slideElement 사용
+          if (!commonAncestor) {
+            commonAncestor = slideElement;
+          }
+          
+          if (process.env.NODE_ENV === 'development') {
+            console.log('🔍 [MeetingCaptureManager] 가입자증감 commonAncestor 찾기:', {
+              commonAncestor: commonAncestor ? '찾음' : '없음',
+              isSlideElement: commonAncestor === slideElement,
+              tablePaperFound: !!tablePaper,
+              chartPapersFound: chartPapers.length
+            });
+          }
+          
+          // commonAncestor가 있으면 월간시상과 동일한 방식으로 캡처
+          if (commonAncestor) {
+            commonAncestor.scrollIntoView({ block: 'start', behavior: 'instant' });
+            await new Promise(r => setTimeout(r, 500));
+            
+            // 실제 콘텐츠 높이 측정 (박스 라인 제외, 실제 테이블/그래프만 측정)
+            const rect = commonAncestor.getBoundingClientRect();
+            let maxRelativeBottom = 0;
+            let actualContentHeight = 0;
+            
+            // 실제 테이블 콘텐츠만 찾아서 측정 (박스 라인 제외)
+            const tables = commonAncestor.querySelectorAll('table, .MuiTable-root, [class*="Table"]');
+            for (const table of tables) {
+              try {
+                const tableRect = table.getBoundingClientRect();
+                const relativeBottom = tableRect.bottom - rect.top;
+                if (relativeBottom > 0) {
+                  maxRelativeBottom = Math.max(maxRelativeBottom, relativeBottom);
+                  actualContentHeight = Math.max(actualContentHeight, tableRect.height);
+                }
+              } catch (e) {
+                // 무시
+              }
+            }
+            
+            // 실제 그래프 콘텐츠만 찾아서 측정 (박스 라인 제외)
+            const charts = commonAncestor.querySelectorAll('canvas, svg, [class*="recharts"], [class*="Chart"]');
+            for (const chart of charts) {
+              try {
+                const chartRect = chart.getBoundingClientRect();
+                const relativeBottom = chartRect.bottom - rect.top;
+                if (relativeBottom > 0 && chartRect.height > 50) { // 최소 크기 확인 (실제 그래프만)
+                  maxRelativeBottom = Math.max(maxRelativeBottom, relativeBottom);
+                  actualContentHeight = Math.max(actualContentHeight, chartRect.height);
+                }
+              } catch (e) {
+                // 무시
+              }
+            }
+            
+            // 테이블/그래프 컨테이너의 실제 콘텐츠 높이 확인 (박스 라인 제외)
+            const containers = commonAncestor.querySelectorAll('.MuiTableContainer-root, .MuiPaper-root, .MuiCard-root');
+            for (const container of containers) {
+              try {
+                // 컨테이너 내부의 실제 테이블/그래프가 있는지 확인
+                const innerTable = container.querySelector('table, .MuiTable-root');
+                const innerChart = container.querySelector('canvas, svg, [class*="recharts"]');
+                
+                if (innerTable || innerChart) {
+                  // 내부 콘텐츠의 실제 높이만 사용 (컨테이너의 패딩/보더 제외)
+                  if (innerTable) {
+                    const tableRect = innerTable.getBoundingClientRect();
+                    const tableRelativeBottom = tableRect.bottom - rect.top;
+                    if (tableRelativeBottom > 0) {
+                      maxRelativeBottom = Math.max(maxRelativeBottom, tableRelativeBottom);
+                      actualContentHeight = Math.max(actualContentHeight, tableRect.height);
+                    }
+                  }
+                  if (innerChart) {
+                    const chartRect = innerChart.getBoundingClientRect();
+                    const chartRelativeBottom = chartRect.bottom - rect.top;
+                    if (chartRelativeBottom > 0 && chartRect.height > 50) {
+                      maxRelativeBottom = Math.max(maxRelativeBottom, chartRelativeBottom);
+                      actualContentHeight = Math.max(actualContentHeight, chartRect.height);
+                    }
+                  }
+                }
+              } catch (e) {
+                // 무시
+              }
+            }
+            
+            // 콘텐츠를 찾지 못한 경우에만 전체 자식 요소 확인 (fallback)
+            if (maxRelativeBottom === 0) {
+              const allChildren = commonAncestor.querySelectorAll('*');
+              for (const child of allChildren) {
+                try {
+                  const childRect = child.getBoundingClientRect();
+                  const relativeBottom = childRect.bottom - rect.top;
+                  // 박스 라인을 가진 요소는 제외 (border가 있는 큰 컨테이너 제외)
+                  const style = window.getComputedStyle(child);
+                  const hasBorder = style.borderWidth && style.borderWidth !== '0px';
+                  const isLargeContainer = childRect.width > rect.width * 0.8 && childRect.height > 200;
+                  
+                  // 박스 라인이 있는 큰 컨테이너는 제외하고, 실제 콘텐츠만 측정
+                  if (relativeBottom > 0 && !(hasBorder && isLargeContainer)) {
+                    maxRelativeBottom = Math.max(maxRelativeBottom, relativeBottom);
+                  }
+                } catch (e) {
+                  // 무시
+                }
+              }
+            }
+            
+            // scrollHeight도 확인하되, 박스 라인을 제외한 실제 콘텐츠 높이 우선 사용
+            const scrollHeight = commonAncestor.scrollHeight || rect.height;
+            
+            // 실제 콘텐츠 높이에 맞춰서 설정 (박스 라인 제외, 컨텐츠가 잘리지 않도록 충분한 여유공간 확보)
+            // 박스 크기를 콘텐츠 크기에 맞춰 조정하여 콘텐츠가 박스를 넘어서지 않도록 함
+            let measuredHeight = Math.max(
+              maxRelativeBottom + 100, // 충분한 여유공간 (100px) - 컨텐츠 잘림 방지
+              actualContentHeight > 0 ? actualContentHeight + 100 : scrollHeight // 실제 콘텐츠 높이가 있으면 사용, 없으면 scrollHeight
+            );
+            
+            // 박스 컨테이너가 있다면 박스 크기도 조정하여 콘텐츠와 일치시킴 (콘텐츠가 박스를 넘어서지 않도록)
+            const boxContainers = commonAncestor.querySelectorAll('.MuiPaper-root, .MuiCard-root, [class*="Container"]');
+            const originalBoxStyles = new Map();
+            
+            for (const box of boxContainers) {
+              try {
+                const boxStyle = window.getComputedStyle(box);
+                const hasBorder = boxStyle.borderWidth && boxStyle.borderWidth !== '0px';
+                const boxRect = box.getBoundingClientRect();
+                
+                // 박스 라인이 있고, 내부에 실제 콘텐츠가 있다면 박스 크기 조정
+                if (hasBorder && (box.querySelector('table, canvas, svg, [class*="recharts"]'))) {
+                  // 원본 박스 스타일 저장 (복원용)
+                  originalBoxStyles.set(box, {
+                    height: box.style.height,
+                    maxHeight: box.style.maxHeight,
+                    width: box.style.width,
+                    maxWidth: box.style.maxWidth
+                  });
+                  
+                  // 박스의 높이를 내부 콘텐츠 크기에 맞춰 조정
+                  const boxInnerContent = box.querySelector('table, canvas, svg, [class*="recharts"]');
+                  if (boxInnerContent) {
+                    const contentRect = boxInnerContent.getBoundingClientRect();
+                    const boxContentHeight = contentRect.height;
+                    const boxContentWidth = contentRect.width;
+                    
+                    // 박스 패딩 고려 (기본 패딩 16-24px)
+                    const boxPaddingTop = parseInt(boxStyle.paddingTop || '0') || 16;
+                    const boxPaddingBottom = parseInt(boxStyle.paddingBottom || '0') || 16;
+                    const boxPaddingLeft = parseInt(boxStyle.paddingLeft || '0') || 16;
+                    const boxPaddingRight = parseInt(boxStyle.paddingRight || '0') || 16;
+                    const boxBorderTop = parseInt(boxStyle.borderTopWidth || '0') || 1;
+                    const boxBorderBottom = parseInt(boxStyle.borderBottomWidth || '0') || 1;
+                    const boxBorderLeft = parseInt(boxStyle.borderLeftWidth || '0') || 1;
+                    const boxBorderRight = parseInt(boxStyle.borderRightWidth || '0') || 1;
+                    
+                    const adjustedBoxHeight = boxContentHeight + boxPaddingTop + boxPaddingBottom + boxBorderTop + boxBorderBottom + 20; // 여유공간 20px
+                    const adjustedBoxWidth = boxContentWidth + boxPaddingLeft + boxPaddingRight + boxBorderLeft + boxBorderRight + 20; // 여유공간 20px
+                    
+                    // 박스 크기가 콘텐츠보다 크면 조정 (콘텐츠가 박스를 넘어서지 않도록)
+                    if (boxRect.height > adjustedBoxHeight) {
+                      box.style.height = `${adjustedBoxHeight}px`;
+                      box.style.maxHeight = `${adjustedBoxHeight}px`;
+                      if (process.env.NODE_ENV === 'development') {
+                        console.log(`📦 [가입자증감] 박스 높이 조정: ${boxRect.height}px → ${adjustedBoxHeight}px`);
+                      }
+                    }
+                    
+                    if (boxRect.width > adjustedBoxWidth) {
+                      box.style.width = `${adjustedBoxWidth}px`;
+                      box.style.maxWidth = `${adjustedBoxWidth}px`;
+                      if (process.env.NODE_ENV === 'development') {
+                        console.log(`📦 [가입자증감] 박스 너비 조정: ${boxRect.width}px → ${adjustedBoxWidth}px`);
+                      }
+                    }
+                  }
+                }
+              } catch (e) {
+                // 무시
+              }
+            }
+            
+            // 박스 크기 조정 후 실제 콘텐츠 크기 재측정 (박스 조정 반영)
+            if (boxContainers.length > 0) {
+              await new Promise(r => setTimeout(r, 200)); // 박스 크기 조정 후 렌더링 대기
+              
+              // 재측정
+              maxRelativeBottom = 0;
+              actualContentHeight = 0;
+              
+              // 테이블 재측정
+              for (const table of tables) {
+                try {
+                  const tableRect = table.getBoundingClientRect();
+                  const relativeBottom = tableRect.bottom - rect.top;
+                  if (relativeBottom > 0) {
+                    maxRelativeBottom = Math.max(maxRelativeBottom, relativeBottom);
+                    actualContentHeight = Math.max(actualContentHeight, tableRect.height);
+                  }
+                } catch (e) {
+                  // 무시
+                }
+              }
+              
+              // 그래프 재측정
+              for (const chart of charts) {
+                try {
+                  const chartRect = chart.getBoundingClientRect();
+                  const relativeBottom = chartRect.bottom - rect.top;
+                  if (relativeBottom > 0 && chartRect.height > 50) {
+                    maxRelativeBottom = Math.max(maxRelativeBottom, relativeBottom);
+                    actualContentHeight = Math.max(actualContentHeight, chartRect.height);
+                  }
+                } catch (e) {
+                  // 무시
+                }
+              }
+              
+              // 컨테이너 내부 콘텐츠 재측정
+              for (const container of containers) {
+                try {
+                  const innerTable = container.querySelector('table, .MuiTable-root');
+                  const innerChart = container.querySelector('canvas, svg, [class*="recharts"]');
+                  
+                  if (innerTable || innerChart) {
+                    if (innerTable) {
+                      const tableRect = innerTable.getBoundingClientRect();
+                      const tableRelativeBottom = tableRect.bottom - rect.top;
+                      if (tableRelativeBottom > 0) {
+                        maxRelativeBottom = Math.max(maxRelativeBottom, tableRelativeBottom);
+                        actualContentHeight = Math.max(actualContentHeight, tableRect.height);
+                      }
+                    }
+                    if (innerChart) {
+                      const chartRect = innerChart.getBoundingClientRect();
+                      const chartRelativeBottom = chartRect.bottom - rect.top;
+                      if (chartRelativeBottom > 0 && chartRect.height > 50) {
+                        maxRelativeBottom = Math.max(maxRelativeBottom, chartRelativeBottom);
+                        actualContentHeight = Math.max(actualContentHeight, chartRect.height);
+                      }
+                    }
+                  }
+                } catch (e) {
+                  // 무시
+                }
+              }
+              
+              // 조정된 크기로 다시 계산
+              measuredHeight = Math.max(
+                maxRelativeBottom + 100,
+                actualContentHeight > 0 ? actualContentHeight + 100 : scrollHeight
+              );
+            }
+            
+            // 요소의 높이를 실제 콘텐츠 높이로 제한하여 불필요한 여백 제거
+            const originalHeight = commonAncestor.style.height;
+            const originalMaxHeight = commonAncestor.style.maxHeight;
+            commonAncestor.style.height = `${measuredHeight}px`;
+            commonAncestor.style.maxHeight = `${measuredHeight}px`;
+            commonAncestor.style.overflow = 'visible';
+            
+            // 박스 스타일 복원을 restoreStylesFunction에 추가
+            if (originalBoxStyles.size > 0) {
+              const originalRestore = restoreStylesFunction;
+              restoreStylesFunction = () => {
+                if (originalRestore) originalRestore();
+                // 박스 스타일 복원
+                originalBoxStyles.forEach((styles, box) => {
+                  if (!box || !box.style) return;
+                  if (styles.height) {
+                    box.style.height = styles.height;
+                  } else {
+                    box.style.removeProperty('height');
+                  }
+                  if (styles.maxHeight) {
+                    box.style.maxHeight = styles.maxHeight;
+                  } else {
+                    box.style.removeProperty('max-height');
+                  }
+                  if (styles.width) {
+                    box.style.width = styles.width;
+                  } else {
+                    box.style.removeProperty('width');
+                  }
+                  if (styles.maxWidth) {
+                    box.style.maxWidth = styles.maxWidth;
+                  } else {
+                    box.style.removeProperty('max-width');
+                  }
+                });
+              };
+            }
+            
+            await new Promise(r => setTimeout(r, 300)); // 스타일 변경 후 렌더링 대기
+            
+            subscriberIncreaseCompositeBlob = await captureElement(commonAncestor, {
+              scale: 2,
+              useCORS: true,
+              fixedBottomPaddingPx: 0, // 핑크 바 제거
+              backgroundColor: '#ffffff',
+              scrollX: 0,
+              scrollY: 0,
+              skipAutoCrop: true, // 크롭 로직 제거 (실제 높이로만 캡처)
+              height: measuredHeight * 2 // scale 고려
+            });
+            
+            // 원본 스타일 복원
+            if (originalHeight) {
+              commonAncestor.style.height = originalHeight;
+            } else {
+              commonAncestor.style.removeProperty('height');
+            }
+            if (originalMaxHeight) {
+              commonAncestor.style.maxHeight = originalMaxHeight;
+            } else {
+              commonAncestor.style.removeProperty('max-height');
+            }
+            commonAncestor.style.removeProperty('overflow');
+            
+            if (process.env.NODE_ENV === 'development') {
+              console.log('✅ [MeetingCaptureManager] 가입자증감 전체 영역 캡처 완료 (월간시상 방식)');
+            }
+          }
+        } catch (e) {
+          console.error('❌ [MeetingCaptureManager] 가입자증감 캡처 실패:', e);
+          subscriberIncreaseCompositeBlob = null;
+        }
+      }
+      
+      // 기존 합성 방식 코드 제거 (월간시상 방식으로 변경)
+      let compositeBlob = null;
+      if (
+        currentSlide?.mode === 'chart' &&
+        (currentSlide?.tab === 'bondChart' || currentSlide?.tab === 'bond') &&
+        (currentSlide?.subTab === 'subscriberIncrease') &&
+        false // 기존 합성 방식 비활성화
       ) {
         try {
           const blobToImage = (blob) => new Promise((resolve, reject) => {
@@ -2872,43 +3584,289 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         }
       }
       
-      // 재초담초채권 슬라이드의 경우 충분한 너비와 높이 보장, 하단 여백 크롭
+      // 재초담초채권 슬라이드의 경우 충분한 너비와 높이 보장, 하단 여백 크롭 (가로 크기도 실제 콘텐츠에 맞춤, 박스 라인 제외)
       if (isRechotancho && captureTargetElement) {
         try {
           const elementRect = captureTargetElement.getBoundingClientRect();
-          const allChildren = captureTargetElement.querySelectorAll('*');
           let maxRelativeBottom = 0;
-          let actualContentHeight = captureTargetElement.scrollHeight || elementRect.height;
+          let maxRelativeRight = 0;
+          let actualContentHeight = 0;
+          let actualContentWidth = 0;
           
-          // 모든 자식 요소의 실제 렌더링 위치 확인
-          for (const child of allChildren) {
+          // 실제 테이블 콘텐츠만 찾아서 측정 (박스 라인 제외)
+          const tables = captureTargetElement.querySelectorAll('table, .MuiTable-root, [class*="Table"]');
+          for (const table of tables) {
             try {
-              const childRect = child.getBoundingClientRect();
-              const relativeBottom = childRect.bottom - elementRect.top;
-              if (relativeBottom > 0 && relativeBottom < actualContentHeight * 3) {
+              const tableRect = table.getBoundingClientRect();
+              const relativeBottom = tableRect.bottom - elementRect.top;
+              const relativeRight = tableRect.right - elementRect.left;
+              
+              if (relativeBottom > 0) {
                 maxRelativeBottom = Math.max(maxRelativeBottom, relativeBottom);
+                actualContentHeight = Math.max(actualContentHeight, tableRect.height);
+              }
+              if (relativeRight > 0) {
+                maxRelativeRight = Math.max(maxRelativeRight, relativeRight);
+                actualContentWidth = Math.max(actualContentWidth, tableRect.width);
               }
             } catch (e) {
               // 무시
             }
           }
           
-          // 실제 콘텐츠 높이에 맞춰서 설정 (불필요한 여백 제거)
-          const measuredHeight = Math.max(
+          // 실제 그래프 콘텐츠만 찾아서 측정 (박스 라인 제외)
+          const charts = captureTargetElement.querySelectorAll('canvas, svg, [class*="recharts"], [class*="Chart"]');
+          for (const chart of charts) {
+            try {
+              const chartRect = chart.getBoundingClientRect();
+              const relativeBottom = chartRect.bottom - elementRect.top;
+              const relativeRight = chartRect.right - elementRect.left;
+              
+              if (relativeBottom > 0 && chartRect.height > 50) { // 최소 크기 확인 (실제 그래프만)
+                maxRelativeBottom = Math.max(maxRelativeBottom, relativeBottom);
+                actualContentHeight = Math.max(actualContentHeight, chartRect.height);
+              }
+              if (relativeRight > 0 && chartRect.width > 100) { // 최소 크기 확인
+                maxRelativeRight = Math.max(maxRelativeRight, relativeRight);
+                actualContentWidth = Math.max(actualContentWidth, chartRect.width);
+              }
+            } catch (e) {
+              // 무시
+            }
+          }
+          
+          // 테이블/그래프 컨테이너의 실제 콘텐츠 크기 확인 (박스 라인 제외)
+          const containers = captureTargetElement.querySelectorAll('.MuiTableContainer-root, .MuiPaper-root, .MuiCard-root');
+          for (const container of containers) {
+            try {
+              // 컨테이너 내부의 실제 테이블/그래프가 있는지 확인
+              const innerTable = container.querySelector('table, .MuiTable-root');
+              const innerChart = container.querySelector('canvas, svg, [class*="recharts"]');
+              
+              if (innerTable || innerChart) {
+                // 내부 콘텐츠의 실제 크기만 사용 (컨테이너의 패딩/보더 제외)
+                if (innerTable) {
+                  const tableRect = innerTable.getBoundingClientRect();
+                  const tableRelativeBottom = tableRect.bottom - elementRect.top;
+                  const tableRelativeRight = tableRect.right - elementRect.left;
+                  
+                  if (tableRelativeBottom > 0) {
+                    maxRelativeBottom = Math.max(maxRelativeBottom, tableRelativeBottom);
+                    actualContentHeight = Math.max(actualContentHeight, tableRect.height);
+                  }
+                  if (tableRelativeRight > 0) {
+                    maxRelativeRight = Math.max(maxRelativeRight, tableRelativeRight);
+                    actualContentWidth = Math.max(actualContentWidth, tableRect.width);
+                  }
+                }
+                if (innerChart) {
+                  const chartRect = innerChart.getBoundingClientRect();
+                  const chartRelativeBottom = chartRect.bottom - elementRect.top;
+                  const chartRelativeRight = chartRect.right - elementRect.left;
+                  
+                  if (chartRelativeBottom > 0 && chartRect.height > 50) {
+                    maxRelativeBottom = Math.max(maxRelativeBottom, chartRelativeBottom);
+                    actualContentHeight = Math.max(actualContentHeight, chartRect.height);
+                  }
+                  if (chartRelativeRight > 0 && chartRect.width > 100) {
+                    maxRelativeRight = Math.max(maxRelativeRight, chartRelativeRight);
+                    actualContentWidth = Math.max(actualContentWidth, chartRect.width);
+                  }
+                }
+              }
+            } catch (e) {
+              // 무시
+            }
+          }
+          
+          // 콘텐츠를 찾지 못한 경우에만 전체 자식 요소 확인 (fallback)
+          if (maxRelativeBottom === 0 || maxRelativeRight === 0) {
+            const allChildren = captureTargetElement.querySelectorAll('*');
+            for (const child of allChildren) {
+              try {
+                const childRect = child.getBoundingClientRect();
+                const relativeBottom = childRect.bottom - elementRect.top;
+                const relativeRight = childRect.right - elementRect.left;
+                
+                // 박스 라인을 가진 요소는 제외 (border가 있는 큰 컨테이너 제외)
+                const style = window.getComputedStyle(child);
+                const hasBorder = style.borderWidth && style.borderWidth !== '0px';
+                const isLargeContainer = childRect.width > elementRect.width * 0.8 && childRect.height > 200;
+                
+                // 박스 라인이 있는 큰 컨테이너는 제외하고, 실제 콘텐츠만 측정
+                if (!(hasBorder && isLargeContainer)) {
+                  if (relativeBottom > 0 && maxRelativeBottom === 0) {
+                    maxRelativeBottom = Math.max(maxRelativeBottom, relativeBottom);
+                  }
+                  if (relativeRight > 0 && maxRelativeRight === 0) {
+                    maxRelativeRight = Math.max(maxRelativeRight, relativeRight);
+                  }
+                }
+              } catch (e) {
+                // 무시
+              }
+            }
+          }
+          
+          // scrollHeight/scrollWidth도 확인하되, 박스 라인을 제외한 실제 콘텐츠 크기 우선 사용
+          const scrollHeight = captureTargetElement.scrollHeight || elementRect.height;
+          const scrollWidth = captureTargetElement.scrollWidth || elementRect.width;
+          
+          // 실제 콘텐츠 높이에 맞춰서 설정 (박스 라인 제외, 불필요한 여백 제거)
+          let measuredHeight = Math.max(
             maxRelativeBottom + 40, // 기본 여유공간 (40px) - 불필요한 여백 최소화
-            actualContentHeight // scrollHeight도 고려
+            actualContentHeight > 0 ? actualContentHeight + 40 : scrollHeight // 실제 콘텐츠 높이가 있으면 사용, 없으면 scrollHeight
           );
           
-          const targetWidth = Math.max(elementRect.width, 1200);
+          // 실제 콘텐츠 너비에 맞춰서 설정 (오른쪽 공백 제거, 박스 라인 제외)
+          // scrollWidth와 실제 렌더링된 최대 위치 중 더 큰 값 사용
+          let measuredWidth = Math.max(
+            maxRelativeRight + 40, // 기본 여유공간 (40px)
+            actualContentWidth > 0 ? actualContentWidth + 40 : scrollWidth, // 실제 콘텐츠 너비가 있으면 사용, 없으면 scrollWidth
+            elementRect.width, // 최소한 현재 보이는 너비는 보장
+            1200 // 최소 너비 보장
+          );
           
-          // 요소의 높이를 실제 콘텐츠 높이로 제한하여 불필요한 여백 제거
+          // 박스 컨테이너가 있다면 박스 크기도 조정하여 콘텐츠와 일치시킴 (콘텐츠가 박스를 넘어서지 않도록)
+          const boxContainers = captureTargetElement.querySelectorAll('.MuiPaper-root, .MuiCard-root, [class*="Container"]');
+          const originalBoxStyles = new Map();
+          
+          for (const box of boxContainers) {
+            try {
+              const boxStyle = window.getComputedStyle(box);
+              const hasBorder = boxStyle.borderWidth && boxStyle.borderWidth !== '0px';
+              const boxRect = box.getBoundingClientRect();
+              
+              // 박스 라인이 있고, 내부에 실제 콘텐츠가 있다면 박스 크기 조정
+              if (hasBorder && (box.querySelector('table, canvas, svg, [class*="recharts"]'))) {
+                // 원본 박스 스타일 저장 (복원용)
+                originalBoxStyles.set(box, {
+                  height: box.style.height,
+                  maxHeight: box.style.maxHeight,
+                  width: box.style.width,
+                  maxWidth: box.style.maxWidth
+                });
+                
+                // 박스의 높이와 너비를 내부 콘텐츠 크기에 맞춰 조정
+                const boxInnerContent = box.querySelector('table, canvas, svg, [class*="recharts"]');
+                if (boxInnerContent) {
+                  const contentRect = boxInnerContent.getBoundingClientRect();
+                  const boxContentHeight = contentRect.height;
+                  const boxContentWidth = contentRect.width;
+                  
+                  // 박스 패딩 고려 (기본 패딩 16-24px)
+                  const boxPaddingTop = parseInt(boxStyle.paddingTop || '0') || 16;
+                  const boxPaddingBottom = parseInt(boxStyle.paddingBottom || '0') || 16;
+                  const boxPaddingLeft = parseInt(boxStyle.paddingLeft || '0') || 16;
+                  const boxPaddingRight = parseInt(boxStyle.paddingRight || '0') || 16;
+                  const boxBorderTop = parseInt(boxStyle.borderTopWidth || '0') || 1;
+                  const boxBorderBottom = parseInt(boxStyle.borderBottomWidth || '0') || 1;
+                  const boxBorderLeft = parseInt(boxStyle.borderLeftWidth || '0') || 1;
+                  const boxBorderRight = parseInt(boxStyle.borderRightWidth || '0') || 1;
+                  
+                  const adjustedBoxHeight = boxContentHeight + boxPaddingTop + boxPaddingBottom + boxBorderTop + boxBorderBottom + 20; // 여유공간 20px
+                  const adjustedBoxWidth = boxContentWidth + boxPaddingLeft + boxPaddingRight + boxBorderLeft + boxBorderRight + 20; // 여유공간 20px
+                  
+                  // 박스 크기가 콘텐츠보다 크면 조정 (콘텐츠가 박스를 넘어서지 않도록)
+                  if (boxRect.height > adjustedBoxHeight) {
+                    box.style.height = `${adjustedBoxHeight}px`;
+                    box.style.maxHeight = `${adjustedBoxHeight}px`;
+                    if (process.env.NODE_ENV === 'development') {
+                      console.log(`📦 [재초담초채권] 박스 높이 조정: ${boxRect.height}px → ${adjustedBoxHeight}px`);
+                    }
+                  }
+                  
+                  if (boxRect.width > adjustedBoxWidth) {
+                    box.style.width = `${adjustedBoxWidth}px`;
+                    box.style.maxWidth = `${adjustedBoxWidth}px`;
+                    if (process.env.NODE_ENV === 'development') {
+                      console.log(`📦 [재초담초채권] 박스 너비 조정: ${boxRect.width}px → ${adjustedBoxWidth}px`);
+                    }
+                  }
+                }
+              }
+            } catch (e) {
+              // 무시
+            }
+          }
+          
+          // 박스 크기 조정 후 실제 콘텐츠 크기 재측정 (박스 조정 반영)
+          if (boxContainers.length > 0) {
+            await new Promise(r => setTimeout(r, 200)); // 박스 크기 조정 후 렌더링 대기
+            
+            // 재측정
+            maxRelativeBottom = 0;
+            maxRelativeRight = 0;
+            actualContentHeight = 0;
+            actualContentWidth = 0;
+            
+            // 테이블 재측정
+            for (const table of tables) {
+              try {
+                const tableRect = table.getBoundingClientRect();
+                const relativeBottom = tableRect.bottom - elementRect.top;
+                const relativeRight = tableRect.right - elementRect.left;
+                
+                if (relativeBottom > 0) {
+                  maxRelativeBottom = Math.max(maxRelativeBottom, relativeBottom);
+                  actualContentHeight = Math.max(actualContentHeight, tableRect.height);
+                }
+                if (relativeRight > 0) {
+                  maxRelativeRight = Math.max(maxRelativeRight, relativeRight);
+                  actualContentWidth = Math.max(actualContentWidth, tableRect.width);
+                }
+              } catch (e) {
+                // 무시
+              }
+            }
+            
+            // 그래프 재측정
+            for (const chart of charts) {
+              try {
+                const chartRect = chart.getBoundingClientRect();
+                const relativeBottom = chartRect.bottom - elementRect.top;
+                const relativeRight = chartRect.right - elementRect.left;
+                
+                if (relativeBottom > 0 && chartRect.height > 50) {
+                  maxRelativeBottom = Math.max(maxRelativeBottom, relativeBottom);
+                  actualContentHeight = Math.max(actualContentHeight, chartRect.height);
+                }
+                if (relativeRight > 0 && chartRect.width > 100) {
+                  maxRelativeRight = Math.max(maxRelativeRight, relativeRight);
+                  actualContentWidth = Math.max(actualContentWidth, chartRect.width);
+                }
+              } catch (e) {
+                // 무시
+              }
+            }
+            
+            // 조정된 크기로 다시 계산
+            measuredHeight = Math.max(
+              maxRelativeBottom + 40,
+              actualContentHeight > 0 ? actualContentHeight + 40 : scrollHeight
+            );
+            
+            measuredWidth = Math.max(
+              maxRelativeRight + 40,
+              actualContentWidth > 0 ? actualContentWidth + 40 : scrollWidth,
+              elementRect.width,
+              1200
+            );
+          }
+          
+          // 요소의 높이와 너비를 실제 콘텐츠 크기로 제한하여 불필요한 여백 제거
           const originalHeight = captureTargetElement.style.height;
           const originalMaxHeight = captureTargetElement.style.maxHeight;
+          const originalWidth = captureTargetElement.style.width;
+          const originalMaxWidth = captureTargetElement.style.maxWidth;
+          
           captureTargetElement.style.height = `${measuredHeight}px`;
           captureTargetElement.style.maxHeight = `${measuredHeight}px`;
+          captureTargetElement.style.width = `${measuredWidth}px`;
+          captureTargetElement.style.maxWidth = `${measuredWidth}px`;
           captureTargetElement.style.overflow = 'visible';
           
-          // 높이 제한을 위해 restoreStylesFunction에 추가
+          // 높이/너비 제한을 위해 restoreStylesFunction에 추가
           if (restoreStylesFunction) {
             const originalRestore = restoreStylesFunction;
             restoreStylesFunction = () => {
@@ -2922,6 +3880,16 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                 captureTargetElement.style.maxHeight = originalMaxHeight;
               } else {
                 captureTargetElement.style.removeProperty('max-height');
+              }
+              if (originalWidth) {
+                captureTargetElement.style.width = originalWidth;
+              } else {
+                captureTargetElement.style.removeProperty('width');
+              }
+              if (originalMaxWidth) {
+                captureTargetElement.style.maxWidth = originalMaxWidth;
+              } else {
+                captureTargetElement.style.removeProperty('max-width');
               }
               captureTargetElement.style.removeProperty('overflow');
             };
@@ -2937,29 +3905,44 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               } else {
                 captureTargetElement.style.removeProperty('max-height');
               }
+              if (originalWidth) {
+                captureTargetElement.style.width = originalWidth;
+              } else {
+                captureTargetElement.style.removeProperty('width');
+              }
+              if (originalMaxWidth) {
+                captureTargetElement.style.maxWidth = originalMaxWidth;
+              } else {
+                captureTargetElement.style.removeProperty('max-width');
+              }
               captureTargetElement.style.removeProperty('overflow');
             };
           }
           
           await new Promise(r => setTimeout(r, 300)); // 스타일 변경 후 렌더링 대기
           
-          captureOptions.width = targetWidth * 2; // scale 고려
+          captureOptions.width = measuredWidth * 2; // scale 고려 (실제 콘텐츠 너비 사용)
           captureOptions.height = measuredHeight * 2; // 측정된 높이 사용 (여백 제거)
           captureOptions.skipAutoCrop = true; // 크롭 로직 제거 (실제 높이로만 캡처)
           captureOptions.fixedBottomPaddingPx = 0; // 핑크 바 제거
           
           if (process.env.NODE_ENV === 'development') {
-            console.log(`📐 [MeetingCaptureManager] 재초담초채권: 실제 콘텐츠 높이 측정`, {
+            console.log(`📐 [MeetingCaptureManager] 재초담초채권: 실제 콘텐츠 크기 측정`, {
               maxRelativeBottom,
+              maxRelativeRight,
               actualContentHeight,
+              actualContentWidth,
               measuredHeight,
+              measuredWidth,
               scrollHeight: captureTargetElement.scrollHeight,
-              offsetHeight: captureTargetElement.offsetHeight
+              scrollWidth: captureTargetElement.scrollWidth,
+              offsetHeight: captureTargetElement.offsetHeight,
+              offsetWidth: captureTargetElement.offsetWidth
             });
           }
         } catch (e) {
           if (process.env.NODE_ENV === 'development') {
-            console.warn('⚠️ [MeetingCaptureManager] 재초담초채권 높이 측정 중 경고:', e?.message);
+            console.warn('⚠️ [MeetingCaptureManager] 재초담초채권 크기 측정 중 경고:', e?.message);
           }
         }
       }
@@ -2997,7 +3980,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         }
       }
       
-      let blob = monthlyAwardCompositeBlob || inventoryCompositeBlob || compositeBlob || await captureElement(captureTargetElement, captureOptions);
+      let blob = monthlyAwardCompositeBlob || subscriberIncreaseCompositeBlob || inventoryCompositeBlob || compositeBlob || await captureElement(captureTargetElement, captureOptions);
       
       // 스타일 복원
       if (restoreStylesFunction) {
