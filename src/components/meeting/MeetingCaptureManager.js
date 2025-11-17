@@ -4,6 +4,16 @@ import { api } from '../../api';
 import { API_BASE_URL } from '../../api';
 import CaptureProgress from './CaptureProgress';
 import SlideRenderer from './SlideRenderer';
+import { 
+  identifySlideType, 
+  getCaptureConfig, 
+  waitForDataLoading, 
+  findTables, 
+  measureContentSize, 
+  resizeBoxesToContent, 
+  removeRightWhitespace 
+} from './SlideCaptureConfig';
+import { unifiedCapture } from './unifiedCaptureLogic';
 
 /**
  * 회의 캡처를 관리하는 컴포넌트
@@ -2738,7 +2748,29 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             
             // commonAncestor를 찾았으면 사용, 없으면 slideElement 사용
             if (foundAncestor) {
-              commonAncestor = foundAncestor;
+              // foundAncestor가 너무 작거나 슬라이드 헤더만 포함하는 경우 slideElement 사용
+              const foundRect = foundAncestor.getBoundingClientRect();
+              const slideRect = slideElement.getBoundingClientRect();
+              
+              // foundAncestor가 slideElement의 90% 이상이면 slideElement 사용 (전체 슬라이드 캡처)
+              if (foundRect.height >= slideRect.height * 0.9 && foundRect.width >= slideRect.width * 0.9) {
+                commonAncestor = slideElement;
+                if (process.env.NODE_ENV === 'development') {
+                  console.log('⚠️ [월간시상] foundAncestor가 전체 슬라이드와 유사하여 slideElement 사용');
+                }
+              } else {
+                // foundAncestor에 실제 테이블이 포함되어 있는지 확인
+                const hasTableInFound = Array.from(foundAncestor.querySelectorAll('table, .MuiTable-root, .MuiTableContainer-root')).length > 0;
+                if (!hasTableInFound) {
+                  // 테이블이 없으면 slideElement 사용
+                  commonAncestor = slideElement;
+                  if (process.env.NODE_ENV === 'development') {
+                    console.warn('⚠️ [월간시상] foundAncestor에 테이블이 없어 slideElement 사용');
+                  }
+                } else {
+                  commonAncestor = foundAncestor;
+                }
+              }
             }
           }
           
@@ -2748,18 +2780,57 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               commonAncestor.scrollIntoView({ block: 'start', behavior: 'instant' });
               await new Promise(r => setTimeout(r, 500));
             
-            // 실제 콘텐츠 높이 측정 (모든 자식 요소의 최대 bottom 위치 확인)
+            // 실제 콘텐츠 높이 측정 (테이블과 실제 콘텐츠 요소 우선 측정)
             const rect = commonAncestor.getBoundingClientRect();
-            const allChildren = commonAncestor.querySelectorAll('*');
             let maxRelativeBottom = 0;
             let actualContentHeight = commonAncestor.scrollHeight || rect.height;
             
-            // 모든 자식 요소의 실제 렌더링 위치 확인
-            for (const child of allChildren) {
-              const childRect = child.getBoundingClientRect();
-              const relativeBottom = childRect.bottom - rect.top;
-              if (relativeBottom > 0 && relativeBottom < actualContentHeight * 3) {
-                maxRelativeBottom = Math.max(maxRelativeBottom, relativeBottom);
+            // 테이블 요소들을 먼저 확인 (테이블이 실제 콘텐츠)
+            const allTables = commonAncestor.querySelectorAll('table, .MuiTable-root, .MuiTableContainer-root, tbody, .MuiTableBody-root');
+            for (const table of allTables) {
+              try {
+                const tableRect = table.getBoundingClientRect();
+                const relativeBottom = tableRect.bottom - rect.top;
+                if (relativeBottom > 0) {
+                  maxRelativeBottom = Math.max(maxRelativeBottom, relativeBottom);
+                  actualContentHeight = Math.max(actualContentHeight, tableRect.height);
+                }
+              } catch (e) {
+                // 무시
+              }
+            }
+            
+            // 찾은 테이블들(Paper/Box) 확인
+            if (tables.length > 0) {
+              for (const table of tables) {
+                try {
+                  const tableRect = table.getBoundingClientRect();
+                  const relativeBottom = tableRect.bottom - rect.top;
+                  if (relativeBottom > 0) {
+                    maxRelativeBottom = Math.max(maxRelativeBottom, relativeBottom);
+                    actualContentHeight = Math.max(actualContentHeight, tableRect.height);
+                  }
+                } catch (e) {
+                  // 무시
+                }
+              }
+            }
+            
+            // 모든 자식 요소의 실제 렌더링 위치 확인 (fallback, 테이블을 찾지 못한 경우)
+            if (maxRelativeBottom === 0 || actualContentHeight === 0) {
+              const allChildren = commonAncestor.querySelectorAll('*');
+              for (const child of allChildren) {
+                try {
+                  const childRect = child.getBoundingClientRect();
+                  const relativeBottom = childRect.bottom - rect.top;
+                  // 헤더 요소는 제외 (너무 작거나 높이가 100px 미만인 요소는 제외)
+                  if (relativeBottom > 0 && childRect.height > 50) {
+                    maxRelativeBottom = Math.max(maxRelativeBottom, relativeBottom);
+                    actualContentHeight = Math.max(actualContentHeight, childRect.height);
+                  }
+                } catch (e) {
+                  // 무시
+                }
               }
             }
             
@@ -2767,8 +2838,21 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             // scrollHeight와 실제 렌더링된 최대 위치 중 더 큰 값 사용하여 컨텐츠가 잘리지 않도록 함
             const measuredHeight = Math.max(
               maxRelativeBottom + 100, // 충분한 여유공간 (100px) - 컨텐츠 잘림 방지
-              actualContentHeight // scrollHeight도 고려
+              actualContentHeight + 100, // 실제 콘텐츠 높이 + 여유공간
+              commonAncestor.scrollHeight || rect.height // scrollHeight도 고려
             );
+            
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`📐 [월간시상] 콘텐츠 높이 측정:`, {
+                maxRelativeBottom,
+                actualContentHeight,
+                measuredHeight,
+                scrollHeight: commonAncestor.scrollHeight,
+                tablesFound: tables.length,
+                allTablesFound: allTables.length,
+                commonAncestor: commonAncestor === slideElement ? 'slideElement' : 'found'
+              });
+            }
             
             // 요소의 높이를 실제 콘텐츠 높이로 제한하여 불필요한 여백 제거
             const originalHeight = commonAncestor.style.height;
@@ -5183,7 +5267,30 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         }
       }
       
-      let blob = monthlyAwardCompositeBlob || subscriberIncreaseCompositeBlob || inventoryCompositeBlob || compositeBlob || await captureElement(captureTargetElement, captureOptions);
+      // 통합 캡처 로직 사용
+      let blob = null;
+      
+      // 기존 composite blob이 있으면 우선 사용
+      if (monthlyAwardCompositeBlob || subscriberIncreaseCompositeBlob || inventoryCompositeBlob || compositeBlob) {
+        blob = monthlyAwardCompositeBlob || subscriberIncreaseCompositeBlob || inventoryCompositeBlob || compositeBlob;
+      } else {
+        // 통합 캡처 로직으로 시도
+        try {
+          const unifiedBlob = await unifiedCapture(slideElement, currentSlide, captureTargetElement);
+          if (unifiedBlob) {
+            blob = unifiedBlob;
+          } else {
+            // 통합 로직 실패 시 기본 캡처 사용
+            blob = await captureElement(captureTargetElement, captureOptions);
+          }
+        } catch (e) {
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('⚠️ [MeetingCaptureManager] 통합 캡처 로직 실패, 기본 캡처 사용:', e?.message);
+          }
+          // 통합 로직 실패 시 기본 캡처 사용
+          blob = await captureElement(captureTargetElement, captureOptions);
+        }
+      }
       
       // 스타일 복원
       if (restoreStylesFunction) {
