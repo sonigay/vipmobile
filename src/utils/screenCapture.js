@@ -332,11 +332,11 @@ export async function captureElement(element, options = {}) {
       Math.max(totalContentHeight, scrollHeight, element.scrollHeight);
     
     // 계산된 높이와 고정 최소 높이 중 큰 값 사용
-    // 목차는 실제 콘텐츠가 매우 길 수 있으므로 실제 높이의 2.0배 + 여유공간
+    // 목차는 실제 콘텐츠가 매우 길 수 있으므로 실제 높이의 3.0배 + 여유공간
     const heightScale = widthScale < 1 ? (1 / widthScale) : 1;
-    const reflowMultiplier = 2.0; // 목차는 재흐름을 더 고려
-    const calculatedHeight = Math.ceil(actualTocHeight * heightScale * reflowMultiplier) + 1000; // 여유공간 1000px 추가
-    targetHeight = Math.max(calculatedHeight, actualTocHeight + 1500, 8000); // 최소 8000px 또는 실제 높이 + 1500px
+    const reflowMultiplier = 3.0; // 목차는 재흐름을 더 고려 (2.0 → 3.0)
+    const calculatedHeight = Math.ceil(actualTocHeight * heightScale * reflowMultiplier) + 2000; // 여유공간 2000px 추가 (1000 → 2000)
+    targetHeight = Math.max(calculatedHeight, actualTocHeight + 2500, 12000); // 최소 12000px 또는 실제 높이 + 2500px (8000 → 12000)
     
     if (process.env.NODE_ENV === 'development') {
       console.log(`📏 [screenCapture] 목차 슬라이드 높이 계산:`, {
@@ -390,9 +390,9 @@ export async function captureElement(element, options = {}) {
     // 계산된 높이와 고정 최소 높이 중 큰 값 사용
     // 고정 가로폭 적용 시 세로 재흐름을 고려한 높이 계산
     const heightScale = widthScale < 1 ? (1 / widthScale) : 1;
-    const reflowMultiplier = 1.5; // 재흐름 고려 배율
-    const calculatedHeight = Math.ceil(actualHeight * heightScale * reflowMultiplier) + 800; // 여유공간 800px 추가
-    targetHeight = Math.max(calculatedHeight, actualHeight + 1200, 4000); // 최소 4000px 또는 실제 높이 + 1200px
+    const reflowMultiplier = 2.0; // 재흐름 고려 배율 (1.5 → 2.0)
+    const calculatedHeight = Math.ceil(actualHeight * heightScale * reflowMultiplier) + 1500; // 여유공간 1500px 추가 (800 → 1500)
+    targetHeight = Math.max(calculatedHeight, actualHeight + 2000, 6000); // 최소 6000px 또는 실제 높이 + 2000px (4000 → 6000, 1200 → 2000)
     
     if (process.env.NODE_ENV === 'development') {
       console.log(`📏 [screenCapture] ${isMain ? '메인' : '엔딩'} 슬라이드 높이 계산:`, {
@@ -650,11 +650,31 @@ export async function captureElement(element, options = {}) {
         clonedDoc.documentElement.scrollTop = 0;
         clonedDoc.documentElement.scrollLeft = 0;
         
-        // body와 html의 높이도 조정
-        clonedDoc.body.style.height = 'auto';
+        // body와 html의 높이도 조정 (더 확실하게)
+        clonedDoc.body.style.height = `${targetHeight}px`;
         clonedDoc.body.style.minHeight = `${targetHeight}px`;
-        clonedDoc.documentElement.style.height = 'auto';
+        clonedDoc.body.style.maxHeight = 'none';
+        clonedDoc.body.style.overflow = 'visible';
+        clonedDoc.documentElement.style.height = `${targetHeight}px`;
         clonedDoc.documentElement.style.minHeight = `${targetHeight}px`;
+        clonedDoc.documentElement.style.maxHeight = 'none';
+        clonedDoc.documentElement.style.overflow = 'visible';
+        
+        // 클론된 요소 자체의 높이도 명시적으로 설정
+        clonedElement.style.height = `${targetHeight}px`;
+        clonedElement.style.minHeight = `${targetHeight}px`;
+        clonedElement.style.maxHeight = 'none';
+        
+        // 클론된 요소의 모든 부모 요소도 높이 확장 (최대 3단계)
+        let clonedParent = clonedElement.parentElement;
+        let parentDepth = 0;
+        while (clonedParent && clonedParent !== clonedDoc.body && parentDepth < 3) {
+          clonedParent.style.maxHeight = 'none';
+          clonedParent.style.overflow = 'visible';
+          clonedParent.style.height = `${targetHeight}px`;
+          clonedParent = clonedParent.parentElement;
+          parentDepth++;
+        }
       }
     },
     ...html2CanvasOptions
@@ -680,19 +700,26 @@ export async function captureElement(element, options = {}) {
       // 하단 공백 자동 제거를 위한 크롭 처리
       const croppedCanvas = await autoCropCanvas(canvas);
       
-      // 고정 하단 여백 추가(요청된 경우): 크롭 결과 캔버스 높이를 늘리고 아래를 흰색으로 채움
+      // 고정 하단 여백 추가(요청된 경우): 크롭 결과 캔버스 높이를 늘리고 아래를 핫핑크로 채움
       let finalCanvas = croppedCanvas;
       if (fixedBottomPaddingPx > 0) {
         const padded = document.createElement('canvas');
         padded.width = croppedCanvas.width;
         padded.height = croppedCanvas.height + fixedBottomPaddingPx;
         const pctx = padded.getContext('2d');
-        // 전체를 파스텔톤 핫핑크로 채우고, 위쪽에 원본 이미지를 그려
-        // 최종적으로 하단 여백 영역만 핫핑크가 보이도록 함
-        pctx.fillStyle = BOTTOM_PADDING_COLOR;
-        pctx.fillRect(0, 0, padded.width, padded.height);
+        
+        // 먼저 원본 이미지를 그려서 콘텐츠를 보존 (핑크색 위에 그리지 않음)
         pctx.drawImage(croppedCanvas, 0, 0);
+        
+        // 그 다음 하단에만 핫핑크 색상으로 패딩 추가 (콘텐츠 아래에만)
+        pctx.fillStyle = BOTTOM_PADDING_COLOR;
+        pctx.fillRect(0, croppedCanvas.height, padded.width, fixedBottomPaddingPx);
+        
         finalCanvas = padded;
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`🎨 [screenCapture] 하단 핑크 패딩 추가: ${fixedBottomPaddingPx}px (콘텐츠 높이: ${croppedCanvas.height}px)`);
+        }
       }
       
       // Canvas를 Blob으로 변환

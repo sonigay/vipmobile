@@ -1095,16 +1095,108 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                 maxWidth: barPaper.style.maxWidth
               };
               
+              // Paper 너비 조정
               barPaper.style.width = `${targetWidth}px`;
               barPaper.style.minWidth = `${targetWidth}px`;
               barPaper.style.maxWidth = 'none';
+              barPaper.style.setProperty('width', `${targetWidth}px`, 'important');
+              barPaper.style.setProperty('min-width', `${targetWidth}px`, 'important');
+              barPaper.style.setProperty('max-width', 'none', 'important');
               
-              // canvas가 있으면 높이도 조정
+              // canvas가 있으면 너비와 높이 모두 조정
               if (barCanvas) {
-                const canvasBox = barCanvas.closest('[style*="height"]') || barPaper.querySelector('[style*="height"]');
-                if (canvasBox) {
-                  canvasBox.style.height = '400px';
-                  canvasBox.style.minHeight = '400px';
+                // canvas 요소 자체의 너비와 높이 조정
+                const originalCanvasWidth = barCanvas.width;
+                const originalCanvasHeight = barCanvas.height;
+                const originalCanvasStyle = {
+                  width: barCanvas.style.width,
+                  height: barCanvas.style.height,
+                  minWidth: barCanvas.style.minWidth,
+                  maxWidth: barCanvas.style.maxWidth
+                };
+                
+                // canvas의 CSS 너비/높이 설정
+                barCanvas.style.width = `${targetWidth}px`;
+                barCanvas.style.height = '400px';
+                barCanvas.style.minWidth = `${targetWidth}px`;
+                barCanvas.style.maxWidth = 'none';
+                barCanvas.style.setProperty('width', `${targetWidth}px`, 'important');
+                barCanvas.style.setProperty('height', '400px', 'important');
+                barCanvas.style.setProperty('min-width', `${targetWidth}px`, 'important');
+                barCanvas.style.setProperty('max-width', 'none', 'important');
+                
+                // canvas의 실제 픽셀 너비/높이도 조정 (Chart.js 등이 사용)
+                // 하지만 실제 크기는 Chart.js가 재렌더링할 때 결정되므로, 스타일만 조정
+                
+                // canvas의 부모 요소들도 확인
+                let canvasParent = barCanvas.parentElement;
+                let parentDepth = 0;
+                while (canvasParent && canvasParent !== barPaper && parentDepth < 3) {
+                  const parentComputed = window.getComputedStyle(canvasParent);
+                  const parentHasMaxWidth = parentComputed.maxWidth && parentComputed.maxWidth !== 'none' && parentComputed.maxWidth !== 'auto';
+                  
+                  if (parentHasMaxWidth || canvasParent.style.maxWidth) {
+                    canvasParent.style.setProperty('max-width', 'none', 'important');
+                    canvasParent.style.setProperty('width', `${targetWidth}px`, 'important');
+                  }
+                  canvasParent = canvasParent.parentElement;
+                  parentDepth++;
+                }
+                
+                // 복원을 위해 원본 값 저장
+                if (!barPaper.__originalCanvasStyle) {
+                  barPaper.__originalCanvasStyle = originalCanvasStyle;
+                  barPaper.__originalCanvasWidth = originalCanvasWidth;
+                  barPaper.__originalCanvasHeight = originalCanvasHeight;
+                }
+              }
+              
+              // Paper 내부의 다른 컨테이너도 확인
+              const paperContainers = barPaper.querySelectorAll('[style*="width"], [style*="max-width"]');
+              paperContainers.forEach(container => {
+                const computed = window.getComputedStyle(container);
+                if (computed.maxWidth && computed.maxWidth !== 'none' && computed.maxWidth !== 'auto') {
+                  container.style.setProperty('max-width', 'none', 'important');
+                }
+                if (computed.width && (computed.width.includes('px') && parseFloat(computed.width) < targetWidth)) {
+                  container.style.setProperty('width', `${targetWidth}px`, 'important');
+                }
+              });
+              
+              // Chart.js 차트가 있으면 resize 이벤트를 트리거하여 재렌더링 강제
+              // Chart.js는 window resize 이벤트를 감지하면 자동으로 차트를 재렌더링함
+              if (barCanvas) {
+                // window resize 이벤트 트리거 (Chart.js가 감지)
+                window.dispatchEvent(new Event('resize'));
+                
+                // 차트 인스턴스를 직접 찾아서 resize 호출 (더 확실한 방법)
+                try {
+                  // Chart.js는 canvas 요소에 chart 인스턴스를 저장하거나, Chart.getChart로 접근 가능
+                  const Chart = window.Chart || (typeof require !== 'undefined' && require('chart.js/auto'));
+                  let chartInstance = null;
+                  
+                  // 여러 방법으로 차트 인스턴스 찾기
+                  if (barCanvas.chart) {
+                    chartInstance = barCanvas.chart;
+                  } else if (Chart && typeof Chart.getChart === 'function') {
+                    chartInstance = Chart.getChart(barCanvas);
+                  } else if (barCanvas._chart) {
+                    chartInstance = barCanvas._chart;
+                  }
+                  
+                  if (chartInstance && typeof chartInstance.resize === 'function') {
+                    // 약간의 딜레이 후 resize 호출 (스타일 변경이 적용된 후)
+                    setTimeout(() => {
+                      chartInstance.resize();
+                      if (process.env.NODE_ENV === 'development') {
+                        console.log('📊 [MeetingCaptureManager] 막대 그래프 Chart.js resize 호출');
+                      }
+                    }, 100);
+                  }
+                } catch (e) {
+                  if (process.env.NODE_ENV === 'development') {
+                    console.warn('⚠️ [MeetingCaptureManager] Chart.js resize 호출 실패:', e?.message);
+                  }
                 }
               }
             }
@@ -1159,8 +1251,14 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               }
             }
             
-            // 크기 조정 후 렌더링 대기
-            await new Promise(r => setTimeout(r, 1000));
+            // 크기 조정 후 렌더링 대기 (Chart.js가 재렌더링할 시간)
+            await new Promise(r => setTimeout(r, 500));
+            
+            // window resize 이벤트를 한 번 더 트리거하여 모든 차트가 재렌더링되도록
+            window.dispatchEvent(new Event('resize'));
+            
+            // 추가 렌더링 대기
+            await new Promise(r => setTimeout(r, 800));
             
             // 캡처 후 원래 스타일 복원을 위한 참조 저장
             slideElement.__restoreStyles = () => {
@@ -1168,6 +1266,27 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                 barPaper.style.width = originalBarStyle.width;
                 barPaper.style.minWidth = originalBarStyle.minWidth;
                 barPaper.style.maxWidth = originalBarStyle.maxWidth;
+                
+                // canvas 스타일 복원
+                const barCanvas = barPaper.querySelector('canvas');
+                if (barCanvas && barPaper.__originalCanvasStyle) {
+                  barCanvas.style.width = barPaper.__originalCanvasStyle.width || '';
+                  barCanvas.style.height = barPaper.__originalCanvasStyle.height || '';
+                  barCanvas.style.minWidth = barPaper.__originalCanvasStyle.minWidth || '';
+                  barCanvas.style.maxWidth = barPaper.__originalCanvasStyle.maxWidth || '';
+                  
+                  // 원본 픽셀 크기도 복원
+                  if (barPaper.__originalCanvasWidth) {
+                    barCanvas.width = barPaper.__originalCanvasWidth;
+                  }
+                  if (barPaper.__originalCanvasHeight) {
+                    barCanvas.height = barPaper.__originalCanvasHeight;
+                  }
+                  
+                  delete barPaper.__originalCanvasStyle;
+                  delete barPaper.__originalCanvasWidth;
+                  delete barPaper.__originalCanvasHeight;
+                }
               }
               if (linePaper) {
                 linePaper.style.width = originalLineStyle.width;
@@ -1952,15 +2071,20 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             feeChartPaper.style.minHeight = originalChart2Style.minHeight;
             const img1 = await blobToImage(chart1Blob);
             const img2 = await blobToImage(chart2Blob);
-            const gap = 16;
+            const gap = 24; // 간격 증가 (16 → 24)
+            const maxWidth = Math.max(img1.width, img2.width);
             const canvas = document.createElement('canvas');
-            canvas.width = Math.max(img1.width, img2.width);
+            canvas.width = maxWidth;
             canvas.height = img1.height + gap + img2.height;
             const ctx = canvas.getContext('2d');
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(img1, 0, 0);
-            ctx.drawImage(img2, 0, img1.height + gap);
+            
+            // 가운데 정렬로 그리기
+            const img1X = (maxWidth - img1.width) / 2;
+            const img2X = (maxWidth - img2.width) / 2;
+            ctx.drawImage(img1, img1X, 0);
+            ctx.drawImage(img2, img2X, img1.height + gap);
             graphBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
           } else {
             if (process.env.NODE_ENV === 'development') {
@@ -1971,20 +2095,25 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             }
           }
           
-          // 3) 테이블과 그래프를 세로로 합치기
+          // 3) 테이블과 그래프를 세로로 합치기 (가운데 정렬)
           let contentBlob = null;
           if (tableBlob && graphBlob) {
             const imgTable = await blobToImage(tableBlob);
             const imgGraph = await blobToImage(graphBlob);
-            const gap = 16;
+            const gap = 24; // 간격 증가 (16 → 24)
+            const maxWidth = Math.max(imgTable.width, imgGraph.width);
             const canvas = document.createElement('canvas');
-            canvas.width = Math.max(imgTable.width, imgGraph.width);
+            canvas.width = maxWidth;
             canvas.height = imgTable.height + gap + imgGraph.height;
             const ctx = canvas.getContext('2d');
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(imgTable, 0, 0);
-            ctx.drawImage(imgGraph, 0, imgTable.height + gap);
+            
+            // 가운데 정렬로 그리기
+            const tableX = (maxWidth - imgTable.width) / 2;
+            const graphX = (maxWidth - imgGraph.width) / 2;
+            ctx.drawImage(imgTable, tableX, 0);
+            ctx.drawImage(imgGraph, graphX, imgTable.height + gap);
             
             contentBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
             
@@ -2049,14 +2178,19 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                 const imgHeader = await blobToImage(headerBlob);
                 const imgContent = await blobToImage(contentBlob);
                 const gap = 0; // 헤더와 콘텐츠 사이 간격 없음
+                const maxWidth = Math.max(imgHeader.width, imgContent.width);
                 const canvas = document.createElement('canvas');
-                canvas.width = Math.max(imgHeader.width, imgContent.width);
+                canvas.width = maxWidth;
                 canvas.height = imgHeader.height + gap + imgContent.height;
                 const ctx = canvas.getContext('2d');
                 ctx.fillStyle = '#ffffff';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.drawImage(imgHeader, 0, 0);
-                ctx.drawImage(imgContent, 0, imgHeader.height + gap);
+                
+                // 가운데 정렬로 그리기
+                const headerX = (maxWidth - imgHeader.width) / 2;
+                const contentX = (maxWidth - imgContent.width) / 2;
+                ctx.drawImage(imgHeader, headerX, 0);
+                ctx.drawImage(imgContent, contentX, imgHeader.height + gap);
                 
                 compositeBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
                 
@@ -2090,6 +2224,210 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         : slideType === 'main' || slideType === 'toc' || slideType === 'ending'
         ? '#ffffff' // 배경색은 그라데이션이므로 흰색으로 설정
         : '#ffffff';
+      
+      // 메인/목차/엔딩 슬라이드의 경우 캡처 전에 실제 DOM 스타일을 변경하여 높이 확보
+      const isMainTocEnding = slideType === 'main' || slideType === 'toc' || slideType === 'ending';
+      let restoreStylesFunction = null;
+      
+      if (isMainTocEnding && captureTargetElement) {
+        try {
+          // 스크롤을 맨 위로 이동
+          captureTargetElement.scrollTop = 0;
+          if (captureTargetElement.parentElement) {
+            captureTargetElement.parentElement.scrollTop = 0;
+          }
+          
+          // 모든 자식 요소의 스크롤 제약 제거
+          const allElements = captureTargetElement.querySelectorAll('*');
+          const originalStyles = new Map();
+          
+          allElements.forEach(el => {
+            if (!el || !el.style) return;
+            
+            // 원본 스타일 저장
+            const styles = {
+              overflow: el.style.overflow,
+              overflowY: el.style.overflowY,
+              overflowX: el.style.overflowX,
+              maxHeight: el.style.maxHeight,
+              height: el.style.height,
+              minHeight: el.style.minHeight
+            };
+            originalStyles.set(el, styles);
+            
+            // computed styles 확인
+            const computed = window.getComputedStyle(el);
+            const hasMaxHeight = computed.maxHeight && computed.maxHeight !== 'none' && computed.maxHeight !== 'auto';
+            const hasOverflow = computed.overflow === 'auto' || computed.overflow === 'scroll' || computed.overflow === 'hidden';
+            const hasOverflowY = computed.overflowY === 'auto' || computed.overflowY === 'scroll' || computed.overflowY === 'hidden';
+            const hasVhHeight = computed.height && (computed.height.includes('vh') || computed.height.includes('%'));
+            
+            // 스크롤 제약 제거
+            if (hasOverflow || hasOverflowY || el.style.overflow || el.style.overflowY) {
+              el.style.setProperty('overflow', 'visible', 'important');
+              el.style.setProperty('overflow-y', 'visible', 'important');
+              el.style.setProperty('overflow-x', 'visible', 'important');
+            }
+            
+            if (hasMaxHeight || el.style.maxHeight) {
+              el.style.setProperty('max-height', 'none', 'important');
+            }
+            
+            if (hasVhHeight || (el.style.height && (el.style.height.includes('vh') || el.style.height.includes('%')))) {
+              el.style.setProperty('height', 'auto', 'important');
+            }
+            
+            // 스크롤 가능한 컨테이너는 실제 스크롤 높이로 확장
+            if (el.scrollHeight && el.scrollHeight > el.clientHeight) {
+              el.style.setProperty('height', `${el.scrollHeight}px`, 'important');
+              el.style.setProperty('max-height', 'none', 'important');
+              el.style.setProperty('overflow', 'visible', 'important');
+            }
+          });
+          
+          // 메인 컨테이너 자체도 처리
+          const mainComputed = window.getComputedStyle(captureTargetElement);
+          const mainHasMaxHeight = mainComputed.maxHeight && mainComputed.maxHeight !== 'none' && mainComputed.maxHeight !== 'auto';
+          const mainHasOverflow = mainComputed.overflow === 'auto' || mainComputed.overflow === 'scroll' || mainComputed.overflow === 'hidden';
+          const mainOriginalStyle = {
+            overflow: captureTargetElement.style.overflow,
+            overflowY: captureTargetElement.style.overflowY,
+            overflowX: captureTargetElement.style.overflowX,
+            maxHeight: captureTargetElement.style.maxHeight,
+            height: captureTargetElement.style.height,
+            minHeight: captureTargetElement.style.minHeight
+          };
+          
+          if (mainHasOverflow || captureTargetElement.style.overflow) {
+            captureTargetElement.style.setProperty('overflow', 'visible', 'important');
+            captureTargetElement.style.setProperty('overflow-y', 'visible', 'important');
+            captureTargetElement.style.setProperty('overflow-x', 'visible', 'important');
+          }
+          if (mainHasMaxHeight || captureTargetElement.style.maxHeight) {
+            captureTargetElement.style.setProperty('max-height', 'none', 'important');
+          }
+          
+          // 실제 scrollHeight 측정
+          await new Promise(r => setTimeout(r, 300)); // 스타일 변경 후 렌더링 대기
+          
+          // 가장 정확한 방법: 모든 자식 요소를 순회하면서 실제 가장 아래 위치 측정
+          let maxBottom = 0;
+          const elementRect = captureTargetElement.getBoundingClientRect();
+          
+          // 모든 실제 렌더링된 요소의 하단 위치 측정
+          const allRenderedElements = Array.from(captureTargetElement.querySelectorAll('*'));
+          allRenderedElements.forEach(child => {
+            try {
+              const childRect = child.getBoundingClientRect();
+              const relativeBottom = childRect.bottom - elementRect.top;
+              maxBottom = Math.max(maxBottom, relativeBottom);
+              
+              // scrollHeight가 있으면 그것도 고려
+              if (child.scrollHeight && child.scrollHeight > child.clientHeight) {
+                const scrollHeightDiff = child.scrollHeight - child.clientHeight;
+                maxBottom = Math.max(maxBottom, relativeBottom + scrollHeightDiff);
+              }
+            } catch (e) {
+              // 무시하고 계속
+            }
+          });
+          
+          // 요소 자체의 scrollHeight도 고려
+          const elementScrollHeight = captureTargetElement.scrollHeight || 0;
+          const elementOffsetHeight = captureTargetElement.offsetHeight || 0;
+          
+          // 여러 방법으로 측정한 높이 중 최대값 사용
+          const measuredHeights = [
+            maxBottom, // 실제 렌더링된 가장 아래 위치
+            elementScrollHeight, // 요소의 scrollHeight
+            elementOffsetHeight, // 요소의 offsetHeight
+            captureTargetElement.getBoundingClientRect().height // getBoundingClientRect 높이
+          ];
+          const actualHeight = Math.max(...measuredHeights.filter(h => h > 0));
+          
+          // 목차 슬라이드는 더 넉넉하게 (실제 콘텐츠 높이의 2배 이상)
+          const buffer = slideType === 'toc' ? Math.max(actualHeight * 2, 15000) : 
+                        (slideType === 'main' ? Math.max(actualHeight * 1.5, 8000) : 
+                        Math.max(actualHeight * 1.5, 7000));
+          const targetHeight = Math.max(actualHeight + 1000, buffer); // 최소 1000px 여유공간 + 버퍼
+          
+          // 메인 컨테이너 높이를 실제 콘텐츠 높이로 명시적으로 설정
+          // height와 min-height 모두 설정하여 확실하게
+          captureTargetElement.style.setProperty('height', `${targetHeight}px`, 'important');
+          captureTargetElement.style.setProperty('min-height', `${targetHeight}px`, 'important');
+          captureTargetElement.style.setProperty('max-height', 'none', 'important');
+          
+          // 부모 요소도 확인하고 높이 확장 (필요한 경우)
+          let parent = captureTargetElement.parentElement;
+          let depth = 0;
+          while (parent && depth < 3) {
+            const parentComputed = window.getComputedStyle(parent);
+            const parentHasMaxHeight = parentComputed.maxHeight && parentComputed.maxHeight !== 'none' && parentComputed.maxHeight !== 'auto';
+            const parentHasOverflow = parentComputed.overflow === 'auto' || parentComputed.overflow === 'scroll' || parentComputed.overflow === 'hidden';
+            
+            if (parentHasMaxHeight || parentHasOverflow) {
+              const parentScrollHeight = parent.scrollHeight || 0;
+              const parentNeededHeight = Math.max(parentScrollHeight, targetHeight);
+              parent.style.setProperty('max-height', 'none', 'important');
+              parent.style.setProperty('overflow', 'visible', 'important');
+              parent.style.setProperty('height', `${parentNeededHeight}px`, 'important');
+            }
+            parent = parent.parentElement;
+            depth++;
+          }
+          
+          // 추가 렌더링 대기 (높이 확장 후 브라우저가 재렌더링할 시간)
+          await new Promise(r => setTimeout(r, 800));
+          
+          // 최종 높이 재확인 및 조정
+          const finalScrollHeight = captureTargetElement.scrollHeight || 0;
+          const finalOffsetHeight = captureTargetElement.offsetHeight || 0;
+          const finalMeasuredHeight = Math.max(finalScrollHeight, finalOffsetHeight, targetHeight);
+          
+          if (finalMeasuredHeight > targetHeight) {
+            captureTargetElement.style.setProperty('height', `${finalMeasuredHeight}px`, 'important');
+            captureTargetElement.style.setProperty('min-height', `${finalMeasuredHeight}px`, 'important');
+            await new Promise(r => setTimeout(r, 300)); // 추가 렌더링 대기
+          }
+          
+          // 복원 함수 생성
+          restoreStylesFunction = () => {
+            // 자식 요소 스타일 복원
+            originalStyles.forEach((styles, el) => {
+              if (!el || !el.style) return;
+              Object.keys(styles).forEach(key => {
+                if (styles[key]) {
+                  el.style[key] = styles[key];
+                } else {
+                  el.style.removeProperty(key);
+                }
+              });
+            });
+            
+            // 메인 컨테이너 스타일 복원
+            Object.keys(mainOriginalStyle).forEach(key => {
+              if (mainOriginalStyle[key]) {
+                captureTargetElement.style[key] = mainOriginalStyle[key];
+              } else {
+                captureTargetElement.style.removeProperty(key);
+              }
+            });
+          };
+          
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`📏 [MeetingCaptureManager] ${slideType} 슬라이드 높이 조정:`, {
+              actualHeight,
+              targetHeight,
+              minHeight,
+              scrollHeight: captureTargetElement.scrollHeight
+            });
+          }
+        } catch (e) {
+          if (process.env.NODE_ENV === 'development') {
+            console.warn(`⚠️ [MeetingCaptureManager] ${slideType} 슬라이드 스타일 조정 중 경고:`, e?.message);
+          }
+        }
+      }
         
       // 최종 Blob 결정
       // 재초담초채권 슬라이드의 경우 그래프와 테이블 크기를 충분히 확보
@@ -2107,6 +2445,26 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         scrollY: 0
       };
       
+      // 메인/목차/엔딩 슬라이드의 경우 충분한 높이 보장 (매우 넉넉하게)
+      if (isMainTocEnding && captureTargetElement) {
+        const elementScrollHeight = captureTargetElement.scrollHeight || captureTargetElement.offsetHeight;
+        const minHeight = slideType === 'toc' ? 15000 : (slideType === 'main' ? 7000 : 6000);
+        const targetHeight = Math.max(elementScrollHeight, minHeight);
+        
+        captureOptions.width = (captureTargetElement.getBoundingClientRect().width || 1280) * 2;
+        captureOptions.height = (targetHeight + 96) * 2; // fixedBottomPadding 포함
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`📐 [MeetingCaptureManager] ${slideType} 슬라이드 캡처 옵션:`, {
+            elementScrollHeight,
+            minHeight,
+            targetHeight,
+            captureHeight: captureOptions.height,
+            captureWidth: captureOptions.width
+          });
+        }
+      }
+      
       // 재초담초채권 슬라이드의 경우 충분한 너비와 높이 보장
       if (isRechotancho && captureTargetElement) {
         const elementRect = captureTargetElement.getBoundingClientRect();
@@ -2119,6 +2477,17 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
       }
       
       let blob = monthlyAwardCompositeBlob || inventoryCompositeBlob || compositeBlob || await captureElement(captureTargetElement, captureOptions);
+      
+      // 스타일 복원
+      if (restoreStylesFunction) {
+        try {
+          restoreStylesFunction();
+        } catch (e) {
+          if (process.env.NODE_ENV === 'development') {
+            console.warn(`⚠️ [MeetingCaptureManager] ${slideType} 슬라이드 스타일 복원 중 경고:`, e?.message);
+          }
+        }
+      }
 
       // 안전 장치: 어떤 경로로 오든 하단 여백이 보장되도록 최종 한 번 더 패딩 적용
       // (합성(canvas.toBlob)로 생성된 compositeBlob 경로는 fixedBottomPaddingPx가 적용되지 않을 수 있음)
