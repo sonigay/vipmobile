@@ -841,16 +841,26 @@ async function findOrCreatePost(channel, yearMonth, meetingNumber, modeLabel) {
     
     if (meetingNumber) {
       // meetingNumber가 있으면 정확히 일치하는 포스트를 찾음
-      // 여러 패턴으로 매칭 시도
-      post = Array.from(activeThreads.threads.values()).find(thread => {
+      // 여러 패턴으로 매칭 시도 (모드 라벨 유무와 관계없이)
+      const allActiveThreads = Array.from(activeThreads.threads.values());
+      console.log(`🔍 [findOrCreatePost] 활성 스레드 개수: ${allActiveThreads.length}`, {
+        searchingFor: postName,
+        yearMonth,
+        meetingNumber,
+        existingThreads: allActiveThreads.map(t => t.name)
+      });
+      
+      post = allActiveThreads.find(thread => {
         const threadName = thread.name;
+        // 모드 라벨 포함/제외 모두 매칭
         const matches = 
-          // 새 포맷(모드 라벨 포함) 또는 구 포맷(모드 라벨 없이)
+          // 정확한 일치
           threadName === postName ||
           threadName === `${baseWithNumber}` ||
-          threadName === `${baseWithNumber}(어플모드)` ||
-          threadName === `${baseWithNumber}(커스텀)` ||
-          (threadName.includes(`${yearMonth} 회의`) && threadName.includes(`${meetingNumber}차`));
+          // 모드 라벨이 다르지만 년월+차수는 일치
+          (threadName.includes(`${yearMonth} 회의`) && 
+           threadName.includes(`${meetingNumber}차`) &&
+           (threadName.includes('(어플모드)') || threadName.includes('(커스텀)')));
         if (matches) {
           console.log(`✅ [findOrCreatePost] 활성 포스트 찾음 (차수 일치): ${threadName} (ID: ${thread.id})`);
         }
@@ -884,15 +894,26 @@ async function findOrCreatePost(channel, yearMonth, meetingNumber, modeLabel) {
         
         if (meetingNumber) {
           // meetingNumber가 있으면 정확히 일치하는 포스트를 찾음
-          // 여러 패턴으로 매칭 시도
-          post = Array.from(archivedThreads.threads.values()).find(thread => {
+          // 여러 패턴으로 매칭 시도 (모드 라벨 유무와 관계없이)
+          const allArchivedThreads = Array.from(archivedThreads.threads.values());
+          console.log(`🔍 [findOrCreatePost] 아카이브된 스레드 개수: ${allArchivedThreads.length}`, {
+            searchingFor: postName,
+            yearMonth,
+            meetingNumber,
+            existingThreads: allArchivedThreads.slice(0, 10).map(t => t.name) // 최대 10개만 로그
+          });
+          
+          post = allArchivedThreads.find(thread => {
             const threadName = thread.name;
+            // 모드 라벨 포함/제외 모두 매칭
             const matches = 
+              // 정확한 일치
               threadName === postName || 
               threadName === `${baseWithNumber}` ||
-              threadName === `${baseWithNumber}(어플모드)` ||
-              threadName === `${baseWithNumber}(커스텀)` ||
-              (threadName.includes(`${yearMonth} 회의`) && threadName.includes(`${meetingNumber}차`));
+              // 모드 라벨이 다르지만 년월+차수는 일치
+              (threadName.includes(`${yearMonth} 회의`) && 
+               threadName.includes(`${meetingNumber}차`) &&
+               (threadName.includes('(어플모드)') || threadName.includes('(커스텀)')));
             if (matches) {
               console.log(`✅ [findOrCreatePost] 아카이브된 포스트 찾음 (차수 일치): ${threadName} (ID: ${thread.id})`);
             }
@@ -920,6 +941,24 @@ async function findOrCreatePost(channel, yearMonth, meetingNumber, modeLabel) {
       } catch (archivedError) {
         console.warn('아카이브된 스레드 조회 실패:', archivedError);
         // 계속 진행
+      }
+    }
+    
+    // 포스트 생성 전 마지막 체크: 혹시 생성 중에 같은 포스트가 생겼는지 다시 확인
+    if (meetingNumber) {
+      const doubleCheckThreads = await channel.threads.fetchActive();
+      const doubleCheckPost = Array.from(doubleCheckThreads.threads.values()).find(thread => {
+        const threadName = thread.name;
+        return (threadName === postName ||
+                threadName === `${baseWithNumber}` ||
+                (threadName.includes(`${yearMonth} 회의`) && 
+                 threadName.includes(`${meetingNumber}차`) &&
+                 (threadName.includes('(어플모드)') || threadName.includes('(커스텀)'))));
+      });
+      
+      if (doubleCheckPost) {
+        console.log(`✅ [findOrCreatePost] 마지막 체크에서 기존 포스트 찾음: ${doubleCheckPost.name} (ID: ${doubleCheckPost.id})`);
+        return doubleCheckPost;
       }
     }
     

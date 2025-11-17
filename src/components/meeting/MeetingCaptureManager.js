@@ -502,10 +502,11 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             }
             
             // 실제 콘텐츠 높이에 맞춰서 설정 (불필요한 여백 제거)
-            // scrollHeight와 실제 렌더링된 최대 위치 중 작은 값 사용
-            const measuredHeight = Math.min(
-              Math.max(maxRelativeBottom + 40, actualContentHeight), // 최소 40px 여유공간
-              actualContentHeight * 1.1 // scrollHeight의 110%를 넘지 않도록 제한
+            // 모든 섹션(5개 테이블)의 높이를 제대로 고려하기 위해 110% 제한 제거
+            // maxRelativeBottom + 100px 여유공간과 scrollHeight 중 더 큰 값 사용
+            const measuredHeight = Math.max(
+              maxRelativeBottom + 100, // 모든 섹션을 포함하기 위해 충분한 여유공간 (100px)
+              actualContentHeight // scrollHeight도 고려
             );
             
             if (process.env.NODE_ENV === 'development') {
@@ -1725,6 +1726,21 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
           
           const tables = [statsPaper, matrixPaper, channelBox, officeBox, departmentBox].filter(Boolean);
           
+          if (process.env.NODE_ENV === 'development') {
+            console.log('🔍 [MeetingCaptureManager] 월간시상 테이블 찾기:', {
+              statsPaper: !!statsPaper,
+              matrixPaper: !!matrixPaper,
+              channelBox: !!channelBox,
+              officeBox: !!officeBox,
+              departmentBox: !!departmentBox,
+              tablesFound: tables.length,
+              allElementsCount: allElements.length
+            });
+          }
+          
+          // 테이블을 찾지 못했거나, commonAncestor를 찾지 못한 경우 slideElement 전체를 캡처
+          let commonAncestor = slideElement; // 기본값: 전체 슬라이드
+          
           if (tables.length > 0) {
             // 5개 테이블의 공통 조상을 찾아서 슬라이드 헤더 포함
             const findCommonAncestor = (elements) => {
@@ -1744,9 +1760,25 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               return common.find(el => el !== document.body && slideElement.contains(el)) || slideElement;
             };
             
-            const commonAncestor = findCommonAncestor(tables);
+            const foundAncestor = findCommonAncestor(tables);
             
-            if (commonAncestor && commonAncestor !== slideElement) {
+            if (process.env.NODE_ENV === 'development') {
+              console.log('🔍 [MeetingCaptureManager] 월간시상 commonAncestor 찾기:', {
+                commonAncestor: foundAncestor ? '찾음' : '없음',
+                isSlideElement: foundAncestor === slideElement,
+                tablesFound: tables.length,
+                tables: tables.map(t => t?.textContent?.substring(0, 50))
+              });
+            }
+            
+            // commonAncestor를 찾았으면 사용, 없으면 slideElement 사용
+            if (foundAncestor) {
+              commonAncestor = foundAncestor;
+            }
+          }
+          
+          // commonAncestor가 있으면 캡처 진행 (slideElement이든 아니든)
+          if (commonAncestor) {
               // 공통 조상이 있으면 전체를 한 번에 캡처 (슬라이드 헤더 포함)
               commonAncestor.scrollIntoView({ block: 'start', behavior: 'instant' });
               await new Promise(r => setTimeout(r, 500));
