@@ -963,16 +963,19 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                 const imgTable = await blobToImage(tableOnlyBlob);
                 const gap = 8;
                 const extraBottom = 96; // 요청된 얇은 하단 여백
+                // 캔버스 너비는 헤더와 테이블 중 더 넓은 것을 기준으로 하되, 최소 1280px
+                const BASE_CAPTURE_WIDTH = 1280;
+                const canvasWidth = Math.max(BASE_CAPTURE_WIDTH, Math.max(imgHeader.width, imgTable.width));
                 const canvas = document.createElement('canvas');
-                canvas.width = Math.max(imgHeader.width, imgTable.width);
+                canvas.width = canvasWidth;
                 canvas.height = imgHeader.height + gap + imgTable.height + extraBottom;
                 const ctx = canvas.getContext('2d');
                 ctx.fillStyle = '#ffffff';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 // 헤더는 좌측 정렬 (보통 전체 폭)
                 ctx.drawImage(imgHeader, 0, 0);
-                // 테이블을 수평 중앙 정렬
-                const tableX = Math.max(0, Math.floor((canvas.width - imgTable.width) / 2));
+                // 테이블을 수평 중앙 정렬 (캔버스 너비 기준)
+                const tableX = Math.max(0, Math.floor((canvasWidth - imgTable.width) / 2));
                 ctx.drawImage(imgTable, tableX, imgHeader.height + gap);
                 inventoryCompositeBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
               } else if (tableOnlyBlob) {
@@ -1623,10 +1626,11 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               monthlyAwardCompositeBlob = await captureElement(commonAncestor, {
                 scale: 2,
                 useCORS: true,
-                fixedBottomPaddingPx: 96,
+                fixedBottomPaddingPx: 0, // 핑크 바 제거
                 backgroundColor: '#ffffff',
                 scrollX: 0,
-                scrollY: 0
+                scrollY: 0,
+                skipAutoCrop: false // 크롭 로직 사용 (일정 하단 여유공간 제외하고 크롭)
               });
               
               if (process.env.NODE_ENV === 'development') {
@@ -1646,10 +1650,11 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                   const blob = await captureElement(table, {
                     scale: 2,
                     useCORS: true,
-                    fixedBottomPaddingPx: 96,
+                    fixedBottomPaddingPx: 0, // 핑크 바 제거
                     backgroundColor: '#ffffff',
                     scrollX: 0,
-                    scrollY: 0
+                    scrollY: 0,
+                    skipAutoCrop: false // 크롭 로직 사용 (일정 하단 여유공간 제외하고 크롭)
                   });
                   tableBlobs.push(blob);
                   
@@ -1827,12 +1832,12 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             tableBlob = await captureElement(tablePaper, {
               scale: 2,
               useCORS: true,
-              fixedBottomPaddingPx: 96,
+              fixedBottomPaddingPx: 0, // 핑크 바 제거
               backgroundColor: '#ffffff',
               scrollX: 0, // 왼쪽 끝에서 캡처 (앞부분이 보이도록)
               scrollY: 0,
               width: actualScrollWidth * 2, // scale 고려
-              height: (tableHeight + 96) * 2 // fixedBottomPadding 포함
+              height: tableHeight * 2 // fixedBottomPadding 제거
             });
             
             // 원본 스타일 복원
@@ -1981,12 +1986,12 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             const chart1Blob = await captureElement(subscriberChartPaper, {
               scale: 2,
               useCORS: true,
-              fixedBottomPaddingPx: 96,
+              fixedBottomPaddingPx: 0, // 핑크 바 제거
               backgroundColor: '#ffffff',
               scrollX: chart1ScrollX,
               scrollY: 0,
               width: chart1Width * 2, // scale 고려
-              height: (chart1Height + 96) * 2 // fixedBottomPadding 포함
+              height: chart1Height * 2 // fixedBottomPadding 제거
             });
             
             // 원래 스타일 복원
@@ -2045,12 +2050,12 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             const chart2Blob = await captureElement(feeChartPaper, {
               scale: 2,
               useCORS: true,
-              fixedBottomPaddingPx: 96,
+              fixedBottomPaddingPx: 0, // 핑크 바 제거
               backgroundColor: '#ffffff',
               scrollX: chart2ScrollX,
               scrollY: 0,
               width: chart2Width * 2, // scale 고려
-              height: (chart2Height + 96) * 2 // fixedBottomPadding 포함
+              height: chart2Height * 2 // fixedBottomPadding 제거
             });
             
             // 원래 스타일 복원
@@ -2159,7 +2164,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                 const headerBlob = await captureElement(headerElement, {
                   scale: 2,
                   useCORS: true,
-                  fixedBottomPaddingPx: 96,
+                  fixedBottomPaddingPx: 0, // 핑크 바 제거
                   backgroundColor: 'transparent',
                   scrollX: 0,
                   scrollY: 0
@@ -2168,19 +2173,23 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                 const imgHeader = await blobToImage(headerBlob);
                 const imgContent = await blobToImage(contentBlob);
                 const gap = 0; // 헤더와 콘텐츠 사이 간격 없음
-                const maxWidth = Math.max(imgHeader.width, imgContent.width);
+                // 헤더 크기를 테이블(콘텐츠) 너비에 맞춰서 스케일링
+                const targetWidth = imgContent.width; // 콘텐츠 너비에 맞춤
+                const headerScale = targetWidth / imgHeader.width; // 헤더 스케일 비율
+                const scaledHeaderHeight = imgHeader.height * headerScale; // 비율 유지하며 높이 계산
+                const maxWidth = targetWidth; // 콘텐츠 너비 사용
                 const canvas = document.createElement('canvas');
                 canvas.width = maxWidth;
-                canvas.height = imgHeader.height + gap + imgContent.height;
+                canvas.height = scaledHeaderHeight + gap + imgContent.height;
                 const ctx = canvas.getContext('2d');
                 ctx.fillStyle = '#ffffff';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 
-                // 가운데 정렬로 그리기
-                const headerX = (maxWidth - imgHeader.width) / 2;
-                const contentX = (maxWidth - imgContent.width) / 2;
-                ctx.drawImage(imgHeader, headerX, 0);
-                ctx.drawImage(imgContent, contentX, imgHeader.height + gap);
+                // 헤더를 테이블 너비에 맞춰서 스케일링하여 그리기 (가운데 정렬)
+                const headerX = 0; // 전체 너비를 사용하므로 0
+                const contentX = 0; // 전체 너비를 사용하므로 0
+                ctx.drawImage(imgHeader, headerX, 0, targetWidth, scaledHeaderHeight);
+                ctx.drawImage(imgContent, contentX, scaledHeaderHeight + gap);
                 
                 compositeBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
                 
@@ -2345,23 +2354,96 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         scrollY: 0
       };
       
-      // 메인/목차/엔딩 슬라이드의 경우: 적당한 높이로 캡처 (과도하게 확장하지 않음)
+      // 메인/목차/엔딩 슬라이드의 경우: 실제 콘텐츠 크기로 정확히 캡처
       if (isMainTocEnding && captureTargetElement) {
+        // 실제 콘텐츠 크기 측정 (모든 자식 요소 포함)
         const elementRect = captureTargetElement.getBoundingClientRect();
-        const elementScrollHeight = captureTargetElement.scrollHeight || elementRect.height;
+        const allChildren = captureTargetElement.querySelectorAll('*');
+        let maxBottom = elementRect.height;
+        let maxRight = elementRect.width;
         
-        // 적당한 높이 설정: 실제 콘텐츠 높이 + 여유공간 200px
-        const targetHeight = Math.max(elementScrollHeight + 200, 1000); // 최소 1000px
+        allChildren.forEach(child => {
+          try {
+            const childRect = child.getBoundingClientRect();
+            const relativeBottom = childRect.bottom - elementRect.top;
+            const relativeRight = childRect.right - elementRect.left;
+            maxBottom = Math.max(maxBottom, relativeBottom);
+            maxRight = Math.max(maxRight, relativeRight);
+          } catch (e) {
+            // 무시
+          }
+        });
         
-        captureOptions.width = (elementRect.width || 1280) * 2;
-        captureOptions.height = targetHeight * 2; // scale 고려
+        // 실제 콘텐츠 크기 사용 (최소 여유공간만 추가)
+        const actualContentHeight = Math.max(maxBottom, captureTargetElement.scrollHeight || elementRect.height);
+        // scrollWidth를 우선 사용하여 정확한 콘텐츠 너비 측정 (오른쪽 공백 제거)
+        const actualContentWidth = Math.max(
+          maxRight, 
+          captureTargetElement.scrollWidth || elementRect.width,
+          elementRect.width // 최소한 현재 보이는 너비는 보장
+        );
+        
+        // 목차 슬라이드처럼 적당한 높이: 실제 콘텐츠 높이만 사용 (여유공간 최소화)
+        // 목차 슬라이드가 적당하다고 하였으므로 메인/엔딩도 동일한 로직 사용
+        const targetHeight = Math.max(actualContentHeight, 400); // 실제 콘텐츠 높이만, 최소 400px
+        // 너비는 1280px로 고정 (BASE_CAPTURE_WIDTH) - 너비에 맞춰서 캡처하면 오른쪽 공백 제거
+        const BASE_CAPTURE_WIDTH = 1280;
+        const targetWidth = BASE_CAPTURE_WIDTH;
+        
+        // 요소의 너비를 1280px로 명시적으로 설정하여 너비에 맞춰지도록 함
+        const originalWidth = captureTargetElement.style.width;
+        const originalMaxWidth = captureTargetElement.style.maxWidth;
+        captureTargetElement.style.setProperty('width', `${targetWidth}px`, 'important');
+        captureTargetElement.style.setProperty('max-width', `${targetWidth}px`, 'important');
+        
+        // 렌더링 대기
+        await new Promise(r => setTimeout(r, 200));
+        
+        // scale은 html2canvas에서 처리하므로 원본 크기만 전달
+        captureOptions.width = targetWidth;
+        captureOptions.height = targetHeight;
+        captureOptions.windowWidth = targetWidth; // windowWidth도 1280px로 설정하여 너비에 맞춰짐
+        captureOptions.windowHeight = targetHeight;
         captureOptions.skipAutoCrop = true; // 자동 크롭 건너뛰기
         captureOptions.fixedBottomPaddingPx = 0; // 핑크색 바 제거
         
+        // 너비 복원 함수에 추가
+        if (restoreStylesFunction) {
+          const originalRestore = restoreStylesFunction;
+          restoreStylesFunction = () => {
+            originalRestore();
+            if (originalWidth) {
+              captureTargetElement.style.width = originalWidth;
+            } else {
+              captureTargetElement.style.removeProperty('width');
+            }
+            if (originalMaxWidth) {
+              captureTargetElement.style.maxWidth = originalMaxWidth;
+            } else {
+              captureTargetElement.style.removeProperty('max-width');
+            }
+          };
+        } else {
+          restoreStylesFunction = () => {
+            if (originalWidth) {
+              captureTargetElement.style.width = originalWidth;
+            } else {
+              captureTargetElement.style.removeProperty('width');
+            }
+            if (originalMaxWidth) {
+              captureTargetElement.style.maxWidth = originalMaxWidth;
+            } else {
+              captureTargetElement.style.removeProperty('max-width');
+            }
+          };
+        }
+        
         if (process.env.NODE_ENV === 'development') {
-          console.log(`📐 [MeetingCaptureManager] ${slideType} 슬라이드 캡처 옵션 (크롭 제거):`, {
-            elementScrollHeight,
+          console.log(`📐 [MeetingCaptureManager] ${slideType} 슬라이드 캡처 옵션 (크롭 제거, 정확한 크기):`, {
+            actualContentHeight,
+            actualContentWidth,
             targetHeight,
+            targetWidth,
             captureHeight: captureOptions.height,
             captureWidth: captureOptions.width,
             skipAutoCrop: true
@@ -2395,7 +2477,10 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
 
       // 안전 장치: 메인/목차/엔딩 슬라이드가 아닌 경우에만 하단 여백 패딩 적용
       // (메인/목차/엔딩 슬라이드는 크롭 및 패딩 로직 제거)
-      if (!isMainTocEnding) {
+      // 월간 시상 슬라이드는 핑크 바 제거 및 크롭 로직 사용하므로 패딩 제거
+      const isMonthlyAward = currentSlide?.mode === 'chart' && 
+                             (currentSlide?.tab === 'indicatorChart' || currentSlide?.subTab === 'monthlyAward');
+      if (!isMainTocEnding && !isMonthlyAward) {
         try {
           const ensureBottomPadding = async (srcBlob, padding = 96) => {
             if (!srcBlob || padding <= 0) return srcBlob;
