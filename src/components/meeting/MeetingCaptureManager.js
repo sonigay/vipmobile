@@ -862,35 +862,70 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             // 1) 테이블만 우선 캡처
             let tableOnlyBlob = null;
             try {
-              // 데이터가 실제 채워질 때까지 추가 대기 (최대 3초)
+              // 데이터가 실제 채워질 때까지 추가 대기 (최대 5초)
               try {
-                const maxWait = 3000;
+                const maxWait = 5000;
                 const start = Date.now();
+                let hasData = false;
+                
                 while (Date.now() - start < maxWait) {
-                  const text = (tableContainer.textContent || '').replace(/\s+/g, ' ');
-                  // 숫자/한글 제조사명이 일정 개수 이상 보이면 로드 완료로 간주
-                  const hasVendors =
-                    text.includes('삼성') || text.includes('애플') || text.includes('LG') || /\d+/.test(text);
-                  // 최소 행 수 확인
-                  const rowCount = tableContainer.querySelectorAll('tbody tr').length;
-                  if (hasVendors && rowCount >= 10) break;
-                  await new Promise(r => setTimeout(r, 200));
-                }
-                // 가로 스크롤을 좌우로 한번 움직여 가상 렌더링/고정열(sticky) 강제 갱신
-                try {
+                  // 가로 스크롤을 좌우로 움직여 가상 렌더링/고정열(sticky) 강제 갱신
                   const scrollable = tableContainer;
                   if (scrollable && typeof scrollable.scrollLeft === 'number') {
                     const original = scrollable.scrollLeft;
-                    scrollable.scrollLeft = scrollable.scrollWidth; // 오른쪽 끝
-                    await new Promise(r => setTimeout(r, 120));
-                    scrollable.scrollLeft = 0; // 왼쪽 끝(구분열 노출)
-                    await new Promise(r => setTimeout(r, 200));
-                    // 원래 위치로 복원 (보통 0이지만 방어)
-                    scrollable.scrollLeft = original || 0;
-                    await new Promise(r => setTimeout(r, 100));
+                    // 오른쪽 끝으로 스크롤하여 모든 컬럼 렌더링 유도
+                    scrollable.scrollLeft = scrollable.scrollWidth;
+                    await new Promise(r => setTimeout(r, 150));
+                    // 왼쪽 끝으로 스크롤하여 구분 컬럼 노출
+                    scrollable.scrollLeft = 0;
+                    await new Promise(r => setTimeout(r, 300)); // 구분 컬럼 데이터 로딩 대기 시간 증가
                   }
-                } catch (_) {}
-              } catch {}
+                  
+                  // 첫 번째 열(구분 컬럼)에 실제 데이터가 있는지 확인
+                  const tbody = tableContainer.querySelector('tbody');
+                  if (tbody) {
+                    const firstRowCells = tbody.querySelectorAll('tr:first-child td');
+                    const firstColumnHasData = Array.from(firstRowCells).some(cell => {
+                      const text = (cell.textContent || '').trim();
+                      // 제조사명이나 숫자가 있는지 확인
+                      return text && (
+                        text.includes('삼성') || 
+                        text.includes('애플') || 
+                        text.includes('LG') || 
+                        text.includes('샤오미') ||
+                        /^\d+$/.test(text) || // 숫자만 있는 경우
+                        /[가-힣]/.test(text) // 한글이 있는 경우
+                      );
+                    });
+                    
+                    // 최소 행 수 확인 (10개 이상)
+                    const rowCount = tbody.querySelectorAll('tr').length;
+                    
+                    // 첫 번째 열에 데이터가 있고, 최소 10개 행이 있으면 로드 완료
+                    if (firstColumnHasData && rowCount >= 10) {
+                      hasData = true;
+                      // 한 번 더 스크롤하여 모든 데이터 렌더링 보장
+                      if (scrollable && typeof scrollable.scrollLeft === 'number') {
+                        scrollable.scrollLeft = scrollable.scrollWidth;
+                        await new Promise(r => setTimeout(r, 100));
+                        scrollable.scrollLeft = 0;
+                        await new Promise(r => setTimeout(r, 200));
+                      }
+                      break;
+                    }
+                  }
+                  
+                  await new Promise(r => setTimeout(r, 300));
+                }
+                
+                if (!hasData && process.env.NODE_ENV === 'development') {
+                  console.warn('⚠️ [MeetingCaptureManager] 재고장표 구분 컬럼 데이터 로딩 시간 초과');
+                }
+              } catch (e) {
+                if (process.env.NODE_ENV === 'development') {
+                  console.warn('⚠️ [MeetingCaptureManager] 재고장표 데이터 로딩 확인 중 오류:', e);
+                }
+              }
 
               tableOnlyBlob = await captureElement(tableContainer, {
                 scale: 2,
@@ -975,7 +1010,9 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                 // 헤더는 좌측 정렬 (보통 전체 폭)
                 ctx.drawImage(imgHeader, 0, 0);
                 // 테이블을 수평 중앙 정렬 (캔버스 너비 기준)
+                // 테이블이 캔버스보다 넓은 경우에도 중앙 정렬 유지
                 const tableX = Math.max(0, Math.floor((canvasWidth - imgTable.width) / 2));
+                // 테이블이 캔버스보다 넓으면 캔버스 너비로 제한하지 않고 그대로 중앙 정렬
                 ctx.drawImage(imgTable, tableX, imgHeader.height + gap);
                 inventoryCompositeBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
               } else if (tableOnlyBlob) {
@@ -1623,6 +1660,37 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               commonAncestor.scrollIntoView({ block: 'start', behavior: 'instant' });
               await new Promise(r => setTimeout(r, 500));
               
+              // 실제 콘텐츠 높이 측정 (모든 자식 요소의 최대 bottom 위치 확인)
+              const rect = commonAncestor.getBoundingClientRect();
+              const allChildren = commonAncestor.querySelectorAll('*');
+              let maxRelativeBottom = 0;
+              let actualContentHeight = commonAncestor.scrollHeight || rect.height;
+              
+              // 모든 자식 요소의 실제 렌더링 위치 확인
+              for (const child of allChildren) {
+                const childRect = child.getBoundingClientRect();
+                const relativeBottom = childRect.bottom - rect.top;
+                if (relativeBottom > 0 && relativeBottom < actualContentHeight * 3) {
+                  maxRelativeBottom = Math.max(maxRelativeBottom, relativeBottom);
+                }
+              }
+              
+              // 실제 콘텐츠 높이에 맞춰서 설정 (불필요한 여백 제거)
+              // scrollHeight와 실제 렌더링된 최대 위치 중 작은 값 사용 (불필요한 여백 제거)
+              const measuredHeight = Math.min(
+                Math.max(maxRelativeBottom + 20, actualContentHeight), // 최소 20px 여유공간
+                actualContentHeight * 1.1 // scrollHeight의 110%를 넘지 않도록 제한
+              );
+              
+              // 요소의 높이를 실제 콘텐츠 높이로 제한하여 불필요한 여백 제거
+              const originalHeight = commonAncestor.style.height;
+              const originalMaxHeight = commonAncestor.style.maxHeight;
+              commonAncestor.style.height = `${measuredHeight}px`;
+              commonAncestor.style.maxHeight = `${measuredHeight}px`;
+              commonAncestor.style.overflow = 'visible';
+              
+              await new Promise(r => setTimeout(r, 300)); // 스타일 변경 후 렌더링 대기
+              
               monthlyAwardCompositeBlob = await captureElement(commonAncestor, {
                 scale: 2,
                 useCORS: true,
@@ -1630,8 +1698,22 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                 backgroundColor: '#ffffff',
                 scrollX: 0,
                 scrollY: 0,
-                skipAutoCrop: false // 크롭 로직 사용 (일정 하단 여유공간 제외하고 크롭)
+                skipAutoCrop: true, // 크롭 로직 제거 (실제 높이로만 캡처)
+                height: measuredHeight * 2 // scale 고려
               });
+              
+              // 원본 스타일 복원
+              if (originalHeight) {
+                commonAncestor.style.height = originalHeight;
+              } else {
+                commonAncestor.style.removeProperty('height');
+              }
+              if (originalMaxHeight) {
+                commonAncestor.style.maxHeight = originalMaxHeight;
+              } else {
+                commonAncestor.style.removeProperty('max-height');
+              }
+              commonAncestor.style.removeProperty('overflow');
               
               if (process.env.NODE_ENV === 'development') {
                 console.log('✅ [MeetingCaptureManager] 월간시상 전체 영역 캡처 완료 (슬라이드 헤더 포함)');
