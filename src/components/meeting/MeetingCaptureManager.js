@@ -502,10 +502,10 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             }
             
             // 실제 콘텐츠 높이에 맞춰서 설정 (불필요한 여백 제거)
-            // 모든 섹션(5개 테이블)의 높이를 제대로 고려하기 위해 110% 제한 제거
-            // maxRelativeBottom + 100px 여유공간과 scrollHeight 중 더 큰 값 사용
+            // 모든 섹션(5개 테이블)의 높이를 제대로 고려하면서도 불필요한 여백 제거
+            // maxRelativeBottom + 기본 여유공간(40px)과 scrollHeight 중 더 큰 값 사용
             const measuredHeight = Math.max(
-              maxRelativeBottom + 100, // 모든 섹션을 포함하기 위해 충분한 여유공간 (100px)
+              maxRelativeBottom + 40, // 기본 여유공간 (40px) - 불필요한 여백 최소화
               actualContentHeight // scrollHeight도 고려
             );
             
@@ -1089,13 +1089,13 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                 const imgHeader = await blobToImage(headerBlob);
                 const imgTable = await blobToImage(tableOnlyBlob);
                 const gap = 8;
-                const extraBottom = 96; // 요청된 얇은 하단 여백
+                // 핑크바 제거: extraBottom 제거하여 불필요한 하단 여백 없음
                 // 캔버스 너비는 헤더와 테이블 중 더 넓은 것을 기준으로 하되, 최소 1280px
                 const BASE_CAPTURE_WIDTH = 1280;
                 const canvasWidth = Math.max(BASE_CAPTURE_WIDTH, Math.max(imgHeader.width, imgTable.width));
                 const canvas = document.createElement('canvas');
                 canvas.width = canvasWidth;
-                canvas.height = imgHeader.height + gap + imgTable.height + extraBottom;
+                canvas.height = imgHeader.height + gap + imgTable.height; // extraBottom 제거
                 const ctx = canvas.getContext('2d');
                 ctx.fillStyle = '#ffffff';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -1798,11 +1798,11 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               }
             }
             
-            // 실제 콘텐츠 높이에 맞춰서 설정 (불필요한 여백 제거)
-            // scrollHeight와 실제 렌더링된 최대 위치 중 작은 값 사용 (불필요한 여백 제거)
-            const measuredHeight = Math.min(
-              Math.max(maxRelativeBottom + 20, actualContentHeight), // 최소 20px 여유공간
-              actualContentHeight * 1.1 // scrollHeight의 110%를 넘지 않도록 제한
+            // 실제 콘텐츠 높이에 맞춰서 설정 (컨텐츠가 잘리지 않도록 충분한 여유공간 확보)
+            // scrollHeight와 실제 렌더링된 최대 위치 중 더 큰 값 사용하여 컨텐츠가 잘리지 않도록 함
+            const measuredHeight = Math.max(
+              maxRelativeBottom + 100, // 충분한 여유공간 (100px) - 컨텐츠 잘림 방지
+              actualContentHeight // scrollHeight도 고려
             );
             
             // 요소의 높이를 실제 콘텐츠 높이로 제한하여 불필요한 여백 제거
@@ -2554,7 +2554,20 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
           }
         } catch (e) {
           console.error('❌ [MeetingCaptureManager] 가입자증감 캡처 실패:', e);
+          // 에러 발생 시에도 compositeBlob을 null로 설정하여 fallback 사용
+          compositeBlob = null;
         }
+      }
+
+      // 가입자증감 슬라이드인 경우 compositeBlob 확인 및 로깅
+      const isSubscriberIncreaseSlide = currentSlide?.mode === 'chart' &&
+                                        (currentSlide?.tab === 'bondChart' || currentSlide?.tab === 'bond') &&
+                                        (currentSlide?.subTab === 'subscriberIncrease');
+      if (isSubscriberIncreaseSlide && process.env.NODE_ENV === 'development') {
+        console.log('🔍 [MeetingCaptureManager] 가입자증감 compositeBlob 상태:', {
+          hasCompositeBlob: !!compositeBlob,
+          compositeBlobType: compositeBlob ? typeof compositeBlob : 'null'
+        });
       }
 
       // 캡처 (선정된 타겟 요소만 캡처)
