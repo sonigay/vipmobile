@@ -294,10 +294,26 @@ export async function captureElement(element, options = {}) {
   let targetHeight;
   if (isToc) {
     // 목차 슬라이드는 항목이 매우 많을 수 있으므로 넉넉한 고정 높이 보장
-    // 계산된 높이와 고정 최소 높이 중 큰 값 사용 (최소 4500px 보장)
+    // 실제 목차 콘텐츠 영역의 높이를 직접 계산
+    const tocContentArea = element.querySelector('[data-slide-content="toc"]') || 
+                          element.querySelector('.MuiBox-root') || 
+                          element;
+    const actualTocHeight = tocContentArea.scrollHeight || tocContentArea.offsetHeight || scrollHeight;
+    
+    // 계산된 높이와 고정 최소 높이 중 큰 값 사용 (최소 8000px 보장)
     const heightScale = widthScale < 1 ? (1 / widthScale) : 1;
-    const calculatedHeight = Math.ceil(scrollHeight * heightScale * 5.0);
-    targetHeight = Math.max(calculatedHeight, 4500); // 목차는 최소 4500px 보장
+    const calculatedHeight = Math.ceil(Math.max(actualTocHeight, scrollHeight) * heightScale * 8.0);
+    targetHeight = Math.max(calculatedHeight, 8000); // 목차는 최소 8000px 보장 (충분히 넉넉하게)
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`📏 [screenCapture] 목차 슬라이드 높이 계산:`, {
+        actualTocHeight,
+        scrollHeight,
+        calculatedHeight,
+        targetHeight,
+        heightScale
+      });
+    }
   } else if (isMain) {
     // 메인 슬라이드는 목차보다 짧지만 충분한 여유를 준다.
     const heightScale = widthScale < 1 ? (1 / widthScale) : 1;

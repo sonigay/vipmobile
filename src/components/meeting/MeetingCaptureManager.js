@@ -272,7 +272,39 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
       try {
         // 전체총마감 슬라이드: 모든 섹션 펼치기 및 전체 슬라이드 캡처
         if (currentSlide?.mode === 'chart' && currentSlide?.tab === 'closingChart' && currentSlide?.subTab === 'totalClosing') {
-          // 섹션별 헤더 텍스트와 해당 섹션의 테이블 확인 함수
+          // 1단계: data-loaded="true" 속성이 설정될 때까지 대기 (데이터 로드 완료 대기)
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`⏳ [MeetingCaptureManager] 전체총마감: 데이터 로드 완료 대기 시작...`);
+          }
+          
+          let dataLoaded = false;
+          let loadWaitAttempts = 0;
+          const maxLoadWaitAttempts = 100; // 최대 20초 (100 * 200ms)
+          
+          while (!dataLoaded && loadWaitAttempts < maxLoadWaitAttempts) {
+            // data-loaded 속성이 있는 요소 찾기
+            const dataLoadedElement = slideElement.querySelector('[data-loaded="true"]');
+            if (dataLoadedElement) {
+              dataLoaded = true;
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`✅ [MeetingCaptureManager] 전체총마감: 데이터 로드 완료 확인 (${loadWaitAttempts * 200}ms 대기)`);
+              }
+              break;
+            }
+            await new Promise(r => setTimeout(r, 200));
+            loadWaitAttempts++;
+          }
+          
+          if (!dataLoaded) {
+            if (process.env.NODE_ENV === 'development') {
+              console.warn(`⚠️ [MeetingCaptureManager] 전체총마감: 데이터 로드 완료 확인 실패, 계속 진행...`);
+            }
+          }
+          
+          // 2단계: 추가 안정화 대기 (데이터 렌더링 완료 보장)
+          await new Promise(r => setTimeout(r, 1000));
+          
+          // 3단계: 섹션별 헤더 텍스트와 해당 섹션의 테이블 확인
           const sectionHeaders = [
             { text: 'CS 개통 실적', key: 'cs' },
             { text: '코드별 실적', key: 'code' },
@@ -285,8 +317,8 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
           const expandedSections = new Set();
           
           for (const section of sectionHeaders) {
-            // 섹션 헤더 찾기
-            const headerElements = Array.from(document.querySelectorAll('h6, .MuiTypography-h6, .MuiBox-root, div, span'))
+            // 섹션 헤더 찾기 (더 정확한 선택자 사용)
+            const headerElements = Array.from(slideElement.querySelectorAll('h6, .MuiTypography-h6, .MuiBox-root, div, span'))
               .filter(el => {
                 const text = (el.textContent || '').trim();
                 return text.includes(section.text);
@@ -301,11 +333,11 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             
             // 헤더가 속한 Paper 컴포넌트 찾기
             let paperElement = headerElements[0].parentElement;
-            while (paperElement && !paperElement.classList.contains('MuiPaper-root')) {
+            while (paperElement && paperElement !== slideElement && !paperElement.classList.contains('MuiPaper-root')) {
               paperElement = paperElement.parentElement;
             }
             
-            if (!paperElement) {
+            if (!paperElement || !paperElement.classList.contains('MuiPaper-root')) {
               if (process.env.NODE_ENV === 'development') {
                 console.warn(`⚠️ [MeetingCaptureManager] 전체총마감: "${section.text}" 섹션의 Paper를 찾을 수 없습니다.`);
               }
@@ -322,16 +354,16 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             if (expandButton) {
               // 펼치기 버튼 클릭
               expandButton.click();
-              await new Promise(r => setTimeout(r, 500)); // 각 버튼 클릭 후 충분한 대기
+              await new Promise(r => setTimeout(r, 800)); // 각 버튼 클릭 후 충분한 대기 (800ms)
               
-              // 해당 섹션의 테이블이 나타날 때까지 대기 (최대 5초)
+              // 해당 섹션의 테이블이 나타날 때까지 대기 (최대 10초)
               let tableFound = false;
               let attempts = 0;
-              while (attempts < 25) {
-                const table = paperElement.querySelector('.MuiTableContainer-root');
+              while (attempts < 50) {
+                const table = paperElement.querySelector('.MuiTableContainer-root, table');
                 if (table) {
                   // 테이블에 실제 데이터가 있는지 확인 (최소 1개 행)
-                  const rows = table.querySelectorAll('tbody tr, tbody > tr');
+                  const rows = table.querySelectorAll('tbody tr, .MuiTableBody-root tr, tbody > tr');
                   if (rows.length > 0) {
                     tableFound = true;
                     expandedSections.add(section.key);
@@ -359,14 +391,24 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                 });
               
               if (collapseButton) {
-                // 이미 펼쳐져 있음
-                const table = paperElement.querySelector('.MuiTableContainer-root');
+                // 이미 펼쳐져 있음 - 테이블 데이터 확인
+                const table = paperElement.querySelector('.MuiTableContainer-root, table');
                 if (table) {
-                  const rows = table.querySelectorAll('tbody tr, tbody > tr');
+                  const rows = table.querySelectorAll('tbody tr, .MuiTableBody-root tr, tbody > tr');
                   if (rows.length > 0) {
                     expandedSections.add(section.key);
                     if (process.env.NODE_ENV === 'development') {
                       console.log(`✅ [MeetingCaptureManager] 전체총마감: "${section.text}" 섹션 이미 펼쳐져 있음 (${rows.length}개 행)`);
+                    }
+                  } else {
+                    // 펼쳐져 있지만 데이터가 없음 - 추가 대기
+                    await new Promise(r => setTimeout(r, 1000));
+                    const retryRows = table.querySelectorAll('tbody tr, .MuiTableBody-root tr, tbody > tr');
+                    if (retryRows.length > 0) {
+                      expandedSections.add(section.key);
+                      if (process.env.NODE_ENV === 'development') {
+                        console.log(`✅ [MeetingCaptureManager] 전체총마감: "${section.text}" 섹션 재확인 완료 (${retryRows.length}개 행)`);
+                      }
                     }
                   }
                 }
@@ -374,14 +416,14 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             }
           }
           
-          // 모든 섹션이 펼쳐질 때까지 추가 대기 (최대 3초)
-          const maxWait = 3000;
+          // 4단계: 모든 섹션이 펼쳐지고 데이터가 로드될 때까지 추가 대기 (최대 5초)
+          const maxWait = 5000;
           const start = Date.now();
           while (Date.now() - start < maxWait) {
-            const allTables = slideElement.querySelectorAll('.MuiTableContainer-root');
+            const allTables = slideElement.querySelectorAll('.MuiTableContainer-root, table');
             let tablesWithData = 0;
             allTables.forEach(table => {
-              const rows = table.querySelectorAll('tbody tr, tbody > tr');
+              const rows = table.querySelectorAll('tbody tr, .MuiTableBody-root tr, tbody > tr');
               if (rows.length > 0) tablesWithData++;
             });
             
@@ -394,17 +436,20 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             await new Promise(r => setTimeout(r, 200));
           }
           
-          // 최종 확인: 최소 5개 테이블이 있는지 확인
-          const finalTables = slideElement.querySelectorAll('.MuiTableContainer-root');
+          // 5단계: 최종 확인 및 안정화 대기
+          const finalTables = slideElement.querySelectorAll('.MuiTableContainer-root, table');
           let finalTablesWithData = 0;
           finalTables.forEach(table => {
-            const rows = table.querySelectorAll('tbody tr, tbody > tr');
+            const rows = table.querySelectorAll('tbody tr, .MuiTableBody-root tr, tbody > tr');
             if (rows.length > 0) finalTablesWithData++;
           });
           
           if (process.env.NODE_ENV === 'development') {
             console.log(`📊 [MeetingCaptureManager] 전체총마감: 최종 확인 - ${finalTablesWithData}개 테이블 (데이터 포함)`);
           }
+          
+          // 최종 안정화 대기 (모든 렌더링 완료 보장)
+          await new Promise(r => setTimeout(r, 1500));
           
           // 전체 슬라이드 캡처
           captureTargetElement = slideElement;
