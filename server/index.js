@@ -585,6 +585,32 @@ process.on('unhandledRejection', async (reason, promise) => {
 
 // 모든 요청에 대한 로깅 미들웨어
 app.use((req, res, next) => {
+  // OPTIONS 요청은 즉시 처리하도록 조기 반환
+  if (req.method === 'OPTIONS') {
+    const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
+    const defaultOrigins = [
+      'https://vipmobile.vercel.app',
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://localhost:4000'
+    ];
+    const allowedOrigins = [...corsOrigins, ...defaultOrigins];
+    const origin = req.headers.origin;
+    
+    if (origin && allowedOrigins.includes(origin)) {
+      res.header('Access-Control-Allow-Origin', origin);
+    } else if (allowedOrigins.length > 0) {
+      res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
+    } else if (origin) {
+      res.header('Access-Control-Allow-Origin', origin);
+    }
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Max-Age', '86400');
+    return res.status(200).end();
+  }
+  
   // console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
   next();
 });
@@ -5151,8 +5177,9 @@ try {
     res.status(200).end();
   });
   
-  // 회의 설정 API OPTIONS 요청 처리
+  // 회의 설정 API OPTIONS 요청 처리 (라우트 등록 전에 먼저 처리)
   app.options('/api/meetings/:meetingId/config', (req, res) => {
+    console.log('🔍 [OPTIONS] config preflight 요청');
     const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
     const defaultOrigins = [
       'https://vipmobile.vercel.app',
@@ -5167,19 +5194,23 @@ try {
       res.header('Access-Control-Allow-Origin', origin);
     } else if (allowedOrigins.length > 0) {
       res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
+    } else if (origin) {
+      res.header('Access-Control-Allow-Origin', origin);
     }
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
     res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key');
     res.header('Access-Control-Allow-Credentials', 'true');
     res.header('Access-Control-Max-Age', '86400'); // 24시간 캐시
-    res.status(200).end();
+    console.log('✅ [OPTIONS] config CORS 헤더 설정 완료');
+    return res.status(200).end();
   });
   
   app.get('/api/meetings/:meetingId/config', meetingRoutes.getMeetingConfig);
   app.post('/api/meetings/:meetingId/config', meetingRoutes.saveMeetingConfig);
   
-  // 회의 이미지 업로드 API OPTIONS 요청 처리
+  // 회의 이미지 업로드 API OPTIONS 요청 처리 (라우트 등록 전에 먼저 처리)
   app.options('/api/meetings/:meetingId/upload-image', (req, res) => {
+    console.log('🔍 [OPTIONS] upload-image preflight 요청');
     const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
     const defaultOrigins = [
       'https://vipmobile.vercel.app',
@@ -5194,12 +5225,15 @@ try {
       res.header('Access-Control-Allow-Origin', origin);
     } else if (allowedOrigins.length > 0) {
       res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
+    } else if (origin) {
+      res.header('Access-Control-Allow-Origin', origin);
     }
     res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key');
     res.header('Access-Control-Allow-Credentials', 'true');
     res.header('Access-Control-Max-Age', '86400'); // 24시간 캐시
-    res.status(200).end();
+    console.log('✅ [OPTIONS] upload-image CORS 헤더 설정 완료');
+    return res.status(200).end();
   });
   
   // multer 에러 처리 미들웨어
