@@ -2814,15 +2814,96 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         }
       }
       
-      // 재초담초채권 슬라이드의 경우 충분한 너비와 높이 보장
+      // 재초담초채권 슬라이드의 경우 충분한 너비와 높이 보장, 하단 여백 크롭
       if (isRechotancho && captureTargetElement) {
-        const elementRect = captureTargetElement.getBoundingClientRect();
-        const elementScrollHeight = captureTargetElement.scrollHeight || elementRect.height;
-        const targetWidth = Math.max(elementRect.width, 1200);
-        const targetHeight = Math.max(elementScrollHeight, 2000); // 최소 2000px 높이 보장
-        
-        captureOptions.width = targetWidth * 2; // scale 고려
-        captureOptions.height = (targetHeight + 96) * 2; // fixedBottomPadding 포함
+        try {
+          const elementRect = captureTargetElement.getBoundingClientRect();
+          const allChildren = captureTargetElement.querySelectorAll('*');
+          let maxRelativeBottom = 0;
+          let actualContentHeight = captureTargetElement.scrollHeight || elementRect.height;
+          
+          // 모든 자식 요소의 실제 렌더링 위치 확인
+          for (const child of allChildren) {
+            try {
+              const childRect = child.getBoundingClientRect();
+              const relativeBottom = childRect.bottom - elementRect.top;
+              if (relativeBottom > 0 && relativeBottom < actualContentHeight * 3) {
+                maxRelativeBottom = Math.max(maxRelativeBottom, relativeBottom);
+              }
+            } catch (e) {
+              // 무시
+            }
+          }
+          
+          // 실제 콘텐츠 높이에 맞춰서 설정 (불필요한 여백 제거)
+          const measuredHeight = Math.max(
+            maxRelativeBottom + 40, // 기본 여유공간 (40px) - 불필요한 여백 최소화
+            actualContentHeight // scrollHeight도 고려
+          );
+          
+          const targetWidth = Math.max(elementRect.width, 1200);
+          
+          // 요소의 높이를 실제 콘텐츠 높이로 제한하여 불필요한 여백 제거
+          const originalHeight = captureTargetElement.style.height;
+          const originalMaxHeight = captureTargetElement.style.maxHeight;
+          captureTargetElement.style.height = `${measuredHeight}px`;
+          captureTargetElement.style.maxHeight = `${measuredHeight}px`;
+          captureTargetElement.style.overflow = 'visible';
+          
+          // 높이 제한을 위해 restoreStylesFunction에 추가
+          if (restoreStylesFunction) {
+            const originalRestore = restoreStylesFunction;
+            restoreStylesFunction = () => {
+              originalRestore();
+              if (originalHeight) {
+                captureTargetElement.style.height = originalHeight;
+              } else {
+                captureTargetElement.style.removeProperty('height');
+              }
+              if (originalMaxHeight) {
+                captureTargetElement.style.maxHeight = originalMaxHeight;
+              } else {
+                captureTargetElement.style.removeProperty('max-height');
+              }
+              captureTargetElement.style.removeProperty('overflow');
+            };
+          } else {
+            restoreStylesFunction = () => {
+              if (originalHeight) {
+                captureTargetElement.style.height = originalHeight;
+              } else {
+                captureTargetElement.style.removeProperty('height');
+              }
+              if (originalMaxHeight) {
+                captureTargetElement.style.maxHeight = originalMaxHeight;
+              } else {
+                captureTargetElement.style.removeProperty('max-height');
+              }
+              captureTargetElement.style.removeProperty('overflow');
+            };
+          }
+          
+          await new Promise(r => setTimeout(r, 300)); // 스타일 변경 후 렌더링 대기
+          
+          captureOptions.width = targetWidth * 2; // scale 고려
+          captureOptions.height = measuredHeight * 2; // 측정된 높이 사용 (여백 제거)
+          captureOptions.skipAutoCrop = true; // 크롭 로직 제거 (실제 높이로만 캡처)
+          captureOptions.fixedBottomPaddingPx = 0; // 핑크 바 제거
+          
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`📐 [MeetingCaptureManager] 재초담초채권: 실제 콘텐츠 높이 측정`, {
+              maxRelativeBottom,
+              actualContentHeight,
+              measuredHeight,
+              scrollHeight: captureTargetElement.scrollHeight,
+              offsetHeight: captureTargetElement.offsetHeight
+            });
+          }
+        } catch (e) {
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('⚠️ [MeetingCaptureManager] 재초담초채권 높이 측정 중 경고:', e?.message);
+          }
+        }
       }
       
       // 전체총마감 슬라이드: 실제 콘텐츠 높이에 맞춰 크롭 (월간시상 슬라이드와 유사)
