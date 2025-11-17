@@ -1908,20 +1908,37 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                 // 원본 스타일 저장
                 originalCellStyles.set(cell, {
                   minWidth: cell.style.minWidth,
+                  maxWidth: cell.style.maxWidth,
+                  width: cell.style.width,
                   whiteSpace: cell.style.whiteSpace
                 });
                 
                 // 셀의 현재 너비 확인
                 const cellRect = cell.getBoundingClientRect();
                 const cellText = (cell.textContent || '').trim();
+                
+                // maxWidth 제거 (ChartMode.js에서 maxWidth: 70으로 제한되어 있어서 큰 숫자가 잘림)
+                cell.style.maxWidth = 'none';
+                cell.style.setProperty('max-width', 'none', 'important');
+                
                 // 큰 숫자가 있는 셀은 최소 너비 보장
                 if (cellText && /[\d,]+/.test(cellText)) {
-                  const minCellWidth = 100; // 최소 셀 너비
+                  // 숫자 길이에 따라 최소 너비 계산 (예: 113,635,306 -> 약 120px 필요)
+                  const numLength = cellText.replace(/,/g, '').length;
+                  const minCellWidth = Math.max(100, numLength * 8); // 숫자 1개당 약 8px
+                  if (cellRect.width < minCellWidth) {
+                    cell.style.minWidth = `${minCellWidth}px`;
+                    cell.style.setProperty('min-width', `${minCellWidth}px`, 'important');
+                  }
+                } else {
+                  // 일반 셀도 최소 너비 보장
+                  const minCellWidth = 60;
                   if (cellRect.width < minCellWidth) {
                     cell.style.minWidth = `${minCellWidth}px`;
                     cell.style.setProperty('min-width', `${minCellWidth}px`, 'important');
                   }
                 }
+                
                 // 셀의 white-space를 nowrap로 설정하여 텍스트가 잘리지 않도록
                 cell.style.whiteSpace = 'nowrap';
                 cell.style.setProperty('white-space', 'nowrap', 'important');
@@ -2037,6 +2054,16 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                     cell.style.minWidth = originalStyle.minWidth;
                   } else {
                     cell.style.removeProperty('min-width');
+                  }
+                  if (originalStyle.maxWidth) {
+                    cell.style.maxWidth = originalStyle.maxWidth;
+                  } else {
+                    cell.style.removeProperty('max-width');
+                  }
+                  if (originalStyle.width) {
+                    cell.style.width = originalStyle.width;
+                  } else {
+                    cell.style.removeProperty('width');
                   }
                   if (originalStyle.whiteSpace) {
                     cell.style.whiteSpace = originalStyle.whiteSpace;
