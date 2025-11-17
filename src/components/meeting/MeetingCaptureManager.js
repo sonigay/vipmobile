@@ -1085,7 +1085,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             // 통일된 너비 결정 (최소 1200px)
             const targetWidth = 1200;
             
-            // 막대 그래프 크기 조정
+            // 막대 그래프 크기 조정 (선 그래프와 동일한 방식으로 단순화)
             if (barPaper) {
               const barCanvas = barPaper.querySelector('canvas');
               const barRect = barPaper.getBoundingClientRect();
@@ -1095,108 +1095,17 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                 maxWidth: barPaper.style.maxWidth
               };
               
-              // Paper 너비 조정
+              // Paper 너비 조정 (선 그래프와 동일)
               barPaper.style.width = `${targetWidth}px`;
               barPaper.style.minWidth = `${targetWidth}px`;
               barPaper.style.maxWidth = 'none';
-              barPaper.style.setProperty('width', `${targetWidth}px`, 'important');
-              barPaper.style.setProperty('min-width', `${targetWidth}px`, 'important');
-              barPaper.style.setProperty('max-width', 'none', 'important');
               
-              // canvas가 있으면 너비와 높이 모두 조정
+              // canvas가 있으면 높이도 조정 (선 그래프와 동일한 방식)
               if (barCanvas) {
-                // canvas 요소 자체의 너비와 높이 조정
-                const originalCanvasWidth = barCanvas.width;
-                const originalCanvasHeight = barCanvas.height;
-                const originalCanvasStyle = {
-                  width: barCanvas.style.width,
-                  height: barCanvas.style.height,
-                  minWidth: barCanvas.style.minWidth,
-                  maxWidth: barCanvas.style.maxWidth
-                };
-                
-                // canvas의 CSS 너비/높이 설정
-                barCanvas.style.width = `${targetWidth}px`;
-                barCanvas.style.height = '400px';
-                barCanvas.style.minWidth = `${targetWidth}px`;
-                barCanvas.style.maxWidth = 'none';
-                barCanvas.style.setProperty('width', `${targetWidth}px`, 'important');
-                barCanvas.style.setProperty('height', '400px', 'important');
-                barCanvas.style.setProperty('min-width', `${targetWidth}px`, 'important');
-                barCanvas.style.setProperty('max-width', 'none', 'important');
-                
-                // canvas의 실제 픽셀 너비/높이도 조정 (Chart.js 등이 사용)
-                // 하지만 실제 크기는 Chart.js가 재렌더링할 때 결정되므로, 스타일만 조정
-                
-                // canvas의 부모 요소들도 확인
-                let canvasParent = barCanvas.parentElement;
-                let parentDepth = 0;
-                while (canvasParent && canvasParent !== barPaper && parentDepth < 3) {
-                  const parentComputed = window.getComputedStyle(canvasParent);
-                  const parentHasMaxWidth = parentComputed.maxWidth && parentComputed.maxWidth !== 'none' && parentComputed.maxWidth !== 'auto';
-                  
-                  if (parentHasMaxWidth || canvasParent.style.maxWidth) {
-                    canvasParent.style.setProperty('max-width', 'none', 'important');
-                    canvasParent.style.setProperty('width', `${targetWidth}px`, 'important');
-                  }
-                  canvasParent = canvasParent.parentElement;
-                  parentDepth++;
-                }
-                
-                // 복원을 위해 원본 값 저장
-                if (!barPaper.__originalCanvasStyle) {
-                  barPaper.__originalCanvasStyle = originalCanvasStyle;
-                  barPaper.__originalCanvasWidth = originalCanvasWidth;
-                  barPaper.__originalCanvasHeight = originalCanvasHeight;
-                }
-              }
-              
-              // Paper 내부의 다른 컨테이너도 확인
-              const paperContainers = barPaper.querySelectorAll('[style*="width"], [style*="max-width"]');
-              paperContainers.forEach(container => {
-                const computed = window.getComputedStyle(container);
-                if (computed.maxWidth && computed.maxWidth !== 'none' && computed.maxWidth !== 'auto') {
-                  container.style.setProperty('max-width', 'none', 'important');
-                }
-                if (computed.width && (computed.width.includes('px') && parseFloat(computed.width) < targetWidth)) {
-                  container.style.setProperty('width', `${targetWidth}px`, 'important');
-                }
-              });
-              
-              // Chart.js 차트가 있으면 resize 이벤트를 트리거하여 재렌더링 강제
-              // Chart.js는 window resize 이벤트를 감지하면 자동으로 차트를 재렌더링함
-              if (barCanvas) {
-                // window resize 이벤트 트리거 (Chart.js가 감지)
-                window.dispatchEvent(new Event('resize'));
-                
-                // 차트 인스턴스를 직접 찾아서 resize 호출 (더 확실한 방법)
-                try {
-                  // Chart.js는 canvas 요소에 chart 인스턴스를 저장하거나, Chart.getChart로 접근 가능
-                  const Chart = window.Chart || (typeof require !== 'undefined' && require('chart.js/auto'));
-                  let chartInstance = null;
-                  
-                  // 여러 방법으로 차트 인스턴스 찾기
-                  if (barCanvas.chart) {
-                    chartInstance = barCanvas.chart;
-                  } else if (Chart && typeof Chart.getChart === 'function') {
-                    chartInstance = Chart.getChart(barCanvas);
-                  } else if (barCanvas._chart) {
-                    chartInstance = barCanvas._chart;
-                  }
-                  
-                  if (chartInstance && typeof chartInstance.resize === 'function') {
-                    // 약간의 딜레이 후 resize 호출 (스타일 변경이 적용된 후)
-                    setTimeout(() => {
-                      chartInstance.resize();
-                      if (process.env.NODE_ENV === 'development') {
-                        console.log('📊 [MeetingCaptureManager] 막대 그래프 Chart.js resize 호출');
-                      }
-                    }, 100);
-                  }
-                } catch (e) {
-                  if (process.env.NODE_ENV === 'development') {
-                    console.warn('⚠️ [MeetingCaptureManager] Chart.js resize 호출 실패:', e?.message);
-                  }
+                const canvasBox = barCanvas.closest('[style*="height"]') || barPaper.querySelector('[style*="height"]');
+                if (canvasBox) {
+                  canvasBox.style.height = '400px';
+                  canvasBox.style.minHeight = '400px';
                 }
               }
             }
@@ -1832,44 +1741,125 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             tablePaper.scrollIntoView({ block: 'center', behavior: 'instant' });
             await new Promise(r => setTimeout(r, 500));
             
-            // 가로 스크롤이 있는 경우 끝까지 스크롤하여 전체 데이터 캡처
-            const tableContainer = tablePaper.querySelector('.MuiTableContainer-root, [style*="overflow"]');
-            if (tableContainer && tableContainer.scrollWidth > tableContainer.clientWidth) {
-              // 오른쪽 끝까지 스크롤
-              tableContainer.scrollLeft = tableContainer.scrollWidth;
-              await new Promise(r => setTimeout(r, 300));
-              // 다시 왼쪽 끝으로 스크롤 (전체 렌더링 보장)
+            // 테이블의 실제 크기 측정 및 조정
+            const tableContainer = tablePaper.querySelector('.MuiTableContainer-root, [style*="overflow"]') || tablePaper;
+            const actualTable = tablePaper.querySelector('table');
+            
+            // 테이블의 실제 scrollWidth 측정 (12월까지 포함한 전체 너비)
+            let actualScrollWidth = 1200; // 기본값
+            if (tableContainer && tableContainer.scrollWidth) {
+              actualScrollWidth = Math.max(tableContainer.scrollWidth, 1200);
+            } else if (actualTable && actualTable.scrollWidth) {
+              actualScrollWidth = Math.max(actualTable.scrollWidth, 1200);
+            } else {
+              const tableRect = tablePaper.getBoundingClientRect();
+              actualScrollWidth = Math.max(tableRect.width, 1200);
+            }
+            
+            // 테이블 Paper 너비를 실제 scrollWidth로 확장
+            const originalTablePaperStyle = {
+              width: tablePaper.style.width,
+              minWidth: tablePaper.style.minWidth,
+              maxWidth: tablePaper.style.maxWidth
+            };
+            tablePaper.style.width = `${actualScrollWidth}px`;
+            tablePaper.style.minWidth = `${actualScrollWidth}px`;
+            tablePaper.style.maxWidth = 'none';
+            tablePaper.style.setProperty('width', `${actualScrollWidth}px`, 'important');
+            tablePaper.style.setProperty('min-width', `${actualScrollWidth}px`, 'important');
+            tablePaper.style.setProperty('max-width', 'none', 'important');
+            
+            // 테이블 컨테이너도 너비 확장
+            if (tableContainer && tableContainer !== tablePaper) {
+              tableContainer.style.width = `${actualScrollWidth}px`;
+              tableContainer.style.minWidth = `${actualScrollWidth}px`;
+              tableContainer.style.maxWidth = 'none';
+              tableContainer.style.setProperty('width', `${actualScrollWidth}px`, 'important');
+              tableContainer.style.setProperty('min-width', `${actualScrollWidth}px`, 'important');
+              tableContainer.style.setProperty('max-width', 'none', 'important');
+              tableContainer.style.setProperty('overflow-x', 'visible', 'important');
+              tableContainer.style.setProperty('overflow', 'visible', 'important');
+            }
+            
+            // 실제 테이블 요소도 너비 확장
+            if (actualTable) {
+              actualTable.style.width = `${actualScrollWidth}px`;
+              actualTable.style.minWidth = `${actualScrollWidth}px`;
+              actualTable.style.setProperty('width', `${actualScrollWidth}px`, 'important');
+              actualTable.style.setProperty('min-width', `${actualScrollWidth}px`, 'important');
+            }
+            
+            // 스크롤을 맨 왼쪽으로 이동 (앞부분이 보이도록)
+            if (tableContainer && tableContainer.scrollLeft !== undefined) {
               tableContainer.scrollLeft = 0;
-              await new Promise(r => setTimeout(r, 300));
-              // 다시 오른쪽 끝으로 스크롤하여 12월까지 보이도록
-              tableContainer.scrollLeft = tableContainer.scrollWidth;
+            }
+            
+            // 스타일 변경 후 렌더링 대기
+            await new Promise(r => setTimeout(r, 500));
+            
+            // 최종 scrollWidth 재확인 (확장 후)
+            if (tableContainer && tableContainer.scrollWidth > actualScrollWidth) {
+              actualScrollWidth = tableContainer.scrollWidth;
+              tablePaper.style.width = `${actualScrollWidth}px`;
+              tablePaper.style.minWidth = `${actualScrollWidth}px`;
+              if (tableContainer !== tablePaper) {
+                tableContainer.style.width = `${actualScrollWidth}px`;
+                tableContainer.style.minWidth = `${actualScrollWidth}px`;
+              }
+              if (actualTable) {
+                actualTable.style.width = `${actualScrollWidth}px`;
+                actualTable.style.minWidth = `${actualScrollWidth}px`;
+              }
               await new Promise(r => setTimeout(r, 300));
             }
             
-            // 테이블의 실제 크기 측정
-            const tableRect = tablePaper.getBoundingClientRect();
-            tableWidth = Math.max(tableRect.width, 1200); // 최소 1200px 너비 보장 (블록 외부 변수 업데이트)
-            const tableHeight = tablePaper.scrollHeight || tableRect.height;
+            // tableWidth 업데이트 (그래프와 동일한 너비로 맞추기)
+            tableWidth = actualScrollWidth;
             
+            // 테이블 높이 측정
+            const tableHeight = tablePaper.scrollHeight || tablePaper.offsetHeight || tablePaper.getBoundingClientRect().height;
+            
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`📊 [MeetingCaptureManager] 가입자증감 테이블 크기 조정: ${actualScrollWidth}px (높이: ${tableHeight}px)`);
+            }
+            
+            // 테이블 캡처 (스크롤 위치 0으로, 확장된 전체 너비)
             tableBlob = await captureElement(tablePaper, {
               scale: 2,
               useCORS: true,
               fixedBottomPaddingPx: 96,
               backgroundColor: '#ffffff',
-              scrollX: tableContainer ? tableContainer.scrollLeft : 0,
+              scrollX: 0, // 왼쪽 끝에서 캡처 (앞부분이 보이도록)
               scrollY: 0,
-              width: tableWidth * 2, // scale 고려
+              width: actualScrollWidth * 2, // scale 고려
               height: (tableHeight + 96) * 2 // fixedBottomPadding 포함
             });
+            
+            // 원본 스타일 복원
+            if (originalTablePaperStyle.width) {
+              tablePaper.style.width = originalTablePaperStyle.width;
+            } else {
+              tablePaper.style.removeProperty('width');
+            }
+            if (originalTablePaperStyle.minWidth) {
+              tablePaper.style.minWidth = originalTablePaperStyle.minWidth;
+            } else {
+              tablePaper.style.removeProperty('min-width');
+            }
+            if (originalTablePaperStyle.maxWidth) {
+              tablePaper.style.maxWidth = originalTablePaperStyle.maxWidth;
+            } else {
+              tablePaper.style.removeProperty('max-width');
+            }
             
             if (process.env.NODE_ENV === 'development') {
               console.log('✅ [MeetingCaptureManager] 가입자증감 테이블 캡처 완료');
             }
           } else {
             if (process.env.NODE_ENV === 'development') {
-              console.warn('⚠️ [MeetingCaptureManager] 가입자증감 테이블을 찾을 수 없습니다.');
-            }
+            console.warn('⚠️ [MeetingCaptureManager] 가입자증감 테이블을 찾을 수 없습니다.');
           }
+        }
           
           // 2) 그래프형식으로 전환하여 그래프 2개 캡처
           const chartBtn = Array.from(document.querySelectorAll('button, [role="button"]'))
@@ -1957,21 +1947,18 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             // 가입자수 추이 그래프의 실제 크기 측정 및 조정
             const chart1Rect = subscriberChartPaper.getBoundingClientRect();
             const chart1Canvas = subscriberChartPaper.querySelector('canvas');
-            // 테이블과 동일한 너비로 맞추기 (tableWidth는 테이블 캡처 시 업데이트됨)
-            let chart1Width = Math.max(chart1Rect.width, tableWidth, 1200); // 테이블과 동일한 너비 또는 최소 1200px
+            // 테이블과 정확히 동일한 너비로 맞추기 (tableWidth는 테이블 캡처 시 업데이트됨)
+            let chart1Width = tableWidth; // 테이블과 정확히 동일한 너비 사용
             let chart1Height = chart1Rect.height;
             
             // canvas 크기 확인 및 조정
             if (chart1Canvas) {
-              const canvasRect = chart1Canvas.getBoundingClientRect();
-              chart1Width = Math.max(chart1Width, canvasRect.width, 1200);
-              chart1Height = Math.max(chart1Height, canvasRect.height, 400);
-              
+              chart1Height = Math.max(chart1Height, 400);
               // 그래프가 잘리지 않도록 충분한 높이 보장
               if (chart1Height < 400) chart1Height = 400;
             }
             
-            // 그래프 Paper 크기 임시 조정 (캡처를 위해)
+            // 그래프 Paper 크기 임시 조정 (캡처를 위해) - 테이블과 동일한 너비로
             const originalChart1Style = {
               width: subscriberChartPaper.style.width,
               minWidth: subscriberChartPaper.style.minWidth,
@@ -1982,6 +1969,9 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             subscriberChartPaper.style.width = `${chart1Width}px`;
             subscriberChartPaper.style.minWidth = `${chart1Width}px`;
             subscriberChartPaper.style.maxWidth = 'none';
+            subscriberChartPaper.style.setProperty('width', `${chart1Width}px`, 'important');
+            subscriberChartPaper.style.setProperty('min-width', `${chart1Width}px`, 'important');
+            subscriberChartPaper.style.setProperty('max-width', 'none', 'important');
             subscriberChartPaper.style.height = 'auto';
             subscriberChartPaper.style.minHeight = `${chart1Height}px`;
             
@@ -2021,21 +2011,18 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             // 관리수수료 추이 그래프의 실제 크기 측정 및 조정
             const chart2Rect = feeChartPaper.getBoundingClientRect();
             const chart2Canvas = feeChartPaper.querySelector('canvas');
-            // 테이블 너비를 참조하거나 기본값 사용 (chart1Width와 동일하게)
-            let chart2Width = Math.max(chart2Rect.width, chart1Width, 1200); // 테이블과 동일한 너비 또는 최소 1200px
+            // 테이블과 정확히 동일한 너비로 맞추기 (tableWidth와 동일)
+            let chart2Width = tableWidth; // 테이블과 정확히 동일한 너비 사용
             let chart2Height = chart2Rect.height;
             
             // canvas 크기 확인 및 조정
             if (chart2Canvas) {
-              const canvasRect = chart2Canvas.getBoundingClientRect();
-              chart2Width = Math.max(chart2Width, canvasRect.width, 1200);
-              chart2Height = Math.max(chart2Height, canvasRect.height, 400);
-              
+              chart2Height = Math.max(chart2Height, 400);
               // 그래프가 잘리지 않도록 충분한 높이 보장
               if (chart2Height < 400) chart2Height = 400;
             }
             
-            // 그래프 Paper 크기 임시 조정 (캡처를 위해)
+            // 그래프 Paper 크기 임시 조정 (캡처를 위해) - 테이블과 동일한 너비로
             const originalChart2Style = {
               width: feeChartPaper.style.width,
               minWidth: feeChartPaper.style.minWidth,
@@ -2046,6 +2033,9 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             feeChartPaper.style.width = `${chart2Width}px`;
             feeChartPaper.style.minWidth = `${chart2Width}px`;
             feeChartPaper.style.maxWidth = 'none';
+            feeChartPaper.style.setProperty('width', `${chart2Width}px`, 'important');
+            feeChartPaper.style.setProperty('min-width', `${chart2Width}px`, 'important');
+            feeChartPaper.style.setProperty('max-width', 'none', 'important');
             feeChartPaper.style.height = 'auto';
             feeChartPaper.style.minHeight = `${chart2Height}px`;
             

@@ -411,18 +411,21 @@ export async function captureElement(element, options = {}) {
     targetHeight = Math.max(Math.ceil(scrollHeight * reflowBoost * 1.35), minHeight);
   }
 
+  // 메인/목차/엔딩 슬라이드의 경우: 요소를 여러 부분으로 나눠서 캡처 후 합성
+  const shouldUseTiledCapture = isToc || isMain || slideId.includes('ending');
+  
   const defaultOptions = {
     scale: 2, // 고해상도 (2배)
     useCORS: true,
     allowTaint: false,
     backgroundColor: '#ffffff',
     width: targetWidth,
-    height: targetHeight,
+    height: shouldUseTiledCapture ? undefined : targetHeight, // 타일 캡처 시 height 제거
     logging: false,
     scrollX: 0,
     scrollY: 0,
     windowWidth: targetWidth,
-    windowHeight: targetHeight,
+    windowHeight: shouldUseTiledCapture ? undefined : targetHeight, // 타일 캡처 시 windowHeight 제거
     removeContainer: false, // 컨테이너 제거하지 않음
     onclone: (clonedDoc, element) => {
       // 클론된 문서에서 요소 찾기
@@ -694,8 +697,129 @@ export async function captureElement(element, options = {}) {
     });
     
     try {
-      // Canvas 생성
-      const canvas = await html2canvas(element, defaultOptions);
+      let canvas;
+      
+      // 메인/목차/엔딩 슬라이드의 경우: 요소를 강제로 확장하여 전체 콘텐츠 캡처
+      if (shouldUseTiledCapture) {
+        // 요소의 실제 scrollHeight를 정확히 측정
+        await new Promise(r => setTimeout(r, 200)); // 스타일 변경 후 렌더링 대기
+        
+        // 모든 자식 요소의 최하단 위치 측정
+        let maxBottom = 0;
+        const elementRect = element.getBoundingClientRect();
+        const allChildren = element.querySelectorAll('*');
+        
+        allChildren.forEach(child => {
+          try {
+            const childRect = child.getBoundingClientRect();
+            const relativeBottom = childRect.bottom - elementRect.top;
+            maxBottom = Math.max(maxBottom, relativeBottom);
+            
+            // scrollHeight가 있으면 그것도 고려
+            if (child.scrollHeight && child.scrollHeight > child.clientHeight) {
+              const scrollHeightDiff = child.scrollHeight - child.clientHeight;
+              maxBottom = Math.max(maxBottom, relativeBottom + scrollHeightDiff);
+            }
+          } catch (e) {
+            // 무시하고 계속
+          }
+        });
+        
+        const actualScrollHeight = Math.max(
+          element.scrollHeight,
+          element.offsetHeight,
+          element.getBoundingClientRect().height,
+          maxBottom,
+          targetHeight
+        );
+        
+        // 요소를 실제로 확장하여 모든 콘텐츠가 보이도록
+        const originalHeight = element.style.height;
+        const originalMinHeight = element.style.minHeight;
+        const originalMaxHeight = element.style.maxHeight;
+        const originalOverflow = element.style.overflow;
+        
+        // 요소의 높이를 실제 scrollHeight로 강제 설정
+        element.style.setProperty('height', `${actualScrollHeight}px`, 'important');
+        element.style.setProperty('min-height', `${actualScrollHeight}px`, 'important');
+        element.style.setProperty('max-height', 'none', 'important');
+        element.style.setProperty('overflow', 'visible', 'important');
+        
+        // 부모 요소도 확인
+        let parent = element.parentElement;
+        let depth = 0;
+        while (parent && depth < 3) {
+          const parentComputed = window.getComputedStyle(parent);
+          if (parentComputed.maxHeight && parentComputed.maxHeight !== 'none' && parentComputed.maxHeight !== 'auto') {
+            parent.style.setProperty('max-height', 'none', 'important');
+          }
+          if (parentComputed.overflow === 'auto' || parentComputed.overflow === 'scroll' || parentComputed.overflow === 'hidden') {
+            parent.style.setProperty('overflow', 'visible', 'important');
+          }
+          parent = parent.parentElement;
+          depth++;
+        }
+        
+        // 확장 후 렌더링 대기
+        await new Promise(r => setTimeout(r, 500));
+        
+        // 최종 높이 재확인
+        const finalScrollHeight = Math.max(
+          element.scrollHeight,
+          element.offsetHeight,
+          actualScrollHeight
+        );
+        
+        if (finalScrollHeight > actualScrollHeight) {
+          element.style.setProperty('height', `${finalScrollHeight}px`, 'important');
+          element.style.setProperty('min-height', `${finalScrollHeight}px`, 'important');
+          await new Promise(r => setTimeout(r, 300));
+        }
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`📏 [screenCapture] 요소 확장: ${actualScrollHeight}px → ${finalScrollHeight}px`);
+        }
+        
+        // html2canvas 옵션에서 height 제한 제거
+        const expandedOptions = {
+          ...defaultOptions,
+          // height와 windowHeight를 제거하여 html2canvas가 확장된 요소의 전체 높이를 캡처하도록
+        };
+        delete expandedOptions.height;
+        delete expandedOptions.windowHeight;
+        
+        // 확장된 요소 캡처
+        canvas = await html2canvas(element, expandedOptions);
+        
+        // 원본 스타일 복원
+        if (originalHeight) {
+          element.style.height = originalHeight;
+        } else {
+          element.style.removeProperty('height');
+        }
+        if (originalMinHeight) {
+          element.style.minHeight = originalMinHeight;
+        } else {
+          element.style.removeProperty('min-height');
+        }
+        if (originalMaxHeight) {
+          element.style.maxHeight = originalMaxHeight;
+        } else {
+          element.style.removeProperty('max-height');
+        }
+        if (originalOverflow) {
+          element.style.overflow = originalOverflow;
+        } else {
+          element.style.removeProperty('overflow');
+        }
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`✅ [screenCapture] 확장 캡처 완료: ${canvas.height}px`);
+        }
+      } else {
+        // 일반 슬라이드: 기존 방식 사용
+        canvas = await html2canvas(element, defaultOptions);
+      }
       
       // 하단 공백 자동 제거를 위한 크롭 처리
       const croppedCanvas = await autoCropCanvas(canvas);
