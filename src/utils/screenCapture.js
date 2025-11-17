@@ -424,8 +424,8 @@ export async function captureElement(element, options = {}) {
     targetHeight = Math.max(Math.ceil(scrollHeight * reflowBoost * 1.35), minHeight);
   }
 
-  // 메인/목차/엔딩 슬라이드의 경우: 요소를 여러 부분으로 나눠서 캡처 후 합성
-  const shouldUseTiledCapture = isToc || isMain || slideId.includes('ending');
+      // 메인/목차/엔딩 슬라이드의 경우: skipAutoCrop이 true이면 타일 캡처 로직 건너뛰기
+  const shouldUseTiledCapture = !skipAutoCrop && (isToc || isMain || slideId.includes('ending'));
   
   const defaultOptions = {
     scale: 2, // 고해상도 (2배)
@@ -834,28 +834,30 @@ export async function captureElement(element, options = {}) {
         canvas = await html2canvas(element, defaultOptions);
       }
       
-      // 하단 공백 자동 제거를 위한 크롭 처리
-      const croppedCanvas = await autoCropCanvas(canvas);
+      // 하단 공백 자동 제거를 위한 크롭 처리 (skipAutoCrop이 false일 때만)
+      let finalCanvas = canvas;
+      if (!skipAutoCrop) {
+        finalCanvas = await autoCropCanvas(canvas);
+      }
       
       // 고정 하단 여백 추가(요청된 경우): 크롭 결과 캔버스 높이를 늘리고 아래를 핫핑크로 채움
-      let finalCanvas = croppedCanvas;
       if (fixedBottomPaddingPx > 0) {
         const padded = document.createElement('canvas');
-        padded.width = croppedCanvas.width;
-        padded.height = croppedCanvas.height + fixedBottomPaddingPx;
+        padded.width = finalCanvas.width;
+        padded.height = finalCanvas.height + fixedBottomPaddingPx;
         const pctx = padded.getContext('2d');
         
         // 먼저 원본 이미지를 그려서 콘텐츠를 보존 (핑크색 위에 그리지 않음)
-        pctx.drawImage(croppedCanvas, 0, 0);
+        pctx.drawImage(finalCanvas, 0, 0);
         
         // 그 다음 하단에만 핫핑크 색상으로 패딩 추가 (콘텐츠 아래에만)
         pctx.fillStyle = BOTTOM_PADDING_COLOR;
-        pctx.fillRect(0, croppedCanvas.height, padded.width, fixedBottomPaddingPx);
+        pctx.fillRect(0, finalCanvas.height, padded.width, fixedBottomPaddingPx);
         
         finalCanvas = padded;
         
         if (process.env.NODE_ENV === 'development') {
-          console.log(`🎨 [screenCapture] 하단 핑크 패딩 추가: ${fixedBottomPaddingPx}px (콘텐츠 높이: ${croppedCanvas.height}px)`);
+          console.log(`🎨 [screenCapture] 하단 핑크 패딩 추가: ${fixedBottomPaddingPx}px (콘텐츠 높이: ${finalCanvas.height - fixedBottomPaddingPx}px)`);
         }
       }
       

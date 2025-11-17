@@ -2275,7 +2275,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             }
           });
           
-          // 메인 컨테이너 자체도 처리
+          // 메인 컨테이너의 스크롤 제약만 제거 (높이 확장하지 않음)
           const mainComputed = window.getComputedStyle(captureTargetElement);
           const mainHasMaxHeight = mainComputed.maxHeight && mainComputed.maxHeight !== 'none' && mainComputed.maxHeight !== 'auto';
           const mainHasOverflow = mainComputed.overflow === 'auto' || mainComputed.overflow === 'scroll' || mainComputed.overflow === 'hidden';
@@ -2283,9 +2283,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             overflow: captureTargetElement.style.overflow,
             overflowY: captureTargetElement.style.overflowY,
             overflowX: captureTargetElement.style.overflowX,
-            maxHeight: captureTargetElement.style.maxHeight,
-            height: captureTargetElement.style.height,
-            minHeight: captureTargetElement.style.minHeight
+            maxHeight: captureTargetElement.style.maxHeight
           };
           
           if (mainHasOverflow || captureTargetElement.style.overflow) {
@@ -2297,90 +2295,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             captureTargetElement.style.setProperty('max-height', 'none', 'important');
           }
           
-          // 실제 scrollHeight 측정
-          await new Promise(r => setTimeout(r, 300)); // 스타일 변경 후 렌더링 대기
-          
-          // 가장 정확한 방법: 모든 자식 요소를 순회하면서 실제 가장 아래 위치 측정
-          let maxBottom = 0;
-          const elementRect = captureTargetElement.getBoundingClientRect();
-          
-          // 모든 실제 렌더링된 요소의 하단 위치 측정
-          const allRenderedElements = Array.from(captureTargetElement.querySelectorAll('*'));
-          allRenderedElements.forEach(child => {
-            try {
-              const childRect = child.getBoundingClientRect();
-              const relativeBottom = childRect.bottom - elementRect.top;
-              maxBottom = Math.max(maxBottom, relativeBottom);
-              
-              // scrollHeight가 있으면 그것도 고려
-              if (child.scrollHeight && child.scrollHeight > child.clientHeight) {
-                const scrollHeightDiff = child.scrollHeight - child.clientHeight;
-                maxBottom = Math.max(maxBottom, relativeBottom + scrollHeightDiff);
-              }
-            } catch (e) {
-              // 무시하고 계속
-            }
-          });
-          
-          // 요소 자체의 scrollHeight도 고려
-          const elementScrollHeight = captureTargetElement.scrollHeight || 0;
-          const elementOffsetHeight = captureTargetElement.offsetHeight || 0;
-          
-          // 여러 방법으로 측정한 높이 중 최대값 사용
-          const measuredHeights = [
-            maxBottom, // 실제 렌더링된 가장 아래 위치
-            elementScrollHeight, // 요소의 scrollHeight
-            elementOffsetHeight, // 요소의 offsetHeight
-            captureTargetElement.getBoundingClientRect().height // getBoundingClientRect 높이
-          ];
-          const actualHeight = Math.max(...measuredHeights.filter(h => h > 0));
-          
-          // 목차 슬라이드는 더 넉넉하게 (실제 콘텐츠 높이의 2배 이상)
-          const buffer = slideType === 'toc' ? Math.max(actualHeight * 2, 15000) : 
-                        (slideType === 'main' ? Math.max(actualHeight * 1.5, 8000) : 
-                        Math.max(actualHeight * 1.5, 7000));
-          const targetHeight = Math.max(actualHeight + 1000, buffer); // 최소 1000px 여유공간 + 버퍼
-          
-          // 메인 컨테이너 높이를 실제 콘텐츠 높이로 명시적으로 설정
-          // height와 min-height 모두 설정하여 확실하게
-          captureTargetElement.style.setProperty('height', `${targetHeight}px`, 'important');
-          captureTargetElement.style.setProperty('min-height', `${targetHeight}px`, 'important');
-          captureTargetElement.style.setProperty('max-height', 'none', 'important');
-          
-          // 부모 요소도 확인하고 높이 확장 (필요한 경우)
-          let parent = captureTargetElement.parentElement;
-          let depth = 0;
-          while (parent && depth < 3) {
-            const parentComputed = window.getComputedStyle(parent);
-            const parentHasMaxHeight = parentComputed.maxHeight && parentComputed.maxHeight !== 'none' && parentComputed.maxHeight !== 'auto';
-            const parentHasOverflow = parentComputed.overflow === 'auto' || parentComputed.overflow === 'scroll' || parentComputed.overflow === 'hidden';
-            
-            if (parentHasMaxHeight || parentHasOverflow) {
-              const parentScrollHeight = parent.scrollHeight || 0;
-              const parentNeededHeight = Math.max(parentScrollHeight, targetHeight);
-              parent.style.setProperty('max-height', 'none', 'important');
-              parent.style.setProperty('overflow', 'visible', 'important');
-              parent.style.setProperty('height', `${parentNeededHeight}px`, 'important');
-            }
-            parent = parent.parentElement;
-            depth++;
-          }
-          
-          // 추가 렌더링 대기 (높이 확장 후 브라우저가 재렌더링할 시간)
-          await new Promise(r => setTimeout(r, 800));
-          
-          // 최종 높이 재확인 및 조정
-          const finalScrollHeight = captureTargetElement.scrollHeight || 0;
-          const finalOffsetHeight = captureTargetElement.offsetHeight || 0;
-          const finalMeasuredHeight = Math.max(finalScrollHeight, finalOffsetHeight, targetHeight);
-          
-          if (finalMeasuredHeight > targetHeight) {
-            captureTargetElement.style.setProperty('height', `${finalMeasuredHeight}px`, 'important');
-            captureTargetElement.style.setProperty('min-height', `${finalMeasuredHeight}px`, 'important');
-            await new Promise(r => setTimeout(r, 300)); // 추가 렌더링 대기
-          }
-          
-          // 복원 함수 생성
+          // 복원 함수 생성 (스타일만 복원, 높이는 변경하지 않음)
           restoreStylesFunction = () => {
             // 자식 요소 스타일 복원
             originalStyles.forEach((styles, el) => {
@@ -2405,12 +2320,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
           };
           
           if (process.env.NODE_ENV === 'development') {
-            console.log(`📏 [MeetingCaptureManager] ${slideType} 슬라이드 높이 조정:`, {
-              actualHeight,
-              targetHeight,
-              minHeight,
-              scrollHeight: captureTargetElement.scrollHeight
-            });
+            console.log(`📏 [MeetingCaptureManager] ${slideType} 슬라이드 스크롤 제약 제거 완료 (높이 확장 없음)`);
           }
         } catch (e) {
           if (process.env.NODE_ENV === 'development') {
@@ -2435,22 +2345,26 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         scrollY: 0
       };
       
-      // 메인/목차/엔딩 슬라이드의 경우 충분한 높이 보장 (매우 넉넉하게)
+      // 메인/목차/엔딩 슬라이드의 경우: 적당한 높이로 캡처 (과도하게 확장하지 않음)
       if (isMainTocEnding && captureTargetElement) {
-        const elementScrollHeight = captureTargetElement.scrollHeight || captureTargetElement.offsetHeight;
-        const minHeight = slideType === 'toc' ? 15000 : (slideType === 'main' ? 7000 : 6000);
-        const targetHeight = Math.max(elementScrollHeight, minHeight);
+        const elementRect = captureTargetElement.getBoundingClientRect();
+        const elementScrollHeight = captureTargetElement.scrollHeight || elementRect.height;
         
-        captureOptions.width = (captureTargetElement.getBoundingClientRect().width || 1280) * 2;
-        captureOptions.height = (targetHeight + 96) * 2; // fixedBottomPadding 포함
+        // 적당한 높이 설정: 실제 콘텐츠 높이 + 여유공간 200px
+        const targetHeight = Math.max(elementScrollHeight + 200, 1000); // 최소 1000px
+        
+        captureOptions.width = (elementRect.width || 1280) * 2;
+        captureOptions.height = targetHeight * 2; // scale 고려
+        captureOptions.skipAutoCrop = true; // 자동 크롭 건너뛰기
+        captureOptions.fixedBottomPaddingPx = 0; // 핑크색 바 제거
         
         if (process.env.NODE_ENV === 'development') {
-          console.log(`📐 [MeetingCaptureManager] ${slideType} 슬라이드 캡처 옵션:`, {
+          console.log(`📐 [MeetingCaptureManager] ${slideType} 슬라이드 캡처 옵션 (크롭 제거):`, {
             elementScrollHeight,
-            minHeight,
             targetHeight,
             captureHeight: captureOptions.height,
-            captureWidth: captureOptions.width
+            captureWidth: captureOptions.width,
+            skipAutoCrop: true
           });
         }
       }
@@ -2479,26 +2393,28 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         }
       }
 
-      // 안전 장치: 어떤 경로로 오든 하단 여백이 보장되도록 최종 한 번 더 패딩 적용
-      // (합성(canvas.toBlob)로 생성된 compositeBlob 경로는 fixedBottomPaddingPx가 적용되지 않을 수 있음)
-      try {
-        const ensureBottomPadding = async (srcBlob, padding = 96) => {
-          if (!srcBlob || padding <= 0) return srcBlob;
-          const img = await blobToImage(srcBlob);
-          const canvas = document.createElement('canvas');
-          canvas.width = img.width;
-          canvas.height = img.height + padding;
-          const ctx = canvas.getContext('2d');
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-          ctx.drawImage(img, 0, 0);
-          return await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-        };
-        blob = await ensureBottomPadding(blob, 96);
-      } catch (e) {
-        // 패딩 보강 실패 시 원본 blob 사용
-        if (process.env.NODE_ENV === 'development') {
-          console.warn('⚠️ [MeetingCaptureManager] 하단 여백 보강 실패, 원본 사용:', e?.message);
+      // 안전 장치: 메인/목차/엔딩 슬라이드가 아닌 경우에만 하단 여백 패딩 적용
+      // (메인/목차/엔딩 슬라이드는 크롭 및 패딩 로직 제거)
+      if (!isMainTocEnding) {
+        try {
+          const ensureBottomPadding = async (srcBlob, padding = 96) => {
+            if (!srcBlob || padding <= 0) return srcBlob;
+            const img = await blobToImage(srcBlob);
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height + padding;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0);
+            return await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+          };
+          blob = await ensureBottomPadding(blob, 96);
+        } catch (e) {
+          // 패딩 보강 실패 시 원본 blob 사용
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('⚠️ [MeetingCaptureManager] 하단 여백 보강 실패, 원본 사용:', e?.message);
+          }
         }
       }
       // 임시 배지 제거
