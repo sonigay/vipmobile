@@ -5204,27 +5204,27 @@ try {
   
   // multer 에러 처리 미들웨어
   const handleMulterError = (err, req, res, next) => {
+    // CORS 헤더 설정 (에러가 발생했을 때 항상 설정)
+    const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
+    const defaultOrigins = [
+      'https://vipmobile.vercel.app',
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://localhost:4000'
+    ];
+    const allowedOrigins = [...corsOrigins, ...defaultOrigins];
+    const origin = req.headers.origin;
+    
+    if (origin && allowedOrigins.includes(origin)) {
+      res.header('Access-Control-Allow-Origin', origin);
+    } else if (allowedOrigins.length > 0) {
+      res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
+    }
+    res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    
     if (err instanceof multer.MulterError) {
-      // CORS 헤더 설정
-      const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
-      const defaultOrigins = [
-        'https://vipmobile.vercel.app',
-        'http://localhost:3000',
-        'http://localhost:3001',
-        'http://localhost:4000'
-      ];
-      const allowedOrigins = [...corsOrigins, ...defaultOrigins];
-      const origin = req.headers.origin;
-      
-      if (origin && allowedOrigins.includes(origin)) {
-        res.header('Access-Control-Allow-Origin', origin);
-      } else if (allowedOrigins.length > 0) {
-        res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
-      }
-      res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
-      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key');
-      res.header('Access-Control-Allow-Credentials', 'true');
-      
       console.error('🚨 [Multer 에러]', err.code, err.message);
       if (err.code === 'LIMIT_FILE_SIZE') {
         return res.status(400).json({
@@ -5239,10 +5239,50 @@ try {
         code: err.code
       });
     }
+    
+    // multer 에러가 아닌 경우도 CORS 헤더를 설정한 후 다음 에러 핸들러로 전달
     next(err);
   };
   
+  // upload-image 라우트에 타임아웃 및 에러 처리 추가
   app.post('/api/meetings/:meetingId/upload-image', 
+    (req, res, next) => {
+      // 요청 타임아웃 설정 (2분)
+      req.setTimeout(120000);
+      res.setTimeout(120000);
+      
+      // 타임아웃 에러 핸들러
+      req.on('timeout', () => {
+        console.error('⚠️ [upload-image] 요청 타임아웃');
+        if (!res.headersSent) {
+          const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
+          const defaultOrigins = [
+            'https://vipmobile.vercel.app',
+            'http://localhost:3000',
+            'http://localhost:3001',
+            'http://localhost:4000'
+          ];
+          const allowedOrigins = [...corsOrigins, ...defaultOrigins];
+          const origin = req.headers.origin;
+          
+          if (origin && allowedOrigins.includes(origin)) {
+            res.header('Access-Control-Allow-Origin', origin);
+          } else if (allowedOrigins.length > 0) {
+            res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
+          }
+          res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+          res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key');
+          res.header('Access-Control-Allow-Credentials', 'true');
+          
+          res.status(504).json({
+            success: false,
+            error: '요청 시간이 초과되었습니다. 다시 시도해주세요.'
+          });
+        }
+      });
+      
+      next();
+    },
     meetingRoutes.upload.single('image'),
     handleMulterError,
     meetingRoutes.uploadMeetingImage
