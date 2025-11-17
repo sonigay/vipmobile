@@ -5202,7 +5202,51 @@ try {
     res.status(200).end();
   });
   
-  app.post('/api/meetings/:meetingId/upload-image', meetingRoutes.upload.single('image'), meetingRoutes.uploadMeetingImage);
+  // multer 에러 처리 미들웨어
+  const handleMulterError = (err, req, res, next) => {
+    if (err instanceof multer.MulterError) {
+      // CORS 헤더 설정
+      const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
+      const defaultOrigins = [
+        'https://vipmobile.vercel.app',
+        'http://localhost:3000',
+        'http://localhost:3001',
+        'http://localhost:4000'
+      ];
+      const allowedOrigins = [...corsOrigins, ...defaultOrigins];
+      const origin = req.headers.origin;
+      
+      if (origin && allowedOrigins.includes(origin)) {
+        res.header('Access-Control-Allow-Origin', origin);
+      } else if (allowedOrigins.length > 0) {
+        res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
+      }
+      res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key');
+      res.header('Access-Control-Allow-Credentials', 'true');
+      
+      console.error('🚨 [Multer 에러]', err.code, err.message);
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({
+          success: false,
+          error: '파일 크기가 너무 큽니다. 최대 25MB까지 업로드 가능합니다.',
+          code: err.code
+        });
+      }
+      return res.status(400).json({
+        success: false,
+        error: `파일 업로드 오류: ${err.message}`,
+        code: err.code
+      });
+    }
+    next(err);
+  };
+  
+  app.post('/api/meetings/:meetingId/upload-image', 
+    meetingRoutes.upload.single('image'),
+    handleMulterError,
+    meetingRoutes.uploadMeetingImage
+  );
   
   // 커스텀 파일 업로드 API OPTIONS 요청 처리
   app.options('/api/meetings/:meetingId/upload-file', (req, res) => {

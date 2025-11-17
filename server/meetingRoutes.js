@@ -1401,29 +1401,40 @@ async function uploadMeetingImage(req, res) {
     // CORS 헤더 설정 (에러 응답에도 포함)
     setCORSHeaders(req, res);
     
-    console.error('이미지 업로드 오류:', error);
+    console.error('❌ [uploadMeetingImage] 이미지 업로드 오류:', error);
+    console.error('❌ [uploadMeetingImage] 에러 스택:', error.stack);
+    
+    // 응답이 이미 전송되었는지 확인
+    if (res.headersSent) {
+      console.error('⚠️ [uploadMeetingImage] 응답이 이미 전송되었습니다.');
+      return;
+    }
     
     // 에러 타입에 따라 적절한 HTTP 상태 코드 반환
     let statusCode = 500;
     let errorMessage = error.message || '이미지 업로드 중 오류가 발생했습니다.';
     
-    if (error.message.includes('Discord')) {
+    if (error.message && error.message.includes('Discord')) {
       statusCode = 503; // Service Unavailable
       errorMessage = 'Discord 서비스에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.';
-    } else if (error.message.includes('크롭') || error.message.includes('이미지 처리')) {
+    } else if (error.message && (error.message.includes('크롭') || error.message.includes('이미지 처리'))) {
       statusCode = 422; // Unprocessable Entity
       errorMessage = '이미지 처리 중 오류가 발생했습니다. 이미지 파일 형식을 확인해주세요.';
-    } else if (error.message.includes('파일이 없습니다')) {
+    } else if (error.message && error.message.includes('파일이 없습니다')) {
       statusCode = 400; // Bad Request
       errorMessage = '이미지 파일이 없습니다.';
     }
     
-    res.status(statusCode).json({ 
-      success: false, 
-      error: errorMessage,
-      errorType: error.name || 'UnknownError',
-      timestamp: new Date().toISOString()
-    });
+    try {
+      res.status(statusCode).json({ 
+        success: false, 
+        error: errorMessage,
+        errorType: error.name || 'UnknownError',
+        timestamp: new Date().toISOString()
+      });
+    } catch (sendError) {
+      console.error('❌ [uploadMeetingImage] 에러 응답 전송 실패:', sendError);
+    }
   }
 }
 
