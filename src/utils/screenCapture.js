@@ -332,10 +332,11 @@ export async function captureElement(element, options = {}) {
       Math.max(totalContentHeight, scrollHeight, element.scrollHeight);
     
     // 계산된 높이와 고정 최소 높이 중 큰 값 사용
-    // 목차는 실제 콘텐츠가 매우 길 수 있으므로 실제 높이의 1.5배 + 여유공간
+    // 목차는 실제 콘텐츠가 매우 길 수 있으므로 실제 높이의 2.0배 + 여유공간
     const heightScale = widthScale < 1 ? (1 / widthScale) : 1;
-    const calculatedHeight = Math.ceil(actualTocHeight * heightScale * 1.5) + 500; // 여유공간 500px 추가
-    targetHeight = Math.max(calculatedHeight, actualTocHeight + 1000, 6000); // 최소 6000px 또는 실제 높이 + 1000px
+    const reflowMultiplier = 2.0; // 목차는 재흐름을 더 고려
+    const calculatedHeight = Math.ceil(actualTocHeight * heightScale * reflowMultiplier) + 1000; // 여유공간 1000px 추가
+    targetHeight = Math.max(calculatedHeight, actualTocHeight + 1500, 8000); // 최소 8000px 또는 실제 높이 + 1500px
     
     if (process.env.NODE_ENV === 'development') {
       console.log(`📏 [screenCapture] 목차 슬라이드 높이 계산:`, {
@@ -349,10 +350,60 @@ export async function captureElement(element, options = {}) {
         maxScrollHeight
       });
     }
-  } else if (isMain) {
-    // 메인 슬라이드는 목차보다 짧지만 충분한 여유를 준다.
+  } else if (isMain || slideId.includes('ending')) {
+    // 메인/엔딩 슬라이드는 실제 콘텐츠 높이를 정확히 측정
+    // 먼저 스크롤을 맨 위로 이동하여 정확한 높이 측정
+    element.scrollTop = 0;
+    if (element.parentElement) element.parentElement.scrollTop = 0;
+    
+    // 모든 자식 요소의 실제 높이 계산 (포함된 모든 콘텐츠)
+    let totalContentHeight = scrollHeight;
+    const allChildren = element.querySelectorAll('*');
+    allChildren.forEach(child => {
+      const childRect = child.getBoundingClientRect();
+      const childBottom = childRect.top + (child.scrollHeight || childRect.height);
+      totalContentHeight = Math.max(totalContentHeight, childBottom - element.getBoundingClientRect().top);
+    });
+    
+    // 실제 콘텐츠 높이 사용 (더 정확한 측정)
+    // 여러 방법으로 높이 측정하고 가장 큰 값 사용
+    const measuredHeights = [
+      totalContentHeight,
+      scrollHeight,
+      element.scrollHeight,
+      element.offsetHeight,
+      element.getBoundingClientRect().height
+    ];
+    
+    // 자식 요소 중 가장 아래에 있는 요소의 위치 측정
+    let maxChildBottom = 0;
+    allChildren.forEach(child => {
+      const rect = child.getBoundingClientRect();
+      const elementRect = element.getBoundingClientRect();
+      const relativeBottom = rect.bottom - elementRect.top + (child.scrollHeight || 0);
+      maxChildBottom = Math.max(maxChildBottom, relativeBottom);
+    });
+    measuredHeights.push(maxChildBottom);
+    
+    const actualHeight = Math.max(...measuredHeights.filter(h => h > 0));
+    
+    // 계산된 높이와 고정 최소 높이 중 큰 값 사용
+    // 고정 가로폭 적용 시 세로 재흐름을 고려한 높이 계산
     const heightScale = widthScale < 1 ? (1 / widthScale) : 1;
-    targetHeight = Math.max(Math.ceil(scrollHeight * heightScale * 3.5), 2500);
+    const reflowMultiplier = 1.5; // 재흐름 고려 배율
+    const calculatedHeight = Math.ceil(actualHeight * heightScale * reflowMultiplier) + 800; // 여유공간 800px 추가
+    targetHeight = Math.max(calculatedHeight, actualHeight + 1200, 4000); // 최소 4000px 또는 실제 높이 + 1200px
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`📏 [screenCapture] ${isMain ? '메인' : '엔딩'} 슬라이드 높이 계산:`, {
+        actualHeight,
+        scrollHeight,
+        totalContentHeight,
+        calculatedHeight,
+        targetHeight,
+        heightScale
+      });
+    }
   } else {
     // 기타 슬라이드: 기존 로직 유지
     const reflowBoost = widthScale < 1 ? (1 / widthScale) : 1;
@@ -391,93 +442,115 @@ export async function captureElement(element, options = {}) {
           parent = parent.parentElement;
         }
         
-        // 목차 슬라이드인 경우: 스크롤 가능한 콘텐츠 영역을 찾아서 전체 높이 표시
-        if (isToc) {
-          // 원본 요소에서 스크롤 가능한 컨테이너 찾기 (maxHeight나 overflow가 있는 Box)
-          const originalScrollableBoxes = Array.from(element.querySelectorAll('.MuiBox-root, div, section'));
-          const scrollableInfo = [];
-          
-          originalScrollableBoxes.forEach((box) => {
-            const styles = window.getComputedStyle(box);
-            const hasMaxHeight = styles.maxHeight && styles.maxHeight !== 'none' && styles.maxHeight !== 'auto';
-            const hasOverflowY = styles.overflowY === 'auto' || styles.overflowY === 'scroll';
+        // 클론된 문서에서 slideId 다시 추출 (더 안전함)
+        const clonedSlideId = clonedElement.getAttribute('data-slide-id') || '';
+        const clonedIsToc = clonedSlideId.includes('toc');
+        const clonedIsMain = clonedSlideId.includes('main') && !clonedSlideId.includes('toc');
+        const clonedIsEnding = clonedSlideId.includes('ending');
+        const isSpecialSlide = clonedIsToc || clonedIsMain || clonedIsEnding;
+        
+        // 목차/메인/엔딩 슬라이드인 경우: 모든 스크롤 제약을 제거하여 전체 콘텐츠 표시
+        if (isSpecialSlide) {
+          // 1단계: 클론된 문서의 모든 요소를 순회하여 스크롤 제약 제거 (더 직접적이고 확실한 방법)
+          const allClonedElements = clonedElement.querySelectorAll('*');
+          allClonedElements.forEach(clonedEl => {
+            if (!clonedEl || !clonedEl.style) return;
             
-            if (hasMaxHeight || hasOverflowY) {
-              // 요소 식별을 위한 정보 저장
-              const boxPath = [];
-              let current = box;
-              while (current && current !== element && current !== document.body) {
-                const parent = current.parentElement;
-                if (parent) {
-                  const index = Array.from(parent.children).indexOf(current);
-                  boxPath.unshift({ tag: current.tagName, index, className: current.className });
-                }
-                current = parent;
-              }
-              scrollableInfo.push({ boxPath, tagName: box.tagName, className: box.className });
+            // 인라인 스타일에서 직접 확인
+            const inlineMaxHeight = clonedEl.style.maxHeight || clonedEl.style.getPropertyValue('max-height');
+            const inlineOverflow = clonedEl.style.overflow || clonedEl.style.getPropertyValue('overflow');
+            const inlineOverflowY = clonedEl.style.overflowY || clonedEl.style.getPropertyValue('overflow-y');
+            const inlineHeight = clonedEl.style.height || clonedEl.style.getPropertyValue('height');
+            
+            // maxHeight 제거 (vh, %, 픽셀 값 모두)
+            if (inlineMaxHeight && inlineMaxHeight !== 'none' && inlineMaxHeight !== 'auto') {
+              clonedEl.style.setProperty('max-height', 'none', 'important');
+            }
+            
+            // overflow 제거
+            if (inlineOverflow === 'auto' || inlineOverflow === 'scroll' || inlineOverflow === 'hidden') {
+              clonedEl.style.setProperty('overflow', 'visible', 'important');
+            }
+            if (inlineOverflowY === 'auto' || inlineOverflowY === 'scroll' || inlineOverflowY === 'hidden') {
+              clonedEl.style.setProperty('overflow-y', 'visible', 'important');
+            }
+            if (clonedEl.style.getPropertyValue('overflow-x') === 'auto' || 
+                clonedEl.style.getPropertyValue('overflow-x') === 'scroll' || 
+                clonedEl.style.getPropertyValue('overflow-x') === 'hidden') {
+              clonedEl.style.setProperty('overflow-x', 'visible', 'important');
+            }
+            
+            // height가 vh나 %로 제한된 경우 제거
+            if (inlineHeight && (inlineHeight.includes('vh') || inlineHeight.includes('%'))) {
+              clonedEl.style.setProperty('height', 'auto', 'important');
+            }
+            
+            // 스크롤 위치 초기화
+            if (clonedEl.scrollTop !== undefined) {
+              clonedEl.scrollTop = 0;
+            }
+            if (clonedEl.scrollLeft !== undefined) {
+              clonedEl.scrollLeft = 0;
             }
           });
           
-          // 클론된 문서에서 같은 위치의 요소 찾아서 스타일 변경
-          scrollableInfo.forEach(({ boxPath, tagName, className }) => {
-            let clonedBox = clonedElement;
-            
-            // 경로를 따라 요소 찾기
-            for (const pathInfo of boxPath) {
-              if (!clonedBox) break;
-              const children = Array.from(clonedBox.children);
-              if (children[pathInfo.index] && children[pathInfo.index].tagName === pathInfo.tag) {
-                clonedBox = children[pathInfo.index];
-              } else {
-                // 클래스명으로 대체 찾기
-                const matching = children.find(child => 
-                  child.tagName === pathInfo.tag && 
-                  (pathInfo.className ? child.className === pathInfo.className : true)
-                );
-                clonedBox = matching || null;
-                if (!clonedBox) break;
-              }
-            }
-            
-            // 찾은 클론 요소에 스타일 적용
-            if (clonedBox && clonedBox !== clonedElement) {
-              clonedBox.style.setProperty('overflow', 'visible', 'important');
-              clonedBox.style.setProperty('max-height', 'none', 'important');
-              clonedBox.style.setProperty('height', 'auto', 'important');
-              clonedBox.style.setProperty('overflow-y', 'visible', 'important');
-              clonedBox.scrollTop = 0;
+          // 2단계: 원본 요소에서 computed styles 확인하여 클론에 적용 (원본 스타일도 확인)
+          const originalElements = Array.from(element.querySelectorAll('*'));
+          originalElements.forEach((originalEl, index) => {
+            try {
+              const computedStyles = window.getComputedStyle(originalEl);
+              const hasMaxHeight = computedStyles.maxHeight && 
+                                   computedStyles.maxHeight !== 'none' && 
+                                   computedStyles.maxHeight !== 'auto';
+              const hasOverflow = computedStyles.overflow === 'auto' || 
+                                 computedStyles.overflow === 'scroll' ||
+                                 computedStyles.overflow === 'hidden';
+              const hasOverflowY = computedStyles.overflowY === 'auto' || 
+                                  computedStyles.overflowY === 'scroll' ||
+                                  computedStyles.overflowY === 'hidden';
+              const hasVhHeight = computedStyles.height && 
+                                 (computedStyles.height.includes('vh') || 
+                                  computedStyles.height.includes('%'));
               
-              // 모든 자식 요소도 확인하여 maxHeight 제거
-              const allDescendants = clonedBox.querySelectorAll('*');
-              allDescendants.forEach(child => {
-                if (child.style) {
-                  const inlineMaxHeight = child.style.maxHeight || child.style.getPropertyValue('max-height');
-                  const inlineOverflowY = child.style.overflowY || child.style.getPropertyValue('overflow-y');
-                  
-                  if (inlineMaxHeight && inlineMaxHeight !== 'none' && inlineMaxHeight !== 'auto') {
-                    child.style.setProperty('max-height', 'none', 'important');
+              if (hasMaxHeight || hasOverflow || hasOverflowY || hasVhHeight) {
+                // 클론된 문서에서 같은 위치의 요소 찾기 (인덱스 기반)
+                const clonedElements = Array.from(clonedElement.querySelectorAll('*'));
+                const clonedEl = clonedElements[index];
+                
+                if (clonedEl && clonedEl !== clonedElement) {
+                  if (hasMaxHeight) {
+                    clonedEl.style.setProperty('max-height', 'none', 'important');
                   }
-                  if (inlineOverflowY === 'auto' || inlineOverflowY === 'scroll') {
-                    child.style.setProperty('overflow-y', 'visible', 'important');
+                  if (hasOverflow) {
+                    clonedEl.style.setProperty('overflow', 'visible', 'important');
+                  }
+                  if (hasOverflowY) {
+                    clonedEl.style.setProperty('overflow-y', 'visible', 'important');
+                  }
+                  if (hasVhHeight) {
+                    clonedEl.style.setProperty('height', 'auto', 'important');
                   }
                 }
-              });
+              }
+            } catch (e) {
+              // 요소가 DOM에서 제거되었을 수 있으므로 무시
             }
           });
           
-          // 추가 안전장치: 모든 요소에서 maxHeight 제거 시도
-          const allElements = clonedElement.querySelectorAll('*');
-          allElements.forEach(el => {
-            if (el.style) {
-              const maxHeight = el.style.maxHeight || el.style.getPropertyValue('max-height');
-              const overflowY = el.style.overflowY || el.style.getPropertyValue('overflow-y');
-              
-              if (maxHeight && (maxHeight.includes('vh') || maxHeight.includes('%'))) {
-                el.style.setProperty('max-height', 'none', 'important');
-              }
-              if (overflowY === 'auto' || overflowY === 'scroll') {
-                el.style.setProperty('overflow-y', 'visible', 'important');
-              }
+          // 3단계: 메인 컨테이너 자체도 확실하게 처리
+          clonedElement.style.setProperty('overflow', 'visible', 'important');
+          clonedElement.style.setProperty('overflow-y', 'visible', 'important');
+          clonedElement.style.setProperty('overflow-x', 'visible', 'important');
+          clonedElement.style.setProperty('max-height', 'none', 'important');
+          
+          // 4단계: 스크롤 가능한 컨테이너를 찾아서 높이를 실제 콘텐츠 높이로 확장
+          const scrollableContainers = clonedElement.querySelectorAll('*');
+          scrollableContainers.forEach(container => {
+            if (container.scrollHeight && container.scrollHeight > container.clientHeight) {
+              // 스크롤 가능한 컨테이너는 실제 스크롤 높이만큼 확장
+              container.style.setProperty('height', `${container.scrollHeight}px`, 'important');
+              container.style.setProperty('max-height', 'none', 'important');
+              container.style.setProperty('overflow', 'visible', 'important');
             }
           });
         }

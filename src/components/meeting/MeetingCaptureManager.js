@@ -1074,6 +1074,118 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             }
           }
           // 이 화면은 상단 그래프 2개 + 하단 입력 테이블 모두 포함해야 하므로 슬라이드 전체 캡쳐 유지
+          // 하지만 그래프와 테이블의 크기를 맞추기 위해 임시로 스타일 조정
+          try {
+            // 그래프 Paper와 테이블 Paper 찾기
+            const allPapers = Array.from(slideElement.querySelectorAll('.MuiPaper-root'));
+            const barPaper = allPapers.find(p => (p.textContent || '').includes('대리점별 채권 현황') || (p.textContent || '').includes('대리점별 현재 채권 현황'));
+            const linePaper = allPapers.find(p => (p.textContent || '').includes('조회 월 선택'));
+            const tablePaper = allPapers.find(p => (p.textContent || '').includes('데이터 입력') || (p.querySelector('table')));
+            
+            // 통일된 너비 결정 (최소 1200px)
+            const targetWidth = 1200;
+            
+            // 막대 그래프 크기 조정
+            if (barPaper) {
+              const barCanvas = barPaper.querySelector('canvas');
+              const barRect = barPaper.getBoundingClientRect();
+              const originalBarStyle = {
+                width: barPaper.style.width,
+                minWidth: barPaper.style.minWidth,
+                maxWidth: barPaper.style.maxWidth
+              };
+              
+              barPaper.style.width = `${targetWidth}px`;
+              barPaper.style.minWidth = `${targetWidth}px`;
+              barPaper.style.maxWidth = 'none';
+              
+              // canvas가 있으면 높이도 조정
+              if (barCanvas) {
+                const canvasBox = barCanvas.closest('[style*="height"]') || barPaper.querySelector('[style*="height"]');
+                if (canvasBox) {
+                  canvasBox.style.height = '400px';
+                  canvasBox.style.minHeight = '400px';
+                }
+              }
+            }
+            
+            // 선 그래프 크기 조정
+            if (linePaper) {
+              const lineCanvas = linePaper.querySelector('canvas');
+              const lineRect = linePaper.getBoundingClientRect();
+              const originalLineStyle = {
+                width: linePaper.style.width,
+                minWidth: linePaper.style.minWidth,
+                maxWidth: linePaper.style.maxWidth
+              };
+              
+              linePaper.style.width = `${targetWidth}px`;
+              linePaper.style.minWidth = `${targetWidth}px`;
+              linePaper.style.maxWidth = 'none';
+              
+              // canvas가 있으면 높이도 조정
+              if (lineCanvas) {
+                const canvasBox = lineCanvas.closest('[style*="height"]') || linePaper.querySelector('[style*="height"]');
+                if (canvasBox) {
+                  canvasBox.style.height = '500px';
+                  canvasBox.style.minHeight = '500px';
+                }
+              }
+            }
+            
+            // 테이블 크기 조정
+            if (tablePaper) {
+              const originalTableStyle = {
+                width: tablePaper.style.width,
+                minWidth: tablePaper.style.minWidth,
+                maxWidth: tablePaper.style.maxWidth
+              };
+              
+              tablePaper.style.width = `${targetWidth}px`;
+              tablePaper.style.minWidth = `${targetWidth}px`;
+              tablePaper.style.maxWidth = 'none';
+              
+              // 테이블 컨테이너도 조정
+              const tableContainer = tablePaper.querySelector('.MuiTableContainer-root, table');
+              if (tableContainer) {
+                const originalTableContainerStyle = {
+                  width: tableContainer.style.width,
+                  minWidth: tableContainer.style.minWidth,
+                  maxWidth: tableContainer.style.maxWidth
+                };
+                tableContainer.style.width = '100%';
+                tableContainer.style.minWidth = `${targetWidth}px`;
+                tableContainer.style.maxWidth = 'none';
+              }
+            }
+            
+            // 크기 조정 후 렌더링 대기
+            await new Promise(r => setTimeout(r, 1000));
+            
+            // 캡처 후 원래 스타일 복원을 위한 참조 저장
+            slideElement.__restoreStyles = () => {
+              if (barPaper) {
+                barPaper.style.width = originalBarStyle.width;
+                barPaper.style.minWidth = originalBarStyle.minWidth;
+                barPaper.style.maxWidth = originalBarStyle.maxWidth;
+              }
+              if (linePaper) {
+                linePaper.style.width = originalLineStyle.width;
+                linePaper.style.minWidth = originalLineStyle.minWidth;
+                linePaper.style.maxWidth = originalLineStyle.maxWidth;
+              }
+              if (tablePaper) {
+                tablePaper.style.width = originalTableStyle.width;
+                tablePaper.style.minWidth = originalTableStyle.minWidth;
+                tablePaper.style.maxWidth = originalTableStyle.maxWidth;
+              }
+            };
+          } catch (e) {
+            if (process.env.NODE_ENV === 'development') {
+              console.warn('⚠️ [MeetingCaptureManager] 재초담초채권 크기 조정 중 경고:', e?.message);
+            }
+          }
+          
           captureTargetElement = slideElement;
 
           // 우상단 배지로 선택된 시점 표시 (캡쳐에 포함되도록 임시로 DOM 추가)
@@ -1596,6 +1708,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
           });
           
           let tableBlob = null;
+          let tableWidth = 1200; // 기본값 설정 (그래프 캡처 시 참조용)
           if (tablePaper) {
             tablePaper.scrollIntoView({ block: 'center', behavior: 'instant' });
             await new Promise(r => setTimeout(r, 500));
@@ -1614,13 +1727,20 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               await new Promise(r => setTimeout(r, 300));
             }
             
+            // 테이블의 실제 크기 측정
+            const tableRect = tablePaper.getBoundingClientRect();
+            tableWidth = Math.max(tableRect.width, 1200); // 최소 1200px 너비 보장 (블록 외부 변수 업데이트)
+            const tableHeight = tablePaper.scrollHeight || tableRect.height;
+            
             tableBlob = await captureElement(tablePaper, {
               scale: 2,
               useCORS: true,
               fixedBottomPaddingPx: 96,
               backgroundColor: '#ffffff',
               scrollX: tableContainer ? tableContainer.scrollLeft : 0,
-              scrollY: 0
+              scrollY: 0,
+              width: tableWidth * 2, // scale 고려
+              height: (tableHeight + 96) * 2 // fixedBottomPadding 포함
             });
             
             if (process.env.NODE_ENV === 'development') {
@@ -1715,14 +1835,57 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               chart1ScrollX = chart1Container.scrollLeft;
             }
             
+            // 가입자수 추이 그래프의 실제 크기 측정 및 조정
+            const chart1Rect = subscriberChartPaper.getBoundingClientRect();
+            const chart1Canvas = subscriberChartPaper.querySelector('canvas');
+            // 테이블과 동일한 너비로 맞추기 (tableWidth는 테이블 캡처 시 업데이트됨)
+            let chart1Width = Math.max(chart1Rect.width, tableWidth, 1200); // 테이블과 동일한 너비 또는 최소 1200px
+            let chart1Height = chart1Rect.height;
+            
+            // canvas 크기 확인 및 조정
+            if (chart1Canvas) {
+              const canvasRect = chart1Canvas.getBoundingClientRect();
+              chart1Width = Math.max(chart1Width, canvasRect.width, 1200);
+              chart1Height = Math.max(chart1Height, canvasRect.height, 400);
+              
+              // 그래프가 잘리지 않도록 충분한 높이 보장
+              if (chart1Height < 400) chart1Height = 400;
+            }
+            
+            // 그래프 Paper 크기 임시 조정 (캡처를 위해)
+            const originalChart1Style = {
+              width: subscriberChartPaper.style.width,
+              minWidth: subscriberChartPaper.style.minWidth,
+              maxWidth: subscriberChartPaper.style.maxWidth,
+              height: subscriberChartPaper.style.height,
+              minHeight: subscriberChartPaper.style.minHeight
+            };
+            subscriberChartPaper.style.width = `${chart1Width}px`;
+            subscriberChartPaper.style.minWidth = `${chart1Width}px`;
+            subscriberChartPaper.style.maxWidth = 'none';
+            subscriberChartPaper.style.height = 'auto';
+            subscriberChartPaper.style.minHeight = `${chart1Height}px`;
+            
+            // 그래프가 렌더링될 때까지 대기
+            await new Promise(r => setTimeout(r, 500));
+            
             const chart1Blob = await captureElement(subscriberChartPaper, {
               scale: 2,
               useCORS: true,
               fixedBottomPaddingPx: 96,
               backgroundColor: '#ffffff',
               scrollX: chart1ScrollX,
-              scrollY: 0
+              scrollY: 0,
+              width: chart1Width * 2, // scale 고려
+              height: (chart1Height + 96) * 2 // fixedBottomPadding 포함
             });
+            
+            // 원래 스타일 복원
+            subscriberChartPaper.style.width = originalChart1Style.width;
+            subscriberChartPaper.style.minWidth = originalChart1Style.minWidth;
+            subscriberChartPaper.style.maxWidth = originalChart1Style.maxWidth;
+            subscriberChartPaper.style.height = originalChart1Style.height;
+            subscriberChartPaper.style.minHeight = originalChart1Style.minHeight;
             
             feeChartPaper.scrollIntoView({ block: 'center', behavior: 'instant' });
             await new Promise(r => setTimeout(r, 500));
@@ -1736,14 +1899,57 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               chart2ScrollX = chart2Container.scrollLeft;
             }
             
+            // 관리수수료 추이 그래프의 실제 크기 측정 및 조정
+            const chart2Rect = feeChartPaper.getBoundingClientRect();
+            const chart2Canvas = feeChartPaper.querySelector('canvas');
+            // 테이블 너비를 참조하거나 기본값 사용 (chart1Width와 동일하게)
+            let chart2Width = Math.max(chart2Rect.width, chart1Width, 1200); // 테이블과 동일한 너비 또는 최소 1200px
+            let chart2Height = chart2Rect.height;
+            
+            // canvas 크기 확인 및 조정
+            if (chart2Canvas) {
+              const canvasRect = chart2Canvas.getBoundingClientRect();
+              chart2Width = Math.max(chart2Width, canvasRect.width, 1200);
+              chart2Height = Math.max(chart2Height, canvasRect.height, 400);
+              
+              // 그래프가 잘리지 않도록 충분한 높이 보장
+              if (chart2Height < 400) chart2Height = 400;
+            }
+            
+            // 그래프 Paper 크기 임시 조정 (캡처를 위해)
+            const originalChart2Style = {
+              width: feeChartPaper.style.width,
+              minWidth: feeChartPaper.style.minWidth,
+              maxWidth: feeChartPaper.style.maxWidth,
+              height: feeChartPaper.style.height,
+              minHeight: feeChartPaper.style.minHeight
+            };
+            feeChartPaper.style.width = `${chart2Width}px`;
+            feeChartPaper.style.minWidth = `${chart2Width}px`;
+            feeChartPaper.style.maxWidth = 'none';
+            feeChartPaper.style.height = 'auto';
+            feeChartPaper.style.minHeight = `${chart2Height}px`;
+            
+            // 그래프가 렌더링될 때까지 대기
+            await new Promise(r => setTimeout(r, 500));
+            
             const chart2Blob = await captureElement(feeChartPaper, {
               scale: 2,
               useCORS: true,
               fixedBottomPaddingPx: 96,
               backgroundColor: '#ffffff',
               scrollX: chart2ScrollX,
-              scrollY: 0
+              scrollY: 0,
+              width: chart2Width * 2, // scale 고려
+              height: (chart2Height + 96) * 2 // fixedBottomPadding 포함
             });
+            
+            // 원래 스타일 복원
+            feeChartPaper.style.width = originalChart2Style.width;
+            feeChartPaper.style.minWidth = originalChart2Style.minWidth;
+            feeChartPaper.style.maxWidth = originalChart2Style.maxWidth;
+            feeChartPaper.style.height = originalChart2Style.height;
+            feeChartPaper.style.minHeight = originalChart2Style.minHeight;
             const img1 = await blobToImage(chart1Blob);
             const img2 = await blobToImage(chart2Blob);
             const gap = 16;
@@ -1886,7 +2092,12 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         : '#ffffff';
         
       // 최종 Blob 결정
-      let blob = monthlyAwardCompositeBlob || inventoryCompositeBlob || compositeBlob || await captureElement(captureTargetElement, {
+      // 재초담초채권 슬라이드의 경우 그래프와 테이블 크기를 충분히 확보
+      const isRechotancho = currentSlide?.mode === 'chart' &&
+        (currentSlide?.tab === 'bondChart' || currentSlide?.tab === 'bond') &&
+        (currentSlide?.subTab === 'rechotanchoBond');
+      
+      const captureOptions = {
         scale: 2,
         useCORS: true,
         fixedBottomPaddingPx: 96,
@@ -1894,7 +2105,20 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         // 스크롤 영역 전체 캡처
         scrollX: 0,
         scrollY: 0
-      });
+      };
+      
+      // 재초담초채권 슬라이드의 경우 충분한 너비와 높이 보장
+      if (isRechotancho && captureTargetElement) {
+        const elementRect = captureTargetElement.getBoundingClientRect();
+        const elementScrollHeight = captureTargetElement.scrollHeight || elementRect.height;
+        const targetWidth = Math.max(elementRect.width, 1200);
+        const targetHeight = Math.max(elementScrollHeight, 2000); // 최소 2000px 높이 보장
+        
+        captureOptions.width = targetWidth * 2; // scale 고려
+        captureOptions.height = (targetHeight + 96) * 2; // fixedBottomPadding 포함
+      }
+      
+      let blob = monthlyAwardCompositeBlob || inventoryCompositeBlob || compositeBlob || await captureElement(captureTargetElement, captureOptions);
 
       // 안전 장치: 어떤 경로로 오든 하단 여백이 보장되도록 최종 한 번 더 패딩 적용
       // (합성(canvas.toBlob)로 생성된 compositeBlob 경로는 fixedBottomPaddingPx가 적용되지 않을 수 있음)
@@ -1927,6 +2151,11 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         if (captureTargetElement && captureTargetElement.__tempYearBadge) {
           captureTargetElement.__tempYearBadge.remove();
           delete captureTargetElement.__tempYearBadge;
+        }
+        // 재초담초채권 스타일 복원
+        if (captureTargetElement && captureTargetElement.__restoreStyles) {
+          captureTargetElement.__restoreStyles();
+          delete captureTargetElement.__restoreStyles;
         }
       } catch (_) {}
 
