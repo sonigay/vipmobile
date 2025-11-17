@@ -1289,9 +1289,51 @@ async function uploadMeetingImage(req, res) {
       filename
     });
     
-    // 이미지 자동 크롭 처리 (회의 캡처본은 하단 여백을 파스텔 핫핑크로 확장)
+    // 이미지 자동 크롭 처리 (메인/목차/엔딩 슬라이드는 핑크 바 제거)
     console.log(`✂️ [uploadMeetingImage] 이미지 자동 크롭 시작`);
-    const croppedResult = await autoCropImage(req.file.buffer, { bottomColor: 'pink' });
+    
+    // 슬라이드 타입 확인 (slideOrder 기반: 0=메인, 1=목차, 마지막=엔딩)
+    // 또는 Google Sheets에서 슬라이드 정보 조회
+    let isMainTocEnding = false;
+    if (!isTempMeeting && slideOrder !== undefined) {
+      try {
+        // 전체 슬라이드 수 확인 (엔딩 슬라이드 판별용)
+        const { sheets, SPREADSHEET_ID } = createSheetsClient();
+        const sheetName = '회의설정';
+        const range = `${sheetName}!A3:V`;
+        const response = await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range
+        });
+        const rows = response.data.values || [];
+        const meetingSlides = rows.filter(row => row[0] === meetingId);
+        const totalSlides = meetingSlides.length;
+        const slideIndex = parseInt(slideOrder) - 1; // 1-based to 0-based
+        
+        // 현재 슬라이드 정보 확인
+        const currentSlide = meetingSlides.find((row, idx) => {
+          const rowOrder = parseInt(row[2]) || (idx + 1);
+          return rowOrder === parseInt(slideOrder);
+        });
+        
+        // 메인(0), 목차(1), 엔딩(마지막) 판별
+        if (slideIndex === 0 || slideIndex === 1 || slideIndex === totalSlides - 1) {
+          isMainTocEnding = true;
+        } else if (currentSlide && currentSlide[3]) {
+          const slideType = currentSlide[3]; // '타입' 컬럼
+          isMainTocEnding = slideType === 'main' || slideType === 'toc' || slideType === 'ending';
+        }
+      } catch (typeError) {
+        console.warn('⚠️ [uploadMeetingImage] 슬라이드 타입 확인 실패, 기본값 사용:', typeError.message);
+      }
+    }
+    
+    // 메인/목차/엔딩 슬라이드는 핑크 바 제거 (minBottomPadding: 0, bottomColor: white)
+    const cropOptions = isMainTocEnding 
+      ? { minBottomPadding: 0, bottomColor: 'white' }
+      : { bottomColor: 'pink' };
+    
+    const croppedResult = await autoCropImage(req.file.buffer, cropOptions);
     console.log(`✅ [uploadMeetingImage] 이미지 자동 크롭 완료:`, {
       originalSize: `${croppedResult.originalWidth}x${croppedResult.originalHeight}`,
       croppedSize: `${croppedResult.croppedWidth}x${croppedResult.croppedHeight}`,
