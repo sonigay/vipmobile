@@ -554,12 +554,20 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             // scrollHeight도 확인하되, 박스 라인을 제외한 실제 콘텐츠 높이 우선 사용
             const scrollHeight = captureTargetElement.scrollHeight || rect.height;
             
-            // 실제 콘텐츠 높이에 맞춰서 설정 (박스 라인 제외)
+            // 실제 콘텐츠 높이에 맞춰서 설정 (박스 라인 제외, 불필요한 여백 최소화)
             // maxRelativeBottom + 기본 여유공간(40px)과 실제 테이블 높이 중 더 큰 값 사용
-            const measuredHeight = Math.max(
+            let measuredHeight = Math.max(
               maxRelativeBottom + 40, // 기본 여유공간 (40px) - 불필요한 여백 최소화
               actualContentHeight > 0 ? actualContentHeight + 40 : scrollHeight // 실제 테이블 높이가 있으면 사용, 없으면 scrollHeight
             );
+            
+            // measuredHeight가 scrollHeight보다 너무 크면 제한 (불필요한 여백 제거)
+            if (scrollHeight > 0 && measuredHeight > scrollHeight * 1.1) {
+              measuredHeight = Math.min(measuredHeight, Math.floor(scrollHeight * 1.05)); // 최대 5% 여유공간만 허용
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`📐 [전체총마감] 높이 제한: ${measuredHeight}px (scrollHeight: ${scrollHeight}px)`);
+              }
+            }
             
             if (process.env.NODE_ENV === 'development') {
               console.log(`📐 [MeetingCaptureManager] 전체총마감: 실제 콘텐츠 높이 측정`, {
@@ -567,7 +575,8 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                 actualContentHeight,
                 measuredHeight,
                 scrollHeight: captureTargetElement.scrollHeight,
-                offsetHeight: captureTargetElement.offsetHeight
+                offsetHeight: captureTargetElement.offsetHeight,
+                reduction: scrollHeight > 0 ? `${((1 - measuredHeight / scrollHeight) * 100).toFixed(2)}%` : '0%'
               });
             }
             
@@ -1090,63 +1099,110 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                 }
               }
               
-              // 테이블 실제 콘텐츠 크기 측정 (박스 라인 제외)
+              // 테이블 실제 콘텐츠 크기 측정 (스크롤 아래까지 포함, 박스 라인 제외)
               const table = tableContainer.querySelector('table');
               let actualTableWidth = 0;
               let actualTableHeight = 0;
               
               if (table) {
+                // 스크롤을 최하단까지 이동하여 모든 데이터가 렌더링되도록 함
+                tableContainer.scrollTop = tableContainer.scrollHeight;
+                await new Promise(r => setTimeout(r, 300));
+                
+                // 다시 최상단으로 이동
+                tableContainer.scrollTop = 0;
+                await new Promise(r => setTimeout(r, 300));
+                
+                // 테이블의 실제 전체 크기 측정 (스크롤 포함)
                 const tableRect = table.getBoundingClientRect();
                 actualTableWidth = tableRect.width;
-                actualTableHeight = tableRect.height;
                 
-                // 테이블 박스 크기를 콘텐츠에 맞춰 조정
+                // scrollHeight를 사용하여 스크롤 아래까지의 전체 높이 측정
+                // 또는 테이블의 모든 행을 확인하여 실제 높이 계산
+                const tbody = table.querySelector('tbody');
+                if (tbody) {
+                  const allRows = tbody.querySelectorAll('tr');
+                  if (allRows.length > 0) {
+                    const firstRow = allRows[0];
+                    const lastRow = allRows[allRows.length - 1];
+                    const firstRowRect = firstRow.getBoundingClientRect();
+                    const lastRowRect = lastRow.getBoundingClientRect();
+                    
+                    // 마지막 행까지의 실제 높이 계산
+                    const tableTop = tableRect.top;
+                    const tableBottom = lastRowRect.bottom;
+                    actualTableHeight = tableBottom - tableTop + 20; // 여유 공간 20px
+                    
+                    // scrollHeight도 확인하고 더 큰 값 사용
+                    const scrollHeight = tableContainer.scrollHeight || 0;
+                    if (scrollHeight > actualTableHeight) {
+                      actualTableHeight = scrollHeight;
+                    }
+                  } else {
+                    // 행이 없으면 기본 높이 사용
+                    actualTableHeight = tableRect.height;
+                  }
+                } else {
+                  // tbody가 없으면 기본 높이 사용
+                  actualTableHeight = tableRect.height;
+                  const scrollHeight = tableContainer.scrollHeight || 0;
+                  if (scrollHeight > actualTableHeight) {
+                    actualTableHeight = scrollHeight;
+                  }
+                }
+                
+                if (process.env.NODE_ENV === 'development') {
+                  console.log(`📐 [재고장표] 테이블 전체 크기 측정:`, {
+                    width: actualTableWidth,
+                    height: actualTableHeight,
+                    scrollHeight: tableContainer.scrollHeight,
+                    tableHeight: tableRect.height,
+                    rowCount: tbody ? tbody.querySelectorAll('tr').length : 0
+                  });
+                }
+                
+                // 테이블 박스 크기를 콘텐츠에 맞춰 조정 (스크롤 아래까지 포함)
                 if (tableBox) {
                   const boxStyle = window.getComputedStyle(tableBox);
                   const boxRect = tableBox.getBoundingClientRect();
                   const hasBorder = boxStyle.borderWidth && boxStyle.borderWidth !== '0px';
                   
-                  if (hasBorder) {
-                    // 박스 패딩/보더 고려
-                    const boxPaddingLeft = parseInt(boxStyle.paddingLeft || '0') || 16;
-                    const boxPaddingRight = parseInt(boxStyle.paddingRight || '0') || 16;
-                    const boxPaddingTop = parseInt(boxStyle.paddingTop || '0') || 16;
-                    const boxPaddingBottom = parseInt(boxStyle.paddingBottom || '0') || 16;
-                    const boxBorderLeft = parseInt(boxStyle.borderLeftWidth || '0') || 1;
-                    const boxBorderRight = parseInt(boxStyle.borderRightWidth || '0') || 1;
-                    const boxBorderTop = parseInt(boxStyle.borderTopWidth || '0') || 1;
-                    const boxBorderBottom = parseInt(boxStyle.borderBottomWidth || '0') || 1;
-                    
-                    const adjustedBoxWidth = actualTableWidth + boxPaddingLeft + boxPaddingRight + boxBorderLeft + boxBorderRight + 20; // 여유공간 20px
-                    const adjustedBoxHeight = actualTableHeight + boxPaddingTop + boxPaddingBottom + boxBorderTop + boxBorderBottom + 20; // 여유공간 20px
-                    
-                    // 박스 크기가 콘텐츠보다 크면 조정
-                    if (boxRect.width > adjustedBoxWidth) {
-                      tableBox.style.width = `${adjustedBoxWidth}px`;
-                      tableBox.style.maxWidth = `${adjustedBoxWidth}px`;
-                      if (process.env.NODE_ENV === 'development') {
-                        console.log(`📦 [재고장표] 박스 너비 조정: ${boxRect.width}px → ${adjustedBoxWidth}px`);
-                      }
-                    }
-                    
-                    if (boxRect.height > adjustedBoxHeight) {
-                      tableBox.style.height = `${adjustedBoxHeight}px`;
-                      tableBox.style.maxHeight = `${adjustedBoxHeight}px`;
-                      if (process.env.NODE_ENV === 'development') {
-                        console.log(`📦 [재고장표] 박스 높이 조정: ${boxRect.height}px → ${adjustedBoxHeight}px`);
-                      }
-                    }
-                    
-                    // 박스 중앙 정렬을 위한 스타일 설정
-                    tableBox.style.margin = '0 auto';
-                    tableBox.style.display = 'flex';
-                    tableBox.style.flexDirection = 'column';
-                    tableBox.style.alignItems = 'center';
-                    tableBox.style.justifyContent = 'center';
+                  // 박스 패딩/보더 고려
+                  const boxPaddingLeft = parseInt(boxStyle.paddingLeft || '0') || 16;
+                  const boxPaddingRight = parseInt(boxStyle.paddingRight || '0') || 16;
+                  const boxPaddingTop = parseInt(boxStyle.paddingTop || '0') || 16;
+                  const boxPaddingBottom = parseInt(boxStyle.paddingBottom || '0') || 16;
+                  const boxBorderLeft = parseInt(boxStyle.borderLeftWidth || '0') || 1;
+                  const boxBorderRight = parseInt(boxStyle.borderRightWidth || '0') || 1;
+                  const boxBorderTop = parseInt(boxStyle.borderTopWidth || '0') || 1;
+                  const boxBorderBottom = parseInt(boxStyle.borderBottomWidth || '0') || 1;
+                  
+                  const adjustedBoxWidth = actualTableWidth + boxPaddingLeft + boxPaddingRight + boxBorderLeft + boxBorderRight + 20; // 여유공간 20px
+                  const adjustedBoxHeight = actualTableHeight + boxPaddingTop + boxPaddingBottom + boxBorderTop + boxBorderBottom + 20; // 여유공간 20px
+                  
+                  // 박스 크기를 실제 콘텐츠 크기로 설정 (스크롤 아래까지 포함)
+                  tableBox.style.width = `${adjustedBoxWidth}px`;
+                  tableBox.style.maxWidth = `${adjustedBoxWidth}px`;
+                  tableBox.style.height = `${adjustedBoxHeight}px`;
+                  tableBox.style.maxHeight = `${adjustedBoxHeight}px`;
+                  
+                  if (process.env.NODE_ENV === 'development') {
+                    console.log(`📦 [재고장표] 박스 크기 조정:`, {
+                      width: `${boxRect.width}px → ${adjustedBoxWidth}px`,
+                      height: `${boxRect.height}px → ${adjustedBoxHeight}px`
+                    });
                   }
+                  
+                  // 박스 중앙 정렬을 위한 스타일 설정
+                  tableBox.style.margin = '0 auto';
+                  tableBox.style.display = 'flex';
+                  tableBox.style.flexDirection = 'column';
+                  tableBox.style.alignItems = 'center';
+                  tableBox.style.justifyContent = 'center';
+                  tableBox.style.overflow = 'visible';
                 }
                 
-                // 테이블 컨테이너도 콘텐츠에 맞춰 조정
+                // 테이블 컨테이너도 콘텐츠에 맞춰 조정 (스크롤 아래까지 포함)
                 tableContainer.style.width = `${actualTableWidth}px`;
                 tableContainer.style.maxWidth = `${actualTableWidth}px`;
                 tableContainer.style.height = `${actualTableHeight}px`;
@@ -1155,7 +1211,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                 tableContainer.style.margin = '0 auto';
               }
               
-              await new Promise(r => setTimeout(r, 300)); // 박스 크기 조정 후 렌더링 대기
+              await new Promise(r => setTimeout(r, 500)); // 박스 크기 조정 후 렌더링 대기 (시간 증가)
 
               // 테이블만 우선 캡처
               let tableOnlyBlob = null;
@@ -2340,10 +2396,12 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             commonAncestor.scrollIntoView({ block: 'start', behavior: 'instant' });
             await new Promise(r => setTimeout(r, 500));
             
-            // 실제 콘텐츠 높이 측정 (박스 라인 제외, 실제 테이블/그래프만 측정)
+            // 실제 콘텐츠 크기 측정 (박스 라인 제외, 실제 테이블/그래프만 측정, 높이 + 너비 모두)
             const rect = commonAncestor.getBoundingClientRect();
             let maxRelativeBottom = 0;
+            let maxRelativeRight = 0;
             let actualContentHeight = 0;
+            let actualContentWidth = 0;
             
             // 실제 테이블 콘텐츠만 찾아서 측정 (박스 라인 제외)
             const tables = commonAncestor.querySelectorAll('table, .MuiTable-root, [class*="Table"]');
@@ -2351,9 +2409,15 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               try {
                 const tableRect = table.getBoundingClientRect();
                 const relativeBottom = tableRect.bottom - rect.top;
+                const relativeRight = tableRect.right - rect.left;
+                
                 if (relativeBottom > 0) {
                   maxRelativeBottom = Math.max(maxRelativeBottom, relativeBottom);
                   actualContentHeight = Math.max(actualContentHeight, tableRect.height);
+                }
+                if (relativeRight > 0) {
+                  maxRelativeRight = Math.max(maxRelativeRight, relativeRight);
+                  actualContentWidth = Math.max(actualContentWidth, tableRect.width);
                 }
               } catch (e) {
                 // 무시
@@ -2366,16 +2430,22 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               try {
                 const chartRect = chart.getBoundingClientRect();
                 const relativeBottom = chartRect.bottom - rect.top;
+                const relativeRight = chartRect.right - rect.left;
+                
                 if (relativeBottom > 0 && chartRect.height > 50) { // 최소 크기 확인 (실제 그래프만)
                   maxRelativeBottom = Math.max(maxRelativeBottom, relativeBottom);
                   actualContentHeight = Math.max(actualContentHeight, chartRect.height);
+                }
+                if (relativeRight > 0 && chartRect.width > 100) { // 최소 크기 확인
+                  maxRelativeRight = Math.max(maxRelativeRight, relativeRight);
+                  actualContentWidth = Math.max(actualContentWidth, chartRect.width);
                 }
               } catch (e) {
                 // 무시
               }
             }
             
-            // 테이블/그래프 컨테이너의 실제 콘텐츠 높이 확인 (박스 라인 제외)
+            // 테이블/그래프 컨테이너의 실제 콘텐츠 크기 확인 (박스 라인 제외)
             const containers = commonAncestor.querySelectorAll('.MuiTableContainer-root, .MuiPaper-root, .MuiCard-root');
             for (const container of containers) {
               try {
@@ -2384,21 +2454,33 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                 const innerChart = container.querySelector('canvas, svg, [class*="recharts"]');
                 
                 if (innerTable || innerChart) {
-                  // 내부 콘텐츠의 실제 높이만 사용 (컨테이너의 패딩/보더 제외)
+                  // 내부 콘텐츠의 실제 크기만 사용 (컨테이너의 패딩/보더 제외)
                   if (innerTable) {
                     const tableRect = innerTable.getBoundingClientRect();
                     const tableRelativeBottom = tableRect.bottom - rect.top;
+                    const tableRelativeRight = tableRect.right - rect.left;
+                    
                     if (tableRelativeBottom > 0) {
                       maxRelativeBottom = Math.max(maxRelativeBottom, tableRelativeBottom);
                       actualContentHeight = Math.max(actualContentHeight, tableRect.height);
+                    }
+                    if (tableRelativeRight > 0) {
+                      maxRelativeRight = Math.max(maxRelativeRight, tableRelativeRight);
+                      actualContentWidth = Math.max(actualContentWidth, tableRect.width);
                     }
                   }
                   if (innerChart) {
                     const chartRect = innerChart.getBoundingClientRect();
                     const chartRelativeBottom = chartRect.bottom - rect.top;
+                    const chartRelativeRight = chartRect.right - rect.left;
+                    
                     if (chartRelativeBottom > 0 && chartRect.height > 50) {
                       maxRelativeBottom = Math.max(maxRelativeBottom, chartRelativeBottom);
                       actualContentHeight = Math.max(actualContentHeight, chartRect.height);
+                    }
+                    if (chartRelativeRight > 0 && chartRect.width > 100) {
+                      maxRelativeRight = Math.max(maxRelativeRight, chartRelativeRight);
+                      actualContentWidth = Math.max(actualContentWidth, chartRect.width);
                     }
                   }
                 }
@@ -2408,20 +2490,27 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             }
             
             // 콘텐츠를 찾지 못한 경우에만 전체 자식 요소 확인 (fallback)
-            if (maxRelativeBottom === 0) {
+            if (maxRelativeBottom === 0 || maxRelativeRight === 0) {
               const allChildren = commonAncestor.querySelectorAll('*');
               for (const child of allChildren) {
                 try {
                   const childRect = child.getBoundingClientRect();
                   const relativeBottom = childRect.bottom - rect.top;
+                  const relativeRight = childRect.right - rect.left;
+                  
                   // 박스 라인을 가진 요소는 제외 (border가 있는 큰 컨테이너 제외)
                   const style = window.getComputedStyle(child);
                   const hasBorder = style.borderWidth && style.borderWidth !== '0px';
                   const isLargeContainer = childRect.width > rect.width * 0.8 && childRect.height > 200;
                   
                   // 박스 라인이 있는 큰 컨테이너는 제외하고, 실제 콘텐츠만 측정
-                  if (relativeBottom > 0 && !(hasBorder && isLargeContainer)) {
-                    maxRelativeBottom = Math.max(maxRelativeBottom, relativeBottom);
+                  if (!(hasBorder && isLargeContainer)) {
+                    if (relativeBottom > 0 && maxRelativeBottom === 0) {
+                      maxRelativeBottom = Math.max(maxRelativeBottom, relativeBottom);
+                    }
+                    if (relativeRight > 0 && maxRelativeRight === 0) {
+                      maxRelativeRight = Math.max(maxRelativeRight, relativeRight);
+                    }
                   }
                 } catch (e) {
                   // 무시
@@ -2429,15 +2518,39 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               }
             }
             
-            // scrollHeight도 확인하되, 박스 라인을 제외한 실제 콘텐츠 높이 우선 사용
+            // scrollHeight/scrollWidth도 확인하되, 박스 라인을 제외한 실제 콘텐츠 크기 우선 사용
             const scrollHeight = commonAncestor.scrollHeight || rect.height;
+            const scrollWidth = commonAncestor.scrollWidth || rect.width;
             
             // 실제 콘텐츠 높이에 맞춰서 설정 (박스 라인 제외, 컨텐츠가 잘리지 않도록 충분한 여유공간 확보)
             // 박스 크기를 콘텐츠 크기에 맞춰 조정하여 콘텐츠가 박스를 넘어서지 않도록 함
             let measuredHeight = Math.max(
-              maxRelativeBottom + 100, // 충분한 여유공간 (100px) - 컨텐츠 잘림 방지
-              actualContentHeight > 0 ? actualContentHeight + 100 : scrollHeight // 실제 콘텐츠 높이가 있으면 사용, 없으면 scrollHeight
+              maxRelativeBottom + 40, // 여유공간 40px - 불필요한 여백 최소화
+              actualContentHeight > 0 ? actualContentHeight + 40 : scrollHeight // 실제 콘텐츠 높이가 있으면 사용, 없으면 scrollHeight
             );
+            
+            // 실제 콘텐츠 너비에 맞춰서 설정 (오른쪽 공백 제거, 박스 라인 제외)
+            let measuredWidth = Math.max(
+              maxRelativeRight + 40, // 기본 여유공간 (40px)
+              actualContentWidth > 0 ? actualContentWidth + 40 : scrollWidth, // 실제 콘텐츠 너비가 있으면 사용, 없으면 scrollWidth
+              rect.width, // 최소한 현재 보이는 너비는 보장
+              1200 // 최소 너비 보장
+            );
+            
+            // measuredHeight/measuredWidth가 scrollHeight/scrollWidth보다 너무 크면 제한 (불필요한 여백 제거)
+            if (scrollHeight > 0 && measuredHeight > scrollHeight * 1.1) {
+              measuredHeight = Math.min(measuredHeight, Math.floor(scrollHeight * 1.05)); // 최대 5% 여유공간만 허용
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`📐 [가입자증감] 높이 제한: ${measuredHeight}px (scrollHeight: ${scrollHeight}px)`);
+              }
+            }
+            
+            if (scrollWidth > 0 && measuredWidth > scrollWidth * 1.1) {
+              measuredWidth = Math.min(measuredWidth, Math.floor(scrollWidth * 1.05)); // 최대 5% 여유공간만 허용
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`📐 [가입자증감] 너비 제한: ${measuredWidth}px (scrollWidth: ${scrollWidth}px)`);
+              }
+            }
             
             // 박스 컨테이너가 있다면 박스 크기도 조정하여 콘텐츠와 일치시킴 (콘텐츠가 박스를 넘어서지 않도록)
             const boxContainers = commonAncestor.querySelectorAll('.MuiPaper-root, .MuiCard-root, [class*="Container"]');
@@ -2479,8 +2592,9 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                     const adjustedBoxHeight = boxContentHeight + boxPaddingTop + boxPaddingBottom + boxBorderTop + boxBorderBottom + 20; // 여유공간 20px
                     const adjustedBoxWidth = boxContentWidth + boxPaddingLeft + boxPaddingRight + boxBorderLeft + boxBorderRight + 20; // 여유공간 20px
                     
-                    // 박스 크기가 콘텐츠보다 크면 조정 (콘텐츠가 박스를 넘어서지 않도록)
-                    if (boxRect.height > adjustedBoxHeight) {
+                    // 박스 크기를 실제 콘텐츠 크기로 설정 (콘텐츠가 박스를 넘어서지 않도록)
+                    // 박스가 콘텐츠보다 크거나 작으면 모두 조정
+                    if (boxRect.height !== adjustedBoxHeight) {
                       box.style.height = `${adjustedBoxHeight}px`;
                       box.style.maxHeight = `${adjustedBoxHeight}px`;
                       if (process.env.NODE_ENV === 'development') {
@@ -2488,11 +2602,30 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                       }
                     }
                     
-                    if (boxRect.width > adjustedBoxWidth) {
+                    if (boxRect.width !== adjustedBoxWidth) {
                       box.style.width = `${adjustedBoxWidth}px`;
                       box.style.maxWidth = `${adjustedBoxWidth}px`;
                       if (process.env.NODE_ENV === 'development') {
                         console.log(`📦 [가입자증감] 박스 너비 조정: ${boxRect.width}px → ${adjustedBoxWidth}px`);
+                      }
+                    }
+                    
+                    // 박스가 콘텐츠보다 작으면 확장 (콘텐츠가 박스 안에 들어오도록)
+                    if (boxRect.width < adjustedBoxWidth) {
+                      box.style.width = `${adjustedBoxWidth}px`;
+                      box.style.maxWidth = `${adjustedBoxWidth}px`;
+                      box.style.minWidth = `${adjustedBoxWidth}px`;
+                      if (process.env.NODE_ENV === 'development') {
+                        console.log(`📦 [가입자증감] 박스 너비 확장: ${boxRect.width}px → ${adjustedBoxWidth}px`);
+                      }
+                    }
+                    
+                    if (boxRect.height < adjustedBoxHeight) {
+                      box.style.height = `${adjustedBoxHeight}px`;
+                      box.style.maxHeight = `${adjustedBoxHeight}px`;
+                      box.style.minHeight = `${adjustedBoxHeight}px`;
+                      if (process.env.NODE_ENV === 'development') {
+                        console.log(`📦 [가입자증감] 박스 높이 확장: ${boxRect.height}px → ${adjustedBoxHeight}px`);
                       }
                     }
                   }
@@ -2506,18 +2639,26 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             if (boxContainers.length > 0) {
               await new Promise(r => setTimeout(r, 200)); // 박스 크기 조정 후 렌더링 대기
               
-              // 재측정
+              // 재측정 (높이 + 너비 모두)
               maxRelativeBottom = 0;
+              maxRelativeRight = 0;
               actualContentHeight = 0;
+              actualContentWidth = 0;
               
               // 테이블 재측정
               for (const table of tables) {
                 try {
                   const tableRect = table.getBoundingClientRect();
                   const relativeBottom = tableRect.bottom - rect.top;
+                  const relativeRight = tableRect.right - rect.left;
+                  
                   if (relativeBottom > 0) {
                     maxRelativeBottom = Math.max(maxRelativeBottom, relativeBottom);
                     actualContentHeight = Math.max(actualContentHeight, tableRect.height);
+                  }
+                  if (relativeRight > 0) {
+                    maxRelativeRight = Math.max(maxRelativeRight, relativeRight);
+                    actualContentWidth = Math.max(actualContentWidth, tableRect.width);
                   }
                 } catch (e) {
                   // 무시
@@ -2529,9 +2670,15 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                 try {
                   const chartRect = chart.getBoundingClientRect();
                   const relativeBottom = chartRect.bottom - rect.top;
+                  const relativeRight = chartRect.right - rect.left;
+                  
                   if (relativeBottom > 0 && chartRect.height > 50) {
                     maxRelativeBottom = Math.max(maxRelativeBottom, relativeBottom);
                     actualContentHeight = Math.max(actualContentHeight, chartRect.height);
+                  }
+                  if (relativeRight > 0 && chartRect.width > 100) {
+                    maxRelativeRight = Math.max(maxRelativeRight, relativeRight);
+                    actualContentWidth = Math.max(actualContentWidth, chartRect.width);
                   }
                 } catch (e) {
                   // 무시
@@ -2548,17 +2695,29 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                     if (innerTable) {
                       const tableRect = innerTable.getBoundingClientRect();
                       const tableRelativeBottom = tableRect.bottom - rect.top;
+                      const tableRelativeRight = tableRect.right - rect.left;
+                      
                       if (tableRelativeBottom > 0) {
                         maxRelativeBottom = Math.max(maxRelativeBottom, tableRelativeBottom);
                         actualContentHeight = Math.max(actualContentHeight, tableRect.height);
+                      }
+                      if (tableRelativeRight > 0) {
+                        maxRelativeRight = Math.max(maxRelativeRight, tableRelativeRight);
+                        actualContentWidth = Math.max(actualContentWidth, tableRect.width);
                       }
                     }
                     if (innerChart) {
                       const chartRect = innerChart.getBoundingClientRect();
                       const chartRelativeBottom = chartRect.bottom - rect.top;
+                      const chartRelativeRight = chartRect.right - rect.left;
+                      
                       if (chartRelativeBottom > 0 && chartRect.height > 50) {
                         maxRelativeBottom = Math.max(maxRelativeBottom, chartRelativeBottom);
                         actualContentHeight = Math.max(actualContentHeight, chartRect.height);
+                      }
+                      if (chartRelativeRight > 0 && chartRect.width > 100) {
+                        maxRelativeRight = Math.max(maxRelativeRight, chartRelativeRight);
+                        actualContentWidth = Math.max(actualContentWidth, chartRect.width);
                       }
                     }
                   }
@@ -2567,19 +2726,57 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                 }
               }
               
-              // 조정된 크기로 다시 계산
-              measuredHeight = Math.max(
-                maxRelativeBottom + 100,
-                actualContentHeight > 0 ? actualContentHeight + 100 : scrollHeight
-              );
+            // 조정된 크기로 다시 계산 (불필요한 여백 최소화)
+            measuredHeight = Math.max(
+              maxRelativeBottom + 40, // 여유공간 40px - 불필요한 여백 제거
+              actualContentHeight > 0 ? actualContentHeight + 40 : scrollHeight // 실제 콘텐츠 높이 + 최소 여유공간
+            );
+            
+            measuredWidth = Math.max(
+              maxRelativeRight + 40, // 기본 여유공간 (40px)
+              actualContentWidth > 0 ? actualContentWidth + 40 : scrollWidth, // 실제 콘텐츠 너비가 있으면 사용, 없으면 scrollWidth
+              rect.width, // 최소한 현재 보이는 너비는 보장
+              1200 // 최소 너비 보장
+            );
+            
+            // measuredHeight/measuredWidth가 scrollHeight/scrollWidth보다 너무 크면 제한 (불필요한 여백 제거)
+            if (scrollHeight > 0 && measuredHeight > scrollHeight * 1.1) {
+              measuredHeight = Math.min(measuredHeight, Math.floor(scrollHeight * 1.05)); // 최대 5% 여유공간만 허용
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`📐 [가입자증감] 높이 제한: ${measuredHeight}px (scrollHeight: ${scrollHeight}px)`);
+              }
             }
             
-            // 요소의 높이를 실제 콘텐츠 높이로 제한하여 불필요한 여백 제거
+            if (scrollWidth > 0 && measuredWidth > scrollWidth * 1.1) {
+              measuredWidth = Math.min(measuredWidth, Math.floor(scrollWidth * 1.05)); // 최대 5% 여유공간만 허용
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`📐 [가입자증감] 너비 제한: ${measuredWidth}px (scrollWidth: ${scrollWidth}px)`);
+              }
+            }
+            }
+            
+            // 요소의 높이와 너비를 실제 콘텐츠 크기로 제한하여 불필요한 여백 제거
             const originalHeight = commonAncestor.style.height;
             const originalMaxHeight = commonAncestor.style.maxHeight;
+            const originalWidth = commonAncestor.style.width;
+            const originalMaxWidth = commonAncestor.style.maxWidth;
+            
             commonAncestor.style.height = `${measuredHeight}px`;
             commonAncestor.style.maxHeight = `${measuredHeight}px`;
+            commonAncestor.style.width = `${measuredWidth}px`;
+            commonAncestor.style.maxWidth = `${measuredWidth}px`;
             commonAncestor.style.overflow = 'visible';
+            
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`📐 [가입자증감] commonAncestor 크기 설정:`, {
+                width: `${measuredWidth}px`,
+                height: `${measuredHeight}px`,
+                actualContentWidth,
+                actualContentHeight,
+                scrollWidth,
+                scrollHeight
+              });
+            }
             
             // 박스 스타일 복원을 restoreStylesFunction에 추가
             if (originalBoxStyles.size > 0) {
@@ -2609,12 +2806,63 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                   } else {
                     box.style.removeProperty('max-width');
                   }
+                  box.style.removeProperty('min-width');
+                  box.style.removeProperty('min-height');
                 });
+                
+                // commonAncestor 스타일 복원
+                if (originalHeight) {
+                  commonAncestor.style.height = originalHeight;
+                } else {
+                  commonAncestor.style.removeProperty('height');
+                }
+                if (originalMaxHeight) {
+                  commonAncestor.style.maxHeight = originalMaxHeight;
+                } else {
+                  commonAncestor.style.removeProperty('max-height');
+                }
+                if (originalWidth) {
+                  commonAncestor.style.width = originalWidth;
+                } else {
+                  commonAncestor.style.removeProperty('width');
+                }
+                if (originalMaxWidth) {
+                  commonAncestor.style.maxWidth = originalMaxWidth;
+                } else {
+                  commonAncestor.style.removeProperty('max-width');
+                }
+                commonAncestor.style.removeProperty('overflow');
+              };
+            } else {
+              // restoreStylesFunction이 없는 경우에도 commonAncestor 스타일 복원 설정
+              restoreStylesFunction = () => {
+                if (originalHeight) {
+                  commonAncestor.style.height = originalHeight;
+                } else {
+                  commonAncestor.style.removeProperty('height');
+                }
+                if (originalMaxHeight) {
+                  commonAncestor.style.maxHeight = originalMaxHeight;
+                } else {
+                  commonAncestor.style.removeProperty('max-height');
+                }
+                if (originalWidth) {
+                  commonAncestor.style.width = originalWidth;
+                } else {
+                  commonAncestor.style.removeProperty('width');
+                }
+                if (originalMaxWidth) {
+                  commonAncestor.style.maxWidth = originalMaxWidth;
+                } else {
+                  commonAncestor.style.removeProperty('max-width');
+                }
+                commonAncestor.style.removeProperty('overflow');
               };
             }
             
             await new Promise(r => setTimeout(r, 300)); // 스타일 변경 후 렌더링 대기
             
+            // 크롭 로직 활성화하여 불필요한 여백 제거 (클라이언트 측 크롭 + 서버 측 크롭)
             subscriberIncreaseCompositeBlob = await captureElement(commonAncestor, {
               scale: 2,
               useCORS: true,
@@ -2622,22 +2870,13 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               backgroundColor: '#ffffff',
               scrollX: 0,
               scrollY: 0,
-              skipAutoCrop: true, // 크롭 로직 제거 (실제 높이로만 캡처)
+              skipAutoCrop: false, // 크롭 로직 활성화 (불필요한 여백 제거)
+              width: measuredWidth * 2, // scale 고려 (너비도 설정)
               height: measuredHeight * 2 // scale 고려
             });
             
-            // 원본 스타일 복원
-            if (originalHeight) {
-              commonAncestor.style.height = originalHeight;
-            } else {
-              commonAncestor.style.removeProperty('height');
-            }
-            if (originalMaxHeight) {
-              commonAncestor.style.maxHeight = originalMaxHeight;
-            } else {
-              commonAncestor.style.removeProperty('max-height');
-            }
-            commonAncestor.style.removeProperty('overflow');
+            // 원본 스타일 복원 (restoreStylesFunction에서 처리하므로 여기서는 제거)
+            // restoreStylesFunction이 호출되면 자동으로 복원됨
             
             if (process.env.NODE_ENV === 'development') {
               console.log('✅ [MeetingCaptureManager] 가입자증감 전체 영역 캡처 완료 (월간시상 방식)');
@@ -3718,6 +3957,58 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             actualContentHeight > 0 ? actualContentHeight + 40 : scrollHeight // 실제 콘텐츠 높이가 있으면 사용, 없으면 scrollHeight
           );
           
+          // 데이터입력 부분 헤더 찾기 및 너비 조정 (헤더가 슬라이드 가로길이보다 길 경우 조정)
+          const dataInputHeaders = captureTargetElement.querySelectorAll('h6, .MuiTypography-h6, .MuiTypography-h5, [class*="header"], [class*="Header"]');
+          const originalHeaderStyles = new Map();
+          
+          for (const header of dataInputHeaders) {
+            try {
+              const headerText = (header.textContent || '').trim();
+              // 데이터입력 관련 헤더 찾기 (그래프 제외)
+              if (headerText && 
+                  (headerText.includes('입력') || headerText.includes('데이터') || headerText.includes('입력') || 
+                   headerText.includes('채권') || headerText.includes('현황')) &&
+                  !headerText.includes('조회') && !headerText.includes('선택')) {
+                const headerRect = header.getBoundingClientRect();
+                const headerStyle = window.getComputedStyle(header);
+                
+                // 헤더가 슬라이드 너비보다 길 경우 조정
+                if (headerRect.width > elementRect.width * 0.95) {
+                  // 원본 헤더 스타일 저장 (복원용)
+                  originalHeaderStyles.set(header, {
+                    width: header.style.width,
+                    maxWidth: header.style.maxWidth,
+                    fontSize: header.style.fontSize,
+                    padding: header.style.padding
+                  });
+                  
+                  // 헤더 너비를 슬라이드 너비의 90%로 제한
+                  const maxHeaderWidth = elementRect.width * 0.90;
+                  header.style.maxWidth = `${maxHeaderWidth}px`;
+                  header.style.width = `${maxHeaderWidth}px`;
+                  header.style.overflow = 'hidden';
+                  header.style.textOverflow = 'ellipsis';
+                  header.style.whiteSpace = 'nowrap';
+                  
+                  // 폰트 크기도 약간 줄여서 맞춤
+                  const currentFontSize = parseFloat(headerStyle.fontSize || '16');
+                  if (currentFontSize > 14) {
+                    header.style.fontSize = `${Math.max(14, currentFontSize * 0.9)}px`;
+                  }
+                  
+                  if (process.env.NODE_ENV === 'development') {
+                    console.log(`📐 [재초담초채권] 데이터입력 헤더 너비 조정: ${headerRect.width}px → ${maxHeaderWidth}px`, {
+                      headerText: headerText.substring(0, 30),
+                      fontSize: `${currentFontSize}px → ${header.style.fontSize}`
+                    });
+                  }
+                }
+              }
+            } catch (e) {
+              // 무시
+            }
+          }
+          
           // 실제 콘텐츠 너비에 맞춰서 설정 (오른쪽 공백 제거, 박스 라인 제외)
           // scrollWidth와 실제 렌더링된 최대 위치 중 더 큰 값 사용
           let measuredWidth = Math.max(
@@ -3726,6 +4017,14 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             elementRect.width, // 최소한 현재 보이는 너비는 보장
             1200 // 최소 너비 보장
           );
+          
+          // measuredWidth가 scrollWidth보다 너무 크면 제한 (불필요한 여백 제거)
+          if (scrollWidth > 0 && measuredWidth > scrollWidth * 1.1) {
+            measuredWidth = Math.min(measuredWidth, Math.floor(scrollWidth * 1.05)); // 최대 5% 여유공간만 허용
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`📐 [재초담초채권] 너비 제한: ${measuredWidth}px (scrollWidth: ${scrollWidth}px)`);
+            }
+          }
           
           // 박스 컨테이너가 있다면 박스 크기도 조정하여 콘텐츠와 일치시킴 (콘텐츠가 박스를 넘어서지 않도록)
           const boxContainers = captureTargetElement.querySelectorAll('.MuiPaper-root, .MuiCard-root, [class*="Container"]');
@@ -3892,6 +4191,36 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                 captureTargetElement.style.removeProperty('max-width');
               }
               captureTargetElement.style.removeProperty('overflow');
+              
+              // 헤더 스타일 복원
+              if (originalHeaderStyles.size > 0) {
+                originalHeaderStyles.forEach((styles, header) => {
+                  if (!header || !header.style) return;
+                  if (styles.width) {
+                    header.style.width = styles.width;
+                  } else {
+                    header.style.removeProperty('width');
+                  }
+                  if (styles.maxWidth) {
+                    header.style.maxWidth = styles.maxWidth;
+                  } else {
+                    header.style.removeProperty('max-width');
+                  }
+                  if (styles.fontSize) {
+                    header.style.fontSize = styles.fontSize;
+                  } else {
+                    header.style.removeProperty('font-size');
+                  }
+                  if (styles.padding) {
+                    header.style.padding = styles.padding;
+                  } else {
+                    header.style.removeProperty('padding');
+                  }
+                  header.style.removeProperty('overflow');
+                  header.style.removeProperty('text-overflow');
+                  header.style.removeProperty('white-space');
+                });
+              }
             };
           } else {
             restoreStylesFunction = () => {
@@ -3916,6 +4245,36 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                 captureTargetElement.style.removeProperty('max-width');
               }
               captureTargetElement.style.removeProperty('overflow');
+              
+              // 헤더 스타일 복원
+              if (originalHeaderStyles.size > 0) {
+                originalHeaderStyles.forEach((styles, header) => {
+                  if (!header || !header.style) return;
+                  if (styles.width) {
+                    header.style.width = styles.width;
+                  } else {
+                    header.style.removeProperty('width');
+                  }
+                  if (styles.maxWidth) {
+                    header.style.maxWidth = styles.maxWidth;
+                  } else {
+                    header.style.removeProperty('max-width');
+                  }
+                  if (styles.fontSize) {
+                    header.style.fontSize = styles.fontSize;
+                  } else {
+                    header.style.removeProperty('font-size');
+                  }
+                  if (styles.padding) {
+                    header.style.padding = styles.padding;
+                  } else {
+                    header.style.removeProperty('padding');
+                  }
+                  header.style.removeProperty('overflow');
+                  header.style.removeProperty('text-overflow');
+                  header.style.removeProperty('white-space');
+                });
+              }
             };
           }
           
@@ -3957,17 +4316,17 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
           const measuredHeight = parseFloat(captureTargetElement.style.height);
           
           if (measuredHeight && measuredHeight > 0) {
-            // 월간시상 슬라이드와 동일한 방식으로 실제 배경색 안에 컨텐츠가 들어가는 부분만 크롭
-            captureOptions.skipAutoCrop = true; // 크롭 로직 제거 (실제 높이로만 캡처)
+            // 가입자증감 슬라이드와 동일한 방식으로 크롭 로직 활성화하여 불필요한 여백 제거
+            captureOptions.skipAutoCrop = false; // 크롭 로직 활성화 (불필요한 여백 제거)
             captureOptions.fixedBottomPaddingPx = 0; // 핑크 바 제거
-            captureOptions.height = measuredHeight * 2; // scale 고려 (월간시상과 동일)
-            captureOptions.backgroundColor = '#ffffff'; // 배경색 명시 (월간시상과 동일)
+            captureOptions.height = measuredHeight * 2; // scale 고려 (측정된 높이 사용)
+            captureOptions.backgroundColor = '#ffffff'; // 배경색 명시
             
             if (process.env.NODE_ENV === 'development') {
-              console.log(`📐 [MeetingCaptureManager] 전체총마감: 크롭 옵션 설정 (월간시상 로직 참고)`, {
+              console.log(`📐 [MeetingCaptureManager] 전체총마감: 크롭 옵션 설정 (불필요한 여백 제거)`, {
                 measuredHeight,
                 captureHeight: captureOptions.height,
-                skipAutoCrop: true,
+                skipAutoCrop: false, // 크롭 활성화
                 fixedBottomPaddingPx: 0,
                 backgroundColor: '#ffffff'
               });
