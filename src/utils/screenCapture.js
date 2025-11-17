@@ -238,8 +238,10 @@ export async function captureElement(element, options = {}) {
   const fixedBottomPaddingPx = typeof options.fixedBottomPaddingPx === 'number'
     ? Math.max(0, Math.floor(options.fixedBottomPaddingPx))
     : 0;
+  // 자동 크롭 건너뛰기 옵션
+  const skipAutoCrop = options.skipAutoCrop === true;
   // html2canvas에는 전달하지 않을 커스텀 옵션을 제거한 사본을 사용할 것
-  const { fixedBottomPaddingPx: _omitFixed, ...html2CanvasOptions } = options || {};
+  const { fixedBottomPaddingPx: _omitFixed, skipAutoCrop: _omitSkipAutoCrop, ...html2CanvasOptions } = options || {};
 
   // 요소의 실제 스크롤 크기 계산 (더 정확하게)
   // 모든 자식 요소를 포함한 실제 크기 계산
