@@ -5099,8 +5099,58 @@ try {
 try {
   app.get('/api/meetings', meetingRoutes.getMeetings);
   app.post('/api/meetings', meetingRoutes.createMeeting);
+  
+  // PUT /api/meetings/:meetingId OPTIONS 요청 처리
+  app.options('/api/meetings/:meetingId', (req, res) => {
+    const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
+    const defaultOrigins = [
+      'https://vipmobile.vercel.app',
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://localhost:4000'
+    ];
+    const allowedOrigins = [...corsOrigins, ...defaultOrigins];
+    const origin = req.headers.origin;
+    
+    if (origin && allowedOrigins.includes(origin)) {
+      res.header('Access-Control-Allow-Origin', origin);
+    } else if (allowedOrigins.length > 0) {
+      res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
+    }
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Max-Age', '86400'); // 24시간 캐시
+    res.status(200).end();
+  });
+  
   app.put('/api/meetings/:meetingId', meetingRoutes.updateMeeting);
   app.delete('/api/meetings/:meetingId', meetingRoutes.deleteMeeting);
+  
+  // GET /api/meetings OPTIONS 요청 처리
+  app.options('/api/meetings', (req, res) => {
+    const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
+    const defaultOrigins = [
+      'https://vipmobile.vercel.app',
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://localhost:4000'
+    ];
+    const allowedOrigins = [...corsOrigins, ...defaultOrigins];
+    const origin = req.headers.origin;
+    
+    if (origin && allowedOrigins.includes(origin)) {
+      res.header('Access-Control-Allow-Origin', origin);
+    } else if (allowedOrigins.length > 0) {
+      res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
+    }
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Max-Age', '86400');
+    res.status(200).end();
+  });
+  
   // 회의 설정 API OPTIONS 요청 처리
   app.options('/api/meetings/:meetingId/config', (req, res) => {
     const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
@@ -6155,8 +6205,8 @@ app.use((error, req, res, next) => {
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key');
   res.header('Access-Control-Allow-Credentials', 'true');
   
-  // Multer 에러 특별 처리
-  if (error instanceof multer.MulterError) {
+  // Multer 에러 특별 처리 (multer가 정의된 경우에만)
+  if (multer && multer.MulterError && error instanceof multer.MulterError) {
     console.error('🚨 [Multer에러]', error.code, error.message);
     if (error.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({
