@@ -5098,6 +5098,30 @@ try {
   app.post('/api/meetings', meetingRoutes.createMeeting);
   app.put('/api/meetings/:meetingId', meetingRoutes.updateMeeting);
   app.delete('/api/meetings/:meetingId', meetingRoutes.deleteMeeting);
+  // 회의 설정 API OPTIONS 요청 처리
+  app.options('/api/meetings/:meetingId/config', (req, res) => {
+    const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
+    const defaultOrigins = [
+      'https://vipmobile.vercel.app',
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://localhost:4000'
+    ];
+    const allowedOrigins = [...corsOrigins, ...defaultOrigins];
+    const origin = req.headers.origin;
+    
+    if (origin && allowedOrigins.includes(origin)) {
+      res.header('Access-Control-Allow-Origin', origin);
+    } else if (allowedOrigins.length > 0) {
+      res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
+    }
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Max-Age', '86400'); // 24시간 캐시
+    res.status(200).end();
+  });
+  
   app.get('/api/meetings/:meetingId/config', meetingRoutes.getMeetingConfig);
   app.post('/api/meetings/:meetingId/config', meetingRoutes.saveMeetingConfig);
   app.post('/api/meetings/:meetingId/upload-image', meetingRoutes.upload.single('image'), meetingRoutes.uploadMeetingImage);

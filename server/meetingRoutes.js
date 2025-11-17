@@ -811,6 +811,8 @@ async function saveMeetingConfig(req, res) {
     res.json({ success: true });
   } catch (error) {
     console.error('회의 설정 저장 오류:', error);
+    // 에러 발생 시에도 CORS 헤더 설정
+    setCORSHeaders(req, res);
     res.status(500).json({ success: false, error: error.message });
   }
 }
