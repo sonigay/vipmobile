@@ -588,13 +588,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// CORS 설정 (더 구체적으로)
-app.use(cors({
-  origin: true, // 모든 origin 허용 (개발 환경)
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control']
-}));
 // 모든 요청 로깅 미들웨어
 app.use((req, res, next) => {
   const timestamp = new Date().toISOString();
@@ -6130,11 +6123,9 @@ app.post('/api/budget/calculate-usage', async (req, res) => {
   }
 });
 
-// 에러 핸들링 미들웨어 (CORS 헤더 포함)
+// Multer 에러 핸들링 미들웨어 (CORS 헤더 포함, multer 에러 특별 처리)
 app.use((error, req, res, next) => {
-  console.error('🚨 [서버에러]', error);
-  
-  // CORS 헤더 동적 설정
+  // CORS 헤더를 먼저 설정하여 에러 응답에도 포함
   const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
   const defaultOrigins = [
     'https://vipmobile.vercel.app',
@@ -6150,11 +6141,31 @@ app.use((error, req, res, next) => {
   } else if (allowedOrigins.length > 0) {
     res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
   }
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key');
   res.header('Access-Control-Allow-Credentials', 'true');
   
+  // Multer 에러 특별 처리
+  if (error instanceof multer.MulterError) {
+    console.error('🚨 [Multer에러]', error.code, error.message);
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({
+        success: false,
+        error: '파일 크기가 너무 큽니다. 최대 25MB까지 업로드 가능합니다.',
+        code: error.code
+      });
+    }
+    return res.status(400).json({
+      success: false,
+      error: `파일 업로드 오류: ${error.message}`,
+      code: error.code
+    });
+  }
+  
+  console.error('🚨 [서버에러]', error);
+  
   res.status(500).json({ 
+    success: false,
     error: '서버 내부 오류가 발생했습니다.',
     message: error.message,
     timestamp: new Date().toISOString()
