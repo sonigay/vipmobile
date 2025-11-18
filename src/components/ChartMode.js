@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { api, API_BASE_URL } from '../api';
+import { fetchWithRetry } from '../utils/fetchWithRetry';
 import {
   Box,
   AppBar,
@@ -2171,7 +2172,15 @@ function TotalClosingTab({ detailOptions, csDetailType: propCsDetailType, csDeta
         });
       }, 100);
 
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/closing-chart?date=${date}`);
+      const response = await fetchWithRetry(
+        `${process.env.REACT_APP_API_URL}/api/closing-chart?date=${date}`,
+        {
+          maxRetries: 3,
+          baseDelay: 1000,
+          maxDelay: 10000,
+          timeout: 30000,
+        }
+      );
       if (!response.ok) {
         throw new Error('데이터 로드에 실패했습니다.');
       }
@@ -2880,7 +2889,15 @@ function AgentClosingTab() {
         params.append('agent', agent);
       }
       
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/agent-closing-chart?${params}`);
+      const response = await fetchWithRetry(
+        `${process.env.REACT_APP_API_URL}/api/agent-closing-chart?${params}`,
+        {
+          maxRetries: 3,
+          baseDelay: 1000,
+          maxDelay: 10000,
+          timeout: 30000,
+        }
+      );
       if (!response.ok) {
         throw new Error('데이터 로드에 실패했습니다.');
       }
@@ -2901,10 +2918,20 @@ function AgentClosingTab() {
     setError(null);
 
     try {
-      // 영업사원 목록과 데이터를 병렬로 로드
+      // 영업사원 목록과 데이터를 병렬로 로드 (재시도 메커니즘 적용)
       const [agentsResponse, dataResponse] = await Promise.all([
-        fetch(`${process.env.REACT_APP_API_URL}/api/agent-closing-agents`),
-        fetch(`${process.env.REACT_APP_API_URL}/api/agent-closing-chart?${new URLSearchParams({ date, ...(agent && { agent }) })}`)
+        fetchWithRetry(`${process.env.REACT_APP_API_URL}/api/agent-closing-agents`, {
+          maxRetries: 3,
+          baseDelay: 1000,
+          maxDelay: 10000,
+          timeout: 30000,
+        }),
+        fetchWithRetry(`${process.env.REACT_APP_API_URL}/api/agent-closing-chart?${new URLSearchParams({ date, ...(agent && { agent }) })}`, {
+          maxRetries: 3,
+          baseDelay: 1000,
+          maxDelay: 10000,
+          timeout: 30000,
+        })
       ]);
 
       // 영업사원 목록 처리
@@ -5257,24 +5284,20 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
   const fetchData = async () => {
     try {
       console.log('🔍 [가입자증감] 데이터 조회 API 호출 시작');
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/subscriber-increase/data`, {
-        credentials: 'include'
-      });
+      
+      // fetchWithRetry를 사용하여 재시도 메커니즘 적용
+      const response = await fetchWithRetry(
+        `${process.env.REACT_APP_API_URL}/api/subscriber-increase/data`,
+        {
+          credentials: 'include',
+          maxRetries: 3,
+          baseDelay: 1000,
+          maxDelay: 10000,
+          timeout: 30000,
+        }
+      );
       
       console.log('🔍 [가입자증감] 데이터 조회 응답 상태:', response.status);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('🔍 [가입자증감] 데이터 조회 실패:', response.status, errorText);
-        
-        // Google Sheets API 할당량 초과 오류 감지
-        if (response.status === 500 && errorText.includes('Quota exceeded')) {
-          setError('Google Sheets API 할당량이 초과되었습니다. 잠시 후 다시 시도해주세요.');
-          return null;
-        }
-        
-        throw new Error(`데이터 조회 실패: ${response.status} ${errorText}`);
-      }
       
       const result = await response.json();
       console.log('🔍 [가입자증감] 데이터 조회 결과:', result);
@@ -5301,8 +5324,17 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
     } catch (error) {
       console.error('🔍 [가입자증감] 데이터 조회 오류:', error);
       
+      // Google Sheets API 할당량 초과 오류
+      if (error.isQuotaExceeded) {
+        setError('Google Sheets API 할당량이 초과되었습니다. 잠시 후 다시 시도해주세요.');
+        return null;
+      }
+      
       // 네트워크 오류나 CORS 오류 감지
-      if (error.message.includes('Failed to fetch') || error.message.includes('CORS')) {
+      if (error.isNetworkError || error.isTimeout || 
+          error.message.includes('Failed to fetch') || 
+          error.message.includes('CORS') ||
+          error.message.includes('네트워크')) {
         setError('서버에 연결할 수 없습니다. 네트워크 상태를 확인해주세요.');
       } else {
         setError('데이터를 불러올 수 없습니다.');

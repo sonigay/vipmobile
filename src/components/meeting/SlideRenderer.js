@@ -550,6 +550,44 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
         return;
       }
       
+      // 최종 확인: 에러 상태가 있는지 확인
+      const finalErrorText = containerRef.current?.textContent || '';
+      const hasFinalError = (finalErrorText.includes('오류') || 
+                             finalErrorText.includes('에러') || 
+                             finalErrorText.includes('실패') ||
+                             finalErrorText.includes('권한')) &&
+                            (finalErrorText.includes('없습니다') || 
+                             finalErrorText.includes('없음') || 
+                             finalErrorText.includes('접근') ||
+                             finalErrorText.includes('불러오지'));
+      
+      if (hasFinalError && !finalHasTableRows && !finalHasChartContent && !finalHasPaperContent) {
+        logger.warn('⚠️ [SlideRenderer] 에러 상태 감지, 재시도 대기', {
+          hasError: hasFinalError,
+          hasContent: hasAnyContent
+        });
+        
+        // 에러 상태일 때 3초 추가 대기 후 재확인 (API 재시도 시간 확보)
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        // 재확인
+        const retryErrorCheck = containerRef.current?.textContent || '';
+        const retryTableRows = containerRef.current?.querySelectorAll('table tbody tr, .MuiTableBody-root tr, tbody tr') || [];
+        const retryChartElements = containerRef.current?.querySelectorAll('[class*="Chart"], canvas, svg, [class*="chart"], [class*="recharts"]') || [];
+        const retryPaperElements = containerRef.current?.querySelectorAll('.MuiPaper-root, .MuiBox-root') || [];
+        const retryHasContent = (retryTableRows.length || 0) >= 3 || (retryChartElements.length || 0) > 0 || (retryPaperElements.length || 0) > 0;
+        
+        if (!retryHasContent) {
+          logger.warn('⚠️ [SlideRenderer] 에러 상태 지속, 하지만 진행 (API 재시도가 처리 중일 수 있음)');
+          // 그래도 진행 (컴포넌트 내부의 재시도 로직이 있을 수 있음)
+        }
+      }
+      
+      // 언마운트 체크
+      if (!isMountedRef.current) {
+        return;
+      }
+      
       logger.info('✅ [SlideRenderer] 안정화 완료, onReady 호출 준비');
       setLoading(false);
       setContentReady(true);
