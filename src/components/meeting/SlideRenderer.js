@@ -129,8 +129,35 @@ const getHeaderGradient = (s) => {
     if (!s) {
       return 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #868e96 100%)';
     }
-    const right = (s?.type === 'custom' && s?.backgroundColor) ? s.backgroundColor : '#868e96';
-    return `linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, ${right} 100%)`;
+    
+    // 커스텀 슬라이드는 배경색 선택값을 사용
+    if (s?.type === 'custom' && s?.backgroundColor) {
+      return `linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, ${s.backgroundColor} 100%)`;
+    }
+    
+    // mode-tab 타입 슬라이드: mode와 subTab에 따라 다른 색상 적용
+    if (s?.type === 'mode-tab' && s?.mode === 'chart') {
+      const tab = s.tab;
+      const subTab = s.subTab;
+      
+      // 지표장표 > 월간시상: 파란색 계열
+      if ((tab === 'indicatorChart' || subTab === 'monthlyAward')) {
+        return 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #1976d2 100%)'; // 파란색
+      }
+      
+      // 채권장표 > 가입자증감: 빨간색 계열
+      if ((tab === 'bondChart' || tab === 'bond') && subTab === 'subscriberIncrease') {
+        return 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #d32f2f 100%)'; // 빨간색
+      }
+      
+      // 채권장표 > 재초담초채권: 주황색 계열
+      if ((tab === 'bondChart' || tab === 'bond') && subTab === 'rechotanchoBond') {
+        return 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #f57c00 100%)'; // 주황색
+      }
+    }
+    
+    // 기본 색상 (회색 계열)
+    return 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #868e96 100%)';
   } catch (err) {
     // logger는 컴포넌트 외부에서 사용 불가하므로 console 사용
     if (process.env.NODE_ENV === 'development') {
@@ -637,12 +664,44 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
     console.log('🔍 [SlideRenderer] getHeaderGradientLocal useCallback 시작');
     getHeaderGradientLocal = useCallback((s) => {
       try {
-        console.log('🔍 [SlideRenderer] getHeaderGradientLocal 호출됨', { slideType: s?.type });
+        console.log('🔍 [SlideRenderer] getHeaderGradientLocal 호출됨', { 
+          slideType: s?.type, 
+          mode: s?.mode, 
+          tab: s?.tab, 
+          subTab: s?.subTab 
+        });
         if (!s) {
           return 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #868e96 100%)';
         }
-        const right = (s?.type === 'custom' && s?.backgroundColor) ? s.backgroundColor : '#868e96';
-        return `linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, ${right} 100%)`;
+        
+        // 커스텀 슬라이드는 배경색 선택값을 사용
+        if (s?.type === 'custom' && s?.backgroundColor) {
+          return `linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, ${s.backgroundColor} 100%)`;
+        }
+        
+        // mode-tab 타입 슬라이드: mode와 subTab에 따라 다른 색상 적용
+        if (s?.type === 'mode-tab' && s?.mode === 'chart') {
+          const tab = s.tab;
+          const subTab = s.subTab;
+          
+          // 지표장표 > 월간시상: 파란색 계열 (기존 색상 유지)
+          if ((tab === 'indicatorChart' || subTab === 'monthlyAward')) {
+            return 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #1976d2 100%)'; // 파란색
+          }
+          
+          // 채권장표 > 가입자증감: 빨간색 계열
+          if ((tab === 'bondChart' || tab === 'bond') && subTab === 'subscriberIncrease') {
+            return 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #d32f2f 100%)'; // 빨간색
+          }
+          
+          // 채권장표 > 재초담초채권: 주황색 계열
+          if ((tab === 'bondChart' || tab === 'bond') && subTab === 'rechotanchoBond') {
+            return 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #f57c00 100%)'; // 주황색
+          }
+        }
+        
+        // 기본 색상 (회색 계열)
+        return 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #868e96 100%)';
       } catch (err) {
         console.error('❌ [SlideRenderer] getHeaderGradientLocal 내부 에러:', err, err?.stack);
         return 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #868e96 100%)';
@@ -657,8 +716,38 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
     console.error('❌ [SlideRenderer] getHeaderGradientLocal 정의 중 에러:', err, err?.stack);
     // 폴백 함수
     getHeaderGradientLocal = (s) => {
-      const right = (s?.type === 'custom' && s?.backgroundColor) ? s.backgroundColor : '#868e96';
-      return `linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, ${right} 100%)`;
+      if (!s) {
+        return 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #868e96 100%)';
+      }
+      
+      // 커스텀 슬라이드는 배경색 선택값을 사용
+      if (s?.type === 'custom' && s?.backgroundColor) {
+        return `linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, ${s.backgroundColor} 100%)`;
+      }
+      
+      // mode-tab 타입 슬라이드: mode와 subTab에 따라 다른 색상 적용
+      if (s?.type === 'mode-tab' && s?.mode === 'chart') {
+        const tab = s.tab;
+        const subTab = s.subTab;
+        
+        // 지표장표 > 월간시상: 파란색 계열
+        if ((tab === 'indicatorChart' || subTab === 'monthlyAward')) {
+          return 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #1976d2 100%)';
+        }
+        
+        // 채권장표 > 가입자증감: 빨간색 계열
+        if ((tab === 'bondChart' || tab === 'bond') && subTab === 'subscriberIncrease') {
+          return 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #d32f2f 100%)';
+        }
+        
+        // 채권장표 > 재초담초채권: 주황색 계열
+        if ((tab === 'bondChart' || tab === 'bond') && subTab === 'rechotanchoBond') {
+          return 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #f57c00 100%)';
+        }
+      }
+      
+      // 기본 색상 (회색 계열)
+      return 'linear-gradient(90deg, #f8f9fa 0%, #e9ecef 35%, #868e96 100%)';
     };
   }
 
@@ -2167,18 +2256,23 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               justifyContent: 'space-between',
               px: { xs: 2.5, md: 4 },
               py: { xs: 1.6, md: 2 },
+              height: { xs: 56, md: 102 }, // 헤더 높이 명시적 설정 (1920px 대응: 68→102px, 1.5배)
+              minHeight: { xs: 56, md: 102 }, // 최소 높이 보장
+              maxHeight: { xs: 56, md: 102 }, // 최대 높이 제한 (로고가 커도 헤더 높이 유지)
+              overflow: 'hidden', // 넘치는 콘텐츠 숨김
               pointerEvents: 'none'
             }}
           >
             {/* 왼쪽: 로고와 회사 이름 */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexShrink: 0 }}>
               <Box
                 component="img"
                 src="/logo512.png"
                 alt="회사 로고"
                 sx={{
-                  width: { xs: 48, md: 90 }, // 1920px 대응: 60→90px, 1.5배
-                  height: { xs: 48, md: 90 }, // 1920px 대응: 60→90px, 1.5배
+                  width: { xs: 48, md: 60 }, // 1920px 대응: 로고 크기 조정 (90→60px, 헤더 높이에 맞춤)
+                  height: { xs: 48, md: 60 }, // 1920px 대응: 로고 크기 조정 (90→60px, 헤더 높이에 맞춤)
+                  flexShrink: 0, // 로고 크기 고정
                   filter: 'brightness(0) invert(0)'
                 }}
                 onError={(e) => {
@@ -2191,7 +2285,9 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                   fontSize: { xs: '1.25rem', md: '2.4rem' }, // 1920px 대응: 1.6rem→2.4rem, 1.5배
                   color: '#212529',
                   letterSpacing: '0.2px',
-                  fontFamily: '"Noto Sans KR","Roboto",sans-serif'
+                  fontFamily: '"Noto Sans KR","Roboto",sans-serif',
+                  whiteSpace: 'nowrap', // 텍스트 줄바꿈 방지
+                  flexShrink: 0 // 회사명 크기 고정
                 }}
               >
                 (주)브이아이피플러스
@@ -2204,7 +2300,13 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                 fontWeight: 800,
                 color: '#ffffff',
                 textShadow: '0 1px 2px rgba(0,0,0,0.15)',
-                letterSpacing: '0.2px'
+                letterSpacing: '0.2px',
+                whiteSpace: 'nowrap', // 텍스트 줄바꿈 방지
+                textAlign: 'right',
+                flexShrink: 1, // 공간이 부족하면 축소 가능
+                minWidth: 0, // flex 축소 허용
+                overflow: 'hidden',
+                textOverflow: 'ellipsis' // 넘치면 ... 표시
               }}
             >
               {getUnifiedTitle(slide, loggedInStore)}
@@ -2215,7 +2317,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
           {slide.createdBy && (
             <Box sx={{ 
               position: 'absolute',
-              top: { xs: 56, md: 68 }, // 헤더 높이만큼 아래
+              top: { xs: 56, md: 102 }, // 헤더 높이만큼 아래 (1920px 대응: 68→102px)
               right: { xs: 2.5, md: 4 },
               zIndex: 14,
               textAlign: 'right'

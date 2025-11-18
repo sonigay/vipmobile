@@ -343,7 +343,7 @@ export async function captureElement(element, options = {}) {
       Math.max(tocContentArea.scrollHeight, maxScrollHeight) : 
       Math.max(totalContentHeight, scrollHeight, element.scrollHeight);
     
-    // 계산된 높이와 고정 최소 높이 중 큰 값 사용
+    // 계산된 높이와 실제 콘텐츠 높이 중 큰 값 사용
     // 목차는 실제 콘텐츠가 매우 길 수 있으므로 실제 높이의 1.8배 + 여유공간
     // 1920px로 증가하면서 파일 크기 제한(25MB)을 고려하여 높이 계산 최적화
     const heightScale = widthScale < 1 ? (1 / widthScale) : 1;
@@ -352,9 +352,10 @@ export async function captureElement(element, options = {}) {
     
     // 1920px 기준 파일 크기 제한 고려: 최대 높이 7000px로 제한 (3840 × 7000 × 4 ≈ 107MB 압축 전 → 약 20-22MB 압축 후, 안전한 여유)
     const maxAllowedHeight = 7000; // 1920px 대응: 8000px → 7000px로 감소 (25MB 제한 안전하게 준수)
-    const minHeightFromContent = actualTocHeight + 1200; // 실제 높이 + 1200px (1500 → 1200, 파일 크기 절감)
+    const minHeightFromContent = actualTocHeight + 800; // 실제 높이 + 800px (1200 → 800, 불필요한 여백 최소화)
+    // 최소 높이 제한 제거: 실제 콘텐츠 크기에 맞춰 동적으로 높이 설정 (autoCrop이 불필요한 여백 제거)
     targetHeight = Math.min(
-      Math.max(calculatedHeight, minHeightFromContent, 5000), // 최소 5000px (6000 → 5000, 파일 크기 절감)
+      Math.max(calculatedHeight, minHeightFromContent), // 실제 콘텐츠 높이 기반으로 계산 (최소 높이 제한 제거)
       maxAllowedHeight // 최대 7000px로 제한
     );
     
@@ -407,7 +408,7 @@ export async function captureElement(element, options = {}) {
     
     const actualHeight = Math.max(...measuredHeights.filter(h => h > 0));
     
-    // 계산된 높이와 고정 최소 높이 중 큰 값 사용
+    // 계산된 높이와 실제 콘텐츠 높이 중 큰 값 사용
     // 고정 가로폭 적용 시 세로 재흐름을 고려한 높이 계산
     // 1920px 대응: 파일 크기 제한(25MB)을 고려하여 높이 계산 최적화
     const heightScale = widthScale < 1 ? (1 / widthScale) : 1;
@@ -416,9 +417,10 @@ export async function captureElement(element, options = {}) {
     
     // 1920px 기준 파일 크기 제한 고려: 최대 높이 8000px로 제한 (3840 × 8000 × 4 ≈ 122MB 압축 전 → 약 25MB 압축 후)
     const maxAllowedHeight = 8000; // 1920px 대응: 최대 높이 8000px로 제한 (25MB 제한 준수)
-    const minHeightFromContent = actualHeight + 1500; // 실제 높이 + 1500px (2000 → 1500)
+    const minHeightFromContent = actualHeight + 1000; // 실제 높이 + 1000px (1500 → 1000, 불필요한 여백 최소화)
+    // 최소 높이 제한 제거: 실제 콘텐츠 크기에 맞춰 동적으로 높이 설정 (autoCrop이 불필요한 여백 제거)
     targetHeight = Math.min(
-      Math.max(calculatedHeight, minHeightFromContent, 5000), // 최소 5000px (6000 → 5000, 1920px 대응으로 감소)
+      Math.max(calculatedHeight, minHeightFromContent), // 실제 콘텐츠 높이 기반으로 계산 (최소 높이 제한 제거)
       maxAllowedHeight // 최대 8000px로 제한
     );
     

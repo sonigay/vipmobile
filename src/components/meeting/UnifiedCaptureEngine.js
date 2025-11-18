@@ -869,6 +869,15 @@ function detectElements(slideElement, captureTargetElement, config) {
     // 헤더 탐지: preserveHeader가 true이거나 needsHeaderComposition/needsHeaderSizeAdjustment가 true일 때
     if (config?.preserveHeader || config?.needsHeaderComposition || config?.needsHeaderSizeAdjustment) {
       elements.headerElement = detectHeader(slideElement, { preserveHeader: true });
+      
+      if (process.env.NODE_ENV === 'development') {
+        if (elements.headerElement && SafeDOM.isInDOM(elements.headerElement)) {
+          const headerRect = SafeDOM.getBoundingRect(elements.headerElement);
+          console.log(`✅ [detectElements] 헤더 탐지 성공: ${headerRect.width}x${headerRect.height}px`);
+        } else {
+          console.warn(`⚠️ [detectElements] 헤더 탐지 실패: needsHeaderComposition=${config?.needsHeaderComposition}, preserveHeader=${config?.preserveHeader}`);
+        }
+      }
     }
 
     // 콘텐츠 요소는 captureTargetElement 사용
@@ -898,7 +907,7 @@ function detectElements(slideElement, captureTargetElement, config) {
  * 통합 캡처 파이프라인: 크기 조정
  * 개선: 복원 함수 안정성, 에러 처리
  */
-async function adjustSizes(elements, config) {
+async function adjustSizes(elements, config, slide) {
   const restoreFunctions = [];
 
   try {
@@ -940,12 +949,79 @@ async function adjustSizes(elements, config) {
     let sizeInfo = null;
     if (config?.needsHeightMeasurement && elements.contentElement && SafeDOM.isInDOM(elements.contentElement)) {
       try {
+        // 재초담초채권 슬라이드는 그래프와 테이블을 모두 포함해야 함
+        const isRechotanchoBond = slide?.mode === 'chart' &&
+          (slide?.tab === 'bondChart' || slide?.tab === 'bond') &&
+          slide?.subTab === 'rechotanchoBond';
+        
         sizeInfo = measureContentSize(elements.contentElement, {
-          preferTables: config.needsManagerTableInclusion || config.needsTableVerification,
+          preferTables: config.needsManagerTableInclusion || config.needsTableVerification || isRechotanchoBond, // 재초담초채권도 테이블 포함
           preferCharts: config.captureMethod === 'direct',
           excludeBorders: true,
           padding: 40,
         });
+
+        // 재초담초채권 슬라이드: 그래프 2개 + 테이블 1개 모두 포함하도록 높이 확장
+        if (isRechotanchoBond && elements.contentElement && SafeDOM.isInDOM(elements.contentElement)) {
+          try {
+            const rect = SafeDOM.getBoundingRect(elements.contentElement);
+            
+            // 모든 Paper 요소 찾기 (막대 그래프, 선 그래프, 테이블)
+            const papers = Array.from(elements.contentElement.querySelectorAll('.MuiPaper-root'));
+            let maxPaperBottom = sizeInfo.maxRelativeBottom || 0;
+            
+            for (const paper of papers) {
+              if (!SafeDOM.isInDOM(paper)) continue;
+              
+              const paperRect = SafeDOM.getBoundingRect(paper);
+              const relativeBottom = paperRect.bottom - rect.top;
+              
+              // Paper가 화면 내에 있고 높이가 100px 이상이면 포함 (버튼 등 작은 요소 제외)
+              if (relativeBottom > 0 && paperRect.height >= 100) {
+                maxPaperBottom = Math.max(maxPaperBottom, relativeBottom);
+                
+                if (process.env.NODE_ENV === 'development') {
+                  const paperText = (paper.textContent || '').substring(0, 50);
+                  console.log(`📏 [adjustSizes] 재초담초채권 Paper 발견: ${paperText}... (높이: ${paperRect.height}px, bottom: ${relativeBottom}px)`);
+                }
+              }
+            }
+            
+            // 테이블도 확인
+            const tables = Array.from(elements.contentElement.querySelectorAll('table, .MuiTable-root, .MuiTableContainer-root'));
+            for (const table of tables) {
+              if (!SafeDOM.isInDOM(table)) continue;
+              
+              const tableRect = SafeDOM.getBoundingRect(table);
+              const relativeBottom = tableRect.bottom - rect.top;
+              
+              if (relativeBottom > 0 && tableRect.height >= 50) {
+                maxPaperBottom = Math.max(maxPaperBottom, relativeBottom);
+                
+                if (process.env.NODE_ENV === 'development') {
+                  console.log(`📏 [adjustSizes] 재초담초채권 테이블 발견 (높이: ${tableRect.height}px, bottom: ${relativeBottom}px)`);
+                }
+              }
+            }
+            
+            // 높이 확장 (여유 공간 포함)
+            if (maxPaperBottom > (sizeInfo.maxRelativeBottom || 0)) {
+              sizeInfo.maxRelativeBottom = maxPaperBottom;
+              sizeInfo.measuredHeight = Math.max(
+                maxPaperBottom + 100, // 여유 공간 100px
+                sizeInfo.measuredHeight || 0
+              );
+              
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`📏 [adjustSizes] 재초담초채권 높이 확장: ${sizeInfo.measuredHeight}px (모든 그래프 및 테이블 포함)`);
+              }
+            }
+          } catch (error) {
+            if (process.env.NODE_ENV === 'development') {
+              console.warn('⚠️ [adjustSizes] 재초담초채권 높이 확장 실패:', error);
+            }
+          }
+        }
 
         // 담당자별 실적 테이블 포함 (전체총마감용)
         if (config?.needsManagerTableInclusion && elements.tables && elements.tables.length > 0) {
@@ -1098,7 +1174,7 @@ async function adjustSizes(elements, config) {
  * 통합 캡처 파이프라인: 캡처 실행
  * 개선: null 체크, 에러 처리, 복원 보장
  */
-async function executeCapture(elements, config, sizeInfo) {
+async function executeCapture(elements, config, sizeInfo, slide) {
   let blob = null;
   const styleRestores = [];
 
@@ -1235,7 +1311,25 @@ async function executeCapture(elements, config, sizeInfo) {
 
           // 테이블의 실제 전체 크기 측정 (마지막 행까지 포함)
           const tableRect = SafeDOM.getBoundingRect(actualTable);
+          const tableScrollWidth = actualTable.scrollWidth || tableRect.width;
+          const tableScrollHeight = actualTable.scrollHeight || tableRect.height;
+          
+          // 오른쪽 여백 제거: scrollWidth와 실제 너비 비교
           let actualTableWidth = tableRect.width;
+          const widthDiff = tableScrollWidth - tableRect.width;
+          
+          // scrollWidth가 실제 너비보다 크면 실제 콘텐츠 너비 사용 (오른쪽 여백 제거)
+          if (widthDiff > 50) {
+            // 실제 콘텐츠 너비 = scrollWidth (오른쪽 여백 제외)
+            actualTableWidth = tableScrollWidth;
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`📏 [executeCapture] 재고장표 오른쪽 여백 제거: ${tableRect.width}px → ${actualTableWidth}px (차이: ${widthDiff}px)`);
+            }
+          } else {
+            // 차이가 작으면 실제 너비 사용
+            actualTableWidth = tableRect.width;
+          }
+          
           let actualTableHeight = 0;
           
           const tbody = actualTable.querySelector('tbody');
@@ -1253,15 +1347,15 @@ async function executeCapture(elements, config, sizeInfo) {
               actualTableHeight = tableBottom - tableTop + 20; // 여유 공간 20px
               
               // scrollHeight도 확인하고 더 큰 값 사용
-              const scrollHeight = tableContainer.scrollHeight || 0;
+              const scrollHeight = tableContainer.scrollHeight || tableScrollHeight;
               if (scrollHeight > actualTableHeight) {
                 actualTableHeight = scrollHeight;
               }
             } else {
-              actualTableHeight = tableRect.height;
+              actualTableHeight = Math.max(tableRect.height, tableScrollHeight);
             }
           } else {
-            actualTableHeight = tableRect.height;
+            actualTableHeight = Math.max(tableRect.height, tableScrollHeight);
             const scrollHeight = tableContainer.scrollHeight || 0;
             if (scrollHeight > actualTableHeight) {
               actualTableHeight = scrollHeight;
@@ -1347,8 +1441,14 @@ async function executeCapture(elements, config, sizeInfo) {
             // 먼저 detectHeader로 찾은 헤더 사용
             if (elements.headerElement && SafeDOM.isInDOM(elements.headerElement)) {
               try {
+                const headerRect = SafeDOM.getBoundingRect(elements.headerElement);
+                if (process.env.NODE_ENV === 'development') {
+                  console.log(`🔍 [executeCapture] 재고장표 헤더 탐지 (detectHeader): ${headerRect.width}x${headerRect.height}px`);
+                }
+                
                 elements.headerElement.scrollIntoView({ block: 'start', behavior: 'instant' });
-                await new Promise(r => setTimeout(r, 200));
+                await new Promise(r => setTimeout(r, 300)); // 대기 시간 증가
+                
                 headerBlob = await captureElement(elements.headerElement, {
                   scale: SCALE,
                   useCORS: true,
@@ -1356,10 +1456,18 @@ async function executeCapture(elements, config, sizeInfo) {
                   backgroundColor: '#ffffff',
                   skipAutoCrop: true,
                 });
+                
+                if (headerBlob && process.env.NODE_ENV === 'development') {
+                  console.log(`✅ [executeCapture] 재고장표 헤더 캡처 성공 (detectHeader): ${(headerBlob.size / 1024).toFixed(2)}KB`);
+                }
               } catch (error) {
                 if (process.env.NODE_ENV === 'development') {
                   console.warn('⚠️ [executeCapture] 헤더 캡처 실패, 대체 방법 시도:', error);
                 }
+              }
+            } else {
+              if (process.env.NODE_ENV === 'development') {
+                console.warn('⚠️ [executeCapture] 재고장표 헤더 탐지 실패: elements.headerElement 없음');
               }
             }
             
@@ -1369,24 +1477,47 @@ async function executeCapture(elements, config, sizeInfo) {
                 const slideRect = SafeDOM.getBoundingRect(elements.slideElement);
                 const allElements = Array.from(elements.slideElement.querySelectorAll('*'));
                 
+                if (process.env.NODE_ENV === 'development') {
+                  console.log(`🔍 [executeCapture] 재고장표 헤더 대체 방법 시도: 전체 요소 ${allElements.length}개 검색`);
+                }
+                
                 // 재고장표 슬라이드 헤더 찾기: 회사명 포함, 상단 위치, 재고장표 텍스트 제외
-                const headerCandidate = allElements.find(el => {
+                const headerCandidates = allElements.filter(el => {
                   if (!SafeDOM.isInDOM(el)) return false;
                   const style = window.getComputedStyle(el);
                   const rect = SafeDOM.getBoundingRect(el);
                   const relativeTop = rect.top - slideRect.top;
                   const text = (el.textContent || '').trim();
                   
-                  return ((style.position === 'absolute' || style.position === 'fixed') || relativeTop < 150) &&
-                         (relativeTop >= -20 && relativeTop < 250) &&
-                         text.includes('(주)브이아이피플러스') &&
-                         !text.includes('재고장표') &&
-                         rect.height > 50 && rect.width > 200;
+                  const hasCompanyName = text.includes('(주)브이아이피플러스') || text.includes('브이아이피플러스');
+                  const isInTopArea = (style.position === 'absolute' || style.position === 'fixed') || (relativeTop >= -20 && relativeTop < 250);
+                  const hasValidSize = rect.height > 50 && rect.width > 200;
+                  const isNotTableContent = !text.includes('재고장표') && !text.includes('모델명') && !text.includes('총계');
+                  
+                  return hasCompanyName && isInTopArea && hasValidSize && isNotTableContent;
                 });
                 
+                if (process.env.NODE_ENV === 'development') {
+                  console.log(`🔍 [executeCapture] 재고장표 헤더 후보: ${headerCandidates.length}개 발견`);
+                  headerCandidates.forEach((candidate, idx) => {
+                    const rect = SafeDOM.getBoundingRect(candidate);
+                    const text = (candidate.textContent || '').substring(0, 50);
+                    console.log(`  후보 ${idx + 1}: ${text}... (${rect.width}x${rect.height}px)`);
+                  });
+                }
+                
+                // 첫 번째 후보 사용
+                const headerCandidate = headerCandidates[0] || null;
+                
                 if (headerCandidate) {
+                  const candidateRect = SafeDOM.getBoundingRect(headerCandidate);
+                  if (process.env.NODE_ENV === 'development') {
+                    console.log(`✅ [executeCapture] 재고장표 헤더 후보 선택: ${candidateRect.width}x${candidateRect.height}px`);
+                  }
+                  
                   headerCandidate.scrollIntoView({ block: 'start', behavior: 'instant' });
-                  await new Promise(r => setTimeout(r, 200));
+                  await new Promise(r => setTimeout(r, 300)); // 대기 시간 증가
+                  
                   headerBlob = await captureElement(headerCandidate, {
                     scale: SCALE,
                     useCORS: true,
@@ -1394,15 +1525,26 @@ async function executeCapture(elements, config, sizeInfo) {
                     backgroundColor: '#ffffff',
                     skipAutoCrop: true,
                   });
+                  
+                  if (headerBlob && process.env.NODE_ENV === 'development') {
+                    console.log(`✅ [executeCapture] 재고장표 헤더 찾음 (대체 방법): ${(headerBlob.size / 1024).toFixed(2)}KB`);
+                  }
+                } else {
                   if (process.env.NODE_ENV === 'development') {
-                    console.log('✅ [executeCapture] 재고장표 헤더 찾음 (대체 방법)');
+                    console.error('❌ [executeCapture] 재고장표 헤더를 찾을 수 없음: 모든 방법 실패');
+                    console.error('  - slideElement 위치:', slideRect);
+                    console.error('  - slideElement 자식 수:', elements.slideElement?.children?.length || 0);
                   }
                 }
               } catch (error) {
                 if (process.env.NODE_ENV === 'development') {
-                  console.warn('⚠️ [executeCapture] 대체 헤더 탐지 실패:', error);
+                  console.error('❌ [executeCapture] 대체 헤더 탐지 실패:', error);
                 }
               }
+            }
+          } else {
+            if (process.env.NODE_ENV === 'development') {
+              console.warn('⚠️ [executeCapture] 재고장표 헤더 합성 비활성화: needsHeaderComposition=false');
             }
           }
 
@@ -1424,12 +1566,21 @@ async function executeCapture(elements, config, sizeInfo) {
           if (headerBlob && tableBlob) {
             blob = await compositeHeaderAndContent(headerBlob, tableBlob);
             if (process.env.NODE_ENV === 'development') {
-              console.log('✅ [executeCapture] 재고장표 헤더+테이블 합성 완료');
+              const headerSize = (headerBlob.size / 1024).toFixed(2);
+              const tableSize = (tableBlob.size / 1024).toFixed(2);
+              const compositeSize = blob ? (blob.size / 1024).toFixed(2) : 'N/A';
+              console.log(`✅ [executeCapture] 재고장표 헤더+테이블 합성 완료: 헤더(${headerSize}KB) + 테이블(${tableSize}KB) = ${compositeSize}KB`);
             }
           } else {
             blob = tableBlob;
-            if (process.env.NODE_ENV === 'development' && !headerBlob) {
-              console.warn('⚠️ [executeCapture] 재고장표 헤더를 찾지 못해 테이블만 캡처');
+            if (process.env.NODE_ENV === 'development') {
+              if (!headerBlob) {
+                console.error('❌ [executeCapture] 재고장표 헤더를 찾지 못해 테이블만 캡처');
+                console.error('  - 헤더 탐지 방법: detectHeader 또는 대체 방법 모두 실패');
+                console.error('  - 테이블만 캡처: 헤더가 없는 이미지가 업로드됩니다');
+              } else if (!tableBlob) {
+                console.error('❌ [executeCapture] 재고장표 테이블을 찾지 못해 헤더만 캡처');
+              }
             }
           }
         } catch (error) {
@@ -1450,6 +1601,58 @@ async function executeCapture(elements, config, sizeInfo) {
         
         if (!captureElementForDirect || !SafeDOM.isInDOM(captureElementForDirect)) {
           throw new Error('유효하지 않은 캡처 요소입니다.');
+        }
+
+        // 재초담초채권 슬라이드: 모든 그래프와 테이블이 보이도록 스크롤 및 렌더링 확인
+        const isRechotanchoBond = slide?.mode === 'chart' &&
+          (slide?.tab === 'bondChart' || slide?.tab === 'bond') &&
+          slide?.subTab === 'rechotanchoBond';
+        
+        if (isRechotanchoBond && elements.contentElement && SafeDOM.isInDOM(elements.contentElement)) {
+          try {
+            // 모든 Paper 요소를 찾아 스크롤하여 강제 렌더링
+            const papers = Array.from(elements.contentElement.querySelectorAll('.MuiPaper-root'));
+            for (const paper of papers) {
+              if (!SafeDOM.isInDOM(paper)) continue;
+              const paperRect = SafeDOM.getBoundingRect(paper);
+              
+              // 큰 Paper 요소(그래프 또는 테이블)를 화면 중앙에 위치시켜 렌더링
+              if (paperRect.height >= 100) {
+                paper.scrollIntoView({ block: 'center', behavior: 'instant' });
+                await new Promise(r => setTimeout(r, 200));
+              }
+            }
+            
+            // 테이블도 확인
+            const tables = Array.from(elements.contentElement.querySelectorAll('table, .MuiTable-root'));
+            if (tables.length > 0) {
+              const lastTable = tables[tables.length - 1];
+              if (SafeDOM.isInDOM(lastTable)) {
+                lastTable.scrollIntoView({ block: 'end', behavior: 'instant' });
+                await new Promise(r => setTimeout(r, 300));
+              }
+            }
+            
+            // 최상단으로 다시 이동하여 전체가 보이도록
+            if (captureElementForDirect.scrollTo) {
+              captureElementForDirect.scrollTo({ top: 0, behavior: 'instant' });
+            } else {
+              captureElementForDirect.scrollTop = 0;
+            }
+            await new Promise(r => setTimeout(r, 300));
+            
+            // Chart.js 그래프 재렌더링
+            window.dispatchEvent(new Event('resize'));
+            await new Promise(r => setTimeout(r, 500));
+            
+            if (process.env.NODE_ENV === 'development') {
+              console.log('✅ [executeCapture] 재초담초채권 모든 요소 렌더링 완료');
+            }
+          } catch (error) {
+            if (process.env.NODE_ENV === 'development') {
+              console.warn('⚠️ [executeCapture] 재초담초채권 렌더링 준비 실패:', error);
+            }
+          }
         }
 
         if (sizeInfo) {
@@ -1602,11 +1805,11 @@ export async function captureSlide(slideElement, slide, captureTargetElement) {
       const elements = detectElements(slideElement, captureTargetElement, config);
 
       // 3. 크기 조정
-      const { sizeInfo, restoreFunctions: adjustRestores } = await adjustSizes(elements, config);
+      const { sizeInfo, restoreFunctions: adjustRestores } = await adjustSizes(elements, config, slide);
       restoreFunctions = adjustRestores || [];
 
       // 4. 캡처 실행
-      const blob = await executeCapture(elements, config, sizeInfo);
+      const blob = await executeCapture(elements, config, sizeInfo, slide);
 
       // 5. 파일 크기 검증 및 경고 강화
       const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
