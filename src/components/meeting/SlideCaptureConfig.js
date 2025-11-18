@@ -54,7 +54,6 @@ export const SLIDE_CAPTURE_CONFIG = {
   // 기본 슬라이드 (main, toc, ending)
   main: {
     needsScrollRemoval: true,           // 스크롤 제약 제거 필요
-    needsPinkBarRemoval: true,          // 핑크바 제거
     needsWidthAdjustment: true,         // 너비 조정 (1920px)
     needsHeightMeasurement: true,       // 높이 측정 (실제 콘텐츠)
     needsBoxResize: false,              // 박스 크기 조정 불필요
@@ -62,7 +61,6 @@ export const SLIDE_CAPTURE_CONFIG = {
     needsDataLoadingWait: false,        // 데이터 로딩 대기 불필요
     needsTableExpansion: false,         // 테이블 펼치기 불필요
     captureMethod: 'direct',            // 직접 캡처
-    defaultPadding: 0,                  // 기본 패딩 없음
     preserveHeader: false,              // 헤더 보존 불필요 (전체 캡처)
     needsHeaderComposition: false,      // 헤더 합성 불필요
     needsHeaderSizeAdjustment: false,   // 헤더 크기 조정 불필요
@@ -73,7 +71,6 @@ export const SLIDE_CAPTURE_CONFIG = {
   },
   toc: {
     needsScrollRemoval: true,
-    needsPinkBarRemoval: true,
     needsWidthAdjustment: true,
     needsHeightMeasurement: true,
     needsBoxResize: false,
@@ -81,7 +78,6 @@ export const SLIDE_CAPTURE_CONFIG = {
     needsDataLoadingWait: false,
     needsTableExpansion: false,
     captureMethod: 'direct',
-    defaultPadding: 0,
     preserveHeader: false,
     needsHeaderComposition: false,
     needsHeaderSizeAdjustment: false,
@@ -92,7 +88,6 @@ export const SLIDE_CAPTURE_CONFIG = {
   },
   ending: {
     needsScrollRemoval: true,
-    needsPinkBarRemoval: true,
     needsWidthAdjustment: true,
     needsHeightMeasurement: true,
     needsBoxResize: false,
@@ -100,7 +95,6 @@ export const SLIDE_CAPTURE_CONFIG = {
     needsDataLoadingWait: false,
     needsTableExpansion: false,
     captureMethod: 'direct',
-    defaultPadding: 0,
     preserveHeader: false,
     needsHeaderComposition: false,
     needsHeaderSizeAdjustment: false,
@@ -113,7 +107,6 @@ export const SLIDE_CAPTURE_CONFIG = {
   // 월간시상
   monthlyAward: {
     needsScrollRemoval: false,
-    needsPinkBarRemoval: true,
     needsWidthAdjustment: false,
     needsHeightMeasurement: true,
     needsBoxResize: false,
@@ -121,7 +114,6 @@ export const SLIDE_CAPTURE_CONFIG = {
     needsDataLoadingWait: true,         // 확대 버튼 클릭 후 대기
     needsTableExpansion: true,          // 확대 버튼 클릭
     captureMethod: 'commonAncestor',    // commonAncestor 찾아서 캡처
-    defaultPadding: 0,
     preserveHeader: false,              // 헤더 포함 캡처
     needsHeaderComposition: false,      // 헤더 합성 불필요
     needsHeaderSizeAdjustment: false,   // 헤더 크기 조정 불필요
@@ -135,7 +127,6 @@ export const SLIDE_CAPTURE_CONFIG = {
   // 전체총마감
   totalClosing: {
     needsScrollRemoval: false,
-    needsPinkBarRemoval: true,
     needsWidthAdjustment: false,
     needsHeightMeasurement: true,
     needsBoxResize: true,               // 박스 크기 조정 필요 (2번 반복)
@@ -143,7 +134,6 @@ export const SLIDE_CAPTURE_CONFIG = {
     needsDataLoadingWait: true,         // 데이터 로드 완료 대기
     needsTableExpansion: true,          // 모든 섹션 펼치기
     captureMethod: 'direct',
-    defaultPadding: 0,
     preserveHeader: true,               // 헤더 보존
     needsHeaderComposition: false,      // 헤더 합성 불필요 (직접 캡처에 포함)
     needsHeaderSizeAdjustment: true,    // 헤더 크기 조정 필요 (콘텐츠 너비에 맞춤)
@@ -156,7 +146,6 @@ export const SLIDE_CAPTURE_CONFIG = {
   // 가입자증감
   subscriberIncrease: {
     needsScrollRemoval: false,
-    needsPinkBarRemoval: true,
     needsWidthAdjustment: false,
     needsHeightMeasurement: true,
     needsBoxResize: true,               // 박스 크기 조정 필요
@@ -165,7 +154,6 @@ export const SLIDE_CAPTURE_CONFIG = {
     needsTableExpansion: false,
     needsTableScroll: true,             // 테이블 스크롤 처리
     captureMethod: 'direct',
-    defaultPadding: 0,
     preserveHeader: true,               // 헤더 보존
     needsHeaderComposition: false,      // 헤더 합성 불필요
     needsHeaderSizeAdjustment: true,    // 헤더 크기 조정 필요
@@ -179,7 +167,6 @@ export const SLIDE_CAPTURE_CONFIG = {
   // 재초담초채권
   rechotanchoBond: {
     needsScrollRemoval: false,
-    needsPinkBarRemoval: false,         // 기본 핑크바 유지
     needsWidthAdjustment: false,
     needsHeightMeasurement: true,
     needsBoxResize: true,               // 박스 크기 조정 필요
@@ -187,7 +174,6 @@ export const SLIDE_CAPTURE_CONFIG = {
     needsDataLoadingWait: false,
     needsTableExpansion: false,
     captureMethod: 'direct',
-    defaultPadding: 96,                 // 기본 패딩 유지
     preserveHeader: true,               // 헤더 보존
     needsHeaderComposition: false,      // 헤더 합성 불필요
     needsHeaderSizeAdjustment: true,    // 헤더 크기 조정 필요 (데이터입력 헤더)
@@ -200,7 +186,6 @@ export const SLIDE_CAPTURE_CONFIG = {
   // 재고장표
   inventoryChart: {
     needsScrollRemoval: false,
-    needsPinkBarRemoval: true,
     needsWidthAdjustment: false,
     needsHeightMeasurement: true,
     needsBoxResize: true,               // 테이블 박스 크기 조정
@@ -208,7 +193,6 @@ export const SLIDE_CAPTURE_CONFIG = {
     needsDataLoadingWait: true,         // 데이터 로드 완료 대기
     needsTableExpansion: true,          // 펼치기 버튼 클릭
     captureMethod: 'composite',         // 헤더 + 테이블 합성
-    defaultPadding: 0,
     preserveHeader: true,               // 헤더 보존
     needsHeaderComposition: true,       // 헤더 합성 필요
     needsHeaderSizeAdjustment: false,   // 헤더 크기 조정 불필요 (합성 방식)
@@ -222,7 +206,6 @@ export const SLIDE_CAPTURE_CONFIG = {
   // CS 개별 실적
   closingDetail: {
     needsScrollRemoval: false,
-    needsPinkBarRemoval: false,
     needsWidthAdjustment: false,
     needsHeightMeasurement: false,
     needsBoxResize: false,
@@ -230,7 +213,6 @@ export const SLIDE_CAPTURE_CONFIG = {
     needsDataLoadingWait: true,         // 데이터 로드 완료 대기
     needsTableExpansion: true,          // 특정 섹션만 펼치기
     captureMethod: 'direct',
-    defaultPadding: 96,
     preserveHeader: false,
     needsHeaderComposition: false,
     needsHeaderSizeAdjustment: false,
@@ -243,7 +225,6 @@ export const SLIDE_CAPTURE_CONFIG = {
   // 기본값
   default: {
     needsScrollRemoval: false,
-    needsPinkBarRemoval: false,
     needsWidthAdjustment: false,
     needsHeightMeasurement: false,
     needsBoxResize: false,
@@ -251,7 +232,6 @@ export const SLIDE_CAPTURE_CONFIG = {
     needsDataLoadingWait: false,
     needsTableExpansion: false,
     captureMethod: 'direct',
-    defaultPadding: 96,
     preserveHeader: false,
     needsHeaderComposition: false,
     needsHeaderSizeAdjustment: false,

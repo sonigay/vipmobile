@@ -866,8 +866,8 @@ function detectElements(slideElement, captureTargetElement, config) {
   };
 
   try {
-    // 헤더 탐지
-    if (config?.needsHeaderComposition || config?.needsHeaderSizeAdjustment) {
+    // 헤더 탐지: preserveHeader가 true이거나 needsHeaderComposition/needsHeaderSizeAdjustment가 true일 때
+    if (config?.preserveHeader || config?.needsHeaderComposition || config?.needsHeaderSizeAdjustment) {
       elements.headerElement = detectHeader(slideElement, { preserveHeader: true });
     }
 
@@ -973,6 +973,38 @@ async function adjustSizes(elements, config) {
           }
         }
 
+        // 헤더가 있고 preserveHeader가 true일 때: 높이와 너비에 헤더 포함
+        if (config?.preserveHeader && elements.headerElement && SafeDOM.isInDOM(elements.headerElement) && sizeInfo) {
+          try {
+            const headerRect = SafeDOM.getBoundingRect(elements.headerElement);
+            const contentRect = SafeDOM.getBoundingRect(elements.contentElement);
+            const slideRect = SafeDOM.getBoundingRect(elements.slideElement);
+            
+            // 헤더 높이 추가
+            const headerHeight = headerRect.height || 0;
+            if (headerHeight > 0) {
+              sizeInfo.measuredHeight = (sizeInfo.measuredHeight || 0) + headerHeight;
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`📏 [adjustSizes] 헤더 높이 포함: ${headerHeight}px (총 높이: ${sizeInfo.measuredHeight}px)`);
+              }
+            }
+            
+            // 헤더와 콘텐츠 중 더 큰 너비 사용
+            const headerWidth = headerRect.width || 0;
+            const contentWidth = sizeInfo.measuredWidth || contentRect.width || 0;
+            if (headerWidth > contentWidth) {
+              sizeInfo.measuredWidth = headerWidth;
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`📏 [adjustSizes] 헤더 너비 적용: ${headerWidth}px (콘텐츠: ${contentWidth}px)`);
+              }
+            }
+          } catch (error) {
+            if (process.env.NODE_ENV === 'development') {
+              console.warn('⚠️ [adjustSizes] 헤더 크기 포함 실패:', error);
+            }
+          }
+        }
+
         // 오른쪽 여백 제거
         if (config?.needsRightWhitespaceRemoval && sizeInfo) {
           try {
@@ -993,7 +1025,33 @@ async function adjustSizes(elements, config) {
         // 이미지 크기 제한
         if (sizeInfo) {
           sizeInfo.measuredWidth = Math.min(sizeInfo.measuredWidth || 0, MAX_WIDTH);
-          sizeInfo.measuredHeight = Math.min(sizeInfo.measuredHeight || 0, MAX_HEIGHT);
+          
+          // 1920px 대응: 모든 슬라이드 높이 제한 강화 (25MB 제한 준수)
+          // 3840px(너비) × 8000px(높이) × 4 bytes = 122MB 압축 전 → 약 25MB 압축 후
+          // 모든 슬라이드는 최대 8000px(실제) = 4000px(원본)로 제한
+          const slideId = elements.slideElement?.getAttribute('data-slide-id') || elements.contentElement?.getAttribute('data-slide-id') || '';
+          const isToc = slideId.includes('toc') || slideId.includes('TOC');
+          const isMain = slideId.includes('main') && !slideId.includes('toc');
+          const isEnding = slideId.includes('ending');
+          
+          // MAX_HEIGHT = 4000px (원본) = 8000px (실제 SCALE 2 적용)
+          // 모든 슬라이드에 동일한 높이 제한 적용 (25MB 제한 준수)
+          const maxAllowedHeight = MAX_HEIGHT; // 4000px (원본) = 8000px (실제)
+          
+          if (isToc || isMain || isEnding) {
+            // 메인/목차/엔딩 슬라이드: 최대 높이 제한 적용
+            sizeInfo.measuredHeight = Math.min(sizeInfo.measuredHeight || 0, maxAllowedHeight);
+            if (process.env.NODE_ENV === 'development') {
+              const slideType = isToc ? '목차' : (isMain ? '메인' : '엔딩');
+              console.log(`📏 [adjustSizes] ${slideType} 슬라이드 높이 제한: ${sizeInfo.measuredHeight}px (최대 ${maxAllowedHeight}px)`);
+            }
+          } else {
+            // 기타 슬라이드: 최대 높이 제한 적용
+            sizeInfo.measuredHeight = Math.min(sizeInfo.measuredHeight || 0, maxAllowedHeight);
+            if (process.env.NODE_ENV === 'development' && sizeInfo.measuredHeight >= maxAllowedHeight) {
+              console.warn(`⚠️ [adjustSizes] 기타 슬라이드 높이가 최대 제한에 도달: ${sizeInfo.measuredHeight}px`);
+            }
+          }
         }
 
         // 헤더 너비 조정
@@ -1101,84 +1159,256 @@ async function executeCapture(elements, config, sizeInfo) {
       case 'composite': {
         // 재고장표: 헤더 + 테이블 합성
         try {
-          const tableBox = elements.contentElement?.querySelector('.MuiPaper-root, .MuiCard-root, [class*="table"], [class*="Table"]');
-          const tableContainer = tableBox ? tableBox.querySelector('.MuiTableContainer-root, [class*="container"], [class*="Container"]') : null;
-          const actualTable = tableContainer ? tableContainer.querySelector('table, .MuiTable-root') : null;
+          // 테이블 컨테이너 찾기 (data-capture-exclude가 없는 것만)
+          let tableContainer = elements.contentElement?.querySelector('.MuiTableContainer-root');
+          
+          // data-capture-exclude가 있는 요소는 제외
+          if (tableContainer) {
+            let current = tableContainer;
+            while (current && current !== elements.slideElement) {
+              if (current.getAttribute('data-capture-exclude') === 'true') {
+                tableContainer = null;
+                break;
+              }
+              current = current.parentElement;
+            }
+          }
+          
+          // 테이블 컨테이너를 찾지 못한 경우, 직접 찾기
+          if (!tableContainer) {
+            const allContainers = Array.from(elements.contentElement?.querySelectorAll('.MuiTableContainer-root') || []);
+            tableContainer = allContainers.find(container => {
+              let current = container;
+              while (current && current !== elements.slideElement) {
+                if (current.getAttribute('data-capture-exclude') === 'true') {
+                  return false;
+                }
+                current = current.parentElement;
+              }
+              const text = container.textContent || '';
+              return text.includes('총계') || text.includes('모델명') || container.querySelector('table') !== null;
+            });
+          }
+          
+          if (!tableContainer || !SafeDOM.isInDOM(tableContainer)) {
+            throw new Error('테이블 컨테이너를 찾을 수 없습니다.');
+          }
 
-          if (!tableBox || !actualTable || !SafeDOM.isInDOM(tableBox) || !SafeDOM.isInDOM(actualTable)) {
+          const actualTable = tableContainer.querySelector('table, .MuiTable-root');
+          if (!actualTable || !SafeDOM.isInDOM(actualTable)) {
             throw new Error('테이블 요소를 찾을 수 없습니다.');
           }
 
-          // 테이블 박스 크기 조정
+          // 테이블 박스 컨테이너 찾기 (MuiPaper-root 또는 MuiCard-root)
+          const tableBox = tableContainer.closest('.MuiPaper-root, .MuiCard-root') || tableContainer.parentElement;
+          if (!tableBox || !SafeDOM.isInDOM(tableBox)) {
+            throw new Error('테이블 박스를 찾을 수 없습니다.');
+          }
+
+          // 스크롤 제거 및 높이 확장
+          const originalTableContainerStyles = {
+            height: tableContainer.style.height || '',
+            maxHeight: tableContainer.style.maxHeight || '',
+            width: tableContainer.style.width || '',
+            maxWidth: tableContainer.style.maxWidth || '',
+            overflow: tableContainer.style.overflow || ''
+          };
+          
+          tableContainer.style.maxHeight = 'none';
+          tableContainer.style.overflow = 'visible';
+          tableContainer.style.height = 'auto';
+          
+          // 스크롤을 최하단까지 이동하여 모든 데이터가 렌더링되도록 함
+          tableContainer.scrollTop = tableContainer.scrollHeight;
+          await new Promise(r => setTimeout(r, 300));
+          
+          // 다시 최상단으로 이동
+          tableContainer.scrollTop = 0;
+          await new Promise(r => setTimeout(r, 300));
+
+          // 테이블의 실제 전체 크기 측정 (마지막 행까지 포함)
           const tableRect = SafeDOM.getBoundingRect(actualTable);
-          const tableScrollWidth = actualTable.scrollWidth || tableRect.width;
-          const tableScrollHeight = actualTable.scrollHeight || tableRect.height;
+          let actualTableWidth = tableRect.width;
+          let actualTableHeight = 0;
+          
+          const tbody = actualTable.querySelector('tbody');
+          if (tbody) {
+            const allRows = tbody.querySelectorAll('tr');
+            if (allRows.length > 0) {
+              const firstRow = allRows[0];
+              const lastRow = allRows[allRows.length - 1];
+              const firstRowRect = SafeDOM.getBoundingRect(firstRow);
+              const lastRowRect = SafeDOM.getBoundingRect(lastRow);
+              
+              // 마지막 행까지의 실제 높이 계산
+              const tableTop = tableRect.top;
+              const tableBottom = lastRowRect.bottom;
+              actualTableHeight = tableBottom - tableTop + 20; // 여유 공간 20px
+              
+              // scrollHeight도 확인하고 더 큰 값 사용
+              const scrollHeight = tableContainer.scrollHeight || 0;
+              if (scrollHeight > actualTableHeight) {
+                actualTableHeight = scrollHeight;
+              }
+            } else {
+              actualTableHeight = tableRect.height;
+            }
+          } else {
+            actualTableHeight = tableRect.height;
+            const scrollHeight = tableContainer.scrollHeight || 0;
+            if (scrollHeight > actualTableHeight) {
+              actualTableHeight = scrollHeight;
+            }
+          }
 
+          // 테이블 박스 크기 조정 (패딩/보더 고려)
           const tableBoxStyle = window.getComputedStyle(tableBox);
-          const paddingLeft = parseInt(tableBoxStyle.paddingLeft || '0') || 0;
-          const paddingRight = parseInt(tableBoxStyle.paddingRight || '0') || 0;
-          const paddingTop = parseInt(tableBoxStyle.paddingTop || '0') || 0;
-          const paddingBottom = parseInt(tableBoxStyle.paddingBottom || '0') || 0;
+          const boxPaddingLeft = parseInt(tableBoxStyle.paddingLeft || '0') || 16;
+          const boxPaddingRight = parseInt(tableBoxStyle.paddingRight || '0') || 16;
+          const boxPaddingTop = parseInt(tableBoxStyle.paddingTop || '0') || 16;
+          const boxPaddingBottom = parseInt(tableBoxStyle.paddingBottom || '0') || 16;
+          const boxBorderLeft = parseInt(tableBoxStyle.borderLeftWidth || '0') || 1;
+          const boxBorderRight = parseInt(tableBoxStyle.borderRightWidth || '0') || 1;
+          const boxBorderTop = parseInt(tableBoxStyle.borderTopWidth || '0') || 1;
+          const boxBorderBottom = parseInt(tableBoxStyle.borderBottomWidth || '0') || 1;
+          
+          const adjustedBoxWidth = actualTableWidth + boxPaddingLeft + boxPaddingRight + boxBorderLeft + boxBorderRight + 20;
+          const adjustedBoxHeight = actualTableHeight + boxPaddingTop + boxPaddingBottom + boxBorderTop + boxBorderBottom + 20;
 
-          const adjustedWidth = tableScrollWidth + paddingLeft + paddingRight + 10;
-          const adjustedHeight = tableScrollHeight + paddingTop + paddingBottom + 10;
-
-          const originalTableBoxWidth = tableBox.style.width || '';
-          const originalTableBoxHeight = tableBox.style.height || '';
-          const originalTableBoxMaxWidth = tableBox.style.maxWidth || '';
-          const originalTableBoxMaxHeight = tableBox.style.maxHeight || '';
-          const originalMargin = tableBox.style.margin || '';
+          const originalTableBoxStyles = {
+            height: tableBox.style.height || '',
+            maxHeight: tableBox.style.maxHeight || '',
+            width: tableBox.style.width || '',
+            maxWidth: tableBox.style.maxWidth || '',
+            overflow: tableBox.style.overflow || '',
+            padding: tableBox.style.padding || '',
+            margin: tableBox.style.margin || ''
+          };
 
           styleRestores.push(() => {
             if (SafeDOM.isInDOM(tableBox)) {
-              SafeDOM.restoreStyle(tableBox, 'width', originalTableBoxWidth);
-              SafeDOM.restoreStyle(tableBox, 'height', originalTableBoxHeight);
-              SafeDOM.restoreStyle(tableBox, 'max-width', originalTableBoxMaxWidth);
-              SafeDOM.restoreStyle(tableBox, 'max-height', originalTableBoxMaxHeight);
-              SafeDOM.restoreStyle(tableBox, 'margin', originalMargin);
+              SafeDOM.restoreStyle(tableBox, 'height', originalTableBoxStyles.height);
+              SafeDOM.restoreStyle(tableBox, 'max-height', originalTableBoxStyles.maxHeight);
+              SafeDOM.restoreStyle(tableBox, 'width', originalTableBoxStyles.width);
+              SafeDOM.restoreStyle(tableBox, 'max-width', originalTableBoxStyles.maxWidth);
+              SafeDOM.restoreStyle(tableBox, 'overflow', originalTableBoxStyles.overflow);
+              SafeDOM.restoreStyle(tableBox, 'padding', originalTableBoxStyles.padding);
+              SafeDOM.restoreStyle(tableBox, 'margin', originalTableBoxStyles.margin);
+              tableBox.style.removeProperty('display');
+              tableBox.style.removeProperty('flex-direction');
+              tableBox.style.removeProperty('align-items');
+              tableBox.style.removeProperty('justify-content');
+            }
+            if (SafeDOM.isInDOM(tableContainer)) {
+              SafeDOM.restoreStyle(tableContainer, 'height', originalTableContainerStyles.height);
+              SafeDOM.restoreStyle(tableContainer, 'max-height', originalTableContainerStyles.maxHeight);
+              SafeDOM.restoreStyle(tableContainer, 'width', originalTableContainerStyles.width);
+              SafeDOM.restoreStyle(tableContainer, 'max-width', originalTableContainerStyles.maxWidth);
+              SafeDOM.restoreStyle(tableContainer, 'overflow', originalTableContainerStyles.overflow);
+              tableContainer.style.removeProperty('margin');
             }
           });
 
-          tableBox.style.width = `${adjustedWidth}px`;
-          tableBox.style.height = `${adjustedHeight}px`;
-          tableBox.style.maxWidth = `${adjustedWidth}px`;
-          tableBox.style.maxHeight = `${adjustedHeight}px`;
+          // 박스 크기를 실제 콘텐츠 크기로 설정
+          tableBox.style.width = `${adjustedBoxWidth}px`;
+          tableBox.style.maxWidth = `${adjustedBoxWidth}px`;
+          tableBox.style.height = `${adjustedBoxHeight}px`;
+          tableBox.style.maxHeight = `${adjustedBoxHeight}px`;
+          tableBox.style.overflow = 'visible';
+          
+          // 테이블 컨테이너도 콘텐츠에 맞춰 조정
+          tableContainer.style.width = `${actualTableWidth}px`;
+          tableContainer.style.maxWidth = `${actualTableWidth}px`;
+          tableContainer.style.height = `${actualTableHeight}px`;
+          tableContainer.style.maxHeight = `${actualTableHeight}px`;
+          tableContainer.style.overflow = 'visible';
+          tableContainer.style.margin = '0 auto';
 
           if (config?.needsTableCentering) {
             tableBox.style.margin = '0 auto';
+            tableBox.style.display = 'flex';
+            tableBox.style.flexDirection = 'column';
+            tableBox.style.alignItems = 'center';
+            tableBox.style.justifyContent = 'center';
           }
 
-          await new Promise(r => setTimeout(r, 300));
+          await new Promise(r => setTimeout(r, 500)); // 박스 크기 조정 후 렌더링 대기
 
-          // 헤더 캡처
+          // 헤더 캡처 (재고장표 슬라이드용 강화된 헤더 탐지)
           let headerBlob = null;
-          if (elements.headerElement && config?.needsHeaderComposition && SafeDOM.isInDOM(elements.headerElement)) {
-            try {
-              headerBlob = await captureElement(elements.headerElement, {
-                scale: SCALE,
-                useCORS: true,
-                fixedBottomPaddingPx: 0,
-                backgroundColor: '#ffffff',
-                skipAutoCrop: true,
-              });
-            } catch (error) {
-              if (process.env.NODE_ENV === 'development') {
-                console.warn('⚠️ [executeCapture] 헤더 캡처 실패:', error);
+          if (config?.needsHeaderComposition) {
+            // 먼저 detectHeader로 찾은 헤더 사용
+            if (elements.headerElement && SafeDOM.isInDOM(elements.headerElement)) {
+              try {
+                elements.headerElement.scrollIntoView({ block: 'start', behavior: 'instant' });
+                await new Promise(r => setTimeout(r, 200));
+                headerBlob = await captureElement(elements.headerElement, {
+                  scale: SCALE,
+                  useCORS: true,
+                  fixedBottomPaddingPx: 0,
+                  backgroundColor: '#ffffff',
+                  skipAutoCrop: true,
+                });
+              } catch (error) {
+                if (process.env.NODE_ENV === 'development') {
+                  console.warn('⚠️ [executeCapture] 헤더 캡처 실패, 대체 방법 시도:', error);
+                }
               }
-              // 헤더 캡처 실패해도 계속 진행
+            }
+            
+            // 헤더를 찾지 못한 경우 대체 방법 시도
+            if (!headerBlob) {
+              try {
+                const slideRect = SafeDOM.getBoundingRect(elements.slideElement);
+                const allElements = Array.from(elements.slideElement.querySelectorAll('*'));
+                
+                // 재고장표 슬라이드 헤더 찾기: 회사명 포함, 상단 위치, 재고장표 텍스트 제외
+                const headerCandidate = allElements.find(el => {
+                  if (!SafeDOM.isInDOM(el)) return false;
+                  const style = window.getComputedStyle(el);
+                  const rect = SafeDOM.getBoundingRect(el);
+                  const relativeTop = rect.top - slideRect.top;
+                  const text = (el.textContent || '').trim();
+                  
+                  return ((style.position === 'absolute' || style.position === 'fixed') || relativeTop < 150) &&
+                         (relativeTop >= -20 && relativeTop < 250) &&
+                         text.includes('(주)브이아이피플러스') &&
+                         !text.includes('재고장표') &&
+                         rect.height > 50 && rect.width > 200;
+                });
+                
+                if (headerCandidate) {
+                  headerCandidate.scrollIntoView({ block: 'start', behavior: 'instant' });
+                  await new Promise(r => setTimeout(r, 200));
+                  headerBlob = await captureElement(headerCandidate, {
+                    scale: SCALE,
+                    useCORS: true,
+                    fixedBottomPaddingPx: 0,
+                    backgroundColor: '#ffffff',
+                    skipAutoCrop: true,
+                  });
+                  if (process.env.NODE_ENV === 'development') {
+                    console.log('✅ [executeCapture] 재고장표 헤더 찾음 (대체 방법)');
+                  }
+                }
+              } catch (error) {
+                if (process.env.NODE_ENV === 'development') {
+                  console.warn('⚠️ [executeCapture] 대체 헤더 탐지 실패:', error);
+                }
+              }
             }
           }
 
-          // 테이블 캡처
-          const tableWidth = Math.min(adjustedWidth, MAX_WIDTH);
-          const tableHeight = Math.min(adjustedHeight, MAX_HEIGHT);
+          // 테이블 캡처 (정확한 크기로)
+          const tableWidth = Math.min(adjustedBoxWidth, MAX_WIDTH);
+          const tableHeight = Math.min(adjustedBoxHeight, MAX_HEIGHT);
 
           const tableBlob = await captureElement(tableBox, {
             scale: SCALE,
             useCORS: true,
             fixedBottomPaddingPx: 0,
             backgroundColor: '#ffffff',
-            skipAutoCrop: false,
+            skipAutoCrop: false, // autoCrop 활성화하여 불필요한 공간 제거
             width: tableWidth,
             height: tableHeight,
           });
@@ -1186,8 +1416,14 @@ async function executeCapture(elements, config, sizeInfo) {
           // 합성 또는 테이블만 반환
           if (headerBlob && tableBlob) {
             blob = await compositeHeaderAndContent(headerBlob, tableBlob);
+            if (process.env.NODE_ENV === 'development') {
+              console.log('✅ [executeCapture] 재고장표 헤더+테이블 합성 완료');
+            }
           } else {
             blob = tableBlob;
+            if (process.env.NODE_ENV === 'development' && !headerBlob) {
+              console.warn('⚠️ [executeCapture] 재고장표 헤더를 찾지 못해 테이블만 캡처');
+            }
           }
         } catch (error) {
           if (process.env.NODE_ENV === 'development') {
@@ -1200,32 +1436,36 @@ async function executeCapture(elements, config, sizeInfo) {
 
       case 'direct':
       default: {
-        // 직접 캡처
-        if (!elements.contentElement || !SafeDOM.isInDOM(elements.contentElement)) {
-          throw new Error('유효하지 않은 contentElement입니다.');
+        // 직접 캡처: preserveHeader가 true이고 헤더가 있으면 slideElement 전체 캡처, 아니면 contentElement만 캡처
+        const captureElementForDirect = (config?.preserveHeader && elements.headerElement && SafeDOM.isInDOM(elements.headerElement))
+          ? elements.slideElement // 헤더를 포함하려면 slideElement 전체 캡처
+          : elements.contentElement; // 헤더 없으면 contentElement만 캡처
+        
+        if (!captureElementForDirect || !SafeDOM.isInDOM(captureElementForDirect)) {
+          throw new Error('유효하지 않은 캡처 요소입니다.');
         }
 
         if (sizeInfo) {
-          const originalHeight = elements.contentElement.style.height || '';
-          const originalMaxHeight = elements.contentElement.style.maxHeight || '';
-          const originalWidth = elements.contentElement.style.width || '';
-          const originalMaxWidth = elements.contentElement.style.maxWidth || '';
+          const originalHeight = captureElementForDirect.style.height || '';
+          const originalMaxHeight = captureElementForDirect.style.maxHeight || '';
+          const originalWidth = captureElementForDirect.style.width || '';
+          const originalMaxWidth = captureElementForDirect.style.maxWidth || '';
 
           styleRestores.push(() => {
-            if (SafeDOM.isInDOM(elements.contentElement)) {
-              SafeDOM.restoreStyle(elements.contentElement, 'height', originalHeight);
-              SafeDOM.restoreStyle(elements.contentElement, 'max-height', originalMaxHeight);
-              SafeDOM.restoreStyle(elements.contentElement, 'width', originalWidth);
-              SafeDOM.restoreStyle(elements.contentElement, 'max-width', originalMaxWidth);
-              SafeDOM.restoreStyle(elements.contentElement, 'overflow', '');
+            if (SafeDOM.isInDOM(captureElementForDirect)) {
+              SafeDOM.restoreStyle(captureElementForDirect, 'height', originalHeight);
+              SafeDOM.restoreStyle(captureElementForDirect, 'max-height', originalMaxHeight);
+              SafeDOM.restoreStyle(captureElementForDirect, 'width', originalWidth);
+              SafeDOM.restoreStyle(captureElementForDirect, 'max-width', originalMaxWidth);
+              SafeDOM.restoreStyle(captureElementForDirect, 'overflow', '');
             }
           });
 
-          elements.contentElement.style.height = `${sizeInfo.measuredHeight || 0}px`;
-          elements.contentElement.style.maxHeight = `${sizeInfo.measuredHeight || 0}px`;
-          elements.contentElement.style.width = `${sizeInfo.measuredWidth || 0}px`;
-          elements.contentElement.style.maxWidth = `${sizeInfo.measuredWidth || 0}px`;
-          elements.contentElement.style.overflow = 'visible';
+          captureElementForDirect.style.height = `${sizeInfo.measuredHeight || 0}px`;
+          captureElementForDirect.style.maxHeight = `${sizeInfo.measuredHeight || 0}px`;
+          captureElementForDirect.style.width = `${sizeInfo.measuredWidth || 0}px`;
+          captureElementForDirect.style.maxWidth = `${sizeInfo.measuredWidth || 0}px`;
+          captureElementForDirect.style.overflow = 'visible';
 
           await new Promise(r => setTimeout(r, 300));
 
@@ -1233,23 +1473,27 @@ async function executeCapture(elements, config, sizeInfo) {
           const captureWidth = Math.min(sizeInfo.measuredWidth || 0, MAX_WIDTH);
           const captureHeight = Math.min(sizeInfo.measuredHeight || 0, MAX_HEIGHT);
 
-          blob = await captureElement(elements.contentElement, {
+          if (process.env.NODE_ENV === 'development' && config?.preserveHeader && elements.headerElement) {
+            console.log(`📸 [executeCapture] direct 캡처: 헤더 포함 slideElement 캡처 (${captureWidth}x${captureHeight})`);
+          }
+
+          blob = await captureElement(captureElementForDirect, {
             scale: SCALE,
             useCORS: true,
-            fixedBottomPaddingPx: config?.needsPinkBarRemoval ? 0 : (config?.defaultPadding || 40),
+            fixedBottomPaddingPx: 0, // 핑크바 제거
             backgroundColor: '#ffffff',
             scrollX: 0,
             scrollY: 0,
-            skipAutoCrop: !config?.needsPinkBarRemoval,
+            skipAutoCrop: false, // autoCrop 활성화 (불필요한 공백 제거)
             width: captureWidth,
             height: captureHeight,
           });
         } else {
           // 기본 캡처 (크기 측정 없이) - autoCrop으로 불필요한 공백 제거
-          blob = await captureElement(elements.contentElement, {
+          blob = await captureElement(captureElementForDirect, {
             scale: SCALE,
             useCORS: true,
-            fixedBottomPaddingPx: config?.defaultPadding || 40,
+            fixedBottomPaddingPx: 0, // 핑크바 제거
             backgroundColor: '#ffffff',
             scrollX: 0,
             scrollY: 0,
@@ -1357,7 +1601,24 @@ export async function captureSlide(slideElement, slide, captureTargetElement) {
       // 4. 캡처 실행
       const blob = await executeCapture(elements, config, sizeInfo);
 
-      // 5. 파일 크기 검증
+      // 5. 파일 크기 검증 및 경고 강화
+      const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
+      if (blob && blob.size > MAX_FILE_SIZE) {
+        const sizeMB = blob.size / (1024 * 1024);
+        if (process.env.NODE_ENV === 'development') {
+          console.error(`❌ [captureSlide] ${slideType} 슬라이드 파일 크기 초과: ${sizeMB.toFixed(2)}MB (25MB 제한)`);
+          console.error(`   - 실제 너비: ${MAX_WIDTH * SCALE}px, 높이: 최대 ${MAX_HEIGHT * SCALE}px`);
+          console.error(`   - 모든 슬라이드는 높이 제한(${MAX_HEIGHT * SCALE}px)을 확인하세요.`);
+        }
+        // 크기 초과 시에도 반환 (서버에서 처리하도록)
+      } else if (blob && blob.size > 20 * 1024 * 1024) {
+        // 20MB 이상이면 경고 (25MB 근접)
+        const sizeMB = blob.size / (1024 * 1024);
+        if (process.env.NODE_ENV === 'development') {
+          console.warn(`⚠️ [captureSlide] ${slideType} 슬라이드 파일 크기가 큼: ${sizeMB.toFixed(2)}MB (25MB 제한 근접)`);
+        }
+      }
+      
       return validateFileSize(blob, slideType);
     } catch (error) {
       // 에러 발생 시 복원 함수 실행 보장

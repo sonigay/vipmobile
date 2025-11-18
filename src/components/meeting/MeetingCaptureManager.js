@@ -2866,7 +2866,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               monthlyAwardCompositeBlob = await captureElement(commonAncestor, {
                 scale: 2,
                 useCORS: true,
-              fixedBottomPaddingPx: 0, // 핑크 바 제거
+              fixedBottomPaddingPx: 0, // 핑크바 제거
                 backgroundColor: '#ffffff',
                 scrollX: 0,
               scrollY: 0,
@@ -2904,7 +2904,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                   const blob = await captureElement(table, {
                     scale: 2,
                     useCORS: true,
-                  fixedBottomPaddingPx: 0, // 핑크 바 제거
+                  fixedBottomPaddingPx: 0, // 핑크바 제거
                     backgroundColor: '#ffffff',
                     scrollX: 0,
                   scrollY: 0,
@@ -3642,7 +3642,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             subscriberIncreaseCompositeBlob = await captureElement(commonAncestor, {
               scale: 2,
               useCORS: true,
-              fixedBottomPaddingPx: 0, // 핑크 바 제거
+              fixedBottomPaddingPx: 0, // 핑크바 제거
               backgroundColor: '#ffffff',
               scrollX: 0,
               scrollY: 0,
@@ -3935,7 +3935,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             tableBlob = await captureElement(tablePaper, {
               scale: 2,
               useCORS: true,
-              fixedBottomPaddingPx: 0, // 핑크 바 제거
+              fixedBottomPaddingPx: 0, // 핑크바 제거
               backgroundColor: '#ffffff',
               scrollX: 0, // 왼쪽 끝에서 캡처 (앞부분이 보이도록)
               scrollY: 0,
@@ -4121,7 +4121,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               const chart1Blob = await captureElement(subscriberChartPaper, {
                 scale: 2,
                 useCORS: true,
-              fixedBottomPaddingPx: 0, // 핑크 바 제거
+              fixedBottomPaddingPx: 0, // 핑크바 제거
                 backgroundColor: '#ffffff',
               scrollX: chart1ScrollX,
               scrollY: 0,
@@ -4185,7 +4185,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               const chart2Blob = await captureElement(feeChartPaper, {
                 scale: 2,
                 useCORS: true,
-              fixedBottomPaddingPx: 0, // 핑크 바 제거
+              fixedBottomPaddingPx: 0, // 핑크바 제거
                 backgroundColor: '#ffffff',
               scrollX: chart2ScrollX,
               scrollY: 0,
@@ -4299,7 +4299,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                 const headerBlob = await captureElement(headerElement, {
                   scale: 2,
                   useCORS: true,
-                  fixedBottomPaddingPx: 0, // 핑크 바 제거
+                  fixedBottomPaddingPx: 0, // 핑크바 제거
                   backgroundColor: 'transparent',
                   scrollX: 0,
                   scrollY: 0
@@ -4495,7 +4495,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
       const captureOptions = {
         scale: 2,
         useCORS: true,
-        fixedBottomPaddingPx: 96,
+        fixedBottomPaddingPx: 0, // 핑크바 제거
         backgroundColor: backgroundColor,
         // 스크롤 영역 전체 캡처
         scrollX: 0,
@@ -4553,7 +4553,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         captureOptions.windowWidth = targetWidth; // windowWidth도 1920px로 설정하여 너비에 맞춰짐
         captureOptions.windowHeight = targetHeight;
         captureOptions.skipAutoCrop = true; // 자동 크롭 건너뛰기
-        captureOptions.fixedBottomPaddingPx = 0; // 핑크색 바 제거
+        captureOptions.fixedBottomPaddingPx = 0; // 핑크바 제거
         
         // 너비 복원 함수에 추가
         if (restoreStylesFunction) {
@@ -5211,7 +5211,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
           captureOptions.width = measuredWidth * 2; // scale 고려 (실제 콘텐츠 너비 사용)
           captureOptions.height = measuredHeight * 2; // 측정된 높이 사용 (여백 제거)
           captureOptions.skipAutoCrop = true; // 크롭 로직 제거 (실제 높이로만 캡처)
-          captureOptions.fixedBottomPaddingPx = 0; // 핑크 바 제거
+          captureOptions.fixedBottomPaddingPx = 0; // 핑크바 제거
           
           if (process.env.NODE_ENV === 'development') {
             console.log(`📐 [MeetingCaptureManager] 재초담초채권: 실제 콘텐츠 크기 측정`, {
@@ -5246,7 +5246,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
           if (measuredHeight && measuredHeight > 0) {
             // 가입자증감 슬라이드와 동일한 방식으로 크롭 로직 활성화하여 불필요한 여백 제거
             captureOptions.skipAutoCrop = false; // 크롭 로직 활성화 (불필요한 여백 제거)
-            captureOptions.fixedBottomPaddingPx = 0; // 핑크 바 제거
+            captureOptions.fixedBottomPaddingPx = 0; // 핑크바 제거
             captureOptions.height = measuredHeight * 2; // scale 고려 (측정된 높이 사용)
             captureOptions.backgroundColor = '#ffffff'; // 배경색 명시
             
@@ -5326,8 +5326,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
 
       // 안전 장치: 메인/목차/엔딩 슬라이드가 아닌 경우에만 하단 여백 패딩 적용
       // (메인/목차/엔딩 슬라이드는 크롭 및 패딩 로직 제거)
-      // 월간 시상 슬라이드는 핑크 바 제거 및 크롭 로직 사용하므로 패딩 제거
-      // 가입자 증감 슬라이드는 핑크 바 제거하므로 패딩 제거
+      // 핑크바 제거: 모든 슬라이드에서 패딩 제거
       const isMonthlyAward = currentSlide?.mode === 'chart' && 
                              (currentSlide?.tab === 'indicatorChart' || currentSlide?.subTab === 'monthlyAward');
       const isSubscriberIncrease = currentSlide?.mode === 'chart' && 

@@ -6197,8 +6197,8 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
             </Box>
           )}
           
-          {/* 합계 테이블 */}
-          {(timeUnit === 'month' ? totalData : getYearlyData(selectedYearMonth).totalData) && (
+          {/* 합계 테이블 - presentationMode일 때는 렌더링 제외 */}
+          {!presentationMode && (timeUnit === 'month' ? totalData : getYearlyData(selectedYearMonth).totalData) && (
             <Card sx={{ mb: 3 }}>
               <CardContent>
                 <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', color: '#1976d2' }}>

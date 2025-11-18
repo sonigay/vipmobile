@@ -1002,7 +1002,7 @@ async function findOrCreateThread(post, meetingId) {
  * 상단 헤더와 작성자 정보는 유지하고, 하단의 공백만 제거/보정합니다.
  * @param {Buffer} imageBuffer - 원본 이미지 버퍼
  * @param {Object} options
- * @param {'white'|'pink'} options.bottomColor - 하단을 확장할 때 사용할 배경 색상 (기본: white)
+ * @param {'white'|'pink'} options.bottomColor - 하단을 확장할 때 사용할 배경 색상 (기본: white, 핑크바 제거로 인해 항상 white 사용)
  * @returns {Promise<{buffer: Buffer, originalWidth: number, originalHeight: number, croppedWidth: number, croppedHeight: number}>}
  */
 async function autoCropImage(imageBuffer, options = {}) {
@@ -1328,7 +1328,7 @@ async function uploadMeetingImage(req, res) {
       filename
     });
     
-    // 이미지 자동 크롭 처리 (메인/목차/엔딩 슬라이드는 핑크 바 제거)
+    // 이미지 자동 크롭 처리 (모든 슬라이드에서 핑크바 제거)
     console.log(`✂️ [uploadMeetingImage] 이미지 자동 크롭 시작`);
     
     // 슬라이드 타입 확인 (slideOrder 기반: 0=메인, 1=목차, 마지막=엔딩)
@@ -1382,18 +1382,16 @@ async function uploadMeetingImage(req, res) {
                                  (parsedSubTab === 'subscriberIncrease' || subTab === 'subscriberIncrease');
         }
         
-        // 메인/목차/엔딩/월간시상/가입자증감 슬라이드는 핑크 바 제거 (minBottomPadding: 0, bottomColor: white)
-        const cropOptions = (isMainTocEnding || isMonthlyAward || isSubscriberIncrease)
-          ? { minBottomPadding: 0, bottomColor: 'white' }
-          : { bottomColor: 'pink' };
+        // 핑크바 제거: 모든 슬라이드에서 핑크바 제거 (minBottomPadding: 0, bottomColor: white)
+        const cropOptions = { minBottomPadding: 0, bottomColor: 'white' };
       } catch (typeError) {
         console.warn('⚠️ [uploadMeetingImage] 슬라이드 타입 확인 실패, 기본값 사용:', typeError.message);
-        // 타입 확인 실패 시 기본값 (핑크 바 추가)
-        var cropOptions = { bottomColor: 'pink' };
+        // 타입 확인 실패 시 기본값 (핑크바 제거)
+        var cropOptions = { minBottomPadding: 0, bottomColor: 'white' };
       }
     } else {
-      // 임시 회의나 slideOrder가 없는 경우 기본값 (핑크 바 추가)
-      var cropOptions = { bottomColor: 'pink' };
+      // 임시 회의나 slideOrder가 없는 경우 기본값 (핑크바 제거)
+      var cropOptions = { minBottomPadding: 0, bottomColor: 'white' };
     }
     
     const croppedResult = await autoCropImage(req.file.buffer, cropOptions);

@@ -1,8 +1,5 @@
 import html2canvas from 'html2canvas';
 
-// 슬라이드 하단 여백 색상 (파스텔톤 핫핑크)
-const BOTTOM_PADDING_COLOR = '#FFB6C1';
-
 /**
  * Canvas에서 하단 공백을 자동으로 제거합니다.
  * 실제 콘텐츠 영역만 남기고 하얀 공백을 제거합니다.
@@ -347,11 +344,19 @@ export async function captureElement(element, options = {}) {
       Math.max(totalContentHeight, scrollHeight, element.scrollHeight);
     
     // 계산된 높이와 고정 최소 높이 중 큰 값 사용
-    // 목차는 실제 콘텐츠가 매우 길 수 있으므로 실제 높이의 3.0배 + 여유공간
+    // 목차는 실제 콘텐츠가 매우 길 수 있으므로 실제 높이의 2.0배 + 여유공간
+    // 1920px로 증가하면서 파일 크기 제한(25MB)을 고려하여 높이 계산 최적화
     const heightScale = widthScale < 1 ? (1 / widthScale) : 1;
-    const reflowMultiplier = 3.0; // 목차는 재흐름을 더 고려 (2.0 → 3.0)
-    const calculatedHeight = Math.ceil(actualTocHeight * heightScale * reflowMultiplier) + 2000; // 여유공간 2000px 추가 (1000 → 2000)
-    targetHeight = Math.max(calculatedHeight, actualTocHeight + 2500, 12000); // 최소 12000px 또는 실제 높이 + 2500px (8000 → 12000)
+    const reflowMultiplier = 2.0; // 목차 재흐름 배율 (3.0 → 2.0, 1920px 대응으로 감소)
+    const calculatedHeight = Math.ceil(actualTocHeight * heightScale * reflowMultiplier) + 1000; // 여유공간 1000px 추가 (2000 → 1000, 1920px 대응으로 감소)
+    
+    // 1920px 기준 파일 크기 제한 고려: 최대 높이 8000px로 제한 (3840 × 8000 × 4 ≈ 122MB 압축 전 → 약 25MB 압축 후)
+    const maxAllowedHeight = 8000; // 1920px 대응: 12000px → 8000px로 감소 (25MB 제한 준수)
+    const minHeightFromContent = actualTocHeight + 1500; // 실제 높이 + 1500px (2500 → 1500)
+    targetHeight = Math.min(
+      Math.max(calculatedHeight, minHeightFromContent, 6000), // 최소 6000px (12000 → 6000)
+      maxAllowedHeight // 최대 8000px로 제한
+    );
     
     if (process.env.NODE_ENV === 'development') {
       console.log(`📏 [screenCapture] 목차 슬라이드 높이 계산:`, {
@@ -404,10 +409,18 @@ export async function captureElement(element, options = {}) {
     
     // 계산된 높이와 고정 최소 높이 중 큰 값 사용
     // 고정 가로폭 적용 시 세로 재흐름을 고려한 높이 계산
+    // 1920px 대응: 파일 크기 제한(25MB)을 고려하여 높이 계산 최적화
     const heightScale = widthScale < 1 ? (1 / widthScale) : 1;
     const reflowMultiplier = 2.0; // 재흐름 고려 배율 (1.5 → 2.0)
-    const calculatedHeight = Math.ceil(actualHeight * heightScale * reflowMultiplier) + 1500; // 여유공간 1500px 추가 (800 → 1500)
-    targetHeight = Math.max(calculatedHeight, actualHeight + 2000, 6000); // 최소 6000px 또는 실제 높이 + 2000px (4000 → 6000, 1200 → 2000)
+    const calculatedHeight = Math.ceil(actualHeight * heightScale * reflowMultiplier) + 1000; // 여유공간 1000px 추가 (1500 → 1000, 1920px 대응으로 감소)
+    
+    // 1920px 기준 파일 크기 제한 고려: 최대 높이 8000px로 제한 (3840 × 8000 × 4 ≈ 122MB 압축 전 → 약 25MB 압축 후)
+    const maxAllowedHeight = 8000; // 1920px 대응: 최대 높이 8000px로 제한 (25MB 제한 준수)
+    const minHeightFromContent = actualHeight + 1500; // 실제 높이 + 1500px (2000 → 1500)
+    targetHeight = Math.min(
+      Math.max(calculatedHeight, minHeightFromContent, 5000), // 최소 5000px (6000 → 5000, 1920px 대응으로 감소)
+      maxAllowedHeight // 최대 8000px로 제한
+    );
     
     if (process.env.NODE_ENV === 'development') {
       console.log(`📏 [screenCapture] ${isMain ? '메인' : '엔딩'} 슬라이드 높이 계산:`, {
@@ -420,10 +433,22 @@ export async function captureElement(element, options = {}) {
       });
     }
   } else {
-    // 기타 슬라이드: 기존 로직 유지
+    // 기타 슬라이드: 기존 로직 유지하되 최대 높이 제한 추가
+    // 1920px 대응: 파일 크기 제한(25MB)을 고려하여 높이 계산 최적화
     const reflowBoost = widthScale < 1 ? (1 / widthScale) : 1;
     const minHeight = 1040;
-    targetHeight = Math.max(Math.ceil(scrollHeight * reflowBoost * 1.35), minHeight);
+    const calculatedHeight = Math.ceil(scrollHeight * reflowBoost * 1.35);
+    
+    // 1920px 기준 파일 크기 제한 고려: 최대 높이 8000px로 제한
+    const maxAllowedHeight = 8000; // 1920px 대응: 최대 높이 8000px로 제한 (25MB 제한 준수)
+    targetHeight = Math.min(
+      Math.max(calculatedHeight, minHeight),
+      maxAllowedHeight // 최대 8000px로 제한
+    );
+    
+    if (process.env.NODE_ENV === 'development' && targetHeight >= maxAllowedHeight) {
+      console.warn(`⚠️ [screenCapture] 기타 슬라이드 높이가 최대 제한에 도달: ${targetHeight}px (계산된 높이: ${calculatedHeight}px)`);
+    }
   }
 
       // 메인/목차/엔딩 슬라이드의 경우: skipAutoCrop이 true이면 타일 캡처 로직 건너뛰기
@@ -842,28 +867,25 @@ export async function captureElement(element, options = {}) {
         finalCanvas = await autoCropCanvas(canvas);
       }
       
-      // 고정 하단 여백 추가(요청된 경우): 크롭 결과 캔버스 높이를 늘리고 아래를 핫핑크로 채움
-      if (fixedBottomPaddingPx > 0) {
-        const padded = document.createElement('canvas');
-        padded.width = finalCanvas.width;
-        padded.height = finalCanvas.height + fixedBottomPaddingPx;
-        const pctx = padded.getContext('2d');
-        
-        // 먼저 원본 이미지를 그려서 콘텐츠를 보존 (핑크색 위에 그리지 않음)
-        pctx.drawImage(finalCanvas, 0, 0);
-        
-        // 그 다음 하단에만 핫핑크 색상으로 패딩 추가 (콘텐츠 아래에만)
-        pctx.fillStyle = BOTTOM_PADDING_COLOR;
-        pctx.fillRect(0, finalCanvas.height, padded.width, fixedBottomPaddingPx);
-        
-        finalCanvas = padded;
-        
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`🎨 [screenCapture] 하단 핑크 패딩 추가: ${fixedBottomPaddingPx}px (콘텐츠 높이: ${finalCanvas.height - fixedBottomPaddingPx}px)`);
-        }
-      }
+      // 핑크바 제거: fixedBottomPaddingPx 옵션은 하위 호환성을 위해 유지하지만 무시됨
       
       // Canvas를 Blob으로 변환
+      // 1920px 대응: 큰 이미지는 압축 품질을 낮춰서 파일 크기 제한(25MB) 준수
+      const isToc = slideId.includes('toc');
+      const isMain = slideId.includes('main') && !slideId.includes('toc');
+      const isEnding = slideId.includes('ending');
+      const isLargeSlide = isToc || isMain || isEnding; // 메인/목차/엔딩은 큰 슬라이드
+      
+      // 큰 슬라이드나 높이가 큰 슬라이드는 압축 품질을 낮춤
+      const SCALE = 2; // html2canvas scale 파라미터 (픽셀 밀도 배율)
+      const estimatedHeight = finalCanvas.height / SCALE; // 원본 높이 추정
+      const isVeryTall = estimatedHeight > 6000; // 6000px 이상이면 매우 긴 슬라이드
+      const quality = (isLargeSlide || isVeryTall) ? 0.90 : 0.95; // 큰 슬라이드는 90% 품질 (파일 크기 절감)
+      
+      if (process.env.NODE_ENV === 'development' && quality === 0.90) {
+        console.log(`📦 [screenCapture] 압축 품질 90% 적용: ${isLargeSlide ? '큰 슬라이드' : '긴 슬라이드'} (높이: ${estimatedHeight.toFixed(0)}px)`);
+      }
+      
       const blob = await new Promise((resolve, reject) => {
         finalCanvas.toBlob(
           (blob) => {
@@ -874,7 +896,7 @@ export async function captureElement(element, options = {}) {
             }
           },
           'image/png',
-          0.95 // 품질 (0.95 = 95%, 파일 크기와 품질의 균형)
+          quality // 품질 (0.90-0.95, 큰 슬라이드는 0.90으로 파일 크기 절감)
         );
       });
       
