@@ -5381,22 +5381,27 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
       formData.append('slideOrder', index + 1);
 
       // 재시도 로직이 포함된 업로드 함수 (지수 백오프 적용, CORS 에러 처리 개선)
-      const uploadWithRetry = async (retries = 3, baseDelay = 1000) => {
+      const uploadWithRetry = async (retries = 5, baseDelay = 2000) => {
         let lastError = null;
         
-        // 전체총마감 슬라이드는 이미지가 크므로 타임아웃을 더 길게 설정
+        // 전체총마감/목차 슬라이드는 이미지가 크므로 타임아웃을 더 길게 설정
         const isTotalClosing = currentSlide?.mode === 'chart' && 
                                currentSlide?.tab === 'closingChart' && 
                                currentSlide?.subTab === 'totalClosing';
-        const uploadTimeout = isTotalClosing ? 120000 : 30000; // 전체총마감: 120초, 기타: 30초
+        const isToc = currentSlide?.type === 'toc';
+        const uploadTimeout = isTotalClosing ? 120000 : (isToc ? 60000 : 45000); // 전체총마감: 120초, 목차: 60초, 기타: 45초
         
-        if (process.env.NODE_ENV === 'development' && isTotalClosing) {
-          console.log(`⏱️ [MeetingCaptureManager] 전체총마감 슬라이드: 업로드 타임아웃 ${uploadTimeout / 1000}초로 설정`);
+        if (process.env.NODE_ENV === 'development') {
+          if (isTotalClosing) {
+            console.log(`⏱️ [MeetingCaptureManager] 전체총마감 슬라이드: 업로드 타임아웃 ${uploadTimeout / 1000}초로 설정`);
+          } else if (isToc) {
+            console.log(`⏱️ [MeetingCaptureManager] 목차 슬라이드: 업로드 타임아웃 ${uploadTimeout / 1000}초로 설정`);
+          }
         }
         
         for (let attempt = 1; attempt <= retries; attempt++) {
           try {
-            // 타임아웃 설정 (전체총마감 슬라이드는 더 긴 타임아웃)
+            // 타임아웃 설정
             const abortController = new AbortController();
             const timeoutId = setTimeout(() => abortController.abort(), uploadTimeout);
             
@@ -5410,16 +5415,31 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               signal: abortController.signal
             }).catch((fetchError) => {
               clearTimeout(timeoutId);
-              // 네트워크 에러를 명시적으로 처리
+              
+              // 타임아웃 에러
               if (fetchError.name === 'AbortError' || fetchError.name === 'TimeoutError') {
                 const timeoutError = new Error('요청 시간이 초과되었습니다.');
                 timeoutError.status = 504;
                 timeoutError.isNetworkError = true;
+                timeoutError.isTimeout = true;
                 throw timeoutError;
               }
-              const networkError = new Error(`네트워크 오류: ${fetchError.message}`);
+              
+              // ERR_FAILED, CORS 에러 등 네트워크 에러 처리
+              const errorMessage = (fetchError.message || '').toLowerCase();
+              const isCorsError = errorMessage.includes('cors') || 
+                                 errorMessage.includes('access-control-allow-origin') ||
+                                 fetchError.name === 'TypeError';
+              const isNetworkError = errorMessage.includes('failed to fetch') ||
+                                    errorMessage.includes('network') ||
+                                    errorMessage.includes('err_failed') ||
+                                    errorMessage.includes('net::err');
+              
+              const networkError = new Error(`네트워크 오류: ${fetchError.message || '알 수 없는 네트워크 오류'}`);
               networkError.isNetworkError = true;
+              networkError.isCorsError = isCorsError;
               networkError.originalError = fetchError;
+              networkError.name = fetchError.name || 'NetworkError';
               throw networkError;
             });
             
@@ -5429,6 +5449,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             if (!uploadResponse || uploadResponse.type === 'opaque' || uploadResponse.type === 'opaqueredirect') {
               const corsError = new Error('CORS 정책으로 인해 요청이 차단되었습니다.');
               corsError.isNetworkError = true;
+              corsError.isCorsError = true;
               throw corsError;
             }
 
@@ -5438,6 +5459,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                 const serverError = new Error(`서버 오류 (HTTP ${uploadResponse.status})`);
                 serverError.status = uploadResponse.status;
                 serverError.isNetworkError = false;
+                serverError.isRetryable = true;
                 throw serverError;
               }
               
@@ -5452,42 +5474,61 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
           } catch (error) {
             lastError = error;
             
-            // 네트워크 에러 또는 CORS 에러인지 확인
+            // 네트워크 에러 또는 CORS 에러인지 확인 (강화된 감지)
+            const errorMessage = (error.message || '').toLowerCase();
+            const errorName = (error.name || '').toLowerCase();
             const isNetworkError = error.isNetworkError || 
-                                   error.message.includes('fetch') || 
-                                   error.message.includes('network') || 
-                                   error.message.includes('Failed to fetch') ||
-                                   error.message.includes('CORS') ||
-                                   error.message.includes('시간이 초과') ||
-                                   (!error.status && error.name !== 'AbortError');
+                                   errorMessage.includes('fetch') || 
+                                   errorMessage.includes('network') || 
+                                   errorMessage.includes('failed to fetch') ||
+                                   errorMessage.includes('err_failed') ||
+                                   errorMessage.includes('net::err') ||
+                                   errorMessage.includes('cors') ||
+                                   errorMessage.includes('access-control-allow-origin') ||
+                                   errorMessage.includes('시간이 초과') ||
+                                   error.isTimeout ||
+                                   error.isCorsError ||
+                                   (!error.status && errorName !== 'aborterror' && errorName !== 'timeouterror');
             
-            // 재시도 가능한 에러인지 확인 (502, 503, 504 또는 네트워크 에러)
+            // 재시도 가능한 에러인지 확인 (502, 503, 504, 500 또는 네트워크/CORS 에러)
             const isRetryableError = isNetworkError || 
-                                     (error.status && [502, 503, 504].includes(error.status));
+                                     error.isRetryable ||
+                                     (error.status && [500, 502, 503, 504].includes(error.status));
             
             if (attempt === retries || !isRetryableError) {
               // 마지막 시도 실패 시 상세한 에러 메시지
-              if (isNetworkError || error.message.includes('CORS')) {
+              if (error.isCorsError || errorMessage.includes('cors') || errorMessage.includes('access-control-allow-origin')) {
+                throw new Error(`CORS 오류로 이미지 업로드에 실패했습니다. (${attempt}회 시도) 서버 연결을 확인해주세요.`);
+              } else if (isNetworkError || errorMessage.includes('network') || errorMessage.includes('err_failed')) {
                 throw new Error(`네트워크 연결 오류로 이미지 업로드에 실패했습니다. (${attempt}회 시도) 인터넷 연결을 확인해주세요.`);
               } else if (error.status === 413) {
                 throw new Error(`이미지 파일이 너무 큽니다. 파일 크기를 줄여주세요.`);
               } else if (error.status === 502) {
-                throw new Error(`서버 게이트웨이 오류가 발생했습니다. 잠시 후 다시 시도해주세요.`);
+                throw new Error(`서버 게이트웨이 오류가 발생했습니다. (${attempt}회 시도) 잠시 후 다시 시도해주세요.`);
               } else if (error.status === 503) {
-                throw new Error(`서버가 일시적으로 사용할 수 없습니다. 잠시 후 다시 시도해주세요.`);
+                throw new Error(`서버가 일시적으로 사용할 수 없습니다. (${attempt}회 시도) 잠시 후 다시 시도해주세요.`);
               } else if (error.status === 504) {
-                throw new Error(`서버 응답 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.`);
+                throw new Error(`서버 응답 시간이 초과되었습니다. (${attempt}회 시도) 잠시 후 다시 시도해주세요.`);
               } else if (error.status === 500) {
-                throw new Error(`서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.`);
+                throw new Error(`서버 오류가 발생했습니다. (${attempt}회 시도) 잠시 후 다시 시도해주세요.`);
               } else {
                 throw new Error(`이미지 업로드 실패 (${attempt}회 시도): ${error.message}`);
               }
             }
             
-            // 지수 백오프: delay * 2^(attempt-1)
-            const delay = baseDelay * Math.pow(2, attempt - 1);
+            // 지수 백오프 + Jitter: delay * 2^(attempt-1) + 랜덤 지터 (0-30%)
+            const baseRetryDelay = baseDelay * Math.pow(2, attempt - 1);
+            const jitter = Math.random() * 0.3 * baseRetryDelay; // 0-30% 지터
+            const delay = Math.min(baseRetryDelay + jitter, 30000); // 최대 30초
+            
             if (process.env.NODE_ENV === 'development') {
-              console.warn(`⚠️ [MeetingCaptureManager] 슬라이드 ${index + 1} 업로드 재시도 ${attempt}/${retries} (${delay}ms 대기):`, error.message);
+              console.warn(`⚠️ [MeetingCaptureManager] 슬라이드 ${index + 1} 업로드 재시도 ${attempt}/${retries} (${Math.round(delay)}ms 대기):`, {
+                error: error.message,
+                status: error.status,
+                isNetworkError,
+                isCorsError: error.isCorsError,
+                errorName: error.name
+              });
             }
             await new Promise(resolve => setTimeout(resolve, delay));
           }

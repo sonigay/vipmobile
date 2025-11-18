@@ -344,18 +344,18 @@ export async function captureElement(element, options = {}) {
       Math.max(totalContentHeight, scrollHeight, element.scrollHeight);
     
     // 계산된 높이와 고정 최소 높이 중 큰 값 사용
-    // 목차는 실제 콘텐츠가 매우 길 수 있으므로 실제 높이의 2.0배 + 여유공간
+    // 목차는 실제 콘텐츠가 매우 길 수 있으므로 실제 높이의 1.8배 + 여유공간
     // 1920px로 증가하면서 파일 크기 제한(25MB)을 고려하여 높이 계산 최적화
     const heightScale = widthScale < 1 ? (1 / widthScale) : 1;
-    const reflowMultiplier = 2.0; // 목차 재흐름 배율 (3.0 → 2.0, 1920px 대응으로 감소)
-    const calculatedHeight = Math.ceil(actualTocHeight * heightScale * reflowMultiplier) + 1000; // 여유공간 1000px 추가 (2000 → 1000, 1920px 대응으로 감소)
+    const reflowMultiplier = 1.8; // 목차 재흐름 배율 (2.0 → 1.8, 25MB 제한을 위해 더 감소)
+    const calculatedHeight = Math.ceil(actualTocHeight * heightScale * reflowMultiplier) + 800; // 여유공간 800px 추가 (1000 → 800, 파일 크기 절감)
     
-    // 1920px 기준 파일 크기 제한 고려: 최대 높이 8000px로 제한 (3840 × 8000 × 4 ≈ 122MB 압축 전 → 약 25MB 압축 후)
-    const maxAllowedHeight = 8000; // 1920px 대응: 12000px → 8000px로 감소 (25MB 제한 준수)
-    const minHeightFromContent = actualTocHeight + 1500; // 실제 높이 + 1500px (2500 → 1500)
+    // 1920px 기준 파일 크기 제한 고려: 최대 높이 7000px로 제한 (3840 × 7000 × 4 ≈ 107MB 압축 전 → 약 20-22MB 압축 후, 안전한 여유)
+    const maxAllowedHeight = 7000; // 1920px 대응: 8000px → 7000px로 감소 (25MB 제한 안전하게 준수)
+    const minHeightFromContent = actualTocHeight + 1200; // 실제 높이 + 1200px (1500 → 1200, 파일 크기 절감)
     targetHeight = Math.min(
-      Math.max(calculatedHeight, minHeightFromContent, 6000), // 최소 6000px (12000 → 6000)
-      maxAllowedHeight // 최대 8000px로 제한
+      Math.max(calculatedHeight, minHeightFromContent, 5000), // 최소 5000px (6000 → 5000, 파일 크기 절감)
+      maxAllowedHeight // 최대 7000px로 제한
     );
     
     if (process.env.NODE_ENV === 'development') {
@@ -880,10 +880,15 @@ export async function captureElement(element, options = {}) {
       const SCALE = 2; // html2canvas scale 파라미터 (픽셀 밀도 배율)
       const estimatedHeight = finalCanvas.height / SCALE; // 원본 높이 추정
       const isVeryTall = estimatedHeight > 6000; // 6000px 이상이면 매우 긴 슬라이드
-      const quality = (isLargeSlide || isVeryTall) ? 0.90 : 0.95; // 큰 슬라이드는 90% 품질 (파일 크기 절감)
+      // 목차 슬라이드는 파일 크기가 크므로 더 낮은 품질 사용 (0.85)
+      const quality = isToc ? 0.85 : ((isLargeSlide || isVeryTall) ? 0.90 : 0.95); // 목차: 85%, 큰 슬라이드: 90%, 기타: 95%
       
-      if (process.env.NODE_ENV === 'development' && quality === 0.90) {
-        console.log(`📦 [screenCapture] 압축 품질 90% 적용: ${isLargeSlide ? '큰 슬라이드' : '긴 슬라이드'} (높이: ${estimatedHeight.toFixed(0)}px)`);
+      if (process.env.NODE_ENV === 'development') {
+        if (quality === 0.85) {
+          console.log(`📦 [screenCapture] 압축 품질 85% 적용: 목차 슬라이드 (높이: ${estimatedHeight.toFixed(0)}px, 파일 크기 최적화)`);
+        } else if (quality === 0.90) {
+          console.log(`📦 [screenCapture] 압축 품질 90% 적용: ${isLargeSlide ? '큰 슬라이드' : '긴 슬라이드'} (높이: ${estimatedHeight.toFixed(0)}px)`);
+        }
       }
       
       const blob = await new Promise((resolve, reject) => {

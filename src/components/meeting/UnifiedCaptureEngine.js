@@ -1035,15 +1035,22 @@ async function adjustSizes(elements, config) {
           const isEnding = slideId.includes('ending');
           
           // MAX_HEIGHT = 4000px (원본) = 8000px (실제 SCALE 2 적용)
-          // 모든 슬라이드에 동일한 높이 제한 적용 (25MB 제한 준수)
-          const maxAllowedHeight = MAX_HEIGHT; // 4000px (원본) = 8000px (실제)
+          // 목차 슬라이드는 파일 크기 제한을 위해 더 보수적인 높이 제한 적용
+          let maxAllowedHeight = MAX_HEIGHT; // 4000px (원본) = 8000px (실제)
           
-          if (isToc || isMain || isEnding) {
-            // 메인/목차/엔딩 슬라이드: 최대 높이 제한 적용
+          if (isToc) {
+            // 목차 슬라이드: 최대 높이 7000px (실제) = 3500px (원본)로 제한 (25MB 제한 안전하게 준수)
+            maxAllowedHeight = 3500; // 4000px → 3500px (원본) = 7000px (실제)
             sizeInfo.measuredHeight = Math.min(sizeInfo.measuredHeight || 0, maxAllowedHeight);
             if (process.env.NODE_ENV === 'development') {
-              const slideType = isToc ? '목차' : (isMain ? '메인' : '엔딩');
-              console.log(`📏 [adjustSizes] ${slideType} 슬라이드 높이 제한: ${sizeInfo.measuredHeight}px (최대 ${maxAllowedHeight}px)`);
+              console.log(`📏 [adjustSizes] 목차 슬라이드 높이 제한: ${sizeInfo.measuredHeight}px (최대 ${maxAllowedHeight * SCALE}px 실제)`);
+            }
+          } else if (isMain || isEnding) {
+            // 메인/엔딩 슬라이드: 최대 높이 제한 적용
+            sizeInfo.measuredHeight = Math.min(sizeInfo.measuredHeight || 0, maxAllowedHeight);
+            if (process.env.NODE_ENV === 'development') {
+              const slideType = isMain ? '메인' : '엔딩';
+              console.log(`📏 [adjustSizes] ${slideType} 슬라이드 높이 제한: ${sizeInfo.measuredHeight}px (최대 ${maxAllowedHeight * SCALE}px 실제)`);
             }
           } else {
             // 기타 슬라이드: 최대 높이 제한 적용
