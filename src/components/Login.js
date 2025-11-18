@@ -55,13 +55,24 @@ function Login({ onLogin }) {
     collectDeviceInfo();
   }, []);
 
-  // IP 정보 수집
+  // IP 정보 수집 (에러 발생 시 조용히 처리, 로그인 프로세스에 영향 없음)
   useEffect(() => {
-
     const fetchIPInfo = async () => {
       try {
-        const response = await axios.get('https://ipapi.co/json/');
+        // 타임아웃 설정 (10초)
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('IP 정보 요청 시간 초과')), 10000)
+        );
+        
+        // IP 정보 요청 (타임아웃과 경쟁)
+        const ipRequest = axios.get('https://ipapi.co/json/', {
+          timeout: 10000, // 10초 타임아웃
+          validateStatus: (status) => status >= 200 && status < 300 // 2xx만 성공으로 처리
+        });
+        
+        const response = await Promise.race([ipRequest, timeoutPromise]);
         const data = response.data;
+        
         setIpInfo({
           ip: data.ip,
           city: data.city,
@@ -92,7 +103,18 @@ function Login({ onLogin }) {
           setUserConsent(true); // 이미 동의한 상태로 설정
         }
       } catch (error) {
-        console.error('IP 정보 가져오기 실패:', error);
+        // IP 정보는 선택적 기능이므로 에러를 조용히 처리
+        // 개발 환경에서만 로그 출력
+        if (process.env.NODE_ENV === 'development') {
+          const errorType = error.message?.includes('CORS') || error.code === 'ERR_NETWORK' 
+            ? 'CORS/네트워크 에러' 
+            : error.message?.includes('시간 초과') || error.name === 'TimeoutError'
+            ? '타임아웃'
+            : '기타 에러';
+          console.warn(`⚠️ [Login] IP 정보 가져오기 실패 (무시됨, 로그인 진행 가능): ${errorType}`, error.message);
+        }
+        
+        // 기본값 설정 (에러가 발생해도 로그인 가능)
         setIpInfo({ ip: '알 수 없음', location: '알 수 없음' });
         
         // API 실패 시 저장된 동의 여부 확인
