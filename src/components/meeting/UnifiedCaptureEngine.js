@@ -424,8 +424,12 @@ async function adjustHeaderWidth(headerElement, contentWidth, slideElement) {
       justifyContent: headerElement.style.justifyContent || '',
     };
 
-    // 헤더가 콘텐츠보다 작으면 콘텐츠 크기에 맞춤
-    if (headerRect.width < contentWidth) {
+    // 헤더와 콘텐츠 너비 차이 확인 (헤더가 작거나 클 때 모두 조정)
+    const widthDiff = Math.abs(headerRect.width - contentWidth);
+    const tolerance = 5; // 5px 이하 차이는 무시 (렌더링 오차 허용)
+    
+    // 헤더와 콘텐츠 너비가 다르면 콘텐츠 크기에 맞춤 (헤더/콘텐츠 비율 개선)
+    if (widthDiff > tolerance) {
       headerElement.style.width = `${contentWidth}px`;
       headerElement.style.maxWidth = `${contentWidth}px`;
       headerElement.style.minWidth = `${contentWidth}px`;
@@ -471,6 +475,11 @@ async function adjustHeaderWidth(headerElement, contentWidth, slideElement) {
       });
 
       await new Promise(r => setTimeout(r, 200));
+
+      if (process.env.NODE_ENV === 'development') {
+        const adjustmentType = headerRect.width < contentWidth ? '확장' : '축소';
+        console.log(`📐 [adjustHeaderWidth] 헤더 너비 ${adjustmentType}: ${headerRect.width.toFixed(0)}px → ${contentWidth.toFixed(0)}px (차이: ${widthDiff.toFixed(0)}px)`);
+      }
 
       // 복원 함수 반환 (안전하게 실행 보장)
       return () => {
@@ -759,9 +768,9 @@ async function compositeHeaderAndContent(headerBlob, contentBlob) {
     }
 
     const canvas = document.createElement('canvas');
-    const gap = 0;
+    const gap = -2; // 헤더와 콘텐츠 사이 여백 제거 (음수로 오버랩하여 불필요한 여백 제거)
     canvas.width = finalWidth;
-    canvas.height = finalHeight;
+    canvas.height = finalHeight + gap; // gap이 음수이므로 높이에서 차감
     
     const ctx = canvas.getContext('2d');
     if (!ctx) {
@@ -775,9 +784,10 @@ async function compositeHeaderAndContent(headerBlob, contentBlob) {
     const headerX = (canvas.width - headerImg.width) / 2;
     ctx.drawImage(headerImg, headerX, 0);
 
-    // 콘텐츠 중앙 정렬
+    // 콘텐츠 중앙 정렬 (헤더 바로 아래, 여백 없이)
     const contentX = (canvas.width - contentImg.width) / 2;
-    ctx.drawImage(contentImg, contentX, headerImg.height + gap);
+    const contentY = Math.max(0, headerImg.height + gap); // gap이 음수이므로 오버랩 방지
+    ctx.drawImage(contentImg, contentX, contentY);
 
     const blob = await new Promise((resolve, reject) => {
       canvas.toBlob(
@@ -1069,7 +1079,7 @@ async function adjustSizes(elements, config, slide) {
           padding: 40,
         });
 
-        // 재초담초채권 슬라이드: 그래프 2개 + 테이블 1개 모두 포함하도록 높이 확장
+        // 재초담초채권 슬라이드: 그래프 2개 + 테이블 1개 모두 포함하도록 높이/너비 확장
         if (isRechotanchoBond && elements.contentElement && SafeDOM.isInDOM(elements.contentElement)) {
           try {
             const rect = SafeDOM.getBoundingRect(elements.contentElement);
@@ -1077,12 +1087,14 @@ async function adjustSizes(elements, config, slide) {
             // 모든 Paper 요소 찾기 (막대 그래프, 선 그래프, 테이블)
             const papers = Array.from(elements.contentElement.querySelectorAll('.MuiPaper-root'));
             let maxPaperBottom = sizeInfo.maxRelativeBottom || 0;
+            let maxPaperRight = sizeInfo.maxRelativeRight || 0;
             
             for (const paper of papers) {
               if (!SafeDOM.isInDOM(paper)) continue;
               
               const paperRect = SafeDOM.getBoundingRect(paper);
               const relativeBottom = paperRect.bottom - rect.top;
+              const relativeRight = paperRect.right - rect.left;
               
               // Paper가 화면 내에 있고 높이가 100px 이상이면 포함 (버튼 등 작은 요소 제외)
               if (relativeBottom > 0 && paperRect.height >= 100) {
@@ -1093,15 +1105,58 @@ async function adjustSizes(elements, config, slide) {
                   console.log(`📏 [adjustSizes] 재초담초채권 Paper 발견: ${paperText}... (높이: ${paperRect.height}px, bottom: ${relativeBottom}px)`);
                 }
               }
+              
+              // Paper 너비도 측정 (scrollWidth 포함하여 실제 콘텐츠 너비 확인)
+              if (relativeRight > 0 && paperRect.width >= 100) {
+                // scrollWidth 확인 (스크롤 가능한 경우 실제 콘텐츠 너비가 더 클 수 있음)
+                const paperScrollWidth = paper.scrollWidth || paperRect.width;
+                const paperContainer = paper.closest('.MuiContainer-root, .MuiBox-root');
+                let containerScrollWidth = 0;
+                if (paperContainer && SafeDOM.isInDOM(paperContainer)) {
+                  containerScrollWidth = paperContainer.scrollWidth || 0;
+                }
+                
+                // 실제 콘텐츠 너비 = max(paperRect.right, scrollWidth, containerScrollWidth)
+                const actualPaperWidth = Math.max(
+                  relativeRight,
+                  (paperRect.left - rect.left) + paperScrollWidth,
+                  containerScrollWidth > 0 ? (paperRect.left - rect.left) + containerScrollWidth : 0
+                );
+                
+                maxPaperRight = Math.max(maxPaperRight, actualPaperWidth);
+                
+                if (process.env.NODE_ENV === 'development') {
+                  console.log(`📏 [adjustSizes] 재초담초채권 Paper 너비: ${paperRect.width}px, scrollWidth: ${paperScrollWidth}px, 실제: ${actualPaperWidth.toFixed(0)}px`);
+                }
+              }
             }
             
-            // 테이블도 확인
+            // 내부 그래프(canvas/svg)도 확인 (Paper 내부에 있을 수 있음)
+            const charts = Array.from(elements.contentElement.querySelectorAll('canvas, svg, [class*="recharts"], [class*="Chart"]'));
+            for (const chart of charts) {
+              if (!SafeDOM.isInDOM(chart)) continue;
+              
+              const chartRect = SafeDOM.getBoundingRect(chart);
+              const relativeRight = chartRect.right - rect.left;
+              
+              // 그래프가 실제로 렌더링된 경우 (너비 100px 이상)
+              if (relativeRight > 0 && chartRect.width >= 100) {
+                maxPaperRight = Math.max(maxPaperRight, relativeRight);
+                
+                if (process.env.NODE_ENV === 'development') {
+                  console.log(`📏 [adjustSizes] 재초담초채권 그래프 너비: ${chartRect.width}px, right: ${relativeRight}px`);
+                }
+              }
+            }
+            
+            // 테이블도 확인 (높이 + 너비)
             const tables = Array.from(elements.contentElement.querySelectorAll('table, .MuiTable-root, .MuiTableContainer-root'));
             for (const table of tables) {
               if (!SafeDOM.isInDOM(table)) continue;
               
               const tableRect = SafeDOM.getBoundingRect(table);
               const relativeBottom = tableRect.bottom - rect.top;
+              const relativeRight = tableRect.right - rect.left;
               
               if (relativeBottom > 0 && tableRect.height >= 50) {
                 maxPaperBottom = Math.max(maxPaperBottom, relativeBottom);
@@ -1110,23 +1165,59 @@ async function adjustSizes(elements, config, slide) {
                   console.log(`📏 [adjustSizes] 재초담초채권 테이블 발견 (높이: ${tableRect.height}px, bottom: ${relativeBottom}px)`);
                 }
               }
+              
+              // 테이블 너비도 확인 (scrollWidth 포함)
+              if (relativeRight > 0 && tableRect.width >= 100) {
+                const tableScrollWidth = table.scrollWidth || tableRect.width;
+                const tableContainer = table.closest('.MuiTableContainer-root');
+                let containerScrollWidth = 0;
+                if (tableContainer && SafeDOM.isInDOM(tableContainer)) {
+                  containerScrollWidth = tableContainer.scrollWidth || 0;
+                }
+                
+                const actualTableWidth = Math.max(
+                  relativeRight,
+                  (tableRect.left - rect.left) + Math.max(tableScrollWidth, containerScrollWidth)
+                );
+                
+                maxPaperRight = Math.max(maxPaperRight, actualTableWidth);
+                
+                if (process.env.NODE_ENV === 'development') {
+                  console.log(`📏 [adjustSizes] 재초담초채권 테이블 너비: ${tableRect.width}px, scrollWidth: ${Math.max(tableScrollWidth, containerScrollWidth)}px, 실제: ${actualTableWidth.toFixed(0)}px`);
+                }
+              }
             }
             
             // 높이 확장 (여유 공간 포함)
             if (maxPaperBottom > (sizeInfo.maxRelativeBottom || 0)) {
               sizeInfo.maxRelativeBottom = maxPaperBottom;
               sizeInfo.measuredHeight = Math.max(
-                maxPaperBottom + 100, // 여유 공간 100px
+                maxPaperBottom + 150, // 여유 공간 증가 (100px → 150px, 콘텐츠 잘림 방지)
                 sizeInfo.measuredHeight || 0
               );
               
               if (process.env.NODE_ENV === 'development') {
-                console.log(`📏 [adjustSizes] 재초담초채권 높이 확장: ${sizeInfo.measuredHeight}px (모든 그래프 및 테이블 포함)`);
+                console.log(`📏 [adjustSizes] 재초담초채권 높이 확장: ${sizeInfo.measuredHeight}px (모든 그래프 및 테이블 포함, 여유공간: 150px)`);
+              }
+            }
+            
+            // 너비 확장 (실제 콘텐츠 너비 보장, 헤더보다 작게 측정되는 문제 해결)
+            if (maxPaperRight > (sizeInfo.maxRelativeRight || 0)) {
+              const previousWidth = sizeInfo.measuredWidth || 0;
+              sizeInfo.maxRelativeRight = maxPaperRight;
+              sizeInfo.measuredWidth = Math.max(
+                maxPaperRight + 40, // 패딩 포함
+                previousWidth,
+                sizeInfo.scrollWidth || 0 // scrollWidth도 고려
+              );
+              
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`📏 [adjustSizes] 재초담초채권 너비 확장: ${previousWidth.toFixed(0)}px → ${sizeInfo.measuredWidth}px (실제 콘텐츠 너비: ${maxPaperRight.toFixed(0)}px + 40px 패딩, 모든 그래프/테이블 포함)`);
               }
             }
           } catch (error) {
             if (process.env.NODE_ENV === 'development') {
-              console.warn('⚠️ [adjustSizes] 재초담초채권 높이 확장 실패:', error);
+              console.warn('⚠️ [adjustSizes] 재초담초채권 크기 확장 실패:', error);
             }
           }
         }
@@ -1163,12 +1254,12 @@ async function adjustSizes(elements, config, slide) {
               if (maxTableHeight > (sizeInfo.maxRelativeBottom || 0)) {
                 sizeInfo.maxRelativeBottom = maxTableHeight;
                 sizeInfo.measuredHeight = Math.max(
-                  maxTableHeight + 150, // 여유 공간 증가 (100px → 150px)
+                  maxTableHeight + 200, // 여유 공간 증가 (150px → 200px, 콘텐츠 잘림 방지)
                   sizeInfo.measuredHeight || 0
                 );
                 
                 if (process.env.NODE_ENV === 'development') {
-                  console.log(`📏 [adjustSizes] 담당자별 실적 테이블 포함: ${maxTableHeight}px (실제 높이: ${relativeBottom}px, scrollHeight: ${Math.max(tableScrollHeight, containerScrollHeight)}px)`);
+                  console.log(`📏 [adjustSizes] 담당자별 실적 테이블 포함: ${maxTableHeight}px (실제 높이: ${relativeBottom}px, scrollHeight: ${Math.max(tableScrollHeight, containerScrollHeight)}px, 여유공간: 200px)`);
                 }
               }
             }
@@ -1245,15 +1336,15 @@ async function adjustSizes(elements, config, slide) {
           let maxAllowedHeight = MAX_HEIGHT; // 4000px (원본) = 8000px (실제)
           
           if (isToc) {
-            // 목차 슬라이드: 최대 높이 6000px (실제) = 3000px (원본)로 제한 (25MB 제한 안전하게 준수)
-            maxAllowedHeight = 3000; // 3500px → 3000px (원본) = 6000px (실제)
+            // 목차 슬라이드: 최대 높이 7000px (실제) = 3500px (원본)로 제한 (25MB 제한 안전하게 준수, 콘텐츠 잘림 방지)
+            maxAllowedHeight = 3500; // 3000px → 3500px (원본) = 7000px (실제) - 콘텐츠 잘림 방지를 위해 증가
             sizeInfo.measuredHeight = Math.min(sizeInfo.measuredHeight || 0, maxAllowedHeight);
             if (process.env.NODE_ENV === 'development') {
               console.log(`📏 [adjustSizes] 목차 슬라이드 높이 제한: ${sizeInfo.measuredHeight}px (최대 ${maxAllowedHeight * SCALE}px 실제)`);
             }
           } else if (isTotalClosing) {
-            // 전체총마감 슬라이드: 담당자별 실적 테이블 포함을 위해 높이 제한 확대 (4500px 원본 = 9000px 실제)
-            maxAllowedHeight = 4500; // 4000px → 4500px (원본) = 9000px (실제)
+            // 전체총마감 슬라이드: 담당자별 실적 테이블 포함을 위해 높이 제한 확대 (5000px 원본 = 10000px 실제, 콘텐츠 잘림 방지)
+            maxAllowedHeight = 5000; // 4500px → 5000px (원본) = 10000px (실제) - 콘텐츠 잘림 방지를 위해 증가
             sizeInfo.measuredHeight = Math.min(sizeInfo.measuredHeight || 0, maxAllowedHeight);
             if (process.env.NODE_ENV === 'development') {
               console.log(`📏 [adjustSizes] 전체총마감 슬라이드 높이 제한: ${sizeInfo.measuredHeight}px (최대 ${maxAllowedHeight * SCALE}px 실제, 담당자별 실적 포함)`);

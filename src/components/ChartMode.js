@@ -6770,13 +6770,21 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                                   <TextField
                                     type="number"
                                     size="small"
-                                placeholder="입력"
-                                value={inputData[`${agent.code}_가입자수`] || ''}
-                                onChange={(e) => handleInputChange(agent.code, '가입자수', e.target.value)}
+                                    placeholder="입력"
+                                    value={inputData[`${agent.code}_가입자수`] || ''}
+                                    onChange={(e) => handleInputChange(agent.code, '가입자수', e.target.value)}
                                     sx={{ 
                                       width: '100%',
+                                      '& .MuiInputBase-root': {
+                                        position: 'relative', // 입력 필드 위치 명확히
+                                        display: 'flex',
+                                        alignItems: 'center', // 수직 정렬
+                                      },
                                       '& input[type=number]': {
                                         MozAppearance: 'textfield',
+                                        textAlign: 'center', // 텍스트 중앙 정렬
+                                        width: '100%', // 전체 너비 사용
+                                        padding: '8px', // 패딩 명시적 설정
                                       },
                                       '& input[type=number]::-webkit-outer-spin-button': {
                                         WebkitAppearance: 'none',
@@ -6788,7 +6796,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                                       }
                                     }}
                                     inputProps={{
-                                  style: { textAlign: 'center' },
+                                      style: { textAlign: 'center' },
                                       inputMode: 'numeric',
                                       pattern: '-?[0-9]*'
                                     }}

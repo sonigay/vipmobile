@@ -350,13 +350,13 @@ export async function captureElement(element, options = {}) {
     const reflowMultiplier = 1.5; // 목차 재흐름 배율 (1.8 → 1.5, 25MB 제한을 위해 더 감소)
     const calculatedHeight = Math.ceil(actualTocHeight * heightScale * reflowMultiplier) + 600; // 여유공간 600px 추가 (800 → 600, 파일 크기 절감)
     
-    // 1920px 기준 파일 크기 제한 고려: 최대 높이 6000px로 제한 (3840 × 6000 × 4 ≈ 92MB 압축 전 → 약 18-20MB 압축 후, 안전한 여유)
-    const maxAllowedHeight = 6000; // 1920px 대응: 7000px → 6000px로 감소 (25MB 제한 안전하게 준수)
-    const minHeightFromContent = actualTocHeight + 600; // 실제 높이 + 600px (800 → 600, 불필요한 여백 최소화)
+    // 1920px 기준 파일 크기 제한 고려: 최대 높이 7000px로 제한 (3840 × 7000 × 4 ≈ 107MB 압축 전 → 약 20-22MB 압축 후, 콘텐츠 잘림 방지)
+    const maxAllowedHeight = 7000; // 6000px → 7000px (콘텐츠 잘림 방지를 위해 증가, 25MB 제한 안전하게 준수)
+    const minHeightFromContent = actualTocHeight + 600; // 실제 높이 + 600px (불필요한 여백 최소화)
     // 최소 높이 제한 제거: 실제 콘텐츠 크기에 맞춰 동적으로 높이 설정 (autoCrop이 불필요한 여백 제거)
     targetHeight = Math.min(
       Math.max(calculatedHeight, minHeightFromContent), // 실제 콘텐츠 높이 기반으로 계산 (최소 높이 제한 제거)
-      maxAllowedHeight // 최대 6000px로 제한
+      maxAllowedHeight // 최대 7000px로 제한
     );
     
     if (process.env.NODE_ENV === 'development') {

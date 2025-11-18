@@ -171,9 +171,9 @@ export const SLIDE_CAPTURE_CONFIG = {
     needsHeightMeasurement: true,
     needsBoxResize: true,               // 박스 크기 조정 필요
     needsRightWhitespaceRemoval: true,  // 오른쪽 여백 제거
-    needsDataLoadingWait: false,
+    needsDataLoadingWait: true,         // 데이터 로드 완료 대기 (그래프 렌더링 보장)
     needsTableExpansion: false,
-    captureMethod: 'direct',
+    captureMethod: 'direct',            // direct 방식 유지 (헤더/콘텐츠 비율 개선)
     preserveHeader: true,               // 헤더 보존
     needsHeaderComposition: false,      // 헤더 합성 불필요
     needsHeaderSizeAdjustment: true,    // 헤더 크기 조정 필요 (데이터입력 헤더)

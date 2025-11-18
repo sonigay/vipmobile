@@ -1495,12 +1495,26 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
     
     // 엔딩 슬라이드 타입
     if (slide.type === 'ending') {
-      // 회의 차수 보강: 슬라이드에 누락된 경우 전역 컨텍스트(window)에 기록된 값을 사용
+      // 회의 차수 보강: 슬라이드에 누락된 경우 전역 컨텍스트(window) 또는 meeting 객체에서 가져오기
       try {
-        if (typeof window !== 'undefined' && slide.meetingNumber == null && window.__MEETING_NUMBER != null) {
-          slide.meetingNumber = window.__MEETING_NUMBER;
+        // slide.meetingNumber가 null, undefined, 0, 빈 문자열인 경우 보강
+        if (typeof window !== 'undefined' && 
+            (slide.meetingNumber == null || slide.meetingNumber === '' || slide.meetingNumber === 0)) {
+          // 1순위: window.__MEETING_NUMBER (메인 슬라이드에서 설정된 값)
+          if (window.__MEETING_NUMBER != null && window.__MEETING_NUMBER !== '' && window.__MEETING_NUMBER !== 0) {
+            slide.meetingNumber = window.__MEETING_NUMBER;
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`✅ [SlideRenderer] 엔딩 슬라이드 회의 차수 보강 (window): ${slide.meetingNumber}`);
+            }
+          }
+          // 2순위: loggedInStore나 meeting 객체에서 가져오기 (추가 보강 로직)
+          // (현재는 window.__MEETING_NUMBER만 사용)
         }
-      } catch {}
+      } catch (error) {
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('⚠️ [SlideRenderer] 엔딩 슬라이드 회의 차수 보강 실패:', error);
+        }
+      }
       const meetingDate = slide.meetingDate || '';
       const dateObj = meetingDate ? new Date(meetingDate + 'T00:00:00') : new Date();
       const formattedDate = dateObj.toLocaleDateString('ko-KR', {
@@ -1664,20 +1678,22 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                 {slide.meetingName || '회의'}
               </Typography>
               
+              {/* 날짜 - 두 번째 줄 */}
               <Typography
                 variant="h6"
                 sx={{
                   fontSize: { xs: '1.1rem', md: '2.1rem' }, // 1920px 대응: 1.4rem→2.1rem, 1.5배
                   fontWeight: 500,
                   color: '#495057',
-                  mb: 1.5,
+                  mb: (slide.meetingNumber != null && slide.meetingNumber !== '') ? 1.5 : 0, // 회의 번호가 실제로 있으면 마진, 없으면 0 (빈 공간 방지)
                   fontFamily: '"Noto Sans KR", sans-serif'
                 }}
               >
                 {formattedDate}
               </Typography>
               
-              {slide.meetingNumber && (
+              {/* 회의 번호 - 세 번째 줄 (조건부 렌더링, 빈 공간 방지) - null/undefined/빈 문자열 체크 */}
+              {slide.meetingNumber != null && slide.meetingNumber !== '' && slide.meetingNumber !== 0 ? (
                 <Box sx={{
                   display: 'inline-block',
                   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -1698,7 +1714,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                     {slide.meetingNumber}차
                   </Typography>
                 </Box>
-              )}
+              ) : null}
             </Box>
             
             <Box sx={{
