@@ -753,7 +753,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               px: { xs: 2.5, md: 4 },
               py: { xs: 1.6, md: 2 },
               pointerEvents: 'none', // 상단바가 UI 선택을 가리지 않도록
-              height: { xs: 56, md: 68 } // 헤더 높이 명시적 설정
+              height: { xs: 56, md: 102 } // 헤더 높이 명시적 설정 (1920px 대응: 68→102px, 1.5배)
             }}
           >
             {/* 왼쪽: 로고와 회사 이름 */}
@@ -763,8 +763,8 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                 src="/logo512.png"
                 alt="회사 로고"
                 sx={{
-                  width: { xs: 48, md: 60 },
-                  height: { xs: 48, md: 60 },
+                  width: { xs: 48, md: 90 }, // 1920px 대응: 60→90px, 1.5배
+                  height: { xs: 48, md: 90 }, // 1920px 대응: 60→90px, 1.5배
                   filter: 'brightness(0) invert(0)'
                 }}
                 onError={(e) => { e.target.style.display = 'none'; }}
@@ -772,7 +772,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               <Typography
                 sx={{
                   fontWeight: 800,
-                  fontSize: { xs: '1.25rem', md: '1.6rem' },
+                  fontSize: { xs: '1.25rem', md: '2.4rem' }, // 1920px 대응: 1.6rem→2.4rem, 1.5배
                   color: '#212529',
                   letterSpacing: '0.2px',
                   fontFamily: '"Noto Sans KR","Roboto",sans-serif'
@@ -783,7 +783,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             </Box>
             <Typography
               sx={{
-                fontSize: { xs: '1rem', md: '1.25rem' },
+                fontSize: { xs: '1rem', md: '1.875rem' }, // 1920px 대응: 1.25rem→1.875rem, 1.5배
                 fontWeight: 800,
                 color: '#ffffff',
                 textShadow: '0 1px 2px rgba(0,0,0,0.15)',
@@ -798,14 +798,14 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
           {slide.createdBy && (
             <Box sx={{ 
               position: 'absolute',
-              top: { xs: 56, md: 68 }, // 헤더 높이 바로 아래
+              top: { xs: 56, md: 102 }, // 헤더 높이 바로 아래 (1920px 대응: 68→102px)
               right: { xs: 2.5, md: 4 },
               zIndex: 14,
               textAlign: 'right'
             }}>
               <Typography variant="body2" sx={{ 
                 color: '#6c757d', 
-                fontSize: { xs: '0.75rem', md: '0.85rem' },
+                fontSize: { xs: '0.75rem', md: '1.275rem' }, // 1920px 대응: 0.85rem→1.275rem, 1.5배
                 fontWeight: 500,
                 fontFamily: '"Noto Sans KR", sans-serif',
                 opacity: 0.8
@@ -818,7 +818,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
           {/* 상단 정렬: 회의 정보 */}
           <Box sx={{ 
             textAlign: 'center', 
-            maxWidth: 1000, 
+            maxWidth: 1920, // 1920px 대응: 1000 → 1920 (1.92배)
             width: '100%', 
             flex: 1, 
             display: 'flex', 
@@ -846,7 +846,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                   variant="h4"
                   sx={{
                     fontWeight: 700,
-                    fontSize: { xs: '1.3rem', md: '1.8rem' },
+                    fontSize: { xs: '1.3rem', md: '2.7rem' }, // 1920px 대응: 1.8rem→2.7rem, 1.5배
                     color: '#ffffff',
                     letterSpacing: '1px',
                     fontFamily: '"Noto Sans KR", "Roboto", sans-serif'
@@ -862,7 +862,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               variant="h2"
               component="h1"
               sx={{
-                fontSize: { xs: '2.5rem', md: '4rem' },
+                fontSize: { xs: '2.5rem', md: '6rem' }, // 1920px 대응: 4rem→6rem, 1.5배
                 fontWeight: 800,
                 mb: 5,
                 lineHeight: 1.1,
@@ -885,7 +885,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                 mb: 3,
                 boxShadow: '0 4px 20px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.05)',
                 border: '1px solid rgba(0,0,0,0.06)',
-                maxWidth: '800px',
+                maxWidth: '1536px', // 1920px 대응: 800px → 1536px (1.92배)
                 mx: 'auto',
                 width: '100%'
               }}
@@ -900,11 +900,11 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                     alignItems: 'center', 
                     justifyContent: 'center' 
                   }}>
-                    <EventIcon sx={{ fontSize: { xs: '1.2rem', md: '1.5rem' }, color: '#ffffff' }} />
+                    <EventIcon sx={{ fontSize: { xs: '1.2rem', md: '2.25rem' }, color: '#ffffff' }} /> {/* 1920px 대응: 1.5rem→2.25rem, 1.5배 */}
                   </Box>
                   <Typography variant="h5" sx={{ 
                     fontWeight: 700, 
-                    fontSize: { xs: '1.1rem', md: '1.4rem' },
+                    fontSize: { xs: '1.1rem', md: '2.1rem' }, // 1920px 대응: 1.4rem→2.1rem, 1.5배
                     color: '#212529',
                     fontFamily: '"Noto Sans KR", sans-serif'
                   }}>
@@ -913,7 +913,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                 </Box>
                 <Typography variant="h6" sx={{ 
                   fontWeight: 500, 
-                  fontSize: { xs: '1rem', md: '1.25rem' }, 
+                  fontSize: { xs: '1rem', md: '1.875rem' }, // 1920px 대응: 1.25rem→1.875rem, 1.5배
                   pl: { xs: 5.5, md: 6 },
                   color: '#495057',
                   fontFamily: '"Noto Sans KR", sans-serif'
@@ -933,11 +933,11 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                       alignItems: 'center', 
                       justifyContent: 'center' 
                     }}>
-                      <LocationIcon sx={{ fontSize: { xs: '1.2rem', md: '1.5rem' }, color: '#ffffff' }} />
+                      <LocationIcon sx={{ fontSize: { xs: '1.2rem', md: '2.25rem' }, color: '#ffffff' }} /> {/* 1920px 대응: 1.5rem→2.25rem, 1.5배 */}
                     </Box>
                     <Typography variant="h5" sx={{ 
                       fontWeight: 700, 
-                      fontSize: { xs: '1.1rem', md: '1.4rem' },
+                      fontSize: { xs: '1.1rem', md: '2.1rem' }, // 1920px 대응: 1.4rem→2.1rem, 1.5배
                       color: '#212529',
                       fontFamily: '"Noto Sans KR", sans-serif'
                     }}>
@@ -946,7 +946,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                   </Box>
                   <Typography variant="h6" sx={{ 
                     fontWeight: 500, 
-                    fontSize: { xs: '1rem', md: '1.25rem' }, 
+                    fontSize: { xs: '1rem', md: '1.875rem' }, // 1920px 대응: 1.25rem→1.875rem, 1.5배 
                     pl: { xs: 5.5, md: 6 },
                     color: '#495057',
                     fontFamily: '"Noto Sans KR", sans-serif'
@@ -967,11 +967,11 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                       alignItems: 'center', 
                       justifyContent: 'center' 
                     }}>
-                      <PeopleIcon sx={{ fontSize: { xs: '1.2rem', md: '1.5rem' }, color: '#ffffff' }} />
+                      <PeopleIcon sx={{ fontSize: { xs: '1.2rem', md: '2.25rem' }, color: '#ffffff' }} /> {/* 1920px 대응: 1.5rem→2.25rem, 1.5배 */}
                     </Box>
                     <Typography variant="h5" sx={{ 
                       fontWeight: 700, 
-                      fontSize: { xs: '1.1rem', md: '1.4rem' },
+                      fontSize: { xs: '1.1rem', md: '2.1rem' }, // 1920px 대응: 1.4rem→2.1rem, 1.5배
                       color: '#212529',
                       fontFamily: '"Noto Sans KR", sans-serif'
                     }}>
@@ -1054,7 +1054,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               px: { xs: 2.5, md: 4 },
               py: { xs: 1.6, md: 2 },
               pointerEvents: 'none', // 상단바가 UI 선택을 가리지 않도록
-              height: { xs: 56, md: 68 } // 헤더 높이 명시적 설정
+              height: { xs: 56, md: 102 } // 헤더 높이 명시적 설정 (1920px 대응: 68→102px, 1.5배)
             }}
           >
             {/* 왼쪽: 로고와 회사 이름 */}
@@ -1064,8 +1064,8 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                 src="/logo512.png"
                 alt="회사 로고"
                 sx={{
-                  width: { xs: 48, md: 60 },
-                  height: { xs: 48, md: 60 },
+                  width: { xs: 48, md: 90 }, // 1920px 대응: 60→90px, 1.5배
+                  height: { xs: 48, md: 90 }, // 1920px 대응: 60→90px, 1.5배
                   filter: 'brightness(0) invert(0)'
                 }}
                 onError={(e) => { e.target.style.display = 'none'; }}
@@ -1073,7 +1073,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               <Typography
                 sx={{
                   fontWeight: 800,
-                  fontSize: { xs: '1.25rem', md: '1.6rem' },
+                  fontSize: { xs: '1.25rem', md: '2.4rem' }, // 1920px 대응: 1.6rem→2.4rem, 1.5배
                   color: '#212529',
                   letterSpacing: '0.2px',
                   fontFamily: '"Noto Sans KR","Roboto",sans-serif'
@@ -1084,7 +1084,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             </Box>
             <Typography
               sx={{
-                fontSize: { xs: '1rem', md: '1.25rem' },
+                fontSize: { xs: '1rem', md: '1.875rem' }, // 1920px 대응: 1.25rem→1.875rem, 1.5배
                 fontWeight: 800,
                 color: '#ffffff',
                 textShadow: '0 1px 2px rgba(0,0,0,0.15)',
@@ -1099,14 +1099,14 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
           {slide.createdBy && (
             <Box sx={{ 
               position: 'absolute',
-              top: { xs: 56, md: 68 }, // 헤더 높이 바로 아래
+              top: { xs: 56, md: 102 }, // 헤더 높이 바로 아래 (1920px 대응: 68→102px)
               right: { xs: 2.5, md: 4 },
               zIndex: 14,
               textAlign: 'right'
             }}>
               <Typography variant="body2" sx={{ 
                 color: '#6c757d', 
-                fontSize: { xs: '0.75rem', md: '0.85rem' },
+                fontSize: { xs: '0.75rem', md: '1.275rem' }, // 1920px 대응: 0.85rem→1.275rem, 1.5배
                 fontWeight: 500,
                 fontFamily: '"Noto Sans KR", sans-serif',
                 opacity: 0.8
@@ -1119,7 +1119,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
           {/* 상단 정렬: 목차 내용 */}
           <Box sx={{ 
             textAlign: 'center', 
-            maxWidth: 1200, 
+            maxWidth: 1920, // 1920px 대응: 1200 → 1920 (1.6배)
             width: '100%', 
             flex: 1, 
             display: 'flex', 
@@ -1134,7 +1134,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               variant="h2"
               component="h1"
               sx={{
-                fontSize: { xs: '2.5rem', md: '4rem' },
+                fontSize: { xs: '2.5rem', md: '6rem' }, // 1920px 대응: 4rem→6rem, 1.5배
                 fontWeight: 800,
                 mb: 5,
                 lineHeight: 1.1,
@@ -1157,7 +1157,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                 border: '1px solid rgba(0,0,0,0.06)',
                 maxHeight: '60vh',
                 overflowY: 'auto',
-                maxWidth: '1000px',
+                maxWidth: '1920px', // 1920px 대응: 1000px → 1920px (1.92배)
                 mx: 'auto',
                 width: '100%'
               }}
@@ -1198,7 +1198,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                           variant="h5"
                           sx={{
                             fontWeight: 700,
-                            fontSize: { xs: '1.3rem', md: '1.6rem' },
+                            fontSize: { xs: '1.3rem', md: '2.4rem' }, // 1920px 대응: 1.6rem→2.4rem, 1.5배
                             mb: 2.5,
                             color: '#212529',
                             borderBottom: '3px solid #667eea',
@@ -1228,7 +1228,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                                 <Typography
                                   variant="body1"
                                   sx={{
-                                    fontSize: { xs: '1rem', md: '1.2rem' },
+                                    fontSize: { xs: '1rem', md: '1.8rem' }, // 1920px 대응: 1.2rem→1.8rem, 1.5배
                                     fontWeight: 600,
                                     color: '#495057',
                                     fontFamily: '"Noto Sans KR", sans-serif',
@@ -1299,7 +1299,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                               <Typography
                                 variant="body1"
                                 sx={{
-                                  fontSize: { xs: '1rem', md: '1.2rem' },
+                                  fontSize: { xs: '1rem', md: '1.8rem' }, // 1920px 대응: 1.2rem→1.8rem, 1.5배
                                   fontWeight: 600,
                                   color: '#495057',
                                   mb: hasSubTabs ? 1 : 0.5,
@@ -1380,7 +1380,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                                           key={subSlide.slideId}
                                           variant="body2"
                                           sx={{
-                                            fontSize: { xs: '0.9rem', md: '1.05rem' },
+                                            fontSize: { xs: '0.9rem', md: '1.575rem' }, // 1920px 대응: 1.05rem→1.575rem, 1.5배
                                             color: '#6c757d',
                                             mb: 0.5,
                                             fontFamily: '"Noto Sans KR", sans-serif',
@@ -1498,7 +1498,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               px: { xs: 2.5, md: 4 },
               py: { xs: 1.6, md: 2 },
               pointerEvents: 'none',
-              height: { xs: 56, md: 68 } // 헤더 높이 명시적 설정
+              height: { xs: 56, md: 102 } // 헤더 높이 명시적 설정 (1920px 대응: 68→102px, 1.5배)
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -1507,8 +1507,8 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                 src="/logo512.png"
                 alt="회사 로고"
                 sx={{
-                  width: { xs: 48, md: 60 },
-                  height: { xs: 48, md: 60 },
+                  width: { xs: 48, md: 90 }, // 1920px 대응: 60→90px, 1.5배
+                  height: { xs: 48, md: 90 }, // 1920px 대응: 60→90px, 1.5배
                   filter: 'brightness(0) invert(0)'
                 }}
                 onError={(e) => { e.target.style.display = 'none'; }}
@@ -1516,7 +1516,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               <Typography
                 sx={{
                   fontWeight: 800,
-                  fontSize: { xs: '1.25rem', md: '1.6rem' },
+                  fontSize: { xs: '1.25rem', md: '2.4rem' }, // 1920px 대응: 1.6rem→2.4rem, 1.5배
                   color: '#212529',
                   letterSpacing: '0.2px',
                   fontFamily: '"Noto Sans KR","Roboto",sans-serif'
@@ -1527,7 +1527,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             </Box>
             <Typography
               sx={{
-                fontSize: { xs: '1rem', md: '1.25rem' },
+                fontSize: { xs: '1rem', md: '1.875rem' }, // 1920px 대응: 1.25rem→1.875rem, 1.5배
                 fontWeight: 800,
                 color: '#ffffff',
                 textShadow: '0 1px 2px rgba(0,0,0,0.15)',
@@ -1542,14 +1542,14 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
           {slide.createdBy && (
             <Box sx={{ 
               position: 'absolute',
-              top: { xs: 56, md: 68 }, // 헤더 높이 바로 아래
+              top: { xs: 56, md: 102 }, // 헤더 높이 바로 아래 (1920px 대응: 68→102px)
               right: { xs: 2.5, md: 4 },
               zIndex: 14,
               textAlign: 'right'
             }}>
               <Typography variant="body2" sx={{ 
                 color: '#6c757d', 
-                fontSize: { xs: '0.75rem', md: '0.85rem' },
+                fontSize: { xs: '0.75rem', md: '1.275rem' }, // 1920px 대응: 0.85rem→1.275rem, 1.5배
                 fontWeight: 500,
                 fontFamily: '"Noto Sans KR", sans-serif',
                 opacity: 0.8
@@ -1562,7 +1562,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
           {/* 상단 정렬: 종료 메시지 */}
           <Box sx={{ 
             textAlign: 'center', 
-            maxWidth: 1000, 
+            maxWidth: 1920, // 1920px 대응: 1000 → 1920 (1.92배)
             width: '100%', 
             flex: 1, 
             display: 'flex', 
@@ -1576,7 +1576,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               variant="h1"
               component="h1"
               sx={{
-                fontSize: { xs: '4rem', md: '6rem' },
+                fontSize: { xs: '4rem', md: '9rem' }, // 1920px 대응: 6rem→9rem, 1.5배
                 fontWeight: 800,
                 mb: 5,
                 lineHeight: 1.1,
@@ -1598,7 +1598,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                 mb: 3,
                 boxShadow: '0 4px 20px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.05)',
                 border: '1px solid rgba(0,0,0,0.06)',
-                maxWidth: 700,
+                maxWidth: 1344, // 1920px 대응: 700 → 1344 (1.92배)
                 width: '100%',
                 mx: 'auto'
               }}
@@ -1606,7 +1606,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               <Typography
                 variant="h4"
                 sx={{
-                  fontSize: { xs: '2rem', md: '2.8rem' },
+                  fontSize: { xs: '2rem', md: '4.2rem' }, // 1920px 대응: 2.8rem→4.2rem, 1.5배
                   fontWeight: 800,
                   mb: 2.5,
                   color: '#212529',
@@ -1622,7 +1622,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               <Typography
                 variant="h6"
                 sx={{
-                  fontSize: { xs: '1.1rem', md: '1.4rem' },
+                  fontSize: { xs: '1.1rem', md: '2.1rem' }, // 1920px 대응: 1.4rem→2.1rem, 1.5배
                   fontWeight: 500,
                   color: '#495057',
                   mb: 1.5,
@@ -1644,7 +1644,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                   <Typography
                     variant="body1"
                     sx={{
-                      fontSize: { xs: '0.9rem', md: '1.05rem' },
+                      fontSize: { xs: '0.9rem', md: '1.575rem' }, // 1920px 대응: 1.05rem→1.575rem, 1.5배
                       fontWeight: 600,
                       color: '#ffffff',
                       fontFamily: '"Noto Sans KR", sans-serif'
@@ -1662,14 +1662,14 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               p: { xs: 3, md: 4 },
               boxShadow: '0 4px 20px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.05)',
               border: '1px solid rgba(0,0,0,0.06)',
-              maxWidth: '600px',
+              maxWidth: '1152px', // 1920px 대응: 600px → 1152px (1.92배)
               mx: 'auto',
               mt: 4
             }}>
               <Typography
                 variant="h4"
                 sx={{
-                  fontSize: { xs: '1.3rem', md: '1.8rem' },
+                  fontSize: { xs: '1.3rem', md: '2.7rem' }, // 1920px 대응: 1.8rem→2.7rem, 1.5배
                   fontWeight: 600,
                   color: '#495057',
                   fontFamily: '"Noto Sans KR", sans-serif',
@@ -1721,7 +1721,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               px: { xs: 2.5, md: 4 },
               py: { xs: 1.6, md: 2 },
               pointerEvents: 'none',
-              height: { xs: 56, md: 68 } // 헤더 높이 명시적 설정
+              height: { xs: 56, md: 102 } // 헤더 높이 명시적 설정 (1920px 대응: 68→102px, 1.5배)
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -1730,8 +1730,8 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                 src="/logo512.png"
                 alt="회사 로고"
                 sx={{
-                  width: { xs: 48, md: 60 },
-                  height: { xs: 48, md: 60 },
+                  width: { xs: 48, md: 90 }, // 1920px 대응: 60→90px, 1.5배
+                  height: { xs: 48, md: 90 }, // 1920px 대응: 60→90px, 1.5배
                   filter: 'brightness(0) invert(0)'
                 }}
                 onError={(e) => { e.target.style.display = 'none'; }}
@@ -1739,7 +1739,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               <Typography
                 sx={{
                   fontWeight: 800,
-                  fontSize: { xs: '1.25rem', md: '1.6rem' },
+                  fontSize: { xs: '1.25rem', md: '2.4rem' }, // 1920px 대응: 1.6rem→2.4rem, 1.5배
                   color: '#212529',
                   letterSpacing: '0.2px',
                   fontFamily: '"Noto Sans KR","Roboto",sans-serif'
@@ -1750,7 +1750,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             </Box>
             <Typography
               sx={{
-                fontSize: { xs: '1rem', md: '1.25rem' },
+                fontSize: { xs: '1rem', md: '1.875rem' }, // 1920px 대응: 1.25rem→1.875rem, 1.5배
                 fontWeight: 800,
                 color: '#ffffff',
                 textShadow: '0 1px 2px rgba(0,0,0,0.15)',
@@ -1765,14 +1765,14 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
           {slide.createdBy && (
             <Box sx={{ 
               position: 'absolute',
-              top: { xs: 56, md: 68 }, // 헤더 높이 바로 아래
+              top: { xs: 56, md: 102 }, // 헤더 높이 바로 아래 (1920px 대응: 68→102px)
               right: { xs: 2.5, md: 4 },
               zIndex: 14,
               textAlign: 'right'
             }}>
               <Typography variant="body2" sx={{ 
                 color: '#6c757d', 
-                fontSize: { xs: '0.75rem', md: '0.85rem' },
+                fontSize: { xs: '0.75rem', md: '1.275rem' }, // 1920px 대응: 0.85rem→1.275rem, 1.5배
                 fontWeight: 500,
                 fontFamily: '"Noto Sans KR", sans-serif',
                 opacity: 0.8
@@ -1785,7 +1785,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
           {/* 상단 정렬: 커스텀 콘텐츠 */}
           <Box sx={{ 
             textAlign: 'center', 
-            maxWidth: 1200, 
+            maxWidth: 1920, // 1920px 대응: 1200 → 1920 (1.6배)
             width: '100%', 
             flex: 1, 
             display: 'flex', 
@@ -1803,14 +1803,14 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                 boxShadow: '0 4px 20px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.05)',
                 border: '1px solid rgba(0,0,0,0.06)',
                 width: '100%',
-                maxWidth: 1000,
+                maxWidth: 1920, // 1920px 대응: 1000 → 1920 (1.92배)
                 textAlign: 'left'
               }}
             >
               <Typography
                 variant="h4"
                 sx={{
-                  fontSize: { xs: '2rem', md: '3rem' },
+                  fontSize: { xs: '2rem', md: '4.5rem' }, // 1920px 대응: 3rem→4.5rem, 1.5배
                   fontWeight: 800,
                   mb: 2,
                   color: '#212529',
@@ -1824,7 +1824,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                 <Typography
                   variant="h6"
                   sx={{
-                    fontSize: { xs: '1rem', md: '1.3rem' },
+                    fontSize: { xs: '1rem', md: '1.95rem' }, // 1920px 대응: 1.3rem→1.95rem, 1.5배
                     lineHeight: 1.8,
                     whiteSpace: 'pre-wrap',
                     color: '#1a1a1a',
@@ -1861,7 +1861,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                           sx={{
                             position: 'relative',
                             width: '100%',
-                            maxWidth: 800,
+                            maxWidth: 1536, // 1920px 대응: 800 → 1536 (1.92배)
                             pt: '56.25%', // 16:9 비율
                             mt: 2,
                             boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
@@ -1996,8 +1996,8 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                 src="/logo512.png"
                 alt="회사 로고"
                 sx={{
-                  width: { xs: 48, md: 60 },
-                  height: { xs: 48, md: 60 },
+                  width: { xs: 48, md: 90 }, // 1920px 대응: 60→90px, 1.5배
+                  height: { xs: 48, md: 90 }, // 1920px 대응: 60→90px, 1.5배
                   filter: 'brightness(0) invert(0)'
                 }}
                 onError={(e) => {
@@ -2007,7 +2007,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               <Typography
                 sx={{
                   fontWeight: 800,
-                  fontSize: { xs: '1.25rem', md: '1.6rem' },
+                  fontSize: { xs: '1.25rem', md: '2.4rem' }, // 1920px 대응: 1.6rem→2.4rem, 1.5배
                   color: '#212529',
                   letterSpacing: '0.2px',
                   fontFamily: '"Noto Sans KR","Roboto",sans-serif'
@@ -2020,7 +2020,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             {/* 오른쪽: 통합 제목 */}
             <Typography
               sx={{
-                fontSize: { xs: '1rem', md: '1.25rem' },
+                fontSize: { xs: '1rem', md: '1.875rem' }, // 1920px 대응: 1.25rem→1.875rem, 1.5배
                 fontWeight: 800,
                 color: '#ffffff',
                 textShadow: '0 1px 2px rgba(0,0,0,0.15)',
@@ -2042,7 +2042,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             }}>
               <Typography variant="body2" sx={{ 
                 color: '#6c757d', 
-                fontSize: { xs: '0.75rem', md: '0.85rem' },
+                fontSize: { xs: '0.75rem', md: '1.275rem' }, // 1920px 대응: 0.85rem→1.275rem, 1.5배
                 fontWeight: 500,
                 fontFamily: '"Noto Sans KR", sans-serif',
                 opacity: 0.8
@@ -2177,8 +2177,8 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                 src="/logo512.png"
                 alt="회사 로고"
                 sx={{
-                  width: { xs: 48, md: 60 },
-                  height: { xs: 48, md: 60 },
+                  width: { xs: 48, md: 90 }, // 1920px 대응: 60→90px, 1.5배
+                  height: { xs: 48, md: 90 }, // 1920px 대응: 60→90px, 1.5배
                   filter: 'brightness(0) invert(0)'
                 }}
                 onError={(e) => {
@@ -2188,7 +2188,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               <Typography
                 sx={{
                   fontWeight: 800,
-                  fontSize: { xs: '1.25rem', md: '1.6rem' },
+                  fontSize: { xs: '1.25rem', md: '2.4rem' }, // 1920px 대응: 1.6rem→2.4rem, 1.5배
                   color: '#212529',
                   letterSpacing: '0.2px',
                   fontFamily: '"Noto Sans KR","Roboto",sans-serif'
@@ -2200,7 +2200,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             {/* 오른쪽: 통합 제목 */}
             <Typography
               sx={{
-                fontSize: { xs: '1rem', md: '1.25rem' },
+                fontSize: { xs: '1rem', md: '1.875rem' }, // 1920px 대응: 1.25rem→1.875rem, 1.5배
                 fontWeight: 800,
                 color: '#ffffff',
                 textShadow: '0 1px 2px rgba(0,0,0,0.15)',
@@ -2222,7 +2222,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             }}>
               <Typography variant="body2" sx={{ 
                 color: '#6c757d', 
-                fontSize: { xs: '0.75rem', md: '0.85rem' },
+                fontSize: { xs: '0.75rem', md: '1.275rem' }, // 1920px 대응: 0.85rem→1.275rem, 1.5배
                 fontWeight: 500,
                 fontFamily: '"Noto Sans KR", sans-serif',
                 opacity: 0.8
@@ -2381,7 +2381,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               }}>
                 <Typography variant="body2" sx={{ 
                   color: '#6c757d', 
-                  fontSize: { xs: '0.75rem', md: '0.85rem' },
+                  fontSize: { xs: '0.75rem', md: '1.275rem' }, // 1920px 대응: 0.85rem→1.275rem, 1.5배
                   fontWeight: 500,
                   fontFamily: '"Noto Sans KR", sans-serif',
                   opacity: 0.8
@@ -2527,7 +2527,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               }}>
                 <Typography variant="body2" sx={{ 
                   color: '#6c757d', 
-                  fontSize: { xs: '0.75rem', md: '0.85rem' },
+                  fontSize: { xs: '0.75rem', md: '1.275rem' }, // 1920px 대응: 0.85rem→1.275rem, 1.5배
                   fontWeight: 500,
                   fontFamily: '"Noto Sans KR", sans-serif',
                   opacity: 0.8
@@ -2676,7 +2676,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               }}>
                 <Typography variant="body2" sx={{ 
                   color: '#6c757d', 
-                  fontSize: { xs: '0.75rem', md: '0.85rem' },
+                  fontSize: { xs: '0.75rem', md: '1.275rem' }, // 1920px 대응: 0.85rem→1.275rem, 1.5배
                   fontWeight: 500,
                   fontFamily: '"Noto Sans KR", sans-serif',
                   opacity: 0.8

@@ -55,7 +55,7 @@ export const SLIDE_CAPTURE_CONFIG = {
   main: {
     needsScrollRemoval: true,           // 스크롤 제약 제거 필요
     needsPinkBarRemoval: true,          // 핑크바 제거
-    needsWidthAdjustment: true,         // 너비 조정 (1280px)
+    needsWidthAdjustment: true,         // 너비 조정 (1920px)
     needsHeightMeasurement: true,       // 높이 측정 (실제 콘텐츠)
     needsBoxResize: false,              // 박스 크기 조정 불필요
     needsRightWhitespaceRemoval: true,  // 오른쪽 여백 제거

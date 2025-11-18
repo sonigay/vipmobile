@@ -294,7 +294,7 @@ export async function captureElement(element, options = {}) {
   
   // 공통 헤더 위치/크기 일관성을 위해 가로 폭을 표준화(고정)하고,
   // 세로는 콘텐츠에 따라 가변(좁은 폭으로 재흐름되어 길어질 수 있음)
-  const BASE_CAPTURE_WIDTH = 1280; // 표준 캡처 폭(px)
+  const BASE_CAPTURE_WIDTH = 1920; // 표준 캡처 폭(px) - 1920px로 변경 (1280px → 1920px, 1.5배)
   const widthScale = BASE_CAPTURE_WIDTH / Math.max(scrollWidth, 1);
   const targetWidth = BASE_CAPTURE_WIDTH;
   // 메인/목차는 헤더 포함 전체를 캡처하므로 충분한 높이 보장
@@ -303,7 +303,7 @@ export async function captureElement(element, options = {}) {
   const isToc = slideId.includes('toc');
   const isMainOrToc = isMain || isToc;
   
-  // 메인/목차 슬라이드: 고정 가로폭(1280px) 적용 시 세로 재흐름으로 인한 하단 잘림 방지
+  // 메인/목차 슬라이드: 고정 가로폭(1920px) 적용 시 세로 재흐름으로 인한 하단 잘림 방지
   // 높이 = scrollHeight × (1/widthScale) × 배율, 최소 높이 보장
   // autoCrop 유지로 과도 여백은 자동 제거
   let targetHeight;

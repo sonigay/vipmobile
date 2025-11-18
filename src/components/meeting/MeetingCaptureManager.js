@@ -1816,8 +1816,8 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                 const imgHeader = await blobToImage(headerBlob);
                 const imgTable = await blobToImage(tableOnlyBlob);
                 const gap = 20; // 헤더와 테이블 사이 간격
-                // 캔버스 너비는 헤더와 테이블 중 더 넓은 것을 기준으로 하되, 최소 1280px
-                const BASE_CAPTURE_WIDTH = 1280;
+                // 캔버스 너비는 헤더와 테이블 중 더 넓은 것을 기준으로 하되, 최소 1920px (1280px → 1920px)
+                const BASE_CAPTURE_WIDTH = 1920;
                 const canvasWidth = Math.max(BASE_CAPTURE_WIDTH, Math.max(imgHeader.width, imgTable.width));
                 const canvas = document.createElement('canvas');
                 canvas.width = canvasWidth;
@@ -4534,11 +4534,11 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         // 목차 슬라이드처럼 적당한 높이: 실제 콘텐츠 높이만 사용 (여유공간 최소화)
         // 목차 슬라이드가 적당하다고 하였으므로 메인/엔딩도 동일한 로직 사용
         const targetHeight = Math.max(actualContentHeight, 400); // 실제 콘텐츠 높이만, 최소 400px
-        // 너비는 1280px로 고정 (BASE_CAPTURE_WIDTH) - 너비에 맞춰서 캡처하면 오른쪽 공백 제거
-        const BASE_CAPTURE_WIDTH = 1280;
+        // 너비는 1920px로 고정 (BASE_CAPTURE_WIDTH) - 너비에 맞춰서 캡처하면 오른쪽 공백 제거 (1280px → 1920px)
+        const BASE_CAPTURE_WIDTH = 1920;
         const targetWidth = BASE_CAPTURE_WIDTH;
         
-        // 요소의 너비를 1280px로 명시적으로 설정하여 너비에 맞춰지도록 함
+        // 요소의 너비를 1920px로 명시적으로 설정하여 너비에 맞춰지도록 함
         const originalWidth = captureTargetElement.style.width;
         const originalMaxWidth = captureTargetElement.style.maxWidth;
         captureTargetElement.style.setProperty('width', `${targetWidth}px`, 'important');
@@ -4550,7 +4550,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         // scale은 html2canvas에서 처리하므로 원본 크기만 전달
         captureOptions.width = targetWidth;
         captureOptions.height = targetHeight;
-        captureOptions.windowWidth = targetWidth; // windowWidth도 1280px로 설정하여 너비에 맞춰짐
+        captureOptions.windowWidth = targetWidth; // windowWidth도 1920px로 설정하여 너비에 맞춰짐
         captureOptions.windowHeight = targetHeight;
         captureOptions.skipAutoCrop = true; // 자동 크롭 건너뛰기
         captureOptions.fixedBottomPaddingPx = 0; // 핑크색 바 제거
