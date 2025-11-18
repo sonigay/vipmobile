@@ -5267,28 +5267,49 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         }
       }
       
-      // 통합 캡처 로직 사용
+      // 통합 캡처 엔진 사용 (98% 성공률 목표)
+      // 새로운 UnifiedCaptureEngine이 모든 슬라이드 타입을 설정 기반으로 처리
       let blob = null;
       
-      // 기존 composite blob이 있으면 우선 사용
-      if (monthlyAwardCompositeBlob || subscriberIncreaseCompositeBlob || inventoryCompositeBlob || compositeBlob) {
-        blob = monthlyAwardCompositeBlob || subscriberIncreaseCompositeBlob || inventoryCompositeBlob || compositeBlob;
-      } else {
-        // 통합 캡처 로직으로 시도
-        try {
-          const unifiedBlob = await unifiedCapture(slideElement, currentSlide, captureTargetElement);
-          if (unifiedBlob) {
-            blob = unifiedBlob;
-          } else {
-            // 통합 로직 실패 시 기본 캡처 사용
-            blob = await captureElement(captureTargetElement, captureOptions);
-          }
-        } catch (e) {
+      // 새로운 통합 캡처 엔진을 우선 사용
+      try {
+        const unifiedBlob = await unifiedCapture(slideElement, currentSlide, captureTargetElement);
+        if (unifiedBlob) {
+          blob = unifiedBlob;
           if (process.env.NODE_ENV === 'development') {
-            console.warn('⚠️ [MeetingCaptureManager] 통합 캡처 로직 실패, 기본 캡처 사용:', e?.message);
+            console.log('✅ [MeetingCaptureManager] 통합 캡처 엔진 성공');
           }
-          // 통합 로직 실패 시 기본 캡처 사용
+        } else {
+          // 통합 엔진이 null을 반환한 경우 기존 composite blob 폴백
+          if (monthlyAwardCompositeBlob || subscriberIncreaseCompositeBlob || inventoryCompositeBlob || compositeBlob) {
+            blob = monthlyAwardCompositeBlob || subscriberIncreaseCompositeBlob || inventoryCompositeBlob || compositeBlob;
+            if (process.env.NODE_ENV === 'development') {
+              console.warn('⚠️ [MeetingCaptureManager] 통합 엔진 실패, 기존 composite blob 사용');
+            }
+          } else {
+            // 최종 폴백: 기본 캡처
+            blob = await captureElement(captureTargetElement, captureOptions);
+            if (process.env.NODE_ENV === 'development') {
+              console.warn('⚠️ [MeetingCaptureManager] 기본 캡처 사용');
+            }
+          }
+        }
+      } catch (e) {
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('⚠️ [MeetingCaptureManager] 통합 캡처 엔진 에러:', e?.message);
+        }
+        // 에러 발생 시 기존 composite blob 폴백
+        if (monthlyAwardCompositeBlob || subscriberIncreaseCompositeBlob || inventoryCompositeBlob || compositeBlob) {
+          blob = monthlyAwardCompositeBlob || subscriberIncreaseCompositeBlob || inventoryCompositeBlob || compositeBlob;
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('⚠️ [MeetingCaptureManager] 기존 composite blob 폴백 사용');
+          }
+        } else {
+          // 최종 폴백: 기본 캡처
           blob = await captureElement(captureTargetElement, captureOptions);
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('⚠️ [MeetingCaptureManager] 기본 캡처 폴백 사용');
+          }
         }
       }
       

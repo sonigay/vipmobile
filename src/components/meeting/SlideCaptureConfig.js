@@ -48,6 +48,7 @@ export function identifySlideType(slide) {
 
 /**
  * 슬라이드 타입별 캡처 설정
+ * 98% 이상 성공률을 목표로 한 완전한 설정 기반 처리
  */
 export const SLIDE_CAPTURE_CONFIG = {
   // 기본 슬라이드 (main, toc, ending)
@@ -62,6 +63,13 @@ export const SLIDE_CAPTURE_CONFIG = {
     needsTableExpansion: false,         // 테이블 펼치기 불필요
     captureMethod: 'direct',            // 직접 캡처
     defaultPadding: 0,                  // 기본 패딩 없음
+    preserveHeader: false,              // 헤더 보존 불필요 (전체 캡처)
+    needsHeaderComposition: false,      // 헤더 합성 불필요
+    needsHeaderSizeAdjustment: false,   // 헤더 크기 조정 불필요
+    needsTableVerification: false,      // 테이블 검증 불필요
+    needsManagerTableInclusion: false,  // 담당자별 테이블 포함 불필요
+    boxResizeIterations: 1,             // 박스 크기 조정 반복 횟수
+    retryConfig: { maxRetries: 3, delay: 500 }, // 재시도 설정
   },
   toc: {
     needsScrollRemoval: true,
@@ -74,6 +82,13 @@ export const SLIDE_CAPTURE_CONFIG = {
     needsTableExpansion: false,
     captureMethod: 'direct',
     defaultPadding: 0,
+    preserveHeader: false,
+    needsHeaderComposition: false,
+    needsHeaderSizeAdjustment: false,
+    needsTableVerification: false,
+    needsManagerTableInclusion: false,
+    boxResizeIterations: 1,
+    retryConfig: { maxRetries: 3, delay: 500 },
   },
   ending: {
     needsScrollRemoval: true,
@@ -86,6 +101,13 @@ export const SLIDE_CAPTURE_CONFIG = {
     needsTableExpansion: false,
     captureMethod: 'direct',
     defaultPadding: 0,
+    preserveHeader: false,
+    needsHeaderComposition: false,
+    needsHeaderSizeAdjustment: false,
+    needsTableVerification: false,
+    needsManagerTableInclusion: false,
+    boxResizeIterations: 1,
+    retryConfig: { maxRetries: 3, delay: 500 },
   },
 
   // 월간시상
@@ -100,8 +122,14 @@ export const SLIDE_CAPTURE_CONFIG = {
     needsTableExpansion: true,          // 확대 버튼 클릭
     captureMethod: 'commonAncestor',    // commonAncestor 찾아서 캡처
     defaultPadding: 0,
+    preserveHeader: false,              // 헤더 포함 캡처
+    needsHeaderComposition: false,      // 헤더 합성 불필요
+    needsHeaderSizeAdjustment: false,   // 헤더 크기 조정 불필요
     needsTableVerification: true,       // 테이블 검증 필요
     minTablesCount: 5,                  // 최소 5개 테이블 필요
+    needsManagerTableInclusion: false,
+    boxResizeIterations: 1,
+    retryConfig: { maxRetries: 3, delay: 500 },
   },
 
   // 전체총마감
@@ -116,8 +144,13 @@ export const SLIDE_CAPTURE_CONFIG = {
     needsTableExpansion: true,          // 모든 섹션 펼치기
     captureMethod: 'direct',
     defaultPadding: 0,
+    preserveHeader: true,               // 헤더 보존
+    needsHeaderComposition: false,      // 헤더 합성 불필요 (직접 캡처에 포함)
+    needsHeaderSizeAdjustment: true,    // 헤더 크기 조정 필요 (콘텐츠 너비에 맞춤)
+    needsTableVerification: false,
     needsManagerTableInclusion: true,   // 담당자별 실적 테이블 포함 필요
     boxResizeIterations: 2,             // 박스 크기 조정 반복 횟수
+    retryConfig: { maxRetries: 3, delay: 500 },
   },
 
   // 가입자증감
@@ -133,8 +166,14 @@ export const SLIDE_CAPTURE_CONFIG = {
     needsTableScroll: true,             // 테이블 스크롤 처리
     captureMethod: 'direct',
     defaultPadding: 0,
+    preserveHeader: true,               // 헤더 보존
+    needsHeaderComposition: false,      // 헤더 합성 불필요
+    needsHeaderSizeAdjustment: true,    // 헤더 크기 조정 필요
+    needsTableVerification: false,
+    needsManagerTableInclusion: false,
     boxResizeIterations: 2,
-    needsYearSelection: true,           // 년도 선택 필요
+    needsYearSelection: true,           // 년도 선택 필요 (현재는 수동)
+    retryConfig: { maxRetries: 3, delay: 500 },
   },
 
   // 재초담초채권
@@ -149,8 +188,13 @@ export const SLIDE_CAPTURE_CONFIG = {
     needsTableExpansion: false,
     captureMethod: 'direct',
     defaultPadding: 96,                 // 기본 패딩 유지
+    preserveHeader: true,               // 헤더 보존
+    needsHeaderComposition: false,      // 헤더 합성 불필요
     needsHeaderSizeAdjustment: true,    // 헤더 크기 조정 필요 (데이터입력 헤더)
+    needsTableVerification: false,
+    needsManagerTableInclusion: false,
     boxResizeIterations: 2,
+    retryConfig: { maxRetries: 3, delay: 500 },
   },
 
   // 재고장표
@@ -165,8 +209,14 @@ export const SLIDE_CAPTURE_CONFIG = {
     needsTableExpansion: true,          // 펼치기 버튼 클릭
     captureMethod: 'composite',         // 헤더 + 테이블 합성
     defaultPadding: 0,
+    preserveHeader: true,               // 헤더 보존
     needsHeaderComposition: true,       // 헤더 합성 필요
+    needsHeaderSizeAdjustment: false,   // 헤더 크기 조정 불필요 (합성 방식)
     needsTableCentering: true,          // 테이블 중앙 정렬
+    needsTableVerification: false,
+    needsManagerTableInclusion: false,
+    boxResizeIterations: 1,
+    retryConfig: { maxRetries: 3, delay: 500 },
   },
 
   // CS 개별 실적
@@ -181,6 +231,13 @@ export const SLIDE_CAPTURE_CONFIG = {
     needsTableExpansion: true,          // 특정 섹션만 펼치기
     captureMethod: 'direct',
     defaultPadding: 96,
+    preserveHeader: false,
+    needsHeaderComposition: false,
+    needsHeaderSizeAdjustment: false,
+    needsTableVerification: false,
+    needsManagerTableInclusion: false,
+    boxResizeIterations: 1,
+    retryConfig: { maxRetries: 3, delay: 500 },
   },
 
   // 기본값
@@ -195,6 +252,13 @@ export const SLIDE_CAPTURE_CONFIG = {
     needsTableExpansion: false,
     captureMethod: 'direct',
     defaultPadding: 96,
+    preserveHeader: false,
+    needsHeaderComposition: false,
+    needsHeaderSizeAdjustment: false,
+    needsTableVerification: false,
+    needsManagerTableInclusion: false,
+    boxResizeIterations: 1,
+    retryConfig: { maxRetries: 3, delay: 500 },
   },
 };
 
