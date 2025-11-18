@@ -344,19 +344,19 @@ export async function captureElement(element, options = {}) {
       Math.max(totalContentHeight, scrollHeight, element.scrollHeight);
     
     // 계산된 높이와 실제 콘텐츠 높이 중 큰 값 사용
-    // 목차는 실제 콘텐츠가 매우 길 수 있으므로 실제 높이의 1.8배 + 여유공간
-    // 1920px로 증가하면서 파일 크기 제한(25MB)을 고려하여 높이 계산 최적화
+    // 목차는 실제 콘텐츠가 매우 길 수 있으므로 실제 높이의 1.5배 + 여유공간
+    // 1920px로 증가하면서 파일 크기 제한(25MB)을 고려하여 높이 계산 최적화 (더 보수적으로)
     const heightScale = widthScale < 1 ? (1 / widthScale) : 1;
-    const reflowMultiplier = 1.8; // 목차 재흐름 배율 (2.0 → 1.8, 25MB 제한을 위해 더 감소)
-    const calculatedHeight = Math.ceil(actualTocHeight * heightScale * reflowMultiplier) + 800; // 여유공간 800px 추가 (1000 → 800, 파일 크기 절감)
+    const reflowMultiplier = 1.5; // 목차 재흐름 배율 (1.8 → 1.5, 25MB 제한을 위해 더 감소)
+    const calculatedHeight = Math.ceil(actualTocHeight * heightScale * reflowMultiplier) + 600; // 여유공간 600px 추가 (800 → 600, 파일 크기 절감)
     
-    // 1920px 기준 파일 크기 제한 고려: 최대 높이 7000px로 제한 (3840 × 7000 × 4 ≈ 107MB 압축 전 → 약 20-22MB 압축 후, 안전한 여유)
-    const maxAllowedHeight = 7000; // 1920px 대응: 8000px → 7000px로 감소 (25MB 제한 안전하게 준수)
-    const minHeightFromContent = actualTocHeight + 800; // 실제 높이 + 800px (1200 → 800, 불필요한 여백 최소화)
+    // 1920px 기준 파일 크기 제한 고려: 최대 높이 6000px로 제한 (3840 × 6000 × 4 ≈ 92MB 압축 전 → 약 18-20MB 압축 후, 안전한 여유)
+    const maxAllowedHeight = 6000; // 1920px 대응: 7000px → 6000px로 감소 (25MB 제한 안전하게 준수)
+    const minHeightFromContent = actualTocHeight + 600; // 실제 높이 + 600px (800 → 600, 불필요한 여백 최소화)
     // 최소 높이 제한 제거: 실제 콘텐츠 크기에 맞춰 동적으로 높이 설정 (autoCrop이 불필요한 여백 제거)
     targetHeight = Math.min(
       Math.max(calculatedHeight, minHeightFromContent), // 실제 콘텐츠 높이 기반으로 계산 (최소 높이 제한 제거)
-      maxAllowedHeight // 최대 7000px로 제한
+      maxAllowedHeight // 최대 6000px로 제한
     );
     
     if (process.env.NODE_ENV === 'development') {
@@ -882,12 +882,12 @@ export async function captureElement(element, options = {}) {
       const SCALE = 2; // html2canvas scale 파라미터 (픽셀 밀도 배율)
       const estimatedHeight = finalCanvas.height / SCALE; // 원본 높이 추정
       const isVeryTall = estimatedHeight > 6000; // 6000px 이상이면 매우 긴 슬라이드
-      // 목차 슬라이드는 파일 크기가 크므로 더 낮은 품질 사용 (0.85)
-      const quality = isToc ? 0.85 : ((isLargeSlide || isVeryTall) ? 0.90 : 0.95); // 목차: 85%, 큰 슬라이드: 90%, 기타: 95%
+      // 목차 슬라이드는 파일 크기가 크므로 더 낮은 품질 사용 (0.80)
+      const quality = isToc ? 0.80 : ((isLargeSlide || isVeryTall) ? 0.90 : 0.95); // 목차: 80%, 큰 슬라이드: 90%, 기타: 95%
       
       if (process.env.NODE_ENV === 'development') {
-        if (quality === 0.85) {
-          console.log(`📦 [screenCapture] 압축 품질 85% 적용: 목차 슬라이드 (높이: ${estimatedHeight.toFixed(0)}px, 파일 크기 최적화)`);
+        if (quality === 0.80) {
+          console.log(`📦 [screenCapture] 압축 품질 80% 적용: 목차 슬라이드 (높이: ${estimatedHeight.toFixed(0)}px, 파일 크기 최적화)`);
         } else if (quality === 0.90) {
           console.log(`📦 [screenCapture] 압축 품질 90% 적용: ${isLargeSlide ? '큰 슬라이드' : '긴 슬라이드'} (높이: ${estimatedHeight.toFixed(0)}px)`);
         }

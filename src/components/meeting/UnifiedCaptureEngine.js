@@ -1115,8 +1115,8 @@ async function adjustSizes(elements, config, slide) {
           let maxAllowedHeight = MAX_HEIGHT; // 4000px (원본) = 8000px (실제)
           
           if (isToc) {
-            // 목차 슬라이드: 최대 높이 7000px (실제) = 3500px (원본)로 제한 (25MB 제한 안전하게 준수)
-            maxAllowedHeight = 3500; // 4000px → 3500px (원본) = 7000px (실제)
+            // 목차 슬라이드: 최대 높이 6000px (실제) = 3000px (원본)로 제한 (25MB 제한 안전하게 준수)
+            maxAllowedHeight = 3000; // 3500px → 3000px (원본) = 6000px (실제)
             sizeInfo.measuredHeight = Math.min(sizeInfo.measuredHeight || 0, maxAllowedHeight);
             if (process.env.NODE_ENV === 'development') {
               console.log(`📏 [adjustSizes] 목차 슬라이드 높이 제한: ${sizeInfo.measuredHeight}px (최대 ${maxAllowedHeight * SCALE}px 실제)`);
