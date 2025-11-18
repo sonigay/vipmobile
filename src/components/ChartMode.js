@@ -4901,8 +4901,8 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
     );
   }
 
-  // presentationMode일 때 그래프와 테이블의 가로 비율을 통일하기 위한 최대 너비
-  const maxContentWidth = presentationMode ? 1200 : '100%';
+  // presentationMode일 때 그래프와 테이블의 가로 비율을 통일하기 위한 최대 너비 (1920px로 증가하여 콘텐츠 축소 방지)
+  const maxContentWidth = presentationMode ? 1920 : '100%';
   
   return (
     <Box sx={{ p: 3 }}>
@@ -6779,12 +6779,14 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                                         position: 'relative', // 입력 필드 위치 명확히
                                         display: 'flex',
                                         alignItems: 'center', // 수직 정렬
+                                        height: '100%', // 전체 높이 사용 (입력값 위치 불일치 문제 해결)
                                       },
                                       '& input[type=number]': {
                                         MozAppearance: 'textfield',
                                         textAlign: 'center', // 텍스트 중앙 정렬
                                         width: '100%', // 전체 너비 사용
                                         padding: '8px', // 패딩 명시적 설정
+                                        lineHeight: 'normal', // 줄 간격 정상화 (입력값 위치 불일치 문제 해결)
                                       },
                                       '& input[type=number]::-webkit-outer-spin-button': {
                                         WebkitAppearance: 'none',
@@ -6880,8 +6882,18 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                                 onChange={(e) => handleInputChange(agent.code, '관리수수료', e.target.value)}
                                     sx={{ 
                                       width: '100%',
+                                      '& .MuiInputBase-root': {
+                                        position: 'relative', // 입력 필드 위치 명확히
+                                        display: 'flex',
+                                        alignItems: 'center', // 수직 정렬
+                                        height: '100%', // 전체 높이 사용 (입력값 위치 불일치 문제 해결)
+                                      },
                                       '& input[type=number]': {
                                         MozAppearance: 'textfield',
+                                        textAlign: 'center', // 텍스트 중앙 정렬
+                                        width: '100%', // 전체 너비 사용
+                                        padding: '8px', // 패딩 명시적 설정
+                                        lineHeight: 'normal', // 줄 간격 정상화 (입력값 위치 불일치 문제 해결)
                                       },
                                       '& input[type=number]::-webkit-outer-spin-button': {
                                         WebkitAppearance: 'none',

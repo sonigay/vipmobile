@@ -733,7 +733,113 @@ function blobToImage(blob) {
 }
 
 /**
- * 헤더 + 콘텐츠 합성 (개선: 에러 처리, 메모리 관리)
+ * 이미지 하단 흰색 여백 측정
+ */
+function measureBottomWhitespace(img, threshold = 240) {
+  // threshold: RGB 값의 평균이 이 값 이상이면 흰색으로 간주 (240 = 거의 흰색)
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return 0;
+    
+    ctx.drawImage(img, 0, 0);
+    const imageData = ctx.getImageData(0, 0, img.width, img.height);
+    const data = imageData.data;
+    
+    let bottomWhitespace = 0;
+    
+    // 하단부터 위로 스캔 (마지막 행부터)
+    for (let y = img.height - 1; y >= 0; y--) {
+      let isWhiteRow = true;
+      
+      // 해당 행의 모든 픽셀 확인
+      for (let x = 0; x < img.width; x++) {
+        const index = (y * img.width + x) * 4;
+        const r = data[index];
+        const g = data[index + 1];
+        const b = data[index + 2];
+        const avg = (r + g + b) / 3;
+        
+        // 흰색이 아니면 중단
+        if (avg < threshold) {
+          isWhiteRow = false;
+          break;
+        }
+      }
+      
+      if (isWhiteRow) {
+        bottomWhitespace++;
+      } else {
+        break; // 흰색 행이 아니면 중단
+      }
+    }
+    
+    return bottomWhitespace;
+  } catch (error) {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('⚠️ [measureBottomWhitespace] 측정 실패:', error);
+    }
+    return 0;
+  }
+}
+
+/**
+ * 이미지 상단 흰색 여백 측정
+ */
+function measureTopWhitespace(img, threshold = 240) {
+  // threshold: RGB 값의 평균이 이 값 이상이면 흰색으로 간주 (240 = 거의 흰색)
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return 0;
+    
+    ctx.drawImage(img, 0, 0);
+    const imageData = ctx.getImageData(0, 0, img.width, img.height);
+    const data = imageData.data;
+    
+    let topWhitespace = 0;
+    
+    // 상단부터 아래로 스캔 (첫 행부터)
+    for (let y = 0; y < img.height; y++) {
+      let isWhiteRow = true;
+      
+      // 해당 행의 모든 픽셀 확인
+      for (let x = 0; x < img.width; x++) {
+        const index = (y * img.width + x) * 4;
+        const r = data[index];
+        const g = data[index + 1];
+        const b = data[index + 2];
+        const avg = (r + g + b) / 3;
+        
+        // 흰색이 아니면 중단
+        if (avg < threshold) {
+          isWhiteRow = false;
+          break;
+        }
+      }
+      
+      if (isWhiteRow) {
+        topWhitespace++;
+      } else {
+        break; // 흰색 행이 아니면 중단
+      }
+    }
+    
+    return topWhitespace;
+  } catch (error) {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('⚠️ [measureTopWhitespace] 측정 실패:', error);
+    }
+    return 0;
+  }
+}
+
+/**
+ * 헤더 + 콘텐츠 합성 (개선: 에러 처리, 메모리 관리, 여백 자동 감지 및 제거)
  */
 async function compositeHeaderAndContent(headerBlob, contentBlob) {
   let headerImg = null;
@@ -767,10 +873,21 @@ async function compositeHeaderAndContent(headerBlob, contentBlob) {
       }
     }
 
+    // 헤더 이미지 하단 흰색 여백 측정
+    const headerBottomWhitespace = measureBottomWhitespace(headerImg, 240);
+    // 콘텐츠 이미지 상단 흰색 여백 측정
+    const contentTopWhitespace = measureTopWhitespace(contentImg, 240);
+    
+    // 실제 여백만큼 오버랩 (둘 중 큰 값 사용)
+    const actualGap = -Math.max(headerBottomWhitespace, contentTopWhitespace, 2); // 최소 2px 오버랩
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`📐 [compositeHeaderAndContent] 여백 자동 감지: 헤더 하단 여백 ${headerBottomWhitespace}px, 콘텐츠 상단 여백 ${contentTopWhitespace}px, 실제 gap: ${actualGap}px`);
+    }
+
     const canvas = document.createElement('canvas');
-    const gap = -2; // 헤더와 콘텐츠 사이 여백 제거 (음수로 오버랩하여 불필요한 여백 제거)
     canvas.width = finalWidth;
-    canvas.height = finalHeight + gap; // gap이 음수이므로 높이에서 차감
+    canvas.height = finalHeight + actualGap; // gap이 음수이므로 높이에서 차감
     
     const ctx = canvas.getContext('2d');
     if (!ctx) {
@@ -786,7 +903,7 @@ async function compositeHeaderAndContent(headerBlob, contentBlob) {
 
     // 콘텐츠 중앙 정렬 (헤더 바로 아래, 여백 없이)
     const contentX = (canvas.width - contentImg.width) / 2;
-    const contentY = Math.max(0, headerImg.height + gap); // gap이 음수이므로 오버랩 방지
+    const contentY = Math.max(0, headerImg.height + actualGap); // gap이 음수이므로 오버랩 방지
     ctx.drawImage(contentImg, contentX, contentY);
 
     const blob = await new Promise((resolve, reject) => {
@@ -1072,6 +1189,36 @@ async function adjustSizes(elements, config, slide) {
           (slide?.tab === 'bondChart' || slide?.tab === 'bond') &&
           slide?.subTab === 'rechotanchoBond';
         
+        // 재초담초채권 슬라이드: Chart.js 그래프 렌더링 완료 대기 (헤더 크기 조정 전에 콘텐츠 너비 정확히 측정하기 위해)
+        if (isRechotanchoBond && elements.contentElement && SafeDOM.isInDOM(elements.contentElement)) {
+          try {
+            // 모든 Paper 요소를 찾아 스크롤하여 강제 렌더링
+            const papers = Array.from(elements.contentElement.querySelectorAll('.MuiPaper-root'));
+            for (const paper of papers) {
+              if (!SafeDOM.isInDOM(paper)) continue;
+              const paperRect = SafeDOM.getBoundingRect(paper);
+              
+              // 큰 Paper 요소(그래프 또는 테이블)를 화면 중앙에 위치시켜 렌더링
+              if (paperRect.height >= 100) {
+                paper.scrollIntoView({ block: 'center', behavior: 'instant' });
+                await new Promise(r => setTimeout(r, 200));
+              }
+            }
+            
+            // Chart.js 그래프 재렌더링
+            window.dispatchEvent(new Event('resize'));
+            await new Promise(r => setTimeout(r, 500)); // Chart.js 그래프 초기 렌더링 대기
+            
+            if (process.env.NODE_ENV === 'development') {
+              console.log('✅ [adjustSizes] 재초담초채권 Chart.js 그래프 렌더링 완료 대기 (헤더 크기 조정 전)');
+            }
+          } catch (error) {
+            if (process.env.NODE_ENV === 'development') {
+              console.warn('⚠️ [adjustSizes] 재초담초채권 그래프 렌더링 대기 실패:', error);
+            }
+          }
+        }
+        
         sizeInfo = measureContentSize(elements.contentElement, {
           preferTables: config.needsManagerTableInclusion || config.needsTableVerification || isRechotanchoBond, // 재초담초채권도 테이블 포함
           preferCharts: config.captureMethod === 'direct',
@@ -1254,12 +1401,12 @@ async function adjustSizes(elements, config, slide) {
               if (maxTableHeight > (sizeInfo.maxRelativeBottom || 0)) {
                 sizeInfo.maxRelativeBottom = maxTableHeight;
                 sizeInfo.measuredHeight = Math.max(
-                  maxTableHeight + 200, // 여유 공간 증가 (150px → 200px, 콘텐츠 잘림 방지)
+                  maxTableHeight + 300, // 여유 공간 증가 (200px → 300px, 콘텐츠 잘림 방지)
                   sizeInfo.measuredHeight || 0
                 );
                 
                 if (process.env.NODE_ENV === 'development') {
-                  console.log(`📏 [adjustSizes] 담당자별 실적 테이블 포함: ${maxTableHeight}px (실제 높이: ${relativeBottom}px, scrollHeight: ${Math.max(tableScrollHeight, containerScrollHeight)}px, 여유공간: 200px)`);
+                  console.log(`📏 [adjustSizes] 담당자별 실적 테이블 포함: ${maxTableHeight}px (실제 높이: ${relativeBottom}px, scrollHeight: ${Math.max(tableScrollHeight, containerScrollHeight)}px, 여유공간: 300px)`);
                 }
               }
             }
@@ -1343,8 +1490,8 @@ async function adjustSizes(elements, config, slide) {
               console.log(`📏 [adjustSizes] 목차 슬라이드 높이 제한: ${sizeInfo.measuredHeight}px (최대 ${maxAllowedHeight * SCALE}px 실제)`);
             }
           } else if (isTotalClosing) {
-            // 전체총마감 슬라이드: 담당자별 실적 테이블 포함을 위해 높이 제한 확대 (5000px 원본 = 10000px 실제, 콘텐츠 잘림 방지)
-            maxAllowedHeight = 5000; // 4500px → 5000px (원본) = 10000px (실제) - 콘텐츠 잘림 방지를 위해 증가
+            // 전체총마감 슬라이드: 담당자별 실적 테이블 포함을 위해 높이 제한 확대 (5500px 원본 = 11000px 실제, 콘텐츠 잘림 방지)
+            maxAllowedHeight = 5500; // 5000px → 5500px (원본) = 11000px (실제) - 콘텐츠 잘림 방지를 위해 증가
             sizeInfo.measuredHeight = Math.min(sizeInfo.measuredHeight || 0, maxAllowedHeight);
             if (process.env.NODE_ENV === 'development') {
               console.log(`📏 [adjustSizes] 전체총마감 슬라이드 높이 제한: ${sizeInfo.measuredHeight}px (최대 ${maxAllowedHeight * SCALE}px 실제, 담당자별 실적 포함)`);
@@ -1909,12 +2056,12 @@ async function executeCapture(elements, config, sizeInfo, slide) {
             }
             await new Promise(r => setTimeout(r, 300));
             
-            // Chart.js 그래프 재렌더링
+            // Chart.js 그래프 재렌더링 (대기 시간 증가: 500ms → 1000ms)
             window.dispatchEvent(new Event('resize'));
-            await new Promise(r => setTimeout(r, 500));
+            await new Promise(r => setTimeout(r, 1000)); // Chart.js 그래프 완전 렌더링 대기 시간 증가
             
             if (process.env.NODE_ENV === 'development') {
-              console.log('✅ [executeCapture] 재초담초채권 모든 요소 렌더링 완료');
+              console.log('✅ [executeCapture] 재초담초채권 모든 요소 렌더링 완료 (Chart.js 렌더링 대기: 1000ms)');
             }
           } catch (error) {
             if (process.env.NODE_ENV === 'development') {

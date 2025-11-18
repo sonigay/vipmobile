@@ -1497,18 +1497,34 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
     if (slide.type === 'ending') {
       // 회의 차수 보강: 슬라이드에 누락된 경우 전역 컨텍스트(window) 또는 meeting 객체에서 가져오기
       try {
-        // slide.meetingNumber가 null, undefined, 0, 빈 문자열인 경우 보강
-        if (typeof window !== 'undefined' && 
-            (slide.meetingNumber == null || slide.meetingNumber === '' || slide.meetingNumber === 0)) {
+        // meetingNumber 유효성 검증 함수
+        const isValidMeetingNumber = (value) => {
+          if (value == null) return false;
+          if (value === '') return false;
+          if (value === 0) return false;
+          const strValue = String(value).trim();
+          if (strValue === '' || strValue === '0') return false;
+          return true;
+        };
+        
+        // slide.meetingNumber가 유효하지 않은 경우 보강
+        if (typeof window !== 'undefined' && !isValidMeetingNumber(slide.meetingNumber)) {
           // 1순위: window.__MEETING_NUMBER (메인 슬라이드에서 설정된 값)
-          if (window.__MEETING_NUMBER != null && window.__MEETING_NUMBER !== '' && window.__MEETING_NUMBER !== 0) {
+          if (isValidMeetingNumber(window.__MEETING_NUMBER)) {
             slide.meetingNumber = window.__MEETING_NUMBER;
             if (process.env.NODE_ENV === 'development') {
               console.log(`✅ [SlideRenderer] 엔딩 슬라이드 회의 차수 보강 (window): ${slide.meetingNumber}`);
             }
+          } else {
+            if (process.env.NODE_ENV === 'development') {
+              console.warn(`⚠️ [SlideRenderer] 엔딩 슬라이드 회의 차수 없음: slide.meetingNumber=${slide.meetingNumber}, window.__MEETING_NUMBER=${window.__MEETING_NUMBER}`);
+            }
           }
           // 2순위: loggedInStore나 meeting 객체에서 가져오기 (추가 보강 로직)
           // (현재는 window.__MEETING_NUMBER만 사용)
+        } else if (process.env.NODE_ENV === 'development') {
+          // 디버깅: meetingNumber 값 로그 출력
+          console.log(`🔍 [SlideRenderer] 엔딩 슬라이드 회의 차수: slide.meetingNumber=${slide.meetingNumber} (타입: ${typeof slide.meetingNumber}), window.__MEETING_NUMBER=${window.__MEETING_NUMBER}`);
         }
       } catch (error) {
         if (process.env.NODE_ENV === 'development') {
@@ -1685,15 +1701,19 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                   fontSize: { xs: '1.1rem', md: '2.1rem' }, // 1920px 대응: 1.4rem→2.1rem, 1.5배
                   fontWeight: 500,
                   color: '#495057',
-                  mb: (slide.meetingNumber != null && slide.meetingNumber !== '') ? 1.5 : 0, // 회의 번호가 실제로 있으면 마진, 없으면 0 (빈 공간 방지)
+                  mb: (slide.meetingNumber != null && slide.meetingNumber !== '' && slide.meetingNumber !== 0 && String(slide.meetingNumber).trim() !== '' && String(slide.meetingNumber).trim() !== '0') ? 1.5 : 0, // 회의 번호가 실제로 있으면 마진, 없으면 0 (빈 공간 방지)
                   fontFamily: '"Noto Sans KR", sans-serif'
                 }}
               >
                 {formattedDate}
               </Typography>
               
-              {/* 회의 번호 - 세 번째 줄 (조건부 렌더링, 빈 공간 방지) - null/undefined/빈 문자열 체크 */}
-              {slide.meetingNumber != null && slide.meetingNumber !== '' && slide.meetingNumber !== 0 ? (
+              {/* 회의 번호 - 세 번째 줄 (조건부 렌더링, 빈 공간 방지) - 강화된 검증: null/undefined/빈 문자열/0/공백 문자열 체크 */}
+              {slide.meetingNumber != null && 
+               slide.meetingNumber !== '' && 
+               slide.meetingNumber !== 0 && 
+               String(slide.meetingNumber).trim() !== '' && 
+               String(slide.meetingNumber).trim() !== '0' ? (
                 <Box sx={{
                   display: 'inline-block',
                   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
