@@ -25,7 +25,8 @@ import {
 
 // 이미지 크기 제한 상수
 // 원본 크기 기준 (html2canvas의 scale이 적용되기 전)
-const MAX_WIDTH = 2560;  // 최대 너비 (원본)
+// screenCapture.js의 BASE_CAPTURE_WIDTH(1280px)와 일관성 유지
+const MAX_WIDTH = 1280;  // 최대 너비 (원본) - 2560에서 축소하여 파일 크기 제한 및 일관성 유지
 const MAX_HEIGHT = 4000;  // 최대 높이 (원본) - 8000에서 축소하여 파일 크기 제한
 const SCALE = 2;  // html2canvas scale 파라미터 (픽셀 밀도 배율)
 
