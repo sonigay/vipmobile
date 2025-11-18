@@ -870,6 +870,68 @@ function detectElements(slideElement, captureTargetElement, config) {
     if (config?.preserveHeader || config?.needsHeaderComposition || config?.needsHeaderSizeAdjustment) {
       elements.headerElement = detectHeader(slideElement, { preserveHeader: true });
       
+      // 재고장표 슬라이드는 헤더가 필수이므로, detectHeader가 실패하면 더 강력한 탐지 시도
+      if (!elements.headerElement && config?.needsHeaderComposition) {
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('⚠️ [detectElements] 재고장표 헤더 탐지 실패, 강화된 탐지 시도...');
+        }
+        
+        // 재고장표 슬라이드 헤더 강화 탐지: 상단에 고정된 Box 요소 찾기
+        try {
+          const slideRect = SafeDOM.getBoundingRect(slideElement);
+          const allElements = Array.from(slideElement.querySelectorAll('*'));
+          
+          // 상단에 고정된 헤더 후보 찾기 (position: absolute 또는 fixed)
+          const headerCandidates = allElements.filter(el => {
+            if (!SafeDOM.isInDOM(el)) return false;
+            const style = window.getComputedStyle(el);
+            const rect = SafeDOM.getBoundingRect(el);
+            const relativeTop = rect.top - slideRect.top;
+            const text = (el.textContent || '').trim();
+            
+            // 상단 영역 (0-200px)에 있고, 회사명 포함하거나 로고 포함
+            const isInTopArea = relativeTop >= -30 && relativeTop < 200;
+            const hasCompanyName = text.includes('(주)브이아이피플러스') || text.includes('브이아이피플러스');
+            const hasLogo = el.querySelector('img, svg, [class*="logo"], [class*="Logo"]') !== null;
+            const hasValidSize = rect.height > 40 && rect.width > slideRect.width * 0.3;
+            const isPositioned = style.position === 'absolute' || style.position === 'fixed';
+            const isNotContent = !text.includes('재고장표') && !text.includes('모델명') && !text.includes('총계') && !text.includes('테이블');
+            
+            return isInTopArea && hasValidSize && isNotContent && (hasCompanyName || hasLogo || isPositioned);
+          });
+          
+          // 가장 상단에 있고 가장 큰 요소 선택
+          if (headerCandidates.length > 0) {
+            const bestCandidate = headerCandidates
+              .sort((a, b) => {
+                const aRect = SafeDOM.getBoundingRect(a);
+                const bRect = SafeDOM.getBoundingRect(b);
+                const aTop = aRect.top - slideRect.top;
+                const bTop = bRect.top - slideRect.top;
+                
+                // 상단에 가까운 것 우선
+                if (Math.abs(aTop) !== Math.abs(bTop)) {
+                  return Math.abs(aTop) - Math.abs(bTop);
+                }
+                // 크기가 큰 것 우선
+                return (bRect.width * bRect.height) - (aRect.width * aRect.height);
+              })[0];
+            
+            if (bestCandidate && SafeDOM.isInDOM(bestCandidate)) {
+              elements.headerElement = bestCandidate;
+              const headerRect = SafeDOM.getBoundingRect(bestCandidate);
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`✅ [detectElements] 재고장표 헤더 강화 탐지 성공: ${headerRect.width}x${headerRect.height}px`);
+              }
+            }
+          }
+        } catch (error) {
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('⚠️ [detectElements] 재고장표 헤더 강화 탐지 실패:', error);
+          }
+        }
+      }
+      
       if (process.env.NODE_ENV === 'development') {
         if (elements.headerElement && SafeDOM.isInDOM(elements.headerElement)) {
           const headerRect = SafeDOM.getBoundingRect(elements.headerElement);
@@ -881,7 +943,53 @@ function detectElements(slideElement, captureTargetElement, config) {
     }
 
     // 콘텐츠 요소는 captureTargetElement 사용
-    elements.contentElement = elements.captureTargetElement;
+    // 단, 재고장표 슬라이드는 composite 방식으로 헤더와 테이블을 합성하므로,
+    // 테이블이 포함된 콘텐츠 영역을 찾아야 함
+    if (config?.needsHeaderComposition && config?.captureMethod === 'composite') {
+      // composite 방식: 헤더는 slideElement에서, 테이블은 contentElement에서 찾음
+      // contentElement는 테이블이 포함된 영역이어야 함
+      // captureTargetElement가 테이블만 포함하는 경우 slideElement 사용
+      let contentElementCandidate = elements.captureTargetElement;
+      
+      // captureTargetElement가 slideElement와 같으면 그대로 사용
+      if (contentElementCandidate === slideElement) {
+        elements.contentElement = slideElement;
+      } else {
+        // captureTargetElement가 테이블 컨테이너인 경우,
+        // 테이블이 포함된 더 큰 컨테이너를 찾거나 slideElement 사용
+        try {
+          const hasTable = contentElementCandidate.querySelector('table, .MuiTable-root, .MuiTableContainer-root');
+          if (hasTable && SafeDOM.isInDOM(hasTable)) {
+            // 테이블이 있으면 해당 요소 사용
+            elements.contentElement = contentElementCandidate;
+          } else {
+            // 테이블이 없으면 slideElement에서 테이블 찾기
+            const tableInSlide = slideElement.querySelector('table, .MuiTable-root, .MuiTableContainer-root');
+            if (tableInSlide && SafeDOM.isInDOM(tableInSlide)) {
+              // 테이블의 부모 컨테이너 찾기 (Paper, Card 등)
+              const tableContainer = tableInSlide.closest('.MuiPaper-root, .MuiCard-root, .MuiBox-root') || 
+                                     tableInSlide.parentElement;
+              elements.contentElement = (tableContainer && SafeDOM.isInDOM(tableContainer)) ? tableContainer : slideElement;
+            } else {
+              // 테이블을 찾을 수 없으면 slideElement 사용
+              elements.contentElement = slideElement;
+            }
+          }
+        } catch (error) {
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('⚠️ [detectElements] 재고장표 콘텐츠 요소 탐지 실패, slideElement 사용:', error);
+          }
+          elements.contentElement = slideElement;
+        }
+      }
+      
+      if (process.env.NODE_ENV === 'development') {
+        const contentRect = elements.contentElement ? SafeDOM.getBoundingRect(elements.contentElement) : null;
+        console.log(`📦 [detectElements] 재고장표 콘텐츠 요소: ${contentElementCandidate === elements.contentElement ? 'captureTargetElement' : 'slideElement/tableContainer'} (${contentRect?.width}x${contentRect?.height}px)`);
+      }
+    } else {
+      elements.contentElement = elements.captureTargetElement;
+    }
 
     // 테이블 찾기 (필요한 경우)
     if ((config?.needsTableVerification || config?.needsManagerTableInclusion) && elements.contentElement) {
@@ -1038,12 +1146,30 @@ async function adjustSizes(elements, config, slide) {
               const tableRect = SafeDOM.getBoundingRect(lastTable);
               const relativeBottom = tableRect.bottom - rect.top;
               
-              if (relativeBottom > (sizeInfo.maxRelativeBottom || 0)) {
-                sizeInfo.maxRelativeBottom = relativeBottom;
+              // scrollHeight도 고려하여 전체 테이블 높이 포함 (스크롤 가능한 테이블도 전체 높이 측정)
+              const tableScrollHeight = lastTable.scrollHeight || tableRect.height;
+              const tableContainer = lastTable.closest('.MuiTableContainer-root');
+              let containerScrollHeight = 0;
+              if (tableContainer && SafeDOM.isInDOM(tableContainer)) {
+                containerScrollHeight = tableContainer.scrollHeight || 0;
+              }
+              
+              // 실제 높이와 scrollHeight 중 큰 값 사용 (스크롤 가능한 테이블도 전체 포함)
+              const maxTableHeight = Math.max(
+                relativeBottom,
+                (tableRect.top - rect.top) + Math.max(tableScrollHeight, containerScrollHeight)
+              );
+              
+              if (maxTableHeight > (sizeInfo.maxRelativeBottom || 0)) {
+                sizeInfo.maxRelativeBottom = maxTableHeight;
                 sizeInfo.measuredHeight = Math.max(
-                  relativeBottom + 100,
+                  maxTableHeight + 150, // 여유 공간 증가 (100px → 150px)
                   sizeInfo.measuredHeight || 0
                 );
+                
+                if (process.env.NODE_ENV === 'development') {
+                  console.log(`📏 [adjustSizes] 담당자별 실적 테이블 포함: ${maxTableHeight}px (실제 높이: ${relativeBottom}px, scrollHeight: ${Math.max(tableScrollHeight, containerScrollHeight)}px)`);
+                }
               }
             }
           }
@@ -1112,6 +1238,10 @@ async function adjustSizes(elements, config, slide) {
           
           // MAX_HEIGHT = 4000px (원본) = 8000px (실제 SCALE 2 적용)
           // 목차 슬라이드는 파일 크기 제한을 위해 더 보수적인 높이 제한 적용
+          // 전체총마감 슬라이드는 담당자별 실적 테이블 포함을 위해 더 큰 높이 필요
+          const isTotalClosing = slide?.mode === 'chart' && 
+                                 (slide?.tab === 'closingChart' || slide?.tab === 'closing') && 
+                                 slide?.subTab === 'totalClosing';
           let maxAllowedHeight = MAX_HEIGHT; // 4000px (원본) = 8000px (실제)
           
           if (isToc) {
@@ -1120,6 +1250,13 @@ async function adjustSizes(elements, config, slide) {
             sizeInfo.measuredHeight = Math.min(sizeInfo.measuredHeight || 0, maxAllowedHeight);
             if (process.env.NODE_ENV === 'development') {
               console.log(`📏 [adjustSizes] 목차 슬라이드 높이 제한: ${sizeInfo.measuredHeight}px (최대 ${maxAllowedHeight * SCALE}px 실제)`);
+            }
+          } else if (isTotalClosing) {
+            // 전체총마감 슬라이드: 담당자별 실적 테이블 포함을 위해 높이 제한 확대 (4500px 원본 = 9000px 실제)
+            maxAllowedHeight = 4500; // 4000px → 4500px (원본) = 9000px (실제)
+            sizeInfo.measuredHeight = Math.min(sizeInfo.measuredHeight || 0, maxAllowedHeight);
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`📏 [adjustSizes] 전체총마감 슬라이드 높이 제한: ${sizeInfo.measuredHeight}px (최대 ${maxAllowedHeight * SCALE}px 실제, 담당자별 실적 포함)`);
             }
           } else if (isMain || isEnding) {
             // 메인/엔딩 슬라이드: 최대 높이 제한 적용
@@ -1242,8 +1379,52 @@ async function executeCapture(elements, config, sizeInfo, slide) {
       case 'composite': {
         // 재고장표: 헤더 + 테이블 합성
         try {
-          // 테이블 컨테이너 찾기 (data-capture-exclude가 없는 것만)
-          let tableContainer = elements.contentElement?.querySelector('.MuiTableContainer-root');
+          // 테이블 컨테이너 찾기: contentElement에서 테이블 찾기
+          // contentElement가 slideElement와 같은 경우 테이블만 포함하는 컨테이너 찾기
+          let tableContainer = null;
+          
+          // 1단계: contentElement에서 직접 테이블 컨테이너 찾기
+          if (elements.contentElement && elements.contentElement !== elements.slideElement) {
+            tableContainer = elements.contentElement.querySelector('.MuiTableContainer-root');
+          }
+          
+          // 2단계: contentElement가 slideElement와 같거나 테이블을 찾지 못한 경우,
+          // slideElement에서 테이블 찾기 (헤더 제외)
+          if (!tableContainer && elements.slideElement) {
+            const allContainers = Array.from(elements.slideElement.querySelectorAll('.MuiTableContainer-root'));
+            tableContainer = allContainers.find(container => {
+              // data-capture-exclude가 있는 요소는 제외
+              let current = container;
+              while (current && current !== elements.slideElement) {
+                if (current.getAttribute('data-capture-exclude') === 'true') {
+                  return false;
+                }
+                current = current.parentElement;
+              }
+              
+              // 헤더 영역이 아닌지 확인 (상단 200px 이하는 헤더)
+              const containerRect = SafeDOM.getBoundingRect(container);
+              const slideRect = SafeDOM.getBoundingRect(elements.slideElement);
+              const relativeTop = containerRect.top - slideRect.top;
+              
+              // 상단 영역(헤더)이 아니고, 테이블 콘텐츠를 포함하는 경우
+              if (relativeTop < 200) return false; // 헤더 영역 제외
+              
+              const text = container.textContent || '';
+              return text.includes('총계') || text.includes('모델명') || text.includes('재고장표') || container.querySelector('table') !== null;
+            });
+          }
+          
+          // 3단계: 여전히 찾지 못한 경우 모든 테이블 컨테이너 중 헤더가 아닌 것 찾기
+          if (!tableContainer && elements.slideElement) {
+            const allContainers = Array.from(elements.slideElement.querySelectorAll('.MuiTableContainer-root'));
+            tableContainer = allContainers.find(container => {
+              const containerRect = SafeDOM.getBoundingRect(container);
+              const slideRect = SafeDOM.getBoundingRect(elements.slideElement);
+              const relativeTop = containerRect.top - slideRect.top;
+              return relativeTop >= 200; // 헤더 영역 제외
+            });
+          }
           
           // data-capture-exclude가 있는 요소는 제외
           if (tableContainer) {
@@ -1255,22 +1436,6 @@ async function executeCapture(elements, config, sizeInfo, slide) {
               }
               current = current.parentElement;
             }
-          }
-          
-          // 테이블 컨테이너를 찾지 못한 경우, 직접 찾기
-          if (!tableContainer) {
-            const allContainers = Array.from(elements.contentElement?.querySelectorAll('.MuiTableContainer-root') || []);
-            tableContainer = allContainers.find(container => {
-              let current = container;
-              while (current && current !== elements.slideElement) {
-                if (current.getAttribute('data-capture-exclude') === 'true') {
-                  return false;
-                }
-                current = current.parentElement;
-              }
-              const text = container.textContent || '';
-              return text.includes('총계') || text.includes('모델명') || container.querySelector('table') !== null;
-            });
           }
           
           if (!tableContainer || !SafeDOM.isInDOM(tableContainer)) {
@@ -1314,20 +1479,35 @@ async function executeCapture(elements, config, sizeInfo, slide) {
           const tableScrollWidth = actualTable.scrollWidth || tableRect.width;
           const tableScrollHeight = actualTable.scrollHeight || tableRect.height;
           
-          // 오른쪽 여백 제거: scrollWidth와 실제 너비 비교
+          // tableContainer의 scrollWidth도 확인 (오른쪽 여백 제거를 위해)
+          const containerScrollWidth = tableContainer.scrollWidth || tableContainer.clientWidth || 0;
+          const containerRect = SafeDOM.getBoundingRect(tableContainer);
+          
+          // 오른쪽 여백 제거: scrollWidth와 실제 너비 비교 (테이블과 컨테이너 모두 확인)
           let actualTableWidth = tableRect.width;
-          const widthDiff = tableScrollWidth - tableRect.width;
+          
+          // 테이블의 scrollWidth 확인
+          const tableWidthDiff = tableScrollWidth - tableRect.width;
+          // 컨테이너의 scrollWidth 확인
+          const containerWidthDiff = containerScrollWidth - containerRect.width;
+          
+          // 더 큰 차이를 사용하여 오른쪽 여백 제거
+          const maxWidthDiff = Math.max(tableWidthDiff, containerWidthDiff);
+          const maxScrollWidth = Math.max(tableScrollWidth, containerScrollWidth);
           
           // scrollWidth가 실제 너비보다 크면 실제 콘텐츠 너비 사용 (오른쪽 여백 제거)
-          if (widthDiff > 50) {
-            // 실제 콘텐츠 너비 = scrollWidth (오른쪽 여백 제외)
-            actualTableWidth = tableScrollWidth;
+          if (maxWidthDiff > 10) { // 임계값 낮춤 (50px → 10px)으로 더 정확하게 감지
+            // 실제 콘텐츠 너비 = maxScrollWidth (오른쪽 여백 제외)
+            actualTableWidth = maxScrollWidth;
             if (process.env.NODE_ENV === 'development') {
-              console.log(`📏 [executeCapture] 재고장표 오른쪽 여백 제거: ${tableRect.width}px → ${actualTableWidth}px (차이: ${widthDiff}px)`);
+              console.log(`📏 [executeCapture] 재고장표 오른쪽 여백 제거: ${tableRect.width}px → ${actualTableWidth}px (테이블 차이: ${tableWidthDiff}px, 컨테이너 차이: ${containerWidthDiff}px)`);
             }
           } else {
             // 차이가 작으면 실제 너비 사용
             actualTableWidth = tableRect.width;
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`📏 [executeCapture] 재고장표 오른쪽 여백 없음: ${actualTableWidth}px (테이블 차이: ${tableWidthDiff}px, 컨테이너 차이: ${containerWidthDiff}px)`);
+            }
           }
           
           let actualTableHeight = 0;
@@ -1562,26 +1742,23 @@ async function executeCapture(elements, config, sizeInfo, slide) {
             height: tableHeight,
           });
 
-          // 합성 또는 테이블만 반환
-          if (headerBlob && tableBlob) {
-            blob = await compositeHeaderAndContent(headerBlob, tableBlob);
-            if (process.env.NODE_ENV === 'development') {
-              const headerSize = (headerBlob.size / 1024).toFixed(2);
-              const tableSize = (tableBlob.size / 1024).toFixed(2);
-              const compositeSize = blob ? (blob.size / 1024).toFixed(2) : 'N/A';
-              console.log(`✅ [executeCapture] 재고장표 헤더+테이블 합성 완료: 헤더(${headerSize}KB) + 테이블(${tableSize}KB) = ${compositeSize}KB`);
-            }
-          } else {
-            blob = tableBlob;
-            if (process.env.NODE_ENV === 'development') {
-              if (!headerBlob) {
-                console.error('❌ [executeCapture] 재고장표 헤더를 찾지 못해 테이블만 캡처');
-                console.error('  - 헤더 탐지 방법: detectHeader 또는 대체 방법 모두 실패');
-                console.error('  - 테이블만 캡처: 헤더가 없는 이미지가 업로드됩니다');
-              } else if (!tableBlob) {
-                console.error('❌ [executeCapture] 재고장표 테이블을 찾지 못해 헤더만 캡처');
-              }
-            }
+          // 헤더가 없으면 에러 발생 (재고장표는 헤더 필수)
+          if (!headerBlob) {
+            throw new Error('재고장표 슬라이드 헤더를 찾을 수 없습니다. 헤더가 포함된 캡처가 필요합니다.');
+          }
+          
+          // 테이블이 없으면 에러 발생
+          if (!tableBlob) {
+            throw new Error('재고장표 슬라이드 테이블을 찾을 수 없습니다.');
+          }
+          
+          // 헤더 + 테이블 합성
+          blob = await compositeHeaderAndContent(headerBlob, tableBlob);
+          if (process.env.NODE_ENV === 'development') {
+            const headerSize = (headerBlob.size / 1024).toFixed(2);
+            const tableSize = (tableBlob.size / 1024).toFixed(2);
+            const compositeSize = blob ? (blob.size / 1024).toFixed(2) : 'N/A';
+            console.log(`✅ [executeCapture] 재고장표 헤더+테이블 합성 완료: 헤더(${headerSize}KB) + 테이블(${tableSize}KB) = ${compositeSize}KB`);
           }
         } catch (error) {
           if (process.env.NODE_ENV === 'development') {

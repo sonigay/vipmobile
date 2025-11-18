@@ -410,14 +410,14 @@ export async function captureElement(element, options = {}) {
     
     // 계산된 높이와 실제 콘텐츠 높이 중 큰 값 사용
     // 고정 가로폭 적용 시 세로 재흐름을 고려한 높이 계산
-    // 1920px 대응: 파일 크기 제한(25MB)을 고려하여 높이 계산 최적화
+    // 1920px 대응: 파일 크기 제한(25MB)을 고려하여 높이 계산 최적화 (더 보수적으로)
     const heightScale = widthScale < 1 ? (1 / widthScale) : 1;
-    const reflowMultiplier = 2.0; // 재흐름 고려 배율 (1.5 → 2.0)
-    const calculatedHeight = Math.ceil(actualHeight * heightScale * reflowMultiplier) + 1000; // 여유공간 1000px 추가 (1500 → 1000, 1920px 대응으로 감소)
+    const reflowMultiplier = 1.5; // 재흐름 고려 배율 (2.0 → 1.5, 불필요한 여백 최소화)
+    const calculatedHeight = Math.ceil(actualHeight * heightScale * reflowMultiplier) + 600; // 여유공간 600px 추가 (1000 → 600, 불필요한 여백 최소화)
     
     // 1920px 기준 파일 크기 제한 고려: 최대 높이 8000px로 제한 (3840 × 8000 × 4 ≈ 122MB 압축 전 → 약 25MB 압축 후)
     const maxAllowedHeight = 8000; // 1920px 대응: 최대 높이 8000px로 제한 (25MB 제한 준수)
-    const minHeightFromContent = actualHeight + 1000; // 실제 높이 + 1000px (1500 → 1000, 불필요한 여백 최소화)
+    const minHeightFromContent = actualHeight + 600; // 실제 높이 + 600px (1000 → 600, 불필요한 여백 최소화)
     // 최소 높이 제한 제거: 실제 콘텐츠 크기에 맞춰 동적으로 높이 설정 (autoCrop이 불필요한 여백 제거)
     targetHeight = Math.min(
       Math.max(calculatedHeight, minHeightFromContent), // 실제 콘텐츠 높이 기반으로 계산 (최소 높이 제한 제거)
@@ -767,13 +767,19 @@ export async function captureElement(element, options = {}) {
           }
         });
         
+        // 실제 콘텐츠 높이만 사용 (targetHeight는 여유가 포함되어 있으므로 제외)
+        // maxBottom은 실제 콘텐츠의 최하단 위치이므로 이를 우선 사용
         const actualScrollHeight = Math.max(
+          maxBottom > 0 ? maxBottom : element.scrollHeight, // 실제 콘텐츠 위치 우선
           element.scrollHeight,
           element.offsetHeight,
-          element.getBoundingClientRect().height,
-          maxBottom,
-          targetHeight
+          element.getBoundingClientRect().height
+          // targetHeight 제외: 불필요한 여백 최소화
         );
+        
+        // targetHeight를 최대값으로 제한하여 불필요한 여백 방지
+        const maxAllowedScrollHeight = targetHeight;
+        const finalCalculatedHeight = Math.min(actualScrollHeight, maxAllowedScrollHeight);
         
         // 요소를 실제로 확장하여 모든 콘텐츠가 보이도록
         const originalHeight = element.style.height;
@@ -781,10 +787,10 @@ export async function captureElement(element, options = {}) {
         const originalMaxHeight = element.style.maxHeight;
         const originalOverflow = element.style.overflow;
         
-        // 요소의 높이를 실제 scrollHeight로 강제 설정
-        element.style.setProperty('height', `${actualScrollHeight}px`, 'important');
-        element.style.setProperty('min-height', `${actualScrollHeight}px`, 'important');
-        element.style.setProperty('max-height', 'none', 'important');
+        // 요소의 높이를 실제 콘텐츠 높이로 강제 설정 (targetHeight 제한 적용)
+        element.style.setProperty('height', `${finalCalculatedHeight}px`, 'important');
+        element.style.setProperty('min-height', `${finalCalculatedHeight}px`, 'important');
+        element.style.setProperty('max-height', `${maxAllowedScrollHeight}px`, 'important'); // 최대 높이 제한
         element.style.setProperty('overflow', 'visible', 'important');
         
         // 부모 요소도 확인
@@ -805,21 +811,24 @@ export async function captureElement(element, options = {}) {
         // 확장 후 렌더링 대기
         await new Promise(r => setTimeout(r, 500));
         
-        // 최종 높이 재확인
-        const finalScrollHeight = Math.max(
-          element.scrollHeight,
-          element.offsetHeight,
-          actualScrollHeight
+        // 최종 높이 재확인 (실제 콘텐츠 높이와 최대 높이 제한 고려)
+        const finalScrollHeight = Math.min(
+          Math.max(
+            element.scrollHeight,
+            element.offsetHeight,
+            finalCalculatedHeight
+          ),
+          maxAllowedScrollHeight // 최대 높이 제한 적용
         );
         
-        if (finalScrollHeight > actualScrollHeight) {
+        if (finalScrollHeight !== finalCalculatedHeight) {
           element.style.setProperty('height', `${finalScrollHeight}px`, 'important');
           element.style.setProperty('min-height', `${finalScrollHeight}px`, 'important');
           await new Promise(r => setTimeout(r, 300));
         }
         
         if (process.env.NODE_ENV === 'development') {
-          console.log(`📏 [screenCapture] 요소 확장: ${actualScrollHeight}px → ${finalScrollHeight}px`);
+          console.log(`📏 [screenCapture] 요소 확장: ${actualScrollHeight}px → ${finalCalculatedHeight}px → ${finalScrollHeight}px (최대 제한: ${maxAllowedScrollHeight}px)`);
         }
         
         // html2canvas 옵션에서 height 제한 제거
