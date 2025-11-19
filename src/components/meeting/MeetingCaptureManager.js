@@ -2298,10 +2298,10 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
 
       // 재고장표, 월간시상, 가입자증감 슬라이드: 레거시 캡처 로직 제거 (UnifiedCaptureEngine으로 통합)
       // 기존 로직은 UnifiedCaptureEngine에서 처리
-      // if (
-      //   currentSlide?.mode === 'chart' &&
-      //   (currentSlide?.tab === 'indicatorChart' || currentSlide?.subTab === 'monthlyAward')
-      // ) {
+      if (false && (
+        currentSlide?.mode === 'chart' &&
+        (currentSlide?.tab === 'indicatorChart' || currentSlide?.subTab === 'monthlyAward')
+      )) {
         try {
           // 1) 확대 버튼 클릭
           const expandBtn = Array.from(document.querySelectorAll('button, .MuiButton-root')).find(
@@ -2524,7 +2524,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             
             await new Promise(r => setTimeout(r, 300)); // 스타일 변경 후 렌더링 대기
               
-              monthlyAwardCompositeBlob = await captureElement(commonAncestor, {
+              const _monthlyAwardCompositeBlob = await captureElement(commonAncestor, {
                 scale: 2,
                 useCORS: true,
               fixedBottomPaddingPx: 0, // 핑크바 제거
@@ -2600,7 +2600,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                   currentY += img.height + gap;
                 });
                 
-                monthlyAwardCompositeBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+                const _monthlyAwardCompositeBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
                 
                 if (process.env.NODE_ENV === 'development') {
                   console.log(`✅ [MeetingCaptureManager] 월간시상 ${tables.length}개 테이블 합성 완료`);
@@ -2619,12 +2619,11 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
 
       // 가입자증감 슬라이드: 레거시 캡처 로직 제거 (UnifiedCaptureEngine으로 통합)
       // 기존 로직은 UnifiedCaptureEngine에서 처리
-      // let subscriberIncreaseCompositeBlob = null;
-      // if (
-      //   currentSlide?.mode === 'chart' &&
-      //   (currentSlide?.tab === 'bondChart' || currentSlide?.tab === 'bond') &&
-      //   (currentSlide?.subTab === 'subscriberIncrease')
-      // ) {
+      if (false && (
+        currentSlide?.mode === 'chart' &&
+        (currentSlide?.tab === 'bondChart' || currentSlide?.tab === 'bond') &&
+        (currentSlide?.subTab === 'subscriberIncrease')
+      )) {
         try {
           // 데이터 로딩 완료 최종 확인 (연도 선택 후 추가 대기 시간 동안에도 확인)
           if (process.env.NODE_ENV === 'development') {
@@ -3301,7 +3300,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             await new Promise(r => setTimeout(r, 300)); // 스타일 변경 후 렌더링 대기
             
             // 크롭 로직 활성화하여 불필요한 여백 제거 (클라이언트 측 크롭 + 서버 측 크롭)
-            subscriberIncreaseCompositeBlob = await captureElement(commonAncestor, {
+            const _subscriberIncreaseCompositeBlob = await captureElement(commonAncestor, {
               scale: 2,
               useCORS: true,
               fixedBottomPaddingPx: 0, // 핑크바 제거
@@ -3322,18 +3321,15 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
           }
         } catch (e) {
           console.error('❌ [MeetingCaptureManager] 가입자증감 캡처 실패:', e);
-          // subscriberIncreaseCompositeBlob = null;
         }
-      // }
+      }
       
       // 기존 합성 방식 코드 제거 (월간시상 방식으로 변경) - UnifiedCaptureEngine으로 통합
-      // let compositeBlob = null;
-      // if (
-      //   currentSlide?.mode === 'chart' &&
-      //   (currentSlide?.tab === 'bondChart' || currentSlide?.tab === 'bond') &&
-      //   (currentSlide?.subTab === 'subscriberIncrease') &&
-      //   false // 기존 합성 방식 비활성화
-      // ) {
+      if (false && (
+        currentSlide?.mode === 'chart' &&
+        (currentSlide?.tab === 'bondChart' || currentSlide?.tab === 'bond') &&
+        (currentSlide?.subTab === 'subscriberIncrease')
+      )) {
         try {
           const blobToImage = (blob) => new Promise((resolve, reject) => {
             const url = URL.createObjectURL(blob);
@@ -3988,21 +3984,21 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                 ctx.drawImage(imgHeader, headerX, 0, targetWidth, scaledHeaderHeight);
                 ctx.drawImage(imgContent, contentX, scaledHeaderHeight + gap);
                 
-                compositeBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+                const _compositeBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
                 
                 if (process.env.NODE_ENV === 'development') {
                   console.log('✅ [MeetingCaptureManager] 가입자증감 헤더+콘텐츠 합성 완료');
                 }
               } else {
                 // 헤더를 찾지 못한 경우 콘텐츠만 사용
-                compositeBlob = contentBlob;
+                const _compositeBlob = contentBlob;
                 if (process.env.NODE_ENV === 'development') {
                   console.warn('⚠️ [MeetingCaptureManager] 슬라이드 헤더를 찾을 수 없습니다.');
                 }
               }
             } catch (e) {
               // 헤더 캡처 실패 시 콘텐츠만 사용
-              compositeBlob = contentBlob;
+              const _compositeBlob = contentBlob;
               if (process.env.NODE_ENV === 'development') {
                 console.warn('⚠️ [MeetingCaptureManager] 헤더 캡처 실패:', e?.message);
               }
@@ -4010,21 +4006,19 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
           }
         } catch (e) {
           console.error('❌ [MeetingCaptureManager] 가입자증감 캡처 실패:', e);
-          // 에러 발생 시에도 compositeBlob을 null로 설정하여 fallback 사용
-          compositeBlob = null;
         }
       }
 
-      // 가입자증감 슬라이드인 경우 compositeBlob 확인 및 로깅
-      const isSubscriberIncreaseSlide = currentSlide?.mode === 'chart' &&
-                                        (currentSlide?.tab === 'bondChart' || currentSlide?.tab === 'bond') &&
-                                        (currentSlide?.subTab === 'subscriberIncrease');
-      if (isSubscriberIncreaseSlide && process.env.NODE_ENV === 'development') {
-        console.log('🔍 [MeetingCaptureManager] 가입자증감 compositeBlob 상태:', {
-          hasCompositeBlob: !!compositeBlob,
-          compositeBlobType: compositeBlob ? typeof compositeBlob : 'null'
-        });
-      }
+      // 가입자증감 슬라이드: 레거시 로직 제거로 인해 로깅 제거
+      // const isSubscriberIncreaseSlide = currentSlide?.mode === 'chart' &&
+      //                                   (currentSlide?.tab === 'bondChart' || currentSlide?.tab === 'bond') &&
+      //                                   (currentSlide?.subTab === 'subscriberIncrease');
+      // if (isSubscriberIncreaseSlide && process.env.NODE_ENV === 'development') {
+      //   console.log('🔍 [MeetingCaptureManager] 가입자증감 compositeBlob 상태:', {
+      //     hasCompositeBlob: !!compositeBlob,
+      //     compositeBlobType: compositeBlob ? typeof compositeBlob : 'null'
+      //   });
+      // }
 
       // 캡처 (선정된 타겟 요소만 캡처)
       const slideType = currentSlide.type || 'mode-tab';
@@ -4942,36 +4936,20 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             console.log('✅ [MeetingCaptureManager] 통합 캡처 엔진 성공');
           }
         } else {
-          // 통합 엔진이 null을 반환한 경우 기존 composite blob 폴백
-          if (monthlyAwardCompositeBlob || subscriberIncreaseCompositeBlob || inventoryCompositeBlob || compositeBlob) {
-            blob = monthlyAwardCompositeBlob || subscriberIncreaseCompositeBlob || inventoryCompositeBlob || compositeBlob;
-            if (process.env.NODE_ENV === 'development') {
-              console.warn('⚠️ [MeetingCaptureManager] 통합 엔진 실패, 기존 composite blob 사용');
-            }
-          } else {
-            // 최종 폴백: 기본 캡처
-            blob = await captureElement(captureTargetElement, captureOptions);
-            if (process.env.NODE_ENV === 'development') {
-              console.warn('⚠️ [MeetingCaptureManager] 기본 캡처 사용');
-            }
+          // 통합 엔진이 null을 반환한 경우 기본 캡처 폴백 (레거시 blob 변수 제거)
+          blob = await captureElement(captureTargetElement, captureOptions);
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('⚠️ [MeetingCaptureManager] 통합 엔진 null 반환, 기본 캡처 사용');
           }
         }
       } catch (e) {
         if (process.env.NODE_ENV === 'development') {
           console.warn('⚠️ [MeetingCaptureManager] 통합 캡처 엔진 에러:', e?.message);
         }
-        // 에러 발생 시 기존 composite blob 폴백
-        if (monthlyAwardCompositeBlob || subscriberIncreaseCompositeBlob || inventoryCompositeBlob || compositeBlob) {
-          blob = monthlyAwardCompositeBlob || subscriberIncreaseCompositeBlob || inventoryCompositeBlob || compositeBlob;
-          if (process.env.NODE_ENV === 'development') {
-            console.warn('⚠️ [MeetingCaptureManager] 기존 composite blob 폴백 사용');
-          }
-        } else {
-          // 최종 폴백: 기본 캡처
-          blob = await captureElement(captureTargetElement, captureOptions);
-          if (process.env.NODE_ENV === 'development') {
-            console.warn('⚠️ [MeetingCaptureManager] 기본 캡처 폴백 사용');
-          }
+        // 에러 발생 시 기본 캡처 폴백 (레거시 blob 변수 제거)
+        blob = await captureElement(captureTargetElement, captureOptions);
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('⚠️ [MeetingCaptureManager] 기본 캡처 폴백 사용');
         }
       }
       
