@@ -429,56 +429,19 @@ async function adjustHeaderWidth(headerElement, contentWidth, slideElement) {
     const tolerance = 5; // 5px 이하 차이는 무시 (렌더링 오차 허용)
     
     // 헤더와 콘텐츠 너비가 다르면 콘텐츠 크기에 맞춤 (헤더/콘텐츠 비율 개선)
+    // 단순화: 헤더 컨테이너 너비만 조정하고 내부 요소 비율 조정 로직 제거
+    // 헤더는 right: 0 고정 스타일이므로 컨테이너 너비만 콘텐츠 너비에 맞추면 내부 요소는 자동 정렬됨
     if (widthDiff > tolerance) {
       headerElement.style.width = `${contentWidth}px`;
       headerElement.style.maxWidth = `${contentWidth}px`;
       headerElement.style.minWidth = `${contentWidth}px`;
       headerElement.style.display = 'block';
 
-      // 헤더 내부 요소들도 비율 조정
-      const headerChildren = headerElement.querySelectorAll('*');
-      const childStyles = new Map();
-
-      headerChildren.forEach(child => {
-        if (!SafeDOM.isInDOM(child)) return;
-        
-        try {
-          const childStyle = window.getComputedStyle(child);
-          const childRect = SafeDOM.getBoundingRect(child);
-
-          childStyles.set(child, {
-            width: child.style.width || '',
-            maxWidth: child.style.maxWidth || '',
-          });
-
-          // 비율 기반이 아닌 고정 너비 요소만 조정
-          if (childStyle.width && !childStyle.width.includes('%') && !childStyle.width.includes('auto')) {
-            const currentWidth = parseFloat(childStyle.width) || childRect.width;
-            if (currentWidth > 0 && headerRect.width > 0) {
-              const ratio = contentWidth / headerRect.width;
-              const newWidth = currentWidth * ratio;
-              child.style.width = `${newWidth}px`;
-            }
-          }
-
-          // 컨테이너 요소는 width 100%로 설정
-          if (child.classList.contains('MuiContainer-root') ||
-              child.classList.contains('MuiBox-root') ||
-              childStyle.display === 'flex' ||
-              childStyle.display === 'grid') {
-            child.style.width = '100%';
-            child.style.maxWidth = '100%';
-          }
-        } catch (e) {
-          // 개별 자식 요소 처리 실패는 무시
-        }
-      });
-
       await new Promise(r => setTimeout(r, 200));
 
       if (process.env.NODE_ENV === 'development') {
         const adjustmentType = headerRect.width < contentWidth ? '확장' : '축소';
-        console.log(`📐 [adjustHeaderWidth] 헤더 너비 ${adjustmentType}: ${headerRect.width.toFixed(0)}px → ${contentWidth.toFixed(0)}px (차이: ${widthDiff.toFixed(0)}px)`);
+        console.log(`📐 [adjustHeaderWidth] 헤더 너비 ${adjustmentType}: ${headerRect.width.toFixed(0)}px → ${contentWidth.toFixed(0)}px (차이: ${widthDiff.toFixed(0)}px) - 단순화된 로직 (내부 요소 비율 조정 제거)`);
       }
 
       // 복원 함수 반환 (안전하게 실행 보장)
@@ -491,13 +454,6 @@ async function adjustHeaderWidth(headerElement, contentWidth, slideElement) {
           SafeDOM.restoreStyle(headerElement, 'min-width', originalStyles.minWidth);
           SafeDOM.restoreStyle(headerElement, 'display', originalStyles.display);
           SafeDOM.restoreStyle(headerElement, 'justify-content', originalStyles.justifyContent);
-
-          childStyles.forEach((styles, child) => {
-            if (!SafeDOM.isInDOM(child)) return;
-            
-            SafeDOM.restoreStyle(child, 'width', styles.width);
-            SafeDOM.restoreStyle(child, 'max-width', styles.maxWidth);
-          });
         } catch (error) {
           if (process.env.NODE_ENV === 'development') {
             console.warn('⚠️ [adjustHeaderWidth] 복원 실패:', error);
@@ -1449,13 +1405,32 @@ async function adjustSizes(elements, config, slide) {
                 
                 if (maxTableHeight > (sizeInfo.maxRelativeBottom || 0)) {
                   sizeInfo.maxRelativeBottom = maxTableHeight;
+                  // 테이블 측정 로직 개선: 모든 행의 offsetHeight 합계를 측정하여 scrollHeight보다 정확한 값 사용
+                  let rowHeightSum = 0;
+                  if (tbody && SafeDOM.isInDOM(tbody)) {
+                    const allRows = tbody.querySelectorAll('tr');
+                    for (const row of allRows) {
+                      if (SafeDOM.isInDOM(row)) {
+                        rowHeightSum += row.offsetHeight || 0;
+                      }
+                    }
+                  }
+                  // 행 높이 합계와 scrollHeight 중 더 큰 값 사용
+                  const preciseTableHeight = Math.max(actualTableHeight, rowHeightSum, containerScrollHeight, tableScrollHeight);
+                  const requiredHeightWithPadding = maxTableHeight + 300; // 여유 공간 300px
+                  // requiredHeight를 별도 저장하여 나중에 높이 제한 적용 시 참조
+                  sizeInfo.requiredHeight = Math.max(
+                    requiredHeightWithPadding,
+                    (tableRect.top - rect.top) + preciseTableHeight + 300,
+                    sizeInfo.requiredHeight || 0
+                  );
                   sizeInfo.measuredHeight = Math.max(
-                    maxTableHeight + 300, // 여유 공간 증가 (200px → 300px, 콘텐츠 잘림 방지)
+                    requiredHeightWithPadding,
                     sizeInfo.measuredHeight || 0
                   );
                   
                   if (process.env.NODE_ENV === 'development') {
-                    console.log(`📏 [adjustSizes] 담당자별 실적 테이블 포함: ${maxTableHeight}px (실제 높이: ${relativeBottom}px, 테이블 높이: ${actualTableHeight}px, scrollHeight: ${Math.max(tableScrollHeight, containerScrollHeight)}px, 여유공간: 300px)`);
+                    console.log(`📏 [adjustSizes] 담당자별 실적 테이블 포함: maxTableHeight=${maxTableHeight}px, preciseTableHeight=${preciseTableHeight}px, rowHeightSum=${rowHeightSum}px, requiredHeight=${sizeInfo.requiredHeight}px (실제 높이: ${relativeBottom}px, 테이블 높이: ${actualTableHeight}px, scrollHeight: ${Math.max(tableScrollHeight, containerScrollHeight)}px, 여유공간: 300px)`);
                   }
                 }
               } else {
@@ -1468,13 +1443,33 @@ async function adjustSizes(elements, config, slide) {
                 
                 if (maxTableHeight > (sizeInfo.maxRelativeBottom || 0)) {
                   sizeInfo.maxRelativeBottom = maxTableHeight;
+                  // 테이블 측정 로직 개선: 모든 행의 offsetHeight 합계를 측정하여 scrollHeight보다 정확한 값 사용
+                  let rowHeightSum = 0;
+                  const tbody = lastTable.querySelector('tbody');
+                  if (tbody && SafeDOM.isInDOM(tbody)) {
+                    const allRows = tbody.querySelectorAll('tr');
+                    for (const row of allRows) {
+                      if (SafeDOM.isInDOM(row)) {
+                        rowHeightSum += row.offsetHeight || 0;
+                      }
+                    }
+                  }
+                  // 행 높이 합계와 scrollHeight 중 더 큰 값 사용
+                  const preciseTableHeight = Math.max(tableRect.height, rowHeightSum, tableScrollHeight);
+                  const requiredHeightWithPadding = maxTableHeight + 300; // 여유 공간 300px
+                  // requiredHeight를 별도 저장하여 나중에 높이 제한 적용 시 참조
+                  sizeInfo.requiredHeight = Math.max(
+                    requiredHeightWithPadding,
+                    (tableRect.top - rect.top) + preciseTableHeight + 300,
+                    sizeInfo.requiredHeight || 0
+                  );
                   sizeInfo.measuredHeight = Math.max(
-                    maxTableHeight + 300,
+                    requiredHeightWithPadding,
                     sizeInfo.measuredHeight || 0
                   );
                   
                   if (process.env.NODE_ENV === 'development') {
-                    console.log(`📏 [adjustSizes] 담당자별 실적 테이블 포함 (컨테이너 없음): ${maxTableHeight}px (실제 높이: ${relativeBottom}px, scrollHeight: ${tableScrollHeight}px, 여유공간: 300px)`);
+                    console.log(`📏 [adjustSizes] 담당자별 실적 테이블 포함 (컨테이너 없음): maxTableHeight=${maxTableHeight}px, preciseTableHeight=${preciseTableHeight}px, rowHeightSum=${rowHeightSum}px, requiredHeight=${sizeInfo.requiredHeight}px (실제 높이: ${relativeBottom}px, scrollHeight: ${tableScrollHeight}px, 여유공간: 300px)`);
                   }
                 }
               }
@@ -1565,11 +1560,27 @@ async function adjustSizes(elements, config, slide) {
               console.log(`📏 [adjustSizes] 목차 슬라이드 높이 제한: ${sizeInfo.measuredHeight}px (최대 ${maxAllowedHeight * SCALE}px 실제)`);
             }
           } else if (isTotalClosing) {
-            // 전체총마감 슬라이드: 담당자별 실적 테이블 포함을 위해 높이 제한 확대 (6000px 원본 = 12000px 실제, 콘텐츠 잘림 방지)
-            maxAllowedHeight = 6000; // 5500px → 6000px (원본) = 12000px (실제) - 콘텐츠 잘림 방지를 위해 추가 증가
+            // 전체총마감 슬라이드: 담당자별 실적 테이블 포함을 위해 높이 제한 동적 조정
+            // requiredHeight가 측정되었으면 그 값을 기준으로 maxAllowedHeight 동적 증가
+            const defaultMaxHeight = 6000; // 기본 최대 높이 (원본) = 12000px (실제)
+            const absoluteMaxHeight = 8000; // 25MB 제한 고려한 절대 최대 높이 (원본) = 16000px (실제)
+            
+            if (sizeInfo.requiredHeight && sizeInfo.requiredHeight > defaultMaxHeight) {
+              // 테이블 측정 결과가 기본 제한을 초과하면 동적으로 증가
+              maxAllowedHeight = Math.min(sizeInfo.requiredHeight, absoluteMaxHeight);
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`📏 [adjustSizes] 전체총마감 슬라이드 높이 제한 동적 증가: requiredHeight=${sizeInfo.requiredHeight}px → maxAllowedHeight=${maxAllowedHeight}px (최대 ${absoluteMaxHeight}px 원본, ${absoluteMaxHeight * SCALE}px 실제)`);
+              }
+            } else {
+              maxAllowedHeight = defaultMaxHeight;
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`📏 [adjustSizes] 전체총마감 슬라이드 높이 제한 (기본값): ${defaultMaxHeight}px 원본 = ${defaultMaxHeight * SCALE}px 실제`);
+              }
+            }
+            
             sizeInfo.measuredHeight = Math.min(sizeInfo.measuredHeight || 0, maxAllowedHeight);
             if (process.env.NODE_ENV === 'development') {
-              console.log(`📏 [adjustSizes] 전체총마감 슬라이드 높이 제한: ${sizeInfo.measuredHeight}px (최대 ${maxAllowedHeight * SCALE}px 실제, 담당자별 실적 포함)`);
+              console.log(`📏 [adjustSizes] 전체총마감 슬라이드 최종 높이: ${sizeInfo.measuredHeight}px (최대 ${maxAllowedHeight * SCALE}px 실제, 담당자별 실적 포함)`);
             }
           } else if (isMain || isEnding) {
             // 메인/엔딩 슬라이드: 최대 높이 제한 적용
@@ -2179,11 +2190,83 @@ async function executeCapture(elements, config, sizeInfo, slide) {
           captureElementForDirect.style.maxWidth = `${sizeInfo.measuredWidth || 0}px`;
           captureElementForDirect.style.overflow = 'visible';
 
+          // 가입자증감 슬라이드: TextField 캡처 시점 스타일 적용 강화
+          const isSubscriberIncrease = slide?.mode === 'chart' &&
+            (slide?.tab === 'bondChart' || slide?.tab === 'bond') &&
+            slide?.subTab === 'subscriberIncrease';
+          
+          if (isSubscriberIncrease && captureElementForDirect && SafeDOM.isInDOM(captureElementForDirect)) {
+            try {
+              // 모든 TextField input 요소 찾기
+              const textFieldInputs = captureElementForDirect.querySelectorAll('input[type="text"], input[type="number"]');
+              for (const input of textFieldInputs) {
+                if (!SafeDOM.isInDOM(input)) continue;
+                
+                // html2canvas가 인식할 수 있도록 inline 스타일 강제 적용 (!important)
+                const inputParent = input.closest('.MuiInputBase-root');
+                if (inputParent && SafeDOM.isInDOM(inputParent)) {
+                  inputParent.style.setProperty('position', 'relative', 'important');
+                  inputParent.style.setProperty('display', 'flex', 'important');
+                  inputParent.style.setProperty('alignItems', 'center', 'important');
+                  inputParent.style.setProperty('height', '100%', 'important');
+                  
+                  input.style.setProperty('height', '100%', 'important');
+                  input.style.setProperty('textAlign', 'center', 'important');
+                  input.style.setProperty('width', '100%', 'important');
+                  input.style.setProperty('padding', '8px', 'important');
+                  if (input.type === 'number') {
+                    input.style.setProperty('lineHeight', 'normal', 'important');
+                  }
+                }
+                
+                // 강제 렌더링을 위해 getBoundingClientRect 호출
+                input.getBoundingClientRect();
+              }
+              
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`✅ [executeCapture] 가입자증감 TextField 스타일 강제 적용 완료 (${textFieldInputs.length}개)`);
+              }
+            } catch (error) {
+              if (process.env.NODE_ENV === 'development') {
+                console.warn('⚠️ [executeCapture] 가입자증감 TextField 스타일 적용 실패:', error);
+              }
+            }
+          }
+
           await new Promise(r => setTimeout(r, 300));
 
           // width/height는 원본 크기만 전달 (SCALE 곱하지 않음)
           const captureWidth = Math.min(sizeInfo.measuredWidth || 0, MAX_WIDTH);
-          const captureHeight = Math.min(sizeInfo.measuredHeight || 0, MAX_HEIGHT);
+          
+          // 전체총마감 슬라이드: requiredHeight 확인하여 높이 제한 동적 조정
+          const isTotalClosing = slide?.mode === 'chart' &&
+            (slide?.tab === 'closingChart' || slide?.tab === 'closing') &&
+            slide?.subTab === 'totalClosing';
+          
+          let captureHeight = Math.min(sizeInfo.measuredHeight || 0, MAX_HEIGHT);
+          if (isTotalClosing && sizeInfo.requiredHeight) {
+            // requiredHeight가 측정되었으면 그 값을 기준으로 높이 제한 동적 조정
+            const defaultMaxHeight = 6000; // 기본 최대 높이 (원본)
+            const absoluteMaxHeight = 8000; // 25MB 제한 고려한 절대 최대 높이 (원본)
+            
+            let effectiveMaxHeight = MAX_HEIGHT; // 4000px (원본)
+            if (sizeInfo.requiredHeight > defaultMaxHeight) {
+              effectiveMaxHeight = Math.min(sizeInfo.requiredHeight, absoluteMaxHeight);
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`📏 [executeCapture] 전체총마감 슬라이드 높이 제한 동적 조정: requiredHeight=${sizeInfo.requiredHeight}px → effectiveMaxHeight=${effectiveMaxHeight}px`);
+              }
+            } else if (sizeInfo.requiredHeight > MAX_HEIGHT) {
+              effectiveMaxHeight = Math.min(sizeInfo.requiredHeight, defaultMaxHeight);
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`📏 [executeCapture] 전체총마감 슬라이드 높이 제한 동적 조정: requiredHeight=${sizeInfo.requiredHeight}px → effectiveMaxHeight=${effectiveMaxHeight}px`);
+              }
+            }
+            
+            captureHeight = Math.min(sizeInfo.measuredHeight || 0, effectiveMaxHeight);
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`📏 [executeCapture] 전체총마감 슬라이드 최종 캡처 높이: ${captureHeight}px (measuredHeight: ${sizeInfo.measuredHeight}px, effectiveMaxHeight: ${effectiveMaxHeight}px)`);
+            }
+          }
 
           if (process.env.NODE_ENV === 'development' && config?.preserveHeader && elements.headerElement) {
             console.log(`📸 [executeCapture] direct 캡처: 헤더 포함 slideElement 캡처 (${captureWidth}x${captureHeight})`);

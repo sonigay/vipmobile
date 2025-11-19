@@ -694,6 +694,16 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
     };
   }
 
+  // 회의 차수 유효성 검증 함수 (엔딩 슬라이드용 - renderSlideContent 외부로 이동하여 스코프 문제 해결)
+  const isValidMeetingNumber = (value) => {
+    if (value == null) return false;
+    if (value === '') return false;
+    if (value === 0) return false;
+    const strValue = String(value).trim();
+    if (strValue === '' || strValue === '0') return false;
+    return true;
+  };
+
   // 디버깅: renderSlideContent 정의 전 (항상 출력)
   try {
     console.log('🔍 [SlideRenderer] renderSlideContent 정의 전', {
@@ -1497,17 +1507,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
     if (slide.type === 'ending') {
       // 회의 차수 보강: 슬라이드에 누락된 경우 전역 컨텍스트(window) 또는 meeting 객체에서 가져오기
       try {
-        // meetingNumber 유효성 검증 함수
-        const isValidMeetingNumber = (value) => {
-          if (value == null) return false;
-          if (value === '') return false;
-          if (value === 0) return false;
-          const strValue = String(value).trim();
-          if (strValue === '' || strValue === '0') return false;
-          return true;
-        };
-        
-        // slide.meetingNumber가 유효하지 않은 경우 보강
+        // slide.meetingNumber가 유효하지 않은 경우 보강 (isValidMeetingNumber 함수는 renderSlideContent 외부에서 정의됨)
         if (typeof window !== 'undefined' && !isValidMeetingNumber(slide.meetingNumber)) {
           // 1순위: window.__MEETING_NUMBER (메인 슬라이드에서 설정된 값)
           if (isValidMeetingNumber(window.__MEETING_NUMBER)) {
@@ -1701,7 +1701,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                   fontSize: { xs: '1.1rem', md: '2.1rem' }, // 1920px 대응: 1.4rem→2.1rem, 1.5배
                   fontWeight: 500,
                   color: '#495057',
-                  mb: (slide.meetingNumber != null && slide.meetingNumber !== '' && slide.meetingNumber !== 0 && String(slide.meetingNumber).trim() !== '' && String(slide.meetingNumber).trim() !== '0') ? 1.5 : 0, // 회의 번호가 실제로 있으면 마진, 없으면 0 (빈 공간 방지)
+                  mb: isValidMeetingNumber(slide.meetingNumber) ? 1.5 : 0, // 회의 번호가 실제로 있으면 마진, 없으면 0 (빈 공간 방지)
                   fontFamily: '"Noto Sans KR", sans-serif'
                 }}
               >
