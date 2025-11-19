@@ -695,12 +695,16 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
   }
 
   // 회의 차수 유효성 검증 함수 (엔딩 슬라이드용 - renderSlideContent 외부로 이동하여 스코프 문제 해결)
+  // 개선: 엣지 케이스 처리 강화 (빈 문자열, 공백, "0" 등)
   const isValidMeetingNumber = (value) => {
     if (value == null) return false;
     if (value === '') return false;
     if (value === 0) return false;
     const strValue = String(value).trim();
-    if (strValue === '' || strValue === '0') return false;
+    if (strValue === '' || strValue === '0' || strValue === 'null' || strValue === 'undefined') return false;
+    // 숫자로 변환 가능한 값만 유효
+    const numValue = Number(strValue);
+    if (isNaN(numValue) || numValue <= 0) return false;
     return true;
   };
 
@@ -1509,19 +1513,58 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
       try {
         // slide.meetingNumber가 유효하지 않은 경우 보강 (isValidMeetingNumber 함수는 renderSlideContent 외부에서 정의됨)
         if (typeof window !== 'undefined' && !isValidMeetingNumber(slide.meetingNumber)) {
-          // 1순위: window.__MEETING_NUMBER (메인 슬라이드에서 설정된 값)
+          // 1순위: window.__MEETING_NUMBER (메인 슬라이드에서 설정된 값) - 즉시 확인 및 강화된 로직
+          let meetingNumberFound = false;
+          
+          // 즉시 확인 (메인 슬라이드가 먼저 렌더링되어 설정되었을 수 있음)
           if (isValidMeetingNumber(window.__MEETING_NUMBER)) {
             slide.meetingNumber = window.__MEETING_NUMBER;
+            meetingNumberFound = true;
             if (process.env.NODE_ENV === 'development') {
-              console.log(`✅ [SlideRenderer] 엔딩 슬라이드 회의 차수 보강 (window): ${slide.meetingNumber}`);
-            }
-          } else {
-            if (process.env.NODE_ENV === 'development') {
-              console.warn(`⚠️ [SlideRenderer] 엔딩 슬라이드 회의 차수 없음: slide.meetingNumber=${slide.meetingNumber}, window.__MEETING_NUMBER=${window.__MEETING_NUMBER}`);
+              console.log(`✅ [SlideRenderer] 엔딩 슬라이드 회의 차수 보강 (window - 즉시): ${slide.meetingNumber}`);
             }
           }
+          
           // 2순위: loggedInStore나 meeting 객체에서 가져오기 (추가 보강 로직)
-          // (현재는 window.__MEETING_NUMBER만 사용)
+          if (!meetingNumberFound && loggedInStore) {
+            // loggedInStore에서 meeting 정보 확인
+            const storeMeeting = loggedInStore.meeting || loggedInStore.currentMeeting;
+            if (storeMeeting && isValidMeetingNumber(storeMeeting.meetingNumber)) {
+              slide.meetingNumber = storeMeeting.meetingNumber;
+              // window.__MEETING_NUMBER도 업데이트 (다음 렌더링을 위해)
+              if (typeof window !== 'undefined') {
+                window.__MEETING_NUMBER = storeMeeting.meetingNumber;
+              }
+              meetingNumberFound = true;
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`✅ [SlideRenderer] 엔딩 슬라이드 회의 차수 보강 (loggedInStore): ${slide.meetingNumber}`);
+              }
+            }
+          }
+          
+          // 3순위: slide 객체 자체에서 meetingNumber를 다시 확인 (다른 필드명으로 저장되었을 수 있음)
+          if (!meetingNumberFound && slide) {
+            const alternativeFields = ['meetingNumber', 'meeting_id', 'meetingId', 'sessionNumber', 'session'];
+            for (const field of alternativeFields) {
+              if (slide[field] && isValidMeetingNumber(slide[field])) {
+                slide.meetingNumber = slide[field];
+                if (typeof window !== 'undefined') {
+                  window.__MEETING_NUMBER = slide[field];
+                }
+                meetingNumberFound = true;
+                if (process.env.NODE_ENV === 'development') {
+                  console.log(`✅ [SlideRenderer] 엔딩 슬라이드 회의 차수 보강 (slide.${field}): ${slide.meetingNumber}`);
+                }
+                break;
+              }
+            }
+          }
+          
+          if (!meetingNumberFound) {
+            if (process.env.NODE_ENV === 'development') {
+              console.warn(`⚠️ [SlideRenderer] 엔딩 슬라이드 회의 차수 없음: slide.meetingNumber=${slide.meetingNumber}, window.__MEETING_NUMBER=${window.__MEETING_NUMBER}, loggedInStore=${!!loggedInStore}, slide=${JSON.stringify(Object.keys(slide || {}))}`);
+            }
+          }
         } else if (process.env.NODE_ENV === 'development') {
           // 디버깅: meetingNumber 값 로그 출력
           console.log(`🔍 [SlideRenderer] 엔딩 슬라이드 회의 차수: slide.meetingNumber=${slide.meetingNumber} (타입: ${typeof slide.meetingNumber}), window.__MEETING_NUMBER=${window.__MEETING_NUMBER}`);

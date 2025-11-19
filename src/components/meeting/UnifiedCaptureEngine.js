@@ -408,6 +408,7 @@ function removeScrollConstraints(element) {
 /**
  * 헤더 크기 조정 (콘텐츠 너비에 맞춤)
  * 개선: DOM 유효성 검증, 복원 함수 안정성
+ * 참고: needsHeaderSizeAdjustment가 true인 경우에는 이 함수를 사용하지 않고 adjustContentToHeaderWidth를 사용
  */
 async function adjustHeaderWidth(headerElement, contentWidth, slideElement) {
   if (!headerElement || !contentWidth || contentWidth <= 0 || !SafeDOM.isInDOM(headerElement)) {
@@ -466,6 +467,63 @@ async function adjustHeaderWidth(headerElement, contentWidth, slideElement) {
   } catch (error) {
     if (process.env.NODE_ENV === 'development') {
       console.error('❌ [adjustHeaderWidth] 헤더 크기 조정 실패:', error);
+    }
+    return null;
+  }
+}
+
+/**
+ * 콘텐츠 너비를 헤더 너비에 맞춤 (역방향 조정)
+ * 재초담초채권/가입자증감 슬라이드용: 헤더가 더 넓을 때 콘텐츠를 헤더 너비에 맞춤
+ */
+async function adjustContentToHeaderWidth(contentElement, targetWidth, slideElement) {
+  if (!contentElement || !targetWidth || targetWidth <= 0 || !SafeDOM.isInDOM(contentElement)) {
+    return null;
+  }
+
+  try {
+    const contentRect = SafeDOM.getBoundingRect(contentElement);
+    const originalStyles = {
+      width: contentElement.style.width || '',
+      maxWidth: contentElement.style.maxWidth || '',
+      minWidth: contentElement.style.minWidth || '',
+    };
+
+    const widthDiff = Math.abs(contentRect.width - targetWidth);
+    const tolerance = 5; // 5px 이하 차이는 무시 (렌더링 오차 허용)
+    
+    // 콘텐츠 너비가 타겟 너비와 다르면 타겟 너비에 맞춤
+    if (widthDiff > tolerance && contentRect.width < targetWidth) {
+      contentElement.style.width = `${targetWidth}px`;
+      contentElement.style.maxWidth = `${targetWidth}px`;
+      contentElement.style.minWidth = `${targetWidth}px`;
+
+      await new Promise(r => setTimeout(r, 200));
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`📐 [adjustContentToHeaderWidth] 콘텐츠 너비 확장: ${contentRect.width.toFixed(0)}px → ${targetWidth.toFixed(0)}px (차이: ${widthDiff.toFixed(0)}px) - 헤더 너비에 맞춤`);
+      }
+
+      // 복원 함수 반환 (안전하게 실행 보장)
+      return () => {
+        try {
+          if (!SafeDOM.isInDOM(contentElement)) return;
+          
+          SafeDOM.restoreStyle(contentElement, 'width', originalStyles.width);
+          SafeDOM.restoreStyle(contentElement, 'max-width', originalStyles.maxWidth);
+          SafeDOM.restoreStyle(contentElement, 'min-width', originalStyles.minWidth);
+        } catch (error) {
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('⚠️ [adjustContentToHeaderWidth] 복원 실패:', error);
+          }
+        }
+      };
+    }
+
+    return null;
+  } catch (error) {
+    if (process.env.NODE_ENV === 'development') {
+      console.error('❌ [adjustContentToHeaderWidth] 콘텐츠 크기 조정 실패:', error);
     }
     return null;
   }
@@ -1598,32 +1656,47 @@ async function adjustSizes(elements, config, slide) {
           }
         }
 
-        // 헤더 너비 조정 (콘텐츠 너비에 맞춤, 헤더가 비정상적으로 크거나 작은 경우 방지)
-        if (config?.needsHeaderSizeAdjustment && elements.headerElement && sizeInfo && sizeInfo.measuredWidth > 0) {
+        // 헤더 너비 조정 (역방향: 헤더 너비를 기준으로 콘텐츠 너비 조정)
+        if (config?.needsHeaderSizeAdjustment && elements.headerElement && sizeInfo) {
           try {
-            // 헤더의 원본 너비 확인 (조정 전)
+            // 헤더 너비를 먼저 측정
             const headerRect = SafeDOM.getBoundingRect(elements.headerElement);
-            const contentWidth = sizeInfo.measuredWidth;
+            const headerWidth = headerRect.width || 0;
+            const contentWidth = sizeInfo.measuredWidth || 0;
             const slideRect = SafeDOM.getBoundingRect(elements.slideElement);
+            const maxSlideWidth = slideRect.width || MAX_WIDTH;
             
-            // 슬라이드 전체 너비를 초과하지 않도록 제한 (비정상적인 헤더 너비 방지)
-            const maxHeaderWidth = Math.min(contentWidth, slideRect.width || MAX_WIDTH);
+            // 헤더 너비와 콘텐츠 너비 중 더 큰 값을 사용 (헤더가 더 넓으면 콘텐츠를 헤더에 맞춤)
+            // 슬라이드 전체 너비를 초과하지 않도록 제한
+            const targetWidth = Math.min(
+              Math.max(headerWidth, contentWidth),
+              maxSlideWidth
+            );
             
             if (process.env.NODE_ENV === 'development') {
-              console.log(`📏 [adjustSizes] 헤더 너비 조정 전: ${headerRect.width.toFixed(0)}px, 콘텐츠: ${contentWidth.toFixed(0)}px, 최대: ${maxHeaderWidth.toFixed(0)}px`);
+              console.log(`📏 [adjustSizes] 헤더/콘텐츠 너비 조정: 헤더=${headerWidth.toFixed(0)}px, 콘텐츠=${contentWidth.toFixed(0)}px → 대상=${targetWidth.toFixed(0)}px (헤더 기준)`);
             }
             
-            const restoreHeader = await adjustHeaderWidth(
-              elements.headerElement,
-              maxHeaderWidth, // 최대 너비 제한 적용
+            // sizeInfo.measuredWidth를 헤더 너비와 콘텐츠 너비 중 더 큰 값으로 설정
+            if (targetWidth > contentWidth) {
+              sizeInfo.measuredWidth = targetWidth;
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`📏 [adjustSizes] 콘텐츠 너비를 헤더 너비에 맞춤: ${contentWidth.toFixed(0)}px → ${targetWidth.toFixed(0)}px`);
+              }
+            }
+            
+            // 콘텐츠 요소의 너비를 헤더 너비에 맞추기 위해 스타일 조정
+            const restoreContent = await adjustContentToHeaderWidth(
+              elements.contentElement,
+              targetWidth,
               elements.slideElement
             );
-            if (restoreHeader) {
-              restoreFunctions.push(restoreHeader);
+            if (restoreContent) {
+              restoreFunctions.push(restoreContent);
             }
           } catch (error) {
             if (process.env.NODE_ENV === 'development') {
-              console.warn('⚠️ [adjustSizes] 헤더 너비 조정 실패:', error);
+              console.warn('⚠️ [adjustSizes] 헤더/콘텐츠 너비 조정 실패:', error);
             }
           }
         }
@@ -2245,26 +2318,21 @@ async function executeCapture(elements, config, sizeInfo, slide) {
           
           let captureHeight = Math.min(sizeInfo.measuredHeight || 0, MAX_HEIGHT);
           if (isTotalClosing && sizeInfo.requiredHeight) {
-            // requiredHeight가 측정되었으면 그 값을 기준으로 높이 제한 동적 조정
+            // requiredHeight가 있을 때 MAX_HEIGHT 기본 제한을 무시하고 requiredHeight를 최소값으로 사용
             const defaultMaxHeight = 6000; // 기본 최대 높이 (원본)
             const absoluteMaxHeight = 8000; // 25MB 제한 고려한 절대 최대 높이 (원본)
             
-            let effectiveMaxHeight = MAX_HEIGHT; // 4000px (원본)
-            if (sizeInfo.requiredHeight > defaultMaxHeight) {
-              effectiveMaxHeight = Math.min(sizeInfo.requiredHeight, absoluteMaxHeight);
-              if (process.env.NODE_ENV === 'development') {
-                console.log(`📏 [executeCapture] 전체총마감 슬라이드 높이 제한 동적 조정: requiredHeight=${sizeInfo.requiredHeight}px → effectiveMaxHeight=${effectiveMaxHeight}px`);
-              }
-            } else if (sizeInfo.requiredHeight > MAX_HEIGHT) {
-              effectiveMaxHeight = Math.min(sizeInfo.requiredHeight, defaultMaxHeight);
-              if (process.env.NODE_ENV === 'development') {
-                console.log(`📏 [executeCapture] 전체총마감 슬라이드 높이 제한 동적 조정: requiredHeight=${sizeInfo.requiredHeight}px → effectiveMaxHeight=${effectiveMaxHeight}px`);
-              }
-            }
+            // requiredHeight를 최소값으로 사용하고, measuredHeight가 더 크면 사용
+            const minRequiredHeight = sizeInfo.requiredHeight;
+            const maxAllowedHeight = Math.min(
+              Math.max(minRequiredHeight, sizeInfo.measuredHeight || 0),
+              absoluteMaxHeight
+            );
             
-            captureHeight = Math.min(sizeInfo.measuredHeight || 0, effectiveMaxHeight);
+            captureHeight = maxAllowedHeight;
+            
             if (process.env.NODE_ENV === 'development') {
-              console.log(`📏 [executeCapture] 전체총마감 슬라이드 최종 캡처 높이: ${captureHeight}px (measuredHeight: ${sizeInfo.measuredHeight}px, effectiveMaxHeight: ${effectiveMaxHeight}px)`);
+              console.log(`📏 [executeCapture] 전체총마감 슬라이드 높이 제한 동적 조정: requiredHeight=${sizeInfo.requiredHeight}px (최소값), measuredHeight=${sizeInfo.measuredHeight}px → captureHeight=${captureHeight}px (최대 ${absoluteMaxHeight}px)`);
             }
           }
 
