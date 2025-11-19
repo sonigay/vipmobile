@@ -697,14 +697,28 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
   // 회의 차수 유효성 검증 함수 (엔딩 슬라이드용 - renderSlideContent 외부로 이동하여 스코프 문제 해결)
   // 개선: 엣지 케이스 처리 강화 (빈 문자열, 공백, "0" 등)
   const isValidMeetingNumber = (value) => {
+    // null, undefined 체크
     if (value == null) return false;
+    
+    // 빈 문자열 체크
     if (value === '') return false;
+    
+    // 숫자 0 체크
     if (value === 0) return false;
+    
+    // 문자열로 변환 및 공백 제거
     const strValue = String(value).trim();
+    
+    // 빈 문자열, "0", "null", "undefined" 체크
     if (strValue === '' || strValue === '0' || strValue === 'null' || strValue === 'undefined') return false;
+    
     // 숫자로 변환 가능한 값만 유효
     const numValue = Number(strValue);
+    
+    // NaN이거나 0 이하인 경우 false
     if (isNaN(numValue) || numValue <= 0) return false;
+    
+    // 모든 검증 통과
     return true;
   };
 
@@ -1751,29 +1765,45 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                 {formattedDate}
               </Typography>
               
-              {/* 회의 번호 - 세 번째 줄 (조건부 렌더링, 빈 공간 방지) - isValidMeetingNumber 함수 사용 */}
-              {isValidMeetingNumber(slide.meetingNumber) ? (
-                <Box sx={{
-                  display: 'inline-block',
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  px: { xs: 2.5, md: 3 },
-                  py: { xs: 1, md: 1.2 },
-                  borderRadius: '50px',
-                  boxShadow: '0 4px 12px rgba(102, 126, 234, 0.25)'
-                }}>
-                  <Typography
-                    variant="body1"
-                    sx={{
-                      fontSize: { xs: '0.9rem', md: '1.575rem' }, // 1920px 대응: 1.05rem→1.575rem, 1.5배
-                      fontWeight: 600,
-                      color: '#ffffff',
-                      fontFamily: '"Noto Sans KR", sans-serif'
-                    }}
-                  >
-                    {slide.meetingNumber}차
-                  </Typography>
-                </Box>
-              ) : null}
+              {/* 회의 번호 - 세 번째 줄 (조건부 렌더링, 빈 공간 완전 방지) */}
+              {/* isValidMeetingNumber 함수로 엄격한 검증 후 렌더링 */}
+              {/* meetingNumber가 유효하지 않으면 아무것도 렌더링하지 않음 (빈 공간 "( )" 완전 방지) */}
+              {(() => {
+                const hasValidMeetingNumber = isValidMeetingNumber(slide.meetingNumber);
+                
+                // 디버깅 로그 (개발 환경에서만)
+                if (process.env.NODE_ENV === 'development' && slide.type === 'ending') {
+                  console.log(`🔍 [SlideRenderer] 엔딩 슬라이드 meetingNumber 조건부 렌더링: slide.meetingNumber=${slide.meetingNumber}, isValid=${hasValidMeetingNumber}, typeof=${typeof slide.meetingNumber}`);
+                }
+                
+                // 유효한 meetingNumber가 있을 때만 렌더링
+                if (!hasValidMeetingNumber) {
+                  return null; // 아무것도 렌더링하지 않음 (빈 공간 완전 방지)
+                }
+                
+                return (
+                  <Box sx={{
+                    display: 'inline-block',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    px: { xs: 2.5, md: 3 },
+                    py: { xs: 1, md: 1.2 },
+                    borderRadius: '50px',
+                    boxShadow: '0 4px 12px rgba(102, 126, 234, 0.25)'
+                  }}>
+                    <Typography
+                      variant="body1"
+                      sx={{
+                        fontSize: { xs: '0.9rem', md: '1.575rem' }, // 1920px 대응: 1.05rem→1.575rem, 1.5배
+                        fontWeight: 600,
+                        color: '#ffffff',
+                        fontFamily: '"Noto Sans KR", sans-serif'
+                      }}
+                    >
+                      {slide.meetingNumber}차
+                    </Typography>
+                  </Box>
+                );
+              })()}
             </Box>
             
             <Box sx={{

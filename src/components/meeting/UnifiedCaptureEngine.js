@@ -1423,30 +1423,81 @@ async function adjustSizes(elements, config, slide) {
                 // 테이블 자체의 scrollHeight도 확인
                 const tableScrollHeight = lastTable.scrollHeight || tableRect.height;
                 
-                // 테이블 내부의 모든 행(tbody > tr)을 확인하여 실제 높이 측정
+                // 테이블 내부의 모든 행(tbody > tr)을 순회하여 실제 높이 정확히 측정
                 const tbody = lastTable.querySelector('tbody');
                 let actualTableHeight = tableRect.height;
+                let rowHeightSum = 0;
+                let firstRowTop = 0;
+                let lastRowBottom = 0;
                 
                 if (tbody && SafeDOM.isInDOM(tbody)) {
                   const allRows = tbody.querySelectorAll('tr');
                   if (allRows.length > 0) {
-                    const firstRowRect = SafeDOM.getBoundingRect(allRows[0]);
-                    const lastRowRect = SafeDOM.getBoundingRect(allRows[allRows.length - 1]);
-                    // 첫 번째 행부터 마지막 행까지의 실제 높이
-                    actualTableHeight = lastRowRect.bottom - firstRowRect.top;
+                    // 모든 행을 순회하여 실제 높이 측정
+                    for (let i = 0; i < allRows.length; i++) {
+                      const row = allRows[i];
+                      if (!SafeDOM.isInDOM(row)) continue;
+                      
+                      const rowRect = SafeDOM.getBoundingRect(row);
+                      const rowOffsetHeight = row.offsetHeight || 0;
+                      
+                      // 첫 번째 행과 마지막 행의 위치 기록
+                      if (i === 0) {
+                        firstRowTop = rowRect.top;
+                      }
+                      if (i === allRows.length - 1) {
+                        lastRowBottom = rowRect.bottom;
+                      }
+                      
+                      // 각 행의 offsetHeight 합계 (정확한 높이 측정)
+                      rowHeightSum += rowOffsetHeight || rowRect.height || 0;
+                    }
+                    
+                    // 첫 번째 행부터 마지막 행까지의 실제 높이 (getBoundingClientRect 기반)
+                    const measuredHeightFromRects = lastRowBottom > 0 && firstRowTop > 0 
+                      ? lastRowBottom - firstRowTop 
+                      : tableRect.height;
                     
                     // tbody의 scrollHeight도 확인
-                    const tbodyScrollHeight = tbody.scrollHeight || actualTableHeight;
-                    actualTableHeight = Math.max(actualTableHeight, tbodyScrollHeight);
+                    const tbodyScrollHeight = tbody.scrollHeight || measuredHeightFromRects;
+                    
+                    // 실제 높이 = max(행 높이 합계, getBoundingClientRect 기반 높이, tbody scrollHeight, 테이블 높이)
+                    actualTableHeight = Math.max(
+                      rowHeightSum,
+                      measuredHeightFromRects,
+                      tbodyScrollHeight,
+                      tableRect.height
+                    );
                   }
                 }
                 
+                // 테이블 헤더(thead) 높이도 포함
+                const thead = lastTable.querySelector('thead');
+                let theadHeight = 0;
+                if (thead && SafeDOM.isInDOM(thead)) {
+                  const theadRect = SafeDOM.getBoundingRect(thead);
+                  theadHeight = theadRect.height || 0;
+                }
+                
+                // 테이블 푸터(tfoot) 높이도 포함
+                const tfoot = lastTable.querySelector('tfoot');
+                let tfootHeight = 0;
+                if (tfoot && SafeDOM.isInDOM(tfoot)) {
+                  const tfootRect = SafeDOM.getBoundingRect(tfoot);
+                  tfootHeight = tfootRect.height || 0;
+                }
+                
+                // 실제 테이블 전체 높이 = tbody 높이 + thead 높이 + tfoot 높이
+                const totalTableHeight = actualTableHeight + theadHeight + tfootHeight;
+                
                 // 실제 높이와 scrollHeight 중 큰 값 사용 (스크롤 가능한 테이블도 전체 포함)
+                // 테이블의 실제 위치를 기준으로 정확한 높이 계산
+                const tableTopRelativeToContent = tableRect.top - rect.top;
                 const maxTableHeight = Math.max(
                   relativeBottom,
-                  (tableRect.top - rect.top) + actualTableHeight,
-                  (tableRect.top - rect.top) + Math.max(tableScrollHeight, containerScrollHeight),
-                  (tableRect.top - rect.top) + tbody?.scrollHeight || 0
+                  tableTopRelativeToContent + totalTableHeight,
+                  tableTopRelativeToContent + Math.max(tableScrollHeight, containerScrollHeight),
+                  tableTopRelativeToContent + (tbody?.scrollHeight || 0) + theadHeight + tfootHeight
                 );
                 
                 // 스타일 복원
@@ -1463,71 +1514,158 @@ async function adjustSizes(elements, config, slide) {
                 
                 if (maxTableHeight > (sizeInfo.maxRelativeBottom || 0)) {
                   sizeInfo.maxRelativeBottom = maxTableHeight;
-                  // 테이블 측정 로직 개선: 모든 행의 offsetHeight 합계를 측정하여 scrollHeight보다 정확한 값 사용
-                  let rowHeightSum = 0;
-                  if (tbody && SafeDOM.isInDOM(tbody)) {
-                    const allRows = tbody.querySelectorAll('tr');
-                    for (const row of allRows) {
-                      if (SafeDOM.isInDOM(row)) {
-                        rowHeightSum += row.offsetHeight || 0;
-                      }
-                    }
-                  }
-                  // 행 높이 합계와 scrollHeight 중 더 큰 값 사용
-                  const preciseTableHeight = Math.max(actualTableHeight, rowHeightSum, containerScrollHeight, tableScrollHeight);
-                  const requiredHeightWithPadding = maxTableHeight + 300; // 여유 공간 300px
+                  
+                  // 정확한 테이블 높이 = max(실제 테이블 높이, 행 높이 합계, scrollHeight)
+                  // 행 높이 합계는 이미 위에서 계산됨
+                  const preciseTableHeight = Math.max(
+                    totalTableHeight,
+                    rowHeightSum + theadHeight + tfootHeight,
+                    containerScrollHeight,
+                    tableScrollHeight
+                  );
+                  
+                  // requiredHeight 계산: 테이블의 정확한 높이를 기반으로 계산
+                  // 테이블이 콘텐츠의 어느 위치에 있는지 고려하여 전체 높이 계산
+                  const tableTopRelativeToContent = tableRect.top - rect.top;
+                  const requiredHeightFromTable = tableTopRelativeToContent + preciseTableHeight;
+                  
+                  // 여유 공간을 더 크게 설정하여 테이블이 잘리지 않도록 보장
+                  const paddingForTable = 400; // 300px → 400px로 증가
+                  const requiredHeightWithPadding = Math.max(
+                    maxTableHeight + paddingForTable,
+                    requiredHeightFromTable + paddingForTable
+                  );
+                  
                   // requiredHeight를 별도 저장하여 나중에 높이 제한 적용 시 참조
                   sizeInfo.requiredHeight = Math.max(
                     requiredHeightWithPadding,
-                    (tableRect.top - rect.top) + preciseTableHeight + 300,
                     sizeInfo.requiredHeight || 0
                   );
+                  
+                  // measuredHeight도 requiredHeight를 반영하여 설정
                   sizeInfo.measuredHeight = Math.max(
                     requiredHeightWithPadding,
                     sizeInfo.measuredHeight || 0
                   );
                   
                   if (process.env.NODE_ENV === 'development') {
-                    console.log(`📏 [adjustSizes] 담당자별 실적 테이블 포함: maxTableHeight=${maxTableHeight}px, preciseTableHeight=${preciseTableHeight}px, rowHeightSum=${rowHeightSum}px, requiredHeight=${sizeInfo.requiredHeight}px (실제 높이: ${relativeBottom}px, 테이블 높이: ${actualTableHeight}px, scrollHeight: ${Math.max(tableScrollHeight, containerScrollHeight)}px, 여유공간: 300px)`);
+                    console.log(`📏 [adjustSizes] 담당자별 실적 테이블 포함: maxTableHeight=${maxTableHeight.toFixed(0)}px, preciseTableHeight=${preciseTableHeight.toFixed(0)}px, totalTableHeight=${totalTableHeight.toFixed(0)}px, rowHeightSum=${rowHeightSum.toFixed(0)}px, theadHeight=${theadHeight.toFixed(0)}px, tfootHeight=${tfootHeight.toFixed(0)}px, requiredHeight=${sizeInfo.requiredHeight.toFixed(0)}px (실제 높이: ${relativeBottom.toFixed(0)}px, 테이블 높이: ${actualTableHeight.toFixed(0)}px, scrollHeight: ${Math.max(tableScrollHeight, containerScrollHeight).toFixed(0)}px, 여유공간: ${paddingForTable}px)`);
                   }
                 }
               } else {
-                // 테이블 컨테이너가 없는 경우 기본 로직 사용
+                // 테이블 컨테이너가 없는 경우: 모든 행을 순회하여 실제 높이 정확히 측정
                 const tableScrollHeight = lastTable.scrollHeight || tableRect.height;
+                
+                // 테이블 내부의 모든 행(tbody > tr)을 순회하여 실제 높이 정확히 측정
+                const tbody = lastTable.querySelector('tbody');
+                let actualTableHeight = tableRect.height;
+                let rowHeightSum = 0;
+                let firstRowTop = 0;
+                let lastRowBottom = 0;
+                
+                if (tbody && SafeDOM.isInDOM(tbody)) {
+                  const allRows = tbody.querySelectorAll('tr');
+                  if (allRows.length > 0) {
+                    // 모든 행을 순회하여 실제 높이 측정
+                    for (let i = 0; i < allRows.length; i++) {
+                      const row = allRows[i];
+                      if (!SafeDOM.isInDOM(row)) continue;
+                      
+                      const rowRect = SafeDOM.getBoundingRect(row);
+                      const rowOffsetHeight = row.offsetHeight || 0;
+                      
+                      // 첫 번째 행과 마지막 행의 위치 기록
+                      if (i === 0) {
+                        firstRowTop = rowRect.top;
+                      }
+                      if (i === allRows.length - 1) {
+                        lastRowBottom = rowRect.bottom;
+                      }
+                      
+                      // 각 행의 offsetHeight 합계 (정확한 높이 측정)
+                      rowHeightSum += rowOffsetHeight || rowRect.height || 0;
+                    }
+                    
+                    // 첫 번째 행부터 마지막 행까지의 실제 높이 (getBoundingClientRect 기반)
+                    const measuredHeightFromRects = lastRowBottom > 0 && firstRowTop > 0 
+                      ? lastRowBottom - firstRowTop 
+                      : tableRect.height;
+                    
+                    // tbody의 scrollHeight도 확인
+                    const tbodyScrollHeight = tbody.scrollHeight || measuredHeightFromRects;
+                    
+                    // 실제 높이 = max(행 높이 합계, getBoundingClientRect 기반 높이, tbody scrollHeight, 테이블 높이)
+                    actualTableHeight = Math.max(
+                      rowHeightSum,
+                      measuredHeightFromRects,
+                      tbodyScrollHeight,
+                      tableRect.height
+                    );
+                  }
+                }
+                
+                // 테이블 헤더(thead) 높이도 포함
+                const thead = lastTable.querySelector('thead');
+                let theadHeight = 0;
+                if (thead && SafeDOM.isInDOM(thead)) {
+                  const theadRect = SafeDOM.getBoundingRect(thead);
+                  theadHeight = theadRect.height || 0;
+                }
+                
+                // 테이블 푸터(tfoot) 높이도 포함
+                const tfoot = lastTable.querySelector('tfoot');
+                let tfootHeight = 0;
+                if (tfoot && SafeDOM.isInDOM(tfoot)) {
+                  const tfootRect = SafeDOM.getBoundingRect(tfoot);
+                  tfootHeight = tfootRect.height || 0;
+                }
+                
+                // 실제 테이블 전체 높이 = tbody 높이 + thead 높이 + tfoot 높이
+                const totalTableHeight = actualTableHeight + theadHeight + tfootHeight;
+                
+                // 실제 높이와 scrollHeight 중 큰 값 사용
+                const tableTopRelativeToContent = tableRect.top - rect.top;
                 const maxTableHeight = Math.max(
                   relativeBottom,
-                  (tableRect.top - rect.top) + tableScrollHeight
+                  tableTopRelativeToContent + totalTableHeight,
+                  tableTopRelativeToContent + tableScrollHeight
                 );
                 
                 if (maxTableHeight > (sizeInfo.maxRelativeBottom || 0)) {
                   sizeInfo.maxRelativeBottom = maxTableHeight;
-                  // 테이블 측정 로직 개선: 모든 행의 offsetHeight 합계를 측정하여 scrollHeight보다 정확한 값 사용
-                  let rowHeightSum = 0;
-                  const tbody = lastTable.querySelector('tbody');
-                  if (tbody && SafeDOM.isInDOM(tbody)) {
-                    const allRows = tbody.querySelectorAll('tr');
-                    for (const row of allRows) {
-                      if (SafeDOM.isInDOM(row)) {
-                        rowHeightSum += row.offsetHeight || 0;
-                      }
-                    }
-                  }
-                  // 행 높이 합계와 scrollHeight 중 더 큰 값 사용
-                  const preciseTableHeight = Math.max(tableRect.height, rowHeightSum, tableScrollHeight);
-                  const requiredHeightWithPadding = maxTableHeight + 300; // 여유 공간 300px
+                  
+                  // 정확한 테이블 높이 = max(실제 테이블 높이, 행 높이 합계, scrollHeight)
+                  const preciseTableHeight = Math.max(
+                    totalTableHeight,
+                    rowHeightSum + theadHeight + tfootHeight,
+                    tableScrollHeight
+                  );
+                  
+                  // requiredHeight 계산: 테이블의 정확한 높이를 기반으로 계산
+                  const tableTopRelativeToContent = tableRect.top - rect.top;
+                  const requiredHeightFromTable = tableTopRelativeToContent + preciseTableHeight;
+                  
+                  // 여유 공간을 더 크게 설정하여 테이블이 잘리지 않도록 보장
+                  const paddingForTable = 400; // 300px → 400px로 증가
+                  const requiredHeightWithPadding = Math.max(
+                    maxTableHeight + paddingForTable,
+                    requiredHeightFromTable + paddingForTable
+                  );
+                  
                   // requiredHeight를 별도 저장하여 나중에 높이 제한 적용 시 참조
                   sizeInfo.requiredHeight = Math.max(
                     requiredHeightWithPadding,
-                    (tableRect.top - rect.top) + preciseTableHeight + 300,
                     sizeInfo.requiredHeight || 0
                   );
+                  
+                  // measuredHeight도 requiredHeight를 반영하여 설정
                   sizeInfo.measuredHeight = Math.max(
                     requiredHeightWithPadding,
                     sizeInfo.measuredHeight || 0
                   );
                   
                   if (process.env.NODE_ENV === 'development') {
-                    console.log(`📏 [adjustSizes] 담당자별 실적 테이블 포함 (컨테이너 없음): maxTableHeight=${maxTableHeight}px, preciseTableHeight=${preciseTableHeight}px, rowHeightSum=${rowHeightSum}px, requiredHeight=${sizeInfo.requiredHeight}px (실제 높이: ${relativeBottom}px, scrollHeight: ${tableScrollHeight}px, 여유공간: 300px)`);
+                    console.log(`📏 [adjustSizes] 담당자별 실적 테이블 포함 (컨테이너 없음): maxTableHeight=${maxTableHeight.toFixed(0)}px, preciseTableHeight=${preciseTableHeight.toFixed(0)}px, totalTableHeight=${totalTableHeight.toFixed(0)}px, rowHeightSum=${rowHeightSum.toFixed(0)}px, theadHeight=${theadHeight.toFixed(0)}px, tfootHeight=${tfootHeight.toFixed(0)}px, requiredHeight=${sizeInfo.requiredHeight.toFixed(0)}px (실제 높이: ${relativeBottom.toFixed(0)}px, scrollHeight: ${tableScrollHeight.toFixed(0)}px, 여유공간: ${paddingForTable}px)`);
                   }
                 }
               }
@@ -1657,35 +1795,59 @@ async function adjustSizes(elements, config, slide) {
         }
 
         // 헤더 너비 조정 (역방향: 헤더 너비를 기준으로 콘텐츠 너비 조정)
+        // 재초담초채권/가입자증감 슬라이드: 1920px로 명시적으로 설정 (정상 슬라이드처럼)
         if (config?.needsHeaderSizeAdjustment && elements.headerElement && sizeInfo) {
           try {
-            // 헤더 너비를 먼저 측정
-            const headerRect = SafeDOM.getBoundingRect(elements.headerElement);
-            const headerWidth = headerRect.width || 0;
-            const contentWidth = sizeInfo.measuredWidth || 0;
-            const slideRect = SafeDOM.getBoundingRect(elements.slideElement);
-            const maxSlideWidth = slideRect.width || MAX_WIDTH;
+            // 재초담초채권/가입자증감 슬라이드 판단
+            const isRechotanchoBond = slide?.mode === 'chart' &&
+              (slide?.tab === 'bondChart' || slide?.tab === 'bond') &&
+              slide?.subTab === 'rechotanchoBond';
+            const isSubscriberIncrease = slide?.mode === 'chart' &&
+              (slide?.tab === 'subscriberChart' || slide?.tab === 'subscriber') &&
+              slide?.subTab === 'subscriberIncrease';
             
-            // 헤더 너비와 콘텐츠 너비 중 더 큰 값을 사용 (헤더가 더 넓으면 콘텐츠를 헤더에 맞춤)
-            // 슬라이드 전체 너비를 초과하지 않도록 제한
-            const targetWidth = Math.min(
-              Math.max(headerWidth, contentWidth),
-              maxSlideWidth
+            // 재초담초채권/가입자증감 슬라이드: 1920px로 명시적으로 설정 (정상 슬라이드처럼)
+            const targetWidth = (isRechotanchoBond || isSubscriberIncrease) ? MAX_WIDTH : (
+              (() => {
+                // 헤더 너비를 먼저 측정
+                const headerRect = SafeDOM.getBoundingRect(elements.headerElement);
+                const headerWidth = headerRect.width || 0;
+                const contentWidth = sizeInfo.measuredWidth || 0;
+                const slideRect = SafeDOM.getBoundingRect(elements.slideElement);
+                const maxSlideWidth = slideRect.width || MAX_WIDTH;
+                
+                // 헤더 너비와 콘텐츠 너비 중 더 큰 값을 사용 (헤더가 더 넓으면 콘텐츠를 헤더에 맞춤)
+                // 슬라이드 전체 너비를 초과하지 않도록 제한
+                return Math.min(
+                  Math.max(headerWidth, contentWidth),
+                  maxSlideWidth
+                );
+              })()
             );
             
             if (process.env.NODE_ENV === 'development') {
-              console.log(`📏 [adjustSizes] 헤더/콘텐츠 너비 조정: 헤더=${headerWidth.toFixed(0)}px, 콘텐츠=${contentWidth.toFixed(0)}px → 대상=${targetWidth.toFixed(0)}px (헤더 기준)`);
+              if (isRechotanchoBond || isSubscriberIncrease) {
+                console.log(`📏 [adjustSizes] 재초담초채권/가입자증감 슬라이드: 1920px로 명시적으로 설정 (정상 슬라이드처럼)`);
+              } else {
+                const headerRect = SafeDOM.getBoundingRect(elements.headerElement);
+                const headerWidth = headerRect.width || 0;
+                const contentWidth = sizeInfo.measuredWidth || 0;
+                console.log(`📏 [adjustSizes] 헤더/콘텐츠 너비 조정: 헤더=${headerWidth.toFixed(0)}px, 콘텐츠=${contentWidth.toFixed(0)}px → 대상=${targetWidth.toFixed(0)}px (헤더 기준)`);
+              }
             }
             
-            // sizeInfo.measuredWidth를 헤더 너비와 콘텐츠 너비 중 더 큰 값으로 설정
-            if (targetWidth > contentWidth) {
-              sizeInfo.measuredWidth = targetWidth;
-              if (process.env.NODE_ENV === 'development') {
+            // sizeInfo.measuredWidth를 targetWidth로 설정
+            sizeInfo.measuredWidth = targetWidth;
+            if (process.env.NODE_ENV === 'development') {
+              const contentWidth = sizeInfo.measuredWidth || 0;
+              if (isRechotanchoBond || isSubscriberIncrease) {
+                console.log(`📏 [adjustSizes] 콘텐츠 너비를 1920px로 설정: ${contentWidth.toFixed(0)}px → ${targetWidth.toFixed(0)}px`);
+              } else if (targetWidth > contentWidth) {
                 console.log(`📏 [adjustSizes] 콘텐츠 너비를 헤더 너비에 맞춤: ${contentWidth.toFixed(0)}px → ${targetWidth.toFixed(0)}px`);
               }
             }
             
-            // 콘텐츠 요소의 너비를 헤더 너비에 맞추기 위해 스타일 조정
+            // 콘텐츠 요소의 너비를 targetWidth에 맞추기 위해 스타일 조정
             const restoreContent = await adjustContentToHeaderWidth(
               elements.contentElement,
               targetWidth,
@@ -1693,6 +1855,36 @@ async function adjustSizes(elements, config, slide) {
             );
             if (restoreContent) {
               restoreFunctions.push(restoreContent);
+            }
+            
+            // 헤더 너비도 1920px로 명시적으로 설정 (재초담초채권/가입자증감 슬라이드)
+            if ((isRechotanchoBond || isSubscriberIncrease) && elements.headerElement && SafeDOM.isInDOM(elements.headerElement)) {
+              const headerRect = SafeDOM.getBoundingRect(elements.headerElement);
+              const headerOriginalWidth = elements.headerElement.style.width || '';
+              const headerOriginalMaxWidth = elements.headerElement.style.maxWidth || '';
+              
+              if (Math.abs(headerRect.width - MAX_WIDTH) > 5) {
+                elements.headerElement.style.width = `${MAX_WIDTH}px`;
+                elements.headerElement.style.maxWidth = `${MAX_WIDTH}px`;
+                
+                await new Promise(r => setTimeout(r, 200));
+                
+                if (process.env.NODE_ENV === 'development') {
+                  console.log(`📐 [adjustSizes] 헤더 너비를 1920px로 설정: ${headerRect.width.toFixed(0)}px → ${MAX_WIDTH}px`);
+                }
+                
+                restoreFunctions.push(() => {
+                  try {
+                    if (!SafeDOM.isInDOM(elements.headerElement)) return;
+                    SafeDOM.restoreStyle(elements.headerElement, 'width', headerOriginalWidth);
+                    SafeDOM.restoreStyle(elements.headerElement, 'max-width', headerOriginalMaxWidth);
+                  } catch (error) {
+                    if (process.env.NODE_ENV === 'development') {
+                      console.warn('⚠️ [adjustSizes] 헤더 너비 복원 실패:', error);
+                    }
+                  }
+                });
+              }
             }
           } catch (error) {
             if (process.env.NODE_ENV === 'development') {
@@ -2265,7 +2457,7 @@ async function executeCapture(elements, config, sizeInfo, slide) {
 
           // 가입자증감 슬라이드: TextField 캡처 시점 스타일 적용 강화
           const isSubscriberIncrease = slide?.mode === 'chart' &&
-            (slide?.tab === 'bondChart' || slide?.tab === 'bond') &&
+            (slide?.tab === 'subscriberChart' || slide?.tab === 'subscriber') &&
             slide?.subTab === 'subscriberIncrease';
           
           if (isSubscriberIncrease && captureElementForDirect && SafeDOM.isInDOM(captureElementForDirect)) {
@@ -2308,8 +2500,23 @@ async function executeCapture(elements, config, sizeInfo, slide) {
 
           await new Promise(r => setTimeout(r, 300));
 
+          // 재초담초채권/가입자증감 슬라이드: 1920px로 명시적으로 설정 (정상 슬라이드처럼)
+          const isRechotanchoBond = slide?.mode === 'chart' &&
+            (slide?.tab === 'bondChart' || slide?.tab === 'bond') &&
+            slide?.subTab === 'rechotanchoBond';
+          const isSubscriberIncreaseForCapture = slide?.mode === 'chart' &&
+            (slide?.tab === 'subscriberChart' || slide?.tab === 'subscriber') &&
+            slide?.subTab === 'subscriberIncrease';
+          
           // width/height는 원본 크기만 전달 (SCALE 곱하지 않음)
-          const captureWidth = Math.min(sizeInfo.measuredWidth || 0, MAX_WIDTH);
+          // 재초담초채권/가입자증감 슬라이드는 1920px로 명시적으로 설정
+          const captureWidth = (isRechotanchoBond || isSubscriberIncreaseForCapture) 
+            ? MAX_WIDTH 
+            : Math.min(sizeInfo.measuredWidth || 0, MAX_WIDTH);
+          
+          if (process.env.NODE_ENV === 'development' && (isRechotanchoBond || isSubscriberIncreaseForCapture)) {
+            console.log(`📏 [executeCapture] 재초담초채권/가입자증감 슬라이드: captureWidth를 1920px로 명시적으로 설정`);
+          }
           
           // 전체총마감 슬라이드: requiredHeight 확인하여 높이 제한 동적 조정
           const isTotalClosing = slide?.mode === 'chart' &&
