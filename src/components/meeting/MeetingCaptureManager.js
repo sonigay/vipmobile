@@ -1978,349 +1978,13 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
           }
         }
 
-        // 채권장표 > 재초담초채권: 저장 시점 콤보박스를 최신 시점으로 자동 선택
-        if (
-          currentSlide?.mode === 'chart' &&
-          (currentSlide?.tab === 'bondChart' || currentSlide?.tab === 'bond') &&
-          (currentSlide?.subTab === 'rechotanchoBond')
-        ) {
-          let selectedTimestampText = '';
-          const desiredTs = (currentSlide?.detailOptions?.bondHistoryTimestamp || '').trim();
-          
-          // 선 그래프를 렌더링하기 위해 "조회 월 선택" Paper가 있는지 확인
-          // 없으면 allData가 로드되지 않았을 수 있으므로 추가 대기
-          const checkLineChartPaper = () => {
-            const papers = slideElement.querySelectorAll('.MuiPaper-root');
-            return Array.from(papers).find(p => {
-              const text = p.textContent || '';
-              return text.includes('조회 월 선택');
-            });
-          };
-          
-          // 선 그래프 Paper가 없으면 allData 로드를 기다림 (최대 5초)
-          if (!checkLineChartPaper()) {
-            let waitCount = 0;
-            while (!checkLineChartPaper() && waitCount < 25) {
-              await new Promise(r => setTimeout(r, 200));
-              waitCount++;
-            }
-          }
-          
-          // 선 그래프 Paper 내부에 실제 차트가 렌더링되었는지 확인
-          const checkLineChartRendered = () => {
-            const linePaper = checkLineChartPaper();
-            if (!linePaper) return false;
-            // Line 차트는 보통 canvas나 svg로 렌더링됨
-            const chart = linePaper.querySelector('canvas, svg, [class*="recharts"], [class*="Line"]');
-            return !!chart;
-          };
-          
-          // 선 그래프가 실제로 렌더링될 때까지 대기 (최대 3초)
-          if (checkLineChartPaper() && !checkLineChartRendered()) {
-            let waitCount = 0;
-            while (!checkLineChartRendered() && waitCount < 15) {
-              await new Promise(r => setTimeout(r, 200));
-              waitCount++;
-            }
-          }
-          
-          // 콤보박스 열기
-          const combo = Array.from(document.querySelectorAll('[role="combobox"], .MuiSelect-select'))
-            .find(el => {
-              // 주변 텍스트에 '저장 시점' 문구가 있는지 대략적으로 판단
-              const parentText = (el.closest('.MuiFormControl-root')?.textContent || '') + (el.parentElement?.textContent || '');
-              return parentText.includes('저장 시점') || parentText.includes('저장 시점 선택');
-            }) || document.querySelector('[aria-haspopup="listbox"]');
-          if (combo) {
-            (combo instanceof HTMLElement) && combo.click();
-            await new Promise(r => setTimeout(r, 200));
-            const listbox = document.querySelector('[role="listbox"]');
-            let targetOption = null;
-            if (desiredTs && listbox) {
-              targetOption = Array.from(listbox.querySelectorAll('[role="option"]'))
-                .find(opt => (opt.textContent || '').includes(desiredTs));
-            }
-            if (!targetOption) {
-              targetOption = document.querySelector('[role="listbox"] [role="option"]');
-            }
-            if (targetOption && targetOption instanceof HTMLElement) {
-              selectedTimestampText = (targetOption.textContent || '').trim();
-              targetOption.click();
-              await new Promise(r => setTimeout(r, 800)); // 데이터 갱신 대기
-            }
-          }
-          // 이 화면은 상단 그래프 2개 + 하단 입력 테이블 모두 포함해야 하므로 슬라이드 전체 캡쳐 유지
-          // 하지만 그래프와 테이블의 크기를 맞추기 위해 임시로 스타일 조정
-          try {
-            // 그래프 Paper와 테이블 Paper 찾기
-            const allPapers = Array.from(slideElement.querySelectorAll('.MuiPaper-root'));
-            const barPaper = allPapers.find(p => (p.textContent || '').includes('대리점별 채권 현황') || (p.textContent || '').includes('대리점별 현재 채권 현황'));
-            const linePaper = allPapers.find(p => (p.textContent || '').includes('조회 월 선택'));
-            const tablePaper = allPapers.find(p => (p.textContent || '').includes('데이터 입력') || (p.querySelector('table')));
-            
-            // 통일된 너비 결정 (최소 1200px)
-            const targetWidth = 1200;
-            
-            // 막대 그래프 크기 조정 (선 그래프와 동일한 방식으로 단순화)
-            if (barPaper) {
-              const barCanvas = barPaper.querySelector('canvas');
-              const barRect = barPaper.getBoundingClientRect();
-              const originalBarStyle = {
-                width: barPaper.style.width,
-                minWidth: barPaper.style.minWidth,
-                maxWidth: barPaper.style.maxWidth
-              };
-              
-              // Paper 너비 조정 (선 그래프와 동일)
-              barPaper.style.width = `${targetWidth}px`;
-              barPaper.style.minWidth = `${targetWidth}px`;
-              barPaper.style.maxWidth = 'none';
-              
-              // canvas가 있으면 높이도 조정 (선 그래프와 동일한 방식)
-              if (barCanvas) {
-                const canvasBox = barCanvas.closest('[style*="height"]') || barPaper.querySelector('[style*="height"]');
-                if (canvasBox) {
-                  canvasBox.style.height = '400px';
-                  canvasBox.style.minHeight = '400px';
-                }
-              }
-            }
-            
-            // 선 그래프 크기 조정
-            if (linePaper) {
-              const lineCanvas = linePaper.querySelector('canvas');
-              const lineRect = linePaper.getBoundingClientRect();
-              const originalLineStyle = {
-                width: linePaper.style.width,
-                minWidth: linePaper.style.minWidth,
-                maxWidth: linePaper.style.maxWidth
-              };
-              
-              linePaper.style.width = `${targetWidth}px`;
-              linePaper.style.minWidth = `${targetWidth}px`;
-              linePaper.style.maxWidth = 'none';
-              
-              // canvas가 있으면 높이도 조정
-              if (lineCanvas) {
-                const canvasBox = lineCanvas.closest('[style*="height"]') || linePaper.querySelector('[style*="height"]');
-                if (canvasBox) {
-                  canvasBox.style.height = '500px';
-                  canvasBox.style.minHeight = '500px';
-                }
-              }
-            }
-            
-            // 테이블 크기 조정
-            if (tablePaper) {
-              const originalTableStyle = {
-                width: tablePaper.style.width,
-                minWidth: tablePaper.style.minWidth,
-                maxWidth: tablePaper.style.maxWidth
-              };
-              
-              tablePaper.style.width = `${targetWidth}px`;
-              tablePaper.style.minWidth = `${targetWidth}px`;
-              tablePaper.style.maxWidth = 'none';
-              
-              // 테이블 컨테이너도 조정
-              const tableContainer = tablePaper.querySelector('.MuiTableContainer-root, table');
-              if (tableContainer) {
-                const originalTableContainerStyle = {
-                  width: tableContainer.style.width,
-                  minWidth: tableContainer.style.minWidth,
-                  maxWidth: tableContainer.style.maxWidth
-                };
-                tableContainer.style.width = '100%';
-                tableContainer.style.minWidth = `${targetWidth}px`;
-                tableContainer.style.maxWidth = 'none';
-              }
-            }
-            
-            // 크기 조정 후 렌더링 대기 (Chart.js가 재렌더링할 시간)
-            await new Promise(r => setTimeout(r, 500));
-            
-            // window resize 이벤트를 한 번 더 트리거하여 모든 차트가 재렌더링되도록
-            window.dispatchEvent(new Event('resize'));
-            
-            // 추가 렌더링 대기
-            await new Promise(r => setTimeout(r, 800));
-            
-            // 캡처 후 원래 스타일 복원을 위한 참조 저장
-            slideElement.__restoreStyles = () => {
-              if (barPaper) {
-                barPaper.style.width = originalBarStyle.width;
-                barPaper.style.minWidth = originalBarStyle.minWidth;
-                barPaper.style.maxWidth = originalBarStyle.maxWidth;
-                
-                // canvas 스타일 복원
-                const barCanvas = barPaper.querySelector('canvas');
-                if (barCanvas && barPaper.__originalCanvasStyle) {
-                  barCanvas.style.width = barPaper.__originalCanvasStyle.width || '';
-                  barCanvas.style.height = barPaper.__originalCanvasStyle.height || '';
-                  barCanvas.style.minWidth = barPaper.__originalCanvasStyle.minWidth || '';
-                  barCanvas.style.maxWidth = barPaper.__originalCanvasStyle.maxWidth || '';
-                  
-                  // 원본 픽셀 크기도 복원
-                  if (barPaper.__originalCanvasWidth) {
-                    barCanvas.width = barPaper.__originalCanvasWidth;
-                  }
-                  if (barPaper.__originalCanvasHeight) {
-                    barCanvas.height = barPaper.__originalCanvasHeight;
-                  }
-                  
-                  delete barPaper.__originalCanvasStyle;
-                  delete barPaper.__originalCanvasWidth;
-                  delete barPaper.__originalCanvasHeight;
-                }
-              }
-              if (linePaper) {
-                linePaper.style.width = originalLineStyle.width;
-                linePaper.style.minWidth = originalLineStyle.minWidth;
-                linePaper.style.maxWidth = originalLineStyle.maxWidth;
-              }
-              if (tablePaper) {
-                tablePaper.style.width = originalTableStyle.width;
-                tablePaper.style.minWidth = originalTableStyle.minWidth;
-                tablePaper.style.maxWidth = originalTableStyle.maxWidth;
-              }
-            };
-          } catch (e) {
-            if (process.env.NODE_ENV === 'development') {
-              console.warn('⚠️ [MeetingCaptureManager] 재초담초채권 크기 조정 중 경고:', e?.message);
-            }
-          }
-          
-          captureTargetElement = slideElement;
-
-          // 우상단 배지로 선택된 시점 표시 (캡쳐에 포함되도록 임시로 DOM 추가)
-          try {
-            if (selectedTimestampText) {
-              slideElement.style.position = slideElement.style.position || 'relative';
-              var tsBadge = document.createElement('div');
-              tsBadge.textContent = `저장 시점: ${selectedTimestampText}`;
-              tsBadge.style.position = 'absolute';
-              tsBadge.style.top = '8px';
-              tsBadge.style.right = '16px';
-              tsBadge.style.background = 'rgba(0,0,0,0.6)';
-              tsBadge.style.color = '#fff';
-              tsBadge.style.padding = '6px 10px';
-              tsBadge.style.borderRadius = '8px';
-              tsBadge.style.fontSize = '12px';
-              tsBadge.style.fontWeight = '700';
-              tsBadge.style.zIndex = '20';
-              tsBadge.style.pointerEvents = 'none';
-              slideElement.appendChild(tsBadge);
-              // 캡쳐 후 제거를 위해 참조 보관
-              captureTargetElement.__tempTsBadge = tsBadge;
-            }
-          } catch (e) {
-            console.warn('⚠️ [MeetingCaptureManager] 시점 배지 표시 중 경고:', e?.message);
-          }
-
-          // 그래프 2개가 모두 렌더링될 때까지 대기 (최대 7초)
-          // 막대 그래프(Bar)와 선 그래프(Line) 모두 포함
-          // 그래프가 잘리지 않았는지 확인 (너비와 높이가 0이 아닌지)
-          try {
-            const maxWait = 7000; // 대기 시간 증가 (5초 → 7초)
-            const start = Date.now();
-            let chartCount = 0;
-            let barChartFound = false;
-            let lineChartFound = false;
-            let barChartValid = false;
-            let lineChartValid = false;
-            
-            while (Date.now() - start < maxWait) {
-              // 모든 차트 요소 찾기 (canvas, svg, recharts)
-              const charts = slideElement.querySelectorAll('canvas, svg, [class*="recharts"], [class*="Chart"]');
-              chartCount = charts.length;
-              
-              // 막대 그래프 확인 (첫 번째 Paper에 있음)
-              const papers = slideElement.querySelectorAll('.MuiPaper-root');
-              for (const paper of papers) {
-                const paperText = paper.textContent || '';
-                // 막대 그래프는 "대리점별 채권 현황" 텍스트가 있는 Paper에 있음
-                if (paperText.includes('대리점별 채권 현황') || paperText.includes('대리점별 현재 채권 현황')) {
-                  const barChart = paper.querySelector('canvas, svg, [class*="recharts"], [class*="Bar"]');
-                  if (barChart) {
-                    barChartFound = true;
-                    // 그래프가 잘리지 않았는지 확인 (너비와 높이가 0이 아닌지)
-                    const rect = barChart.getBoundingClientRect();
-                    barChartValid = rect.width > 100 && rect.height > 100;
-                  }
-                }
-                // 선 그래프 확인 (Line 차트는 "조회 월 선택" 텍스트가 있는 Paper에 있음)
-                if (paperText.includes('조회 월 선택')) {
-                  const lineChart = paper.querySelector('canvas, svg, [class*="recharts"], [class*="Line"]');
-                  if (lineChart) {
-                    lineChartFound = true;
-                    // 그래프가 잘리지 않았는지 확인 (너비와 높이가 0이 아닌지)
-                    const rect = lineChart.getBoundingClientRect();
-                    lineChartValid = rect.width > 100 && rect.height > 100;
-                  }
-                }
-              }
-              
-              // 막대 그래프와 선 그래프가 모두 렌더링되었고, 잘리지 않았는지 확인
-              if (barChartFound && lineChartFound && barChartValid && lineChartValid && chartCount >= 2) {
-                if (process.env.NODE_ENV === 'development') {
-                  console.log('✅ [MeetingCaptureManager] 재초담초채권 그래프 모두 렌더링 완료 (잘림 없음)');
-                }
-                break;
-              }
-              
-              // 선 그래프 Paper로 스크롤하여 강제 렌더링 유도
-              if (!lineChartFound || !lineChartValid) {
-                try { 
-                  const linePaper = Array.from(papers).find(p => (p.textContent || '').includes('조회 월 선택'));
-                  if (linePaper) {
-                    linePaper.scrollIntoView({ block: 'center', behavior: 'instant' });
-                    // 스크롤 후 잠시 대기
-                    await new Promise(r => setTimeout(r, 300));
-                  }
-                } catch {}
-              }
-              
-              // 막대 그래프 Paper로 스크롤하여 강제 렌더링 유도
-              if (!barChartFound || !barChartValid) {
-                try {
-                  const barPaper = Array.from(papers).find(p => 
-                    (p.textContent || '').includes('대리점별 채권 현황') || 
-                    (p.textContent || '').includes('대리점별 현재 채권 현황')
-                  );
-                  if (barPaper) {
-                    barPaper.scrollIntoView({ block: 'center', behavior: 'instant' });
-                    await new Promise(r => setTimeout(r, 300));
-                  }
-                } catch {}
-              }
-              
-              await new Promise(r => setTimeout(r, 200));
-            }
-            
-            // 최종 확인: 그래프가 없거나 잘렸으면 추가 대기 및 경고
-            if (!barChartFound || !barChartValid || !lineChartFound || !lineChartValid) {
-              if (process.env.NODE_ENV === 'development') {
-                console.warn('⚠️ [MeetingCaptureManager] 재초담초채권 그래프 렌더링 문제:', {
-                  barChartFound,
-                  barChartValid,
-                  lineChartFound,
-                  lineChartValid
-                });
-              }
-              // 모든 Paper로 스크롤하고 추가 대기
-              const papers = slideElement.querySelectorAll('.MuiPaper-root');
-              for (const paper of papers) {
-                paper.scrollIntoView({ block: 'center', behavior: 'instant' });
-                await new Promise(r => setTimeout(r, 200));
-              }
-              await new Promise(r => setTimeout(r, 1000));
-            }
-          } catch (e) {
-            if (process.env.NODE_ENV === 'development') {
-              console.warn('⚠️ [MeetingCaptureManager] 재초담초채권 그래프 대기 중 경고:', e?.message);
-            }
-          }
-        }
+        // 재초담초채권 슬라이드: 레거시 캡처 로직 제거 (UnifiedCaptureEngine으로 통합)
+        // 기존 로직은 UnifiedCaptureEngine의 preProcess와 executeCapture에서 처리
+        // if (
+        //   currentSlide?.mode === 'chart' &&
+        //   (currentSlide?.tab === 'bondChart' || currentSlide?.tab === 'bond') &&
+        //   (currentSlide?.subTab === 'rechotanchoBond')
+        // ) { /* ... 기존 로직 제거 ... */ }
 
         // 채권장표 > 가입자증감: '년단위' 토글 + 2025년 우선 선택 (없으면 최신) (이 부분은 캡처 타겟 선택에만 사용)
         if (
@@ -2632,15 +2296,12 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         console.warn('⚠️ [MeetingCaptureManager] 상세옵션 타겟 선택 중 경고:', e?.message);
       }
 
-      // 재고장표 특수 처리: 위에서 헤더+테이블 합성 결과가 있으면 사용
-      let inventoryCompositeBlob = slideElement && slideElement.__inventoryCompositeBlob ? slideElement.__inventoryCompositeBlob : null;
-
-      // 지표장표 > 월간시상: 확대 후 5개 테이블 모두 캡처 (슬라이드 헤더 포함)
-      let monthlyAwardCompositeBlob = null;
-      if (
-        currentSlide?.mode === 'chart' &&
-        (currentSlide?.tab === 'indicatorChart' || currentSlide?.subTab === 'monthlyAward')
-      ) {
+      // 재고장표, 월간시상, 가입자증감 슬라이드: 레거시 캡처 로직 제거 (UnifiedCaptureEngine으로 통합)
+      // 기존 로직은 UnifiedCaptureEngine에서 처리
+      // if (
+      //   currentSlide?.mode === 'chart' &&
+      //   (currentSlide?.tab === 'indicatorChart' || currentSlide?.subTab === 'monthlyAward')
+      // ) {
         try {
           // 1) 확대 버튼 클릭
           const expandBtn = Array.from(document.querySelectorAll('button, .MuiButton-root')).find(
@@ -2956,13 +2617,14 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         }
       }
 
-      // 가입자증감: 월간시상 슬라이드와 동일한 방식으로 전체를 한 번에 캡처 (합성 방식 제거)
-      let subscriberIncreaseCompositeBlob = null;
-      if (
-        currentSlide?.mode === 'chart' &&
-        (currentSlide?.tab === 'bondChart' || currentSlide?.tab === 'bond') &&
-        (currentSlide?.subTab === 'subscriberIncrease')
-      ) {
+      // 가입자증감 슬라이드: 레거시 캡처 로직 제거 (UnifiedCaptureEngine으로 통합)
+      // 기존 로직은 UnifiedCaptureEngine에서 처리
+      // let subscriberIncreaseCompositeBlob = null;
+      // if (
+      //   currentSlide?.mode === 'chart' &&
+      //   (currentSlide?.tab === 'bondChart' || currentSlide?.tab === 'bond') &&
+      //   (currentSlide?.subTab === 'subscriberIncrease')
+      // ) {
         try {
           // 데이터 로딩 완료 최종 확인 (연도 선택 후 추가 대기 시간 동안에도 확인)
           if (process.env.NODE_ENV === 'development') {
@@ -3660,18 +3322,18 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
           }
         } catch (e) {
           console.error('❌ [MeetingCaptureManager] 가입자증감 캡처 실패:', e);
-          subscriberIncreaseCompositeBlob = null;
+          // subscriberIncreaseCompositeBlob = null;
         }
-      }
+      // }
       
-      // 기존 합성 방식 코드 제거 (월간시상 방식으로 변경)
-      let compositeBlob = null;
-      if (
-        currentSlide?.mode === 'chart' &&
-        (currentSlide?.tab === 'bondChart' || currentSlide?.tab === 'bond') &&
-        (currentSlide?.subTab === 'subscriberIncrease') &&
-        false // 기존 합성 방식 비활성화
-      ) {
+      // 기존 합성 방식 코드 제거 (월간시상 방식으로 변경) - UnifiedCaptureEngine으로 통합
+      // let compositeBlob = null;
+      // if (
+      //   currentSlide?.mode === 'chart' &&
+      //   (currentSlide?.tab === 'bondChart' || currentSlide?.tab === 'bond') &&
+      //   (currentSlide?.subTab === 'subscriberIncrease') &&
+      //   false // 기존 합성 방식 비활성화
+      // ) {
         try {
           const blobToImage = (blob) => new Promise((resolve, reject) => {
             const url = URL.createObjectURL(blob);

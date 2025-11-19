@@ -1384,29 +1384,98 @@ async function adjustSizes(elements, config, slide) {
               const tableRect = SafeDOM.getBoundingRect(lastTable);
               const relativeBottom = tableRect.bottom - rect.top;
               
-              // scrollHeight도 고려하여 전체 테이블 높이 포함 (스크롤 가능한 테이블도 전체 높이 측정)
-              const tableScrollHeight = lastTable.scrollHeight || tableRect.height;
+              // 테이블 컨테이너 찾기 및 overflow 확인
               const tableContainer = lastTable.closest('.MuiTableContainer-root');
               let containerScrollHeight = 0;
+              let originalOverflow = '';
+              let originalMaxHeight = '';
+              
               if (tableContainer && SafeDOM.isInDOM(tableContainer)) {
+                // 스크롤 가능한 테이블의 전체 높이를 정확히 측정하기 위해 overflow 제거
+                const containerStyle = window.getComputedStyle(tableContainer);
+                originalOverflow = tableContainer.style.overflow || '';
+                originalMaxHeight = tableContainer.style.maxHeight || '';
+                
+                // overflow를 제거하여 전체 높이 측정 가능하게 함
+                tableContainer.style.overflow = 'visible';
+                tableContainer.style.maxHeight = 'none';
+                
+                // 스타일 변경 후 렌더링 대기
+                await new Promise(r => setTimeout(r, 100));
+                
+                // scrollHeight 측정 (overflow 제거 후 정확한 값)
                 containerScrollHeight = tableContainer.scrollHeight || 0;
-              }
-              
-              // 실제 높이와 scrollHeight 중 큰 값 사용 (스크롤 가능한 테이블도 전체 포함)
-              const maxTableHeight = Math.max(
-                relativeBottom,
-                (tableRect.top - rect.top) + Math.max(tableScrollHeight, containerScrollHeight)
-              );
-              
-              if (maxTableHeight > (sizeInfo.maxRelativeBottom || 0)) {
-                sizeInfo.maxRelativeBottom = maxTableHeight;
-                sizeInfo.measuredHeight = Math.max(
-                  maxTableHeight + 300, // 여유 공간 증가 (200px → 300px, 콘텐츠 잘림 방지)
-                  sizeInfo.measuredHeight || 0
+                
+                // 테이블 자체의 scrollHeight도 확인
+                const tableScrollHeight = lastTable.scrollHeight || tableRect.height;
+                
+                // 테이블 내부의 모든 행(tbody > tr)을 확인하여 실제 높이 측정
+                const tbody = lastTable.querySelector('tbody');
+                let actualTableHeight = tableRect.height;
+                
+                if (tbody && SafeDOM.isInDOM(tbody)) {
+                  const allRows = tbody.querySelectorAll('tr');
+                  if (allRows.length > 0) {
+                    const firstRowRect = SafeDOM.getBoundingRect(allRows[0]);
+                    const lastRowRect = SafeDOM.getBoundingRect(allRows[allRows.length - 1]);
+                    // 첫 번째 행부터 마지막 행까지의 실제 높이
+                    actualTableHeight = lastRowRect.bottom - firstRowRect.top;
+                    
+                    // tbody의 scrollHeight도 확인
+                    const tbodyScrollHeight = tbody.scrollHeight || actualTableHeight;
+                    actualTableHeight = Math.max(actualTableHeight, tbodyScrollHeight);
+                  }
+                }
+                
+                // 실제 높이와 scrollHeight 중 큰 값 사용 (스크롤 가능한 테이블도 전체 포함)
+                const maxTableHeight = Math.max(
+                  relativeBottom,
+                  (tableRect.top - rect.top) + actualTableHeight,
+                  (tableRect.top - rect.top) + Math.max(tableScrollHeight, containerScrollHeight),
+                  (tableRect.top - rect.top) + tbody?.scrollHeight || 0
                 );
                 
-                if (process.env.NODE_ENV === 'development') {
-                  console.log(`📏 [adjustSizes] 담당자별 실적 테이블 포함: ${maxTableHeight}px (실제 높이: ${relativeBottom}px, scrollHeight: ${Math.max(tableScrollHeight, containerScrollHeight)}px, 여유공간: 300px)`);
+                // 스타일 복원
+                if (originalOverflow) {
+                  tableContainer.style.overflow = originalOverflow;
+                } else {
+                  tableContainer.style.removeProperty('overflow');
+                }
+                if (originalMaxHeight) {
+                  tableContainer.style.maxHeight = originalMaxHeight;
+                } else {
+                  tableContainer.style.removeProperty('max-height');
+                }
+                
+                if (maxTableHeight > (sizeInfo.maxRelativeBottom || 0)) {
+                  sizeInfo.maxRelativeBottom = maxTableHeight;
+                  sizeInfo.measuredHeight = Math.max(
+                    maxTableHeight + 300, // 여유 공간 증가 (200px → 300px, 콘텐츠 잘림 방지)
+                    sizeInfo.measuredHeight || 0
+                  );
+                  
+                  if (process.env.NODE_ENV === 'development') {
+                    console.log(`📏 [adjustSizes] 담당자별 실적 테이블 포함: ${maxTableHeight}px (실제 높이: ${relativeBottom}px, 테이블 높이: ${actualTableHeight}px, scrollHeight: ${Math.max(tableScrollHeight, containerScrollHeight)}px, 여유공간: 300px)`);
+                  }
+                }
+              } else {
+                // 테이블 컨테이너가 없는 경우 기본 로직 사용
+                const tableScrollHeight = lastTable.scrollHeight || tableRect.height;
+                const maxTableHeight = Math.max(
+                  relativeBottom,
+                  (tableRect.top - rect.top) + tableScrollHeight
+                );
+                
+                if (maxTableHeight > (sizeInfo.maxRelativeBottom || 0)) {
+                  sizeInfo.maxRelativeBottom = maxTableHeight;
+                  sizeInfo.measuredHeight = Math.max(
+                    maxTableHeight + 300,
+                    sizeInfo.measuredHeight || 0
+                  );
+                  
+                  if (process.env.NODE_ENV === 'development') {
+                    console.log(`📏 [adjustSizes] 담당자별 실적 테이블 포함 (컨테이너 없음): ${maxTableHeight}px (실제 높이: ${relativeBottom}px, scrollHeight: ${tableScrollHeight}px, 여유공간: 300px)`);
+                  }
                 }
               }
             }

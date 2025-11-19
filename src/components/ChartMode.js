@@ -6494,12 +6494,25 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                                     }}
                                 sx={{ 
                                       width: '100%',
+                                      '& .MuiInputBase-root': {
+                                        position: 'relative',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        height: '100%', // 전체 높이 사용 (입력값 위치 불일치 문제 해결)
+                                      },
                                       '& .MuiInputBase-input': {
                                         fontSize: '0.8rem',
                                         fontWeight: 'bold',
                                         padding: '6px 4px',
                                         textAlign: 'center',
-                                        color: '#1976d2'
+                                        color: '#1976d2',
+                                        lineHeight: 'normal', // 줄 간격 정상화 (입력값 위치 불일치 문제 해결)
+                                      },
+                                      '& input[type=text]': {
+                                        textAlign: 'center',
+                                        width: '100%',
+                                        padding: '6px 4px',
+                                        lineHeight: 'normal', // 줄 간격 정상화
                                       },
                                       '& .MuiOutlinedInput-root': {
                                         '& fieldset': {
@@ -6520,7 +6533,8 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                                     textAlign: 'center', 
                                     fontSize: '0.8rem',
                                     fontWeight: 'bold',
-                                    color: '#1976d2'
+                                    color: '#1976d2',
+                                    lineHeight: 'normal', // 줄 간격 정상화
                                   },
                                   inputMode: 'numeric',
                                   pattern: '-?[0-9,]*'
@@ -6594,12 +6608,25 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                                     }}
                                 sx={{ 
                                       width: '100%',
+                                      '& .MuiInputBase-root': {
+                                        position: 'relative',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        height: '100%', // 전체 높이 사용 (입력값 위치 불일치 문제 해결)
+                                      },
                                       '& .MuiInputBase-input': {
                                         fontSize: '0.8rem',
                                         fontWeight: 'bold',
                                         padding: '6px 4px',
                                         textAlign: 'center',
-                                        color: '#7b1fa2'
+                                        color: '#7b1fa2',
+                                        lineHeight: 'normal', // 줄 간격 정상화 (입력값 위치 불일치 문제 해결)
+                                      },
+                                      '& input[type=text]': {
+                                        textAlign: 'center',
+                                        width: '100%',
+                                        padding: '6px 4px',
+                                        lineHeight: 'normal', // 줄 간격 정상화
                                       },
                                       '& .MuiOutlinedInput-root': {
                                         '& fieldset': {
@@ -6620,7 +6647,8 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                                     textAlign: 'center', 
                                     fontSize: '0.8rem',
                                     fontWeight: 'bold',
-                                    color: '#7b1fa2'
+                                    color: '#7b1fa2',
+                                    lineHeight: 'normal', // 줄 간격 정상화
                                   },
                                   inputMode: 'numeric',
                                   pattern: '-?[0-9,]*'
