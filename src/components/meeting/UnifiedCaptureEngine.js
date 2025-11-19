@@ -1483,6 +1483,7 @@ async function adjustSizes(elements, config, slide) {
         }
 
         // 헤더가 있고 preserveHeader가 true일 때: 높이와 너비에 헤더 포함
+        // 단, needsHeaderSizeAdjustment가 true인 경우(재초담초채권, 가입자증감)는 헤더 너비를 콘텐츠에 맞추므로 제외
         if (config?.preserveHeader && elements.headerElement && SafeDOM.isInDOM(elements.headerElement) && sizeInfo) {
           try {
             const headerRect = SafeDOM.getBoundingRect(elements.headerElement);
@@ -1498,14 +1499,19 @@ async function adjustSizes(elements, config, slide) {
               }
             }
             
-            // 헤더와 콘텐츠 중 더 큰 너비 사용
-            const headerWidth = headerRect.width || 0;
-            const contentWidth = sizeInfo.measuredWidth || contentRect.width || 0;
-            if (headerWidth > contentWidth) {
-              sizeInfo.measuredWidth = headerWidth;
-              if (process.env.NODE_ENV === 'development') {
-                console.log(`📏 [adjustSizes] 헤더 너비 적용: ${headerWidth}px (콘텐츠: ${contentWidth}px)`);
+            // 헤더 너비는 needsHeaderSizeAdjustment가 false일 때만 적용 (헤더 너비 조정 로직과 충돌 방지)
+            // needsHeaderSizeAdjustment가 true인 경우(재초담초채권, 가입자증감)는 나중에 adjustHeaderWidth에서 콘텐츠 크기에 맞춤
+            if (!config?.needsHeaderSizeAdjustment) {
+              const headerWidth = headerRect.width || 0;
+              const contentWidth = sizeInfo.measuredWidth || contentRect.width || 0;
+              if (headerWidth > contentWidth) {
+                sizeInfo.measuredWidth = headerWidth;
+                if (process.env.NODE_ENV === 'development') {
+                  console.log(`📏 [adjustSizes] 헤더 너비 적용: ${headerWidth}px (콘텐츠: ${contentWidth}px)`);
+                }
               }
+            } else if (process.env.NODE_ENV === 'development') {
+              console.log(`📏 [adjustSizes] 헤더 너비 조정 로직이 활성화되어 있어 헤더 너비 적용 건너뜀 (나중에 콘텐츠 크기에 맞춤)`);
             }
           } catch (error) {
             if (process.env.NODE_ENV === 'development') {
@@ -1559,8 +1565,8 @@ async function adjustSizes(elements, config, slide) {
               console.log(`📏 [adjustSizes] 목차 슬라이드 높이 제한: ${sizeInfo.measuredHeight}px (최대 ${maxAllowedHeight * SCALE}px 실제)`);
             }
           } else if (isTotalClosing) {
-            // 전체총마감 슬라이드: 담당자별 실적 테이블 포함을 위해 높이 제한 확대 (5500px 원본 = 11000px 실제, 콘텐츠 잘림 방지)
-            maxAllowedHeight = 5500; // 5000px → 5500px (원본) = 11000px (실제) - 콘텐츠 잘림 방지를 위해 증가
+            // 전체총마감 슬라이드: 담당자별 실적 테이블 포함을 위해 높이 제한 확대 (6000px 원본 = 12000px 실제, 콘텐츠 잘림 방지)
+            maxAllowedHeight = 6000; // 5500px → 6000px (원본) = 12000px (실제) - 콘텐츠 잘림 방지를 위해 추가 증가
             sizeInfo.measuredHeight = Math.min(sizeInfo.measuredHeight || 0, maxAllowedHeight);
             if (process.env.NODE_ENV === 'development') {
               console.log(`📏 [adjustSizes] 전체총마감 슬라이드 높이 제한: ${sizeInfo.measuredHeight}px (최대 ${maxAllowedHeight * SCALE}px 실제, 담당자별 실적 포함)`);
@@ -1581,12 +1587,24 @@ async function adjustSizes(elements, config, slide) {
           }
         }
 
-        // 헤더 너비 조정
+        // 헤더 너비 조정 (콘텐츠 너비에 맞춤, 헤더가 비정상적으로 크거나 작은 경우 방지)
         if (config?.needsHeaderSizeAdjustment && elements.headerElement && sizeInfo && sizeInfo.measuredWidth > 0) {
           try {
+            // 헤더의 원본 너비 확인 (조정 전)
+            const headerRect = SafeDOM.getBoundingRect(elements.headerElement);
+            const contentWidth = sizeInfo.measuredWidth;
+            const slideRect = SafeDOM.getBoundingRect(elements.slideElement);
+            
+            // 슬라이드 전체 너비를 초과하지 않도록 제한 (비정상적인 헤더 너비 방지)
+            const maxHeaderWidth = Math.min(contentWidth, slideRect.width || MAX_WIDTH);
+            
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`📏 [adjustSizes] 헤더 너비 조정 전: ${headerRect.width.toFixed(0)}px, 콘텐츠: ${contentWidth.toFixed(0)}px, 최대: ${maxHeaderWidth.toFixed(0)}px`);
+            }
+            
             const restoreHeader = await adjustHeaderWidth(
               elements.headerElement,
-              sizeInfo.measuredWidth,
+              maxHeaderWidth, // 최대 너비 제한 적용
               elements.slideElement
             );
             if (restoreHeader) {

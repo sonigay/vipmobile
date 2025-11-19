@@ -1708,12 +1708,8 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                 {formattedDate}
               </Typography>
               
-              {/* 회의 번호 - 세 번째 줄 (조건부 렌더링, 빈 공간 방지) - 강화된 검증: null/undefined/빈 문자열/0/공백 문자열 체크 */}
-              {slide.meetingNumber != null && 
-               slide.meetingNumber !== '' && 
-               slide.meetingNumber !== 0 && 
-               String(slide.meetingNumber).trim() !== '' && 
-               String(slide.meetingNumber).trim() !== '0' ? (
+              {/* 회의 번호 - 세 번째 줄 (조건부 렌더링, 빈 공간 방지) - isValidMeetingNumber 함수 사용 */}
+              {isValidMeetingNumber(slide.meetingNumber) ? (
                 <Box sx={{
                   display: 'inline-block',
                   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',

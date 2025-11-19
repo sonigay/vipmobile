@@ -6507,12 +6507,14 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                                         textAlign: 'center',
                                         color: '#1976d2',
                                         lineHeight: 'normal', // 줄 간격 정상화 (입력값 위치 불일치 문제 해결)
+                                        height: '100%', // 전체 높이 사용
                                       },
                                       '& input[type=text]': {
                                         textAlign: 'center',
                                         width: '100%',
                                         padding: '6px 4px',
                                         lineHeight: 'normal', // 줄 간격 정상화
+                                        height: '100%', // 전체 높이 사용 (입력값 위치 불일치 문제 해결)
                                       },
                                       '& .MuiOutlinedInput-root': {
                                         '& fieldset': {
@@ -6621,12 +6623,14 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                                         textAlign: 'center',
                                         color: '#7b1fa2',
                                         lineHeight: 'normal', // 줄 간격 정상화 (입력값 위치 불일치 문제 해결)
+                                        height: '100%', // 전체 높이 사용
                                       },
                                       '& input[type=text]': {
                                         textAlign: 'center',
                                         width: '100%',
                                         padding: '6px 4px',
                                         lineHeight: 'normal', // 줄 간격 정상화
+                                        height: '100%', // 전체 높이 사용 (입력값 위치 불일치 문제 해결)
                                       },
                                       '& .MuiOutlinedInput-root': {
                                         '& fieldset': {
