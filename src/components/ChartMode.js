@@ -6260,7 +6260,15 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
 
           {/* 월별 데이터 입력 테이블 - 개선된 디자인 */}
           {timeUnit === 'year' && selectedYearMonth && (
-            <Card sx={{ mb: 3, boxShadow: 3 }}>
+            <Card sx={{ 
+              mb: 3, 
+              boxShadow: 3,
+              ...(presentationMode && {
+                maxWidth: 1920,
+                mx: 'auto',
+                width: '100%'
+              })
+            }}>
               <CardContent>
                 <Box sx={{ 
                   display: 'flex', 
@@ -6299,7 +6307,11 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                     maxWidth: 'none',
                     overflowX: 'auto',
                     borderRadius: 2,
-                    border: '1px solid #e0e0e0'
+                    border: '1px solid #e0e0e0',
+                    ...(presentationMode && {
+                      maxWidth: 1920,
+                      width: '100%'
+                    })
                   }}
                 >
                   <Table size="small" sx={{ minWidth: 1400, width: '100%' }}>
@@ -6680,7 +6692,15 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
 
           {/* 월단위 입력 테이블 */}
           {timeUnit === 'month' && selectedYearMonth && (
-            <Card sx={{ mb: 3, boxShadow: 3 }}>
+            <Card sx={{ 
+              mb: 3, 
+              boxShadow: 3,
+              ...(presentationMode && {
+                maxWidth: 1920,
+                mx: 'auto',
+                width: '100%'
+              })
+            }}>
               <CardContent>
                 <Box sx={{ 
                   display: 'flex', 
@@ -6705,7 +6725,11 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                     maxWidth: 'none',
                     overflowX: 'auto',
                     borderRadius: 2,
-                    border: '1px solid #e0e0e0'
+                    border: '1px solid #e0e0e0',
+                    ...(presentationMode && {
+                      maxWidth: 1920,
+                      width: '100%'
+                    })
                   }}
                 >
                   <Table size="small" sx={{ minWidth: 1000, width: '100%' }}>
@@ -6992,7 +7016,15 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
           {presentationMode && (
             <>
               {/* 가입자수 추이 그래프 */}
-              <Card sx={{ mb: 3, width: '100%' }}>
+              <Card sx={{ 
+                mb: 3, 
+                width: '100%',
+                ...(presentationMode && {
+                  maxWidth: 1920,
+                  mx: 'auto',
+                  width: '100%'
+                })
+              }}>
                 <CardContent sx={{ width: '100%' }}>
                   <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', color: '#388e3c' }}>
                     📈 가입자수 추이 {timeUnit === 'year' ? '(월별 흐름)' : '(막대 그래프)'}
@@ -7204,7 +7236,15 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
               </Card>
 
               {/* 관리수수료 추이 그래프 */}
-              <Card sx={{ mb: 3, width: '100%' }}>
+              <Card sx={{ 
+                mb: 3, 
+                width: '100%',
+                ...(presentationMode && {
+                  maxWidth: 1920,
+                  mx: 'auto',
+                  width: '100%'
+                })
+              }}>
                 <CardContent sx={{ width: '100%' }}>
                   <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', color: '#388e3c' }}>
                     📊 관리수수료 추이 {timeUnit === 'year' ? '(월별 흐름)' : '(선 그래프)'}

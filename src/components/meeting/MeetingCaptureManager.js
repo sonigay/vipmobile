@@ -4286,8 +4286,9 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         }
       }
       
-      // 재초담초채권 슬라이드의 경우 충분한 너비와 높이 보장, 하단 여백 크롭 (가로 크기도 실제 콘텐츠에 맞춤, 박스 라인 제외)
-      if (isRechotancho && captureTargetElement) {
+      // 재초담초채권 슬라이드: 레거시 코드 비활성화 (UnifiedCaptureEngine에서 처리)
+      // UnifiedCaptureEngine이 재초담초채권 슬라이드를 완전히 처리하므로 레거시 로직 제거
+      if (false && isRechotancho && captureTargetElement) {
         try {
           const elementRect = captureTargetElement.getBoundingClientRect();
           let maxRelativeBottom = 0;

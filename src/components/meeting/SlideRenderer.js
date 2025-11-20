@@ -177,111 +177,101 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
     };
   }, []);
   
-  // 엔딩 슬라이드: meetingNumber 완전 재구현 (window.__MEETING_NUMBER 확인 및 강화된 로직)
+  // 엔딩 슬라이드: meetingNumber 완전 재구현 (단순화 및 강화)
   useEffect(() => {
-    if (slide?.type === 'ending' && typeof window !== 'undefined') {
-      // meetingNumber가 유효하지 않은 경우 여러 소스에서 찾기
-      if (!isValidMeetingNumber(slide.meetingNumber)) {
-        let meetingNumberFound = false;
-        let foundMeetingNumber = null;
-        
-        // 1순위: window.__MEETING_NUMBER (메인 슬라이드에서 설정된 값) - 즉시 확인
-        if (isValidMeetingNumber(window.__MEETING_NUMBER)) {
-          foundMeetingNumber = window.__MEETING_NUMBER;
-          meetingNumberFound = true;
-          if (process.env.NODE_ENV === 'development') {
-            console.log(`✅ [SlideRenderer] 엔딩 슬라이드 meetingNumber 찾음 (useEffect - window): ${foundMeetingNumber}`);
-          }
+    if (slide?.type !== 'ending' || typeof window === 'undefined') {
+      return;
+    }
+
+    const findMeetingNumber = () => {
+      // 1순위: window.__MEETING_NUMBER (메인 슬라이드에서 설정된 값)
+      if (isValidMeetingNumber(window.__MEETING_NUMBER)) {
+        return window.__MEETING_NUMBER;
+      }
+      
+      // 2순위: slide.meetingNumber
+      if (isValidMeetingNumber(slide.meetingNumber)) {
+        return slide.meetingNumber;
+      }
+      
+      // 3순위: loggedInStore에서 찾기
+      if (loggedInStore) {
+        const storeMeeting = loggedInStore.meeting || loggedInStore.currentMeeting;
+        if (storeMeeting && isValidMeetingNumber(storeMeeting.meetingNumber)) {
+          return storeMeeting.meetingNumber;
         }
-        
-        // 2순위: loggedInStore에서 찾기
-        if (!meetingNumberFound && loggedInStore) {
-          const storeMeeting = loggedInStore.meeting || loggedInStore.currentMeeting;
-          if (storeMeeting && isValidMeetingNumber(storeMeeting.meetingNumber)) {
-            foundMeetingNumber = storeMeeting.meetingNumber;
-            meetingNumberFound = true;
-            if (typeof window !== 'undefined') {
-              window.__MEETING_NUMBER = foundMeetingNumber;
-            }
-            if (process.env.NODE_ENV === 'development') {
-              console.log(`✅ [SlideRenderer] 엔딩 슬라이드 meetingNumber 찾음 (useEffect - loggedInStore): ${foundMeetingNumber}`);
-            }
-          }
-        }
-        
-        // 3순위: slide 객체의 다른 필드 확인
-        if (!meetingNumberFound && slide) {
-          const alternativeFields = ['meetingNumber', 'meeting_id', 'meetingId', 'sessionNumber', 'session'];
-          for (const field of alternativeFields) {
-            if (slide[field] && isValidMeetingNumber(slide[field])) {
-              foundMeetingNumber = slide[field];
-              meetingNumberFound = true;
-              if (typeof window !== 'undefined') {
-                window.__MEETING_NUMBER = foundMeetingNumber;
-              }
-              if (process.env.NODE_ENV === 'development') {
-                console.log(`✅ [SlideRenderer] 엔딩 슬라이드 meetingNumber 찾음 (useEffect - slide.${field}): ${foundMeetingNumber}`);
-              }
-              break;
-            }
-          }
-        }
-        
-        // meetingNumber를 찾았으면 slide 객체에 설정하고 리렌더링
-        if (meetingNumberFound && foundMeetingNumber != null) {
-          slide.meetingNumber = foundMeetingNumber;
-          // 강제 리렌더링을 위해 상태 업데이트
-          setContentReady(false);
-          setLoading(false);
-          setTimeout(() => {
-            setContentReady(true);
-          }, 100);
-        } else {
-          // meetingNumber를 찾지 못했으면 명시적으로 null로 설정하여 빈 공간 방지
-          slide.meetingNumber = null;
-          if (process.env.NODE_ENV === 'development') {
-            console.warn(`⚠️ [SlideRenderer] 엔딩 슬라이드 meetingNumber를 찾지 못함: slide.meetingNumber=${slide.meetingNumber}, window.__MEETING_NUMBER=${window.__MEETING_NUMBER}`);
+      }
+      
+      // 4순위: slide 객체의 다른 필드 확인
+      if (slide) {
+        const alternativeFields = ['meeting_id', 'meetingId', 'sessionNumber', 'session'];
+        for (const field of alternativeFields) {
+          if (slide[field] && isValidMeetingNumber(slide[field])) {
+            return slide[field];
           }
         }
       }
-    }
-    
-    // 추가: 주기적으로 window.__MEETING_NUMBER 확인 (메인 슬라이드가 나중에 렌더링될 수 있음)
-    const checkMeetingNumber = () => {
-      if (slide?.type === 'ending' && typeof window !== 'undefined' && !isValidMeetingNumber(slide.meetingNumber)) {
-        if (isValidMeetingNumber(window.__MEETING_NUMBER)) {
-          slide.meetingNumber = window.__MEETING_NUMBER;
-          // 강제 리렌더링을 위해 상태 업데이트
+      
+      return null;
+    };
+
+    const updateMeetingNumber = (foundNumber) => {
+      if (foundNumber != null && isValidMeetingNumber(foundNumber)) {
+        if (slide.meetingNumber !== foundNumber) {
+          slide.meetingNumber = foundNumber;
+          if (typeof window !== 'undefined') {
+            window.__MEETING_NUMBER = foundNumber;
+          }
+          // 강제 리렌더링
           setContentReady(false);
           setLoading(false);
           setTimeout(() => {
             setContentReady(true);
-          }, 100);
+          }, 50);
           if (process.env.NODE_ENV === 'development') {
-            console.log(`✅ [SlideRenderer] 엔딩 슬라이드 meetingNumber 재시도 성공 (주기적 확인): ${slide.meetingNumber}`);
+            console.log(`✅ [SlideRenderer] 엔딩 슬라이드 meetingNumber 설정: ${foundNumber}`);
+          }
+        }
+      } else {
+        // 유효하지 않으면 명시적으로 null로 설정하여 빈 공간 완전 방지
+        if (slide.meetingNumber != null) {
+          slide.meetingNumber = null;
+          setContentReady(false);
+          setLoading(false);
+          setTimeout(() => {
+            setContentReady(true);
+          }, 50);
+          if (process.env.NODE_ENV === 'development') {
+            console.warn(`⚠️ [SlideRenderer] 엔딩 슬라이드 meetingNumber 유효하지 않음, null로 설정: 기존=${slide.meetingNumber}, window.__MEETING_NUMBER=${window.__MEETING_NUMBER}`);
           }
         }
       }
     };
-    
+
     // 즉시 확인
-    checkMeetingNumber();
+    const foundNumber = findMeetingNumber();
+    updateMeetingNumber(foundNumber);
     
-    // 짧은 지연 후 다시 확인 (메인 슬라이드가 아직 설정하지 않았을 수 있음)
+    // 주기적으로 재확인 (메인 슬라이드가 나중에 렌더링될 수 있음)
     const retryTimer = setTimeout(() => {
-      checkMeetingNumber();
+      const retryNumber = findMeetingNumber();
+      if (retryNumber != null && isValidMeetingNumber(retryNumber)) {
+        updateMeetingNumber(retryNumber);
+      }
     }, 500);
     
-    // 더 긴 지연 후 다시 확인 (최후의 수단)
     const finalRetryTimer = setTimeout(() => {
-      checkMeetingNumber();
+      const finalNumber = findMeetingNumber();
+      if (finalNumber != null && isValidMeetingNumber(finalNumber)) {
+        updateMeetingNumber(finalNumber);
+      }
     }, 2000);
     
     return () => {
       clearTimeout(retryTimer);
       clearTimeout(finalRetryTimer);
     };
-  }, [slide?.type, slide?.meetingNumber, loggedInStore]);
+  }, [slide?.type, loggedInStore]);
   
   useEffect(() => {
     // slide가 변경되면 완전히 리셋
@@ -1895,36 +1885,19 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               </Typography>
               
               {/* 회의 번호 - 세 번째 줄 (조건부 렌더링, 빈 공간 완전 방지) */}
-              {/* isValidMeetingNumber 함수로 엄격한 검증 후 렌더링 */}
-              {/* meetingNumber가 유효하지 않으면 아무것도 렌더링하지 않음 (빈 공간 "( )" 완전 방지) */}
+              {/* meetingNumber가 유효할 때만 렌더링, 유효하지 않으면 완전히 렌더링하지 않음 (빈 공간 "( )" 완전 방지) */}
               {(() => {
-                // meetingNumber 값을 다시 확인 (위에서 보강했을 수 있음)
-                // window.__MEETING_NUMBER도 다시 확인하여 최신 값 사용
-                let meetingNumberValue = slide.meetingNumber;
-                
-                // slide.meetingNumber가 유효하지 않으면 window.__MEETING_NUMBER 확인
-                if (!isValidMeetingNumber(meetingNumberValue) && typeof window !== 'undefined' && isValidMeetingNumber(window.__MEETING_NUMBER)) {
-                  meetingNumberValue = window.__MEETING_NUMBER;
-                  slide.meetingNumber = meetingNumberValue; // slide 객체도 업데이트
-                  if (process.env.NODE_ENV === 'development') {
-                    console.log(`✅ [SlideRenderer] 엔딩 슬라이드 meetingNumber 최종 보강 (렌더링 시점): ${meetingNumberValue}`);
-                  }
+                // 최종 meetingNumber 값 확인 (우선순위: slide.meetingNumber > window.__MEETING_NUMBER)
+                let finalMeetingNumber = slide.meetingNumber;
+                if (!isValidMeetingNumber(finalMeetingNumber) && typeof window !== 'undefined' && isValidMeetingNumber(window.__MEETING_NUMBER)) {
+                  finalMeetingNumber = window.__MEETING_NUMBER;
+                  slide.meetingNumber = finalMeetingNumber; // slide 객체도 업데이트
                 }
                 
-                const hasValidMeetingNumber = isValidMeetingNumber(meetingNumberValue);
-                
-                // 디버깅 로그 (개발 환경에서만)
-                if (process.env.NODE_ENV === 'development' && slide.type === 'ending') {
-                  console.log(`🔍 [SlideRenderer] 엔딩 슬라이드 meetingNumber 조건부 렌더링 (렌더링 시점): slide.meetingNumber=${meetingNumberValue}, isValid=${hasValidMeetingNumber}, typeof=${typeof meetingNumberValue}, window.__MEETING_NUMBER=${window.__MEETING_NUMBER}`);
-                }
-                
-                // 유효한 meetingNumber가 없으면 아무것도 렌더링하지 않음 (빈 공간 "( )" 완전 방지)
-                // null, undefined, 0, 빈 문자열 등 모든 무효 값을 완전히 제외
-                if (!hasValidMeetingNumber) {
-                  if (process.env.NODE_ENV === 'development') {
-                    console.warn(`⚠️ [SlideRenderer] 엔딩 슬라이드 meetingNumber가 유효하지 않아 렌더링하지 않음: ${meetingNumberValue} (타입: ${typeof meetingNumberValue})`);
-                  }
-                  return null; // 아무것도 렌더링하지 않음 (빈 공간 완전 방지)
+                // 엄격한 검증: 유효한 meetingNumber가 있을 때만 렌더링
+                if (!isValidMeetingNumber(finalMeetingNumber)) {
+                  // 유효하지 않으면 완전히 렌더링하지 않음 (null 반환으로 빈 공간 완전 방지)
+                  return null;
                 }
                 
                 // 유효한 meetingNumber가 있을 때만 렌더링
@@ -1946,7 +1919,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                         fontFamily: '"Noto Sans KR", sans-serif'
                       }}
                     >
-                      {meetingNumberValue}차
+                      {finalMeetingNumber}차
                     </Typography>
                   </Box>
                 );

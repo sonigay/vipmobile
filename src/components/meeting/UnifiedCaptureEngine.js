@@ -1889,15 +1889,23 @@ async function adjustSizes(elements, config, slide) {
               const headerRect = SafeDOM.getBoundingRect(elements.headerElement);
               const headerOriginalWidth = elements.headerElement.style.width || '';
               const headerOriginalMaxWidth = elements.headerElement.style.maxWidth || '';
+              const headerOriginalMinWidth = elements.headerElement.style.minWidth || '';
               
+              // 헤더 너비가 1920px와 다르면 강제 설정 (차이 5px 이상)
               if (Math.abs(headerRect.width - MAX_WIDTH) > 5) {
                 elements.headerElement.style.width = `${MAX_WIDTH}px`;
                 elements.headerElement.style.maxWidth = `${MAX_WIDTH}px`;
+                elements.headerElement.style.minWidth = `${MAX_WIDTH}px`;
                 
+                // 렌더링 보장을 위해 대기 시간 증가 (200ms → 500ms)
+                await new Promise(r => setTimeout(r, 500));
+                
+                // 헤더 내부 요소들도 재조정하기 위해 resize 이벤트 발생
+                window.dispatchEvent(new Event('resize'));
                 await new Promise(r => setTimeout(r, 200));
                 
                 if (process.env.NODE_ENV === 'development') {
-                  console.log(`📐 [adjustSizes] 헤더 너비를 1920px로 설정: ${headerRect.width.toFixed(0)}px → ${MAX_WIDTH}px`);
+                  console.log(`📐 [adjustSizes] 헤더 너비를 1920px로 강제 설정: ${headerRect.width.toFixed(0)}px → ${MAX_WIDTH}px (minWidth 포함, 대기: 700ms)`);
                 }
                 
                 restoreFunctions.push(() => {
@@ -1905,12 +1913,15 @@ async function adjustSizes(elements, config, slide) {
                     if (!SafeDOM.isInDOM(elements.headerElement)) return;
                     SafeDOM.restoreStyle(elements.headerElement, 'width', headerOriginalWidth);
                     SafeDOM.restoreStyle(elements.headerElement, 'max-width', headerOriginalMaxWidth);
+                    SafeDOM.restoreStyle(elements.headerElement, 'min-width', headerOriginalMinWidth);
                   } catch (error) {
                     if (process.env.NODE_ENV === 'development') {
                       console.warn('⚠️ [adjustSizes] 헤더 너비 복원 실패:', error);
                     }
                   }
                 });
+              } else if (process.env.NODE_ENV === 'development') {
+                console.log(`✅ [adjustSizes] 헤더 너비가 이미 1920px에 가까움: ${headerRect.width.toFixed(0)}px`);
               }
             }
           } catch (error) {
@@ -2446,31 +2457,40 @@ async function executeCapture(elements, config, sizeInfo, slide) {
             }
             await new Promise(r => setTimeout(r, 300));
             
-            // 모든 콘텐츠 박스의 너비를 1920px로 강제 설정하여 렌더링 보장
+            // 모든 콘텐츠 박스의 너비를 1920px로 강제 설정하여 렌더링 보장 (강화)
             const allPaperElements = Array.from(elements.contentElement.querySelectorAll('.MuiPaper-root'));
             const allTableContainers = Array.from(elements.contentElement.querySelectorAll('.MuiTableContainer-root'));
             const allBoxElements = Array.from(elements.contentElement.querySelectorAll('.MuiBox-root'));
+            const allContainerElements = Array.from(elements.contentElement.querySelectorAll('.MuiContainer-root'));
+            const allCardElements = Array.from(elements.contentElement.querySelectorAll('.MuiCard-root'));
             
             const styleRestoresForWidth = [];
             
-            [...allPaperElements, ...allTableContainers, ...allBoxElements].forEach(box => {
+            // 모든 박스 타입을 포함하여 1920px로 강제 설정
+            [...allPaperElements, ...allTableContainers, ...allBoxElements, ...allContainerElements, ...allCardElements].forEach(box => {
               if (!SafeDOM.isInDOM(box)) return;
               
-              const computedStyles = window.getComputedStyle(box);
               const currentWidth = box.getBoundingClientRect().width;
               
-              // 너비가 1920px보다 작거나 매우 크면 1920px로 설정
-              if (currentWidth !== MAX_WIDTH && (currentWidth < MAX_WIDTH || currentWidth > MAX_WIDTH + 100)) {
+              // 너비가 1920px와 다르면 강제 설정 (!important 포함)
+              if (Math.abs(currentWidth - MAX_WIDTH) > 5) {
                 const originalWidth = box.style.width || '';
                 const originalMaxWidth = box.style.maxWidth || '';
                 const originalMinWidth = box.style.minWidth || '';
                 
+                // !important 플래그 사용하여 강제 설정
                 box.style.width = `${MAX_WIDTH}px`;
                 box.style.maxWidth = `${MAX_WIDTH}px`;
                 box.style.minWidth = `${MAX_WIDTH}px`;
+                box.style.setProperty('width', `${MAX_WIDTH}px`, 'important');
+                box.style.setProperty('max-width', `${MAX_WIDTH}px`, 'important');
+                box.style.setProperty('min-width', `${MAX_WIDTH}px`, 'important');
                 
                 styleRestoresForWidth.push(() => {
                   if (!SafeDOM.isInDOM(box)) return;
+                  box.style.removeProperty('width');
+                  box.style.removeProperty('max-width');
+                  box.style.removeProperty('min-width');
                   SafeDOM.restoreStyle(box, 'width', originalWidth);
                   SafeDOM.restoreStyle(box, 'max-width', originalMaxWidth);
                   SafeDOM.restoreStyle(box, 'min-width', originalMinWidth);
@@ -2478,11 +2498,14 @@ async function executeCapture(elements, config, sizeInfo, slide) {
               }
             });
             
-            await new Promise(r => setTimeout(r, 200)); // 너비 설정 후 렌더링 대기
+            // 너비 설정 후 렌더링 대기 시간 증가 (200ms → 500ms)
+            await new Promise(r => setTimeout(r, 500));
             
-            // Chart.js 그래프 재렌더링 (대기 시간 증가: 1000ms → 1500ms)
+            // Chart.js 그래프 재렌더링을 위해 여러 번 resize 이벤트 발생 (대기 시간 증가: 1500ms → 2000ms)
             window.dispatchEvent(new Event('resize'));
-            await new Promise(r => setTimeout(r, 1500)); // Chart.js 그래프 완전 렌더링 대기 시간 증가
+            await new Promise(r => setTimeout(r, 500));
+            window.dispatchEvent(new Event('resize'));
+            await new Promise(r => setTimeout(r, 2000)); // Chart.js 그래프 완전 렌더링 대기 시간 증가
             
             // 스타일 복원 함수에 추가
             styleRestores.push(() => {
@@ -2496,7 +2519,7 @@ async function executeCapture(elements, config, sizeInfo, slide) {
             });
             
             if (process.env.NODE_ENV === 'development') {
-              console.log(`✅ [executeCapture] 재초담초채권 모든 요소 렌더링 완료 (Chart.js 렌더링 대기: 1500ms, 너비 설정: ${allPaperElements.length + allTableContainers.length + allBoxElements.length}개 박스)`);
+              console.log(`✅ [executeCapture] 재초담초채권 모든 요소 렌더링 완료 (Chart.js 렌더링 대기: 3000ms, 너비 설정: ${allPaperElements.length + allTableContainers.length + allBoxElements.length + allContainerElements.length + allCardElements.length}개 박스, important 플래그 사용)`);
             }
           } catch (error) {
             if (process.env.NODE_ENV === 'development') {
@@ -2593,25 +2616,38 @@ async function executeCapture(elements, config, sizeInfo, slide) {
             console.log(`📏 [executeCapture] 재초담초채권/가입자증감 슬라이드: captureWidth를 ${captureWidth}px로 명시적으로 설정`);
           }
           
-          // 헤더도 1920px로 명시적으로 설정 (재초담초채권/가입자증감 슬라이드)
+          // 헤더도 1920px로 명시적으로 설정 (재초담초채권/가입자증감 슬라이드) - executeCapture에서 강화
           if ((isRechotanchoBond || isSubscriberIncreaseForWidth) && elements.headerElement && SafeDOM.isInDOM(elements.headerElement)) {
+            const headerRect = SafeDOM.getBoundingRect(elements.headerElement);
             const headerOriginalWidth = elements.headerElement.style.width || '';
             const headerOriginalMaxWidth = elements.headerElement.style.maxWidth || '';
             const headerOriginalMinWidth = elements.headerElement.style.minWidth || '';
             
+            // 강제 설정 (조건 없이 항상 1920px로 설정)
             elements.headerElement.style.width = `${MAX_WIDTH}px`;
             elements.headerElement.style.maxWidth = `${MAX_WIDTH}px`;
             elements.headerElement.style.minWidth = `${MAX_WIDTH}px`;
+            elements.headerElement.style.setProperty('width', `${MAX_WIDTH}px`, 'important');
+            elements.headerElement.style.setProperty('max-width', `${MAX_WIDTH}px`, 'important');
+            elements.headerElement.style.setProperty('min-width', `${MAX_WIDTH}px`, 'important');
             
+            // 렌더링 보장을 위해 대기 시간 증가 (200ms → 500ms)
+            await new Promise(r => setTimeout(r, 500));
+            
+            // resize 이벤트 발생으로 내부 요소 재조정
+            window.dispatchEvent(new Event('resize'));
             await new Promise(r => setTimeout(r, 200));
             
             if (process.env.NODE_ENV === 'development') {
-              console.log(`📐 [executeCapture] 재초담초채권/가입자증감 슬라이드: 헤더 너비를 ${MAX_WIDTH}px로 명시적으로 설정`);
+              console.log(`📐 [executeCapture] 재초담초채권/가입자증감 슬라이드: 헤더 너비를 ${MAX_WIDTH}px로 강제 설정 (important 포함, 이전: ${headerRect.width.toFixed(0)}px, 대기: 700ms)`);
             }
             
             styleRestores.push(() => {
               try {
                 if (!SafeDOM.isInDOM(elements.headerElement)) return;
+                elements.headerElement.style.removeProperty('width');
+                elements.headerElement.style.removeProperty('max-width');
+                elements.headerElement.style.removeProperty('min-width');
                 SafeDOM.restoreStyle(elements.headerElement, 'width', headerOriginalWidth);
                 SafeDOM.restoreStyle(elements.headerElement, 'max-width', headerOriginalMaxWidth);
                 SafeDOM.restoreStyle(elements.headerElement, 'min-width', headerOriginalMinWidth);
