@@ -16,6 +16,41 @@ import {
 import { unifiedCapture } from './unifiedCaptureLogic';
 
 /**
+ * 이미지 Blob을 추가로 압축하는 함수
+ * @param {Blob} blob - 원본 이미지 Blob
+ * @param {number} quality - 압축 품질 (0-1)
+ * @returns {Promise<Blob>} 압축된 이미지 Blob
+ */
+async function compressImageBlob(blob, quality = 0.85) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      
+      canvas.toBlob(
+        (compressedBlob) => {
+          if (compressedBlob) {
+            resolve(compressedBlob);
+          } else {
+            reject(new Error('이미지 압축에 실패했습니다.'));
+          }
+        },
+        'image/png',
+        quality
+      );
+    };
+    img.onerror = () => {
+      reject(new Error('이미지 로드에 실패했습니다.'));
+    };
+    img.src = URL.createObjectURL(blob);
+  });
+}
+
+/**
  * 회의 캡처를 관리하는 컴포넌트
  * 회의 생성 시 모든 슬라이드를 자동으로 캡처
  */
@@ -4411,6 +4446,30 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
       if (blob) {
         imageSizeMB = blob.size / (1024 * 1024);
         console.log(`📊 [MeetingCaptureManager] 슬라이드 ${index + 1} (${currentSlide?.subTab || currentSlide?.tab || 'unknown'}) 이미지 크기: ${imageSizeMB.toFixed(2)}MB`);
+        
+        // 재초담초채권 슬라이드는 업로드 안정성을 위해 추가 압축 수행
+        const isRechotanchoBond = currentSlide?.mode === 'chart' && 
+                                  (currentSlide?.tab === 'bondChart' || currentSlide?.tab === 'bond') && 
+                                  currentSlide?.subTab === 'rechotanchoBond';
+        
+        // 재초담초채권 슬라이드가 1MB 이상이면 추가 압축 시도
+        if (isRechotanchoBond && blob.size > 1 * 1024 * 1024) {
+          try {
+            const compressedBlob = await compressImageBlob(blob, 0.85);
+            if (compressedBlob && compressedBlob.size < blob.size) {
+              const originalSizeMB = imageSizeMB;
+              const compressedSizeMB = compressedBlob.size / (1024 * 1024);
+              const reduction = ((blob.size - compressedBlob.size) / blob.size * 100).toFixed(1);
+              console.log(`📦 [MeetingCaptureManager] 재초담초채권 슬라이드 추가 압축: ${originalSizeMB.toFixed(2)}MB → ${compressedSizeMB.toFixed(2)}MB (${reduction}% 감소)`);
+              blob = compressedBlob;
+              imageSizeMB = compressedSizeMB;
+            }
+          } catch (compressError) {
+            if (process.env.NODE_ENV === 'development') {
+              console.warn('⚠️ [MeetingCaptureManager] 재초담초채권 슬라이드 추가 압축 실패, 원본 사용:', compressError?.message);
+            }
+          }
+        }
         
         if (blob.size > 25 * 1024 * 1024) {
           // 25MB 초과 시 에러 발생

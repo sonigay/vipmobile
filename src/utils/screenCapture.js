@@ -963,12 +963,21 @@ export async function captureElement(element, options = {}) {
       const SCALE = 2; // html2canvas scale 파라미터 (픽셀 밀도 배율)
       const estimatedHeight = finalCanvas.height / SCALE; // 원본 높이 추정
       const isVeryTall = estimatedHeight > 6000; // 6000px 이상이면 매우 긴 슬라이드
+      
+      // 재초담초채권 슬라이드 확인 (업로드 안정성을 위해 압축 품질 낮춤)
+      const isRechotanchoBond = slideId.includes('rechotanchoBond');
+      
       // 목차 슬라이드는 파일 크기가 크므로 더 낮은 품질 사용 (0.80)
-      const quality = isToc ? 0.80 : ((isLargeSlide || isVeryTall) ? 0.90 : 0.95); // 목차: 80%, 큰 슬라이드: 90%, 기타: 95%
+      // 재초담초채권 슬라이드는 업로드 안정성을 위해 품질을 낮춤 (0.85)
+      const quality = isToc ? 0.80 : 
+                     (isRechotanchoBond ? 0.85 : 
+                     ((isLargeSlide || isVeryTall) ? 0.90 : 0.95)); // 목차: 80%, 재초담초채권: 85%, 큰 슬라이드: 90%, 기타: 95%
       
       if (process.env.NODE_ENV === 'development') {
         if (quality === 0.80) {
           console.log(`📦 [screenCapture] 압축 품질 80% 적용: 목차 슬라이드 (높이: ${estimatedHeight.toFixed(0)}px, 파일 크기 최적화)`);
+        } else if (quality === 0.85) {
+          console.log(`📦 [screenCapture] 압축 품질 85% 적용: 재초담초채권 슬라이드 (높이: ${estimatedHeight.toFixed(0)}px, 업로드 안정성 향상)`);
         } else if (quality === 0.90) {
           console.log(`📦 [screenCapture] 압축 품질 90% 적용: ${isLargeSlide ? '큰 슬라이드' : '긴 슬라이드'} (높이: ${estimatedHeight.toFixed(0)}px)`);
         }
