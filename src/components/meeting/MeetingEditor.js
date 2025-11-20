@@ -564,10 +564,13 @@ function MeetingEditor({ open, meeting, loggedInStore, onClose, onSuccess, autoE
       };
       
       // 기존 슬라이드들의 order를 2씩 증가시키고 메인 슬라이드와 목차 슬라이드를 맨 앞에 추가
-      const updatedSlides = slides.map(slide => ({
-        ...slide,
-        order: slide.order + 2
-      }));
+      // 메인/목차/엔딩 슬라이드는 제외 (중복 방지)
+      const updatedSlides = slides
+        .filter(slide => slide.type !== 'main' && slide.type !== 'toc' && slide.type !== 'ending')
+        .map(slide => ({
+          ...slide,
+          order: slide.order + 2
+        }));
       
       // 엔딩 슬라이드 생성 (마지막 슬라이드로 자동 추가)
       const maxOrder = updatedSlides.length > 0 
