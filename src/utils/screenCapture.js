@@ -775,7 +775,6 @@ export async function captureElement(element, options = {}) {
           }
         }
       }
-    }
     },
     ...html2CanvasOptions
   };
