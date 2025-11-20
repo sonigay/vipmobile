@@ -2461,9 +2461,7 @@ async function executeCapture(elements, config, sizeInfo, slide) {
         }
 
         // 재초담초채권/가입자증감 슬라이드: 1920px로 명시적으로 설정 (정상 슬라이드처럼)
-        const isRechotanchoBond = slide?.mode === 'chart' &&
-          (slide?.tab === 'bondChart' || slide?.tab === 'bond') &&
-          slide?.subTab === 'rechotanchoBond';
+        // isRechotanchoBond는 위에서 이미 선언됨 (2412번 줄)
         const isSubscriberIncreaseForWidth = slide?.mode === 'chart' &&
           (slide?.tab === 'subscriberChart' || slide?.tab === 'subscriber') &&
           slide?.subTab === 'subscriberIncrease';
