@@ -145,41 +145,40 @@ export const SLIDE_CAPTURE_CONFIG = {
 
   // 가입자증감
   subscriberIncrease: {
-    needsScrollRemoval: false,
-    needsWidthAdjustment: false,
-    needsHeightMeasurement: true,
-    needsBoxResize: true,               // 박스 크기 조정 필요
+    needsScrollRemoval: true,           // 스크롤 제약 제거 필요
+    needsWidthAdjustment: true,         // 너비 조정 (1920px)
+    needsHeightMeasurement: true,       // 높이 측정 (실제 콘텐츠)
+    needsBoxResize: false,              // 박스 크기 조정 불필요 (direct 방식에서 자동 처리)
     needsRightWhitespaceRemoval: true,  // 오른쪽 여백 제거
-    needsDataLoadingWait: true,         // 데이터 로드 완료 대기 (로딩 텍스트/아이콘 확인)
-    needsTableExpansion: false,
-    needsTableScroll: true,             // 테이블 스크롤 처리
-    captureMethod: 'direct',
-    preserveHeader: true,               // 헤더 보존
+    needsDataLoadingWait: false,        // 데이터 로딩 대기 불필요
+    needsTableExpansion: false,         // 테이블 펼치기 불필요
+    needsTableScroll: false,            // 테이블 스크롤 처리 불필요 (direct 방식에서 불필요)
+    captureMethod: 'direct',            // 직접 캡처
+    preserveHeader: false,              // 헤더 보존 불필요 (전체 캡처)
     needsHeaderComposition: false,      // 헤더 합성 불필요
-    needsHeaderSizeAdjustment: true,    // 헤더 크기 조정 필요
+    needsHeaderSizeAdjustment: false,   // 헤더 크기 조정 불필요
     needsTableVerification: false,
     needsManagerTableInclusion: false,
-    boxResizeIterations: 2,
-    needsYearSelection: true,           // 년도 선택 필요 (현재는 수동)
+    boxResizeIterations: 1,             // 박스 크기 조정 반복 횟수
     retryConfig: { maxRetries: 3, delay: 500 },
   },
 
   // 재초담초채권
   rechotanchoBond: {
-    needsScrollRemoval: false,
-    needsWidthAdjustment: false,
-    needsHeightMeasurement: true,
-    needsBoxResize: true,               // 박스 크기 조정 필요
+    needsScrollRemoval: true,           // 스크롤 제약 제거 필요
+    needsWidthAdjustment: true,         // 너비 조정 (1920px)
+    needsHeightMeasurement: true,       // 높이 측정 (실제 콘텐츠)
+    needsBoxResize: false,              // 박스 크기 조정 불필요 (direct 방식에서 자동 처리)
     needsRightWhitespaceRemoval: true,  // 오른쪽 여백 제거
-    needsDataLoadingWait: true,         // 데이터 로드 완료 대기 (그래프 렌더링 보장)
-    needsTableExpansion: false,
-    captureMethod: 'direct',            // direct 방식 유지 (헤더/콘텐츠 비율 개선)
-    preserveHeader: true,               // 헤더 보존
+    needsDataLoadingWait: false,        // 데이터 로딩 대기 불필요
+    needsTableExpansion: false,         // 테이블 펼치기 불필요
+    captureMethod: 'direct',            // 직접 캡처
+    preserveHeader: false,              // 헤더 보존 불필요 (전체 캡처)
     needsHeaderComposition: false,      // 헤더 합성 불필요
-    needsHeaderSizeAdjustment: true,    // 헤더 크기 조정 필요 (데이터입력 헤더)
+    needsHeaderSizeAdjustment: false,   // 헤더 크기 조정 불필요
     needsTableVerification: false,
     needsManagerTableInclusion: false,
-    boxResizeIterations: 2,
+    boxResizeIterations: 1,             // 박스 크기 조정 반복 횟수
     retryConfig: { maxRetries: 3, delay: 500 },
   },
 
