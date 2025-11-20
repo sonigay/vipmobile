@@ -488,7 +488,7 @@ export async function captureElement(element, options = {}) {
         if (process.env.NODE_ENV === 'development') {
           console.warn('⚠️ [screenCapture] onclone: element 또는 clonedDoc가 null입니다.');
         }
-        return;
+        return; // 조기 종료 (null이면 처리하지 않음)
       }
       
       // 클론된 문서에서 요소 찾기
@@ -499,7 +499,7 @@ export async function captureElement(element, options = {}) {
         if (process.env.NODE_ENV === 'development') {
           console.warn('⚠️ [screenCapture] onclone: clonedElement를 찾을 수 없습니다.');
         }
-        return;
+        return; // 조기 종료 (clonedElement가 없으면 처리하지 않음)
       }
       
       // 스크롤 위치를 맨 위로 설정
@@ -525,14 +525,8 @@ export async function captureElement(element, options = {}) {
       if (isSpecialSlide) {
         // 1단계: 클론된 문서의 모든 요소를 순회하여 스크롤 제약 제거 (더 직접적이고 확실한 방법)
         // clonedElement가 유효한지 다시 확인
-        if (!clonedElement || typeof clonedElement.querySelectorAll !== 'function') {
-          if (process.env.NODE_ENV === 'development') {
-            console.warn('⚠️ [screenCapture] onclone: clonedElement가 유효하지 않습니다.');
-          }
-          return;
-        }
-        
-        const allClonedElements = clonedElement.querySelectorAll('*');
+        if (clonedElement && typeof clonedElement.querySelectorAll === 'function') {
+          const allClonedElements = clonedElement.querySelectorAll('*');
           allClonedElements.forEach(clonedEl => {
             if (!clonedEl || !clonedEl.style) return;
             
@@ -573,16 +567,15 @@ export async function captureElement(element, options = {}) {
               clonedEl.scrollLeft = 0;
             }
           });
-          
-          // 2단계: 원본 요소에서 computed styles 확인하여 클론에 적용 (원본 스타일도 확인)
-          // element가 유효한지 확인
-          if (!element || typeof element.querySelectorAll !== 'function') {
-            if (process.env.NODE_ENV === 'development') {
-              console.warn('⚠️ [screenCapture] onclone: element가 유효하지 않습니다.');
-            }
-            return;
+        } else {
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('⚠️ [screenCapture] onclone: clonedElement가 유효하지 않습니다.');
           }
+        }
           
+        // 2단계: 원본 요소에서 computed styles 확인하여 클론에 적용 (원본 스타일도 확인)
+        // element가 유효한지 확인
+        if (element && typeof element.querySelectorAll === 'function') {
           const originalElements = Array.from(element.querySelectorAll('*'));
           originalElements.forEach((originalEl, index) => {
             try {
@@ -624,144 +617,163 @@ export async function captureElement(element, options = {}) {
               // 요소가 DOM에서 제거되었을 수 있으므로 무시
             }
           });
+        } else {
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('⚠️ [screenCapture] onclone: element가 유효하지 않습니다.');
+          }
+        }
           
-          // 3단계: 메인 컨테이너 자체도 확실하게 처리
-          clonedElement.style.setProperty('overflow', 'visible', 'important');
-          clonedElement.style.setProperty('overflow-y', 'visible', 'important');
-          clonedElement.style.setProperty('overflow-x', 'visible', 'important');
-          clonedElement.style.setProperty('max-height', 'none', 'important');
-          
-          // 4단계: 스크롤 가능한 컨테이너를 찾아서 높이를 실제 콘텐츠 높이로 확장
-          const scrollableContainers = clonedElement.querySelectorAll('*');
-          scrollableContainers.forEach(container => {
-            if (container.scrollHeight && container.scrollHeight > container.clientHeight) {
-              // 스크롤 가능한 컨테이너는 실제 스크롤 높이만큼 확장
-              container.style.setProperty('height', `${container.scrollHeight}px`, 'important');
-              container.style.setProperty('max-height', 'none', 'important');
-              container.style.setProperty('overflow', 'visible', 'important');
+          // 3단계: 메인 컨테이너 자체도 확실하게 처리 (clonedElement가 유효한 경우에만)
+          if (clonedElement) {
+            clonedElement.style.setProperty('overflow', 'visible', 'important');
+            clonedElement.style.setProperty('overflow-y', 'visible', 'important');
+            clonedElement.style.setProperty('overflow-x', 'visible', 'important');
+            clonedElement.style.setProperty('max-height', 'none', 'important');
+            
+            // 4단계: 스크롤 가능한 컨테이너를 찾아서 높이를 실제 콘텐츠 높이로 확장
+            if (typeof clonedElement.querySelectorAll === 'function') {
+              const scrollableContainers = clonedElement.querySelectorAll('*');
+              scrollableContainers.forEach(container => {
+                if (container.scrollHeight && container.scrollHeight > container.clientHeight) {
+                  // 스크롤 가능한 컨테이너는 실제 스크롤 높이만큼 확장
+                  container.style.setProperty('height', `${container.scrollHeight}px`, 'important');
+                  container.style.setProperty('max-height', 'none', 'important');
+                  container.style.setProperty('overflow', 'visible', 'important');
+                }
+              });
             }
-          });
+          }
         }
         
-        // 전체 높이를 표시하도록 스타일 조정
-        clonedElement.style.overflow = 'visible';
-        clonedElement.style.height = 'auto';
-        clonedElement.style.maxHeight = 'none';
-        // 표준 폭으로 고정
-        clonedElement.style.width = `${targetWidth}px`;
-        // 세로는 표준 폭에 따른 스케일로 재흐름된 콘텐츠의 최대치 확보
-        clonedElement.style.minHeight = `${targetHeight}px`;
-        
-        // 캡처 시 상단 정렬로 변경 (하단 공백 제거를 위해)
-        // flex 컨테이너의 경우 상단 정렬로 변경
-        const flexContainers = clonedElement.querySelectorAll('[style*="justify-content"], [style*="justifyContent"]');
-        flexContainers.forEach(container => {
-          const style = container.getAttribute('style') || '';
-          // center, space-between, space-around 등을 flex-start로 변경
-          if (style.includes('justify-content: center') || 
-              style.includes('justifyContent: center') ||
-              style.includes('justify-content:space-between') ||
-              style.includes('justifyContent:space-between') ||
-              style.includes('justify-content: space-between') ||
-              style.includes('justifyContent: space-between')) {
-            container.style.justifyContent = 'flex-start';
-          }
-        });
-        
-        // 직접 스타일이 있는 요소들도 확인 (클론된 문서의 요소들)
-        const allFlexElements = clonedElement.querySelectorAll('*');
-        allFlexElements.forEach(el => {
-          // 인라인 스타일 확인
-          const inlineStyle = el.getAttribute('style') || '';
-          const hasFlexDisplay = inlineStyle.includes('display: flex') || 
-                                inlineStyle.includes('display:flex') ||
-                                inlineStyle.includes('display: inline-flex') ||
-                                inlineStyle.includes('display:inline-flex');
+        // 전체 높이를 표시하도록 스타일 조정 (clonedElement가 유효한 경우에만)
+        if (clonedElement) {
+          clonedElement.style.overflow = 'visible';
+          clonedElement.style.height = 'auto';
+          clonedElement.style.maxHeight = 'none';
+          // 표준 폭으로 고정
+          clonedElement.style.width = `${targetWidth}px`;
+          // 세로는 표준 폭에 따른 스케일로 재흐름된 콘텐츠의 최대치 확보
+          clonedElement.style.minHeight = `${targetHeight}px`;
           
-          // sx prop이나 MUI 스타일은 이미 인라인 스타일로 변환되어 있을 수 있음
-          if (hasFlexDisplay || el.style.display === 'flex' || el.style.display === 'inline-flex') {
-            // justifyContent가 center나 space-between인 경우 flex-start로 변경
-            if (inlineStyle.includes('justify-content: center') ||
-                inlineStyle.includes('justifyContent: center') ||
-                inlineStyle.includes('justify-content:space-between') ||
-                inlineStyle.includes('justifyContent:space-between') ||
-                inlineStyle.includes('justify-content: space-between') ||
-                inlineStyle.includes('justifyContent: space-between') ||
-                inlineStyle.includes('justify-content:space-around') ||
-                inlineStyle.includes('justify-content: space-around') ||
-                el.style.justifyContent === 'center' ||
-                el.style.justifyContent === 'space-between' ||
-                el.style.justifyContent === 'space-around') {
-              el.style.justifyContent = 'flex-start';
+          // 캡처 시 상단 정렬로 변경 (하단 공백 제거를 위해)
+          // flex 컨테이너의 경우 상단 정렬로 변경
+          if (typeof clonedElement.querySelectorAll === 'function') {
+            const flexContainers = clonedElement.querySelectorAll('[style*="justify-content"], [style*="justifyContent"]');
+            flexContainers.forEach(container => {
+              const style = container.getAttribute('style') || '';
+              // center, space-between, space-around 등을 flex-start로 변경
+              if (style.includes('justify-content: center') || 
+                  style.includes('justifyContent: center') ||
+                  style.includes('justify-content:space-between') ||
+                  style.includes('justifyContent:space-between') ||
+                  style.includes('justify-content: space-between') ||
+                  style.includes('justifyContent: space-between')) {
+                container.style.justifyContent = 'flex-start';
+              }
+            });
+            
+            // 직접 스타일이 있는 요소들도 확인 (클론된 문서의 요소들)
+            const allFlexElements = clonedElement.querySelectorAll('*');
+            allFlexElements.forEach(el => {
+              // 인라인 스타일 확인
+              const inlineStyle = el.getAttribute('style') || '';
+              const hasFlexDisplay = inlineStyle.includes('display: flex') || 
+                                    inlineStyle.includes('display:flex') ||
+                                    inlineStyle.includes('display: inline-flex') ||
+                                    inlineStyle.includes('display:inline-flex');
+              
+              // sx prop이나 MUI 스타일은 이미 인라인 스타일로 변환되어 있을 수 있음
+              if (hasFlexDisplay || el.style.display === 'flex' || el.style.display === 'inline-flex') {
+                // justifyContent가 center나 space-between인 경우 flex-start로 변경
+                if (inlineStyle.includes('justify-content: center') ||
+                    inlineStyle.includes('justifyContent: center') ||
+                    inlineStyle.includes('justify-content:space-between') ||
+                    inlineStyle.includes('justifyContent:space-between') ||
+                    inlineStyle.includes('justify-content: space-between') ||
+                    inlineStyle.includes('justifyContent: space-between') ||
+                    inlineStyle.includes('justify-content:space-around') ||
+                    inlineStyle.includes('justify-content: space-around') ||
+                    el.style.justifyContent === 'center' ||
+                    el.style.justifyContent === 'space-between' ||
+                    el.style.justifyContent === 'space-around') {
+                  el.style.justifyContent = 'flex-start';
+                }
+              }
+            });
+            
+            // 모든 자식 요소의 overflow와 높이 확인 및 조정
+            const allChildren = clonedElement.querySelectorAll('*');
+            allChildren.forEach(child => {
+              // overflow 속성 제거하여 전체 영역 표시
+              const computedStyle = window.getComputedStyle(child);
+              if (computedStyle.overflow === 'hidden' || computedStyle.overflow === 'auto' || computedStyle.overflow === 'scroll') {
+                child.style.overflow = 'visible';
+              }
+              
+              // maxHeight 제거
+              if (child.style.maxHeight || computedStyle.maxHeight !== 'none') {
+                child.style.maxHeight = 'none';
+              }
+              
+              // 스크롤 컨테이너인 경우 높이를 실제 스크롤 높이로 설정
+              if (child.scrollHeight > child.clientHeight) {
+                child.style.height = 'auto';
+                child.style.minHeight = `${child.scrollHeight}px`;
+                child.style.overflow = 'visible';
+              }
+              
+              // MuiPaper, MuiBox 등 Material-UI 컨테이너도 확인
+              if (child.classList.contains('MuiPaper-root') || 
+                  child.classList.contains('MuiBox-root') ||
+                  child.classList.contains('MuiContainer-root')) {
+                if (child.scrollHeight > child.clientHeight) {
+                  child.style.height = 'auto';
+                  child.style.minHeight = `${child.scrollHeight}px`;
+                  child.style.overflow = 'visible';
+                }
+              }
+            });
+          }
+        }
+        
+        // body와 html도 스크롤 위치 조정 및 overflow 설정 (clonedDoc가 유효한 경우에만)
+        if (clonedDoc && clonedDoc.body) {
+          clonedDoc.body.style.overflow = 'visible';
+          clonedDoc.documentElement.style.overflow = 'visible';
+          clonedDoc.body.scrollTop = 0;
+          clonedDoc.body.scrollLeft = 0;
+          clonedDoc.documentElement.scrollTop = 0;
+          clonedDoc.documentElement.scrollLeft = 0;
+          
+          // body와 html의 높이도 조정 (더 확실하게)
+          clonedDoc.body.style.height = `${targetHeight}px`;
+          clonedDoc.body.style.minHeight = `${targetHeight}px`;
+          clonedDoc.body.style.maxHeight = 'none';
+          clonedDoc.body.style.overflow = 'visible';
+          clonedDoc.documentElement.style.height = `${targetHeight}px`;
+          clonedDoc.documentElement.style.minHeight = `${targetHeight}px`;
+          clonedDoc.documentElement.style.maxHeight = 'none';
+          clonedDoc.documentElement.style.overflow = 'visible';
+        }
+        
+        // 클론된 요소 자체의 높이도 명시적으로 설정 (clonedElement가 유효한 경우에만)
+        if (clonedElement) {
+          clonedElement.style.height = `${targetHeight}px`;
+          clonedElement.style.minHeight = `${targetHeight}px`;
+          clonedElement.style.maxHeight = 'none';
+          
+          // 클론된 요소의 모든 부모 요소도 높이 확장 (최대 3단계)
+          if (clonedDoc && clonedDoc.body) {
+            let clonedParent = clonedElement.parentElement;
+            let parentDepth = 0;
+            while (clonedParent && clonedParent !== clonedDoc.body && parentDepth < 3) {
+              clonedParent.style.maxHeight = 'none';
+              clonedParent.style.overflow = 'visible';
+              clonedParent.style.height = `${targetHeight}px`;
+              clonedParent = clonedParent.parentElement;
+              parentDepth++;
             }
           }
-        });
-        
-        // 모든 자식 요소의 overflow와 높이 확인 및 조정
-        const allChildren = clonedElement.querySelectorAll('*');
-        allChildren.forEach(child => {
-          // overflow 속성 제거하여 전체 영역 표시
-          const computedStyle = window.getComputedStyle(child);
-          if (computedStyle.overflow === 'hidden' || computedStyle.overflow === 'auto' || computedStyle.overflow === 'scroll') {
-            child.style.overflow = 'visible';
-          }
-          
-          // maxHeight 제거
-          if (child.style.maxHeight || computedStyle.maxHeight !== 'none') {
-            child.style.maxHeight = 'none';
-          }
-          
-          // 스크롤 컨테이너인 경우 높이를 실제 스크롤 높이로 설정
-          if (child.scrollHeight > child.clientHeight) {
-            child.style.height = 'auto';
-            child.style.minHeight = `${child.scrollHeight}px`;
-            child.style.overflow = 'visible';
-          }
-          
-          // MuiPaper, MuiBox 등 Material-UI 컨테이너도 확인
-          if (child.classList.contains('MuiPaper-root') || 
-              child.classList.contains('MuiBox-root') ||
-              child.classList.contains('MuiContainer-root')) {
-            if (child.scrollHeight > child.clientHeight) {
-              child.style.height = 'auto';
-              child.style.minHeight = `${child.scrollHeight}px`;
-              child.style.overflow = 'visible';
-            }
-          }
-        });
-        
-        // body와 html도 스크롤 위치 조정 및 overflow 설정
-        clonedDoc.body.style.overflow = 'visible';
-        clonedDoc.documentElement.style.overflow = 'visible';
-        clonedDoc.body.scrollTop = 0;
-        clonedDoc.body.scrollLeft = 0;
-        clonedDoc.documentElement.scrollTop = 0;
-        clonedDoc.documentElement.scrollLeft = 0;
-        
-        // body와 html의 높이도 조정 (더 확실하게)
-        clonedDoc.body.style.height = `${targetHeight}px`;
-        clonedDoc.body.style.minHeight = `${targetHeight}px`;
-        clonedDoc.body.style.maxHeight = 'none';
-        clonedDoc.body.style.overflow = 'visible';
-        clonedDoc.documentElement.style.height = `${targetHeight}px`;
-        clonedDoc.documentElement.style.minHeight = `${targetHeight}px`;
-        clonedDoc.documentElement.style.maxHeight = 'none';
-        clonedDoc.documentElement.style.overflow = 'visible';
-        
-        // 클론된 요소 자체의 높이도 명시적으로 설정
-        clonedElement.style.height = `${targetHeight}px`;
-        clonedElement.style.minHeight = `${targetHeight}px`;
-        clonedElement.style.maxHeight = 'none';
-        
-        // 클론된 요소의 모든 부모 요소도 높이 확장 (최대 3단계)
-        let clonedParent = clonedElement.parentElement;
-        let parentDepth = 0;
-        while (clonedParent && clonedParent !== clonedDoc.body && parentDepth < 3) {
-          clonedParent.style.maxHeight = 'none';
-          clonedParent.style.overflow = 'visible';
-          clonedParent.style.height = `${targetHeight}px`;
-          clonedParent = clonedParent.parentElement;
-          parentDepth++;
         }
       }
     },
