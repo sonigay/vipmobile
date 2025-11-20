@@ -300,6 +300,12 @@ export async function captureElement(element, options = {}) {
   const isToc = slideId.includes('toc');
   const isMainOrToc = isMain || isToc;
   
+  // height 옵션이 명시적으로 전달된 경우 (totalClosing 등): 해당 높이를 직접 사용
+  const hasExplicitHeight = typeof options.height === 'number' && options.height > 0;
+  
+  // height 옵션이 명시적으로 전달된 경우 (totalClosing 등): 해당 높이를 직접 사용
+  const hasExplicitHeight = typeof options.height === 'number' && options.height > 0;
+  
   // 메인/목차 슬라이드: 고정 가로폭(1920px) 적용 시 세로 재흐름으로 인한 하단 잘림 방지
   // 높이 = scrollHeight × (1/widthScale) × 배율, 최소 높이 보장
   // autoCrop 유지로 과도 여백은 자동 제거
@@ -454,7 +460,11 @@ export async function captureElement(element, options = {}) {
   }
 
       // 메인/목차/엔딩 슬라이드의 경우: skipAutoCrop이 true이면 타일 캡처 로직 건너뛰기
-  const shouldUseTiledCapture = !skipAutoCrop && (isToc || isMain || slideId.includes('ending'));
+  // height 옵션이 명시적으로 전달된 경우 (totalClosing 등): 타일 캡처 우회하여 명시된 높이 직접 사용
+  const shouldUseTiledCapture = !skipAutoCrop && !hasExplicitHeight && (isToc || isMain || slideId.includes('ending'));
+  
+  // height 옵션이 명시적으로 전달된 경우: 해당 높이를 targetHeight로 직접 사용
+  const finalTargetHeight = hasExplicitHeight ? options.height : targetHeight;
   
   const defaultOptions = {
     scale: 2, // 고해상도 (2배)
@@ -462,12 +472,12 @@ export async function captureElement(element, options = {}) {
     allowTaint: false,
     backgroundColor: '#ffffff',
     width: targetWidth,
-    height: shouldUseTiledCapture ? undefined : targetHeight, // 타일 캡처 시 height 제거
+    height: shouldUseTiledCapture ? undefined : finalTargetHeight, // 타일 캡처 시 height 제거, 명시적 height가 있으면 직접 사용
     logging: false,
     scrollX: 0,
     scrollY: 0,
     windowWidth: targetWidth,
-    windowHeight: shouldUseTiledCapture ? undefined : targetHeight, // 타일 캡처 시 windowHeight 제거
+    windowHeight: shouldUseTiledCapture ? undefined : finalTargetHeight, // 타일 캡처 시 windowHeight 제거, 명시적 height가 있으면 직접 사용
     removeContainer: false, // 컨테이너 제거하지 않음
     onclone: (clonedDoc, element) => {
       // 클론된 문서에서 요소 찾기

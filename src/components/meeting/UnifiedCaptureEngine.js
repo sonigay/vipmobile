@@ -2578,6 +2578,84 @@ async function executeCapture(elements, config, sizeInfo, slide) {
             });
           }
           
+          // 콘텐츠 요소와 내부 콘텐츠 박스의 너비도 1920px로 명시적으로 설정 (재초담초채권/가입자증감 슬라이드)
+          if ((isRechotanchoBond || isSubscriberIncreaseForWidth) && elements.contentElement && SafeDOM.isInDOM(elements.contentElement)) {
+            try {
+              // 콘텐츠 요소 자체의 너비 설정
+              const contentOriginalWidth = elements.contentElement.style.width || '';
+              const contentOriginalMaxWidth = elements.contentElement.style.maxWidth || '';
+              const contentOriginalMinWidth = elements.contentElement.style.minWidth || '';
+              
+              elements.contentElement.style.width = `${MAX_WIDTH}px`;
+              elements.contentElement.style.maxWidth = `${MAX_WIDTH}px`;
+              elements.contentElement.style.minWidth = `${MAX_WIDTH}px`;
+              
+              // 내부 콘텐츠 박스들도 찾아서 너비 설정 (.MuiBox-root, .MuiContainer-root, .MuiPaper-root 등)
+              const contentBoxes = elements.contentElement.querySelectorAll('.MuiBox-root, .MuiContainer-root, .MuiPaper-root, [class*="content"], [class*="container"]');
+              const boxRestores = [];
+              
+              contentBoxes.forEach(box => {
+                if (!SafeDOM.isInDOM(box)) return;
+                
+                const boxOriginalWidth = box.style.width || '';
+                const boxOriginalMaxWidth = box.style.maxWidth || '';
+                const boxOriginalMinWidth = box.style.minWidth || '';
+                
+                // 너비가 100%나 auto인 경우만 명시적으로 1920px로 설정
+                const computedStyles = window.getComputedStyle(box);
+                const hasWidthLimit = computedStyles.maxWidth && computedStyles.maxWidth !== 'none' && 
+                                      parseInt(computedStyles.maxWidth) < MAX_WIDTH;
+                
+                if (!hasWidthLimit) {
+                  box.style.width = `${MAX_WIDTH}px`;
+                  box.style.maxWidth = `${MAX_WIDTH}px`;
+                  box.style.minWidth = `${MAX_WIDTH}px`;
+                  
+                  boxRestores.push(() => {
+                    try {
+                      if (!SafeDOM.isInDOM(box)) return;
+                      SafeDOM.restoreStyle(box, 'width', boxOriginalWidth);
+                      SafeDOM.restoreStyle(box, 'max-width', boxOriginalMaxWidth);
+                      SafeDOM.restoreStyle(box, 'min-width', boxOriginalMinWidth);
+                    } catch (error) {
+                      // 무시
+                    }
+                  });
+                }
+              });
+              
+              await new Promise(r => setTimeout(r, 300)); // 렌더링 대기 시간 증가
+              
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`📐 [executeCapture] 재초담초채권/가입자증감 슬라이드: 콘텐츠 요소 및 내부 박스 너비를 ${MAX_WIDTH}px로 명시적으로 설정 (${contentBoxes.length}개 박스)`);
+              }
+              
+              // 스타일 복원 함수 추가
+              styleRestores.push(() => {
+                try {
+                  if (!SafeDOM.isInDOM(elements.contentElement)) return;
+                  SafeDOM.restoreStyle(elements.contentElement, 'width', contentOriginalWidth);
+                  SafeDOM.restoreStyle(elements.contentElement, 'max-width', contentOriginalMaxWidth);
+                  SafeDOM.restoreStyle(elements.contentElement, 'min-width', contentOriginalMinWidth);
+                } catch (error) {
+                  // 무시
+                }
+              });
+              
+              boxRestores.forEach(restore => {
+                try {
+                  restore();
+                } catch (error) {
+                  // 무시
+                }
+              });
+            } catch (error) {
+              if (process.env.NODE_ENV === 'development') {
+                console.warn('⚠️ [executeCapture] 콘텐츠 너비 설정 실패:', error);
+              }
+            }
+          }
+          
           // 전체총마감 슬라이드: requiredHeight 확인하여 높이 제한 동적 조정
           const isTotalClosing = slide?.mode === 'chart' &&
             (slide?.tab === 'closingChart' || slide?.tab === 'closing') &&

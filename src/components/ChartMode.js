@@ -5034,7 +5034,14 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
           </FormControl>
         </Box>
 
-        <TableContainer>
+        <TableContainer
+          sx={{
+            ...(presentationMode && {
+              maxWidth: maxContentWidth,
+              width: '100%'
+            })
+          }}
+        >
           <Table>
             <TableHead>
               {/* 합계 행 */}

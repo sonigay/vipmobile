@@ -177,6 +177,47 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
     };
   }, []);
   
+  // 엔딩 슬라이드: meetingNumber 재시도 로직 (window.__MEETING_NUMBER 확인)
+  useEffect(() => {
+    if (slide?.type === 'ending' && typeof window !== 'undefined' && !isValidMeetingNumber(slide.meetingNumber)) {
+      // meetingNumber가 없으면 window.__MEETING_NUMBER를 다시 확인
+      const checkMeetingNumber = () => {
+        if (typeof window !== 'undefined' && isValidMeetingNumber(window.__MEETING_NUMBER)) {
+          if (!isValidMeetingNumber(slide.meetingNumber)) {
+            slide.meetingNumber = window.__MEETING_NUMBER;
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`✅ [SlideRenderer] 엔딩 슬라이드 meetingNumber 재시도 성공 (useEffect): ${slide.meetingNumber}`);
+            }
+            // 강제 리렌더링을 위해 상태 업데이트 (간접적)
+            setContentReady(false);
+            setLoading(false);
+            setTimeout(() => {
+              setContentReady(true);
+            }, 100);
+          }
+        }
+      };
+      
+      // 즉시 확인
+      checkMeetingNumber();
+      
+      // 짧은 지연 후 다시 확인 (메인 슬라이드가 아직 설정하지 않았을 수 있음)
+      const retryTimer = setTimeout(() => {
+        checkMeetingNumber();
+      }, 500);
+      
+      // 더 긴 지연 후 다시 확인 (최후의 수단)
+      const finalRetryTimer = setTimeout(() => {
+        checkMeetingNumber();
+      }, 2000);
+      
+      return () => {
+        clearTimeout(retryTimer);
+        clearTimeout(finalRetryTimer);
+      };
+    }
+  }, [slide?.type, slide?.meetingNumber]);
+  
   useEffect(() => {
     // slide가 변경되면 완전히 리셋
     if (slide) {

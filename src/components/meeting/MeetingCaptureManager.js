@@ -40,6 +40,25 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
   }, []);
 
   useEffect(() => {
+    // window.__MEETING_NUMBER를 가능한 한 일찍 설정 (슬라이드 초기화 전에)
+    try {
+      if (typeof window !== 'undefined') {
+        // 즉시 설정: meeting 객체 -> main 슬라이드 (slides가 있을 때) -> null 순서로 확인
+        const immediateMeetingNumber = meeting?.meetingNumber ?? 
+          (slides && Array.isArray(slides) ? slides.find(sl => sl?.type === 'main')?.meetingNumber : null) ?? 
+          null;
+        window.__MEETING_NUMBER = immediateMeetingNumber;
+        
+        if (process.env.NODE_ENV === 'development' && immediateMeetingNumber) {
+          console.log(`🔍 [MeetingCaptureManager] window.__MEETING_NUMBER 즉시 설정: ${immediateMeetingNumber} (meeting=${meeting?.meetingNumber}, main=${slides && Array.isArray(slides) ? slides.find(sl => sl?.type === 'main')?.meetingNumber : 'N/A'})`);
+        }
+      }
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('⚠️ [MeetingCaptureManager] window.__MEETING_NUMBER 즉시 설정 실패:', error);
+      }
+    }
+    
     if (slides && Array.isArray(slides)) {
       if (process.env.NODE_ENV === 'development') {
         console.log(`📋 [MeetingCaptureManager] 슬라이드 초기화: ${slides.length}개`);
@@ -60,17 +79,19 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
       setSlidesState(normalized);
       try {
         if (typeof window !== 'undefined') {
-          // window.__MEETING_NUMBER 설정: meeting 객체 -> main 슬라이드 -> null 순서로 확인
+          // window.__MEETING_NUMBER 재설정: meeting 객체 -> main 슬라이드 -> null 순서로 확인 (더 확실한 값이 있으면 업데이트)
           const meetingNumber = meeting?.meetingNumber ?? normalized.find(sl=>sl.type==='main')?.meetingNumber ?? null;
-          window.__MEETING_NUMBER = meetingNumber;
-          
-          if (process.env.NODE_ENV === 'development') {
-            console.log(`🔍 [MeetingCaptureManager] window.__MEETING_NUMBER 설정: ${meetingNumber} (meeting=${meeting?.meetingNumber}, main=${normalized.find(sl=>sl.type==='main')?.meetingNumber})`);
+          if (meetingNumber !== window.__MEETING_NUMBER) {
+            window.__MEETING_NUMBER = meetingNumber;
+            
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`🔍 [MeetingCaptureManager] window.__MEETING_NUMBER 재설정: ${meetingNumber} (meeting=${meeting?.meetingNumber}, main=${normalized.find(sl=>sl.type==='main')?.meetingNumber})`);
+            }
           }
         }
       } catch (error) {
         if (process.env.NODE_ENV === 'development') {
-          console.warn('⚠️ [MeetingCaptureManager] window.__MEETING_NUMBER 설정 실패:', error);
+          console.warn('⚠️ [MeetingCaptureManager] window.__MEETING_NUMBER 재설정 실패:', error);
         }
       }
     } else {
@@ -5030,6 +5051,22 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
       formData.append('meetingDate', meeting.meetingDate);
       formData.append('slideOrder', index + 1);
 
+      // 이미지 파일 크기 사전 검증 및 경고
+      if (blob) {
+        const sizeMB = blob.size / (1024 * 1024);
+        if (blob.size > 25 * 1024 * 1024) {
+          // 25MB 초과 시 에러 발생
+          throw new Error(`이미지 파일이 너무 큽니다 (${sizeMB.toFixed(2)}MB). 25MB 이하로 줄여주세요.`);
+        } else if (blob.size > 20 * 1024 * 1024) {
+          // 20MB 이상이면 경고 (서버 부하 가능성)
+          if (process.env.NODE_ENV === 'development') {
+            console.warn(`⚠️ [MeetingCaptureManager] 슬라이드 ${index + 1} 이미지 크기가 큼: ${sizeMB.toFixed(2)}MB (25MB 제한 근접, 서버 부하 가능성)`);
+          }
+        } else if (process.env.NODE_ENV === 'development') {
+          console.log(`📊 [MeetingCaptureManager] 슬라이드 ${index + 1} 이미지 크기: ${sizeMB.toFixed(2)}MB`);
+        }
+      }
+      
       // 재시도 로직이 포함된 업로드 함수 (지수 백오프 적용, CORS 에러 처리 개선)
       const uploadWithRetry = async (retries = 5, baseDelay = 2000) => {
         let lastError = null;
@@ -5059,13 +5096,19 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             const timeoutId = setTimeout(() => abortController.abort(), uploadTimeout);
             
             // FormData를 사용할 때는 Content-Type 헤더를 설정하지 않음 (브라우저가 자동으로 설정)
+            // CORS 에러 방지를 위해 헤더 최소화 및 명시적 설정
             const uploadResponse = await fetch(`${API_BASE_URL}/api/meetings/${meeting.meetingId}/upload-image`, {
               method: 'POST',
               body: formData,
               // CORS 에러 방지를 위한 옵션
               mode: 'cors',
               credentials: 'omit',
-              signal: abortController.signal
+              signal: abortController.signal,
+              // 헤더는 브라우저가 자동으로 설정하도록 하되, 명시적으로 설정하지 않음
+              headers: {
+                // Content-Type은 브라우저가 자동으로 설정 (multipart/form-data; boundary=...)
+                // 명시적으로 설정하면 CORS 에러 발생 가능
+              }
             }).catch((fetchError) => {
               clearTimeout(timeoutId);
               
@@ -5179,20 +5222,31 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             }
             
             // 지수 백오프 + Jitter: delay * 2^(attempt-1) + 랜덤 지터 (0-30%)
-            const baseRetryDelay = baseDelay * Math.pow(2, attempt - 1);
+            // 502/503 에러는 서버 부하를 의미하므로 더 긴 대기 시간 필요
+            const isServerOverload = error.status === 502 || error.status === 503;
+            const serverOverloadMultiplier = isServerOverload ? 2 : 1; // 502/503 에러 시 2배 대기
+            const baseRetryDelay = baseDelay * Math.pow(2, attempt - 1) * serverOverloadMultiplier;
             const jitter = Math.random() * 0.3 * baseRetryDelay; // 0-30% 지터
-            const delay = Math.min(baseRetryDelay + jitter, 30000); // 최대 30초
+            const maxDelay = isServerOverload ? 60000 : 30000; // 502/503 에러 시 최대 60초, 기타 30초
+            const delay = Math.min(baseRetryDelay + jitter, maxDelay);
+            
+            // CORS 에러는 서버 설정 문제이므로 더 긴 대기 시간 필요
+            const isCorsError = error.isCorsError || errorMessage.includes('cors') || errorMessage.includes('access-control-allow-origin');
+            const corsMultiplier = isCorsError ? 1.5 : 1; // CORS 에러 시 1.5배 대기
+            const finalDelay = Math.min(delay * corsMultiplier, maxDelay);
             
             if (process.env.NODE_ENV === 'development') {
-              console.warn(`⚠️ [MeetingCaptureManager] 슬라이드 ${index + 1} 업로드 재시도 ${attempt}/${retries} (${Math.round(delay)}ms 대기):`, {
+              console.warn(`⚠️ [MeetingCaptureManager] 슬라이드 ${index + 1} 업로드 재시도 ${attempt}/${retries} (${Math.round(finalDelay)}ms 대기):`, {
                 error: error.message,
                 status: error.status,
                 isNetworkError,
-                isCorsError: error.isCorsError,
-                errorName: error.name
+                isCorsError: error.isCorsError || isCorsError,
+                errorName: error.name,
+                isServerOverload,
+                fileSize: blob ? `${(blob.size / (1024 * 1024)).toFixed(2)}MB` : 'N/A'
               });
             }
-            await new Promise(resolve => setTimeout(resolve, delay));
+            await new Promise(resolve => setTimeout(resolve, finalDelay));
           }
         }
         
