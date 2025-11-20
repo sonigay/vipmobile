@@ -60,9 +60,19 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
       setSlidesState(normalized);
       try {
         if (typeof window !== 'undefined') {
-          window.__MEETING_NUMBER = meeting?.meetingNumber ?? normalized.find(sl=>sl.type==='main')?.meetingNumber ?? null;
+          // window.__MEETING_NUMBER 설정: meeting 객체 -> main 슬라이드 -> null 순서로 확인
+          const meetingNumber = meeting?.meetingNumber ?? normalized.find(sl=>sl.type==='main')?.meetingNumber ?? null;
+          window.__MEETING_NUMBER = meetingNumber;
+          
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`🔍 [MeetingCaptureManager] window.__MEETING_NUMBER 설정: ${meetingNumber} (meeting=${meeting?.meetingNumber}, main=${normalized.find(sl=>sl.type==='main')?.meetingNumber})`);
+          }
         }
-      } catch {}
+      } catch (error) {
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('⚠️ [MeetingCaptureManager] window.__MEETING_NUMBER 설정 실패:', error);
+        }
+      }
     } else {
       if (process.env.NODE_ENV === 'development') {
         console.warn(`⚠️ [MeetingCaptureManager] slides가 배열이 아닙니다:`, slides);
@@ -5024,18 +5034,21 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
       const uploadWithRetry = async (retries = 5, baseDelay = 2000) => {
         let lastError = null;
         
-        // 전체총마감/목차 슬라이드는 이미지가 크므로 타임아웃을 더 길게 설정
+        // 전체총마감/목차/메인 슬라이드는 이미지가 크므로 타임아웃을 더 길게 설정
         const isTotalClosing = currentSlide?.mode === 'chart' && 
                                currentSlide?.tab === 'closingChart' && 
                                currentSlide?.subTab === 'totalClosing';
         const isToc = currentSlide?.type === 'toc';
-        const uploadTimeout = isTotalClosing ? 120000 : (isToc ? 60000 : 45000); // 전체총마감: 120초, 목차: 60초, 기타: 45초
+        const isMain = currentSlide?.type === 'main';
+        const uploadTimeout = isTotalClosing ? 120000 : (isToc || isMain ? 60000 : 45000); // 전체총마감: 120초, 목차/메인: 60초, 기타: 45초
         
         if (process.env.NODE_ENV === 'development') {
           if (isTotalClosing) {
             console.log(`⏱️ [MeetingCaptureManager] 전체총마감 슬라이드: 업로드 타임아웃 ${uploadTimeout / 1000}초로 설정`);
           } else if (isToc) {
             console.log(`⏱️ [MeetingCaptureManager] 목차 슬라이드: 업로드 타임아웃 ${uploadTimeout / 1000}초로 설정`);
+          } else if (isMain) {
+            console.log(`⏱️ [MeetingCaptureManager] 메인 슬라이드: 업로드 타임아웃 ${uploadTimeout / 1000}초로 설정`);
           }
         }
         
@@ -5086,7 +5099,16 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             clearTimeout(timeoutId);
 
             // 응답이 없거나 CORS 에러인 경우
-            if (!uploadResponse || uploadResponse.type === 'opaque' || uploadResponse.type === 'opaqueredirect') {
+            // CORS 에러는 보통 fetch 단계에서 catch되지만, 응답이 opaque인 경우도 확인
+            if (!uploadResponse) {
+              const corsError = new Error('서버로부터 응답을 받을 수 없습니다. CORS 정책 또는 네트워크 문제일 수 있습니다.');
+              corsError.isNetworkError = true;
+              corsError.isCorsError = true;
+              throw corsError;
+            }
+            
+            // opaque 응답은 CORS 에러의 신호일 수 있음
+            if (uploadResponse.type === 'opaque' || uploadResponse.type === 'opaqueredirect') {
               const corsError = new Error('CORS 정책으로 인해 요청이 차단되었습니다.');
               corsError.isNetworkError = true;
               corsError.isCorsError = true;

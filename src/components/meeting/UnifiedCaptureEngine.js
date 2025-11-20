@@ -1493,11 +1493,19 @@ async function adjustSizes(elements, config, slide) {
                 // 실제 높이와 scrollHeight 중 큰 값 사용 (스크롤 가능한 테이블도 전체 포함)
                 // 테이블의 실제 위치를 기준으로 정확한 높이 계산
                 const tableTopRelativeToContent = tableRect.top - rect.top;
+                
+                // 테이블의 스크롤 영역을 정확히 포함: 컨테이너의 scrollHeight와 테이블의 scrollHeight 모두 고려
+                const containerScrollHeightWithHeader = containerScrollHeight + theadHeight + tfootHeight;
+                const tableScrollHeightWithHeader = tableScrollHeight + theadHeight + tfootHeight;
+                const tbodyScrollHeightWithHeader = (tbody?.scrollHeight || 0) + theadHeight + tfootHeight;
+                
+                // 테이블이 콘텐츠 내에서 차지하는 최대 높이 계산 (스크롤 영역 포함)
                 const maxTableHeight = Math.max(
-                  relativeBottom,
-                  tableTopRelativeToContent + totalTableHeight,
-                  tableTopRelativeToContent + Math.max(tableScrollHeight, containerScrollHeight),
-                  tableTopRelativeToContent + (tbody?.scrollHeight || 0) + theadHeight + tfootHeight
+                  relativeBottom, // 현재 보이는 테이블의 bottom
+                  tableTopRelativeToContent + totalTableHeight, // 실제 테이블 높이
+                  tableTopRelativeToContent + containerScrollHeightWithHeader, // 컨테이너 스크롤 높이 (헤더/푸터 포함)
+                  tableTopRelativeToContent + tableScrollHeightWithHeader, // 테이블 스크롤 높이 (헤더/푸터 포함)
+                  tableTopRelativeToContent + tbodyScrollHeightWithHeader // tbody 스크롤 높이 (헤더/푸터 포함)
                 );
                 
                 // 스타일 복원
@@ -1521,19 +1529,28 @@ async function adjustSizes(elements, config, slide) {
                     totalTableHeight,
                     rowHeightSum + theadHeight + tfootHeight,
                     containerScrollHeight,
-                    tableScrollHeight
+                    tableScrollHeight,
+                    tbody?.scrollHeight || 0
                   );
                   
                   // requiredHeight 계산: 테이블의 정확한 높이를 기반으로 계산
                   // 테이블이 콘텐츠의 어느 위치에 있는지 고려하여 전체 높이 계산
-                  const tableTopRelativeToContent = tableRect.top - rect.top;
+                  // 테이블의 실제 위치부터 전체 높이까지를 포함
                   const requiredHeightFromTable = tableTopRelativeToContent + preciseTableHeight;
                   
+                  // 테이블의 스크롤 영역을 정확히 포함한 높이 계산
+                  const requiredHeightFromScroll = Math.max(
+                    tableTopRelativeToContent + containerScrollHeightWithHeader,
+                    tableTopRelativeToContent + tableScrollHeightWithHeader,
+                    tableTopRelativeToContent + tbodyScrollHeightWithHeader
+                  );
+                  
                   // 여유 공간을 더 크게 설정하여 테이블이 잘리지 않도록 보장
-                  const paddingForTable = 400; // 300px → 400px로 증가
+                  const paddingForTable = 500; // 400px → 500px로 증가 (여유 공간 확대)
                   const requiredHeightWithPadding = Math.max(
                     maxTableHeight + paddingForTable,
-                    requiredHeightFromTable + paddingForTable
+                    requiredHeightFromTable + paddingForTable,
+                    requiredHeightFromScroll + paddingForTable
                   );
                   
                   // requiredHeight를 별도 저장하여 나중에 높이 제한 적용 시 참조
@@ -1638,18 +1655,28 @@ async function adjustSizes(elements, config, slide) {
                   const preciseTableHeight = Math.max(
                     totalTableHeight,
                     rowHeightSum + theadHeight + tfootHeight,
-                    tableScrollHeight
+                    tableScrollHeight,
+                    tbody?.scrollHeight || 0
                   );
                   
                   // requiredHeight 계산: 테이블의 정확한 높이를 기반으로 계산
-                  const tableTopRelativeToContent = tableRect.top - rect.top;
+                  // 테이블의 실제 위치부터 전체 높이까지를 포함
                   const requiredHeightFromTable = tableTopRelativeToContent + preciseTableHeight;
                   
+                  // 테이블의 스크롤 영역을 정확히 포함한 높이 계산
+                  const tableScrollHeightWithHeader = tableScrollHeight + theadHeight + tfootHeight;
+                  const tbodyScrollHeightWithHeader = (tbody?.scrollHeight || 0) + theadHeight + tfootHeight;
+                  const requiredHeightFromScroll = Math.max(
+                    tableTopRelativeToContent + tableScrollHeightWithHeader,
+                    tableTopRelativeToContent + tbodyScrollHeightWithHeader
+                  );
+                  
                   // 여유 공간을 더 크게 설정하여 테이블이 잘리지 않도록 보장
-                  const paddingForTable = 400; // 300px → 400px로 증가
+                  const paddingForTable = 500; // 400px → 500px로 증가 (여유 공간 확대)
                   const requiredHeightWithPadding = Math.max(
                     maxTableHeight + paddingForTable,
-                    requiredHeightFromTable + paddingForTable
+                    requiredHeightFromTable + paddingForTable,
+                    requiredHeightFromScroll + paddingForTable
                   );
                   
                   // requiredHeight를 별도 저장하여 나중에 높이 제한 적용 시 참조
@@ -2433,6 +2460,14 @@ async function executeCapture(elements, config, sizeInfo, slide) {
           }
         }
 
+        // 재초담초채권/가입자증감 슬라이드: 1920px로 명시적으로 설정 (정상 슬라이드처럼)
+        const isRechotanchoBond = slide?.mode === 'chart' &&
+          (slide?.tab === 'bondChart' || slide?.tab === 'bond') &&
+          slide?.subTab === 'rechotanchoBond';
+        const isSubscriberIncreaseForWidth = slide?.mode === 'chart' &&
+          (slide?.tab === 'subscriberChart' || slide?.tab === 'subscriber') &&
+          slide?.subTab === 'subscriberIncrease';
+        
         if (sizeInfo) {
           const originalHeight = captureElementForDirect.style.height || '';
           const originalMaxHeight = captureElementForDirect.style.maxHeight || '';
@@ -2449,18 +2484,23 @@ async function executeCapture(elements, config, sizeInfo, slide) {
             }
           });
 
+          // 재초담초채권/가입자증감 슬라이드는 1920px로 명시적으로 설정
+          const elementWidth = (isRechotanchoBond || isSubscriberIncreaseForWidth) 
+            ? MAX_WIDTH 
+            : (sizeInfo.measuredWidth || 0);
+          
           captureElementForDirect.style.height = `${sizeInfo.measuredHeight || 0}px`;
           captureElementForDirect.style.maxHeight = `${sizeInfo.measuredHeight || 0}px`;
-          captureElementForDirect.style.width = `${sizeInfo.measuredWidth || 0}px`;
-          captureElementForDirect.style.maxWidth = `${sizeInfo.measuredWidth || 0}px`;
+          captureElementForDirect.style.width = `${elementWidth}px`;
+          captureElementForDirect.style.maxWidth = `${elementWidth}px`;
           captureElementForDirect.style.overflow = 'visible';
+          
+          if (process.env.NODE_ENV === 'development' && (isRechotanchoBond || isSubscriberIncreaseForWidth)) {
+            console.log(`📏 [executeCapture] 재초담초채권/가입자증감 슬라이드: captureElementForDirect.style.width를 ${elementWidth}px로 직접 설정`);
+          }
 
           // 가입자증감 슬라이드: TextField 캡처 시점 스타일 적용 강화
-          const isSubscriberIncrease = slide?.mode === 'chart' &&
-            (slide?.tab === 'subscriberChart' || slide?.tab === 'subscriber') &&
-            slide?.subTab === 'subscriberIncrease';
-          
-          if (isSubscriberIncrease && captureElementForDirect && SafeDOM.isInDOM(captureElementForDirect)) {
+          if (isSubscriberIncreaseForWidth && captureElementForDirect && SafeDOM.isInDOM(captureElementForDirect)) {
             try {
               // 모든 TextField input 요소 찾기
               const textFieldInputs = captureElementForDirect.querySelectorAll('input[type="text"], input[type="number"]');
@@ -2500,22 +2540,44 @@ async function executeCapture(elements, config, sizeInfo, slide) {
 
           await new Promise(r => setTimeout(r, 300));
 
-          // 재초담초채권/가입자증감 슬라이드: 1920px로 명시적으로 설정 (정상 슬라이드처럼)
-          const isRechotanchoBond = slide?.mode === 'chart' &&
-            (slide?.tab === 'bondChart' || slide?.tab === 'bond') &&
-            slide?.subTab === 'rechotanchoBond';
-          const isSubscriberIncreaseForCapture = slide?.mode === 'chart' &&
-            (slide?.tab === 'subscriberChart' || slide?.tab === 'subscriber') &&
-            slide?.subTab === 'subscriberIncrease';
-          
           // width/height는 원본 크기만 전달 (SCALE 곱하지 않음)
-          // 재초담초채권/가입자증감 슬라이드는 1920px로 명시적으로 설정
-          const captureWidth = (isRechotanchoBond || isSubscriberIncreaseForCapture) 
+          // 재초담초채권/가입자증감 슬라이드는 1920px로 명시적으로 설정 (위에서 이미 elementWidth로 설정됨)
+          const captureWidth = (isRechotanchoBond || isSubscriberIncreaseForWidth) 
             ? MAX_WIDTH 
             : Math.min(sizeInfo.measuredWidth || 0, MAX_WIDTH);
           
-          if (process.env.NODE_ENV === 'development' && (isRechotanchoBond || isSubscriberIncreaseForCapture)) {
-            console.log(`📏 [executeCapture] 재초담초채권/가입자증감 슬라이드: captureWidth를 1920px로 명시적으로 설정`);
+          if (process.env.NODE_ENV === 'development' && (isRechotanchoBond || isSubscriberIncreaseForWidth)) {
+            console.log(`📏 [executeCapture] 재초담초채권/가입자증감 슬라이드: captureWidth를 ${captureWidth}px로 명시적으로 설정`);
+          }
+          
+          // 헤더도 1920px로 명시적으로 설정 (재초담초채권/가입자증감 슬라이드)
+          if ((isRechotanchoBond || isSubscriberIncreaseForWidth) && elements.headerElement && SafeDOM.isInDOM(elements.headerElement)) {
+            const headerOriginalWidth = elements.headerElement.style.width || '';
+            const headerOriginalMaxWidth = elements.headerElement.style.maxWidth || '';
+            const headerOriginalMinWidth = elements.headerElement.style.minWidth || '';
+            
+            elements.headerElement.style.width = `${MAX_WIDTH}px`;
+            elements.headerElement.style.maxWidth = `${MAX_WIDTH}px`;
+            elements.headerElement.style.minWidth = `${MAX_WIDTH}px`;
+            
+            await new Promise(r => setTimeout(r, 200));
+            
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`📐 [executeCapture] 재초담초채권/가입자증감 슬라이드: 헤더 너비를 ${MAX_WIDTH}px로 명시적으로 설정`);
+            }
+            
+            styleRestores.push(() => {
+              try {
+                if (!SafeDOM.isInDOM(elements.headerElement)) return;
+                SafeDOM.restoreStyle(elements.headerElement, 'width', headerOriginalWidth);
+                SafeDOM.restoreStyle(elements.headerElement, 'max-width', headerOriginalMaxWidth);
+                SafeDOM.restoreStyle(elements.headerElement, 'min-width', headerOriginalMinWidth);
+              } catch (error) {
+                if (process.env.NODE_ENV === 'development') {
+                  console.warn('⚠️ [executeCapture] 헤더 너비 복원 실패:', error);
+                }
+              }
+            });
           }
           
           // 전체총마감 슬라이드: requiredHeight 확인하여 높이 제한 동적 조정
@@ -2529,17 +2591,21 @@ async function executeCapture(elements, config, sizeInfo, slide) {
             const defaultMaxHeight = 6000; // 기본 최대 높이 (원본)
             const absoluteMaxHeight = 8000; // 25MB 제한 고려한 절대 최대 높이 (원본)
             
-            // requiredHeight를 최소값으로 사용하고, measuredHeight가 더 크면 사용
+            // requiredHeight를 최소값으로 사용하여 콘텐츠가 잘리지 않도록 보장
             const minRequiredHeight = sizeInfo.requiredHeight;
+            const measuredHeightValue = sizeInfo.measuredHeight || 0;
+            
+            // requiredHeight와 measuredHeight 중 더 큰 값을 사용하고, absoluteMaxHeight를 초과하지 않도록 제한
             const maxAllowedHeight = Math.min(
-              Math.max(minRequiredHeight, sizeInfo.measuredHeight || 0),
+              Math.max(minRequiredHeight, measuredHeightValue),
               absoluteMaxHeight
             );
             
-            captureHeight = maxAllowedHeight;
+            // requiredHeight를 최소값으로 보장하여 콘텐츠가 잘리지 않도록 함
+            captureHeight = Math.max(minRequiredHeight, Math.min(maxAllowedHeight, absoluteMaxHeight));
             
             if (process.env.NODE_ENV === 'development') {
-              console.log(`📏 [executeCapture] 전체총마감 슬라이드 높이 제한 동적 조정: requiredHeight=${sizeInfo.requiredHeight}px (최소값), measuredHeight=${sizeInfo.measuredHeight}px → captureHeight=${captureHeight}px (최대 ${absoluteMaxHeight}px)`);
+              console.log(`📏 [executeCapture] 전체총마감 슬라이드 높이 제한 동적 조정: requiredHeight=${sizeInfo.requiredHeight.toFixed(0)}px (최소값 보장), measuredHeight=${measuredHeightValue.toFixed(0)}px, maxAllowedHeight=${maxAllowedHeight.toFixed(0)}px → captureHeight=${captureHeight.toFixed(0)}px (최대 ${absoluteMaxHeight}px)`);
             }
           }
 

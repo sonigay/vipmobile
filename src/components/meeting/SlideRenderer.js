@@ -1526,7 +1526,8 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
       // 회의 차수 보강: 슬라이드에 누락된 경우 전역 컨텍스트(window) 또는 meeting 객체에서 가져오기
       try {
         // slide.meetingNumber가 유효하지 않은 경우 보강 (isValidMeetingNumber 함수는 renderSlideContent 외부에서 정의됨)
-        if (typeof window !== 'undefined' && !isValidMeetingNumber(slide.meetingNumber)) {
+        const currentMeetingNumber = slide.meetingNumber;
+        if (typeof window !== 'undefined' && !isValidMeetingNumber(currentMeetingNumber)) {
           // 1순위: window.__MEETING_NUMBER (메인 슬라이드에서 설정된 값) - 즉시 확인 및 강화된 로직
           let meetingNumberFound = false;
           
@@ -1574,14 +1575,36 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
             }
           }
           
+          // 4순위: slide 객체의 다른 속성 확인 (숫자로 변환 가능한 값 찾기)
+          if (!meetingNumberFound && slide) {
+            const allKeys = Object.keys(slide);
+            for (const key of allKeys) {
+              const value = slide[key];
+              if (value != null && !isNaN(Number(value)) && Number(value) > 0) {
+                const numValue = Number(value);
+                if (isValidMeetingNumber(numValue)) {
+                  slide.meetingNumber = numValue;
+                  if (typeof window !== 'undefined') {
+                    window.__MEETING_NUMBER = numValue;
+                  }
+                  meetingNumberFound = true;
+                  if (process.env.NODE_ENV === 'development') {
+                    console.log(`✅ [SlideRenderer] 엔딩 슬라이드 회의 차수 보강 (slide.${key}): ${slide.meetingNumber}`);
+                  }
+                  break;
+                }
+              }
+            }
+          }
+          
           if (!meetingNumberFound) {
             if (process.env.NODE_ENV === 'development') {
-              console.warn(`⚠️ [SlideRenderer] 엔딩 슬라이드 회의 차수 없음: slide.meetingNumber=${slide.meetingNumber}, window.__MEETING_NUMBER=${window.__MEETING_NUMBER}, loggedInStore=${!!loggedInStore}, slide=${JSON.stringify(Object.keys(slide || {}))}`);
+              console.warn(`⚠️ [SlideRenderer] 엔딩 슬라이드 회의 차수 없음: slide.meetingNumber=${currentMeetingNumber}, window.__MEETING_NUMBER=${window.__MEETING_NUMBER}, loggedInStore=${!!loggedInStore}, slideKeys=${JSON.stringify(Object.keys(slide || {}))}`);
             }
           }
         } else if (process.env.NODE_ENV === 'development') {
           // 디버깅: meetingNumber 값 로그 출력
-          console.log(`🔍 [SlideRenderer] 엔딩 슬라이드 회의 차수: slide.meetingNumber=${slide.meetingNumber} (타입: ${typeof slide.meetingNumber}), window.__MEETING_NUMBER=${window.__MEETING_NUMBER}`);
+          console.log(`🔍 [SlideRenderer] 엔딩 슬라이드 회의 차수: slide.meetingNumber=${currentMeetingNumber} (타입: ${typeof currentMeetingNumber}), window.__MEETING_NUMBER=${window.__MEETING_NUMBER}, isValid=${isValidMeetingNumber(currentMeetingNumber)}`);
         }
       } catch (error) {
         if (process.env.NODE_ENV === 'development') {
@@ -1769,18 +1792,24 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
               {/* isValidMeetingNumber 함수로 엄격한 검증 후 렌더링 */}
               {/* meetingNumber가 유효하지 않으면 아무것도 렌더링하지 않음 (빈 공간 "( )" 완전 방지) */}
               {(() => {
-                const hasValidMeetingNumber = isValidMeetingNumber(slide.meetingNumber);
+                // meetingNumber 값을 다시 확인 (위에서 보강했을 수 있음)
+                const meetingNumberValue = slide.meetingNumber;
+                const hasValidMeetingNumber = isValidMeetingNumber(meetingNumberValue);
                 
                 // 디버깅 로그 (개발 환경에서만)
                 if (process.env.NODE_ENV === 'development' && slide.type === 'ending') {
-                  console.log(`🔍 [SlideRenderer] 엔딩 슬라이드 meetingNumber 조건부 렌더링: slide.meetingNumber=${slide.meetingNumber}, isValid=${hasValidMeetingNumber}, typeof=${typeof slide.meetingNumber}`);
+                  console.log(`🔍 [SlideRenderer] 엔딩 슬라이드 meetingNumber 조건부 렌더링 (렌더링 시점): slide.meetingNumber=${meetingNumberValue}, isValid=${hasValidMeetingNumber}, typeof=${typeof meetingNumberValue}, window.__MEETING_NUMBER=${window.__MEETING_NUMBER}`);
                 }
                 
-                // 유효한 meetingNumber가 있을 때만 렌더링
+                // 유효한 meetingNumber가 없으면 아무것도 렌더링하지 않음 (빈 공간 "( )" 완전 방지)
                 if (!hasValidMeetingNumber) {
+                  if (process.env.NODE_ENV === 'development') {
+                    console.warn(`⚠️ [SlideRenderer] 엔딩 슬라이드 meetingNumber가 유효하지 않아 렌더링하지 않음: ${meetingNumberValue} (타입: ${typeof meetingNumberValue})`);
+                  }
                   return null; // 아무것도 렌더링하지 않음 (빈 공간 완전 방지)
                 }
                 
+                // 유효한 meetingNumber가 있을 때만 렌더링
                 return (
                   <Box sx={{
                     display: 'inline-block',
@@ -1799,7 +1828,7 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                         fontFamily: '"Noto Sans KR", sans-serif'
                       }}
                     >
-                      {slide.meetingNumber}차
+                      {meetingNumberValue}차
                     </Typography>
                   </Box>
                 );
