@@ -622,28 +622,28 @@ export async function captureElement(element, options = {}) {
             console.warn('⚠️ [screenCapture] onclone: element가 유효하지 않습니다.');
           }
         }
+        
+        // 3단계: 메인 컨테이너 자체도 확실하게 처리 (clonedElement가 유효한 경우에만)
+        if (clonedElement) {
+          clonedElement.style.setProperty('overflow', 'visible', 'important');
+          clonedElement.style.setProperty('overflow-y', 'visible', 'important');
+          clonedElement.style.setProperty('overflow-x', 'visible', 'important');
+          clonedElement.style.setProperty('max-height', 'none', 'important');
           
-          // 3단계: 메인 컨테이너 자체도 확실하게 처리 (clonedElement가 유효한 경우에만)
-          if (clonedElement) {
-            clonedElement.style.setProperty('overflow', 'visible', 'important');
-            clonedElement.style.setProperty('overflow-y', 'visible', 'important');
-            clonedElement.style.setProperty('overflow-x', 'visible', 'important');
-            clonedElement.style.setProperty('max-height', 'none', 'important');
-            
-            // 4단계: 스크롤 가능한 컨테이너를 찾아서 높이를 실제 콘텐츠 높이로 확장
-            if (typeof clonedElement.querySelectorAll === 'function') {
-              const scrollableContainers = clonedElement.querySelectorAll('*');
-              scrollableContainers.forEach(container => {
-                if (container.scrollHeight && container.scrollHeight > container.clientHeight) {
-                  // 스크롤 가능한 컨테이너는 실제 스크롤 높이만큼 확장
-                  container.style.setProperty('height', `${container.scrollHeight}px`, 'important');
-                  container.style.setProperty('max-height', 'none', 'important');
-                  container.style.setProperty('overflow', 'visible', 'important');
-                }
-              });
-            }
+          // 4단계: 스크롤 가능한 컨테이너를 찾아서 높이를 실제 콘텐츠 높이로 확장
+          if (typeof clonedElement.querySelectorAll === 'function') {
+            const scrollableContainers = clonedElement.querySelectorAll('*');
+            scrollableContainers.forEach(container => {
+              if (container.scrollHeight && container.scrollHeight > container.clientHeight) {
+                // 스크롤 가능한 컨테이너는 실제 스크롤 높이만큼 확장
+                container.style.setProperty('height', `${container.scrollHeight}px`, 'important');
+                container.style.setProperty('max-height', 'none', 'important');
+                container.style.setProperty('overflow', 'visible', 'important');
+              }
+            });
           }
         }
+      }
         
         // 전체 높이를 표시하도록 스타일 조정 (clonedElement가 유효한 경우에만)
         if (clonedElement) {
