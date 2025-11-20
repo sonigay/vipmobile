@@ -483,34 +483,56 @@ export async function captureElement(element, options = {}) {
     windowHeight: shouldUseTiledCapture ? undefined : finalTargetHeight, // 타일 캡처 시 windowHeight 제거, 명시적 height가 있으면 직접 사용
     removeContainer: false, // 컨테이너 제거하지 않음
     onclone: (clonedDoc, element) => {
+      // 요소 null 체크
+      if (!element || !clonedDoc || !clonedDoc.body) {
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('⚠️ [screenCapture] onclone: element 또는 clonedDoc가 null입니다.');
+        }
+        return;
+      }
+      
       // 클론된 문서에서 요소 찾기
       const clonedElement = clonedDoc.querySelector(`[data-slide-id="${element.getAttribute('data-slide-id')}"]`) || 
                            clonedDoc.body.firstElementChild;
       
-      if (clonedElement) {
-        // 스크롤 위치를 맨 위로 설정
-        clonedElement.scrollTop = 0;
-        clonedElement.scrollLeft = 0;
-        
-        // 부모 요소들도 스크롤 위치 조정
-        let parent = clonedElement.parentElement;
-        while (parent && parent !== clonedDoc.body) {
-          parent.scrollTop = 0;
-          parent.scrollLeft = 0;
-          parent = parent.parentElement;
+      if (!clonedElement) {
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('⚠️ [screenCapture] onclone: clonedElement를 찾을 수 없습니다.');
+        }
+        return;
+      }
+      
+      // 스크롤 위치를 맨 위로 설정
+      clonedElement.scrollTop = 0;
+      clonedElement.scrollLeft = 0;
+      
+      // 부모 요소들도 스크롤 위치 조정
+      let parent = clonedElement.parentElement;
+      while (parent && parent !== clonedDoc.body) {
+        parent.scrollTop = 0;
+        parent.scrollLeft = 0;
+        parent = parent.parentElement;
+      }
+      
+      // 클론된 문서에서 slideId 다시 추출 (더 안전함)
+      const clonedSlideId = clonedElement.getAttribute('data-slide-id') || '';
+      const clonedIsToc = clonedSlideId.includes('toc');
+      const clonedIsMain = clonedSlideId.includes('main') && !clonedSlideId.includes('toc');
+      const clonedIsEnding = clonedSlideId.includes('ending');
+      const isSpecialSlide = clonedIsToc || clonedIsMain || clonedIsEnding;
+      
+      // 목차/메인/엔딩 슬라이드인 경우: 모든 스크롤 제약을 제거하여 전체 콘텐츠 표시
+      if (isSpecialSlide) {
+        // 1단계: 클론된 문서의 모든 요소를 순회하여 스크롤 제약 제거 (더 직접적이고 확실한 방법)
+        // clonedElement가 유효한지 다시 확인
+        if (!clonedElement || typeof clonedElement.querySelectorAll !== 'function') {
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('⚠️ [screenCapture] onclone: clonedElement가 유효하지 않습니다.');
+          }
+          return;
         }
         
-        // 클론된 문서에서 slideId 다시 추출 (더 안전함)
-        const clonedSlideId = clonedElement.getAttribute('data-slide-id') || '';
-        const clonedIsToc = clonedSlideId.includes('toc');
-        const clonedIsMain = clonedSlideId.includes('main') && !clonedSlideId.includes('toc');
-        const clonedIsEnding = clonedSlideId.includes('ending');
-        const isSpecialSlide = clonedIsToc || clonedIsMain || clonedIsEnding;
-        
-        // 목차/메인/엔딩 슬라이드인 경우: 모든 스크롤 제약을 제거하여 전체 콘텐츠 표시
-        if (isSpecialSlide) {
-          // 1단계: 클론된 문서의 모든 요소를 순회하여 스크롤 제약 제거 (더 직접적이고 확실한 방법)
-          const allClonedElements = clonedElement.querySelectorAll('*');
+        const allClonedElements = clonedElement.querySelectorAll('*');
           allClonedElements.forEach(clonedEl => {
             if (!clonedEl || !clonedEl.style) return;
             
@@ -553,6 +575,14 @@ export async function captureElement(element, options = {}) {
           });
           
           // 2단계: 원본 요소에서 computed styles 확인하여 클론에 적용 (원본 스타일도 확인)
+          // element가 유효한지 확인
+          if (!element || typeof element.querySelectorAll !== 'function') {
+            if (process.env.NODE_ENV === 'development') {
+              console.warn('⚠️ [screenCapture] onclone: element가 유효하지 않습니다.');
+            }
+            return;
+          }
+          
           const originalElements = Array.from(element.querySelectorAll('*'));
           originalElements.forEach((originalEl, index) => {
             try {

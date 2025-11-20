@@ -6526,7 +6526,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                                         height: '100%', // 전체 높이 사용 (입력값 위치 불일치 문제 해결)
                                       },
                                       '& .MuiInputBase-input': {
-                                        fontSize: '0.8rem',
+                                        fontSize: '0.7rem', // 폰트 크기 축소 (0.8rem -> 0.7rem)
                                         fontWeight: 'bold',
                                         padding: '6px 4px',
                                         textAlign: 'left',
@@ -6536,6 +6536,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                                       },
                                       '& input[type=text]': {
                                         textAlign: 'left',
+                                        fontSize: '0.7rem', // 폰트 크기 축소 (0.8rem -> 0.7rem)
                                         width: '100%',
                                         padding: '6px 4px',
                                         lineHeight: 'normal', // 줄 간격 정상화
@@ -6661,7 +6662,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                                         height: '100%', // 전체 높이 사용 (입력값 위치 불일치 문제 해결)
                                       },
                                       '& .MuiInputBase-input': {
-                                        fontSize: '0.8rem',
+                                        fontSize: '0.7rem', // 폰트 크기 축소 (0.8rem -> 0.7rem)
                                         fontWeight: 'bold',
                                         padding: '6px 4px',
                                         textAlign: 'left',
@@ -6671,6 +6672,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                                       },
                                       '& input[type=text]': {
                                         textAlign: 'left',
+                                        fontSize: '0.7rem', // 폰트 크기 축소 (0.8rem -> 0.7rem)
                                         width: '100%',
                                         padding: '6px 4px',
                                         lineHeight: 'normal', // 줄 간격 정상화
@@ -6705,7 +6707,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                                 inputProps={{
                                   style: { 
                                     textAlign: 'left', 
-                                    fontSize: '0.8rem',
+                                    fontSize: '0.7rem', // 폰트 크기 축소 (0.8rem -> 0.7rem)
                                     fontWeight: 'bold',
                                     color: '#7b1fa2',
                                     lineHeight: 'normal', // 줄 간격 정상화
@@ -6891,6 +6893,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                                       '& input[type=number]': {
                                         MozAppearance: 'textfield',
                                         textAlign: 'left', // 텍스트 왼쪽 정렬
+                                        fontSize: '0.7rem', // 폰트 크기 축소 (입력값 잘림 방지)
                                         width: '100%', // 전체 너비 사용
                                         padding: '8px', // 패딩 명시적 설정
                                         lineHeight: 'normal', // 줄 간격 정상화 (입력값 위치 불일치 문제 해결)
@@ -6916,6 +6919,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                                     inputProps={{
                                       style: { 
                                         textAlign: 'left',
+                                        fontSize: '0.7rem', // 폰트 크기 축소 (입력값 잘림 방지)
                                         ...(presentationMode && { textAlign: 'left' })
                                       },
                                       inputMode: 'numeric',
