@@ -4431,7 +4431,11 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                                currentSlide?.subTab === 'totalClosing';
         const isToc = currentSlide?.type === 'toc';
         const isMain = currentSlide?.type === 'main';
-        const uploadTimeout = isTotalClosing ? 120000 : (isToc || isMain ? 60000 : 45000); // 전체총마감: 120초, 목차/메인: 60초, 기타: 45초
+        const isRechotanchoBond = currentSlide?.mode === 'chart' && 
+                                  (currentSlide?.tab === 'bondChart' || currentSlide?.tab === 'bond') && 
+                                  currentSlide?.subTab === 'rechotanchoBond';
+        // 재초담초채권 슬라이드는 업로드 안정성을 위해 타임아웃을 더 길게 설정
+        const uploadTimeout = isTotalClosing ? 120000 : (isToc || isMain ? 60000 : (isRechotanchoBond ? 60000 : 45000)); // 전체총마감: 120초, 목차/메인/재초담초채권: 60초, 기타: 45초
         
         if (process.env.NODE_ENV === 'development') {
           if (isTotalClosing) {
@@ -4440,10 +4444,15 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             console.log(`⏱️ [MeetingCaptureManager] 목차 슬라이드: 업로드 타임아웃 ${uploadTimeout / 1000}초로 설정`);
           } else if (isMain) {
             console.log(`⏱️ [MeetingCaptureManager] 메인 슬라이드: 업로드 타임아웃 ${uploadTimeout / 1000}초로 설정`);
+          } else if (isRechotanchoBond) {
+            console.log(`⏱️ [MeetingCaptureManager] 재초담초채권 슬라이드: 업로드 타임아웃 ${uploadTimeout / 1000}초로 설정`);
           }
         }
         
-        for (let attempt = 1; attempt <= retries; attempt++) {
+        // 재초담초채권 슬라이드는 업로드 안정성을 위해 재시도 횟수를 증가
+        const maxRetries = isRechotanchoBond ? 7 : retries; // 재초담초채권: 7회, 기타: 5회
+        
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
           try {
             // 타임아웃 설정
             const abortController = new AbortController();
@@ -4554,7 +4563,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                                      error.isRetryable ||
                                      (error.status && [500, 502, 503, 504].includes(error.status));
             
-            if (attempt === retries || !isRetryableError) {
+            if (attempt === maxRetries || !isRetryableError) {
               // 마지막 시도 실패 시 상세한 에러 메시지 (이미지 크기 정보 포함)
               const sizeInfo = blob ? ` (이미지 크기: ${(blob.size / (1024 * 1024)).toFixed(2)}MB)` : '';
               const slideInfo = currentSlide?.subTab || currentSlide?.tab || 'unknown';
@@ -4592,7 +4601,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             const corsMultiplier = isCorsError ? 1.5 : 1; // CORS 에러 시 1.5배 대기
             const finalDelay = Math.min(delay * corsMultiplier, maxDelay);
             
-            console.warn(`⚠️ [MeetingCaptureManager] 슬라이드 ${index + 1} (${currentSlide?.subTab || currentSlide?.tab || 'unknown'}) 업로드 재시도 ${attempt}/${retries} (${Math.round(finalDelay)}ms 대기):`, {
+            console.warn(`⚠️ [MeetingCaptureManager] 슬라이드 ${index + 1} (${currentSlide?.subTab || currentSlide?.tab || 'unknown'}) 업로드 재시도 ${attempt}/${maxRetries} (${Math.round(finalDelay)}ms 대기):`, {
               error: error.message,
               status: error.status,
               isNetworkError,
