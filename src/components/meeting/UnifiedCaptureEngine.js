@@ -2446,12 +2446,57 @@ async function executeCapture(elements, config, sizeInfo, slide) {
             }
             await new Promise(r => setTimeout(r, 300));
             
-            // Chart.js 그래프 재렌더링 (대기 시간 증가: 500ms → 1000ms)
+            // 모든 콘텐츠 박스의 너비를 1920px로 강제 설정하여 렌더링 보장
+            const allPaperElements = Array.from(elements.contentElement.querySelectorAll('.MuiPaper-root'));
+            const allTableContainers = Array.from(elements.contentElement.querySelectorAll('.MuiTableContainer-root'));
+            const allBoxElements = Array.from(elements.contentElement.querySelectorAll('.MuiBox-root'));
+            
+            const styleRestoresForWidth = [];
+            
+            [...allPaperElements, ...allTableContainers, ...allBoxElements].forEach(box => {
+              if (!SafeDOM.isInDOM(box)) return;
+              
+              const computedStyles = window.getComputedStyle(box);
+              const currentWidth = box.getBoundingClientRect().width;
+              
+              // 너비가 1920px보다 작거나 매우 크면 1920px로 설정
+              if (currentWidth !== MAX_WIDTH && (currentWidth < MAX_WIDTH || currentWidth > MAX_WIDTH + 100)) {
+                const originalWidth = box.style.width || '';
+                const originalMaxWidth = box.style.maxWidth || '';
+                const originalMinWidth = box.style.minWidth || '';
+                
+                box.style.width = `${MAX_WIDTH}px`;
+                box.style.maxWidth = `${MAX_WIDTH}px`;
+                box.style.minWidth = `${MAX_WIDTH}px`;
+                
+                styleRestoresForWidth.push(() => {
+                  if (!SafeDOM.isInDOM(box)) return;
+                  SafeDOM.restoreStyle(box, 'width', originalWidth);
+                  SafeDOM.restoreStyle(box, 'max-width', originalMaxWidth);
+                  SafeDOM.restoreStyle(box, 'min-width', originalMinWidth);
+                });
+              }
+            });
+            
+            await new Promise(r => setTimeout(r, 200)); // 너비 설정 후 렌더링 대기
+            
+            // Chart.js 그래프 재렌더링 (대기 시간 증가: 1000ms → 1500ms)
             window.dispatchEvent(new Event('resize'));
-            await new Promise(r => setTimeout(r, 1000)); // Chart.js 그래프 완전 렌더링 대기 시간 증가
+            await new Promise(r => setTimeout(r, 1500)); // Chart.js 그래프 완전 렌더링 대기 시간 증가
+            
+            // 스타일 복원 함수에 추가
+            styleRestores.push(() => {
+              styleRestoresForWidth.forEach(restore => {
+                try {
+                  restore();
+                } catch (error) {
+                  // 무시
+                }
+              });
+            });
             
             if (process.env.NODE_ENV === 'development') {
-              console.log('✅ [executeCapture] 재초담초채권 모든 요소 렌더링 완료 (Chart.js 렌더링 대기: 1000ms)');
+              console.log(`✅ [executeCapture] 재초담초채권 모든 요소 렌더링 완료 (Chart.js 렌더링 대기: 1500ms, 너비 설정: ${allPaperElements.length + allTableContainers.length + allBoxElements.length}개 박스)`);
             }
           } catch (error) {
             if (process.env.NODE_ENV === 'development') {
@@ -2578,6 +2623,68 @@ async function executeCapture(elements, config, sizeInfo, slide) {
             });
           }
           
+          // 가입자증감 슬라이드: 렌더링 보장 로직 (재초담초채권과 동일)
+          if (isSubscriberIncreaseForWidth && elements.contentElement && SafeDOM.isInDOM(elements.contentElement)) {
+            try {
+              // 모든 콘텐츠 박스의 너비를 1920px로 강제 설정하여 렌더링 보장
+              const allPaperElements = Array.from(elements.contentElement.querySelectorAll('.MuiPaper-root'));
+              const allTableContainers = Array.from(elements.contentElement.querySelectorAll('.MuiTableContainer-root'));
+              const allBoxElements = Array.from(elements.contentElement.querySelectorAll('.MuiBox-root'));
+              
+              const styleRestoresForWidth = [];
+              
+              [...allPaperElements, ...allTableContainers, ...allBoxElements].forEach(box => {
+                if (!SafeDOM.isInDOM(box)) return;
+                
+                const computedStyles = window.getComputedStyle(box);
+                const currentWidth = box.getBoundingClientRect().width;
+                
+                // 너비가 1920px보다 작거나 매우 크면 1920px로 설정
+                if (currentWidth !== MAX_WIDTH && (currentWidth < MAX_WIDTH || currentWidth > MAX_WIDTH + 100)) {
+                  const originalWidth = box.style.width || '';
+                  const originalMaxWidth = box.style.maxWidth || '';
+                  const originalMinWidth = box.style.minWidth || '';
+                  
+                  box.style.width = `${MAX_WIDTH}px`;
+                  box.style.maxWidth = `${MAX_WIDTH}px`;
+                  box.style.minWidth = `${MAX_WIDTH}px`;
+                  
+                  styleRestoresForWidth.push(() => {
+                    if (!SafeDOM.isInDOM(box)) return;
+                    SafeDOM.restoreStyle(box, 'width', originalWidth);
+                    SafeDOM.restoreStyle(box, 'max-width', originalMaxWidth);
+                    SafeDOM.restoreStyle(box, 'min-width', originalMinWidth);
+                  });
+                }
+              });
+              
+              await new Promise(r => setTimeout(r, 200)); // 너비 설정 후 렌더링 대기
+              
+              // resize 이벤트를 호출하여 컴포넌트 재렌더링 보장
+              window.dispatchEvent(new Event('resize'));
+              await new Promise(r => setTimeout(r, 1500)); // 재렌더링 대기 시간 증가
+              
+              // 스타일 복원 함수에 추가
+              styleRestores.push(() => {
+                styleRestoresForWidth.forEach(restore => {
+                  try {
+                    restore();
+                  } catch (error) {
+                    // 무시
+                  }
+                });
+              });
+              
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`✅ [executeCapture] 가입자증감 슬라이드 렌더링 보장 완료 (너비 설정: ${allPaperElements.length + allTableContainers.length + allBoxElements.length}개 박스, 렌더링 대기: 1500ms)`);
+              }
+            } catch (error) {
+              if (process.env.NODE_ENV === 'development') {
+                console.warn('⚠️ [executeCapture] 가입자증감 슬라이드 렌더링 보장 실패:', error);
+              }
+            }
+          }
+          
           // 콘텐츠 요소와 내부 콘텐츠 박스의 너비도 1920px로 명시적으로 설정 (재초담초채권/가입자증감 슬라이드)
           if ((isRechotanchoBond || isSubscriberIncreaseForWidth) && elements.contentElement && SafeDOM.isInDOM(elements.contentElement)) {
             try {
@@ -2624,7 +2731,7 @@ async function executeCapture(elements, config, sizeInfo, slide) {
                 }
               });
               
-              await new Promise(r => setTimeout(r, 300)); // 렌더링 대기 시간 증가
+              await new Promise(r => setTimeout(r, 500)); // 렌더링 대기 시간 증가 (300ms → 500ms)
               
               if (process.env.NODE_ENV === 'development') {
                 console.log(`📐 [executeCapture] 재초담초채권/가입자증감 슬라이드: 콘텐츠 요소 및 내부 박스 너비를 ${MAX_WIDTH}px로 명시적으로 설정 (${contentBoxes.length}개 박스)`);
@@ -2657,11 +2764,14 @@ async function executeCapture(elements, config, sizeInfo, slide) {
           }
           
           // 전체총마감 슬라이드: requiredHeight 확인하여 높이 제한 동적 조정
+          // 전체총마감 슬라이드는 높이가 매우 클 수 있어 타일 캡처가 필요하므로 height 옵션을 전달하지 않음
           const isTotalClosing = slide?.mode === 'chart' &&
             (slide?.tab === 'closingChart' || slide?.tab === 'closing') &&
             slide?.subTab === 'totalClosing';
           
           let captureHeight = Math.min(sizeInfo.measuredHeight || 0, MAX_HEIGHT);
+          let shouldUseTiledCaptureForTotalClosing = false;
+          
           if (isTotalClosing && sizeInfo.requiredHeight) {
             // requiredHeight가 있을 때 MAX_HEIGHT 기본 제한을 무시하고 requiredHeight를 최소값으로 사용
             const defaultMaxHeight = 6000; // 기본 최대 높이 (원본)
@@ -2670,6 +2780,14 @@ async function executeCapture(elements, config, sizeInfo, slide) {
             // requiredHeight를 최소값으로 사용하여 콘텐츠가 잘리지 않도록 보장
             const minRequiredHeight = sizeInfo.requiredHeight;
             const measuredHeightValue = sizeInfo.measuredHeight || 0;
+            
+            // requiredHeight가 매우 크면(기본 최대 높이보다 크면) 타일 캡처 필요
+            if (minRequiredHeight > defaultMaxHeight) {
+              shouldUseTiledCaptureForTotalClosing = true;
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`📏 [executeCapture] 전체총마감 슬라이드 타일 캡처 필요: requiredHeight=${minRequiredHeight.toFixed(0)}px > defaultMaxHeight=${defaultMaxHeight}px`);
+              }
+            }
             
             // requiredHeight와 measuredHeight 중 더 큰 값을 사용하고, absoluteMaxHeight를 초과하지 않도록 제한
             const maxAllowedHeight = Math.min(
@@ -2681,7 +2799,7 @@ async function executeCapture(elements, config, sizeInfo, slide) {
             captureHeight = Math.max(minRequiredHeight, Math.min(maxAllowedHeight, absoluteMaxHeight));
             
             if (process.env.NODE_ENV === 'development') {
-              console.log(`📏 [executeCapture] 전체총마감 슬라이드 높이 제한 동적 조정: requiredHeight=${sizeInfo.requiredHeight.toFixed(0)}px (최소값 보장), measuredHeight=${measuredHeightValue.toFixed(0)}px, maxAllowedHeight=${maxAllowedHeight.toFixed(0)}px → captureHeight=${captureHeight.toFixed(0)}px (최대 ${absoluteMaxHeight}px)`);
+              console.log(`📏 [executeCapture] 전체총마감 슬라이드 높이 제한 동적 조정: requiredHeight=${sizeInfo.requiredHeight.toFixed(0)}px (최소값 보장), measuredHeight=${measuredHeightValue.toFixed(0)}px, maxAllowedHeight=${maxAllowedHeight.toFixed(0)}px → captureHeight=${captureHeight.toFixed(0)}px (최대 ${absoluteMaxHeight}px, 타일 캡처: ${shouldUseTiledCaptureForTotalClosing})`);
             }
           }
 
@@ -2689,6 +2807,7 @@ async function executeCapture(elements, config, sizeInfo, slide) {
             console.log(`📸 [executeCapture] direct 캡처: 헤더 포함 slideElement 캡처 (${captureWidth}x${captureHeight})`);
           }
 
+          // 전체총마감 슬라이드가 타일 캡처가 필요한 경우 height 옵션 전달하지 않음 (타일 캡처 사용)
           blob = await captureElement(captureElementForDirect, {
             scale: SCALE,
             useCORS: true,
@@ -2698,7 +2817,7 @@ async function executeCapture(elements, config, sizeInfo, slide) {
             scrollY: 0,
             skipAutoCrop: false, // autoCrop 활성화 (불필요한 공백 제거)
             width: captureWidth,
-            height: captureHeight,
+            height: shouldUseTiledCaptureForTotalClosing ? undefined : captureHeight, // 타일 캡처 필요 시 height 전달하지 않음
           });
         } else {
           // 기본 캡처 (크기 측정 없이) - autoCrop으로 불필요한 공백 제거

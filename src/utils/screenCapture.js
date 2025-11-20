@@ -301,7 +301,11 @@ export async function captureElement(element, options = {}) {
   const isMainOrToc = isMain || isToc;
   
   // height 옵션이 명시적으로 전달된 경우 (totalClosing 등): 해당 높이를 직접 사용
-  const hasExplicitHeight = typeof options.height === 'number' && options.height > 0;
+  // 단, 메인/목차/엔딩 슬라이드는 타일 캡처가 필요하므로 hasExplicitHeight 적용 제외
+  // 전체총마감 슬라이드는 높이가 매우 클 수 있어 타일 캡처가 필요하므로 hasExplicitHeight 적용 제외
+  const isTotalClosing = slideId.includes('totalClosing') || slideId.includes('total-closing');
+  const hasExplicitHeight = typeof options.height === 'number' && options.height > 0 && 
+                           !(isToc || isMain || slideId.includes('ending') || isTotalClosing);
   
   // 메인/목차 슬라이드: 고정 가로폭(1920px) 적용 시 세로 재흐름으로 인한 하단 잘림 방지
   // 높이 = scrollHeight × (1/widthScale) × 배율, 최소 높이 보장
@@ -456,9 +460,11 @@ export async function captureElement(element, options = {}) {
     }
   }
 
-      // 메인/목차/엔딩 슬라이드의 경우: skipAutoCrop이 true이면 타일 캡처 로직 건너뛰기
-  // height 옵션이 명시적으로 전달된 경우 (totalClosing 등): 타일 캡처 우회하여 명시된 높이 직접 사용
-  const shouldUseTiledCapture = !skipAutoCrop && !hasExplicitHeight && (isToc || isMain || slideId.includes('ending'));
+      // 메인/목차/엔딩 슬라이드의 경우: 항상 타일 캡처 사용 (실제 콘텐츠 높이 정확히 반영)
+  // 전체총마감 슬라이드는 높이가 매우 클 수 있어 타일 캡처 필요
+  // skipAutoCrop이 true이면 타일 캡처 로직 건너뛰기
+  // hasExplicitHeight는 이미 메인/목차/엔딩/전체총마감 슬라이드에는 적용되지 않도록 위에서 처리됨
+  const shouldUseTiledCapture = !skipAutoCrop && (isToc || isMain || slideId.includes('ending') || isTotalClosing);
   
   // height 옵션이 명시적으로 전달된 경우: 해당 높이를 targetHeight로 직접 사용
   const finalTargetHeight = hasExplicitHeight ? options.height : targetHeight;
@@ -784,9 +790,25 @@ export async function captureElement(element, options = {}) {
           // targetHeight 제외: 불필요한 여백 최소화
         );
         
-        // targetHeight를 최대값으로 제한하여 불필요한 여백 방지
-        const maxAllowedScrollHeight = targetHeight;
-        const finalCalculatedHeight = Math.min(actualScrollHeight, maxAllowedScrollHeight);
+        // 실제 콘텐츠 높이를 우선하되, 파일 크기 제한(25MB)을 고려한 최대 높이 제한 설정
+        // 메인/목차/엔딩/전체총마감 슬라이드: 실제 콘텐츠가 매우 길 수 있으므로 실제 높이 우선
+        // 최대 높이 제한: 8000px (3840 × 8000 × 4 ≈ 122MB 압축 전 → 약 25MB 압축 후)
+        const maxAllowedScrollHeight = 8000; // 파일 크기 제한을 고려한 최대 높이
+        
+        // 전체총마감 슬라이드: requiredHeight를 고려하여 targetHeight 조정
+        // options.height가 undefined인 경우(타일 캡처), 실제 콘텐츠 높이를 우선
+        let effectiveTargetHeight = targetHeight;
+        if (isTotalClosing && options.height === undefined) {
+          // 타일 캡처 시 requiredHeight를 반영하여 targetHeight 조정
+          // 실제 콘텐츠 높이가 targetHeight보다 크면 실제 높이 사용
+          effectiveTargetHeight = Math.max(actualScrollHeight, targetHeight);
+        }
+        
+        // 실제 콘텐츠 높이를 우선: actualScrollHeight가 effectiveTargetHeight보다 크면 actualScrollHeight 사용
+        const finalCalculatedHeight = Math.min(
+          Math.max(actualScrollHeight, effectiveTargetHeight), // 실제 콘텐츠 높이 우선
+          maxAllowedScrollHeight // 최대 높이 제한 적용
+        );
         
         // 요소를 실제로 확장하여 모든 콘텐츠가 보이도록
         const originalHeight = element.style.height;
@@ -819,13 +841,15 @@ export async function captureElement(element, options = {}) {
         await new Promise(r => setTimeout(r, 500));
         
         // 최종 높이 재확인 (실제 콘텐츠 높이와 최대 높이 제한 고려)
+        // 실제 콘텐츠 높이를 우선: 확장 후 측정한 실제 높이가 finalCalculatedHeight보다 크면 그것을 사용
+        const measuredHeight = Math.max(
+          element.scrollHeight,
+          element.offsetHeight,
+          finalCalculatedHeight
+        );
         const finalScrollHeight = Math.min(
-          Math.max(
-            element.scrollHeight,
-            element.offsetHeight,
-            finalCalculatedHeight
-          ),
-          maxAllowedScrollHeight // 최대 높이 제한 적용
+          measuredHeight,
+          maxAllowedScrollHeight // 최대 높이 제한 적용 (파일 크기 제한)
         );
         
         if (finalScrollHeight !== finalCalculatedHeight) {
