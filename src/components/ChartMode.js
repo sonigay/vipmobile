@@ -6492,13 +6492,18 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                               
                               return (
                                 <TableCell key={month} sx={{ 
-                                  textAlign: 'center', 
+                                  textAlign: 'left',
+                                  verticalAlign: 'middle', // 수직 중간 정렬
                                   padding: '6px 4px',
                                   width: '4%',
                                   minWidth: 60,
                                   maxWidth: 70,
                                   borderRight: '1px solid #e0e0e0',
-                                  backgroundColor: month % 2 === 0 ? '#f8f9fa' : '#ffffff'
+                                  backgroundColor: month % 2 === 0 ? '#f8f9fa' : '#ffffff',
+                                  ...(presentationMode && {
+                                    textAlign: 'left',
+                                    verticalAlign: 'middle'
+                                  })
                                 }}>
                               <TextField
                                     type="text"
@@ -6516,25 +6521,38 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                                       '& .MuiInputBase-root': {
                                         position: 'relative',
                                         display: 'flex',
-                                        alignItems: 'center',
+                                        alignItems: 'center', // 수직 중간 정렬
+                                        justifyContent: 'flex-start', // 수평 왼쪽 정렬
                                         height: '100%', // 전체 높이 사용 (입력값 위치 불일치 문제 해결)
                                       },
                                       '& .MuiInputBase-input': {
                                         fontSize: '0.8rem',
                                         fontWeight: 'bold',
                                         padding: '6px 4px',
-                                        textAlign: 'center',
+                                        textAlign: 'left',
                                         color: '#1976d2',
                                         lineHeight: 'normal', // 줄 간격 정상화 (입력값 위치 불일치 문제 해결)
                                         height: '100%', // 전체 높이 사용
                                       },
                                       '& input[type=text]': {
-                                        textAlign: 'center',
+                                        textAlign: 'left',
                                         width: '100%',
                                         padding: '6px 4px',
                                         lineHeight: 'normal', // 줄 간격 정상화
                                         height: '100%', // 전체 높이 사용 (입력값 위치 불일치 문제 해결)
                                       },
+                                      ...(presentationMode && {
+                                        '& .MuiInputBase-root': {
+                                          alignItems: 'center', // 렌더링 모드에서 수직 중간 정렬
+                                          justifyContent: 'flex-start', // 렌더링 모드에서 수평 왼쪽 정렬
+                                        },
+                                        '& .MuiInputBase-input': {
+                                          textAlign: 'left', // 렌더링 모드에서 텍스트 왼쪽 정렬
+                                        },
+                                        '& input[type=text]': {
+                                          textAlign: 'left', // 렌더링 모드에서 텍스트 왼쪽 정렬
+                                        }
+                                      }),
                                       '& .MuiOutlinedInput-root': {
                                         '& fieldset': {
                                           borderWidth: '2px',
@@ -6551,11 +6569,12 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                                 }}
                                 inputProps={{
                                   style: { 
-                                    textAlign: 'center', 
+                                    textAlign: 'left', 
                                     fontSize: '0.8rem',
                                     fontWeight: 'bold',
                                     color: '#1976d2',
                                     lineHeight: 'normal', // 줄 간격 정상화
+                                    ...(presentationMode && { textAlign: 'left' })
                                   },
                                   inputMode: 'numeric',
                                   pattern: '-?[0-9,]*'
@@ -6608,13 +6627,18 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                               
                               return (
                                 <TableCell key={month} sx={{ 
-                                  textAlign: 'center', 
+                                  textAlign: 'left',
+                                  verticalAlign: 'middle', // 수직 중간 정렬
                                   padding: '6px 4px',
                                   width: '4%',
                                   minWidth: 60,
                                   maxWidth: 70,
                                   borderRight: '1px solid #e0e0e0',
-                                  backgroundColor: month % 2 === 0 ? '#f8f9fa' : '#ffffff'
+                                  backgroundColor: month % 2 === 0 ? '#f8f9fa' : '#ffffff',
+                                  ...(presentationMode && {
+                                    textAlign: 'left',
+                                    verticalAlign: 'middle'
+                                  })
                                 }}>
                               <TextField
                                     type="text"
@@ -6632,25 +6656,38 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                                       '& .MuiInputBase-root': {
                                         position: 'relative',
                                         display: 'flex',
-                                        alignItems: 'center',
+                                        alignItems: 'center', // 수직 중간 정렬
+                                        justifyContent: 'flex-start', // 수평 왼쪽 정렬
                                         height: '100%', // 전체 높이 사용 (입력값 위치 불일치 문제 해결)
                                       },
                                       '& .MuiInputBase-input': {
                                         fontSize: '0.8rem',
                                         fontWeight: 'bold',
                                         padding: '6px 4px',
-                                        textAlign: 'center',
+                                        textAlign: 'left',
                                         color: '#7b1fa2',
                                         lineHeight: 'normal', // 줄 간격 정상화 (입력값 위치 불일치 문제 해결)
                                         height: '100%', // 전체 높이 사용
                                       },
                                       '& input[type=text]': {
-                                        textAlign: 'center',
+                                        textAlign: 'left',
                                         width: '100%',
                                         padding: '6px 4px',
                                         lineHeight: 'normal', // 줄 간격 정상화
                                         height: '100%', // 전체 높이 사용 (입력값 위치 불일치 문제 해결)
                                       },
+                                      ...(presentationMode && {
+                                        '& .MuiInputBase-root': {
+                                          alignItems: 'center', // 렌더링 모드에서 수직 중간 정렬
+                                          justifyContent: 'flex-start', // 렌더링 모드에서 수평 왼쪽 정렬
+                                        },
+                                        '& .MuiInputBase-input': {
+                                          textAlign: 'left', // 렌더링 모드에서 텍스트 왼쪽 정렬
+                                        },
+                                        '& input[type=text]': {
+                                          textAlign: 'left', // 렌더링 모드에서 텍스트 왼쪽 정렬
+                                        }
+                                      }),
                                       '& .MuiOutlinedInput-root': {
                                         '& fieldset': {
                                           borderWidth: '2px',
@@ -6667,11 +6704,12 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                                 }}
                                 inputProps={{
                                   style: { 
-                                    textAlign: 'center', 
+                                    textAlign: 'left', 
                                     fontSize: '0.8rem',
                                     fontWeight: 'bold',
                                     color: '#7b1fa2',
                                     lineHeight: 'normal', // 줄 간격 정상화
+                                    ...(presentationMode && { textAlign: 'left' })
                                   },
                                   inputMode: 'numeric',
                                   pattern: '-?[0-9,]*'
@@ -6680,7 +6718,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                             </TableCell>
                               );
                             })}
-                          </TableRow>
+                        </TableRow>
                         </React.Fragment>
                       ))}
                     </TableBody>
@@ -6827,8 +6865,13 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                               }
                             </TableCell>
                             <TableCell sx={{ 
-                                  textAlign: 'center', 
-                              borderRight: '1px solid #e0e0e0'
+                                  textAlign: 'left',
+                                  verticalAlign: 'middle', // 수직 중간 정렬
+                              borderRight: '1px solid #e0e0e0',
+                                  ...(presentationMode && {
+                                    textAlign: 'left',
+                                    verticalAlign: 'middle'
+                                  })
                                 }}>
                                   <TextField
                                     type="number"
@@ -6841,12 +6884,13 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                                       '& .MuiInputBase-root': {
                                         position: 'relative', // 입력 필드 위치 명확히
                                         display: 'flex',
-                                        alignItems: 'center', // 수직 정렬
+                                        alignItems: 'center', // 수직 중간 정렬
+                                        justifyContent: 'flex-start', // 수평 왼쪽 정렬
                                         height: '100%', // 전체 높이 사용 (입력값 위치 불일치 문제 해결)
                                       },
                                       '& input[type=number]': {
                                         MozAppearance: 'textfield',
-                                        textAlign: 'center', // 텍스트 중앙 정렬
+                                        textAlign: 'left', // 텍스트 왼쪽 정렬
                                         width: '100%', // 전체 너비 사용
                                         padding: '8px', // 패딩 명시적 설정
                                         lineHeight: 'normal', // 줄 간격 정상화 (입력값 위치 불일치 문제 해결)
@@ -6858,10 +6902,22 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                                       '& input[type=number]::-webkit-inner-spin-button': {
                                         WebkitAppearance: 'none',
                                         margin: 0,
-                                      }
+                                      },
+                                      ...(presentationMode && {
+                                        '& .MuiInputBase-root': {
+                                          alignItems: 'center', // 렌더링 모드에서 수직 중간 정렬
+                                          justifyContent: 'flex-start', // 렌더링 모드에서 수평 왼쪽 정렬
+                                        },
+                                        '& input[type=number]': {
+                                          textAlign: 'left', // 렌더링 모드에서 텍스트 왼쪽 정렬
+                                        }
+                                      })
                                     }}
                                     inputProps={{
-                                      style: { textAlign: 'center' },
+                                      style: { 
+                                        textAlign: 'left',
+                                        ...(presentationMode && { textAlign: 'left' })
+                                      },
                                       inputMode: 'numeric',
                                       pattern: '-?[0-9]*'
                                     }}

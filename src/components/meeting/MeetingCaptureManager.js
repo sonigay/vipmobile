@@ -4406,19 +4406,18 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
       formData.append('meetingDate', meeting.meetingDate);
       formData.append('slideOrder', index + 1);
 
-      // 이미지 파일 크기 사전 검증 및 경고
+      // 이미지 파일 크기 사전 검증 및 경고 (항상 로깅)
+      let imageSizeMB = 0;
       if (blob) {
-        const sizeMB = blob.size / (1024 * 1024);
+        imageSizeMB = blob.size / (1024 * 1024);
+        console.log(`📊 [MeetingCaptureManager] 슬라이드 ${index + 1} (${currentSlide?.subTab || currentSlide?.tab || 'unknown'}) 이미지 크기: ${imageSizeMB.toFixed(2)}MB`);
+        
         if (blob.size > 25 * 1024 * 1024) {
           // 25MB 초과 시 에러 발생
-          throw new Error(`이미지 파일이 너무 큽니다 (${sizeMB.toFixed(2)}MB). 25MB 이하로 줄여주세요.`);
+          throw new Error(`이미지 파일이 너무 큽니다 (${imageSizeMB.toFixed(2)}MB). 25MB 이하로 줄여주세요.`);
         } else if (blob.size > 20 * 1024 * 1024) {
           // 20MB 이상이면 경고 (서버 부하 가능성)
-          if (process.env.NODE_ENV === 'development') {
-            console.warn(`⚠️ [MeetingCaptureManager] 슬라이드 ${index + 1} 이미지 크기가 큼: ${sizeMB.toFixed(2)}MB (25MB 제한 근접, 서버 부하 가능성)`);
-          }
-        } else if (process.env.NODE_ENV === 'development') {
-          console.log(`📊 [MeetingCaptureManager] 슬라이드 ${index + 1} 이미지 크기: ${sizeMB.toFixed(2)}MB`);
+          console.warn(`⚠️ [MeetingCaptureManager] 슬라이드 ${index + 1} 이미지 크기가 큼: ${imageSizeMB.toFixed(2)}MB (25MB 제한 근접, 서버 부하 가능성)`);
         }
       }
       
@@ -4556,21 +4555,24 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                                      (error.status && [500, 502, 503, 504].includes(error.status));
             
             if (attempt === retries || !isRetryableError) {
-              // 마지막 시도 실패 시 상세한 에러 메시지
+              // 마지막 시도 실패 시 상세한 에러 메시지 (이미지 크기 정보 포함)
+              const sizeInfo = blob ? ` (이미지 크기: ${(blob.size / (1024 * 1024)).toFixed(2)}MB)` : '';
+              const slideInfo = currentSlide?.subTab || currentSlide?.tab || 'unknown';
+              
               if (error.isCorsError || errorMessage.includes('cors') || errorMessage.includes('access-control-allow-origin')) {
-                throw new Error(`CORS 오류로 이미지 업로드에 실패했습니다. (${attempt}회 시도) 서버 연결을 확인해주세요.`);
+                throw new Error(`CORS 오류로 이미지 업로드에 실패했습니다. (${attempt}회 시도, 슬라이드: ${slideInfo}${sizeInfo}) 서버 연결을 확인해주세요.`);
               } else if (isNetworkError || errorMessage.includes('network') || errorMessage.includes('err_failed')) {
-                throw new Error(`네트워크 연결 오류로 이미지 업로드에 실패했습니다. (${attempt}회 시도) 인터넷 연결을 확인해주세요.`);
+                throw new Error(`네트워크 연결 오류로 이미지 업로드에 실패했습니다. (${attempt}회 시도, 슬라이드: ${slideInfo}${sizeInfo}) 인터넷 연결을 확인해주세요.`);
               } else if (error.status === 413) {
-                throw new Error(`이미지 파일이 너무 큽니다. 파일 크기를 줄여주세요.`);
+                throw new Error(`이미지 파일이 너무 큽니다. (${sizeInfo}) 파일 크기를 줄여주세요.`);
               } else if (error.status === 502) {
-                throw new Error(`서버 게이트웨이 오류가 발생했습니다. (${attempt}회 시도) 잠시 후 다시 시도해주세요.`);
+                throw new Error(`서버 게이트웨이 오류가 발생했습니다. (${attempt}회 시도, 슬라이드: ${slideInfo}${sizeInfo}) 잠시 후 다시 시도해주세요.`);
               } else if (error.status === 503) {
-                throw new Error(`서버가 일시적으로 사용할 수 없습니다. (${attempt}회 시도) 잠시 후 다시 시도해주세요.`);
+                throw new Error(`서버가 일시적으로 사용할 수 없습니다. (${attempt}회 시도, 슬라이드: ${slideInfo}${sizeInfo}) 잠시 후 다시 시도해주세요.`);
               } else if (error.status === 504) {
-                throw new Error(`서버 응답 시간이 초과되었습니다. (${attempt}회 시도) 잠시 후 다시 시도해주세요.`);
+                throw new Error(`서버 응답 시간이 초과되었습니다. (${attempt}회 시도, 슬라이드: ${slideInfo}${sizeInfo}) 잠시 후 다시 시도해주세요.`);
               } else if (error.status === 500) {
-                throw new Error(`서버 오류가 발생했습니다. (${attempt}회 시도) 잠시 후 다시 시도해주세요.`);
+                throw new Error(`서버 오류가 발생했습니다. (${attempt}회 시도, 슬라이드: ${slideInfo}${sizeInfo}) 잠시 후 다시 시도해주세요.`);
               } else {
                 throw new Error(`이미지 업로드 실패 (${attempt}회 시도): ${error.message}`);
               }
@@ -4590,17 +4592,16 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             const corsMultiplier = isCorsError ? 1.5 : 1; // CORS 에러 시 1.5배 대기
             const finalDelay = Math.min(delay * corsMultiplier, maxDelay);
             
-            if (process.env.NODE_ENV === 'development') {
-              console.warn(`⚠️ [MeetingCaptureManager] 슬라이드 ${index + 1} 업로드 재시도 ${attempt}/${retries} (${Math.round(finalDelay)}ms 대기):`, {
-                error: error.message,
-                status: error.status,
-                isNetworkError,
-                isCorsError: error.isCorsError || isCorsError,
-                errorName: error.name,
-                isServerOverload,
-                fileSize: blob ? `${(blob.size / (1024 * 1024)).toFixed(2)}MB` : 'N/A'
-              });
-            }
+            console.warn(`⚠️ [MeetingCaptureManager] 슬라이드 ${index + 1} (${currentSlide?.subTab || currentSlide?.tab || 'unknown'}) 업로드 재시도 ${attempt}/${retries} (${Math.round(finalDelay)}ms 대기):`, {
+              error: error.message,
+              status: error.status,
+              isNetworkError,
+              isCorsError: error.isCorsError || isCorsError,
+              errorName: error.name,
+              isServerOverload,
+              fileSize: blob ? `${(blob.size / (1024 * 1024)).toFixed(2)}MB` : 'N/A',
+              slideType: currentSlide?.subTab || currentSlide?.tab || 'unknown'
+            });
             await new Promise(resolve => setTimeout(resolve, finalDelay));
           }
         }
