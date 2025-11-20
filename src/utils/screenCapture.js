@@ -303,9 +303,6 @@ export async function captureElement(element, options = {}) {
   // height 옵션이 명시적으로 전달된 경우 (totalClosing 등): 해당 높이를 직접 사용
   const hasExplicitHeight = typeof options.height === 'number' && options.height > 0;
   
-  // height 옵션이 명시적으로 전달된 경우 (totalClosing 등): 해당 높이를 직접 사용
-  const hasExplicitHeight = typeof options.height === 'number' && options.height > 0;
-  
   // 메인/목차 슬라이드: 고정 가로폭(1920px) 적용 시 세로 재흐름으로 인한 하단 잘림 방지
   // 높이 = scrollHeight × (1/widthScale) × 배율, 최소 높이 보장
   // autoCrop 유지로 과도 여백은 자동 제거
