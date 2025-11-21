@@ -1098,10 +1098,6 @@ function buildRecontractSummary(rows, exclusionConfig = {}, targetOutletConfig =
       const remarkPlate = parseString(row[59]);
       const remarkRecontract = parseString(row[74]);
 
-      // 오퍼금액을 상품권과 입금으로 구분하지 않고 전체 금액으로 처리
-      const offerGiftCard = 0; // 19인덱스 사용 시 구분 없음
-      const offerDeposit = rawOfferAmount; // 19인덱스 값 저장 (계산용)
-
       const promoterId = parseString(row[90]); // 유치자ID
       const promoterName = parseString(row[91] || ''); // 등록직원/유치자명
 
@@ -1109,6 +1105,7 @@ function buildRecontractSummary(rows, exclusionConfig = {}, targetOutletConfig =
       const settlementAmount = (rawSettlementAmount + rawOfferAmount) * -1;
       // 재약정 오퍼 지급: (19인덱스)*-1
       const offerDeposit = rawOfferAmount * -1;
+      const offerGiftCard = 0; // 19인덱스 사용 시 구분 없음
 
       return {
         sourceSheet,
