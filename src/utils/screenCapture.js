@@ -967,19 +967,31 @@ export async function captureElement(element, options = {}) {
       // 재초담초채권 슬라이드 확인 (업로드 안정성을 위해 압축 품질 낮춤)
       const isRechotanchoBond = slideId.includes('rechotanchoBond');
       
-      // 목차 슬라이드는 파일 크기가 크므로 더 낮은 품질 사용 (0.80)
-      // 재초담초채권 슬라이드는 업로드 안정성을 위해 품질을 낮춤 (0.85)
-      const quality = isToc ? 0.80 : 
-                     (isRechotanchoBond ? 0.85 : 
-                     ((isLargeSlide || isVeryTall) ? 0.90 : 0.95)); // 목차: 80%, 재초담초채권: 85%, 큰 슬라이드: 90%, 기타: 95%
-      
-      if (process.env.NODE_ENV === 'development') {
-        if (quality === 0.80) {
-          console.log(`📦 [screenCapture] 압축 품질 80% 적용: 목차 슬라이드 (높이: ${estimatedHeight.toFixed(0)}px, 파일 크기 최적화)`);
-        } else if (quality === 0.85) {
-          console.log(`📦 [screenCapture] 압축 품질 85% 적용: 재초담초채권 슬라이드 (높이: ${estimatedHeight.toFixed(0)}px, 업로드 안정성 향상)`);
-        } else if (quality === 0.90) {
-          console.log(`📦 [screenCapture] 압축 품질 90% 적용: ${isLargeSlide ? '큰 슬라이드' : '긴 슬라이드'} (높이: ${estimatedHeight.toFixed(0)}px)`);
+      // options.imageQuality가 명시적으로 전달된 경우 우선 사용 (재초담초채권)
+      // 전달되지 않은 경우 기존 로직 유지 (다른 슬라이드)
+      let quality;
+      if (options?.imageQuality !== undefined) {
+        // UnifiedCaptureEngine에서 명시적으로 전달한 경우 (재초담초채권)
+        quality = options.imageQuality;
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`📦 [screenCapture] 명시적 이미지 품질 사용: ${quality} (slideId: ${slideId})`);
+        }
+      } else {
+        // 기존 로직 완전히 유지 (다른 슬라이드)
+        // 목차 슬라이드는 파일 크기가 크므로 더 낮은 품질 사용 (0.80)
+        // 재초담초채권 슬라이드는 업로드 안정성을 위해 품질을 낮춤 (0.85)
+        quality = isToc ? 0.80 : 
+                 (isRechotanchoBond ? 0.85 : 
+                 ((isLargeSlide || isVeryTall) ? 0.90 : 0.95)); // 목차: 80%, 재초담초채권: 85%, 큰 슬라이드: 90%, 기타: 95%
+        
+        if (process.env.NODE_ENV === 'development') {
+          if (quality === 0.80) {
+            console.log(`📦 [screenCapture] 압축 품질 80% 적용: 목차 슬라이드 (높이: ${estimatedHeight.toFixed(0)}px, 파일 크기 최적화)`);
+          } else if (quality === 0.85) {
+            console.log(`📦 [screenCapture] 압축 품질 85% 적용: 재초담초채권 슬라이드 (높이: ${estimatedHeight.toFixed(0)}px, 업로드 안정성 향상)`);
+          } else if (quality === 0.90) {
+            console.log(`📦 [screenCapture] 압축 품질 90% 적용: ${isLargeSlide ? '큰 슬라이드' : '긴 슬라이드'} (높이: ${estimatedHeight.toFixed(0)}px)`);
+          }
         }
       }
       
