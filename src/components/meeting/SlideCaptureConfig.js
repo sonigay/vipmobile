@@ -180,6 +180,7 @@ export const SLIDE_CAPTURE_CONFIG = {
     needsManagerTableInclusion: false,
     boxResizeIterations: 1,             // 박스 크기 조정 반복 횟수
     retryConfig: { maxRetries: 3, delay: 500 },
+    imageQuality: 0.85,                 // 이미지 품질 (업로드 안정성 향상)
   },
 
   // 재고장표
