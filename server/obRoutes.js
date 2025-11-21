@@ -1091,11 +1091,8 @@ function buildRecontractSummary(rows, exclusionConfig = {}, targetOutletConfig =
       const status = parseString(row[11]);
       const isObOutlet = outlet.includes('OB');
       const isCompleted = status === '완료';
-      const rawSettlementAmount = parseNumber(row[20]);
-      const settlementAmount = rawSettlementAmount * -1; // sheet stores negative values → convert to positive
-      
-      // 19인덱스(오퍼금액) 컬럼 사용 (시트에 이미 -금액으로 입력됨)
-      const offerAmount = parseNumber(row[19]);
+      const rawSettlementAmount = parseNumber(row[20]); // 20인덱스
+      const rawOfferAmount = parseNumber(row[19]); // 19인덱스
       
       // 기존 비고 필드 추출 로직은 유지 (참고용)
       const remarkPlate = parseString(row[59]);
@@ -1103,10 +1100,15 @@ function buildRecontractSummary(rows, exclusionConfig = {}, targetOutletConfig =
 
       // 오퍼금액을 상품권과 입금으로 구분하지 않고 전체 금액으로 처리
       const offerGiftCard = 0; // 19인덱스 사용 시 구분 없음
-      const offerDeposit = offerAmount; // 전체 오퍼금액을 입금으로 처리
+      const offerDeposit = rawOfferAmount; // 19인덱스 값 저장 (계산용)
 
       const promoterId = parseString(row[90]); // 유치자ID
       const promoterName = parseString(row[91] || ''); // 등록직원/유치자명
+
+      // 재약정 수수료: ((20인덱스)+(19인덱스))*-1
+      const settlementAmount = (rawSettlementAmount + rawOfferAmount) * -1;
+      // 재약정 오퍼 지급: (19인덱스)*-1
+      const offerDeposit = rawOfferAmount * -1;
 
       return {
         sourceSheet,
@@ -1118,22 +1120,27 @@ function buildRecontractSummary(rows, exclusionConfig = {}, targetOutletConfig =
         status,
         isObOutlet,
         isCompleted,
-        settlementAmount,
+        settlementAmount, // 재약정 수수료: ((20인덱스)+(19인덱스))*-1
+        rawSettlementAmount, // 20인덱스 원본 값 (참고용)
+        rawOfferAmount, // 19인덱스 원본 값 (참고용)
         remarkPlate,
         remarkRecontract,
-        offerGiftCard,
-        offerDeposit,
+        offerGiftCard: 0, // 19인덱스 사용 시 구분 없음
+        offerDeposit, // 재약정 오퍼 지급: (19인덱스)*-1
         promoterId,
         promoterName
       };
     })
     .filter((row) => row.isObOutlet && row.isCompleted);
 
-  const feeTotal = filteredRows.reduce((sum, row) => sum + row.settlementAmount, 0);
-  // 19인덱스 사용 시 offerDeposit에 전체 오퍼금액이 포함됨
+  // 재약정 수수료: ((20인덱스)+(19인덱스))*-1
+  const feeTotal = filteredRows.reduce((sum, row) => sum + (row.rawSettlementAmount + row.rawOfferAmount) * -1, 0);
+  // 재약정 오퍼 지급: (19인덱스)*-1
   const giftCardTotal = 0; // 19인덱스 사용 시 구분 없음
-  const depositTotal = filteredRows.reduce((sum, row) => sum + row.offerDeposit, 0);
+  const depositTotal = filteredRows.reduce((sum, row) => sum + row.rawOfferAmount * -1, 0);
   const offerTotal = depositTotal; // offerDeposit에 전체 오퍼금액이 포함됨
+  // 재약정 총 지급액: (20인덱스)*-1
+  const totalPayout = filteredRows.reduce((sum, row) => sum + row.rawSettlementAmount * -1, 0);
 
   return {
     includedCount: filteredRows.length,
@@ -1144,7 +1151,7 @@ function buildRecontractSummary(rows, exclusionConfig = {}, targetOutletConfig =
       deposit: depositTotal,
       total: offerTotal
     },
-    totalPayout: feeTotal + offerTotal,
+    totalPayout,
     exclusions: exclusionEntries,
     rows: filteredRows
   };

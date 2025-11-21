@@ -890,12 +890,14 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
             outlet,
             count: 0, 
             feeTotal: 0, 
-            offerTotal: 0 
+            offerTotal: 0,
+            totalAmount: 0 // 재약정 총 지급액: (20인덱스)*-1
           };
         }
         stats[key].count += 1;
-        stats[key].feeTotal += row.settlementAmount || 0;
-        stats[key].offerTotal += (row.offerGiftCard || 0) + (row.offerDeposit || 0);
+        stats[key].feeTotal += row.settlementAmount || 0; // 재약정 수수료: ((20인덱스)+(19인덱스))*-1
+        stats[key].offerTotal += (row.offerGiftCard || 0) + (row.offerDeposit || 0); // 재약정 오퍼 지급: (19인덱스)*-1
+        stats[key].totalAmount += (row.rawSettlementAmount || 0) * -1; // 재약정 총 지급액: (20인덱스)*-1
       }
     });
     
@@ -1836,7 +1838,7 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
                         <TableCell align="right">{currencyFormatter.format(stat.feeTotal)}</TableCell>
                         <TableCell align="right">{currencyFormatter.format(stat.offerTotal)}</TableCell>
                         <TableCell align="right" sx={{ fontWeight: 600 }}>
-                          {currencyFormatter.format(stat.feeTotal + stat.offerTotal)}
+                          {currencyFormatter.format(stat.totalAmount)}
                         </TableCell>
                       </TableRow>
                     ))}
