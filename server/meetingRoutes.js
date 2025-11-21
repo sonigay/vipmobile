@@ -16,18 +16,18 @@ const DISCORD_LOGGING_ENABLED = process.env.DISCORD_LOGGING_ENABLED === 'true';
 // Discord 봇 초기화
 let discordBot = null;
 if (DISCORD_LOGGING_ENABLED && DISCORD_BOT_TOKEN) {
-  discordBot = new Client({ 
+  discordBot = new Client({
     intents: [
-      GatewayIntentBits.Guilds, 
+      GatewayIntentBits.Guilds,
       GatewayIntentBits.GuildMessages,
       GatewayIntentBits.MessageContent
     ]
   });
-  
+
   discordBot.once('ready', () => {
     console.log(`✅ [회의] Discord 봇이 준비되었습니다: ${discordBot.user.tag}`);
   });
-  
+
   discordBot.login(DISCORD_BOT_TOKEN)
     .then(() => console.log('✅ [회의] Discord 봇 로그인 성공'))
     .catch(error => console.error('❌ [회의] Discord 봇 로그인 실패:', error));
@@ -59,10 +59,10 @@ async function retrySheetsOperation(operation, maxRetries = 3, delay = 1000) {
     try {
       return await operation();
     } catch (error) {
-      const isQuotaError = error.code === 429 || 
+      const isQuotaError = error.code === 429 ||
         (error.message && error.message.includes('Quota exceeded')) ||
         (error.response && error.response.status === 429);
-      
+
       if (isQuotaError && attempt < maxRetries) {
         const waitTime = delay * Math.pow(2, attempt - 1); // Exponential backoff
         console.warn(`⚠️ [Sheets API] 할당량 초과, ${waitTime}ms 후 재시도 (${attempt}/${maxRetries})`);
@@ -200,9 +200,9 @@ async function createMeeting(req, res) {
 
     // 필수 필드 검증
     if (!meetingName || !meetingDate || !meetingNumber || !createdBy) {
-      return res.status(400).json({ 
-        success: false, 
-        error: '필수 필드가 누락되었습니다.' 
+      return res.status(400).json({
+        success: false,
+        error: '필수 필드가 누락되었습니다.'
       });
     }
 
@@ -219,14 +219,14 @@ async function createMeeting(req, res) {
     });
 
     const rows = response.data.values || [];
-    const duplicate = rows.find(row => 
+    const duplicate = rows.find(row =>
       row[2] === meetingDate && parseInt(row[3]) === parseInt(meetingNumber)
     );
 
     if (duplicate) {
-      return res.status(400).json({ 
-        success: false, 
-        error: `해당 날짜(${meetingDate})에 차수 ${meetingNumber}가 이미 존재합니다.` 
+      return res.status(400).json({
+        success: false,
+        error: `해당 날짜(${meetingDate})에 차수 ${meetingNumber}가 이미 존재합니다.`
       });
     }
 
@@ -256,8 +256,8 @@ async function createMeeting(req, res) {
       }
     });
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       meeting: {
         meetingId,
         meetingName,
@@ -303,14 +303,14 @@ async function updateMeeting(req, res) {
 
     // 차수 중복 확인 (자신 제외, meetingDate와 meetingNumber가 변경되는 경우만)
     if (meetingDate && meetingNumber && (meetingDate !== rows[rowIndex][2] || parseInt(meetingNumber) !== parseInt(rows[rowIndex][3]))) {
-      const duplicate = rows.find((row, idx) => 
+      const duplicate = rows.find((row, idx) =>
         idx !== rowIndex && row[2] === meetingDate && parseInt(row[3]) === parseInt(meetingNumber)
       );
 
       if (duplicate) {
-        return res.status(400).json({ 
-          success: false, 
-          error: `해당 날짜(${meetingDate})에 차수 ${meetingNumber}가 이미 존재합니다.` 
+        return res.status(400).json({
+          success: false,
+          error: `해당 날짜(${meetingDate})에 차수 ${meetingNumber}가 이미 존재합니다.`
         });
       }
     }
@@ -327,7 +327,7 @@ async function updateMeeting(req, res) {
     if (status !== undefined) updateRow[6] = status; // 상태 업데이트 (인덱스 6)
     if (meetingLocation !== undefined) updateRow[7] = meetingLocation;
     if (participants !== undefined) updateRow[8] = participants;
-    
+
     console.log(`🔄 [updateMeeting] 회의 상태 업데이트: ${meetingId} -> ${status}`);
     console.log(`🔄 [updateMeeting] 업데이트할 행:`, updateRow);
 
@@ -440,7 +440,7 @@ function setCORSHeaders(req, res) {
   ];
   const allowedOrigins = [...corsOrigins, ...defaultOrigins];
   const origin = req.headers.origin;
-  
+
   if (origin && allowedOrigins.includes(origin)) {
     res.header('Access-Control-Allow-Origin', origin);
   } else if (allowedOrigins.length > 0) {
@@ -456,7 +456,7 @@ async function getMeetingConfig(req, res) {
   try {
     // CORS 헤더 설정
     setCORSHeaders(req, res);
-    
+
     const { sheets, SPREADSHEET_ID } = createSheetsClient();
     const { meetingId } = req.params;
     const sheetName = '회의설정';
@@ -475,16 +475,16 @@ async function getMeetingConfig(req, res) {
 
     const rows = response.data.values || [];
     console.log(`📖 [getMeetingConfig] 회의ID ${meetingId}의 전체 행 수: ${rows.length}`);
-    
+
     const filteredRows = rows.filter(row => row[0] === meetingId);
     console.log(`📖 [getMeetingConfig] 필터링된 행 수: ${filteredRows.length}`);
-    
+
     const slides = filteredRows
       .map((row, idx) => {
         const tabValue = row[5] || '';
         // tab/subTab 형식으로 저장된 경우 파싱
         const [tab, subTab] = tabValue.includes('/') ? tabValue.split('/') : [tabValue, ''];
-        
+
         const slide = {
           slideId: row[1] || '',
           order: parseInt(row[2]) || 0,
@@ -510,7 +510,7 @@ async function getMeetingConfig(req, res) {
           participants: row[20] || '',
           createdBy: row[21] || ''
         };
-        
+
         console.log(`📖 [getMeetingConfig] 슬라이드 ${idx + 1}:`, {
           slideId: slide.slideId,
           order: slide.order,
@@ -521,17 +521,17 @@ async function getMeetingConfig(req, res) {
           imageUrl: slide.imageUrl || '없음',
           hasImageUrl: !!slide.imageUrl
         });
-        
+
         return slide;
       })
       .sort((a, b) => a.order - b.order);
-    
+
     // 목차 슬라이드가 있으면 modeGroups 재구성
     const tocSlideIndex = slides.findIndex(s => s.type === 'toc');
     if (tocSlideIndex !== -1) {
       const tocSlide = slides[tocSlideIndex];
       const modeGroups = {};
-      
+
       // 모든 슬라이드를 순회하며 모드별로 그룹화
       slides.forEach(slide => {
         if (slide.type === 'mode-tab' && slide.mode) {
@@ -553,11 +553,11 @@ async function getMeetingConfig(req, res) {
           modeGroups['custom'].push(slide);
         }
       });
-      
+
       // 목차 슬라이드에 modeGroups 추가
       tocSlide.modeGroups = modeGroups;
       slides[tocSlideIndex] = tocSlide;
-      
+
       console.log(`📖 [getMeetingConfig] 목차 슬라이드 modeGroups 재구성 완료:`, {
         modeCount: Object.keys(modeGroups).length,
         customCount: modeGroups['custom']?.length || 0
@@ -577,7 +577,7 @@ async function saveMeetingConfig(req, res) {
   try {
     // CORS 헤더 설정
     setCORSHeaders(req, res);
-    
+
     const { sheets, SPREADSHEET_ID } = createSheetsClient();
     const { meetingId } = req.params;
     const { slides } = req.body;
@@ -603,31 +603,31 @@ async function saveMeetingConfig(req, res) {
 
     const existingRows = response.data.values || [];
     console.log(`📋 [saveMeetingConfig] 기존 행 수: ${existingRows.length}, 저장할 슬라이드 수: ${slides.length}`);
-    
+
     // 각 슬라이드를 개별적으로 업데이트 또는 추가
     for (let i = 0; i < slides.length; i++) {
       const slide = slides[i];
-      
+
       // 필수 필드 검증
       if (!slide || typeof slide !== 'object') {
         console.error(`❌ [saveMeetingConfig] 슬라이드 ${i + 1}이 유효하지 않습니다.`, slide);
         continue;
       }
-      
+
       // slideId 생성 (유효성 검증 포함)
       const slideId = slide.slideId || slide.id || `slide-${slide.order || i + 1}`;
       if (!slideId || typeof slideId !== 'string') {
         console.error(`❌ [saveMeetingConfig] 슬라이드 ${i + 1}의 slideId가 유효하지 않습니다.`, slide);
         continue;
       }
-      
+
       // order 검증 및 정규화
-      const order = typeof slide.order === 'number' && slide.order >= 0 
-        ? slide.order 
+      const order = typeof slide.order === 'number' && slide.order >= 0
+        ? slide.order
         : (typeof slide.order === 'string' && !isNaN(parseInt(slide.order)))
           ? parseInt(slide.order)
           : i + 1;
-      
+
       console.log(`\n🔄 [saveMeetingConfig] 슬라이드 ${i + 1}/${slides.length} 처리 시작:`, {
         slideId,
         order,
@@ -638,14 +638,14 @@ async function saveMeetingConfig(req, res) {
         discordPostId: slide.discordPostId || '없음',
         discordThreadId: slide.discordThreadId || '없음'
       });
-      
+
       // 기존 슬라이드 찾기: slideId로 먼저 찾고, 없으면 mode/tab/subTab/order로 찾기
-      let existingRowIndex = existingRows.findIndex((row, idx) => 
+      let existingRowIndex = existingRows.findIndex((row, idx) =>
         row[0] === meetingId && row[1] === slideId
       );
-      
+
       console.log(`🔍 [saveMeetingConfig] slideId로 찾기 결과: ${existingRowIndex !== -1 ? `찾음 (행 ${existingRowIndex + 3})` : '없음'}`);
-      
+
       // slideId로 찾지 못한 경우 mode/tab/subTab/order로 찾기
       if (existingRowIndex === -1) {
         const tabValue = slide.subTab ? `${slide.tab || ''}/${slide.subTab}` : (slide.tab || '');
@@ -655,11 +655,11 @@ async function saveMeetingConfig(req, res) {
           const rowMode = row[4] || '';
           const rowTab = row[5] || '';
           const rowOrder = parseInt(row[2] || 0);
-          
-          const matches = rowMode === (slide.mode || '') && 
-                 rowTab === tabValue && 
-                 rowOrder === (slide.order || 0);
-          
+
+          const matches = rowMode === (slide.mode || '') &&
+            rowTab === tabValue &&
+            rowOrder === (slide.order || 0);
+
           if (matches) {
             console.log(`🔍 [saveMeetingConfig] mode/tab/order로 찾음 (행 ${idx + 3}):`, {
               rowMode,
@@ -670,10 +670,10 @@ async function saveMeetingConfig(req, res) {
               slideOrder: slide.order
             });
           }
-          
+
           return matches;
         });
-        
+
         if (existingRowIndex !== -1) {
           console.log(`✅ [saveMeetingConfig] mode/tab/order로 찾기 성공: 행 ${existingRowIndex + 3}`);
         } else {
@@ -683,7 +683,7 @@ async function saveMeetingConfig(req, res) {
 
       // subTab이 있으면 tab 필드에 tab/subTab 형식으로 저장
       const tabValue = slide.subTab ? `${slide.tab || ''}/${slide.subTab}` : (slide.tab || '');
-      
+
       // 메인 슬라이드의 경우 추가 필드 포함 (tabLabel, subTabLabel, 세부항목옵션 추가)
       // 타입 검증 및 정규화
       const slideType = typeof slide.type === 'string' ? slide.type : 'mode-tab';
@@ -716,7 +716,7 @@ async function saveMeetingConfig(req, res) {
       const mergedDiscordThreadId =
         incomingDiscordThreadId ||
         (existingDiscordThreadId && existingDiscordThreadId !== '없음' ? existingDiscordThreadId : '');
-      
+
       const newRow = [
         meetingId,
         slideId,
@@ -784,13 +784,13 @@ async function saveMeetingConfig(req, res) {
         // 기존 행 목록에도 추가 (다음 반복을 위해)
         existingRows.push(newRow);
       }
-      
+
       // 각 슬라이드 저장 후 약간의 지연 (Google Sheets API rate limit 방지)
       if (i < slides.length - 1) {
         await new Promise(resolve => setTimeout(resolve, 500)); // 200ms -> 500ms로 증가
       }
     }
-    
+
     console.log(`\n✅ [saveMeetingConfig] 모든 슬라이드 저장 완료 (${slides.length}개)`);
 
     // 회의 날짜와 차수 추출 후 준비중 스레드 rename 시도
@@ -825,20 +825,20 @@ async function findOrCreatePost(channel, yearMonth, meetingNumber, modeLabel) {
     const suffix = modeLabel ? `(${modeLabel})` : '';
     const baseWithNumber = meetingNumber ? `${yearMonth} 회의 - ${meetingNumber}차` : `${yearMonth} 회의 - 준비중`;
     const postName = `${baseWithNumber}${suffix}`;
-    
+
     console.log(`🔍 [findOrCreatePost] 포스트 찾기 시작:`, {
       yearMonth,
       meetingNumber,
       postName
     });
-    
+
     // 포럼 채널의 활성 포스트 가져오기
     const activeThreads = await channel.threads.fetchActive();
-    
+
     // 활성 스레드에서 차수별 포스트 찾기
     // meetingNumber가 있으면 정확히 일치하는 포스트를 찾고, 없으면 yearMonth만 일치하는 포스트를 찾음
     let post = null;
-    
+
     if (meetingNumber) {
       // meetingNumber가 있으면 정확히 일치하는 포스트를 찾음
       // 여러 패턴으로 매칭 시도 (모드 라벨 유무와 관계없이)
@@ -849,18 +849,18 @@ async function findOrCreatePost(channel, yearMonth, meetingNumber, modeLabel) {
         meetingNumber,
         existingThreads: allActiveThreads.map(t => t.name)
       });
-      
+
       post = allActiveThreads.find(thread => {
         const threadName = thread.name;
         // 모드 라벨 포함/제외 모두 매칭
-        const matches = 
+        const matches =
           // 정확한 일치
           threadName === postName ||
           threadName === `${baseWithNumber}` ||
           // 모드 라벨이 다르지만 년월+차수는 일치
-          (threadName.includes(`${yearMonth} 회의`) && 
-           threadName.includes(`${meetingNumber}차`) &&
-           (threadName.includes('(어플모드)') || threadName.includes('(커스텀)')));
+          (threadName.includes(`${yearMonth} 회의`) &&
+            threadName.includes(`${meetingNumber}차`) &&
+            (threadName.includes('(어플모드)') || threadName.includes('(커스텀)')));
         if (matches) {
           console.log(`✅ [findOrCreatePost] 활성 포스트 찾음 (차수 일치): ${threadName} (ID: ${thread.id})`);
         }
@@ -875,23 +875,23 @@ async function findOrCreatePost(channel, yearMonth, meetingNumber, modeLabel) {
           // 생성 시간으로 정렬 (최신순)
           return (b.createdTimestamp || 0) - (a.createdTimestamp || 0);
         });
-      
+
       if (matchingThreads.length > 0) {
         post = matchingThreads[0];
         console.log(`✅ [findOrCreatePost] 활성 포스트 찾음 (년월 일치, 차수 없음, 가장 최근): ${post.name} (ID: ${post.id})`);
       }
     }
-    
+
     if (post) {
       console.log(`📌 [Discord] 기존 포스트 찾음: ${post.name} (ID: ${post.id})`);
       return post;
     }
-    
+
     // 아카이브된 스레드도 확인
     if (!post) {
       try {
         const archivedThreads = await channel.threads.fetchArchived({ limit: 100 });
-        
+
         if (meetingNumber) {
           // meetingNumber가 있으면 정확히 일치하는 포스트를 찾음
           // 여러 패턴으로 매칭 시도 (모드 라벨 유무와 관계없이)
@@ -902,18 +902,18 @@ async function findOrCreatePost(channel, yearMonth, meetingNumber, modeLabel) {
             meetingNumber,
             existingThreads: allArchivedThreads.slice(0, 10).map(t => t.name) // 최대 10개만 로그
           });
-          
+
           post = allArchivedThreads.find(thread => {
             const threadName = thread.name;
             // 모드 라벨 포함/제외 모두 매칭
-            const matches = 
+            const matches =
               // 정확한 일치
-              threadName === postName || 
+              threadName === postName ||
               threadName === `${baseWithNumber}` ||
               // 모드 라벨이 다르지만 년월+차수는 일치
-              (threadName.includes(`${yearMonth} 회의`) && 
-               threadName.includes(`${meetingNumber}차`) &&
-               (threadName.includes('(어플모드)') || threadName.includes('(커스텀)')));
+              (threadName.includes(`${yearMonth} 회의`) &&
+                threadName.includes(`${meetingNumber}차`) &&
+                (threadName.includes('(어플모드)') || threadName.includes('(커스텀)')));
             if (matches) {
               console.log(`✅ [findOrCreatePost] 아카이브된 포스트 찾음 (차수 일치): ${threadName} (ID: ${thread.id})`);
             }
@@ -927,13 +927,13 @@ async function findOrCreatePost(channel, yearMonth, meetingNumber, modeLabel) {
               // 생성 시간으로 정렬 (최신순)
               return (b.createdTimestamp || 0) - (a.createdTimestamp || 0);
             });
-          
+
           if (matchingThreads.length > 0) {
             post = matchingThreads[0];
             console.log(`✅ [findOrCreatePost] 아카이브된 포스트 찾음 (년월 일치, 차수 없음, 가장 최근): ${post.name} (ID: ${post.id})`);
           }
         }
-        
+
         if (post) {
           console.log(`📌 [Discord] 아카이브된 포스트 찾음: ${post.name} (ID: ${post.id})`);
           return post;
@@ -943,25 +943,25 @@ async function findOrCreatePost(channel, yearMonth, meetingNumber, modeLabel) {
         // 계속 진행
       }
     }
-    
+
     // 포스트 생성 전 마지막 체크: 혹시 생성 중에 같은 포스트가 생겼는지 다시 확인
     if (meetingNumber) {
       const doubleCheckThreads = await channel.threads.fetchActive();
       const doubleCheckPost = Array.from(doubleCheckThreads.threads.values()).find(thread => {
         const threadName = thread.name;
         return (threadName === postName ||
-                threadName === `${baseWithNumber}` ||
-                (threadName.includes(`${yearMonth} 회의`) && 
-                 threadName.includes(`${meetingNumber}차`) &&
-                 (threadName.includes('(어플모드)') || threadName.includes('(커스텀)'))));
+          threadName === `${baseWithNumber}` ||
+          (threadName.includes(`${yearMonth} 회의`) &&
+            threadName.includes(`${meetingNumber}차`) &&
+            (threadName.includes('(어플모드)') || threadName.includes('(커스텀)'))));
       });
-      
+
       if (doubleCheckPost) {
         console.log(`✅ [findOrCreatePost] 마지막 체크에서 기존 포스트 찾음: ${doubleCheckPost.name} (ID: ${doubleCheckPost.id})`);
         return doubleCheckPost;
       }
     }
-    
+
     // 포스트 생성 (포럼 채널에서는 스레드 생성)
     // meetingNumber가 없으면 년월만 사용하여 포스트 생성 (차수 없이)
     const finalPostName = meetingNumber ? postName : `${yearMonth} 회의 - 준비중${suffix}`;
@@ -973,7 +973,7 @@ async function findOrCreatePost(channel, yearMonth, meetingNumber, modeLabel) {
       },
       appliedTags: []
     });
-    
+
     console.log(`✅ [Discord] 새 포스트 생성 완료: ${finalPostName} (ID: ${newPost.id})`);
     return newPost;
   } catch (error) {
@@ -988,7 +988,7 @@ async function findOrCreateThread(post, meetingId) {
     // 포스트(스레드) 내의 하위 스레드 찾기
     // Discord 포럼에서는 포스트 자체가 스레드이므로, 여기서는 포스트를 그대로 사용
     // 또는 포스트 내에 메시지로 회의 정보를 저장하고, 이미지는 해당 포스트에 업로드
-    
+
     // 일단 포스트를 스레드로 사용 (나중에 필요시 수정)
     return post;
   } catch (error) {
@@ -1011,21 +1011,21 @@ async function autoCropImage(imageBuffer, options = {}) {
     const metadata = await sharp(imageBuffer).metadata();
     const originalWidth = metadata.width || 0;
     const originalHeight = metadata.height || 0;
-    
+
     console.log(`🔍 [autoCropImage] 원본 이미지 크기: ${originalWidth}x${originalHeight}`);
-    
+
     // 이미지의 raw 픽셀 데이터 읽기 (RGBA)
     const { data } = await sharp(imageBuffer)
       .ensureAlpha()
       .raw()
       .toBuffer({ resolveWithObject: true });
-    
+
     // 배경색 (흰색) 임계값 설정
     const backgroundColorThreshold = 250; // RGB 값이 모두 250 이상이면 배경으로 간주
     const alphaThreshold = 10; // 알파값이 10 이하면 투명으로 간주
-    
+
     let lastContentY = -1; // 마지막 콘텐츠가 있는 Y 좌표 (하단부터 스캔, -1은 아직 찾지 못함)
-    
+
     // 하단부터 역순으로 스캔하여 마지막 콘텐츠 라인 찾기
     for (let y = originalHeight - 1; y >= 0; y--) {
       let hasContent = false;
@@ -1035,14 +1035,14 @@ async function autoCropImage(imageBuffer, options = {}) {
         const g = data[index + 1];
         const b = data[index + 2];
         const a = data[index + 3];
-        
+
         // 배경이 아닌 픽셀인지 확인
-        const isBackground = 
-          (r >= backgroundColorThreshold && 
-           g >= backgroundColorThreshold && 
-           b >= backgroundColorThreshold) ||
+        const isBackground =
+          (r >= backgroundColorThreshold &&
+            g >= backgroundColorThreshold &&
+            b >= backgroundColorThreshold) ||
           a < alphaThreshold;
-        
+
         if (!isBackground) {
           hasContent = true;
           lastContentY = y;
@@ -1054,7 +1054,7 @@ async function autoCropImage(imageBuffer, options = {}) {
         break;
       }
     }
-    
+
     // 콘텐츠가 없는 경우 원본 반환
     if (lastContentY === -1) {
       console.log(`⚠️ [autoCropImage] 콘텐츠가 없는 이미지로 판단, 원본 반환`);
@@ -1066,7 +1066,7 @@ async function autoCropImage(imageBuffer, options = {}) {
         croppedHeight: originalHeight
       };
     }
-    
+
     // 최소 하단 여백 보장 (클라이언트와 일치: 기본 96px, 커스텀 업로드 등에서는 0으로 줄일 수 있음)
     const minBottomPadding = typeof options.minBottomPadding === 'number' ? options.minBottomPadding : 96;
     const desiredBottom = lastContentY + minBottomPadding + 1;
@@ -1100,11 +1100,11 @@ async function autoCropImage(imageBuffer, options = {}) {
         .png()
         .toBuffer();
     }
-    
+
     const croppedWidth = originalWidth;
-    
+
     console.log(`✂️ [autoCropImage] 하단 공백 처리: ${originalWidth}x${originalHeight} → ${croppedWidth}x${croppedHeight}`);
-    
+
     return {
       buffer: finalBuffer,
       originalWidth,
@@ -1152,23 +1152,23 @@ async function uploadVideoToDiscord(videoBuffer, filename, meetingId, meetingDat
 
     // 년월 추출 (예: "2025-01")
     const yearMonth = meetingDate ? meetingDate.substring(0, 7) : new Date().toISOString().substring(0, 7);
-    
+
     // 해당 년월과 차수의 포스트 찾기 또는 생성
     let post = await findOrCreatePost(channel, yearMonth, meetingNumber, modeLabel);
-    
+
     // 회의 스레드 찾기 또는 생성 (현재는 포스트를 그대로 사용)
     let thread = post;
-    
+
     // 동영상 업로드
     const attachment = new AttachmentBuilder(videoBuffer, { name: filename });
     const message = await thread.send({ files: [attachment] });
-    
+
     const result = {
       videoUrl: message.attachments.first().url,
       postId: post.id,
       threadId: thread.id
     };
-    
+
     return result;
   } catch (error) {
     console.error('Discord 동영상 업로드 오류:', error);
@@ -1202,23 +1202,23 @@ async function uploadImageToDiscord(imageBuffer, filename, meetingId, meetingDat
 
     // 년월 추출 (예: "2025-01")
     const yearMonth = meetingDate ? meetingDate.substring(0, 7) : new Date().toISOString().substring(0, 7);
-    
+
     // 해당 년월과 차수의 포스트 찾기 또는 생성
     let post = await findOrCreatePost(channel, yearMonth, meetingNumber, modeLabel);
-    
+
     // 회의 스레드 찾기 또는 생성 (현재는 포스트를 그대로 사용)
     let thread = post;
-    
+
     // 이미지 업로드
     const attachment = new AttachmentBuilder(imageBuffer, { name: filename });
     const message = await thread.send({ files: [attachment] });
-    
+
     const result = {
       imageUrl: message.attachments.first().url,
       postId: post.id,
       threadId: thread.id
     };
-    
+
     // 메타데이터가 있으면 추가
     if (metadata) {
       result.originalWidth = metadata.originalWidth;
@@ -1226,7 +1226,7 @@ async function uploadImageToDiscord(imageBuffer, filename, meetingId, meetingDat
       result.croppedWidth = metadata.croppedWidth;
       result.croppedHeight = metadata.croppedHeight;
     }
-    
+
     return result;
   } catch (error) {
     console.error('Discord 이미지 업로드 오류:', error);
@@ -1270,7 +1270,7 @@ async function renamePreparedPostToNumber(yearMonth, meetingNumber) {
 }
 
 // 이미지 업로드 API
-const upload = multer({ 
+const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 25 * 1024 * 1024 } // 25MB 제한
 });
@@ -1279,20 +1279,20 @@ async function uploadMeetingImage(req, res) {
   try {
     // CORS 헤더 설정
     setCORSHeaders(req, res);
-    
+
     const { meetingId } = req.params;
     const { meetingDate, slideOrder } = req.body;
-    
+
     if (!req.file) {
       return res.status(400).json({ success: false, error: '이미지 파일이 없습니다.' });
     }
 
     // 임시 meetingId인 경우 (커스텀 슬라이드 이미지 업로드)
     const isTempMeeting = meetingId === 'temp-custom-slide';
-    const filename = req.file.originalname || (isTempMeeting 
+    const filename = req.file.originalname || (isTempMeeting
       ? `custom-slide-${Date.now()}.${req.file.originalname?.split('.').pop() || 'png'}`
       : `meeting-${meetingId}-${slideOrder}.png`);
-    
+
     // 회의 정보 조회 (차수 가져오기)
     let meetingNumber = null;
     if (!isTempMeeting) {
@@ -1304,10 +1304,10 @@ async function uploadMeetingImage(req, res) {
           spreadsheetId: SPREADSHEET_ID,
           range
         });
-        
+
         const rows = response.data.values || [];
         const meetingRow = rows.find(row => row[0] === meetingId);
-        
+
         if (meetingRow && meetingRow[3]) {
           meetingNumber = parseInt(meetingRow[3]);
           console.log(`📋 [uploadMeetingImage] 회의 차수 조회: ${meetingNumber}차`);
@@ -1319,7 +1319,7 @@ async function uploadMeetingImage(req, res) {
         // 차수 정보가 없어도 계속 진행
       }
     }
-    
+
     console.log(`📤 [uploadMeetingImage] Discord 업로드 시작:`, {
       meetingId,
       isTempMeeting,
@@ -1327,10 +1327,10 @@ async function uploadMeetingImage(req, res) {
       meetingNumber,
       filename
     });
-    
+
     // 이미지 자동 크롭 처리 (모든 슬라이드에서 핑크바 제거)
     console.log(`✂️ [uploadMeetingImage] 이미지 자동 크롭 시작`);
-    
+
     // 슬라이드 타입 확인 (slideOrder 기반: 0=메인, 1=목차, 마지막=엔딩)
     // 또는 Google Sheets에서 슬라이드 정보 조회
     let isMainTocEnding = false;
@@ -1348,13 +1348,13 @@ async function uploadMeetingImage(req, res) {
         const meetingSlides = rows.filter(row => row[0] === meetingId);
         const totalSlides = meetingSlides.length;
         const slideIndex = parseInt(slideOrder) - 1; // 1-based to 0-based
-        
+
         // 현재 슬라이드 정보 확인
         const currentSlide = meetingSlides.find((row, idx) => {
           const rowOrder = parseInt(row[2]) || (idx + 1);
           return rowOrder === parseInt(slideOrder);
         });
-        
+
         // 메인(0), 목차(1), 엔딩(마지막) 판별
         if (slideIndex === 0 || slideIndex === 1 || slideIndex === totalSlides - 1) {
           isMainTocEnding = true;
@@ -1362,7 +1362,7 @@ async function uploadMeetingImage(req, res) {
           const slideType = currentSlide[3]; // '타입' 컬럼
           isMainTocEnding = slideType === 'main' || slideType === 'toc' || slideType === 'ending';
         }
-        
+
         // 월간시상 슬라이드 확인 (탭: indicatorChart, 서브탭: monthlyAward)
         let isMonthlyAward = false;
         if (currentSlide && currentSlide[5]) { // '탭' 컬럼
@@ -1370,7 +1370,7 @@ async function uploadMeetingImage(req, res) {
           const subTab = currentSlide[6]; // '서브탭' 컬럼
           isMonthlyAward = tab === 'indicatorChart' && subTab === 'monthlyAward';
         }
-        
+
         // 가입자 증감 슬라이드 확인 (탭: bondChart, 서브탭: subscriberIncrease)
         let isSubscriberIncrease = false;
         if (currentSlide && currentSlide[5]) { // '탭' 컬럼
@@ -1378,10 +1378,10 @@ async function uploadMeetingImage(req, res) {
           const subTab = currentSlide[6]; // '서브탭' 컬럼
           // tab/subTab 형식으로 저장된 경우 파싱
           const [parsedTab, parsedSubTab] = tab.includes('/') ? tab.split('/') : [tab, subTab];
-          isSubscriberIncrease = (parsedTab === 'bondChart' || parsedTab === 'bond') && 
-                                 (parsedSubTab === 'subscriberIncrease' || subTab === 'subscriberIncrease');
+          isSubscriberIncrease = (parsedTab === 'bondChart' || parsedTab === 'bond') &&
+            (parsedSubTab === 'subscriberIncrease' || subTab === 'subscriberIncrease');
         }
-        
+
         // 핑크바 제거: 모든 슬라이드에서 핑크바 제거 (minBottomPadding: 0, bottomColor: white)
         const cropOptions = { minBottomPadding: 0, bottomColor: 'white' };
       } catch (typeError) {
@@ -1393,14 +1393,14 @@ async function uploadMeetingImage(req, res) {
       // 임시 회의나 slideOrder가 없는 경우 기본값 (핑크바 제거)
       var cropOptions = { minBottomPadding: 0, bottomColor: 'white' };
     }
-    
+
     const croppedResult = await autoCropImage(req.file.buffer, cropOptions);
     console.log(`✅ [uploadMeetingImage] 이미지 자동 크롭 완료:`, {
       originalSize: `${croppedResult.originalWidth}x${croppedResult.originalHeight}`,
       croppedSize: `${croppedResult.croppedWidth}x${croppedResult.croppedHeight}`,
       reduction: `${((1 - (croppedResult.croppedWidth * croppedResult.croppedHeight) / (croppedResult.originalWidth * croppedResult.originalHeight)) * 100).toFixed(2)}%`
     });
-    
+
     // Discord에 업로드 (크롭된 이미지 사용)
     const result = await uploadImageToDiscord(
       croppedResult.buffer,
@@ -1416,12 +1416,55 @@ async function uploadMeetingImage(req, res) {
         croppedHeight: croppedResult.croppedHeight
       }
     );
-    
+
+
     console.log(`✅ [uploadMeetingImage] Discord 업로드 완료:`, {
       imageUrl: result.imageUrl,
       postId: result.postId,
       threadId: result.threadId
     });
+
+    // 재초담초채권 슬라이드의 경우 추가 로깅
+    let isRechotanchoBond = false;
+    try {
+      if (!isTempMeeting && slideOrder !== undefined) {
+        const { sheets, SPREADSHEET_ID } = createSheetsClient();
+        const sheetName = '회의설정';
+        const range = `${sheetName}!A3:V`;
+        const response = await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range
+        });
+        const rows = response.data.values || [];
+        const currentSlide = rows.find((row) => {
+          const rowMeetingId = row[0];
+          const rowOrder = parseInt(row[2]) || 0;
+          return rowMeetingId === meetingId && rowOrder === parseInt(slideOrder);
+        });
+
+        if (currentSlide) {
+          const tab = currentSlide[5]; // '탭' 컬럼
+          const subTab = currentSlide[6]; // '서브탭' 컬럼
+          isRechotanchoBond = (tab === 'bondChart' || tab === 'bond') && subTab === 'rechotanchoBond';
+
+          if (isRechotanchoBond) {
+            console.log(`📊 [재초담초채권 상세] Discord 업로드 결과:`, {
+              imageUrl: result.imageUrl,
+              postId: result.postId,
+              threadId: result.threadId,
+              imageUrlValid: result.imageUrl && result.imageUrl.startsWith('https://'),
+              urlPrefix: result.imageUrl ? result.imageUrl.substring(0, 50) : 'N/A',
+              meetingId,
+              slideOrder,
+              tab,
+              subTab
+            });
+          }
+        }
+      }
+    } catch (logError) {
+      console.warn('⚠️ [uploadMeetingImage] 슬라이드 정보 로깅 실패:', logError.message);
+    }
 
     res.json({
       success: true,
@@ -1437,20 +1480,20 @@ async function uploadMeetingImage(req, res) {
   } catch (error) {
     // CORS 헤더 설정 (에러 응답에도 포함)
     setCORSHeaders(req, res);
-    
+
     console.error('❌ [uploadMeetingImage] 이미지 업로드 오류:', error);
     console.error('❌ [uploadMeetingImage] 에러 스택:', error.stack);
-    
+
     // 응답이 이미 전송되었는지 확인
     if (res.headersSent) {
       console.error('⚠️ [uploadMeetingImage] 응답이 이미 전송되었습니다.');
       return;
     }
-    
+
     // 에러 타입에 따라 적절한 HTTP 상태 코드 반환
     let statusCode = 500;
     let errorMessage = error.message || '이미지 업로드 중 오류가 발생했습니다.';
-    
+
     if (error.message && error.message.includes('Discord')) {
       statusCode = 503; // Service Unavailable
       errorMessage = 'Discord 서비스에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.';
@@ -1461,10 +1504,10 @@ async function uploadMeetingImage(req, res) {
       statusCode = 400; // Bad Request
       errorMessage = '이미지 파일이 없습니다.';
     }
-    
+
     try {
-      res.status(statusCode).json({ 
-        success: false, 
+      res.status(statusCode).json({
+        success: false,
         error: errorMessage,
         errorType: error.name || 'UnknownError',
         timestamp: new Date().toISOString()
@@ -1621,7 +1664,7 @@ function convertExcelToHTML(worksheet) {
     .replace(/'/g, '&#39;');
   html += `<h2>${sheetName}</h2>`;
   html += '<table>';
-  
+
   // 헤더 행
   const headerRow = worksheet.getRow(1);
   if (headerRow && headerRow.values && headerRow.values.length > 1) {
@@ -1639,12 +1682,12 @@ function convertExcelToHTML(worksheet) {
     });
     html += '</tr></thead>';
   }
-  
+
   // 데이터 행
   html += '<tbody>';
   worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
     if (rowNumber === 1) return; // 헤더는 이미 처리됨
-    
+
     html += '<tr>';
     row.eachCell({ includeEmpty: false }, (cell) => {
       const value = cell.value !== null && cell.value !== undefined ? String(cell.value) : '';
@@ -1660,7 +1703,7 @@ function convertExcelToHTML(worksheet) {
     html += '</tr>';
   });
   html += '</tbody></table></body></html>';
-  
+
   return html;
 }
 
@@ -1671,7 +1714,7 @@ async function convertExcelToImage(worksheet, filename) {
     let canvasModule;
     let createCanvas;
     let registerFont;
-    
+
     try {
       canvasModule = require('canvas');
       createCanvas = canvasModule.createCanvas;
@@ -1680,14 +1723,14 @@ async function convertExcelToImage(worksheet, filename) {
       console.error('❌ [Excel 변환] Canvas 모듈을 찾을 수 없습니다:', canvasError.message);
       throw new Error('Excel 파일을 이미지로 변환하려면 Canvas 모듈이 필요합니다. 서버에 Canvas를 설치해주세요: npm install canvas');
     }
-    
+
     // 시스템 한글 폰트 우선순위 (OS별)
     // Canvas는 시스템 폰트를 직접 사용하므로 폰트 이름만 지정
     const os = require('os');
     const platform = os.platform();
-    
+
     let fontFamily = 'Arial'; // 기본값
-    
+
     // OS별 한글 폰트 우선순위
     if (platform === 'win32') {
       // Windows: 맑은 고딕 우선
@@ -1699,9 +1742,9 @@ async function convertExcelToImage(worksheet, filename) {
       // Linux: Noto Sans CJK KR 또는 NanumGothic
       fontFamily = 'Noto Sans CJK KR';
     }
-    
+
     console.log(`📝 [Excel 변환] OS: ${platform}, 사용 폰트: ${fontFamily}`);
-    
+
     // Excel 데이터 읽기
     const rows = [];
     worksheet.eachRow({ includeEmpty: false }, (row) => {
@@ -1714,11 +1757,11 @@ async function convertExcelToImage(worksheet, filename) {
       });
       rows.push(rowData);
     });
-    
+
     if (rows.length === 0) {
       throw new Error('Excel 시트에 데이터가 없습니다.');
     }
-    
+
     // 동적 크기 계산
     const maxCols = Math.max(...rows.map(r => r.length));
     const maxRows = Math.min(rows.length, 50); // 최대 50행
@@ -1726,21 +1769,21 @@ async function convertExcelToImage(worksheet, filename) {
     const rowHeight = 35;
     const padding = 50;
     const headerHeight = 80;
-    
+
     const canvasWidth = Math.max(1920, padding * 2 + colWidth * maxCols);
     const canvasHeight = Math.max(1080, headerHeight + padding * 2 + rowHeight * maxRows);
-    
+
     const canvas = createCanvas(canvasWidth, canvasHeight);
     const ctx = canvas.getContext('2d');
-    
+
     // 텍스트 인코딩 설정 (UTF-8)
     ctx.textBaseline = 'top';
     ctx.textAlign = 'left';
-    
+
     // 배경
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
+
     // 제목
     ctx.fillStyle = '#000000';
     ctx.font = `bold 36px ${fontFamily}, Arial, sans-serif`;
@@ -1756,17 +1799,17 @@ async function convertExcelToImage(worksheet, filename) {
       ctx.fillText(title, padding, 50);
       ctx.font = `bold 36px ${fontFamily}, Arial, sans-serif`;
     }
-    
+
     // 테이블 영역
     let yPos = headerHeight;
     const startX = padding;
-    
+
     // 헤더 행 (첫 번째 행)
     if (rows.length > 0) {
       const headerRow = rows[0];
       ctx.fillStyle = '#4a90e2';
       ctx.fillRect(startX, yPos, colWidth * maxCols, rowHeight);
-      
+
       ctx.fillStyle = '#ffffff';
       ctx.font = `bold 18px ${fontFamily}, Arial, sans-serif`;
       ctx.textBaseline = 'middle';
@@ -1776,7 +1819,7 @@ async function convertExcelToImage(worksheet, filename) {
         const text = String(cell.value || '');
         // 텍스트가 너무 길면 자르기
         let displayText = text.length > 25 ? text.substring(0, 22) + '...' : text;
-        
+
         // 한글 텍스트 렌더링 (UTF-8 인코딩 보장)
         try {
           // 텍스트 측정
@@ -1794,27 +1837,27 @@ async function convertExcelToImage(worksheet, filename) {
       });
       yPos += rowHeight;
     }
-    
+
     // 데이터 행
     ctx.font = `16px ${fontFamily}, Arial, sans-serif`;
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'left';
     for (let i = 1; i < Math.min(rows.length, maxRows + 1); i++) {
       const row = rows[i];
-      
+
       // 짝수 행 배경색
       if (i % 2 === 0) {
         ctx.fillStyle = '#f8f9fa';
         ctx.fillRect(startX, yPos, colWidth * maxCols, rowHeight);
       }
-      
+
       ctx.fillStyle = '#000000';
       let xPos = startX + 10;
       row.forEach((cell, colIndex) => {
         const text = String(cell.value || '');
         // 텍스트가 너무 길면 자르기
         let displayText = text.length > 25 ? text.substring(0, 22) + '...' : text;
-        
+
         // 한글 텍스트 렌더링 (UTF-8 인코딩 보장)
         try {
           const textY = yPos + rowHeight / 2;
@@ -1829,10 +1872,10 @@ async function convertExcelToImage(worksheet, filename) {
         xPos += colWidth;
       });
       yPos += rowHeight;
-      
+
       if (yPos > canvas.height - padding) break;
     }
-    
+
     // 그리드 라인
     ctx.strokeStyle = '#e0e0e0';
     ctx.lineWidth = 1;
@@ -1848,7 +1891,7 @@ async function convertExcelToImage(worksheet, filename) {
       ctx.lineTo(startX + maxCols * colWidth, headerHeight + i * rowHeight);
       ctx.stroke();
     }
-    
+
     // Canvas를 Buffer로 변환
     return canvas.toBuffer('image/png');
   } catch (error) {
@@ -1861,11 +1904,11 @@ async function convertExcelToImage(worksheet, filename) {
 async function convertPPTToImages(pptBuffer, filename) {
   try {
     console.log(`📊 [PPT 변환] PPT 파일 변환 시작: ${filename}`);
-    
+
     // PPTX 파일은 ZIP 파일이므로 압축 해제
     const zip = new JSZip();
     const zipContent = await zip.loadAsync(pptBuffer);
-    
+
     // 슬라이드 파일 목록 가져오기 (ppt/slides/slide*.xml)
     const slideFiles = Object.keys(zipContent.files)
       .filter(name => name.startsWith('ppt/slides/slide') && name.endsWith('.xml'))
@@ -1875,16 +1918,16 @@ async function convertPPTToImages(pptBuffer, filename) {
         const numB = parseInt(b.match(/slide(\d+)\.xml/)?.[1] || '0');
         return numA - numB;
       });
-    
+
     if (slideFiles.length === 0) {
       throw new Error('PPTX 파일에서 슬라이드를 찾을 수 없습니다.');
     }
-    
+
     console.log(`📊 [PPT 변환] ${slideFiles.length}개의 슬라이드 발견`);
-    
+
     const parser = new xml2js.Parser();
     const imageBuffers = [];
-    
+
     // Puppeteer 브라우저 초기화 (한 번만 생성하여 재사용)
     const puppeteer = require('puppeteer');
     let browser;
@@ -1938,42 +1981,42 @@ async function convertPPTToImages(pptBuffer, filename) {
         } else {
           console.log(`✅ [PPT 변환] 환경 변수에서 Chrome 경로 사용: ${chromePath}`);
         }
-        
+
         // Puppeteer 설정: Chrome 자동 다운로드 허용
         const launchOptions = {
           headless: true,
           args: [
-            '--no-sandbox', 
-            '--disable-setuid-sandbox', 
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
             '--disable-gpu',
             '--disable-software-rasterizer'
           ]
         };
-        
+
         if (chromePath) {
           launchOptions.executablePath = chromePath;
         } else {
           console.warn('⚠️ [PPT 변환] Chrome 경로를 찾을 수 없습니다. Puppeteer가 자동으로 다운로드할 수 있습니다.');
         }
-        
+
         console.log(`🚀 [PPT 변환] Puppeteer 브라우저 실행 시도... (Chrome: ${chromePath || '자동'})`);
         global.pptBrowser = await puppeteer.launch(launchOptions);
         console.log('✅ [PPT 변환] Puppeteer 브라우저 실행 성공');
       } catch (launchError) {
         console.error('❌ [PPT 변환] Puppeteer 브라우저 실행 실패:', launchError.message);
-        
+
         // Chrome을 찾을 수 없는 경우 처리
-        if (launchError.message.includes('Could not find Chrome') || 
-            launchError.message.includes('Browser was not found') ||
-            launchError.message.includes('Executable doesn\'t exist')) {
+        if (launchError.message.includes('Could not find Chrome') ||
+          launchError.message.includes('Browser was not found') ||
+          launchError.message.includes('Executable doesn\'t exist')) {
           console.log('📥 [PPT 변환] Chrome을 찾을 수 없습니다. 설치된 Chrome 경로 확인 중...');
-          
+
           // 이미 설치된 Chrome 경로 확인 (Puppeteer 캐시 디렉토리에서)
           const os = require('os');
           const path = require('path');
           const fs = require('fs');
-          
+
           // 공통 경로 후보
           const commonCandidates = [
             process.env.PUPPETEER_EXECUTABLE_PATH,
@@ -1984,13 +2027,13 @@ async function convertPPTToImages(pptBuffer, filename) {
             '/usr/bin/chromium',
             '/opt/google/chrome/chrome'
           ].filter(Boolean);
-          
+
           const puppeteerCacheDir = process.env.PUPPETEER_CACHE_DIR || path.join(os.homedir(), '.cache', 'puppeteer');
           const chromePaths = [
             path.join(puppeteerCacheDir, 'chrome', 'linux-142.0.7444.162', 'chrome-linux64', 'chrome'),
             path.join(puppeteerCacheDir, 'chrome', 'linux-*', 'chrome-linux64', 'chrome'),
           ];
-          
+
           // 실제 설치된 Chrome 경로 찾기
           let foundChromePath = null;
           try {
@@ -2022,14 +2065,14 @@ async function convertPPTToImages(pptBuffer, filename) {
                       console.log(`✅ [PPT 변환] 시스템 Chrome 발견: ${foundChromePath}`);
                       break;
                     }
-                  } catch (_) {}
+                  } catch (_) { }
                 }
               }
             }
           } catch (pathError) {
             console.warn('⚠️ [PPT 변환] Chrome 경로 확인 실패:', pathError.message);
           }
-          
+
           if (foundChromePath) {
             // 설치된 Chrome 경로로 재시도
             try {
@@ -2037,8 +2080,8 @@ async function convertPPTToImages(pptBuffer, filename) {
                 headless: true,
                 executablePath: foundChromePath,
                 args: [
-                  '--no-sandbox', 
-                  '--disable-setuid-sandbox', 
+                  '--no-sandbox',
+                  '--disable-setuid-sandbox',
                   '--disable-dev-shm-usage',
                   '--disable-gpu',
                   '--disable-software-rasterizer'
@@ -2072,48 +2115,48 @@ async function convertPPTToImages(pptBuffer, filename) {
       }
     }
     browser = global.pptBrowser;
-    
+
     // 각 슬라이드를 HTML로 변환 후 이미지로 변환
     for (let i = 0; i < slideFiles.length; i++) {
       const slideFile = slideFiles[i];
       const slideXml = await zipContent.files[slideFile].async('string');
-      
+
       // XML 파싱
       const slideData = await parser.parseStringPromise(slideXml);
-      
+
       // 슬라이드 내용 추출 (텍스트, 이미지 등)
       const slideContent = await extractSlideContent(slideData, zipContent);
-      
+
       // HTML 생성
       const html = generateSlideHTML(slideContent, i + 1, slideFiles.length);
-      
+
       // Puppeteer로 이미지 변환
       const page = await browser.newPage();
-      
+
       try {
-        await page.setContent(html, { 
+        await page.setContent(html, {
           waitUntil: 'networkidle0',
           timeout: 30000
         });
-        
+
         // 한글 폰트가 로드되도록 대기
         await page.evaluateHandle(() => {
           return document.fonts.ready;
         });
-        
+
         // 추가 대기 시간 (폰트 렌더링 완료 보장)
         await page.waitForTimeout(2000);
-        
+
         // 스크린샷 촬영
         const screenshot = await page.screenshot({
           type: 'png',
           fullPage: true,
           encoding: 'binary'
         });
-        
+
         // 이미지 자동 크롭 처리
         const croppedResult = await autoCropImage(screenshot);
-        
+
         imageBuffers.push({
           buffer: croppedResult.buffer,
           filename: `${filename}_slide${i + 1}.png`,
@@ -2125,7 +2168,7 @@ async function convertPPTToImages(pptBuffer, filename) {
             croppedHeight: croppedResult.croppedHeight
           }
         });
-        
+
         console.log(`✅ [PPT 변환] 슬라이드 ${i + 1}/${slideFiles.length} 변환 완료`);
       } catch (error) {
         console.error(`❌ [PPT 변환] 슬라이드 ${i + 1} 변환 실패:`, error);
@@ -2134,11 +2177,11 @@ async function convertPPTToImages(pptBuffer, filename) {
         await page.close();
       }
     }
-    
+
     // 브라우저는 유지 (다음 변환을 위해)
-    
+
     console.log(`✅ [PPT 변환] PPT 파일 변환 완료: ${filename} (${imageBuffers.length}개 슬라이드)`);
-    
+
     return imageBuffers;
   } catch (error) {
     console.error('❌ [PPT 변환] PPT 변환 오류:', error);
@@ -2152,7 +2195,7 @@ async function extractSlideContent(slideData, zipContent) {
     texts: [],
     images: []
   };
-  
+
   try {
     // 텍스트 추출 (a:t 요소)
     const extractText = (obj, texts = []) => {
@@ -2171,9 +2214,9 @@ async function extractSlideContent(slideData, zipContent) {
       }
       return texts;
     };
-    
+
     content.texts = extractText(slideData);
-    
+
     // 이미지 추출 (a:blip 요소의 r:embed 속성)
     const extractImages = (obj, images = []) => {
       if (typeof obj === 'object' && obj !== null) {
@@ -2190,9 +2233,9 @@ async function extractSlideContent(slideData, zipContent) {
       }
       return images;
     };
-    
+
     const imageIds = extractImages(slideData);
-    
+
     // 이미지 파일 찾기 및 Base64 변환
     const imagePromises = imageIds.map(async (imageId) => {
       try {
@@ -2200,13 +2243,13 @@ async function extractSlideContent(slideData, zipContent) {
         // ppt/slides/_rels/slide*.xml.rels 파일들을 확인
         const relsFiles = Object.keys(zipContent.files)
           .filter(name => name.includes('_rels') && name.endsWith('.rels'));
-        
+
         let imagePath = null;
         for (const relsFile of relsFiles) {
           try {
             const relsContent = await zipContent.files[relsFile].async('string');
             const relsData = await parser.parseStringPromise(relsContent);
-            
+
             // Relationship 요소에서 이미지 찾기
             const relationships = relsData['Relationships']?.['Relationship'] || [];
             for (const rel of relationships) {
@@ -2231,7 +2274,7 @@ async function extractSlideContent(slideData, zipContent) {
             continue;
           }
         }
-        
+
         // 이미지 파일 찾기
         if (imagePath) {
           const imageFile = zipContent.files[imagePath];
@@ -2246,11 +2289,11 @@ async function extractSlideContent(slideData, zipContent) {
             };
           }
         }
-        
+
         // 직접 media 폴더에서 찾기
         const mediaFiles = Object.keys(zipContent.files)
           .filter(name => name.startsWith('ppt/media/') && !name.endsWith('/'));
-        
+
         for (const mediaFile of mediaFiles) {
           const fileName = mediaFile.split('/').pop();
           if (fileName.includes(imageId) || imageId.includes(fileName)) {
@@ -2264,21 +2307,21 @@ async function extractSlideContent(slideData, zipContent) {
             };
           }
         }
-        
+
         return null;
       } catch (error) {
         console.warn(`⚠️ [PPT 변환] 이미지 ${imageId} 추출 실패:`, error.message);
         return null;
       }
     });
-    
+
     const extractedImages = await Promise.all(imagePromises);
     content.images = extractedImages.filter(img => img !== null);
-    
+
   } catch (error) {
     console.warn('⚠️ [PPT 변환] 슬라이드 내용 추출 중 오류:', error);
   }
-  
+
   return content;
 }
 
@@ -2303,12 +2346,12 @@ function generateSlideHTML(slideContent, slideNumber, totalSlides) {
   const images = slideContent.images || [];
   const title = texts[0] || `슬라이드 ${slideNumber}`;
   const bodyTexts = texts.slice(1);
-  
+
   // 이미지 HTML 생성
   const imagesHTML = images.map((img, idx) => {
     return `<img src="${img.data}" alt="이미지 ${idx + 1}" style="max-width: 100%; height: auto; margin: 10px 0;" />`;
   }).join('');
-  
+
   return `
     <!DOCTYPE html>
     <html>
@@ -2403,34 +2446,34 @@ async function uploadCustomSlideFile(req, res) {
   try {
     // CORS 헤더 설정
     setCORSHeaders(req, res);
-    
+
     const { meetingId } = req.params;
     const { meetingDate, fileType, meetingNumber: bodyMeetingNumber } = req.body;
-    
+
     if (!req.file) {
       return res.status(400).json({ success: false, error: '파일이 없습니다.' });
     }
 
     const file = req.file;
-    
+
     // 파일 타입 자동 감지 (fileType이 제공되지 않은 경우)
     let detectedFileType = fileType;
     if (!detectedFileType) {
       const fileName = (file.originalname || '').toLowerCase();
       const mimeType = file.mimetype || '';
-      
+
       if (mimeType.startsWith('image/')) {
         detectedFileType = 'image';
       } else if (
-        fileName.endsWith('.xlsx') || 
-        fileName.endsWith('.xls') || 
+        fileName.endsWith('.xlsx') ||
+        fileName.endsWith('.xls') ||
         mimeType.includes('spreadsheet') ||
         mimeType.includes('excel')
       ) {
         detectedFileType = 'excel';
       } else if (
-        fileName.endsWith('.pptx') || 
-        fileName.endsWith('.ppt') || 
+        fileName.endsWith('.pptx') ||
+        fileName.endsWith('.ppt') ||
         mimeType.includes('presentation') ||
         mimeType.includes('powerpoint')
       ) {
@@ -2448,11 +2491,11 @@ async function uploadCustomSlideFile(req, res) {
         detectedFileType = 'unknown';
       }
     }
-    
+
     console.log(`📤 [uploadCustomSlideFile] 파일 업로드 시작: ${file.originalname}, 타입: ${detectedFileType}`);
-    
+
     let imageBuffers = [];
-    
+
     if (detectedFileType === 'image') {
       // 이미지 파일 자동 크롭 처리
       console.log(`✂️ [uploadCustomSlideFile] 이미지 자동 크롭 시작`);
@@ -2587,204 +2630,204 @@ async function uploadCustomSlideFile(req, res) {
         if (imageBuffers.length === 0) {
           console.log('📊 [Excel 변환] HTML→Puppeteer 파이프라인 시작 (한글 지원)');
           // 먼저 HTML로 변환 시도 (기존 로직)
-        const workbook = new ExcelJS.Workbook();
-        await workbook.xlsx.load(file.buffer);
-        console.log(`📊 [Excel 변환] Excel 파일 로드 완료: ${workbook.worksheets.length}개 시트`);
-        
-        const imageBuffersFromHTML = [];
-        for (let i = 0; i < workbook.worksheets.length; i++) {
-          const worksheet = workbook.worksheets[i];
-          const sheetName = worksheet.name || `Sheet${i + 1}`;
-          console.log(`📊 [Excel 변환] 시트 "${sheetName}" HTML 변환 중...`);
-          const html = convertExcelToHTML(worksheet);
-          
-          // Puppeteer로 HTML을 이미지로 변환 (한글 폰트 확실히 로드)
-          try {
-            const puppeteer = require('puppeteer');
-            
-            // Chrome 경로 찾기 (여러 경로 시도)
-            let chromePath = process.env.PUPPETEER_EXECUTABLE_PATH || process.env.CHROME_PATH || null;
-            if (!chromePath) {
-              try {
-                const { executablePath } = require('puppeteer');
-                chromePath = executablePath();
-                console.log(`✅ [Excel 변환] Puppeteer 기본 Chrome 경로 발견: ${chromePath}`);
-              } catch (e) {
-                console.warn('⚠️ [Excel 변환] Puppeteer 기본 executablePath 탐색 실패:', e.message);
-                // 추가 경로 시도
-                const fs = require('fs');
-                const possiblePaths = [
-                  '/usr/bin/google-chrome',
-                  '/usr/bin/chromium-browser',
-                  '/usr/bin/chromium',
-                  '/opt/google/chrome/chrome',
-                  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
-                ];
-                for (const p of possiblePaths) {
-                  if (fs.existsSync(p)) {
-                    chromePath = p;
-                    console.log(`✅ [Excel 변환] 시스템 Chrome 경로 발견: ${chromePath}`);
-                    break;
+          const workbook = new ExcelJS.Workbook();
+          await workbook.xlsx.load(file.buffer);
+          console.log(`📊 [Excel 변환] Excel 파일 로드 완료: ${workbook.worksheets.length}개 시트`);
+
+          const imageBuffersFromHTML = [];
+          for (let i = 0; i < workbook.worksheets.length; i++) {
+            const worksheet = workbook.worksheets[i];
+            const sheetName = worksheet.name || `Sheet${i + 1}`;
+            console.log(`📊 [Excel 변환] 시트 "${sheetName}" HTML 변환 중...`);
+            const html = convertExcelToHTML(worksheet);
+
+            // Puppeteer로 HTML을 이미지로 변환 (한글 폰트 확실히 로드)
+            try {
+              const puppeteer = require('puppeteer');
+
+              // Chrome 경로 찾기 (여러 경로 시도)
+              let chromePath = process.env.PUPPETEER_EXECUTABLE_PATH || process.env.CHROME_PATH || null;
+              if (!chromePath) {
+                try {
+                  const { executablePath } = require('puppeteer');
+                  chromePath = executablePath();
+                  console.log(`✅ [Excel 변환] Puppeteer 기본 Chrome 경로 발견: ${chromePath}`);
+                } catch (e) {
+                  console.warn('⚠️ [Excel 변환] Puppeteer 기본 executablePath 탐색 실패:', e.message);
+                  // 추가 경로 시도
+                  const fs = require('fs');
+                  const possiblePaths = [
+                    '/usr/bin/google-chrome',
+                    '/usr/bin/chromium-browser',
+                    '/usr/bin/chromium',
+                    '/opt/google/chrome/chrome',
+                    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+                  ];
+                  for (const p of possiblePaths) {
+                    if (fs.existsSync(p)) {
+                      chromePath = p;
+                      console.log(`✅ [Excel 변환] 시스템 Chrome 경로 발견: ${chromePath}`);
+                      break;
+                    }
                   }
                 }
+              } else {
+                console.log(`✅ [Excel 변환] 환경 변수에서 Chrome 경로 사용: ${chromePath}`);
               }
-            } else {
-              console.log(`✅ [Excel 변환] 환경 변수에서 Chrome 경로 사용: ${chromePath}`);
-            }
-            
-            // Puppeteer 설정: Chrome 자동 다운로드 허용
-            const launchOptions = {
-              headless: true,
-              args: [
-                '--no-sandbox', 
-                '--disable-setuid-sandbox', 
-                '--disable-dev-shm-usage',
-                '--disable-gpu',
-                '--disable-software-rasterizer',
-                '--font-render-hinting=none', // 폰트 렌더링 힌팅 비활성화
-                '--disable-font-subpixel-positioning' // 폰트 서브픽셀 위치 지정 비활성화
-              ]
-            };
-            
-            if (chromePath) {
-              launchOptions.executablePath = chromePath;
-            } else {
-              console.warn('⚠️ [Excel 변환] Chrome 경로를 찾을 수 없습니다. Puppeteer가 자동으로 다운로드할 수 있습니다.');
-            }
-            
-            console.log(`🚀 [Excel 변환] Puppeteer 브라우저 실행 시도... (Chrome: ${chromePath || '자동'})`);
-            const browser = await puppeteer.launch(launchOptions);
-            console.log(`✅ [Excel 변환] Puppeteer 브라우저 실행 성공`);
-            const page = await browser.newPage();
-            
-            // 뷰포트 설정 (한글 렌더링 개선)
-            await page.setViewport({
-              width: 1920,
-              height: 1080,
-              deviceScaleFactor: 2 // 고해상도로 렌더링
-            });
-            
-            // HTML 콘텐츠 설정 (폰트 로드 대기)
-            await page.setContent(html, { 
-              waitUntil: 'networkidle0',
-              timeout: 60000 // 타임아웃 증가
-            });
-            
-            // Google Fonts 로드 대기
-            await page.evaluateHandle(() => {
-              return document.fonts.ready;
-            });
-            
-            // 폰트가 실제로 로드되었는지 확인
-            await page.evaluate(async () => {
-              // Noto Sans KR 폰트가 로드되었는지 확인
-              const checkFont = async () => {
-                try {
-                  await document.fonts.load('400 16px "Noto Sans KR"');
-                  await document.fonts.load('500 16px "Noto Sans KR"');
-                  await document.fonts.load('700 16px "Noto Sans KR"');
-                  return true;
-                } catch (e) {
-                  return false;
-                }
+
+              // Puppeteer 설정: Chrome 자동 다운로드 허용
+              const launchOptions = {
+                headless: true,
+                args: [
+                  '--no-sandbox',
+                  '--disable-setuid-sandbox',
+                  '--disable-dev-shm-usage',
+                  '--disable-gpu',
+                  '--disable-software-rasterizer',
+                  '--font-render-hinting=none', // 폰트 렌더링 힌팅 비활성화
+                  '--disable-font-subpixel-positioning' // 폰트 서브픽셀 위치 지정 비활성화
+                ]
               };
-              
-              const fontLoaded = await checkFont();
-              if (!fontLoaded) {
-                console.warn('⚠️ [Excel 변환] Noto Sans KR 폰트 로드 실패, 시스템 폰트 사용');
+
+              if (chromePath) {
+                launchOptions.executablePath = chromePath;
+              } else {
+                console.warn('⚠️ [Excel 변환] Chrome 경로를 찾을 수 없습니다. Puppeteer가 자동으로 다운로드할 수 있습니다.');
               }
-              
-              // 모든 요소에 폰트 강제 적용
-              const koreanFonts = '"Noto Sans KR", "Malgun Gothic", "맑은 고딕", "AppleGothic", "Apple SD Gothic Neo", "NanumGothic", "Nanum Gothic", "Noto Sans CJK KR", "Gulim", "굴림", "Batang", "바탕", sans-serif';
-              const allElements = document.querySelectorAll('*');
-              allElements.forEach(el => {
-                el.style.fontFamily = koreanFonts;
-                el.style.fontFeatureSettings = 'normal';
-                el.style.fontVariant = 'normal';
-                el.style.textRendering = 'optimizeLegibility';
-                el.style.webkitFontSmoothing = 'antialiased';
-                el.style.mozOsxFontSmoothing = 'grayscale';
+
+              console.log(`🚀 [Excel 변환] Puppeteer 브라우저 실행 시도... (Chrome: ${chromePath || '자동'})`);
+              const browser = await puppeteer.launch(launchOptions);
+              console.log(`✅ [Excel 변환] Puppeteer 브라우저 실행 성공`);
+              const page = await browser.newPage();
+
+              // 뷰포트 설정 (한글 렌더링 개선)
+              await page.setViewport({
+                width: 1920,
+                height: 1080,
+                deviceScaleFactor: 2 // 고해상도로 렌더링
               });
-              
-              // 강제 리플로우 트리거 (렌더링 강제)
-              const forceReflow = () => {
-                document.body.offsetHeight;
-                document.body.style.display = 'none';
-                document.body.offsetHeight;
-                document.body.style.display = '';
-                document.body.offsetHeight;
-              };
-              forceReflow();
-            });
-            
-            // 폰트 적용 후 충분한 대기 시간 (Google Fonts 로드 대기)
-            await page.waitForTimeout(2000);
-            
-            // 한글 텍스트가 제대로 렌더링되었는지 확인
-            await page.evaluate(() => {
-              // 테이블의 모든 텍스트 확인
-              const cells = document.querySelectorAll('th, td');
-              let hasKorean = false;
-              cells.forEach(cell => {
-                const text = cell.textContent || '';
-                // 한글 유니코드 범위 확인 (AC00-D7A3)
-                if (/[\uAC00-\uD7A3]/.test(text)) {
-                  hasKorean = true;
+
+              // HTML 콘텐츠 설정 (폰트 로드 대기)
+              await page.setContent(html, {
+                waitUntil: 'networkidle0',
+                timeout: 60000 // 타임아웃 증가
+              });
+
+              // Google Fonts 로드 대기
+              await page.evaluateHandle(() => {
+                return document.fonts.ready;
+              });
+
+              // 폰트가 실제로 로드되었는지 확인
+              await page.evaluate(async () => {
+                // Noto Sans KR 폰트가 로드되었는지 확인
+                const checkFont = async () => {
+                  try {
+                    await document.fonts.load('400 16px "Noto Sans KR"');
+                    await document.fonts.load('500 16px "Noto Sans KR"');
+                    await document.fonts.load('700 16px "Noto Sans KR"');
+                    return true;
+                  } catch (e) {
+                    return false;
+                  }
+                };
+
+                const fontLoaded = await checkFont();
+                if (!fontLoaded) {
+                  console.warn('⚠️ [Excel 변환] Noto Sans KR 폰트 로드 실패, 시스템 폰트 사용');
+                }
+
+                // 모든 요소에 폰트 강제 적용
+                const koreanFonts = '"Noto Sans KR", "Malgun Gothic", "맑은 고딕", "AppleGothic", "Apple SD Gothic Neo", "NanumGothic", "Nanum Gothic", "Noto Sans CJK KR", "Gulim", "굴림", "Batang", "바탕", sans-serif';
+                const allElements = document.querySelectorAll('*');
+                allElements.forEach(el => {
+                  el.style.fontFamily = koreanFonts;
+                  el.style.fontFeatureSettings = 'normal';
+                  el.style.fontVariant = 'normal';
+                  el.style.textRendering = 'optimizeLegibility';
+                  el.style.webkitFontSmoothing = 'antialiased';
+                  el.style.mozOsxFontSmoothing = 'grayscale';
+                });
+
+                // 강제 리플로우 트리거 (렌더링 강제)
+                const forceReflow = () => {
+                  document.body.offsetHeight;
+                  document.body.style.display = 'none';
+                  document.body.offsetHeight;
+                  document.body.style.display = '';
+                  document.body.offsetHeight;
+                };
+                forceReflow();
+              });
+
+              // 폰트 적용 후 충분한 대기 시간 (Google Fonts 로드 대기)
+              await page.waitForTimeout(2000);
+
+              // 한글 텍스트가 제대로 렌더링되었는지 확인
+              await page.evaluate(() => {
+                // 테이블의 모든 텍스트 확인
+                const cells = document.querySelectorAll('th, td');
+                let hasKorean = false;
+                cells.forEach(cell => {
+                  const text = cell.textContent || '';
+                  // 한글 유니코드 범위 확인 (AC00-D7A3)
+                  if (/[\uAC00-\uD7A3]/.test(text)) {
+                    hasKorean = true;
+                  }
+                });
+
+                if (!hasKorean) {
+                  console.warn('⚠️ [Excel 변환] 한글 텍스트가 감지되지 않았습니다.');
                 }
               });
-              
-              if (!hasKorean) {
-                console.warn('⚠️ [Excel 변환] 한글 텍스트가 감지되지 않았습니다.');
-              }
-            });
-            
-            // 스크린샷 촬영 (고해상도)
-            const screenshot = await page.screenshot({
-              type: 'png',
-              fullPage: true,
-              encoding: 'binary'
-            });
-            
-            await browser.close();
-            
-            // Excel 변환 이미지도 자동 크롭 처리
-            const croppedResult = await autoCropImage(screenshot);
-            console.log(`✅ [Excel 변환] 시트 "${sheetName}" Puppeteer 변환 완료 (크기: ${croppedResult.croppedWidth}x${croppedResult.croppedHeight})`);
-            imageBuffersFromHTML.push({
-              buffer: croppedResult.buffer,
-              filename: `${file.originalname || 'excel'}_${worksheet.name}.png`,
-              sheetName: worksheet.name,
-              metadata: {
-                originalWidth: croppedResult.originalWidth,
-                originalHeight: croppedResult.originalHeight,
-                croppedWidth: croppedResult.croppedWidth,
-                croppedHeight: croppedResult.croppedHeight
-              }
-            });
-          } catch (puppeteerError) {
-            console.error('❌ [Excel 변환] Puppeteer 변환 실패:', puppeteerError.message);
-            console.error('❌ [Excel 변환] 스택:', puppeteerError.stack);
-            console.warn('⚠️ [Excel 변환] Canvas로 재시도...');
-            // Puppeteer 실패 시 Canvas로 폴백
-            const canvasImages = await convertExcelToImages(file.buffer, file.originalname || 'excel');
-            // Canvas로 변환된 이미지들도 자동 크롭 처리
-            imageBuffers = await Promise.all(canvasImages.map(async (img) => {
-              const croppedResult = await autoCropImage(img.buffer);
-              return {
-                ...img,
+
+              // 스크린샷 촬영 (고해상도)
+              const screenshot = await page.screenshot({
+                type: 'png',
+                fullPage: true,
+                encoding: 'binary'
+              });
+
+              await browser.close();
+
+              // Excel 변환 이미지도 자동 크롭 처리
+              const croppedResult = await autoCropImage(screenshot);
+              console.log(`✅ [Excel 변환] 시트 "${sheetName}" Puppeteer 변환 완료 (크기: ${croppedResult.croppedWidth}x${croppedResult.croppedHeight})`);
+              imageBuffersFromHTML.push({
                 buffer: croppedResult.buffer,
+                filename: `${file.originalname || 'excel'}_${worksheet.name}.png`,
+                sheetName: worksheet.name,
                 metadata: {
                   originalWidth: croppedResult.originalWidth,
                   originalHeight: croppedResult.originalHeight,
                   croppedWidth: croppedResult.croppedWidth,
                   croppedHeight: croppedResult.croppedHeight
                 }
-              };
-            }));
-            break; // Canvas 방식으로 전환했으므로 루프 종료
+              });
+            } catch (puppeteerError) {
+              console.error('❌ [Excel 변환] Puppeteer 변환 실패:', puppeteerError.message);
+              console.error('❌ [Excel 변환] 스택:', puppeteerError.stack);
+              console.warn('⚠️ [Excel 변환] Canvas로 재시도...');
+              // Puppeteer 실패 시 Canvas로 폴백
+              const canvasImages = await convertExcelToImages(file.buffer, file.originalname || 'excel');
+              // Canvas로 변환된 이미지들도 자동 크롭 처리
+              imageBuffers = await Promise.all(canvasImages.map(async (img) => {
+                const croppedResult = await autoCropImage(img.buffer);
+                return {
+                  ...img,
+                  buffer: croppedResult.buffer,
+                  metadata: {
+                    originalWidth: croppedResult.originalWidth,
+                    originalHeight: croppedResult.originalHeight,
+                    croppedWidth: croppedResult.croppedWidth,
+                    croppedHeight: croppedResult.croppedHeight
+                  }
+                };
+              }));
+              break; // Canvas 방식으로 전환했으므로 루프 종료
+            }
           }
-        }
-        
+
           if (imageBuffersFromHTML.length > 0) {
             imageBuffers = imageBuffersFromHTML;
           } else {
@@ -2812,14 +2855,14 @@ async function uploadCustomSlideFile(req, res) {
         console.error('Excel 변환 오류:', excelError);
         // Canvas가 없는 경우 더 명확한 에러 메시지
         if (excelError.message.includes('Canvas')) {
-          return res.status(503).json({ 
-            success: false, 
-            error: 'Excel 파일 변환 기능을 사용하려면 서버에 Canvas 모듈 또는 Puppeteer가 설치되어 있어야 합니다. 관리자에게 문의하세요.' 
+          return res.status(503).json({
+            success: false,
+            error: 'Excel 파일 변환 기능을 사용하려면 서버에 Canvas 모듈 또는 Puppeteer가 설치되어 있어야 합니다. 관리자에게 문의하세요.'
           });
         }
-        return res.status(500).json({ 
-          success: false, 
-          error: `Excel 변환 실패: ${excelError.message}` 
+        return res.status(500).json({
+          success: false,
+          error: `Excel 변환 실패: ${excelError.message}`
         });
       }
     } else if (detectedFileType === 'ppt') {
@@ -2844,20 +2887,20 @@ async function uploadCustomSlideFile(req, res) {
         // CORS 헤더 설정 (에러 응답에도 포함)
         setCORSHeaders(req, res);
         console.error('PPT 변환 오류:', pptError);
-        return res.status(500).json({ 
-          success: false, 
-          error: `PPT 변환 실패: ${pptError.message}` 
+        return res.status(500).json({
+          success: false,
+          error: `PPT 변환 실패: ${pptError.message}`
         });
       }
     } else if (detectedFileType === 'video') {
       // 동영상 파일 업로드
       try {
         console.log(`🎬 [uploadCustomSlideFile] 동영상 파일 업로드 시작: ${file.originalname}`);
-        
+
         // 회의 정보 조회 (차수 가져오기) - 동영상 업로드 전에 필요
         let meetingNumber = bodyMeetingNumber ? parseInt(bodyMeetingNumber) : null;
         const isTempMeeting = meetingId === 'temp-custom-slide';
-        
+
         if (!meetingNumber && !isTempMeeting) {
           try {
             const { sheets, SPREADSHEET_ID } = createSheetsClient();
@@ -2867,10 +2910,10 @@ async function uploadCustomSlideFile(req, res) {
               spreadsheetId: SPREADSHEET_ID,
               range
             });
-            
+
             const rows = response.data.values || [];
             const meetingRow = rows.find(row => row[0] === meetingId);
-            
+
             if (meetingRow && meetingRow[3]) {
               meetingNumber = parseInt(meetingRow[3]);
             }
@@ -2878,12 +2921,12 @@ async function uploadCustomSlideFile(req, res) {
             console.warn('회의 정보 조회 실패:', meetingError);
           }
         }
-        
-        const uploadMeetingId = isTempMeeting 
-          ? `temp-${meetingDate || new Date().toISOString().split('T')[0]}` 
+
+        const uploadMeetingId = isTempMeeting
+          ? `temp-${meetingDate || new Date().toISOString().split('T')[0]}`
           : meetingId;
         const finalMeetingDate = meetingDate || new Date().toISOString().split('T')[0];
-        
+
         // Discord에 동영상 업로드
         const result = await uploadVideoToDiscord(
           file.buffer,
@@ -2893,9 +2936,9 @@ async function uploadCustomSlideFile(req, res) {
           meetingNumber,
           '커스텀'
         );
-        
+
         console.log(`✅ [uploadCustomSlideFile] 동영상 업로드 완료: ${result.videoUrl}`);
-        
+
         // 동영상 URL 반환
         res.json({
           success: true,
@@ -2909,24 +2952,24 @@ async function uploadCustomSlideFile(req, res) {
         // CORS 헤더 설정 (에러 응답에도 포함)
         setCORSHeaders(req, res);
         console.error('동영상 업로드 오류:', videoError);
-        return res.status(500).json({ 
-          success: false, 
-          error: `동영상 업로드 실패: ${videoError.message}` 
+        return res.status(500).json({
+          success: false,
+          error: `동영상 업로드 실패: ${videoError.message}`
         });
       }
     } else {
       // CORS 헤더 설정 (에러 응답에도 포함)
       setCORSHeaders(req, res);
-      return res.status(400).json({ 
-        success: false, 
-        error: '지원하지 않는 파일 형식입니다.' 
+      return res.status(400).json({
+        success: false,
+        error: '지원하지 않는 파일 형식입니다.'
       });
     }
-    
+
     // 회의 정보 조회 (차수 가져오기)
     let meetingNumber = bodyMeetingNumber ? parseInt(bodyMeetingNumber) : null;
     const isTempMeeting = meetingId === 'temp-custom-slide';
-    
+
     console.log(`🔍 [uploadCustomSlideFile] 초기 상태:`, {
       meetingId,
       bodyMeetingNumber,
@@ -2934,7 +2977,7 @@ async function uploadCustomSlideFile(req, res) {
       isTempMeeting,
       meetingDate
     });
-    
+
     // body에서 meetingNumber를 받지 못한 경우, Google Sheets에서 조회
     if (!meetingNumber && !isTempMeeting) {
       try {
@@ -2945,10 +2988,10 @@ async function uploadCustomSlideFile(req, res) {
           spreadsheetId: SPREADSHEET_ID,
           range
         });
-        
+
         const rows = response.data.values || [];
         const meetingRow = rows.find(row => row[0] === meetingId);
-        
+
         if (meetingRow && meetingRow[3]) {
           meetingNumber = parseInt(meetingRow[3]);
           console.log(`📋 [uploadCustomSlideFile] 회의 차수 조회 (Google Sheets): ${meetingNumber}차`);
@@ -2963,38 +3006,38 @@ async function uploadCustomSlideFile(req, res) {
     } else if (isTempMeeting) {
       // 임시 회의인 경우, meetingNumber가 없으면 null로 유지
       console.log('📋 [uploadCustomSlideFile] 임시 회의 (커스텀 슬라이드), meetingNumber 없음');
-      
+
       // 임시 회의인 경우에도 meetingDate를 사용하여 같은 포스트를 찾도록 시도
       // 하지만 meetingNumber가 없으면 다른 포스트가 생성될 수 있음
       if (!meetingNumber && meetingDate) {
         console.warn('⚠️ [uploadCustomSlideFile] 임시 회의에서 meetingNumber가 없습니다. meetingDate만 사용하여 포스트를 찾습니다.');
       }
     }
-    
+
     // 최종 meetingNumber 확인 및 로깅
     console.log(`📋 [uploadCustomSlideFile] 최종 meetingNumber: ${meetingNumber}, meetingDate: ${meetingDate}, isTempMeeting: ${isTempMeeting}`);
-    
+
     // 각 이미지를 Discord에 업로드
     // 임시 회의인 경우에도 meetingDate와 meetingNumber를 사용하여 같은 포스트에 저장되도록 함
     const imageUrls = [];
     for (let i = 0; i < imageBuffers.length; i++) {
       const imageData = imageBuffers[i];
-      
+
       // Discord 업로드 시 meetingId는 실제 meetingId를 사용하되, 
       // meetingNumber와 meetingDate를 명시적으로 전달하여 같은 포스트를 찾도록 함
       // 임시 회의인 경우에도 meetingNumber가 있으면 사용하여 같은 포스트를 찾도록 함
-      const uploadMeetingId = isTempMeeting 
-        ? `temp-${meetingDate || new Date().toISOString().split('T')[0]}` 
+      const uploadMeetingId = isTempMeeting
+        ? `temp-${meetingDate || new Date().toISOString().split('T')[0]}`
         : meetingId;
-      
+
       // meetingNumber를 명시적으로 전달하여 같은 포스트를 찾도록 함
       // 임시 회의인 경우에도 meetingNumber가 있으면 사용
       // meetingNumber가 없으면 meetingDate만 사용하여 포스트를 찾도록 함
       const finalMeetingNumber = meetingNumber || null;
-      
+
       // meetingDate가 없으면 오늘 날짜 사용
       const finalMeetingDate = meetingDate || new Date().toISOString().split('T')[0];
-      
+
       console.log(`📤 [uploadCustomSlideFile] Discord 업로드 시작 (${i + 1}/${imageBuffers.length}):`, {
         uploadMeetingId,
         meetingDate: finalMeetingDate,
@@ -3002,7 +3045,7 @@ async function uploadCustomSlideFile(req, res) {
         isTempMeeting,
         filename: imageData.filename
       });
-      
+
       // 검색을 위한 추적 강화를 위해 파일명 개선
       const generatedFilename = `custom-${finalMeetingDate}-${uploadMeetingId}-${i + 1}.png`;
       const result = await uploadImageToDiscord(
@@ -3014,13 +3057,13 @@ async function uploadCustomSlideFile(req, res) {
         '커스텀',
         imageData.metadata || null // 메타데이터 전달
       );
-      
+
       console.log(`✅ [uploadCustomSlideFile] Discord 업로드 완료 (${i + 1}/${imageBuffers.length}):`, {
         imageUrl: result.imageUrl,
         postId: result.postId,
         threadId: result.threadId
       });
-      
+
       imageUrls.push({
         imageUrl: result.imageUrl,
         originalWidth: result.originalWidth,
@@ -3030,7 +3073,7 @@ async function uploadCustomSlideFile(req, res) {
       });
       console.log(`✅ [uploadCustomSlideFile] 이미지 ${i + 1}/${imageBuffers.length} 업로드 완료: ${result.imageUrl}`);
     }
-    
+
     // 여러 이미지인 경우 imageUrls 배열 반환, 단일 이미지인 경우 imageUrl 반환
     if (imageUrls.length === 1) {
       res.json({
@@ -3055,7 +3098,7 @@ async function uploadCustomSlideFile(req, res) {
   } catch (error) {
     // CORS 헤더 설정 (에러 응답에도 포함)
     setCORSHeaders(req, res);
-    
+
     console.error('파일 업로드 오류:', error);
     res.status(500).json({ success: false, error: error.message });
   }
@@ -3066,35 +3109,35 @@ async function proxyDiscordImage(req, res) {
   try {
     // CORS 헤더 설정
     setCORSHeaders(req, res);
-    
+
     const imageUrl = req.query.url;
-    
+
     if (!imageUrl) {
-      return res.status(400).json({ 
-        success: false, 
-        error: '이미지 URL이 필요합니다.' 
+      return res.status(400).json({
+        success: false,
+        error: '이미지 URL이 필요합니다.'
       });
     }
-    
+
     // Discord CDN URL인지 확인
     if (!imageUrl.includes('cdn.discordapp.com')) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Discord CDN URL만 허용됩니다.' 
+      return res.status(400).json({
+        success: false,
+        error: 'Discord CDN URL만 허용됩니다.'
       });
     }
-    
+
     // Discord CDN에서 이미지 가져오기 (Node.js 내장 https 모듈 사용)
     const https = require('https');
     const http = require('http');
     const url = require('url');
-    
+
     let contentType = 'image/png'; // 기본값
-    
+
     const imageBuffer = await new Promise((resolve, reject) => {
       const parsedUrl = new URL(imageUrl);
       const protocol = parsedUrl.protocol === 'https:' ? https : http;
-      
+
       const request = protocol.get(imageUrl, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
@@ -3104,20 +3147,20 @@ async function proxyDiscordImage(req, res) {
           reject(new Error(`이미지 가져오기 실패: ${response.statusCode} ${response.statusMessage}`));
           return;
         }
-        
+
         // Content-Type 가져오기
         contentType = response.headers['content-type'] || 'image/png';
-        
+
         const chunks = [];
         response.on('data', (chunk) => chunks.push(chunk));
         response.on('end', () => resolve(Buffer.concat(chunks)));
         response.on('error', reject);
       });
-      
+
       request.on('error', reject);
       request.end();
     });
-    
+
     // 이미지 응답 전송
     res.setHeader('Content-Type', contentType);
     res.setHeader('Cache-Control', 'public, max-age=31536000'); // 1년 캐시
@@ -3126,10 +3169,10 @@ async function proxyDiscordImage(req, res) {
     console.error('Discord 이미지 프록시 오류:', error);
     // CORS 헤더 설정 (에러 응답에도 포함)
     setCORSHeaders(req, res);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: '이미지를 가져오는데 실패했습니다.',
-      message: error.message 
+      message: error.message
     });
   }
 }

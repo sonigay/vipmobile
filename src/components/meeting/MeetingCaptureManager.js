@@ -4362,7 +4362,18 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             console.log('✅ [MeetingCaptureManager] 통합 캡처 엔진 성공');
           }
         } else {
-          // 통합 엔진이 null을 반환한 경우 기본 캡처 폴백 (레거시 blob 변수 제거)
+          // 통합 엔진이 null을 반환한 경우 기본 캡처 폴백
+          // 재초담초채권 슬라이드의 경우 imageQuality 설정 추가 (근본 문제 해결)
+          const isRechotanchoBond = currentSlide?.mode === 'chart' &&
+            (currentSlide?.tab === 'bondChart' || currentSlide?.tab === 'bond') &&
+            currentSlide?.subTab === 'rechotanchoBond';
+
+          if (isRechotanchoBond) {
+            // SlideCaptureConfig에서 imageQuality 0.85 설정을 실제로 적용
+            captureOptions.imageQuality = 0.85;
+            console.log('🔧 [MeetingCaptureManager] 재초담초채권 슬라이드: imageQuality 0.85 적용 (폴백)');
+          }
+
           blob = await captureElement(captureTargetElement, captureOptions);
           if (process.env.NODE_ENV === 'development') {
             console.warn('⚠️ [MeetingCaptureManager] 통합 엔진 null 반환, 기본 캡처 사용');
@@ -4372,7 +4383,17 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         if (process.env.NODE_ENV === 'development') {
           console.warn('⚠️ [MeetingCaptureManager] 통합 캡처 엔진 에러:', e?.message);
         }
-        // 에러 발생 시 기본 캡처 폴백 (레거시 blob 변수 제거)
+        // 에러 발생 시 기본 캡처 폴백
+        // 재초담초채권 슬라이드의 경우 imageQuality 설정 추가
+        const isRechotanchoBond = currentSlide?.mode === 'chart' &&
+          (currentSlide?.tab === 'bondChart' || currentSlide?.tab === 'bond') &&
+          currentSlide?.subTab === 'rechotanchoBond';
+
+        if (isRechotanchoBond) {
+          captureOptions.imageQuality = 0.85;
+          console.log('🔧 [MeetingCaptureManager] 재초담초채권 슬라이드: imageQuality 0.85 적용 (에러 폴백)');
+        }
+
         blob = await captureElement(captureTargetElement, captureOptions);
         if (process.env.NODE_ENV === 'development') {
           console.warn('⚠️ [MeetingCaptureManager] 기본 캡처 폴백 사용');
@@ -4687,7 +4708,23 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
       const uploadResponse = await uploadWithRetry();
 
       const uploadResult = await uploadResponse.json();
-      if (process.env.NODE_ENV === 'development') {
+
+      // 재초담초채권 슬라이드의 경우 더 자세한 로그 출력
+      const isRechotanchoBond = currentSlide?.mode === 'chart' &&
+        (currentSlide?.tab === 'bondChart' || currentSlide?.tab === 'bond') &&
+        currentSlide?.subTab === 'rechotanchoBond';
+
+      if (isRechotanchoBond) {
+        console.log(`✅ [재초담초채권] 슬라이드 ${index + 1} 업로드 완료:`, {
+          imageUrl: uploadResult.imageUrl,
+          postId: uploadResult.postId,
+          threadId: uploadResult.threadId,
+          imageSizeMB: imageSizeMB.toFixed(2),
+          compressionApplied: true,
+          quality: 0.85,
+          fullResponse: uploadResult
+        });
+      } else if (process.env.NODE_ENV === 'development') {
         console.log(`✅ [MeetingCaptureManager] 슬라이드 ${index + 1} 업로드 완료:`, uploadResult.imageUrl);
       }
 
@@ -4699,7 +4736,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         updatedSlides = prevSlides.map((s, i) =>
           i === index ? {
             ...s,
-            imageUrl: uploadResult.imageUrl,
+            imageUrl: uploadResult.imageUrl, // 원본 Discord CDN URL 사용
             capturedAt: new Date().toISOString(),
             discordPostId: uploadResult.postId || '',
             discordThreadId: uploadResult.threadId || ''
@@ -4733,7 +4770,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
           updatedSlides = prevSlides.map((s, i) =>
             i === index ? {
               ...s,
-              imageUrl: uploadResult.imageUrl,
+              imageUrl: uploadResult.imageUrl, // 원본 URL 사용
               capturedAt: new Date().toISOString(),
               discordPostId: uploadResult.postId || '',
               discordThreadId: uploadResult.threadId || ''
