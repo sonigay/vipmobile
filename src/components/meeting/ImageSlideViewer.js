@@ -432,12 +432,35 @@ function ImageSlideViewer({ slides, onClose }) {
                 WebkitUserSelect: 'none',
                 touchAction: 'none'
               }}
-              onError={() => setError('이미지를 불러올 수 없습니다.')}
+              onError={(e) => {
+                // 프록시 실패 시 원본 URL로 폴백
+                const imgElement = e.currentTarget;
+                const proxyUrl = imgElement.src;
+                const originalUrl = currentSlide.imageUrl;
+                
+                if (originalUrl && proxyUrl !== originalUrl) {
+                  console.warn(`⚠️ [ImageSlideViewer] 프록시 이미지 로드 실패, 원본 URL로 폴백:`, {
+                    proxyUrl: proxyUrl.substring(0, 100),
+                    originalUrl: originalUrl.substring(0, 100)
+                  });
+                  imgElement.src = originalUrl;
+                } else {
+                  setError('이미지를 불러올 수 없습니다.');
+                  if (process.env.NODE_ENV === 'development') {
+                    console.error('❌ [ImageSlideViewer] 이미지 로드 실패:', {
+                      imageUrl: currentSlide.imageUrl,
+                      slideIndex: currentIndex,
+                      slideId: currentSlide.slideId
+                    });
+                  }
+                }
+              }}
               onLoad={() => {
                 // 이미지 로드 시 초기화 및 로드 상태 업데이트
                 setLoadedImages(prev => new Set([...prev, currentIndex]));
                 setScale(1);
                 setPosition({ x: 0, y: 0 });
+                setError(null); // 에러 상태 초기화
               }}
             />
           )}

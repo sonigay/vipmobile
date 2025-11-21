@@ -2002,12 +2002,24 @@ const SlideRenderer = React.memo(function SlideRenderer({ slide, loggedInStore, 
                   }}
                   onError={(e) => {
                     // 프록시 실패 시 원본 URL로 폴백
-                    try {
-                      const original = slide.imageUrl;
-                      if (original && e.currentTarget.src !== original) {
-                        e.currentTarget.src = original;
-                      }
-                    } catch {}
+                    const imgElement = e.currentTarget;
+                    const proxyUrl = imgElement.src;
+                    const originalUrl = slide.imageUrl;
+                    
+                    if (originalUrl && proxyUrl !== originalUrl) {
+                      console.warn(`⚠️ [SlideRenderer] 프록시 이미지 로드 실패, 원본 URL로 폴백:`, {
+                        proxyUrl: proxyUrl.substring(0, 100),
+                        originalUrl: originalUrl.substring(0, 100),
+                        slideId: slide.slideId
+                      });
+                      imgElement.src = originalUrl;
+                    } else if (process.env.NODE_ENV === 'development') {
+                      console.error('❌ [SlideRenderer] 이미지 로드 실패:', {
+                        imageUrl: slide.imageUrl,
+                        slideId: slide.slideId,
+                        currentSrc: imgElement.src
+                      });
+                    }
                   }}
                 />
               )}

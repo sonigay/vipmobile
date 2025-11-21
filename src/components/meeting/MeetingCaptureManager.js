@@ -24,29 +24,73 @@ import { unifiedCapture } from './unifiedCaptureLogic';
 async function compressImageBlob(blob, quality = 0.85) {
   return new Promise((resolve, reject) => {
     const img = new Image();
+    const objectUrl = URL.createObjectURL(blob);
+    
     img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0);
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
 
-      canvas.toBlob(
-        (compressedBlob) => {
-          if (compressedBlob) {
-            resolve(compressedBlob);
-          } else {
-            reject(new Error('이미지 압축에 실패했습니다.'));
+        // PNG는 손실 없는 포맷이므로 quality가 효과가 없습니다.
+        // JPEG로 변환하여 압축 효과를 얻습니다.
+        // 단, 투명도가 필요한 경우를 위해 원본이 PNG이고 투명도가 있으면 PNG 유지
+        let hasTransparency = false;
+        try {
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const data = imageData.data;
+          // 알파 채널 체크 (4번째 바이트가 255 미만이면 투명도 있음)
+          for (let i = 3; i < data.length; i += 4) {
+            if (data[i] < 255) {
+              hasTransparency = true;
+              break;
+            }
           }
-        },
-        'image/png',
-        quality
-      );
+        } catch (e) {
+          // 투명도 체크 실패 시 안전하게 JPEG로 변환
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('⚠️ [compressImageBlob] 투명도 체크 실패, JPEG로 변환:', e.message);
+          }
+        }
+        
+        const mimeType = hasTransparency ? 'image/png' : 'image/jpeg';
+        
+        canvas.toBlob(
+          (compressedBlob) => {
+            // 메모리 정리
+            URL.revokeObjectURL(objectUrl);
+            
+            if (compressedBlob) {
+              // 압축 후에도 크기가 줄어들지 않으면 원본 반환
+              if (compressedBlob.size >= blob.size) {
+                if (process.env.NODE_ENV === 'development') {
+                  console.warn('⚠️ [compressImageBlob] 압축 후 크기가 줄어들지 않아 원본 반환');
+                }
+                resolve(blob);
+              } else {
+                resolve(compressedBlob);
+              }
+            } else {
+              reject(new Error('이미지 압축에 실패했습니다.'));
+            }
+          },
+          mimeType,
+          mimeType === 'image/jpeg' ? quality : undefined // PNG는 quality 파라미터 무시
+        );
+      } catch (error) {
+        URL.revokeObjectURL(objectUrl);
+        reject(error);
+      }
     };
+    
     img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
       reject(new Error('이미지 로드에 실패했습니다.'));
     };
-    img.src = URL.createObjectURL(blob);
+    
+    img.src = objectUrl;
   });
 }
 
@@ -4472,10 +4516,11 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
           console.log(`📊 [MeetingCaptureManager] 재초담초채권 슬라이드 이미지 크기: ${imageSizeMB.toFixed(2)}MB (압축 전)`);
         }
 
-        // 재초담초채권 슬라이드가 1MB 이상이면 추가 압축 시도
-        if (isRechotanchoBond && blob.size > 1 * 1024 * 1024) {
+        // 재초담초채권 슬라이드가 2MB 이상이면 추가 압축 시도 (임계값 상향 조정)
+        // 품질도 0.90으로 상향 조정하여 이미지 품질 유지
+        if (isRechotanchoBond && blob.size > 2 * 1024 * 1024) {
           try {
-            const compressedBlob = await compressImageBlob(blob, 0.85);
+            const compressedBlob = await compressImageBlob(blob, 0.90);
             if (compressedBlob && compressedBlob.size < blob.size) {
               const originalSizeMB = imageSizeMB;
               const compressedSizeMB = compressedBlob.size / (1024 * 1024);
@@ -4483,11 +4528,19 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               console.log(`📦 [MeetingCaptureManager] 재초담초채권 슬라이드 추가 압축: ${originalSizeMB.toFixed(2)}MB → ${compressedSizeMB.toFixed(2)}MB (${reduction}% 감소)`);
               blob = compressedBlob;
               imageSizeMB = compressedSizeMB;
+            } else {
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`📦 [MeetingCaptureManager] 재초담초채권 슬라이드 압축 효과 없음, 원본 사용`);
+              }
             }
           } catch (compressError) {
             if (process.env.NODE_ENV === 'development') {
               console.warn('⚠️ [MeetingCaptureManager] 재초담초채권 슬라이드 추가 압축 실패, 원본 사용:', compressError?.message);
             }
+          }
+        } else if (isRechotanchoBond) {
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`📦 [MeetingCaptureManager] 재초담초채권 슬라이드 크기가 ${imageSizeMB.toFixed(2)}MB로 작아 추가 압축 생략`);
           }
         }
 
@@ -4714,18 +4767,37 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         (currentSlide?.tab === 'bondChart' || currentSlide?.tab === 'bond') &&
         currentSlide?.subTab === 'rechotanchoBond';
 
+      // 이미지 URL 검증
+      if (!uploadResult.imageUrl) {
+        const errorMsg = `이미지 URL이 없습니다. (슬라이드 ${index + 1}, ${isRechotanchoBond ? '재초담초채권' : '일반'})`;
+        console.error(`❌ [MeetingCaptureManager] ${errorMsg}`, uploadResult);
+        throw new Error(errorMsg);
+      }
+
+      if (!uploadResult.imageUrl.startsWith('https://')) {
+        const errorMsg = `유효하지 않은 이미지 URL입니다: ${uploadResult.imageUrl.substring(0, 50)}...`;
+        console.error(`❌ [MeetingCaptureManager] ${errorMsg}`);
+        throw new Error(errorMsg);
+      }
+
       if (isRechotanchoBond) {
         console.log(`✅ [재초담초채권] 슬라이드 ${index + 1} 업로드 완료:`, {
           imageUrl: uploadResult.imageUrl,
+          imageUrlLength: uploadResult.imageUrl.length,
+          imageUrlValid: uploadResult.imageUrl.startsWith('https://'),
           postId: uploadResult.postId,
           threadId: uploadResult.threadId,
           imageSizeMB: imageSizeMB.toFixed(2),
-          compressionApplied: true,
-          quality: 0.85,
+          compressionApplied: blob.size !== imageSizeMB * 1024 * 1024,
+          quality: 0.90,
           fullResponse: uploadResult
         });
       } else if (process.env.NODE_ENV === 'development') {
-        console.log(`✅ [MeetingCaptureManager] 슬라이드 ${index + 1} 업로드 완료:`, uploadResult.imageUrl);
+        console.log(`✅ [MeetingCaptureManager] 슬라이드 ${index + 1} 업로드 완료:`, {
+          imageUrl: uploadResult.imageUrl,
+          imageUrlLength: uploadResult.imageUrl.length,
+          imageUrlValid: uploadResult.imageUrl.startsWith('https://')
+        });
       }
 
       // 현재 상태를 기반으로 슬라이드 배열 업데이트 (이전 슬라이드 정보 유지)
@@ -4848,7 +4920,25 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         await saveWithRetry({
           slides: slidesToSave
         });
-        if (process.env.NODE_ENV === 'development') {
+        
+        // 재초담초채권 슬라이드의 경우 저장 후 검증
+        if (isRechotanchoBond) {
+          const savedSlide = slidesToSave.find(s => s.slideId === currentSlide?.slideId);
+          if (savedSlide?.imageUrl) {
+            console.log(`✅ [재초담초채권] 슬라이드 ${index + 1} 저장 완료 및 검증:`, {
+              slideId: savedSlide.slideId,
+              imageUrl: savedSlide.imageUrl,
+              imageUrlLength: savedSlide.imageUrl.length,
+              imageUrlValid: savedSlide.imageUrl.startsWith('https://'),
+              order: savedSlide.order
+            });
+          } else {
+            console.warn(`⚠️ [재초담초채권] 슬라이드 ${index + 1} 저장 후 imageUrl 확인 실패:`, {
+              slideId: currentSlide?.slideId,
+              savedSlides: slidesToSave.map(s => ({ slideId: s.slideId, hasImageUrl: !!s.imageUrl }))
+            });
+          }
+        } else if (process.env.NODE_ENV === 'development') {
           console.log(`✅ [MeetingCaptureManager] 슬라이드 ${index + 1} 저장 완료`);
         }
       } catch (err) {
