@@ -1711,6 +1711,11 @@ async function adjustSizes(elements, config, slide) {
 async function executeCapture(elements, config, sizeInfo, slide) {
   let blob = null;
   const styleRestores = [];
+  
+  // 재초담초채권 슬라이드 식별
+  const isRechotanchoBond = slide?.mode === 'chart' &&
+    (slide?.tab === 'bondChart' || slide?.tab === 'bond') &&
+    slide?.subTab === 'rechotanchoBond';
 
   try {
     switch (config?.captureMethod) {
@@ -1753,7 +1758,7 @@ async function executeCapture(elements, config, sizeInfo, slide) {
           await new Promise(r => setTimeout(r, 300));
 
           // width/height는 원본 크기만 전달 (SCALE 곱하지 않음)
-          blob = await captureElement(commonAncestor, {
+          const captureOptions = {
             scale: SCALE,
             useCORS: true,
             fixedBottomPaddingPx: 0,
@@ -1763,7 +1768,14 @@ async function executeCapture(elements, config, sizeInfo, slide) {
             skipAutoCrop: false,
             height: Math.min(sizeInfo?.measuredHeight || 0, MAX_HEIGHT),
             width: Math.min(sizeInfo?.measuredWidth || 0, MAX_WIDTH),
-          });
+          };
+          
+          // 재초담초채권만 imageQuality 추가 (다른 슬라이드는 전달하지 않음)
+          if (isRechotanchoBond && config?.imageQuality) {
+            captureOptions.imageQuality = config.imageQuality;
+          }
+          
+          blob = await captureElement(commonAncestor, captureOptions);
         } catch (error) {
           if (process.env.NODE_ENV === 'development') {
             console.error('❌ [executeCapture] commonAncestor 캡처 실패:', error);
@@ -2026,13 +2038,20 @@ async function executeCapture(elements, config, sizeInfo, slide) {
                 elements.headerElement.scrollIntoView({ block: 'start', behavior: 'instant' });
                 await new Promise(r => setTimeout(r, 300)); // 대기 시간 증가
                 
-                headerBlob = await captureElement(elements.headerElement, {
+                const headerCaptureOptions = {
                   scale: SCALE,
                   useCORS: true,
                   fixedBottomPaddingPx: 0,
                   backgroundColor: '#ffffff',
                   skipAutoCrop: true,
-                });
+                };
+                
+                // 재초담초채권만 imageQuality 추가 (실제로는 이 경로를 사용하지 않지만 일관성 유지)
+                if (isRechotanchoBond && config?.imageQuality) {
+                  headerCaptureOptions.imageQuality = config.imageQuality;
+                }
+                
+                headerBlob = await captureElement(elements.headerElement, headerCaptureOptions);
                 
                 if (headerBlob && process.env.NODE_ENV === 'development') {
                   console.log(`✅ [executeCapture] 재고장표 헤더 캡처 성공 (detectHeader): ${(headerBlob.size / 1024).toFixed(2)}KB`);
@@ -2095,13 +2114,20 @@ async function executeCapture(elements, config, sizeInfo, slide) {
                   headerCandidate.scrollIntoView({ block: 'start', behavior: 'instant' });
                   await new Promise(r => setTimeout(r, 300)); // 대기 시간 증가
                   
-                  headerBlob = await captureElement(headerCandidate, {
+                  const headerCaptureOptions2 = {
                     scale: SCALE,
                     useCORS: true,
                     fixedBottomPaddingPx: 0,
                     backgroundColor: '#ffffff',
                     skipAutoCrop: true,
-                  });
+                  };
+                  
+                  // 재초담초채권만 imageQuality 추가 (실제로는 이 경로를 사용하지 않지만 일관성 유지)
+                  if (isRechotanchoBond && config?.imageQuality) {
+                    headerCaptureOptions2.imageQuality = config.imageQuality;
+                  }
+                  
+                  headerBlob = await captureElement(headerCandidate, headerCaptureOptions2);
                   
                   if (headerBlob && process.env.NODE_ENV === 'development') {
                     console.log(`✅ [executeCapture] 재고장표 헤더 찾음 (대체 방법): ${(headerBlob.size / 1024).toFixed(2)}KB`);
@@ -2129,7 +2155,7 @@ async function executeCapture(elements, config, sizeInfo, slide) {
           const tableWidth = Math.min(adjustedBoxWidth, MAX_WIDTH);
           const tableHeight = Math.min(adjustedBoxHeight, MAX_HEIGHT);
 
-          const tableBlob = await captureElement(tableBox, {
+          const tableCaptureOptions = {
             scale: SCALE,
             useCORS: true,
             fixedBottomPaddingPx: 0,
@@ -2137,7 +2163,14 @@ async function executeCapture(elements, config, sizeInfo, slide) {
             skipAutoCrop: false, // autoCrop 활성화하여 불필요한 공간 제거
             width: tableWidth,
             height: tableHeight,
-          });
+          };
+          
+          // 재초담초채권만 imageQuality 추가 (실제로는 이 경로를 사용하지 않지만 일관성 유지)
+          if (isRechotanchoBond && config?.imageQuality) {
+            tableCaptureOptions.imageQuality = config.imageQuality;
+          }
+          
+          const tableBlob = await captureElement(tableBox, tableCaptureOptions);
 
           // 헤더가 없으면 에러 발생 (재고장표는 헤더 필수)
           if (!headerBlob) {
@@ -2246,7 +2279,7 @@ async function executeCapture(elements, config, sizeInfo, slide) {
           }
 
           // 전체총마감 슬라이드가 타일 캡처가 필요한 경우 height 옵션 전달하지 않음 (타일 캡처 사용)
-          blob = await captureElement(captureElementForDirect, {
+          const directCaptureOptions = {
             scale: SCALE,
             useCORS: true,
             fixedBottomPaddingPx: 0, // 핑크바 제거
@@ -2256,10 +2289,17 @@ async function executeCapture(elements, config, sizeInfo, slide) {
             skipAutoCrop: false, // autoCrop 활성화 (불필요한 공백 제거)
             width: captureWidth,
             height: shouldUseTiledCaptureForTotalClosing ? undefined : captureHeight, // 타일 캡처 필요 시 height 전달하지 않음
-          });
+          };
+          
+          // 재초담초채권만 imageQuality 추가
+          if (isRechotanchoBond && config?.imageQuality) {
+            directCaptureOptions.imageQuality = config.imageQuality;
+          }
+          
+          blob = await captureElement(captureElementForDirect, directCaptureOptions);
         } else {
           // 기본 캡처 (크기 측정 없이) - autoCrop으로 불필요한 공백 제거
-          blob = await captureElement(captureElementForDirect, {
+          const defaultCaptureOptions = {
             scale: SCALE,
             useCORS: true,
             fixedBottomPaddingPx: 0, // 핑크바 제거
@@ -2267,7 +2307,14 @@ async function executeCapture(elements, config, sizeInfo, slide) {
             scrollX: 0,
             scrollY: 0,
             skipAutoCrop: false, // autoCrop 활성화 (불필요한 공백 제거)
-          });
+          };
+          
+          // 재초담초채권만 imageQuality 추가
+          if (isRechotanchoBond && config?.imageQuality) {
+            defaultCaptureOptions.imageQuality = config.imageQuality;
+          }
+          
+          blob = await captureElement(captureElementForDirect, defaultCaptureOptions);
         }
         break;
       }
