@@ -1716,6 +1716,18 @@ async function executeCapture(elements, config, sizeInfo, slide) {
   const isRechotanchoBond = slide?.mode === 'chart' &&
     (slide?.tab === 'bondChart' || slide?.tab === 'bond') &&
     slide?.subTab === 'rechotanchoBond';
+  
+  // 재초담초채권 디버깅 로그
+  if (isRechotanchoBond && process.env.NODE_ENV === 'development') {
+    console.log('🔍 [executeCapture] 재초담초채권 슬라이드 확인:', {
+      isRechotanchoBond: true,
+      hasConfig: !!config,
+      imageQuality: config?.imageQuality,
+      slideType: slide?.subTab,
+      slideMode: slide?.mode,
+      slideTab: slide?.tab
+    });
+  }
 
   try {
     switch (config?.captureMethod) {
@@ -2294,6 +2306,15 @@ async function executeCapture(elements, config, sizeInfo, slide) {
           // 재초담초채권만 imageQuality 추가
           if (isRechotanchoBond && config?.imageQuality) {
             directCaptureOptions.imageQuality = config.imageQuality;
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`✅ [executeCapture] 재초담초채권 imageQuality 전달: ${config.imageQuality}`);
+            }
+          } else if (isRechotanchoBond && process.env.NODE_ENV === 'development') {
+            console.warn('⚠️ [executeCapture] 재초담초채권이지만 imageQuality가 없음:', {
+              hasConfig: !!config,
+              configKeys: config ? Object.keys(config) : [],
+              imageQuality: config?.imageQuality
+            });
           }
           
           blob = await captureElement(captureElementForDirect, directCaptureOptions);
@@ -2390,12 +2411,22 @@ export async function captureSlide(slideElement, slide, captureTargetElement) {
   let config;
   
   try {
-    slideType = identifySlideType(slide);
-    config = getCaptureConfig(slide);
-  } catch (error) {
-    if (process.env.NODE_ENV === 'development') {
-      console.error('❌ [captureSlide] 슬라이드 타입 식별 실패:', error);
-    }
+      slideType = identifySlideType(slide);
+      config = getCaptureConfig(slide);
+      
+      // 재초담초채권 디버깅 로그
+      if (slideType === 'rechotanchoBond' && process.env.NODE_ENV === 'development') {
+        console.log('🔍 [captureSlide] 재초담초채권 슬라이드 식별:', {
+          slideType,
+          hasConfig: !!config,
+          imageQuality: config?.imageQuality,
+          configKeys: config ? Object.keys(config) : []
+        });
+      }
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('❌ [captureSlide] 슬라이드 타입 식별 실패:', error);
+      }
     throw new Error('슬라이드 타입을 식별할 수 없습니다.');
   }
 

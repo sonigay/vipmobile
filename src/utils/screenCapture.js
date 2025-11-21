@@ -975,6 +975,9 @@ export async function captureElement(element, options = {}) {
         quality = options.imageQuality;
         if (process.env.NODE_ENV === 'development') {
           console.log(`📦 [screenCapture] 명시적 이미지 품질 사용: ${quality} (slideId: ${slideId})`);
+          if (isRechotanchoBond) {
+            console.log(`✅ [screenCapture] 재초담초채권 슬라이드에 imageQuality ${quality} 적용`);
+          }
         }
       } else {
         // 기존 로직 완전히 유지 (다른 슬라이드)

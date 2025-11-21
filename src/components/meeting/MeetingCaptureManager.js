@@ -4452,6 +4452,10 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
                                   (currentSlide?.tab === 'bondChart' || currentSlide?.tab === 'bond') && 
                                   currentSlide?.subTab === 'rechotanchoBond';
         
+        if (isRechotanchoBond) {
+          console.log(`📊 [MeetingCaptureManager] 재초담초채권 슬라이드 이미지 크기: ${imageSizeMB.toFixed(2)}MB (압축 전)`);
+        }
+        
         // 재초담초채권 슬라이드가 1MB 이상이면 추가 압축 시도
         if (isRechotanchoBond && blob.size > 1 * 1024 * 1024) {
           try {
