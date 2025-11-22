@@ -1198,6 +1198,14 @@ async function adjustSizes(elements, config, slide) {
     let sizeInfo = null;
     if (config?.needsHeightMeasurement && elements.contentElement && SafeDOM.isInDOM(elements.contentElement)) {
       try {
+        console.log('🎯 [adjustSizes] measureContentSize 호출 준비:', {
+          slideMode: slide?.mode,
+          slideTab: slide?.tab,
+          slideSubTab: slide?.subTab,
+          configIgnoreScrollHeight: config.ignoreScrollHeight,
+          needsHeightMeasurement: config.needsHeightMeasurement
+        });
+
         sizeInfo = measureContentSize(elements.contentElement, {
           preferTables: config.needsManagerTableInclusion || config.needsTableVerification,
           preferCharts: config.captureMethod === 'direct',

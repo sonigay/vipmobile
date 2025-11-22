@@ -333,6 +333,13 @@ export function measureContentSize(element, options = {}) {
     ignoreScrollHeight = false,
   } = options;
 
+  console.log('🔍 [measureContentSize] 함수 호출됨:', {
+    ignoreScrollHeight,
+    hasElement: !!element,
+    elementTag: element?.tagName,
+    allOptions: options
+  });
+
   const rect = element.getBoundingClientRect();
   let maxRelativeBottom = 0;
   let maxRelativeRight = 0;
@@ -425,15 +432,14 @@ export function measureContentSize(element, options = {}) {
     ? Math.max(maxRelativeBottom, actualContentHeight)
     : scrollHeight;
 
-  if (process.env.NODE_ENV === 'development' && ignoreScrollHeight) {
-    console.log('[measureContentSize] ignoreScrollHeight 옵션 활성화:', {
-      scrollHeight,
-      maxRelativeBottom,
-      actualContentHeight,
-      heightToUse,
-      willIgnoreScrollHeight: ignoreScrollHeight
-    });
-  }
+  console.log('📊 [measureContentSize] 높이 계산:', {
+    ignoreScrollHeight,
+    scrollHeight,
+    maxRelativeBottom,
+    actualContentHeight,
+    heightToUse,
+    '사용된 높이': ignoreScrollHeight ? 'maxRelativeBottom/actualContentHeight' : 'scrollHeight'
+  });
 
   const measuredHeight = Math.max(
     maxRelativeBottom + padding,
