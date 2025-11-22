@@ -48,12 +48,12 @@ const SafeDOM = {
     if (!element || !this.isInDOM(element)) {
       return { width: 0, height: 0, top: 0, left: 0, right: 0, bottom: 0 };
     }
-    
+
     // 캐시가 있고 최신이면 재사용
     if (cache && cache.element === element && cache.timestamp > Date.now() - 100) {
       return cache.rect;
     }
-    
+
     try {
       const rect = element.getBoundingClientRect();
       return {
@@ -77,7 +77,7 @@ const SafeDOM = {
    */
   restoreStyle(element, property, originalValue) {
     if (!element || !this.isInDOM(element)) return;
-    
+
     try {
       if (originalValue !== undefined && originalValue !== null && originalValue !== '') {
         element.style.setProperty(property, originalValue);
@@ -105,22 +105,22 @@ function detectHeader(slideElement, options = {}) {
 
     const slideRect = SafeDOM.getBoundingRect(slideElement);
     const companyNames = ['(주)브이아이피플러스', '브이아이피플러스', '브이아이피', 'VIPPLUS'];
-    
+
     // 1단계: 클래스명/속성 기반 검색
     try {
       const headerElement = slideElement.querySelector(
         '[class*="header"], [class*="Header"], .MuiAppBar-root, .MuiToolbar-root, header, [role="banner"]'
       );
-      
+
       if (headerElement && SafeDOM.isInDOM(headerElement)) {
         const headerRect = SafeDOM.getBoundingRect(headerElement);
         const relativeTop = headerRect.top - slideRect.top;
-        
+
         if (relativeTop >= -30 && relativeTop < 250 && headerRect.height > 30 && headerRect.width > 200) {
           const hasLogo = headerElement.querySelector('img, svg, [class*="logo"], [class*="Logo"]') !== null;
           const textContent = headerElement.textContent || '';
           const hasCompanyName = companyNames.some(name => textContent.includes(name));
-          
+
           if (hasLogo || hasCompanyName || headerRect.height > 50) {
             return headerElement;
           }
@@ -137,26 +137,26 @@ function detectHeader(slideElement, options = {}) {
       const allElements = Array.from(slideElement.querySelectorAll('*'));
       const fixedOrAbsolute = allElements.find(el => {
         if (!SafeDOM.isInDOM(el)) return false;
-        
+
         try {
           const style = window.getComputedStyle(el);
           const rect = SafeDOM.getBoundingRect(el);
           const relativeTop = rect.top - slideRect.top;
-          
+
           return (style.position === 'fixed' || style.position === 'absolute') &&
-                 relativeTop >= -20 && relativeTop < 200 &&
-                 rect.height > 50 && rect.width > 200 &&
-                 (rect.width > slideRect.width * 0.4);
+            relativeTop >= -20 && relativeTop < 200 &&
+            rect.height > 50 && rect.width > 200 &&
+            (rect.width > slideRect.width * 0.4);
         } catch {
           return false;
         }
       });
-      
+
       if (fixedOrAbsolute && SafeDOM.isInDOM(fixedOrAbsolute)) {
         const hasLogo = fixedOrAbsolute.querySelector('img, svg, [class*="logo"], [class*="Logo"]') !== null;
         const textContent = fixedOrAbsolute.textContent || '';
         const hasCompanyName = companyNames.some(name => textContent.includes(name));
-        
+
         if (hasLogo || hasCompanyName) {
           return fixedOrAbsolute;
         }
@@ -172,26 +172,26 @@ function detectHeader(slideElement, options = {}) {
       const allElements = Array.from(slideElement.querySelectorAll('*'));
       const textBased = allElements.find(el => {
         if (!SafeDOM.isInDOM(el)) return false;
-        
+
         try {
           const elRect = SafeDOM.getBoundingRect(el);
           const relativeTop = elRect.top - slideRect.top;
           const text = (el.textContent || '').trim().toLowerCase();
-          const hasCompanyName = companyNames.some(name => 
+          const hasCompanyName = companyNames.some(name =>
             text.includes(name.toLowerCase().replace(/\s/g, ''))
           );
-          
+
           return relativeTop >= -30 && relativeTop < 250 &&
-                 elRect.height > 40 && 
-                 elRect.width > slideRect.width * 0.4 &&
-                 hasCompanyName &&
-                 !text.includes('재고장표') &&
-                 !text.includes('테이블');
+            elRect.height > 40 &&
+            elRect.width > slideRect.width * 0.4 &&
+            hasCompanyName &&
+            !text.includes('재고장표') &&
+            !text.includes('테이블');
         } catch {
           return false;
         }
       });
-      
+
       if (textBased && SafeDOM.isInDOM(textBased)) {
         return textBased;
       }
@@ -206,22 +206,22 @@ function detectHeader(slideElement, options = {}) {
       const allElements = Array.from(slideElement.querySelectorAll('*'));
       const structureBased = allElements.find(el => {
         if (!SafeDOM.isInDOM(el)) return false;
-        
+
         try {
           const elRect = SafeDOM.getBoundingRect(el);
           const relativeTop = elRect.top - slideRect.top;
           const hasLogo = el.querySelector('img, svg, [class*="logo"], [class*="Logo"]') !== null;
-          
+
           return relativeTop >= -30 && relativeTop < 200 &&
-                 elRect.height > 40 &&
-                 elRect.width > slideRect.width * 0.3 &&
-                 hasLogo &&
-                 !(el.textContent || '').toLowerCase().includes('재고장표');
+            elRect.height > 40 &&
+            elRect.width > slideRect.width * 0.3 &&
+            hasLogo &&
+            !(el.textContent || '').toLowerCase().includes('재고장표');
         } catch {
           return false;
         }
       });
-      
+
       if (structureBased && SafeDOM.isInDOM(structureBased)) {
         return structureBased;
       }
@@ -237,18 +237,18 @@ function detectHeader(slideElement, options = {}) {
       const candidates = allElements
         .filter(el => {
           if (!SafeDOM.isInDOM(el)) return false;
-          
+
           try {
             const elRect = SafeDOM.getBoundingRect(el);
             const relativeTop = elRect.top - slideRect.top;
             const text = (el.textContent || '').trim().toLowerCase();
-            
+
             return relativeTop >= -30 && relativeTop < 200 &&
-                   elRect.height > 30 &&
-                   elRect.width > slideRect.width * 0.3 &&
-                   !text.includes('재고장표') &&
-                   !text.includes('테이블') &&
-                   !text.includes('그래프');
+              elRect.height > 30 &&
+              elRect.width > slideRect.width * 0.3 &&
+              !text.includes('재고장표') &&
+              !text.includes('테이블') &&
+              !text.includes('그래프');
           } catch {
             return false;
           }
@@ -259,7 +259,7 @@ function detectHeader(slideElement, options = {}) {
             const bRect = SafeDOM.getBoundingRect(b);
             const aTop = aRect.top - slideRect.top;
             const bTop = bRect.top - slideRect.top;
-            
+
             if (Math.abs(aTop) !== Math.abs(bTop)) {
               return Math.abs(aTop) - Math.abs(bTop);
             }
@@ -268,7 +268,7 @@ function detectHeader(slideElement, options = {}) {
             return 0;
           }
         });
-      
+
       if (candidates.length > 0 && SafeDOM.isInDOM(candidates[0])) {
         return candidates[0];
       }
@@ -330,7 +330,7 @@ async function clickExpandButtons(slideElement, config) {
 
     for (const btn of expandButtons) {
       if (!SafeDOM.isInDOM(btn)) continue;
-      
+
       try {
         btn.click();
         await new Promise(r => setTimeout(r, 300));
@@ -428,7 +428,7 @@ async function adjustHeaderWidth(headerElement, contentWidth, slideElement) {
     // 헤더와 콘텐츠 너비 차이 확인 (헤더가 작거나 클 때 모두 조정)
     const widthDiff = Math.abs(headerRect.width - contentWidth);
     const tolerance = 5; // 5px 이하 차이는 무시 (렌더링 오차 허용)
-    
+
     // 헤더와 콘텐츠 너비가 다르면 콘텐츠 크기에 맞춤 (헤더/콘텐츠 비율 개선)
     // 단순화: 헤더 컨테이너 너비만 조정하고 내부 요소 비율 조정 로직 제거
     // 헤더는 right: 0 고정 스타일이므로 컨테이너 너비만 콘텐츠 너비에 맞추면 내부 요소는 자동 정렬됨
@@ -449,7 +449,7 @@ async function adjustHeaderWidth(headerElement, contentWidth, slideElement) {
       return () => {
         try {
           if (!SafeDOM.isInDOM(headerElement)) return;
-          
+
           SafeDOM.restoreStyle(headerElement, 'width', originalStyles.width);
           SafeDOM.restoreStyle(headerElement, 'max-width', originalStyles.maxWidth);
           SafeDOM.restoreStyle(headerElement, 'min-width', originalStyles.minWidth);
@@ -491,7 +491,7 @@ async function adjustContentToHeaderWidth(contentElement, targetWidth, slideElem
 
     const widthDiff = Math.abs(contentRect.width - targetWidth);
     const tolerance = 5; // 5px 이하 차이는 무시 (렌더링 오차 허용)
-    
+
     // 콘텐츠 너비가 타겟 너비와 다르면 타겟 너비에 맞춤
     if (widthDiff > tolerance && contentRect.width < targetWidth) {
       contentElement.style.width = `${targetWidth}px`;
@@ -508,7 +508,7 @@ async function adjustContentToHeaderWidth(contentElement, targetWidth, slideElem
       return () => {
         try {
           if (!SafeDOM.isInDOM(contentElement)) return;
-          
+
           SafeDOM.restoreStyle(contentElement, 'width', originalStyles.width);
           SafeDOM.restoreStyle(contentElement, 'max-width', originalStyles.maxWidth);
           SafeDOM.restoreStyle(contentElement, 'min-width', originalStyles.minWidth);
@@ -545,16 +545,16 @@ function findMonthlyAwardTables(slideElement) {
       if (!SafeDOM.isInDOM(el)) return false;
       const text = el.textContent || '';
       return text.includes('월간시상 현황') &&
-             text.includes('확대') &&
-             (text.includes('셋팅') || text.includes('업셀기변') || text.includes('기변105이상'));
+        text.includes('확대') &&
+        (text.includes('셋팅') || text.includes('업셀기변') || text.includes('기변105이상'));
     });
 
     const matrixPaper = allElements.find(el => {
       if (!SafeDOM.isInDOM(el)) return false;
       const text = el.textContent || '';
       return (text.includes('월간시상 Matrix') || text.includes('만점기준')) &&
-             text.includes('총점') &&
-             text.includes('달성상황');
+        text.includes('총점') &&
+        text.includes('달성상황');
     });
 
     const channelBox = allElements.find(el => {
@@ -632,7 +632,7 @@ function findCommonAncestor(elements, slideElement) {
       // 테이블이 있는지 확인
       const hasTableInFound = Array.from(foundAncestor.querySelectorAll('table, .MuiTable-root, .MuiTableContainer-root'))
         .some(el => SafeDOM.isInDOM(el));
-      
+
       if (!hasTableInFound) {
         return slideElement;
       }
@@ -654,28 +654,28 @@ function findCommonAncestor(elements, slideElement) {
  */
 async function withRetry(fn, maxRetries = 3, delay = 500) {
   let lastError = null;
-  
+
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       return await fn();
     } catch (error) {
       lastError = error;
-      
+
       // 재시도 불가능한 에러는 즉시 throw
       if (error.name === 'TypeError' && error.message?.includes('Cannot read')) {
         throw error;
       }
-      
+
       if (attempt === maxRetries) {
         throw error;
       }
-      
+
       // 지수 백오프
       const retryDelay = delay * Math.pow(2, attempt - 1);
       await new Promise(r => setTimeout(r, retryDelay));
     }
   }
-  
+
   throw lastError || new Error('알 수 없는 오류가 발생했습니다.');
 }
 
@@ -690,11 +690,11 @@ function blobToImage(blob) {
   return new Promise((resolve, reject) => {
     let url = null;
     let isResolved = false;
-    
+
     try {
       url = URL.createObjectURL(blob);
       const img = new Image();
-      
+
       const cleanup = () => {
         if (url && !isResolved) {
           try {
@@ -704,7 +704,7 @@ function blobToImage(blob) {
           }
         }
       };
-      
+
       // 타임아웃 설정 (10초)
       const timeoutId = setTimeout(() => {
         if (!isResolved) {
@@ -713,7 +713,7 @@ function blobToImage(blob) {
           reject(new Error('이미지 로딩 타임아웃'));
         }
       }, 10000);
-      
+
       img.onload = () => {
         clearTimeout(timeoutId);
         if (!isResolved) {
@@ -722,7 +722,7 @@ function blobToImage(blob) {
           resolve(img);
         }
       };
-      
+
       img.onerror = (e) => {
         clearTimeout(timeoutId);
         if (!isResolved) {
@@ -731,7 +731,7 @@ function blobToImage(blob) {
           reject(new Error('이미지 로딩 실패'));
         }
       };
-      
+
       img.src = url;
     } catch (error) {
       if (url) {
@@ -757,17 +757,17 @@ function measureBottomWhitespace(img, threshold = 240) {
     canvas.height = img.height;
     const ctx = canvas.getContext('2d');
     if (!ctx) return 0;
-    
+
     ctx.drawImage(img, 0, 0);
     const imageData = ctx.getImageData(0, 0, img.width, img.height);
     const data = imageData.data;
-    
+
     let bottomWhitespace = 0;
-    
+
     // 하단부터 위로 스캔 (마지막 행부터)
     for (let y = img.height - 1; y >= 0; y--) {
       let isWhiteRow = true;
-      
+
       // 해당 행의 모든 픽셀 확인
       for (let x = 0; x < img.width; x++) {
         const index = (y * img.width + x) * 4;
@@ -775,21 +775,21 @@ function measureBottomWhitespace(img, threshold = 240) {
         const g = data[index + 1];
         const b = data[index + 2];
         const avg = (r + g + b) / 3;
-        
+
         // 흰색이 아니면 중단
         if (avg < threshold) {
           isWhiteRow = false;
           break;
         }
       }
-      
+
       if (isWhiteRow) {
         bottomWhitespace++;
       } else {
         break; // 흰색 행이 아니면 중단
       }
     }
-    
+
     return bottomWhitespace;
   } catch (error) {
     if (process.env.NODE_ENV === 'development') {
@@ -810,17 +810,17 @@ function measureTopWhitespace(img, threshold = 240) {
     canvas.height = img.height;
     const ctx = canvas.getContext('2d');
     if (!ctx) return 0;
-    
+
     ctx.drawImage(img, 0, 0);
     const imageData = ctx.getImageData(0, 0, img.width, img.height);
     const data = imageData.data;
-    
+
     let topWhitespace = 0;
-    
+
     // 상단부터 아래로 스캔 (첫 행부터)
     for (let y = 0; y < img.height; y++) {
       let isWhiteRow = true;
-      
+
       // 해당 행의 모든 픽셀 확인
       for (let x = 0; x < img.width; x++) {
         const index = (y * img.width + x) * 4;
@@ -828,21 +828,21 @@ function measureTopWhitespace(img, threshold = 240) {
         const g = data[index + 1];
         const b = data[index + 2];
         const avg = (r + g + b) / 3;
-        
+
         // 흰색이 아니면 중단
         if (avg < threshold) {
           isWhiteRow = false;
           break;
         }
       }
-      
+
       if (isWhiteRow) {
         topWhitespace++;
       } else {
         break; // 흰색 행이 아니면 중단
       }
     }
-    
+
     return topWhitespace;
   } catch (error) {
     if (process.env.NODE_ENV === 'development') {
@@ -858,7 +858,7 @@ function measureTopWhitespace(img, threshold = 240) {
 async function compositeHeaderAndContent(headerBlob, contentBlob) {
   let headerImg = null;
   let contentImg = null;
-  
+
   try {
     // 이미지 로딩
     headerImg = await blobToImage(headerBlob);
@@ -873,14 +873,14 @@ async function compositeHeaderAndContent(headerBlob, contentBlob) {
     const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
     const maxWidth = MAX_WIDTH * SCALE;  // scale 적용 후 최대 너비
     const maxHeight = MAX_HEIGHT * SCALE;  // scale 적용 후 최대 높이
-    
+
     const finalWidth = Math.min(Math.max(headerImg.width, contentImg.width), maxWidth);
     const finalHeight = Math.min(headerImg.height + contentImg.height, maxHeight);
-    
+
     // 예상 파일 크기 검증 (RGBA, 압축 전)
     const estimatedPixels = finalWidth * finalHeight;
     const estimatedSizeMB = (estimatedPixels * 4) / (1024 * 1024); // RGBA = 4 bytes per pixel
-    
+
     if (estimatedSizeMB > 50) {  // 50MB 이상이면 경고
       if (process.env.NODE_ENV === 'development') {
         console.warn(`⚠️ [compositeHeaderAndContent] 합성 이미지 예상 크기가 큼: ${estimatedSizeMB.toFixed(2)}MB (${finalWidth}x${finalHeight})`);
@@ -891,10 +891,10 @@ async function compositeHeaderAndContent(headerBlob, contentBlob) {
     const headerBottomWhitespace = measureBottomWhitespace(headerImg, 240);
     // 콘텐츠 이미지 상단 흰색 여백 측정
     const contentTopWhitespace = measureTopWhitespace(contentImg, 240);
-    
+
     // 실제 여백만큼 오버랩 (둘 중 큰 값 사용)
     const actualGap = -Math.max(headerBottomWhitespace, contentTopWhitespace, 2); // 최소 2px 오버랩
-    
+
     if (process.env.NODE_ENV === 'development') {
       console.log(`📐 [compositeHeaderAndContent] 여백 자동 감지: 헤더 하단 여백 ${headerBottomWhitespace}px, 콘텐츠 상단 여백 ${contentTopWhitespace}px, 실제 gap: ${actualGap}px`);
     }
@@ -902,12 +902,12 @@ async function compositeHeaderAndContent(headerBlob, contentBlob) {
     const canvas = document.createElement('canvas');
     canvas.width = finalWidth;
     canvas.height = finalHeight + actualGap; // gap이 음수이므로 높이에서 차감
-    
+
     const ctx = canvas.getContext('2d');
     if (!ctx) {
       throw new Error('Canvas context를 가져올 수 없습니다.');
     }
-    
+
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -933,7 +933,7 @@ async function compositeHeaderAndContent(headerBlob, contentBlob) {
         0.95
       );
     });
-    
+
     // 실제 파일 크기 검증
     if (blob && blob.size > MAX_FILE_SIZE) {
       if (process.env.NODE_ENV === 'development') {
@@ -941,7 +941,7 @@ async function compositeHeaderAndContent(headerBlob, contentBlob) {
       }
       // 크기 초과 시에도 반환 (서버에서 처리)
     }
-    
+
     return blob;
   } catch (error) {
     if (process.env.NODE_ENV === 'development') {
@@ -1010,18 +1010,18 @@ function detectElements(slideElement, captureTargetElement, config) {
     // 헤더 탐지: preserveHeader가 true이거나 needsHeaderComposition/needsHeaderSizeAdjustment가 true일 때
     if (config?.preserveHeader || config?.needsHeaderComposition || config?.needsHeaderSizeAdjustment) {
       elements.headerElement = detectHeader(slideElement, { preserveHeader: true });
-      
+
       // 재고장표 슬라이드는 헤더가 필수이므로, detectHeader가 실패하면 더 강력한 탐지 시도
       if (!elements.headerElement && config?.needsHeaderComposition) {
         if (process.env.NODE_ENV === 'development') {
           console.warn('⚠️ [detectElements] 재고장표 헤더 탐지 실패, 강화된 탐지 시도...');
         }
-        
+
         // 재고장표 슬라이드 헤더 강화 탐지: 상단에 고정된 Box 요소 찾기
         try {
           const slideRect = SafeDOM.getBoundingRect(slideElement);
           const allElements = Array.from(slideElement.querySelectorAll('*'));
-          
+
           // 상단에 고정된 헤더 후보 찾기 (position: absolute 또는 fixed)
           const headerCandidates = allElements.filter(el => {
             if (!SafeDOM.isInDOM(el)) return false;
@@ -1029,7 +1029,7 @@ function detectElements(slideElement, captureTargetElement, config) {
             const rect = SafeDOM.getBoundingRect(el);
             const relativeTop = rect.top - slideRect.top;
             const text = (el.textContent || '').trim();
-            
+
             // 상단 영역 (0-200px)에 있고, 회사명 포함하거나 로고 포함
             const isInTopArea = relativeTop >= -30 && relativeTop < 200;
             const hasCompanyName = text.includes('(주)브이아이피플러스') || text.includes('브이아이피플러스');
@@ -1037,10 +1037,10 @@ function detectElements(slideElement, captureTargetElement, config) {
             const hasValidSize = rect.height > 40 && rect.width > slideRect.width * 0.3;
             const isPositioned = style.position === 'absolute' || style.position === 'fixed';
             const isNotContent = !text.includes('재고장표') && !text.includes('모델명') && !text.includes('총계') && !text.includes('테이블');
-            
+
             return isInTopArea && hasValidSize && isNotContent && (hasCompanyName || hasLogo || isPositioned);
           });
-          
+
           // 가장 상단에 있고 가장 큰 요소 선택
           if (headerCandidates.length > 0) {
             const bestCandidate = headerCandidates
@@ -1049,7 +1049,7 @@ function detectElements(slideElement, captureTargetElement, config) {
                 const bRect = SafeDOM.getBoundingRect(b);
                 const aTop = aRect.top - slideRect.top;
                 const bTop = bRect.top - slideRect.top;
-                
+
                 // 상단에 가까운 것 우선
                 if (Math.abs(aTop) !== Math.abs(bTop)) {
                   return Math.abs(aTop) - Math.abs(bTop);
@@ -1057,7 +1057,7 @@ function detectElements(slideElement, captureTargetElement, config) {
                 // 크기가 큰 것 우선
                 return (bRect.width * bRect.height) - (aRect.width * aRect.height);
               })[0];
-            
+
             if (bestCandidate && SafeDOM.isInDOM(bestCandidate)) {
               elements.headerElement = bestCandidate;
               const headerRect = SafeDOM.getBoundingRect(bestCandidate);
@@ -1072,7 +1072,7 @@ function detectElements(slideElement, captureTargetElement, config) {
           }
         }
       }
-      
+
       if (process.env.NODE_ENV === 'development') {
         if (elements.headerElement && SafeDOM.isInDOM(elements.headerElement)) {
           const headerRect = SafeDOM.getBoundingRect(elements.headerElement);
@@ -1091,7 +1091,7 @@ function detectElements(slideElement, captureTargetElement, config) {
       // contentElement는 테이블이 포함된 영역이어야 함
       // captureTargetElement가 테이블만 포함하는 경우 slideElement 사용
       let contentElementCandidate = elements.captureTargetElement;
-      
+
       // captureTargetElement가 slideElement와 같으면 그대로 사용
       if (contentElementCandidate === slideElement) {
         elements.contentElement = slideElement;
@@ -1108,8 +1108,8 @@ function detectElements(slideElement, captureTargetElement, config) {
             const tableInSlide = slideElement.querySelector('table, .MuiTable-root, .MuiTableContainer-root');
             if (tableInSlide && SafeDOM.isInDOM(tableInSlide)) {
               // 테이블의 부모 컨테이너 찾기 (Paper, Card 등)
-              const tableContainer = tableInSlide.closest('.MuiPaper-root, .MuiCard-root, .MuiBox-root') || 
-                                     tableInSlide.parentElement;
+              const tableContainer = tableInSlide.closest('.MuiPaper-root, .MuiCard-root, .MuiBox-root') ||
+                tableInSlide.parentElement;
               elements.contentElement = (tableContainer && SafeDOM.isInDOM(tableContainer)) ? tableContainer : slideElement;
             } else {
               // 테이블을 찾을 수 없으면 slideElement 사용
@@ -1123,7 +1123,7 @@ function detectElements(slideElement, captureTargetElement, config) {
           elements.contentElement = slideElement;
         }
       }
-      
+
       if (process.env.NODE_ENV === 'development') {
         const contentRect = elements.contentElement ? SafeDOM.getBoundingRect(elements.contentElement) : null;
         console.log(`📦 [detectElements] 재고장표 콘텐츠 요소: ${contentElementCandidate === elements.contentElement ? 'captureTargetElement' : 'slideElement/tableContainer'} (${contentRect?.width}x${contentRect?.height}px)`);
@@ -1174,7 +1174,7 @@ async function adjustSizes(elements, config, slide) {
             try {
               originalBoxStyles.forEach((styles, box) => {
                 if (!box || !box.style || !SafeDOM.isInDOM(box)) return;
-                
+
                 SafeDOM.restoreStyle(box, 'height', styles.height);
                 SafeDOM.restoreStyle(box, 'max-height', styles.maxHeight);
                 SafeDOM.restoreStyle(box, 'width', styles.width);
@@ -1205,6 +1205,78 @@ async function adjustSizes(elements, config, slide) {
           padding: 40,
         });
 
+        // 재초담초채권 슬라이드: 차트 영역 정밀 측정 (공백 제거 강화)
+        // 문제: 컨테이너의 불필요한 여백이 포함되어 이미지가 너무 크게 캡처되는 현상 수정
+        const isRechotanchoBond = slide?.mode === 'chart' &&
+          (slide?.tab === 'bondChart' || slide?.tab === 'bond') &&
+          slide?.subTab === 'rechotanchoBond';
+
+        if (isRechotanchoBond && sizeInfo) {
+          try {
+            // 차트 요소 직접 찾기 (Canvas, SVG, Recharts 등)
+            const charts = Array.from(elements.contentElement.querySelectorAll('canvas, svg, [class*="recharts-wrapper"], [class*="Chart"]'));
+
+            // 가장 큰 차트 찾기
+            let maxChartHeight = 0;
+            let maxChartWidth = 0;
+            let maxChartBottom = 0;
+            let maxChartRight = 0;
+            let foundChart = false;
+
+            const contentRect = SafeDOM.getBoundingRect(elements.contentElement);
+
+            charts.forEach(chart => {
+              if (!SafeDOM.isInDOM(chart)) return;
+              const rect = SafeDOM.getBoundingRect(chart);
+
+              // 너무 작은 요소 제외 (아이콘 등)
+              if (rect.width < 100 || rect.height < 100) return;
+
+              foundChart = true;
+              const relativeBottom = rect.bottom - contentRect.top;
+              const relativeRight = rect.right - contentRect.left;
+
+              maxChartHeight = Math.max(maxChartHeight, rect.height);
+              maxChartWidth = Math.max(maxChartWidth, rect.width);
+              maxChartBottom = Math.max(maxChartBottom, relativeBottom);
+              maxChartRight = Math.max(maxChartRight, relativeRight);
+            });
+
+            if (foundChart) {
+              // 차트 크기 + 패딩으로 높이/너비 재설정
+              const padding = 50; // 여유 공간
+
+              // 기존 측정값과 비교하여 더 작은 값(더 타이트한 값) 사용
+              // 단, 차트가 잘리지 않도록 최소값 보장
+              const newHeight = maxChartBottom + padding;
+              const newWidth = maxChartRight + padding;
+
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`📏 [adjustSizes] 재초담초채권 정밀 측정:
+                  기존: ${sizeInfo.measuredWidth}x${sizeInfo.measuredHeight}
+                  차트: ${maxChartWidth}x${maxChartHeight} (Bottom: ${maxChartBottom}, Right: ${maxChartRight})
+                  신규: ${newWidth}x${newHeight}
+                `);
+              }
+
+              // 높이 재설정 (너무 큰 공백 제거)
+              sizeInfo.measuredHeight = newHeight;
+              sizeInfo.maxRelativeBottom = maxChartBottom;
+
+              // 너비 재설정 (오른쪽 공백 제거)
+              sizeInfo.measuredWidth = newWidth;
+              sizeInfo.maxRelativeRight = maxChartRight;
+
+              // scrollWidth도 보정 (불필요한 스크롤 영역 무시)
+              sizeInfo.scrollWidth = Math.min(sizeInfo.scrollWidth, newWidth + 100);
+            }
+          } catch (e) {
+            if (process.env.NODE_ENV === 'development') {
+              console.warn('⚠️ [adjustSizes] 재초담초채권 정밀 측정 실패:', e);
+            }
+          }
+        }
+
         // 담당자별 실적 테이블 포함 (전체총마감용)
         if (config?.needsManagerTableInclusion && elements.tables && elements.tables.length > 0) {
           const managerTables = elements.tables.filter(table => {
@@ -1219,39 +1291,39 @@ async function adjustSizes(elements, config, slide) {
               const rect = SafeDOM.getBoundingRect(elements.contentElement);
               const tableRect = SafeDOM.getBoundingRect(lastTable);
               const relativeBottom = tableRect.bottom - rect.top;
-              
+
               // 테이블 컨테이너 찾기 및 overflow 확인
               const tableContainer = lastTable.closest('.MuiTableContainer-root');
               let containerScrollHeight = 0;
               let originalOverflow = '';
               let originalMaxHeight = '';
-              
+
               if (tableContainer && SafeDOM.isInDOM(tableContainer)) {
                 // 스크롤 가능한 테이블의 전체 높이를 정확히 측정하기 위해 overflow 제거
                 const containerStyle = window.getComputedStyle(tableContainer);
                 originalOverflow = tableContainer.style.overflow || '';
                 originalMaxHeight = tableContainer.style.maxHeight || '';
-                
+
                 // overflow를 제거하여 전체 높이 측정 가능하게 함
                 tableContainer.style.overflow = 'visible';
                 tableContainer.style.maxHeight = 'none';
-                
+
                 // 스타일 변경 후 렌더링 대기
                 await new Promise(r => setTimeout(r, 100));
-                
+
                 // scrollHeight 측정 (overflow 제거 후 정확한 값)
                 containerScrollHeight = tableContainer.scrollHeight || 0;
-                
+
                 // 테이블 자체의 scrollHeight도 확인
                 const tableScrollHeight = lastTable.scrollHeight || tableRect.height;
-                
+
                 // 테이블 내부의 모든 행(tbody > tr)을 순회하여 실제 높이 정확히 측정
                 const tbody = lastTable.querySelector('tbody');
                 let actualTableHeight = tableRect.height;
                 let rowHeightSum = 0;
                 let firstRowTop = 0;
                 let lastRowBottom = 0;
-                
+
                 if (tbody && SafeDOM.isInDOM(tbody)) {
                   const allRows = tbody.querySelectorAll('tr');
                   if (allRows.length > 0) {
@@ -1259,10 +1331,10 @@ async function adjustSizes(elements, config, slide) {
                     for (let i = 0; i < allRows.length; i++) {
                       const row = allRows[i];
                       if (!SafeDOM.isInDOM(row)) continue;
-                      
+
                       const rowRect = SafeDOM.getBoundingRect(row);
                       const rowOffsetHeight = row.offsetHeight || 0;
-                      
+
                       // 첫 번째 행과 마지막 행의 위치 기록
                       if (i === 0) {
                         firstRowTop = rowRect.top;
@@ -1270,19 +1342,19 @@ async function adjustSizes(elements, config, slide) {
                       if (i === allRows.length - 1) {
                         lastRowBottom = rowRect.bottom;
                       }
-                      
+
                       // 각 행의 offsetHeight 합계 (정확한 높이 측정)
                       rowHeightSum += rowOffsetHeight || rowRect.height || 0;
                     }
-                    
+
                     // 첫 번째 행부터 마지막 행까지의 실제 높이 (getBoundingClientRect 기반)
-                    const measuredHeightFromRects = lastRowBottom > 0 && firstRowTop > 0 
-                      ? lastRowBottom - firstRowTop 
+                    const measuredHeightFromRects = lastRowBottom > 0 && firstRowTop > 0
+                      ? lastRowBottom - firstRowTop
                       : tableRect.height;
-                    
+
                     // tbody의 scrollHeight도 확인
                     const tbodyScrollHeight = tbody.scrollHeight || measuredHeightFromRects;
-                    
+
                     // 실제 높이 = max(행 높이 합계, getBoundingClientRect 기반 높이, tbody scrollHeight, 테이블 높이)
                     actualTableHeight = Math.max(
                       rowHeightSum,
@@ -1292,7 +1364,7 @@ async function adjustSizes(elements, config, slide) {
                     );
                   }
                 }
-                
+
                 // 테이블 헤더(thead) 높이도 포함
                 const thead = lastTable.querySelector('thead');
                 let theadHeight = 0;
@@ -1300,7 +1372,7 @@ async function adjustSizes(elements, config, slide) {
                   const theadRect = SafeDOM.getBoundingRect(thead);
                   theadHeight = theadRect.height || 0;
                 }
-                
+
                 // 테이블 푸터(tfoot) 높이도 포함
                 const tfoot = lastTable.querySelector('tfoot');
                 let tfootHeight = 0;
@@ -1308,19 +1380,19 @@ async function adjustSizes(elements, config, slide) {
                   const tfootRect = SafeDOM.getBoundingRect(tfoot);
                   tfootHeight = tfootRect.height || 0;
                 }
-                
+
                 // 실제 테이블 전체 높이 = tbody 높이 + thead 높이 + tfoot 높이
                 const totalTableHeight = actualTableHeight + theadHeight + tfootHeight;
-                
+
                 // 실제 높이와 scrollHeight 중 큰 값 사용 (스크롤 가능한 테이블도 전체 포함)
                 // 테이블의 실제 위치를 기준으로 정확한 높이 계산
                 const tableTopRelativeToContent = tableRect.top - rect.top;
-                
+
                 // 테이블의 스크롤 영역을 정확히 포함: 컨테이너의 scrollHeight와 테이블의 scrollHeight 모두 고려
                 const containerScrollHeightWithHeader = containerScrollHeight + theadHeight + tfootHeight;
                 const tableScrollHeightWithHeader = tableScrollHeight + theadHeight + tfootHeight;
                 const tbodyScrollHeightWithHeader = (tbody?.scrollHeight || 0) + theadHeight + tfootHeight;
-                
+
                 // 테이블이 콘텐츠 내에서 차지하는 최대 높이 계산 (스크롤 영역 포함)
                 const maxTableHeight = Math.max(
                   relativeBottom, // 현재 보이는 테이블의 bottom
@@ -1329,7 +1401,7 @@ async function adjustSizes(elements, config, slide) {
                   tableTopRelativeToContent + tableScrollHeightWithHeader, // 테이블 스크롤 높이 (헤더/푸터 포함)
                   tableTopRelativeToContent + tbodyScrollHeightWithHeader // tbody 스크롤 높이 (헤더/푸터 포함)
                 );
-                
+
                 // 스타일 복원
                 if (originalOverflow) {
                   tableContainer.style.overflow = originalOverflow;
@@ -1341,10 +1413,10 @@ async function adjustSizes(elements, config, slide) {
                 } else {
                   tableContainer.style.removeProperty('max-height');
                 }
-                
+
                 if (maxTableHeight > (sizeInfo.maxRelativeBottom || 0)) {
                   sizeInfo.maxRelativeBottom = maxTableHeight;
-                  
+
                   // 정확한 테이블 높이 = max(실제 테이블 높이, 행 높이 합계, scrollHeight)
                   // 행 높이 합계는 이미 위에서 계산됨
                   const preciseTableHeight = Math.max(
@@ -1354,19 +1426,19 @@ async function adjustSizes(elements, config, slide) {
                     tableScrollHeight,
                     tbody?.scrollHeight || 0
                   );
-                  
+
                   // requiredHeight 계산: 테이블의 정확한 높이를 기반으로 계산
                   // 테이블이 콘텐츠의 어느 위치에 있는지 고려하여 전체 높이 계산
                   // 테이블의 실제 위치부터 전체 높이까지를 포함
                   const requiredHeightFromTable = tableTopRelativeToContent + preciseTableHeight;
-                  
+
                   // 테이블의 스크롤 영역을 정확히 포함한 높이 계산
                   const requiredHeightFromScroll = Math.max(
                     tableTopRelativeToContent + containerScrollHeightWithHeader,
                     tableTopRelativeToContent + tableScrollHeightWithHeader,
                     tableTopRelativeToContent + tbodyScrollHeightWithHeader
                   );
-                  
+
                   // 여유 공간을 더 크게 설정하여 테이블이 잘리지 않도록 보장
                   const paddingForTable = 500; // 400px → 500px로 증가 (여유 공간 확대)
                   const requiredHeightWithPadding = Math.max(
@@ -1374,19 +1446,19 @@ async function adjustSizes(elements, config, slide) {
                     requiredHeightFromTable + paddingForTable,
                     requiredHeightFromScroll + paddingForTable
                   );
-                  
+
                   // requiredHeight를 별도 저장하여 나중에 높이 제한 적용 시 참조
                   sizeInfo.requiredHeight = Math.max(
                     requiredHeightWithPadding,
                     sizeInfo.requiredHeight || 0
                   );
-                  
+
                   // measuredHeight도 requiredHeight를 반영하여 설정
                   sizeInfo.measuredHeight = Math.max(
                     requiredHeightWithPadding,
                     sizeInfo.measuredHeight || 0
                   );
-                  
+
                   if (process.env.NODE_ENV === 'development') {
                     console.log(`📏 [adjustSizes] 담당자별 실적 테이블 포함: maxTableHeight=${maxTableHeight.toFixed(0)}px, preciseTableHeight=${preciseTableHeight.toFixed(0)}px, totalTableHeight=${totalTableHeight.toFixed(0)}px, rowHeightSum=${rowHeightSum.toFixed(0)}px, theadHeight=${theadHeight.toFixed(0)}px, tfootHeight=${tfootHeight.toFixed(0)}px, requiredHeight=${sizeInfo.requiredHeight.toFixed(0)}px (실제 높이: ${relativeBottom.toFixed(0)}px, 테이블 높이: ${actualTableHeight.toFixed(0)}px, scrollHeight: ${Math.max(tableScrollHeight, containerScrollHeight).toFixed(0)}px, 여유공간: ${paddingForTable}px)`);
                   }
@@ -1394,14 +1466,14 @@ async function adjustSizes(elements, config, slide) {
               } else {
                 // 테이블 컨테이너가 없는 경우: 모든 행을 순회하여 실제 높이 정확히 측정
                 const tableScrollHeight = lastTable.scrollHeight || tableRect.height;
-                
+
                 // 테이블 내부의 모든 행(tbody > tr)을 순회하여 실제 높이 정확히 측정
                 const tbody = lastTable.querySelector('tbody');
                 let actualTableHeight = tableRect.height;
                 let rowHeightSum = 0;
                 let firstRowTop = 0;
                 let lastRowBottom = 0;
-                
+
                 if (tbody && SafeDOM.isInDOM(tbody)) {
                   const allRows = tbody.querySelectorAll('tr');
                   if (allRows.length > 0) {
@@ -1409,10 +1481,10 @@ async function adjustSizes(elements, config, slide) {
                     for (let i = 0; i < allRows.length; i++) {
                       const row = allRows[i];
                       if (!SafeDOM.isInDOM(row)) continue;
-                      
+
                       const rowRect = SafeDOM.getBoundingRect(row);
                       const rowOffsetHeight = row.offsetHeight || 0;
-                      
+
                       // 첫 번째 행과 마지막 행의 위치 기록
                       if (i === 0) {
                         firstRowTop = rowRect.top;
@@ -1420,19 +1492,19 @@ async function adjustSizes(elements, config, slide) {
                       if (i === allRows.length - 1) {
                         lastRowBottom = rowRect.bottom;
                       }
-                      
+
                       // 각 행의 offsetHeight 합계 (정확한 높이 측정)
                       rowHeightSum += rowOffsetHeight || rowRect.height || 0;
                     }
-                    
+
                     // 첫 번째 행부터 마지막 행까지의 실제 높이 (getBoundingClientRect 기반)
-                    const measuredHeightFromRects = lastRowBottom > 0 && firstRowTop > 0 
-                      ? lastRowBottom - firstRowTop 
+                    const measuredHeightFromRects = lastRowBottom > 0 && firstRowTop > 0
+                      ? lastRowBottom - firstRowTop
                       : tableRect.height;
-                    
+
                     // tbody의 scrollHeight도 확인
                     const tbodyScrollHeight = tbody.scrollHeight || measuredHeightFromRects;
-                    
+
                     // 실제 높이 = max(행 높이 합계, getBoundingClientRect 기반 높이, tbody scrollHeight, 테이블 높이)
                     actualTableHeight = Math.max(
                       rowHeightSum,
@@ -1442,7 +1514,7 @@ async function adjustSizes(elements, config, slide) {
                     );
                   }
                 }
-                
+
                 // 테이블 헤더(thead) 높이도 포함
                 const thead = lastTable.querySelector('thead');
                 let theadHeight = 0;
@@ -1450,7 +1522,7 @@ async function adjustSizes(elements, config, slide) {
                   const theadRect = SafeDOM.getBoundingRect(thead);
                   theadHeight = theadRect.height || 0;
                 }
-                
+
                 // 테이블 푸터(tfoot) 높이도 포함
                 const tfoot = lastTable.querySelector('tfoot');
                 let tfootHeight = 0;
@@ -1458,10 +1530,10 @@ async function adjustSizes(elements, config, slide) {
                   const tfootRect = SafeDOM.getBoundingRect(tfoot);
                   tfootHeight = tfootRect.height || 0;
                 }
-                
+
                 // 실제 테이블 전체 높이 = tbody 높이 + thead 높이 + tfoot 높이
                 const totalTableHeight = actualTableHeight + theadHeight + tfootHeight;
-                
+
                 // 실제 높이와 scrollHeight 중 큰 값 사용
                 const tableTopRelativeToContent = tableRect.top - rect.top;
                 const maxTableHeight = Math.max(
@@ -1469,10 +1541,10 @@ async function adjustSizes(elements, config, slide) {
                   tableTopRelativeToContent + totalTableHeight,
                   tableTopRelativeToContent + tableScrollHeight
                 );
-                
+
                 if (maxTableHeight > (sizeInfo.maxRelativeBottom || 0)) {
                   sizeInfo.maxRelativeBottom = maxTableHeight;
-                  
+
                   // 정확한 테이블 높이 = max(실제 테이블 높이, 행 높이 합계, scrollHeight)
                   const preciseTableHeight = Math.max(
                     totalTableHeight,
@@ -1480,11 +1552,11 @@ async function adjustSizes(elements, config, slide) {
                     tableScrollHeight,
                     tbody?.scrollHeight || 0
                   );
-                  
+
                   // requiredHeight 계산: 테이블의 정확한 높이를 기반으로 계산
                   // 테이블의 실제 위치부터 전체 높이까지를 포함
                   const requiredHeightFromTable = tableTopRelativeToContent + preciseTableHeight;
-                  
+
                   // 테이블의 스크롤 영역을 정확히 포함한 높이 계산
                   const tableScrollHeightWithHeader = tableScrollHeight + theadHeight + tfootHeight;
                   const tbodyScrollHeightWithHeader = (tbody?.scrollHeight || 0) + theadHeight + tfootHeight;
@@ -1492,7 +1564,7 @@ async function adjustSizes(elements, config, slide) {
                     tableTopRelativeToContent + tableScrollHeightWithHeader,
                     tableTopRelativeToContent + tbodyScrollHeightWithHeader
                   );
-                  
+
                   // 여유 공간을 더 크게 설정하여 테이블이 잘리지 않도록 보장
                   const paddingForTable = 500; // 400px → 500px로 증가 (여유 공간 확대)
                   const requiredHeightWithPadding = Math.max(
@@ -1500,19 +1572,19 @@ async function adjustSizes(elements, config, slide) {
                     requiredHeightFromTable + paddingForTable,
                     requiredHeightFromScroll + paddingForTable
                   );
-                  
+
                   // requiredHeight를 별도 저장하여 나중에 높이 제한 적용 시 참조
                   sizeInfo.requiredHeight = Math.max(
                     requiredHeightWithPadding,
                     sizeInfo.requiredHeight || 0
                   );
-                  
+
                   // measuredHeight도 requiredHeight를 반영하여 설정
                   sizeInfo.measuredHeight = Math.max(
                     requiredHeightWithPadding,
                     sizeInfo.measuredHeight || 0
                   );
-                  
+
                   if (process.env.NODE_ENV === 'development') {
                     console.log(`📏 [adjustSizes] 담당자별 실적 테이블 포함 (컨테이너 없음): maxTableHeight=${maxTableHeight.toFixed(0)}px, preciseTableHeight=${preciseTableHeight.toFixed(0)}px, totalTableHeight=${totalTableHeight.toFixed(0)}px, rowHeightSum=${rowHeightSum.toFixed(0)}px, theadHeight=${theadHeight.toFixed(0)}px, tfootHeight=${tfootHeight.toFixed(0)}px, requiredHeight=${sizeInfo.requiredHeight.toFixed(0)}px (실제 높이: ${relativeBottom.toFixed(0)}px, scrollHeight: ${tableScrollHeight.toFixed(0)}px, 여유공간: ${paddingForTable}px)`);
                   }
@@ -1529,7 +1601,7 @@ async function adjustSizes(elements, config, slide) {
             const headerRect = SafeDOM.getBoundingRect(elements.headerElement);
             const contentRect = SafeDOM.getBoundingRect(elements.contentElement);
             const slideRect = SafeDOM.getBoundingRect(elements.slideElement);
-            
+
             // 헤더 높이 추가
             const headerHeight = headerRect.height || 0;
             if (headerHeight > 0) {
@@ -1538,7 +1610,7 @@ async function adjustSizes(elements, config, slide) {
                 console.log(`📏 [adjustSizes] 헤더 높이 포함: ${headerHeight}px (총 높이: ${sizeInfo.measuredHeight}px)`);
               }
             }
-            
+
             // 헤더 너비는 needsHeaderSizeAdjustment가 false일 때만 적용 (헤더 너비 조정 로직과 충돌 방지)
             // needsHeaderSizeAdjustment가 true인 경우(재초담초채권, 가입자증감)는 나중에 adjustHeaderWidth에서 콘텐츠 크기에 맞춤
             if (!config?.needsHeaderSizeAdjustment) {
@@ -1580,7 +1652,7 @@ async function adjustSizes(elements, config, slide) {
         // 이미지 크기 제한
         if (sizeInfo) {
           sizeInfo.measuredWidth = Math.min(sizeInfo.measuredWidth || 0, MAX_WIDTH);
-          
+
           // 1920px 대응: 모든 슬라이드 높이 제한 강화 (25MB 제한 준수)
           // 3840px(너비) × 8000px(높이) × 4 bytes = 122MB 압축 전 → 약 25MB 압축 후
           // 모든 슬라이드는 최대 8000px(실제) = 4000px(원본)로 제한
@@ -1588,15 +1660,15 @@ async function adjustSizes(elements, config, slide) {
           const isToc = slideId.includes('toc') || slideId.includes('TOC');
           const isMain = slideId.includes('main') && !slideId.includes('toc');
           const isEnding = slideId.includes('ending');
-          
+
           // MAX_HEIGHT = 4000px (원본) = 8000px (실제 SCALE 2 적용)
           // 목차 슬라이드는 파일 크기 제한을 위해 더 보수적인 높이 제한 적용
           // 전체총마감 슬라이드는 담당자별 실적 테이블 포함을 위해 더 큰 높이 필요
-          const isTotalClosing = slide?.mode === 'chart' && 
-                                 (slide?.tab === 'closingChart' || slide?.tab === 'closing') && 
-                                 slide?.subTab === 'totalClosing';
+          const isTotalClosing = slide?.mode === 'chart' &&
+            (slide?.tab === 'closingChart' || slide?.tab === 'closing') &&
+            slide?.subTab === 'totalClosing';
           let maxAllowedHeight = MAX_HEIGHT; // 4000px (원본) = 8000px (실제)
-          
+
           if (isToc) {
             // 목차 슬라이드: 최대 높이 7000px (실제) = 3500px (원본)로 제한 (25MB 제한 안전하게 준수, 콘텐츠 잘림 방지)
             maxAllowedHeight = 3500; // 3000px → 3500px (원본) = 7000px (실제) - 콘텐츠 잘림 방지를 위해 증가
@@ -1609,7 +1681,7 @@ async function adjustSizes(elements, config, slide) {
             // requiredHeight가 측정되었으면 그 값을 기준으로 maxAllowedHeight 동적 증가
             const defaultMaxHeight = 6000; // 기본 최대 높이 (원본) = 12000px (실제)
             const absoluteMaxHeight = 8000; // 25MB 제한 고려한 절대 최대 높이 (원본) = 16000px (실제)
-            
+
             if (sizeInfo.requiredHeight && sizeInfo.requiredHeight > defaultMaxHeight) {
               // 테이블 측정 결과가 기본 제한을 초과하면 동적으로 증가
               maxAllowedHeight = Math.min(sizeInfo.requiredHeight, absoluteMaxHeight);
@@ -1622,7 +1694,7 @@ async function adjustSizes(elements, config, slide) {
                 console.log(`📏 [adjustSizes] 전체총마감 슬라이드 높이 제한 (기본값): ${defaultMaxHeight}px 원본 = ${defaultMaxHeight * SCALE}px 실제`);
               }
             }
-            
+
             sizeInfo.measuredHeight = Math.min(sizeInfo.measuredHeight || 0, maxAllowedHeight);
             if (process.env.NODE_ENV === 'development') {
               console.log(`📏 [adjustSizes] 전체총마감 슬라이드 최종 높이: ${sizeInfo.measuredHeight}px (최대 ${maxAllowedHeight * SCALE}px 실제, 담당자별 실적 포함)`);
@@ -1652,18 +1724,18 @@ async function adjustSizes(elements, config, slide) {
             const contentWidth = sizeInfo.measuredWidth || 0;
             const slideRect = SafeDOM.getBoundingRect(elements.slideElement);
             const maxSlideWidth = slideRect.width || MAX_WIDTH;
-            
+
             // 헤더 너비와 콘텐츠 너비 중 더 큰 값을 사용 (헤더가 더 넓으면 콘텐츠를 헤더에 맞춤)
             // 슬라이드 전체 너비를 초과하지 않도록 제한
             const targetWidth = Math.min(
               Math.max(headerWidth, contentWidth),
               maxSlideWidth
             );
-            
+
             if (process.env.NODE_ENV === 'development') {
               console.log(`📏 [adjustSizes] 헤더/콘텐츠 너비 조정: 헤더=${headerWidth.toFixed(0)}px, 콘텐츠=${contentWidth.toFixed(0)}px → 대상=${targetWidth.toFixed(0)}px (헤더 기준)`);
             }
-            
+
             // sizeInfo.measuredWidth를 targetWidth로 설정
             sizeInfo.measuredWidth = targetWidth;
             if (process.env.NODE_ENV === 'development') {
@@ -1672,7 +1744,7 @@ async function adjustSizes(elements, config, slide) {
                 console.log(`📏 [adjustSizes] 콘텐츠 너비를 헤더 너비에 맞춤: ${contentWidth.toFixed(0)}px → ${targetWidth.toFixed(0)}px`);
               }
             }
-            
+
             // 콘텐츠 요소의 너비를 targetWidth에 맞추기 위해 스타일 조정
             const restoreContent = await adjustContentToHeaderWidth(
               elements.contentElement,
@@ -1711,12 +1783,12 @@ async function adjustSizes(elements, config, slide) {
 async function executeCapture(elements, config, sizeInfo, slide) {
   let blob = null;
   const styleRestores = [];
-  
+
   // 재초담초채권 슬라이드 식별
   const isRechotanchoBond = slide?.mode === 'chart' &&
     (slide?.tab === 'bondChart' || slide?.tab === 'bond') &&
     slide?.subTab === 'rechotanchoBond';
-  
+
   // 재초담초채권 디버깅 로그
   if (isRechotanchoBond && process.env.NODE_ENV === 'development') {
     console.log('🔍 [executeCapture] 재초담초채권 슬라이드 확인:', {
@@ -1754,7 +1826,7 @@ async function executeCapture(elements, config, sizeInfo, slide) {
 
           const originalHeight = commonAncestor.style.height || '';
           const originalMaxHeight = commonAncestor.style.maxHeight || '';
-          
+
           styleRestores.push(() => {
             if (SafeDOM.isInDOM(commonAncestor)) {
               SafeDOM.restoreStyle(commonAncestor, 'height', originalHeight);
@@ -1781,12 +1853,12 @@ async function executeCapture(elements, config, sizeInfo, slide) {
             height: Math.min(sizeInfo?.measuredHeight || 0, MAX_HEIGHT),
             width: Math.min(sizeInfo?.measuredWidth || 0, MAX_WIDTH),
           };
-          
+
           // 재초담초채권만 imageQuality 추가 (다른 슬라이드는 전달하지 않음)
           if (isRechotanchoBond && config?.imageQuality) {
             captureOptions.imageQuality = config.imageQuality;
           }
-          
+
           blob = await captureElement(commonAncestor, captureOptions);
         } catch (error) {
           if (process.env.NODE_ENV === 'development') {
@@ -1803,12 +1875,12 @@ async function executeCapture(elements, config, sizeInfo, slide) {
           // 테이블 컨테이너 찾기: contentElement에서 테이블 찾기
           // contentElement가 slideElement와 같은 경우 테이블만 포함하는 컨테이너 찾기
           let tableContainer = null;
-          
+
           // 1단계: contentElement에서 직접 테이블 컨테이너 찾기
           if (elements.contentElement && elements.contentElement !== elements.slideElement) {
             tableContainer = elements.contentElement.querySelector('.MuiTableContainer-root');
           }
-          
+
           // 2단계: contentElement가 slideElement와 같거나 테이블을 찾지 못한 경우,
           // slideElement에서 테이블 찾기 (헤더 제외)
           if (!tableContainer && elements.slideElement) {
@@ -1822,20 +1894,20 @@ async function executeCapture(elements, config, sizeInfo, slide) {
                 }
                 current = current.parentElement;
               }
-              
+
               // 헤더 영역이 아닌지 확인 (상단 200px 이하는 헤더)
               const containerRect = SafeDOM.getBoundingRect(container);
               const slideRect = SafeDOM.getBoundingRect(elements.slideElement);
               const relativeTop = containerRect.top - slideRect.top;
-              
+
               // 상단 영역(헤더)이 아니고, 테이블 콘텐츠를 포함하는 경우
               if (relativeTop < 200) return false; // 헤더 영역 제외
-              
+
               const text = container.textContent || '';
               return text.includes('총계') || text.includes('모델명') || text.includes('재고장표') || container.querySelector('table') !== null;
             });
           }
-          
+
           // 3단계: 여전히 찾지 못한 경우 모든 테이블 컨테이너 중 헤더가 아닌 것 찾기
           if (!tableContainer && elements.slideElement) {
             const allContainers = Array.from(elements.slideElement.querySelectorAll('.MuiTableContainer-root'));
@@ -1846,7 +1918,7 @@ async function executeCapture(elements, config, sizeInfo, slide) {
               return relativeTop >= 200; // 헤더 영역 제외
             });
           }
-          
+
           // data-capture-exclude가 있는 요소는 제외
           if (tableContainer) {
             let current = tableContainer;
@@ -1858,7 +1930,7 @@ async function executeCapture(elements, config, sizeInfo, slide) {
               current = current.parentElement;
             }
           }
-          
+
           if (!tableContainer || !SafeDOM.isInDOM(tableContainer)) {
             throw new Error('테이블 컨테이너를 찾을 수 없습니다.');
           }
@@ -1882,15 +1954,15 @@ async function executeCapture(elements, config, sizeInfo, slide) {
             maxWidth: tableContainer.style.maxWidth || '',
             overflow: tableContainer.style.overflow || ''
           };
-          
+
           tableContainer.style.maxHeight = 'none';
           tableContainer.style.overflow = 'visible';
           tableContainer.style.height = 'auto';
-          
+
           // 스크롤을 최하단까지 이동하여 모든 데이터가 렌더링되도록 함
           tableContainer.scrollTop = tableContainer.scrollHeight;
           await new Promise(r => setTimeout(r, 300));
-          
+
           // 다시 최상단으로 이동
           tableContainer.scrollTop = 0;
           await new Promise(r => setTimeout(r, 300));
@@ -1899,23 +1971,23 @@ async function executeCapture(elements, config, sizeInfo, slide) {
           const tableRect = SafeDOM.getBoundingRect(actualTable);
           const tableScrollWidth = actualTable.scrollWidth || tableRect.width;
           const tableScrollHeight = actualTable.scrollHeight || tableRect.height;
-          
+
           // tableContainer의 scrollWidth도 확인 (오른쪽 여백 제거를 위해)
           const containerScrollWidth = tableContainer.scrollWidth || tableContainer.clientWidth || 0;
           const containerRect = SafeDOM.getBoundingRect(tableContainer);
-          
+
           // 오른쪽 여백 제거: scrollWidth와 실제 너비 비교 (테이블과 컨테이너 모두 확인)
           let actualTableWidth = tableRect.width;
-          
+
           // 테이블의 scrollWidth 확인
           const tableWidthDiff = tableScrollWidth - tableRect.width;
           // 컨테이너의 scrollWidth 확인
           const containerWidthDiff = containerScrollWidth - containerRect.width;
-          
+
           // 더 큰 차이를 사용하여 오른쪽 여백 제거
           const maxWidthDiff = Math.max(tableWidthDiff, containerWidthDiff);
           const maxScrollWidth = Math.max(tableScrollWidth, containerScrollWidth);
-          
+
           // scrollWidth가 실제 너비보다 크면 실제 콘텐츠 너비 사용 (오른쪽 여백 제거)
           if (maxWidthDiff > 10) { // 임계값 낮춤 (50px → 10px)으로 더 정확하게 감지
             // 실제 콘텐츠 너비 = maxScrollWidth (오른쪽 여백 제외)
@@ -1930,9 +2002,9 @@ async function executeCapture(elements, config, sizeInfo, slide) {
               console.log(`📏 [executeCapture] 재고장표 오른쪽 여백 없음: ${actualTableWidth}px (테이블 차이: ${tableWidthDiff}px, 컨테이너 차이: ${containerWidthDiff}px)`);
             }
           }
-          
+
           let actualTableHeight = 0;
-          
+
           const tbody = actualTable.querySelector('tbody');
           if (tbody) {
             const allRows = tbody.querySelectorAll('tr');
@@ -1941,12 +2013,12 @@ async function executeCapture(elements, config, sizeInfo, slide) {
               const lastRow = allRows[allRows.length - 1];
               const firstRowRect = SafeDOM.getBoundingRect(firstRow);
               const lastRowRect = SafeDOM.getBoundingRect(lastRow);
-              
+
               // 마지막 행까지의 실제 높이 계산
               const tableTop = tableRect.top;
               const tableBottom = lastRowRect.bottom;
               actualTableHeight = tableBottom - tableTop + 20; // 여유 공간 20px
-              
+
               // scrollHeight도 확인하고 더 큰 값 사용
               const scrollHeight = tableContainer.scrollHeight || tableScrollHeight;
               if (scrollHeight > actualTableHeight) {
@@ -1973,7 +2045,7 @@ async function executeCapture(elements, config, sizeInfo, slide) {
           const boxBorderRight = parseInt(tableBoxStyle.borderRightWidth || '0') || 1;
           const boxBorderTop = parseInt(tableBoxStyle.borderTopWidth || '0') || 1;
           const boxBorderBottom = parseInt(tableBoxStyle.borderBottomWidth || '0') || 1;
-          
+
           const adjustedBoxWidth = actualTableWidth + boxPaddingLeft + boxPaddingRight + boxBorderLeft + boxBorderRight + 20;
           const adjustedBoxHeight = actualTableHeight + boxPaddingTop + boxPaddingBottom + boxBorderTop + boxBorderBottom + 20;
 
@@ -2017,7 +2089,7 @@ async function executeCapture(elements, config, sizeInfo, slide) {
           tableBox.style.height = `${adjustedBoxHeight}px`;
           tableBox.style.maxHeight = `${adjustedBoxHeight}px`;
           tableBox.style.overflow = 'visible';
-          
+
           // 테이블 컨테이너도 콘텐츠에 맞춰 조정
           tableContainer.style.width = `${actualTableWidth}px`;
           tableContainer.style.maxWidth = `${actualTableWidth}px`;
@@ -2046,10 +2118,10 @@ async function executeCapture(elements, config, sizeInfo, slide) {
                 if (process.env.NODE_ENV === 'development') {
                   console.log(`🔍 [executeCapture] 재고장표 헤더 탐지 (detectHeader): ${headerRect.width}x${headerRect.height}px`);
                 }
-                
+
                 elements.headerElement.scrollIntoView({ block: 'start', behavior: 'instant' });
                 await new Promise(r => setTimeout(r, 300)); // 대기 시간 증가
-                
+
                 const headerCaptureOptions = {
                   scale: SCALE,
                   useCORS: true,
@@ -2057,14 +2129,14 @@ async function executeCapture(elements, config, sizeInfo, slide) {
                   backgroundColor: '#ffffff',
                   skipAutoCrop: true,
                 };
-                
+
                 // 재초담초채권만 imageQuality 추가 (실제로는 이 경로를 사용하지 않지만 일관성 유지)
                 if (isRechotanchoBond && config?.imageQuality) {
                   headerCaptureOptions.imageQuality = config.imageQuality;
                 }
-                
+
                 headerBlob = await captureElement(elements.headerElement, headerCaptureOptions);
-                
+
                 if (headerBlob && process.env.NODE_ENV === 'development') {
                   console.log(`✅ [executeCapture] 재고장표 헤더 캡처 성공 (detectHeader): ${(headerBlob.size / 1024).toFixed(2)}KB`);
                 }
@@ -2078,17 +2150,17 @@ async function executeCapture(elements, config, sizeInfo, slide) {
                 console.warn('⚠️ [executeCapture] 재고장표 헤더 탐지 실패: elements.headerElement 없음');
               }
             }
-            
+
             // 헤더를 찾지 못한 경우 대체 방법 시도
             if (!headerBlob) {
               try {
                 const slideRect = SafeDOM.getBoundingRect(elements.slideElement);
                 const allElements = Array.from(elements.slideElement.querySelectorAll('*'));
-                
+
                 if (process.env.NODE_ENV === 'development') {
                   console.log(`🔍 [executeCapture] 재고장표 헤더 대체 방법 시도: 전체 요소 ${allElements.length}개 검색`);
                 }
-                
+
                 // 재고장표 슬라이드 헤더 찾기: 회사명 포함, 상단 위치, 재고장표 텍스트 제외
                 const headerCandidates = allElements.filter(el => {
                   if (!SafeDOM.isInDOM(el)) return false;
@@ -2096,15 +2168,15 @@ async function executeCapture(elements, config, sizeInfo, slide) {
                   const rect = SafeDOM.getBoundingRect(el);
                   const relativeTop = rect.top - slideRect.top;
                   const text = (el.textContent || '').trim();
-                  
+
                   const hasCompanyName = text.includes('(주)브이아이피플러스') || text.includes('브이아이피플러스');
                   const isInTopArea = (style.position === 'absolute' || style.position === 'fixed') || (relativeTop >= -20 && relativeTop < 250);
                   const hasValidSize = rect.height > 50 && rect.width > 200;
                   const isNotTableContent = !text.includes('재고장표') && !text.includes('모델명') && !text.includes('총계');
-                  
+
                   return hasCompanyName && isInTopArea && hasValidSize && isNotTableContent;
                 });
-                
+
                 if (process.env.NODE_ENV === 'development') {
                   console.log(`🔍 [executeCapture] 재고장표 헤더 후보: ${headerCandidates.length}개 발견`);
                   headerCandidates.forEach((candidate, idx) => {
@@ -2113,19 +2185,19 @@ async function executeCapture(elements, config, sizeInfo, slide) {
                     console.log(`  후보 ${idx + 1}: ${text}... (${rect.width}x${rect.height}px)`);
                   });
                 }
-                
+
                 // 첫 번째 후보 사용
                 const headerCandidate = headerCandidates[0] || null;
-                
+
                 if (headerCandidate) {
                   const candidateRect = SafeDOM.getBoundingRect(headerCandidate);
                   if (process.env.NODE_ENV === 'development') {
                     console.log(`✅ [executeCapture] 재고장표 헤더 후보 선택: ${candidateRect.width}x${candidateRect.height}px`);
                   }
-                  
+
                   headerCandidate.scrollIntoView({ block: 'start', behavior: 'instant' });
                   await new Promise(r => setTimeout(r, 300)); // 대기 시간 증가
-                  
+
                   const headerCaptureOptions2 = {
                     scale: SCALE,
                     useCORS: true,
@@ -2133,14 +2205,14 @@ async function executeCapture(elements, config, sizeInfo, slide) {
                     backgroundColor: '#ffffff',
                     skipAutoCrop: true,
                   };
-                  
+
                   // 재초담초채권만 imageQuality 추가 (실제로는 이 경로를 사용하지 않지만 일관성 유지)
                   if (isRechotanchoBond && config?.imageQuality) {
                     headerCaptureOptions2.imageQuality = config.imageQuality;
                   }
-                  
+
                   headerBlob = await captureElement(headerCandidate, headerCaptureOptions2);
-                  
+
                   if (headerBlob && process.env.NODE_ENV === 'development') {
                     console.log(`✅ [executeCapture] 재고장표 헤더 찾음 (대체 방법): ${(headerBlob.size / 1024).toFixed(2)}KB`);
                   }
@@ -2176,24 +2248,24 @@ async function executeCapture(elements, config, sizeInfo, slide) {
             width: tableWidth,
             height: tableHeight,
           };
-          
+
           // 재초담초채권만 imageQuality 추가 (실제로는 이 경로를 사용하지 않지만 일관성 유지)
           if (isRechotanchoBond && config?.imageQuality) {
             tableCaptureOptions.imageQuality = config.imageQuality;
           }
-          
+
           const tableBlob = await captureElement(tableBox, tableCaptureOptions);
 
           // 헤더가 없으면 에러 발생 (재고장표는 헤더 필수)
           if (!headerBlob) {
             throw new Error('재고장표 슬라이드 헤더를 찾을 수 없습니다. 헤더가 포함된 캡처가 필요합니다.');
           }
-          
+
           // 테이블이 없으면 에러 발생
           if (!tableBlob) {
             throw new Error('재고장표 슬라이드 테이블을 찾을 수 없습니다.');
           }
-          
+
           // 헤더 + 테이블 합성
           blob = await compositeHeaderAndContent(headerBlob, tableBlob);
           if (process.env.NODE_ENV === 'development') {
@@ -2217,7 +2289,7 @@ async function executeCapture(elements, config, sizeInfo, slide) {
         const captureElementForDirect = (config?.preserveHeader && elements.headerElement && SafeDOM.isInDOM(elements.headerElement))
           ? elements.slideElement // 헤더를 포함하려면 slideElement 전체 캡처
           : elements.contentElement; // 헤더 없으면 contentElement만 캡처
-        
+
         if (!captureElementForDirect || !SafeDOM.isInDOM(captureElementForDirect)) {
           throw new Error('유효하지 않은 캡처 요소입니다.');
         }
@@ -2245,25 +2317,25 @@ async function executeCapture(elements, config, sizeInfo, slide) {
           captureElementForDirect.style.overflow = 'visible';
 
           await new Promise(r => setTimeout(r, 300));
-          
+
           // 전체총마감 슬라이드: requiredHeight 확인하여 높이 제한 동적 조정
           // 전체총마감 슬라이드는 높이가 매우 클 수 있어 타일 캡처가 필요하므로 height 옵션을 전달하지 않음
           const isTotalClosing = slide?.mode === 'chart' &&
             (slide?.tab === 'closingChart' || slide?.tab === 'closing') &&
             slide?.subTab === 'totalClosing';
-          
+
           let captureHeight = Math.min(sizeInfo.measuredHeight || 0, MAX_HEIGHT);
           let shouldUseTiledCaptureForTotalClosing = false;
-          
+
           if (isTotalClosing && sizeInfo.requiredHeight) {
             // requiredHeight가 있을 때 MAX_HEIGHT 기본 제한을 무시하고 requiredHeight를 최소값으로 사용
             const defaultMaxHeight = 6000; // 기본 최대 높이 (원본)
             const absoluteMaxHeight = 8000; // 25MB 제한 고려한 절대 최대 높이 (원본)
-            
+
             // requiredHeight를 최소값으로 사용하여 콘텐츠가 잘리지 않도록 보장
             const minRequiredHeight = sizeInfo.requiredHeight;
             const measuredHeightValue = sizeInfo.measuredHeight || 0;
-            
+
             // requiredHeight가 매우 크면(기본 최대 높이보다 크면) 타일 캡처 필요
             if (minRequiredHeight > defaultMaxHeight) {
               shouldUseTiledCaptureForTotalClosing = true;
@@ -2271,16 +2343,16 @@ async function executeCapture(elements, config, sizeInfo, slide) {
                 console.log(`📏 [executeCapture] 전체총마감 슬라이드 타일 캡처 필요: requiredHeight=${minRequiredHeight.toFixed(0)}px > defaultMaxHeight=${defaultMaxHeight}px`);
               }
             }
-            
+
             // requiredHeight와 measuredHeight 중 더 큰 값을 사용하고, absoluteMaxHeight를 초과하지 않도록 제한
             const maxAllowedHeight = Math.min(
               Math.max(minRequiredHeight, measuredHeightValue),
               absoluteMaxHeight
             );
-            
+
             // requiredHeight를 최소값으로 보장하여 콘텐츠가 잘리지 않도록 함
             captureHeight = Math.max(minRequiredHeight, Math.min(maxAllowedHeight, absoluteMaxHeight));
-            
+
             if (process.env.NODE_ENV === 'development') {
               console.log(`📏 [executeCapture] 전체총마감 슬라이드 높이 제한 동적 조정: requiredHeight=${sizeInfo.requiredHeight.toFixed(0)}px (최소값 보장), measuredHeight=${measuredHeightValue.toFixed(0)}px, maxAllowedHeight=${maxAllowedHeight.toFixed(0)}px → captureHeight=${captureHeight.toFixed(0)}px (최대 ${absoluteMaxHeight}px, 타일 캡처: ${shouldUseTiledCaptureForTotalClosing})`);
             }
@@ -2302,7 +2374,7 @@ async function executeCapture(elements, config, sizeInfo, slide) {
             width: captureWidth,
             height: shouldUseTiledCaptureForTotalClosing ? undefined : captureHeight, // 타일 캡처 필요 시 height 전달하지 않음
           };
-          
+
           // 재초담초채권만 imageQuality 추가
           if (isRechotanchoBond && config?.imageQuality) {
             directCaptureOptions.imageQuality = config.imageQuality;
@@ -2316,7 +2388,7 @@ async function executeCapture(elements, config, sizeInfo, slide) {
               imageQuality: config?.imageQuality
             });
           }
-          
+
           blob = await captureElement(captureElementForDirect, directCaptureOptions);
         } else {
           // 기본 캡처 (크기 측정 없이) - autoCrop으로 불필요한 공백 제거
@@ -2329,12 +2401,12 @@ async function executeCapture(elements, config, sizeInfo, slide) {
             scrollY: 0,
             skipAutoCrop: false, // autoCrop 활성화 (불필요한 공백 제거)
           };
-          
+
           // 재초담초채권만 imageQuality 추가
           if (isRechotanchoBond && config?.imageQuality) {
             defaultCaptureOptions.imageQuality = config.imageQuality;
           }
-          
+
           blob = await captureElement(captureElementForDirect, defaultCaptureOptions);
         }
         break;
@@ -2375,10 +2447,10 @@ async function executeCapture(elements, config, sizeInfo, slide) {
  */
 function validateFileSize(blob, context = '') {
   if (!blob) return blob;
-  
+
   const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
   const sizeMB = blob.size / (1024 * 1024);
-  
+
   if (blob.size > MAX_FILE_SIZE) {
     if (process.env.NODE_ENV === 'development') {
       console.warn(`⚠️ [UnifiedCaptureEngine] ${context} 이미지가 25MB 제한 초과: ${sizeMB.toFixed(2)}MB`);
@@ -2388,7 +2460,7 @@ function validateFileSize(blob, context = '') {
     // 20MB 이상이면 경고
     console.warn(`⚠️ [UnifiedCaptureEngine] ${context} 이미지 크기가 큼: ${sizeMB.toFixed(2)}MB (25MB 제한 근접)`);
   }
-  
+
   return blob;
 }
 
@@ -2409,31 +2481,31 @@ export async function captureSlide(slideElement, slide, captureTargetElement) {
 
   let slideType;
   let config;
-  
+
   try {
-      slideType = identifySlideType(slide);
-      config = getCaptureConfig(slide);
-      
-      // 재초담초채권 디버깅 로그
-      if (slideType === 'rechotanchoBond' && process.env.NODE_ENV === 'development') {
-        console.log('🔍 [captureSlide] 재초담초채권 슬라이드 식별:', {
-          slideType,
-          hasConfig: !!config,
-          imageQuality: config?.imageQuality,
-          configKeys: config ? Object.keys(config) : []
-        });
-      }
-    } catch (error) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error('❌ [captureSlide] 슬라이드 타입 식별 실패:', error);
-      }
+    slideType = identifySlideType(slide);
+    config = getCaptureConfig(slide);
+
+    // 재초담초채권 디버깅 로그
+    if (slideType === 'rechotanchoBond' && process.env.NODE_ENV === 'development') {
+      console.log('🔍 [captureSlide] 재초담초채권 슬라이드 식별:', {
+        slideType,
+        hasConfig: !!config,
+        imageQuality: config?.imageQuality,
+        configKeys: config ? Object.keys(config) : []
+      });
+    }
+  } catch (error) {
+    if (process.env.NODE_ENV === 'development') {
+      console.error('❌ [captureSlide] 슬라이드 타입 식별 실패:', error);
+    }
     throw new Error('슬라이드 타입을 식별할 수 없습니다.');
   }
 
   // 재시도 메커니즘으로 실행
   return await withRetry(async () => {
     let restoreFunctions = [];
-    
+
     try {
       // 1. 전처리
       await preProcess(slideElement, captureTargetElement, config);
@@ -2465,7 +2537,7 @@ export async function captureSlide(slideElement, slide, captureTargetElement) {
           console.warn(`⚠️ [captureSlide] ${slideType} 슬라이드 파일 크기가 큼: ${sizeMB.toFixed(2)}MB (25MB 제한 근접)`);
         }
       }
-      
+
       return validateFileSize(blob, slideType);
     } catch (error) {
       // 에러 발생 시 복원 함수 실행 보장
