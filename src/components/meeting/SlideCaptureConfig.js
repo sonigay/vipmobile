@@ -181,7 +181,7 @@ export const SLIDE_CAPTURE_CONFIG = {
     boxResizeIterations: 1,             // 박스 크기 조정 반복 횟수
     retryConfig: { maxRetries: 3, delay: 500 },
     imageQuality: 0.85,                 // 이미지 품질 (업로드 안정성 향상)
-    ignoreScrollHeight: true,           // scrollHeight 무시 (실제 콘텐츠 높이만 사용)
+    ignoreScrollHeight: false,          // ignoreScrollHeight 비활성화 (표준 scrollHeight 사용)
   },
 
   // 재고장표
