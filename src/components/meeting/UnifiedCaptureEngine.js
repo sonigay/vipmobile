@@ -1203,6 +1203,7 @@ async function adjustSizes(elements, config, slide) {
           preferCharts: config.captureMethod === 'direct',
           excludeBorders: true,
           padding: 40,
+          ignoreScrollHeight: config.ignoreScrollHeight,
         });
 
         // 재초담초채권 슬라이드: 입력 테이블 숨김 처리 (전면 교체)

@@ -181,6 +181,7 @@ export const SLIDE_CAPTURE_CONFIG = {
     boxResizeIterations: 1,             // 박스 크기 조정 반복 횟수
     retryConfig: { maxRetries: 3, delay: 500 },
     imageQuality: 0.85,                 // 이미지 품질 (업로드 안정성 향상)
+    ignoreScrollHeight: true,           // scrollHeight 무시 (실제 콘텐츠 높이만 사용)
   },
 
   // 재고장표
@@ -275,7 +276,7 @@ export async function waitForDataLoading(element, options = {}) {
     });
 
     // 로딩 아이콘 확인
-    const hasLoadingIcon = checkLoadingIcon && 
+    const hasLoadingIcon = checkLoadingIcon &&
       element.querySelector('.MuiCircularProgress-root, [class*="loading"], [class*="Loading"]') !== null;
 
     // 데이터 존재 확인 (테이블, 그래프 등)
@@ -329,6 +330,7 @@ export function measureContentSize(element, options = {}) {
     preferCharts = false,
     excludeBorders = true,
     padding = 40,
+    ignoreScrollHeight = false,
   } = options;
 
   const rect = element.getBoundingClientRect();
@@ -418,10 +420,15 @@ export function measureContentSize(element, options = {}) {
   const scrollHeight = element.scrollHeight || rect.height;
   const scrollWidth = element.scrollWidth || rect.width;
 
+  // ignoreScrollHeight가 true이면 scrollHeight를 무시하고 실제 콘텐츠 높이만 사용
+  const heightToUse = ignoreScrollHeight
+    ? Math.max(maxRelativeBottom, actualContentHeight)
+    : scrollHeight;
+
   const measuredHeight = Math.max(
     maxRelativeBottom + padding,
     actualContentHeight + padding,
-    scrollHeight
+    heightToUse
   );
 
   const measuredWidth = Math.max(
@@ -549,7 +556,7 @@ export function removeRightWhitespace(measuredWidth, maxRelativeRight, scrollWid
   // maxRelativeRight가 있으면 우선 사용 (실제 콘텐츠 위치)
   if (maxRelativeRight > 0) {
     const scrollWidthDiff = scrollWidth - maxRelativeRight;
-    
+
     // scrollWidth가 maxRelativeRight보다 크면 불필요한 여백 포함
     if (scrollWidthDiff > 50) {
       // maxRelativeRight 기준 사용 (오른쪽 여백 제거)
