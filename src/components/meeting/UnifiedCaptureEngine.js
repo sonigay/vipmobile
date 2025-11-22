@@ -1214,75 +1214,8 @@ async function adjustSizes(elements, config, slide) {
           ignoreScrollHeight: config.ignoreScrollHeight,
         });
 
-        // 재초담초채권 슬라이드: 입력 테이블 숨김 처리 (전면 교체)
-        // 복잡한 높이 계산 대신, 캡처 시 불필요한 입력 테이블을 아예 숨겨서 이미지 크기를 줄임
-        const isRechotanchoBond = slide?.mode === 'chart' &&
-          (slide?.tab === 'bondChart' || slide?.tab === 'bond') &&
-          slide?.subTab === 'rechotanchoBond';
 
-        if (isRechotanchoBond) {
-          try {
-            // 1. "데이터 입력" 텍스트가 포함된 Paper 요소 찾기
-            const papers = Array.from(elements.contentElement.querySelectorAll('.MuiPaper-root'));
-            const inputTablePaper = papers.find(paper => {
-              return paper.textContent.includes('데이터 입력') || paper.textContent.includes('저장 시점 선택');
-            });
-
-            if (inputTablePaper && SafeDOM.isInDOM(inputTablePaper)) {
-              // 2. 입력 테이블 숨기기
-              const originalDisplay = inputTablePaper.style.display;
-              inputTablePaper.style.display = 'none';
-
-              if (process.env.NODE_ENV === 'development') {
-                console.log('🙈 [adjustSizes] 재초담초채권 입력 테이블 숨김 처리 완료');
-              }
-
-              // 3. 복원 함수 등록
-              restoreFunctions.push(() => {
-                if (SafeDOM.isInDOM(inputTablePaper)) {
-                  inputTablePaper.style.display = originalDisplay;
-                }
-              });
-
-              // 4. 컨테이너 높이 재조정 (숨겨진 요소로 인한 여백 제거)
-              // Paper가 숨겨졌으므로 컨테이너 높이를 auto로 설정하여 자연스럽게 줄어들게 함
-              if (elements.contentElement) {
-                const originalHeight = elements.contentElement.style.height;
-                const originalMinHeight = elements.contentElement.style.minHeight;
-
-                elements.contentElement.style.height = 'auto';
-                elements.contentElement.style.minHeight = 'auto';
-
-                restoreFunctions.push(() => {
-                  if (SafeDOM.isInDOM(elements.contentElement)) {
-                    elements.contentElement.style.height = originalHeight;
-                    elements.contentElement.style.minHeight = originalMinHeight;
-                  }
-                });
-              }
-
-              // 5. sizeInfo 업데이트 (숨김 처리 후 실제 크기로 재측정)
-              // 약간의 지연 후 측정 (렌더링 반영)
-              await new Promise(r => setTimeout(r, 50));
-
-              const newRect = SafeDOM.getBoundingRect(elements.contentElement);
-              sizeInfo.measuredHeight = newRect.height;
-              sizeInfo.measuredWidth = newRect.width;
-
-              if (process.env.NODE_ENV === 'development') {
-                console.log(`📏 [adjustSizes] 재초담초채권 재측정 (테이블 숨김 후): ${sizeInfo.measuredWidth}x${sizeInfo.measuredHeight}`);
-              }
-            } else {
-              if (process.env.NODE_ENV === 'development') {
-                console.warn('⚠️ [adjustSizes] 재초담초채권 입력 테이블을 찾을 수 없음');
-              }
-            }
-          } catch (e) {
-            if (process.env.NODE_ENV === 'development') {
-              console.warn('⚠️ [adjustSizes] 재초담초채권 테이블 숨김 처리 실패:', e);
-            }
-          }
-        }
+        console.log(`📏 [adjustSizes] 측정 완료: ${sizeInfo.measuredWidth}x${sizeInfo.measuredHeight}`);
 
         // 담당자별 실적 테이블 포함 (전체총마감용)
         if (config?.needsManagerTableInclusion && elements.tables && elements.tables.length > 0) {
