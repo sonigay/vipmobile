@@ -2255,20 +2255,14 @@ async function executeCapture(elements, config, sizeInfo, slide) {
             }
           });
 
-          // 재초담초채권 슬라이드는 높이 강제 설정하지 않음 (실제 콘텐츠가 숨겨지는 문제 방지)
-          // ignoreScrollHeight로 계산한 정확한 높이를 captureElement에 옵션으로만 전달
-          if (!isRechotanchoBond) {
-            captureElementForDirect.style.height = `${sizeInfo.measuredHeight || 0}px`;
-            captureElementForDirect.style.maxHeight = `${sizeInfo.measuredHeight || 0}px`;
-            captureElementForDirect.style.width = `${sizeInfo.measuredWidth || 0}px`;
-            captureElementForDirect.style.maxWidth = `${sizeInfo.measuredWidth || 0}px`;
-          }
-
+          // 모든 슬라이드에 동일하게 크기 설정 (재초담초채권 특별 처리 제거)
+          captureElementForDirect.style.height = `${sizeInfo.measuredHeight || 0}px`;
+          captureElementForDirect.style.maxHeight = `${sizeInfo.measuredHeight || 0}px`;
+          captureElementForDirect.style.width = `${sizeInfo.measuredWidth || 0}px`;
+          captureElementForDirect.style.maxWidth = `${sizeInfo.measuredWidth || 0}px`;
           captureElementForDirect.style.overflow = 'visible';
 
           console.log('🎨 [executeCapture] 요소 스타일 설정:', {
-            isRechotanchoBond,
-            skippedHeightForcing: isRechotanchoBond,
             measuredHeight: sizeInfo.measuredHeight,
             measuredWidth: sizeInfo.measuredWidth
           });
