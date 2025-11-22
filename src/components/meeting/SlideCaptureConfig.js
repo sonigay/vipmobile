@@ -170,7 +170,7 @@ export const SLIDE_CAPTURE_CONFIG = {
     needsHeightMeasurement: true,       // 높이 측정 (실제 콘텐츠)
     needsBoxResize: false,              // 박스 크기 조정 불필요 (direct 방식에서 자동 처리)
     needsRightWhitespaceRemoval: true,  // 오른쪽 여백 제거
-    needsDataLoadingWait: false,        // 데이터 로딩 대기 불필요
+    needsDataLoadingWait: true,         // 데이터 로딩 및 차트 렌더링 대기 (필수!)
     needsTableExpansion: false,         // 테이블 펼치기 불필요
     captureMethod: 'direct',            // 직접 캡처
     preserveHeader: false,              // 헤더 보존 불필요 (전체 캡처)
