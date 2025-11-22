@@ -2237,24 +2237,41 @@ async function executeCapture(elements, config, sizeInfo, slide) {
         if (sizeInfo) {
           const originalHeight = captureElementForDirect.style.height || '';
           const originalMaxHeight = captureElementForDirect.style.maxHeight || '';
-          const originalWidth = captureElementForDirect.style.width || '';
-          const originalMaxWidth = captureElementForDirect.style.maxWidth || '';
+          const originalDirectStyles = {
+            height: captureElementForDirect.style.height || '',
+            maxHeight: captureElementForDirect.style.maxHeight || '',
+            width: captureElementForDirect.style.width || '',
+            maxWidth: captureElementForDirect.style.maxWidth || '',
+            overflow: captureElementForDirect.style.overflow || '',
+          };
 
           styleRestores.push(() => {
             if (SafeDOM.isInDOM(captureElementForDirect)) {
-              SafeDOM.restoreStyle(captureElementForDirect, 'height', originalHeight);
-              SafeDOM.restoreStyle(captureElementForDirect, 'max-height', originalMaxHeight);
-              SafeDOM.restoreStyle(captureElementForDirect, 'width', originalWidth);
-              SafeDOM.restoreStyle(captureElementForDirect, 'max-width', originalMaxWidth);
-              SafeDOM.restoreStyle(captureElementForDirect, 'overflow', '');
+              SafeDOM.restoreStyle(captureElementForDirect, 'height', originalDirectStyles.height);
+              SafeDOM.restoreStyle(captureElementForDirect, 'max-height', originalDirectStyles.maxHeight);
+              SafeDOM.restoreStyle(captureElementForDirect, 'width', originalDirectStyles.width);
+              SafeDOM.restoreStyle(captureElementForDirect, 'max-width', originalDirectStyles.maxWidth);
+              SafeDOM.restoreStyle(captureElementForDirect, 'overflow', originalDirectStyles.overflow);
             }
           });
 
-          captureElementForDirect.style.height = `${sizeInfo.measuredHeight || 0}px`;
-          captureElementForDirect.style.maxHeight = `${sizeInfo.measuredHeight || 0}px`;
-          captureElementForDirect.style.width = `${sizeInfo.measuredWidth || 0}px`;
-          captureElementForDirect.style.maxWidth = `${sizeInfo.measuredWidth || 0}px`;
+          // 재초담초채권 슬라이드는 높이 강제 설정하지 않음 (실제 콘텐츠가 숨겨지는 문제 방지)
+          // ignoreScrollHeight로 계산한 정확한 높이를 captureElement에 옵션으로만 전달
+          if (!isRechotanchoBond) {
+            captureElementForDirect.style.height = `${sizeInfo.measuredHeight || 0}px`;
+            captureElementForDirect.style.maxHeight = `${sizeInfo.measuredHeight || 0}px`;
+            captureElementForDirect.style.width = `${sizeInfo.measuredWidth || 0}px`;
+            captureElementForDirect.style.maxWidth = `${sizeInfo.measuredWidth || 0}px`;
+          }
+
           captureElementForDirect.style.overflow = 'visible';
+
+          console.log('🎨 [executeCapture] 요소 스타일 설정:', {
+            isRechotanchoBond,
+            skippedHeightForcing: isRechotanchoBond,
+            measuredHeight: sizeInfo.measuredHeight,
+            measuredWidth: sizeInfo.measuredWidth
+          });
 
           await new Promise(r => setTimeout(r, 300));
 
