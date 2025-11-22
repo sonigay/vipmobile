@@ -1214,9 +1214,10 @@ async function adjustSizes(elements, config, slide) {
         if (isRechotanchoBond && sizeInfo) {
           try {
             // 차트 요소 직접 찾기 (Canvas, SVG, Recharts 등)
+            // 입력 테이블(Table)은 제외하고 차트만 찾도록 필터링
             const charts = Array.from(elements.contentElement.querySelectorAll('canvas, svg, [class*="recharts-wrapper"], [class*="Chart"]'));
 
-            // 가장 큰 차트 찾기
+            // 가장 큰 차트 찾기 (또는 모든 차트 포함)
             let maxChartHeight = 0;
             let maxChartWidth = 0;
             let maxChartBottom = 0;
@@ -1227,6 +1228,10 @@ async function adjustSizes(elements, config, slide) {
 
             charts.forEach(chart => {
               if (!SafeDOM.isInDOM(chart)) return;
+
+              // 테이블 내부의 차트나 아이콘은 제외
+              if (chart.closest('table') || chart.closest('.MuiTable-root')) return;
+
               const rect = SafeDOM.getBoundingRect(chart);
 
               // 너무 작은 요소 제외 (아이콘 등)
@@ -1242,6 +1247,7 @@ async function adjustSizes(elements, config, slide) {
               maxChartRight = Math.max(maxChartRight, relativeRight);
             });
 
+            // 차트가 발견되면 차트 영역까지만 높이 제한 (입력 테이블 제외)
             if (foundChart) {
               // 차트 크기 + 패딩으로 높이/너비 재설정
               const padding = 50; // 여유 공간
@@ -1252,14 +1258,15 @@ async function adjustSizes(elements, config, slide) {
               const newWidth = maxChartRight + padding;
 
               if (process.env.NODE_ENV === 'development') {
-                console.log(`📏 [adjustSizes] 재초담초채권 정밀 측정:
+                console.log(`📏 [adjustSizes] 재초담초채권 정밀 측정 (테이블 제외):
                   기존: ${sizeInfo.measuredWidth}x${sizeInfo.measuredHeight}
                   차트: ${maxChartWidth}x${maxChartHeight} (Bottom: ${maxChartBottom}, Right: ${maxChartRight})
                   신규: ${newWidth}x${newHeight}
                 `);
               }
 
-              // 높이 재설정 (너무 큰 공백 제거)
+              // 높이 재설정 (너무 큰 공백 및 하단 테이블 제거)
+              // 기존 측정 높이가 차트 높이보다 훨씬 크다면(테이블 포함 등), 차트 높이로 강제 제한
               sizeInfo.measuredHeight = newHeight;
               sizeInfo.maxRelativeBottom = maxChartBottom;
 
@@ -1269,6 +1276,22 @@ async function adjustSizes(elements, config, slide) {
 
               // scrollWidth도 보정 (불필요한 스크롤 영역 무시)
               sizeInfo.scrollWidth = Math.min(sizeInfo.scrollWidth, newWidth + 100);
+
+              // 강제로 높이 제한 스타일 적용 (캡처 시 테이블이 보이지 않도록)
+              if (elements.contentElement) {
+                const originalOverflow = elements.contentElement.style.overflow;
+                const originalMaxHeight = elements.contentElement.style.maxHeight;
+
+                elements.contentElement.style.overflow = 'hidden';
+                elements.contentElement.style.maxHeight = `${newHeight}px`;
+
+                restoreFunctions.push(() => {
+                  if (SafeDOM.isInDOM(elements.contentElement)) {
+                    elements.contentElement.style.overflow = originalOverflow;
+                    elements.contentElement.style.maxHeight = originalMaxHeight;
+                  }
+                });
+              }
             }
           } catch (e) {
             if (process.env.NODE_ENV === 'development') {
