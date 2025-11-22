@@ -425,6 +425,16 @@ export function measureContentSize(element, options = {}) {
     ? Math.max(maxRelativeBottom, actualContentHeight)
     : scrollHeight;
 
+  if (process.env.NODE_ENV === 'development' && ignoreScrollHeight) {
+    console.log('[measureContentSize] ignoreScrollHeight 옵션 활성화:', {
+      scrollHeight,
+      maxRelativeBottom,
+      actualContentHeight,
+      heightToUse,
+      willIgnoreScrollHeight: ignoreScrollHeight
+    });
+  }
+
   const measuredHeight = Math.max(
     maxRelativeBottom + padding,
     actualContentHeight + padding,
