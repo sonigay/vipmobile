@@ -2329,6 +2329,14 @@ async function executeCapture(elements, config, sizeInfo, slide) {
             });
           }
 
+          console.log('📸 [executeCapture] captureElement 호출:', {
+            isRechotanchoBond,
+            captureWidth,
+            captureHeight,
+            sizeInfoMeasuredHeight: sizeInfo?.measuredHeight,
+            options: directCaptureOptions
+          });
+
           blob = await captureElement(captureElementForDirect, directCaptureOptions);
         } else {
           // 기본 캡처 (크기 측정 없이) - autoCrop으로 불필요한 공백 제거
