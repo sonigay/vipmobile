@@ -1205,97 +1205,72 @@ async function adjustSizes(elements, config, slide) {
           padding: 40,
         });
 
-        // 재초담초채권 슬라이드: 차트 영역 정밀 측정 (공백 제거 강화)
-        // 문제: 컨테이너의 불필요한 여백이 포함되어 이미지가 너무 크게 캡처되는 현상 수정
+        // 재초담초채권 슬라이드: 입력 테이블 숨김 처리 (전면 교체)
+        // 복잡한 높이 계산 대신, 캡처 시 불필요한 입력 테이블을 아예 숨겨서 이미지 크기를 줄임
         const isRechotanchoBond = slide?.mode === 'chart' &&
           (slide?.tab === 'bondChart' || slide?.tab === 'bond') &&
           slide?.subTab === 'rechotanchoBond';
 
-        if (isRechotanchoBond && sizeInfo) {
+        if (isRechotanchoBond) {
           try {
-            // 차트 요소 직접 찾기 (Canvas, SVG, Recharts 등)
-            // 입력 테이블(Table)은 제외하고 차트만 찾도록 필터링
-            const charts = Array.from(elements.contentElement.querySelectorAll('canvas, svg, [class*="recharts-wrapper"], [class*="Chart"]'));
-
-            // 가장 큰 차트 찾기 (또는 모든 차트 포함)
-            let maxChartHeight = 0;
-            let maxChartWidth = 0;
-            let maxChartBottom = 0;
-            let maxChartRight = 0;
-            let foundChart = false;
-
-            const contentRect = SafeDOM.getBoundingRect(elements.contentElement);
-
-            charts.forEach(chart => {
-              if (!SafeDOM.isInDOM(chart)) return;
-
-              // 테이블 내부의 차트나 아이콘은 제외
-              if (chart.closest('table') || chart.closest('.MuiTable-root')) return;
-
-              const rect = SafeDOM.getBoundingRect(chart);
-
-              // 너무 작은 요소 제외 (아이콘 등)
-              if (rect.width < 100 || rect.height < 100) return;
-
-              foundChart = true;
-              const relativeBottom = rect.bottom - contentRect.top;
-              const relativeRight = rect.right - contentRect.left;
-
-              maxChartHeight = Math.max(maxChartHeight, rect.height);
-              maxChartWidth = Math.max(maxChartWidth, rect.width);
-              maxChartBottom = Math.max(maxChartBottom, relativeBottom);
-              maxChartRight = Math.max(maxChartRight, relativeRight);
+            // 1. "데이터 입력" 텍스트가 포함된 Paper 요소 찾기
+            const papers = Array.from(elements.contentElement.querySelectorAll('.MuiPaper-root'));
+            const inputTablePaper = papers.find(paper => {
+              return paper.textContent.includes('데이터 입력') || paper.textContent.includes('저장 시점 선택');
             });
 
-            // 차트가 발견되면 차트 영역까지만 높이 제한 (입력 테이블 제외)
-            if (foundChart) {
-              // 차트 크기 + 패딩으로 높이/너비 재설정
-              const padding = 50; // 여유 공간
-
-              // 기존 측정값과 비교하여 더 작은 값(더 타이트한 값) 사용
-              // 단, 차트가 잘리지 않도록 최소값 보장
-              const newHeight = maxChartBottom + padding;
-              const newWidth = maxChartRight + padding;
+            if (inputTablePaper && SafeDOM.isInDOM(inputTablePaper)) {
+              // 2. 입력 테이블 숨기기
+              const originalDisplay = inputTablePaper.style.display;
+              inputTablePaper.style.display = 'none';
 
               if (process.env.NODE_ENV === 'development') {
-                console.log(`📏 [adjustSizes] 재초담초채권 정밀 측정 (테이블 제외):
-                  기존: ${sizeInfo.measuredWidth}x${sizeInfo.measuredHeight}
-                  차트: ${maxChartWidth}x${maxChartHeight} (Bottom: ${maxChartBottom}, Right: ${maxChartRight})
-                  신규: ${newWidth}x${newHeight}
-                `);
+                console.log('🙈 [adjustSizes] 재초담초채권 입력 테이블 숨김 처리 완료');
               }
 
-              // 높이 재설정 (너무 큰 공백 및 하단 테이블 제거)
-              // 기존 측정 높이가 차트 높이보다 훨씬 크다면(테이블 포함 등), 차트 높이로 강제 제한
-              sizeInfo.measuredHeight = newHeight;
-              sizeInfo.maxRelativeBottom = maxChartBottom;
+              // 3. 복원 함수 등록
+              restoreFunctions.push(() => {
+                if (SafeDOM.isInDOM(inputTablePaper)) {
+                  inputTablePaper.style.display = originalDisplay;
+                }
+              });
 
-              // 너비 재설정 (오른쪽 공백 제거)
-              sizeInfo.measuredWidth = newWidth;
-              sizeInfo.maxRelativeRight = maxChartRight;
-
-              // scrollWidth도 보정 (불필요한 스크롤 영역 무시)
-              sizeInfo.scrollWidth = Math.min(sizeInfo.scrollWidth, newWidth + 100);
-
-              // 강제로 높이 제한 스타일 적용 (캡처 시 테이블이 보이지 않도록)
+              // 4. 컨테이너 높이 재조정 (숨겨진 요소로 인한 여백 제거)
+              // Paper가 숨겨졌으므로 컨테이너 높이를 auto로 설정하여 자연스럽게 줄어들게 함
               if (elements.contentElement) {
-                const originalOverflow = elements.contentElement.style.overflow;
-                const originalMaxHeight = elements.contentElement.style.maxHeight;
+                const originalHeight = elements.contentElement.style.height;
+                const originalMinHeight = elements.contentElement.style.minHeight;
 
-                elements.contentElement.style.overflow = 'hidden';
-                elements.contentElement.style.maxHeight = `${newHeight}px`;
+                elements.contentElement.style.height = 'auto';
+                elements.contentElement.style.minHeight = 'auto';
 
                 restoreFunctions.push(() => {
                   if (SafeDOM.isInDOM(elements.contentElement)) {
-                    elements.contentElement.style.overflow = originalOverflow;
-                    elements.contentElement.style.maxHeight = originalMaxHeight;
+                    elements.contentElement.style.height = originalHeight;
+                    elements.contentElement.style.minHeight = originalMinHeight;
                   }
                 });
+              }
+
+              // 5. sizeInfo 업데이트 (숨김 처리 후 실제 크기로 재측정)
+              // 약간의 지연 후 측정 (렌더링 반영)
+              await new Promise(r => setTimeout(r, 50));
+
+              const newRect = SafeDOM.getBoundingRect(elements.contentElement);
+              sizeInfo.measuredHeight = newRect.height;
+              sizeInfo.measuredWidth = newRect.width;
+
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`📏 [adjustSizes] 재초담초채권 재측정 (테이블 숨김 후): ${sizeInfo.measuredWidth}x${sizeInfo.measuredHeight}`);
+              }
+            } else {
+              if (process.env.NODE_ENV === 'development') {
+                console.warn('⚠️ [adjustSizes] 재초담초채권 입력 테이블을 찾을 수 없음');
               }
             }
           } catch (e) {
             if (process.env.NODE_ENV === 'development') {
-              console.warn('⚠️ [adjustSizes] 재초담초채권 정밀 측정 실패:', e);
+              console.warn('⚠️ [adjustSizes] 재초담초채권 테이블 숨김 처리 실패:', e);
             }
           }
         }
