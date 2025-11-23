@@ -1284,6 +1284,8 @@ async function uploadMeetingImage(req, res) {
     const { meetingDate, slideOrder } = req.body;
 
     if (!req.file) {
+      // 에러 응답에도 CORS 헤더 포함
+      setCORSHeaders(req, res);
       return res.status(400).json({ success: false, error: '이미지 파일이 없습니다.' });
     }
 
