@@ -4207,6 +4207,21 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
   
   // 현재 데이터 (선택된 시점 또는 입력 중인 데이터)
   const [currentData, setCurrentData] = useState([]);
+  const containerRef = useRef(null);
+
+  // data-loaded, data-loading 속성 관리
+  useEffect(() => {
+    if (!containerRef.current) return;
+    
+    if (loading) {
+      containerRef.current.setAttribute('data-loading', 'true');
+      containerRef.current.removeAttribute('data-loaded');
+    } else if (inputData.length > 0 || allData.length > 0) {
+      // 데이터가 로드되었고 로딩이 완료되면
+      containerRef.current.setAttribute('data-loaded', 'true');
+      containerRef.current.removeAttribute('data-loading');
+    }
+  }, [loading, inputData.length, allData.length]);
 
   // 초기 데이터 로드 - 히스토리만 먼저 로드 (성능 개선)
   useEffect(() => {
@@ -4216,6 +4231,7 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
 
   // 저장 시점 목록 로드
   const loadHistory = async () => {
+    setLoading(true);
     const fetchWithRetry = async (url, opts = {}, retries = 3, baseDelay = 800) => {
       let lastErr = null;
       for (let i = 1; i <= retries; i++) {
@@ -4257,11 +4273,14 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
     } catch (error) {
       console.error('저장 시점 목록 로드 실패:', error);
       await fallbackLoadHistoryFromAllData();
+    } finally {
+      setLoading(false);
     }
   };
 
   const fallbackLoadHistoryFromAllData = async () => {
     try {
+      // loadHistory에서 이미 loading을 설정했으므로 중복 설정 방지
       const response = await fetch(`${API_BASE_URL}/api/rechotancho-bond/all-data`);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const result = await response.json();
@@ -4281,12 +4300,14 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
     } catch (e) {
       console.error('폴백 all-data 로드 실패:', e);
     }
+    // loadHistory에서 finally로 loading을 false로 설정하므로 여기서는 설정하지 않음
   };
 
   // 전체 데이터 로드 (그래프용)
   const loadAllData = async () => {
     try {
-      setLoading(true);
+      // loadHistory에서 이미 loading을 설정했으므로 중복 설정 방지
+      // setLoading(true);
       const response = await fetch(`${API_BASE_URL}/api/rechotancho-bond/all-data`);
       const result = await response.json();
       
@@ -4311,15 +4332,15 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
     } catch (error) {
       console.error('전체 데이터 로드 실패:', error);
       setError('데이터를 불러오는데 실패했습니다.');
-    } finally {
-      setLoading(false);
     }
+    // loadHistory에서 finally로 loading을 false로 설정하므로 여기서는 설정하지 않음
   };
 
   // 특정 시점 데이터 로드
   const loadDataByTimestamp = async (timestamp) => {
     try {
-      setLoading(true);
+      // loadHistory에서 이미 loading을 설정했으므로 중복 설정 방지
+      // setLoading(true);
       const response = await fetch(`${API_BASE_URL}/api/rechotancho-bond/data/${encodeURIComponent(timestamp)}`);
       const result = await response.json();
       
@@ -4340,9 +4361,8 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
     } catch (error) {
       console.error('데이터 로드 실패:', error);
       setError('데이터를 불러오는데 실패했습니다.');
-    } finally {
-      setLoading(false);
     }
+    // loadHistory에서 finally로 loading을 false로 설정하므로 여기서는 설정하지 않음
   };
 
   // 시점 선택 핸들러
@@ -4905,7 +4925,7 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
   const maxContentWidth = presentationMode ? 1920 : '100%';
   
   return (
-    <Box sx={{ p: 3 }}>
+    <Box ref={containerRef} sx={{ p: 3 }}>
       <Typography variant="h5" sx={{ mb: 3, fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1, color: '#1a1a1a' }}>
         <AccountBalanceWalletIcon sx={{ fontSize: 32, color: '#4ecdc4' }} />
         재초담초채권 관리
