@@ -2236,72 +2236,11 @@ async function executeCapture(elements, config, sizeInfo, slide, meeting = null)
 
         if (isRechotanchoBond) {
           console.log('\n🔍 [executeCapture] ========== 재초담초채권 슬라이드 감지 ==========');
-          console.log('🔍 [executeCapture] Chart.js 고정 및 다단계 캡처 시작');
-          
-          // 기본 캡처 옵션 준비 (directCaptureOptions가 정의되기 전에 사용)
-          // Chart.js 캔버스 복사를 위해 onclone 콜백 추가
-          const basicCaptureOptions = {
-            scale: 1, // 빠른 테스트를 위해 낮은 해상도
-            useCORS: true,
-            backgroundColor: '#ffffff',
-            scrollX: 0,
-            scrollY: 0,
-            skipAutoCrop: false,
-            onclone: (clonedDoc, clonedElement) => {
-              // 재초담초채권: Chart.js 캔버스 복사
-              try {
-                const chartCanvases = clonedElement.querySelectorAll('canvas');
-                const originalCanvases = captureElementForDirect.querySelectorAll('canvas');
-                chartCanvases.forEach((canvas, index) => {
-                  if (index < originalCanvases.length) {
-                    const originalCanvas = originalCanvases[index];
-                    if (originalCanvas && originalCanvas.width > 0 && originalCanvas.height > 0) {
-                      const ctx = canvas.getContext('2d');
-                      canvas.width = originalCanvas.width;
-                      canvas.height = originalCanvas.height;
-                      ctx.drawImage(originalCanvas, 0, 0);
-                      if (process.env.NODE_ENV === 'development') {
-                        console.log(`✅ [executeCapture] 단계별 캡처: Chart.js 캔버스 ${index + 1} 복사 완료 (${originalCanvas.width}x${originalCanvas.height}px)`);
-                      }
-                    }
-                  }
-                });
-              } catch (e) {
-                if (process.env.NODE_ENV === 'development') {
-                  console.warn('⚠️ [executeCapture] 단계별 캡처 Chart.js 캔버스 복사 실패:', e);
-                }
-              }
-            },
-          };
-          
-          // 1단계: 초기 상태 확인 및 캡처 (렌더링 전)
-          console.log('\n📸 [executeCapture] [1단계] 초기 상태 캡처 (렌더링 전)');
-          const initialCanvases = captureElementForDirect.querySelectorAll('canvas');
-          console.log(`🔍 [executeCapture] 초기 Chart.js 캔버스 개수: ${initialCanvases.length}`);
-          initialCanvases.forEach((canvas, idx) => {
-            console.log(`   초기 캔버스 ${idx + 1}: ${canvas.width}x${canvas.height}px`);
-          });
-          
-          // 초기 상태 캡처 시도
-          try {
-            const initialBlob = await captureElement(captureElementForDirect, basicCaptureOptions);
-            if (initialBlob && meeting) {
-              console.log(`📊 [executeCapture] 초기 상태 캡처 결과: ${(initialBlob.size / 1024).toFixed(2)}KB`);
-              // 디스코드에 업로드
-              try {
-                await uploadDebugImageToDiscord(initialBlob, meeting, 'step1-initial', '초기 상태 (렌더링 전)');
-                console.log(`✅ [executeCapture] 초기 상태 캡처 디스코드 업로드 완료`);
-              } catch (uploadError) {
-                console.warn(`⚠️ [executeCapture] 초기 상태 디스코드 업로드 실패: ${uploadError?.message}`);
-              }
-            }
-          } catch (e) {
-            console.warn(`⚠️ [executeCapture] 초기 상태 캡처 실패: ${e?.message}`);
-          }
+          console.log('🔍 [executeCapture] Chart.js 고정 및 빠른 캡처 시작');
           
           // Chart.js 캔버스 고정 (재렌더링 방지)
           const chartCanvases = captureElementForDirect.querySelectorAll('canvas');
-          console.log(`\n🔍 [executeCapture] Chart.js 캔버스 고정 시작 (개수: ${chartCanvases.length})`);
+          console.log(`🔍 [executeCapture] Chart.js 캔버스 고정 시작 (개수: ${chartCanvases.length})`);
           
           const originalCanvasStyles = [];
           chartCanvases.forEach((canvas, index) => {
@@ -2320,120 +2259,105 @@ async function executeCapture(elements, config, sizeInfo, slide, meeting = null)
           });
           console.log('✅ [executeCapture] Chart.js 캔버스 고정 완료');
 
-          // 2단계: 고정 후 즉시 캡처
-          console.log('\n📸 [executeCapture] [2단계] Chart.js 고정 직후 캡처');
+          // Chart.js 캔버스 복사 함수 (재사용)
+          const chartCanvasCloneCallback = (clonedDoc, clonedElement) => {
+            try {
+              const chartCanvases = clonedElement.querySelectorAll('canvas');
+              const originalCanvases = captureElementForDirect.querySelectorAll('canvas');
+              chartCanvases.forEach((canvas, index) => {
+                if (index < originalCanvases.length) {
+                  const originalCanvas = originalCanvases[index];
+                  if (originalCanvas && originalCanvas.width > 0 && originalCanvas.height > 0) {
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = originalCanvas.width;
+                    canvas.height = originalCanvas.height;
+                    ctx.drawImage(originalCanvas, 0, 0);
+                    if (process.env.NODE_ENV === 'development') {
+                      console.log(`✅ [executeCapture] Chart.js 캔버스 ${index + 1} 복사 완료 (${originalCanvas.width}x${originalCanvas.height}px)`);
+                    }
+                  }
+                }
+              });
+            } catch (e) {
+              if (process.env.NODE_ENV === 'development') {
+                console.warn('⚠️ [executeCapture] Chart.js 캔버스 복사 실패:', e);
+              }
+            }
+          };
+
+          // 빠른 캡처 시도: 200ms 대기 후 저해상도로 먼저 확인
+          console.log('\n📸 [executeCapture] 재초담초채권 빠른 캡처 시도 (200ms 대기 후)');
+          console.log('⏳ [executeCapture] 200ms 대기 중...');
+          await new Promise(r => setTimeout(r, 200));
+          console.log('✅ [executeCapture] 대기 완료, 빠른 확인 캡처 시작');
+          
+          const quickCheckOptions = {
+            scale: 1, // 빠른 확인을 위해 저해상도
+            useCORS: true,
+            backgroundColor: '#ffffff',
+            scrollX: 0,
+            scrollY: 0,
+            skipAutoCrop: false,
+            onclone: chartCanvasCloneCallback,
+          };
+          
           try {
-            await new Promise(r => setTimeout(r, 100));
-            const fixedBlob = await captureElement(captureElementForDirect, basicCaptureOptions);
-            if (fixedBlob && meeting) {
-              console.log(`📊 [executeCapture] 고정 직후 캡처 결과: ${(fixedBlob.size / 1024).toFixed(2)}KB`);
-              // 디스코드에 업로드
-              try {
-                await uploadDebugImageToDiscord(fixedBlob, meeting, 'step2-fixed', 'Chart.js 고정 직후');
-                console.log(`✅ [executeCapture] 고정 직후 캡처 디스코드 업로드 완료`);
-              } catch (uploadError) {
-                console.warn(`⚠️ [executeCapture] 고정 직후 디스코드 업로드 실패: ${uploadError?.message}`);
+            const quickBlob = await captureElement(captureElementForDirect, quickCheckOptions);
+            if (quickBlob && quickBlob.size > 50000) {
+              console.log(`✅ [executeCapture] 빠른 캡처 확인 성공: ${(quickBlob.size / 1024).toFixed(2)}KB`);
+              console.log('📸 [executeCapture] 고해상도 최종 캡처 시작...');
+              
+              // 고해상도 최종 캡처
+              const finalCaptureOptions = {
+                scale: SCALE, // 고해상도 (2)
+                useCORS: true,
+                backgroundColor: '#ffffff',
+                scrollX: 0,
+                scrollY: 0,
+                skipAutoCrop: false,
+                onclone: chartCanvasCloneCallback,
+              };
+              
+              blob = await captureElement(captureElementForDirect, finalCaptureOptions);
+              
+              if (blob && blob.size > 50000) {
+                console.log(`✅ [executeCapture] ✅✅✅ 재초담초채권 캡처 성공! ✅✅✅`);
+                console.log(`   - 이미지 크기: ${(blob.size / 1024).toFixed(2)}KB`);
+                console.log(`   - 빠른 캡처 방식 사용 (200ms 대기)`);
+                console.log(`==========================================\n`);
+                return blob; // 까만 화면 이후 로직 건너뛰고 바로 반환
               }
             }
           } catch (e) {
-            console.warn(`⚠️ [executeCapture] 고정 직후 캡처 실패: ${e?.message}`);
-          }
-
-          // 3단계: 까만 화면 대기 중 여러 시점 캡처
-          console.log('\n📸 [executeCapture] [3단계] 까만 화면 대기 중 다중 캡처');
-          const waitIntervals = [200, 500, 800, 1000]; // 0.2초, 0.5초, 0.8초, 1초
-          const intervalBlobs = [];
-          for (let i = 0; i < waitIntervals.length; i++) {
-            const waitTime = waitIntervals[i];
-            console.log(`⏳ [executeCapture] ${waitTime}ms 대기 후 캡처...`);
-            await new Promise(r => setTimeout(r, i === 0 ? waitTime : waitTime - waitIntervals[i - 1]));
-            
-            try {
-              const intervalBlob = await captureElement(captureElementForDirect, basicCaptureOptions);
-              if (intervalBlob) {
-                const blobSizeKB = intervalBlob.size / 1024;
-                console.log(`📊 [executeCapture] ${waitTime}ms 시점 캡처 결과: ${blobSizeKB.toFixed(2)}KB`);
-                intervalBlobs.push({ time: waitTime, blob: intervalBlob, size: blobSizeKB });
-                
-                // 디스코드에 업로드
-                if (meeting) {
-                  try {
-                    await uploadDebugImageToDiscord(intervalBlob, meeting, `step3-${waitTime}ms`, `${waitTime}ms 시점`);
-                    console.log(`✅ [executeCapture] ${waitTime}ms 시점 디스코드 업로드 완료`);
-                  } catch (uploadError) {
-                    console.warn(`⚠️ [executeCapture] ${waitTime}ms 시점 디스코드 업로드 실패: ${uploadError?.message}`);
-                  }
-                }
-              }
-            } catch (e) {
-              console.warn(`⚠️ [executeCapture] ${waitTime}ms 시점 캡처 실패: ${e?.message}`);
-            }
+            console.warn(`⚠️ [executeCapture] 빠른 캡처 실패: ${e?.message}, 더 긴 대기 후 재시도`);
           }
           
-          // 단계별 캡처 결과 요약
-          console.log(`\n📋 [executeCapture] ===== 단계별 캡처 결과 요약 =====`);
-          intervalBlobs.forEach(({ time, size }) => {
-            console.log(`   ${time}ms 시점: ${size.toFixed(2)}KB`);
-          });
-          console.log(`   (모든 단계별 캡처 이미지는 디스코드에 업로드되었습니다)`);
-          console.log(`==========================================\n`);
+          // 빠른 캡처 실패 시 1000ms 대기 후 재시도
+          console.log('\n📸 [executeCapture] 재초담초채권 최종 캡처 (1000ms 대기 후)');
+          console.log('⏳ [executeCapture] 1000ms 대기 중...');
+          await new Promise(r => setTimeout(r, 800)); // 이미 200ms 대기했으므로 800ms만 추가
+          console.log('✅ [executeCapture] 대기 완료, 고해상도 캡처 시작');
           
-          console.log('✅ [executeCapture] 까만 화면 대기 완료');
+          const finalCaptureOptions = {
+            scale: SCALE, // 고해상도 (2)
+            useCORS: true,
+            backgroundColor: '#ffffff',
+            scrollX: 0,
+            scrollY: 0,
+            skipAutoCrop: false,
+            onclone: chartCanvasCloneCallback,
+          };
           
-          // 재초담초채권: 최종 캡처 전 Chart.js 완전 렌더링 확인 및 추가 대기
-          if (isRechotanchoBond) {
-            console.log('\n🔍 [executeCapture] ===== 재초담초채권 최종 캡처 전 Chart.js 렌더링 확인 =====');
-            
-            // Chart.js 캔버스가 실제로 그려졌는지 확인 (최대 5초 대기)
-            let chartFullyRendered = false;
-            let chartCheckAttempts = 0;
-            const maxChartCheckAttempts = 25; // 최대 5초 (25 * 200ms)
-            
-            while (!chartFullyRendered && chartCheckAttempts < maxChartCheckAttempts) {
-              const chartCanvases = captureElementForDirect.querySelectorAll('canvas');
-              if (chartCanvases.length > 0) {
-                // 모든 캔버스가 실제로 그려졌는지 확인 (toDataURL로 확인)
-                let allRendered = true;
-                for (const canvas of chartCanvases) {
-                  if (canvas.width > 0 && canvas.height > 0) {
-                    try {
-                      const dataURL = canvas.toDataURL();
-                      // 빈 캔버스는 보통 매우 작은 base64 문자열을 가짐 (약 22자)
-                      // 실제로 그려진 캔버스는 훨씬 긴 문자열을 가짐
-                      if (dataURL.length < 100) {
-                        allRendered = false;
-                        break;
-                      }
-                    } catch (e) {
-                      allRendered = false;
-                      break;
-                    }
-                  } else {
-                    allRendered = false;
-                    break;
-                  }
-                }
-                
-                if (allRendered) {
-                  chartFullyRendered = true;
-                  console.log(`✅ [executeCapture] Chart.js 완전 렌더링 확인 완료 (${chartCheckAttempts * 200}ms 대기)`);
-                  break;
-                }
-              }
-              
-              await new Promise(r => setTimeout(r, 200));
-              chartCheckAttempts++;
-            }
-            
-            if (!chartFullyRendered) {
-              console.warn(`⚠️ [executeCapture] Chart.js 완전 렌더링 확인 실패 (최대 ${maxChartCheckAttempts * 200}ms 대기 후에도 미완료)`);
-            }
-            
-            // 추가 안정화 대기 (Chart.js 애니메이션 완료 및 레이아웃 안정화)
-            console.log('⏳ [executeCapture] 최종 캡처 전 추가 안정화 대기 (2초)...');
-            await new Promise(r => setTimeout(r, 2000));
-            console.log('✅ [executeCapture] 추가 안정화 대기 완료');
-            console.log('==========================================\n');
+          blob = await captureElement(captureElementForDirect, finalCaptureOptions);
+          
+          if (blob && blob.size > 50000) {
+            console.log(`✅ [executeCapture] ✅✅✅ 재초담초채권 캡처 성공! ✅✅✅`);
+            console.log(`   - 이미지 크기: ${(blob.size / 1024).toFixed(2)}KB`);
+            console.log(`==========================================\n`);
+            return blob; // 까만 화면 이후 로직 건너뛰고 바로 반환
+          } else {
+            console.warn(`⚠️ [executeCapture] 재초담초채권 캡처 실패 또는 빈 이미지 (${blob ? (blob.size / 1024).toFixed(2) : 0}KB)`);
+            // 실패 시 기본 로직으로 진행
           }
         }
 
@@ -2459,11 +2383,13 @@ async function executeCapture(elements, config, sizeInfo, slide, meeting = null)
           captureElementForDirect.style.maxWidth = `${sizeInfo.measuredWidth || 0}px`;
           captureElementForDirect.style.overflow = 'visible';
 
-          // 재초담초채권: 스타일 변경 후 더 긴 대기 (까만 화면이 지나갈 시간)
-          const waitTime = isRechotanchoBond ? 2000 : 300; // 재초담초채권: 2초, 기타: 300ms
-          console.log(`⏳ [executeCapture] 스타일 변경 후 대기 (${waitTime}ms)...`);
-          await new Promise(r => setTimeout(r, waitTime));
-          console.log(`✅ [executeCapture] 스타일 변경 후 대기 완료`);
+          // 재초담초채권은 이미 위에서 캡처 완료했으므로 스타일 변경 후 대기 건너뜀
+          if (!isRechotanchoBond) {
+            const waitTime = 300; // 기타 슬라이드: 300ms
+            console.log(`⏳ [executeCapture] 스타일 변경 후 대기 (${waitTime}ms)...`);
+            await new Promise(r => setTimeout(r, waitTime));
+            console.log(`✅ [executeCapture] 스타일 변경 후 대기 완료`);
+          }
           
           // 전체총마감 슬라이드: requiredHeight 확인하여 높이 제한 동적 조정
           // 전체총마감 슬라이드는 높이가 매우 클 수 있어 타일 캡처가 필요하므로 height 옵션을 전달하지 않음
