@@ -2185,6 +2185,31 @@ async function executeCapture(elements, config, sizeInfo, slide) {
           throw new Error('유효하지 않은 캡처 요소입니다.');
         }
 
+        // 재초담초채권 슬라이드: Chart.js 고정 및 재시도 로직
+        const isRechotanchoBond = slide?.mode === 'chart' &&
+          (slide?.tab === 'bondChart' || slide?.tab === 'bond') &&
+          slide?.subTab === 'rechotanchoBond';
+
+        if (isRechotanchoBond) {
+          // Chart.js 캔버스 고정 (재렌더링 방지)
+          const chartCanvases = captureElementForDirect.querySelectorAll('canvas');
+          const originalCanvasStyles = [];
+          chartCanvases.forEach((canvas, index) => {
+            if (canvas.width > 0 && canvas.height > 0) {
+              // 캔버스 스타일 고정
+              originalCanvasStyles[index] = {
+                pointerEvents: canvas.style.pointerEvents || '',
+                visibility: canvas.style.visibility || '',
+              };
+              canvas.style.pointerEvents = 'none';
+              canvas.style.visibility = 'visible';
+            }
+          });
+
+          // Chart.js 안정화 대기 (까만 화면이 지나갈 시간)
+          await new Promise(r => setTimeout(r, 1000));
+        }
+
         if (sizeInfo) {
           const originalHeight = captureElementForDirect.style.height || '';
           const originalMaxHeight = captureElementForDirect.style.maxHeight || '';
@@ -2266,7 +2291,52 @@ async function executeCapture(elements, config, sizeInfo, slide) {
             height: shouldUseTiledCaptureForTotalClosing ? undefined : captureHeight, // 타일 캡처 필요 시 height 전달하지 않음
           };
           
-          blob = await captureElement(captureElementForDirect, directCaptureOptions);
+          // 재초담초채권 슬라이드: 캡처 재시도 로직 (까만 화면 문제 해결)
+          if (isRechotanchoBond) {
+            const maxRetries = 3;
+            let lastError = null;
+            
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+              try {
+                if (process.env.NODE_ENV === 'development') {
+                  console.log(`🔄 [executeCapture] 재초담초채권 캡처 시도 ${attempt}/${maxRetries}`);
+                }
+                
+                // 각 시도 사이에 대기 (까만 화면이 지나갈 시간)
+                if (attempt > 1) {
+                  await new Promise(r => setTimeout(r, 1500));
+                }
+                
+                blob = await captureElement(captureElementForDirect, directCaptureOptions);
+                
+                // 캡처 성공 확인 (blob이 있고 크기가 0보다 큰지)
+                if (blob && blob.size > 1000) { // 최소 1KB 이상
+                  if (process.env.NODE_ENV === 'development') {
+                    console.log(`✅ [executeCapture] 재초담초채권 캡처 성공 (시도 ${attempt}/${maxRetries}, 크기: ${(blob.size / 1024).toFixed(2)}KB)`);
+                  }
+                  break; // 성공하면 루프 종료
+                } else {
+                  if (process.env.NODE_ENV === 'development') {
+                    console.warn(`⚠️ [executeCapture] 재초담초채권 캡처 결과가 비어있음 (시도 ${attempt}/${maxRetries})`);
+                  }
+                  blob = null; // 빈 blob이면 null로 설정하여 재시도
+                }
+              } catch (error) {
+                lastError = error;
+                if (process.env.NODE_ENV === 'development') {
+                  console.warn(`⚠️ [executeCapture] 재초담초채권 캡처 실패 (시도 ${attempt}/${maxRetries}):`, error?.message);
+                }
+                blob = null;
+              }
+            }
+            
+            // 모든 시도 실패 시 마지막 에러 throw
+            if (!blob && lastError) {
+              throw lastError;
+            }
+          } else {
+            blob = await captureElement(captureElementForDirect, directCaptureOptions);
+          }
         } else {
           // 기본 캡처 (크기 측정 없이) - autoCrop으로 불필요한 공백 제거
           const defaultCaptureOptions = {
