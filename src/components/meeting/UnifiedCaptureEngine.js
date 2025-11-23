@@ -1711,23 +1711,6 @@ async function adjustSizes(elements, config, slide) {
 async function executeCapture(elements, config, sizeInfo, slide) {
   let blob = null;
   const styleRestores = [];
-  
-  // 재초담초채권 슬라이드 식별
-  const isRechotanchoBond = slide?.mode === 'chart' &&
-    (slide?.tab === 'bondChart' || slide?.tab === 'bond') &&
-    slide?.subTab === 'rechotanchoBond';
-  
-  // 재초담초채권 디버깅 로그
-  if (isRechotanchoBond && process.env.NODE_ENV === 'development') {
-    console.log('🔍 [executeCapture] 재초담초채권 슬라이드 확인:', {
-      isRechotanchoBond: true,
-      hasConfig: !!config,
-      imageQuality: config?.imageQuality,
-      slideType: slide?.subTab,
-      slideMode: slide?.mode,
-      slideTab: slide?.tab
-    });
-  }
 
   try {
     switch (config?.captureMethod) {
@@ -1781,11 +1764,6 @@ async function executeCapture(elements, config, sizeInfo, slide) {
             height: Math.min(sizeInfo?.measuredHeight || 0, MAX_HEIGHT),
             width: Math.min(sizeInfo?.measuredWidth || 0, MAX_WIDTH),
           };
-          
-          // 재초담초채권만 imageQuality 추가 (다른 슬라이드는 전달하지 않음)
-          if (isRechotanchoBond && config?.imageQuality) {
-            captureOptions.imageQuality = config.imageQuality;
-          }
           
           blob = await captureElement(commonAncestor, captureOptions);
         } catch (error) {
@@ -2058,11 +2036,6 @@ async function executeCapture(elements, config, sizeInfo, slide) {
                   skipAutoCrop: true,
                 };
                 
-                // 재초담초채권만 imageQuality 추가 (실제로는 이 경로를 사용하지 않지만 일관성 유지)
-                if (isRechotanchoBond && config?.imageQuality) {
-                  headerCaptureOptions.imageQuality = config.imageQuality;
-                }
-                
                 headerBlob = await captureElement(elements.headerElement, headerCaptureOptions);
                 
                 if (headerBlob && process.env.NODE_ENV === 'development') {
@@ -2134,11 +2107,6 @@ async function executeCapture(elements, config, sizeInfo, slide) {
                     skipAutoCrop: true,
                   };
                   
-                  // 재초담초채권만 imageQuality 추가 (실제로는 이 경로를 사용하지 않지만 일관성 유지)
-                  if (isRechotanchoBond && config?.imageQuality) {
-                    headerCaptureOptions2.imageQuality = config.imageQuality;
-                  }
-                  
                   headerBlob = await captureElement(headerCandidate, headerCaptureOptions2);
                   
                   if (headerBlob && process.env.NODE_ENV === 'development') {
@@ -2176,11 +2144,6 @@ async function executeCapture(elements, config, sizeInfo, slide) {
             width: tableWidth,
             height: tableHeight,
           };
-          
-          // 재초담초채권만 imageQuality 추가 (실제로는 이 경로를 사용하지 않지만 일관성 유지)
-          if (isRechotanchoBond && config?.imageQuality) {
-            tableCaptureOptions.imageQuality = config.imageQuality;
-          }
           
           const tableBlob = await captureElement(tableBox, tableCaptureOptions);
 
@@ -2303,20 +2266,6 @@ async function executeCapture(elements, config, sizeInfo, slide) {
             height: shouldUseTiledCaptureForTotalClosing ? undefined : captureHeight, // 타일 캡처 필요 시 height 전달하지 않음
           };
           
-          // 재초담초채권만 imageQuality 추가
-          if (isRechotanchoBond && config?.imageQuality) {
-            directCaptureOptions.imageQuality = config.imageQuality;
-            if (process.env.NODE_ENV === 'development') {
-              console.log(`✅ [executeCapture] 재초담초채권 imageQuality 전달: ${config.imageQuality}`);
-            }
-          } else if (isRechotanchoBond && process.env.NODE_ENV === 'development') {
-            console.warn('⚠️ [executeCapture] 재초담초채권이지만 imageQuality가 없음:', {
-              hasConfig: !!config,
-              configKeys: config ? Object.keys(config) : [],
-              imageQuality: config?.imageQuality
-            });
-          }
-          
           blob = await captureElement(captureElementForDirect, directCaptureOptions);
         } else {
           // 기본 캡처 (크기 측정 없이) - autoCrop으로 불필요한 공백 제거
@@ -2329,11 +2278,6 @@ async function executeCapture(elements, config, sizeInfo, slide) {
             scrollY: 0,
             skipAutoCrop: false, // autoCrop 활성화 (불필요한 공백 제거)
           };
-          
-          // 재초담초채권만 imageQuality 추가
-          if (isRechotanchoBond && config?.imageQuality) {
-            defaultCaptureOptions.imageQuality = config.imageQuality;
-          }
           
           blob = await captureElement(captureElementForDirect, defaultCaptureOptions);
         }
@@ -2413,16 +2357,6 @@ export async function captureSlide(slideElement, slide, captureTargetElement) {
   try {
       slideType = identifySlideType(slide);
       config = getCaptureConfig(slide);
-      
-      // 재초담초채권 디버깅 로그
-      if (slideType === 'rechotanchoBond' && process.env.NODE_ENV === 'development') {
-        console.log('🔍 [captureSlide] 재초담초채권 슬라이드 식별:', {
-          slideType,
-          hasConfig: !!config,
-          imageQuality: config?.imageQuality,
-          configKeys: config ? Object.keys(config) : []
-        });
-      }
     } catch (error) {
       if (process.env.NODE_ENV === 'development') {
         console.error('❌ [captureSlide] 슬라이드 타입 식별 실패:', error);

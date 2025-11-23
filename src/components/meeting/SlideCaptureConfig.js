@@ -172,6 +172,7 @@ export const SLIDE_CAPTURE_CONFIG = {
     needsRightWhitespaceRemoval: true,  // 오른쪽 여백 제거
     needsDataLoadingWait: false,        // 데이터 로딩 대기 불필요
     needsTableExpansion: false,         // 테이블 펼치기 불필요
+    needsTableScroll: false,            // 테이블 스크롤 처리 불필요 (direct 방식에서 불필요)
     captureMethod: 'direct',            // 직접 캡처
     preserveHeader: false,              // 헤더 보존 불필요 (전체 캡처)
     needsHeaderComposition: false,      // 헤더 합성 불필요
@@ -180,7 +181,6 @@ export const SLIDE_CAPTURE_CONFIG = {
     needsManagerTableInclusion: false,
     boxResizeIterations: 1,             // 박스 크기 조정 반복 횟수
     retryConfig: { maxRetries: 3, delay: 500 },
-    imageQuality: 0.85,                 // 이미지 품질 (업로드 안정성 향상)
   },
 
   // 재고장표

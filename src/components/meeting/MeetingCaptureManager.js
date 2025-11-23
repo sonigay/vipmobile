@@ -4407,17 +4407,6 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
           }
         } else {
           // 통합 엔진이 null을 반환한 경우 기본 캡처 폴백
-          // 재초담초채권 슬라이드의 경우 imageQuality 설정 추가 (근본 문제 해결)
-          const isRechotanchoBond = currentSlide?.mode === 'chart' &&
-            (currentSlide?.tab === 'bondChart' || currentSlide?.tab === 'bond') &&
-            currentSlide?.subTab === 'rechotanchoBond';
-
-          if (isRechotanchoBond) {
-            // SlideCaptureConfig에서 imageQuality 0.85 설정을 실제로 적용
-            captureOptions.imageQuality = 0.85;
-            console.log('🔧 [MeetingCaptureManager] 재초담초채권 슬라이드: imageQuality 0.85 적용 (폴백)');
-          }
-
           blob = await captureElement(captureTargetElement, captureOptions);
           if (process.env.NODE_ENV === 'development') {
             console.warn('⚠️ [MeetingCaptureManager] 통합 엔진 null 반환, 기본 캡처 사용');
@@ -4428,16 +4417,6 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
           console.warn('⚠️ [MeetingCaptureManager] 통합 캡처 엔진 에러:', e?.message);
         }
         // 에러 발생 시 기본 캡처 폴백
-        // 재초담초채권 슬라이드의 경우 imageQuality 설정 추가
-        const isRechotanchoBond = currentSlide?.mode === 'chart' &&
-          (currentSlide?.tab === 'bondChart' || currentSlide?.tab === 'bond') &&
-          currentSlide?.subTab === 'rechotanchoBond';
-
-        if (isRechotanchoBond) {
-          captureOptions.imageQuality = 0.85;
-          console.log('🔧 [MeetingCaptureManager] 재초담초채권 슬라이드: imageQuality 0.85 적용 (에러 폴백)');
-        }
-
         blob = await captureElement(captureTargetElement, captureOptions);
         if (process.env.NODE_ENV === 'development') {
           console.warn('⚠️ [MeetingCaptureManager] 기본 캡처 폴백 사용');
@@ -4507,43 +4486,6 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         imageSizeMB = blob.size / (1024 * 1024);
         console.log(`📊 [MeetingCaptureManager] 슬라이드 ${index + 1} (${currentSlide?.subTab || currentSlide?.tab || 'unknown'}) 이미지 크기: ${imageSizeMB.toFixed(2)}MB`);
 
-        // 재초담초채권 슬라이드는 업로드 안정성을 위해 추가 압축 수행
-        const isRechotanchoBond = currentSlide?.mode === 'chart' &&
-          (currentSlide?.tab === 'bondChart' || currentSlide?.tab === 'bond') &&
-          currentSlide?.subTab === 'rechotanchoBond';
-
-        if (isRechotanchoBond) {
-          console.log(`📊 [MeetingCaptureManager] 재초담초채권 슬라이드 이미지 크기: ${imageSizeMB.toFixed(2)}MB (압축 전)`);
-        }
-
-        // 재초담초채권 슬라이드가 2MB 이상이면 추가 압축 시도 (임계값 상향 조정)
-        // 품질도 0.90으로 상향 조정하여 이미지 품질 유지
-        if (isRechotanchoBond && blob.size > 2 * 1024 * 1024) {
-          try {
-            const compressedBlob = await compressImageBlob(blob, 0.90);
-            if (compressedBlob && compressedBlob.size < blob.size) {
-              const originalSizeMB = imageSizeMB;
-              const compressedSizeMB = compressedBlob.size / (1024 * 1024);
-              const reduction = ((blob.size - compressedBlob.size) / blob.size * 100).toFixed(1);
-              console.log(`📦 [MeetingCaptureManager] 재초담초채권 슬라이드 추가 압축: ${originalSizeMB.toFixed(2)}MB → ${compressedSizeMB.toFixed(2)}MB (${reduction}% 감소)`);
-              blob = compressedBlob;
-              imageSizeMB = compressedSizeMB;
-            } else {
-              if (process.env.NODE_ENV === 'development') {
-                console.log(`📦 [MeetingCaptureManager] 재초담초채권 슬라이드 압축 효과 없음, 원본 사용`);
-              }
-            }
-          } catch (compressError) {
-            if (process.env.NODE_ENV === 'development') {
-              console.warn('⚠️ [MeetingCaptureManager] 재초담초채권 슬라이드 추가 압축 실패, 원본 사용:', compressError?.message);
-            }
-          }
-        } else if (isRechotanchoBond) {
-          if (process.env.NODE_ENV === 'development') {
-            console.log(`📦 [MeetingCaptureManager] 재초담초채권 슬라이드 크기가 ${imageSizeMB.toFixed(2)}MB로 작아 추가 압축 생략`);
-          }
-        }
-
         if (blob.size > 25 * 1024 * 1024) {
           // 25MB 초과 시 에러 발생
           throw new Error(`이미지 파일이 너무 큽니다 (${imageSizeMB.toFixed(2)}MB). 25MB 이하로 줄여주세요.`);
@@ -4570,11 +4512,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
           currentSlide?.subTab === 'totalClosing';
         const isToc = currentSlide?.type === 'toc';
         const isMain = currentSlide?.type === 'main';
-        const isRechotanchoBond = currentSlide?.mode === 'chart' &&
-          (currentSlide?.tab === 'bondChart' || currentSlide?.tab === 'bond') &&
-          currentSlide?.subTab === 'rechotanchoBond';
-        // 재초담초채권 슬라이드는 업로드 안정성을 위해 타임아웃을 더 길게 설정
-        const uploadTimeout = isTotalClosing ? 120000 : (isToc || isMain ? 60000 : (isRechotanchoBond ? 60000 : 45000)); // 전체총마감: 120초, 목차/메인/재초담초채권: 60초, 기타: 45초
+        const uploadTimeout = isTotalClosing ? 120000 : (isToc || isMain ? 60000 : 45000); // 전체총마감: 120초, 목차/메인: 60초, 기타: 45초
 
         if (process.env.NODE_ENV === 'development') {
           if (isTotalClosing) {
@@ -4583,13 +4521,10 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             console.log(`⏱️ [MeetingCaptureManager] 목차 슬라이드: 업로드 타임아웃 ${uploadTimeout / 1000}초로 설정`);
           } else if (isMain) {
             console.log(`⏱️ [MeetingCaptureManager] 메인 슬라이드: 업로드 타임아웃 ${uploadTimeout / 1000}초로 설정`);
-          } else if (isRechotanchoBond) {
-            console.log(`⏱️ [MeetingCaptureManager] 재초담초채권 슬라이드: 업로드 타임아웃 ${uploadTimeout / 1000}초로 설정`);
           }
         }
 
-        // 재초담초채권 슬라이드는 업로드 안정성을 위해 재시도 횟수를 증가
-        const maxRetries = isRechotanchoBond ? 7 : retries; // 재초담초채권: 7회, 기타: 5회
+        const maxRetries = retries;
 
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
           try {
@@ -4762,14 +4697,9 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
 
       const uploadResult = await uploadResponse.json();
 
-      // 재초담초채권 슬라이드의 경우 더 자세한 로그 출력
-      const isRechotanchoBond = currentSlide?.mode === 'chart' &&
-        (currentSlide?.tab === 'bondChart' || currentSlide?.tab === 'bond') &&
-        currentSlide?.subTab === 'rechotanchoBond';
-
       // 이미지 URL 검증
       if (!uploadResult.imageUrl) {
-        const errorMsg = `이미지 URL이 없습니다. (슬라이드 ${index + 1}, ${isRechotanchoBond ? '재초담초채권' : '일반'})`;
+        const errorMsg = `이미지 URL이 없습니다. (슬라이드 ${index + 1})`;
         console.error(`❌ [MeetingCaptureManager] ${errorMsg}`, uploadResult);
         throw new Error(errorMsg);
       }
@@ -4780,19 +4710,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         throw new Error(errorMsg);
       }
 
-      if (isRechotanchoBond) {
-        console.log(`✅ [재초담초채권] 슬라이드 ${index + 1} 업로드 완료:`, {
-          imageUrl: uploadResult.imageUrl,
-          imageUrlLength: uploadResult.imageUrl.length,
-          imageUrlValid: uploadResult.imageUrl.startsWith('https://'),
-          postId: uploadResult.postId,
-          threadId: uploadResult.threadId,
-          imageSizeMB: imageSizeMB.toFixed(2),
-          compressionApplied: blob.size !== imageSizeMB * 1024 * 1024,
-          quality: 0.90,
-          fullResponse: uploadResult
-        });
-      } else if (process.env.NODE_ENV === 'development') {
+      if (process.env.NODE_ENV === 'development') {
         console.log(`✅ [MeetingCaptureManager] 슬라이드 ${index + 1} 업로드 완료:`, {
           imageUrl: uploadResult.imageUrl,
           imageUrlLength: uploadResult.imageUrl.length,
@@ -4921,24 +4839,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
           slides: slidesToSave
         });
         
-        // 재초담초채권 슬라이드의 경우 저장 후 검증
-        if (isRechotanchoBond) {
-          const savedSlide = slidesToSave.find(s => s.slideId === currentSlide?.slideId);
-          if (savedSlide?.imageUrl) {
-            console.log(`✅ [재초담초채권] 슬라이드 ${index + 1} 저장 완료 및 검증:`, {
-              slideId: savedSlide.slideId,
-              imageUrl: savedSlide.imageUrl,
-              imageUrlLength: savedSlide.imageUrl.length,
-              imageUrlValid: savedSlide.imageUrl.startsWith('https://'),
-              order: savedSlide.order
-            });
-          } else {
-            console.warn(`⚠️ [재초담초채권] 슬라이드 ${index + 1} 저장 후 imageUrl 확인 실패:`, {
-              slideId: currentSlide?.slideId,
-              savedSlides: slidesToSave.map(s => ({ slideId: s.slideId, hasImageUrl: !!s.imageUrl }))
-            });
-          }
-        } else if (process.env.NODE_ENV === 'development') {
+        if (process.env.NODE_ENV === 'development') {
           console.log(`✅ [MeetingCaptureManager] 슬라이드 ${index + 1} 저장 완료`);
         }
       } catch (err) {
