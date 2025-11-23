@@ -519,7 +519,38 @@ export async function captureElement(element, options = {}) {
       const clonedIsToc = clonedSlideId.includes('toc');
       const clonedIsMain = clonedSlideId.includes('main') && !clonedSlideId.includes('toc');
       const clonedIsEnding = clonedSlideId.includes('ending');
+      const isRechotanchoBond = clonedSlideId.includes('rechotanchoBond');
       const isSpecialSlide = clonedIsToc || clonedIsMain || clonedIsEnding;
+      
+      // 재초담초채권 슬라이드: Chart.js 캔버스 처리
+      if (isRechotanchoBond) {
+        // Chart.js 캔버스 요소 찾기 (react-chartjs-2는 canvas를 직접 렌더링)
+        const chartCanvases = clonedElement.querySelectorAll('canvas');
+        chartCanvases.forEach(canvas => {
+          // Chart.js 캔버스는 이미 렌더링된 상태여야 함
+          // 하지만 클론된 문서에서는 Chart.js 인스턴스가 없으므로
+          // 원본 문서에서 같은 위치의 캔버스를 찾아서 복사
+          try {
+            // 원본 요소에서 같은 위치의 캔버스 찾기
+            const originalCanvases = element.querySelectorAll('canvas');
+            const canvasIndex = Array.from(clonedElement.querySelectorAll('canvas')).indexOf(canvas);
+            if (canvasIndex >= 0 && canvasIndex < originalCanvases.length) {
+              const originalCanvas = originalCanvases[canvasIndex];
+              if (originalCanvas && originalCanvas.width > 0 && originalCanvas.height > 0) {
+                // 원본 캔버스의 이미지 데이터를 클론된 캔버스에 복사
+                const ctx = canvas.getContext('2d');
+                canvas.width = originalCanvas.width;
+                canvas.height = originalCanvas.height;
+                ctx.drawImage(originalCanvas, 0, 0);
+              }
+            }
+          } catch (e) {
+            if (process.env.NODE_ENV === 'development') {
+              console.warn('⚠️ [screenCapture] Chart.js 캔버스 복사 실패:', e);
+            }
+          }
+        });
+      }
       
       // 목차/메인/엔딩 슬라이드인 경우: 모든 스크롤 제약을 제거하여 전체 콘텐츠 표시
       if (isSpecialSlide) {

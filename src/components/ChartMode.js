@@ -4218,8 +4218,32 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
       containerRef.current.removeAttribute('data-loaded');
     } else if (inputData.length > 0 || allData.length > 0) {
       // 데이터가 로드되었고 로딩이 완료되면
-      containerRef.current.setAttribute('data-loaded', 'true');
-      containerRef.current.removeAttribute('data-loading');
+      // Chart.js 렌더링 완료를 확인한 후에 data-loaded 설정
+      const checkChartRendered = () => {
+        const chartCanvases = containerRef.current.querySelectorAll('canvas');
+        if (chartCanvases.length > 0) {
+          // 모든 캔버스가 렌더링되었는지 확인 (너비와 높이가 0이 아니어야 함)
+          const allRendered = Array.from(chartCanvases).every(canvas => {
+            return canvas.width > 0 && canvas.height > 0;
+          });
+          
+          if (allRendered) {
+            // Chart.js 렌더링 완료 확인 후 data-loaded 설정
+            containerRef.current.setAttribute('data-loaded', 'true');
+            containerRef.current.removeAttribute('data-loading');
+          } else {
+            // 아직 렌더링 중이면 잠시 후 다시 확인
+            setTimeout(checkChartRendered, 100);
+          }
+        } else {
+          // Chart.js가 없으면 (선 그래프가 표시되지 않는 경우) 바로 설정
+          containerRef.current.setAttribute('data-loaded', 'true');
+          containerRef.current.removeAttribute('data-loading');
+        }
+      };
+      
+      // Chart.js 렌더링 완료 확인 시작
+      checkChartRendered();
     }
   }, [loading, inputData.length, allData.length]);
 
