@@ -2353,6 +2353,62 @@ async function executeCapture(elements, config, sizeInfo, slide, meeting = null)
           console.log(`==========================================\n`);
           
           console.log('✅ [executeCapture] 까만 화면 대기 완료');
+          
+          // 재초담초채권: 최종 캡처 전 Chart.js 완전 렌더링 확인 및 추가 대기
+          if (isRechotanchoBond) {
+            console.log('\n🔍 [executeCapture] ===== 재초담초채권 최종 캡처 전 Chart.js 렌더링 확인 =====');
+            
+            // Chart.js 캔버스가 실제로 그려졌는지 확인 (최대 5초 대기)
+            let chartFullyRendered = false;
+            let chartCheckAttempts = 0;
+            const maxChartCheckAttempts = 25; // 최대 5초 (25 * 200ms)
+            
+            while (!chartFullyRendered && chartCheckAttempts < maxChartCheckAttempts) {
+              const chartCanvases = captureElementForDirect.querySelectorAll('canvas');
+              if (chartCanvases.length > 0) {
+                // 모든 캔버스가 실제로 그려졌는지 확인 (toDataURL로 확인)
+                let allRendered = true;
+                for (const canvas of chartCanvases) {
+                  if (canvas.width > 0 && canvas.height > 0) {
+                    try {
+                      const dataURL = canvas.toDataURL();
+                      // 빈 캔버스는 보통 매우 작은 base64 문자열을 가짐 (약 22자)
+                      // 실제로 그려진 캔버스는 훨씬 긴 문자열을 가짐
+                      if (dataURL.length < 100) {
+                        allRendered = false;
+                        break;
+                      }
+                    } catch (e) {
+                      allRendered = false;
+                      break;
+                    }
+                  } else {
+                    allRendered = false;
+                    break;
+                  }
+                }
+                
+                if (allRendered) {
+                  chartFullyRendered = true;
+                  console.log(`✅ [executeCapture] Chart.js 완전 렌더링 확인 완료 (${chartCheckAttempts * 200}ms 대기)`);
+                  break;
+                }
+              }
+              
+              await new Promise(r => setTimeout(r, 200));
+              chartCheckAttempts++;
+            }
+            
+            if (!chartFullyRendered) {
+              console.warn(`⚠️ [executeCapture] Chart.js 완전 렌더링 확인 실패 (최대 ${maxChartCheckAttempts * 200}ms 대기 후에도 미완료)`);
+            }
+            
+            // 추가 안정화 대기 (Chart.js 애니메이션 완료 및 레이아웃 안정화)
+            console.log('⏳ [executeCapture] 최종 캡처 전 추가 안정화 대기 (2초)...');
+            await new Promise(r => setTimeout(r, 2000));
+            console.log('✅ [executeCapture] 추가 안정화 대기 완료');
+            console.log('==========================================\n');
+          }
         }
 
         if (sizeInfo) {
@@ -2377,7 +2433,11 @@ async function executeCapture(elements, config, sizeInfo, slide, meeting = null)
           captureElementForDirect.style.maxWidth = `${sizeInfo.measuredWidth || 0}px`;
           captureElementForDirect.style.overflow = 'visible';
 
-          await new Promise(r => setTimeout(r, 300));
+          // 재초담초채권: 스타일 변경 후 더 긴 대기 (까만 화면이 지나갈 시간)
+          const waitTime = isRechotanchoBond ? 2000 : 300; // 재초담초채권: 2초, 기타: 300ms
+          console.log(`⏳ [executeCapture] 스타일 변경 후 대기 (${waitTime}ms)...`);
+          await new Promise(r => setTimeout(r, waitTime));
+          console.log(`✅ [executeCapture] 스타일 변경 후 대기 완료`);
           
           // 전체총마감 슬라이드: requiredHeight 확인하여 높이 제한 동적 조정
           // 전체총마감 슬라이드는 높이가 매우 클 수 있어 타일 캡처가 필요하므로 height 옵션을 전달하지 않음
