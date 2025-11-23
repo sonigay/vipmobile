@@ -4922,8 +4922,9 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
     );
   }
 
-  // presentationMode일 때 그래프와 테이블의 가로 비율을 통일하기 위한 최대 너비 (1920px로 증가하여 콘텐츠 축소 방지)
-  const maxContentWidth = presentationMode ? 1920 : '100%';
+  // presentationMode일 때 그래프와 테이블의 가로 비율을 통일하기 위한 최대 너비
+  // 1920px 고정 너비는 화면 최대화 시 html2canvas 캡처 문제를 일으킬 수 있으므로 상대적 너비 사용
+  const maxContentWidth = presentationMode ? '100%' : '100%';
   
   return (
     <Box ref={containerRef} sx={{ p: 3 }}>
