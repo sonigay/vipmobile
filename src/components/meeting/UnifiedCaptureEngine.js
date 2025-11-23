@@ -2239,6 +2239,7 @@ async function executeCapture(elements, config, sizeInfo, slide, meeting = null)
           console.log('🔍 [executeCapture] Chart.js 고정 및 다단계 캡처 시작');
           
           // 기본 캡처 옵션 준비 (directCaptureOptions가 정의되기 전에 사용)
+          // Chart.js 캔버스 복사를 위해 onclone 콜백 추가
           const basicCaptureOptions = {
             scale: 1, // 빠른 테스트를 위해 낮은 해상도
             useCORS: true,
@@ -2246,6 +2247,31 @@ async function executeCapture(elements, config, sizeInfo, slide, meeting = null)
             scrollX: 0,
             scrollY: 0,
             skipAutoCrop: false,
+            onclone: (clonedDoc, clonedElement) => {
+              // 재초담초채권: Chart.js 캔버스 복사
+              try {
+                const chartCanvases = clonedElement.querySelectorAll('canvas');
+                const originalCanvases = captureElementForDirect.querySelectorAll('canvas');
+                chartCanvases.forEach((canvas, index) => {
+                  if (index < originalCanvases.length) {
+                    const originalCanvas = originalCanvases[index];
+                    if (originalCanvas && originalCanvas.width > 0 && originalCanvas.height > 0) {
+                      const ctx = canvas.getContext('2d');
+                      canvas.width = originalCanvas.width;
+                      canvas.height = originalCanvas.height;
+                      ctx.drawImage(originalCanvas, 0, 0);
+                      if (process.env.NODE_ENV === 'development') {
+                        console.log(`✅ [executeCapture] 단계별 캡처: Chart.js 캔버스 ${index + 1} 복사 완료 (${originalCanvas.width}x${originalCanvas.height}px)`);
+                      }
+                    }
+                  }
+                });
+              } catch (e) {
+                if (process.env.NODE_ENV === 'development') {
+                  console.warn('⚠️ [executeCapture] 단계별 캡처 Chart.js 캔버스 복사 실패:', e);
+                }
+              }
+            },
           };
           
           // 1단계: 초기 상태 확인 및 캡처 (렌더링 전)
