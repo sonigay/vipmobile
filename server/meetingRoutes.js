@@ -1466,6 +1466,9 @@ async function uploadMeetingImage(req, res) {
       console.warn('⚠️ [uploadMeetingImage] 슬라이드 정보 로깅 실패:', logError.message);
     }
 
+    // 정상 응답 전에 CORS 헤더 재설정 (확실히 포함되도록)
+    setCORSHeaders(req, res);
+
     res.json({
       success: true,
       imageUrl: result.imageUrl,
