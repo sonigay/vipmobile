@@ -2498,32 +2498,66 @@ async function executeCapture(elements, config, sizeInfo, slide, meeting = null)
           
           // 재초담초채권 슬라이드: 캡처 재시도 로직 (까만 화면 문제 해결)
           if (isRechotanchoBond) {
-            const maxRetries = 10; // 재시도 횟수 증가 (3 → 10)
+            const maxRetries = 5; // 재시도 횟수 (충분한 대기 후 첫 시도에서 성공하도록)
             let lastError = null;
             let successfulAttempt = null;
             
-            console.log(`🔄 [executeCapture] 재초담초채권 캡처 시작 - 최대 ${maxRetries}회 시도`);
+            console.log(`🔄 [executeCapture] 재초담초채권 최종 캡처 시작 - 최대 ${maxRetries}회 시도`);
+            
+            // 최종 캡처 전 Chart.js 최종 확인
+            console.log(`\n🔍 [executeCapture] ===== 최종 캡처 전 Chart.js 최종 확인 =====`);
+            const finalChartCanvases = captureElementForDirect.querySelectorAll('canvas');
+            console.log(`🔍 [executeCapture] 최종 Chart.js 캔버스 개수: ${finalChartCanvases.length}`);
+            finalChartCanvases.forEach((canvas, idx) => {
+              try {
+                const dataURL = canvas.toDataURL();
+                const dataLength = dataURL.length;
+                console.log(`   캔버스 ${idx + 1}: ${canvas.width}x${canvas.height}px, 데이터 길이: ${dataLength} (${dataLength > 100 ? '✅ 렌더링됨' : '⚠️ 빈 캔버스'})`);
+              } catch (e) {
+                console.warn(`   캔버스 ${idx + 1}: 데이터 확인 실패 - ${e?.message}`);
+              }
+            });
+            console.log(`==========================================\n`);
             
             for (let attempt = 1; attempt <= maxRetries; attempt++) {
               const attemptStartTime = Date.now();
               
               try {
-                console.log(`\n📸 [executeCapture] ===== 재초담초채권 캡처 시도 ${attempt}/${maxRetries} =====`);
+                console.log(`\n📸 [executeCapture] ===== 재초담초채권 최종 캡처 시도 ${attempt}/${maxRetries} =====`);
                 console.log(`⏰ [executeCapture] 시도 시작 시간: ${new Date().toISOString()}`);
                 
                 // 각 시도 사이에 대기 (까만 화면이 지나갈 시간)
                 if (attempt > 1) {
-                  const waitTime = 2000; // 2초 대기
+                  const waitTime = 3000; // 3초 대기 (더 길게)
                   console.log(`⏳ [executeCapture] 이전 시도와의 간격 대기 (${waitTime}ms)...`);
                   await new Promise(r => setTimeout(r, waitTime));
                   console.log(`✅ [executeCapture] 대기 완료`);
+                  
+                  // 대기 후 Chart.js 상태 재확인
+                  const chartCanvasesAfterWait = captureElementForDirect.querySelectorAll('canvas');
+                  console.log(`🔍 [executeCapture] 대기 후 Chart.js 캔버스 상태:`);
+                  chartCanvasesAfterWait.forEach((canvas, idx) => {
+                    try {
+                      const dataURL = canvas.toDataURL();
+                      const dataLength = dataURL.length;
+                      console.log(`   캔버스 ${idx + 1}: ${canvas.width}x${canvas.height}px, 데이터 길이: ${dataLength}`);
+                    } catch (e) {
+                      console.warn(`   캔버스 ${idx + 1}: 데이터 확인 실패`);
+                    }
+                  });
                 }
                 
                 // 캡처 전 Chart.js 상태 확인
                 const chartCanvasesBefore = captureElementForDirect.querySelectorAll('canvas');
-                console.log(`🔍 [executeCapture] 캡처 전 Chart.js 캔버스 상태:`);
+                console.log(`🔍 [executeCapture] 캡처 직전 Chart.js 캔버스 상태:`);
                 chartCanvasesBefore.forEach((canvas, idx) => {
-                  console.log(`   캔버스 ${idx + 1}: ${canvas.width}x${canvas.height}px, visible: ${canvas.style.visibility !== 'hidden'}`);
+                  try {
+                    const dataURL = canvas.toDataURL();
+                    const dataLength = dataURL.length;
+                    console.log(`   캔버스 ${idx + 1}: ${canvas.width}x${canvas.height}px, 데이터 길이: ${dataLength}, visible: ${canvas.style.visibility !== 'hidden'}`);
+                  } catch (e) {
+                    console.warn(`   캔버스 ${idx + 1}: 데이터 확인 실패`);
+                  }
                 });
                 
                 console.log(`📸 [executeCapture] captureElement 호출 시작...`);
