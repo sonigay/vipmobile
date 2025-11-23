@@ -2191,11 +2191,38 @@ async function executeCapture(elements, config, sizeInfo, slide) {
           slide?.subTab === 'rechotanchoBond';
 
         if (isRechotanchoBond) {
+          console.log('\n🔍 [executeCapture] ========== 재초담초채권 슬라이드 감지 ==========');
+          console.log('🔍 [executeCapture] Chart.js 고정 및 다단계 캡처 시작');
+          
+          // 1단계: 초기 상태 확인 및 캡처 (렌더링 전)
+          console.log('\n📸 [executeCapture] [1단계] 초기 상태 캡처 (렌더링 전)');
+          const initialCanvases = captureElementForDirect.querySelectorAll('canvas');
+          console.log(`🔍 [executeCapture] 초기 Chart.js 캔버스 개수: ${initialCanvases.length}`);
+          initialCanvases.forEach((canvas, idx) => {
+            console.log(`   초기 캔버스 ${idx + 1}: ${canvas.width}x${canvas.height}px`);
+          });
+          
+          // 초기 상태 캡처 시도
+          try {
+            const initialBlob = await captureElement(captureElementForDirect, {
+              ...directCaptureOptions,
+              scale: 1, // 빠른 테스트를 위해 낮은 해상도
+            });
+            if (initialBlob) {
+              console.log(`📊 [executeCapture] 초기 상태 캡처 결과: ${(initialBlob.size / 1024).toFixed(2)}KB`);
+            }
+          } catch (e) {
+            console.warn(`⚠️ [executeCapture] 초기 상태 캡처 실패: ${e?.message}`);
+          }
+          
           // Chart.js 캔버스 고정 (재렌더링 방지)
           const chartCanvases = captureElementForDirect.querySelectorAll('canvas');
+          console.log(`\n🔍 [executeCapture] Chart.js 캔버스 고정 시작 (개수: ${chartCanvases.length})`);
+          
           const originalCanvasStyles = [];
           chartCanvases.forEach((canvas, index) => {
             if (canvas.width > 0 && canvas.height > 0) {
+              console.log(`🔍 [executeCapture] 캔버스 ${index + 1}: ${canvas.width}x${canvas.height}px - 고정 중`);
               // 캔버스 스타일 고정
               originalCanvasStyles[index] = {
                 pointerEvents: canvas.style.pointerEvents || '',
@@ -2203,11 +2230,48 @@ async function executeCapture(elements, config, sizeInfo, slide) {
               };
               canvas.style.pointerEvents = 'none';
               canvas.style.visibility = 'visible';
+            } else {
+              console.warn(`⚠️ [executeCapture] 캔버스 ${index + 1}: 크기가 0 (${canvas.width}x${canvas.height}) - 고정 건너뜀`);
             }
           });
+          console.log('✅ [executeCapture] Chart.js 캔버스 고정 완료');
 
-          // Chart.js 안정화 대기 (까만 화면이 지나갈 시간)
-          await new Promise(r => setTimeout(r, 1000));
+          // 2단계: 고정 후 즉시 캡처
+          console.log('\n📸 [executeCapture] [2단계] Chart.js 고정 직후 캡처');
+          try {
+            await new Promise(r => setTimeout(r, 100));
+            const fixedBlob = await captureElement(captureElementForDirect, {
+              ...directCaptureOptions,
+              scale: 1,
+            });
+            if (fixedBlob) {
+              console.log(`📊 [executeCapture] 고정 직후 캡처 결과: ${(fixedBlob.size / 1024).toFixed(2)}KB`);
+            }
+          } catch (e) {
+            console.warn(`⚠️ [executeCapture] 고정 직후 캡처 실패: ${e?.message}`);
+          }
+
+          // 3단계: 까만 화면 대기 중 여러 시점 캡처
+          console.log('\n📸 [executeCapture] [3단계] 까만 화면 대기 중 다중 캡처');
+          const waitIntervals = [200, 500, 800, 1000]; // 0.2초, 0.5초, 0.8초, 1초
+          for (let i = 0; i < waitIntervals.length; i++) {
+            const waitTime = waitIntervals[i];
+            console.log(`⏳ [executeCapture] ${waitTime}ms 대기 후 캡처...`);
+            await new Promise(r => setTimeout(r, i === 0 ? waitTime : waitTime - waitIntervals[i - 1]));
+            
+            try {
+              const intervalBlob = await captureElement(captureElementForDirect, {
+                ...directCaptureOptions,
+                scale: 1,
+              });
+              if (intervalBlob) {
+                console.log(`📊 [executeCapture] ${waitTime}ms 시점 캡처 결과: ${(intervalBlob.size / 1024).toFixed(2)}KB`);
+              }
+            } catch (e) {
+              console.warn(`⚠️ [executeCapture] ${waitTime}ms 시점 캡처 실패: ${e?.message}`);
+            }
+          }
+          console.log('✅ [executeCapture] 까만 화면 대기 완료');
         }
 
         if (sizeInfo) {
@@ -2293,42 +2357,97 @@ async function executeCapture(elements, config, sizeInfo, slide) {
           
           // 재초담초채권 슬라이드: 캡처 재시도 로직 (까만 화면 문제 해결)
           if (isRechotanchoBond) {
-            const maxRetries = 3;
+            const maxRetries = 10; // 재시도 횟수 증가 (3 → 10)
             let lastError = null;
+            let successfulAttempt = null;
+            
+            console.log(`🔄 [executeCapture] 재초담초채권 캡처 시작 - 최대 ${maxRetries}회 시도`);
             
             for (let attempt = 1; attempt <= maxRetries; attempt++) {
+              const attemptStartTime = Date.now();
+              
               try {
-                if (process.env.NODE_ENV === 'development') {
-                  console.log(`🔄 [executeCapture] 재초담초채권 캡처 시도 ${attempt}/${maxRetries}`);
-                }
+                console.log(`\n📸 [executeCapture] ===== 재초담초채권 캡처 시도 ${attempt}/${maxRetries} =====`);
+                console.log(`⏰ [executeCapture] 시도 시작 시간: ${new Date().toISOString()}`);
                 
                 // 각 시도 사이에 대기 (까만 화면이 지나갈 시간)
                 if (attempt > 1) {
-                  await new Promise(r => setTimeout(r, 1500));
+                  const waitTime = 2000; // 2초 대기
+                  console.log(`⏳ [executeCapture] 이전 시도와의 간격 대기 (${waitTime}ms)...`);
+                  await new Promise(r => setTimeout(r, waitTime));
+                  console.log(`✅ [executeCapture] 대기 완료`);
                 }
                 
+                // 캡처 전 Chart.js 상태 확인
+                const chartCanvasesBefore = captureElementForDirect.querySelectorAll('canvas');
+                console.log(`🔍 [executeCapture] 캡처 전 Chart.js 캔버스 상태:`);
+                chartCanvasesBefore.forEach((canvas, idx) => {
+                  console.log(`   캔버스 ${idx + 1}: ${canvas.width}x${canvas.height}px, visible: ${canvas.style.visibility !== 'hidden'}`);
+                });
+                
+                console.log(`📸 [executeCapture] captureElement 호출 시작...`);
+                const captureStartTime = Date.now();
                 blob = await captureElement(captureElementForDirect, directCaptureOptions);
+                const captureEndTime = Date.now();
+                const captureDuration = captureEndTime - captureStartTime;
                 
-                // 캡처 성공 확인 (blob이 있고 크기가 0보다 큰지)
-                if (blob && blob.size > 1000) { // 최소 1KB 이상
-                  if (process.env.NODE_ENV === 'development') {
-                    console.log(`✅ [executeCapture] 재초담초채권 캡처 성공 (시도 ${attempt}/${maxRetries}, 크기: ${(blob.size / 1024).toFixed(2)}KB)`);
+                console.log(`⏱️ [executeCapture] captureElement 완료 (소요 시간: ${captureDuration}ms)`);
+                
+                // 캡처 성공 확인 (blob이 있고 크기가 충분한지)
+                if (blob) {
+                  const blobSizeKB = blob.size / 1024;
+                  const blobSizeMB = blobSizeKB / 1024;
+                  console.log(`📊 [executeCapture] 캡처 결과: 크기 ${blobSizeKB.toFixed(2)}KB (${blobSizeMB.toFixed(2)}MB)`);
+                  
+                  if (blob.size > 50000) { // 최소 50KB 이상 (빈 이미지 방지)
+                    const attemptDuration = Date.now() - attemptStartTime;
+                    console.log(`✅ [executeCapture] ✅✅✅ 재초담초채권 캡처 성공! ✅✅✅`);
+                    console.log(`   - 시도 번호: ${attempt}/${maxRetries}`);
+                    console.log(`   - 시도 소요 시간: ${attemptDuration}ms`);
+                    console.log(`   - 캡처 소요 시간: ${captureDuration}ms`);
+                    console.log(`   - 이미지 크기: ${blobSizeKB.toFixed(2)}KB`);
+                    console.log(`   - 성공 시점: ${new Date().toISOString()}`);
+                    successfulAttempt = attempt;
+                    break; // 성공하면 루프 종료
+                  } else {
+                    console.warn(`⚠️ [executeCapture] 캡처 결과가 너무 작음 (${blobSizeKB.toFixed(2)}KB < 50KB) - 빈 이미지로 판단`);
+                    blob = null; // 빈 blob이면 null로 설정하여 재시도
                   }
-                  break; // 성공하면 루프 종료
                 } else {
-                  if (process.env.NODE_ENV === 'development') {
-                    console.warn(`⚠️ [executeCapture] 재초담초채권 캡처 결과가 비어있음 (시도 ${attempt}/${maxRetries})`);
-                  }
-                  blob = null; // 빈 blob이면 null로 설정하여 재시도
+                  console.warn(`⚠️ [executeCapture] 캡처 결과가 null`);
+                  blob = null;
                 }
+                
+                // 캡처 후 Chart.js 상태 확인
+                const chartCanvasesAfter = captureElementForDirect.querySelectorAll('canvas');
+                console.log(`🔍 [executeCapture] 캡처 후 Chart.js 캔버스 상태:`);
+                chartCanvasesAfter.forEach((canvas, idx) => {
+                  console.log(`   캔버스 ${idx + 1}: ${canvas.width}x${canvas.height}px, visible: ${canvas.style.visibility !== 'hidden'}`);
+                });
+                
               } catch (error) {
+                const attemptDuration = Date.now() - attemptStartTime;
                 lastError = error;
-                if (process.env.NODE_ENV === 'development') {
-                  console.warn(`⚠️ [executeCapture] 재초담초채권 캡처 실패 (시도 ${attempt}/${maxRetries}):`, error?.message);
-                }
+                console.error(`❌ [executeCapture] 재초담초채권 캡처 실패 (시도 ${attempt}/${maxRetries}):`);
+                console.error(`   - 에러 메시지: ${error?.message}`);
+                console.error(`   - 시도 소요 시간: ${attemptDuration}ms`);
+                console.error(`   - 실패 시점: ${new Date().toISOString()}`);
                 blob = null;
               }
             }
+            
+            // 최종 결과 로그
+            console.log(`\n📋 [executeCapture] ===== 재초담초채권 캡처 최종 결과 =====`);
+            if (blob && successfulAttempt) {
+              console.log(`✅ 성공: 시도 ${successfulAttempt}/${maxRetries}에서 성공`);
+              console.log(`   - 최종 이미지 크기: ${(blob.size / 1024).toFixed(2)}KB`);
+            } else {
+              console.error(`❌ 실패: 모든 ${maxRetries}회 시도 실패`);
+              if (lastError) {
+                console.error(`   - 마지막 에러: ${lastError?.message}`);
+              }
+            }
+            console.log(`==========================================\n`);
             
             // 모든 시도 실패 시 마지막 에러 throw
             if (!blob && lastError) {
