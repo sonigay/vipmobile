@@ -2194,6 +2194,16 @@ async function executeCapture(elements, config, sizeInfo, slide) {
           console.log('\n🔍 [executeCapture] ========== 재초담초채권 슬라이드 감지 ==========');
           console.log('🔍 [executeCapture] Chart.js 고정 및 다단계 캡처 시작');
           
+          // 기본 캡처 옵션 준비 (directCaptureOptions가 정의되기 전에 사용)
+          const basicCaptureOptions = {
+            scale: 1, // 빠른 테스트를 위해 낮은 해상도
+            useCORS: true,
+            backgroundColor: '#ffffff',
+            scrollX: 0,
+            scrollY: 0,
+            skipAutoCrop: false,
+          };
+          
           // 1단계: 초기 상태 확인 및 캡처 (렌더링 전)
           console.log('\n📸 [executeCapture] [1단계] 초기 상태 캡처 (렌더링 전)');
           const initialCanvases = captureElementForDirect.querySelectorAll('canvas');
@@ -2204,12 +2214,12 @@ async function executeCapture(elements, config, sizeInfo, slide) {
           
           // 초기 상태 캡처 시도
           try {
-            const initialBlob = await captureElement(captureElementForDirect, {
-              ...directCaptureOptions,
-              scale: 1, // 빠른 테스트를 위해 낮은 해상도
-            });
+            const initialBlob = await captureElement(captureElementForDirect, basicCaptureOptions);
             if (initialBlob) {
               console.log(`📊 [executeCapture] 초기 상태 캡처 결과: ${(initialBlob.size / 1024).toFixed(2)}KB`);
+              // 디버깅: blob을 이미지로 변환하여 확인 가능하도록
+              const initialUrl = URL.createObjectURL(initialBlob);
+              console.log(`🔗 [executeCapture] 초기 상태 캡처 이미지 URL: ${initialUrl} (콘솔에서 확인 가능)`);
             }
           } catch (e) {
             console.warn(`⚠️ [executeCapture] 초기 상태 캡처 실패: ${e?.message}`);
@@ -2240,12 +2250,11 @@ async function executeCapture(elements, config, sizeInfo, slide) {
           console.log('\n📸 [executeCapture] [2단계] Chart.js 고정 직후 캡처');
           try {
             await new Promise(r => setTimeout(r, 100));
-            const fixedBlob = await captureElement(captureElementForDirect, {
-              ...directCaptureOptions,
-              scale: 1,
-            });
+            const fixedBlob = await captureElement(captureElementForDirect, basicCaptureOptions);
             if (fixedBlob) {
               console.log(`📊 [executeCapture] 고정 직후 캡처 결과: ${(fixedBlob.size / 1024).toFixed(2)}KB`);
+              const fixedUrl = URL.createObjectURL(fixedBlob);
+              console.log(`🔗 [executeCapture] 고정 직후 캡처 이미지 URL: ${fixedUrl}`);
             }
           } catch (e) {
             console.warn(`⚠️ [executeCapture] 고정 직후 캡처 실패: ${e?.message}`);
@@ -2254,23 +2263,33 @@ async function executeCapture(elements, config, sizeInfo, slide) {
           // 3단계: 까만 화면 대기 중 여러 시점 캡처
           console.log('\n📸 [executeCapture] [3단계] 까만 화면 대기 중 다중 캡처');
           const waitIntervals = [200, 500, 800, 1000]; // 0.2초, 0.5초, 0.8초, 1초
+          const intervalBlobs = [];
           for (let i = 0; i < waitIntervals.length; i++) {
             const waitTime = waitIntervals[i];
             console.log(`⏳ [executeCapture] ${waitTime}ms 대기 후 캡처...`);
             await new Promise(r => setTimeout(r, i === 0 ? waitTime : waitTime - waitIntervals[i - 1]));
             
             try {
-              const intervalBlob = await captureElement(captureElementForDirect, {
-                ...directCaptureOptions,
-                scale: 1,
-              });
+              const intervalBlob = await captureElement(captureElementForDirect, basicCaptureOptions);
               if (intervalBlob) {
-                console.log(`📊 [executeCapture] ${waitTime}ms 시점 캡처 결과: ${(intervalBlob.size / 1024).toFixed(2)}KB`);
+                const blobSizeKB = intervalBlob.size / 1024;
+                console.log(`📊 [executeCapture] ${waitTime}ms 시점 캡처 결과: ${blobSizeKB.toFixed(2)}KB`);
+                const intervalUrl = URL.createObjectURL(intervalBlob);
+                console.log(`🔗 [executeCapture] ${waitTime}ms 시점 캡처 이미지 URL: ${intervalUrl}`);
+                intervalBlobs.push({ time: waitTime, blob: intervalBlob, url: intervalUrl, size: blobSizeKB });
               }
             } catch (e) {
               console.warn(`⚠️ [executeCapture] ${waitTime}ms 시점 캡처 실패: ${e?.message}`);
             }
           }
+          
+          // 단계별 캡처 결과 요약
+          console.log(`\n📋 [executeCapture] ===== 단계별 캡처 결과 요약 =====`);
+          intervalBlobs.forEach(({ time, size, url }) => {
+            console.log(`   ${time}ms 시점: ${size.toFixed(2)}KB - ${url}`);
+          });
+          console.log(`==========================================\n`);
+          
           console.log('✅ [executeCapture] 까만 화면 대기 완료');
         }
 
