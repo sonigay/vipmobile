@@ -31,6 +31,49 @@ const MAX_WIDTH = 1920;  // 최대 너비 (원본) - 콘텐츠 일치도 향상�
 const MAX_HEIGHT = 4000;  // 최대 높이 (원본) - 8000에서 축소하여 파일 크기 제한
 const SCALE = 2;  // html2canvas scale 파라미터 (픽셀 밀도 배율)
 
+/**
+ * 디버그 이미지를 디스코드에 업로드하는 헬퍼 함수
+ */
+async function uploadDebugImageToDiscord(blob, meeting, stepName, description) {
+  if (!meeting || !meeting.meetingId) {
+    console.warn('⚠️ [uploadDebugImageToDiscord] meeting 정보가 없어 업로드 건너뜀');
+    return;
+  }
+
+  try {
+    const formData = new FormData();
+    const filename = `debug-${meeting.meetingId}-${stepName}-${Date.now()}.png`;
+    formData.append('image', blob, filename);
+    formData.append('meetingId', meeting.meetingId);
+    formData.append('meetingDate', meeting.meetingDate || new Date().toISOString().split('T')[0]);
+    formData.append('slideOrder', 0); // 디버그 이미지는 order 0
+    formData.append('debugStep', stepName);
+    formData.append('debugDescription', description);
+
+    const response = await fetch(`${API_BASE_URL}/api/meetings/${meeting.meetingId}/upload-image`, {
+      method: 'POST',
+      body: formData,
+      mode: 'cors',
+      credentials: 'omit',
+    });
+
+    if (!response.ok) {
+      throw new Error(`업로드 실패: ${response.status}`);
+    }
+
+    const result = await response.json();
+    if (result.success && result.imageUrl) {
+      console.log(`🔗 [uploadDebugImageToDiscord] ${description} 디스코드 URL: ${result.imageUrl}`);
+      return result.imageUrl;
+    } else {
+      throw new Error('업로드 응답이 성공이 아닙니다.');
+    }
+  } catch (error) {
+    console.error(`❌ [uploadDebugImageToDiscord] ${description} 업로드 실패:`, error);
+    throw error;
+  }
+}
+
 // 안전한 DOM 유틸리티
 const SafeDOM = {
   /**
@@ -2568,7 +2611,7 @@ function validateFileSize(blob, context = '') {
  * 모든 슬라이드 타입을 단일 파이프라인으로 처리
  * 개선: 완전한 에러 처리, 복원 보장, 입력 검증
  */
-export async function captureSlide(slideElement, slide, captureTargetElement) {
+export async function captureSlide(slideElement, slide, captureTargetElement, meeting = null) {
   // 입력 검증
   if (!slideElement) {
     throw new Error('slideElement가 없습니다.');
@@ -2607,7 +2650,7 @@ export async function captureSlide(slideElement, slide, captureTargetElement) {
       restoreFunctions = adjustRestores || [];
 
       // 4. 캡처 실행
-      const blob = await executeCapture(elements, config, sizeInfo, slide);
+      const blob = await executeCapture(elements, config, sizeInfo, slide, meeting);
 
       // 5. 파일 크기 검증 및 경고 강화
       const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
