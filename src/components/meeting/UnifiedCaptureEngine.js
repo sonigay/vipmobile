@@ -13,6 +13,7 @@
  */
 
 import { captureElement } from '../../utils/screenCapture';
+import { API_BASE_URL } from '../../api';
 import {
   identifySlideType,
   getCaptureConfig,
@@ -1708,7 +1709,7 @@ async function adjustSizes(elements, config, slide) {
  * 통합 캡처 파이프라인: 캡처 실행
  * 개선: null 체크, 에러 처리, 복원 보장
  */
-async function executeCapture(elements, config, sizeInfo, slide) {
+async function executeCapture(elements, config, sizeInfo, slide, meeting = null) {
   let blob = null;
   const styleRestores = [];
 
@@ -2215,11 +2216,15 @@ async function executeCapture(elements, config, sizeInfo, slide) {
           // 초기 상태 캡처 시도
           try {
             const initialBlob = await captureElement(captureElementForDirect, basicCaptureOptions);
-            if (initialBlob) {
+            if (initialBlob && meeting) {
               console.log(`📊 [executeCapture] 초기 상태 캡처 결과: ${(initialBlob.size / 1024).toFixed(2)}KB`);
-              // 디버깅: blob을 이미지로 변환하여 확인 가능하도록
-              const initialUrl = URL.createObjectURL(initialBlob);
-              console.log(`🔗 [executeCapture] 초기 상태 캡처 이미지 URL: ${initialUrl} (콘솔에서 확인 가능)`);
+              // 디스코드에 업로드
+              try {
+                await uploadDebugImageToDiscord(initialBlob, meeting, 'step1-initial', '초기 상태 (렌더링 전)');
+                console.log(`✅ [executeCapture] 초기 상태 캡처 디스코드 업로드 완료`);
+              } catch (uploadError) {
+                console.warn(`⚠️ [executeCapture] 초기 상태 디스코드 업로드 실패: ${uploadError?.message}`);
+              }
             }
           } catch (e) {
             console.warn(`⚠️ [executeCapture] 초기 상태 캡처 실패: ${e?.message}`);
@@ -2251,10 +2256,15 @@ async function executeCapture(elements, config, sizeInfo, slide) {
           try {
             await new Promise(r => setTimeout(r, 100));
             const fixedBlob = await captureElement(captureElementForDirect, basicCaptureOptions);
-            if (fixedBlob) {
+            if (fixedBlob && meeting) {
               console.log(`📊 [executeCapture] 고정 직후 캡처 결과: ${(fixedBlob.size / 1024).toFixed(2)}KB`);
-              const fixedUrl = URL.createObjectURL(fixedBlob);
-              console.log(`🔗 [executeCapture] 고정 직후 캡처 이미지 URL: ${fixedUrl}`);
+              // 디스코드에 업로드
+              try {
+                await uploadDebugImageToDiscord(fixedBlob, meeting, 'step2-fixed', 'Chart.js 고정 직후');
+                console.log(`✅ [executeCapture] 고정 직후 캡처 디스코드 업로드 완료`);
+              } catch (uploadError) {
+                console.warn(`⚠️ [executeCapture] 고정 직후 디스코드 업로드 실패: ${uploadError?.message}`);
+              }
             }
           } catch (e) {
             console.warn(`⚠️ [executeCapture] 고정 직후 캡처 실패: ${e?.message}`);
@@ -2274,9 +2284,17 @@ async function executeCapture(elements, config, sizeInfo, slide) {
               if (intervalBlob) {
                 const blobSizeKB = intervalBlob.size / 1024;
                 console.log(`📊 [executeCapture] ${waitTime}ms 시점 캡처 결과: ${blobSizeKB.toFixed(2)}KB`);
-                const intervalUrl = URL.createObjectURL(intervalBlob);
-                console.log(`🔗 [executeCapture] ${waitTime}ms 시점 캡처 이미지 URL: ${intervalUrl}`);
-                intervalBlobs.push({ time: waitTime, blob: intervalBlob, url: intervalUrl, size: blobSizeKB });
+                intervalBlobs.push({ time: waitTime, blob: intervalBlob, size: blobSizeKB });
+                
+                // 디스코드에 업로드
+                if (meeting) {
+                  try {
+                    await uploadDebugImageToDiscord(intervalBlob, meeting, `step3-${waitTime}ms`, `${waitTime}ms 시점`);
+                    console.log(`✅ [executeCapture] ${waitTime}ms 시점 디스코드 업로드 완료`);
+                  } catch (uploadError) {
+                    console.warn(`⚠️ [executeCapture] ${waitTime}ms 시점 디스코드 업로드 실패: ${uploadError?.message}`);
+                  }
+                }
               }
             } catch (e) {
               console.warn(`⚠️ [executeCapture] ${waitTime}ms 시점 캡처 실패: ${e?.message}`);
@@ -2285,9 +2303,10 @@ async function executeCapture(elements, config, sizeInfo, slide) {
           
           // 단계별 캡처 결과 요약
           console.log(`\n📋 [executeCapture] ===== 단계별 캡처 결과 요약 =====`);
-          intervalBlobs.forEach(({ time, size, url }) => {
-            console.log(`   ${time}ms 시점: ${size.toFixed(2)}KB - ${url}`);
+          intervalBlobs.forEach(({ time, size }) => {
+            console.log(`   ${time}ms 시점: ${size.toFixed(2)}KB`);
           });
+          console.log(`   (모든 단계별 캡처 이미지는 디스코드에 업로드되었습니다)`);
           console.log(`==========================================\n`);
           
           console.log('✅ [executeCapture] 까만 화면 대기 완료');

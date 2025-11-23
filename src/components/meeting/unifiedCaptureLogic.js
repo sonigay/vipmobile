@@ -17,8 +17,8 @@ import { captureSlide } from './UnifiedCaptureEngine';
  * @param {HTMLElement} captureTargetElement - 캡처 대상 요소
  * @returns {Promise<Blob>} 캡처된 이미지 Blob
  */
-export async function unifiedCapture(slideElement, slide, captureTargetElement) {
-  return await captureSlide(slideElement, slide, captureTargetElement);
+export async function unifiedCapture(slideElement, slide, captureTargetElement, meeting = null) {
+  return await captureSlide(slideElement, slide, captureTargetElement, meeting);
 }
 
 // 기존 슬라이드별 특수 핸들러는 UnifiedCaptureEngine.js로 완전 이동

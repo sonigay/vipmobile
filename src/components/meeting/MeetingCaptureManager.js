@@ -4445,7 +4445,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
 
       // 새로운 통합 캡처 엔진을 우선 사용
       try {
-        const unifiedBlob = await unifiedCapture(slideElement, currentSlide, captureTargetElement);
+        const unifiedBlob = await unifiedCapture(slideElement, currentSlide, captureTargetElement, meeting);
         if (unifiedBlob) {
           blob = unifiedBlob;
           if (process.env.NODE_ENV === 'development') {
