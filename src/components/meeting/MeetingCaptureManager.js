@@ -2088,7 +2088,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
           }
         }
 
-        // 재초담초채권 슬라이드: Chart.js 렌더링 완료 대기
+        // 재초담초채권 슬라이드: 데이터 로드 완료 대기 및 Chart.js 안정화
         if (
           currentSlide?.mode === 'chart' &&
           (currentSlide?.tab === 'bondChart' || currentSlide?.tab === 'bond') &&
@@ -2097,7 +2097,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
           // 1단계: data-loaded="true" 속성이 설정될 때까지 대기
           let dataLoaded = false;
           let loadWaitAttempts = 0;
-          const maxLoadWaitAttempts = 100; // 최대 20초 (100 * 200ms)
+          const maxLoadWaitAttempts = 50; // 최대 10초 (50 * 200ms)
 
           while (!dataLoaded && loadWaitAttempts < maxLoadWaitAttempts) {
             const dataLoadedElement = slideElement.querySelector('[data-loaded="true"]');
@@ -2112,22 +2112,20 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             loadWaitAttempts++;
           }
 
-          // 2단계: Chart.js 캔버스가 완전히 렌더링될 때까지 대기
+          // 2단계: Chart.js 캔버스 렌더링 확인 (빠른 확인, 무한 대기 방지)
           let chartReady = false;
           let chartWaitAttempts = 0;
-          const maxChartWaitAttempts = 50; // 최대 10초 (50 * 200ms)
+          const maxChartWaitAttempts = 20; // 최대 4초 (20 * 200ms)
 
           while (!chartReady && chartWaitAttempts < maxChartWaitAttempts) {
             const chartCanvases = slideElement.querySelectorAll('canvas');
             if (chartCanvases.length > 0) {
-              // 모든 캔버스가 렌더링되었는지 확인 (너비와 높이가 0이 아니어야 함)
+              // 모든 캔버스가 렌더링되었는지 확인
               const allRendered = Array.from(chartCanvases).every(canvas => {
                 return canvas.width > 0 && canvas.height > 0;
               });
               
               if (allRendered) {
-                // 추가 안정화 대기 (Chart.js 애니메이션 완료)
-                await new Promise(r => setTimeout(r, 500));
                 chartReady = true;
                 if (process.env.NODE_ENV === 'development') {
                   console.log(`✅ [MeetingCaptureManager] 재초담초채권: Chart.js 렌더링 완료 확인 (${chartWaitAttempts * 200}ms 대기)`);
@@ -2139,8 +2137,9 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             chartWaitAttempts++;
           }
 
-          // 3단계: 최종 안정화 대기 (화면 깜빡임 방지)
-          await new Promise(r => setTimeout(r, 300));
+          // 3단계: 최종 안정화 대기 (Chart.js 애니메이션 및 레이아웃 안정화)
+          // 1920px 너비에서 Chart.js가 안정화될 시간 확보
+          await new Promise(r => setTimeout(r, 800));
         }
 
         // 채권장표 > 가입자증감: '년단위' 토글 + 2025년 우선 선택 (없으면 최신) (이 부분은 캡처 타겟 선택에만 사용)
