@@ -2285,61 +2285,19 @@ async function executeCapture(elements, config, sizeInfo, slide, meeting = null)
             }
           };
 
-          // 빠른 캡처 시도: 200ms 대기 후 저해상도로 먼저 확인
-          console.log('\n📸 [executeCapture] 재초담초채권 빠른 캡처 시도 (200ms 대기 후)');
+          // ⚠️ 중요: 재초담초채권 슬라이드는 고해상도(scale: 2) 캡처 시 까만 화면이 나타나고 빈 이미지가 생성됨
+          // 따라서 반드시 저해상도(scale: 1)로만 캡처해야 함
+          // 고해상도 캡처는 절대 사용하지 말 것!
+          
+          // 최적화: 200ms 대기 후 바로 저해상도 최종 캡처
+          console.log('\n📸 [executeCapture] 재초담초채권 최종 캡처 (200ms 대기 후, 저해상도)');
           console.log('⏳ [executeCapture] 200ms 대기 중...');
           await new Promise(r => setTimeout(r, 200));
-          console.log('✅ [executeCapture] 대기 완료, 빠른 확인 캡처 시작');
+          console.log('✅ [executeCapture] 대기 완료, 저해상도 최종 캡처 시작');
           
-          const quickCheckOptions = {
-            scale: 1, // 빠른 확인을 위해 저해상도
-            useCORS: true,
-            backgroundColor: '#ffffff',
-            scrollX: 0,
-            scrollY: 0,
-            skipAutoCrop: false,
-            onclone: chartCanvasCloneCallback,
-          };
-          
-          try {
-            const quickBlob = await captureElement(captureElementForDirect, quickCheckOptions);
-            if (quickBlob && quickBlob.size > 50000) {
-              console.log(`✅ [executeCapture] 빠른 캡처 확인 성공: ${(quickBlob.size / 1024).toFixed(2)}KB`);
-              console.log('📸 [executeCapture] 고해상도 최종 캡처 시작...');
-              
-              // 고해상도 최종 캡처
-              const finalCaptureOptions = {
-                scale: SCALE, // 고해상도 (2)
-                useCORS: true,
-                backgroundColor: '#ffffff',
-                scrollX: 0,
-                scrollY: 0,
-                skipAutoCrop: false,
-                onclone: chartCanvasCloneCallback,
-              };
-              
-              blob = await captureElement(captureElementForDirect, finalCaptureOptions);
-              
-              if (blob && blob.size > 50000) {
-                console.log(`✅ [executeCapture] ✅✅✅ 재초담초채권 캡처 성공! ✅✅✅`);
-                console.log(`   - 이미지 크기: ${(blob.size / 1024).toFixed(2)}KB`);
-                console.log(`   - 빠른 캡처 방식 사용 (200ms 대기)`);
-                console.log(`==========================================\n`);
-                return blob; // 까만 화면 이후 로직 건너뛰고 바로 반환
-              }
-            }
-          } catch (e) {
-            console.warn(`⚠️ [executeCapture] 빠른 캡처 실패: ${e?.message}, 더 긴 대기 후 재시도`);
-          }
-          
-          // 빠른 캡처 실패 시 1000ms 대기 후 재시도
-          console.log('\n📸 [executeCapture] 재초담초채권 최종 캡처 (1000ms 대기 후)');
-          console.log('⏳ [executeCapture] 1000ms 대기 중...');
-          await new Promise(r => setTimeout(r, 800)); // 이미 200ms 대기했으므로 800ms만 추가
-          console.log('✅ [executeCapture] 대기 완료, 고해상도 캡처 시작');
-          
+          // 저해상도 최종 캡처 옵션 (고해상도 사용 금지!)
           const finalCaptureOptions = {
-            scale: SCALE, // 고해상도 (2)
+            scale: 1, // ⚠️ 중요: 재초담초채권은 반드시 저해상도만 사용 (고해상도 시 까만 화면 및 빈 이미지 발생)
             useCORS: true,
             backgroundColor: '#ffffff',
             scrollX: 0,
@@ -2353,6 +2311,7 @@ async function executeCapture(elements, config, sizeInfo, slide, meeting = null)
           if (blob && blob.size > 50000) {
             console.log(`✅ [executeCapture] ✅✅✅ 재초담초채권 캡처 성공! ✅✅✅`);
             console.log(`   - 이미지 크기: ${(blob.size / 1024).toFixed(2)}KB`);
+            console.log(`   - 저해상도 캡처 사용 (200ms 대기)`);
             console.log(`==========================================\n`);
             return blob; // 까만 화면 이후 로직 건너뛰고 바로 반환
           } else {
