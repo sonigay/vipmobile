@@ -859,19 +859,33 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         }
       }
       
-      // policy.policyDate가 없거나 파싱 실패한 경우 기존 방식 사용
+      // policy.policyDate가 없거나 파싱 실패한 경우 대상월에 맞춰 변경
       if (!policyStartDate || !policyEndDate) {
-        policyStartDate = originalPolicy.policyStartDate;
-        policyEndDate = originalPolicy.policyEndDate;
-        if (!policyStartDate || !policyEndDate) {
-          if (originalPolicy.policyDate) {
-            const dateMatch = originalPolicy.policyDate.match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\.\s*~\s*(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\./);
-            if (dateMatch) {
-              const [, startYear, startMonth, startDay, endYear, endMonth, endDay] = dateMatch;
-              policyStartDate = new Date(parseInt(startYear), parseInt(startMonth) - 1, parseInt(startDay)).toISOString();
-              policyEndDate = new Date(parseInt(endYear), parseInt(endMonth) - 1, parseInt(endDay)).toISOString();
-            }
+        if (originalPolicy.policyStartDate && originalPolicy.policyEndDate && targetYearMonth) {
+          // policyStartDate와 policyEndDate가 있으면 대상월로 변경
+          const [targetYear, targetMonth] = targetYearMonth.split('-').map(Number);
+          const startDate = new Date(targetYear, targetMonth - 1, 1);
+          const endDate = new Date(targetYear, targetMonth, 0);
+          policyStartDate = startDate.toISOString();
+          policyEndDate = endDate.toISOString();
+        } else if (originalPolicy.policyDate) {
+          // policyDate 문자열이 있으면 파싱 시도
+          const dateMatch = originalPolicy.policyDate.match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\.\s*~\s*(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\./);
+          if (dateMatch && targetYearMonth) {
+            const [targetYear, targetMonth] = targetYearMonth.split('-').map(Number);
+            const startDate = new Date(targetYear, targetMonth - 1, 1);
+            const endDate = new Date(targetYear, targetMonth, 0);
+            policyStartDate = startDate.toISOString();
+            policyEndDate = endDate.toISOString();
+          } else if (dateMatch) {
+            const [, startYear, startMonth, startDay, endYear, endMonth, endDay] = dateMatch;
+            policyStartDate = new Date(parseInt(startYear), parseInt(startMonth) - 1, parseInt(startDay)).toISOString();
+            policyEndDate = new Date(parseInt(endYear), parseInt(endMonth) - 1, parseInt(endDay)).toISOString();
           }
+        } else {
+          // 모든 방법이 실패하면 기본값 사용
+          policyStartDate = originalPolicy.policyStartDate || new Date().toISOString();
+          policyEndDate = originalPolicy.policyEndDate || new Date().toISOString();
         }
       }
       
@@ -925,27 +939,27 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
           settlement: '대기',
           team: '대기'
         },
-        // 정책별 특수 필드들 복사
-        activationType: originalPolicy.activationType,
+        // 정책별 특수 필드들 복사 (깊은 복사)
+        activationType: originalPolicy.activationType ? { ...originalPolicy.activationType } : { new010: false, mnp: false, change: false },
         multipleStoreName: originalPolicy.multipleStoreName,
         isMultiple: originalPolicy.isMultiple,
         // 구두정책
         amount95Above: originalPolicy.amount95Above,
         amount95Below: originalPolicy.amount95Below,
         // 부가차감지원정책
-        deductSupport: originalPolicy.deductSupport,
-        conditionalOptions: originalPolicy.conditionalOptions,
+        deductSupport: originalPolicy.deductSupport ? { ...originalPolicy.deductSupport } : { addServiceAmount: '', insuranceAmount: '', connectionAmount: '' },
+        conditionalOptions: originalPolicy.conditionalOptions ? { ...originalPolicy.conditionalOptions } : { addServiceAcquired: false, insuranceAcquired: false, connectionAcquired: false },
         // 부가추가지원정책
-        addSupport: originalPolicy.addSupport,
-        supportConditionalOptions: originalPolicy.supportConditionalOptions,
+        addSupport: originalPolicy.addSupport ? { ...originalPolicy.addSupport } : { uplayPremiumAmount: '', phoneExchangePassAmount: '', musicAmount: '', numberFilteringAmount: '' },
+        supportConditionalOptions: originalPolicy.supportConditionalOptions ? { ...originalPolicy.supportConditionalOptions } : { vas2Both: false, vas2Either: false, addon3All: false },
         // 요금제유형별정책
-        rateSupports: originalPolicy.rateSupports,
+        rateSupports: originalPolicy.rateSupports ? JSON.parse(JSON.stringify(originalPolicy.rateSupports)) : [],
         // 연합정책
         unionSettlementStore: originalPolicy.unionSettlementStore,
-        unionTargetStores: originalPolicy.unionTargetStores,
-        unionConditions: originalPolicy.unionConditions,
+        unionTargetStores: originalPolicy.unionTargetStores ? [...originalPolicy.unionTargetStores] : [],
+        unionConditions: originalPolicy.unionConditions ? { ...originalPolicy.unionConditions } : {},
         // 개별소급정책
-        individualTarget: originalPolicy.individualTarget,
+        individualTarget: originalPolicy.individualTarget ? { ...originalPolicy.individualTarget } : {},
         individualActivationType: originalPolicy.individualActivationType
       };
 
@@ -1268,19 +1282,33 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
             }
           }
           
-          // policy.policyDate가 없거나 파싱 실패한 경우 기존 방식 사용
+          // policy.policyDate가 없거나 파싱 실패한 경우 대상월에 맞춰 변경
           if (!policyStartDate || !policyEndDate) {
-            policyStartDate = policy.policyStartDate;
-            policyEndDate = policy.policyEndDate;
-            if (!policyStartDate || !policyEndDate) {
-              if (policy.policyDate) {
-                const m = policy.policyDate.match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\.\s*~\s*(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\./);
-                if (m) {
-                  const [, sy, sm, sd, ey, em, ed] = m.map(Number);
-                  policyStartDate = new Date(sy, sm - 1, sd).toISOString();
-                  policyEndDate = new Date(ey, em - 1, ed).toISOString();
-                }
+            if (policy.policyStartDate && policy.policyEndDate && targetYearMonth) {
+              // policyStartDate와 policyEndDate가 있으면 대상월로 변경
+              const [targetYear, targetMonth] = targetYearMonth.split('-').map(Number);
+              const startDate = new Date(targetYear, targetMonth - 1, 1);
+              const endDate = new Date(targetYear, targetMonth, 0);
+              policyStartDate = startDate.toISOString();
+              policyEndDate = endDate.toISOString();
+            } else if (policy.policyDate) {
+              // policyDate 문자열이 있으면 파싱 시도
+              const m = policy.policyDate.match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\.\s*~\s*(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\./);
+              if (m && targetYearMonth) {
+                const [targetYear, targetMonth] = targetYearMonth.split('-').map(Number);
+                const startDate = new Date(targetYear, targetMonth - 1, 1);
+                const endDate = new Date(targetYear, targetMonth, 0);
+                policyStartDate = startDate.toISOString();
+                policyEndDate = endDate.toISOString();
+              } else if (m) {
+                const [, sy, sm, sd, ey, em, ed] = m.map(Number);
+                policyStartDate = new Date(sy, sm - 1, sd).toISOString();
+                policyEndDate = new Date(ey, em - 1, ed).toISOString();
               }
+            } else {
+              // 모든 방법이 실패하면 기본값 사용
+              policyStartDate = policy.policyStartDate || new Date().toISOString();
+              policyEndDate = policy.policyEndDate || new Date().toISOString();
             }
           }
 
@@ -1330,26 +1358,26 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
               team: '대기'
             },
             // 공통/카테고리별 추가 필드들
-            activationType: policy.activationType,
+            activationType: policy.activationType ? { ...policy.activationType } : { new010: false, mnp: false, change: false },
             multipleStoreName: policy.multipleStoreName,
             isMultiple: policy.isMultiple,
             // 구두정책
             amount95Above: policy.amount95Above,
             amount95Below: policy.amount95Below,
             // 부가차감지원정책
-            deductSupport: policy.deductSupport,
-            conditionalOptions: policy.conditionalOptions,
+            deductSupport: policy.deductSupport ? { ...policy.deductSupport } : { addServiceAmount: '', insuranceAmount: '', connectionAmount: '' },
+            conditionalOptions: policy.conditionalOptions ? { ...policy.conditionalOptions } : { addServiceAcquired: false, insuranceAcquired: false, connectionAcquired: false },
             // 부가추가지원정책
-            addSupport: policy.addSupport,
-            supportConditionalOptions: policy.supportConditionalOptions,
+            addSupport: policy.addSupport ? { ...policy.addSupport } : { uplayPremiumAmount: '', phoneExchangePassAmount: '', musicAmount: '', numberFilteringAmount: '' },
+            supportConditionalOptions: policy.supportConditionalOptions ? { ...policy.supportConditionalOptions } : { vas2Both: false, vas2Either: false, addon3All: false },
             // 요금제유형별정책
-            rateSupports: policy.rateSupports,
+            rateSupports: policy.rateSupports ? JSON.parse(JSON.stringify(policy.rateSupports)) : [],
             // 연합정책
             unionSettlementStore: policy.unionSettlementStore,
-            unionTargetStores: policy.unionTargetStores,
-            unionConditions: policy.unionConditions,
+            unionTargetStores: policy.unionTargetStores ? [...policy.unionTargetStores] : [],
+            unionConditions: policy.unionConditions ? { ...policy.unionConditions } : {},
             // 개별소급정책
-            individualTarget: policy.individualTarget,
+            individualTarget: policy.individualTarget ? { ...policy.individualTarget } : {},
             individualActivationType: policy.individualActivationType
           };
           await PolicyService.createPolicy(copyData);
