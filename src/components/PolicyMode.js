@@ -843,30 +843,60 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     try {
       const originalPolicy = selectedPolicyForCopy;
       
-      // 정책 적용일에서 시작일과 종료일 추출
+      // 정책 적용일에서 시작일과 종료일 추출 (대상월에 맞춰 변경)
       let policyStartDate, policyEndDate;
-      if (originalPolicy.policyDate) {
+      if (originalPolicy.policyDate && targetYearMonth) {
         // "2025. 6. 1. ~ 2025. 12. 31." 형태에서 날짜 추출
         const dateMatch = originalPolicy.policyDate.match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\.\s*~\s*(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\./);
         if (dateMatch) {
-          const [, startYear, startMonth, startDay, endYear, endMonth, endDay] = dateMatch;
-          policyStartDate = new Date(parseInt(startYear), parseInt(startMonth) - 1, parseInt(startDay)).toISOString();
-          policyEndDate = new Date(parseInt(endYear), parseInt(endMonth) - 1, parseInt(endDay)).toISOString();
+          const [targetYear, targetMonth] = targetYearMonth.split('-').map(Number);
+          // 시작일: 대상월의 1일
+          const startDate = new Date(targetYear, targetMonth - 1, 1);
+          // 종료일: 대상월의 마지막 일
+          const endDate = new Date(targetYear, targetMonth, 0);
+          policyStartDate = startDate.toISOString();
+          policyEndDate = endDate.toISOString();
         }
       }
       
-      // 금액에서 실제 금액과 유형 추출
+      // policy.policyDate가 없거나 파싱 실패한 경우 기존 방식 사용
+      if (!policyStartDate || !policyEndDate) {
+        policyStartDate = originalPolicy.policyStartDate;
+        policyEndDate = originalPolicy.policyEndDate;
+        if (!policyStartDate || !policyEndDate) {
+          if (originalPolicy.policyDate) {
+            const dateMatch = originalPolicy.policyDate.match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\.\s*~\s*(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\./);
+            if (dateMatch) {
+              const [, startYear, startMonth, startDay, endYear, endMonth, endDay] = dateMatch;
+              policyStartDate = new Date(parseInt(startYear), parseInt(startMonth) - 1, parseInt(startDay)).toISOString();
+              policyEndDate = new Date(parseInt(endYear), parseInt(endMonth) - 1, parseInt(endDay)).toISOString();
+            }
+          }
+        }
+      }
+      
+      // 금액에서 실제 금액과 유형 추출 ("내용에 직접입력" 문구 처리 포함)
       let policyAmount = '';
       let amountType = 'total';
       if (originalPolicy.policyAmount) {
         if (originalPolicy.policyAmount.includes('내용에 직접입력')) {
           amountType = 'in_content';
         } else {
-          const amountMatch = originalPolicy.policyAmount.match(/(\d+)원/);
-          if (amountMatch) {
-            policyAmount = amountMatch[1];
+          // 만원 단위 처리: "3만원" -> 30000
+          const manwonMatch = originalPolicy.policyAmount.match(/(\d+)만원/);
+          if (manwonMatch) {
+            policyAmount = String(Number(manwonMatch[1]) * 10000);
             if (originalPolicy.policyAmount.includes('건당금액')) {
               amountType = 'per_case';
+            }
+          } else {
+            // 원 단위 처리: "30000원" -> 30000
+            const amountMatch = originalPolicy.policyAmount.match(/(\d+)원/);
+            if (amountMatch) {
+              policyAmount = amountMatch[1];
+              if (originalPolicy.policyAmount.includes('건당금액')) {
+                amountType = 'per_case';
+              }
             }
           }
         }
@@ -930,7 +960,14 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       alert('정책이 성공적으로 복사되었습니다.');
     } catch (error) {
       console.error('정책 복사 실패:', error);
-      alert('정책 복사에 실패했습니다. 다시 시도해주세요.');
+      // API 응답에서 상세 에러 메시지 추출
+      let errorMessage = '정책 복사에 실패했습니다. 다시 시도해주세요.';
+      if (error.message) {
+        errorMessage = error.message;
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      }
+      alert(`정책 복사 실패: ${errorMessage}`);
       throw error;
     }
   };
@@ -1217,25 +1254,17 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
           let policyStartDate;
           let policyEndDate;
           
-          // policy.policyDate 문자열에서 날짜 정보 추출
+          // policy.policyDate 문자열에서 날짜 정보 추출 (대상월에 맞춰 변경)
           if (policy.policyDate && targetYearMonth) {
             const m = policy.policyDate.match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\.\s*~\s*(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\./);
             if (m) {
-              const [, sy, sm, sd, ey, em, ed] = m.map(Number);
               const [targetYear, targetMonth] = targetYearMonth.split('-').map(Number);
-              
-              // 시작일: 대상월의 같은 일로 변경
-              const startDay = sd;
-              const newStartDate = new Date(targetYear, targetMonth - 1, startDay);
-              policyStartDate = newStartDate.toISOString();
-              
-              // 종료일: 대상월의 같은 일로 변경 (해당 월의 마지막 날을 초과하지 않도록)
-              const endDay = ed;
-              // 대상월의 마지막 날 계산
-              const lastDayOfTargetMonth = new Date(targetYear, targetMonth, 0).getDate();
-              const adjustedEndDay = Math.min(endDay, lastDayOfTargetMonth);
-              const newEndDate = new Date(targetYear, targetMonth - 1, adjustedEndDay);
-              policyEndDate = newEndDate.toISOString();
+              // 시작일: 대상월의 1일
+              const startDate = new Date(targetYear, targetMonth - 1, 1);
+              // 종료일: 대상월의 마지막 일
+              const endDate = new Date(targetYear, targetMonth, 0);
+              policyStartDate = startDate.toISOString();
+              policyEndDate = endDate.toISOString();
             }
           }
           
@@ -1262,10 +1291,18 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
             if (policy.policyAmount.includes('내용에 직접입력')) {
               amountType = 'in_content';
             } else {
-              const amt = policy.policyAmount.match(/(\d+)원/);
-              if (amt) {
-                policyAmount = amt[1];
+              // 만원 단위 처리: "3만원" -> 30000
+              const manwonMatch = policy.policyAmount.match(/(\d+)만원/);
+              if (manwonMatch) {
+                policyAmount = String(Number(manwonMatch[1]) * 10000);
                 if (policy.policyAmount.includes('건당금액')) amountType = 'per_case';
+              } else {
+                // 원 단위 처리: "30000원" -> 30000
+                const amt = policy.policyAmount.match(/(\d+)원/);
+                if (amt) {
+                  policyAmount = amt[1];
+                  if (policy.policyAmount.includes('건당금액')) amountType = 'per_case';
+                }
               }
             }
           }
@@ -1325,7 +1362,14 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       await loadPolicyData();
     } catch (error) {
       console.error('일괄 복사 실패:', error);
-      alert('일괄 복사에 실패했습니다.');
+      // API 응답에서 상세 에러 메시지 추출
+      let errorMessage = '일괄 복사에 실패했습니다.';
+      if (error.message) {
+        errorMessage = error.message;
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      }
+      alert(`일괄 복사 실패: ${errorMessage}`);
     } finally {
       setBulkProcessing(false);
       setBulkProcessingMessage('');
