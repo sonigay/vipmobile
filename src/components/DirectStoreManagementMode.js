@@ -11,18 +11,12 @@ import {
   ThemeProvider,
   IconButton,
   Paper,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
   Alert,
   CircularProgress
 } from '@mui/material';
 import {
   Update as UpdateIcon,
   Refresh as RefreshIcon,
-  Lock as LockIcon,
   Settings as SettingsIcon,
   Link as LinkIcon,
   Assessment as AssessmentIcon
@@ -48,10 +42,8 @@ const DirectStoreManagementMode = ({
   const [error, setError] = useState(null);
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
 
-  // 인증 상태
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [password, setPassword] = useState('');
-  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  // 인증 상태 (어플 접속 시 이미 검증됨)
+  const [isAuthenticated] = useState(true);
 
   // 탭 상태 (0: 정책 설정, 1: 링크 설정, 2: 판매일보)
   const [activeTab, setActiveTab] = useState(0);
@@ -61,37 +53,6 @@ const DirectStoreManagementMode = ({
 
   const API_URL = process.env.REACT_APP_API_URL;
   const modeTitle = getModeTitle('directStoreManagement', '직영점 관리 모드');
-
-  // 비밀번호가 필요한지 확인 (관리 모드는 항상 필요하다고 가정하거나 설정 따름)
-  const requiresPassword = true;
-  // const alreadyAuthenticated = loggedInStore?.directStoreManagementSecurity?.authenticated; // 나중에 추가 가능
-
-  const handlePasswordSubmit = async () => {
-    try {
-      if (!password) {
-        setError('비밀번호를 입력해주세요.');
-        return;
-      }
-
-      setLoading(true);
-      setError(null);
-
-      // TODO: 관리자 비밀번호 확인 API 호출 (임시로 'admin1234'로 하드코딩하거나 기존 API 재사용)
-      // 실제로는 별도의 관리자 인증 API가 필요할 수 있음
-      if (password === 'admin1234') {
-        setIsAuthenticated(true);
-        setShowPasswordDialog(false);
-        setPassword('');
-      } else {
-        setError('비밀번호가 일치하지 않습니다.');
-      }
-    } catch (error) {
-      console.error('비밀번호 확인 실패:', error);
-      setError('비밀번호 확인에 실패했습니다.');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
@@ -107,59 +68,6 @@ const DirectStoreManagementMode = ({
     setSelectedReport(null);
   };
 
-  // 인증 전 화면
-  if (requiresPassword && !isAuthenticated) {
-    return (
-      <ThemeProvider theme={directStoreTheme}>
-        <CssBaseline />
-        <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
-          <AppBar position="static">
-            <Toolbar>
-              <SettingsIcon sx={{ mr: 2, color: 'primary.main' }} />
-              <Typography variant="h6" sx={{ flexGrow: 1, color: 'primary.main' }}>
-                {modeTitle}
-              </Typography>
-              <Button color="inherit" onClick={onLogout}>로그아웃</Button>
-            </Toolbar>
-          </AppBar>
-
-          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 64px)', p: 3 }}>
-            <Paper sx={{ p: 4, maxWidth: 500, width: '100%', textAlign: 'center', border: '1px solid rgba(212, 175, 55, 0.3)' }}>
-              <LockIcon sx={{ fontSize: 60, color: 'primary.main', mb: 2 }} />
-              <Typography variant="h5" gutterBottom sx={{ color: 'primary.main', fontWeight: 'bold' }}>
-                관리자 접근 권한 필요
-              </Typography>
-              <Button variant="contained" size="large" onClick={() => setShowPasswordDialog(true)} sx={{ mt: 2 }}>
-                관리자 로그인
-              </Button>
-            </Paper>
-          </Box>
-
-          <Dialog open={showPasswordDialog} onClose={() => setShowPasswordDialog(false)}>
-            <DialogTitle>관리자 비밀번호 입력</DialogTitle>
-            <DialogContent>
-              <Box sx={{ pt: 1, minWidth: 300 }}>
-                {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-                <TextField
-                  fullWidth
-                  type="password"
-                  label="비밀번호"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handlePasswordSubmit()}
-                  autoFocus
-                />
-              </Box>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={() => setShowPasswordDialog(false)}>취소</Button>
-              <Button onClick={handlePasswordSubmit} variant="contained">확인</Button>
-            </DialogActions>
-          </Dialog>
-        </Box>
-      </ThemeProvider>
-    );
-  }
 
   return (
     <ThemeProvider theme={directStoreTheme}>

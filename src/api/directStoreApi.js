@@ -93,5 +93,49 @@ export const directStoreApi = {
 
         if (!response.ok) throw new Error('이미지 업로드 실패');
         return response.json();
+    },
+
+    // === 직영점 관리 모드 API ===
+
+    // 정책 설정 조회
+    getPolicySettings: async (carrier) => {
+        const params = new URLSearchParams();
+        if (carrier) params.append('carrier', carrier);
+
+        const response = await fetch(`${BASE_URL}/management/policy?${params.toString()}`);
+        if (!response.ok) throw new Error('정책 설정 조회 실패');
+        return response.json();
+    },
+
+    // 정책 설정 저장
+    savePolicySettings: async (carrier, settings) => {
+        const response = await fetch(`${BASE_URL}/management/policy`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ carrier, ...settings })
+        });
+        if (!response.ok) throw new Error('정책 설정 저장 실패');
+        return response.json();
+    },
+
+    // 링크 설정 조회
+    getLinkSettings: async (carrier) => {
+        const params = new URLSearchParams();
+        if (carrier) params.append('carrier', carrier);
+
+        const response = await fetch(`${BASE_URL}/management/links?${params.toString()}`);
+        if (!response.ok) throw new Error('링크 설정 조회 실패');
+        return response.json();
+    },
+
+    // 링크 설정 저장
+    saveLinkSettings: async (carrier, settings) => {
+        const response = await fetch(`${BASE_URL}/management/links`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ carrier, ...settings })
+        });
+        if (!response.ok) throw new Error('링크 설정 저장 실패');
+        return response.json();
     }
 };

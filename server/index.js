@@ -3643,6 +3643,834 @@ app.post('/api/verify-direct-store-password', async (req, res) => {
   }
 });
 
+// ========== 직영점 모드 API ==========
+
+// Google Sheets URL에서 spreadsheetId 추출 헬퍼 함수
+function extractSpreadsheetId(url) {
+  if (!url) return null;
+  const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  return match ? match[1] : null;
+}
+
+// 외부 시트에서 데이터 읽기 헬퍼 함수
+async function readExternalSheet(spreadsheetId, range) {
+  try {
+    const response = await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.get({
+        spreadsheetId: spreadsheetId,
+        range: range
+      })
+    );
+    return response.data.values || [];
+  } catch (error) {
+    console.error('외부 시트 읽기 오류:', error);
+    throw error;
+  }
+}
+
+// GET /api/direct/todays-mobiles: 오늘의 휴대폰 조회
+app.get('/api/direct/todays-mobiles', async (req, res) => {
+  try {
+    const response = await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '직영점_오늘의휴대폰!A:Z'
+      })
+    );
+
+    const values = response.data.values || [];
+    if (values.length <= 1) {
+      return res.json({ premium: [], budget: [] });
+    }
+
+    // 헤더 행 제외
+    const rows = values.slice(1);
+    const premium = [];
+    const budget = [];
+
+    rows.forEach((row, index) => {
+      if (!row[0]) return; // 빈 행 스킵
+
+      const product = {
+        id: `todays-${index}`,
+        model: row[0] || '',
+        petName: row[1] || row[0] || '',
+        carrier: row[2] || 'SK',
+        factoryPrice: parseInt(row[3] || 0),
+        support: parseInt(row[4] || 0),
+        storeSupport: parseInt(row[5] || 0),
+        storeSupportNoAddon: parseInt(row[6] || 0),
+        image: row[7] || '',
+        addons: row[8] || '',
+        isPremium: row[9] === 'Y' || row[9] === 'TRUE' || row[9] === true
+      };
+
+      if (product.isPremium) {
+        premium.push(product);
+      } else {
+        budget.push(product);
+      }
+    });
+
+    return res.json({ premium, budget });
+  } catch (error) {
+    console.error('오늘의 휴대폰 조회 오류:', error);
+    return res.status(500).json({
+      success: false,
+      error: '오늘의 휴대폰 데이터를 불러오는데 실패했습니다.'
+    });
+  }
+});
+
+// GET /api/direct/mobiles: 휴대폰 목록 조회 (통신사별)
+app.get('/api/direct/mobiles', async (req, res) => {
+  try {
+    const carrier = req.query.carrier || 'SK';
+
+    // 1. 직영점_설정 시트에서 해당 통신사의 이통사 지원금 링크/범위 조회
+    const settingsResponse = await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '직영점_설정!A:Z'
+      })
+    );
+
+    const settingsValues = settingsResponse.data.values || [];
+    let supportLink = null;
+    let supportRange = null;
+
+    // 설정 시트에서 해당 통신사의 이통사 지원금 링크 찾기
+    // 형식: [통신사, 설정타입, 링크, 범위, ...]
+    for (const row of settingsValues) {
+      if (row[0] === carrier && row[1] === '이통사지원금') {
+        supportLink = row[2];
+        supportRange = row[3];
+        break;
+      }
+    }
+
+    if (!supportLink || !supportRange) {
+      return res.status(404).json({
+        success: false,
+        error: '이통사 지원금 설정을 찾을 수 없습니다.'
+      });
+    }
+
+    // 2. 외부 시트에서 모델명/출고가/지원금 데이터 읽기
+    const externalSpreadsheetId = extractSpreadsheetId(supportLink);
+    if (!externalSpreadsheetId) {
+      return res.status(400).json({
+        success: false,
+        error: '유효하지 않은 시트 링크입니다.'
+      });
+    }
+
+    const externalData = await readExternalSheet(externalSpreadsheetId, supportRange);
+
+    // 3. 직영점_모델이미지 시트에서 이미지 URL 조회
+    const imageResponse = await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '직영점_모델이미지!A:C'
+      })
+    );
+
+    const imageValues = imageResponse.data.values || [];
+    const imageMap = new Map();
+    
+    // 헤더 제외하고 이미지 매핑 생성
+    imageValues.slice(1).forEach(row => {
+      if (row[0] && row[2]) {
+        imageMap.set(row[0], row[2]); // 모델ID -> 이미지URL
+      }
+    });
+
+    // 4. 데이터 조합
+    const mobileList = [];
+    externalData.forEach((row, index) => {
+      if (!row[0]) return; // 빈 행 스킵
+
+      const modelId = row[0] || `model-${index}`;
+      const mobile = {
+        id: modelId,
+        model: row[0] || '',
+        petName: row[1] || row[0] || '',
+        carrier: carrier,
+        factoryPrice: parseInt(row[2] || 0),
+        support: parseInt(row[3] || 0),
+        storeSupport: parseInt(row[4] || 0),
+        storeSupportNoAddon: parseInt(row[5] || 0),
+        image: imageMap.get(modelId) || '',
+        isRecommended: row[6] === 'Y' || row[6] === 'TRUE',
+        isPopular: row[7] === 'Y' || row[7] === 'TRUE'
+      };
+
+      mobileList.push(mobile);
+    });
+
+    return res.json(mobileList);
+  } catch (error) {
+    console.error('휴대폰 목록 조회 오류:', error);
+    return res.status(500).json({
+      success: false,
+      error: '휴대폰 목록을 불러오는데 실패했습니다.'
+    });
+  }
+});
+
+// GET /api/direct/sales: 판매일보 목록 조회
+app.get('/api/direct/sales', async (req, res) => {
+  try {
+    const response = await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '직영점_판매일보!A:Z'
+      })
+    );
+
+    const values = response.data.values || [];
+    if (values.length <= 1) {
+      return res.json([]);
+    }
+
+    // 헤더 행 제외
+    const rows = values.slice(1);
+    const salesReports = rows.map((row, index) => ({
+      id: row[0] || `sales-${index}`,
+      date: row[1] || '',
+      store: row[2] || '',
+      carrier: row[3] || 'SK',
+      type: row[4] || '신규',
+      model: row[5] || '',
+      customer: row[6] || '',
+      contact: row[7] || '',
+      status: row[8] || 'pending',
+      customerName: row[6] || '',
+      customerContact: row[7] || '',
+      openingType: row[4] === '기변' ? 'CHANGE' : row[4] === '신규' ? 'NEW' : 'MNP'
+    })).filter(report => report.id); // 빈 행 제외
+
+    return res.json(salesReports);
+  } catch (error) {
+    console.error('판매일보 조회 오류:', error);
+    return res.status(500).json({
+      success: false,
+      error: '판매일보를 불러오는데 실패했습니다.'
+    });
+  }
+});
+
+// POST /api/direct/sales: 판매일보 생성 (개통정보 저장)
+app.post('/api/direct/sales', async (req, res) => {
+  try {
+    const data = req.body;
+
+    // 필수 필드 검증
+    if (!data.customerName || !data.customerContact) {
+      return res.status(400).json({
+        success: false,
+        error: '고객명과 연락처를 입력해주세요.'
+      });
+    }
+
+    // ID 생성 (타임스탬프 기반)
+    const id = `sales-${Date.now()}`;
+    const date = data.date || new Date().toISOString().split('T')[0];
+
+    // 저장할 행 데이터
+    const row = [
+      id,
+      date,
+      data.store || '',
+      data.carrier || 'SK',
+      data.openingType === 'NEW' ? '신규' : data.openingType === 'MNP' ? '번호이동' : '기기변경',
+      data.model || '',
+      data.customerName,
+      data.customerContact,
+      data.status || 'pending',
+      data.customerBirth || '',
+      data.prevCarrier || '',
+      data.installmentPeriod || 24,
+      data.plan || '',
+      data.installmentPrincipal || 0,
+      data.monthlyInstallment || 0,
+      data.monthlyPlanPrice || 0,
+      data.totalMonthlyPrice || 0,
+      JSON.stringify(data.addons || {}),
+      new Date().toISOString()
+    ];
+
+    // 직영점_판매일보 시트에 추가
+    await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.append({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '직영점_판매일보!A2',
+        valueInputOption: 'USER_ENTERED',
+        insertDataOption: 'INSERT_ROWS',
+        resource: {
+          values: [row]
+        }
+      })
+    );
+
+    return res.json({
+      success: true,
+      id: id,
+      message: '판매일보가 저장되었습니다.'
+    });
+  } catch (error) {
+    console.error('판매일보 저장 오류:', error);
+    return res.status(500).json({
+      success: false,
+      error: '판매일보 저장에 실패했습니다.'
+    });
+  }
+});
+
+// PUT /api/direct/sales/:id: 판매일보 수정
+app.put('/api/direct/sales/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const data = req.body;
+
+    // 기존 데이터 조회
+    const response = await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '직영점_판매일보!A:Z'
+      })
+    );
+
+    const values = response.data.values || [];
+    if (values.length <= 1) {
+      return res.status(404).json({
+        success: false,
+        error: '판매일보를 찾을 수 없습니다.'
+      });
+    }
+
+    // 해당 ID의 행 찾기
+    const rows = values.slice(1);
+    const rowIndex = rows.findIndex(row => row[0] === id);
+
+    if (rowIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        error: '판매일보를 찾을 수 없습니다.'
+      });
+    }
+
+    // 업데이트할 행 데이터 (기존 데이터 유지하면서 수정)
+    const existingRow = rows[rowIndex];
+    const updatedRow = [
+      existingRow[0] || id, // ID
+      data.date || existingRow[1] || '',
+      data.store || existingRow[2] || '',
+      data.carrier || existingRow[3] || 'SK',
+      data.openingType === 'NEW' ? '신규' : data.openingType === 'MNP' ? '번호이동' : data.openingType === 'CHANGE' ? '기기변경' : existingRow[4] || '',
+      data.model || existingRow[5] || '',
+      data.customerName || existingRow[6] || '',
+      data.customerContact || existingRow[7] || '',
+      data.status || existingRow[8] || 'pending',
+      data.customerBirth || existingRow[9] || '',
+      data.prevCarrier || existingRow[10] || '',
+      data.installmentPeriod || existingRow[11] || 24,
+      data.plan || existingRow[12] || '',
+      data.installmentPrincipal || existingRow[13] || 0,
+      data.monthlyInstallment || existingRow[14] || 0,
+      data.monthlyPlanPrice || existingRow[15] || 0,
+      data.totalMonthlyPrice || existingRow[16] || 0,
+      data.addons ? JSON.stringify(data.addons) : existingRow[17] || '',
+      new Date().toISOString()
+    ];
+
+    // 행 업데이트 (행 번호는 2부터 시작, 헤더 제외)
+    await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `직영점_판매일보!A${rowIndex + 2}`,
+        valueInputOption: 'USER_ENTERED',
+        resource: {
+          values: [updatedRow]
+        }
+      })
+    );
+
+    return res.json({
+      success: true,
+      id: id,
+      message: '판매일보가 수정되었습니다.'
+    });
+  } catch (error) {
+    console.error('판매일보 수정 오류:', error);
+    return res.status(500).json({
+      success: false,
+      error: '판매일보 수정에 실패했습니다.'
+    });
+  }
+});
+
+// 직영점 이미지 업로드를 위한 multer 설정
+const directStoreUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB 제한
+});
+
+// POST /api/direct/upload-image: 이미지 업로드 (Discord)
+app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: '이미지 파일이 없습니다.'
+      });
+    }
+
+    const file = req.file;
+    const modelId = req.body.modelId || 'unknown';
+
+    if (!DISCORD_LOGGING_ENABLED || !discordBot) {
+      return res.status(500).json({
+        success: false,
+        error: 'Discord 봇이 초기화되지 않았습니다.'
+      });
+    }
+
+    // Discord 봇이 준비될 때까지 대기
+    if (!discordBot.isReady()) {
+      for (let i = 0; i < 10; i++) {
+        if (discordBot.isReady()) break;
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+
+    if (!discordBot.isReady()) {
+      return res.status(500).json({
+        success: false,
+        error: 'Discord 봇이 준비되지 않았습니다.'
+      });
+    }
+
+    // Discord 채널 가져오기 (직영점 전용 채널 사용)
+    const channelId = DISCORD_STORE_CHANNEL_ID || DISCORD_CHANNEL_ID;
+    const channel = await discordBot.channels.fetch(channelId);
+    
+    if (!channel) {
+      return res.status(500).json({
+        success: false,
+        error: `Discord 채널을 찾을 수 없습니다: ${channelId}`
+      });
+    }
+
+    // 이미지 업로드
+    const filename = `direct-store-${modelId}-${Date.now()}.${file.originalname.split('.').pop()}`;
+    const { AttachmentBuilder } = require('discord.js');
+    const attachment = new AttachmentBuilder(file.buffer, { name: filename });
+    const message = await channel.send({ files: [attachment] });
+
+    const imageUrl = message.attachments.first().url;
+
+    // 직영점_모델이미지 시트에 저장/업데이트
+    try {
+      // 기존 데이터 조회
+      const imageResponse = await rateLimitedSheetsCall(() =>
+        sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: '직영점_모델이미지!A:C'
+        })
+      );
+
+      const imageValues = imageResponse.data.values || [];
+      const rows = imageValues.slice(1); // 헤더 제외
+      const existingRowIndex = rows.findIndex(row => row[0] === modelId);
+
+      const now = new Date().toISOString();
+      const newRow = [modelId, now, imageUrl];
+
+      if (existingRowIndex !== -1) {
+        // 기존 행 업데이트
+        await rateLimitedSheetsCall(() =>
+          sheets.spreadsheets.values.update({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `직영점_모델이미지!A${existingRowIndex + 2}`,
+            valueInputOption: 'USER_ENTERED',
+            resource: {
+              values: [newRow]
+            }
+          })
+        );
+      } else {
+        // 새 행 추가
+        await rateLimitedSheetsCall(() =>
+          sheets.spreadsheets.values.append({
+            spreadsheetId: SPREADSHEET_ID,
+            range: '직영점_모델이미지!A2',
+            valueInputOption: 'USER_ENTERED',
+            insertDataOption: 'INSERT_ROWS',
+            resource: {
+              values: [newRow]
+            }
+          })
+        );
+      }
+    } catch (sheetError) {
+      console.error('이미지 URL 저장 오류:', sheetError);
+      // 이미지 업로드는 성공했으므로 계속 진행
+    }
+
+    return res.json({
+      success: true,
+      imageUrl: imageUrl,
+      modelId: modelId
+    });
+  } catch (error) {
+    console.error('이미지 업로드 오류:', error);
+    return res.status(500).json({
+      success: false,
+      error: '이미지 업로드에 실패했습니다.'
+    });
+  }
+});
+
+// ========== 직영점 관리 모드 API ==========
+
+// GET /api/direct/management/policy: 정책 설정 조회
+app.get('/api/direct/management/policy', async (req, res) => {
+  try {
+    const carrier = req.query.carrier || 'SK';
+
+    // 마진 설정 조회
+    const marginResponse = await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '직영점_정책_마진!A:Z'
+      })
+    );
+
+    // 부가서비스 설정 조회
+    const addonResponse = await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '직영점_정책_부가서비스!A:Z'
+      })
+    );
+
+    // 별도 정책 설정 조회
+    const specialResponse = await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '직영점_정책_별도!A:Z'
+      })
+    );
+
+    const marginValues = marginResponse.data.values || [];
+    const addonValues = addonResponse.data.values || [];
+    const specialValues = specialResponse.data.values || [];
+
+    // 해당 통신사의 설정 찾기
+    const marginRow = marginValues.slice(1).find(row => row[0] === carrier);
+    const addonRow = addonValues.slice(1).find(row => row[0] === carrier);
+    const specialRow = specialValues.slice(1).find(row => row[0] === carrier);
+
+    return res.json({
+      success: true,
+      carrier: carrier,
+      margin: {
+        baseMargin: parseInt(marginRow?.[1] || 0),
+        mnpMargin: parseInt(marginRow?.[2] || 0),
+        changeMargin: parseInt(marginRow?.[3] || 0)
+      },
+      addon: {
+        welfareDeduction: parseInt(addonRow?.[1] || 0),
+        insuranceDeduction: parseInt(addonRow?.[2] || 0)
+      },
+      special: {
+        policyDeduction: parseInt(specialRow?.[1] || 0),
+        specialPolicy: parseInt(specialRow?.[2] || 0)
+      }
+    });
+  } catch (error) {
+    console.error('정책 설정 조회 오류:', error);
+    return res.status(500).json({
+      success: false,
+      error: '정책 설정을 불러오는데 실패했습니다.'
+    });
+  }
+});
+
+// POST /api/direct/management/policy: 정책 설정 저장
+app.post('/api/direct/management/policy', async (req, res) => {
+  try {
+    const { carrier, margin, addon, special } = req.body;
+
+    if (!carrier) {
+      return res.status(400).json({
+        success: false,
+        error: '통신사를 선택해주세요.'
+      });
+    }
+
+    // 마진 설정 저장
+    if (margin) {
+      const marginResponse = await rateLimitedSheetsCall(() =>
+        sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: '직영점_정책_마진!A:Z'
+        })
+      );
+
+      const marginValues = marginResponse.data.values || [];
+      const rows = marginValues.slice(1);
+      const existingRowIndex = rows.findIndex(row => row[0] === carrier);
+
+      const marginRow = [
+        carrier,
+        margin.baseMargin || 0,
+        margin.mnpMargin || 0,
+        margin.changeMargin || 0
+      ];
+
+      if (existingRowIndex !== -1) {
+        await rateLimitedSheetsCall(() =>
+          sheets.spreadsheets.values.update({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `직영점_정책_마진!A${existingRowIndex + 2}`,
+            valueInputOption: 'USER_ENTERED',
+            resource: { values: [marginRow] }
+          })
+        );
+      } else {
+        await rateLimitedSheetsCall(() =>
+          sheets.spreadsheets.values.append({
+            spreadsheetId: SPREADSHEET_ID,
+            range: '직영점_정책_마진!A2',
+            valueInputOption: 'USER_ENTERED',
+            insertDataOption: 'INSERT_ROWS',
+            resource: { values: [marginRow] }
+          })
+        );
+      }
+    }
+
+    // 부가서비스 설정 저장
+    if (addon) {
+      const addonResponse = await rateLimitedSheetsCall(() =>
+        sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: '직영점_정책_부가서비스!A:Z'
+        })
+      );
+
+      const addonValues = addonResponse.data.values || [];
+      const rows = addonValues.slice(1);
+      const existingRowIndex = rows.findIndex(row => row[0] === carrier);
+
+      const addonRow = [
+        carrier,
+        addon.welfareDeduction || 0,
+        addon.insuranceDeduction || 0
+      ];
+
+      if (existingRowIndex !== -1) {
+        await rateLimitedSheetsCall(() =>
+          sheets.spreadsheets.values.update({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `직영점_정책_부가서비스!A${existingRowIndex + 2}`,
+            valueInputOption: 'USER_ENTERED',
+            resource: { values: [addonRow] }
+          })
+        );
+      } else {
+        await rateLimitedSheetsCall(() =>
+          sheets.spreadsheets.values.append({
+            spreadsheetId: SPREADSHEET_ID,
+            range: '직영점_정책_부가서비스!A2',
+            valueInputOption: 'USER_ENTERED',
+            insertDataOption: 'INSERT_ROWS',
+            resource: { values: [addonRow] }
+          })
+        );
+      }
+    }
+
+    // 별도 정책 설정 저장
+    if (special) {
+      const specialResponse = await rateLimitedSheetsCall(() =>
+        sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: '직영점_정책_별도!A:Z'
+        })
+      );
+
+      const specialValues = specialResponse.data.values || [];
+      const rows = specialValues.slice(1);
+      const existingRowIndex = rows.findIndex(row => row[0] === carrier);
+
+      const specialRow = [
+        carrier,
+        special.policyDeduction || 0,
+        special.specialPolicy || 0
+      ];
+
+      if (existingRowIndex !== -1) {
+        await rateLimitedSheetsCall(() =>
+          sheets.spreadsheets.values.update({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `직영점_정책_별도!A${existingRowIndex + 2}`,
+            valueInputOption: 'USER_ENTERED',
+            resource: { values: [specialRow] }
+          })
+        );
+      } else {
+        await rateLimitedSheetsCall(() =>
+          sheets.spreadsheets.values.append({
+            spreadsheetId: SPREADSHEET_ID,
+            range: '직영점_정책_별도!A2',
+            valueInputOption: 'USER_ENTERED',
+            insertDataOption: 'INSERT_ROWS',
+            resource: { values: [specialRow] }
+          })
+        );
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: '정책 설정이 저장되었습니다.'
+    });
+  } catch (error) {
+    console.error('정책 설정 저장 오류:', error);
+    return res.status(500).json({
+      success: false,
+      error: '정책 설정 저장에 실패했습니다.'
+    });
+  }
+});
+
+// GET /api/direct/management/links: 링크 설정 조회
+app.get('/api/direct/management/links', async (req, res) => {
+  try {
+    const carrier = req.query.carrier || 'SK';
+
+    const response = await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '직영점_설정!A:Z'
+      })
+    );
+
+    const values = response.data.values || [];
+    const rows = values.slice(1); // 헤더 제외
+
+    // 해당 통신사의 설정 찾기
+    const planGroupRow = rows.find(row => row[0] === carrier && row[1] === '요금제그룹');
+    const supportRow = rows.find(row => row[0] === carrier && row[1] === '이통사지원금');
+    const policyRow = rows.find(row => row[0] === carrier && row[1] === '정책표');
+
+    return res.json({
+      success: true,
+      carrier: carrier,
+      planGroup: {
+        link: planGroupRow?.[2] || '',
+        range: planGroupRow?.[3] || ''
+      },
+      support: {
+        link: supportRow?.[2] || '',
+        range: supportRow?.[3] || ''
+      },
+      policy: {
+        link: policyRow?.[2] || '',
+        range: policyRow?.[3] || ''
+      }
+    });
+  } catch (error) {
+    console.error('링크 설정 조회 오류:', error);
+    return res.status(500).json({
+      success: false,
+      error: '링크 설정을 불러오는데 실패했습니다.'
+    });
+  }
+});
+
+// POST /api/direct/management/links: 링크 설정 저장
+app.post('/api/direct/management/links', async (req, res) => {
+  try {
+    const { carrier, planGroup, support, policy } = req.body;
+
+    if (!carrier) {
+      return res.status(400).json({
+        success: false,
+        error: '통신사를 선택해주세요.'
+      });
+    }
+
+    // 기존 설정 조회
+    const response = await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '직영점_설정!A:Z'
+      })
+    );
+
+    const values = response.data.values || [];
+    const rows = values.slice(1);
+
+    // 각 설정 타입별로 저장
+    const settingsToSave = [
+      { type: '요금제그룹', data: planGroup },
+      { type: '이통사지원금', data: support },
+      { type: '정책표', data: policy }
+    ];
+
+    for (const setting of settingsToSave) {
+      if (!setting.data) continue;
+
+      const existingRowIndex = rows.findIndex(
+        row => row[0] === carrier && row[1] === setting.type
+      );
+
+      const settingRow = [
+        carrier,
+        setting.type,
+        setting.data.link || '',
+        setting.data.range || ''
+      ];
+
+      if (existingRowIndex !== -1) {
+        await rateLimitedSheetsCall(() =>
+          sheets.spreadsheets.values.update({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `직영점_설정!A${existingRowIndex + 2}`,
+            valueInputOption: 'USER_ENTERED',
+            resource: { values: [settingRow] }
+          })
+        );
+      } else {
+        await rateLimitedSheetsCall(() =>
+          sheets.spreadsheets.values.append({
+            spreadsheetId: SPREADSHEET_ID,
+            range: '직영점_설정!A2',
+            valueInputOption: 'USER_ENTERED',
+            insertDataOption: 'INSERT_ROWS',
+            resource: { values: [settingRow] }
+          })
+        );
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: '링크 설정이 저장되었습니다.'
+    });
+  } catch (error) {
+    console.error('링크 설정 저장 오류:', error);
+    return res.status(500).json({
+      success: false,
+      error: '링크 설정 저장에 실패했습니다.'
+    });
+  }
+});
+
 // 패스워드 설정 API
 app.post('/api/set-password', async (req, res) => {
   try {
