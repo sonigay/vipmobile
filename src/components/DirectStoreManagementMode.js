@@ -54,19 +54,57 @@ const DirectStoreManagementMode = ({
   const API_URL = process.env.REACT_APP_API_URL;
   const modeTitle = getModeTitle('directStoreManagement', '직영점 관리 모드');
 
+  // 권한 확인
+  const directStoreManagementPermission = loggedInStore?.modePermissions?.directStoreManagement;
+  const permissionValue = typeof directStoreManagementPermission === 'string' 
+    ? directStoreManagementPermission.trim().toUpperCase() 
+    : (directStoreManagementPermission === true ? 'O' : '');
+
+  // 탭별 권한 체크
+  const hasPolicyPermission = permissionValue === 'M' || permissionValue === 'S';
+  const hasLinkPermission = permissionValue === 'M';
+  const hasSalesReportPermission = permissionValue === 'M' || permissionValue === 'S' || permissionValue === 'O';
+
+  // 사용 가능한 탭 목록 생성 (권한에 따라)
+  const availableTabs = React.useMemo(() => {
+    const tabs = [];
+    if (hasPolicyPermission) {
+      tabs.push({ key: 'policy', label: '정책 설정', icon: <SettingsIcon />, component: <PolicySettingsTab /> });
+    }
+    if (hasLinkPermission) {
+      tabs.push({ key: 'link', label: '링크 설정', icon: <LinkIcon />, component: <LinkSettingsTab /> });
+    }
+    if (hasSalesReportPermission) {
+      tabs.push({ key: 'sales', label: '전체 판매일보', icon: <AssessmentIcon />, component: <DirectSalesReportTab onRowClick={handleReportSelect} /> });
+    }
+    return tabs;
+  }, [hasPolicyPermission, hasLinkPermission, hasSalesReportPermission]);
+
+  // 현재 활성 탭이 사용 가능한 탭인지 확인하고, 아니면 첫 번째 사용 가능한 탭으로 변경
+  useEffect(() => {
+    if (availableTabs.length > 0) {
+      const currentTab = availableTabs[activeTab];
+      if (!currentTab && activeTab >= availableTabs.length) {
+        setActiveTab(0);
+      }
+    }
+  }, [availableTabs.length, permissionValue]);
+
   const handleTabChange = (event, newValue) => {
-    setActiveTab(newValue);
+    if (newValue >= 0 && newValue < availableTabs.length) {
+      setActiveTab(newValue);
+    }
   };
 
   // 판매일보 상세 보기 핸들러
-  const handleReportSelect = (report) => {
+  const handleReportSelect = React.useCallback((report) => {
     setSelectedReport(report);
-  };
+  }, []);
 
   // 목록으로 돌아가기 핸들러
-  const handleBackToReports = () => {
+  const handleBackToReports = React.useCallback(() => {
     setSelectedReport(null);
-  };
+  }, []);
 
 
   return (
@@ -97,30 +135,38 @@ const DirectStoreManagementMode = ({
                 <Button color="inherit" onClick={onLogout}>로그아웃</Button>
               </Toolbar>
 
-              <Tabs
-                value={activeTab}
-                onChange={handleTabChange}
-                textColor="primary"
-                indicatorColor="primary"
-                centered
-                sx={{ borderBottom: 1, borderColor: 'divider' }}
-              >
-                <Tab icon={<SettingsIcon />} label="정책 설정" iconPosition="start" />
-                <Tab icon={<LinkIcon />} label="링크 설정" iconPosition="start" />
-                <Tab icon={<AssessmentIcon />} label="전체 판매일보" iconPosition="start" />
-              </Tabs>
+              {availableTabs.length > 0 && (
+                <Tabs
+                  value={Math.min(activeTab, availableTabs.length - 1)}
+                  onChange={handleTabChange}
+                  textColor="primary"
+                  indicatorColor="primary"
+                  centered
+                  sx={{ borderBottom: 1, borderColor: 'divider' }}
+                >
+                  {availableTabs.map((tab, index) => (
+                    <Tab 
+                      key={tab.key}
+                      icon={tab.icon} 
+                      label={tab.label} 
+                      iconPosition="start" 
+                    />
+                  ))}
+                </Tabs>
+              )}
             </AppBar>
 
             <Box sx={{ flexGrow: 1, overflow: 'hidden' }}>
-              <Box role="tabpanel" hidden={activeTab !== 0} sx={{ height: '100%', display: activeTab === 0 ? 'block' : 'none' }}>
-                <PolicySettingsTab />
-              </Box>
-              <Box role="tabpanel" hidden={activeTab !== 1} sx={{ height: '100%', display: activeTab === 1 ? 'block' : 'none' }}>
-                <LinkSettingsTab />
-              </Box>
-              <Box role="tabpanel" hidden={activeTab !== 2} sx={{ height: '100%', display: activeTab === 2 ? 'block' : 'none' }}>
-                <DirectSalesReportTab onRowClick={handleReportSelect} />
-              </Box>
+              {availableTabs.map((tab, index) => (
+                <Box 
+                  key={tab.key}
+                  role="tabpanel" 
+                  hidden={activeTab !== index} 
+                  sx={{ height: '100%', display: activeTab === index ? 'block' : 'none' }}
+                >
+                  {tab.component}
+                </Box>
+              ))}
             </Box>
           </>
         )}
