@@ -38,6 +38,13 @@ function ModeSelector({ loggedInStore, selectedModes, onModeToggle, selectedTabs
                  permission === 'M' ||
                  permission === 'O';
         }
+        // 직영점 관리 모드의 경우 M, S, O 모두 접속 가능
+        if (mode === 'directStoreManagement') {
+          const permission = String(hasPermission || '').trim().toUpperCase();
+          return hasPermission === 'M' || hasPermission === 'S' || hasPermission === 'O' || 
+                 permission === 'M' || permission === 'S' || permission === 'O' ||
+                 hasPermission === true;
+        }
         // 다른 모드는 권한이 있으면 포함 (true 또는 'O')
         return hasPermission === true || hasPermission === 'O' || String(hasPermission || '').trim().toUpperCase() === 'O';
       })
@@ -45,6 +52,10 @@ function ModeSelector({ loggedInStore, selectedModes, onModeToggle, selectedTabs
       .filter(mode => {
         // 모드 설정이 있는 모드만 표시 (회의 모드 포함)
         const modeConfig = getModeConfig(mode);
+        // 직영점 관리 모드는 캡쳐 지원 여부와 관계없이 표시
+        if (mode === 'directStoreManagement') {
+          return modeConfig !== null;
+        }
         // 캡쳐 타겟이 정의된 모드만 노출 (정확한 캡쳐 지원 모드 한정)
         return modeConfig && hasCaptureSupport(mode);
       });

@@ -277,6 +277,14 @@ function AppContent() {
             return hasPermission === 'M' || hasPermission === true || String(hasPermission).trim().toUpperCase() === 'M';
           }
           
+          // 직영점 관리 모드의 경우 M, S, O 모두 접속 가능
+          if (mode === 'directStoreManagement') {
+            const permission = String(hasPermission || '').trim().toUpperCase();
+            return hasPermission === 'M' || hasPermission === 'S' || hasPermission === 'O' || 
+                   permission === 'M' || permission === 'S' || permission === 'O' ||
+                   hasPermission === true;
+          }
+          
           // 다른 모드는 권한이 있으면 포함 (true 또는 'O')
           return hasPermission === true || hasPermission === 'O' || String(hasPermission).trim().toUpperCase() === 'O';
         })
