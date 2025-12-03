@@ -2822,6 +2822,8 @@ function AgentClosingTab() {
   const [availableAgents, setAvailableAgents] = useState([]);
   const [error, setError] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
+  const [dataRendered, setDataRendered] = useState(false); // 실제 데이터 렌더링 완료 여부
+  const containerRef = useRef(null);
   
   // 업체 재고 상세 모달 상태 (2단계 구조)
   const [showTypeSelectionModal, setShowTypeSelectionModal] = useState(false);
@@ -3020,6 +3022,39 @@ function AgentClosingTab() {
     setSelectedInventoryType('');
     setSelectedCompanyName('');
   };
+
+  // 데이터가 로드되고 실제 테이블이 렌더링되었는지 확인
+  useEffect(() => {
+    // 로딩 중이거나 데이터가 없으면 즉시 false
+    if (loading || !data) {
+      setDataRendered(false);
+      return;
+    }
+    
+    if (!containerRef.current) {
+      return;
+    }
+    
+    // 데이터가 있는지 확인
+    const hasData = data.agentData && Array.isArray(data.agentData) && data.agentData.length > 0;
+    
+    if (!hasData) {
+      setDataRendered(false);
+      return;
+    }
+    
+    // 짧은 지연 후 데이터 렌더링 완료로 설정
+    const timer = setTimeout(() => {
+      const tableRows = containerRef.current.querySelectorAll('table tbody tr, .MuiTableBody-root tr, tbody tr');
+      const hasTableRows = tableRows.length > 0;
+      
+      if (hasTableRows) {
+        setDataRendered(true);
+      }
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, [data, loading]);
 
   // 테이블 데이터 합계 계산
   const calculateTableTotals = () => {
