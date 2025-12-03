@@ -1301,6 +1301,16 @@ function AppContent() {
               return hasAccess; // M 또는 O 권한 체크 완료
             }
             
+            // 직영점 관리 모드의 경우 M, S, O 모두 접속 가능
+            if (mode === 'directStoreManagement') {
+              const permission = String(hasPermission || '').trim().toUpperCase();
+              const hasAccess = hasPermission === 'M' || hasPermission === 'S' || hasPermission === 'O' || 
+                                permission === 'M' || permission === 'S' || permission === 'O' ||
+                                hasPermission === true;
+              console.log(`🔍 [필터링] directStoreManagement 모드 체크: mode="${mode}", hasPermission="${hasPermission}", type=${typeof hasPermission}, hasAccess=${hasAccess}`);
+              return hasAccess;
+            }
+            
             // 다른 모드는 권한이 있으면 포함 (true 또는 'O')
             return hasPermission === true || hasPermission === 'O' || String(hasPermission || '').trim().toUpperCase() === 'O';
           })

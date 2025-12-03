@@ -66,7 +66,7 @@ const ProductCard = ({ product, isPremium, onSelect }) => {
         </Box>
       )}
 
-      <Box sx={{ position: 'relative', pt: '60%', bgcolor: '#fff', borderRadius: '16px 16px 0 0', overflow: 'hidden' }}>
+      <Box sx={{ position: 'relative', pt: '60%', bgcolor: '#FAFAFA', borderRadius: '16px 16px 0 0', overflow: 'hidden' }}>
         <CardMedia
           component="img"
           image={product.image || 'https://via.placeholder.com/300x300?text=No+Image'}
@@ -102,7 +102,7 @@ const ProductCard = ({ product, isPremium, onSelect }) => {
           {product.petName}
         </Typography>
 
-        <Stack spacing={1} sx={{ bgcolor: 'background.subtle', p: 1.5, borderRadius: 2 }}>
+        <Stack spacing={1} sx={{ bgcolor: '#F5F5F5', p: 1.5, borderRadius: 2 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
             <Typography variant="body2" color="text.secondary">출고가</Typography>
             <Typography variant="body2" sx={{ textDecoration: 'line-through' }}>
@@ -191,6 +191,11 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
     );
   }
 
+  // 프리미엄: 최대 6개 (3열 x 2행)
+  const displayPremiumPhones = premiumPhones.slice(0, 6);
+  // 실속형: 최대 2개 (1열 x 2행)
+  const displayBudgetPhones = budgetPhones.slice(0, 2);
+
   return (
     <Box
       sx={{
@@ -202,61 +207,62 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
       }}
     >
       <Container maxWidth="xl">
-        {/* 프리미엄 휴대폰 섹션 */}
-        <Box sx={{ mb: 6 }}>
-          <Stack direction="row" alignItems="center" spacing={2} mb={3}>
-            <StarIcon sx={{ color: 'primary.main', fontSize: 32 }} />
-            <Typography variant="h4" component="h2" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
-              프리미엄 휴대폰
-            </Typography>
-            <Divider sx={{ flexGrow: 1, borderColor: 'rgba(212, 175, 55, 0.3)' }} />
-          </Stack>
+        <Grid container spacing={3}>
+          {/* 프리미엄 휴대폰 섹션 - 3열 */}
+          <Grid item xs={12} md={9}>
+            <Stack direction="row" alignItems="center" spacing={2} mb={3}>
+              <StarIcon sx={{ color: 'primary.main', fontSize: 32 }} />
+              <Typography variant="h4" component="h2" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
+                프리미엄
+              </Typography>
+              <Divider sx={{ flexGrow: 1, borderColor: 'rgba(212, 175, 55, 0.3)' }} />
+            </Stack>
 
-          <Grid container spacing={3}>
-            {premiumPhones.map((product) => (
-              <Grid item xs={12} sm={6} md={4} key={product.id}>
-                <ProductCard
-                  product={product}
-                  isPremium={true}
-                  onSelect={onProductSelect}
-                />
-              </Grid>
-            ))}
-            {premiumPhones.length === 0 && (
-              <Grid item xs={12}>
-                <Typography color="text.secondary" align="center">등록된 프리미엄 휴대폰이 없습니다.</Typography>
-              </Grid>
-            )}
+            <Grid container spacing={3}>
+              {displayPremiumPhones.map((product) => (
+                <Grid item xs={12} sm={6} md={4} key={product.id}>
+                  <ProductCard
+                    product={product}
+                    isPremium={true}
+                    onSelect={onProductSelect}
+                  />
+                </Grid>
+              ))}
+              {displayPremiumPhones.length === 0 && (
+                <Grid item xs={12}>
+                  <Typography color="text.secondary" align="center">등록된 프리미엄 휴대폰이 없습니다.</Typography>
+                </Grid>
+              )}
+            </Grid>
           </Grid>
-        </Box>
 
-        {/* 중저가 휴대폰 섹션 */}
-        <Box sx={{ mb: 4 }}>
-          <Stack direction="row" alignItems="center" spacing={2} mb={3}>
-            <LocalOfferIcon sx={{ color: 'secondary.main', fontSize: 32 }} />
-            <Typography variant="h4" component="h2" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
-              실속형 휴대폰
-            </Typography>
-            <Divider sx={{ flexGrow: 1, borderColor: 'rgba(255, 255, 255, 0.1)' }} />
-          </Stack>
+          {/* 실속형 휴대폰 섹션 - 1열 */}
+          <Grid item xs={12} md={3}>
+            <Stack direction="row" alignItems="center" spacing={2} mb={3}>
+              <LocalOfferIcon sx={{ color: 'secondary.main', fontSize: 32 }} />
+              <Typography variant="h4" component="h2" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
+                실속형
+              </Typography>
+            </Stack>
 
-          <Grid container spacing={3}>
-            {budgetPhones.map((product) => (
-              <Grid item xs={12} sm={6} key={product.id}>
-                <ProductCard
-                  product={product}
-                  isPremium={false}
-                  onSelect={onProductSelect}
-                />
-              </Grid>
-            ))}
-            {budgetPhones.length === 0 && (
-              <Grid item xs={12}>
-                <Typography color="text.secondary" align="center">등록된 실속형 휴대폰이 없습니다.</Typography>
-              </Grid>
-            )}
+            <Grid container spacing={3}>
+              {displayBudgetPhones.map((product) => (
+                <Grid item xs={12} key={product.id}>
+                  <ProductCard
+                    product={product}
+                    isPremium={false}
+                    onSelect={onProductSelect}
+                  />
+                </Grid>
+              ))}
+              {displayBudgetPhones.length === 0 && (
+                <Grid item xs={12}>
+                  <Typography color="text.secondary" align="center">등록된 실속형 휴대폰이 없습니다.</Typography>
+                </Grid>
+              )}
+            </Grid>
           </Grid>
-        </Box>
+        </Grid>
       </Container>
     </Box>
   );

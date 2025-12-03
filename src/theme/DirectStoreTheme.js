@@ -1,9 +1,9 @@
 import { createTheme } from '@mui/material/styles';
 
-// 직영점 모드 전용 프리미엄 테마 (Black & Gold)
+// 직영점 모드 전용 밝은 테마 (Light & Gold)
 const directStoreTheme = createTheme({
     palette: {
-        mode: 'dark',
+        mode: 'light',
         primary: {
             main: '#D4AF37', // Gold
             light: '#F4CF57',
@@ -11,23 +11,23 @@ const directStoreTheme = createTheme({
             contrastText: '#000000',
         },
         secondary: {
-            main: '#FFFFFF', // White
-            light: '#FFFFFF',
-            dark: '#CCCCCC',
-            contrastText: '#000000',
+            main: '#546E7A', // Blue Gray
+            light: '#78909C',
+            dark: '#37474F',
+            contrastText: '#FFFFFF',
         },
         background: {
-            default: '#000000', // Deep Black
-            paper: '#121212',   // Dark Gray for cards
-            subtle: '#1E1E1E',  // Slightly lighter background
+            default: '#F5F5F5', // Light Gray
+            paper: '#FFFFFF',   // White for cards
+            subtle: '#FAFAFA',  // Very light background
         },
         text: {
-            primary: '#FFFFFF',
-            secondary: 'rgba(255, 255, 255, 0.7)',
-            disabled: 'rgba(255, 255, 255, 0.5)',
+            primary: '#212121',
+            secondary: 'rgba(0, 0, 0, 0.6)',
+            disabled: 'rgba(0, 0, 0, 0.38)',
             highlight: '#D4AF37', // Gold text
         },
-        divider: 'rgba(212, 175, 55, 0.2)', // Subtle Gold divider
+        divider: 'rgba(0, 0, 0, 0.12)', // Light divider
         action: {
             active: '#D4AF37',
             hover: 'rgba(212, 175, 55, 0.08)',
@@ -69,10 +69,9 @@ const directStoreTheme = createTheme({
         MuiAppBar: {
             styleOverrides: {
                 root: {
-                    backgroundColor: 'rgba(0, 0, 0, 0.8)', // Glassmorphism background
-                    backdropFilter: 'blur(10px)',
+                    backgroundColor: '#FFFFFF', // White background
                     borderBottom: '1px solid rgba(212, 175, 55, 0.3)',
-                    boxShadow: 'none',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
                 },
             },
         },
@@ -102,15 +101,15 @@ const directStoreTheme = createTheme({
         MuiCard: {
             styleOverrides: {
                 root: {
-                    backgroundColor: '#121212',
-                    border: '1px solid rgba(255, 255, 255, 0.05)',
+                    backgroundColor: '#FFFFFF',
+                    border: '1px solid rgba(0, 0, 0, 0.12)',
                     borderRadius: 16,
-                    boxShadow: '0 8px 16px rgba(0,0,0,0.4)',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
                     transition: 'transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out',
                     '&:hover': {
                         transform: 'translateY(-4px)',
-                        boxShadow: '0 12px 24px rgba(0,0,0,0.6), 0 0 10px rgba(212, 175, 55, 0.2)',
-                        border: '1px solid rgba(212, 175, 55, 0.3)',
+                        boxShadow: '0 8px 16px rgba(0,0,0,0.15), 0 0 10px rgba(212, 175, 55, 0.2)',
+                        border: '1px solid rgba(212, 175, 55, 0.5)',
                     },
                 },
             },
@@ -121,7 +120,7 @@ const directStoreTheme = createTheme({
                     textTransform: 'none',
                     fontWeight: 600,
                     fontSize: '1rem',
-                    color: 'rgba(255, 255, 255, 0.6)',
+                    color: 'rgba(0, 0, 0, 0.6)',
                     '&.Mui-selected': {
                         color: '#D4AF37',
                     },
@@ -131,11 +130,11 @@ const directStoreTheme = createTheme({
         MuiTableCell: {
             styleOverrides: {
                 root: {
-                    borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                    borderBottom: '1px solid rgba(0, 0, 0, 0.12)',
                 },
                 head: {
                     fontWeight: 700,
-                    backgroundColor: '#1E1E1E',
+                    backgroundColor: '#FAFAFA',
                     color: '#D4AF37',
                 },
             },
@@ -150,7 +149,7 @@ const directStoreTheme = createTheme({
         MuiDialog: {
             styleOverrides: {
                 paper: {
-                    backgroundColor: '#121212',
+                    backgroundColor: '#FFFFFF',
                     border: '1px solid rgba(212, 175, 55, 0.3)',
                     borderRadius: 16,
                 },
