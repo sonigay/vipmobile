@@ -54,6 +54,16 @@ const DirectStoreManagementMode = ({
   const API_URL = process.env.REACT_APP_API_URL;
   const modeTitle = getModeTitle('directStoreManagement', '직영점 관리 모드');
 
+  // 판매일보 상세 보기 핸들러
+  const handleReportSelect = React.useCallback((report) => {
+    setSelectedReport(report);
+  }, []);
+
+  // 목록으로 돌아가기 핸들러
+  const handleBackToReports = React.useCallback(() => {
+    setSelectedReport(null);
+  }, []);
+
   // 권한 확인
   const directStoreManagementPermission = loggedInStore?.modePermissions?.directStoreManagement;
   const permissionValue = typeof directStoreManagementPermission === 'string' 
@@ -78,33 +88,20 @@ const DirectStoreManagementMode = ({
       tabs.push({ key: 'sales', label: '전체 판매일보', icon: <AssessmentIcon />, component: <DirectSalesReportTab onRowClick={handleReportSelect} /> });
     }
     return tabs;
-  }, [hasPolicyPermission, hasLinkPermission, hasSalesReportPermission]);
+  }, [hasPolicyPermission, hasLinkPermission, hasSalesReportPermission, handleReportSelect]);
 
   // 현재 활성 탭이 사용 가능한 탭인지 확인하고, 아니면 첫 번째 사용 가능한 탭으로 변경
   useEffect(() => {
-    if (availableTabs.length > 0) {
-      const currentTab = availableTabs[activeTab];
-      if (!currentTab && activeTab >= availableTabs.length) {
-        setActiveTab(0);
-      }
+    if (availableTabs.length > 0 && activeTab >= availableTabs.length) {
+      setActiveTab(0);
     }
-  }, [availableTabs.length, permissionValue]);
+  }, [availableTabs.length, activeTab]);
 
   const handleTabChange = (event, newValue) => {
     if (newValue >= 0 && newValue < availableTabs.length) {
       setActiveTab(newValue);
     }
   };
-
-  // 판매일보 상세 보기 핸들러
-  const handleReportSelect = React.useCallback((report) => {
-    setSelectedReport(report);
-  }, []);
-
-  // 목록으로 돌아가기 핸들러
-  const handleBackToReports = React.useCallback(() => {
-    setSelectedReport(null);
-  }, []);
 
 
   return (
