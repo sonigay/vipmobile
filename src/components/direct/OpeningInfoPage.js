@@ -86,43 +86,81 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
         posCode: ''
     });
 
-    // 요금제 그룹 로드 (링크설정에서 가져오기 - 일단 Mock)
+    // 요금제 그룹 로드 (링크설정에서 가져오기)
     useEffect(() => {
         const loadPlanGroups = async () => {
             try {
-                // TODO: 실제 API 연동 시 directStoreApi.getLinkSettings(selectedCarrier) 사용
-                // 지금은 Mock 데이터
-                const mockPlans = [
-                    { name: '5GX 프라임', group: '5GX프라임군', basicFee: 89000 },
-                    { name: '5GX 플래티넘', group: '5GX플래티넘군', basicFee: 125000 },
-                    { name: 'T플랜 에센스', group: 'T플랜군', basicFee: 75000 }
-                ];
-                setPlanGroups(mockPlans);
-                if (mockPlans.length > 0) {
-                    setSelectedPlanGroup(mockPlans[0].name);
-                    setPlanBasicFee(mockPlans[0].basicFee);
-                    setFormData(prev => ({ ...prev, plan: mockPlans[0].name }));
+                const linkSettings = await directStoreApi.getLinkSettings(selectedCarrier);
+                if (linkSettings.success && linkSettings.planGroup) {
+                    const planGroup = linkSettings.planGroup;
+                    // 요금제군 목록과 기본료를 조합하여 요금제 목록 생성
+                    // TODO: 실제로는 planNameRange와 basicFeeRange를 읽어서 조합해야 함
+                    const plans = (planGroup.planGroups || []).map((group, idx) => ({
+                        name: group,
+                        group: group,
+                        basicFee: 89000 + (idx * 10000) // 임시 기본료
+                    }));
+                    setPlanGroups(plans);
+                    if (plans.length > 0) {
+                        setSelectedPlanGroup(plans[0].name);
+                        setPlanBasicFee(plans[0].basicFee);
+                        setFormData(prev => ({ ...prev, plan: plans[0].name }));
+                    }
+                } else {
+                    // 링크설정이 없으면 Mock 데이터 사용
+                    const mockPlans = [
+                        { name: '5GX 프라임', group: '5GX프라임군', basicFee: 89000 },
+                        { name: '5GX 플래티넘', group: '5GX플래티넘군', basicFee: 125000 },
+                        { name: 'T플랜 에센스', group: 'T플랜군', basicFee: 75000 }
+                    ];
+                    setPlanGroups(mockPlans);
+                    if (mockPlans.length > 0) {
+                        setSelectedPlanGroup(mockPlans[0].name);
+                        setPlanBasicFee(mockPlans[0].basicFee);
+                        setFormData(prev => ({ ...prev, plan: mockPlans[0].name }));
+                    }
                 }
             } catch (err) {
                 console.error('요금제 그룹 로드 실패:', err);
+                // 에러 시 Mock 데이터 사용
+                const mockPlans = [
+                    { name: '5GX 프라임', group: '5GX프라임군', basicFee: 89000 },
+                    { name: '5GX 플래티넘', group: '5GX플래티넘군', basicFee: 125000 }
+                ];
+                setPlanGroups(mockPlans);
             }
         };
         loadPlanGroups();
     }, [selectedCarrier]);
 
-    // 필수 부가서비스 로드 (정책설정에서 가져오기 - 일단 Mock)
+    // 필수 부가서비스 로드 (정책설정에서 가져오기)
     useEffect(() => {
         const loadRequiredAddons = async () => {
             try {
-                // TODO: 실제 API 연동 시 directStoreApi.getPolicySettings(selectedCarrier) 사용
-                // 지금은 Mock 데이터
-                const mockAddons = [
-                    { name: '우주패스', monthlyFee: 9900 },
-                    { name: 'V컬러링', monthlyFee: 3300 }
-                ];
-                setRequiredAddons(mockAddons);
+                const policySettings = await directStoreApi.getPolicySettings(selectedCarrier);
+                if (policySettings.success && policySettings.addon?.list) {
+                    // 미유치차감금액이 있는 부가서비스를 필수 부가서비스로 간주
+                    const required = policySettings.addon.list
+                        .filter(addon => addon.deduction > 0)
+                        .map(addon => ({
+                            name: addon.name,
+                            monthlyFee: addon.fee || 0
+                        }));
+                    setRequiredAddons(required);
+                } else {
+                    // 정책설정이 없으면 Mock 데이터 사용
+                    setRequiredAddons([
+                        { name: '우주패스', monthlyFee: 9900 },
+                        { name: 'V컬러링', monthlyFee: 3300 }
+                    ]);
+                }
             } catch (err) {
                 console.error('필수 부가서비스 로드 실패:', err);
+                // 에러 시 Mock 데이터 사용
+                setRequiredAddons([
+                    { name: '우주패스', monthlyFee: 9900 },
+                    { name: 'V컬러링', monthlyFee: 3300 }
+                ]);
             }
         };
         loadRequiredAddons();
@@ -293,23 +331,177 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
             {/* 인쇄용 스타일 */}
             <style>{`
                 @media print {
+                    @page {
+                        size: A4;
+                        margin: 10mm;
+                    }
+                    
                     body * {
                         visibility: hidden;
                     }
+                    
                     .print-area, .print-area * {
                         visibility: visible;
                     }
+                    
                     .print-area {
                         position: absolute;
                         left: 0;
                         top: 0;
                         width: 100%;
+                        padding: 0 !important;
+                        margin: 0 !important;
+                        background: white !important;
+                    }
+                    
+                    /* 헤더 숨기기 */
+                    .no-print {
+                        display: none !important;
+                    }
+                    
+                    /* Paper 컴포넌트 스타일 최적화 */
+                    .print-area .MuiPaper-root {
+                        margin-bottom: 8px !important;
+                        padding: 12px !important;
+                        box-shadow: none !important;
+                        page-break-inside: avoid;
+                    }
+                    
+                    /* Typography 크기 축소 */
+                    .print-area .MuiTypography-h4 {
+                        font-size: 1.5rem !important;
+                        margin-bottom: 8px !important;
+                    }
+                    
+                    .print-area .MuiTypography-h6 {
+                        font-size: 1rem !important;
+                        margin-bottom: 6px !important;
+                    }
+                    
+                    .print-area .MuiTypography-body1 {
+                        font-size: 0.875rem !important;
+                    }
+                    
+                    .print-area .MuiTypography-body2 {
+                        font-size: 0.75rem !important;
+                    }
+                    
+                    /* Grid 간격 축소 */
+                    .print-area .MuiGrid-container {
+                        margin: 0 !important;
+                        width: 100% !important;
+                    }
+                    
+                    .print-area .MuiGrid-item {
+                        padding: 2px 4px !important;
+                    }
+                    
+                    /* Grid spacing 최소화 */
+                    .print-area .MuiGrid-spacing-xs-1\.5 > .MuiGrid-item {
+                        padding: 2px !important;
+                    }
+                    
+                    /* TextField 스타일 최적화 */
+                    .print-area .MuiTextField-root {
+                        margin-bottom: 2px !important;
+                    }
+                    
+                    .print-area .MuiInputBase-root {
+                        font-size: 0.7rem !important;
+                        padding: 3px 6px !important;
+                        min-height: 28px !important;
+                    }
+                    
+                    .print-area .MuiInputLabel-root {
+                        font-size: 0.7rem !important;
+                        transform: translate(6px, 8px) scale(1) !important;
+                    }
+                    
+                    .print-area .MuiInputLabel-shrink {
+                        transform: translate(6px, -9px) scale(0.75) !important;
+                    }
+                    
+                    /* Divider 간격 축소 */
+                    .print-area .MuiDivider-root {
+                        margin: 2px 0 !important;
+                    }
+                    
+                    /* Stack 간격 축소 */
+                    .print-area .MuiStack-root {
+                        margin-bottom: 1px !important;
+                    }
+                    
+                    /* Stack spacing 최소화 */
+                    .print-area .MuiStack-root > * {
+                        margin: 0 !important;
+                    }
+                    
+                    /* Alert 스타일 최적화 */
+                    .print-area .MuiAlert-root {
+                        padding: 2px 6px !important;
+                        margin-bottom: 2px !important;
+                        font-size: 0.7rem !important;
+                    }
+                    
+                    /* RadioGroup, Checkbox 간격 축소 */
+                    .print-area .MuiFormControl-root {
+                        margin-bottom: 2px !important;
+                    }
+                    
+                    .print-area .MuiFormControlLabel-root {
+                        margin-right: 8px !important;
+                        margin-bottom: 0 !important;
+                    }
+                    
+                    .print-area .MuiRadio-root {
+                        padding: 2px !important;
+                        font-size: 0.7rem !important;
+                    }
+                    
+                    .print-area .MuiCheckbox-root {
+                        padding: 2px !important;
+                    }
+                    
+                    /* Select 스타일 최적화 */
+                    .print-area .MuiSelect-root {
+                        font-size: 0.7rem !important;
+                        padding: 3px 6px !important;
+                        min-height: 28px !important;
+                    }
+                    
+                    /* 금액종합안내 박스 최적화 */
+                    .print-area .MuiPaper-root[style*="background-color: rgb(51, 51, 51)"] {
+                        padding: 6px !important;
+                    }
+                    
+                    .print-area .MuiPaper-root[style*="background-color: rgb(51, 51, 51)"] .MuiTypography-h6 {
+                        font-size: 0.9rem !important;
+                        margin-bottom: 3px !important;
+                    }
+                    
+                    .print-area .MuiPaper-root[style*="background-color: rgb(51, 51, 51)"] .MuiTypography-h5 {
+                        font-size: 1.1rem !important;
+                    }
+                    
+                    .print-area .MuiPaper-root[style*="background-color: rgb(51, 51, 51)"] .MuiTypography-h4 {
+                        font-size: 1.3rem !important;
+                    }
+                    
+                    /* 불필요한 여백 제거 */
+                    .print-area .MuiBox-root {
+                        margin: 0 !important;
+                    }
+                    
+                    /* 페이지 브레이크 방지 */
+                    .print-area .MuiPaper-root {
+                        page-break-inside: avoid;
+                        break-inside: avoid;
                     }
                 }
             `}</style>
 
             {/* 헤더 */}
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 4 }}>
+            <Box className="no-print" sx={{ display: 'flex', alignItems: 'center', mb: 4 }}>
                 <IconButton onClick={onBack} sx={{ mr: 2 }}>
                     <ArrowBackIcon />
                 </IconButton>
@@ -336,15 +528,29 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                     {isSaving ? <CircularProgress size={24} color="inherit" /> : '입력완료'}
                 </Button>
             </Box>
+            
+            {/* 인쇄용 제목 */}
+            <Box className="print-only" sx={{ display: 'none', '@media print': { display: 'block', mb: 1 } }}>
+                <Typography variant="h5" sx={{ fontWeight: 'bold', color: theme.primary, textAlign: 'center' }}>
+                    {selectedCarrier} 개통정보
+                </Typography>
+            </Box>
 
             <div className="print-area">
-                <Grid container spacing={3}>
+                <style>{`
+                    @media print {
+                        .print-only {
+                            display: block !important;
+                        }
+                    }
+                `}</style>
+                <Grid container spacing={1}>
                     {/* 왼쪽: 가입 정보, 통신사 정보, 약정 및 할부 정보, 단말기유심 정보 */}
                     <Grid item xs={12} md={6}>
                         {/* 가입 정보 */}
-                        <Paper sx={{ p: 3, mb: 3, borderTop: `4px solid ${theme.primary}` }}>
+                        <Paper sx={{ p: 2, mb: 1.5, borderTop: `3px solid ${theme.primary}` }}>
                             <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>가입 정보</Typography>
-                            <Grid container spacing={2}>
+                            <Grid container spacing={1.5}>
                                 <Grid item xs={12} sm={6}>
                                     <TextField
                                         label="고객명"
@@ -390,7 +596,7 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                         </Paper>
 
                         {/* 통신사 정보 박스 */}
-                        <Paper sx={{ p: 3, mb: 3, borderTop: `4px solid ${theme.primary}`, bgcolor: theme.bg }}>
+                        <Paper sx={{ p: 1.5, mb: 1.5, borderTop: `3px solid ${theme.primary}`, bgcolor: theme.bg }}>
                             <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold', color: theme.primary }}>
                                 통신사 정보
                             </Typography>
@@ -400,9 +606,9 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                         </Paper>
 
                         {/* 약정 및 할부 정보 */}
-                        <Paper sx={{ p: 3, mb: 3, borderTop: `4px solid ${theme.primary}` }}>
+                        <Paper sx={{ p: 2, mb: 1.5, borderTop: `3px solid ${theme.primary}` }}>
                             <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>약정 및 할부 정보</Typography>
-                            <Grid container spacing={2}>
+                            <Grid container spacing={1.5}>
                                 <Grid item xs={12}>
                                     <FormControl component="fieldset">
                                         <Typography variant="subtitle2" gutterBottom>약정 유형</Typography>
@@ -435,9 +641,9 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                         </Paper>
 
                         {/* 단말기유심 정보 및 금액안내 */}
-                        <Paper sx={{ p: 3, borderTop: `4px solid ${theme.primary}` }}>
+                        <Paper sx={{ p: 2, borderTop: `3px solid ${theme.primary}` }}>
                             <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>단말기유심 정보 및 금액안내</Typography>
-                            <Grid container spacing={2}>
+                            <Grid container spacing={1.5}>
                                 <Grid item xs={12}>
                                     <TextField
                                         label="모델명"
@@ -618,9 +824,9 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                     {/* 오른쪽: 요금정보, 금액종합안내 */}
                     <Grid item xs={12} md={6}>
                         {/* 요금정보 */}
-                        <Paper sx={{ p: 3, mb: 3, borderTop: `4px solid ${theme.primary}` }}>
+                        <Paper sx={{ p: 2, mb: 1.5, borderTop: `3px solid ${theme.primary}` }}>
                             <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>요금정보</Typography>
-                            <Grid container spacing={2}>
+                            <Grid container spacing={1.5}>
                                 <Grid item xs={12}>
                                     <FormControl fullWidth>
                                         <InputLabel>요금제 선택</InputLabel>
@@ -697,7 +903,7 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                         </Paper>
 
                         {/* 금액종합안내 */}
-                        <Paper sx={{ p: 3, bgcolor: '#333', color: '#fff', mb: 3 }}>
+                        <Paper sx={{ p: 2, bgcolor: '#333', color: '#fff', mb: 1.5 }}>
                             <Typography variant="h6" gutterBottom sx={{ color: '#ffd700', fontWeight: 'bold' }}>
                                 금액종합안내
                             </Typography>

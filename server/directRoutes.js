@@ -639,6 +639,322 @@ function setupDirectRoutes(app) {
     }
   });
 
+  // === 상품 데이터 ===
+
+  // GET /api/direct/mobiles?carrier=SK
+  // 링크설정에서 시트 링크와 범위를 읽어서 휴대폰 목록 동적 생성
+  router.get('/mobiles', async (req, res) => {
+    try {
+      const carrier = req.query.carrier || 'SK';
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+
+      // 1. 링크설정에서 이통사 지원금 설정 읽기
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_SETTINGS, HEADERS_SETTINGS);
+      const settingsRes = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: SHEET_SETTINGS
+      });
+      const settingsRows = (settingsRes.data.values || []).slice(1);
+      const supportRow = settingsRows.find(row => (row[0] || '').trim() === carrier && (row[1] || '').trim() === 'support');
+
+      if (!supportRow || !supportRow[2]) {
+        return res.status(404).json({
+          success: false,
+          error: '이통사 지원금 설정을 찾을 수 없습니다. 링크설정에서 먼저 설정해주세요.'
+        });
+      }
+
+      const supportSettingsJson = supportRow[4] ? JSON.parse(supportRow[4]) : {};
+      const supportSheetId = supportRow[2].trim();
+      const modelRange = supportSettingsJson.modelRange || '';
+      const petNameRange = supportSettingsJson.petNameRange || '';
+      const factoryPriceRange = supportSettingsJson.factoryPriceRange || '';
+      const openingTypeRange = supportSettingsJson.openingTypeRange || '';
+      const planGroupRanges = supportSettingsJson.planGroupRanges || {};
+
+      if (!modelRange || !petNameRange || !factoryPriceRange) {
+        return res.status(400).json({
+          success: false,
+          error: '필수 범위 설정이 누락되었습니다. (모델명, 펫네임, 출고가 범위)'
+        });
+      }
+
+      // 2. 외부 시트에서 각 범위 데이터 읽기
+      const [modelData, petNameData, factoryPriceData, openingTypeData] = await Promise.all([
+        modelRange ? sheets.spreadsheets.values.get({
+          spreadsheetId: supportSheetId,
+          range: modelRange,
+          majorDimension: 'ROWS',
+          valueRenderOption: 'UNFORMATTED_VALUE'
+        }).then(r => r.data.values || []).catch(() => []) : Promise.resolve([]),
+        petNameRange ? sheets.spreadsheets.values.get({
+          spreadsheetId: supportSheetId,
+          range: petNameRange,
+          majorDimension: 'ROWS',
+          valueRenderOption: 'UNFORMATTED_VALUE'
+        }).then(r => r.data.values || []).catch(() => []) : Promise.resolve([]),
+        factoryPriceRange ? sheets.spreadsheets.values.get({
+          spreadsheetId: supportSheetId,
+          range: factoryPriceRange,
+          majorDimension: 'ROWS',
+          valueRenderOption: 'UNFORMATTED_VALUE'
+        }).then(r => r.data.values || []).catch(() => []) : Promise.resolve([]),
+        openingTypeRange ? sheets.spreadsheets.values.get({
+          spreadsheetId: supportSheetId,
+          range: openingTypeRange,
+          majorDimension: 'ROWS',
+          valueRenderOption: 'UNFORMATTED_VALUE'
+        }).then(r => r.data.values || []).catch(() => []) : Promise.resolve([])
+      ]);
+
+      // 3. 요금제군별 지원금 범위 읽기
+      const planGroupSupportData = {};
+      for (const [planGroup, range] of Object.entries(planGroupRanges)) {
+        if (range) {
+          try {
+            const response = await sheets.spreadsheets.values.get({
+              spreadsheetId: supportSheetId,
+              range: range,
+              majorDimension: 'ROWS',
+              valueRenderOption: 'UNFORMATTED_VALUE'
+            });
+            planGroupSupportData[planGroup] = response.data.values || [];
+          } catch (err) {
+            console.warn(`[Direct] ${planGroup} 지원금 범위 읽기 실패:`, err);
+            planGroupSupportData[planGroup] = [];
+          }
+        }
+      }
+
+      // 4. 정책설정에서 마진, 부가서비스 정보 읽기
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_MARGIN, HEADERS_POLICY_MARGIN);
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_ADDON, HEADERS_POLICY_ADDON);
+      
+      const marginRes = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: SHEET_POLICY_MARGIN
+      });
+      const marginRows = (marginRes.data.values || []).slice(1);
+      const marginRow = marginRows.find(row => (row[0] || '').trim() === carrier);
+      const baseMargin = marginRow ? Number(marginRow[1] || 0) : 50000;
+
+      const addonRes = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: SHEET_POLICY_ADDON
+      });
+      const addonRows = (addonRes.data.values || []).slice(1);
+      const requiredAddons = addonRows
+        .filter(row => (row[0] || '').trim() === carrier && (row[4] || 0) > 0) // 미유치차감금액이 있는 것만
+        .map(row => row[1] || '');
+
+      // 5. 직영점_모델이미지 시트에서 이미지 URL 조회
+      const imageRes = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '직영점_모델이미지!A:C'
+      });
+      const imageRows = (imageRes.data.values || []).slice(1);
+      const imageMap = new Map();
+      imageRows.forEach(row => {
+        if (row[0] && row[2]) {
+          imageMap.set((row[0] || '').trim(), (row[2] || '').trim());
+        }
+      });
+
+      // 6. 데이터 조합 (행 인덱스 기준으로 매칭)
+      const maxRows = Math.max(
+        modelData.length,
+        petNameData.length,
+        factoryPriceData.length,
+        openingTypeData.length
+      );
+
+      const mobileList = [];
+      for (let i = 0; i < maxRows; i++) {
+        const model = (modelData[i]?.[0] || '').toString().trim();
+        if (!model) continue; // 빈 행 스킵
+
+        const petName = (petNameData[i]?.[0] || model).toString().trim();
+        const factoryPrice = Number(factoryPriceData[i]?.[0] || 0);
+        const openingType = (openingTypeData[i]?.[0] || '').toString().trim();
+
+        // 기본 지원금 (첫 번째 요금제군의 지원금 또는 0)
+        let publicSupport = 0;
+        const firstPlanGroup = Object.keys(planGroupRanges)[0];
+        if (firstPlanGroup && planGroupSupportData[firstPlanGroup]?.[i]?.[0]) {
+          publicSupport = Number(planGroupSupportData[firstPlanGroup][i][0]) || 0;
+        }
+
+        // 대리점 지원금은 정책표 설정에서 가져와야 하지만, 일단 기본값 사용
+        // TODO: 정책표 설정에서 요금제군 & 유형별 리베이트를 읽어서 계산
+        const storeSupport = 0; // 임시
+        const storeSupportNoAddon = 0; // 임시
+
+        // 태그 판단 (임시 로직, 실제로는 시트에서 가져와야 함)
+        const tags = [];
+        if (i < 3) tags.push('popular', 'recommend');
+        if (factoryPrice < 1000000) tags.push('cheap');
+
+        const mobile = {
+          id: `mobile-${carrier}-${i}`,
+          model: model,
+          petName: petName,
+          carrier: carrier,
+          factoryPrice: factoryPrice,
+          support: publicSupport,
+          publicSupport: publicSupport,
+          storeSupport: storeSupport,
+          storeSupportNoAddon: storeSupportNoAddon,
+          purchasePriceWithAddon: Math.max(0, factoryPrice - publicSupport - storeSupport),
+          purchasePriceWithoutAddon: Math.max(0, factoryPrice - publicSupport - storeSupportNoAddon),
+          image: imageMap.get(model) || '',
+          tags: tags,
+          requiredAddons: requiredAddons.join(', ') || '없음',
+          isPopular: tags.includes('popular'),
+          isRecommended: tags.includes('recommend'),
+          isCheap: tags.includes('cheap')
+        };
+
+        mobileList.push(mobile);
+      }
+
+      res.json(mobileList);
+    } catch (error) {
+      console.error('[Direct] mobiles GET error:', error);
+      res.status(500).json({ success: false, error: '휴대폰 목록 조회 실패', message: error.message });
+    }
+  });
+
+  // GET /api/direct/todays-mobiles
+  // 오늘의 휴대폰 조회 (휴대폰 목록에서 필터링)
+  router.get('/todays-mobiles', async (req, res) => {
+    try {
+      // mobiles 엔드포인트를 재사용하기 위해 내부 함수 호출
+      // SK 통신사 데이터 가져오기
+      const carrier = 'SK';
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+
+      // 링크설정 읽기 (mobiles와 동일한 로직)
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_SETTINGS, HEADERS_SETTINGS);
+      const settingsRes = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: SHEET_SETTINGS
+      });
+      const settingsRows = (settingsRes.data.values || []).slice(1);
+      const supportRow = settingsRows.find(row => (row[0] || '').trim() === carrier && (row[1] || '').trim() === 'support');
+
+      if (!supportRow || !supportRow[2]) {
+        return res.json({ premium: [], budget: [] });
+      }
+
+      const supportSettingsJson = supportRow[4] ? JSON.parse(supportRow[4]) : {};
+      const supportSheetId = supportRow[2].trim();
+      const modelRange = supportSettingsJson.modelRange || '';
+      const petNameRange = supportSettingsJson.petNameRange || '';
+      const factoryPriceRange = supportSettingsJson.factoryPriceRange || '';
+
+      if (!modelRange || !petNameRange || !factoryPriceRange) {
+        return res.json({ premium: [], budget: [] });
+      }
+
+      // 시트에서 데이터 읽기
+      const [modelData, petNameData, factoryPriceData] = await Promise.all([
+        modelRange ? sheets.spreadsheets.values.get({
+          spreadsheetId: supportSheetId,
+          range: modelRange,
+          majorDimension: 'ROWS',
+          valueRenderOption: 'UNFORMATTED_VALUE'
+        }).then(r => r.data.values || []).catch(() => []) : Promise.resolve([]),
+        petNameRange ? sheets.spreadsheets.values.get({
+          spreadsheetId: supportSheetId,
+          range: petNameRange,
+          majorDimension: 'ROWS',
+          valueRenderOption: 'UNFORMATTED_VALUE'
+        }).then(r => r.data.values || []).catch(() => []) : Promise.resolve([]),
+        factoryPriceRange ? sheets.spreadsheets.values.get({
+          spreadsheetId: supportSheetId,
+          range: factoryPriceRange,
+          majorDimension: 'ROWS',
+          valueRenderOption: 'UNFORMATTED_VALUE'
+        }).then(r => r.data.values || []).catch(() => []) : Promise.resolve([])
+      ]);
+
+      // 이미지 맵
+      const imageRes = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '직영점_모델이미지!A:C'
+      });
+      const imageRows = (imageRes.data.values || []).slice(1);
+      const imageMap = new Map();
+      imageRows.forEach(row => {
+        if (row[0] && row[2]) {
+          imageMap.set((row[0] || '').trim(), (row[2] || '').trim());
+        }
+      });
+
+      // 데이터 조합
+      const maxRows = Math.max(modelData.length, petNameData.length, factoryPriceData.length);
+      const skList = [];
+      for (let i = 0; i < maxRows; i++) {
+        const model = (modelData[i]?.[0] || '').toString().trim();
+        if (!model) continue;
+
+        const petName = (petNameData[i]?.[0] || model).toString().trim();
+        const factoryPrice = Number(factoryPriceData[i]?.[0] || 0);
+        const tags = [];
+        if (i < 3) tags.push('popular', 'recommend');
+        if (factoryPrice < 1000000) tags.push('cheap');
+
+        skList.push({
+          id: `mobile-SK-${i}`,
+          model,
+          petName,
+          carrier: 'SK',
+          factoryPrice,
+          support: 0,
+          publicSupport: 0,
+          storeSupport: 0,
+          storeSupportNoAddon: 0,
+          purchasePriceWithAddon: factoryPrice,
+          purchasePriceWithoutAddon: factoryPrice,
+          image: imageMap.get(model) || '',
+          tags,
+          requiredAddons: '없음',
+          isPopular: tags.includes('popular'),
+          isRecommended: tags.includes('recommend'),
+          isCheap: tags.includes('cheap')
+        });
+      }
+
+      // 프리미엄: 인기/추천 태그 위주로 상위 6개
+      const premium = skList
+        .filter(p => p.isPopular || p.isRecommended)
+        .slice(0, 6)
+        .map(p => ({
+          ...p,
+          purchasePrice: p.purchasePriceWithAddon,
+          addons: p.requiredAddons
+        }));
+
+      // 실속형: 저렴 태그 위주로 상위 2개
+      const cheap = skList.filter(p => p.isCheap);
+      const fallback = skList
+        .filter(p => !p.isPopular && !p.isRecommended)
+        .sort((a, b) => (a.purchasePriceWithAddon || 0) - (b.purchasePriceWithAddon || 0));
+
+      const budgetSource = cheap.length > 0 ? cheap : fallback;
+      const budget = budgetSource.slice(0, 2).map(p => ({
+        ...p,
+        purchasePrice: p.purchasePriceWithAddon,
+        addons: p.requiredAddons
+      }));
+
+      res.json({ premium, budget });
+    } catch (error) {
+      console.error('[Direct] todays-mobiles GET error:', error);
+      res.status(500).json({ success: false, error: '오늘의 휴대폰 조회 실패', message: error.message });
+    }
+  });
+
   app.use('/api/direct', router);
 }
 
