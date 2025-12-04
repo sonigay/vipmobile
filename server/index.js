@@ -3670,6 +3670,8 @@ async function readExternalSheet(spreadsheetId, range) {
 }
 
 // GET /api/direct/todays-mobiles: 오늘의 휴대폰 조회
+// 주석 처리: directRoutes.js의 라우터로 이동
+/*
 app.get('/api/direct/todays-mobiles', async (req, res) => {
   try {
     const response = await rateLimitedSheetsCall(() =>
@@ -3722,8 +3724,11 @@ app.get('/api/direct/todays-mobiles', async (req, res) => {
     });
   }
 });
+*/
 
 // GET /api/direct/mobiles: 휴대폰 목록 조회 (통신사별)
+// 주석 처리: directRoutes.js의 라우터로 이동
+/*
 app.get('/api/direct/mobiles', async (req, res) => {
   try {
     const carrier = req.query.carrier || 'SK';
@@ -3818,6 +3823,7 @@ app.get('/api/direct/mobiles', async (req, res) => {
     });
   }
 });
+*/
 
 // GET /api/direct/sales: 판매일보 목록 조회
 app.get('/api/direct/sales', async (req, res) => {
