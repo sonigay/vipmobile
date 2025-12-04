@@ -23457,7 +23457,7 @@ app.post('/api/policies', async (req, res) => {
       console.log('📝 [정책생성] 시트가 비어있어 헤더와 함께 데이터 추가');
       response = await sheets.spreadsheets.values.append({
         spreadsheetId: SPREADSHEET_ID,
-          range: '정책_기본정보 !A:AX',
+          range: '정책_기본정보 !A:AY',
         valueInputOption: 'RAW',
         insertDataOption: 'INSERT_ROWS',
         resource: {
@@ -23471,10 +23471,10 @@ app.post('/api/policies', async (req, res) => {
         const needsHeaderUpdate = !currentHeader[24] || !currentHeader[25] || !currentHeader[26]; // Y, Z, AA열 확인
         
         if (needsHeaderUpdate) {
-          console.log('📝 [정책생성] 헤더 업데이트 필요 - Y~AX열 헤더 추가');
+          console.log('📝 [정책생성] 헤더 업데이트 필요 - Y~AY열 헤더 추가');
           await sheets.spreadsheets.values.update({
             spreadsheetId: SPREADSHEET_ID,
-            range: '정책_기본정보 !A1:AX1',
+            range: '정책_기본정보 !A1:AY1',
             valueInputOption: 'RAW',
             resource: {
               values: [headerRow]
@@ -23486,7 +23486,7 @@ app.post('/api/policies', async (req, res) => {
       console.log('📝 [정책생성] 기존 데이터에 정책 추가');
         // existingData에는 헤더를 포함한 전체 행이 들어있다고 가정
         const nextRowIndex = existingData.length + 1; // 1-based index
-        const targetRange = `정책_기본정보 !A${nextRowIndex}:AX${nextRowIndex}`;
+        const targetRange = `정책_기본정보 !A${nextRowIndex}:AY${nextRowIndex}`;
         response = await sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
           range: targetRange,
@@ -23874,37 +23874,16 @@ app.put('/api/policies/:policyId', async (req, res) => {
       updatedRow.push('');
     }
     updatedRow[50] = (req.body.isDirectInput === true || req.body.isDirectInput === 'true') ? 'Y' : 'N'; // AY열: 직접입력여부
-    // AY열: 직접입력여부 (true/false를 Y/N으로 저장)
-    if (updatedRow.length < 51) {
-      updatedRow.push('');
-    }
-    updatedRow[50] = (req.body.isDirectInput === true || req.body.isDirectInput === 'true') ? 'Y' : 'N'; // AY열: 직접입력여부
     
-    // 배열을 24개 컬럼으로 제한 (A:X 범위)
-    const updatedRowForSheet = updatedRow.slice(0, 24);
-    
-    // 전체 행을 한 번에 업데이트
+    // 전체 행을 한 번에 업데이트 (A~AY 열, 51개 컬럼)
     await sheets.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_ID,
-      range: `정책_기본정보 !A${rowNumber}:X${rowNumber}`,
+      range: `정책_기본정보 !A${rowNumber}:AY${rowNumber}`,
       valueInputOption: 'RAW',
       resource: {
-        values: [updatedRowForSheet]
+        values: [updatedRow]
       }
     });
-    
-    // 추가 컬럼(Y~AX)이 있으면 별도로 업데이트
-    if (updatedRow.length > 24) {
-      const additionalColumns = updatedRow.slice(24);
-      await sheets.spreadsheets.values.update({
-        spreadsheetId: SPREADSHEET_ID,
-        range: `정책_기본정보 !Y${rowNumber}:AX${rowNumber}`,
-        valueInputOption: 'RAW',
-        resource: {
-          values: [additionalColumns]
-        }
-      });
-    }
     
     // 정책_기본정보 시트 캐시 무효화
     cacheUtils.delete('sheet_정책_기본정보 ');
