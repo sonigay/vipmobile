@@ -1070,11 +1070,31 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
           }
           return { ...originalPolicy.supportConditionalOptions };
         })(),
-        // isDirectInput: 원본 값 그대로 사용 (없으면 false)
-        isDirectInput: originalPolicy.isDirectInput === true || originalPolicy.isDirectInput === 'true' || false,
+        // isDirectInput: 원본 값 사용, 없으면 rateSupports와 policyContent로 판단
+        isDirectInput: (() => {
+          // 명시적으로 true인 경우
+          if (originalPolicy.isDirectInput === true || originalPolicy.isDirectInput === 'true') {
+            return true;
+          }
+          // 명시적으로 false인 경우
+          if (originalPolicy.isDirectInput === false || originalPolicy.isDirectInput === 'false') {
+            return false;
+          }
+          // undefined/null인 경우: rateSupports가 없고 policyContent가 있으면 직접입력으로 판단
+          if ((originalPolicy.category === 'wireless_rate' || originalPolicy.category === 'wired_rate')) {
+            const hasRateSupports = originalPolicy.rateSupports && 
+              Array.isArray(originalPolicy.rateSupports) && 
+              originalPolicy.rateSupports.length > 0;
+            const hasPolicyContent = originalPolicy.policyContent && originalPolicy.policyContent.trim();
+            // rateSupports가 없고 policyContent가 있으면 직접입력
+            if (!hasRateSupports && hasPolicyContent) {
+              return true;
+            }
+          }
+          return false;
+        })(),
         rateSupports: (() => {
           if (!originalPolicy.rateSupports) {
-            // rateSupports가 없고 isDirectInput이 true인 경우 빈 배열 반환 (검증 통과)
             return [];
           }
           // JSON 문자열인 경우 파싱
@@ -1590,14 +1610,31 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
               }
               return { ...policy.supportConditionalOptions };
             })(),
-            // isDirectInput: 원본 값 그대로 사용 (없으면 false)
-            isDirectInput: policy.isDirectInput === true || policy.isDirectInput === 'true' || false,
+            // isDirectInput: 원본 값 사용, 없으면 rateSupports와 policyContent로 판단
+            isDirectInput: (() => {
+              // 명시적으로 true인 경우
+              if (policy.isDirectInput === true || policy.isDirectInput === 'true') {
+                return true;
+              }
+              // 명시적으로 false인 경우
+              if (policy.isDirectInput === false || policy.isDirectInput === 'false') {
+                return false;
+              }
+              // undefined/null인 경우: rateSupports가 없고 policyContent가 있으면 직접입력으로 판단
+              if ((policy.category === 'wireless_rate' || policy.category === 'wired_rate')) {
+                const hasRateSupports = policy.rateSupports && 
+                  Array.isArray(policy.rateSupports) && 
+                  policy.rateSupports.length > 0;
+                const hasPolicyContent = policy.policyContent && policy.policyContent.trim();
+                // rateSupports가 없고 policyContent가 있으면 직접입력
+                if (!hasRateSupports && hasPolicyContent) {
+                  return true;
+                }
+              }
+              return false;
+            })(),
             rateSupports: (() => {
               if (!policy.rateSupports) {
-                // rateSupports가 없고 isDirectInput이 true인 경우 빈 배열 반환 (검증 통과)
-                const isDirect = policy.isDirectInput === true || policy.isDirectInput === 'true' ||
-                  ((policy.category === 'wireless_rate' || policy.category === 'wired_rate') && 
-                   policy.policyContent && policy.policyContent.trim());
                 return [];
               }
               // JSON 문자열인 경우 파싱
