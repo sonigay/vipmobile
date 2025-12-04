@@ -34,6 +34,18 @@ import {
 } from '@mui/icons-material';
 import { directStoreApi } from '../../../api/directStoreApi';
 
+// 구글 시트 ID 추출 함수 (전체 URL 또는 ID만 입력 가능)
+const extractSheetId = (value = '') => {
+    if (!value) return '';
+    const trimmed = value.trim();
+    // URL 형식에서 ID 추출: /d/(ID) 패턴
+    const match = trimmed.match(/\/d\/([a-zA-Z0-9-_]+)/);
+    if (match && match[1]) return match[1];
+    // 이미 ID 형식인 경우 (10자 이상의 영숫자, 하이픈, 언더스코어)
+    if (/^[a-zA-Z0-9-_]{10,}$/.test(trimmed)) return trimmed;
+    return '';
+};
+
 const LinkSettingsTab = () => {
     const [carrierTab, setCarrierTab] = useState(0);
     const [loading, setLoading] = useState(false);
@@ -152,11 +164,48 @@ const LinkSettingsTab = () => {
             let settings = {};
 
             if (type === 'planGroup') {
-                settings = { planGroup: planGroupSettings };
+                // 링크에서 ID만 추출해서 저장
+                const sheetId = extractSheetId(planGroupSettings.link);
+                if (!sheetId) {
+                    setError('올바른 구글 시트 링크 또는 ID를 입력해주세요.');
+                    setSaving(false);
+                    return;
+                }
+                settings = { 
+                    planGroup: {
+                        ...planGroupSettings,
+                        link: sheetId, // ID만 저장
+                        sheetId: sheetId
+                    }
+                };
             } else if (type === 'support') {
-                settings = { support: supportSettings };
+                const sheetId = extractSheetId(supportSettings.link);
+                if (!sheetId) {
+                    setError('올바른 구글 시트 링크 또는 ID를 입력해주세요.');
+                    setSaving(false);
+                    return;
+                }
+                settings = { 
+                    support: {
+                        ...supportSettings,
+                        link: sheetId,
+                        sheetId: sheetId
+                    }
+                };
             } else if (type === 'policy') {
-                settings = { policy: policySettings };
+                const sheetId = extractSheetId(policySettings.link);
+                if (!sheetId) {
+                    setError('올바른 구글 시트 링크 또는 ID를 입력해주세요.');
+                    setSaving(false);
+                    return;
+                }
+                settings = { 
+                    policy: {
+                        ...policySettings,
+                        link: sheetId,
+                        sheetId: sheetId
+                    }
+                };
             }
 
             await directStoreApi.saveLinkSettings(carrier, settings);
@@ -264,11 +313,12 @@ const LinkSettingsTab = () => {
                 <DialogContent dividers>
                     <Stack spacing={3}>
                         <TextField
-                            label="구글 시트 링크"
+                            label="구글 시트 링크 또는 ID"
                             fullWidth
                             value={planGroupSettings.link}
                             onChange={(e) => setPlanGroupSettings({ ...planGroupSettings, link: e.target.value })}
-                            placeholder="https://docs.google.com/spreadsheets/..."
+                            placeholder="전체 URL 또는 시트 ID만 입력 (예: 12Jx-Y2EXGjsIulWvw9Cr4kVOZQwQPdBQtIRi90rUTJc)"
+                            helperText="전체 URL 또는 시트 ID만 입력해주세요. ID만 입력해도 됩니다."
                         />
                         <Divider />
                         <Typography variant="subtitle1" fontWeight="bold">데이터 범위 설정</Typography>
@@ -347,10 +397,12 @@ const LinkSettingsTab = () => {
                 <DialogContent dividers>
                     <Stack spacing={3}>
                         <TextField
-                            label="구글 시트 링크"
+                            label="구글 시트 링크 또는 ID"
                             fullWidth
                             value={supportSettings.link}
                             onChange={(e) => setSupportSettings({ ...supportSettings, link: e.target.value })}
+                            placeholder="전체 URL 또는 시트 ID만 입력 (예: 12Jx-Y2EXGjsIulWvw9Cr4kVOZQwQPdBQtIRi90rUTJc)"
+                            helperText="전체 URL 또는 시트 ID만 입력해주세요. ID만 입력해도 됩니다."
                         />
                         <Divider />
                         <Typography variant="subtitle1" fontWeight="bold">모델 정보 범위</Typography>
@@ -430,10 +482,12 @@ const LinkSettingsTab = () => {
                 <DialogContent dividers>
                     <Stack spacing={3}>
                         <TextField
-                            label="구글 시트 링크"
+                            label="구글 시트 링크 또는 ID"
                             fullWidth
                             value={policySettings.link}
                             onChange={(e) => setPolicySettings({ ...policySettings, link: e.target.value })}
+                            placeholder="전체 URL 또는 시트 ID만 입력 (예: 12Jx-Y2EXGjsIulWvw9Cr4kVOZQwQPdBQtIRi90rUTJc)"
+                            helperText="전체 URL 또는 시트 ID만 입력해주세요. ID만 입력해도 됩니다."
                         />
                         <Divider />
                         <Typography variant="subtitle1" fontWeight="bold">모델 정보 범위</Typography>
