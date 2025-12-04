@@ -182,6 +182,37 @@ export const directStoreApi = {
         }
     },
 
+    // 범위에서 데이터 가져오기 (범용 함수)
+    fetchRangeData: async (sheetId, range, unique = false) => {
+        try {
+            const params = new URLSearchParams();
+            params.append('sheetId', sheetId);
+            params.append('range', range);
+            if (unique) params.append('unique', 'true');
+            const response = await fetch(`${BASE_URL}/link-settings/fetch-range?${params.toString()}`);
+            if (!response.ok) throw new Error('범위 데이터 조회 실패');
+            return response.json();
+        } catch (err) {
+            console.warn('범위 데이터 조회 API 호출 실패:', err);
+            return { success: false, error: err.message, data: [] };
+        }
+    },
+
+    // 요금제군 자동 가져오기 (시트에서 유니크한 값 추출) - 하위 호환성
+    fetchPlanGroups: async (sheetId, range) => {
+        try {
+            const params = new URLSearchParams();
+            params.append('sheetId', sheetId);
+            params.append('range', range);
+            const response = await fetch(`${BASE_URL}/link-settings/plan-groups?${params.toString()}`);
+            if (!response.ok) throw new Error('요금제군 조회 실패');
+            return response.json();
+        } catch (err) {
+            console.warn('요금제군 조회 API 호출 실패:', err);
+            return { success: false, error: err.message, planGroups: [] };
+        }
+    },
+
     /**
      * === 상품 데이터 Mock 구현 ===
      *

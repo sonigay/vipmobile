@@ -384,6 +384,91 @@ function setupDirectRoutes(app) {
     }
   });
 
+  // GET /api/direct/link-settings/fetch-range?sheetId=xxx&range=전체!F5:F500&unique=true
+  // 시트에서 범위를 읽어서 데이터 반환 (유니크 옵션 지원)
+  // 주의: unique=true는 요금제군 같은 카테고리 데이터에만 사용하고,
+  //       금액 범위(기본료, 출고가, 지원금 등)는 unique=false로 모든 값을 가져와야 합니다.
+  router.get('/link-settings/fetch-range', async (req, res) => {
+    try {
+      const { sheetId, range, unique } = req.query;
+      if (!sheetId || !range) {
+        return res.status(400).json({ success: false, error: 'sheetId와 range가 필요합니다.' });
+      }
+
+      const { sheets } = createSheetsClient();
+      
+      // 시트에서 범위 읽기
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: sheetId,
+        range: range
+      });
+
+      const values = response.data.values || [];
+      
+      if (unique === 'true') {
+        // 유니크한 값 추출 (빈 값 제외, 공백 제거)
+        const uniqueValues = [...new Set(
+          values
+            .flat()
+            .map(v => (v || '').toString().trim())
+            .filter(v => v.length > 0)
+        )].sort();
+        
+        res.json({
+          success: true,
+          data: uniqueValues,
+          isUnique: true
+        });
+      } else {
+        // 원본 데이터 그대로 반환
+        res.json({
+          success: true,
+          data: values,
+          isUnique: false
+        });
+      }
+    } catch (error) {
+      console.error('[Direct] fetch-range GET error:', error);
+      res.status(500).json({ success: false, error: '범위 데이터 조회 실패', message: error.message });
+    }
+  });
+
+  // GET /api/direct/link-settings/plan-groups?carrier=SK&sheetId=xxx&range=전체!F5:F500
+  // 시트에서 요금제군 범위를 읽어서 유니크한 값들만 반환 (하위 호환성)
+  router.get('/link-settings/plan-groups', async (req, res) => {
+    try {
+      const { sheetId, range } = req.query;
+      if (!sheetId || !range) {
+        return res.status(400).json({ success: false, error: 'sheetId와 range가 필요합니다.' });
+      }
+
+      const { sheets } = createSheetsClient();
+      
+      // 시트에서 범위 읽기
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: sheetId,
+        range: range
+      });
+
+      const values = response.data.values || [];
+      // 유니크한 값 추출 (빈 값 제외, 공백 제거)
+      const uniqueGroups = [...new Set(
+        values
+          .flat()
+          .map(v => (v || '').toString().trim())
+          .filter(v => v.length > 0)
+      )].sort();
+
+      res.json({
+        success: true,
+        planGroups: uniqueGroups
+      });
+    } catch (error) {
+      console.error('[Direct] plan-groups GET error:', error);
+      res.status(500).json({ success: false, error: '요금제군 조회 실패', message: error.message });
+    }
+  });
+
   // POST /api/direct/link-settings?carrier=SK
   router.post('/link-settings', async (req, res) => {
     try {
@@ -392,6 +477,30 @@ function setupDirectRoutes(app) {
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
 
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_SETTINGS, HEADERS_SETTINGS);
+
+      // planGroup 저장 시, planGroupRange가 있고 planGroups가 비어있으면 자동으로 추출
+      if (planGroup && planGroup.planGroupRange && (!planGroup.planGroups || planGroup.planGroups.length === 0)) {
+        try {
+          const sheetId = planGroup.sheetId || planGroup.link;
+          if (sheetId) {
+            const response = await sheets.spreadsheets.values.get({
+              spreadsheetId: sheetId,
+              range: planGroup.planGroupRange
+            });
+            const values = response.data.values || [];
+            const uniqueGroups = [...new Set(
+              values
+                .flat()
+                .map(v => (v || '').toString().trim())
+                .filter(v => v.length > 0)
+            )].sort();
+            planGroup.planGroups = uniqueGroups;
+          }
+        } catch (autoExtractError) {
+          console.warn('[Direct] planGroups 자동 추출 실패:', autoExtractError);
+          // 자동 추출 실패해도 계속 진행
+        }
+      }
 
       // 기존 설정 읽기
       const settingsRes = await sheets.spreadsheets.values.get({

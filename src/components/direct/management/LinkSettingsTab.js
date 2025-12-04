@@ -30,7 +30,8 @@ import {
     Add as AddIcon,
     Delete as DeleteIcon,
     Save as SaveIcon,
-    Close as CloseIcon
+    Close as CloseIcon,
+    Checkbox
 } from '@mui/icons-material';
 import { directStoreApi } from '../../../api/directStoreApi';
 
@@ -52,6 +53,7 @@ const LinkSettingsTab = () => {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState(null);
     const [successMessage, setSuccessMessage] = useState(null);
+    const [previewDialog, setPreviewDialog] = useState({ open: false, title: '', data: [], useUnique: false, multiplyBy10000: false, link: '', range: '', fieldName: '' });
 
     // 모달 상태
     const [openPlanGroupModal, setOpenPlanGroupModal] = useState(false);
@@ -165,6 +167,95 @@ const LinkSettingsTab = () => {
         }));
     };
 
+    // 시트에서 요금제군 자동 가져오기
+    // 주의: 요금제군은 유니크한 값만 필요하므로 unique=true로 처리합니다.
+    // 금액 범위는 이 함수를 사용하지 않고 handlePreviewRange를 사용합니다.
+    const handleFetchPlanGroups = async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            const sheetId = extractSheetId(planGroupSettings.link);
+            if (!sheetId) {
+                setError('구글 시트 링크 또는 ID를 먼저 입력해주세요.');
+                setLoading(false);
+                return;
+            }
+            if (!planGroupSettings.planGroupRange) {
+                setError('요금제군 범위를 먼저 입력해주세요.');
+                setLoading(false);
+                return;
+            }
+
+            const result = await directStoreApi.fetchPlanGroups(sheetId, planGroupSettings.planGroupRange);
+            if (result.success && result.planGroups) {
+                setPlanGroupSettings(prev => ({
+                    ...prev,
+                    planGroups: result.planGroups
+                }));
+                setSuccessMessage(`${result.planGroups.length}개의 요금제군을 가져왔습니다.`);
+            } else {
+                setError(result.error || '요금제군을 가져오는데 실패했습니다.');
+            }
+        } catch (err) {
+            console.error('요금제군 가져오기 실패:', err);
+            setError('요금제군을 가져오는데 실패했습니다.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // 범위 데이터 미리보기
+    // unique 옵션 지원: 금액 범위도 유니크 옵션을 선택할 수 있습니다.
+    // 정책금 범위는 *10000을 적용하여 표시합니다.
+    const handlePreviewRange = async (type, fieldName, link, range, useUnique = false, multiplyBy10000 = false) => {
+        try {
+            setLoading(true);
+            setError(null);
+            const sheetId = extractSheetId(link);
+            if (!sheetId) {
+                setError('구글 시트 링크 또는 ID를 먼저 입력해주세요.');
+                setLoading(false);
+                return;
+            }
+            if (!range) {
+                setError('범위를 먼저 입력해주세요.');
+                setLoading(false);
+                return;
+            }
+
+            const result = await directStoreApi.fetchRangeData(sheetId, range, useUnique);
+            if (result.success && result.data) {
+                let previewData = result.data.flat().slice(0, 20); // 최대 20개만 미리보기
+                
+                // 정책금 범위는 *10000 적용
+                if (multiplyBy10000) {
+                    previewData = previewData.map(item => {
+                        const numValue = parseFloat(item) || 0;
+                        return numValue > 0 ? (numValue * 10000).toLocaleString() : item;
+                    });
+                }
+                
+                setPreviewDialog({
+                    open: true,
+                    title: `${fieldName} 미리보기 (최대 20개)${useUnique ? ' - 유니크' : ''}${multiplyBy10000 ? ' - 만원 단위 변환' : ''}`,
+                    data: previewData,
+                    useUnique,
+                    multiplyBy10000,
+                    link,
+                    range,
+                    fieldName
+                });
+            } else {
+                setError(result.error || '데이터를 가져오는데 실패했습니다.');
+            }
+        } catch (err) {
+            console.error('범위 미리보기 실패:', err);
+            setError('데이터를 가져오는데 실패했습니다.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleSave = async (type) => {
         try {
             setSaving(true);
@@ -219,9 +310,24 @@ const LinkSettingsTab = () => {
             await directStoreApi.saveLinkSettings(carrier, settings);
             setSuccessMessage('설정이 저장되었습니다.');
             
-            if (type === 'planGroup') setOpenPlanGroupModal(false);
-            if (type === 'support') setOpenSupportModal(false);
-            if (type === 'policy') setOpenPolicyModal(false);
+            // 저장 후 자동으로 다시 로드 (planGroups 자동 추출 반영)
+            if (type === 'planGroup') {
+                const reloadData = await directStoreApi.getLinkSettings(carrier);
+                if (reloadData.success && reloadData.planGroup) {
+                    setPlanGroupSettings({
+                        link: reloadData.planGroup.link || reloadData.planGroup.sheetId || '',
+                        planNameRange: reloadData.planGroup.planNameRange || '',
+                        planGroupRange: reloadData.planGroup.planGroupRange || '',
+                        basicFeeRange: reloadData.planGroup.basicFeeRange || '',
+                        planGroups: reloadData.planGroup.planGroups || []
+                    });
+                }
+                setOpenPlanGroupModal(false);
+            } else if (type === 'support') {
+                setOpenSupportModal(false);
+            } else if (type === 'policy') {
+                setOpenPolicyModal(false);
+            }
         } catch (err) {
             console.error('링크 설정 저장 실패:', err);
             setError('저장에 실패했습니다.');
@@ -366,18 +472,31 @@ const LinkSettingsTab = () => {
                         <Divider />
                         <Box>
                             <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                                요금제군 목록 (테스트용 수동 관리)
+                                요금제군 목록
                             </Typography>
                             <Typography variant="caption" color="text.secondary" display="block" mb={2}>
-                                * 실제로는 위 범위 설정에 따라 시트에서 자동으로 가져오지만, 현재 백엔드 미구현으로 수동 입력이 필요합니다.
+                                * 시트에서 자동으로 가져오거나 수동으로 추가할 수 있습니다.
                                 이 목록은 다른 설정 모달의 동적 필드를 생성하는 데 사용됩니다.
                             </Typography>
-                            <Stack direction="row" spacing={1} mb={2}>
+                            <Stack direction="row" spacing={1} mb={2} flexWrap="wrap">
+                                <Button 
+                                    variant="outlined" 
+                                    onClick={handleFetchPlanGroups} 
+                                    disabled={!planGroupSettings.link || !planGroupSettings.planGroupRange || loading}
+                                    startIcon={<LinkIcon />}
+                                >
+                                    시트에서 자동 가져오기
+                                </Button>
                                 <TextField
                                     size="small"
                                     label="요금제군 추가"
                                     value={newPlanGroup}
                                     onChange={(e) => setNewPlanGroup(e.target.value)}
+                                    onKeyPress={(e) => {
+                                        if (e.key === 'Enter') {
+                                            handleAddPlanGroup();
+                                        }
+                                    }}
                                 />
                                 <Button variant="contained" onClick={handleAddPlanGroup} startIcon={<AddIcon />}>추가</Button>
                             </Stack>
@@ -419,44 +538,88 @@ const LinkSettingsTab = () => {
                         <Typography variant="subtitle1" fontWeight="bold">모델 정보 범위</Typography>
                         <Grid container spacing={2}>
                             <Grid item xs={6} md={3}>
-                                <TextField
-                                    label="모델명 범위"
-                                    fullWidth
-                                    value={supportSettings.modelRange}
-                                    onChange={(e) => setSupportSettings({ ...supportSettings, modelRange: e.target.value })}
-                                    placeholder="예: 정책!A5:A500"
-                                    helperText="시트이름!범위"
-                                />
+                                <Stack direction="row" spacing={1}>
+                                    <TextField
+                                        label="모델명 범위"
+                                        fullWidth
+                                        value={supportSettings.modelRange}
+                                        onChange={(e) => setSupportSettings({ ...supportSettings, modelRange: e.target.value })}
+                                        placeholder="예: 정책!A5:A500"
+                                        helperText="시트이름!범위"
+                                    />
+                                    <Button 
+                                        variant="outlined" 
+                                        size="small"
+                                        onClick={() => handlePreviewRange('support', 'modelRange', supportSettings.link, supportSettings.modelRange)}
+                                        disabled={!supportSettings.link || !supportSettings.modelRange}
+                                        sx={{ minWidth: 'auto', px: 1 }}
+                                    >
+                                        미리보기
+                                    </Button>
+                                </Stack>
                             </Grid>
                             <Grid item xs={6} md={3}>
-                                <TextField
-                                    label="펫네임 범위"
-                                    fullWidth
-                                    value={supportSettings.petNameRange}
-                                    onChange={(e) => setSupportSettings({ ...supportSettings, petNameRange: e.target.value })}
-                                    placeholder="예: 정책!B5:B500"
-                                    helperText="시트이름!범위"
-                                />
+                                <Stack direction="row" spacing={1}>
+                                    <TextField
+                                        label="펫네임 범위"
+                                        fullWidth
+                                        value={supportSettings.petNameRange}
+                                        onChange={(e) => setSupportSettings({ ...supportSettings, petNameRange: e.target.value })}
+                                        placeholder="예: 정책!B5:B500"
+                                        helperText="시트이름!범위"
+                                    />
+                                    <Button 
+                                        variant="outlined" 
+                                        size="small"
+                                        onClick={() => handlePreviewRange('support', 'petNameRange', supportSettings.link, supportSettings.petNameRange)}
+                                        disabled={!supportSettings.link || !supportSettings.petNameRange}
+                                        sx={{ minWidth: 'auto', px: 1 }}
+                                    >
+                                        미리보기
+                                    </Button>
+                                </Stack>
                             </Grid>
                             <Grid item xs={6} md={3}>
-                                <TextField
-                                    label="출고가 범위"
-                                    fullWidth
-                                    value={supportSettings.factoryPriceRange}
-                                    onChange={(e) => setSupportSettings({ ...supportSettings, factoryPriceRange: e.target.value })}
-                                    placeholder="예: 정책!C5:C500"
-                                    helperText="시트이름!범위"
-                                />
+                                <Stack direction="row" spacing={1}>
+                                    <TextField
+                                        label="출고가 범위"
+                                        fullWidth
+                                        value={supportSettings.factoryPriceRange}
+                                        onChange={(e) => setSupportSettings({ ...supportSettings, factoryPriceRange: e.target.value })}
+                                        placeholder="예: 정책!C5:C500"
+                                        helperText="시트이름!범위"
+                                    />
+                                    <Button 
+                                        variant="outlined" 
+                                        size="small"
+                                        onClick={() => handlePreviewRange('support', 'factoryPriceRange', supportSettings.link, supportSettings.factoryPriceRange)}
+                                        disabled={!supportSettings.link || !supportSettings.factoryPriceRange}
+                                        sx={{ minWidth: 'auto', px: 1 }}
+                                    >
+                                        미리보기
+                                    </Button>
+                                </Stack>
                             </Grid>
                             <Grid item xs={6} md={3}>
-                                <TextField
-                                    label="개통유형 범위"
-                                    fullWidth
-                                    value={supportSettings.openingTypeRange}
-                                    onChange={(e) => setSupportSettings({ ...supportSettings, openingTypeRange: e.target.value })}
-                                    placeholder="예: 정책!D5:D500"
-                                    helperText="시트이름!범위"
-                                />
+                                <Stack direction="row" spacing={1}>
+                                    <TextField
+                                        label="개통유형 범위"
+                                        fullWidth
+                                        value={supportSettings.openingTypeRange}
+                                        onChange={(e) => setSupportSettings({ ...supportSettings, openingTypeRange: e.target.value })}
+                                        placeholder="예: 정책!D5:D500"
+                                        helperText="시트이름!범위"
+                                    />
+                                    <Button 
+                                        variant="outlined" 
+                                        size="small"
+                                        onClick={() => handlePreviewRange('support', 'openingTypeRange', supportSettings.link, supportSettings.openingTypeRange)}
+                                        disabled={!supportSettings.link || !supportSettings.openingTypeRange}
+                                        sx={{ minWidth: 'auto', px: 1 }}
+                                    >
+                                        미리보기
+                                    </Button>
+                                </Stack>
                             </Grid>
                         </Grid>
                         <Divider />
@@ -538,20 +701,31 @@ const LinkSettingsTab = () => {
                         <Grid container spacing={2}>
                             {planGroupSettings.planGroups.map((group) => (
                                 <Grid item xs={12} sm={6} key={group}>
-                                    <TextField
-                                        label={`${group} 정책금 범위`}
-                                        fullWidth
-                                        value={policySettings.planGroupRanges[group] || ''}
-                                        onChange={(e) => setPolicySettings({
-                                            ...policySettings,
-                                            planGroupRanges: {
-                                                ...policySettings.planGroupRanges,
-                                                [group]: e.target.value
-                                            }
-                                        })}
-                                        placeholder="예: 정책!F5:F500"
-                                        helperText="시트이름!범위 (한글 시트명은 작은따옴표 권장)"
-                                    />
+                                    <Stack direction="row" spacing={1}>
+                                        <TextField
+                                            label={`${group} 정책금 범위`}
+                                            fullWidth
+                                            value={policySettings.planGroupRanges[group] || ''}
+                                            onChange={(e) => setPolicySettings({
+                                                ...policySettings,
+                                                planGroupRanges: {
+                                                    ...policySettings.planGroupRanges,
+                                                    [group]: e.target.value
+                                                }
+                                            })}
+                                            placeholder="예: 정책!F5:F500"
+                                            helperText="시트이름!범위 (만원 단위, *10000 적용)"
+                                        />
+                                        <Button 
+                                            variant="outlined" 
+                                            size="small"
+                                            onClick={() => handlePreviewRange('policy', `${group} 정책금 범위`, policySettings.link, policySettings.planGroupRanges[group], false, true)}
+                                            disabled={!policySettings.link || !policySettings.planGroupRanges[group]}
+                                            sx={{ minWidth: 'auto', px: 1, alignSelf: 'flex-start', mt: 1 }}
+                                        >
+                                            미리보기
+                                        </Button>
+                                    </Stack>
                                 </Grid>
                             ))}
                             {planGroupSettings.planGroups.length === 0 && (
@@ -586,6 +760,57 @@ const LinkSettingsTab = () => {
                     <Alert severity="error">{error}</Alert>
                 </Snackbar>
             )}
+
+            {/* 범위 데이터 미리보기 다이얼로그 */}
+            <Dialog open={previewDialog.open} onClose={() => setPreviewDialog({ open: false, title: '', data: [], useUnique: false, multiplyBy10000: false, link: '', range: '', fieldName: '' })} maxWidth="sm" fullWidth>
+                <DialogTitle>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center">
+                        <Typography variant="h6">{previewDialog.title}</Typography>
+                        {previewDialog.fieldName && (
+                            <Button
+                                size="small"
+                                variant={previewDialog.useUnique ? 'contained' : 'outlined'}
+                                onClick={async () => {
+                                    const sheetId = extractSheetId(previewDialog.link);
+                                    const result = await directStoreApi.fetchRangeData(sheetId, previewDialog.range, !previewDialog.useUnique);
+                                    if (result.success && result.data) {
+                                        let previewData = result.data.flat().slice(0, 20);
+                                        if (previewDialog.multiplyBy10000) {
+                                            previewData = previewData.map(item => {
+                                                const numValue = parseFloat(item) || 0;
+                                                return numValue > 0 ? (numValue * 10000).toLocaleString() : item;
+                                            });
+                                        }
+                                        setPreviewDialog(prev => ({
+                                            ...prev,
+                                            useUnique: !prev.useUnique,
+                                            data: previewData
+                                        }));
+                                    }
+                                }}
+                            >
+                                유니크 {previewDialog.useUnique ? 'ON' : 'OFF'}
+                            </Button>
+                        )}
+                    </Stack>
+                </DialogTitle>
+                <DialogContent dividers>
+                    <Stack spacing={1} sx={{ maxHeight: 400, overflow: 'auto' }}>
+                        {previewDialog.data.length > 0 ? (
+                            previewDialog.data.map((item, idx) => (
+                                <Paper key={idx} sx={{ p: 1, bgcolor: 'background.default' }}>
+                                    <Typography variant="body2">{item || '(빈 값)'}</Typography>
+                                </Paper>
+                            ))
+                        ) : (
+                            <Typography variant="body2" color="text.secondary">데이터가 없습니다.</Typography>
+                        )}
+                    </Stack>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setPreviewDialog({ open: false, title: '', data: [], useUnique: false, multiplyBy10000: false, link: '', range: '', fieldName: '' })}>닫기</Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 };
