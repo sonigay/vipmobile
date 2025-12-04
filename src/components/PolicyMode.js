@@ -495,9 +495,32 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
           }
         });
         
-        // isDirectInput이 undefined/null인 경우 false로 설정 (기존 데이터 호환성)
+        // isDirectInput이 undefined/null인 경우 판단 로직 적용
         if (normalized.isDirectInput === undefined || normalized.isDirectInput === null) {
-          normalized.isDirectInput = false;
+          const originalValue = normalized.isDirectInput;
+          // wireless_rate/wired_rate 카테고리에서 rateSupports가 없고 policyContent가 있으면 직접입력으로 판단
+          if ((normalized.category === 'wireless_rate' || normalized.category === 'wired_rate')) {
+            const hasRateSupports = normalized.rateSupports && 
+              Array.isArray(normalized.rateSupports) && 
+              normalized.rateSupports.length > 0;
+            const hasPolicyContent = normalized.policyContent && normalized.policyContent.trim();
+            normalized.isDirectInput = !hasRateSupports && hasPolicyContent;
+            
+            // 디버깅: 정규화 단계에서 isDirectInput 판단
+            if (normalized.policyName === '동서울집단' || normalized.policyName === 'A2633-128 특별정책') {
+              console.log(`🔄 [정규화] isDirectInput 판단:`, {
+                policyName: normalized.policyName,
+                category: normalized.category,
+                originalValue,
+                hasRateSupports,
+                hasPolicyContent,
+                result: normalized.isDirectInput,
+                reason: normalized.isDirectInput ? 'rateSupports 없음 && policyContent 있음' : '기타'
+              });
+            }
+          } else {
+            normalized.isDirectInput = false;
+          }
         }
         
         return normalized;
@@ -1072,13 +1095,26 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         })(),
         // isDirectInput: 원본 값 사용, 없으면 rateSupports와 policyContent로 판단
         isDirectInput: (() => {
+          let result;
           // 명시적으로 true인 경우
           if (originalPolicy.isDirectInput === true || originalPolicy.isDirectInput === 'true') {
-            return true;
+            result = true;
+            console.log(`✅ [개별복사-2단계] isDirectInput 판단: 명시적 true`, {
+              policyName: originalPolicy.policyName,
+              originalValue: originalPolicy.isDirectInput,
+              result
+            });
+            return result;
           }
           // 명시적으로 false인 경우
           if (originalPolicy.isDirectInput === false || originalPolicy.isDirectInput === 'false') {
-            return false;
+            result = false;
+            console.log(`✅ [개별복사-2단계] isDirectInput 판단: 명시적 false`, {
+              policyName: originalPolicy.policyName,
+              originalValue: originalPolicy.isDirectInput,
+              result
+            });
+            return result;
           }
           // undefined/null인 경우: rateSupports가 없고 policyContent가 있으면 직접입력으로 판단
           if ((originalPolicy.category === 'wireless_rate' || originalPolicy.category === 'wired_rate')) {
@@ -1088,10 +1124,28 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
             const hasPolicyContent = originalPolicy.policyContent && originalPolicy.policyContent.trim();
             // rateSupports가 없고 policyContent가 있으면 직접입력
             if (!hasRateSupports && hasPolicyContent) {
-              return true;
+              result = true;
+              console.log(`✅ [개별복사-2단계] isDirectInput 판단: 추론 true`, {
+                policyName: originalPolicy.policyName,
+                originalValue: originalPolicy.isDirectInput,
+                hasRateSupports,
+                hasPolicyContent,
+                result,
+                reason: 'rateSupports 없음 && policyContent 있음'
+              });
+              return result;
             }
           }
-          return false;
+          result = false;
+          console.log(`❌ [개별복사-2단계] isDirectInput 판단: 최종 false`, {
+            policyName: originalPolicy.policyName,
+            originalValue: originalPolicy.isDirectInput,
+            category: originalPolicy.category,
+            hasRateSupports: originalPolicy.rateSupports && Array.isArray(originalPolicy.rateSupports) && originalPolicy.rateSupports.length > 0,
+            hasPolicyContent: !!(originalPolicy.policyContent && originalPolicy.policyContent.trim()),
+            result
+          });
+          return result;
         })(),
         rateSupports: (() => {
           if (!originalPolicy.rateSupports) {
@@ -1153,6 +1207,17 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         })(),
         individualActivationType: originalPolicy.individualActivationType || ''
       };
+      
+      // 디버깅: 최종 복사 데이터 확인
+      console.log(`📤 [개별복사-3단계] 최종 복사 데이터:`, {
+        policyName: copyData.policyName,
+        category: copyData.category,
+        isDirectInput: copyData.isDirectInput,
+        rateSupports: copyData.rateSupports,
+        rateSupportsLength: Array.isArray(copyData.rateSupports) ? copyData.rateSupports.length : 'N/A',
+        hasPolicyContent: !!(copyData.policyContent && copyData.policyContent.trim()),
+        yearMonth: copyData.yearMonth
+      });
 
       await PolicyService.createPolicy(copyData);
       
@@ -1456,13 +1521,17 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         setBulkProcessingMessage(`일괄 복사 중... (${i + 1}/${totalCount})`);
         if (policy.policyStatus !== '취소됨') {
           // 디버깅: 원본 정책 데이터 확인
-          console.log(`[일괄복사] 정책 ${i + 1}/${totalCount}:`, {
+          console.log(`🔍 [일괄복사-1단계] 원본 정책 데이터 (${i + 1}/${totalCount}):`, {
             policyName: policy.policyName,
             category: policy.category,
             isDirectInput: policy.isDirectInput,
+            isDirectInputType: typeof policy.isDirectInput,
             rateSupports: policy.rateSupports,
             rateSupportsType: typeof policy.rateSupports,
-            rateSupportsLength: Array.isArray(policy.rateSupports) ? policy.rateSupports.length : 'N/A'
+            rateSupportsLength: Array.isArray(policy.rateSupports) ? policy.rateSupports.length : 'N/A',
+            rateSupportsIsArray: Array.isArray(policy.rateSupports),
+            hasPolicyContent: !!(policy.policyContent && policy.policyContent.trim()),
+            policyContentLength: policy.policyContent ? policy.policyContent.length : 0
           });
           // 정책 적용일 처리 및 대상월에 맞춰 변경
           let policyStartDate;
@@ -1612,13 +1681,26 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
             })(),
             // isDirectInput: 원본 값 사용, 없으면 rateSupports와 policyContent로 판단
             isDirectInput: (() => {
+              let result;
               // 명시적으로 true인 경우
               if (policy.isDirectInput === true || policy.isDirectInput === 'true') {
-                return true;
+                result = true;
+                console.log(`✅ [일괄복사-2단계] isDirectInput 판단 (${i + 1}/${totalCount}): 명시적 true`, {
+                  policyName: policy.policyName,
+                  originalValue: policy.isDirectInput,
+                  result
+                });
+                return result;
               }
               // 명시적으로 false인 경우
               if (policy.isDirectInput === false || policy.isDirectInput === 'false') {
-                return false;
+                result = false;
+                console.log(`✅ [일괄복사-2단계] isDirectInput 판단 (${i + 1}/${totalCount}): 명시적 false`, {
+                  policyName: policy.policyName,
+                  originalValue: policy.isDirectInput,
+                  result
+                });
+                return result;
               }
               // undefined/null인 경우: rateSupports가 없고 policyContent가 있으면 직접입력으로 판단
               if ((policy.category === 'wireless_rate' || policy.category === 'wired_rate')) {
@@ -1628,10 +1710,28 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                 const hasPolicyContent = policy.policyContent && policy.policyContent.trim();
                 // rateSupports가 없고 policyContent가 있으면 직접입력
                 if (!hasRateSupports && hasPolicyContent) {
-                  return true;
+                  result = true;
+                  console.log(`✅ [일괄복사-2단계] isDirectInput 판단 (${i + 1}/${totalCount}): 추론 true`, {
+                    policyName: policy.policyName,
+                    originalValue: policy.isDirectInput,
+                    hasRateSupports,
+                    hasPolicyContent,
+                    result,
+                    reason: 'rateSupports 없음 && policyContent 있음'
+                  });
+                  return result;
                 }
               }
-              return false;
+              result = false;
+              console.log(`❌ [일괄복사-2단계] isDirectInput 판단 (${i + 1}/${totalCount}): 최종 false`, {
+                policyName: policy.policyName,
+                originalValue: policy.isDirectInput,
+                category: policy.category,
+                hasRateSupports: policy.rateSupports && Array.isArray(policy.rateSupports) && policy.rateSupports.length > 0,
+                hasPolicyContent: !!(policy.policyContent && policy.policyContent.trim()),
+                result
+              });
+              return result;
             })(),
             rateSupports: (() => {
               if (!policy.rateSupports) {
@@ -1693,6 +1793,18 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
             })(),
             individualActivationType: policy.individualActivationType || ''
           };
+          
+          // 디버깅: 최종 복사 데이터 확인
+          console.log(`📤 [일괄복사-3단계] 최종 복사 데이터 (${i + 1}/${totalCount}):`, {
+            policyName: copyData.policyName,
+            category: copyData.category,
+            isDirectInput: copyData.isDirectInput,
+            rateSupports: copyData.rateSupports,
+            rateSupportsLength: Array.isArray(copyData.rateSupports) ? copyData.rateSupports.length : 'N/A',
+            hasPolicyContent: !!(copyData.policyContent && copyData.policyContent.trim()),
+            yearMonth: copyData.yearMonth
+          });
+          
           await PolicyService.createPolicy(copyData);
         }
       }
