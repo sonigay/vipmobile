@@ -767,14 +767,8 @@ function setupDirectRoutes(app) {
         }
       }
 
-      // 3. 링크설정에서 정책표 설정 읽기
-      const policyRow = settingsRows.find(row => (row[0] || '').trim() === carrier && (row[1] || '').trim() === 'policy');
-      let policySettingsJson = {};
-      let policySheetId = '';
-      if (policyRow && policyRow[2]) {
-        policySheetId = policyRow[2].trim();
-        policySettingsJson = policyRow[4] ? JSON.parse(policyRow[4]) : {};
-      }
+      // 3. 정책표 설정은 이미 위에서 읽었으므로 재사용
+      // policyRow, policySettingsJson, policySheetId는 이미 선언됨
 
       // 4. 요금제군별 이통사지원금 범위 읽기
       const planGroupSupportData = {};
