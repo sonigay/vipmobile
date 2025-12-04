@@ -22846,6 +22846,46 @@ app.get('/api/policies', async (req, res) => {
             return [];
           }
         })(),
+        // isDirectInput: AY열에서 읽거나, 없으면 rateSupports와 policyContent로 판단
+        isDirectInput: (() => {
+          // AY열이 있으면 Y/N을 boolean으로 변환
+          if (row.length >= 51 && row[50] !== undefined && row[50] !== null && row[50] !== '') {
+            const ayValue = row[50].toString().trim();
+            console.log('🔍 [정책조회] AY열 직접입력여부 값:', {
+              policyId: row[0],
+              ayValue,
+              ayValueType: typeof row[50],
+              result: ayValue === 'Y' || ayValue === 'true'
+            });
+            return ayValue === 'Y' || ayValue === 'true';
+          }
+          // 기존 데이터는 AY열이 없으므로 rateSupports와 policyContent로 판단
+          const category = row[8]; // I열: 하위카테고리
+          if (category === 'wireless_rate' || category === 'wired_rate') {
+            try {
+              const rateSupports = JSON.parse(row[43] || '[]');
+              const hasRateSupports = Array.isArray(rateSupports) && rateSupports.length > 0;
+              const hasPolicyContent = row[4] && row[4].toString().trim(); // E열: 정책내용
+              // rateSupports가 없고 policyContent가 있으면 직접입력
+              const result = !hasRateSupports && !!hasPolicyContent;
+              if (row[0] === 'POL_1758709000782_o32vwgmfj' || row[0] === 'POL_1758709081080_j2h0146uj') {
+                console.log('🔍 [정책조회] isDirectInput 추론:', {
+                  policyId: row[0],
+                  category,
+                  hasRateSupports,
+                  hasPolicyContent,
+                  result
+                });
+              }
+              return result;
+            } catch (error) {
+              // 파싱 실패 시 policyContent가 있으면 직접입력으로 간주
+              const hasPolicyContent = row[4] && row[4].toString().trim();
+              return !!hasPolicyContent;
+            }
+          }
+          return false;
+        })(),
         // 연합정책 관련 데이터
         unionSettlementStore: row[44] || '',  // AS열: 정산 입금처
         unionTargetStores: (() => {
@@ -22946,7 +22986,18 @@ app.get('/api/policies', async (req, res) => {
 
 app.post('/api/policies', async (req, res) => {
   try {
+    console.log('📡 [2025-12-04T' + new Date().toISOString().split('T')[1] + '] POST /api/policies - IP: ' + (req.ip || req.connection.remoteAddress) + ' - UA: ' + (req.get('user-agent') || 'Unknown'));
     console.log('새 정책 생성 요청:', req.body);
+    
+    // 디버깅: isDirectInput 필드 확인
+    console.log('🔍 [정책생성-요청데이터] isDirectInput 필드 확인:', {
+      isDirectInput: req.body.isDirectInput,
+      isDirectInputType: typeof req.body.isDirectInput,
+      category: req.body.category,
+      rateSupports: req.body.rateSupports,
+      rateSupportsLength: Array.isArray(req.body.rateSupports) ? req.body.rateSupports.length : 'N/A',
+      hasPolicyContent: !!(req.body.policyContent && req.body.policyContent.trim())
+    });
     
     // 카테고리별 로그 출력
     const policyCategory = req.body.category;
@@ -22967,7 +23018,8 @@ app.post('/api/policies', async (req, res) => {
       activationType: req.body.activationType,
       amount95Above: req.body.amount95Above,
       amount95Below: req.body.amount95Below,
-      multipleStoreName: req.body.multipleStoreName
+      multipleStoreName: req.body.multipleStoreName,
+      isDirectInput: req.body.isDirectInput
     });
     } else if (isAddDeductPolicyForLog) {
       console.log('📝 [정책생성-부가차감지원정책] 요청 데이터 상세:', {
@@ -22981,7 +23033,8 @@ app.post('/api/policies', async (req, res) => {
         activationType: req.body.activationType,
         deductSupport: req.body.deductSupport,
         conditionalOptions: req.body.conditionalOptions,
-        multipleStoreName: req.body.multipleStoreName
+        multipleStoreName: req.body.multipleStoreName,
+        isDirectInput: req.body.isDirectInput
       });
     } else {
       console.log('📝 [정책생성-일반정책] 요청 데이터 상세:', {
@@ -22995,7 +23048,10 @@ app.post('/api/policies', async (req, res) => {
         category: req.body.category,
         yearMonth: req.body.yearMonth,
         activationType: req.body.activationType,
-        multipleStoreName: req.body.multipleStoreName
+        multipleStoreName: req.body.multipleStoreName,
+        isDirectInput: req.body.isDirectInput,
+        rateSupports: req.body.rateSupports,
+        rateSupportsLength: Array.isArray(req.body.rateSupports) ? req.body.rateSupports.length : 'N/A'
       });
     }
     
@@ -23115,26 +23171,35 @@ app.post('/api/policies', async (req, res) => {
     if (isRatePolicy) {
       console.log('🔍 [요금제유형별정책] 전용 검증 시작');
       const rateSupports = req.body.rateSupports || [];
+      const isDirectInput = req.body.isDirectInput === true || req.body.isDirectInput === 'true';
       
       console.log('🔍 [요금제유형별정책] 검증 데이터:', {
         rateSupports,
-        count: rateSupports.length
+        count: rateSupports.length,
+        isDirectInput,
+        isDirectInputType: typeof req.body.isDirectInput,
+        hasPolicyContent: !!(req.body.policyContent && req.body.policyContent.trim())
       });
       
-      // 지원사항 최소 1개는 입력되어야 함
-      if (rateSupports.length === 0) {
-        console.log('❌ [요금제유형별정책] 지원사항 누락');
-        missingFields.push('지원사항');
+      // isDirectInput이 true이면 rateSupports 검증 생략
+      if (isDirectInput) {
+        console.log('✅ [요금제유형별정책] 직접입력 모드 - rateSupports 검증 생략');
       } else {
-        // 각 항목의 필드 검증 (rateRange는 선택사항이므로 제외)
-        const hasIncompleteItem = rateSupports.some(item => 
-          !item.modelType || !item.rateGrade || !item.activationType || !item.amount
-        );
-        if (hasIncompleteItem) {
-          console.log('❌ [요금제유형별정책] 불완전한 지원사항 존재');
-          missingFields.push('지원사항 필드');
+        // 지원사항 최소 1개는 입력되어야 함
+        if (rateSupports.length === 0) {
+          console.log('❌ [요금제유형별정책] 지원사항 누락');
+          missingFields.push('지원사항');
         } else {
-          console.log('✅ [요금제유형별정책] 지원사항 검증 통과');
+          // 각 항목의 필드 검증 (rateRange는 선택사항이므로 제외)
+          const hasIncompleteItem = rateSupports.some(item => 
+            !item.modelType || !item.rateGrade || !item.activationType || !item.amount
+          );
+          if (hasIncompleteItem) {
+            console.log('❌ [요금제유형별정책] 불완전한 지원사항 존재');
+            missingFields.push('지원사항 필드');
+          } else {
+            console.log('✅ [요금제유형별정책] 지원사항 검증 통과');
+          }
         }
       }
       
@@ -23254,7 +23319,8 @@ app.post('/api/policies', async (req, res) => {
       '연합조건',                   // AU열
       '개별소급적용대상',           // AV열
       '개별소급개통유형',           // AW열
-      '담당자'                      // AX열
+      '담당자',                     // AX열
+      '직접입력여부'                // AY열
     ];
     
     // 매장 데이터에서 업체명 조회 (캐시 사용하여 쿼터 절약)
@@ -23364,7 +23430,9 @@ app.post('/api/policies', async (req, res) => {
       // AW열: 개별소급정책 개통유형
       (category === 'wireless_individual' || category === 'wired_individual') ? (req.body.individualActivationType || '') : '',
       // AX열: 담당자명
-      req.body.manager || ''
+      req.body.manager || '',
+      // AY열: 직접입력여부 (true/false를 문자열로 저장)
+      (req.body.isDirectInput === true || req.body.isDirectInput === 'true') ? 'Y' : 'N'
     ];
     
     console.log('📝 [정책생성] 구글시트 저장 데이터:', {
@@ -23613,17 +23681,35 @@ app.put('/api/policies/:policyId', async (req, res) => {
     if (isRatePolicyForUpdate) {
       console.log('🔍 [정책수정-요금제유형별정책] 전용 검증 시작');
       const rateSupports = req.body.rateSupports || [];
+      const isDirectInput = req.body.isDirectInput === true || req.body.isDirectInput === 'true';
       
-      // 지원사항 최소 1개는 입력되어야 함
-      if (rateSupports.length === 0) {
-        missingFields.push('지원사항');
+      console.log('🔍 [정책수정-요금제유형별정책] 검증 데이터:', {
+        rateSupports,
+        count: rateSupports.length,
+        isDirectInput,
+        isDirectInputType: typeof req.body.isDirectInput,
+        hasPolicyContent: !!(req.body.policyContent && req.body.policyContent.trim())
+      });
+      
+      // isDirectInput이 true이면 rateSupports 검증 생략
+      if (isDirectInput) {
+        console.log('✅ [정책수정-요금제유형별정책] 직접입력 모드 - rateSupports 검증 생략');
       } else {
-        // 각 항목의 필드 검증 (rateRange는 선택사항이므로 제외)
-        const hasIncompleteItem = rateSupports.some(item => 
-          !item.modelType || !item.rateGrade || !item.activationType || !item.amount
-        );
-        if (hasIncompleteItem) {
-          missingFields.push('지원사항 필드');
+        // 지원사항 최소 1개는 입력되어야 함
+        if (rateSupports.length === 0) {
+          console.log('❌ [정책수정-요금제유형별정책] 지원사항 누락');
+          missingFields.push('지원사항');
+        } else {
+          // 각 항목의 필드 검증 (rateRange는 선택사항이므로 제외)
+          const hasIncompleteItem = rateSupports.some(item => 
+            !item.modelType || !item.rateGrade || !item.activationType || !item.amount
+          );
+          if (hasIncompleteItem) {
+            console.log('❌ [정책수정-요금제유형별정책] 불완전한 지원사항 존재');
+            missingFields.push('지원사항 필드');
+          } else {
+            console.log('✅ [정책수정-요금제유형별정책] 지원사항 검증 통과');
+          }
         }
       }
       
@@ -23720,9 +23806,9 @@ app.put('/api/policies/:policyId', async (req, res) => {
     }
 
     // 기존 행 데이터를 유지하면서 수정할 필드만 업데이트
-    // 기존 행이 24개 컬럼보다 적을 수 있으므로 최소 50개까지 확장
+    // 기존 행이 24개 컬럼보다 적을 수 있으므로 최소 51개까지 확장 (AY열 포함)
     const updatedRow = [...policyRow];
-    while (updatedRow.length < 50) {
+    while (updatedRow.length < 51) {
       updatedRow.push('');
     }
     
@@ -23783,6 +23869,16 @@ app.put('/api/policies/:policyId', async (req, res) => {
     updatedRow[47] = (category === 'wireless_individual' || category === 'wired_individual') ? JSON.stringify(req.body.individualTarget || {}) : ''; // AV열: 개별소급정책 적용대상
     updatedRow[48] = (category === 'wireless_individual' || category === 'wired_individual') ? (req.body.individualActivationType || '') : ''; // AW열: 개별소급정책 개통유형
     updatedRow[49] = req.body.manager || ''; // AX열: 담당자명
+    // AY열: 직접입력여부 (true/false를 Y/N으로 저장)
+    if (updatedRow.length < 51) {
+      updatedRow.push('');
+    }
+    updatedRow[50] = (req.body.isDirectInput === true || req.body.isDirectInput === 'true') ? 'Y' : 'N'; // AY열: 직접입력여부
+    // AY열: 직접입력여부 (true/false를 Y/N으로 저장)
+    if (updatedRow.length < 51) {
+      updatedRow.push('');
+    }
+    updatedRow[50] = (req.body.isDirectInput === true || req.body.isDirectInput === 'true') ? 'Y' : 'N'; // AY열: 직접입력여부
     
     // 배열을 24개 컬럼으로 제한 (A:X 범위)
     const updatedRowForSheet = updatedRow.slice(0, 24);
