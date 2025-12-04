@@ -285,4 +285,5 @@ export const directStoreApi = {
         }));
 
         return { premium, budget };
-    },
+    }
+};
