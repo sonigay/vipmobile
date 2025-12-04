@@ -337,7 +337,8 @@ const LinkSettingsTab = () => {
                                     fullWidth
                                     value={planGroupSettings.planNameRange}
                                     onChange={(e) => setPlanGroupSettings({ ...planGroupSettings, planNameRange: e.target.value })}
-                                    placeholder="예: Sheet1!A2:A100"
+                                    placeholder="예: 정책!D5:D500 또는 '정책'!D5:D500"
+                                    helperText="시트이름!범위 형식 (한글 시트명은 작은따옴표 권장)"
                                 />
                             </Grid>
                             <Grid item xs={12} md={4}>
@@ -346,7 +347,8 @@ const LinkSettingsTab = () => {
                                     fullWidth
                                     value={planGroupSettings.planGroupRange}
                                     onChange={(e) => setPlanGroupSettings({ ...planGroupSettings, planGroupRange: e.target.value })}
-                                    placeholder="예: Sheet1!B2:B100"
+                                    placeholder="예: 정책!F5:F500 또는 '정책'!F5:F500"
+                                    helperText="시트이름!범위 형식 (한글 시트명은 작은따옴표 권장)"
                                 />
                             </Grid>
                             <Grid item xs={12} md={4}>
@@ -355,7 +357,8 @@ const LinkSettingsTab = () => {
                                     fullWidth
                                     value={planGroupSettings.basicFeeRange}
                                     onChange={(e) => setPlanGroupSettings({ ...planGroupSettings, basicFeeRange: e.target.value })}
-                                    placeholder="예: Sheet1!C2:C100"
+                                    placeholder="예: 정책!E5:E500 또는 '정책'!E5:E500"
+                                    helperText="시트이름!범위 형식 (한글 시트명은 작은따옴표 권장)"
                                 />
                             </Grid>
                         </Grid>
@@ -421,6 +424,8 @@ const LinkSettingsTab = () => {
                                     fullWidth
                                     value={supportSettings.modelRange}
                                     onChange={(e) => setSupportSettings({ ...supportSettings, modelRange: e.target.value })}
+                                    placeholder="예: 정책!A5:A500"
+                                    helperText="시트이름!범위"
                                 />
                             </Grid>
                             <Grid item xs={6} md={3}>
@@ -429,6 +434,8 @@ const LinkSettingsTab = () => {
                                     fullWidth
                                     value={supportSettings.petNameRange}
                                     onChange={(e) => setSupportSettings({ ...supportSettings, petNameRange: e.target.value })}
+                                    placeholder="예: 정책!B5:B500"
+                                    helperText="시트이름!범위"
                                 />
                             </Grid>
                             <Grid item xs={6} md={3}>
@@ -437,6 +444,8 @@ const LinkSettingsTab = () => {
                                     fullWidth
                                     value={supportSettings.factoryPriceRange}
                                     onChange={(e) => setSupportSettings({ ...supportSettings, factoryPriceRange: e.target.value })}
+                                    placeholder="예: 정책!C5:C500"
+                                    helperText="시트이름!범위"
                                 />
                             </Grid>
                             <Grid item xs={6} md={3}>
@@ -445,6 +454,8 @@ const LinkSettingsTab = () => {
                                     fullWidth
                                     value={supportSettings.openingTypeRange}
                                     onChange={(e) => setSupportSettings({ ...supportSettings, openingTypeRange: e.target.value })}
+                                    placeholder="예: 정책!D5:D500"
+                                    helperText="시트이름!범위"
                                 />
                             </Grid>
                         </Grid>
@@ -464,7 +475,8 @@ const LinkSettingsTab = () => {
                                                 [group]: e.target.value
                                             }
                                         })}
-                                        placeholder="예: Sheet1!E2:E100"
+                                        placeholder="예: 정책!E5:E500"
+                                        helperText="시트이름!범위 (한글 시트명은 작은따옴표 권장)"
                                     />
                                 </Grid>
                             ))}
@@ -506,6 +518,8 @@ const LinkSettingsTab = () => {
                                     fullWidth
                                     value={policySettings.modelRange}
                                     onChange={(e) => setPolicySettings({ ...policySettings, modelRange: e.target.value })}
+                                    placeholder="예: 정책!A5:A500"
+                                    helperText="시트이름!범위"
                                 />
                             </Grid>
                             <Grid item xs={12} sm={6}>
@@ -514,6 +528,8 @@ const LinkSettingsTab = () => {
                                     fullWidth
                                     value={policySettings.petNameRange}
                                     onChange={(e) => setPolicySettings({ ...policySettings, petNameRange: e.target.value })}
+                                    placeholder="예: 정책!B5:B500"
+                                    helperText="시트이름!범위"
                                 />
                             </Grid>
                         </Grid>
@@ -533,7 +549,8 @@ const LinkSettingsTab = () => {
                                                 [group]: e.target.value
                                             }
                                         })}
-                                        placeholder="예: Sheet1!F2:F100"
+                                        placeholder="예: 정책!F5:F500"
+                                        helperText="시트이름!범위 (한글 시트명은 작은따옴표 권장)"
                                     />
                                 </Grid>
                             ))}
