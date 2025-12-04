@@ -398,19 +398,27 @@ function setupDirectRoutes(app) {
       const { sheets } = createSheetsClient();
       
       // 시트에서 범위 읽기
+      // majorDimension: 'ROWS'를 사용하여 모든 행을 가져오고, 빈 행도 포함
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId: sheetId,
-        range: range
+        range: range,
+        majorDimension: 'ROWS',
+        valueRenderOption: 'UNFORMATTED_VALUE'
       });
 
       const values = response.data.values || [];
       
       if (unique === 'true') {
         // 유니크한 값 추출 (빈 값 제외, 공백 제거)
+        // flat()으로 모든 행의 값을 하나의 배열로 만들고, 빈 값은 제외
         const uniqueValues = [...new Set(
           values
             .flat()
-            .map(v => (v || '').toString().trim())
+            .map(v => {
+              // 숫자나 문자열 모두 처리
+              if (v === null || v === undefined) return '';
+              return String(v).trim();
+            })
             .filter(v => v.length > 0)
         )].sort();
         
@@ -420,7 +428,8 @@ function setupDirectRoutes(app) {
           isUnique: true
         });
       } else {
-        // 원본 데이터 그대로 반환
+        // 원본 데이터 그대로 반환 (빈 행 포함)
+        // 중간에 빈 행이 있어도 모든 행을 반환
         res.json({
           success: true,
           data: values,
@@ -445,9 +454,12 @@ function setupDirectRoutes(app) {
       const { sheets } = createSheetsClient();
       
       // 시트에서 범위 읽기
+      // majorDimension: 'ROWS'를 사용하여 모든 행을 가져오고, 빈 행도 포함
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId: sheetId,
-        range: range
+        range: range,
+        majorDimension: 'ROWS',
+        valueRenderOption: 'UNFORMATTED_VALUE'
       });
 
       const values = response.data.values || [];
@@ -455,7 +467,11 @@ function setupDirectRoutes(app) {
       const uniqueGroups = [...new Set(
         values
           .flat()
-          .map(v => (v || '').toString().trim())
+          .map(v => {
+            // 숫자나 문자열 모두 처리
+            if (v === null || v === undefined) return '';
+            return String(v).trim();
+          })
           .filter(v => v.length > 0)
       )].sort();
 
@@ -485,13 +501,19 @@ function setupDirectRoutes(app) {
           if (sheetId) {
             const response = await sheets.spreadsheets.values.get({
               spreadsheetId: sheetId,
-              range: planGroup.planGroupRange
+              range: planGroup.planGroupRange,
+              majorDimension: 'ROWS',
+              valueRenderOption: 'UNFORMATTED_VALUE'
             });
             const values = response.data.values || [];
             const uniqueGroups = [...new Set(
               values
                 .flat()
-                .map(v => (v || '').toString().trim())
+                .map(v => {
+                  // 숫자나 문자열 모두 처리
+                  if (v === null || v === undefined) return '';
+                  return String(v).trim();
+                })
                 .filter(v => v.length > 0)
             )].sort();
             planGroup.planGroups = uniqueGroups;
