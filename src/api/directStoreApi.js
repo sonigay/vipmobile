@@ -139,6 +139,24 @@ export const directStoreApi = {
         return response.json();
     },
 
+    // === 구분 태그 업데이트 ===
+
+    // 구분(인기/추천/저렴) 태그 업데이트
+    updateMobileTags: async (modelId, tags) => {
+        try {
+            const response = await fetch(`${BASE_URL}/mobiles/${modelId}/tags`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(tags)
+            });
+            if (!response.ok) throw new Error('구분 태그 업데이트 실패');
+            return response.json();
+        } catch (err) {
+            console.warn('구분 태그 업데이트 API 호출 실패:', err);
+            return { success: false, error: err.message };
+        }
+    },
+
     // === 이미지 업로드 (Discord) ===
 
     // 이미지 업로드

@@ -17,7 +17,8 @@ import {
   IconButton,
   Tooltip,
   CircularProgress,
-  Alert
+  Alert,
+  FormControlLabel
 } from '@mui/material';
 import {
   PhotoCamera as PhotoCameraIcon,
@@ -25,6 +26,7 @@ import {
   Recommend as RecommendIcon,
   Star as StarIcon
 } from '@mui/icons-material';
+import { Checkbox } from '@mui/material';
 import { directStoreApi } from '../../api/directStoreApi';
 
 const MobileListTab = ({ onProductSelect }) => {
@@ -109,6 +111,28 @@ const MobileListTab = ({ onProductSelect }) => {
   const handleRowClick = (model) => {
     if (onProductSelect) {
       onProductSelect(model);
+    }
+  };
+
+  const handleTagChange = async (modelId, tagType, checked) => {
+    try {
+      const tags = {
+        isPopular: tagType === 'popular' ? checked : mobileList.find(m => m.id === modelId)?.isPopular || false,
+        isRecommended: tagType === 'recommend' ? checked : mobileList.find(m => m.id === modelId)?.isRecommended || false,
+        isCheap: tagType === 'cheap' ? checked : mobileList.find(m => m.id === modelId)?.isCheap || false
+      };
+      
+      await directStoreApi.updateMobileTags(modelId, tags);
+      
+      // 로컬 상태 업데이트
+      setMobileList(prevList => prevList.map(item => 
+        item.id === modelId 
+          ? { ...item, ...tags, tags: Object.keys(tags).filter(k => tags[k]) }
+          : item
+      ));
+    } catch (err) {
+      console.error('구분 태그 업데이트 실패:', err);
+      alert('구분 태그 업데이트에 실패했습니다.');
     }
   };
 
@@ -209,10 +233,42 @@ const MobileListTab = ({ onProductSelect }) => {
                       sx={{ cursor: 'pointer' }}
                       onClick={() => handleRowClick(row)}
                     >
-                      <TableCell align="center">
-                        {row.isRecommended && <Chip icon={<RecommendIcon />} label="추천" color="primary" size="small" />}
-                        {row.isPopular && <Chip icon={<StarIcon />} label="인기" color="secondary" size="small" />}
-                        {row.isCheap && <Chip label="저렴" color="success" size="small" />}
+                      <TableCell align="center" onClick={(e) => e.stopPropagation()}>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, alignItems: 'center' }}>
+                          <FormControlLabel
+                            control={
+                              <Checkbox
+                                checked={row.isPopular || false}
+                                onChange={(e) => handleTagChange(row.id, 'popular', e.target.checked)}
+                                size="small"
+                              />
+                            }
+                            label={<Chip icon={<StarIcon />} label="인기" color="secondary" size="small" />}
+                            labelPlacement="end"
+                          />
+                          <FormControlLabel
+                            control={
+                              <Checkbox
+                                checked={row.isRecommended || false}
+                                onChange={(e) => handleTagChange(row.id, 'recommend', e.target.checked)}
+                                size="small"
+                              />
+                            }
+                            label={<Chip icon={<RecommendIcon />} label="추천" color="primary" size="small" />}
+                            labelPlacement="end"
+                          />
+                          <FormControlLabel
+                            control={
+                              <Checkbox
+                                checked={row.isCheap || false}
+                                onChange={(e) => handleTagChange(row.id, 'cheap', e.target.checked)}
+                                size="small"
+                              />
+                            }
+                            label={<Chip label="저렴" color="success" size="small" />}
+                            labelPlacement="end"
+                          />
+                        </Box>
                       </TableCell>
                       <TableCell align="center" onClick={(e) => e.stopPropagation()}>
                         <Box sx={{ position: 'relative', display: 'inline-block' }}>
