@@ -311,6 +311,7 @@ const DirectStoreMode = ({
               <OpeningInfoPage
                 initialData={selectedProduct}
                 onBack={handleBackToStore}
+                loggedInStore={loggedInStore}
               />
             </Box>
           </Fade>
@@ -407,7 +408,11 @@ const DirectStoreMode = ({
                 hidden={activeTab !== 2}
                 sx={{ height: '100%', display: activeTab === 2 ? 'block' : 'none' }}
               >
-                <DirectSalesReportTab onRowClick={handleProductSelect} />
+                <DirectSalesReportTab 
+                  onRowClick={handleProductSelect} 
+                  loggedInStore={loggedInStore}
+                  isManagementMode={false}
+                />
               </Box>
             </Box>
           </>

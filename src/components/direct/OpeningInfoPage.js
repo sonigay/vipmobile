@@ -17,7 +17,8 @@ import {
     Divider,
     Stack,
     IconButton,
-    CircularProgress
+    CircularProgress,
+    Alert
 } from '@mui/material';
 import {
     ArrowBack as ArrowBackIcon,
@@ -46,10 +47,20 @@ const CARRIER_THEMES = {
     }
 };
 
-const OpeningInfoPage = ({ initialData, onBack }) => {
+const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
     const [selectedCarrier, setSelectedCarrier] = useState(initialData?.carrier || 'SK');
     const theme = CARRIER_THEMES[selectedCarrier] || CARRIER_THEMES['SK'];
     const [isSaving, setIsSaving] = useState(false);
+    const [planGroups, setPlanGroups] = useState([]); // 요금제 그룹 목록
+    const [selectedPlanGroup, setSelectedPlanGroup] = useState('');
+    const [planBasicFee, setPlanBasicFee] = useState(0);
+    const [requiredAddons, setRequiredAddons] = useState([]); // 필수 부가서비스 목록
+
+    // 단말/지원금 기본값 정리 (휴대폰목록/오늘의휴대폰에서 전달된 데이터 사용)
+    const factoryPrice = initialData?.factoryPrice || 0;
+    const publicSupport = initialData?.publicSupport || initialData?.support || 0; // 이통사 지원금
+    const storeSupportWithAddon = initialData?.storeSupport || 0; // 부가유치시 대리점추가지원금
+    const storeSupportWithoutAddon = initialData?.storeSupportNoAddon || 0; // 부가미유치시 대리점추가지원금
 
     const [formData, setFormData] = useState({
         customerName: initialData?.customerName || '',
@@ -57,58 +68,150 @@ const OpeningInfoPage = ({ initialData, onBack }) => {
         customerBirth: '',
         openingType: initialData?.openingType || 'NEW', // NEW, MNP, CHANGE
         prevCarrier: '',
+        contractType: 'standard', // standard | selected (선택약정)
         installmentPeriod: 24,
-        plan: '5GX 프라임', // 임시 기본값
-        addons: {
-            insurance: false,
-            welfare: false,
-            card: false
-        }
+        plan: '', // 요금제명
+        paymentType: 'installment', // installment | cash
+        withAddon: true, // 부가유치 여부 (true: 부가유치, false: 미유치)
+        usePublicSupport: true, // 이통사지원금 사용 여부
+        lgPremier: false, // LG 프리미어 약정 적용 여부
+        cashPrice: 0, // 현금가
+        depositAccount: '', // 입금계좌
+        // 단말기/유심 정보
+        deviceColor: '',
+        deviceSerial: '',
+        simModel: '',
+        simSerial: '',
+        // POS코드
+        posCode: ''
     });
 
+    // 요금제 그룹 로드 (링크설정에서 가져오기 - 일단 Mock)
+    useEffect(() => {
+        const loadPlanGroups = async () => {
+            try {
+                // TODO: 실제 API 연동 시 directStoreApi.getLinkSettings(selectedCarrier) 사용
+                // 지금은 Mock 데이터
+                const mockPlans = [
+                    { name: '5GX 프라임', group: '5GX프라임군', basicFee: 89000 },
+                    { name: '5GX 플래티넘', group: '5GX플래티넘군', basicFee: 125000 },
+                    { name: 'T플랜 에센스', group: 'T플랜군', basicFee: 75000 }
+                ];
+                setPlanGroups(mockPlans);
+                if (mockPlans.length > 0) {
+                    setSelectedPlanGroup(mockPlans[0].name);
+                    setPlanBasicFee(mockPlans[0].basicFee);
+                    setFormData(prev => ({ ...prev, plan: mockPlans[0].name }));
+                }
+            } catch (err) {
+                console.error('요금제 그룹 로드 실패:', err);
+            }
+        };
+        loadPlanGroups();
+    }, [selectedCarrier]);
+
+    // 필수 부가서비스 로드 (정책설정에서 가져오기 - 일단 Mock)
+    useEffect(() => {
+        const loadRequiredAddons = async () => {
+            try {
+                // TODO: 실제 API 연동 시 directStoreApi.getPolicySettings(selectedCarrier) 사용
+                // 지금은 Mock 데이터
+                const mockAddons = [
+                    { name: '우주패스', monthlyFee: 9900 },
+                    { name: 'V컬러링', monthlyFee: 3300 }
+                ];
+                setRequiredAddons(mockAddons);
+            } catch (err) {
+                console.error('필수 부가서비스 로드 실패:', err);
+            }
+        };
+        loadRequiredAddons();
+    }, [selectedCarrier]);
+
     // 계산 로직
-    const calculateInstallmentPrincipal = () => {
-        const factoryPrice = initialData?.factoryPrice || 0;
-        const publicSupport = initialData?.publicSupport || 0; // 공시지원금
-        const storeSupport = initialData?.storeSupport || 0; // 대리점지원금
-        return Math.max(0, factoryPrice - publicSupport - storeSupport);
+    const calculateInstallmentPrincipalWithAddon = () => {
+        // 출고가 - 이통사지원금(선택시) - 대리점추가지원금(부가유치)
+        const support = formData.usePublicSupport ? publicSupport : 0;
+        return Math.max(0, factoryPrice - support - storeSupportWithAddon);
     };
 
-    const calculateMonthlyInstallment = () => {
-        const principal = calculateInstallmentPrincipal();
+    const calculateInstallmentPrincipalWithoutAddon = () => {
+        // 출고가 - 이통사지원금(선택시) - 대리점추가지원금(부가미유치)
+        const support = formData.usePublicSupport ? publicSupport : 0;
+        return Math.max(0, factoryPrice - support - storeSupportWithoutAddon);
+    };
+
+    const getCurrentInstallmentPrincipal = () => {
+        return formData.withAddon
+            ? calculateInstallmentPrincipalWithAddon()
+            : calculateInstallmentPrincipalWithoutAddon();
+    };
+
+    // 할부수수료 계산 (연 5.9%, 원리금균등상환)
+    const calculateInstallmentFee = () => {
+        const principal = getCurrentInstallmentPrincipal();
         const rate = 0.059; // 연이율 5.9%
         const period = formData.installmentPeriod;
 
-        if (period === 0) return 0; // 일시불
+        if (period === 0 || principal === 0) return { total: 0, monthly: 0 };
 
-        // 원리금균등상환 공식
         const monthlyRate = rate / 12;
-        const payment = (principal * monthlyRate * Math.pow(1 + monthlyRate, period)) / (Math.pow(1 + monthlyRate, period) - 1);
+        const monthlyPayment = (principal * monthlyRate * Math.pow(1 + monthlyRate, period)) / (Math.pow(1 + monthlyRate, period) - 1);
+        const totalPayment = monthlyPayment * period;
+        const totalFee = totalPayment - principal; // 총 할부수수료
 
-        // 10원 단위 절사
-        return Math.floor(payment / 10) * 10;
+        return {
+            total: Math.floor(totalFee / 10) * 10, // 10원 단위 절사
+            monthly: Math.floor(monthlyPayment / 10) * 10
+        };
     };
 
-    const calculateMonthlyPlanPrice = () => {
-        // 임시 요금제 가격 (나중에 DB 연동 필요)
-        let planPrice = 89000;
+    // 요금제 기본료 계산 (선택약정 할인, LG 프리미어 할인 포함)
+    const calculatePlanFee = () => {
+        let fee = planBasicFee;
 
         // 선택약정 할인 (25%)
-        if (formData.openingType !== 'NEW') { // 예시 조건
-            // 실제로는 요금제 유형에 따라 다름
+        if (formData.contractType === 'selected') {
+            fee = fee * 0.75;
         }
 
-        // LG 프리미어 약정 할인 (-5250원)
-        let discount = 0;
-        if (selectedCarrier === 'LG' && planPrice >= 85000) {
-            discount += 5250;
+        // LG 프리미어 약정 할인 (-5,250원)
+        if (selectedCarrier === 'LG' && formData.lgPremier && planBasicFee >= 85000) {
+            fee = fee - 5250;
         }
 
-        return Math.floor((planPrice - discount) / 10) * 10;
+        return Math.floor(fee / 10) * 10;
     };
 
-    const calculateTotalMonthlyPrice = () => {
-        return calculateMonthlyInstallment() + calculateMonthlyPlanPrice();
+    // 필수 부가서비스 월요금 합계
+    const calculateRequiredAddonsFee = () => {
+        return requiredAddons.reduce((sum, addon) => sum + (addon.monthlyFee || 0), 0);
+    };
+
+    // 최종 월 납부금 계산
+    const calculateTotalMonthlyFee = () => {
+        if (formData.paymentType === 'cash') {
+            return 0; // 현금은 월 납부 없음
+        }
+
+        const installmentFee = calculateInstallmentFee();
+        const planFee = calculatePlanFee();
+        const addonsFee = calculateRequiredAddonsFee();
+
+        return installmentFee.monthly + planFee + addonsFee;
+    };
+
+    // 현금가 계산 (할부원금이 0보다 크면 할부원금 표시, 아니면 직접 입력)
+    const getCashPrice = () => {
+        const principal = getCurrentInstallmentPrincipal();
+        if (principal > 0 && formData.cashPrice === 0) {
+            return principal;
+        }
+        return formData.cashPrice;
+    };
+
+    const handlePrint = () => {
+        window.print();
     };
 
     const handleComplete = async () => {
@@ -122,19 +225,52 @@ const OpeningInfoPage = ({ initialData, onBack }) => {
                 return;
             }
 
-            // 저장할 데이터 구성
+            if (!formData.plan) {
+                alert('요금제를 선택해주세요.');
+                setIsSaving(false);
+                return;
+            }
+
+            // 판매일보 시트 구조에 맞는 데이터 구성
             const saveData = {
-                ...formData,
+                // 기본 정보
+                posCode: formData.posCode || '',
+                storeName: loggedInStore?.name || '',
+                storeId: loggedInStore?.id || '',
+                saleDateTime: new Date().toISOString(),
+                customerName: formData.customerName,
+                customerContact: formData.customerContact,
+                ctn: '', // CTN은 나중에 입력
                 carrier: selectedCarrier,
-                model: initialData.model,
-                petName: initialData.petName,
-                status: 'pending', // 초기 상태
-                date: new Date().toISOString().split('T')[0], // 오늘 날짜
+                deviceModel: initialData?.model || '',
+                deviceName: initialData?.petName || '',
+                deviceColor: formData.deviceColor,
+                deviceSerial: formData.deviceSerial,
+                simModel: formData.simModel,
+                simSerial: formData.simSerial,
+                openingType: formData.openingType,
+                prevCarrier: formData.openingType === 'MNP' ? formData.prevCarrier : '',
+                paymentType: formData.paymentType, // 할부구분
+                installmentPeriod: formData.installmentPeriod, // 할부개월
+                contractType: formData.contractType, // 약정
+                plan: formData.plan, // 요금제
+                addons: requiredAddons.map(a => a.name).join(', '), // 부가서비스
+                // 금액 정보
+                factoryPrice: factoryPrice, // 출고가
+                publicSupport: formData.usePublicSupport ? publicSupport : 0, // 이통사지원금
+                storeSupportWithAddon: formData.withAddon ? storeSupportWithAddon : 0, // 대리점추가지원금(부가유치)
+                storeSupportWithoutAddon: !formData.withAddon ? storeSupportWithoutAddon : 0, // 대리점추가지원금(부가미유치)
+                margin: 0, // 마진 (정책설정에서 가져와야 함)
                 // 계산된 값들
-                installmentPrincipal: calculateInstallmentPrincipal(),
-                monthlyInstallment: calculateMonthlyInstallment(),
-                monthlyPlanPrice: calculateMonthlyPlanPrice(),
-                totalMonthlyPrice: calculateTotalMonthlyPrice()
+                installmentPrincipalWithAddon: calculateInstallmentPrincipalWithAddon(),
+                installmentPrincipalWithoutAddon: calculateInstallmentPrincipalWithoutAddon(),
+                installmentFee: calculateInstallmentFee(),
+                planFee: calculatePlanFee(),
+                requiredAddonsFee: calculateRequiredAddonsFee(),
+                totalMonthlyFee: calculateTotalMonthlyFee(),
+                cashPrice: formData.paymentType === 'cash' ? getCashPrice() : 0,
+                depositAccount: formData.paymentType === 'cash' ? formData.depositAccount : '',
+                status: '개통대기' // 초기 상태
             };
 
             console.log('저장할 데이터:', saveData);
@@ -154,19 +290,38 @@ const OpeningInfoPage = ({ initialData, onBack }) => {
 
     return (
         <Box sx={{ p: 3, height: '100%', overflow: 'auto', bgcolor: theme.bg }}>
+            {/* 인쇄용 스타일 */}
+            <style>{`
+                @media print {
+                    body * {
+                        visibility: hidden;
+                    }
+                    .print-area, .print-area * {
+                        visibility: visible;
+                    }
+                    .print-area {
+                        position: absolute;
+                        left: 0;
+                        top: 0;
+                        width: 100%;
+                    }
+                }
+            `}</style>
+
             {/* 헤더 */}
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 4 }}>
                 <IconButton onClick={onBack} sx={{ mr: 2 }}>
                     <ArrowBackIcon />
                 </IconButton>
                 <Typography variant="h4" sx={{ fontWeight: 'bold', color: theme.primary }}>
-                    개통정보 입력 ({selectedCarrier})
+                    {selectedCarrier} 개통정보를 입력해주세요
                 </Typography>
                 <Box sx={{ flexGrow: 1 }} />
                 <Button
                     variant="outlined"
                     startIcon={<PrintIcon />}
                     sx={{ mr: 2, borderColor: theme.primary, color: theme.primary }}
+                    onClick={handlePrint}
                 >
                     인쇄하기
                 </Button>
@@ -182,160 +337,474 @@ const OpeningInfoPage = ({ initialData, onBack }) => {
                 </Button>
             </Box>
 
-            <Grid container spacing={3}>
-                {/* 왼쪽: 가입 정보 및 단말기 정보 */}
-                <Grid item xs={12} md={6}>
-                    <Paper sx={{ p: 3, mb: 3, borderTop: `4px solid ${theme.primary}` }}>
-                        <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>가입 정보</Typography>
-                        <Grid container spacing={2}>
-                            <Grid item xs={12} sm={6}>
-                                <TextField
-                                    label="고객명"
-                                    fullWidth
-                                    value={formData.customerName}
-                                    onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                                <TextField
-                                    label="연락처"
-                                    fullWidth
-                                    value={formData.customerContact}
-                                    onChange={(e) => setFormData({ ...formData, customerContact: e.target.value })}
-                                />
-                            </Grid>
-                            <Grid item xs={12}>
-                                <FormControl component="fieldset">
-                                    <Typography variant="subtitle2" gutterBottom>가입 유형</Typography>
-                                    <RadioGroup
-                                        row
-                                        value={formData.openingType}
-                                        onChange={(e) => setFormData({ ...formData, openingType: e.target.value })}
-                                    >
-                                        <FormControlLabel value="NEW" control={<Radio />} label="신규가입" />
-                                        <FormControlLabel value="MNP" control={<Radio />} label="번호이동" />
-                                        <FormControlLabel value="CHANGE" control={<Radio />} label="기기변경" />
-                                    </RadioGroup>
-                                </FormControl>
-                            </Grid>
-                            {formData.openingType === 'MNP' && (
-                                <Grid item xs={12}>
+            <div className="print-area">
+                <Grid container spacing={3}>
+                    {/* 왼쪽: 가입 정보, 통신사 정보, 약정 및 할부 정보, 단말기유심 정보 */}
+                    <Grid item xs={12} md={6}>
+                        {/* 가입 정보 */}
+                        <Paper sx={{ p: 3, mb: 3, borderTop: `4px solid ${theme.primary}` }}>
+                            <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>가입 정보</Typography>
+                            <Grid container spacing={2}>
+                                <Grid item xs={12} sm={6}>
                                     <TextField
-                                        label="이전 통신사"
+                                        label="고객명"
                                         fullWidth
-                                        value={formData.prevCarrier}
-                                        onChange={(e) => setFormData({ ...formData, prevCarrier: e.target.value })}
+                                        value={formData.customerName}
+                                        onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
                                     />
                                 </Grid>
-                            )}
-                        </Grid>
-                    </Paper>
-
-                    <Paper sx={{ p: 3, borderTop: `4px solid ${theme.primary}` }}>
-                        <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>단말기 및 할부 정보</Typography>
-                        <Grid container spacing={2}>
-                            <Grid item xs={12}>
-                                <TextField
-                                    label="모델명"
-                                    fullWidth
-                                    value={initialData?.petName || ''}
-                                    InputProps={{ readOnly: true }}
-                                    variant="filled"
-                                />
-                            </Grid>
-                            <Grid item xs={6}>
-                                <TextField
-                                    label="출고가"
-                                    fullWidth
-                                    value={initialData?.factoryPrice?.toLocaleString() || 0}
-                                    InputProps={{ readOnly: true }}
-                                />
-                            </Grid>
-                            <Grid item xs={6}>
-                                <TextField
-                                    label="할부원금"
-                                    fullWidth
-                                    value={calculateInstallmentPrincipal().toLocaleString()}
-                                    InputProps={{ readOnly: true }}
-                                    sx={{ input: { fontWeight: 'bold', color: theme.primary } }}
-                                />
-                            </Grid>
-                            <Grid item xs={12}>
-                                <FormControl fullWidth>
-                                    <InputLabel>할부 개월</InputLabel>
-                                    <Select
-                                        value={formData.installmentPeriod}
-                                        label="할부 개월"
-                                        onChange={(e) => setFormData({ ...formData, installmentPeriod: e.target.value })}
-                                    >
-                                        <MenuItem value={24}>24개월</MenuItem>
-                                        <MenuItem value={30}>30개월</MenuItem>
-                                        <MenuItem value={36}>36개월</MenuItem>
-                                        <MenuItem value={0}>일시불</MenuItem>
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-                        </Grid>
-                    </Paper>
-                </Grid>
-
-                {/* 오른쪽: 요금제 및 최종 납부 금액 */}
-                <Grid item xs={12} md={6}>
-                    <Paper sx={{ p: 3, mb: 3, borderTop: `4px solid ${theme.primary}` }}>
-                        <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>요금제 정보</Typography>
-                        <Grid container spacing={2}>
-                            <Grid item xs={12}>
-                                <FormControl fullWidth>
-                                    <InputLabel>요금제 선택</InputLabel>
-                                    <Select
-                                        value={formData.plan}
-                                        label="요금제 선택"
-                                        onChange={(e) => setFormData({ ...formData, plan: e.target.value })}
-                                    >
-                                        <MenuItem value="5GX 프라임">5GX 프라임 (89,000원)</MenuItem>
-                                        <MenuItem value="5GX 플래티넘">5GX 플래티넘 (125,000원)</MenuItem>
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-                            <Grid item xs={12}>
-                                <FormControlLabel
-                                    control={<Checkbox checked={true} />}
-                                    label="선택약정 할인 (25%)"
-                                />
-                                {selectedCarrier === 'LG' && (
-                                    <FormControlLabel
-                                        control={<Checkbox checked={true} />}
-                                        label="LG 프리미어 약정 할인 (-5,250원)"
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        label="연락처"
+                                        fullWidth
+                                        value={formData.customerContact}
+                                        onChange={(e) => setFormData({ ...formData, customerContact: e.target.value })}
                                     />
+                                </Grid>
+                                <Grid item xs={12}>
+                                    <FormControl component="fieldset">
+                                        <Typography variant="subtitle2" gutterBottom>가입 유형</Typography>
+                                        <RadioGroup
+                                            row
+                                            value={formData.openingType}
+                                            onChange={(e) => setFormData({ ...formData, openingType: e.target.value })}
+                                        >
+                                            <FormControlLabel value="NEW" control={<Radio />} label="신규가입" />
+                                            <FormControlLabel value="MNP" control={<Radio />} label="번호이동" />
+                                            <FormControlLabel value="CHANGE" control={<Radio />} label="기기변경" />
+                                        </RadioGroup>
+                                    </FormControl>
+                                </Grid>
+                                {formData.openingType === 'MNP' && (
+                                    <Grid item xs={12}>
+                                        <TextField
+                                            label="전통신사"
+                                            fullWidth
+                                            value={formData.prevCarrier}
+                                            onChange={(e) => setFormData({ ...formData, prevCarrier: e.target.value })}
+                                            placeholder="SK, KT, LG 중 선택"
+                                        />
+                                    </Grid>
                                 )}
                             </Grid>
-                        </Grid>
-                    </Paper>
+                        </Paper>
 
-                    <Paper sx={{ p: 3, bgcolor: '#333', color: '#fff' }}>
-                        <Typography variant="h6" gutterBottom sx={{ color: '#ffd700' }}>최종 납부 금액 (월)</Typography>
-                        <Divider sx={{ borderColor: 'rgba(255,255,255,0.2)', mb: 2 }} />
-
-                        <Stack direction="row" justifyContent="space-between" mb={1}>
-                            <Typography>월 할부금 (5.9%)</Typography>
-                            <Typography>{calculateMonthlyInstallment().toLocaleString()} 원</Typography>
-                        </Stack>
-                        <Stack direction="row" justifyContent="space-between" mb={2}>
-                            <Typography>월 통신요금</Typography>
-                            <Typography>{calculateMonthlyPlanPrice().toLocaleString()} 원</Typography>
-                        </Stack>
-
-                        <Divider sx={{ borderColor: 'rgba(255,255,255,0.2)', mb: 2 }} />
-
-                        <Stack direction="row" justifyContent="space-between" alignItems="center">
-                            <Typography variant="h5" fontWeight="bold">합계</Typography>
-                            <Typography variant="h4" fontWeight="bold" sx={{ color: '#ffd700' }}>
-                                {calculateTotalMonthlyPrice().toLocaleString()} 원
+                        {/* 통신사 정보 박스 */}
+                        <Paper sx={{ p: 3, mb: 3, borderTop: `4px solid ${theme.primary}`, bgcolor: theme.bg }}>
+                            <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold', color: theme.primary }}>
+                                통신사 정보
                             </Typography>
-                        </Stack>
-                    </Paper>
+                            <Typography variant="body1" sx={{ fontWeight: 'bold', color: theme.primary }}>
+                                {selectedCarrier}
+                            </Typography>
+                        </Paper>
+
+                        {/* 약정 및 할부 정보 */}
+                        <Paper sx={{ p: 3, mb: 3, borderTop: `4px solid ${theme.primary}` }}>
+                            <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>약정 및 할부 정보</Typography>
+                            <Grid container spacing={2}>
+                                <Grid item xs={12}>
+                                    <FormControl component="fieldset">
+                                        <Typography variant="subtitle2" gutterBottom>약정 유형</Typography>
+                                        <RadioGroup
+                                            row
+                                            value={formData.contractType}
+                                            onChange={(e) => setFormData({ ...formData, contractType: e.target.value })}
+                                        >
+                                            <FormControlLabel value="standard" control={<Radio />} label="일반약정" />
+                                            <FormControlLabel value="selected" control={<Radio />} label="선택약정" />
+                                        </RadioGroup>
+                                    </FormControl>
+                                </Grid>
+                                <Grid item xs={12}>
+                                    <FormControl fullWidth>
+                                        <InputLabel>할부 개월</InputLabel>
+                                        <Select
+                                            value={formData.installmentPeriod}
+                                            label="할부 개월"
+                                            onChange={(e) => setFormData({ ...formData, installmentPeriod: e.target.value })}
+                                        >
+                                            <MenuItem value={24}>24개월</MenuItem>
+                                            <MenuItem value={30}>30개월</MenuItem>
+                                            <MenuItem value={36}>36개월</MenuItem>
+                                            <MenuItem value={0}>일시불</MenuItem>
+                                        </Select>
+                                    </FormControl>
+                                </Grid>
+                            </Grid>
+                        </Paper>
+
+                        {/* 단말기유심 정보 및 금액안내 */}
+                        <Paper sx={{ p: 3, borderTop: `4px solid ${theme.primary}` }}>
+                            <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>단말기유심 정보 및 금액안내</Typography>
+                            <Grid container spacing={2}>
+                                <Grid item xs={12}>
+                                    <TextField
+                                        label="모델명"
+                                        fullWidth
+                                        value={initialData?.model || ''}
+                                        InputProps={{ readOnly: true }}
+                                        variant="filled"
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        label="색상"
+                                        fullWidth
+                                        value={formData.deviceColor}
+                                        onChange={(e) => setFormData({ ...formData, deviceColor: e.target.value })}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        label="단말일련번호"
+                                        fullWidth
+                                        value={formData.deviceSerial}
+                                        onChange={(e) => setFormData({ ...formData, deviceSerial: e.target.value })}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        label="유심모델명"
+                                        fullWidth
+                                        value={formData.simModel}
+                                        onChange={(e) => setFormData({ ...formData, simModel: e.target.value })}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        label="유심일련번호"
+                                        fullWidth
+                                        value={formData.simSerial}
+                                        onChange={(e) => setFormData({ ...formData, simSerial: e.target.value })}
+                                    />
+                                </Grid>
+                                <Grid item xs={12}>
+                                    <Divider sx={{ my: 2 }} />
+                                </Grid>
+                                <Grid item xs={6}>
+                                    <TextField
+                                        label="출고가"
+                                        fullWidth
+                                        value={factoryPrice.toLocaleString()}
+                                        InputProps={{ readOnly: true }}
+                                    />
+                                </Grid>
+                                {formData.usePublicSupport && (
+                                    <Grid item xs={6}>
+                                        <TextField
+                                            label="이통사 지원금"
+                                            fullWidth
+                                            value={publicSupport.toLocaleString()}
+                                            InputProps={{ readOnly: true }}
+                                        />
+                                    </Grid>
+                                )}
+                                <Grid item xs={6}>
+                                    <TextField
+                                        label="대리점추가지원금 (부가유치)"
+                                        fullWidth
+                                        value={storeSupportWithAddon.toLocaleString()}
+                                        InputProps={{ readOnly: true }}
+                                    />
+                                </Grid>
+                                <Grid item xs={6}>
+                                    <TextField
+                                        label="대리점추가지원금 (부가미유치)"
+                                        fullWidth
+                                        value={storeSupportWithoutAddon.toLocaleString()}
+                                        InputProps={{ readOnly: true }}
+                                    />
+                                </Grid>
+                                <Grid item xs={6}>
+                                    <TextField
+                                        label="할부원금 (부가유치)"
+                                        fullWidth
+                                        value={calculateInstallmentPrincipalWithAddon().toLocaleString()}
+                                        InputProps={{ readOnly: true }}
+                                        sx={{ input: { fontWeight: 'bold', color: theme.primary } }}
+                                    />
+                                </Grid>
+                                <Grid item xs={6}>
+                                    <TextField
+                                        label="할부원금 (부가미유치)"
+                                        fullWidth
+                                        value={calculateInstallmentPrincipalWithoutAddon().toLocaleString()}
+                                        InputProps={{ readOnly: true }}
+                                        sx={{ input: { fontWeight: 'bold', color: theme.primary } }}
+                                    />
+                                </Grid>
+                                <Grid item xs={12}>
+                                    <FormControl component="fieldset">
+                                        <Typography variant="subtitle2" gutterBottom>부가서비스 유치 여부</Typography>
+                                        <RadioGroup
+                                            row
+                                            value={formData.withAddon ? 'with' : 'without'}
+                                            onChange={(e) => setFormData({ ...formData, withAddon: e.target.value === 'with' })}
+                                        >
+                                            <FormControlLabel value="with" control={<Radio />} label="부가유치" />
+                                            <FormControlLabel value="without" control={<Radio />} label="부가미유치" />
+                                        </RadioGroup>
+                                    </FormControl>
+                                </Grid>
+                                <Grid item xs={12}>
+                                    <FormControl component="fieldset">
+                                        <Typography variant="subtitle2" gutterBottom>할부/현금 선택</Typography>
+                                        <RadioGroup
+                                            row
+                                            value={formData.paymentType}
+                                            onChange={(e) => setFormData({ ...formData, paymentType: e.target.value })}
+                                        >
+                                            <FormControlLabel value="installment" control={<Radio />} label="할부" />
+                                            <FormControlLabel value="cash" control={<Radio />} label="현금" />
+                                        </RadioGroup>
+                                    </FormControl>
+                                </Grid>
+                                {formData.paymentType === 'installment' && (
+                                    <>
+                                        <Grid item xs={12}>
+                                            <Divider sx={{ my: 1 }} />
+                                        </Grid>
+                                        <Grid item xs={6}>
+                                            <TextField
+                                                label="총 할부수수료"
+                                                fullWidth
+                                                value={calculateInstallmentFee().total.toLocaleString()}
+                                                InputProps={{ readOnly: true }}
+                                            />
+                                        </Grid>
+                                        <Grid item xs={6}>
+                                            <TextField
+                                                label="월 할부수수료"
+                                                fullWidth
+                                                value={calculateInstallmentFee().monthly.toLocaleString()}
+                                                InputProps={{ readOnly: true }}
+                                            />
+                                        </Grid>
+                                    </>
+                                )}
+                                {formData.paymentType === 'cash' && (
+                                    <>
+                                        <Grid item xs={12}>
+                                            <Divider sx={{ my: 1 }} />
+                                        </Grid>
+                                        <Grid item xs={6}>
+                                            <TextField
+                                                label="현금가"
+                                                fullWidth
+                                                type="number"
+                                                value={getCashPrice()}
+                                                onChange={(e) => {
+                                                    const price = parseInt(e.target.value) || 0;
+                                                    setFormData({ ...formData, cashPrice: price });
+                                                }}
+                                                disabled={getCurrentInstallmentPrincipal() > 0}
+                                            />
+                                        </Grid>
+                                        <Grid item xs={6}>
+                                            <TextField
+                                                label="입금계좌"
+                                                fullWidth
+                                                value={formData.depositAccount}
+                                                onChange={(e) => setFormData({ ...formData, depositAccount: e.target.value })}
+                                            />
+                                        </Grid>
+                                    </>
+                                )}
+                            </Grid>
+                        </Paper>
+                    </Grid>
+
+                    {/* 오른쪽: 요금정보, 금액종합안내 */}
+                    <Grid item xs={12} md={6}>
+                        {/* 요금정보 */}
+                        <Paper sx={{ p: 3, mb: 3, borderTop: `4px solid ${theme.primary}` }}>
+                            <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>요금정보</Typography>
+                            <Grid container spacing={2}>
+                                <Grid item xs={12}>
+                                    <FormControl fullWidth>
+                                        <InputLabel>요금제 선택</InputLabel>
+                                        <Select
+                                            value={formData.plan}
+                                            label="요금제 선택"
+                                            onChange={(e) => {
+                                                const selectedPlan = planGroups.find(p => p.name === e.target.value);
+                                                setFormData({ ...formData, plan: e.target.value });
+                                                setSelectedPlanGroup(e.target.value);
+                                                setPlanBasicFee(selectedPlan?.basicFee || 0);
+                                            }}
+                                        >
+                                            {planGroups.map((plan) => (
+                                                <MenuItem key={plan.name} value={plan.name}>
+                                                    {plan.name} ({plan.basicFee.toLocaleString()}원)
+                                                </MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
+                                </Grid>
+                                {formData.plan && (
+                                    <>
+                                        <Grid item xs={12}>
+                                            <TextField
+                                                label="기본료"
+                                                fullWidth
+                                                value={planBasicFee.toLocaleString()}
+                                                InputProps={{ readOnly: true }}
+                                            />
+                                        </Grid>
+                                        {formData.contractType === 'selected' && (
+                                            <Grid item xs={12}>
+                                                <Alert severity="info">
+                                                    선택약정 할인: -{Math.floor(planBasicFee * 0.25).toLocaleString()}원
+                                                </Alert>
+                                            </Grid>
+                                        )}
+                                        {selectedCarrier === 'LG' && planBasicFee >= 85000 && (
+                                            <Grid item xs={12}>
+                                                <FormControlLabel
+                                                    control={
+                                                        <Checkbox
+                                                            checked={formData.lgPremier}
+                                                            onChange={(e) => setFormData({ ...formData, lgPremier: e.target.checked })}
+                                                        />
+                                                    }
+                                                    label="LG 프리미어 약정 적용"
+                                                />
+                                                {formData.lgPremier && (
+                                                    <Typography variant="body2" color="error" sx={{ ml: 4 }}>
+                                                        -5,250원
+                                                    </Typography>
+                                                )}
+                                            </Grid>
+                                        )}
+                                        {requiredAddons.length > 0 && (
+                                            <Grid item xs={12}>
+                                                <Divider sx={{ my: 1 }} />
+                                                <Typography variant="subtitle2" gutterBottom>필수 부가서비스</Typography>
+                                                {requiredAddons.map((addon, idx) => (
+                                                    <Box key={idx} sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                                                        <Typography variant="body2">{addon.name}</Typography>
+                                                        <Typography variant="body2" color="primary">
+                                                            +{addon.monthlyFee.toLocaleString()}원
+                                                        </Typography>
+                                                    </Box>
+                                                ))}
+                                            </Grid>
+                                        )}
+                                    </>
+                                )}
+                            </Grid>
+                        </Paper>
+
+                        {/* 금액종합안내 */}
+                        <Paper sx={{ p: 3, bgcolor: '#333', color: '#fff', mb: 3 }}>
+                            <Typography variant="h6" gutterBottom sx={{ color: '#ffd700', fontWeight: 'bold' }}>
+                                금액종합안내
+                            </Typography>
+                            <Divider sx={{ borderColor: 'rgba(255,255,255,0.2)', mb: 2 }} />
+
+                            {/* 단말기 금액 */}
+                            <Typography variant="subtitle2" sx={{ mb: 1, color: '#ffd700' }}>단말기 금액</Typography>
+                            <Stack direction="row" justifyContent="space-between" mb={1}>
+                                <Typography variant="body2">출고가</Typography>
+                                <Typography variant="body2">{factoryPrice.toLocaleString()}원</Typography>
+                            </Stack>
+                            {formData.usePublicSupport && (
+                                <Stack direction="row" justifyContent="space-between" mb={1}>
+                                    <Typography variant="body2">이통사 지원금</Typography>
+                                    <Typography variant="body2">-{publicSupport.toLocaleString()}원</Typography>
+                                </Stack>
+                            )}
+                            <Stack direction="row" justifyContent="space-between" mb={1}>
+                                <Typography variant="body2">
+                                    대리점추가지원금 ({formData.withAddon ? '부가유치' : '부가미유치'})
+                                </Typography>
+                                <Typography variant="body2">
+                                    -{(formData.withAddon ? storeSupportWithAddon : storeSupportWithoutAddon).toLocaleString()}원
+                                </Typography>
+                            </Stack>
+                            {formData.paymentType === 'installment' && (
+                                <Stack direction="row" justifyContent="space-between" mb={2}>
+                                    <Typography variant="body2" fontWeight="bold">할부원금</Typography>
+                                    <Typography variant="body2" fontWeight="bold" sx={{ color: '#ffd700' }}>
+                                        {getCurrentInstallmentPrincipal().toLocaleString()}원
+                                    </Typography>
+                                </Stack>
+                            )}
+                            {formData.paymentType === 'cash' && (
+                                <Stack direction="row" justifyContent="space-between" mb={2}>
+                                    <Typography variant="body2" fontWeight="bold">현금가</Typography>
+                                    <Typography variant="body2" fontWeight="bold" sx={{ color: '#ffd700' }}>
+                                        {getCashPrice().toLocaleString()}원
+                                    </Typography>
+                                </Stack>
+                            )}
+
+                            <Divider sx={{ borderColor: 'rgba(255,255,255,0.2)', my: 2 }} />
+
+                            {/* 요금 금액 */}
+                            <Typography variant="subtitle2" sx={{ mb: 1, color: '#ffd700' }}>요금 금액</Typography>
+                            <Stack direction="row" justifyContent="space-between" mb={1}>
+                                <Typography variant="body2">기본료</Typography>
+                                <Typography variant="body2">{planBasicFee.toLocaleString()}원</Typography>
+                            </Stack>
+                            {formData.contractType === 'selected' && (
+                                <Stack direction="row" justifyContent="space-between" mb={1}>
+                                    <Typography variant="body2">선택약정 할인</Typography>
+                                    <Typography variant="body2" color="error">
+                                        -{Math.floor(planBasicFee * 0.25).toLocaleString()}원
+                                    </Typography>
+                                </Stack>
+                            )}
+                            {selectedCarrier === 'LG' && formData.lgPremier && planBasicFee >= 85000 && (
+                                <Stack direction="row" justifyContent="space-between" mb={1}>
+                                    <Typography variant="body2">LG 프리미어 할인</Typography>
+                                    <Typography variant="body2" color="error">-5,250원</Typography>
+                                </Stack>
+                            )}
+                            {requiredAddons.length > 0 && (
+                                <Stack direction="row" justifyContent="space-between" mb={1}>
+                                    <Typography variant="body2">필수 부가서비스</Typography>
+                                    <Typography variant="body2" color="primary">
+                                        +{calculateRequiredAddonsFee().toLocaleString()}원
+                                    </Typography>
+                                </Stack>
+                            )}
+
+                            <Divider sx={{ borderColor: 'rgba(255,255,255,0.2)', my: 2 }} />
+
+                            {/* 최종 합계 */}
+                            {formData.paymentType === 'installment' && (
+                                <>
+                                    <Stack direction="row" justifyContent="space-between" mb={1}>
+                                        <Typography variant="body1">월 할부금</Typography>
+                                        <Typography variant="body1">{calculateInstallmentFee().monthly.toLocaleString()}원</Typography>
+                                    </Stack>
+                                    <Stack direction="row" justifyContent="space-between" mb={2}>
+                                        <Typography variant="body1">월 통신요금</Typography>
+                                        <Typography variant="body1">{calculatePlanFee().toLocaleString()}원</Typography>
+                                    </Stack>
+                                    {requiredAddons.length > 0 && (
+                                        <Stack direction="row" justifyContent="space-between" mb={2}>
+                                            <Typography variant="body1">월 부가서비스</Typography>
+                                            <Typography variant="body1">{calculateRequiredAddonsFee().toLocaleString()}원</Typography>
+                                        </Stack>
+                                    )}
+                                </>
+                            )}
+
+                            <Divider sx={{ borderColor: 'rgba(255,255,255,0.2)', mb: 2 }} />
+
+                            <Stack direction="row" justifyContent="space-between" alignItems="center">
+                                <Typography variant="h5" fontWeight="bold">최종 월 납부금</Typography>
+                                <Typography variant="h4" fontWeight="bold" sx={{ color: '#ffd700' }}>
+                                    {calculateTotalMonthlyFee().toLocaleString()}원
+                                </Typography>
+                            </Stack>
+                        </Paper>
+                    </Grid>
                 </Grid>
-            </Grid>
+            </div>
         </Box>
     );
 };

@@ -85,7 +85,16 @@ const DirectStoreManagementMode = ({
       tabs.push({ key: 'link', label: '링크 설정', icon: <LinkIcon />, component: <LinkSettingsTab /> });
     }
     if (hasSalesReportPermission) {
-      tabs.push({ key: 'sales', label: '전체 판매일보', icon: <AssessmentIcon />, component: <DirectSalesReportTab onRowClick={handleReportSelect} /> });
+      tabs.push({ 
+        key: 'sales', 
+        label: '전체 판매일보', 
+        icon: <AssessmentIcon />, 
+        component: <DirectSalesReportTab 
+          onRowClick={handleReportSelect} 
+          loggedInStore={loggedInStore}
+          isManagementMode={true}
+        /> 
+      });
     }
     return tabs;
   }, [hasPolicyPermission, hasLinkPermission, hasSalesReportPermission, handleReportSelect]);

@@ -198,8 +198,9 @@ const MobileListTab = ({ onProductSelect }) => {
                 </TableRow>
               ) : (
                 mobileList.map((row) => {
-                  const purchasePriceAddon = (row.factoryPrice || 0) - (row.support || 0) - (row.storeSupport || 0);
-                  const purchasePriceNoAddon = (row.factoryPrice || 0) - (row.support || 0) - (row.storeSupportNoAddon || 0);
+                  // directStoreApi에서 이미 계산된 값 사용
+                  const purchasePriceAddon = row.purchasePriceWithAddon || (row.factoryPrice || 0) - (row.support || row.publicSupport || 0) - (row.storeSupport || 0);
+                  const purchasePriceNoAddon = row.purchasePriceWithoutAddon || (row.factoryPrice || 0) - (row.support || row.publicSupport || 0) - (row.storeSupportNoAddon || 0);
 
                   return (
                     <TableRow
@@ -211,6 +212,7 @@ const MobileListTab = ({ onProductSelect }) => {
                       <TableCell align="center">
                         {row.isRecommended && <Chip icon={<RecommendIcon />} label="추천" color="primary" size="small" />}
                         {row.isPopular && <Chip icon={<StarIcon />} label="인기" color="secondary" size="small" />}
+                        {row.isCheap && <Chip label="저렴" color="success" size="small" />}
                       </TableCell>
                       <TableCell align="center" onClick={(e) => e.stopPropagation()}>
                         <Box sx={{ position: 'relative', display: 'inline-block' }}>
@@ -242,11 +244,13 @@ const MobileListTab = ({ onProductSelect }) => {
                         <Typography variant="caption" color="text.secondary">{row.model}</Typography>
                       </TableCell>
                       <TableCell align="right">{row.factoryPrice?.toLocaleString()}</TableCell>
-                      <TableCell align="right" sx={{ color: 'info.main' }}>{row.support?.toLocaleString()}</TableCell>
+                      <TableCell align="right" sx={{ color: 'info.main' }}>
+                        {(row.support || row.publicSupport)?.toLocaleString()}
+                      </TableCell>
 
                       {/* 대리점 지원금 */}
                       <TableCell align="right" sx={{ borderLeft: '1px solid rgba(81, 81, 81, 0.3)' }}>
-                        {row.storeSupport?.toLocaleString()}
+                        {(row.storeSupport || row.storeSupportWithAddon)?.toLocaleString()}
                       </TableCell>
                       <TableCell align="right">
                         {row.storeSupportNoAddon?.toLocaleString()}

@@ -112,14 +112,14 @@ const ProductCard = ({ product, isPremium, onSelect }) => {
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Typography variant="body1" fontWeight="bold" color="primary">구매가</Typography>
             <Typography variant="h5" fontWeight="bold" color="primary">
-              {product.purchasePrice?.toLocaleString()}원
+              {(product.purchasePrice || product.purchasePriceWithAddon || product.purchasePriceWithoutAddon)?.toLocaleString()}원
             </Typography>
           </Box>
         </Stack>
 
         <Box sx={{ mt: 2 }}>
           <Typography variant="caption" color="text.secondary" display="block">
-            * 필수부가: {product.addons || '없음'}
+            * 필수부가: {product.addons || product.requiredAddons || '없음'}
           </Typography>
         </Box>
       </CardContent>
