@@ -83,8 +83,11 @@ const LinkSettingsTab = () => {
         link: '',
         modelRange: '',
         petNameRange: '',
-        planGroupRanges: {} // { '5GX 프라임': 'Sheet1!G2:G100', ... }
+        planGroupRanges: {} // { '115군': { '010신규': 'Sheet1!G2:G100', 'MNP': 'Sheet1!H2:H100', '기변': 'Sheet1!I2:I100' }, ... }
     });
+
+    // 개통 유형 목록 (고정)
+    const openingTypes = ['010신규', 'MNP', '기변'];
 
     // 임시 요금제군 추가 상태
     const [newPlanGroup, setNewPlanGroup] = useState('');
@@ -413,7 +416,7 @@ const LinkSettingsTab = () => {
                         <TableChartIcon sx={{ fontSize: 60, color: 'success.main', mb: 2 }} />
                         <Typography variant="h6" fontWeight="bold">정책표 설정</Typography>
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                            모델정보 및 요금제군별 정책금 범위 설정
+                            모델정보 및 요금제군별 리베이트 범위 설정
                         </Typography>
                     </Paper>
                 </Grid>
@@ -697,35 +700,53 @@ const LinkSettingsTab = () => {
                             </Grid>
                         </Grid>
                         <Divider />
-                        <Typography variant="subtitle1" fontWeight="bold">요금제군별 정책금 범위 (동적 생성)</Typography>
+                        <Typography variant="subtitle1" fontWeight="bold">요금제군별 리베이트 범위 (동적 생성)</Typography>
                         <Grid container spacing={2}>
                             {planGroupSettings.planGroups.map((group) => (
-                                <Grid item xs={12} sm={6} key={group}>
-                                    <Stack direction="row" spacing={1}>
-                                        <TextField
-                                            label={`${group} 정책금 범위`}
-                                            fullWidth
-                                            value={policySettings.planGroupRanges[group] || ''}
-                                            onChange={(e) => setPolicySettings({
-                                                ...policySettings,
-                                                planGroupRanges: {
-                                                    ...policySettings.planGroupRanges,
-                                                    [group]: e.target.value
-                                                }
+                                <Grid item xs={12} key={group}>
+                                    <Paper sx={{ p: 2, bgcolor: 'background.default' }}>
+                                        <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+                                            {group}
+                                        </Typography>
+                                        <Grid container spacing={2} sx={{ mt: 1 }}>
+                                            {openingTypes.map((type) => {
+                                                const rangeKey = `${group}_${type}`;
+                                                const currentRange = policySettings.planGroupRanges[group]?.[type] || '';
+                                                return (
+                                                    <Grid item xs={12} sm={4} key={type}>
+                                                        <Stack direction="row" spacing={1}>
+                                                            <TextField
+                                                                label={`${type} 리베이트 범위`}
+                                                                fullWidth
+                                                                value={currentRange}
+                                                                onChange={(e) => setPolicySettings({
+                                                                    ...policySettings,
+                                                                    planGroupRanges: {
+                                                                        ...policySettings.planGroupRanges,
+                                                                        [group]: {
+                                                                            ...(policySettings.planGroupRanges[group] || {}),
+                                                                            [type]: e.target.value
+                                                                        }
+                                                                    }
+                                                                })}
+                                                                placeholder="예: 정책!F5:F500"
+                                                                helperText="시트이름!범위 (만원 단위, *10000 적용)"
+                                                            />
+                                                            <Button 
+                                                                variant="outlined" 
+                                                                size="small"
+                                                                onClick={() => handlePreviewRange('policy', `${group} ${type} 리베이트 범위`, policySettings.link, currentRange, false, true)}
+                                                                disabled={!policySettings.link || !currentRange}
+                                                                sx={{ minWidth: 'auto', px: 1, alignSelf: 'flex-start', mt: 1 }}
+                                                            >
+                                                                미리보기
+                                                            </Button>
+                                                        </Stack>
+                                                    </Grid>
+                                                );
                                             })}
-                                            placeholder="예: 정책!F5:F500"
-                                            helperText="시트이름!범위 (만원 단위, *10000 적용)"
-                                        />
-                                        <Button 
-                                            variant="outlined" 
-                                            size="small"
-                                            onClick={() => handlePreviewRange('policy', `${group} 정책금 범위`, policySettings.link, policySettings.planGroupRanges[group], false, true)}
-                                            disabled={!policySettings.link || !policySettings.planGroupRanges[group]}
-                                            sx={{ minWidth: 'auto', px: 1, alignSelf: 'flex-start', mt: 1 }}
-                                        >
-                                            미리보기
-                                        </Button>
-                                    </Stack>
+                                        </Grid>
+                                    </Paper>
                                 </Grid>
                             ))}
                             {planGroupSettings.planGroups.length === 0 && (
