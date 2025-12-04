@@ -715,7 +715,9 @@ function PolicyInputModal({
           unionConditions: formData.unionConditions,
           // 개별소급정책 데이터
           individualTarget: formData.individualTarget,
-          individualActivationType: formData.individualActivationType
+          individualActivationType: formData.individualActivationType,
+          // 직접입력 여부 (모든 카테고리 공통)
+          isDirectInput: formData.isDirectInput || false
         };
 
         await onSave(policy.id, updateData);
@@ -770,7 +772,9 @@ function PolicyInputModal({
             // 개별소급정책 데이터 추가
             individualTarget: formData.individualTarget,
             individualActivationType: formData.individualActivationType,
-            multipleStoreName: formData.multipleStoreName || ''
+            multipleStoreName: formData.multipleStoreName || '',
+            // 직접입력 여부 (모든 카테고리 공통)
+            isDirectInput: formData.isDirectInput || false
           };
 
           await onSave(policyData);
@@ -825,7 +829,9 @@ function PolicyInputModal({
             unionConditions: formData.unionConditions,
             // 개별소급정책 데이터 추가
             individualTarget: formData.individualTarget,
-            individualActivationType: formData.individualActivationType
+            individualActivationType: formData.individualActivationType,
+            // 직접입력 여부 (모든 카테고리 공통)
+            isDirectInput: formData.isDirectInput || false
           }));
 
           await onSave(policies);

@@ -411,6 +411,26 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         policyType: policyTypeLabel
       });
       
+      // 디버깅: 원본 API 응답 확인 (wireless_rate 카테고리만)
+      const ratePoliciesRaw = policies.filter(p => p.category === 'wireless_rate' || p.category === 'wired_rate');
+      if (ratePoliciesRaw.length > 0) {
+        console.log('🔍 [정책 로드] 원본 API 응답 샘플 (요금제유형별정책):', 
+          ratePoliciesRaw.slice(0, 2).map(p => ({
+            id: p.id,
+            policyName: p.policyName,
+            category: p.category,
+            isDirectInput: p.isDirectInput,
+            isDirectInputType: typeof p.isDirectInput,
+            rateSupports: p.rateSupports,
+            rateSupportsType: typeof p.rateSupports,
+            rateSupportsIsArray: Array.isArray(p.rateSupports),
+            rateSupportsLength: Array.isArray(p.rateSupports) ? p.rateSupports.length : 'N/A',
+            hasPolicyContent: !!(p.policyContent && p.policyContent.trim()),
+            allKeys: Object.keys(p).filter(k => k.includes('Direct') || k.includes('rate') || k.includes('Support'))
+          }))
+        );
+      }
+      
       // 정책 조회 권한 제한 적용
       const userRole = loggedInStore?.userRole;
       const currentUserId = loggedInStore?.contactId || loggedInStore?.id;
@@ -440,18 +460,66 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         ? policiesWithTeamNames
         : policiesWithTeamNames.filter(policy => policy.manager === selectedManager);
       
-      // 전체 정책 목록 저장 (담당자 필터링된 정책들)
-      setPolicies(managerFilteredPolicies);
+      // 정책 데이터 파싱 및 정규화 (JSON 문자열 필드 파싱)
+      const normalizedPolicies = managerFilteredPolicies.map(policy => {
+        const normalized = { ...policy };
+        
+        // rateSupports 파싱 (JSON 문자열일 수 있음)
+        if (normalized.rateSupports && typeof normalized.rateSupports === 'string') {
+          try {
+            normalized.rateSupports = JSON.parse(normalized.rateSupports);
+          } catch (e) {
+            console.warn('rateSupports 파싱 실패:', e, normalized.rateSupports);
+            normalized.rateSupports = [];
+          }
+        }
+        
+        // unionTargetStores 파싱
+        if (normalized.unionTargetStores && typeof normalized.unionTargetStores === 'string') {
+          try {
+            normalized.unionTargetStores = JSON.parse(normalized.unionTargetStores);
+          } catch (e) {
+            normalized.unionTargetStores = [];
+          }
+        }
+        
+        // 객체 필드들 파싱
+        const objectFields = ['deductSupport', 'addSupport', 'conditionalOptions', 'supportConditionalOptions', 'unionConditions', 'individualTarget', 'activationType'];
+        objectFields.forEach(field => {
+          if (normalized[field] && typeof normalized[field] === 'string') {
+            try {
+              normalized[field] = JSON.parse(normalized[field]);
+            } catch (e) {
+              console.warn(`${field} 파싱 실패:`, e);
+            }
+          }
+        });
+        
+        // isDirectInput이 undefined/null인 경우 false로 설정 (기존 데이터 호환성)
+        if (normalized.isDirectInput === undefined || normalized.isDirectInput === null) {
+          normalized.isDirectInput = false;
+        }
+        
+        return normalized;
+      });
       
-      // 디버깅: 복수점명 확인
-      console.log('📊 정책 데이터 샘플 (복수점명 확인):', 
-        managerFilteredPolicies.slice(0, 10).map(p => ({
-          id: p.id,
-          name: p.policyName,
-          multipleStoreName: p.multipleStoreName,
-          isMultiple: p.isMultiple
-        }))
-      );
+      // 전체 정책 목록 저장 (정규화된 정책들)
+      setPolicies(normalizedPolicies);
+      
+      // 디버깅: 정책 데이터 샘플 확인 (wireless_rate 카테고리만)
+      const ratePolicies = normalizedPolicies.filter(p => p.category === 'wireless_rate' || p.category === 'wired_rate');
+      if (ratePolicies.length > 0) {
+        console.log('📊 요금제유형별정책 데이터 샘플:', 
+          ratePolicies.slice(0, 3).map(p => ({
+            id: p.id,
+            name: p.policyName,
+            category: p.category,
+            isDirectInput: p.isDirectInput,
+            rateSupportsLength: Array.isArray(p.rateSupports) ? p.rateSupports.length : 'N/A',
+            hasPolicyContent: !!(p.policyContent && p.policyContent.trim())
+          }))
+        );
+      }
       
       // 새로 저장된 정책 찾기
       const newPolicy = managerFilteredPolicies.find(p => p.id === 'POL_1760243517056_ushvjqq8t');
@@ -842,6 +910,16 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const handleCopyPolicySubmit = async (targetYearMonth) => {
     try {
       const originalPolicy = selectedPolicyForCopy;
+      // 디버깅: 원본 정책 데이터 확인
+      console.log('[개별복사] 원본 정책 데이터:', {
+        policyName: originalPolicy.policyName,
+        category: originalPolicy.category,
+        isDirectInput: originalPolicy.isDirectInput,
+        rateSupports: originalPolicy.rateSupports,
+        rateSupportsType: typeof originalPolicy.rateSupports,
+        rateSupportsLength: Array.isArray(originalPolicy.rateSupports) ? originalPolicy.rateSupports.length : 'N/A',
+        policyContent: originalPolicy.policyContent?.substring(0, 50)
+      });
       
       // 정책 적용일에서 시작일과 종료일 추출 (대상월에 맞춰 변경)
       let policyStartDate, policyEndDate;
@@ -861,31 +939,21 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       
       // policy.policyDate가 없거나 파싱 실패한 경우 대상월에 맞춰 변경
       if (!policyStartDate || !policyEndDate) {
-        if (originalPolicy.policyStartDate && originalPolicy.policyEndDate && targetYearMonth) {
-          // policyStartDate와 policyEndDate가 있으면 대상월로 변경
+        // targetYearMonth가 있으면 항상 대상월의 1일~말일로 설정
+        if (targetYearMonth) {
           const [targetYear, targetMonth] = targetYearMonth.split('-').map(Number);
           const startDate = new Date(targetYear, targetMonth - 1, 1);
           const endDate = new Date(targetYear, targetMonth, 0);
           policyStartDate = startDate.toISOString();
           policyEndDate = endDate.toISOString();
-        } else if (originalPolicy.policyDate) {
-          // policyDate 문자열이 있으면 파싱 시도
-          const dateMatch = originalPolicy.policyDate.match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\.\s*~\s*(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\./);
-          if (dateMatch && targetYearMonth) {
-            const [targetYear, targetMonth] = targetYearMonth.split('-').map(Number);
-            const startDate = new Date(targetYear, targetMonth - 1, 1);
-            const endDate = new Date(targetYear, targetMonth, 0);
-            policyStartDate = startDate.toISOString();
-            policyEndDate = endDate.toISOString();
-          } else if (dateMatch) {
-            const [, startYear, startMonth, startDay, endYear, endMonth, endDay] = dateMatch;
-            policyStartDate = new Date(parseInt(startYear), parseInt(startMonth) - 1, parseInt(startDay)).toISOString();
-            policyEndDate = new Date(parseInt(endYear), parseInt(endMonth) - 1, parseInt(endDay)).toISOString();
-          }
+        } else if (originalPolicy.policyStartDate && originalPolicy.policyEndDate) {
+          // targetYearMonth가 없으면 원본 날짜 사용 (예외 케이스)
+          policyStartDate = originalPolicy.policyStartDate;
+          policyEndDate = originalPolicy.policyEndDate;
         } else {
-          // 모든 방법이 실패하면 기본값 사용
-          policyStartDate = originalPolicy.policyStartDate || new Date().toISOString();
-          policyEndDate = originalPolicy.policyEndDate || new Date().toISOString();
+          // 모든 방법이 실패하면 현재 날짜 사용
+          policyStartDate = new Date().toISOString();
+          policyEndDate = new Date().toISOString();
         }
       }
       
@@ -1002,21 +1070,28 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
           }
           return { ...originalPolicy.supportConditionalOptions };
         })(),
-        // 요금제유형별정책
-        isDirectInput: originalPolicy.isDirectInput || false,
+        // isDirectInput: 원본 값 그대로 사용 (없으면 false)
+        isDirectInput: originalPolicy.isDirectInput === true || originalPolicy.isDirectInput === 'true' || false,
         rateSupports: (() => {
-          if (!originalPolicy.rateSupports) return [];
+          if (!originalPolicy.rateSupports) {
+            // rateSupports가 없고 isDirectInput이 true인 경우 빈 배열 반환 (검증 통과)
+            return [];
+          }
           // JSON 문자열인 경우 파싱
           if (typeof originalPolicy.rateSupports === 'string') {
             try {
-              return JSON.parse(originalPolicy.rateSupports);
+              const parsed = JSON.parse(originalPolicy.rateSupports);
+              return Array.isArray(parsed) ? parsed : [];
             } catch (e) {
-              console.error('rateSupports 파싱 실패:', e);
+              console.error('rateSupports 파싱 실패:', e, originalPolicy.rateSupports);
               return [];
             }
           }
           // 이미 배열인 경우 깊은 복사
-          return Array.isArray(originalPolicy.rateSupports) ? JSON.parse(JSON.stringify(originalPolicy.rateSupports)) : [];
+          if (Array.isArray(originalPolicy.rateSupports)) {
+            return JSON.parse(JSON.stringify(originalPolicy.rateSupports));
+          }
+          return [];
         })(),
         // 연합정책
         unionSettlementStore: originalPolicy.unionSettlementStore || '',
@@ -1360,6 +1435,15 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         const policy = selectedPolicies[i];
         setBulkProcessingMessage(`일괄 복사 중... (${i + 1}/${totalCount})`);
         if (policy.policyStatus !== '취소됨') {
+          // 디버깅: 원본 정책 데이터 확인
+          console.log(`[일괄복사] 정책 ${i + 1}/${totalCount}:`, {
+            policyName: policy.policyName,
+            category: policy.category,
+            isDirectInput: policy.isDirectInput,
+            rateSupports: policy.rateSupports,
+            rateSupportsType: typeof policy.rateSupports,
+            rateSupportsLength: Array.isArray(policy.rateSupports) ? policy.rateSupports.length : 'N/A'
+          });
           // 정책 적용일 처리 및 대상월에 맞춰 변경
           let policyStartDate;
           let policyEndDate;
@@ -1380,31 +1464,21 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
           
           // policy.policyDate가 없거나 파싱 실패한 경우 대상월에 맞춰 변경
           if (!policyStartDate || !policyEndDate) {
-            if (policy.policyStartDate && policy.policyEndDate && targetYearMonth) {
-              // policyStartDate와 policyEndDate가 있으면 대상월로 변경
+            // targetYearMonth가 있으면 항상 대상월의 1일~말일로 설정
+            if (targetYearMonth) {
               const [targetYear, targetMonth] = targetYearMonth.split('-').map(Number);
               const startDate = new Date(targetYear, targetMonth - 1, 1);
               const endDate = new Date(targetYear, targetMonth, 0);
               policyStartDate = startDate.toISOString();
               policyEndDate = endDate.toISOString();
-            } else if (policy.policyDate) {
-              // policyDate 문자열이 있으면 파싱 시도
-              const m = policy.policyDate.match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\.\s*~\s*(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\./);
-              if (m && targetYearMonth) {
-                const [targetYear, targetMonth] = targetYearMonth.split('-').map(Number);
-                const startDate = new Date(targetYear, targetMonth - 1, 1);
-                const endDate = new Date(targetYear, targetMonth, 0);
-                policyStartDate = startDate.toISOString();
-                policyEndDate = endDate.toISOString();
-              } else if (m) {
-                const [, sy, sm, sd, ey, em, ed] = m.map(Number);
-                policyStartDate = new Date(sy, sm - 1, sd).toISOString();
-                policyEndDate = new Date(ey, em - 1, ed).toISOString();
-              }
+            } else if (policy.policyStartDate && policy.policyEndDate) {
+              // targetYearMonth가 없으면 원본 날짜 사용 (예외 케이스)
+              policyStartDate = policy.policyStartDate;
+              policyEndDate = policy.policyEndDate;
             } else {
-              // 모든 방법이 실패하면 기본값 사용
-              policyStartDate = policy.policyStartDate || new Date().toISOString();
-              policyEndDate = policy.policyEndDate || new Date().toISOString();
+              // 모든 방법이 실패하면 현재 날짜 사용
+              policyStartDate = new Date().toISOString();
+              policyEndDate = new Date().toISOString();
             }
           }
 
@@ -1516,21 +1590,31 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
               }
               return { ...policy.supportConditionalOptions };
             })(),
-            // 요금제유형별정책
-            isDirectInput: policy.isDirectInput || false,
+            // isDirectInput: 원본 값 그대로 사용 (없으면 false)
+            isDirectInput: policy.isDirectInput === true || policy.isDirectInput === 'true' || false,
             rateSupports: (() => {
-              if (!policy.rateSupports) return [];
+              if (!policy.rateSupports) {
+                // rateSupports가 없고 isDirectInput이 true인 경우 빈 배열 반환 (검증 통과)
+                const isDirect = policy.isDirectInput === true || policy.isDirectInput === 'true' ||
+                  ((policy.category === 'wireless_rate' || policy.category === 'wired_rate') && 
+                   policy.policyContent && policy.policyContent.trim());
+                return [];
+              }
               // JSON 문자열인 경우 파싱
               if (typeof policy.rateSupports === 'string') {
                 try {
-                  return JSON.parse(policy.rateSupports);
+                  const parsed = JSON.parse(policy.rateSupports);
+                  return Array.isArray(parsed) ? parsed : [];
                 } catch (e) {
-                  console.error('rateSupports 파싱 실패:', e);
+                  console.error('rateSupports 파싱 실패:', e, policy.rateSupports);
                   return [];
                 }
               }
               // 이미 배열인 경우 깊은 복사
-              return Array.isArray(policy.rateSupports) ? JSON.parse(JSON.stringify(policy.rateSupports)) : [];
+              if (Array.isArray(policy.rateSupports)) {
+                return JSON.parse(JSON.stringify(policy.rateSupports));
+              }
+              return [];
             })(),
             // 연합정책
             unionSettlementStore: policy.unionSettlementStore || '',
