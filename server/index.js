@@ -5950,6 +5950,15 @@ try {
   console.error('❌ [OB] Failed to mount OB routes:', e.message);
 }
 
+// 직영점 모드 라우트 설정
+const setupDirectRoutes = require('./directRoutes');
+try {
+  setupDirectRoutes(app);
+  console.log('✅ [Direct] Direct store routes mounted at /api/direct');
+} catch (e) {
+  console.error('❌ [Direct] Failed to mount Direct store routes:', e.message);
+}
+
 // 회의 모드 라우트 설정
 try {
   app.get('/api/meetings', meetingRoutes.getMeetings);
