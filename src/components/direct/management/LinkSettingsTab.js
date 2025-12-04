@@ -106,23 +106,31 @@ const LinkSettingsTab = () => {
                 
                 if (data.success) {
                     if (data.planGroup) {
-                        setPlanGroupSettings(prev => ({
-                            ...prev,
-                            link: data.planGroup.link || '',
-                            planGroups: data.planGroup.planGroups || prev.planGroups
-                        }));
+                        setPlanGroupSettings({
+                            link: data.planGroup.link || data.planGroup.sheetId || '',
+                            planNameRange: data.planGroup.planNameRange || '',
+                            planGroupRange: data.planGroup.planGroupRange || '',
+                            basicFeeRange: data.planGroup.basicFeeRange || '',
+                            planGroups: data.planGroup.planGroups || []
+                        });
                     }
                     if (data.support) {
-                        setSupportSettings(prev => ({
-                            ...prev,
-                            link: data.support.link || ''
-                        }));
+                        setSupportSettings({
+                            link: data.support.link || data.support.sheetId || '',
+                            modelRange: data.support.modelRange || '',
+                            petNameRange: data.support.petNameRange || '',
+                            factoryPriceRange: data.support.factoryPriceRange || '',
+                            openingTypeRange: data.support.openingTypeRange || '',
+                            planGroupRanges: data.support.planGroupRanges || {}
+                        });
                     }
                     if (data.policy) {
-                        setPolicySettings(prev => ({
-                            ...prev,
-                            link: data.policy.link || ''
-                        }));
+                        setPolicySettings({
+                            link: data.policy.link || data.policy.sheetId || '',
+                            modelRange: data.policy.modelRange || '',
+                            petNameRange: data.policy.petNameRange || '',
+                            planGroupRanges: data.policy.planGroupRanges || {}
+                        });
                     }
                 }
             } catch (err) {
