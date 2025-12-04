@@ -648,8 +648,21 @@ const OnSaleManagementMode = ({
       const response = await fetch(url, {
         method: method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(policyData)
+        body: JSON.stringify(policyData),
+        credentials: 'include' // CORS 요청 시 쿠키 포함
       });
+
+      if (!response.ok) {
+        // 응답이 실패한 경우 에러 메시지 추출 시도
+        let errorMessage = `정책 저장에 실패했습니다. (상태 코드: ${response.status})`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorData.message || errorMessage;
+        } catch (e) {
+          // JSON 파싱 실패 시 기본 메시지 사용
+        }
+        throw new Error(errorMessage);
+      }
 
       const data = await response.json();
 
@@ -662,7 +675,7 @@ const OnSaleManagementMode = ({
       }
     } catch (error) {
       console.error('정책 저장 실패:', error);
-      setError('정책 저장에 실패했습니다.');
+      setError(error.message || '정책 저장에 실패했습니다.');
     } finally {
       setLoading(false);
     }
