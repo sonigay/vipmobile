@@ -940,27 +940,123 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
           team: '대기'
         },
         // 정책별 특수 필드들 복사 (깊은 복사)
-        activationType: originalPolicy.activationType ? { ...originalPolicy.activationType } : { new010: false, mnp: false, change: false },
+        activationType: (() => {
+          if (!originalPolicy.activationType) return { new010: false, mnp: false, change: false };
+          if (typeof originalPolicy.activationType === 'string') {
+            try {
+              return JSON.parse(originalPolicy.activationType);
+            } catch (e) {
+              return { new010: false, mnp: false, change: false };
+            }
+          }
+          return { ...originalPolicy.activationType };
+        })(),
         multipleStoreName: originalPolicy.multipleStoreName,
         isMultiple: originalPolicy.isMultiple,
         // 구두정책
         amount95Above: originalPolicy.amount95Above,
         amount95Below: originalPolicy.amount95Below,
         // 부가차감지원정책
-        deductSupport: originalPolicy.deductSupport ? { ...originalPolicy.deductSupport } : { addServiceAmount: '', insuranceAmount: '', connectionAmount: '' },
-        conditionalOptions: originalPolicy.conditionalOptions ? { ...originalPolicy.conditionalOptions } : { addServiceAcquired: false, insuranceAcquired: false, connectionAcquired: false },
+        deductSupport: (() => {
+          if (!originalPolicy.deductSupport) return { addServiceAmount: '', insuranceAmount: '', connectionAmount: '' };
+          if (typeof originalPolicy.deductSupport === 'string') {
+            try {
+              return JSON.parse(originalPolicy.deductSupport);
+            } catch (e) {
+              return { addServiceAmount: '', insuranceAmount: '', connectionAmount: '' };
+            }
+          }
+          return { ...originalPolicy.deductSupport };
+        })(),
+        conditionalOptions: (() => {
+          if (!originalPolicy.conditionalOptions) return { addServiceAcquired: false, insuranceAcquired: false, connectionAcquired: false };
+          if (typeof originalPolicy.conditionalOptions === 'string') {
+            try {
+              return JSON.parse(originalPolicy.conditionalOptions);
+            } catch (e) {
+              return { addServiceAcquired: false, insuranceAcquired: false, connectionAcquired: false };
+            }
+          }
+          return { ...originalPolicy.conditionalOptions };
+        })(),
         // 부가추가지원정책
-        addSupport: originalPolicy.addSupport ? { ...originalPolicy.addSupport } : { uplayPremiumAmount: '', phoneExchangePassAmount: '', musicAmount: '', numberFilteringAmount: '' },
-        supportConditionalOptions: originalPolicy.supportConditionalOptions ? { ...originalPolicy.supportConditionalOptions } : { vas2Both: false, vas2Either: false, addon3All: false },
+        addSupport: (() => {
+          if (!originalPolicy.addSupport) return { uplayPremiumAmount: '', phoneExchangePassAmount: '', musicAmount: '', numberFilteringAmount: '' };
+          if (typeof originalPolicy.addSupport === 'string') {
+            try {
+              return JSON.parse(originalPolicy.addSupport);
+            } catch (e) {
+              return { uplayPremiumAmount: '', phoneExchangePassAmount: '', musicAmount: '', numberFilteringAmount: '' };
+            }
+          }
+          return { ...originalPolicy.addSupport };
+        })(),
+        supportConditionalOptions: (() => {
+          if (!originalPolicy.supportConditionalOptions) return { vas2Both: false, vas2Either: false, addon3All: false };
+          if (typeof originalPolicy.supportConditionalOptions === 'string') {
+            try {
+              return JSON.parse(originalPolicy.supportConditionalOptions);
+            } catch (e) {
+              return { vas2Both: false, vas2Either: false, addon3All: false };
+            }
+          }
+          return { ...originalPolicy.supportConditionalOptions };
+        })(),
         // 요금제유형별정책
-        rateSupports: originalPolicy.rateSupports ? JSON.parse(JSON.stringify(originalPolicy.rateSupports)) : [],
+        isDirectInput: originalPolicy.isDirectInput || false,
+        rateSupports: (() => {
+          if (!originalPolicy.rateSupports) return [];
+          // JSON 문자열인 경우 파싱
+          if (typeof originalPolicy.rateSupports === 'string') {
+            try {
+              return JSON.parse(originalPolicy.rateSupports);
+            } catch (e) {
+              console.error('rateSupports 파싱 실패:', e);
+              return [];
+            }
+          }
+          // 이미 배열인 경우 깊은 복사
+          return Array.isArray(originalPolicy.rateSupports) ? JSON.parse(JSON.stringify(originalPolicy.rateSupports)) : [];
+        })(),
         // 연합정책
-        unionSettlementStore: originalPolicy.unionSettlementStore,
-        unionTargetStores: originalPolicy.unionTargetStores ? [...originalPolicy.unionTargetStores] : [],
-        unionConditions: originalPolicy.unionConditions ? { ...originalPolicy.unionConditions } : {},
+        unionSettlementStore: originalPolicy.unionSettlementStore || '',
+        unionTargetStores: (() => {
+          if (!originalPolicy.unionTargetStores) return [];
+          // JSON 문자열인 경우 파싱
+          if (typeof originalPolicy.unionTargetStores === 'string') {
+            try {
+              return JSON.parse(originalPolicy.unionTargetStores);
+            } catch (e) {
+              return [];
+            }
+          }
+          // 이미 배열인 경우 복사
+          return Array.isArray(originalPolicy.unionTargetStores) ? [...originalPolicy.unionTargetStores] : [];
+        })(),
+        unionConditions: (() => {
+          if (!originalPolicy.unionConditions) return {};
+          if (typeof originalPolicy.unionConditions === 'string') {
+            try {
+              return JSON.parse(originalPolicy.unionConditions);
+            } catch (e) {
+              return {};
+            }
+          }
+          return { ...originalPolicy.unionConditions };
+        })(),
         // 개별소급정책
-        individualTarget: originalPolicy.individualTarget ? { ...originalPolicy.individualTarget } : {},
-        individualActivationType: originalPolicy.individualActivationType
+        individualTarget: (() => {
+          if (!originalPolicy.individualTarget) return {};
+          if (typeof originalPolicy.individualTarget === 'string') {
+            try {
+              return JSON.parse(originalPolicy.individualTarget);
+            } catch (e) {
+              return {};
+            }
+          }
+          return { ...originalPolicy.individualTarget };
+        })(),
+        individualActivationType: originalPolicy.individualActivationType || ''
       };
 
       await PolicyService.createPolicy(copyData);
@@ -1358,27 +1454,123 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
               team: '대기'
             },
             // 공통/카테고리별 추가 필드들
-            activationType: policy.activationType ? { ...policy.activationType } : { new010: false, mnp: false, change: false },
+            activationType: (() => {
+              if (!policy.activationType) return { new010: false, mnp: false, change: false };
+              if (typeof policy.activationType === 'string') {
+                try {
+                  return JSON.parse(policy.activationType);
+                } catch (e) {
+                  return { new010: false, mnp: false, change: false };
+                }
+              }
+              return { ...policy.activationType };
+            })(),
             multipleStoreName: policy.multipleStoreName,
             isMultiple: policy.isMultiple,
             // 구두정책
             amount95Above: policy.amount95Above,
             amount95Below: policy.amount95Below,
             // 부가차감지원정책
-            deductSupport: policy.deductSupport ? { ...policy.deductSupport } : { addServiceAmount: '', insuranceAmount: '', connectionAmount: '' },
-            conditionalOptions: policy.conditionalOptions ? { ...policy.conditionalOptions } : { addServiceAcquired: false, insuranceAcquired: false, connectionAcquired: false },
+            deductSupport: (() => {
+              if (!policy.deductSupport) return { addServiceAmount: '', insuranceAmount: '', connectionAmount: '' };
+              if (typeof policy.deductSupport === 'string') {
+                try {
+                  return JSON.parse(policy.deductSupport);
+                } catch (e) {
+                  return { addServiceAmount: '', insuranceAmount: '', connectionAmount: '' };
+                }
+              }
+              return { ...policy.deductSupport };
+            })(),
+            conditionalOptions: (() => {
+              if (!policy.conditionalOptions) return { addServiceAcquired: false, insuranceAcquired: false, connectionAcquired: false };
+              if (typeof policy.conditionalOptions === 'string') {
+                try {
+                  return JSON.parse(policy.conditionalOptions);
+                } catch (e) {
+                  return { addServiceAcquired: false, insuranceAcquired: false, connectionAcquired: false };
+                }
+              }
+              return { ...policy.conditionalOptions };
+            })(),
             // 부가추가지원정책
-            addSupport: policy.addSupport ? { ...policy.addSupport } : { uplayPremiumAmount: '', phoneExchangePassAmount: '', musicAmount: '', numberFilteringAmount: '' },
-            supportConditionalOptions: policy.supportConditionalOptions ? { ...policy.supportConditionalOptions } : { vas2Both: false, vas2Either: false, addon3All: false },
+            addSupport: (() => {
+              if (!policy.addSupport) return { uplayPremiumAmount: '', phoneExchangePassAmount: '', musicAmount: '', numberFilteringAmount: '' };
+              if (typeof policy.addSupport === 'string') {
+                try {
+                  return JSON.parse(policy.addSupport);
+                } catch (e) {
+                  return { uplayPremiumAmount: '', phoneExchangePassAmount: '', musicAmount: '', numberFilteringAmount: '' };
+                }
+              }
+              return { ...policy.addSupport };
+            })(),
+            supportConditionalOptions: (() => {
+              if (!policy.supportConditionalOptions) return { vas2Both: false, vas2Either: false, addon3All: false };
+              if (typeof policy.supportConditionalOptions === 'string') {
+                try {
+                  return JSON.parse(policy.supportConditionalOptions);
+                } catch (e) {
+                  return { vas2Both: false, vas2Either: false, addon3All: false };
+                }
+              }
+              return { ...policy.supportConditionalOptions };
+            })(),
             // 요금제유형별정책
-            rateSupports: policy.rateSupports ? JSON.parse(JSON.stringify(policy.rateSupports)) : [],
+            isDirectInput: policy.isDirectInput || false,
+            rateSupports: (() => {
+              if (!policy.rateSupports) return [];
+              // JSON 문자열인 경우 파싱
+              if (typeof policy.rateSupports === 'string') {
+                try {
+                  return JSON.parse(policy.rateSupports);
+                } catch (e) {
+                  console.error('rateSupports 파싱 실패:', e);
+                  return [];
+                }
+              }
+              // 이미 배열인 경우 깊은 복사
+              return Array.isArray(policy.rateSupports) ? JSON.parse(JSON.stringify(policy.rateSupports)) : [];
+            })(),
             // 연합정책
-            unionSettlementStore: policy.unionSettlementStore,
-            unionTargetStores: policy.unionTargetStores ? [...policy.unionTargetStores] : [],
-            unionConditions: policy.unionConditions ? { ...policy.unionConditions } : {},
+            unionSettlementStore: policy.unionSettlementStore || '',
+            unionTargetStores: (() => {
+              if (!policy.unionTargetStores) return [];
+              // JSON 문자열인 경우 파싱
+              if (typeof policy.unionTargetStores === 'string') {
+                try {
+                  return JSON.parse(policy.unionTargetStores);
+                } catch (e) {
+                  return [];
+                }
+              }
+              // 이미 배열인 경우 복사
+              return Array.isArray(policy.unionTargetStores) ? [...policy.unionTargetStores] : [];
+            })(),
+            unionConditions: (() => {
+              if (!policy.unionConditions) return {};
+              if (typeof policy.unionConditions === 'string') {
+                try {
+                  return JSON.parse(policy.unionConditions);
+                } catch (e) {
+                  return {};
+                }
+              }
+              return { ...policy.unionConditions };
+            })(),
             // 개별소급정책
-            individualTarget: policy.individualTarget ? { ...policy.individualTarget } : {},
-            individualActivationType: policy.individualActivationType
+            individualTarget: (() => {
+              if (!policy.individualTarget) return {};
+              if (typeof policy.individualTarget === 'string') {
+                try {
+                  return JSON.parse(policy.individualTarget);
+                } catch (e) {
+                  return {};
+                }
+              }
+              return { ...policy.individualTarget };
+            })(),
+            individualActivationType: policy.individualActivationType || ''
           };
           await PolicyService.createPolicy(copyData);
         }
