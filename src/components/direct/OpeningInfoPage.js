@@ -381,33 +381,35 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
             const saveData = {
                 // 기본 정보
                 posCode: formData.posCode || '',
+                company: loggedInStore?.name || '',
                 storeName: loggedInStore?.name || '',
                 storeId: loggedInStore?.id || '',
-                saleDateTime: new Date().toISOString(),
+                soldAt: new Date().toISOString(),
                 customerName: formData.customerName,
                 customerContact: formData.customerContact,
-                ctn: '', // CTN은 나중에 입력
+                ctn: formData.ctn || '', // CTN
                 carrier: selectedCarrier,
-                deviceModel: initialData?.model || '',
-                deviceName: initialData?.petName || '',
-                deviceColor: formData.deviceColor,
-                deviceSerial: formData.deviceSerial,
-                simModel: formData.simModel,
-                simSerial: formData.simSerial,
-                openingType: formData.openingType,
-                prevCarrier: formData.openingType === 'MNP' ? formData.prevCarrier : '',
-                paymentType: formData.paymentType, // 할부구분
-                installmentPeriod: formData.installmentPeriod, // 할부개월
-                contractType: formData.contractType, // 약정
-                plan: formData.plan, // 요금제
-                addons: requiredAddons.map(a => a.name).join(', '), // 부가서비스
+                model: initialData?.model || '', // 단말기모델명
+                color: formData.deviceColor || '', // 색상
+                deviceSerial: formData.deviceSerial || '', // 단말일련번호
+                usimModel: formData.simModel || '', // 유심모델명
+                usimSerial: formData.simSerial || '', // 유심일련번호
+                openingType: formData.openingType, // 개통유형 (NEW, MNP, CHANGE)
+                prevCarrier: formData.openingType === 'MNP' ? (formData.prevCarrier || '') : '', // 전통신사
+                installmentType: formData.paymentType === 'installment' ? '할부' : formData.paymentType === 'cash' ? '현금' : '', // 할부구분
+                installmentPeriod: formData.installmentPeriod || 24, // 할부개월
+                contractType: formData.contractType || 'standard', // 약정
+                contract: formData.contractType || 'standard', // 약정 (하위 호환)
+                plan: formData.plan || '', // 요금제
+                addons: requiredAddons.map(a => a.name).join(', ') || '', // 부가서비스
                 // 금액 정보
-                factoryPrice: factoryPrice, // 출고가
+                factoryPrice: factoryPrice || 0, // 출고가
                 publicSupport: formData.usePublicSupport ? publicSupport : 0, // 이통사지원금
                 storeSupportWithAddon: formData.withAddon ? storeSupportWithAddon : 0, // 대리점추가지원금(부가유치)
-                storeSupportWithoutAddon: !formData.withAddon ? storeSupportWithoutAddon : 0, // 대리점추가지원금(부가미유치)
+                storeSupportNoAddon: !formData.withAddon ? storeSupportWithoutAddon : 0, // 대리점추가지원금(부가미유치)
+                storeSupportWithoutAddon: !formData.withAddon ? storeSupportWithoutAddon : 0, // 하위 호환
                 margin: 0, // 마진 (정책설정에서 가져와야 함)
-                // 계산된 값들
+                // 계산된 값들 (참고용, 시트에는 저장 안 됨)
                 installmentPrincipalWithAddon: calculateInstallmentPrincipalWithAddon(),
                 installmentPrincipalWithoutAddon: calculateInstallmentPrincipalWithoutAddon(),
                 installmentFee: calculateInstallmentFee(),
