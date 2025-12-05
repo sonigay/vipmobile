@@ -62,6 +62,11 @@ const PolicySettingsTab = () => {
     // 부가서비스 입력 폼 상태
     const [newAddon, setNewAddon] = useState({ name: '', fee: '', incentive: '', deduction: '' });
 
+    // 2-1. 보험상품 설정 리스트
+    const [insurances, setInsurances] = useState([]);
+    // 보험상품 입력 폼 상태
+    const [newInsurance, setNewInsurance] = useState({ name: '', minPrice: '', maxPrice: '', fee: '', incentive: '', deduction: '' });
+
     // 3. 별도정책 설정 리스트
     const [specialPolicies, setSpecialPolicies] = useState([
         { id: 1, name: '기기반납', addition: 0, deduction: 100000, isActive: true },
@@ -94,6 +99,9 @@ const PolicySettingsTab = () => {
                     }
                     if (data.addon?.list) {
                         setAddons(data.addon.list);
+                    }
+                    if (data.insurance?.list) {
+                        setInsurances(data.insurance.list);
                     }
                     if (data.special?.list) {
                         setSpecialPolicies(data.special.list);
@@ -133,6 +141,27 @@ const PolicySettingsTab = () => {
         setAddons(addons.filter(item => item.id !== id));
     };
 
+    // 보험상품 추가
+    const handleAddInsurance = () => {
+        if (newInsurance.name && newInsurance.minPrice !== '' && newInsurance.maxPrice !== '' && newInsurance.fee !== '') {
+            setInsurances([...insurances, {
+                id: Date.now(),
+                name: newInsurance.name,
+                minPrice: Number(newInsurance.minPrice) || 0,
+                maxPrice: Number(newInsurance.maxPrice) || 0,
+                fee: Number(newInsurance.fee) || 0,
+                incentive: Number(newInsurance.incentive) || 0,
+                deduction: Number(newInsurance.deduction) || 0
+            }]);
+            setNewInsurance({ name: '', minPrice: '', maxPrice: '', fee: '', incentive: '', deduction: '' });
+        }
+    };
+
+    // 보험상품 삭제
+    const handleDeleteInsurance = (id) => {
+        setInsurances(insurances.filter(item => item.id !== id));
+    };
+
     // 별도정책 추가
     const handleAddSpecial = () => {
         if (newSpecial.name) {
@@ -168,7 +197,7 @@ const PolicySettingsTab = () => {
             if (type === 'margin') {
                 settings = { margin: { baseMargin: margin } };
             } else if (type === 'addon') {
-                settings = { addon: { list: addons } };
+                settings = { addon: { list: addons }, insurance: { list: insurances } };
             } else if (type === 'special') {
                 settings = { special: { list: specialPolicies } };
             }
@@ -380,6 +409,104 @@ const PolicySettingsTab = () => {
                                 </Typography>
                             )}
                         </List>
+
+                        {/* 보험상품 추가 섹션 */}
+                        <Divider sx={{ my: 2 }} />
+                        <Paper variant="outlined" sx={{ p: 2, bgcolor: 'background.subtle' }}>
+                            <Typography variant="subtitle2" gutterBottom fontWeight="bold">새 보험상품 추가</Typography>
+                            <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>
+                                출고가 범위별로 월요금을 다르게 설정할 수 있습니다.
+                            </Typography>
+                            <Grid container spacing={2} alignItems="center">
+                                <Grid item xs={12} sm={3}>
+                                    <TextField
+                                        label="보험상품명" size="small" fullWidth
+                                        value={newInsurance.name} onChange={(e) => setNewInsurance({ ...newInsurance, name: e.target.value })}
+                                    />
+                                </Grid>
+                                <Grid item xs={6} sm={2}>
+                                    <TextField
+                                        label="출고가 최소" size="small" fullWidth type="number"
+                                        value={newInsurance.minPrice} onChange={(e) => setNewInsurance({ ...newInsurance, minPrice: e.target.value })}
+                                        placeholder="0"
+                                    />
+                                </Grid>
+                                <Grid item xs={6} sm={2}>
+                                    <TextField
+                                        label="출고가 최대" size="small" fullWidth type="number"
+                                        value={newInsurance.maxPrice} onChange={(e) => setNewInsurance({ ...newInsurance, maxPrice: e.target.value })}
+                                        placeholder="9999999"
+                                    />
+                                </Grid>
+                                <Grid item xs={4} sm={1.5}>
+                                    <TextField
+                                        label="월요금" size="small" fullWidth type="number"
+                                        value={newInsurance.fee} onChange={(e) => setNewInsurance({ ...newInsurance, fee: e.target.value })}
+                                    />
+                                </Grid>
+                                <Grid item xs={4} sm={1.5}>
+                                    <TextField
+                                        label="유치(+)" size="small" fullWidth type="number" color="primary"
+                                        value={newInsurance.incentive} onChange={(e) => setNewInsurance({ ...newInsurance, incentive: e.target.value })}
+                                    />
+                                </Grid>
+                                <Grid item xs={4} sm={1.5}>
+                                    <TextField
+                                        label="미유치(-)" size="small" fullWidth type="number" color="error"
+                                        value={newInsurance.deduction} onChange={(e) => setNewInsurance({ ...newInsurance, deduction: e.target.value })}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={0.5}>
+                                    <Button variant="contained" fullWidth startIcon={<AddIcon />} onClick={handleAddInsurance}>
+                                        추가
+                                    </Button>
+                                </Grid>
+                            </Grid>
+                        </Paper>
+
+                        {/* 보험상품 리스트 */}
+                        {insurances.length > 0 && (
+                            <>
+                                <Typography variant="subtitle2" gutterBottom fontWeight="bold" sx={{ mt: 2 }}>등록된 보험상품</Typography>
+                                <List>
+                                    {insurances.map((insurance) => (
+                                        <React.Fragment key={insurance.id}>
+                                            <ListItem>
+                                                <ListItemText
+                                                    primary={
+                                                        <Typography fontWeight="bold">{insurance.name}</Typography>
+                                                    }
+                                                    secondary={
+                                                        <Box>
+                                                            <Typography variant="body2" color="text.secondary">
+                                                                출고가: {insurance.minPrice.toLocaleString()}원 ~ {insurance.maxPrice.toLocaleString()}원
+                                                            </Typography>
+                                                            <Typography variant="body2" color="text.secondary">
+                                                                월 {insurance.fee.toLocaleString()}원
+                                                            </Typography>
+                                                        </Box>
+                                                    }
+                                                />
+                                                <Stack direction="row" spacing={2} alignItems="center" sx={{ mr: 2 }}>
+                                                    <Typography variant="body2" color="primary">
+                                                        유치: +{insurance.incentive.toLocaleString()}
+                                                    </Typography>
+                                                    <Typography variant="body2" color="error">
+                                                        미유치: -{insurance.deduction.toLocaleString()}
+                                                    </Typography>
+                                                </Stack>
+                                                <ListItemSecondaryAction>
+                                                    <IconButton edge="end" onClick={() => handleDeleteInsurance(insurance.id)}>
+                                                        <DeleteIcon />
+                                                    </IconButton>
+                                                </ListItemSecondaryAction>
+                                            </ListItem>
+                                            <Divider />
+                                        </React.Fragment>
+                                    ))}
+                                </List>
+                            </>
+                        )}
                     </Stack>
                 </DialogContent>
                 <DialogActions>

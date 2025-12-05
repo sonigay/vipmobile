@@ -4,12 +4,14 @@ const { google } = require('googleapis');
 // 직영점 모드 시트 이름
 const SHEET_POLICY_MARGIN = '직영점_정책_마진';
 const SHEET_POLICY_ADDON = '직영점_정책_부가서비스';
+const SHEET_POLICY_INSURANCE = '직영점_정책_보험상품';
 const SHEET_POLICY_SPECIAL = '직영점_정책_별도';
 const SHEET_SETTINGS = '직영점_설정';
 
 // 시트 헤더 정의
 const HEADERS_POLICY_MARGIN = ['통신사', '마진'];
 const HEADERS_POLICY_ADDON = ['통신사', '서비스명', '월요금', '유치추가금액', '미유치차감금액'];
+const HEADERS_POLICY_INSURANCE = ['통신사', '보험상품명', '출고가최소', '출고가최대', '월요금', '유치추가금액', '미유치차감금액'];
 const HEADERS_POLICY_SPECIAL = ['통신사', '정책명', '추가금액', '차감금액', '적용여부'];
 const HEADERS_SETTINGS = ['통신사', '설정유형', '시트ID', '시트URL', '설정값JSON'];
 
@@ -128,6 +130,25 @@ function setupDirectRoutes(app) {
           deduction: Number(row[4] || 0)
         }));
 
+      // 보험상품 설정 읽기
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_INSURANCE, HEADERS_POLICY_INSURANCE);
+      const insuranceRes = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: SHEET_POLICY_INSURANCE
+      });
+      const insuranceRows = (insuranceRes.data.values || []).slice(1);
+      const insurances = insuranceRows
+        .filter(row => (row[0] || '').trim() === carrier)
+        .map((row, idx) => ({
+          id: idx + 1,
+          name: (row[1] || '').trim(),
+          minPrice: Number(row[2] || 0),
+          maxPrice: Number(row[3] || 0),
+          fee: Number(row[4] || 0),
+          incentive: Number(row[5] || 0),
+          deduction: Number(row[6] || 0)
+        }));
+
       // 별도 정책 설정 읽기
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_SPECIAL, HEADERS_POLICY_SPECIAL);
       const specialRes = await sheets.spreadsheets.values.get({
@@ -149,6 +170,7 @@ function setupDirectRoutes(app) {
         success: true,
         margin: { baseMargin: margin },
         addon: { list: addons },
+        insurance: { list: insurances },
         special: { list: specialPolicies }
       });
     } catch (error) {
@@ -157,11 +179,11 @@ function setupDirectRoutes(app) {
     }
   });
 
-  // POST /api/direct/policy-settings?carrier=SK
+      // POST /api/direct/policy-settings?carrier=SK
   router.post('/policy-settings', async (req, res) => {
     try {
       const carrier = req.query.carrier || 'SK';
-      const { margin, addon, special } = req.body || {};
+      const { margin, addon, insurance, special } = req.body || {};
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
 
       // 마진 설정 저장
@@ -244,6 +266,62 @@ function setupDirectRoutes(app) {
             valueInputOption: 'USER_ENTERED',
             insertDataOption: 'INSERT_ROWS',
             resource: { values: newAddonRows }
+          });
+        }
+      }
+
+      // 보험상품 설정 저장
+      if (insurance && insurance.list) {
+        await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_INSURANCE, HEADERS_POLICY_INSURANCE);
+        // 기존 데이터 읽기
+        const insuranceRes = await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: SHEET_POLICY_INSURANCE
+        });
+        const insuranceRows = (insuranceRes.data.values || []).slice(1);
+        // 해당 통신사 데이터 삭제 (인덱스 역순으로 삭제)
+        const deleteIndices = [];
+        for (let i = insuranceRows.length - 1; i >= 0; i--) {
+          if ((insuranceRows[i][0] || '').trim() === carrier) {
+            deleteIndices.push(i + 2); // 1-based + header row
+          }
+        }
+        if (deleteIndices.length > 0) {
+          const sheetId = await getSheetId(sheets, SPREADSHEET_ID, SHEET_POLICY_INSURANCE);
+          // 역순으로 정렬 (높은 인덱스부터 삭제)
+          deleteIndices.sort((a, b) => b - a);
+          const deleteRequests = deleteIndices.map(idx => ({
+            deleteDimension: {
+              range: {
+                sheetId: sheetId,
+                dimension: 'ROWS',
+                startIndex: idx - 1,
+                endIndex: idx
+              }
+            }
+          }));
+          await sheets.spreadsheets.batchUpdate({
+            spreadsheetId: SPREADSHEET_ID,
+            resource: { requests: deleteRequests }
+          });
+        }
+        // 새 데이터 추가
+        const newInsuranceRows = insurance.list.map(item => [
+          carrier,
+          item.name || '',
+          item.minPrice || 0,
+          item.maxPrice || 0,
+          item.fee || 0,
+          item.incentive || 0,
+          item.deduction || 0
+        ]);
+        if (newInsuranceRows.length > 0) {
+          await sheets.spreadsheets.values.append({
+            spreadsheetId: SPREADSHEET_ID,
+            range: SHEET_POLICY_INSURANCE,
+            valueInputOption: 'USER_ENTERED',
+            insertDataOption: 'INSERT_ROWS',
+            resource: { values: newInsuranceRows }
           });
         }
       }
@@ -810,9 +888,10 @@ function setupDirectRoutes(app) {
         }
       }
 
-      // 6. 정책설정에서 마진, 부가서비스, 별도정책 정보 읽기
+      // 6. 정책설정에서 마진, 부가서비스, 보험상품, 별도정책 정보 읽기
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_MARGIN, HEADERS_POLICY_MARGIN);
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_ADDON, HEADERS_POLICY_ADDON);
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_INSURANCE, HEADERS_POLICY_INSURANCE);
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_SPECIAL, HEADERS_POLICY_SPECIAL);
       
       const marginRes = await sheets.spreadsheets.values.get({
@@ -846,6 +925,24 @@ function setupDirectRoutes(app) {
       const requiredAddons = addonList
         .filter(addon => addon.deduction > 0)
         .map(addon => addon.name);
+
+      // 보험상품 설정 읽기
+      const insuranceRes = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: SHEET_POLICY_INSURANCE
+      });
+      const insuranceRows = (insuranceRes.data.values || []).slice(1);
+      const insuranceList = insuranceRows
+        .filter(row => (row[0] || '').trim() === carrierParam)
+        .map((row, idx) => ({
+          id: idx + 1,
+          name: (row[1] || '').trim(),
+          minPrice: Number(row[2] || 0),
+          maxPrice: Number(row[3] || 0),
+          fee: Number(row[4] || 0),
+          incentive: Number(row[5] || 0),
+          deduction: Number(row[6] || 0)
+        }));
 
       // 별도정책 설정 읽기
       const specialRes = await sheets.spreadsheets.values.get({
@@ -924,6 +1021,15 @@ function setupDirectRoutes(app) {
         const factoryPrice = supportData.factoryPrice || 0;
         const openingTypeStr = supportData.openingType || '';
         const supportRowIndex = supportData.rowIndex || i; // 요금제군별 지원금 매칭용
+
+        // 출고가에 맞는 보험상품 찾기
+        const matchingInsurance = insuranceList.find(insurance => {
+          const minPrice = insurance.minPrice || 0;
+          const maxPrice = insurance.maxPrice || 9999999;
+          return factoryPrice >= minPrice && factoryPrice <= maxPrice;
+        });
+        const insuranceFee = matchingInsurance ? matchingInsurance.fee : 0;
+        const insuranceName = matchingInsurance ? matchingInsurance.name : '';
         
         // 개통유형을 표준화 (010신규, MNP, 기변)
         let openingType = '010신규';
@@ -1000,7 +1106,9 @@ function setupDirectRoutes(app) {
           purchasePriceWithoutAddon: purchasePriceWithoutAddon,
           image: imageMap.get(model) || '',
           tags: tagsArray,
-          requiredAddons: requiredAddons.join(', ') || '없음',
+          requiredAddons: (requiredAddons.length > 0 ? requiredAddons.join(', ') : '') + (insuranceName ? (requiredAddons.length > 0 ? ', ' : '') + insuranceName : '') || '없음',
+          insuranceName: insuranceName,
+          insuranceFee: insuranceFee,
           isPopular: tags.isPopular || false,
           isRecommended: tags.isRecommended || false,
           isCheap: tags.isCheap || false,

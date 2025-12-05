@@ -217,38 +217,62 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
         loadPlanGroups();
     }, [selectedCarrier]);
 
-    // 필수 부가서비스 로드 (정책설정에서 가져오기)
+    // 필수 부가서비스 및 보험상품 로드 (정책설정에서 가져오기)
     useEffect(() => {
         const loadRequiredAddons = async () => {
             try {
                 const policySettings = await directStoreApi.getPolicySettings(selectedCarrier);
+                const required = [];
+                
                 if (policySettings.success && policySettings.addon?.list) {
                     // 미유치차감금액이 있는 부가서비스를 필수 부가서비스로 간주
-                    const required = policySettings.addon.list
+                    const addonList = policySettings.addon.list
                         .filter(addon => addon.deduction > 0)
                         .map(addon => ({
                             name: addon.name,
-                            monthlyFee: addon.fee || 0
+                            monthlyFee: addon.fee || 0,
+                            type: 'addon'
                         }));
+                    required.push(...addonList);
+                }
+                
+                // 보험상품: 출고가에 맞는 보험상품 찾기
+                if (policySettings.success && policySettings.insurance?.list && factoryPrice > 0) {
+                    const matchingInsurance = policySettings.insurance.list.find(insurance => {
+                        const minPrice = insurance.minPrice || 0;
+                        const maxPrice = insurance.maxPrice || 9999999;
+                        return factoryPrice >= minPrice && factoryPrice <= maxPrice;
+                    });
+                    
+                    if (matchingInsurance) {
+                        required.push({
+                            name: matchingInsurance.name,
+                            monthlyFee: matchingInsurance.fee || 0,
+                            type: 'insurance'
+                        });
+                    }
+                }
+                
+                if (required.length > 0) {
                     setRequiredAddons(required);
                 } else {
                     // 정책설정이 없으면 Mock 데이터 사용
                     setRequiredAddons([
-                        { name: '우주패스', monthlyFee: 9900 },
-                        { name: 'V컬러링', monthlyFee: 3300 }
+                        { name: '우주패스', monthlyFee: 9900, type: 'addon' },
+                        { name: 'V컬러링', monthlyFee: 3300, type: 'addon' }
                     ]);
                 }
             } catch (err) {
                 console.error('필수 부가서비스 로드 실패:', err);
                 // 에러 시 Mock 데이터 사용
                 setRequiredAddons([
-                    { name: '우주패스', monthlyFee: 9900 },
-                    { name: 'V컬러링', monthlyFee: 3300 }
+                    { name: '우주패스', monthlyFee: 9900, type: 'addon' },
+                    { name: 'V컬러링', monthlyFee: 3300, type: 'addon' }
                 ]);
             }
         };
         loadRequiredAddons();
-    }, [selectedCarrier]);
+    }, [selectedCarrier, factoryPrice]);
 
     // 계산 로직
     const calculateInstallmentPrincipalWithAddon = () => {
