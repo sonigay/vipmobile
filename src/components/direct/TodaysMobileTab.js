@@ -40,7 +40,8 @@ const ProductCard = ({ product, isPremium, onSelect, compact }) => {
   return (
     <Card
       sx={{
-        height: '100%',
+        height: 'auto',  // 내용에 맞게 자동 높이
+        minHeight: compact ? 380 : 420,  // 최소 높이만 설정
         display: 'flex',
         flexDirection: 'column',
         position: 'relative',
@@ -251,8 +252,9 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
               lg: 'repeat(5, 1fr)',    // 큰 PC: 5열
               xl: 'repeat(6, 1fr)'     // 초대형: 6열
             },
-            gridAutoRows: '1fr',
+            gridAutoRows: 'auto',  // 내용에 맞게 자동 높이 조정
             alignContent: 'start',
+            alignItems: 'start',  // 카드들을 위쪽부터 정렬
             overflowY: 'auto',
             overflowX: 'hidden',
             flex: 1,
