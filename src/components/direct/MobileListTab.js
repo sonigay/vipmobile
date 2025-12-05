@@ -79,14 +79,36 @@ const MobileListTab = ({ onProductSelect }) => {
     fetchMobileList();
   }, [carrierTab]);
 
-  // 요금제군 목록 로드
+  // 요금제군 목록 로드 (캐싱으로 최적화)
   useEffect(() => {
     const fetchPlanGroups = async () => {
       try {
         const carrier = getCurrentCarrier();
+        const cacheKey = `planGroups-${carrier}`;
+        const cached = sessionStorage.getItem(cacheKey);
+        
+        if (cached) {
+          try {
+            const cachedData = JSON.parse(cached);
+            // 5분 이내 캐시면 사용
+            if (Date.now() - cachedData.timestamp < 5 * 60 * 1000) {
+              setPlanGroups(cachedData.planGroups || []);
+              return;
+            }
+          } catch (e) {
+            // 캐시 파싱 실패 시 무시
+          }
+        }
+        
         const linkSettings = await directStoreApi.getLinkSettings(carrier);
         if (linkSettings.success && linkSettings.planGroup) {
-          setPlanGroups(linkSettings.planGroup.planGroups || []);
+          const planGroups = linkSettings.planGroup.planGroups || [];
+          setPlanGroups(planGroups);
+          // 세션 스토리지에 캐싱 (5분)
+          sessionStorage.setItem(cacheKey, JSON.stringify({
+            planGroups,
+            timestamp: Date.now()
+          }));
         }
       } catch (err) {
         console.error('요금제군 목록 로딩 실패:', err);

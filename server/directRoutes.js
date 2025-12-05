@@ -860,9 +860,9 @@ function setupDirectRoutes(app) {
       // 3. 정책표 설정은 이미 위에서 읽었으므로 재사용
       // policyRow, policySettingsJson, policySheetId는 이미 선언됨
 
-      // 4. 요금제군별 이통사지원금 범위 읽기
+      // 4. 요금제군별 이통사지원금 범위 읽기 (병렬 처리로 최적화)
       const planGroupSupportData = {};
-      for (const [planGroup, range] of Object.entries(planGroupRanges)) {
+      const supportPromises = Object.entries(planGroupRanges).map(async ([planGroup, range]) => {
         if (range) {
           try {
             const response = await sheets.spreadsheets.values.get({
@@ -871,62 +871,83 @@ function setupDirectRoutes(app) {
               majorDimension: 'ROWS',
               valueRenderOption: 'UNFORMATTED_VALUE'
             });
-            planGroupSupportData[planGroup] = response.data.values || [];
+            return { planGroup, data: response.data.values || [] };
           } catch (err) {
             console.warn(`[Direct] ${planGroup} 지원금 범위 읽기 실패:`, err);
-            planGroupSupportData[planGroup] = [];
+            return { planGroup, data: [] };
           }
         }
-      }
+        return { planGroup, data: [] };
+      });
+      
+      const supportResults = await Promise.all(supportPromises);
+      supportResults.forEach(({ planGroup, data }) => {
+        planGroupSupportData[planGroup] = data;
+      });
 
-      // 5. 정책표 설정에서 요금제군 & 유형별 리베이트 읽기
+      // 5. 정책표 설정에서 요금제군 & 유형별 리베이트 읽기 (병렬 처리로 최적화)
       const policyRebateData = {}; // { '115군': { '010신규': [값들], 'MNP': [값들], '기변': [값들] } }
       if (policySheetId && policySettingsJson.planGroupRanges) {
+        const rebatePromises = [];
         for (const [planGroup, typeRanges] of Object.entries(policySettingsJson.planGroupRanges)) {
           if (typeof typeRanges === 'object') {
             policyRebateData[planGroup] = {};
             for (const [openingType, range] of Object.entries(typeRanges)) {
               if (range) {
-                try {
-                  const response = await sheets.spreadsheets.values.get({
+                rebatePromises.push(
+                  sheets.spreadsheets.values.get({
                     spreadsheetId: policySheetId,
                     range: range,
                     majorDimension: 'ROWS',
                     valueRenderOption: 'UNFORMATTED_VALUE'
-                  });
-                  // 만원 단위로 저장되어 있으므로 *10000 적용
-                  const values = (response.data.values || []).map(row => 
-                    Number((row[0] || 0).toString().replace(/,/g, '')) * 10000
-                  );
-                  policyRebateData[planGroup][openingType] = values;
-                } catch (err) {
-                  console.warn(`[Direct] ${planGroup} ${openingType} 리베이트 범위 읽기 실패:`, err);
-                  policyRebateData[planGroup][openingType] = [];
-                }
+                  })
+                  .then(response => {
+                    // 만원 단위로 저장되어 있으므로 *10000 적용
+                    const values = (response.data.values || []).map(row => 
+                      Number((row[0] || 0).toString().replace(/,/g, '')) * 10000
+                    );
+                    policyRebateData[planGroup][openingType] = values;
+                  })
+                  .catch(err => {
+                    console.warn(`[Direct] ${planGroup} ${openingType} 리베이트 범위 읽기 실패:`, err);
+                    policyRebateData[planGroup][openingType] = [];
+                  })
+                );
               }
             }
           }
         }
+        await Promise.all(rebatePromises);
       }
 
-      // 6. 정책설정에서 마진, 부가서비스, 보험상품, 별도정책 정보 읽기
-      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_MARGIN, HEADERS_POLICY_MARGIN);
-      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_ADDON, HEADERS_POLICY_ADDON);
-      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_INSURANCE, HEADERS_POLICY_INSURANCE);
-      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_SPECIAL, HEADERS_POLICY_SPECIAL);
+      // 6. 정책설정에서 마진, 부가서비스, 보험상품, 별도정책 정보 읽기 (병렬 처리로 최적화)
+      const [marginRes, addonRes, insuranceRes, specialRes] = await Promise.all([
+        ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_MARGIN, HEADERS_POLICY_MARGIN)
+          .then(() => sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: SHEET_POLICY_MARGIN
+          })),
+        ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_ADDON, HEADERS_POLICY_ADDON)
+          .then(() => sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: SHEET_POLICY_ADDON
+          })),
+        ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_INSURANCE, HEADERS_POLICY_INSURANCE)
+          .then(() => sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: SHEET_POLICY_INSURANCE
+          })),
+        ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_SPECIAL, HEADERS_POLICY_SPECIAL)
+          .then(() => sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: SHEET_POLICY_SPECIAL
+          }))
+      ]);
       
-      const marginRes = await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: SHEET_POLICY_MARGIN
-      });
       const marginRows = (marginRes.data.values || []).slice(1);
       const marginRow = marginRows.find(row => (row[0] || '').trim() === carrierParam);
       const baseMargin = marginRow ? Number(marginRow[1] || 0) : 50000;
 
-      const addonRes = await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: SHEET_POLICY_ADDON
-      });
       const addonRows = (addonRes.data.values || []).slice(1);
       const addonList = addonRows
         .filter(row => (row[0] || '').trim() === carrierParam)
@@ -947,11 +968,6 @@ function setupDirectRoutes(app) {
         .filter(addon => addon.deduction > 0)
         .map(addon => addon.name);
 
-      // 보험상품 설정 읽기
-      const insuranceRes = await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: SHEET_POLICY_INSURANCE
-      });
       const insuranceRows = (insuranceRes.data.values || []).slice(1);
       const insuranceList = insuranceRows
         .filter(row => (row[0] || '').trim() === carrierParam)
@@ -965,11 +981,6 @@ function setupDirectRoutes(app) {
           deduction: Number(row[6] || 0)
         }));
 
-      // 별도정책 설정 읽기
-      const specialRes = await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: SHEET_POLICY_SPECIAL
-      });
       const specialRows = (specialRes.data.values || []).slice(1);
       const specialPolicies = specialRows
         .filter(row => (row[0] || '').trim() === carrierParam && (row[4] || '').toString().toLowerCase() === 'true')
@@ -985,11 +996,18 @@ function setupDirectRoutes(app) {
       // 별도정책 차감금액 합계
       const totalSpecialDeduction = specialPolicies.reduce((sum, policy) => sum + (policy.deduction || 0), 0);
 
-      // 7. 직영점_모델이미지 시트에서 이미지 URL 조회
-      const imageRes = await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: '직영점_모델이미지!A:C'
-      });
+      // 7. 직영점_모델이미지 시트와 직영점_오늘의휴대폰 시트 병렬 읽기 (최적화)
+      const [imageRes, todaysRes] = await Promise.all([
+        sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: '직영점_모델이미지!A:C'
+        }).catch(() => ({ data: { values: [] } })),
+        sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: '직영점_오늘의휴대폰!A:Z'
+        }).catch(() => ({ data: { values: [] } }))
+      ]);
+      
       const imageRows = (imageRes.data.values || []).slice(1);
       const imageMap = new Map();
       imageRows.forEach(row => {
@@ -1001,10 +1019,6 @@ function setupDirectRoutes(app) {
       // 8. 직영점_오늘의휴대폰 시트에서 구분(인기/추천/저렴/프리미엄/중저가) 태그 읽기
       let tagMap = new Map(); // { model: { isPopular, isRecommended, isCheap, isPremium, isBudget } }
       try {
-        const todaysRes = await sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: '직영점_오늘의휴대폰!A:Z'
-        });
         const todaysRows = (todaysRes.data.values || []).slice(1);
         todaysRows.forEach(row => {
           if (row[0]) { // 모델명
@@ -1162,7 +1176,7 @@ function setupDirectRoutes(app) {
       }
 
       const mobileList = await getMobileList(carrier);
-      setCache(cacheKey, mobileList, 60 * 1000); // 60초 캐시
+      setCache(cacheKey, mobileList, 5 * 60 * 1000); // 5분 캐시 (로딩 시간 최적화)
       res.json(mobileList);
     } catch (error) {
       console.error('[Direct] mobiles GET error:', error);
@@ -1185,16 +1199,18 @@ function setupDirectRoutes(app) {
         return res.json(cached);
       }
 
-      // 각 통신사별로 mobiles 데이터 가져오기 (getMobileList 함수 재사용)
-      for (const carrier of carriers) {
-        try {
-          const mobileList = await getMobileList(carrier);
-          allMobiles.push(...mobileList);
-        } catch (err) {
+      // 각 통신사별로 mobiles 데이터 가져오기 (병렬 처리로 최적화)
+      const mobileListPromises = carriers.map(carrier => 
+        getMobileList(carrier).catch(err => {
           console.warn(`[Direct] ${carrier} 통신사 데이터 가져오기 실패:`, err);
-          // 에러가 발생해도 다른 통신사 데이터는 계속 가져오기
-        }
-      }
+          return []; // 에러 시 빈 배열 반환
+        })
+      );
+      
+      const mobileLists = await Promise.all(mobileListPromises);
+      mobileLists.forEach(mobileList => {
+        allMobiles.push(...mobileList);
+      });
 
       // 프리미엄: isPremium 태그가 true인 상품만 필터링
       const premium = allMobiles
@@ -1217,7 +1233,7 @@ function setupDirectRoutes(app) {
         }));
 
       const result = { premium, budget };
-      setCache(cacheKey, result, 60 * 1000); // 60초 캐시
+      setCache(cacheKey, result, 5 * 60 * 1000); // 5분 캐시 (로딩 시간 최적화)
       res.json(result);
     } catch (error) {
       console.error('[Direct] todays-mobiles GET error:', error);
