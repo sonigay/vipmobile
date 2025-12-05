@@ -245,10 +245,10 @@ const DirectSalesReportTab = ({ onRowClick, loggedInStore, isManagementMode = fa
                                             </TableCell>
                                             <TableCell>{row.deviceModel || row.단말기모델명 || row.model || '-'}</TableCell>
                                             <TableCell align="center">{row.deviceColor || row.색상 || '-'}</TableCell>
-                                            <TableCell align="center">{row.openingType || row.개통유형 || '-'}</TableCell>
-                                            <TableCell align="center">{row.paymentType || row.할부구분 || '-'}</TableCell>
+                                            <TableCell align="center">{row.openingType || row.개통유형 || row.type || '-'}</TableCell>
+                                            <TableCell align="center">{row.installmentType || row.paymentType || row.할부구분 || '-'}</TableCell>
                                             <TableCell align="center">{row.installmentPeriod || row.할부개월 || '-'}</TableCell>
-                                            <TableCell align="center">{row.contractType || row.약정 || '-'}</TableCell>
+                                            <TableCell align="center">{row.contractType || row.contract || row.약정 || '-'}</TableCell>
                                             <TableCell>{row.plan || row.요금제 || '-'}</TableCell>
                                             <TableCell align="center">{getStatusChip(status)}</TableCell>
                                             <TableCell align="center" onClick={(e) => e.stopPropagation()}>
