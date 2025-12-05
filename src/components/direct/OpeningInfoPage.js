@@ -333,7 +333,7 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                 @media print {
                     @page {
                         size: A4;
-                        margin: 10mm;
+                        margin: 5mm;
                     }
                     
                     body * {
@@ -352,6 +352,7 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                         padding: 0 !important;
                         margin: 0 !important;
                         background: white !important;
+                        page-break-inside: avoid;
                     }
                     
                     /* 헤더 숨기기 */
@@ -359,31 +360,32 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                         display: none !important;
                     }
                     
-                    /* Paper 컴포넌트 스타일 최적화 */
+                    /* Paper 컴포넌트 스타일 최적화 - 페이지 브레이크 제거 */
                     .print-area .MuiPaper-root {
-                        margin-bottom: 8px !important;
-                        padding: 12px !important;
+                        margin-bottom: 4px !important;
+                        padding: 6px !important;
                         box-shadow: none !important;
-                        page-break-inside: avoid;
+                        page-break-inside: auto !important;
+                        break-inside: auto !important;
                     }
                     
                     /* Typography 크기 축소 */
                     .print-area .MuiTypography-h4 {
-                        font-size: 1.5rem !important;
-                        margin-bottom: 8px !important;
+                        font-size: 1.2rem !important;
+                        margin-bottom: 4px !important;
                     }
                     
                     .print-area .MuiTypography-h6 {
-                        font-size: 1rem !important;
-                        margin-bottom: 6px !important;
+                        font-size: 0.85rem !important;
+                        margin-bottom: 3px !important;
                     }
                     
                     .print-area .MuiTypography-body1 {
-                        font-size: 0.875rem !important;
+                        font-size: 0.75rem !important;
                     }
                     
                     .print-area .MuiTypography-body2 {
-                        font-size: 0.75rem !important;
+                        font-size: 0.65rem !important;
                     }
                     
                     /* Grid 간격 축소 */
@@ -393,42 +395,47 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                     }
                     
                     .print-area .MuiGrid-item {
-                        padding: 2px 4px !important;
+                        padding: 1px 2px !important;
                     }
                     
                     /* Grid spacing 최소화 */
                     .print-area .MuiGrid-spacing-xs-1\.5 > .MuiGrid-item {
-                        padding: 2px !important;
+                        padding: 1px !important;
+                    }
+                    
+                    .print-area .MuiGrid-spacing-xs-1 > .MuiGrid-item {
+                        padding: 1px !important;
                     }
                     
                     /* TextField 스타일 최적화 */
                     .print-area .MuiTextField-root {
-                        margin-bottom: 2px !important;
+                        margin-bottom: 1px !important;
                     }
                     
                     .print-area .MuiInputBase-root {
-                        font-size: 0.7rem !important;
-                        padding: 3px 6px !important;
-                        min-height: 28px !important;
+                        font-size: 0.65rem !important;
+                        padding: 2px 4px !important;
+                        min-height: 24px !important;
+                        height: 24px !important;
                     }
                     
                     .print-area .MuiInputLabel-root {
-                        font-size: 0.7rem !important;
-                        transform: translate(6px, 8px) scale(1) !important;
+                        font-size: 0.65rem !important;
+                        transform: translate(4px, 6px) scale(1) !important;
                     }
                     
                     .print-area .MuiInputLabel-shrink {
-                        transform: translate(6px, -9px) scale(0.75) !important;
+                        transform: translate(4px, -7px) scale(0.7) !important;
                     }
                     
                     /* Divider 간격 축소 */
                     .print-area .MuiDivider-root {
-                        margin: 2px 0 !important;
+                        margin: 1px 0 !important;
                     }
                     
                     /* Stack 간격 축소 */
                     .print-area .MuiStack-root {
-                        margin-bottom: 1px !important;
+                        margin-bottom: 0 !important;
                     }
                     
                     /* Stack spacing 최소화 */
@@ -438,64 +445,66 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                     
                     /* Alert 스타일 최적화 */
                     .print-area .MuiAlert-root {
-                        padding: 2px 6px !important;
-                        margin-bottom: 2px !important;
-                        font-size: 0.7rem !important;
+                        padding: 1px 4px !important;
+                        margin-bottom: 1px !important;
+                        font-size: 0.65rem !important;
                     }
                     
                     /* RadioGroup, Checkbox 간격 축소 */
                     .print-area .MuiFormControl-root {
-                        margin-bottom: 2px !important;
+                        margin-bottom: 1px !important;
                     }
                     
                     .print-area .MuiFormControlLabel-root {
-                        margin-right: 8px !important;
+                        margin-right: 4px !important;
                         margin-bottom: 0 !important;
                     }
                     
                     .print-area .MuiRadio-root {
-                        padding: 2px !important;
-                        font-size: 0.7rem !important;
+                        padding: 1px !important;
+                        font-size: 0.65rem !important;
                     }
                     
                     .print-area .MuiCheckbox-root {
-                        padding: 2px !important;
+                        padding: 1px !important;
                     }
                     
                     /* Select 스타일 최적화 */
                     .print-area .MuiSelect-root {
-                        font-size: 0.7rem !important;
-                        padding: 3px 6px !important;
-                        min-height: 28px !important;
+                        font-size: 0.65rem !important;
+                        padding: 2px 4px !important;
+                        min-height: 24px !important;
+                        height: 24px !important;
                     }
                     
                     /* 금액종합안내 박스 최적화 */
                     .print-area .MuiPaper-root[style*="background-color: rgb(51, 51, 51)"] {
-                        padding: 6px !important;
+                        padding: 4px !important;
                     }
                     
                     .print-area .MuiPaper-root[style*="background-color: rgb(51, 51, 51)"] .MuiTypography-h6 {
-                        font-size: 0.9rem !important;
-                        margin-bottom: 3px !important;
+                        font-size: 0.75rem !important;
+                        margin-bottom: 2px !important;
                     }
                     
                     .print-area .MuiPaper-root[style*="background-color: rgb(51, 51, 51)"] .MuiTypography-h5 {
-                        font-size: 1.1rem !important;
+                        font-size: 0.9rem !important;
                     }
                     
                     .print-area .MuiPaper-root[style*="background-color: rgb(51, 51, 51)"] .MuiTypography-h4 {
-                        font-size: 1.3rem !important;
+                        font-size: 1.1rem !important;
                     }
                     
                     /* 불필요한 여백 제거 */
                     .print-area .MuiBox-root {
                         margin: 0 !important;
+                        padding: 0 !important;
                     }
                     
-                    /* 페이지 브레이크 방지 */
+                    /* 페이지 브레이크 방지 제거 - 한 페이지에 모든 내용 표시 */
                     .print-area .MuiPaper-root {
-                        page-break-inside: avoid;
-                        break-inside: avoid;
+                        page-break-inside: auto !important;
+                        break-inside: auto !important;
                     }
                 }
             `}</style>

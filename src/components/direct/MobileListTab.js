@@ -210,13 +210,12 @@ const MobileListTab = ({ onProductSelect }) => {
                     <span>미유치</span>
                   </Box>
                 </TableCell>
-                <TableCell align="center" width="100">관리</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {mobileList.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} align="center" sx={{ py: 5 }}>
+                  <TableCell colSpan={8} align="center" sx={{ py: 5 }}>
                     <Typography color="text.secondary">표시할 데이터가 없습니다.</Typography>
                   </TableCell>
                 </TableRow>
@@ -318,12 +317,6 @@ const MobileListTab = ({ onProductSelect }) => {
                       </TableCell>
                       <TableCell align="right" sx={{ bgcolor: 'rgba(212, 175, 55, 0.05)' }}>
                         {purchasePriceNoAddon.toLocaleString()}
-                      </TableCell>
-
-                      <TableCell align="center" onClick={(e) => e.stopPropagation()}>
-                        <Button variant="outlined" size="small">
-                          상세
-                        </Button>
                       </TableCell>
                     </TableRow>
                   );

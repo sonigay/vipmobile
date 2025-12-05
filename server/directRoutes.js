@@ -641,11 +641,10 @@ function setupDirectRoutes(app) {
 
   // === 상품 데이터 ===
 
-  // GET /api/direct/mobiles?carrier=SK
-  // 링크설정에서 시트 링크와 범위를 읽어서 휴대폰 목록 동적 생성
-  router.get('/mobiles', async (req, res) => {
+  // mobiles 데이터를 가져오는 공통 함수
+  async function getMobileList(carrier) {
     try {
-      const carrier = req.query.carrier || 'SK';
+      const carrierParam = carrier || 'SK';
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
 
       // 1. 링크설정에서 정책표 설정과 이통사 지원금 설정 읽기
@@ -657,7 +656,7 @@ function setupDirectRoutes(app) {
       const settingsRows = (settingsRes.data.values || []).slice(1);
       
       // 정책표 설정에서 모델명, 펫네임 가져오기 (프롬프트 기준)
-      const policyRow = settingsRows.find(row => (row[0] || '').trim() === carrier && (row[1] || '').trim() === 'policy');
+      const policyRow = settingsRows.find(row => (row[0] || '').trim() === carrierParam && (row[1] || '').trim() === 'policy');
       if (!policyRow || !policyRow[2]) {
         return res.status(404).json({
           success: false,
@@ -678,7 +677,7 @@ function setupDirectRoutes(app) {
       }
 
       // 이통사 지원금 설정 읽기
-      const supportRow = settingsRows.find(row => (row[0] || '').trim() === carrier && (row[1] || '').trim() === 'support');
+      const supportRow = settingsRows.find(row => (row[0] || '').trim() === carrierParam && (row[1] || '').trim() === 'support');
       if (!supportRow || !supportRow[2]) {
         return res.status(404).json({
           success: false,
@@ -829,7 +828,7 @@ function setupDirectRoutes(app) {
         range: SHEET_POLICY_MARGIN
       });
       const marginRows = (marginRes.data.values || []).slice(1);
-      const marginRow = marginRows.find(row => (row[0] || '').trim() === carrier);
+      const marginRow = marginRows.find(row => (row[0] || '').trim() === carrierParam);
       const baseMargin = marginRow ? Number(marginRow[1] || 0) : 50000;
 
       const addonRes = await sheets.spreadsheets.values.get({
@@ -838,7 +837,7 @@ function setupDirectRoutes(app) {
       });
       const addonRows = (addonRes.data.values || []).slice(1);
       const addonList = addonRows
-        .filter(row => (row[0] || '').trim() === carrier)
+        .filter(row => (row[0] || '').trim() === carrierParam)
         .map((row, idx) => ({
           id: idx + 1,
           name: (row[1] || '').trim(),
@@ -863,7 +862,7 @@ function setupDirectRoutes(app) {
       });
       const specialRows = (specialRes.data.values || []).slice(1);
       const specialPolicies = specialRows
-        .filter(row => (row[0] || '').trim() === carrier && (row[4] || '').toString().toLowerCase() === 'true')
+        .filter(row => (row[0] || '').trim() === carrierParam && (row[4] || '').toString().toLowerCase() === 'true')
         .map((row, idx) => ({
           id: idx + 1,
           name: (row[1] || '').trim(),
@@ -991,10 +990,10 @@ function setupDirectRoutes(app) {
         if (tags.isCheap) tagsArray.push('cheap');
 
         const mobile = {
-          id: `mobile-${carrier}-${i}`,
+          id: `mobile-${carrierParam}-${i}`,
           model: model,
           petName: petName,
-          carrier: carrier,
+          carrier: carrierParam,
           factoryPrice: factoryPrice,
           support: publicSupport,
           publicSupport: publicSupport,
@@ -1014,12 +1013,12 @@ function setupDirectRoutes(app) {
         mobileList.push(mobile);
       }
 
-      res.json(mobileList);
+      return mobileList;
     } catch (error) {
-      console.error('[Direct] mobiles GET error:', error);
-      res.status(500).json({ success: false, error: '휴대폰 목록 조회 실패', message: error.message });
+      console.error('[Direct] getMobileList error:', error);
+      throw error;
     }
-  });
+  }
 
   // GET /api/direct/todays-mobiles
   // 오늘의 휴대폰 조회 (모든 통신사 데이터에서 구분 태그 기반 필터링)
@@ -1029,77 +1028,15 @@ function setupDirectRoutes(app) {
       const carriers = ['SK', 'KT', 'LG'];
       const allMobiles = [];
 
-      // 각 통신사별로 mobiles 데이터 가져오기
-      // mobiles 엔드포인트의 로직을 재사용하기 위해 내부 함수로 분리하지 않고
-      // 직접 mobiles 엔드포인트를 호출하는 대신, 로직을 복사하여 사용
-      // (실제로는 함수로 분리하는 것이 좋지만, 시간 관계상 이렇게 구현)
-      
+      // 각 통신사별로 mobiles 데이터 가져오기 (getMobileList 함수 재사용)
       for (const carrier of carriers) {
         try {
-          // mobiles 엔드포인트와 동일한 로직 (간단하게 요약)
-          // 실제로는 mobiles 로직을 함수로 분리하여 재사용해야 함
-          const { sheets, SPREADSHEET_ID } = createSheetsClient();
-          
-          await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_SETTINGS, HEADERS_SETTINGS);
-          const settingsRes = await sheets.spreadsheets.values.get({
-            spreadsheetId: SPREADSHEET_ID,
-            range: SHEET_SETTINGS
-          });
-          const settingsRows = (settingsRes.data.values || []).slice(1);
-          const supportRow = settingsRows.find(row => (row[0] || '').trim() === carrier && (row[1] || '').trim() === 'support');
-          
-          if (!supportRow || !supportRow[2]) continue;
-          
-          // 간단하게 처리: mobiles 엔드포인트를 직접 호출하는 대신
-          // 여기서는 mobiles 엔드포인트가 반환하는 데이터 구조를 가정하고
-          // 실제로는 mobiles 엔드포인트를 호출하거나 로직을 재사용해야 함
-          // 일단은 빈 배열로 처리하고, 실제 구현 시 mobiles 로직을 함수로 분리하여 재사용
+          const mobileList = await getMobileList(carrier);
+          allMobiles.push(...mobileList);
         } catch (err) {
           console.warn(`[Direct] ${carrier} 통신사 데이터 가져오기 실패:`, err);
+          // 에러가 발생해도 다른 통신사 데이터는 계속 가져오기
         }
-      }
-
-      // mobiles 엔드포인트를 각 통신사별로 호출하여 데이터 수집
-      // 실제로는 mobiles 로직을 함수로 분리하여 재사용하는 것이 좋음
-      // 여기서는 간단하게 처리하기 위해 mobiles 엔드포인트를 직접 호출하지 않고
-      // 대신 직영점_오늘의휴대폰 시트에서 직접 읽기
-      const { sheets, SPREADSHEET_ID } = createSheetsClient();
-      
-      try {
-        const todaysRes = await sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: '직영점_오늘의휴대폰!A:Z'
-        });
-        const todaysRows = (todaysRes.data.values || []).slice(1);
-        
-        // 직영점_오늘의휴대폰 시트에서 데이터 읽기
-        // 형식: 모델명, 펫네임, 통신사, 출고가, 이통사지원금, 대리점지원금(부가유치), 대리점지원금(부가미유치), 이미지, 필수부가서비스, 인기, 추천, 저렴
-        todaysRows.forEach((row, idx) => {
-          if (!row[0]) return; // 모델명이 없으면 스킵
-          
-          const mobile = {
-            id: `todays-${idx}`,
-            model: (row[0] || '').trim(),
-            petName: (row[1] || row[0] || '').trim(),
-            carrier: (row[2] || 'SK').trim(),
-            factoryPrice: Number(row[3] || 0),
-            support: Number(row[4] || 0),
-            publicSupport: Number(row[4] || 0),
-            storeSupport: Number(row[5] || 0),
-            storeSupportNoAddon: Number(row[6] || 0),
-            purchasePriceWithAddon: Number(row[3] || 0) - Number(row[4] || 0) - Number(row[5] || 0),
-            purchasePriceWithoutAddon: Number(row[3] || 0) - Number(row[4] || 0) - Number(row[6] || 0),
-            image: (row[7] || '').trim(),
-            requiredAddons: (row[8] || '없음').trim(),
-            isPopular: (row[9] || '').toString().toUpperCase() === 'Y' || (row[9] || '').toString().toUpperCase() === 'TRUE',
-            isRecommended: (row[10] || '').toString().toUpperCase() === 'Y' || (row[10] || '').toString().toUpperCase() === 'TRUE',
-            isCheap: (row[11] || '').toString().toUpperCase() === 'Y' || (row[11] || '').toString().toUpperCase() === 'TRUE'
-          };
-          
-          allMobiles.push(mobile);
-        });
-      } catch (err) {
-        console.warn('[Direct] 직영점_오늘의휴대폰 시트 읽기 실패:', err);
       }
 
       // 프리미엄: 인기 또는 추천 태그가 있는 상품 중 상위 6개
