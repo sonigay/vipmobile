@@ -1076,31 +1076,34 @@ function setupDirectRoutes(app) {
         }
 
         // 대리점 지원금 계산
-        // 부가유치: 부가서비스 추가금액 합계
-        const storeSupportWithAddon = totalAddonIncentive;
-        // 부가미유치: 부가서비스 차감금액 합계
-        const storeSupportWithoutAddon = totalAddonDeduction;
+        // 부가유치: 정책표리베이트 - 마진 + 부가서비스추가금액 + 별도정책추가금액
+        const storeSupportWithAddon = Math.max(0,
+          policyRebate        // 정책표 요금제군별 리베이트
+          - baseMargin         // 마진 (차감)
+          + totalAddonIncentive // 부가서비스 추가금액
+          + totalSpecialAddition // 별도정책 추가금액
+        );
+        // 부가미유치: 정책표리베이트 - 마진 + 부가서비스차감금액 + 별도정책차감금액
+        const storeSupportWithoutAddon = Math.max(0,
+          policyRebate        // 정책표 요금제군별 리베이트
+          - baseMargin         // 마진 (차감)
+          + totalAddonDeduction // 부가서비스 차감금액
+          + totalSpecialDeduction // 별도정책 차감금액
+        );
 
-        // 구매가 계산 (프롬프트 기준)
-        // 부가유치: 정책표 요금제구간별 + 이통사지원금 요금제구간별 + 부가서비스 추가금액 + 별도정책 추가금액
-        // = 출고가 - 정책표리베이트 - 이통사지원금 - 부가서비스추가금액 - 별도정책추가금액
+        // 구매가 계산
+        // 대리점추가지원금에 이미 정책표리베이트, 마진, 부가서비스, 별도정책이 포함되어 있으므로
+        // 구매가 = 출고가 - 이통사지원금 - 대리점추가지원금
         const purchasePriceWithAddon = Math.max(0, 
           factoryPrice 
-          - policyRebate        // 정책표 요금제구간별 (리베이트)
           - publicSupport       // 이통사지원금 요금제구간별
-          - storeSupportWithAddon  // 부가서비스 추가금액
-          - totalSpecialAddition   // 별도정책 추가금액
+          - storeSupportWithAddon  // 대리점추가지원금 (정책표리베이트 - 마진 + 부가서비스추가 + 별도정책추가 포함)
         );
         
-        // 부가미유치: 정책표 요금제구간별 - 마진 + 이통사지원금 요금제구간별 + 부가서비스 차감금액 + 별도정책 차감금액
-        // = 출고가 - 정책표리베이트 + 마진 - 이통사지원금 - 부가서비스차감금액 - 별도정책차감금액
         const purchasePriceWithoutAddon = Math.max(0, 
           factoryPrice 
-          - policyRebate        // 정책표 요금제구간별 (리베이트)
-          + baseMargin          // 마진 (차감이므로 더해줌)
           - publicSupport       // 이통사지원금 요금제구간별
-          - storeSupportWithoutAddon  // 부가서비스 차감금액
-          - totalSpecialDeduction    // 별도정책 차감금액
+          - storeSupportWithoutAddon  // 대리점추가지원금 (정책표리베이트 - 마진 + 부가서비스차감 + 별도정책차감 포함)
         );
 
         // 구분 태그 가져오기
