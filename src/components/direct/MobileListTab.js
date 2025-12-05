@@ -18,13 +18,18 @@ import {
   Tooltip,
   CircularProgress,
   Alert,
-  FormControlLabel
+  FormControlLabel,
+  Menu,
+  MenuItem,
+  ListItemText,
+  ListItemIcon
 } from '@mui/material';
 import {
   PhotoCamera as PhotoCameraIcon,
   Edit as EditIcon,
   Recommend as RecommendIcon,
-  Star as StarIcon
+  Star as StarIcon,
+  Label as LabelIcon
 } from '@mui/icons-material';
 import { Checkbox } from '@mui/material';
 import { directStoreApi } from '../../api/directStoreApi';
@@ -34,6 +39,7 @@ const MobileListTab = ({ onProductSelect }) => {
   const [mobileList, setMobileList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [tagMenuAnchor, setTagMenuAnchor] = useState({}); // { modelId: anchorElement }
 
   const handleCarrierChange = (event, newValue) => {
     setCarrierTab(newValue);
@@ -114,6 +120,19 @@ const MobileListTab = ({ onProductSelect }) => {
     }
   };
 
+  const handleTagMenuOpen = (event, modelId) => {
+    event.stopPropagation();
+    setTagMenuAnchor(prev => ({ ...prev, [modelId]: event.currentTarget }));
+  };
+
+  const handleTagMenuClose = (modelId) => {
+    setTagMenuAnchor(prev => {
+      const newState = { ...prev };
+      delete newState[modelId];
+      return newState;
+    });
+  };
+
   const handleTagChange = async (modelId, tagType, checked) => {
     try {
       const currentMobile = mobileList.find(m => m.id === modelId);
@@ -151,6 +170,16 @@ const MobileListTab = ({ onProductSelect }) => {
       console.error('구분 태그 업데이트 실패:', err);
       alert('구분 태그 업데이트에 실패했습니다.');
     }
+  };
+
+  const getSelectedTags = (row) => {
+    const tags = [];
+    if (row.isPopular) tags.push('인기');
+    if (row.isRecommended) tags.push('추천');
+    if (row.isCheap) tags.push('저렴');
+    if (row.isPremium) tags.push('프리미엄');
+    if (row.isBudget) tags.push('중저가');
+    return tags.length > 0 ? tags.join(', ') : '선택';
   };
 
   return (
@@ -208,11 +237,11 @@ const MobileListTab = ({ onProductSelect }) => {
           <Table stickyHeader>
             <TableHead>
               <TableRow>
-                <TableCell align="center" width="80">구분</TableCell>
+                <TableCell align="center" width="120">구분</TableCell>
                 <TableCell align="center" width="100">이미지</TableCell>
-                <TableCell>모델명 / 펫네임</TableCell>
-                <TableCell align="right">출고가</TableCell>
-                <TableCell align="right">공시지원금</TableCell>
+                <TableCell align="center" width="180">모델명 / 펫네임</TableCell>
+                <TableCell align="center" width="100">출고가</TableCell>
+                <TableCell align="center" width="100">공시지원금</TableCell>
                 <TableCell align="center" colSpan={2} sx={{ borderLeft: '1px solid rgba(81, 81, 81, 0.5)' }}>
                   대리점 지원금
                   <Box sx={{ display: 'flex', justifyContent: 'space-around', fontSize: '0.75rem', color: 'text.secondary', mt: 0.5 }}>
@@ -250,63 +279,97 @@ const MobileListTab = ({ onProductSelect }) => {
                       onClick={() => handleRowClick(row)}
                     >
                       <TableCell align="center" onClick={(e) => e.stopPropagation()}>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, alignItems: 'center' }}>
-                          <FormControlLabel
-                            control={
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          startIcon={<LabelIcon />}
+                          onClick={(e) => handleTagMenuOpen(e, row.id)}
+                          sx={{ 
+                            minWidth: 100,
+                            textTransform: 'none',
+                            fontSize: '0.75rem',
+                            py: 0.5
+                          }}
+                        >
+                          {getSelectedTags(row)}
+                        </Button>
+                        <Menu
+                          anchorEl={tagMenuAnchor[row.id]}
+                          open={Boolean(tagMenuAnchor[row.id])}
+                          onClose={() => handleTagMenuClose(row.id)}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <MenuItem onClick={(e) => {
+                            e.stopPropagation();
+                            handleTagChange(row.id, 'popular', !row.isPopular);
+                          }}>
+                            <ListItemIcon>
                               <Checkbox
                                 checked={row.isPopular || false}
-                                onChange={(e) => handleTagChange(row.id, 'popular', e.target.checked)}
                                 size="small"
                               />
-                            }
-                            label={<Chip icon={<StarIcon />} label="인기" color="secondary" size="small" />}
-                            labelPlacement="end"
-                          />
-                          <FormControlLabel
-                            control={
+                            </ListItemIcon>
+                            <ListItemText>
+                              <Chip icon={<StarIcon />} label="인기" color="secondary" size="small" />
+                            </ListItemText>
+                          </MenuItem>
+                          <MenuItem onClick={(e) => {
+                            e.stopPropagation();
+                            handleTagChange(row.id, 'recommend', !row.isRecommended);
+                          }}>
+                            <ListItemIcon>
                               <Checkbox
                                 checked={row.isRecommended || false}
-                                onChange={(e) => handleTagChange(row.id, 'recommend', e.target.checked)}
                                 size="small"
                               />
-                            }
-                            label={<Chip icon={<RecommendIcon />} label="추천" color="primary" size="small" />}
-                            labelPlacement="end"
-                          />
-                          <FormControlLabel
-                            control={
+                            </ListItemIcon>
+                            <ListItemText>
+                              <Chip icon={<RecommendIcon />} label="추천" color="primary" size="small" />
+                            </ListItemText>
+                          </MenuItem>
+                          <MenuItem onClick={(e) => {
+                            e.stopPropagation();
+                            handleTagChange(row.id, 'cheap', !row.isCheap);
+                          }}>
+                            <ListItemIcon>
                               <Checkbox
                                 checked={row.isCheap || false}
-                                onChange={(e) => handleTagChange(row.id, 'cheap', e.target.checked)}
                                 size="small"
                               />
-                            }
-                            label={<Chip label="저렴" color="success" size="small" />}
-                            labelPlacement="end"
-                          />
-                          <FormControlLabel
-                            control={
+                            </ListItemIcon>
+                            <ListItemText>
+                              <Chip label="저렴" color="success" size="small" />
+                            </ListItemText>
+                          </MenuItem>
+                          <MenuItem onClick={(e) => {
+                            e.stopPropagation();
+                            handleTagChange(row.id, 'premium', !row.isPremium);
+                          }}>
+                            <ListItemIcon>
                               <Checkbox
                                 checked={row.isPremium || false}
-                                onChange={(e) => handleTagChange(row.id, 'premium', e.target.checked)}
                                 size="small"
                               />
-                            }
-                            label={<Chip label="프리미엄" color="warning" size="small" />}
-                            labelPlacement="end"
-                          />
-                          <FormControlLabel
-                            control={
+                            </ListItemIcon>
+                            <ListItemText>
+                              <Chip label="프리미엄" color="warning" size="small" />
+                            </ListItemText>
+                          </MenuItem>
+                          <MenuItem onClick={(e) => {
+                            e.stopPropagation();
+                            handleTagChange(row.id, 'budget', !row.isBudget);
+                          }}>
+                            <ListItemIcon>
                               <Checkbox
                                 checked={row.isBudget || false}
-                                onChange={(e) => handleTagChange(row.id, 'budget', e.target.checked)}
                                 size="small"
                               />
-                            }
-                            label={<Chip label="중저가" color="info" size="small" />}
-                            labelPlacement="end"
-                          />
-                        </Box>
+                            </ListItemIcon>
+                            <ListItemText>
+                              <Chip label="중저가" color="info" size="small" />
+                            </ListItemText>
+                          </MenuItem>
+                        </Menu>
                       </TableCell>
                       <TableCell align="center" onClick={(e) => e.stopPropagation()}>
                         <Box sx={{ position: 'relative', display: 'inline-block' }}>
@@ -333,28 +396,28 @@ const MobileListTab = ({ onProductSelect }) => {
                           </IconButton>
                         </Box>
                       </TableCell>
-                      <TableCell>
+                      <TableCell align="center">
                         <Typography variant="body1" fontWeight="bold">{row.petName}</Typography>
                         <Typography variant="caption" color="text.secondary">{row.model}</Typography>
                       </TableCell>
-                      <TableCell align="right">{row.factoryPrice?.toLocaleString()}</TableCell>
-                      <TableCell align="right" sx={{ color: 'info.main' }}>
+                      <TableCell align="center">{row.factoryPrice?.toLocaleString()}</TableCell>
+                      <TableCell align="center" sx={{ color: 'info.main' }}>
                         {(row.support || row.publicSupport)?.toLocaleString()}
                       </TableCell>
 
                       {/* 대리점 지원금 */}
-                      <TableCell align="right" sx={{ borderLeft: '1px solid rgba(81, 81, 81, 0.3)' }}>
+                      <TableCell align="center" sx={{ borderLeft: '1px solid rgba(81, 81, 81, 0.3)' }}>
                         {(row.storeSupport || row.storeSupportWithAddon)?.toLocaleString()}
                       </TableCell>
-                      <TableCell align="right">
+                      <TableCell align="center">
                         {row.storeSupportNoAddon?.toLocaleString()}
                       </TableCell>
 
                       {/* 구매가 (할부원금) */}
-                      <TableCell align="right" sx={{ borderLeft: '1px solid rgba(81, 81, 81, 0.3)', bgcolor: 'rgba(212, 175, 55, 0.05)', fontWeight: 'bold', color: 'primary.main' }}>
+                      <TableCell align="center" sx={{ borderLeft: '1px solid rgba(81, 81, 81, 0.3)', bgcolor: 'rgba(212, 175, 55, 0.05)', fontWeight: 'bold', color: 'primary.main' }}>
                         {purchasePriceAddon.toLocaleString()}
                       </TableCell>
-                      <TableCell align="right" sx={{ bgcolor: 'rgba(212, 175, 55, 0.05)' }}>
+                      <TableCell align="center" sx={{ bgcolor: 'rgba(212, 175, 55, 0.05)' }}>
                         {purchasePriceNoAddon.toLocaleString()}
                       </TableCell>
                     </TableRow>
