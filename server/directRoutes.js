@@ -658,10 +658,8 @@ function setupDirectRoutes(app) {
       // 정책표 설정에서 모델명, 펫네임 가져오기 (프롬프트 기준)
       const policyRow = settingsRows.find(row => (row[0] || '').trim() === carrierParam && (row[1] || '').trim() === 'policy');
       if (!policyRow || !policyRow[2]) {
-        return res.status(404).json({
-          success: false,
-          error: '정책표 설정을 찾을 수 없습니다. 링크설정에서 먼저 설정해주세요.'
-        });
+        console.warn(`[Direct] ${carrierParam} 정책표 설정을 찾을 수 없습니다.`);
+        return []; // 빈 배열 반환
       }
 
       const policySettingsJson = policyRow[4] ? JSON.parse(policyRow[4]) : {};
@@ -670,19 +668,15 @@ function setupDirectRoutes(app) {
       const petNameRange = policySettingsJson.petNameRange || '';
 
       if (!modelRange || !petNameRange) {
-        return res.status(400).json({
-          success: false,
-          error: '정책표 설정에서 모델명, 펫네임 범위가 누락되었습니다.'
-        });
+        console.warn(`[Direct] ${carrierParam} 정책표 설정에서 모델명, 펫네임 범위가 누락되었습니다.`);
+        return []; // 빈 배열 반환
       }
 
       // 이통사 지원금 설정 읽기
       const supportRow = settingsRows.find(row => (row[0] || '').trim() === carrierParam && (row[1] || '').trim() === 'support');
       if (!supportRow || !supportRow[2]) {
-        return res.status(404).json({
-          success: false,
-          error: '이통사 지원금 설정을 찾을 수 없습니다. 링크설정에서 먼저 설정해주세요.'
-        });
+        console.warn(`[Direct] ${carrierParam} 이통사 지원금 설정을 찾을 수 없습니다.`);
+        return []; // 빈 배열 반환
       }
 
       const supportSettingsJson = supportRow[4] ? JSON.parse(supportRow[4]) : {};
@@ -692,10 +686,8 @@ function setupDirectRoutes(app) {
       const planGroupRanges = supportSettingsJson.planGroupRanges || {};
 
       if (!factoryPriceRange) {
-        return res.status(400).json({
-          success: false,
-          error: '이통사 지원금 설정에서 출고가 범위가 누락되었습니다.'
-        });
+        console.warn(`[Direct] ${carrierParam} 이통사 지원금 설정에서 출고가 범위가 누락되었습니다.`);
+        return []; // 빈 배열 반환
       }
 
       // 2. 정책표 시트에서 모델명, 펫네임 읽기 (기준 데이터)
@@ -1019,6 +1011,19 @@ function setupDirectRoutes(app) {
       throw error;
     }
   }
+
+  // GET /api/direct/mobiles?carrier=SK
+  // 링크설정에서 시트 링크와 범위를 읽어서 휴대폰 목록 동적 생성
+  router.get('/mobiles', async (req, res) => {
+    try {
+      const carrier = req.query.carrier || 'SK';
+      const mobileList = await getMobileList(carrier);
+      res.json(mobileList);
+    } catch (error) {
+      console.error('[Direct] mobiles GET error:', error);
+      res.status(500).json({ success: false, error: '휴대폰 목록 조회 실패', message: error.message });
+    }
+  });
 
   // GET /api/direct/todays-mobiles
   // 오늘의 휴대폰 조회 (모든 통신사 데이터에서 구분 태그 기반 필터링)
