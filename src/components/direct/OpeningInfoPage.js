@@ -60,8 +60,8 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
     // 단말/지원금 기본값 정리 (휴대폰목록/오늘의휴대폰에서 전달된 데이터 사용)
     const factoryPrice = initialData?.factoryPrice || 0;
     const publicSupport = initialData?.publicSupport || initialData?.support || 0; // 이통사 지원금
-    const storeSupportWithAddon = initialData?.storeSupport || 0; // 부가유치시 대리점추가지원금
-    const storeSupportWithoutAddon = initialData?.storeSupportNoAddon || 0; // 부가미유치시 대리점추가지원금
+    const [storeSupportWithAddon, setStoreSupportWithAddon] = useState(initialData?.storeSupport || 0); // 부가유치시 대리점추가지원금
+    const [storeSupportWithoutAddon, setStoreSupportWithoutAddon] = useState(initialData?.storeSupportNoAddon || 0); // 부가미유치시 대리점추가지원금
 
     const [formData, setFormData] = useState({
         customerName: initialData?.customerName || '',
@@ -692,7 +692,58 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                                         <RadioGroup
                                             row
                                             value={formData.openingType}
-                                            onChange={(e) => setFormData({ ...formData, openingType: e.target.value })}
+                                            onChange={async (e) => {
+                                                const newOpeningType = e.target.value;
+                                                setFormData({ ...formData, openingType: newOpeningType });
+                                                
+                                                // 요금제가 선택되어 있으면 대리점추가지원금 재계산
+                                                if (formData.plan && selectedPlanGroup) {
+                                                    const planGroup = planGroups.find(p => p.name === formData.plan)?.group || selectedPlanGroup;
+                                                    if (planGroup && (initialData?.id || initialData?.model)) {
+                                                        try {
+                                                            const openingTypeMap = {
+                                                                'NEW': '010신규',
+                                                                'MNP': 'MNP',
+                                                                'CHANGE': '기변'
+                                                            };
+                                                            const openingType = openingTypeMap[newOpeningType] || '010신규';
+                                                            
+                                                            // 모델 ID가 없으면 모델명과 통신사로 생성 (임시)
+                                                            let modelId = initialData?.id;
+                                                            if (!modelId && initialData?.model) {
+                                                                try {
+                                                                    const mobileList = await directStoreApi.getMobileList(selectedCarrier);
+                                                                    const foundMobile = mobileList.find(m => 
+                                                                        m.model === initialData.model && 
+                                                                        m.carrier === selectedCarrier
+                                                                    );
+                                                                    if (foundMobile) {
+                                                                        modelId = foundMobile.id;
+                                                                    }
+                                                                } catch (err) {
+                                                                    console.warn('모델 ID 찾기 실패:', err);
+                                                                }
+                                                            }
+                                                            
+                                                            if (modelId) {
+                                                                const result = await directStoreApi.calculateMobilePrice(
+                                                                    modelId,
+                                                                    planGroup,
+                                                                    openingType,
+                                                                    selectedCarrier
+                                                                );
+                                                                
+                                                                if (result.success) {
+                                                                    setStoreSupportWithAddon(result.storeSupportWithAddon || 0);
+                                                                    setStoreSupportWithoutAddon(result.storeSupportWithoutAddon || 0);
+                                                                }
+                                                            }
+                                                        } catch (err) {
+                                                            console.error('대리점추가지원금 계산 실패:', err);
+                                                        }
+                                                    }
+                                                }
+                                            }}
                                         >
                                             <FormControlLabel value="NEW" control={<Radio />} label="신규가입" />
                                             <FormControlLabel value="MNP" control={<Radio />} label="번호이동" />
@@ -951,15 +1002,65 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                                         options={planGroups}
                                         getOptionLabel={(option) => typeof option === 'string' ? option : option.name}
                                         value={planGroups.find(p => p.name === formData.plan) || null}
-                                        onChange={(event, newValue) => {
+                                        onChange={async (event, newValue) => {
                                             if (newValue) {
                                                 setFormData({ ...formData, plan: newValue.name });
                                                 setSelectedPlanGroup(newValue.name);
                                                 setPlanBasicFee(newValue.basicFee || 0);
+                                                
+                                                // 요금제군 추출하여 대리점추가지원금 자동 계산
+                                                const planGroup = newValue.group || newValue.name;
+                                                if (planGroup && (initialData?.id || initialData?.model)) {
+                                                    try {
+                                                        const openingTypeMap = {
+                                                            'NEW': '010신규',
+                                                            'MNP': 'MNP',
+                                                            'CHANGE': '기변'
+                                                        };
+                                                        const openingType = openingTypeMap[formData.openingType] || '010신규';
+                                                        
+                                                        // 모델 ID가 없으면 모델명과 통신사로 생성 (임시)
+                                                        let modelId = initialData?.id;
+                                                        if (!modelId && initialData?.model) {
+                                                            // 모바일 목록에서 해당 모델 찾기
+                                                            try {
+                                                                const mobileList = await directStoreApi.getMobileList(selectedCarrier);
+                                                                const foundMobile = mobileList.find(m => 
+                                                                    m.model === initialData.model && 
+                                                                    m.carrier === selectedCarrier
+                                                                );
+                                                                if (foundMobile) {
+                                                                    modelId = foundMobile.id;
+                                                                }
+                                                            } catch (err) {
+                                                                console.warn('모델 ID 찾기 실패:', err);
+                                                            }
+                                                        }
+                                                        
+                                                        if (modelId) {
+                                                            const result = await directStoreApi.calculateMobilePrice(
+                                                                modelId,
+                                                                planGroup,
+                                                                openingType,
+                                                                selectedCarrier
+                                                            );
+                                                            
+                                                            if (result.success) {
+                                                                setStoreSupportWithAddon(result.storeSupportWithAddon || 0);
+                                                                setStoreSupportWithoutAddon(result.storeSupportWithoutAddon || 0);
+                                                            }
+                                                        }
+                                                    } catch (err) {
+                                                        console.error('대리점추가지원금 계산 실패:', err);
+                                                    }
+                                                }
                                             } else {
                                                 setFormData({ ...formData, plan: '' });
                                                 setSelectedPlanGroup('');
                                                 setPlanBasicFee(0);
+                                                // 초기값으로 복원
+                                                setStoreSupportWithAddon(initialData?.storeSupport || 0);
+                                                setStoreSupportWithoutAddon(initialData?.storeSupportNoAddon || 0);
                                             }
                                         }}
                                         renderInput={(params) => (
