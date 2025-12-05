@@ -23,7 +23,7 @@ import {
 } from '@mui/icons-material';
 import { directStoreApi } from '../../api/directStoreApi';
 
-const ProductCard = ({ product, isPremium, onSelect }) => {
+const ProductCard = ({ product, isPremium, onSelect, compact }) => {
   const getCarrierChipColor = (carrier) => {
     switch (carrier) {
       case 'SK': return 'info'; // 하늘색 계열
@@ -67,7 +67,7 @@ const ProductCard = ({ product, isPremium, onSelect }) => {
         </Box>
       )}
 
-      <Box sx={{ position: 'relative', pt: '60%', bgcolor: '#FAFAFA', borderRadius: '16px 16px 0 0', overflow: 'hidden' }}>
+      <Box sx={{ position: 'relative', pt: compact ? '52%' : '60%', bgcolor: '#FAFAFA', borderRadius: '16px 16px 0 0', overflow: 'hidden' }}>
         <CardMedia
           component="img"
           image={product.image || 'https://via.placeholder.com/300x300?text=No+Image'}
@@ -79,14 +79,14 @@ const ProductCard = ({ product, isPremium, onSelect }) => {
             width: '100%',
             height: '100%',
             objectFit: 'contain',
-            p: 2,
+            p: compact ? 1.5 : 2,
             transition: 'transform 0.3s',
             '&:hover': { transform: 'scale(1.05)' }
           }}
         />
       </Box>
 
-      <CardContent sx={{ flexGrow: 1, p: 2 }}>
+      <CardContent sx={{ flexGrow: 1, p: compact ? 1.5 : 2 }}>
         <Stack direction="row" spacing={1} mb={1}>
           <Chip
             label={product.carrier}
@@ -103,7 +103,7 @@ const ProductCard = ({ product, isPremium, onSelect }) => {
           {product.petName}
         </Typography>
 
-        <Stack spacing={1} sx={{ bgcolor: '#F5F5F5', p: 1.5, borderRadius: 2 }}>
+        <Stack spacing={1} sx={{ bgcolor: '#F5F5F5', p: compact ? 1 : 1.5, borderRadius: 2 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
             <Typography variant="body2" color="text.secondary">출고가</Typography>
             <Typography variant="body2" sx={{ textDecoration: 'line-through' }}>
@@ -112,7 +112,7 @@ const ProductCard = ({ product, isPremium, onSelect }) => {
           </Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Typography variant="body1" fontWeight="bold" color="primary">구매가</Typography>
-            <Typography variant="h5" fontWeight="bold" color="primary">
+            <Typography variant={compact ? 'h6' : 'h5'} fontWeight="bold" color="primary">
               {(product.purchasePrice || product.purchasePriceWithAddon || product.purchasePriceWithoutAddon)?.toLocaleString()}원
             </Typography>
           </Box>
@@ -125,12 +125,12 @@ const ProductCard = ({ product, isPremium, onSelect }) => {
         </Box>
       </CardContent>
 
-      <CardActions sx={{ p: 2, pt: 0 }}>
+      <CardActions sx={{ p: compact ? 1.5 : 2, pt: compact ? 0 : 0 }}>
         <Button
           variant="contained"
           fullWidth
           startIcon={<ShoppingCartIcon />}
-          size="large"
+          size={compact ? 'medium' : 'large'}
           sx={{ borderRadius: 2 }}
           onClick={(e) => {
             e.stopPropagation();
@@ -149,6 +149,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
   const [budgetPhones, setBudgetPhones] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [compact, setCompact] = useState(true);
 
   const fetchData = useCallback(async () => {
     try {
@@ -199,32 +200,44 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
   return (
     <Box
       sx={{
-        minHeight: '100%',
-        overflow: 'auto',
-        p: isFullScreen ? 3 : 3,
+        minHeight: 'calc(100vh - 60px)',
+        maxHeight: '100vh',
+        overflow: 'hidden',
+        p: isFullScreen ? 2.5 : 3,
         bgcolor: 'background.default',
         transition: 'all 0.3s ease'
       }}
     >
       <Container maxWidth="xl">
-        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
-          <Typography variant="h5" fontWeight="bold">오늘의 휴대폰</Typography>
-          <Button
-            variant="outlined"
-            size="small"
-            startIcon={<RefreshIcon />}
-            onClick={fetchData}
-            disabled={loading}
-          >
-            새로고침
-          </Button>
+        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
+          <Typography variant="h6" fontWeight="bold">오늘의 휴대폰</Typography>
+          <Stack direction="row" spacing={1}>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<RefreshIcon />}
+              onClick={fetchData}
+              disabled={loading}
+            >
+              새로고침
+            </Button>
+            <Chip
+              label={compact ? '컴팩트' : '넉넉하게'}
+              color="primary"
+              variant="outlined"
+              onClick={() => setCompact(prev => !prev)}
+              sx={{ cursor: 'pointer' }}
+            />
+          </Stack>
         </Stack>
 
         <Box
           sx={{
             display: 'grid',
-            gap: isFullScreen ? 3 : 2,
-            gridTemplateColumns: { xs: '1fr', lg: '2fr 1fr' }
+            gap: isFullScreen ? 2.5 : 2,
+            gridTemplateColumns: { xs: '1fr', lg: '2fr 1fr' },
+            height: 'calc(100vh - 120px)',
+            overflow: 'hidden'
           }}
         >
           {/* 프리미엄 섹션 */}
@@ -237,17 +250,18 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
               <Divider sx={{ flexGrow: 1, borderColor: 'rgba(212, 175, 55, 0.3)' }} />
             </Stack>
 
-            <Box
-              sx={{
-                display: 'grid',
-                gap: isFullScreen ? 2.5 : 2,
-                gridTemplateColumns: {
-                  xs: 'repeat(auto-fit, minmax(230px, 1fr))',
-                  sm: 'repeat(auto-fit, minmax(240px, 1fr))',
-                  md: 'repeat(auto-fit, minmax(250px, 1fr))'
-                }
-              }}
-            >
+          <Box
+            sx={{
+              display: 'grid',
+              gap: isFullScreen ? 2.5 : 2,
+              gridTemplateColumns: {
+                xs: 'repeat(auto-fit, minmax(220px, 1fr))',
+                sm: 'repeat(auto-fit, minmax(230px, 1fr))',
+                md: 'repeat(auto-fit, minmax(240px, 1fr))'
+              },
+              alignContent: 'start'
+            }}
+          >
               {displayPremiumPhones.map((product) => (
                 <ProductCard
                   key={product.id}
@@ -272,16 +286,17 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
               <Divider sx={{ flexGrow: 1, borderColor: 'rgba(0,0,0,0.08)' }} />
             </Stack>
 
-            <Box
-              sx={{
-                display: 'grid',
-                gap: isFullScreen ? 2.5 : 2,
-                gridTemplateColumns: {
-                  xs: 'repeat(auto-fit, minmax(240px, 1fr))',
-                  sm: 'repeat(auto-fit, minmax(260px, 1fr))'
-                }
-              }}
-            >
+          <Box
+            sx={{
+              display: 'grid',
+              gap: isFullScreen ? 2.5 : 2,
+              gridTemplateColumns: {
+                xs: 'repeat(auto-fit, minmax(200px, 1fr))',
+                sm: 'repeat(auto-fit, minmax(220px, 1fr))'
+              },
+              alignContent: 'start'
+            }}
+          >
               {displayBudgetPhones.map((product) => (
                 <ProductCard
                   key={product.id}

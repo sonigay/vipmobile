@@ -33,6 +33,27 @@ function createSheetsClient() {
   return { sheets, SPREADSHEET_ID };
 }
 
+// 간단한 메모리 캐시 (TTL)
+const cacheStore = new Map(); // key -> { data, expires }
+
+function getCache(key) {
+  const entry = cacheStore.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.expires) {
+    cacheStore.delete(key);
+    return null;
+  }
+  return entry.data;
+}
+
+function setCache(key, data, ttlMs = 60 * 1000) {
+  cacheStore.set(key, { data, expires: Date.now() + ttlMs });
+}
+
+function deleteCache(key) {
+  cacheStore.delete(key);
+}
+
 // 시트 ID 조회 헬퍼 함수
 async function getSheetId(sheets, spreadsheetId, sheetName) {
   const metadata = await sheets.spreadsheets.get({ spreadsheetId });
@@ -1131,7 +1152,14 @@ function setupDirectRoutes(app) {
   router.get('/mobiles', async (req, res) => {
     try {
       const carrier = req.query.carrier || 'SK';
+      const cacheKey = `mobiles-${carrier}`;
+      const cached = getCache(cacheKey);
+      if (cached) {
+        return res.json(cached);
+      }
+
       const mobileList = await getMobileList(carrier);
+      setCache(cacheKey, mobileList, 60 * 1000); // 60초 캐시
       res.json(mobileList);
     } catch (error) {
       console.error('[Direct] mobiles GET error:', error);
@@ -1146,6 +1174,13 @@ function setupDirectRoutes(app) {
       // 모든 통신사 데이터 가져오기 (SK, KT, LG)
       const carriers = ['SK', 'KT', 'LG'];
       const allMobiles = [];
+
+      // 캐시 확인
+      const cacheKey = `todays-mobiles`;
+      const cached = getCache(cacheKey);
+      if (cached) {
+        return res.json(cached);
+      }
 
       // 각 통신사별로 mobiles 데이터 가져오기 (getMobileList 함수 재사용)
       for (const carrier of carriers) {
@@ -1178,7 +1213,9 @@ function setupDirectRoutes(app) {
           addons: p.requiredAddons
         }));
 
-      res.json({ premium, budget });
+      const result = { premium, budget };
+      setCache(cacheKey, result, 60 * 1000); // 60초 캐시
+      res.json(result);
     } catch (error) {
       console.error('[Direct] todays-mobiles GET error:', error);
       res.status(500).json({ success: false, error: '오늘의 휴대폰 조회 실패', message: error.message });
@@ -1325,6 +1362,12 @@ function setupDirectRoutes(app) {
           }
         });
       }
+
+      // 태그/모바일 캐시 무효화
+      deleteCache('todays-mobiles');
+      deleteCache(`mobiles-${carrier || 'SK'}`);
+      deleteCache(`mobiles-KT`);
+      deleteCache(`mobiles-LG`);
 
       res.json({ success: true });
     } catch (error) {
