@@ -1192,15 +1192,63 @@ function setupDirectRoutes(app) {
       const { modelId } = req.params;
       const { isPopular, isRecommended, isCheap, isPremium, isBudget } = req.body;
 
-      // modelId에서 모델명 추출 (형식: mobile-{carrier}-{index})
+      // modelId에서 carrier와 index 추출 (형식: mobile-{carrier}-{index})
       const parts = modelId.split('-');
       if (parts.length < 3) {
         return res.status(400).json({ success: false, error: '잘못된 모델 ID 형식입니다.' });
       }
       
-      // 모델명을 가져오기 위해 mobiles 엔드포인트를 호출하거나, 직접 시트에서 찾기
-      // 여기서는 간단하게 시트에서 모델명으로 찾기
+      const carrier = parts[1]; // SK, KT, LG
+      const index = parseInt(parts[2], 10);
+      
+      if (isNaN(index)) {
+        return res.status(400).json({ success: false, error: '잘못된 모델 인덱스입니다.' });
+      }
+      
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      
+      // 링크설정에서 정책표 설정 읽기
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_SETTINGS, HEADERS_SETTINGS);
+      const settingsRes = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: SHEET_SETTINGS
+      });
+      const settingsRows = (settingsRes.data.values || []).slice(1);
+      
+      const policyRow = settingsRows.find(row => (row[0] || '').trim() === carrier && (row[1] || '').trim() === 'policy');
+      if (!policyRow || !policyRow[2]) {
+        return res.status(404).json({ success: false, error: `${carrier} 정책표 설정을 찾을 수 없습니다.` });
+      }
+
+      const policySettingsJson = policyRow[4] ? JSON.parse(policyRow[4]) : {};
+      const policySheetId = policyRow[2].trim();
+      const modelRange = policySettingsJson.modelRange || '';
+      
+      if (!modelRange) {
+        return res.status(404).json({ success: false, error: `${carrier} 정책표 설정에서 모델명 범위가 누락되었습니다.` });
+      }
+
+      // 정책표 시트에서 해당 인덱스의 모델명 읽기
+      let modelName = null;
+      try {
+        const modelRes = await sheets.spreadsheets.values.get({
+          spreadsheetId: policySheetId,
+          range: modelRange,
+          majorDimension: 'ROWS',
+          valueRenderOption: 'UNFORMATTED_VALUE'
+        });
+        const modelRows = modelRes.data.values || [];
+        if (modelRows[index] && modelRows[index][0]) {
+          modelName = (modelRows[index][0] || '').toString().trim();
+        }
+      } catch (err) {
+        console.warn('[Direct] 모델명 읽기 실패:', err);
+        return res.status(500).json({ success: false, error: '모델명을 읽을 수 없습니다.', message: err.message });
+      }
+
+      if (!modelName) {
+        return res.status(404).json({ success: false, error: '모델을 찾을 수 없습니다.' });
+      }
       
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, '직영점_오늘의휴대폰', [
         '모델명', '펫네임', '통신사', '출고가', '이통사지원금', '대리점지원금(부가유치)', '대리점지원금(부가미유치)', '이미지', '필수부가서비스', '인기', '추천', '저렴', '프리미엄', '중저가'
@@ -1212,34 +1260,6 @@ function setupDirectRoutes(app) {
         range: '직영점_오늘의휴대폰!A:Z'
       });
       const todaysRows = (todaysRes.data.values || []).slice(1);
-      
-      // 모델명으로 행 찾기 (modelId에서 모델명 추출이 어려우므로, 전체 mobiles에서 찾기)
-      // 대신 요청 본문에 model 필드를 추가하거나, modelId를 파싱해서 찾기
-      // 일단은 첫 번째 통신사(SK)의 mobiles를 가져와서 modelId로 모델명 찾기
-      let modelName = null;
-      try {
-        const mobileList = await getMobileList('SK');
-        const mobile = mobileList.find(m => m.id === modelId);
-        if (mobile) {
-          modelName = mobile.model;
-        } else {
-          // KT, LG도 시도
-          for (const carrier of ['KT', 'LG']) {
-            const carrierList = await getMobileList(carrier);
-            const carrierMobile = carrierList.find(m => m.id === modelId);
-            if (carrierMobile) {
-              modelName = carrierMobile.model;
-              break;
-            }
-          }
-        }
-      } catch (err) {
-        console.warn('[Direct] 모델명 찾기 실패:', err);
-      }
-
-      if (!modelName) {
-        return res.status(404).json({ success: false, error: '모델을 찾을 수 없습니다.' });
-      }
 
       // 해당 모델명의 행 찾기
       const rowIndex = todaysRows.findIndex(row => (row[0] || '').trim() === modelName);
