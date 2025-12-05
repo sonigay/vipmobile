@@ -142,12 +142,12 @@ export const directStoreApi = {
     // === 구분 태그 업데이트 ===
 
     // 구분(인기/추천/저렴) 태그 업데이트
-    updateMobileTags: async (modelId, tags) => {
+    updateMobileTags: async (modelId, payload) => {
         try {
             const response = await fetch(`${BASE_URL}/mobiles/${modelId}/tags`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(tags)
+                body: JSON.stringify(payload)
             });
             if (!response.ok) throw new Error('구분 태그 업데이트 실패');
             return response.json();

@@ -1190,7 +1190,22 @@ function setupDirectRoutes(app) {
   router.put('/mobiles/:modelId/tags', async (req, res) => {
     try {
       const { modelId } = req.params;
-      const { isPopular, isRecommended, isCheap, isPremium, isBudget } = req.body;
+      const {
+        isPopular,
+        isRecommended,
+        isCheap,
+        isPremium,
+        isBudget,
+        model: modelFromBody,
+        petName: petNameFromBody,
+        carrier: carrierFromBody,
+        factoryPrice,
+        publicSupport,
+        storeSupport,
+        storeSupportNoAddon,
+        requiredAddons,
+        image
+      } = req.body || {};
 
       // modelId에서 carrier와 index 추출 (형식: mobile-{carrier}-{index})
       const parts = modelId.split('-');
@@ -1198,7 +1213,7 @@ function setupDirectRoutes(app) {
         return res.status(400).json({ success: false, error: '잘못된 모델 ID 형식입니다.' });
       }
       
-      const carrier = parts[1]; // SK, KT, LG
+      const carrier = carrierFromBody || parts[1]; // SK, KT, LG
       const index = parseInt(parts[2], 10);
       
       if (isNaN(index)) {
@@ -1228,22 +1243,24 @@ function setupDirectRoutes(app) {
         return res.status(404).json({ success: false, error: `${carrier} 정책표 설정에서 모델명 범위가 누락되었습니다.` });
       }
 
-      // 정책표 시트에서 해당 인덱스의 모델명 읽기
-      let modelName = null;
-      try {
-        const modelRes = await sheets.spreadsheets.values.get({
-          spreadsheetId: policySheetId,
-          range: modelRange,
-          majorDimension: 'ROWS',
-          valueRenderOption: 'UNFORMATTED_VALUE'
-        });
-        const modelRows = modelRes.data.values || [];
-        if (modelRows[index] && modelRows[index][0]) {
-          modelName = (modelRows[index][0] || '').toString().trim();
+      // 정책표 시트에서 해당 인덱스의 모델명 읽기 (body 우선)
+      let modelName = (modelFromBody || '').toString().trim();
+      if (!modelName) {
+        try {
+          const modelRes = await sheets.spreadsheets.values.get({
+            spreadsheetId: policySheetId,
+            range: modelRange,
+            majorDimension: 'ROWS',
+            valueRenderOption: 'UNFORMATTED_VALUE'
+          });
+          const modelRows = modelRes.data.values || [];
+          if (modelRows[index] && modelRows[index][0]) {
+            modelName = (modelRows[index][0] || '').toString().trim();
+          }
+        } catch (err) {
+          console.warn('[Direct] 모델명 읽기 실패:', err);
+          return res.status(500).json({ success: false, error: '모델명을 읽을 수 없습니다.', message: err.message });
         }
-      } catch (err) {
-        console.warn('[Direct] 모델명 읽기 실패:', err);
-        return res.status(500).json({ success: false, error: '모델명을 읽을 수 없습니다.', message: err.message });
       }
 
       if (!modelName) {
@@ -1264,46 +1281,47 @@ function setupDirectRoutes(app) {
       // 해당 모델명의 행 찾기
       const rowIndex = todaysRows.findIndex(row => (row[0] || '').trim() === modelName);
       
+      // 기존 행 정보 확보
+      const existingRow = todaysRows[rowIndex] || [];
+      const toText = (v) => (v === undefined || v === null ? '' : v);
+      const addonsText = Array.isArray(requiredAddons) ? requiredAddons.join(', ') : (requiredAddons || '');
+
+      // 채워 넣을 전체 행 데이터 (A:N)
+      const newRowValues = [
+        modelName,                                             // A 모델명
+        petNameFromBody || existingRow[1] || '',              // B 펫네임
+        carrier || existingRow[2] || '',                      // C 통신사
+        toText(factoryPrice) || existingRow[3] || '',         // D 출고가
+        toText(publicSupport) || existingRow[4] || '',        // E 이통사지원금
+        toText(storeSupport) || existingRow[5] || '',         // F 대리점지원금(부가유치)
+        toText(storeSupportNoAddon) || existingRow[6] || '',  // G 대리점지원금(부가미유치)
+        image || existingRow[7] || '',                        // H 이미지
+        addonsText || existingRow[8] || '',                   // I 필수부가서비스
+        isPopular ? 'Y' : '',                                 // J 인기
+        isRecommended ? 'Y' : '',                             // K 추천
+        isCheap ? 'Y' : '',                                   // L 저렴
+        isPremium ? 'Y' : '',                                 // M 프리미엄
+        isBudget ? 'Y' : ''                                   // N 중저가
+      ];
+
       if (rowIndex === -1) {
         // 행이 없으면 추가
-        const newRow = [
-          modelName, // 모델명
-          '', // 펫네임
-          '', // 통신사
-          '', // 출고가
-          '', // 이통사지원금
-          '', // 대리점지원금(부가유치)
-          '', // 대리점지원금(부가미유치)
-          '', // 이미지
-          '', // 필수부가서비스
-          isPopular ? 'Y' : '', // 인기 (컬럼 9, 인덱스 9)
-          isRecommended ? 'Y' : '', // 추천 (컬럼 10, 인덱스 10)
-          isCheap ? 'Y' : '', // 저렴 (컬럼 11, 인덱스 11)
-          isPremium ? 'Y' : '', // 프리미엄 (컬럼 12, 인덱스 12)
-          isBudget ? 'Y' : '' // 중저가 (컬럼 13, 인덱스 13)
-        ];
         await sheets.spreadsheets.values.append({
           spreadsheetId: SPREADSHEET_ID,
           range: '직영점_오늘의휴대폰',
           valueInputOption: 'USER_ENTERED',
           insertDataOption: 'INSERT_ROWS',
-          resource: { values: [newRow] }
+          resource: { values: [newRowValues] }
         });
       } else {
-        // 행이 있으면 업데이트 (컬럼 9-13만 업데이트)
-        const updateRange = `직영점_오늘의휴대폰!J${rowIndex + 2}:N${rowIndex + 2}`;
+        // 행이 있으면 전체 컬럼(A:N) 업데이트
+        const updateRange = `직영점_오늘의휴대폰!A${rowIndex + 2}:N${rowIndex + 2}`;
         await sheets.spreadsheets.values.update({
           spreadsheetId: SPREADSHEET_ID,
           range: updateRange,
           valueInputOption: 'USER_ENTERED',
           resource: {
-            values: [[
-              isPopular ? 'Y' : '', // 인기 (컬럼 J, 인덱스 9)
-              isRecommended ? 'Y' : '', // 추천 (컬럼 K, 인덱스 10)
-              isCheap ? 'Y' : '', // 저렴 (컬럼 L, 인덱스 11)
-              isPremium ? 'Y' : '', // 프리미엄 (컬럼 M, 인덱스 12)
-              isBudget ? 'Y' : '' // 중저가 (컬럼 N, 인덱스 13)
-            ]]
+            values: [newRowValues]
           }
         });
       }

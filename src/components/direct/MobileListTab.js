@@ -125,7 +125,21 @@ const MobileListTab = ({ onProductSelect }) => {
         isBudget: tagType === 'budget' ? checked : currentMobile?.isBudget || false
       };
       
-      await directStoreApi.updateMobileTags(modelId, tags);
+      // 태그 외에도 모델 정보 전달하여 시트에 함께 저장되도록 함
+      const payload = {
+        ...tags,
+        model: currentMobile?.model,
+        petName: currentMobile?.petName,
+        carrier: currentMobile?.carrier,
+        factoryPrice: currentMobile?.factoryPrice,
+        publicSupport: currentMobile?.publicSupport,
+        storeSupport: currentMobile?.storeSupportWithAddon,
+        storeSupportNoAddon: currentMobile?.storeSupportNoAddon,
+        requiredAddons: currentMobile?.requiredAddons,
+        image: currentMobile?.image
+      };
+
+      await directStoreApi.updateMobileTags(modelId, payload);
       
       // 로컬 상태 업데이트
       setMobileList(prevList => prevList.map(item => 
