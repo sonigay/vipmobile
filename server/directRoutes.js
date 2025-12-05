@@ -1206,7 +1206,7 @@ function setupDirectRoutes(app) {
       // 중저가: isBudget 태그가 true인 상품만 필터링
       const budget = allMobiles
         .filter(p => p.isBudget === true)
-        .slice(0, 2)
+        .slice(0, 3)
         .map(p => ({
           ...p,
           purchasePrice: p.purchasePriceWithAddon,
