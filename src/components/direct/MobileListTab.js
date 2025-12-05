@@ -22,7 +22,9 @@ import {
   Menu,
   MenuItem,
   ListItemText,
-  ListItemIcon
+  ListItemIcon,
+  Autocomplete,
+  TextField
 } from '@mui/material';
 import {
   PhotoCamera as PhotoCameraIcon,
@@ -40,6 +42,9 @@ const MobileListTab = ({ onProductSelect }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [tagMenuAnchor, setTagMenuAnchor] = useState({}); // { modelId: anchorElement }
+  const [planGroups, setPlanGroups] = useState([]); // 요금제군 목록
+  const [selectedPlanGroups, setSelectedPlanGroups] = useState({}); // { modelId: planGroup }
+  const [calculatedPrices, setCalculatedPrices] = useState({}); // { modelId: { storeSupportWithAddon, storeSupportWithoutAddon, purchasePriceWithAddon, purchasePriceWithoutAddon } }
 
   const handleCarrierChange = (event, newValue) => {
     setCarrierTab(newValue);
@@ -72,6 +77,23 @@ const MobileListTab = ({ onProductSelect }) => {
     };
 
     fetchMobileList();
+  }, [carrierTab]);
+
+  // 요금제군 목록 로드
+  useEffect(() => {
+    const fetchPlanGroups = async () => {
+      try {
+        const carrier = getCurrentCarrier();
+        const linkSettings = await directStoreApi.getLinkSettings(carrier);
+        if (linkSettings.success && linkSettings.planGroup) {
+          setPlanGroups(linkSettings.planGroup.planGroups || []);
+        }
+      } catch (err) {
+        console.error('요금제군 목록 로딩 실패:', err);
+      }
+    };
+
+    fetchPlanGroups();
   }, [carrierTab]);
 
   const [uploadingModelId, setUploadingModelId] = useState(null);
@@ -182,6 +204,52 @@ const MobileListTab = ({ onProductSelect }) => {
     return tags.length > 0 ? tags.join(', ') : '선택';
   };
 
+  // 요금제군 선택 핸들러
+  const handlePlanGroupChange = async (modelId, planGroup) => {
+    if (!planGroup) {
+      setSelectedPlanGroups(prev => {
+        const newState = { ...prev };
+        delete newState[modelId];
+        return newState;
+      });
+      setCalculatedPrices(prev => {
+        const newState = { ...prev };
+        delete newState[modelId];
+        return newState;
+      });
+      return;
+    }
+
+    setSelectedPlanGroups(prev => ({ ...prev, [modelId]: planGroup }));
+
+    try {
+      const carrier = getCurrentCarrier();
+      const result = await directStoreApi.calculateMobilePrice(modelId, planGroup, '010신규', carrier);
+      if (result.success) {
+        setCalculatedPrices(prev => ({
+          ...prev,
+          [modelId]: {
+            storeSupportWithAddon: result.storeSupportWithAddon,
+            storeSupportWithoutAddon: result.storeSupportWithoutAddon,
+            purchasePriceWithAddon: result.purchasePriceWithAddon,
+            purchasePriceWithoutAddon: result.purchasePriceWithoutAddon
+          }
+        }));
+      }
+    } catch (err) {
+      console.error('가격 계산 실패:', err);
+    }
+  };
+
+  // 표시할 값 가져오기 (계산된 값이 있으면 사용, 없으면 원래 값)
+  const getDisplayValue = (row, field) => {
+    const calculated = calculatedPrices[row.id];
+    if (calculated && calculatedPrices[row.id]) {
+      return calculated[field];
+    }
+    return row[field];
+  };
+
   return (
     <Box sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
       <input
@@ -240,6 +308,7 @@ const MobileListTab = ({ onProductSelect }) => {
                 <TableCell align="center" width="120">구분</TableCell>
                 <TableCell align="center" width="100">이미지</TableCell>
                 <TableCell align="center" width="180">모델명 / 펫네임</TableCell>
+                <TableCell align="center" width="120">요금제군</TableCell>
                 <TableCell align="center" width="100">출고가</TableCell>
                 <TableCell align="center" width="100">공시지원금</TableCell>
                 <TableCell align="center" colSpan={2} sx={{ borderLeft: '1px solid rgba(81, 81, 81, 0.5)' }}>
@@ -261,7 +330,7 @@ const MobileListTab = ({ onProductSelect }) => {
             <TableBody>
               {mobileList.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} align="center" sx={{ py: 5 }}>
+                  <TableCell colSpan={9} align="center" sx={{ py: 5 }}>
                     <Typography color="text.secondary">표시할 데이터가 없습니다.</Typography>
                   </TableCell>
                 </TableRow>
@@ -400,6 +469,22 @@ const MobileListTab = ({ onProductSelect }) => {
                         <Typography variant="body1" fontWeight="bold">{row.petName}</Typography>
                         <Typography variant="caption" color="text.secondary">{row.model}</Typography>
                       </TableCell>
+                      <TableCell align="center" onClick={(e) => e.stopPropagation()}>
+                        <Autocomplete
+                          size="small"
+                          options={planGroups}
+                          value={selectedPlanGroups[row.id] || null}
+                          onChange={(e, newValue) => handlePlanGroupChange(row.id, newValue)}
+                          renderInput={(params) => (
+                            <TextField
+                              {...params}
+                              placeholder="요금제군 선택"
+                              sx={{ minWidth: 100 }}
+                            />
+                          )}
+                          sx={{ minWidth: 120 }}
+                        />
+                      </TableCell>
                       <TableCell align="center">{row.factoryPrice?.toLocaleString()}</TableCell>
                       <TableCell align="center" sx={{ color: 'info.main' }}>
                         {(row.support || row.publicSupport)?.toLocaleString()}
@@ -407,18 +492,18 @@ const MobileListTab = ({ onProductSelect }) => {
 
                       {/* 대리점 지원금 */}
                       <TableCell align="center" sx={{ borderLeft: '1px solid rgba(81, 81, 81, 0.3)' }}>
-                        {(row.storeSupport || row.storeSupportWithAddon)?.toLocaleString()}
+                        {getDisplayValue(row, 'storeSupportWithAddon')?.toLocaleString() || (row.storeSupport || row.storeSupportWithAddon)?.toLocaleString() || '-'}
                       </TableCell>
                       <TableCell align="center">
-                        {row.storeSupportNoAddon?.toLocaleString()}
+                        {getDisplayValue(row, 'storeSupportWithoutAddon')?.toLocaleString() || row.storeSupportNoAddon?.toLocaleString() || '-'}
                       </TableCell>
 
                       {/* 구매가 (할부원금) */}
                       <TableCell align="center" sx={{ borderLeft: '1px solid rgba(81, 81, 81, 0.3)', bgcolor: 'rgba(212, 175, 55, 0.05)', fontWeight: 'bold', color: 'primary.main' }}>
-                        {purchasePriceAddon.toLocaleString()}
+                        {getDisplayValue(row, 'purchasePriceWithAddon')?.toLocaleString() || purchasePriceAddon.toLocaleString()}
                       </TableCell>
                       <TableCell align="center" sx={{ bgcolor: 'rgba(212, 175, 55, 0.05)' }}>
-                        {purchasePriceNoAddon.toLocaleString()}
+                        {getDisplayValue(row, 'purchasePriceWithoutAddon')?.toLocaleString() || purchasePriceNoAddon.toLocaleString()}
                       </TableCell>
                     </TableRow>
                   );

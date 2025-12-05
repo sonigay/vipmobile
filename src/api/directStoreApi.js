@@ -292,4 +292,20 @@ export const directStoreApi = {
         }
     },
 
+    // 요금제군별 대리점지원금 및 구매가 계산
+    calculateMobilePrice: async (modelId, planGroup, openingType, carrier) => {
+        try {
+            const params = new URLSearchParams();
+            params.append('planGroup', planGroup);
+            params.append('openingType', openingType || '010신규');
+            params.append('carrier', carrier);
+            const response = await fetch(`${BASE_URL}/mobiles/${modelId}/calculate?${params.toString()}`);
+            if (!response.ok) throw new Error('가격 계산 실패');
+            return response.json();
+        } catch (err) {
+            console.warn('가격 계산 API 호출 실패:', err);
+            return { success: false, error: err.message };
+        }
+    },
+
 };

@@ -1379,6 +1379,223 @@ function setupDirectRoutes(app) {
     }
   });
 
+  // GET /api/direct/mobiles/:modelId/calculate?planGroup=xxx&openingType=xxx&carrier=SK
+  // 요금제군별 대리점지원금 및 구매가 계산
+  router.get('/mobiles/:modelId/calculate', async (req, res) => {
+    try {
+      const { modelId } = req.params;
+      const { planGroup, openingType = '010신규', carrier } = req.query;
+      
+      if (!planGroup || !carrier) {
+        return res.status(400).json({ success: false, error: 'planGroup과 carrier가 필요합니다.' });
+      }
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+
+      // 모델 정보 가져오기 (정책표 시트에서)
+      const linkSettingsRes = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: SHEET_SETTINGS
+      });
+      const linkSettingsRows = (linkSettingsRes.data.values || []).slice(1);
+      const carrierSettings = linkSettingsRows.filter(row => (row[0] || '').trim() === carrier);
+      const policyRow = carrierSettings.find(row => (row[1] || '').trim() === 'policy');
+      
+      if (!policyRow) {
+        return res.status(404).json({ success: false, error: '정책표 설정을 찾을 수 없습니다.' });
+      }
+
+      const policySettingsJson = policyRow[4] ? JSON.parse(policyRow[4]) : {};
+      const policySheetId = policyRow[2] || '';
+      const modelRange = policySettingsJson.modelRange || '';
+      
+      // 모델 인덱스 추출 (modelId에서)
+      const parts = modelId.split('-');
+      if (parts.length < 3) {
+        return res.status(400).json({ success: false, error: '잘못된 모델 ID 형식입니다.' });
+      }
+      const modelIndex = parseInt(parts[2], 10);
+
+      // 정책표에서 모델 정보 가져오기
+      const modelDataRes = await sheets.spreadsheets.values.get({
+        spreadsheetId: policySheetId,
+        range: modelRange,
+        majorDimension: 'ROWS',
+        valueRenderOption: 'UNFORMATTED_VALUE'
+      });
+      const modelData = (modelDataRes.data.values || []).slice(1);
+      const modelRow = modelData[modelIndex];
+      
+      if (!modelRow) {
+        return res.status(404).json({ success: false, error: '모델을 찾을 수 없습니다.' });
+      }
+
+      // 출고가 가져오기 (이통사 지원금 시트에서)
+      const supportRow = carrierSettings.find(row => (row[1] || '').trim() === 'support');
+      let factoryPrice = 0;
+      if (supportRow) {
+        const supportSettingsJson = supportRow[4] ? JSON.parse(supportRow[4]) : {};
+        const supportSheetId = supportRow[2] || '';
+        const factoryPriceRange = supportSettingsJson.factoryPriceRange || '';
+        const modelRange = supportSettingsJson.modelRange || '';
+        
+        if (factoryPriceRange && modelRange && supportSheetId) {
+          try {
+            const [modelDataRes, factoryPriceRes] = await Promise.all([
+              sheets.spreadsheets.values.get({
+                spreadsheetId: supportSheetId,
+                range: modelRange,
+                majorDimension: 'ROWS',
+                valueRenderOption: 'UNFORMATTED_VALUE'
+              }),
+              sheets.spreadsheets.values.get({
+                spreadsheetId: supportSheetId,
+                range: factoryPriceRange,
+                majorDimension: 'ROWS',
+                valueRenderOption: 'UNFORMATTED_VALUE'
+              })
+            ]);
+            
+            const modelData = (modelDataRes.data.values || []).slice(1);
+            const factoryPriceData = (factoryPriceRes.data.values || []).slice(1);
+            
+            // 정책표의 모델명으로 이통사 지원금 시트에서 매칭
+            const policyModel = modelRow[0] || '';
+            const supportModelIndex = modelData.findIndex(row => (row[0] || '').toString().trim() === policyModel);
+            if (supportModelIndex >= 0) {
+              factoryPrice = Number(factoryPriceData[supportModelIndex]?.[0] || 0);
+            }
+          } catch (err) {
+            console.warn('[Direct] 출고가 읽기 실패:', err);
+          }
+        }
+      }
+
+      // 정책표 리베이트 가져오기
+      const planGroupRanges = policySettingsJson.planGroupRanges || {};
+      const rebateRange = planGroupRanges[planGroup]?.[openingType];
+      
+      let policyRebate = 0;
+      if (rebateRange && policySheetId) {
+        try {
+          const rebateRes = await sheets.spreadsheets.values.get({
+            spreadsheetId: policySheetId,
+            range: rebateRange,
+            majorDimension: 'ROWS',
+            valueRenderOption: 'UNFORMATTED_VALUE'
+          });
+          const rebateValues = (rebateRes.data.values || []).slice(1);
+          policyRebate = Number(rebateValues[modelIndex]?.[0] || 0) * 10000; // 만원 단위 변환
+        } catch (err) {
+          console.warn(`[Direct] ${planGroup} ${openingType} 리베이트 읽기 실패:`, err);
+        }
+      }
+
+      // 정책설정 가져오기
+      const marginRes = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: SHEET_POLICY_MARGIN
+      });
+      const marginRows = (marginRes.data.values || []).slice(1);
+      const marginRow = marginRows.find(row => (row[0] || '').trim() === carrier);
+      const baseMargin = marginRow ? Number(marginRow[1] || 0) : 50000;
+
+      const addonRes = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: SHEET_POLICY_ADDON
+      });
+      const addonRows = (addonRes.data.values || []).slice(1);
+      const addonList = addonRows
+        .filter(row => (row[0] || '').trim() === carrier)
+        .map(row => ({
+          incentive: Number(row[3] || 0),
+          deduction: Number(row[4] || 0)
+        }));
+      const totalAddonIncentive = addonList.reduce((sum, addon) => sum + (addon.incentive || 0), 0);
+      const totalAddonDeduction = addonList.reduce((sum, addon) => sum + (addon.deduction || 0), 0);
+
+      const specialRes = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: SHEET_POLICY_SPECIAL
+      });
+      const specialRows = (specialRes.data.values || []).slice(1);
+      const specialPolicies = specialRows
+        .filter(row => (row[0] || '').trim() === carrier && (row[4] || '').toString().toLowerCase() === 'true')
+        .map(row => ({
+          addition: Number(row[2] || 0),
+          deduction: Number(row[3] || 0)
+        }));
+      const totalSpecialAddition = specialPolicies.reduce((sum, policy) => sum + (policy.addition || 0), 0);
+      const totalSpecialDeduction = specialPolicies.reduce((sum, policy) => sum + (policy.deduction || 0), 0);
+
+      // 이통사지원금 가져오기 (요금제군별)
+      let publicSupport = 0;
+      if (supportRow) {
+        const supportSettingsJson = supportRow[4] ? JSON.parse(supportRow[4]) : {};
+        const supportSheetId = supportRow[2] || '';
+        const planGroupRanges = supportSettingsJson.planGroupRanges || {};
+        const supportRange = planGroupRanges[planGroup];
+        const modelRange = supportSettingsJson.modelRange || '';
+        
+        if (supportRange && modelRange && supportSheetId) {
+          try {
+            const [modelDataRes, supportRes] = await Promise.all([
+              sheets.spreadsheets.values.get({
+                spreadsheetId: supportSheetId,
+                range: modelRange,
+                majorDimension: 'ROWS',
+                valueRenderOption: 'UNFORMATTED_VALUE'
+              }),
+              sheets.spreadsheets.values.get({
+                spreadsheetId: supportSheetId,
+                range: supportRange,
+                majorDimension: 'ROWS',
+                valueRenderOption: 'UNFORMATTED_VALUE'
+              })
+            ]);
+            
+            const modelData = (modelDataRes.data.values || []).slice(1);
+            const supportValues = (supportRes.data.values || []).slice(1);
+            
+            // 정책표의 모델명으로 이통사 지원금 시트에서 매칭
+            const policyModel = modelRow[0] || '';
+            const supportModelIndex = modelData.findIndex(row => (row[0] || '').toString().trim() === policyModel);
+            if (supportModelIndex >= 0) {
+              publicSupport = Number(supportValues[supportModelIndex]?.[0] || 0);
+            }
+          } catch (err) {
+            console.warn(`[Direct] ${planGroup} 이통사지원금 읽기 실패:`, err);
+          }
+        }
+      }
+
+      // 대리점지원금 계산
+      const storeSupportWithAddon = Math.max(0,
+        policyRebate - baseMargin + totalAddonIncentive + totalSpecialAddition
+      );
+      const storeSupportWithoutAddon = Math.max(0,
+        policyRebate - baseMargin + totalAddonDeduction + totalSpecialDeduction
+      );
+
+      // 구매가 계산
+      const purchasePriceWithAddon = Math.max(0, factoryPrice - publicSupport - storeSupportWithAddon);
+      const purchasePriceWithoutAddon = Math.max(0, factoryPrice - publicSupport - storeSupportWithoutAddon);
+
+      res.json({
+        success: true,
+        storeSupportWithAddon,
+        storeSupportWithoutAddon,
+        purchasePriceWithAddon,
+        purchasePriceWithoutAddon,
+        policyRebate,
+        publicSupport
+      });
+    } catch (error) {
+      console.error('[Direct] mobiles calculate GET error:', error);
+      res.status(500).json({ success: false, error: '계산 실패', message: error.message });
+    }
+  });
+
   app.use('/api/direct', router);
 }
 
