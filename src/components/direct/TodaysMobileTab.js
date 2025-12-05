@@ -268,13 +268,13 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
               display: 'grid',
               gap: compact ? (isFullScreen ? 1.5 : 2) : (isFullScreen ? 2.5 : 3),
               gridTemplateColumns: {
-                xs: 'repeat(auto-fit, minmax(180px, 1fr))',
-                sm: compact ? 'repeat(auto-fit, minmax(200px, 1fr))' : 'repeat(auto-fit, minmax(220px, 1fr))',
-                md: compact ? 'repeat(auto-fit, minmax(220px, 1fr))' : 'repeat(auto-fit, minmax(240px, 1fr))',
-                lg: compact ? 'repeat(auto-fit, minmax(200px, 1fr))' : 'repeat(auto-fit, minmax(220px, 1fr))'
+                xs: 'repeat(2, 1fr)',
+                sm: 'repeat(3, 1fr)',
+                md: 'repeat(3, 1fr)',
+                lg: 'repeat(3, 1fr)'
               },
               alignContent: 'start',
-              gridAutoRows: 'minmax(auto, 1fr)',
+              gridAutoRows: '1fr',
               overflowY: 'auto',
               overflowX: 'hidden',
               flex: 1,
@@ -312,8 +312,13 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
             sx={{
               display: 'grid',
               gap: compact ? (isFullScreen ? 1.5 : 2) : (isFullScreen ? 2.5 : 3),
-              gridTemplateColumns: '1fr',
-              gridAutoRows: 'minmax(auto, 1fr)',
+              gridTemplateColumns: {
+                xs: 'repeat(2, 1fr)',
+                sm: 'repeat(3, 1fr)',
+                md: 'repeat(3, 1fr)',
+                lg: '1fr'
+              },
+              gridAutoRows: '1fr',
               alignContent: 'start',
               overflowY: 'auto',
               overflowX: 'hidden',
