@@ -3898,6 +3898,8 @@ app.get('/api/direct/sales', async (req, res) => {
         simSerial: row[12] || '',
         openingType: row[13] || '',
         개통유형: row[13] || '',
+        // 개통유형을 영문으로도 변환 (하위 호환)
+        type: row[13] === '신규' ? 'NEW' : row[13] === '번호이동' ? 'MNP' : row[13] === '기기변경' ? 'CHANGE' : '',
         prevCarrier: row[14] || '',
         전통신사: row[14] || '',
         installmentType: row[15] || '',
