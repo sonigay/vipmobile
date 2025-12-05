@@ -93,25 +93,103 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                 const linkSettings = await directStoreApi.getLinkSettings(selectedCarrier);
                 if (linkSettings.success && linkSettings.planGroup) {
                     const planGroup = linkSettings.planGroup;
-                    // 요금제군 목록과 기본료를 조합하여 요금제 목록 생성
-                    // TODO: 실제로는 planNameRange와 basicFeeRange를 읽어서 조합해야 함
-                    const plans = (planGroup.planGroups || []).map((group, idx) => ({
-                        name: group,
-                        group: group,
-                        basicFee: 89000 + (idx * 10000) // 임시 기본료
-                    }));
-                    setPlanGroups(plans);
-                    if (plans.length > 0) {
-                        setSelectedPlanGroup(plans[0].name);
-                        setPlanBasicFee(plans[0].basicFee);
-                        setFormData(prev => ({ ...prev, plan: plans[0].name }));
+                    const sheetId = planGroup.sheetId || planGroup.link;
+                    const planNameRange = planGroup.planNameRange || '';
+                    const planGroupRange = planGroup.planGroupRange || '';
+                    const basicFeeRange = planGroup.basicFeeRange || '';
+
+                    // planNameRange와 basicFeeRange가 있으면 실제 데이터를 가져옴
+                    if (sheetId && planNameRange && basicFeeRange) {
+                        try {
+                            const [planNameData, basicFeeData, planGroupData] = await Promise.all([
+                                directStoreApi.fetchRangeData(sheetId, planNameRange, false),
+                                directStoreApi.fetchRangeData(sheetId, basicFeeRange, false),
+                                planGroupRange ? directStoreApi.fetchRangeData(sheetId, planGroupRange, false) : Promise.resolve({ success: true, data: [] })
+                            ]);
+
+                            // 데이터를 평탄화하고 빈 값 제거
+                            const planNames = (planNameData.data || []).flat().filter(v => v !== null && v !== undefined && String(v).trim() !== '');
+                            const basicFees = (basicFeeData.data || []).flat().filter(v => v !== null && v !== undefined);
+                            const planGroups = (planGroupData.data || []).flat().filter(v => v !== null && v !== undefined && String(v).trim() !== '');
+
+                            // 같은 인덱스의 요금제명, 기본료, 요금제군을 매칭
+                            const maxLength = Math.max(planNames.length, basicFees.length, planGroups.length);
+                            const plans = [];
+                            
+                            for (let i = 0; i < maxLength; i++) {
+                                const planName = String(planNames[i] || '').trim();
+                                const basicFee = Number(basicFees[i] || 0);
+                                const group = String(planGroups[i] || '').trim();
+
+                                if (planName) {
+                                    // 요금제명(요금제군) 형식으로 표시
+                                    const displayName = group ? `${planName}(${group})` : planName;
+                                    plans.push({
+                                        name: displayName,
+                                        planName: planName,
+                                        group: group || planName,
+                                        basicFee: basicFee
+                                    });
+                                }
+                            }
+
+                            if (plans.length > 0) {
+                                setPlanGroups(plans);
+                                setSelectedPlanGroup(plans[0].name);
+                                setPlanBasicFee(plans[0].basicFee);
+                                setFormData(prev => ({ ...prev, plan: plans[0].name }));
+                            } else {
+                                // 데이터가 없으면 요금제군만 사용
+                                const fallbackPlans = (planGroup.planGroups || []).map((group, idx) => ({
+                                    name: group,
+                                    planName: group,
+                                    group: group,
+                                    basicFee: 89000 + (idx * 10000)
+                                }));
+                                setPlanGroups(fallbackPlans);
+                                if (fallbackPlans.length > 0) {
+                                    setSelectedPlanGroup(fallbackPlans[0].name);
+                                    setPlanBasicFee(fallbackPlans[0].basicFee);
+                                    setFormData(prev => ({ ...prev, plan: fallbackPlans[0].name }));
+                                }
+                            }
+                        } catch (rangeErr) {
+                            console.error('요금제 범위 데이터 읽기 실패:', rangeErr);
+                            // 범위 읽기 실패 시 요금제군만 사용
+                            const fallbackPlans = (planGroup.planGroups || []).map((group, idx) => ({
+                                name: group,
+                                planName: group,
+                                group: group,
+                                basicFee: 89000 + (idx * 10000)
+                            }));
+                            setPlanGroups(fallbackPlans);
+                            if (fallbackPlans.length > 0) {
+                                setSelectedPlanGroup(fallbackPlans[0].name);
+                                setPlanBasicFee(fallbackPlans[0].basicFee);
+                                setFormData(prev => ({ ...prev, plan: fallbackPlans[0].name }));
+                            }
+                        }
+                    } else {
+                        // 범위가 없으면 요금제군만 사용
+                        const fallbackPlans = (planGroup.planGroups || []).map((group, idx) => ({
+                            name: group,
+                            planName: group,
+                            group: group,
+                            basicFee: 89000 + (idx * 10000)
+                        }));
+                        setPlanGroups(fallbackPlans);
+                        if (fallbackPlans.length > 0) {
+                            setSelectedPlanGroup(fallbackPlans[0].name);
+                            setPlanBasicFee(fallbackPlans[0].basicFee);
+                            setFormData(prev => ({ ...prev, plan: fallbackPlans[0].name }));
+                        }
                     }
                 } else {
                     // 링크설정이 없으면 Mock 데이터 사용
                     const mockPlans = [
-                        { name: '5GX 프라임', group: '5GX프라임군', basicFee: 89000 },
-                        { name: '5GX 플래티넘', group: '5GX플래티넘군', basicFee: 125000 },
-                        { name: 'T플랜 에센스', group: 'T플랜군', basicFee: 75000 }
+                        { name: '5GX 프라임(5GX프라임군)', planName: '5GX 프라임', group: '5GX프라임군', basicFee: 89000 },
+                        { name: '5GX 플래티넘(5GX플래티넘군)', planName: '5GX 플래티넘', group: '5GX플래티넘군', basicFee: 125000 },
+                        { name: 'T플랜 에센스(T플랜군)', planName: 'T플랜 에센스', group: 'T플랜군', basicFee: 75000 }
                     ];
                     setPlanGroups(mockPlans);
                     if (mockPlans.length > 0) {
@@ -124,10 +202,15 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                 console.error('요금제 그룹 로드 실패:', err);
                 // 에러 시 Mock 데이터 사용
                 const mockPlans = [
-                    { name: '5GX 프라임', group: '5GX프라임군', basicFee: 89000 },
-                    { name: '5GX 플래티넘', group: '5GX플래티넘군', basicFee: 125000 }
+                    { name: '5GX 프라임(5GX프라임군)', planName: '5GX 프라임', group: '5GX프라임군', basicFee: 89000 },
+                    { name: '5GX 플래티넘(5GX플래티넘군)', planName: '5GX 플래티넘', group: '5GX플래티넘군', basicFee: 125000 }
                 ];
                 setPlanGroups(mockPlans);
+                if (mockPlans.length > 0) {
+                    setSelectedPlanGroup(mockPlans[0].name);
+                    setPlanBasicFee(mockPlans[0].basicFee);
+                    setFormData(prev => ({ ...prev, plan: mockPlans[0].name }));
+                }
             }
         };
         loadPlanGroups();
@@ -851,7 +934,7 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                                         >
                                             {planGroups.map((plan) => (
                                                 <MenuItem key={plan.name} value={plan.name}>
-                                                    {plan.name} ({plan.basicFee.toLocaleString()}원)
+                                                    {plan.name}
                                                 </MenuItem>
                                             ))}
                                         </Select>
