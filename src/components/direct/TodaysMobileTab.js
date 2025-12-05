@@ -10,14 +10,11 @@ import {
   Stack,
   Button,
   Container,
-  Divider,
   CardActions,
   CircularProgress,
   Alert
 } from '@mui/material';
 import {
-  Star as StarIcon,
-  LocalOffer as LocalOfferIcon,
   ShoppingCart as ShoppingCartIcon,
   Refresh as RefreshIcon
 } from '@mui/icons-material';
@@ -202,10 +199,10 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
     );
   }
 
-  // 프리미엄: 최대 6개 (3열 x 2행)
+  // 프리미엄과 중저가를 하나의 배열로 합치기 (프리미엄 먼저, 중저가 나중에)
   const displayPremiumPhones = premiumPhones.slice(0, 6);
-  // 실속형: 최대 2개 (1열 x 2행)
-  const displayBudgetPhones = budgetPhones.slice(0, 2);
+  const displayBudgetPhones = budgetPhones.slice(0, 3);
+  const allProducts = [...displayPremiumPhones, ...displayBudgetPhones];
 
   return (
     <Box
@@ -214,12 +211,12 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
         overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
-        p: isFullScreen ? (compact ? 1.5 : 2) : (compact ? 2 : 2.5),
+        p: isFullScreen ? (compact ? 1 : 1.5) : (compact ? 1.5 : 2),
         bgcolor: 'background.default',
         transition: 'all 0.3s ease'
       }}
     >
-      <Container maxWidth="xl" sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={compact ? 1.5 : 2}>
           <Typography variant="h6" fontWeight="bold">오늘의 휴대폰</Typography>
           <Stack direction="row" spacing={1}>
@@ -246,104 +243,45 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
         <Box
           sx={{
             display: 'grid',
-            gap: compact ? (isFullScreen ? 1.5 : 2) : (isFullScreen ? 2.5 : 3),
-            gridTemplateColumns: { xs: '1fr', lg: '2fr 1fr' },
+            gap: compact ? (isFullScreen ? 1 : 1.5) : (isFullScreen ? 1.5 : 2),
+            gridTemplateColumns: {
+              xs: 'repeat(2, 1fr)',   // 모바일: 2열
+              sm: 'repeat(3, 1fr)',    // 태블릿: 3열
+              md: 'repeat(4, 1fr)',    // 작은 PC: 4열
+              lg: 'repeat(5, 1fr)',    // 큰 PC: 5열
+              xl: 'repeat(6, 1fr)'     // 초대형: 6열
+            },
+            gridAutoRows: '1fr',
+            alignContent: 'start',
+            overflowY: 'auto',
+            overflowX: 'hidden',
             flex: 1,
-            overflow: 'hidden',
-            alignContent: 'start'
+            '&::-webkit-scrollbar': { width: '6px' },
+            '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(0,0,0,0.2)', borderRadius: '3px' }
           }}
         >
-          {/* 프리미엄 섹션 */}
-          <Box sx={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', height: '100%' }}>
-            <Stack direction="row" alignItems="center" spacing={2} mb={compact ? 1 : 1.5}>
-              <StarIcon sx={{ color: 'primary.main', fontSize: compact ? 24 : 28 }} />
-              <Typography variant={compact ? 'h6' : 'h5'} sx={{ fontWeight: 'bold', color: 'text.primary' }}>
-                프리미엄
+          {allProducts.map((product) => {
+            // 프리미엄인지 중저가인지 태그로 판단
+            const isPremium = product.isPremium || false;
+            return (
+              <ProductCard
+                key={product.id}
+                product={product}
+                isPremium={isPremium}
+                onSelect={onProductSelect}
+                compact={compact}
+              />
+            );
+          })}
+          {allProducts.length === 0 && (
+            <Box sx={{ gridColumn: '1 / -1', gridRow: '1 / -1' }}>
+              <Typography color="text.secondary" align="center" py={4}>
+                등록된 휴대폰이 없습니다.
               </Typography>
-              <Divider sx={{ flexGrow: 1, borderColor: 'rgba(212, 175, 55, 0.3)' }} />
-            </Stack>
-
-          <Box
-            sx={{
-              display: 'grid',
-              gap: compact ? (isFullScreen ? 1.5 : 2) : (isFullScreen ? 2.5 : 3),
-              gridTemplateColumns: {
-                xs: 'repeat(2, 1fr)',
-                sm: 'repeat(3, 1fr)',
-                md: 'repeat(3, 1fr)',
-                lg: 'repeat(3, 1fr)'
-              },
-              alignContent: 'start',
-              gridAutoRows: '1fr',
-              overflowY: 'auto',
-              overflowX: 'hidden',
-              flex: 1,
-              pr: 1,
-              '&::-webkit-scrollbar': { width: '6px' },
-              '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(0,0,0,0.2)', borderRadius: '3px' }
-            }}
-          >
-              {displayPremiumPhones.map((product) => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  isPremium={true}
-                  onSelect={onProductSelect}
-                  compact={compact}
-                />
-              ))}
-              {displayPremiumPhones.length === 0 && (
-                <Typography color="text.secondary" align="center">등록된 프리미엄 휴대폰이 없습니다.</Typography>
-              )}
             </Box>
-          </Box>
-
-          {/* 중저가 섹션 */}
-          <Box sx={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', height: '100%' }}>
-            <Stack direction="row" alignItems="center" spacing={2} mb={compact ? 1 : 1.5}>
-              <LocalOfferIcon sx={{ color: 'secondary.main', fontSize: compact ? 24 : 28 }} />
-              <Typography variant={compact ? 'h6' : 'h5'} sx={{ fontWeight: 'bold', color: 'text.primary' }}>
-                중저가
-              </Typography>
-              <Divider sx={{ flexGrow: 1, borderColor: 'rgba(0,0,0,0.08)' }} />
-            </Stack>
-
-          <Box
-            sx={{
-              display: 'grid',
-              gap: compact ? (isFullScreen ? 1.5 : 2) : (isFullScreen ? 2.5 : 3),
-              gridTemplateColumns: {
-                xs: 'repeat(2, 1fr)',
-                sm: 'repeat(3, 1fr)',
-                md: 'repeat(3, 1fr)',
-                lg: '1fr'
-              },
-              gridAutoRows: '1fr',
-              alignContent: 'start',
-              overflowY: 'auto',
-              overflowX: 'hidden',
-              flex: 1,
-              pr: 1,
-              '&::-webkit-scrollbar': { width: '6px' },
-              '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(0,0,0,0.2)', borderRadius: '3px' }
-            }}
-          >
-              {displayBudgetPhones.map((product) => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  isPremium={false}
-                  onSelect={onProductSelect}
-                  compact={compact}
-                />
-              ))}
-              {displayBudgetPhones.length === 0 && (
-                <Typography color="text.secondary" align="center">등록된 중저가 휴대폰이 없습니다.</Typography>
-              )}
-            </Box>
-          </Box>
+          )}
         </Box>
-      </Container>
+      </Box>
     </Box>
   );
 };
