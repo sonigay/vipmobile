@@ -3825,9 +3825,27 @@ app.get('/api/direct/mobiles', async (req, res) => {
 });
 */
 
+// 직영점 판매일보 컬럼 정의 (A~Z)
+const DIRECT_SALES_HEADERS = [
+  '번호', 'POS코드', '업체명', '매장ID', '판매일시', '고객명', 'CTN', '통신사',
+  '단말기모델명', '색상', '단말일련번호', '유심모델명', '유심일련번호',
+  '개통유형', '전통신사', '할부구분', '할부개월', '약정', '요금제', '부가서비스',
+  '출고가', '이통사지원금', '대리점추가지원금(부가유치)', '대리점추가지원금(부가미유치)', '마진', '상태'
+];
+
 // GET /api/direct/sales: 판매일보 목록 조회
 app.get('/api/direct/sales', async (req, res) => {
   try {
+    // 헤더 보정
+    await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '직영점_판매일보!A1:Z1',
+        valueInputOption: 'RAW',
+        resource: { values: [DIRECT_SALES_HEADERS] }
+      })
+    );
+
     const response = await rateLimitedSheetsCall(() =>
       sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
@@ -3842,20 +3860,36 @@ app.get('/api/direct/sales', async (req, res) => {
 
     // 헤더 행 제외
     const rows = values.slice(1);
-    const salesReports = rows.map((row, index) => ({
-      id: row[0] || `sales-${index}`,
-      date: row[1] || '',
-      store: row[2] || '',
-      carrier: row[3] || 'SK',
-      type: row[4] || '신규',
-      model: row[5] || '',
-      customer: row[6] || '',
-      contact: row[7] || '',
-      status: row[8] || 'pending',
-      customerName: row[6] || '',
-      customerContact: row[7] || '',
-      openingType: row[4] === '기변' ? 'CHANGE' : row[4] === '신규' ? 'NEW' : 'MNP'
-    })).filter(report => report.id); // 빈 행 제외
+    const salesReports = rows
+      .map((row, index) => ({
+        id: row[0] || `sales-${index}`,
+        posCode: row[1] || '',
+        company: row[2] || '',
+        storeId: row[3] || '',
+        soldAt: row[4] || '',
+        customerName: row[5] || '',
+        ctn: row[6] || '',
+        carrier: row[7] || '',
+        model: row[8] || '',
+        color: row[9] || '',
+        deviceSerial: row[10] || '',
+        usimModel: row[11] || '',
+        usimSerial: row[12] || '',
+        openingType: row[13] || '',
+        prevCarrier: row[14] || '',
+        installmentType: row[15] || '',
+        installmentPeriod: row[16] || '',
+        contract: row[17] || '',
+        plan: row[18] || '',
+        addons: row[19] || '',
+        factoryPrice: Number(row[20] || 0),
+        publicSupport: Number(row[21] || 0),
+        storeSupportWithAddon: Number(row[22] || 0),
+        storeSupportNoAddon: Number(row[23] || 0),
+        margin: Number(row[24] || 0),
+        status: row[25] || ''
+      }))
+      .filter(report => report.id); // 빈 행 제외
 
     return res.json(salesReports);
   } catch (error) {
@@ -3882,32 +3916,57 @@ app.post('/api/direct/sales', async (req, res) => {
 
     // ID 생성 (타임스탬프 기반)
     const id = `sales-${Date.now()}`;
-    const date = data.date || new Date().toISOString().split('T')[0];
+    const soldAt = data.soldAt || new Date().toISOString();
 
-    // 저장할 행 데이터
+    const openingTypeKor =
+      data.openingType === 'NEW' ? '신규' :
+      data.openingType === 'MNP' ? '번호이동' :
+      data.openingType === 'CHANGE' ? '기기변경' :
+      data.openingType || '';
+
+    const addonsText = Array.isArray(data.addons)
+      ? data.addons.join(', ')
+      : (typeof data.addons === 'string' ? data.addons : JSON.stringify(data.addons || {}));
+
     const row = [
-      id,
-      date,
-      data.store || '',
-      data.carrier || 'SK',
-      data.openingType === 'NEW' ? '신규' : data.openingType === 'MNP' ? '번호이동' : '기기변경',
-      data.model || '',
-      data.customerName,
-      data.customerContact,
-      data.status || 'pending',
-      data.customerBirth || '',
-      data.prevCarrier || '',
-      data.installmentPeriod || 24,
-      data.plan || '',
-      data.installmentPrincipal || 0,
-      data.monthlyInstallment || 0,
-      data.monthlyPlanPrice || 0,
-      data.totalMonthlyPrice || 0,
-      JSON.stringify(data.addons || {}),
-      new Date().toISOString()
+      id,                                       // 번호
+      data.posCode || '',                       // POS코드
+      data.company || data.storeName || '',     // 업체명
+      data.storeId || '',                       // 매장ID
+      soldAt,                                   // 판매일시
+      data.customerName || '',                  // 고객명
+      data.customerContact || '',               // CTN
+      data.carrier || '',                       // 통신사
+      data.model || '',                         // 단말기모델명
+      data.color || '',                         // 색상
+      data.deviceSerial || '',                  // 단말일련번호
+      data.usimModel || '',                     // 유심모델명
+      data.usimSerial || '',                    // 유심일련번호
+      openingTypeKor,                           // 개통유형
+      data.prevCarrier || '',                   // 전통신사
+      data.installmentType || '',               // 할부구분
+      data.installmentPeriod || '',             // 할부개월
+      data.contractType || data.contract || '', // 약정
+      data.plan || '',                          // 요금제
+      addonsText || '',                         // 부가서비스
+      data.factoryPrice || 0,                   // 출고가
+      data.publicSupport || 0,                  // 이통사지원금
+      data.storeSupportWithAddon || 0,          // 대리점추가지원금(부가유치)
+      data.storeSupportNoAddon || 0,            // 대리점추가지원금(부가미유치)
+      data.margin || 0,                         // 마진
+      data.status || '개통대기'                  // 상태
     ];
 
-    // 직영점_판매일보 시트에 추가
+    // 헤더 보정 후 직영점_판매일보 시트에 추가
+    await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '직영점_판매일보!A1:Z1',
+        valueInputOption: 'RAW',
+        resource: { values: [DIRECT_SALES_HEADERS] }
+      })
+    );
+
     await rateLimitedSheetsCall(() =>
       sheets.spreadsheets.values.append({
         spreadsheetId: SPREADSHEET_ID,
@@ -3967,28 +4026,44 @@ app.put('/api/direct/sales/:id', async (req, res) => {
       });
     }
 
-    // 업데이트할 행 데이터 (기존 데이터 유지하면서 수정)
     const existingRow = rows[rowIndex];
+    const openingTypeKor =
+      data.openingType === 'NEW' ? '신규' :
+      data.openingType === 'MNP' ? '번호이동' :
+      data.openingType === 'CHANGE' ? '기기변경' :
+      data.openingType || existingRow[13] || '';
+
+    const addonsText = Array.isArray(data.addons)
+      ? data.addons.join(', ')
+      : (typeof data.addons === 'string' ? data.addons : data.addons ? JSON.stringify(data.addons) : existingRow[19] || '');
+
     const updatedRow = [
-      existingRow[0] || id, // ID
-      data.date || existingRow[1] || '',
-      data.store || existingRow[2] || '',
-      data.carrier || existingRow[3] || 'SK',
-      data.openingType === 'NEW' ? '신규' : data.openingType === 'MNP' ? '번호이동' : data.openingType === 'CHANGE' ? '기기변경' : existingRow[4] || '',
-      data.model || existingRow[5] || '',
-      data.customerName || existingRow[6] || '',
-      data.customerContact || existingRow[7] || '',
-      data.status || existingRow[8] || 'pending',
-      data.customerBirth || existingRow[9] || '',
-      data.prevCarrier || existingRow[10] || '',
-      data.installmentPeriod || existingRow[11] || 24,
-      data.plan || existingRow[12] || '',
-      data.installmentPrincipal || existingRow[13] || 0,
-      data.monthlyInstallment || existingRow[14] || 0,
-      data.monthlyPlanPrice || existingRow[15] || 0,
-      data.totalMonthlyPrice || existingRow[16] || 0,
-      data.addons ? JSON.stringify(data.addons) : existingRow[17] || '',
-      new Date().toISOString()
+      existingRow[0] || id,                      // 번호
+      data.posCode || existingRow[1] || '',      // POS코드
+      data.company || data.storeName || existingRow[2] || '', // 업체명
+      data.storeId || existingRow[3] || '',      // 매장ID
+      data.soldAt || existingRow[4] || '',       // 판매일시
+      data.customerName || existingRow[5] || '', // 고객명
+      data.customerContact || existingRow[6] || '', // CTN
+      data.carrier || existingRow[7] || '',      // 통신사
+      data.model || existingRow[8] || '',        // 단말기모델명
+      data.color || existingRow[9] || '',        // 색상
+      data.deviceSerial || existingRow[10] || '',// 단말일련번호
+      data.usimModel || existingRow[11] || '',   // 유심모델명
+      data.usimSerial || existingRow[12] || '',  // 유심일련번호
+      openingTypeKor,                            // 개통유형
+      data.prevCarrier || existingRow[14] || '', // 전통신사
+      data.installmentType || existingRow[15] || '', // 할부구분
+      data.installmentPeriod || existingRow[16] || '', // 할부개월
+      data.contractType || data.contract || existingRow[17] || '', // 약정
+      data.plan || existingRow[18] || '',        // 요금제
+      addonsText,                                // 부가서비스
+      data.factoryPrice || existingRow[20] || 0, // 출고가
+      data.publicSupport || existingRow[21] || 0,// 이통사지원금
+      data.storeSupportWithAddon || existingRow[22] || 0, // 대리점추가지원금(부가유치)
+      data.storeSupportNoAddon || existingRow[23] || 0,   // 대리점추가지원금(부가미유치)
+      data.margin || existingRow[24] || 0,       // 마진
+      data.status || existingRow[25] || '개통대기' // 상태
     ];
 
     // 행 업데이트 (행 번호는 2부터 시작, 헤더 제외)
