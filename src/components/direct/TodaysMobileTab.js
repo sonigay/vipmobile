@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Grid,
@@ -18,7 +18,8 @@ import {
 import {
   Star as StarIcon,
   LocalOffer as LocalOfferIcon,
-  ShoppingCart as ShoppingCartIcon
+  ShoppingCart as ShoppingCartIcon,
+  Refresh as RefreshIcon
 } from '@mui/icons-material';
 import { directStoreApi } from '../../api/directStoreApi';
 
@@ -149,31 +150,30 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        // API 호출
-        const data = await directStoreApi.getTodaysMobiles();
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await directStoreApi.getTodaysMobiles();
 
-        if (data && (data.premium || data.budget)) {
-          setPremiumPhones(data.premium || []);
-          setBudgetPhones(data.budget || []);
-        } else {
-          // 데이터가 없을 경우 (초기 상태 등)
-          setPremiumPhones([]);
-          setBudgetPhones([]);
-        }
-      } catch (err) {
-        console.error('오늘의 휴대폰 데이터 로딩 실패:', err);
-        setError('데이터를 불러오는 중 오류가 발생했습니다.');
-      } finally {
-        setLoading(false);
+      if (data && (data.premium || data.budget)) {
+        setPremiumPhones(data.premium || []);
+        setBudgetPhones(data.budget || []);
+      } else {
+        setPremiumPhones([]);
+        setBudgetPhones([]);
       }
-    };
-
-    fetchData();
+    } catch (err) {
+      console.error('오늘의 휴대폰 데이터 로딩 실패:', err);
+      setError('데이터를 불러오는 중 오류가 발생했습니다.');
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   if (loading) {
     return (
@@ -199,70 +199,103 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
   return (
     <Box
       sx={{
-        height: '100%',
+        minHeight: '100%',
         overflow: 'auto',
-        p: isFullScreen ? 4 : 3,
+        p: isFullScreen ? 3 : 3,
         bgcolor: 'background.default',
         transition: 'all 0.3s ease'
       }}
     >
       <Container maxWidth="xl">
-        <Grid container spacing={3}>
-          {/* 프리미엄 휴대폰 섹션 - 3열 */}
-          <Grid item xs={12} md={9}>
-            <Stack direction="row" alignItems="center" spacing={2} mb={3}>
-              <StarIcon sx={{ color: 'primary.main', fontSize: 32 }} />
-              <Typography variant="h4" component="h2" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
+        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
+          <Typography variant="h5" fontWeight="bold">오늘의 휴대폰</Typography>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<RefreshIcon />}
+            onClick={fetchData}
+            disabled={loading}
+          >
+            새로고침
+          </Button>
+        </Stack>
+
+        <Box
+          sx={{
+            display: 'grid',
+            gap: isFullScreen ? 3 : 2,
+            gridTemplateColumns: { xs: '1fr', lg: '2fr 1fr' }
+          }}
+        >
+          {/* 프리미엄 섹션 */}
+          <Box>
+            <Stack direction="row" alignItems="center" spacing={2} mb={2}>
+              <StarIcon sx={{ color: 'primary.main', fontSize: 28 }} />
+              <Typography variant="h5" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
                 프리미엄
               </Typography>
               <Divider sx={{ flexGrow: 1, borderColor: 'rgba(212, 175, 55, 0.3)' }} />
             </Stack>
 
-            <Grid container spacing={3}>
+            <Box
+              sx={{
+                display: 'grid',
+                gap: isFullScreen ? 2.5 : 2,
+                gridTemplateColumns: {
+                  xs: 'repeat(auto-fit, minmax(230px, 1fr))',
+                  sm: 'repeat(auto-fit, minmax(240px, 1fr))',
+                  md: 'repeat(auto-fit, minmax(250px, 1fr))'
+                }
+              }}
+            >
               {displayPremiumPhones.map((product) => (
-                <Grid item xs={12} sm={6} md={4} key={product.id}>
-                  <ProductCard
-                    product={product}
-                    isPremium={true}
-                    onSelect={onProductSelect}
-                  />
-                </Grid>
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  isPremium={true}
+                  onSelect={onProductSelect}
+                />
               ))}
               {displayPremiumPhones.length === 0 && (
-                <Grid item xs={12}>
-                  <Typography color="text.secondary" align="center">등록된 프리미엄 휴대폰이 없습니다.</Typography>
-                </Grid>
+                <Typography color="text.secondary" align="center">등록된 프리미엄 휴대폰이 없습니다.</Typography>
               )}
-            </Grid>
-          </Grid>
+            </Box>
+          </Box>
 
-          {/* 실속형 휴대폰 섹션 - 1열 */}
-          <Grid item xs={12} md={3}>
-            <Stack direction="row" alignItems="center" spacing={2} mb={3}>
-              <LocalOfferIcon sx={{ color: 'secondary.main', fontSize: 32 }} />
-              <Typography variant="h4" component="h2" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
+          {/* 중저가 섹션 */}
+          <Box>
+            <Stack direction="row" alignItems="center" spacing={2} mb={2}>
+              <LocalOfferIcon sx={{ color: 'secondary.main', fontSize: 28 }} />
+              <Typography variant="h5" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
                 중저가
               </Typography>
+              <Divider sx={{ flexGrow: 1, borderColor: 'rgba(0,0,0,0.08)' }} />
             </Stack>
 
-            <Grid container spacing={3}>
+            <Box
+              sx={{
+                display: 'grid',
+                gap: isFullScreen ? 2.5 : 2,
+                gridTemplateColumns: {
+                  xs: 'repeat(auto-fit, minmax(240px, 1fr))',
+                  sm: 'repeat(auto-fit, minmax(260px, 1fr))'
+                }
+              }}
+            >
               {displayBudgetPhones.map((product) => (
-                <Grid item xs={12} key={product.id}>
-                  <ProductCard
-                    product={product}
-                    isPremium={false}
-                    onSelect={onProductSelect}
-                  />
-                </Grid>
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  isPremium={false}
+                  onSelect={onProductSelect}
+                />
               ))}
               {displayBudgetPhones.length === 0 && (
-                <Grid item xs={12}>
-                  <Typography color="text.secondary" align="center">등록된 중저가 휴대폰이 없습니다.</Typography>
-                </Grid>
+                <Typography color="text.secondary" align="center">등록된 중저가 휴대폰이 없습니다.</Typography>
               )}
-            </Grid>
-          </Grid>
-        </Grid>
+            </Box>
+          </Box>
+        </Box>
       </Container>
     </Box>
   );
