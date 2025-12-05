@@ -75,7 +75,14 @@ const ProductCard = ({ product, isPremium, onSelect, compact }) => {
         </Stack>
       )}
 
-      <Box sx={{ position: 'relative', pt: compact ? '48%' : '56%', bgcolor: '#FAFAFA', borderRadius: '16px 16px 0 0', overflow: 'hidden' }}>
+      <Box sx={{ 
+        position: 'relative', 
+        pt: compact ? '50%' : '60%',  // 이미지 영역 비율 조정 (사진이 잘리지 않도록)
+        minHeight: compact ? 120 : 150,  // 최소 높이 설정
+        bgcolor: '#FAFAFA', 
+        borderRadius: '16px 16px 0 0', 
+        overflow: 'hidden' 
+      }}>
         <CardMedia
           component="img"
           image={product.image || 'https://via.placeholder.com/300x300?text=No+Image'}
@@ -86,7 +93,7 @@ const ProductCard = ({ product, isPremium, onSelect, compact }) => {
             left: 0,
             width: '100%',
             height: '100%',
-            objectFit: 'contain',
+            objectFit: 'contain',  // contain으로 설정하여 이미지가 잘리지 않도록
             p: compact ? 1.5 : 2,
             transition: 'transform 0.3s',
             '&:hover': { transform: 'scale(1.05)' }
@@ -252,9 +259,9 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
               lg: 'repeat(5, 1fr)',    // 큰 PC: 5열
               xl: 'repeat(6, 1fr)'     // 초대형: 6열
             },
-            gridAutoRows: 'auto',  // 내용에 맞게 자동 높이 조정
+            gridAutoRows: 'auto',  // 내용에 맞게 자동 높이 조정 (행 수 제한 없음)
             alignContent: 'start',
-            alignItems: 'start',  // 카드들을 위쪽부터 정렬
+            alignItems: 'stretch',  // 카드들이 같은 높이를 가지도록 (하지만 autoRows로 인해 내용에 맞게 조정됨)
             overflowY: 'auto',
             overflowX: 'hidden',
             flex: 1,
