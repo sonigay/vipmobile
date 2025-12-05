@@ -307,18 +307,18 @@ const MobileListTab = ({ onProductSelect }) => {
               <TableRow>
                 <TableCell align="center" width="120">구분</TableCell>
                 <TableCell align="center" width="100">이미지</TableCell>
-                <TableCell align="center" width="180">모델명 / 펫네임</TableCell>
+                <TableCell align="center" width="220">모델명 / 펫네임</TableCell>
                 <TableCell align="center" width="120">요금제군</TableCell>
                 <TableCell align="center" width="100">출고가</TableCell>
-                <TableCell align="center" width="100">공시지원금</TableCell>
-                <TableCell align="center" colSpan={2} sx={{ borderLeft: '1px solid rgba(81, 81, 81, 0.5)' }}>
+                <TableCell align="center" width="100">이통사지원금</TableCell>
+                <TableCell align="center" colSpan={2} width="180" sx={{ borderLeft: '1px solid rgba(81, 81, 81, 0.5)' }}>
                   대리점 지원금
                   <Box sx={{ display: 'flex', justifyContent: 'space-around', fontSize: '0.75rem', color: 'text.secondary', mt: 0.5 }}>
                     <span>부가유치</span>
                     <span>미유치</span>
                   </Box>
                 </TableCell>
-                <TableCell align="center" colSpan={2} sx={{ borderLeft: '1px solid rgba(81, 81, 81, 0.5)', bgcolor: 'rgba(212, 175, 55, 0.1)' }}>
+                <TableCell align="center" colSpan={2} width="180" sx={{ borderLeft: '1px solid rgba(81, 81, 81, 0.5)', bgcolor: 'rgba(212, 175, 55, 0.1)' }}>
                   구매가 (할부원금)
                   <Box sx={{ display: 'flex', justifyContent: 'space-around', fontSize: '0.75rem', color: 'text.secondary', mt: 0.5 }}>
                     <span>부가유치</span>
@@ -465,9 +465,9 @@ const MobileListTab = ({ onProductSelect }) => {
                           </IconButton>
                         </Box>
                       </TableCell>
-                      <TableCell align="center">
-                        <Typography variant="body1" fontWeight="bold">{row.petName}</Typography>
-                        <Typography variant="caption" color="text.secondary">{row.model}</Typography>
+                      <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>
+                        <Typography variant="body1" fontWeight="bold" sx={{ fontSize: '0.95rem' }}>{row.petName}</Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>{row.model}</Typography>
                       </TableCell>
                       <TableCell align="center" onClick={(e) => e.stopPropagation()}>
                         <Autocomplete
@@ -485,25 +485,71 @@ const MobileListTab = ({ onProductSelect }) => {
                           sx={{ minWidth: 120 }}
                         />
                       </TableCell>
-                      <TableCell align="center">{row.factoryPrice?.toLocaleString()}</TableCell>
+                      <TableCell align="center">
+                        <Typography 
+                          variant="body1" 
+                          sx={{ 
+                            textDecoration: 'line-through',
+                            color: 'text.secondary'
+                          }}
+                        >
+                          {row.factoryPrice?.toLocaleString()}
+                        </Typography>
+                      </TableCell>
                       <TableCell align="center" sx={{ color: 'info.main' }}>
                         {(row.support || row.publicSupport)?.toLocaleString()}
                       </TableCell>
 
                       {/* 대리점 지원금 */}
-                      <TableCell align="center" sx={{ borderLeft: '1px solid rgba(81, 81, 81, 0.3)' }}>
-                        {getDisplayValue(row, 'storeSupportWithAddon')?.toLocaleString() || (row.storeSupport || row.storeSupportWithAddon)?.toLocaleString() || '-'}
+                      <TableCell align="center" sx={{ borderLeft: '1px solid rgba(81, 81, 81, 0.3)', width: '90px' }}>
+                        <Typography 
+                          variant="body1" 
+                          sx={{ 
+                            fontSize: '1.1rem', 
+                            fontWeight: 'bold', 
+                            color: 'info.main' 
+                          }}
+                        >
+                          {getDisplayValue(row, 'storeSupportWithAddon')?.toLocaleString() || (row.storeSupport || row.storeSupportWithAddon)?.toLocaleString() || '-'}
+                        </Typography>
                       </TableCell>
-                      <TableCell align="center">
-                        {getDisplayValue(row, 'storeSupportWithoutAddon')?.toLocaleString() || row.storeSupportNoAddon?.toLocaleString() || '-'}
+                      <TableCell align="center" sx={{ width: '90px' }}>
+                        <Typography 
+                          variant="body1" 
+                          sx={{ 
+                            fontSize: '1.1rem', 
+                            fontWeight: 'bold', 
+                            color: 'warning.main' 
+                          }}
+                        >
+                          {getDisplayValue(row, 'storeSupportWithoutAddon')?.toLocaleString() || row.storeSupportNoAddon?.toLocaleString() || '-'}
+                        </Typography>
                       </TableCell>
 
                       {/* 구매가 (할부원금) */}
-                      <TableCell align="center" sx={{ borderLeft: '1px solid rgba(81, 81, 81, 0.3)', bgcolor: 'rgba(212, 175, 55, 0.05)', fontWeight: 'bold', color: 'primary.main' }}>
-                        {getDisplayValue(row, 'purchasePriceWithAddon')?.toLocaleString() || purchasePriceAddon.toLocaleString()}
+                      <TableCell align="center" sx={{ borderLeft: '1px solid rgba(81, 81, 81, 0.3)', bgcolor: 'rgba(212, 175, 55, 0.05)', width: '90px' }}>
+                        <Typography 
+                          variant="body1" 
+                          sx={{ 
+                            fontSize: '1.15rem', 
+                            fontWeight: 'bold', 
+                            color: 'primary.main' 
+                          }}
+                        >
+                          {getDisplayValue(row, 'purchasePriceWithAddon')?.toLocaleString() || purchasePriceAddon.toLocaleString()}
+                        </Typography>
                       </TableCell>
-                      <TableCell align="center" sx={{ bgcolor: 'rgba(212, 175, 55, 0.05)' }}>
-                        {getDisplayValue(row, 'purchasePriceWithoutAddon')?.toLocaleString() || purchasePriceNoAddon.toLocaleString()}
+                      <TableCell align="center" sx={{ bgcolor: 'rgba(212, 175, 55, 0.05)', width: '90px' }}>
+                        <Typography 
+                          variant="body1" 
+                          sx={{ 
+                            fontSize: '1.15rem', 
+                            fontWeight: 'bold', 
+                            color: 'success.main' 
+                          }}
+                        >
+                          {getDisplayValue(row, 'purchasePriceWithoutAddon')?.toLocaleString() || purchasePriceNoAddon.toLocaleString()}
+                        </Typography>
                       </TableCell>
                     </TableRow>
                   );
