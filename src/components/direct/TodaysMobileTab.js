@@ -77,7 +77,7 @@ const ProductCard = ({ product, isPremium, onSelect, compact }) => {
         </Stack>
       )}
 
-      <Box sx={{ position: 'relative', pt: compact ? '52%' : '60%', bgcolor: '#FAFAFA', borderRadius: '16px 16px 0 0', overflow: 'hidden' }}>
+      <Box sx={{ position: 'relative', pt: compact ? '48%' : '56%', bgcolor: '#FAFAFA', borderRadius: '16px 16px 0 0', overflow: 'hidden' }}>
         <CardMedia
           component="img"
           image={product.image || 'https://via.placeholder.com/300x300?text=No+Image'}
@@ -210,10 +210,10 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
   return (
     <Box
       sx={{
-        minHeight: 'calc(100vh - 60px)',
+        minHeight: 'calc(100vh - 40px)',
         maxHeight: '100vh',
         overflow: 'hidden',
-        p: isFullScreen ? 2.5 : 3,
+        p: isFullScreen ? 2 : 2.5,
         bgcolor: 'background.default',
         transition: 'all 0.3s ease'
       }}
@@ -269,7 +269,9 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                 sm: 'repeat(auto-fit, minmax(230px, 1fr))',
                 md: 'repeat(auto-fit, minmax(240px, 1fr))'
               },
-              alignContent: 'start'
+              alignContent: 'start',
+              gridAutoRows: '1fr',
+              overflow: 'hidden'
             }}
           >
               {displayPremiumPhones.map((product) => (
@@ -301,10 +303,12 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
               display: 'grid',
               gap: isFullScreen ? 2.5 : 2,
               gridTemplateColumns: {
-                xs: 'repeat(auto-fit, minmax(200px, 1fr))',
-                sm: 'repeat(auto-fit, minmax(220px, 1fr))'
+                xs: '1fr',
+                sm: '1fr'
               },
-              alignContent: 'start'
+              gridAutoRows: '1fr',
+              alignContent: 'start',
+              overflow: 'hidden'
             }}
           >
               {displayBudgetPhones.map((product) => (
