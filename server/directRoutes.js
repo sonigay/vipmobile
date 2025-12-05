@@ -880,8 +880,8 @@ function setupDirectRoutes(app) {
         }
       });
 
-      // 8. 직영점_오늘의휴대폰 시트에서 구분(인기/추천/저렴) 태그 읽기
-      let tagMap = new Map(); // { model: { isPopular: true, isRecommended: true, isCheap: false } }
+      // 8. 직영점_오늘의휴대폰 시트에서 구분(인기/추천/저렴/프리미엄/중저가) 태그 읽기
+      let tagMap = new Map(); // { model: { isPopular, isRecommended, isCheap, isPremium, isBudget } }
       try {
         const todaysRes = await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
@@ -894,7 +894,9 @@ function setupDirectRoutes(app) {
             tagMap.set(model, {
               isPopular: (row[9] || '').toString().toUpperCase() === 'Y' || (row[9] || '').toString().toUpperCase() === 'TRUE',
               isRecommended: (row[10] || '').toString().toUpperCase() === 'Y' || (row[10] || '').toString().toUpperCase() === 'TRUE',
-              isCheap: (row[11] || '').toString().toUpperCase() === 'Y' || (row[11] || '').toString().toUpperCase() === 'TRUE'
+              isCheap: (row[11] || '').toString().toUpperCase() === 'Y' || (row[11] || '').toString().toUpperCase() === 'TRUE',
+              isPremium: (row[12] || '').toString().toUpperCase() === 'Y' || (row[12] || '').toString().toUpperCase() === 'TRUE',
+              isBudget: (row[13] || '').toString().toUpperCase() === 'Y' || (row[13] || '').toString().toUpperCase() === 'TRUE'
             });
           }
         });
@@ -980,6 +982,8 @@ function setupDirectRoutes(app) {
         if (tags.isPopular) tagsArray.push('popular');
         if (tags.isRecommended) tagsArray.push('recommend');
         if (tags.isCheap) tagsArray.push('cheap');
+        if (tags.isPremium) tagsArray.push('premium');
+        if (tags.isBudget) tagsArray.push('budget');
 
         const mobile = {
           id: `mobile-${carrierParam}-${i}`,
@@ -999,7 +1003,9 @@ function setupDirectRoutes(app) {
           requiredAddons: requiredAddons.join(', ') || '없음',
           isPopular: tags.isPopular || false,
           isRecommended: tags.isRecommended || false,
-          isCheap: tags.isCheap || false
+          isCheap: tags.isCheap || false,
+          isPremium: tags.isPremium || false,
+          isBudget: tags.isBudget || false
         };
 
         mobileList.push(mobile);
@@ -1044,9 +1050,9 @@ function setupDirectRoutes(app) {
         }
       }
 
-      // 프리미엄: 인기 또는 추천 태그가 있는 상품 중 상위 6개
+      // 프리미엄: isPremium 태그가 true인 상품만 필터링
       const premium = allMobiles
-        .filter(p => p.isPopular || p.isRecommended)
+        .filter(p => p.isPremium === true)
         .slice(0, 6)
         .map(p => ({
           ...p,
@@ -1054,23 +1060,130 @@ function setupDirectRoutes(app) {
           addons: p.requiredAddons
         }));
 
-      // 실속형: 저렴 태그가 있는 상품 중 상위 2개, 없으면 가격 낮은 순으로 2개
-      const cheap = allMobiles.filter(p => p.isCheap);
-      const fallback = allMobiles
-        .filter(p => !p.isPopular && !p.isRecommended)
-        .sort((a, b) => (a.purchasePriceWithAddon || 0) - (b.purchasePriceWithAddon || 0));
-
-      const budgetSource = cheap.length > 0 ? cheap : fallback;
-      const budget = budgetSource.slice(0, 2).map(p => ({
-        ...p,
-        purchasePrice: p.purchasePriceWithAddon,
-        addons: p.requiredAddons
-      }));
+      // 중저가: isBudget 태그가 true인 상품만 필터링
+      const budget = allMobiles
+        .filter(p => p.isBudget === true)
+        .slice(0, 2)
+        .map(p => ({
+          ...p,
+          purchasePrice: p.purchasePriceWithAddon,
+          addons: p.requiredAddons
+        }));
 
       res.json({ premium, budget });
     } catch (error) {
       console.error('[Direct] todays-mobiles GET error:', error);
       res.status(500).json({ success: false, error: '오늘의 휴대폰 조회 실패', message: error.message });
+    }
+  });
+
+  // PUT /api/direct/mobiles/:modelId/tags
+  // 휴대폰 태그 업데이트 (직영점_오늘의휴대폰 시트에 저장)
+  router.put('/mobiles/:modelId/tags', async (req, res) => {
+    try {
+      const { modelId } = req.params;
+      const { isPopular, isRecommended, isCheap, isPremium, isBudget } = req.body;
+
+      // modelId에서 모델명 추출 (형식: mobile-{carrier}-{index})
+      const parts = modelId.split('-');
+      if (parts.length < 3) {
+        return res.status(400).json({ success: false, error: '잘못된 모델 ID 형식입니다.' });
+      }
+      
+      // 모델명을 가져오기 위해 mobiles 엔드포인트를 호출하거나, 직접 시트에서 찾기
+      // 여기서는 간단하게 시트에서 모델명으로 찾기
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, '직영점_오늘의휴대폰', [
+        '모델명', '펫네임', '통신사', '출고가', '이통사지원금', '대리점지원금(부가유치)', '대리점지원금(부가미유치)', '이미지', '필수부가서비스', '인기', '추천', '저렴', '프리미엄', '중저가'
+      ]);
+
+      // 직영점_오늘의휴대폰 시트에서 해당 모델 찾기
+      const todaysRes = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '직영점_오늘의휴대폰!A:Z'
+      });
+      const todaysRows = (todaysRes.data.values || []).slice(1);
+      
+      // 모델명으로 행 찾기 (modelId에서 모델명 추출이 어려우므로, 전체 mobiles에서 찾기)
+      // 대신 요청 본문에 model 필드를 추가하거나, modelId를 파싱해서 찾기
+      // 일단은 첫 번째 통신사(SK)의 mobiles를 가져와서 modelId로 모델명 찾기
+      let modelName = null;
+      try {
+        const mobileList = await getMobileList('SK');
+        const mobile = mobileList.find(m => m.id === modelId);
+        if (mobile) {
+          modelName = mobile.model;
+        } else {
+          // KT, LG도 시도
+          for (const carrier of ['KT', 'LG']) {
+            const carrierList = await getMobileList(carrier);
+            const carrierMobile = carrierList.find(m => m.id === modelId);
+            if (carrierMobile) {
+              modelName = carrierMobile.model;
+              break;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[Direct] 모델명 찾기 실패:', err);
+      }
+
+      if (!modelName) {
+        return res.status(404).json({ success: false, error: '모델을 찾을 수 없습니다.' });
+      }
+
+      // 해당 모델명의 행 찾기
+      const rowIndex = todaysRows.findIndex(row => (row[0] || '').trim() === modelName);
+      
+      if (rowIndex === -1) {
+        // 행이 없으면 추가
+        const newRow = [
+          modelName, // 모델명
+          '', // 펫네임
+          '', // 통신사
+          '', // 출고가
+          '', // 이통사지원금
+          '', // 대리점지원금(부가유치)
+          '', // 대리점지원금(부가미유치)
+          '', // 이미지
+          '', // 필수부가서비스
+          isPopular ? 'Y' : '', // 인기 (컬럼 9, 인덱스 9)
+          isRecommended ? 'Y' : '', // 추천 (컬럼 10, 인덱스 10)
+          isCheap ? 'Y' : '', // 저렴 (컬럼 11, 인덱스 11)
+          isPremium ? 'Y' : '', // 프리미엄 (컬럼 12, 인덱스 12)
+          isBudget ? 'Y' : '' // 중저가 (컬럼 13, 인덱스 13)
+        ];
+        await sheets.spreadsheets.values.append({
+          spreadsheetId: SPREADSHEET_ID,
+          range: '직영점_오늘의휴대폰',
+          valueInputOption: 'USER_ENTERED',
+          insertDataOption: 'INSERT_ROWS',
+          resource: { values: [newRow] }
+        });
+      } else {
+        // 행이 있으면 업데이트 (컬럼 9-13만 업데이트)
+        const updateRange = `직영점_오늘의휴대폰!J${rowIndex + 2}:N${rowIndex + 2}`;
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: updateRange,
+          valueInputOption: 'USER_ENTERED',
+          resource: {
+            values: [[
+              isPopular ? 'Y' : '', // 인기 (컬럼 J, 인덱스 9)
+              isRecommended ? 'Y' : '', // 추천 (컬럼 K, 인덱스 10)
+              isCheap ? 'Y' : '', // 저렴 (컬럼 L, 인덱스 11)
+              isPremium ? 'Y' : '', // 프리미엄 (컬럼 M, 인덱스 12)
+              isBudget ? 'Y' : '' // 중저가 (컬럼 N, 인덱스 13)
+            ]]
+          }
+        });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('[Direct] mobiles tags PUT error:', error);
+      res.status(500).json({ success: false, error: '태그 업데이트 실패', message: error.message });
     }
   });
 

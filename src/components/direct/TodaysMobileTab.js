@@ -241,7 +241,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
             <Stack direction="row" alignItems="center" spacing={2} mb={3}>
               <LocalOfferIcon sx={{ color: 'secondary.main', fontSize: 32 }} />
               <Typography variant="h4" component="h2" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
-                실속형
+                중저가
               </Typography>
             </Stack>
 
@@ -257,7 +257,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
               ))}
               {displayBudgetPhones.length === 0 && (
                 <Grid item xs={12}>
-                  <Typography color="text.secondary" align="center">등록된 실속형 휴대폰이 없습니다.</Typography>
+                  <Typography color="text.secondary" align="center">등록된 중저가 휴대폰이 없습니다.</Typography>
                 </Grid>
               )}
             </Grid>

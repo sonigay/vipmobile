@@ -116,10 +116,13 @@ const MobileListTab = ({ onProductSelect }) => {
 
   const handleTagChange = async (modelId, tagType, checked) => {
     try {
+      const currentMobile = mobileList.find(m => m.id === modelId);
       const tags = {
-        isPopular: tagType === 'popular' ? checked : mobileList.find(m => m.id === modelId)?.isPopular || false,
-        isRecommended: tagType === 'recommend' ? checked : mobileList.find(m => m.id === modelId)?.isRecommended || false,
-        isCheap: tagType === 'cheap' ? checked : mobileList.find(m => m.id === modelId)?.isCheap || false
+        isPopular: tagType === 'popular' ? checked : currentMobile?.isPopular || false,
+        isRecommended: tagType === 'recommend' ? checked : currentMobile?.isRecommended || false,
+        isCheap: tagType === 'cheap' ? checked : currentMobile?.isCheap || false,
+        isPremium: tagType === 'premium' ? checked : currentMobile?.isPremium || false,
+        isBudget: tagType === 'budget' ? checked : currentMobile?.isBudget || false
       };
       
       await directStoreApi.updateMobileTags(modelId, tags);
@@ -265,6 +268,28 @@ const MobileListTab = ({ onProductSelect }) => {
                               />
                             }
                             label={<Chip label="저렴" color="success" size="small" />}
+                            labelPlacement="end"
+                          />
+                          <FormControlLabel
+                            control={
+                              <Checkbox
+                                checked={row.isPremium || false}
+                                onChange={(e) => handleTagChange(row.id, 'premium', e.target.checked)}
+                                size="small"
+                              />
+                            }
+                            label={<Chip label="프리미엄" color="warning" size="small" />}
+                            labelPlacement="end"
+                          />
+                          <FormControlLabel
+                            control={
+                              <Checkbox
+                                checked={row.isBudget || false}
+                                onChange={(e) => handleTagChange(row.id, 'budget', e.target.checked)}
+                                size="small"
+                              />
+                            }
+                            label={<Chip label="중저가" color="info" size="small" />}
                             labelPlacement="end"
                           />
                         </Box>
