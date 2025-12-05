@@ -33,6 +33,13 @@ const ProductCard = ({ product, isPremium, onSelect, compact }) => {
     }
   };
 
+  const tagChips = [];
+  if (product.isPremium) tagChips.push({ label: '프리미엄', color: 'primary' });
+  if (product.isBudget) tagChips.push({ label: '중저가', color: 'secondary' });
+  if (product.isPopular) tagChips.push({ label: '인기', color: 'warning' });
+  if (product.isRecommended) tagChips.push({ label: '추천', color: 'success' });
+  if (product.isCheap) tagChips.push({ label: '저렴', color: 'info' });
+
   return (
     <Card
       sx={{
@@ -47,24 +54,27 @@ const ProductCard = ({ product, isPremium, onSelect, compact }) => {
       }}
       onClick={() => onSelect(product)}
     >
-      {isPremium && (
-        <Box
+      {tagChips.length > 0 && (
+        <Stack
+          direction="row"
+          spacing={0.5}
           sx={{
             position: 'absolute',
-            top: -10,
-            left: -10,
-            zIndex: 1,
-            bgcolor: 'primary.main',
-            color: 'black',
-            px: 2,
-            py: 0.5,
-            borderRadius: 2,
-            fontWeight: 'bold',
-            boxShadow: '0 4px 8px rgba(0,0,0,0.3)'
+            top: 8,
+            left: 8,
+            zIndex: 1
           }}
         >
-          BEST
-        </Box>
+          {tagChips.map((chip) => (
+            <Chip
+              key={chip.label}
+              label={chip.label}
+              color={chip.color}
+              size="small"
+              sx={{ fontWeight: 'bold', boxShadow: 3 }}
+            />
+          ))}
+        </Stack>
       )}
 
       <Box sx={{ position: 'relative', pt: compact ? '52%' : '60%', bgcolor: '#FAFAFA', borderRadius: '16px 16px 0 0', overflow: 'hidden' }}>
