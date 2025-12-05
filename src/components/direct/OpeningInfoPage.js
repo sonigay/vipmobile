@@ -18,7 +18,8 @@ import {
     Stack,
     IconButton,
     CircularProgress,
-    Alert
+    Alert,
+    Autocomplete
 } from '@mui/material';
 import {
     ArrowBack as ArrowBackIcon,
@@ -920,25 +921,35 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                             <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>요금정보</Typography>
                             <Grid container spacing={1.5}>
                                 <Grid item xs={12}>
-                                    <FormControl fullWidth>
-                                        <InputLabel>요금제 선택</InputLabel>
-                                        <Select
-                                            value={formData.plan}
-                                            label="요금제 선택"
-                                            onChange={(e) => {
-                                                const selectedPlan = planGroups.find(p => p.name === e.target.value);
-                                                setFormData({ ...formData, plan: e.target.value });
-                                                setSelectedPlanGroup(e.target.value);
-                                                setPlanBasicFee(selectedPlan?.basicFee || 0);
-                                            }}
-                                        >
-                                            {planGroups.map((plan) => (
-                                                <MenuItem key={plan.name} value={plan.name}>
-                                                    {plan.name}
-                                                </MenuItem>
-                                            ))}
-                                        </Select>
-                                    </FormControl>
+                                    <Autocomplete
+                                        options={planGroups}
+                                        getOptionLabel={(option) => typeof option === 'string' ? option : option.name}
+                                        value={planGroups.find(p => p.name === formData.plan) || null}
+                                        onChange={(event, newValue) => {
+                                            if (newValue) {
+                                                setFormData({ ...formData, plan: newValue.name });
+                                                setSelectedPlanGroup(newValue.name);
+                                                setPlanBasicFee(newValue.basicFee || 0);
+                                            } else {
+                                                setFormData({ ...formData, plan: '' });
+                                                setSelectedPlanGroup('');
+                                                setPlanBasicFee(0);
+                                            }
+                                        }}
+                                        renderInput={(params) => (
+                                            <TextField
+                                                {...params}
+                                                label="요금제 선택"
+                                                placeholder="요금제명을 입력하세요"
+                                            />
+                                        )}
+                                        filterOptions={(options, { inputValue }) => {
+                                            return options.filter(option =>
+                                                option.name.toLowerCase().includes(inputValue.toLowerCase())
+                                            );
+                                        }}
+                                        noOptionsText="검색 결과가 없습니다"
+                                    />
                                 </Grid>
                                 {formData.plan && (
                                     <>
