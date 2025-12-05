@@ -210,16 +210,17 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
   return (
     <Box
       sx={{
-        minHeight: 'calc(100vh - 40px)',
-        maxHeight: '100vh',
+        height: isFullScreen ? '100vh' : 'calc(100vh - 64px)',
         overflow: 'hidden',
-        p: isFullScreen ? 2 : 2.5,
+        display: 'flex',
+        flexDirection: 'column',
+        p: isFullScreen ? (compact ? 1.5 : 2) : (compact ? 2 : 2.5),
         bgcolor: 'background.default',
         transition: 'all 0.3s ease'
       }}
     >
-      <Container maxWidth="xl">
-        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
+      <Container maxWidth="xl" sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={compact ? 1.5 : 2}>
           <Typography variant="h6" fontWeight="bold">오늘의 휴대폰</Typography>
           <Stack direction="row" spacing={1}>
             <Button
@@ -231,30 +232,32 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
             >
               새로고침
             </Button>
-            <Chip
-              label={compact ? '컴팩트' : '넉넉하게'}
-              color="primary"
-              variant="outlined"
+            <Button
+              variant={compact ? 'contained' : 'outlined'}
+              size="small"
               onClick={() => setCompact(prev => !prev)}
-              sx={{ cursor: 'pointer' }}
-            />
+              sx={{ minWidth: 100 }}
+            >
+              {compact ? '컴팩트' : '넉넉하게'}
+            </Button>
           </Stack>
         </Stack>
 
         <Box
           sx={{
             display: 'grid',
-            gap: isFullScreen ? 2.5 : 2,
+            gap: compact ? (isFullScreen ? 1.5 : 2) : (isFullScreen ? 2.5 : 3),
             gridTemplateColumns: { xs: '1fr', lg: '2fr 1fr' },
-            height: 'calc(100vh - 120px)',
-            overflow: 'hidden'
+            flex: 1,
+            overflow: 'hidden',
+            alignContent: 'start'
           }}
         >
           {/* 프리미엄 섹션 */}
-          <Box>
-            <Stack direction="row" alignItems="center" spacing={2} mb={2}>
-              <StarIcon sx={{ color: 'primary.main', fontSize: 28 }} />
-              <Typography variant="h5" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', height: '100%' }}>
+            <Stack direction="row" alignItems="center" spacing={2} mb={compact ? 1 : 1.5}>
+              <StarIcon sx={{ color: 'primary.main', fontSize: compact ? 24 : 28 }} />
+              <Typography variant={compact ? 'h6' : 'h5'} sx={{ fontWeight: 'bold', color: 'text.primary' }}>
                 프리미엄
               </Typography>
               <Divider sx={{ flexGrow: 1, borderColor: 'rgba(212, 175, 55, 0.3)' }} />
@@ -263,15 +266,21 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
           <Box
             sx={{
               display: 'grid',
-              gap: isFullScreen ? 2.5 : 2,
+              gap: compact ? (isFullScreen ? 1.5 : 2) : (isFullScreen ? 2.5 : 3),
               gridTemplateColumns: {
-                xs: 'repeat(auto-fit, minmax(220px, 1fr))',
-                sm: 'repeat(auto-fit, minmax(230px, 1fr))',
-                md: 'repeat(auto-fit, minmax(240px, 1fr))'
+                xs: 'repeat(auto-fit, minmax(180px, 1fr))',
+                sm: compact ? 'repeat(auto-fit, minmax(200px, 1fr))' : 'repeat(auto-fit, minmax(220px, 1fr))',
+                md: compact ? 'repeat(auto-fit, minmax(220px, 1fr))' : 'repeat(auto-fit, minmax(240px, 1fr))',
+                lg: compact ? 'repeat(auto-fit, minmax(200px, 1fr))' : 'repeat(auto-fit, minmax(220px, 1fr))'
               },
               alignContent: 'start',
-              gridAutoRows: '1fr',
-              overflow: 'hidden'
+              gridAutoRows: 'minmax(auto, 1fr)',
+              overflowY: 'auto',
+              overflowX: 'hidden',
+              flex: 1,
+              pr: 1,
+              '&::-webkit-scrollbar': { width: '6px' },
+              '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(0,0,0,0.2)', borderRadius: '3px' }
             }}
           >
               {displayPremiumPhones.map((product) => (
@@ -280,6 +289,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                   product={product}
                   isPremium={true}
                   onSelect={onProductSelect}
+                  compact={compact}
                 />
               ))}
               {displayPremiumPhones.length === 0 && (
@@ -289,10 +299,10 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
           </Box>
 
           {/* 중저가 섹션 */}
-          <Box>
-            <Stack direction="row" alignItems="center" spacing={2} mb={2}>
-              <LocalOfferIcon sx={{ color: 'secondary.main', fontSize: 28 }} />
-              <Typography variant="h5" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', height: '100%' }}>
+            <Stack direction="row" alignItems="center" spacing={2} mb={compact ? 1 : 1.5}>
+              <LocalOfferIcon sx={{ color: 'secondary.main', fontSize: compact ? 24 : 28 }} />
+              <Typography variant={compact ? 'h6' : 'h5'} sx={{ fontWeight: 'bold', color: 'text.primary' }}>
                 중저가
               </Typography>
               <Divider sx={{ flexGrow: 1, borderColor: 'rgba(0,0,0,0.08)' }} />
@@ -301,14 +311,16 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
           <Box
             sx={{
               display: 'grid',
-              gap: isFullScreen ? 2.5 : 2,
-              gridTemplateColumns: {
-                xs: '1fr',
-                sm: '1fr'
-              },
-              gridAutoRows: '1fr',
+              gap: compact ? (isFullScreen ? 1.5 : 2) : (isFullScreen ? 2.5 : 3),
+              gridTemplateColumns: '1fr',
+              gridAutoRows: 'minmax(auto, 1fr)',
               alignContent: 'start',
-              overflow: 'hidden'
+              overflowY: 'auto',
+              overflowX: 'hidden',
+              flex: 1,
+              pr: 1,
+              '&::-webkit-scrollbar': { width: '6px' },
+              '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(0,0,0,0.2)', borderRadius: '3px' }
             }}
           >
               {displayBudgetPhones.map((product) => (
@@ -317,6 +329,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                   product={product}
                   isPremium={false}
                   onSelect={onProductSelect}
+                  compact={compact}
                 />
               ))}
               {displayBudgetPhones.length === 0 && (
