@@ -257,21 +257,6 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
     }
   }, []);
 
-  useEffect(() => {
-    const initializeData = async () => {
-      await fetchData();
-      await loadMainHeaderText();
-      // 일반 모드에서도 슬라이드쇼 데이터 준비
-      setIsSlideshowDataLoading(true);
-      try {
-        await prepareSlideshowData();
-      } finally {
-        setIsSlideshowDataLoading(false);
-      }
-    };
-    initializeData();
-  }, [fetchData, loadMainHeaderText, prepareSlideshowData]);
-
   // 슬라이드쇼용 데이터 준비: 모든 통신사의 체크된 상품 가져오기
   const prepareSlideshowData = useCallback(async () => {
     try {
@@ -407,6 +392,21 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
       return [];
     }
   }, []);
+
+  useEffect(() => {
+    const initializeData = async () => {
+      await fetchData();
+      await loadMainHeaderText();
+      // 일반 모드에서도 슬라이드쇼 데이터 준비
+      setIsSlideshowDataLoading(true);
+      try {
+        await prepareSlideshowData();
+      } finally {
+        setIsSlideshowDataLoading(false);
+      }
+    };
+    initializeData();
+  }, [fetchData, loadMainHeaderText, prepareSlideshowData]);
 
   // 슬라이드쇼 로딩 상태
   const [isSlideshowLoading, setIsSlideshowLoading] = useState(false);
