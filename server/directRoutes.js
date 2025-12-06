@@ -1342,20 +1342,20 @@ function setupDirectRoutes(app) {
         allMobiles.push(...mobileList);
       });
 
-      // 프리미엄: isPremium 태그가 true인 상품만 필터링
+      // 프리미엄: isPremium 태그가 true인 상품만 필터링 (3개로 제한)
       const premium = allMobiles
         .filter(p => p.isPremium === true)
-        .slice(0, 6)
+        .slice(0, 3)
         .map(p => ({
           ...p,
           purchasePrice: p.purchasePriceWithAddon,
           addons: p.requiredAddons
         }));
 
-      // 중저가: isBudget 태그가 true인 상품만 필터링
+      // 중저가: isBudget 태그가 true인 상품만 필터링 (2개로 제한)
       const budget = allMobiles
         .filter(p => p.isBudget === true)
-        .slice(0, 3)
+        .slice(0, 2)
         .map(p => ({
           ...p,
           purchasePrice: p.purchasePriceWithAddon,

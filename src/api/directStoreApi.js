@@ -30,34 +30,43 @@ export const directStoreApi = {
         try {
             const response = await fetch(`${BASE_URL}/todays-mobiles`);
             if (!response.ok) {
-                throw new Error('오늘의 휴대폰 조회 실패');
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || `오늘의 휴대폰 조회 실패 (${response.status})`);
             }
             const data = await response.json();
             // 백엔드에서 { premium: [], budget: [] } 형식으로 반환
-            return data.premium && data.budget ? data : { premium: data.premium || [], budget: data.budget || [] };
+            const result = data.premium && data.budget ? data : { premium: data.premium || [], budget: data.budget || [] };
+            // 빈 배열이어도 반환 (에러가 아님)
+            return result;
         } catch (err) {
-            console.warn('오늘의 휴대폰 API 호출 실패, Mock 데이터 사용:', err);
-            // API 실패 시 getMobileList를 사용하여 Mock 데이터 생성
-            const skList = await directStoreApi.getMobileList('SK');
-            const premium = skList
-                .filter(p => p.isPopular || p.isRecommended)
-                .slice(0, 6)
-                .map(p => ({
-                    ...p,
-                    purchasePrice: p.purchasePriceWithAddon,
-                    addons: p.requiredAddons
-                }));
-            const cheap = skList.filter(p => p.isCheap);
-            const fallback = skList
-                .filter(p => !p.isPopular && !p.isRecommended)
-                .sort((a, b) => (a.purchasePriceWithAddon || 0) - (b.purchasePriceWithAddon || 0));
-            const budgetSource = cheap.length > 0 ? cheap : fallback;
-            const budget = budgetSource.slice(0, 2).map(p => ({
-                ...p,
-                purchasePrice: p.purchasePriceWithAddon,
-                addons: p.requiredAddons
-            }));
-            return { premium, budget };
+            console.error('오늘의 휴대폰 API 호출 실패:', err);
+            // API 실패 시 getMobileList를 사용하여 Mock 데이터 생성 시도
+            try {
+                const skList = await directStoreApi.getMobileList('SK');
+                if (skList && skList.length > 0) {
+                    const premium = skList
+                        .filter(p => p.isPremium || p.isPopular || p.isRecommended)
+                        .slice(0, 3)
+                        .map(p => ({
+                            ...p,
+                            purchasePrice: p.purchasePriceWithAddon,
+                            addons: p.requiredAddons
+                        }));
+                    const budget = skList
+                        .filter(p => p.isBudget || p.isCheap)
+                        .slice(0, 2)
+                        .map(p => ({
+                            ...p,
+                            purchasePrice: p.purchasePriceWithAddon,
+                            addons: p.requiredAddons
+                        }));
+                    return { premium, budget };
+                }
+            } catch (fallbackErr) {
+                console.error('Mock 데이터 생성도 실패:', fallbackErr);
+            }
+            // 모든 시도 실패 시 빈 배열 반환
+            return { premium: [], budget: [] };
         }
     },
 

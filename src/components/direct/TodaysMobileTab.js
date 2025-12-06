@@ -214,16 +214,19 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
       setError(null);
       const data = await directStoreApi.getTodaysMobiles();
 
-      if (data && (data.premium || data.budget)) {
-        setPremiumPhones(data.premium || []);
-        setBudgetPhones(data.budget || []);
+      // 데이터가 있으면 설정, 없으면 빈 배열 (에러 아님)
+      if (data) {
+        setPremiumPhones(Array.isArray(data.premium) ? data.premium : []);
+        setBudgetPhones(Array.isArray(data.budget) ? data.budget : []);
       } else {
         setPremiumPhones([]);
         setBudgetPhones([]);
       }
     } catch (err) {
       console.error('오늘의 휴대폰 데이터 로딩 실패:', err);
-      setError('데이터를 불러오는 중 오류가 발생했습니다.');
+      setError('데이터를 불러오는 중 오류가 발생했습니다. 서버 연결을 확인해주세요.');
+      setPremiumPhones([]);
+      setBudgetPhones([]);
     } finally {
       setLoading(false);
     }
@@ -280,8 +283,9 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
       // 체크된 상품 수가 많은 순서로 정렬
       allCheckedProducts.sort((a, b) => b.count - a.count);
       
-      // 슬라이드쇼 데이터 구조 생성
+      // 슬라이드쇼 데이터 구조 생성 (6개씩 그룹화)
       const slideshowItems = [];
+      const PRODUCTS_PER_SLIDE = 6; // 슬라이드당 상품 개수
       
       for (let i = 0; i < allCheckedProducts.length; i++) {
         const carrierData = allCheckedProducts[i];
@@ -293,9 +297,8 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
         
         // 프리미엄 상품이 있으면
         if (premium.length > 0) {
-          // 다음에 표시될 상품이 있으면 연결페이지 추가 (마지막 그룹이 아니거나 중저가 상품이 있으면)
-          const hasNext = i < allCheckedProducts.length - 1 || budget.length > 0;
-          if (hasNext) {
+          // 프리미엄 상품 그룹 시작 전 연결페이지 추가 (첫 번째가 아니거나 이전에 상품이 있었으면)
+          if (slideshowItems.length > 0) {
             const transitionText = await directStoreApi.getTransitionPageText(carrier, 'premium');
             slideshowItems.push({
               type: 'transition',
@@ -306,21 +309,22 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
             });
           }
           
-          // 프리미엄 상품들 추가
-          premium.forEach((product, idx) => {
+          // 프리미엄 상품들을 6개씩 그룹화하여 추가
+          for (let j = 0; j < premium.length; j += PRODUCTS_PER_SLIDE) {
+            const productGroup = premium.slice(j, j + PRODUCTS_PER_SLIDE);
             slideshowItems.push({
-              type: 'product',
-              product,
-              carrier
+              type: 'productGroup',
+              products: productGroup,
+              carrier,
+              category: 'premium'
             });
-          });
+          }
         }
         
         // 중저가 상품이 있으면
         if (budget.length > 0) {
-          // 다음에 표시될 상품이 있으면 연결페이지 추가 (마지막 통신사가 아니면)
-          const hasNext = i < allCheckedProducts.length - 1;
-          if (hasNext) {
+          // 중저가 상품 그룹 시작 전 연결페이지 추가 (프리미엄이 있었거나 이전에 상품이 있었으면)
+          if (premium.length > 0 || slideshowItems.length > 0) {
             const transitionText = await directStoreApi.getTransitionPageText(carrier, 'budget');
             slideshowItems.push({
               type: 'transition',
@@ -331,14 +335,45 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
             });
           }
           
-          // 중저가 상품들 추가
-          budget.forEach(product => {
+          // 중저가 상품들을 6개씩 그룹화하여 추가
+          for (let j = 0; j < budget.length; j += PRODUCTS_PER_SLIDE) {
+            const productGroup = budget.slice(j, j + PRODUCTS_PER_SLIDE);
             slideshowItems.push({
-              type: 'product',
-              product,
-              carrier
+              type: 'productGroup',
+              products: productGroup,
+              carrier,
+              category: 'budget'
             });
-          });
+          }
+        }
+        
+        // 다음 통신사로 넘어가기 전 연결페이지 추가 (마지막 통신사가 아니면)
+        if (i < allCheckedProducts.length - 1) {
+          const nextCarrier = allCheckedProducts[i + 1].carrier;
+          const nextCarrierData = allCheckedProducts[i + 1];
+          const nextPremium = nextCarrierData.products.filter(p => p.isPremium);
+          const nextBudget = nextCarrierData.products.filter(p => p.isBudget);
+          
+          // 다음 통신사에 프리미엄이 있으면 프리미엄 연결페이지, 없으면 중저가 연결페이지
+          if (nextPremium.length > 0) {
+            const transitionText = await directStoreApi.getTransitionPageText(nextCarrier, 'premium');
+            slideshowItems.push({
+              type: 'transition',
+              carrier: nextCarrier,
+              category: 'premium',
+              content: transitionText.data?.content || `이어서 ${nextCarrier} 프리미엄 상품 안내입니다.`,
+              imageUrl: transitionText.data?.imageUrl || ''
+            });
+          } else if (nextBudget.length > 0) {
+            const transitionText = await directStoreApi.getTransitionPageText(nextCarrier, 'budget');
+            slideshowItems.push({
+              type: 'transition',
+              carrier: nextCarrier,
+              category: 'budget',
+              content: transitionText.data?.content || `이어서 ${nextCarrier} 중저가 상품 안내입니다.`,
+              imageUrl: transitionText.data?.imageUrl || ''
+            });
+          }
         }
       }
       
@@ -364,7 +399,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
       const firstItem = data[0];
       setIsTransitionPage(firstItem?.type === 'transition');
       setTransitionPageData(firstItem?.type === 'transition' ? firstItem : null);
-      if (firstItem?.type === 'product') {
+      if (firstItem?.type === 'productGroup' || firstItem?.type === 'product') {
         setCurrentCarrier(firstItem.carrier);
       } else if (firstItem?.type === 'transition') {
         setCurrentCarrier(firstItem.carrier);
@@ -383,7 +418,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
     if (!isSlideshowActive || slideshowData.length === 0) return;
     
     const currentItem = slideshowData[currentSlideIndex];
-    const displayDuration = currentItem?.type === 'transition' ? 3000 : 5000;
+    const displayDuration = currentItem?.type === 'transition' ? 3000 : 5000; // 상품 그룹도 5초
     
     const timeout = setTimeout(() => {
       setCurrentSlideIndex(prev => {
@@ -402,7 +437,9 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
         setIsTransitionPage(nextItem.type === 'transition');
         setTransitionPageData(nextItem.type === 'transition' ? nextItem : null);
         
-        if (nextItem.type === 'product') {
+        if (nextItem.type === 'productGroup' || nextItem.type === 'product') {
+          setCurrentCarrier(nextItem.carrier);
+        } else if (nextItem.type === 'transition') {
           setCurrentCarrier(nextItem.carrier);
         }
         
@@ -738,27 +775,48 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                 );
               })()
             ) : (
-              // 상품 표시
-              slideshowData[currentSlideIndex]?.type === 'product' && (
+              // 상품 그룹 표시 (6개씩 그리드)
+              slideshowData[currentSlideIndex]?.type === 'productGroup' && (
                 <Box
                   sx={{
                     width: '100%',
                     height: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    animation: 'slideIn 0.5s ease-out'
+                    display: 'grid',
+                    gap: compact ? (isFullScreen ? 1 : 1.5) : (isFullScreen ? 1.5 : 2),
+                    gridTemplateColumns: {
+                      xs: 'repeat(2, 1fr)',
+                      sm: 'repeat(3, 1fr)',
+                      md: 'repeat(4, 1fr)',
+                      lg: 'repeat(5, 1fr)',
+                      xl: 'repeat(6, 1fr)'
+                    },
+                    gridAutoRows: 'auto',
+                    alignContent: 'start',
+                    alignItems: 'stretch',
+                    overflowY: 'auto',
+                    overflowX: 'hidden',
+                    p: isFullScreen ? (compact ? 1 : 1.5) : (compact ? 1.5 : 2),
+                    animation: 'slideIn 0.5s ease-out',
+                    '&::-webkit-scrollbar': { width: '6px' },
+                    '&::-webkit-scrollbar-thumb': { 
+                      bgcolor: `${theme.primary}80`, 
+                      borderRadius: '3px',
+                      '&:hover': {
+                        bgcolor: theme.primary
+                      }
+                    }
                   }}
                 >
-                  <Box sx={{ maxWidth: '90%', width: '100%' }}>
+                  {slideshowData[currentSlideIndex].products.map((product) => (
                     <ProductCard
-                      product={slideshowData[currentSlideIndex].product}
-                      isPremium={slideshowData[currentSlideIndex].product.isPremium || false}
+                      key={product.id || `${product.model}-${product.carrier}`}
+                      product={product}
+                      isPremium={product.isPremium || false}
                       onSelect={onProductSelect}
-                      compact={false}
+                      compact={compact}
                       theme={getCarrierTheme(slideshowData[currentSlideIndex].carrier)}
                     />
-                  </Box>
+                  ))}
                 </Box>
               )
             )}
