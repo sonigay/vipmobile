@@ -12,13 +12,16 @@ import {
   Container,
   CardActions,
   CircularProgress,
-  Alert
+  Alert,
+  IconButton
 } from '@mui/material';
 import {
   ShoppingCart as ShoppingCartIcon,
   Refresh as RefreshIcon,
   PlayArrow as PlayArrowIcon,
-  Pause as PauseIcon
+  Pause as PauseIcon,
+  ArrowBack as ArrowBackIcon,
+  ArrowForward as ArrowForwardIcon
 } from '@mui/icons-material';
 import { directStoreApi } from '../../api/directStoreApi';
 
@@ -211,6 +214,12 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [isTransitionPage, setIsTransitionPage] = useState(false);
   const [transitionPageData, setTransitionPageData] = useState(null);
+  const [isSlideshowDataLoading, setIsSlideshowDataLoading] = useState(false);
+  
+  // 일반 모드에서 수동 슬라이드 탐색용 상태
+  const [manualSlideIndex, setManualSlideIndex] = useState(0);
+  const [isManualTransitionPage, setIsManualTransitionPage] = useState(false);
+  const [manualTransitionPageData, setManualTransitionPageData] = useState(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -249,9 +258,19 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
   }, []);
 
   useEffect(() => {
-    fetchData();
-    loadMainHeaderText();
-  }, [fetchData, loadMainHeaderText]);
+    const initializeData = async () => {
+      await fetchData();
+      await loadMainHeaderText();
+      // 일반 모드에서도 슬라이드쇼 데이터 준비
+      setIsSlideshowDataLoading(true);
+      try {
+        await prepareSlideshowData();
+      } finally {
+        setIsSlideshowDataLoading(false);
+      }
+    };
+    initializeData();
+  }, [fetchData, loadMainHeaderText, prepareSlideshowData]);
 
   // 슬라이드쇼용 데이터 준비: 모든 통신사의 체크된 상품 가져오기
   const prepareSlideshowData = useCallback(async () => {
@@ -287,9 +306,9 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
       // 체크된 상품 수가 많은 순서로 정렬
       allCheckedProducts.sort((a, b) => b.count - a.count);
       
-      // 슬라이드쇼 데이터 구조 생성 (6개씩 그룹화)
+      // 슬라이드쇼 데이터 구조 생성 (3개씩 그룹화 - 그리드가 3열이므로)
       const slideshowItems = [];
-      const PRODUCTS_PER_SLIDE = 6; // 슬라이드당 상품 개수
+      const PRODUCTS_PER_SLIDE = 3; // 슬라이드당 상품 개수 (그리드 3열 기준)
       
       for (let i = 0; i < allCheckedProducts.length; i++) {
         const carrierData = allCheckedProducts[i];
@@ -313,7 +332,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
             });
           }
           
-          // 프리미엄 상품들을 6개씩 그룹화하여 추가
+          // 프리미엄 상품들을 3개씩 그룹화하여 추가
           for (let j = 0; j < premium.length; j += PRODUCTS_PER_SLIDE) {
             const productGroup = premium.slice(j, j + PRODUCTS_PER_SLIDE);
             slideshowItems.push({
@@ -339,7 +358,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
             });
           }
           
-          // 중저가 상품들을 6개씩 그룹화하여 추가
+          // 중저가 상품들을 3개씩 그룹화하여 추가
           for (let j = 0; j < budget.length; j += PRODUCTS_PER_SLIDE) {
             const productGroup = budget.slice(j, j + PRODUCTS_PER_SLIDE);
             slideshowItems.push({
@@ -487,6 +506,56 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
     const combined = [...premium, ...budget];
     return combined.slice(0, 3); // 최대 3개만 표시
   }, [premiumPhones, budgetPhones]);
+
+  // 일반 모드에서 수동 슬라이드 탐색 함수
+  const handleManualSlideChange = useCallback((direction) => {
+    if (slideshowData.length === 0) return;
+    
+    setManualSlideIndex(prev => {
+      let newIndex;
+      if (direction === 'next') {
+        newIndex = prev + 1 >= slideshowData.length ? 0 : prev + 1;
+      } else {
+        newIndex = prev - 1 < 0 ? slideshowData.length - 1 : prev - 1;
+      }
+      
+      const item = slideshowData[newIndex];
+      setIsManualTransitionPage(item?.type === 'transition');
+      setManualTransitionPageData(item?.type === 'transition' ? item : null);
+      
+      if (item?.type === 'productGroup' || item?.type === 'product') {
+        setCurrentCarrier(item.carrier);
+      } else if (item?.type === 'transition') {
+        setCurrentCarrier(item.carrier);
+      }
+      
+      return newIndex;
+    });
+  }, [slideshowData]);
+
+  // 슬라이드쇼 데이터가 준비되면 첫 번째 슬라이드 설정
+  useEffect(() => {
+    if (slideshowData.length > 0 && !isSlideshowActive) {
+      // 첫 번째 상품 그룹을 찾아서 표시 (연결페이지가 첫 번째면 건너뛰기)
+      let firstProductGroupIndex = 0;
+      for (let i = 0; i < slideshowData.length; i++) {
+        if (slideshowData[i]?.type === 'productGroup') {
+          firstProductGroupIndex = i;
+          break;
+        }
+      }
+      
+      setManualSlideIndex(firstProductGroupIndex);
+      const firstItem = slideshowData[firstProductGroupIndex];
+      setIsManualTransitionPage(firstItem?.type === 'transition');
+      setManualTransitionPageData(firstItem?.type === 'transition' ? firstItem : null);
+      if (firstItem?.type === 'productGroup' || firstItem?.type === 'product') {
+        setCurrentCarrier(firstItem.carrier);
+      } else if (firstItem?.type === 'transition') {
+        setCurrentCarrier(firstItem.carrier);
+      }
+    }
+  }, [slideshowData, isSlideshowActive]);
   
   // 현재 표시 중인 통신사 감지 (테마용)
   useEffect(() => {
@@ -838,53 +907,240 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
           </Box>
         )}
 
-        {/* 일반 모드: 그리드 표시 */}
+        {/* 일반 모드: 슬라이드쇼 데이터 사용 (수동 탐색) */}
         {!isSlideshowActive && (
           <Box
             sx={{
-              display: 'grid',
-              gap: compact ? (isFullScreen ? 1 : 1.5) : (isFullScreen ? 1.5 : 2),
-              gridTemplateColumns: {
-                xs: 'repeat(1, 1fr)',  // 모바일: 1열
-                sm: 'repeat(2, 1fr)',  // 태블릿: 2열
-                md: 'repeat(2, 1fr)',  // 작은PC: 2열
-                lg: 'repeat(3, 1fr)',  // 큰PC: 3열
-                xl: 'repeat(3, 1fr)'   // 매우 큰 화면: 3열
-              },
-              gridAutoRows: 'auto',
-              alignContent: 'start',
-              alignItems: 'stretch',
-              overflowY: 'auto',
-              overflowX: 'hidden',
               flex: 1,
-              '&::-webkit-scrollbar': { width: '6px' },
-              '&::-webkit-scrollbar-thumb': { 
-                bgcolor: `${theme.primary}80`, 
-                borderRadius: '3px',
-                '&:hover': {
-                  bgcolor: theme.primary
-                }
-              }
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              position: 'relative',
+              overflow: 'hidden'
             }}
           >
-            {allProducts.map((product) => {
-              const isPremium = product.isPremium || false;
-              return (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  isPremium={isPremium}
-                  onSelect={onProductSelect}
-                  compact={compact}
-                  theme={getCarrierTheme(product.carrier)}
-                />
-              );
-            })}
-            {allProducts.length === 0 && (
-              <Box sx={{ gridColumn: '1 / -1', gridRow: '1 / -1' }}>
-                <Typography color="text.secondary" align="center" py={4}>
-                  등록된 휴대폰이 없습니다.
-                </Typography>
+            {/* 이전 버튼 */}
+            {slideshowData.length > 0 && (
+              <IconButton
+                onClick={() => handleManualSlideChange('prev')}
+                disabled={slideshowData.length === 0}
+                sx={{
+                  position: 'absolute',
+                  left: 16,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  zIndex: 10,
+                  bgcolor: 'rgba(255, 255, 255, 0.9)',
+                  boxShadow: 3,
+                  '&:hover': {
+                    bgcolor: 'rgba(255, 255, 255, 1)',
+                    transform: 'translateY(-50%) scale(1.1)'
+                  },
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <ArrowBackIcon sx={{ fontSize: 32, color: theme.primary }} />
+              </IconButton>
+            )}
+
+            {/* 다음 버튼 */}
+            {slideshowData.length > 0 && (
+              <IconButton
+                onClick={() => handleManualSlideChange('next')}
+                disabled={slideshowData.length === 0}
+                sx={{
+                  position: 'absolute',
+                  right: 16,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  zIndex: 10,
+                  bgcolor: 'rgba(255, 255, 255, 0.9)',
+                  boxShadow: 3,
+                  '&:hover': {
+                    bgcolor: 'rgba(255, 255, 255, 1)',
+                    transform: 'translateY(-50%) scale(1.1)'
+                  },
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <ArrowForwardIcon sx={{ fontSize: 32, color: theme.primary }} />
+              </IconButton>
+            )}
+
+            {/* 슬라이드쇼 데이터 로딩 중 */}
+            {isSlideshowDataLoading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', height: '100%' }}>
+                <CircularProgress />
+              </Box>
+            ) : slideshowData.length > 0 ? (
+              /* 슬라이드쇼 데이터가 있으면 슬라이드 표시 */
+              <>
+                {isManualTransitionPage && manualTransitionPageData ? (
+                  // 연결페이지 표시
+                  (() => {
+                    const transitionTheme = getCarrierTheme(manualTransitionPageData.carrier);
+                    return (
+                      <Box
+                        sx={{
+                          width: '100%',
+                          height: '100%',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          textAlign: 'center',
+                          p: 4,
+                          animation: 'fadeIn 0.5s ease-in',
+                          background: `linear-gradient(135deg, ${transitionTheme.cardBg} 0%, ${transitionTheme.primary}10 100%)`
+                        }}
+                      >
+                        {manualTransitionPageData.imageUrl ? (
+                          <>
+                            <CardMedia
+                              component="img"
+                              image={manualTransitionPageData.imageUrl}
+                              alt="연결페이지 이미지"
+                              sx={{
+                                maxWidth: '60%',
+                                maxHeight: '50%',
+                                objectFit: 'contain',
+                                mb: 3,
+                                borderRadius: 2,
+                                boxShadow: `0 8px 24px ${transitionTheme.primary}40`,
+                                border: `3px solid ${transitionTheme.primary}30`
+                              }}
+                            />
+                            <Typography
+                              variant="h4"
+                              sx={{
+                                fontWeight: 'bold',
+                                color: transitionTheme.text,
+                                mt: 2,
+                                textShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                                px: 2
+                              }}
+                            >
+                              {manualTransitionPageData.content}
+                            </Typography>
+                          </>
+                        ) : (
+                          <Typography
+                            variant="h2"
+                            sx={{
+                              fontWeight: 'bold',
+                              color: transitionTheme.text,
+                              textShadow: `0 4px 12px ${transitionTheme.primary}30`,
+                              lineHeight: 1.5,
+                              px: 4,
+                              py: 3,
+                              borderRadius: 4,
+                              background: `linear-gradient(135deg, ${transitionTheme.cardBg} 0%, ${transitionTheme.primary}08 100%)`,
+                              border: `2px solid ${transitionTheme.primary}30`,
+                              boxShadow: `0 8px 32px ${transitionTheme.primary}20`
+                            }}
+                          >
+                            {manualTransitionPageData.content}
+                          </Typography>
+                        )}
+                      </Box>
+                    );
+                  })()
+                ) : (
+                  // 상품 그룹 표시
+                  slideshowData[manualSlideIndex]?.type === 'productGroup' && slideshowData[manualSlideIndex]?.products && (
+                    <Box
+                      sx={{
+                        width: '100%',
+                        height: '100%',
+                        display: 'grid',
+                        gap: compact ? (isFullScreen ? 1 : 1.5) : (isFullScreen ? 1.5 : 2),
+                        gridTemplateColumns: {
+                          xs: 'repeat(1, 1fr)',  // 모바일: 1열
+                          sm: 'repeat(2, 1fr)',  // 태블릿: 2열
+                          md: 'repeat(2, 1fr)',  // 작은PC: 2열
+                          lg: 'repeat(3, 1fr)',  // 큰PC: 3열
+                          xl: 'repeat(3, 1fr)'   // 매우 큰 화면: 3열
+                        },
+                        gridAutoRows: 'auto',
+                        alignContent: 'start',
+                        alignItems: 'stretch',
+                        overflowY: 'auto',
+                        overflowX: 'hidden',
+                        p: isFullScreen ? (compact ? 1 : 1.5) : (compact ? 1.5 : 2),
+                        animation: 'slideIn 0.5s ease-out',
+                        '&::-webkit-scrollbar': { width: '6px' },
+                        '&::-webkit-scrollbar-thumb': { 
+                          bgcolor: `${theme.primary}80`, 
+                          borderRadius: '3px',
+                          '&:hover': {
+                            bgcolor: theme.primary
+                          }
+                        }
+                      }}
+                    >
+                      {slideshowData[manualSlideIndex].products.map((product) => (
+                        <ProductCard
+                          key={product.id || `${product.model}-${product.carrier}`}
+                          product={product}
+                          isPremium={product.isPremium === true}
+                          onSelect={onProductSelect}
+                          compact={compact}
+                          theme={getCarrierTheme(slideshowData[manualSlideIndex].carrier)}
+                        />
+                      ))}
+                    </Box>
+                  )
+                )}
+              </>
+            ) : (
+              // 슬라이드쇼 데이터가 없으면 기본 그리드 표시
+              <Box
+                sx={{
+                  display: 'grid',
+                  gap: compact ? (isFullScreen ? 1 : 1.5) : (isFullScreen ? 1.5 : 2),
+                  gridTemplateColumns: {
+                    xs: 'repeat(1, 1fr)',  // 모바일: 1열
+                    sm: 'repeat(2, 1fr)',  // 태블릿: 2열
+                    md: 'repeat(2, 1fr)',  // 작은PC: 2열
+                    lg: 'repeat(3, 1fr)',  // 큰PC: 3열
+                    xl: 'repeat(3, 1fr)'   // 매우 큰 화면: 3열
+                  },
+                  gridAutoRows: 'auto',
+                  alignContent: 'start',
+                  alignItems: 'stretch',
+                  overflowY: 'auto',
+                  overflowX: 'hidden',
+                  flex: 1,
+                  '&::-webkit-scrollbar': { width: '6px' },
+                  '&::-webkit-scrollbar-thumb': { 
+                    bgcolor: `${theme.primary}80`, 
+                    borderRadius: '3px',
+                    '&:hover': {
+                      bgcolor: theme.primary
+                    }
+                  }
+                }}
+              >
+                {allProducts.map((product) => {
+                  const isPremium = product.isPremium || false;
+                  return (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      isPremium={isPremium}
+                      onSelect={onProductSelect}
+                      compact={compact}
+                      theme={getCarrierTheme(product.carrier)}
+                    />
+                  );
+                })}
+                {allProducts.length === 0 && (
+                  <Box sx={{ gridColumn: '1 / -1', gridRow: '1 / -1' }}>
+                    <Typography color="text.secondary" align="center" py={4}>
+                      등록된 휴대폰이 없습니다.
+                    </Typography>
+                  </Box>
+                )}
               </Box>
             )}
           </Box>
