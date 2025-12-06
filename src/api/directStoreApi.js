@@ -160,18 +160,36 @@ export const directStoreApi = {
     // === 이미지 업로드 (Discord) ===
 
     // 이미지 업로드
-    uploadImage: async (file, modelId) => {
+    uploadImage: async (file, modelId, carrier, modelName, petName) => {
         const formData = new FormData();
         formData.append('image', file);
         if (modelId) formData.append('modelId', modelId);
+        if (carrier) formData.append('carrier', carrier);
+        if (modelName) formData.append('modelName', modelName);
+        if (petName) formData.append('petName', petName);
 
-        const response = await fetch(`${BASE_URL}/upload-image`, {
-            method: 'POST',
-            body: formData
-        });
+        try {
+            const response = await fetch(`${BASE_URL}/upload-image`, {
+                method: 'POST',
+                body: formData
+            });
 
-        if (!response.ok) throw new Error('이미지 업로드 실패');
-        return response.json();
+            const data = await response.json();
+
+            if (!response.ok) {
+                // 서버에서 반환한 에러 메시지 사용
+                const errorMessage = data?.error || `이미지 업로드 실패 (${response.status})`;
+                throw new Error(errorMessage);
+            }
+
+            return data;
+        } catch (error) {
+            // 네트워크 오류 등
+            if (error instanceof TypeError && error.message.includes('fetch')) {
+                throw new Error('네트워크 오류가 발생했습니다. 인터넷 연결을 확인해주세요.');
+            }
+            throw error;
+        }
     },
 
     // === 직영점 관리 모드 API (Mock Data 포함) ===

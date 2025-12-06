@@ -455,6 +455,8 @@ const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const DISCORD_CHANNEL_ID = process.env.DISCORD_CHANNEL_ID;
 const DISCORD_AGENT_CHANNEL_ID = process.env.DISCORD_AGENT_CHANNEL_ID || DISCORD_CHANNEL_ID; // 관리자 채널 (없으면 기본 채널 사용)
 const DISCORD_STORE_CHANNEL_ID = process.env.DISCORD_STORE_CHANNEL_ID || DISCORD_CHANNEL_ID; // 일반 매장 채널 (없으면 기본 채널 사용)
+// 직영점 이미지 업로드용 포럼 채널 (프롬프트: 1445397081333174377)
+const DISCORD_STORE_FORUM_CHANNEL_ID = process.env.DISCORD_STORE_FORUM_CHANNEL_ID || '1445397081333174377';
 const DISCORD_LOGGING_ENABLED = process.env.DISCORD_LOGGING_ENABLED === 'true';
 
 // 디스코드 봇 및 관련 라이브러리는 필요한 경우에만 초기화
@@ -3774,10 +3776,11 @@ app.get('/api/direct/mobiles', async (req, res) => {
     const externalData = await readExternalSheet(externalSpreadsheetId, supportRange);
 
     // 3. 직영점_모델이미지 시트에서 이미지 URL 조회
+    // 컬럼 구조: 통신사(A) | 모델ID(B) | 모델명(C) | 펫네임(D) | 제조사(E) | 이미지URL(F) | 비고(G)
     const imageResponse = await rateLimitedSheetsCall(() =>
       sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
-        range: '직영점_모델이미지!A:C'
+        range: '직영점_모델이미지!A:G'
       })
     );
 
@@ -3785,9 +3788,12 @@ app.get('/api/direct/mobiles', async (req, res) => {
     const imageMap = new Map();
     
     // 헤더 제외하고 이미지 매핑 생성
+    // 모델ID(B열, 인덱스 1)와 이미지URL(F열, 인덱스 5) 매핑
     imageValues.slice(1).forEach(row => {
-      if (row[0] && row[2]) {
-        imageMap.set(row[0], row[2]); // 모델ID -> 이미지URL
+      const modelId = (row[1] || '').trim();
+      const imageUrl = (row[5] || '').trim();
+      if (modelId && imageUrl) {
+        imageMap.set(modelId, imageUrl); // 모델ID -> 이미지URL
       }
     });
 
@@ -4136,10 +4142,104 @@ const directStoreUpload = multer({
   limits: { fileSize: 10 * 1024 * 1024 } // 10MB 제한
 });
 
+// 모델명에서 제조사 추출 함수
+function extractManufacturer(modelName) {
+  if (!modelName) return '기타';
+  const model = modelName.toUpperCase();
+  
+  if (model.startsWith('SM-') || model.includes('SAMSUNG') || model.includes('갤럭시')) {
+    return '삼성';
+  } else if (model.includes('IPHONE') || model.includes('IPAD') || model.includes('APPLE')) {
+    return '애플';
+  } else if (model.includes('LG') || model.includes('VELVET') || model.includes('G')) {
+    return 'LG';
+  } else if (model.includes('XIAOMI') || model.includes('샤오미') || model.includes('MI ')) {
+    return '샤오미';
+  } else if (model.includes('OPPO') || model.includes('원플러스')) {
+    return 'OPPO';
+  } else {
+    return '기타';
+  }
+}
+
+// 포럼 채널에서 통신사별 포스트 찾기 또는 생성
+async function findOrCreateCarrierPost(forumChannel, carrier) {
+  try {
+    const postName = `${carrier} 통신사`;
+    console.log(`🔍 [findOrCreateCarrierPost] 포스트 찾기: ${postName}`);
+    
+    // 활성 스레드에서 찾기
+    const activeThreads = await forumChannel.threads.fetchActive();
+    let post = Array.from(activeThreads.threads.values()).find(
+      thread => thread.name === postName
+    );
+    
+    if (post) {
+      console.log(`✅ [findOrCreateCarrierPost] 기존 포스트 찾음: ${postName} (ID: ${post.id})`);
+      return post;
+    }
+    
+    // 아카이브된 스레드에서 찾기
+    try {
+      const archivedThreads = await forumChannel.threads.fetchArchived({ limit: 100 });
+      post = Array.from(archivedThreads.threads.values()).find(
+        thread => thread.name === postName
+      );
+      
+      if (post) {
+        console.log(`✅ [findOrCreateCarrierPost] 아카이브된 포스트 찾음: ${postName} (ID: ${post.id})`);
+        return post;
+      }
+    } catch (archivedError) {
+      console.warn('아카이브된 스레드 조회 실패:', archivedError);
+    }
+    
+    // 포스트 생성
+    console.log(`📌 [findOrCreateCarrierPost] 새 포스트 생성: ${postName}`);
+    const newPost = await forumChannel.threads.create({
+      name: postName,
+      message: {
+        content: `${carrier} 통신사 이미지 저장`
+      },
+      appliedTags: []
+    });
+    
+    console.log(`✅ [findOrCreateCarrierPost] 새 포스트 생성 완료: ${postName} (ID: ${newPost.id})`);
+    return newPost;
+  } catch (error) {
+    console.error('통신사별 포스트 찾기/생성 오류:', error);
+    throw error;
+  }
+}
+
+// 포스트에서 제조사별 스레드 찾기 또는 생성
+async function findOrCreateManufacturerThread(post, manufacturer) {
+  try {
+    // Discord 포럼에서는 포스트 자체가 스레드이므로, 
+    // 여기서는 포스트를 그대로 사용하거나 하위 스레드를 생성할 수 있습니다.
+    // 하지만 포럼 구조상 포스트가 스레드이므로, 포스트를 그대로 반환합니다.
+    // 만약 하위 스레드가 필요하다면 다른 구조를 사용해야 합니다.
+    
+    // 현재는 포스트를 그대로 사용 (포럼 구조상 포스트 = 스레드)
+    console.log(`📌 [findOrCreateManufacturerThread] 포스트 사용: ${post.name}, 제조사: ${manufacturer}`);
+    return post;
+  } catch (error) {
+    console.error('제조사별 스레드 찾기/생성 오류:', error);
+    throw error;
+  }
+}
+
 // POST /api/direct/upload-image: 이미지 업로드 (Discord)
 app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (req, res) => {
+  const startTime = Date.now();
+  let imageUrl = null;
+  let discordUploadSuccess = false;
+  
   try {
+    console.log('📤 [이미지 업로드] 요청 시작');
+    
     if (!req.file) {
+      console.error('❌ [이미지 업로드] 파일이 없습니다.');
       return res.status(400).json({
         success: false,
         error: '이미지 파일이 없습니다.'
@@ -4148,8 +4248,19 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
 
     const file = req.file;
     const modelId = req.body.modelId || 'unknown';
+    const carrier = req.body.carrier || 'SK'; // 통신사 정보 (클라이언트에서 전송)
+    const modelName = req.body.modelName || modelId; // 모델명 (제조사 추출용)
+    const petName = req.body.petName || modelName; // 펫네임 (클라이언트에서 전송)
+    
+    console.log(`📤 [이미지 업로드] 모델 ID: ${modelId}, 통신사: ${carrier}, 모델명: ${modelName}, 펫네임: ${petName}, 파일명: ${file.originalname}, 크기: ${file.size} bytes`);
 
+    // 제조사 추출
+    const manufacturer = extractManufacturer(modelName);
+    console.log(`📤 [이미지 업로드] 추출된 제조사: ${manufacturer}`);
+
+    // Discord 봇 초기화 확인
     if (!DISCORD_LOGGING_ENABLED || !discordBot) {
+      console.error('❌ [이미지 업로드] Discord 봇이 초기화되지 않았습니다.');
       return res.status(500).json({
         success: false,
         error: 'Discord 봇이 초기화되지 않았습니다.'
@@ -4158,6 +4269,7 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
 
     // Discord 봇이 준비될 때까지 대기
     if (!discordBot.isReady()) {
+      console.log('⏳ [이미지 업로드] Discord 봇 준비 대기 중...');
       for (let i = 0; i < 10; i++) {
         if (discordBot.isReady()) break;
         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -4165,66 +4277,160 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
     }
 
     if (!discordBot.isReady()) {
+      console.error('❌ [이미지 업로드] Discord 봇이 준비되지 않았습니다.');
       return res.status(500).json({
         success: false,
         error: 'Discord 봇이 준비되지 않았습니다.'
       });
     }
 
-    // Discord 채널 가져오기 (직영점 전용 채널 사용)
-    const channelId = DISCORD_STORE_CHANNEL_ID || DISCORD_CHANNEL_ID;
-    const channel = await discordBot.channels.fetch(channelId);
+    // 포럼 채널 가져오기
+    const forumChannelId = DISCORD_STORE_FORUM_CHANNEL_ID;
     
-    if (!channel) {
+    if (!forumChannelId) {
+      console.error('❌ [이미지 업로드] Discord 포럼 채널 ID가 설정되지 않았습니다.');
       return res.status(500).json({
         success: false,
-        error: `Discord 채널을 찾을 수 없습니다: ${channelId}`
+        error: 'Discord 포럼 채널 ID가 설정되지 않았습니다.'
+      });
+    }
+    
+    console.log(`📤 [이미지 업로드] Discord 포럼 채널 ID: ${forumChannelId}`);
+    
+    let forumChannel;
+    try {
+      forumChannel = await discordBot.channels.fetch(forumChannelId);
+    } catch (fetchError) {
+      console.error(`❌ [이미지 업로드] Discord 포럼 채널 가져오기 실패:`, fetchError);
+      return res.status(500).json({
+        success: false,
+        error: `Discord 포럼 채널을 가져올 수 없습니다: ${fetchError.message}`
+      });
+    }
+    
+    if (!forumChannel) {
+      console.error(`❌ [이미지 업로드] Discord 포럼 채널을 찾을 수 없습니다: ${forumChannelId}`);
+      return res.status(500).json({
+        success: false,
+        error: `Discord 포럼 채널을 찾을 수 없습니다: ${forumChannelId}`
+      });
+    }
+
+    // 포럼 채널 타입 확인
+    if (forumChannel.type !== 15) { // ForumChannel = 15
+      console.warn(`⚠️ [이미지 업로드] 채널이 포럼 채널이 아닙니다. 타입: ${forumChannel.type}`);
+      // 포럼이 아니어도 계속 진행 (하위 호환성)
+    }
+
+    // 통신사별 포스트 찾기 또는 생성
+    let carrierPost;
+    try {
+      carrierPost = await findOrCreateCarrierPost(forumChannel, carrier);
+    } catch (postError) {
+      console.error('❌ [이미지 업로드] 통신사별 포스트 찾기/생성 실패:', postError);
+      return res.status(500).json({
+        success: false,
+        error: `통신사별 포스트 찾기/생성 실패: ${postError.message}`
+      });
+    }
+
+    // 제조사별 스레드 찾기 또는 생성 (현재는 포스트를 그대로 사용)
+    let targetThread;
+    try {
+      targetThread = await findOrCreateManufacturerThread(carrierPost, manufacturer);
+    } catch (threadError) {
+      console.error('❌ [이미지 업로드] 제조사별 스레드 찾기/생성 실패:', threadError);
+      return res.status(500).json({
+        success: false,
+        error: `제조사별 스레드 찾기/생성 실패: ${threadError.message}`
       });
     }
 
     // 이미지 업로드
-    const filename = `direct-store-${modelId}-${Date.now()}.${file.originalname.split('.').pop()}`;
-    const { AttachmentBuilder } = require('discord.js');
-    const attachment = new AttachmentBuilder(file.buffer, { name: filename });
-    const message = await channel.send({ files: [attachment] });
+    const filename = `direct-store-${carrier}-${manufacturer}-${modelId}-${Date.now()}.${file.originalname.split('.').pop()}`;
+    console.log(`📤 [이미지 업로드] Discord에 업로드 시작: ${filename} (포스트: ${carrierPost.name}, 스레드: ${targetThread.name})`);
+    
+    try {
+      const { AttachmentBuilder } = require('discord.js');
+      const attachment = new AttachmentBuilder(file.buffer, { name: filename });
+      const message = await targetThread.send({ files: [attachment] });
 
-    const imageUrl = message.attachments.first().url;
+      if (!message || !message.attachments || !message.attachments.first()) {
+        throw new Error('Discord 메시지에 첨부파일이 없습니다.');
+      }
+
+      imageUrl = message.attachments.first().url;
+      discordUploadSuccess = true;
+      console.log(`✅ [이미지 업로드] Discord 업로드 성공: ${imageUrl} (포스트: ${carrierPost.name}, 스레드: ${targetThread.name})`);
+    } catch (discordError) {
+      console.error('❌ [이미지 업로드] Discord 업로드 실패:', discordError);
+      return res.status(500).json({
+        success: false,
+        error: `Discord에 이미지 업로드 실패: ${discordError.message}`
+      });
+    }
+
+    // imageUrl이 없으면 에러 반환
+    if (!imageUrl) {
+      console.error('❌ [이미지 업로드] 이미지 URL을 가져올 수 없습니다.');
+      return res.status(500).json({
+        success: false,
+        error: '이미지 URL을 가져올 수 없습니다.'
+      });
+    }
 
     // 직영점_모델이미지 시트에 저장/업데이트
+    // 컬럼 구조: 통신사(A) | 모델ID(B) | 모델명(C) | 펫네임(D) | 제조사(E) | 이미지URL(F) | 비고(G)
+    let sheetSaveSuccess = false;
     try {
-      // 기존 데이터 조회
+      console.log(`📝 [이미지 업로드] Google Sheets에 저장 시작: ${modelId}`);
+      
+      // 기존 데이터 조회 (A:G 범위로 변경)
       const imageResponse = await rateLimitedSheetsCall(() =>
         sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
-          range: '직영점_모델이미지!A:C'
+          range: '직영점_모델이미지!A:G'
         })
       );
 
       const imageValues = imageResponse.data.values || [];
       const rows = imageValues.slice(1); // 헤더 제외
-      const existingRowIndex = rows.findIndex(row => row[0] === modelId);
+      // 모델ID(B열, 인덱스 1)로 기존 행 찾기
+      const existingRowIndex = rows.findIndex(row => (row[1] || '').trim() === modelId);
 
-      const now = new Date().toISOString();
-      const newRow = [modelId, now, imageUrl];
+      // 7개 컬럼 데이터 구성: 통신사 | 모델ID | 모델명 | 펫네임 | 제조사 | 이미지URL | 비고
+      const newRow = [
+        carrier,           // A: 통신사
+        modelId,           // B: 모델ID
+        modelName,         // C: 모델명
+        petName,           // D: 펫네임
+        manufacturer,      // E: 제조사
+        imageUrl,          // F: 이미지URL
+        ''                 // G: 비고 (빈 값)
+      ];
 
       if (existingRowIndex !== -1) {
         // 기존 행 업데이트
+        console.log(`📝 [이미지 업로드] 기존 행 업데이트: 행 ${existingRowIndex + 2}`);
         await rateLimitedSheetsCall(() =>
           sheets.spreadsheets.values.update({
             spreadsheetId: SPREADSHEET_ID,
-            range: `직영점_모델이미지!A${existingRowIndex + 2}`,
+            range: `직영점_모델이미지!A${existingRowIndex + 2}:G${existingRowIndex + 2}`,
             valueInputOption: 'USER_ENTERED',
             resource: {
               values: [newRow]
             }
           })
         );
+        sheetSaveSuccess = true;
+        console.log(`✅ [이미지 업로드] Google Sheets 업데이트 성공`);
       } else {
         // 새 행 추가
+        console.log(`📝 [이미지 업로드] 새 행 추가`);
         await rateLimitedSheetsCall(() =>
           sheets.spreadsheets.values.append({
             spreadsheetId: SPREADSHEET_ID,
-            range: '직영점_모델이미지!A2',
+            range: '직영점_모델이미지!A:G',
             valueInputOption: 'USER_ENTERED',
             insertDataOption: 'INSERT_ROWS',
             resource: {
@@ -4232,11 +4438,28 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
             }
           })
         );
+        sheetSaveSuccess = true;
+        console.log(`✅ [이미지 업로드] Google Sheets 추가 성공`);
       }
     } catch (sheetError) {
-      console.error('이미지 URL 저장 오류:', sheetError);
-      // 이미지 업로드는 성공했으므로 계속 진행
+      console.error('❌ [이미지 업로드] Google Sheets 저장 오류:', sheetError);
+      console.error('❌ [이미지 업로드] 스택 트레이스:', sheetError.stack);
+      
+      // Discord 업로드는 성공했지만 Google Sheets 저장 실패
+      // 사용자에게 경고와 함께 성공 응답 반환 (이미지 URL은 사용 가능)
+      const elapsedTime = Date.now() - startTime;
+      console.warn(`⚠️ [이미지 업로드] Discord 업로드는 성공했지만 Google Sheets 저장 실패 (${elapsedTime}ms)`);
+      
+      return res.status(200).json({
+        success: true,
+        imageUrl: imageUrl,
+        modelId: modelId,
+        warning: 'Discord에는 업로드되었지만 Google Sheets 저장에 실패했습니다. 이미지 URL은 사용 가능합니다.'
+      });
     }
+
+    const elapsedTime = Date.now() - startTime;
+    console.log(`✅ [이미지 업로드] 완료 (${elapsedTime}ms) - Discord: ${discordUploadSuccess}, Sheets: ${sheetSaveSuccess}`);
 
     return res.json({
       success: true,
@@ -4244,10 +4467,14 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
       modelId: modelId
     });
   } catch (error) {
-    console.error('이미지 업로드 오류:', error);
+    const elapsedTime = Date.now() - startTime;
+    console.error(`❌ [이미지 업로드] 전체 프로세스 오류 (${elapsedTime}ms):`, error);
+    console.error('❌ [이미지 업로드] 스택 트레이스:', error.stack);
+    
     return res.status(500).json({
       success: false,
-      error: '이미지 업로드에 실패했습니다.'
+      error: `이미지 업로드에 실패했습니다: ${error.message}`,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });

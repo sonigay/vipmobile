@@ -997,10 +997,11 @@ function setupDirectRoutes(app) {
       const totalSpecialDeduction = specialPolicies.reduce((sum, policy) => sum + (policy.deduction || 0), 0);
 
       // 7. 직영점_모델이미지 시트와 직영점_오늘의휴대폰 시트 병렬 읽기 (최적화)
+      // 컬럼 구조: 통신사(A) | 모델ID(B) | 모델명(C) | 펫네임(D) | 제조사(E) | 이미지URL(F) | 비고(G)
       const [imageRes, todaysRes] = await Promise.all([
         sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
-          range: '직영점_모델이미지!A:C'
+          range: '직영점_모델이미지!A:G'
         }).catch(() => ({ data: { values: [] } })),
         sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
@@ -1011,8 +1012,11 @@ function setupDirectRoutes(app) {
       const imageRows = (imageRes.data.values || []).slice(1);
       const imageMap = new Map();
       imageRows.forEach(row => {
-        if (row[0] && row[2]) {
-          imageMap.set((row[0] || '').trim(), (row[2] || '').trim());
+        // 모델ID(B열, 인덱스 1)와 이미지URL(F열, 인덱스 5) 매핑
+        const modelId = (row[1] || '').trim();
+        const imageUrl = (row[5] || '').trim();
+        if (modelId && imageUrl) {
+          imageMap.set(modelId, imageUrl);
         }
       });
 

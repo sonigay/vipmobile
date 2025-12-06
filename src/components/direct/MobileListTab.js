@@ -138,8 +138,27 @@ const MobileListTab = ({ onProductSelect }) => {
     try {
       setLoading(true); // 전체 로딩 혹은 개별 로딩 처리 (여기서는 전체 로딩으로 단순화)
 
-      // API 호출
-      const result = await directStoreApi.uploadImage(file, uploadingModelId);
+      // 현재 모델 정보 가져오기
+      const currentModel = mobileList.find(m => m.id === uploadingModelId);
+      const carrier = getCurrentCarrier();
+      const modelName = currentModel?.model || uploadingModelId;
+      const petName = currentModel?.petName || modelName;
+
+      console.log('📤 [이미지 업로드] 시작:', { 
+        modelId: uploadingModelId, 
+        carrier, 
+        modelName,
+        petName,
+        fileName: file.name, 
+        fileSize: file.size 
+      });
+
+      // API 호출 (통신사, 모델명, 펫네임 정보 포함)
+      const result = await directStoreApi.uploadImage(file, uploadingModelId, carrier, modelName, petName);
+
+      if (!result || !result.success) {
+        throw new Error(result?.error || '이미지 업로드에 실패했습니다.');
+      }
 
       // 성공 시 리스트 업데이트 (이미지 URL 반영)
       setMobileList(prevList => prevList.map(item =>
@@ -148,10 +167,18 @@ const MobileListTab = ({ onProductSelect }) => {
           : item
       ));
 
-      alert('이미지가 성공적으로 업로드되었습니다.');
+      // 경고가 있으면 함께 표시
+      if (result.warning) {
+        alert(`이미지가 업로드되었습니다.\n\n⚠️ 경고: ${result.warning}`);
+      } else {
+        alert('이미지가 성공적으로 업로드되었습니다.');
+      }
+      
+      console.log('✅ [이미지 업로드] 성공:', result.imageUrl);
     } catch (err) {
-      console.error('이미지 업로드 실패:', err);
-      alert('이미지 업로드에 실패했습니다.');
+      console.error('❌ [이미지 업로드] 실패:', err);
+      const errorMessage = err.message || err.toString() || '이미지 업로드에 실패했습니다.';
+      alert(`이미지 업로드에 실패했습니다.\n\n오류: ${errorMessage}`);
     } finally {
       setLoading(false);
       setUploadingModelId(null);
