@@ -430,24 +430,9 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
     };
   }, [fetchData]);
 
-  if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
-
-  if (error) {
-    return (
-      <Box sx={{ p: 3 }}>
-        <Alert severity="error">{error}</Alert>
-      </Box>
-    );
-  }
-
   // 프리미엄과 중저가를 하나의 배열로 합치기 (프리미엄 먼저, 중저가 나중에)
   // 표시 개수 조정: 프리미엄 6개→3개, 중저가 3개→1~2개
+  // ⚠️ 중요: 모든 훅은 early return 이전에 호출되어야 함
   const displayPremiumPhones = useMemo(() => premiumPhones.slice(0, 3), [premiumPhones]);
   const displayBudgetPhones = useMemo(() => budgetPhones.slice(0, 2), [budgetPhones]);
   const allProducts = useMemo(() => [...displayPremiumPhones, ...displayBudgetPhones], [displayPremiumPhones, displayBudgetPhones]);
@@ -506,6 +491,23 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
   };
   
   const theme = getCarrierTheme(currentCarrier);
+
+  // Early return은 모든 훅 호출 이후에 위치
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Alert severity="error">{error}</Alert>
+      </Box>
+    );
+  }
 
   return (
     <Box
