@@ -1142,12 +1142,25 @@ function setupDirectRoutes(app) {
             };
             // 원본 모델명과 정규화된 모델명 모두 키로 저장 (매칭 강화)
             tagMap.set(model, tagData);
-            if (normalizedModel && normalizedModel !== model.toLowerCase()) {
+            // 대소문자 변형도 저장
+            tagMap.set(model.toLowerCase(), tagData);
+            tagMap.set(model.toUpperCase(), tagData);
+            if (normalizedModel) {
               tagMap.set(normalizedModel, tagData);
+              // 정규화된 모델명의 대소문자 변형도 저장
+              if (normalizedModel !== model.toLowerCase()) {
+                tagMap.set(normalizedModel.toLowerCase(), tagData);
+                tagMap.set(normalizedModel.toUpperCase(), tagData);
+              }
             }
           }
         });
         console.log(`[Direct] 태그 맵 크기: ${tagMap.size}, 통신사: ${carrierParam}`);
+        // UIP 관련 모델명이 있는지 확인
+        const uipKeys = Array.from(tagMap.keys()).filter(k => k.includes('UIP') || k.includes('uip'));
+        if (uipKeys.length > 0) {
+          console.log(`[Direct] UIP 관련 태그 키:`, uipKeys);
+        }
       } catch (err) {
         console.warn('[Direct] 직영점_오늘의휴대폰 시트 읽기 실패:', err);
       }
@@ -1236,15 +1249,39 @@ function setupDirectRoutes(app) {
           - storeSupportWithoutAddon  // 대리점추가지원금 (정책표리베이트 - 마진 + 부가서비스차감 + 별도정책차감 포함)
         );
 
-        // 구분 태그 가져오기 (원본 모델명, 정규화된 모델명 모두 시도)
+        // 구분 태그 가져오기 (원본 모델명, 정규화된 모델명, 대소문자 변형 모두 시도)
         let tags = tagMap.get(model) || {};
         if (!tags || Object.keys(tags).length === 0) {
-          // 원본 모델명으로 찾지 못하면 정규화된 모델명으로 시도
+          // 대소문자 변형 시도
+          tags = tagMap.get(model.toLowerCase()) || tagMap.get(model.toUpperCase()) || {};
+        }
+        if (!tags || Object.keys(tags).length === 0) {
+          // 정규화된 모델명으로 시도
           const normalizedModel = normalizeModelCode(model);
           if (normalizedModel) {
-            tags = tagMap.get(normalizedModel) || {};
+            tags = tagMap.get(normalizedModel) || tagMap.get(normalizedModel.toLowerCase()) || tagMap.get(normalizedModel.toUpperCase()) || {};
           }
         }
+        // 여전히 찾지 못했으면 유사 매칭 시도
+        if ((!tags || Object.keys(tags).length === 0) && tagMap.size > 0) {
+          const modelLower = model.toLowerCase();
+          const normalizedModel = normalizeModelCode(model);
+          const normalizedModelLower = normalizedModel ? normalizedModel.toLowerCase() : '';
+          
+          for (const [key, value] of tagMap.entries()) {
+            const keyLower = key.toLowerCase();
+            // 정확한 일치 또는 포함 관계 확인
+            if (keyLower === modelLower || 
+                keyLower === normalizedModelLower ||
+                (normalizedModelLower && (keyLower.includes(normalizedModelLower) || normalizedModelLower.includes(keyLower))) ||
+                (modelLower && (keyLower.includes(modelLower) || modelLower.includes(keyLower)))) {
+              tags = value;
+              console.log(`[Direct] ✅ 유사 매칭으로 태그 찾음: 모델명=${model}, 맵키=${key}`);
+              break;
+            }
+          }
+        }
+        
         const tagsArray = [];
         if (tags.isPopular) tagsArray.push('popular');
         if (tags.isRecommended) tagsArray.push('recommend');
@@ -1252,23 +1289,31 @@ function setupDirectRoutes(app) {
         if (tags.isPremium) tagsArray.push('premium');
         if (tags.isBudget) tagsArray.push('budget');
         
-        // 디버깅: 태그를 찾지 못한 경우 로그
-        if ((tags.isPremium || tags.isBudget) && tagMap.size > 0) {
-          console.log(`[Direct] ✅ 태그 찾음: 모델명=${model}, isPremium=${tags.isPremium}, isBudget=${tags.isBudget}`);
-        } else if (tagMap.size > 0 && (model.includes('UIP') || model.includes('uip'))) {
-          const mapKeys = Array.from(tagMap.keys());
-          const matchingKeys = mapKeys.filter(k => {
-            const kLower = k.toLowerCase();
-            const modelLower = model.toLowerCase();
-            return kLower.includes(modelLower) || modelLower.includes(kLower) || kLower === modelLower;
-          });
-          console.log(`[Direct] ⚠️ 태그를 찾을 수 없음:`, {
-            통신사: carrierParam,
-            모델명: model,
-            태그맵크기: tagMap.size,
-            태그맵키전체: mapKeys.slice(0, 20), // 처음 20개만
-            유사키: matchingKeys
-          });
+        // 디버깅: UIP 관련 모델명에 대한 상세 로그
+        if (tagMap.size > 0 && (model.includes('UIP') || model.includes('uip'))) {
+          if (tags.isPremium || tags.isBudget) {
+            console.log(`[Direct] ✅ UIP 태그 찾음: 모델명=${model}, isPremium=${tags.isPremium}, isBudget=${tags.isBudget}`);
+          } else {
+            const mapKeys = Array.from(tagMap.keys());
+            const matchingKeys = mapKeys.filter(k => {
+              const kLower = k.toLowerCase();
+              const modelLower = model.toLowerCase();
+              const normalizedModel = normalizeModelCode(model);
+              const normalizedModelLower = normalizedModel ? normalizedModel.toLowerCase() : '';
+              return kLower.includes(modelLower) || 
+                     modelLower.includes(kLower) || 
+                     kLower === modelLower ||
+                     (normalizedModelLower && (kLower.includes(normalizedModelLower) || normalizedModelLower.includes(kLower)));
+            });
+            console.log(`[Direct] ⚠️ UIP 태그를 찾을 수 없음:`, {
+              통신사: carrierParam,
+              모델명: model,
+              정규화된모델명: normalizeModelCode(model),
+              태그맵크기: tagMap.size,
+              태그맵키전체: mapKeys.slice(0, 30), // 처음 30개
+              유사키: matchingKeys
+            });
+          }
         }
 
         const mobile = {

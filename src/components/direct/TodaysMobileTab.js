@@ -102,8 +102,12 @@ const ProductCard = ({ product, isPremium, onSelect, compact, theme }) => {
       }}>
         <CardMedia
           component="img"
-          image={product.image || 'https://via.placeholder.com/300x300?text=No+Image'}
+          image={product.image || ''}
           alt={product.petName}
+          onError={(e) => {
+            // 이미지 로드 실패 시 빈 이미지로 처리
+            e.target.style.display = 'none';
+          }}
           sx={{
             position: 'absolute',
             top: 0,
@@ -290,9 +294,9 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
         const carrierData = allCheckedProducts[i];
         const { carrier, products } = carrierData;
         
-        // 프리미엄과 중저가 분리
-        const premium = products.filter(p => p.isPremium);
-        const budget = products.filter(p => p.isBudget);
+        // 프리미엄과 중저가 분리 (태그가 정확히 true인 것만)
+        const premium = products.filter(p => p.isPremium === true);
+        const budget = products.filter(p => p.isBudget === true);
         
         // 프리미엄 상품이 있으면
         if (premium.length > 0) {
@@ -477,7 +481,12 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
   // 프리미엄과 중저가를 하나의 배열로 합치기 (프리미엄 먼저, 중저가 나중에)
   // 서버에서 이미 3개, 2개로 제한되어 있으므로 클라이언트에서는 slice 불필요
   // ⚠️ 중요: 모든 훅은 early return 이전에 호출되어야 함
-  const allProducts = useMemo(() => [...premiumPhones, ...budgetPhones], [premiumPhones, budgetPhones]);
+  // 추가 안전장치: 서버 제한이 실패한 경우를 대비해 클라이언트에서도 제한
+  const allProducts = useMemo(() => {
+    const premium = Array.isArray(premiumPhones) ? premiumPhones.slice(0, 3) : [];
+    const budget = Array.isArray(budgetPhones) ? budgetPhones.slice(0, 2) : [];
+    return [...premium, ...budget];
+  }, [premiumPhones, budgetPhones]);
   
   // 현재 표시 중인 통신사 감지 (테마용)
   useEffect(() => {
@@ -782,7 +791,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
               })()
             ) : (
               // 상품 그룹 표시 (6개씩 그리드)
-              slideshowData[currentSlideIndex]?.type === 'productGroup' && (
+              slideshowData[currentSlideIndex]?.type === 'productGroup' && slideshowData[currentSlideIndex]?.products && (
                 <Box
                   sx={{
                     width: '100%',
@@ -817,7 +826,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                     <ProductCard
                       key={product.id || `${product.model}-${product.carrier}`}
                       product={product}
-                      isPremium={product.isPremium || false}
+                      isPremium={product.isPremium === true}
                       onSelect={onProductSelect}
                       compact={compact}
                       theme={getCarrierTheme(slideshowData[currentSlideIndex].carrier)}
