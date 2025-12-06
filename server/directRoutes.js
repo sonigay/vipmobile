@@ -1132,15 +1132,22 @@ function setupDirectRoutes(app) {
         todaysRows.forEach(row => {
           if (row[0]) { // 모델명
             const model = (row[0] || '').trim();
-            tagMap.set(model, {
+            const normalizedModel = normalizeModelCode(model);
+            const tagData = {
               isPopular: (row[9] || '').toString().toUpperCase() === 'Y' || (row[9] || '').toString().toUpperCase() === 'TRUE',
               isRecommended: (row[10] || '').toString().toUpperCase() === 'Y' || (row[10] || '').toString().toUpperCase() === 'TRUE',
               isCheap: (row[11] || '').toString().toUpperCase() === 'Y' || (row[11] || '').toString().toUpperCase() === 'TRUE',
               isPremium: (row[12] || '').toString().toUpperCase() === 'Y' || (row[12] || '').toString().toUpperCase() === 'TRUE',
               isBudget: (row[13] || '').toString().toUpperCase() === 'Y' || (row[13] || '').toString().toUpperCase() === 'TRUE'
-            });
+            };
+            // 원본 모델명과 정규화된 모델명 모두 키로 저장 (매칭 강화)
+            tagMap.set(model, tagData);
+            if (normalizedModel && normalizedModel !== model.toLowerCase()) {
+              tagMap.set(normalizedModel, tagData);
+            }
           }
         });
+        console.log(`[Direct] 태그 맵 크기: ${tagMap.size}, 통신사: ${carrierParam}`);
       } catch (err) {
         console.warn('[Direct] 직영점_오늘의휴대폰 시트 읽기 실패:', err);
       }
@@ -1229,14 +1236,40 @@ function setupDirectRoutes(app) {
           - storeSupportWithoutAddon  // 대리점추가지원금 (정책표리베이트 - 마진 + 부가서비스차감 + 별도정책차감 포함)
         );
 
-        // 구분 태그 가져오기
-        const tags = tagMap.get(model) || {};
+        // 구분 태그 가져오기 (원본 모델명, 정규화된 모델명 모두 시도)
+        let tags = tagMap.get(model) || {};
+        if (!tags || Object.keys(tags).length === 0) {
+          // 원본 모델명으로 찾지 못하면 정규화된 모델명으로 시도
+          const normalizedModel = normalizeModelCode(model);
+          if (normalizedModel) {
+            tags = tagMap.get(normalizedModel) || {};
+          }
+        }
         const tagsArray = [];
         if (tags.isPopular) tagsArray.push('popular');
         if (tags.isRecommended) tagsArray.push('recommend');
         if (tags.isCheap) tagsArray.push('cheap');
         if (tags.isPremium) tagsArray.push('premium');
         if (tags.isBudget) tagsArray.push('budget');
+        
+        // 디버깅: 태그를 찾지 못한 경우 로그
+        if ((tags.isPremium || tags.isBudget) && tagMap.size > 0) {
+          console.log(`[Direct] ✅ 태그 찾음: 모델명=${model}, isPremium=${tags.isPremium}, isBudget=${tags.isBudget}`);
+        } else if (tagMap.size > 0 && (model.includes('UIP') || model.includes('uip'))) {
+          const mapKeys = Array.from(tagMap.keys());
+          const matchingKeys = mapKeys.filter(k => {
+            const kLower = k.toLowerCase();
+            const modelLower = model.toLowerCase();
+            return kLower.includes(modelLower) || modelLower.includes(kLower) || kLower === modelLower;
+          });
+          console.log(`[Direct] ⚠️ 태그를 찾을 수 없음:`, {
+            통신사: carrierParam,
+            모델명: model,
+            태그맵크기: tagMap.size,
+            태그맵키전체: mapKeys.slice(0, 20), // 처음 20개만
+            유사키: matchingKeys
+          });
+        }
 
         const mobile = {
           id: `mobile-${carrierParam}-${i}`,

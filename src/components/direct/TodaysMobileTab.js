@@ -93,8 +93,8 @@ const ProductCard = ({ product, isPremium, onSelect, compact, theme }) => {
 
       <Box sx={{ 
         position: 'relative', 
-        pt: compact ? '50%' : '60%',
-        minHeight: compact ? 120 : 150,
+        pt: compact ? '70%' : '80%',  // 이미지 영역을 더 크게 (50%→70%, 60%→80%)
+        minHeight: compact ? 200 : 250,  // 최소 높이도 증가
         background: `linear-gradient(135deg, ${cardTheme.primary}10 0%, ${cardTheme.secondary}10 100%)`,
         borderRadius: '16px 16px 0 0', 
         overflow: 'hidden',
@@ -110,8 +110,7 @@ const ProductCard = ({ product, isPremium, onSelect, compact, theme }) => {
             left: 0,
             width: '100%',
             height: '100%',
-            objectFit: 'contain',  // contain으로 설정하여 이미지가 잘리지 않도록
-            p: compact ? 1.5 : 2,
+            objectFit: 'cover',  // cover로 변경하여 섹션을 꽉 채움
             transition: 'transform 0.3s',
             '&:hover': { transform: 'scale(1.05)' }
           }}
@@ -385,24 +384,32 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
     }
   }, []);
 
+  // 슬라이드쇼 로딩 상태
+  const [isSlideshowLoading, setIsSlideshowLoading] = useState(false);
+
   // 슬라이드쇼 시작/중지
   const toggleSlideshow = useCallback(async () => {
     if (!isSlideshowActive) {
       // 슬라이드쇼 시작
-      const data = await prepareSlideshowData();
-      if (data.length === 0) {
-        alert('슬라이드쇼할 체크된 상품이 없습니다.');
-        return;
-      }
-      setIsSlideshowActive(true);
-      setCurrentSlideIndex(0);
-      const firstItem = data[0];
-      setIsTransitionPage(firstItem?.type === 'transition');
-      setTransitionPageData(firstItem?.type === 'transition' ? firstItem : null);
-      if (firstItem?.type === 'productGroup' || firstItem?.type === 'product') {
-        setCurrentCarrier(firstItem.carrier);
-      } else if (firstItem?.type === 'transition') {
-        setCurrentCarrier(firstItem.carrier);
+      setIsSlideshowLoading(true);
+      try {
+        const data = await prepareSlideshowData();
+        if (data.length === 0) {
+          alert('슬라이드쇼할 체크된 상품이 없습니다.');
+          return;
+        }
+        setIsSlideshowActive(true);
+        setCurrentSlideIndex(0);
+        const firstItem = data[0];
+        setIsTransitionPage(firstItem?.type === 'transition');
+        setTransitionPageData(firstItem?.type === 'transition' ? firstItem : null);
+        if (firstItem?.type === 'productGroup' || firstItem?.type === 'product') {
+          setCurrentCarrier(firstItem.carrier);
+        } else if (firstItem?.type === 'transition') {
+          setCurrentCarrier(firstItem.carrier);
+        }
+      } finally {
+        setIsSlideshowLoading(false);
       }
     } else {
       // 슬라이드쇼 중지
@@ -468,11 +475,9 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
   }, [fetchData]);
 
   // 프리미엄과 중저가를 하나의 배열로 합치기 (프리미엄 먼저, 중저가 나중에)
-  // 표시 개수 조정: 프리미엄 6개→3개, 중저가 3개→1~2개
+  // 서버에서 이미 3개, 2개로 제한되어 있으므로 클라이언트에서는 slice 불필요
   // ⚠️ 중요: 모든 훅은 early return 이전에 호출되어야 함
-  const displayPremiumPhones = useMemo(() => premiumPhones.slice(0, 3), [premiumPhones]);
-  const displayBudgetPhones = useMemo(() => budgetPhones.slice(0, 2), [budgetPhones]);
-  const allProducts = useMemo(() => [...displayPremiumPhones, ...displayBudgetPhones], [displayPremiumPhones, displayBudgetPhones]);
+  const allProducts = useMemo(() => [...premiumPhones, ...budgetPhones], [premiumPhones, budgetPhones]);
   
   // 현재 표시 중인 통신사 감지 (테마용)
   useEffect(() => {
@@ -611,8 +616,9 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
               <Button
                 variant={isSlideshowActive ? 'contained' : 'outlined'}
                 size="small"
-                startIcon={isSlideshowActive ? <PauseIcon /> : <PlayArrowIcon />}
+                startIcon={isSlideshowLoading ? <CircularProgress size={16} /> : (isSlideshowActive ? <PauseIcon /> : <PlayArrowIcon />)}
                 onClick={toggleSlideshow}
+                disabled={isSlideshowLoading}
                 sx={{
                   ...(isSlideshowActive ? {
                     backgroundColor: theme.primary,
@@ -630,7 +636,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                   })
                 }}
               >
-                {isSlideshowActive ? '슬라이드쇼 중지' : '슬라이드쇼 시작'}
+                {isSlideshowLoading ? '준비 중...' : (isSlideshowActive ? '슬라이드쇼 중지' : '슬라이드쇼 시작')}
               </Button>
               <Button
                 variant="outlined"
@@ -784,11 +790,11 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                     display: 'grid',
                     gap: compact ? (isFullScreen ? 1 : 1.5) : (isFullScreen ? 1.5 : 2),
                     gridTemplateColumns: {
-                      xs: 'repeat(2, 1fr)',
-                      sm: 'repeat(3, 1fr)',
-                      md: 'repeat(4, 1fr)',
-                      lg: 'repeat(5, 1fr)',
-                      xl: 'repeat(6, 1fr)'
+                      xs: 'repeat(1, 1fr)',  // 모바일: 1개
+                      sm: 'repeat(2, 1fr)',  // 작은 화면: 2개
+                      md: 'repeat(3, 1fr)',  // 중간 화면: 3개
+                      lg: 'repeat(3, 1fr)',  // 큰 화면: 3개 (꽉 차게)
+                      xl: 'repeat(3, 1fr)'   // 매우 큰 화면: 3개 (꽉 차게)
                     },
                     gridAutoRows: 'auto',
                     alignContent: 'start',
@@ -830,11 +836,11 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
               display: 'grid',
               gap: compact ? (isFullScreen ? 1 : 1.5) : (isFullScreen ? 1.5 : 2),
               gridTemplateColumns: {
-                xs: 'repeat(2, 1fr)',
-                sm: 'repeat(3, 1fr)',
-                md: 'repeat(4, 1fr)',
-                lg: 'repeat(5, 1fr)',
-                xl: 'repeat(6, 1fr)'
+                xs: 'repeat(1, 1fr)',  // 모바일: 1개
+                sm: 'repeat(2, 1fr)',  // 작은 화면: 2개
+                md: 'repeat(3, 1fr)',  // 중간 화면: 3개
+                lg: 'repeat(3, 1fr)',  // 큰 화면: 3개 (꽉 차게)
+                xl: 'repeat(3, 1fr)'   // 매우 큰 화면: 3개 (꽉 차게)
               },
               gridAutoRows: 'auto',
               alignContent: 'start',
