@@ -143,9 +143,14 @@ const MobileListTab = ({ onProductSelect }) => {
       const carrier = getCurrentCarrier();
       const modelName = currentModel?.model || uploadingModelId;
       const petName = currentModel?.petName || modelName;
+      
+      // 모델ID는 실제 모델 코드(모델명)로 사용 (동적 ID 대신)
+      // 서버에서도 modelId = modelName으로 처리하므로 일관성 유지
+      const actualModelId = modelName; // 실제 모델 코드를 modelId로 사용
 
       console.log('📤 [이미지 업로드] 시작:', { 
-        modelId: uploadingModelId, 
+        clientId: uploadingModelId, // 클라이언트 ID (참고용)
+        modelId: actualModelId,      // 실제 모델 코드 (서버에 전송)
         carrier, 
         modelName,
         petName,
@@ -153,8 +158,8 @@ const MobileListTab = ({ onProductSelect }) => {
         fileSize: file.size 
       });
 
-      // API 호출 (통신사, 모델명, 펫네임 정보 포함)
-      const result = await directStoreApi.uploadImage(file, uploadingModelId, carrier, modelName, petName);
+      // API 호출 (실제 모델 코드를 modelId로 전송)
+      const result = await directStoreApi.uploadImage(file, actualModelId, carrier, modelName, petName);
 
       if (!result || !result.success) {
         throw new Error(result?.error || '이미지 업로드에 실패했습니다.');
