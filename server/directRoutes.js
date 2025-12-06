@@ -459,7 +459,13 @@ function setupDirectRoutes(app) {
       let policy = { link: '' };
 
       if (planGroupRow) {
-        const settingsJson = planGroupRow[4] ? JSON.parse(planGroupRow[4]) : {};
+        let settingsJson = {};
+        try {
+          settingsJson = planGroupRow[4] ? JSON.parse(planGroupRow[4]) : {};
+        } catch (parseErr) {
+          console.error(`[Direct] ${carrier} planGroup 설정 JSON 파싱 실패:`, parseErr);
+          console.error(`[Direct] JSON 문자열:`, planGroupRow[4]);
+        }
         planGroup = {
           link: planGroupRow[2] || '', // 시트ID
           sheetId: planGroupRow[2] || '',
@@ -471,7 +477,13 @@ function setupDirectRoutes(app) {
       }
 
       if (supportRow) {
-        const settingsJson = supportRow[4] ? JSON.parse(supportRow[4]) : {};
+        let settingsJson = {};
+        try {
+          settingsJson = supportRow[4] ? JSON.parse(supportRow[4]) : {};
+        } catch (parseErr) {
+          console.error(`[Direct] ${carrier} support 설정 JSON 파싱 실패:`, parseErr);
+          console.error(`[Direct] JSON 문자열:`, supportRow[4]);
+        }
         support = {
           link: supportRow[2] || '',
           sheetId: supportRow[2] || '',
@@ -484,7 +496,13 @@ function setupDirectRoutes(app) {
       }
 
       if (policyRow) {
-        const settingsJson = policyRow[4] ? JSON.parse(policyRow[4]) : {};
+        let settingsJson = {};
+        try {
+          settingsJson = policyRow[4] ? JSON.parse(policyRow[4]) : {};
+        } catch (parseErr) {
+          console.error(`[Direct] ${carrier} policy 설정 JSON 파싱 실패:`, parseErr);
+          console.error(`[Direct] JSON 문자열:`, policyRow[4]);
+        }
         policy = {
           link: policyRow[2] || '',
           sheetId: policyRow[2] || '',
@@ -501,8 +519,15 @@ function setupDirectRoutes(app) {
         policy
       });
     } catch (error) {
-      console.error('[Direct] link-settings GET error:', error);
-      res.status(500).json({ success: false, error: '링크 설정 조회 실패', message: error.message });
+      console.error(`[Direct] link-settings GET error (통신사: ${req.query.carrier || 'SK'}):`, error);
+      console.error('[Direct] Error stack:', error.stack);
+      // 에러 발생 시에도 기본값 반환 (500 에러 대신)
+      res.json({
+        success: true,
+        planGroup: { link: '', planGroups: [] },
+        support: { link: '' },
+        policy: { link: '' }
+      });
     }
   });
 
@@ -784,7 +809,14 @@ function setupDirectRoutes(app) {
         return []; // 빈 배열 반환
       }
 
-      const policySettingsJson = policyRow[4] ? JSON.parse(policyRow[4]) : {};
+      let policySettingsJson = {};
+      try {
+        policySettingsJson = policyRow[4] ? JSON.parse(policyRow[4]) : {};
+      } catch (parseErr) {
+        console.error(`[Direct] ${carrierParam} 정책표 설정 JSON 파싱 실패:`, parseErr);
+        console.error(`[Direct] JSON 문자열:`, policyRow[4]);
+        return []; // 빈 배열 반환
+      }
       const policySheetId = policyRow[2].trim();
       const modelRange = policySettingsJson.modelRange || '';
       const petNameRange = policySettingsJson.petNameRange || '';
@@ -801,7 +833,14 @@ function setupDirectRoutes(app) {
         return []; // 빈 배열 반환
       }
 
-      const supportSettingsJson = supportRow[4] ? JSON.parse(supportRow[4]) : {};
+      let supportSettingsJson = {};
+      try {
+        supportSettingsJson = supportRow[4] ? JSON.parse(supportRow[4]) : {};
+      } catch (parseErr) {
+        console.error(`[Direct] ${carrierParam} 이통사 지원금 설정 JSON 파싱 실패:`, parseErr);
+        console.error(`[Direct] JSON 문자열:`, supportRow[4]);
+        return []; // 빈 배열 반환
+      }
       const supportSheetId = supportRow[2].trim();
       const factoryPriceRange = supportSettingsJson.factoryPriceRange || '';
       const openingTypeRange = supportSettingsJson.openingTypeRange || '';
@@ -1289,8 +1328,10 @@ function setupDirectRoutes(app) {
 
       return mobileList;
     } catch (error) {
-      console.error('[Direct] getMobileList error:', error);
-      throw error;
+      console.error(`[Direct] getMobileList error (통신사: ${carrier || 'SK'}):`, error);
+      console.error('[Direct] Error stack:', error.stack);
+      // 에러를 throw하지 않고 빈 배열 반환하여 다른 통신사 데이터는 정상적으로 가져올 수 있도록 함
+      return [];
     }
   }
 
@@ -1306,11 +1347,14 @@ function setupDirectRoutes(app) {
       }
 
       const mobileList = await getMobileList(carrier);
+      // getMobileList가 빈 배열을 반환해도 정상 응답으로 처리
       setCache(cacheKey, mobileList, 5 * 60 * 1000); // 5분 캐시 (로딩 시간 최적화)
       res.json(mobileList);
     } catch (error) {
-      console.error('[Direct] mobiles GET error:', error);
-      res.status(500).json({ success: false, error: '휴대폰 목록 조회 실패', message: error.message });
+      console.error(`[Direct] mobiles GET error (통신사: ${req.query.carrier || 'SK'}):`, error);
+      console.error('[Direct] Error stack:', error.stack);
+      // 에러 발생 시에도 빈 배열 반환 (500 에러 대신)
+      res.json([]);
     }
   });
 
