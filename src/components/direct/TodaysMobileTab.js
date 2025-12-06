@@ -50,12 +50,11 @@ const ProductCard = ({ product, isPremium, onSelect, compact, theme }) => {
   return (
     <Card
       sx={{
-        height: 'auto',
-        minHeight: compact ? 380 : 420,
+        height: '100%',
         display: 'flex',
         flexDirection: 'column',
         position: 'relative',
-        overflow: 'visible',
+        overflow: 'hidden',
         cursor: 'pointer',
         backgroundColor: cardTheme.cardBg,
         border: `2px solid ${cardTheme.primary}30`,
@@ -93,8 +92,8 @@ const ProductCard = ({ product, isPremium, onSelect, compact, theme }) => {
 
       <Box sx={{ 
         position: 'relative', 
-        pt: compact ? '70%' : '80%',  // 이미지 영역을 더 크게 (50%→70%, 60%→80%)
-        minHeight: compact ? 200 : 250,  // 최소 높이도 증가
+        pt: compact ? '50%' : '60%',  // 이미지 영역 비율 조정
+        minHeight: compact ? 150 : 180,  // 최소 높이 조정
         background: `linear-gradient(135deg, ${cardTheme.primary}10 0%, ${cardTheme.secondary}10 100%)`,
         borderRadius: '16px 16px 0 0', 
         overflow: 'hidden',
@@ -121,7 +120,7 @@ const ProductCard = ({ product, isPremium, onSelect, compact, theme }) => {
         />
       </Box>
 
-      <CardContent sx={{ flexGrow: 1, p: compact ? 1.5 : 2 }}>
+      <CardContent sx={{ flex: '1 1 auto', p: compact ? 1.5 : 2 }}>
         <Stack direction="row" spacing={1} mb={1}>
           <Chip
             label={product.carrier}
@@ -799,11 +798,11 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                     display: 'grid',
                     gap: compact ? (isFullScreen ? 1 : 1.5) : (isFullScreen ? 1.5 : 2),
                     gridTemplateColumns: {
-                      xs: 'repeat(1, 1fr)',  // 모바일: 1개
-                      sm: 'repeat(2, 1fr)',  // 작은 화면: 2개
-                      md: 'repeat(3, 1fr)',  // 중간 화면: 3개
-                      lg: 'repeat(3, 1fr)',  // 큰 화면: 3개 (꽉 차게)
-                      xl: 'repeat(3, 1fr)'   // 매우 큰 화면: 3개 (꽉 차게)
+                      xs: 'repeat(1, 1fr)',  // 모바일: 1열
+                      sm: 'repeat(2, 1fr)',  // 태블릿: 2열
+                      md: 'repeat(2, 1fr)',  // 작은PC: 2열
+                      lg: 'repeat(3, 1fr)',  // 큰PC: 3열
+                      xl: 'repeat(3, 1fr)'   // 매우 큰 화면: 3열
                     },
                     gridAutoRows: 'auto',
                     alignContent: 'start',
@@ -845,11 +844,11 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
               display: 'grid',
               gap: compact ? (isFullScreen ? 1 : 1.5) : (isFullScreen ? 1.5 : 2),
               gridTemplateColumns: {
-                xs: 'repeat(1, 1fr)',  // 모바일: 1개
-                sm: 'repeat(2, 1fr)',  // 작은 화면: 2개
-                md: 'repeat(3, 1fr)',  // 중간 화면: 3개
-                lg: 'repeat(3, 1fr)',  // 큰 화면: 3개 (꽉 차게)
-                xl: 'repeat(3, 1fr)'   // 매우 큰 화면: 3개 (꽉 차게)
+                xs: 'repeat(1, 1fr)',  // 모바일: 1열
+                sm: 'repeat(2, 1fr)',  // 태블릿: 2열
+                md: 'repeat(2, 1fr)',  // 작은PC: 2열
+                lg: 'repeat(3, 1fr)',  // 큰PC: 3열
+                xl: 'repeat(3, 1fr)'   // 매우 큰 화면: 3열
               },
               gridAutoRows: 'auto',
               alignContent: 'start',
