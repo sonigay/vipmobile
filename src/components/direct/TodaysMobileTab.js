@@ -33,13 +33,16 @@ import {
 } from '@mui/icons-material';
 import { directStoreApi } from '../../api/directStoreApi';
 
-const ProductCard = ({ product, isPremium, onSelect, compact, theme }) => {
+const ProductCard = ({ product, isPremium, onSelect, compact, theme, priceData: propPriceData }) => {
   const [priceData, setPriceData] = useState({
     '010신규': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: true },
     'MNP': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: true },
     '기변': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: true }
   });
   const hasLoadedRef = useRef(false);
+  
+  // props로 받은 priceData가 있으면 사용
+  const finalPriceData = propPriceData || priceData;
 
   const getCarrierChipColor = (carrier) => {
     switch (carrier) {
@@ -65,9 +68,9 @@ const ProductCard = ({ product, isPremium, onSelect, compact, theme }) => {
   if (product.isRecommended) tagChips.push({ label: '추천', color: 'success' });
   if (product.isCheap) tagChips.push({ label: '저렴', color: 'info' });
 
-  // 각 유형별 가격 정보 로드
+  // 각 유형별 가격 정보 로드 (props로 받은 priceData가 없을 때만)
   useEffect(() => {
-    if (hasLoadedRef.current || !product.id || !product.carrier) return;
+    if (propPriceData || hasLoadedRef.current || !product.id || !product.carrier) return;
     
     const loadPrices = async () => {
       hasLoadedRef.current = true;
@@ -110,7 +113,7 @@ const ProductCard = ({ product, isPremium, onSelect, compact, theme }) => {
     };
 
     loadPrices();
-  }, [product.id, product.carrier, product.isPremium, product.isBudget]);
+  }, [product.id, product.carrier, product.isPremium, product.isBudget, propPriceData]);
 
   return (
     <Card
@@ -158,8 +161,8 @@ const ProductCard = ({ product, isPremium, onSelect, compact, theme }) => {
 
       <Box sx={{ 
         position: 'relative', 
-        pt: compact ? '65%' : '70%',  // 이미지 영역 비율 추가 증가
-        minHeight: compact ? 220 : 240,  // 최소 높이 추가 증가
+        pt: compact ? '60%' : '70%',  // 컴팩트 모드에서 이미지 영역 비율 감소
+        minHeight: compact ? 200 : 240,  // 컴팩트 모드에서 최소 높이 감소
         background: `linear-gradient(135deg, ${cardTheme.primary}10 0%, ${cardTheme.secondary}10 100%)`,
         borderRadius: '16px 16px 0 0', 
         overflow: 'hidden',
@@ -187,7 +190,7 @@ const ProductCard = ({ product, isPremium, onSelect, compact, theme }) => {
         />
       </Box>
 
-      <CardContent sx={{ flex: '1 1 auto', p: compact ? 1.5 : 2, minHeight: 0, overflow: 'visible' }}>
+      <CardContent sx={{ flex: '1 1 auto', p: compact ? 1.2 : 2, minHeight: 0, overflow: 'visible' }}>
         <Stack direction="row" spacing={1} mb={1}>
           <Chip
             label={product.carrier}
@@ -206,14 +209,14 @@ const ProductCard = ({ product, isPremium, onSelect, compact, theme }) => {
 
         <Stack spacing={1.5} sx={{ 
           background: `linear-gradient(135deg, ${cardTheme.primary}08 0%, ${cardTheme.secondary}08 100%)`,
-          p: compact ? 1.5 : 2, 
+          p: compact ? 1.2 : 2, 
           borderRadius: 2,
           border: `1px solid ${cardTheme.primary}20`
         }}>
           {/* 출고가 */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', pb: 1, borderBottom: `1px solid ${cardTheme.primary}15` }}>
-            <Typography variant="body2" color="text.secondary" fontWeight="medium">출고가</Typography>
-            <Typography variant="body2" sx={{ textDecoration: 'line-through', color: 'text.secondary' }}>
+            <Typography variant="body1" color="text.secondary" fontWeight="medium">출고가</Typography>
+            <Typography variant="body1" sx={{ textDecoration: 'line-through', color: 'text.secondary', fontWeight: 'bold' }}>
               {product.factoryPrice?.toLocaleString()}원
             </Typography>
           </Box>
@@ -245,12 +248,12 @@ const ProductCard = ({ product, isPremium, onSelect, compact, theme }) => {
               이통사지원금
             </Typography>
             {['010신규', 'MNP', '기변'].map((type) => (
-              <Box key={type} sx={{ textAlign: 'center' }}>
-                {priceData[type].loading ? (
+              <Box key={type} sx={{ textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {finalPriceData[type].loading ? (
                   <CircularProgress size={12} />
                 ) : (
                   <Typography variant="caption" sx={{ fontSize: compact ? '0.7rem' : '0.75rem' }}>
-                    {priceData[type].publicSupport?.toLocaleString()}원
+                    {finalPriceData[type].publicSupport?.toLocaleString()}원
                   </Typography>
                 )}
               </Box>
@@ -261,12 +264,12 @@ const ProductCard = ({ product, isPremium, onSelect, compact, theme }) => {
               대리점지원금
             </Typography>
             {['010신규', 'MNP', '기변'].map((type) => (
-              <Box key={type} sx={{ textAlign: 'center' }}>
-                {priceData[type].loading ? (
+              <Box key={type} sx={{ textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {finalPriceData[type].loading ? (
                   <CircularProgress size={12} />
                 ) : (
                   <Typography variant="caption" sx={{ fontSize: compact ? '0.7rem' : '0.75rem' }}>
-                    {priceData[type].storeSupport?.toLocaleString()}원
+                    {finalPriceData[type].storeSupport?.toLocaleString()}원
                   </Typography>
                 )}
               </Box>
@@ -277,12 +280,12 @@ const ProductCard = ({ product, isPremium, onSelect, compact, theme }) => {
               최종구매가
             </Typography>
             {['010신규', 'MNP', '기변'].map((type) => (
-              <Box key={type} sx={{ textAlign: 'center' }}>
-                {priceData[type].loading ? (
+              <Box key={type} sx={{ textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {finalPriceData[type].loading ? (
                   <CircularProgress size={12} />
                 ) : (
-                  <Typography variant="caption" fontWeight="bold" sx={{ fontSize: compact ? '0.75rem' : '0.8rem', color: cardTheme.primary }}>
-                    {priceData[type].purchasePrice?.toLocaleString()}원
+                  <Typography variant="caption" fontWeight="bold" sx={{ fontSize: compact ? '0.9rem' : '1rem', color: cardTheme.primary }}>
+                    {finalPriceData[type].purchasePrice?.toLocaleString()}원
                   </Typography>
                 )}
               </Box>
@@ -348,6 +351,9 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
   const [manualSlideIndex, setManualSlideIndex] = useState(0);
   const [isManualTransitionPage, setIsManualTransitionPage] = useState(false);
   const [manualTransitionPageData, setManualTransitionPageData] = useState(null);
+  
+  // 가격 캐시
+  const [priceCache, setPriceCache] = useState({});
 
   const fetchData = useCallback(async () => {
     try {
@@ -418,6 +424,54 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
       
       // 체크된 상품 수가 많은 순서로 정렬
       allCheckedProducts.sort((a, b) => b.count - a.count);
+      
+      // 모든 상품 수집 (가격 미리 로드용)
+      const allProducts = [];
+      for (const carrierData of allCheckedProducts) {
+        allProducts.push(...carrierData.products);
+      }
+      
+      // 모든 상품의 가격을 병렬로 미리 로드하여 캐시에 저장
+      const pricePromises = [];
+      const newCache = { ...priceCache };
+      
+      for (const product of allProducts) {
+        const planGroup = product.isBudget && !product.isPremium ? '33군' : '115군';
+        for (const openingType of ['010신규', 'MNP', '기변']) {
+          const cacheKey = `${product.id}-${planGroup}-${openingType}-${product.carrier}`;
+          
+          // 캐시에 없으면 API 호출
+          if (!newCache[cacheKey]) {
+            pricePromises.push(
+              directStoreApi.calculateMobilePrice(
+                product.id,
+                planGroup,
+                openingType,
+                product.carrier
+              ).then(result => {
+                if (result.success) {
+                  newCache[cacheKey] = {
+                    publicSupport: result.publicSupport || 0,
+                    storeSupport: result.storeSupportWithAddon || 0,
+                    purchasePrice: result.purchasePriceWithAddon || 0,
+                    loading: false
+                  };
+                }
+                return { cacheKey, result };
+              }).catch(err => {
+                console.error(`가격 계산 실패 (${cacheKey}):`, err);
+                return { cacheKey, result: { success: false } };
+              })
+            );
+          }
+        }
+      }
+      
+      // 모든 가격 로드 완료 대기
+      if (pricePromises.length > 0) {
+        await Promise.all(pricePromises);
+        setPriceCache(newCache);
+      }
       
       // 슬라이드쇼 데이터 구조 생성 (3개씩 그룹화 - 그리드가 3열이므로)
       const slideshowItems = [];
@@ -728,6 +782,35 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
   }, [allProducts, isSlideshowActive, isSlideshowDataLoading, slideshowData.length, currentCarrier]);
   
   // 통신사별 테마 색상 정의
+  // 캐시에서 가격 데이터 가져오기
+  const getPriceDataFromCache = useCallback((product) => {
+    if (!product.id || !product.carrier) return null;
+    
+    const planGroup = product.isBudget && !product.isPremium ? '33군' : '115군';
+    const priceData = {
+      '010신규': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: true },
+      'MNP': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: true },
+      '기변': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: true }
+    };
+    
+    let hasCachedData = false;
+    for (const openingType of ['010신규', 'MNP', '기변']) {
+      const cacheKey = `${product.id}-${planGroup}-${openingType}-${product.carrier}`;
+      const cached = priceCache[cacheKey];
+      if (cached) {
+        priceData[openingType] = {
+          publicSupport: cached.publicSupport || 0,
+          storeSupport: cached.storeSupport || 0,
+          purchasePrice: cached.purchasePrice || 0,
+          loading: false
+        };
+        hasCachedData = true;
+      }
+    }
+    
+    return hasCachedData ? priceData : null;
+  }, [priceCache]);
+
   const getCarrierTheme = (carrier) => {
     switch (carrier) {
       case 'SK':
@@ -1058,6 +1141,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                       onSelect={onProductSelect}
                       compact={compact}
                       theme={getCarrierTheme(slideshowData[currentSlideIndex].carrier)}
+                      priceData={getPriceDataFromCache(product)}
                     />
                   ))}
                 </Box>
@@ -1245,6 +1329,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                           onSelect={onProductSelect}
                           compact={compact}
                           theme={getCarrierTheme(slideshowData[manualSlideIndex].carrier)}
+                          priceData={getPriceDataFromCache(product)}
                         />
                       ))}
                     </Box>
@@ -1291,6 +1376,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                       onSelect={onProductSelect}
                       compact={compact}
                       theme={getCarrierTheme(product.carrier)}
+                      priceData={getPriceDataFromCache(product)}
                     />
                   );
                 })}

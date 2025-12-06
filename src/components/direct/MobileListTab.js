@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Tabs,
@@ -46,6 +46,8 @@ const MobileListTab = ({ onProductSelect }) => {
   const [selectedPlanGroups, setSelectedPlanGroups] = useState({}); // { modelId: planGroup }
   const [selectedOpeningTypes, setSelectedOpeningTypes] = useState({}); // { modelId: openingType } - 010신규, MNP, 기변
   const [calculatedPrices, setCalculatedPrices] = useState({}); // { modelId: { storeSupportWithAddon, storeSupportWithoutAddon, purchasePriceWithAddon, purchasePriceWithoutAddon } }
+  const [priceCache, setPriceCache] = useState({}); // { cacheKey: { storeSupportWithAddon, storeSupportWithoutAddon, purchasePriceWithAddon, purchasePriceWithoutAddon } }
+  const pendingRequestsRef = useRef(new Map()); // { cacheKey: Promise } - 중복 요청 방지
   
   // 개통 유형 목록 (고정)
   const openingTypes = ['010신규', 'MNP', '기변'];
@@ -91,7 +93,9 @@ const MobileListTab = ({ onProductSelect }) => {
       const carrier = getCurrentCarrier();
       const newPlanGroups = { ...selectedPlanGroups };
       const newOpeningTypes = { ...selectedOpeningTypes };
+      const pricePromises = [];
 
+      // 모든 모델에 대해 기본값 설정 및 가격 계산 준비
       for (const model of mobileList) {
         // 이미 값이 설정되어 있으면 스킵
         if (newPlanGroups[model.id] && newOpeningTypes[model.id]) {
@@ -122,13 +126,19 @@ const MobileListTab = ({ onProductSelect }) => {
           newPlanGroups[model.id] = defaultPlanGroup;
           newOpeningTypes[model.id] = defaultOpeningType;
 
-          // 자동으로 가격 계산
-          await calculatePrice(model.id, defaultPlanGroup, defaultOpeningType);
+          // 가격 계산을 Promise 배열에 추가 (병렬 처리)
+          pricePromises.push(calculatePrice(model.id, defaultPlanGroup, defaultOpeningType, true));
         }
       }
 
+      // 상태 먼저 업데이트 (UI에 즉시 반영)
       setSelectedPlanGroups(newPlanGroups);
       setSelectedOpeningTypes(newOpeningTypes);
+
+      // 모든 가격 계산을 병렬로 실행
+      if (pricePromises.length > 0) {
+        await Promise.all(pricePromises);
+      }
     };
 
     setDefaultValues();
@@ -374,29 +384,88 @@ const MobileListTab = ({ onProductSelect }) => {
     return tags.length > 0 ? tags.join(', ') : '선택';
   };
 
-  // 가격 계산 함수 (요금제군과 유형 모두 필요)
-  const calculatePrice = async (modelId, planGroup, openingType) => {
+  // 가격 계산 함수 (요금제군과 유형 모두 필요) - 캐시 사용 및 병렬 처리 지원
+  const calculatePrice = async (modelId, planGroup, openingType, useCache = true) => {
     if (!planGroup || !openingType) {
       return;
     }
 
-    try {
-      const carrier = getCurrentCarrier();
-      const result = await directStoreApi.calculateMobilePrice(modelId, planGroup, openingType, carrier);
-      if (result.success) {
-        setCalculatedPrices(prev => ({
-          ...prev,
-          [modelId]: {
-            storeSupportWithAddon: result.storeSupportWithAddon,
-            storeSupportWithoutAddon: result.storeSupportWithoutAddon,
-            purchasePriceWithAddon: result.purchasePriceWithAddon,
-            purchasePriceWithoutAddon: result.purchasePriceWithoutAddon
-          }
-        }));
-      }
-    } catch (err) {
-      console.error('가격 계산 실패:', err);
+    const carrier = getCurrentCarrier();
+    const cacheKey = `${modelId}-${planGroup}-${openingType}-${carrier}`;
+    
+    // 캐시 확인
+    if (useCache && priceCache[cacheKey]) {
+      const cached = priceCache[cacheKey];
+      setCalculatedPrices(prev => ({
+        ...prev,
+        [modelId]: {
+          storeSupportWithAddon: cached.storeSupportWithAddon,
+          storeSupportWithoutAddon: cached.storeSupportWithoutAddon,
+          purchasePriceWithAddon: cached.purchasePriceWithAddon,
+          purchasePriceWithoutAddon: cached.purchasePriceWithoutAddon
+        }
+      }));
+      return;
     }
+
+    // 중복 요청 방지
+    if (pendingRequestsRef.current.has(cacheKey)) {
+      try {
+        const result = await pendingRequestsRef.current.get(cacheKey);
+        if (result.success) {
+          setCalculatedPrices(prev => ({
+            ...prev,
+            [modelId]: {
+              storeSupportWithAddon: result.storeSupportWithAddon,
+              storeSupportWithoutAddon: result.storeSupportWithoutAddon,
+              purchasePriceWithAddon: result.purchasePriceWithAddon,
+              purchasePriceWithoutAddon: result.purchasePriceWithoutAddon
+            }
+          }));
+        }
+      } catch (err) {
+        console.error('가격 계산 실패 (대기 중 요청):', err);
+      }
+      return;
+    }
+
+    // API 호출
+    const pricePromise = directStoreApi.calculateMobilePrice(modelId, planGroup, openingType, carrier)
+      .then(result => {
+        if (result.success) {
+          // 캐시에 저장
+          setPriceCache(prev => ({
+            ...prev,
+            [cacheKey]: {
+              storeSupportWithAddon: result.storeSupportWithAddon,
+              storeSupportWithoutAddon: result.storeSupportWithoutAddon,
+              purchasePriceWithAddon: result.purchasePriceWithAddon,
+              purchasePriceWithoutAddon: result.purchasePriceWithoutAddon
+            }
+          }));
+          
+          // 상태 업데이트
+          setCalculatedPrices(prev => ({
+            ...prev,
+            [modelId]: {
+              storeSupportWithAddon: result.storeSupportWithAddon,
+              storeSupportWithoutAddon: result.storeSupportWithoutAddon,
+              purchasePriceWithAddon: result.purchasePriceWithAddon,
+              purchasePriceWithoutAddon: result.purchasePriceWithoutAddon
+            }
+          }));
+        }
+        pendingRequestsRef.current.delete(cacheKey);
+        return result;
+      })
+      .catch(err => {
+        console.error('가격 계산 실패:', err);
+        pendingRequestsRef.current.delete(cacheKey);
+        throw err;
+      });
+
+    pendingRequestsRef.current.set(cacheKey, pricePromise);
+    return pricePromise;
   };
 
   // 요금제군 선택 핸들러
