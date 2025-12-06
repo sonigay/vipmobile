@@ -3788,12 +3788,27 @@ app.get('/api/direct/mobiles', async (req, res) => {
     const imageMap = new Map();
     
     // 헤더 제외하고 이미지 매핑 생성
-    // 모델ID(B열, 인덱스 1)와 이미지URL(F열, 인덱스 5) 매핑
+    // 통신사(A열, 인덱스 0), 모델ID(B열, 인덱스 1), 모델명(C열, 인덱스 2), 이미지URL(F열, 인덱스 5) 매핑
+    // 모델ID = 모델명 (실제 모델 코드)로 통일되어 있음
     imageValues.slice(1).forEach(row => {
-      const modelId = (row[1] || '').trim();
+      const rowCarrier = (row[0] || '').trim();
+      const modelId = (row[1] || '').trim(); // 모델ID (실제 모델 코드)
+      const modelName = (row[2] || '').trim(); // 모델명 (모델ID와 동일)
       const imageUrl = (row[5] || '').trim();
-      if (modelId && imageUrl) {
-        imageMap.set(modelId, imageUrl); // 모델ID -> 이미지URL
+      
+      // 현재 조회 중인 통신사와 일치하는 경우만 매핑
+      if (imageUrl && (!rowCarrier || rowCarrier === carrier)) {
+        // 모델ID와 모델명 중 하나라도 있으면 사용 (둘 다 실제 모델 코드와 동일)
+        const actualModelCode = modelId || modelName;
+        
+        if (actualModelCode) {
+          // 통신사+모델코드 조합으로 키 생성 (가장 정확한 매칭)
+          const key = `${carrier}:${actualModelCode}`;
+          imageMap.set(key, imageUrl);
+          
+          // 모델코드만으로도 조회 가능하도록 (하위 호환 및 편의성)
+          imageMap.set(actualModelCode, imageUrl);
+        }
       }
     });
 
@@ -3812,7 +3827,18 @@ app.get('/api/direct/mobiles', async (req, res) => {
         support: parseInt(row[3] || 0),
         storeSupport: parseInt(row[4] || 0),
         storeSupportNoAddon: parseInt(row[5] || 0),
-        image: imageMap.get(modelId) || '',
+        image: (() => {
+          // 통신사+모델명 조합으로 먼저 조회 (가장 정확)
+          const key = `${carrier}:${row[0] || modelId}`;
+          let imgUrl = imageMap.get(key);
+          
+          // 없으면 모델명만으로 조회 (하위 호환)
+          if (!imgUrl) {
+            imgUrl = imageMap.get(row[0] || modelId);
+          }
+          
+          return imgUrl || '';
+        })(),
         isRecommended: row[6] === 'Y' || row[6] === 'TRUE',
         isPopular: row[7] === 'Y' || row[7] === 'TRUE'
       };
@@ -4247,12 +4273,16 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
     }
 
     const file = req.file;
-    const modelId = req.body.modelId || 'unknown';
+    const clientModelId = req.body.modelId || 'unknown'; // 클라이언트에서 전송한 ID (mobile-SK-0 형식)
     const carrier = req.body.carrier || 'SK'; // 통신사 정보 (클라이언트에서 전송)
-    const modelName = req.body.modelName || modelId; // 모델명 (제조사 추출용)
+    const modelName = req.body.modelName || clientModelId; // 모델명 (실제 모델 코드, 예: SM-S918N)
     const petName = req.body.petName || modelName; // 펫네임 (클라이언트에서 전송)
     
-    console.log(`📤 [이미지 업로드] 모델 ID: ${modelId}, 통신사: ${carrier}, 모델명: ${modelName}, 펫네임: ${petName}, 파일명: ${file.originalname}, 크기: ${file.size} bytes`);
+    // 모델ID = 모델명으로 통일 (안정적인 식별자)
+    // 모델명이 실제 모델 코드이므로 이를 모델ID로 사용
+    const modelId = modelName; // 모델ID는 실제 모델 코드와 동일하게 설정
+    
+    console.log(`📤 [이미지 업로드] 클라이언트 ID: ${clientModelId}, 모델ID(모델명): ${modelId}, 통신사: ${carrier}, 펫네임: ${petName}, 파일명: ${file.originalname}, 크기: ${file.size} bytes`);
 
     // 제조사 추출
     const manufacturer = extractManufacturer(modelName);
@@ -4395,14 +4425,23 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
 
       const imageValues = imageResponse.data.values || [];
       const rows = imageValues.slice(1); // 헤더 제외
-      // 모델ID(B열, 인덱스 1)로 기존 행 찾기
-      const existingRowIndex = rows.findIndex(row => (row[1] || '').trim() === modelId);
+      
+      // 기존 행 찾기: 통신사 + 모델ID(모델명) 조합으로 찾기
+      // 모델ID = 모델명으로 통일되어 있으므로, 통신사와 모델ID 조합으로 찾음
+      const existingRowIndex = rows.findIndex(row => {
+        const rowCarrier = (row[0] || '').trim();
+        const rowModelId = (row[1] || '').trim(); // 모델ID (실제 모델 코드)
+        const rowModelName = (row[2] || '').trim(); // 모델명 (동일)
+        // 모델ID 또는 모델명으로 매칭 (둘 다 실제 모델 코드와 동일)
+        return rowCarrier === carrier && (rowModelId === modelId || rowModelName === modelName);
+      });
 
       // 7개 컬럼 데이터 구성: 통신사 | 모델ID | 모델명 | 펫네임 | 제조사 | 이미지URL | 비고
+      // 모델ID는 참고용으로 저장하되, 실제 조회는 통신사+모델명 조합으로 함
       const newRow = [
         carrier,           // A: 통신사
-        modelId,           // B: 모델ID
-        modelName,         // C: 모델명
+        modelId,           // B: 모델ID (참고용, 동적으로 변할 수 있음)
+        modelName,         // C: 모델명 (실제 조회 키)
         petName,           // D: 펫네임
         manufacturer,      // E: 제조사
         imageUrl,          // F: 이미지URL

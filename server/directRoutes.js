@@ -1012,13 +1012,29 @@ function setupDirectRoutes(app) {
       const imageRows = (imageRes.data.values || []).slice(1);
       const imageMap = new Map();
       imageRows.forEach(row => {
-        // 모델ID(B열, 인덱스 1)와 이미지URL(F열, 인덱스 5) 매핑
-        const modelId = (row[1] || '').trim();
+        // 통신사(A열, 인덱스 0), 모델ID(B열, 인덱스 1), 모델명(C열, 인덱스 2), 이미지URL(F열, 인덱스 5) 매핑
+        const rowCarrier = (row[0] || '').trim();
+        const modelId = (row[1] || '').trim(); // 모델ID (실제 모델 코드)
+        const modelName = (row[2] || '').trim(); // 모델명 (모델ID와 동일)
         const imageUrl = (row[5] || '').trim();
-        if (modelId && imageUrl) {
-          imageMap.set(modelId, imageUrl);
+        
+        // 현재 조회 중인 통신사와 일치하는 경우만 매핑
+        if (imageUrl && (!rowCarrier || rowCarrier === carrierParam)) {
+          // 모델ID와 모델명 중 하나라도 있으면 사용 (둘 다 실제 모델 코드와 동일)
+          const actualModelCode = modelId || modelName;
+          
+          if (actualModelCode) {
+            // 통신사+모델코드 조합으로 키 생성 (가장 정확한 매칭)
+            const key = `${carrierParam}:${actualModelCode}`;
+            imageMap.set(key, imageUrl);
+            
+            // 모델코드만으로도 조회 가능하도록 (하위 호환 및 편의성)
+            imageMap.set(actualModelCode, imageUrl);
+          }
         }
       });
+      
+      console.log(`[Direct] 이미지 맵 크기: ${imageMap.size}, 통신사: ${carrierParam}`);
 
       // 8. 직영점_오늘의휴대폰 시트에서 구분(인기/추천/저렴/프리미엄/중저가) 태그 읽기
       let tagMap = new Map(); // { model: { isPopular, isRecommended, isCheap, isPremium, isBudget } }
@@ -1146,7 +1162,21 @@ function setupDirectRoutes(app) {
           storeSupportNoAddon: storeSupportWithoutAddon,
           purchasePriceWithAddon: purchasePriceWithAddon,
           purchasePriceWithoutAddon: purchasePriceWithoutAddon,
-          image: imageMap.get(model) || '',
+          image: (() => {
+            // 통신사+모델명 조합으로 먼저 조회 (가장 정확)
+            const key = `${carrierParam}:${model}`;
+            let imgUrl = imageMap.get(key);
+            
+            // 없으면 모델명만으로 조회 (하위 호환)
+            if (!imgUrl) {
+              imgUrl = imageMap.get(model);
+            }
+            
+            if (!imgUrl && imageMap.size > 0) {
+              console.log(`[Direct] 이미지를 찾을 수 없음: 통신사=${carrierParam}, 모델명=${model}, 맵 키들:`, Array.from(imageMap.keys()).slice(0, 10));
+            }
+            return imgUrl || '';
+          })(),
           tags: tagsArray,
           requiredAddons: (requiredAddons.length > 0 ? requiredAddons.join(', ') : '') + (insuranceName ? (requiredAddons.length > 0 ? ', ' : '') + insuranceName : '') || '없음',
           insuranceName: insuranceName,
