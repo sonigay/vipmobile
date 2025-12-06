@@ -1035,6 +1035,13 @@ function setupDirectRoutes(app) {
       });
       
       console.log(`[Direct] 이미지 맵 크기: ${imageMap.size}, 통신사: ${carrierParam}`);
+      // 디버깅: 이미지 맵의 키들 출력 (처음 20개)
+      if (imageMap.size > 0) {
+        const mapKeys = Array.from(imageMap.keys());
+        console.log(`[Direct] 이미지 맵 키 전체 (${mapKeys.length}개):`, mapKeys);
+      } else {
+        console.warn(`[Direct] 이미지 맵이 비어있습니다. 통신사: ${carrierParam}`);
+      }
 
       // 8. 직영점_오늘의휴대폰 시트에서 구분(인기/추천/저렴/프리미엄/중저가) 태그 읽기
       let tagMap = new Map(); // { model: { isPopular, isRecommended, isCheap, isPremium, isBudget } }
@@ -1172,8 +1179,25 @@ function setupDirectRoutes(app) {
               imgUrl = imageMap.get(model);
             }
             
+            // 디버깅: 이미지를 찾지 못한 경우 상세 로그
             if (!imgUrl && imageMap.size > 0) {
-              console.log(`[Direct] 이미지를 찾을 수 없음: 통신사=${carrierParam}, 모델명=${model}, 맵 키들:`, Array.from(imageMap.keys()).slice(0, 10));
+              const mapKeys = Array.from(imageMap.keys());
+              const matchingKeys = mapKeys.filter(k => {
+                const kLower = k.toLowerCase();
+                const modelLower = model.toLowerCase();
+                return kLower.includes(modelLower) || modelLower.includes(kLower) || kLower === modelLower;
+              });
+              console.log(`[Direct] ⚠️ 이미지를 찾을 수 없음:`, {
+                통신사: carrierParam,
+                모델명: model,
+                조회키: key,
+                맵크기: imageMap.size,
+                맵키전체: mapKeys,
+                유사키: matchingKeys
+              });
+            } else if (imgUrl) {
+              // 성공한 경우는 간단히만 로그 (너무 많으면 로그가 과도해짐)
+              // console.log(`[Direct] ✅ 이미지 찾음: 모델명=${model}, 키=${key}, URL=${imgUrl.substring(0, 50)}...`);
             }
             return imgUrl || '';
           })(),

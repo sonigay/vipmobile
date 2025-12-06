@@ -3828,13 +3828,31 @@ app.get('/api/direct/mobiles', async (req, res) => {
         storeSupport: parseInt(row[4] || 0),
         storeSupportNoAddon: parseInt(row[5] || 0),
         image: (() => {
-          // 통신사+모델명 조합으로 먼저 조회 (가장 정확)
-          const key = `${carrier}:${row[0] || modelId}`;
+          const modelCode = row[0] || modelId;
+          // 통신사+모델코드 조합으로 먼저 조회 (가장 정확)
+          const key = `${carrier}:${modelCode}`;
           let imgUrl = imageMap.get(key);
           
-          // 없으면 모델명만으로 조회 (하위 호환)
+          // 없으면 모델코드만으로 조회 (하위 호환)
           if (!imgUrl) {
-            imgUrl = imageMap.get(row[0] || modelId);
+            imgUrl = imageMap.get(modelCode);
+          }
+          
+          // 디버깅: 이미지를 찾지 못한 경우
+          if (!imgUrl && imageMap.size > 0) {
+            const mapKeys = Array.from(imageMap.keys());
+            const matchingKeys = mapKeys.filter(k => {
+              const kLower = k.toLowerCase();
+              const modelLower = modelCode.toLowerCase();
+              return kLower.includes(modelLower) || modelLower.includes(kLower);
+            });
+            console.log(`[Direct] ⚠️ 오늘의휴대폰 이미지를 찾을 수 없음:`, {
+              통신사: carrier,
+              모델코드: modelCode,
+              조회키: key,
+              맵크기: imageMap.size,
+              유사키: matchingKeys
+            });
           }
           
           return imgUrl || '';
