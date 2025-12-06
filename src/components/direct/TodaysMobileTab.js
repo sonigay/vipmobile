@@ -13,7 +13,15 @@ import {
   CardActions,
   CircularProgress,
   Alert,
-  IconButton
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  RadioGroup,
+  FormControlLabel,
+  Radio,
+  FormControl
 } from '@mui/material';
 import {
   ShoppingCart as ShoppingCartIcon,
@@ -214,7 +222,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [isTransitionPage, setIsTransitionPage] = useState(false);
   const [transitionPageData, setTransitionPageData] = useState(null);
-  const [isSlideshowDataLoading, setIsSlideshowDataLoading] = useState(false);
+  const [isSlideshowDataLoading, setIsSlideshowDataLoading] = useState(true); // 초기값을 true로 설정하여 로딩 상태로 시작
   
   // 일반 모드에서 수동 슬라이드 탐색용 상태
   const [manualSlideIndex, setManualSlideIndex] = useState(0);
@@ -389,6 +397,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
       return slideshowItems;
     } catch (err) {
       console.error('슬라이드쇼 데이터 준비 실패:', err);
+      setSlideshowData([]); // 실패 시에도 빈 배열 설정
       return [];
     }
   }, []);
@@ -410,11 +419,15 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
 
   // 슬라이드쇼 로딩 상태
   const [isSlideshowLoading, setIsSlideshowLoading] = useState(false);
+  
+  // 슬라이드쇼 반복 옵션
+  const [isSlideshowLooping, setIsSlideshowLooping] = useState(false);
+  const [showRepeatDialog, setShowRepeatDialog] = useState(false);
 
   // 슬라이드쇼 시작/중지
   const toggleSlideshow = useCallback(async () => {
     if (!isSlideshowActive) {
-      // 슬라이드쇼 시작
+      // 슬라이드쇼 시작 - 반복 옵션 선택 다이얼로그 표시
       setIsSlideshowLoading(true);
       try {
         const data = await prepareSlideshowData();
@@ -422,16 +435,10 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
           alert('슬라이드쇼할 체크된 상품이 없습니다.');
           return;
         }
-        setIsSlideshowActive(true);
-        setCurrentSlideIndex(0);
-        const firstItem = data[0];
-        setIsTransitionPage(firstItem?.type === 'transition');
-        setTransitionPageData(firstItem?.type === 'transition' ? firstItem : null);
-        if (firstItem?.type === 'productGroup' || firstItem?.type === 'product') {
-          setCurrentCarrier(firstItem.carrier);
-        } else if (firstItem?.type === 'transition') {
-          setCurrentCarrier(firstItem.carrier);
-        }
+        // 반복 옵션 기본값 설정 (한번만)
+        setIsSlideshowLooping(false);
+        // 반복 옵션 선택 다이얼로그 표시
+        setShowRepeatDialog(true);
       } finally {
         setIsSlideshowLoading(false);
       }
@@ -441,8 +448,25 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
       setCurrentSlideIndex(0);
       setIsTransitionPage(false);
       setTransitionPageData(null);
+      setIsSlideshowLooping(false);
     }
   }, [isSlideshowActive, prepareSlideshowData]);
+
+  // 슬라이드쇼 실제 시작 (반복 옵션 선택 후)
+  const startSlideshow = useCallback((loop = false) => {
+    setIsSlideshowLooping(loop);
+    setIsSlideshowActive(true);
+    setCurrentSlideIndex(0);
+    const firstItem = slideshowData[0];
+    setIsTransitionPage(firstItem?.type === 'transition');
+    setTransitionPageData(firstItem?.type === 'transition' ? firstItem : null);
+    if (firstItem?.type === 'productGroup' || firstItem?.type === 'product') {
+      setCurrentCarrier(firstItem.carrier);
+    } else if (firstItem?.type === 'transition') {
+      setCurrentCarrier(firstItem.carrier);
+    }
+    setShowRepeatDialog(false);
+  }, [slideshowData]);
 
   // 슬라이드쇼 자동 진행
   useEffect(() => {
@@ -456,12 +480,27 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
         const nextIndex = prev + 1;
         
         if (nextIndex >= slideshowData.length) {
-          // 마지막 슬라이드 후 처음으로 돌아가기
-          setIsSlideshowActive(false);
-          setCurrentSlideIndex(0);
-          setIsTransitionPage(false);
-          setTransitionPageData(null);
-          return 0;
+          // 마지막 슬라이드 후 처리
+          if (isSlideshowLooping) {
+            // 무한 반복: 첫 슬라이드로 자연스럽게 돌아가기
+            const firstItem = slideshowData[0];
+            setIsTransitionPage(firstItem?.type === 'transition');
+            setTransitionPageData(firstItem?.type === 'transition' ? firstItem : null);
+            if (firstItem?.type === 'productGroup' || firstItem?.type === 'product') {
+              setCurrentCarrier(firstItem.carrier);
+            } else if (firstItem?.type === 'transition') {
+              setCurrentCarrier(firstItem.carrier);
+            }
+            return 0; // 첫 슬라이드로 돌아가기
+          } else {
+            // 한번만: 슬라이드쇼 중지
+            setIsSlideshowActive(false);
+            setCurrentSlideIndex(0);
+            setIsTransitionPage(false);
+            setTransitionPageData(null);
+            setIsSlideshowLooping(false);
+            return 0;
+          }
         }
         
         const nextItem = slideshowData[nextIndex];
@@ -479,7 +518,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
     }, displayDuration);
     
     return () => clearTimeout(timeout);
-  }, [isSlideshowActive, slideshowData, currentSlideIndex]);
+  }, [isSlideshowActive, slideshowData, currentSlideIndex, isSlideshowLooping]);
 
   // 이미지 업로드 이벤트 리스너: 이미지 업로드 성공 시 데이터 재로딩
   useEffect(() => {
@@ -557,16 +596,16 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
     }
   }, [slideshowData, isSlideshowActive]);
   
-  // 현재 표시 중인 통신사 감지 (테마용)
+  // 현재 표시 중인 통신사 감지 (테마용) - 슬라이드쇼 데이터가 준비된 후에만 실행
   useEffect(() => {
-    if (allProducts.length > 0 && !isSlideshowActive) {
-      // 첫 번째 상품의 통신사를 기본값으로 사용 (슬라이드쇼가 아닐 때만)
+    if (allProducts.length > 0 && !isSlideshowActive && !isSlideshowDataLoading && slideshowData.length === 0) {
+      // 첫 번째 상품의 통신사를 기본값으로 사용 (슬라이드쇼가 아닐 때만, 기본 그리드 표시 시)
       const firstCarrier = allProducts[0]?.carrier;
       if (firstCarrier && firstCarrier !== currentCarrier) {
         setCurrentCarrier(firstCarrier);
       }
     }
-  }, [allProducts, isSlideshowActive, currentCarrier]);
+  }, [allProducts, isSlideshowActive, isSlideshowDataLoading, slideshowData.length, currentCarrier]);
   
   // 통신사별 테마 색상 정의
   const getCarrierTheme = (carrier) => {
@@ -1093,7 +1132,8 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                 )}
               </>
             ) : (
-              // 슬라이드쇼 데이터가 없으면 기본 그리드 표시
+              // 슬라이드쇼 데이터가 없으면 기본 그리드 표시 (슬라이드쇼 데이터 로딩이 완료된 후에만 표시)
+              !isSlideshowDataLoading ? (
               <Box
                 sx={{
                   display: 'grid',
@@ -1142,6 +1182,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                   </Box>
                 )}
               </Box>
+              ) : null
             )}
           </Box>
         )}
@@ -1169,6 +1210,55 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
           }
         }
       `}</style>
+      
+      {/* 슬라이드쇼 반복 옵션 선택 다이얼로그 */}
+      <Dialog
+        open={showRepeatDialog}
+        onClose={() => {
+          setShowRepeatDialog(false);
+          setIsSlideshowLooping(false); // 다이얼로그 닫을 때 기본값으로 초기화
+        }}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>슬라이드쇼 반복 옵션 선택</DialogTitle>
+        <DialogContent>
+          <FormControl component="fieldset" sx={{ mt: 2, width: '100%' }}>
+            <RadioGroup
+              value={isSlideshowLooping ? 'loop' : 'once'}
+              onChange={(e) => setIsSlideshowLooping(e.target.value === 'loop')}
+            >
+              <FormControlLabel
+                value="once"
+                control={<Radio />}
+                label="한번만 (마지막 슬라이드 후 중지)"
+              />
+              <FormControlLabel
+                value="loop"
+                control={<Radio />}
+                label="계속 반복 (무한 반복)"
+              />
+            </RadioGroup>
+          </FormControl>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => {
+              setShowRepeatDialog(false);
+              setIsSlideshowLooping(false); // 취소 시 기본값으로 초기화
+            }}
+          >
+            취소
+          </Button>
+          <Button
+            onClick={() => startSlideshow(isSlideshowLooping)}
+            variant="contained"
+            color="primary"
+          >
+            시작
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
