@@ -56,6 +56,9 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
     const [selectedPlanGroup, setSelectedPlanGroup] = useState('');
     const [planBasicFee, setPlanBasicFee] = useState(0);
     const [requiredAddons, setRequiredAddons] = useState([]); // 필수 부가서비스 목록
+    const [addonIncentiveList, setAddonIncentiveList] = useState([]); // 부가유치 시 유치되는 부가서비스 목록
+    const [insuranceIncentiveList, setInsuranceIncentiveList] = useState([]); // 부가유치 시 유치되는 보험상품 목록
+    const [agreementChecked, setAgreementChecked] = useState(false); // 동의 체크박스 상태
 
     // 단말/지원금 기본값 정리 (휴대폰목록/오늘의휴대폰에서 전달된 데이터 사용)
     const factoryPrice = initialData?.factoryPrice || 0;
@@ -63,11 +66,20 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
     const [storeSupportWithAddon, setStoreSupportWithAddon] = useState(initialData?.storeSupport || 0); // 부가유치시 대리점추가지원금
     const [storeSupportWithoutAddon, setStoreSupportWithoutAddon] = useState(initialData?.storeSupportNoAddon || 0); // 부가미유치시 대리점추가지원금
 
+    // openingType 변환 함수 (010신규/MNP/기변 -> NEW/MNP/CHANGE)
+    const convertOpeningType = (type) => {
+        if (!type) return 'NEW';
+        if (type === '010신규' || type === 'NEW') return 'NEW';
+        if (type === 'MNP') return 'MNP';
+        if (type === '기변' || type === 'CHANGE') return 'CHANGE';
+        return 'NEW';
+    };
+
     const [formData, setFormData] = useState({
         customerName: initialData?.customerName || '',
         customerContact: initialData?.customerContact || '',
         customerBirth: '',
-        openingType: initialData?.openingType || 'NEW', // NEW, MNP, CHANGE
+        openingType: convertOpeningType(initialData?.openingType) || 'NEW', // NEW, MNP, CHANGE
         prevCarrier: '',
         contractType: 'standard', // standard | selected (선택약정)
         installmentPeriod: 24,
@@ -208,9 +220,21 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                 ];
                 setPlanGroups(mockPlans);
                 if (mockPlans.length > 0) {
-                    setSelectedPlanGroup(mockPlans[0].name);
-                    setPlanBasicFee(mockPlans[0].basicFee);
-                    setFormData(prev => ({ ...prev, plan: mockPlans[0].name }));
+                    // initialData에서 planGroup이 전달된 경우 해당 plan을 찾아서 설정
+                    let initialPlan = mockPlans[0];
+                    if (initialData?.planGroup) {
+                        const foundPlan = mockPlans.find(p => 
+                            p.group === initialData.planGroup || 
+                            p.name.includes(initialData.planGroup)
+                        );
+                        if (foundPlan) {
+                            initialPlan = foundPlan;
+                        }
+                    }
+                    
+                    setSelectedPlanGroup(initialPlan.name);
+                    setPlanBasicFee(initialPlan.basicFee);
+                    setFormData(prev => ({ ...prev, plan: initialPlan.name }));
                 }
             }
         };
@@ -223,6 +247,8 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
             try {
                 const policySettings = await directStoreApi.getPolicySettings(selectedCarrier);
                 const required = [];
+                const addonIncentives = [];
+                const insuranceIncentives = [];
                 
                 if (policySettings.success && policySettings.addon?.list) {
                     // 미유치차감금액이 있는 부가서비스를 필수 부가서비스로 간주
@@ -234,6 +260,12 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                             type: 'addon'
                         }));
                     required.push(...addonList);
+                    
+                    // 부가유치 시 유치되는 부가서비스 (incentive가 있는 항목)
+                    const incentiveAddons = policySettings.addon.list
+                        .filter(addon => addon.incentive > 0)
+                        .map(addon => addon.name);
+                    setAddonIncentiveList(incentiveAddons);
                 }
                 
                 // 보험상품: 출고가에 맞는 보험상품 찾기
@@ -250,6 +282,11 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                             monthlyFee: matchingInsurance.fee || 0,
                             type: 'insurance'
                         });
+                        
+                        // 부가유치 시 유치되는 보험상품 (incentive가 있는 경우)
+                        if (matchingInsurance.incentive > 0) {
+                            setInsuranceIncentiveList([matchingInsurance.name]);
+                        }
                     }
                 }
                 
@@ -273,6 +310,71 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
         };
         loadRequiredAddons();
     }, [selectedCarrier, factoryPrice]);
+
+    // initialData에서 planGroup과 openingType이 전달된 경우 대리점지원금 자동 계산
+    useEffect(() => {
+        const calculateInitialPrice = async () => {
+            if (!initialData?.planGroup || !initialData?.openingType || !planGroups.length) {
+                return;
+            }
+
+            // planGroup에 해당하는 plan 찾기
+            const foundPlan = planGroups.find(p => 
+                p.group === initialData.planGroup || 
+                p.name.includes(initialData.planGroup)
+            );
+
+            if (!foundPlan || !(initialData?.id || initialData?.model)) {
+                return;
+            }
+
+            try {
+                const openingTypeMap = {
+                    '010신규': '010신규',
+                    'NEW': '010신규',
+                    'MNP': 'MNP',
+                    '기변': '기변',
+                    'CHANGE': '기변'
+                };
+                const openingType = openingTypeMap[initialData.openingType] || '010신규';
+                
+                // 모델 ID 찾기
+                let modelId = initialData?.id;
+                if (!modelId && initialData?.model) {
+                    try {
+                        const mobileList = await directStoreApi.getMobileList(selectedCarrier);
+                        const foundMobile = mobileList.find(m => 
+                            m.model === initialData.model && 
+                            m.carrier === selectedCarrier
+                        );
+                        if (foundMobile) {
+                            modelId = foundMobile.id;
+                        }
+                    } catch (err) {
+                        console.warn('모델 ID 찾기 실패:', err);
+                    }
+                }
+                
+                if (modelId) {
+                    const result = await directStoreApi.calculateMobilePrice(
+                        modelId,
+                        foundPlan.group,
+                        openingType,
+                        selectedCarrier
+                    );
+                    
+                    if (result.success) {
+                        setStoreSupportWithAddon(result.storeSupportWithAddon || 0);
+                        setStoreSupportWithoutAddon(result.storeSupportWithoutAddon || 0);
+                    }
+                }
+            } catch (err) {
+                console.error('초기 대리점지원금 계산 실패:', err);
+            }
+        };
+
+        calculateInitialPrice();
+    }, [initialData?.planGroup, initialData?.openingType, planGroups, selectedCarrier, initialData?.id, initialData?.model]);
 
     // 계산 로직
     const calculateInstallmentPrincipalWithAddon = () => {
@@ -362,6 +464,12 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
 
     const handleComplete = async () => {
         try {
+            // 동의 체크박스 검증
+            if (!agreementChecked) {
+                alert('동의사항에 체크되지 않았습니다. 해당 내용을 고객님께 정확히 안내하고 동의체크해주세요.');
+                return;
+            }
+
             setIsSaving(true);
 
             // 필수 데이터 검증
@@ -616,6 +724,30 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                         page-break-inside: auto !important;
                         break-inside: auto !important;
                     }
+                    
+                    /* 통신사 정보, 가입유형, 약정유형, 부가서비스 유치 여부, 할부/현금 선택을 한 줄로 배치 */
+                    .print-area .MuiPaper-root:has(.print-inline-group) {
+                        display: flex !important;
+                        flex-wrap: wrap !important;
+                        align-items: center !important;
+                        gap: 8px !important;
+                    }
+                    
+                    .print-area .print-inline-group {
+                        display: inline-block !important;
+                        margin-right: 12px !important;
+                        margin-bottom: 0 !important;
+                    }
+                    
+                    .print-area .print-inline-group .MuiTypography-subtitle2 {
+                        display: inline !important;
+                        margin-right: 4px !important;
+                        margin-bottom: 0 !important;
+                    }
+                    
+                    .print-area .print-inline-group .MuiFormGroup-root {
+                        display: inline-flex !important;
+                    }
                 }
             `}</style>
 
@@ -642,10 +774,36 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                     startIcon={<CheckCircleIcon />}
                     sx={{ bgcolor: theme.primary, '&:hover': { bgcolor: theme.primary } }}
                     onClick={handleComplete}
-                    disabled={isSaving}
+                    disabled={isSaving || !agreementChecked}
                 >
                     {isSaving ? <CircularProgress size={24} color="inherit" /> : '입력완료'}
                 </Button>
+            </Box>
+
+            {/* 안내문구 및 동의 체크박스 */}
+            <Box className="print-area" sx={{ mb: 3, p: 2, bgcolor: 'rgba(0, 0, 0, 0.02)', borderRadius: 2, border: `1px solid ${theme.primary}20` }}>
+                <Stack spacing={1}>
+                    <Typography variant="body2" color="text.secondary">
+                        • 요금제는 183일 유지조건
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                        • 부가서비스는 93일 유지조건
+                    </Typography>
+                    <FormControlLabel
+                        control={
+                            <Checkbox
+                                checked={agreementChecked}
+                                onChange={(e) => setAgreementChecked(e.target.checked)}
+                                sx={{ color: theme.primary }}
+                            />
+                        }
+                        label={
+                            <Typography variant="body2" color="text.primary">
+                                미유지되어 계약을 위반할 시 할부금액을 조정해 청구됨에 동의합니다.
+                            </Typography>
+                        }
+                    />
+                </Stack>
             </Box>
             
             {/* 인쇄용 제목 */}
@@ -687,8 +845,8 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                                     />
                                 </Grid>
                                 <Grid item xs={12}>
-                                    <FormControl component="fieldset">
-                                        <Typography variant="subtitle2" gutterBottom>가입 유형</Typography>
+                                    <FormControl component="fieldset" className="print-inline-group" sx={{ '@media print': { display: 'inline-block', mr: 2, verticalAlign: 'top' } }}>
+                                        <Typography variant="subtitle2" gutterBottom sx={{ '@media print': { display: 'inline', mr: 1, mb: 0 } }}>가입유형</Typography>
                                         <RadioGroup
                                             row
                                             value={formData.openingType}
@@ -767,10 +925,10 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
 
                         {/* 통신사 정보 박스 */}
                         <Paper sx={{ p: 1.5, mb: 1.5, borderTop: `3px solid ${theme.primary}`, bgcolor: theme.bg }}>
-                            <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold', color: theme.primary }}>
-                                통신사 정보
+                            <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold', color: theme.primary, '@media print': { display: 'inline', mr: 2, mb: 0 } }}>
+                                통신사 정보 {selectedCarrier} {selectedCarrier === 'SK' ? 'T' : selectedCarrier === 'KT' ? 'U+' : 'U+'}
                             </Typography>
-                            <Typography variant="body1" sx={{ fontWeight: 'bold', color: theme.primary }}>
+                            <Typography variant="body1" sx={{ fontWeight: 'bold', color: theme.primary, '@media print': { display: 'none' } }}>
                                 {selectedCarrier}
                             </Typography>
                         </Paper>
@@ -780,8 +938,8 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                             <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>약정 및 할부 정보</Typography>
                             <Grid container spacing={1.5}>
                                 <Grid item xs={12}>
-                                    <FormControl component="fieldset">
-                                        <Typography variant="subtitle2" gutterBottom>약정 유형</Typography>
+                                    <FormControl component="fieldset" className="print-inline-group" sx={{ '@media print': { display: 'inline-block', mr: 2, verticalAlign: 'top' } }}>
+                                        <Typography variant="subtitle2" gutterBottom sx={{ '@media print': { display: 'inline', mr: 1, mb: 0 } }}>약정유형</Typography>
                                         <RadioGroup
                                             row
                                             value={formData.contractType}
@@ -911,8 +1069,8 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                                     />
                                 </Grid>
                                 <Grid item xs={12}>
-                                    <FormControl component="fieldset">
-                                        <Typography variant="subtitle2" gutterBottom>부가서비스 유치 여부</Typography>
+                                    <FormControl component="fieldset" className="print-inline-group" sx={{ '@media print': { display: 'inline-block', mr: 2, verticalAlign: 'top' } }}>
+                                        <Typography variant="subtitle2" gutterBottom sx={{ '@media print': { display: 'inline', mr: 1, mb: 0 } }}>부가서비스 유치 여부</Typography>
                                         <RadioGroup
                                             row
                                             value={formData.withAddon ? 'with' : 'without'}
@@ -921,11 +1079,17 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                                             <FormControlLabel value="with" control={<Radio />} label="부가유치" />
                                             <FormControlLabel value="without" control={<Radio />} label="부가미유치" />
                                         </RadioGroup>
+                                        {/* 유치되는 부가서비스/보험상품 항목명 표기 */}
+                                        {formData.withAddon && (addonIncentiveList.length > 0 || insuranceIncentiveList.length > 0) && (
+                                            <Typography variant="caption" color="text.secondary" sx={{ ml: 2, fontSize: '0.75rem', '@media print': { ml: 1, display: 'inline' } }}>
+                                                ({[...addonIncentiveList, ...insuranceIncentiveList].join(', ')})
+                                            </Typography>
+                                        )}
                                     </FormControl>
                                 </Grid>
                                 <Grid item xs={12}>
-                                    <FormControl component="fieldset">
-                                        <Typography variant="subtitle2" gutterBottom>할부/현금 선택</Typography>
+                                    <FormControl component="fieldset" className="print-inline-group" sx={{ '@media print': { display: 'inline-block', mr: 2, verticalAlign: 'top' } }}>
+                                        <Typography variant="subtitle2" gutterBottom sx={{ '@media print': { display: 'inline', mr: 1, mb: 0 } }}>할부/현금 선택</Typography>
                                         <RadioGroup
                                             row
                                             value={formData.paymentType}

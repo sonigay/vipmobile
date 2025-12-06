@@ -1018,7 +1018,7 @@ function setupDirectRoutes(app) {
           name: (row[1] || '').trim(),
           fee: Number(row[2] || 0),
           incentive: Number(row[3] || 0), // 부가유치 추가금액
-          deduction: Number(row[4] || 0)  // 부가미유치 차감금액
+          deduction: -Math.abs(Number(row[4] || 0))  // 부가미유치 차감금액 (음수 처리)
         }));
       
       // 부가서비스 추가금액 합계 (부가유치)
@@ -1027,7 +1027,7 @@ function setupDirectRoutes(app) {
       const totalAddonDeduction = addonList.reduce((sum, addon) => sum + (addon.deduction || 0), 0);
       
       const requiredAddons = addonList
-        .filter(addon => addon.deduction > 0)
+        .filter(addon => addon.deduction < 0)  // 차감금액이 음수인 경우 (미유치 시 차감되는 부가서비스)
         .map(addon => addon.name);
 
       const insuranceRows = (insuranceRes.data.values || []).slice(1);
@@ -1039,8 +1039,8 @@ function setupDirectRoutes(app) {
           minPrice: Number(row[2] || 0),
           maxPrice: Number(row[3] || 0),
           fee: Number(row[4] || 0),
-          incentive: Number(row[5] || 0),
-          deduction: Number(row[6] || 0)
+          incentive: Number(row[5] || 0), // 보험 유치 추가금액
+          deduction: -Math.abs(Number(row[6] || 0))  // 보험 미유치 차감금액 (음수 처리)
         }));
 
       const specialRows = (specialRes.data.values || []).slice(1);
@@ -1052,6 +1052,13 @@ function setupDirectRoutes(app) {
           addition: Number(row[2] || 0), // 추가금액
           deduction: Number(row[3] || 0)  // 차감금액
         }));
+      
+      // 부가서비스 + 보험상품 추가금액 합계 (부가유치)
+      const totalAddonIncentive = addonList.reduce((sum, addon) => sum + (addon.incentive || 0), 0) +
+                                  insuranceList.reduce((sum, insurance) => sum + (insurance.incentive || 0), 0);
+      // 부가서비스 + 보험상품 차감금액 합계 (부가미유치)
+      const totalAddonDeduction = addonList.reduce((sum, addon) => sum + (addon.deduction || 0), 0) +
+                                  insuranceList.reduce((sum, insurance) => sum + (insurance.deduction || 0), 0);
       
       // 별도정책 추가금액 합계
       const totalSpecialAddition = specialPolicies.reduce((sum, policy) => sum + (policy.addition || 0), 0);
@@ -1768,24 +1775,44 @@ function setupDirectRoutes(app) {
       const marginRow = marginRows.find(row => (row[0] || '').trim() === carrier);
       const baseMargin = marginRow ? Number(marginRow[1] || 0) : 50000;
 
-      const addonRes = await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: SHEET_POLICY_ADDON
-      });
+      const [addonRes, insuranceRes, specialRes] = await Promise.all([
+        sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: SHEET_POLICY_ADDON
+        }),
+        sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: SHEET_POLICY_INSURANCE
+        }),
+        sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: SHEET_POLICY_SPECIAL
+        })
+      ]);
+      
       const addonRows = (addonRes.data.values || []).slice(1);
       const addonList = addonRows
         .filter(row => (row[0] || '').trim() === carrier)
         .map(row => ({
           incentive: Number(row[3] || 0),
-          deduction: Number(row[4] || 0)
+          deduction: -Math.abs(Number(row[4] || 0))  // 부가미유치 차감금액 (음수 처리)
         }));
-      const totalAddonIncentive = addonList.reduce((sum, addon) => sum + (addon.incentive || 0), 0);
-      const totalAddonDeduction = addonList.reduce((sum, addon) => sum + (addon.deduction || 0), 0);
+      
+      const insuranceRows = (insuranceRes.data.values || []).slice(1);
+      const insuranceList = insuranceRows
+        .filter(row => (row[0] || '').trim() === carrier)
+        .map(row => ({
+          incentive: Number(row[5] || 0), // 보험 유치 추가금액
+          deduction: -Math.abs(Number(row[6] || 0))  // 보험 미유치 차감금액 (음수 처리)
+        }));
+      
+      // 부가서비스 + 보험상품 추가금액 합계 (부가유치)
+      const totalAddonIncentive = addonList.reduce((sum, addon) => sum + (addon.incentive || 0), 0) +
+                                  insuranceList.reduce((sum, insurance) => sum + (insurance.incentive || 0), 0);
+      // 부가서비스 + 보험상품 차감금액 합계 (부가미유치)
+      const totalAddonDeduction = addonList.reduce((sum, addon) => sum + (addon.deduction || 0), 0) +
+                                  insuranceList.reduce((sum, insurance) => sum + (insurance.deduction || 0), 0);
 
-      const specialRes = await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: SHEET_POLICY_SPECIAL
-      });
       const specialRows = (specialRes.data.values || []).slice(1);
       const specialPolicies = specialRows
         .filter(row => (row[0] || '').trim() === carrier && (row[4] || '').toString().toLowerCase() === 'true')

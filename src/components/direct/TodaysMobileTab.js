@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Box,
   Grid,
@@ -34,6 +34,13 @@ import {
 import { directStoreApi } from '../../api/directStoreApi';
 
 const ProductCard = ({ product, isPremium, onSelect, compact, theme }) => {
+  const [priceData, setPriceData] = useState({
+    '010신규': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: true },
+    'MNP': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: true },
+    '기변': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: true }
+  });
+  const hasLoadedRef = useRef(false);
+
   const getCarrierChipColor = (carrier) => {
     switch (carrier) {
       case 'SK': return 'info'; // 하늘색 계열
@@ -57,6 +64,53 @@ const ProductCard = ({ product, isPremium, onSelect, compact, theme }) => {
   if (product.isPopular) tagChips.push({ label: '인기', color: 'warning' });
   if (product.isRecommended) tagChips.push({ label: '추천', color: 'success' });
   if (product.isCheap) tagChips.push({ label: '저렴', color: 'info' });
+
+  // 각 유형별 가격 정보 로드
+  useEffect(() => {
+    if (hasLoadedRef.current || !product.id || !product.carrier) return;
+    
+    const loadPrices = async () => {
+      hasLoadedRef.current = true;
+      
+      // 기본 요금제군 결정 (프리미엄/중저가에 따라)
+      let defaultPlanGroup = '115군';
+      if (product.isBudget && !product.isPremium) {
+        defaultPlanGroup = '33군';
+      }
+
+      const openingTypes = ['010신규', 'MNP', '기변'];
+      const newPriceData = { ...priceData };
+
+      for (const openingType of openingTypes) {
+        try {
+          const result = await directStoreApi.calculateMobilePrice(
+            product.id,
+            defaultPlanGroup,
+            openingType,
+            product.carrier
+          );
+
+          if (result.success) {
+            newPriceData[openingType] = {
+              publicSupport: result.publicSupport || 0,
+              storeSupport: result.storeSupportWithAddon || 0,
+              purchasePrice: result.purchasePriceWithAddon || 0,
+              loading: false
+            };
+          } else {
+            newPriceData[openingType].loading = false;
+          }
+        } catch (err) {
+          console.error(`가격 계산 실패 (${openingType}):`, err);
+          newPriceData[openingType].loading = false;
+        }
+      }
+
+      setPriceData(newPriceData);
+    };
+
+    loadPrices();
+  }, [product.id, product.carrier, product.isPremium, product.isBudget]);
 
   return (
     <Card
@@ -150,29 +204,95 @@ const ProductCard = ({ product, isPremium, onSelect, compact, theme }) => {
           {product.petName}
         </Typography>
 
-        <Stack spacing={1} sx={{ 
+        <Stack spacing={1.5} sx={{ 
           background: `linear-gradient(135deg, ${cardTheme.primary}08 0%, ${cardTheme.secondary}08 100%)`,
-          p: compact ? 1 : 1.5, 
+          p: compact ? 1.5 : 2, 
           borderRadius: 2,
           border: `1px solid ${cardTheme.primary}20`
         }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-            <Typography variant="body2" color="text.secondary">출고가</Typography>
+          {/* 출고가 */}
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', pb: 1, borderBottom: `1px solid ${cardTheme.primary}15` }}>
+            <Typography variant="body2" color="text.secondary" fontWeight="medium">출고가</Typography>
             <Typography variant="body2" sx={{ textDecoration: 'line-through', color: 'text.secondary' }}>
               {product.factoryPrice?.toLocaleString()}원
             </Typography>
           </Box>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography variant="body1" fontWeight="bold" sx={{ color: cardTheme.text }}>구매가</Typography>
-            <Typography variant={compact ? 'h6' : 'h5'} fontWeight="bold" sx={{ color: cardTheme.primary }}>
-              {(product.purchasePrice || product.purchasePriceWithAddon || product.purchasePriceWithoutAddon)?.toLocaleString()}원
+
+          {/* 가격 정보 테이블 (부드러운 디자인) */}
+          <Box sx={{ 
+            display: 'grid',
+            gridTemplateColumns: 'auto 1fr 1fr 1fr',
+            gap: 1,
+            alignItems: 'center',
+            fontSize: compact ? '0.75rem' : '0.8rem'
+          }}>
+            {/* 헤더 */}
+            <Box sx={{ gridColumn: '1 / -1', display: 'flex', gap: 1.5, pb: 0.5, borderBottom: `1px solid ${cardTheme.primary}20` }}>
+              <Box sx={{ flex: 1 }}></Box>
+              <Box sx={{ flex: 1, textAlign: 'center' }}>
+                <Typography variant="caption" color="text.secondary" fontWeight="medium">010신규</Typography>
+              </Box>
+              <Box sx={{ flex: 1, textAlign: 'center' }}>
+                <Typography variant="caption" color="text.secondary" fontWeight="medium">MNP</Typography>
+              </Box>
+              <Box sx={{ flex: 1, textAlign: 'center' }}>
+                <Typography variant="caption" color="text.secondary" fontWeight="medium">기변</Typography>
+              </Box>
+            </Box>
+
+            {/* 이통사지원금 */}
+            <Typography variant="caption" color="text.secondary" sx={{ fontSize: compact ? '0.7rem' : '0.75rem' }}>
+              이통사지원금
             </Typography>
+            {['010신규', 'MNP', '기변'].map((type) => (
+              <Box key={type} sx={{ textAlign: 'center' }}>
+                {priceData[type].loading ? (
+                  <CircularProgress size={12} />
+                ) : (
+                  <Typography variant="caption" sx={{ fontSize: compact ? '0.7rem' : '0.75rem' }}>
+                    {priceData[type].publicSupport?.toLocaleString()}원
+                  </Typography>
+                )}
+              </Box>
+            ))}
+
+            {/* 대리점지원금 */}
+            <Typography variant="caption" color="text.secondary" sx={{ fontSize: compact ? '0.7rem' : '0.75rem' }}>
+              대리점지원금
+            </Typography>
+            {['010신규', 'MNP', '기변'].map((type) => (
+              <Box key={type} sx={{ textAlign: 'center' }}>
+                {priceData[type].loading ? (
+                  <CircularProgress size={12} />
+                ) : (
+                  <Typography variant="caption" sx={{ fontSize: compact ? '0.7rem' : '0.75rem' }}>
+                    {priceData[type].storeSupport?.toLocaleString()}원
+                  </Typography>
+                )}
+              </Box>
+            ))}
+
+            {/* 최종구매가 */}
+            <Typography variant="caption" fontWeight="bold" sx={{ fontSize: compact ? '0.75rem' : '0.8rem', color: cardTheme.text }}>
+              최종구매가
+            </Typography>
+            {['010신규', 'MNP', '기변'].map((type) => (
+              <Box key={type} sx={{ textAlign: 'center' }}>
+                {priceData[type].loading ? (
+                  <CircularProgress size={12} />
+                ) : (
+                  <Typography variant="caption" fontWeight="bold" sx={{ fontSize: compact ? '0.75rem' : '0.8rem', color: cardTheme.primary }}>
+                    {priceData[type].purchasePrice?.toLocaleString()}원
+                  </Typography>
+                )}
+              </Box>
+            ))}
           </Box>
         </Stack>
 
         <Box sx={{ mt: 2 }}>
           <Typography variant="caption" color="text.secondary" display="block">
-            * 필수부가: {product.addons || product.requiredAddons || '없음'}
+            * 필수부가: {product.addons || product.requiredAddons || '없음'} (93일 유지조건)
           </Typography>
         </Box>
       </CardContent>

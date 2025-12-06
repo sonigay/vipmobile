@@ -83,6 +83,57 @@ const MobileListTab = ({ onProductSelect }) => {
     fetchMobileList();
   }, [carrierTab]);
 
+  // 초기 로딩 시 구분 태그에 따라 요금제군/유형 기본값 설정
+  useEffect(() => {
+    if (mobileList.length === 0 || planGroups.length === 0) return;
+
+    const setDefaultValues = async () => {
+      const carrier = getCurrentCarrier();
+      const newPlanGroups = { ...selectedPlanGroups };
+      const newOpeningTypes = { ...selectedOpeningTypes };
+
+      for (const model of mobileList) {
+        // 이미 값이 설정되어 있으면 스킵
+        if (newPlanGroups[model.id] && newOpeningTypes[model.id]) {
+          continue;
+        }
+
+        // 구분 태그 확인
+        const isPremium = model.isPremium || false;
+        const isBudget = model.isBudget || false;
+
+        // 기본값 결정
+        let defaultPlanGroup = '115군'; // 기본값: 115군
+        const defaultOpeningType = 'MNP'; // 기본값: MNP
+
+        if (isPremium && !isBudget) {
+          // 프리미엄만 체크: 115군
+          defaultPlanGroup = '115군';
+        } else if (isBudget && !isPremium) {
+          // 중저가만 체크: 33군
+          defaultPlanGroup = '33군';
+        } else {
+          // 둘 다 체크 또는 둘 다 없음: 115군 (프리미엄 우선)
+          defaultPlanGroup = '115군';
+        }
+
+        // 요금제군이 목록에 있는지 확인
+        if (planGroups.includes(defaultPlanGroup)) {
+          newPlanGroups[model.id] = defaultPlanGroup;
+          newOpeningTypes[model.id] = defaultOpeningType;
+
+          // 자동으로 가격 계산
+          await calculatePrice(model.id, defaultPlanGroup, defaultOpeningType);
+        }
+      }
+
+      setSelectedPlanGroups(newPlanGroups);
+      setSelectedOpeningTypes(newOpeningTypes);
+    };
+
+    setDefaultValues();
+  }, [mobileList, planGroups]);
+
   // 요금제군 목록 로드 (캐싱으로 최적화)
   useEffect(() => {
     const fetchPlanGroups = async () => {
@@ -216,7 +267,14 @@ const MobileListTab = ({ onProductSelect }) => {
 
   const handleRowClick = (model) => {
     if (onProductSelect) {
-      onProductSelect(model);
+      // 선택된 요금제군과 유형을 포함하여 전달
+      const planGroup = selectedPlanGroups[model.id] || null;
+      const openingType = selectedOpeningTypes[model.id] || null;
+      onProductSelect({
+        ...model,
+        planGroup,
+        openingType
+      });
     }
   };
 
