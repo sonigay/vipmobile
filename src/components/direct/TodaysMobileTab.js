@@ -96,8 +96,8 @@ const ProductCard = ({ product, isPremium, onSelect, compact, theme }) => {
 
       <Box sx={{ 
         position: 'relative', 
-        pt: compact ? '45%' : '50%',  // 이미지 영역 비율 조정 (카드 내용이 보이도록 축소)
-        minHeight: compact ? 140 : 160,  // 최소 높이 조정
+        pt: compact ? '60%' : '65%',  // 이미지 영역 비율 추가 증가
+        minHeight: compact ? 200 : 220,  // 최소 높이 추가 증가
         background: `linear-gradient(135deg, ${cardTheme.primary}10 0%, ${cardTheme.secondary}10 100%)`,
         borderRadius: '16px 16px 0 0', 
         overflow: 'hidden',
