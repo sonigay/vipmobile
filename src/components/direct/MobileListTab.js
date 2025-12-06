@@ -479,7 +479,7 @@ const MobileListTab = ({ onProductSelect }) => {
             <TableBody>
               {mobileList.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} align="center" sx={{ py: 5 }}>
+                  <TableCell colSpan={11} align="center" sx={{ py: 5 }}>
                     <Typography color="text.secondary">표시할 데이터가 없습니다.</Typography>
                   </TableCell>
                 </TableRow>
