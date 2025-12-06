@@ -54,7 +54,7 @@ const ProductCard = ({ product, isPremium, onSelect, compact, theme }) => {
         display: 'flex',
         flexDirection: 'column',
         position: 'relative',
-        overflow: 'hidden',
+        overflow: 'visible',
         cursor: 'pointer',
         backgroundColor: cardTheme.cardBg,
         border: `2px solid ${cardTheme.primary}30`,
@@ -62,7 +62,8 @@ const ProductCard = ({ product, isPremium, onSelect, compact, theme }) => {
         '&:hover': { 
           transform: 'translateY(-5px)', 
           boxShadow: `0 8px 24px ${cardTheme.primary}40`,
-          borderColor: cardTheme.primary
+          borderColor: cardTheme.primary,
+          zIndex: 1
         }
       }}
       onClick={() => onSelect(product)}
@@ -92,12 +93,13 @@ const ProductCard = ({ product, isPremium, onSelect, compact, theme }) => {
 
       <Box sx={{ 
         position: 'relative', 
-        pt: compact ? '50%' : '60%',  // 이미지 영역 비율 조정
-        minHeight: compact ? 150 : 180,  // 최소 높이 조정
+        pt: compact ? '45%' : '50%',  // 이미지 영역 비율 조정 (카드 내용이 보이도록 축소)
+        minHeight: compact ? 140 : 160,  // 최소 높이 조정
         background: `linear-gradient(135deg, ${cardTheme.primary}10 0%, ${cardTheme.secondary}10 100%)`,
         borderRadius: '16px 16px 0 0', 
         overflow: 'hidden',
-        borderBottom: `2px solid ${cardTheme.primary}20`
+        borderBottom: `2px solid ${cardTheme.primary}20`,
+        flexShrink: 0  // 이미지 영역이 축소되지 않도록
       }}>
         <CardMedia
           component="img"
@@ -120,7 +122,7 @@ const ProductCard = ({ product, isPremium, onSelect, compact, theme }) => {
         />
       </Box>
 
-      <CardContent sx={{ flex: '1 1 auto', p: compact ? 1.5 : 2 }}>
+      <CardContent sx={{ flex: '1 1 auto', p: compact ? 1.5 : 2, minHeight: 0, overflow: 'visible' }}>
         <Stack direction="row" spacing={1} mb={1}>
           <Chip
             label={product.carrier}
@@ -478,13 +480,12 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
   }, [fetchData]);
 
   // 프리미엄과 중저가를 하나의 배열로 합치기 (프리미엄 먼저, 중저가 나중에)
-  // 서버에서 이미 3개, 2개로 제한되어 있으므로 클라이언트에서는 slice 불필요
-  // ⚠️ 중요: 모든 훅은 early return 이전에 호출되어야 함
-  // 추가 안전장치: 서버 제한이 실패한 경우를 대비해 클라이언트에서도 제한
+  // 총 3개만 표시 (프리미엄 우선)
   const allProducts = useMemo(() => {
     const premium = Array.isArray(premiumPhones) ? premiumPhones.slice(0, 3) : [];
     const budget = Array.isArray(budgetPhones) ? budgetPhones.slice(0, 2) : [];
-    return [...premium, ...budget];
+    const combined = [...premium, ...budget];
+    return combined.slice(0, 3); // 최대 3개만 표시
   }, [premiumPhones, budgetPhones]);
   
   // 현재 표시 중인 통신사 감지 (테마용)
