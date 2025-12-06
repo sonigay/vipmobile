@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Box,
   Grid,
@@ -229,13 +229,8 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
     }
   }, []);
 
-  useEffect(() => {
-    fetchData();
-    loadMainHeaderText();
-  }, [fetchData]);
-
   // 메인헤더 문구 로드
-  const loadMainHeaderText = async () => {
+  const loadMainHeaderText = useCallback(async () => {
     try {
       const response = await directStoreApi.getMainHeaderText();
       if (response.success && response.data) {
@@ -244,7 +239,12 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
     } catch (err) {
       console.error('메인헤더 문구 로드 실패:', err);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+    loadMainHeaderText();
+  }, [fetchData, loadMainHeaderText]);
 
   // 슬라이드쇼용 데이터 준비: 모든 통신사의 체크된 상품 가져오기
   const prepareSlideshowData = useCallback(async () => {
@@ -448,20 +448,20 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
 
   // 프리미엄과 중저가를 하나의 배열로 합치기 (프리미엄 먼저, 중저가 나중에)
   // 표시 개수 조정: 프리미엄 6개→3개, 중저가 3개→1~2개
-  const displayPremiumPhones = premiumPhones.slice(0, 3);
-  const displayBudgetPhones = budgetPhones.slice(0, 2);
-  const allProducts = [...displayPremiumPhones, ...displayBudgetPhones];
+  const displayPremiumPhones = useMemo(() => premiumPhones.slice(0, 3), [premiumPhones]);
+  const displayBudgetPhones = useMemo(() => budgetPhones.slice(0, 2), [budgetPhones]);
+  const allProducts = useMemo(() => [...displayPremiumPhones, ...displayBudgetPhones], [displayPremiumPhones, displayBudgetPhones]);
   
   // 현재 표시 중인 통신사 감지 (테마용)
   useEffect(() => {
-    if (allProducts.length > 0) {
-      // 첫 번째 상품의 통신사를 기본값으로 사용
+    if (allProducts.length > 0 && !isSlideshowActive) {
+      // 첫 번째 상품의 통신사를 기본값으로 사용 (슬라이드쇼가 아닐 때만)
       const firstCarrier = allProducts[0]?.carrier;
-      if (firstCarrier) {
+      if (firstCarrier && firstCarrier !== currentCarrier) {
         setCurrentCarrier(firstCarrier);
       }
     }
-  }, [allProducts]);
+  }, [allProducts, isSlideshowActive, currentCarrier]);
   
   // 통신사별 테마 색상 정의
   const getCarrierTheme = (carrier) => {
