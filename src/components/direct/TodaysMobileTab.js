@@ -32,6 +32,7 @@ import {
   ArrowForward as ArrowForwardIcon
 } from '@mui/icons-material';
 import { directStoreApi } from '../../api/directStoreApi';
+import { getCachedPrice, setCachedPrice, setCachedPricesBatch } from '../../utils/priceCache';
 
 const ProductCard = ({ product, isPremium, onSelect, compact, theme, priceData: propPriceData }) => {
   const [priceData, setPriceData] = useState({
@@ -88,7 +89,33 @@ const ProductCard = ({ product, isPremium, onSelect, compact, theme, priceData: 
       const openingTypes = ['010신규', 'MNP', '기변'];
       const newPriceData = { ...priceData };
 
+      // 먼저 전역 캐시에서 확인
+      let allCached = true;
       for (const openingType of openingTypes) {
+        const cached = getCachedPrice(product.id, defaultPlanGroup, openingType, product.carrier);
+        if (cached && (cached.publicSupport !== undefined || cached.storeSupport !== undefined)) {
+          newPriceData[openingType] = {
+            publicSupport: cached.publicSupport || 0,
+            storeSupport: cached.storeSupport || cached.storeSupportWithAddon || 0,
+            purchasePrice: cached.purchasePrice || cached.purchasePriceWithAddon || 0,
+            loading: false
+          };
+        } else {
+          allCached = false;
+        }
+      }
+
+      // 모든 데이터가 캐시에 있으면 API 호출 없이 종료
+      if (allCached) {
+        setPriceData(newPriceData);
+        return;
+      }
+
+      // 캐시에 없는 데이터만 API 호출
+      for (const openingType of openingTypes) {
+        // 이미 캐시에서 가져온 데이터는 스킵
+        if (newPriceData[openingType].loading === false) continue;
+
         try {
           const result = await directStoreApi.calculateMobilePrice(
             product.id,
@@ -98,6 +125,13 @@ const ProductCard = ({ product, isPremium, onSelect, compact, theme, priceData: 
           );
 
           if (result.success) {
+            // 전역 캐시에 저장
+            setCachedPrice(product.id, defaultPlanGroup, openingType, product.carrier, {
+              publicSupport: result.publicSupport || 0,
+              storeSupport: result.storeSupportWithAddon || 0,
+              purchasePrice: result.purchasePriceWithAddon || 0
+            });
+
             newPriceData[openingType] = {
               publicSupport: result.publicSupport || 0,
               storeSupport: result.storeSupportWithAddon || 0,
@@ -356,8 +390,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
   const [isManualTransitionPage, setIsManualTransitionPage] = useState(false);
   const [manualTransitionPageData, setManualTransitionPageData] = useState(null);
   
-  // 가격 캐시
-  const [priceCache, setPriceCache] = useState({});
+  // 가격 캐시는 전역 유틸리티 사용 (제거됨)
 
   const fetchData = useCallback(async () => {
     try {
@@ -387,15 +420,11 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
   const loadMainHeaderText = useCallback(async () => {
     try {
       const response = await directStoreApi.getMainHeaderText();
-      if (response.success && response.data && response.data.content) {
-        setMainHeaderText(response.data.content);
-      } else {
-        // 데이터가 없거나 실패한 경우에도 빈 문자열로 설정하여 조건부 렌더링이 작동하도록
-        setMainHeaderText('');
+      if (response.success && response.data) {
+        setMainHeaderText(response.data.content || '');
       }
     } catch (err) {
       console.error('메인헤더 문구 로드 실패:', err);
-      setMainHeaderText('');
     }
   }, []);
 
@@ -439,48 +468,59 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
         allProducts.push(...carrierData.products);
       }
       
-      // 모든 상품의 가격을 병렬로 미리 로드하여 캐시에 저장
+      // 모든 상품의 가격을 병렬로 미리 로드하여 전역 캐시에 저장
       const pricePromises = [];
-      const newCache = { ...priceCache };
+      const cacheEntries = [];
       
       for (const product of allProducts) {
         const planGroup = product.isBudget && !product.isPremium ? '33군' : '115군';
         for (const openingType of ['010신규', 'MNP', '기변']) {
-          const cacheKey = `${product.id}-${planGroup}-${openingType}-${product.carrier}`;
+          // 전역 캐시 확인
+          const cached = getCachedPrice(product.id, planGroup, openingType, product.carrier);
+          if (cached) {
+            // 캐시에 있으면 스킵
+            continue;
+          }
           
           // 캐시에 없으면 API 호출
-          if (!newCache[cacheKey]) {
-            pricePromises.push(
-              directStoreApi.calculateMobilePrice(
-                product.id,
-                planGroup,
-                openingType,
-                product.carrier
-              ).then(result => {
-                if (result.success) {
-                  newCache[cacheKey] = {
+          pricePromises.push(
+            directStoreApi.calculateMobilePrice(
+              product.id,
+              planGroup,
+              openingType,
+              product.carrier
+            ).then(result => {
+              if (result.success) {
+                cacheEntries.push({
+                  modelId: product.id,
+                  planGroup,
+                  openingType,
+                  carrier: product.carrier,
+                  priceData: {
                     publicSupport: result.publicSupport || 0,
                     storeSupport: result.storeSupportWithAddon || 0,
-                    purchasePrice: result.purchasePriceWithAddon || 0,
-                    loading: false
-                  };
-                }
-                return { cacheKey, result };
-              }).catch(err => {
-                console.error(`가격 계산 실패 (${cacheKey}):`, err);
-                return { cacheKey, result: { success: false } };
-              })
-            );
-          }
+                    purchasePrice: result.purchasePriceWithAddon || 0
+                  }
+                });
+              }
+              return { product, result };
+            }).catch(err => {
+              console.error(`가격 계산 실패 (${product.id}-${planGroup}-${openingType}):`, err);
+              return { product, result: { success: false } };
+            })
+          );
         }
       }
       
       // 모든 가격 로드 완료 대기
       if (pricePromises.length > 0) {
-        await Promise.all(pricePromises);
+        await Promise.allSettled(pricePromises);
       }
-      // 캐시 업데이트 (Promise.all 완료 후)
-      setPriceCache(newCache);
+      
+      // 배치로 전역 캐시에 저장
+      if (cacheEntries.length > 0) {
+        setCachedPricesBatch(cacheEntries);
+      }
       
       // 슬라이드쇼 데이터 구조 생성 (3개씩 그룹화 - 그리드가 3열이므로)
       const slideshowItems = [];
@@ -791,7 +831,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
   }, [allProducts, isSlideshowActive, isSlideshowDataLoading, slideshowData.length, currentCarrier]);
   
   // 통신사별 테마 색상 정의
-  // 캐시에서 가격 데이터 가져오기
+  // 전역 캐시에서 가격 데이터 가져오기
   const getPriceDataFromCache = useCallback((product) => {
     if (!product.id || !product.carrier) return null;
     
@@ -804,13 +844,12 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
     
     let hasCachedData = false;
     for (const openingType of ['010신규', 'MNP', '기변']) {
-      const cacheKey = `${product.id}-${planGroup}-${openingType}-${product.carrier}`;
-      const cached = priceCache[cacheKey];
-      if (cached && cached.publicSupport !== undefined) {
+      const cached = getCachedPrice(product.id, planGroup, openingType, product.carrier);
+      if (cached && (cached.publicSupport !== undefined || cached.storeSupport !== undefined)) {
         priceData[openingType] = {
           publicSupport: cached.publicSupport || 0,
-          storeSupport: cached.storeSupport || 0,
-          purchasePrice: cached.purchasePrice || 0,
+          storeSupport: cached.storeSupport || cached.storeSupportWithAddon || 0,
+          purchasePrice: cached.purchasePrice || cached.purchasePriceWithAddon || 0,
           loading: false
         };
         hasCachedData = true;
@@ -819,7 +858,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
     
     // 캐시가 있으면 priceData 반환, 없으면 null 반환하여 ProductCard에서 자체 로드하도록
     return hasCachedData ? priceData : null;
-  }, [priceCache]);
+  }, []);
 
   const getCarrierTheme = (carrier) => {
     switch (carrier) {
@@ -903,7 +942,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
         }}
       >
         {/* 메인헤더 문구 */}
-        {mainHeaderText && mainHeaderText.trim() && (
+        {mainHeaderText && (
           <Box
             sx={{
               mb: isFullScreen ? 2 : 1.5,

@@ -35,6 +35,7 @@ import {
 } from '@mui/icons-material';
 import { Checkbox } from '@mui/material';
 import { directStoreApi } from '../../api/directStoreApi';
+import { getCachedPrice, setCachedPrice, setCachedPricesBatch } from '../../utils/priceCache';
 
 const MobileListTab = ({ onProductSelect }) => {
   const [carrierTab, setCarrierTab] = useState(0); // 0: SK, 1: KT, 2: LG
@@ -46,7 +47,6 @@ const MobileListTab = ({ onProductSelect }) => {
   const [selectedPlanGroups, setSelectedPlanGroups] = useState({}); // { modelId: planGroup }
   const [selectedOpeningTypes, setSelectedOpeningTypes] = useState({}); // { modelId: openingType } - 010신규, MNP, 기변
   const [calculatedPrices, setCalculatedPrices] = useState({}); // { modelId: { storeSupportWithAddon, storeSupportWithoutAddon, purchasePriceWithAddon, purchasePriceWithoutAddon } }
-  const [priceCache, setPriceCache] = useState({}); // { cacheKey: { storeSupportWithAddon, storeSupportWithoutAddon, purchasePriceWithAddon, purchasePriceWithoutAddon } }
   const pendingRequestsRef = useRef(new Map()); // { cacheKey: Promise } - 중복 요청 방지
   
   // 개통 유형 목록 (고정)
@@ -96,15 +96,32 @@ const MobileListTab = ({ onProductSelect }) => {
       const pricePromises = [];
 
       // 모든 모델에 대해 기본값 설정 및 가격 계산 준비
+      const cacheEntries = [];
+      
       for (const model of mobileList) {
         // 초기 로딩 시에는 기존 값이 있어도 기본값으로 재설정하지 않음
         // 단, 값이 없을 때만 기본값 설정
         if (newPlanGroups[model.id] && newOpeningTypes[model.id]) {
-          // 값이 이미 있으면 가격만 다시 계산 (요금제군이나 유형이 변경되었을 수 있음)
+          // 값이 이미 있으면 전역 캐시에서 먼저 확인
           const existingPlanGroup = newPlanGroups[model.id];
           const existingOpeningType = newOpeningTypes[model.id];
           if (planGroups.includes(existingPlanGroup)) {
-            pricePromises.push(calculatePrice(model.id, existingPlanGroup, existingOpeningType, true));
+            const cached = getCachedPrice(model.id, existingPlanGroup, existingOpeningType, carrier);
+            if (cached) {
+              // 캐시에서 즉시 상태 업데이트
+              setCalculatedPrices(prev => ({
+                ...prev,
+                [model.id]: {
+                  storeSupportWithAddon: cached.storeSupportWithAddon || 0,
+                  storeSupportWithoutAddon: cached.storeSupportWithoutAddon || 0,
+                  purchasePriceWithAddon: cached.purchasePriceWithAddon || 0,
+                  purchasePriceWithoutAddon: cached.purchasePriceWithoutAddon || 0
+                }
+              }));
+            } else {
+              // 캐시에 없으면 API 호출
+              pricePromises.push(calculatePrice(model.id, existingPlanGroup, existingOpeningType, true));
+            }
           }
           continue;
         }
@@ -133,8 +150,23 @@ const MobileListTab = ({ onProductSelect }) => {
           newPlanGroups[model.id] = defaultPlanGroup;
           newOpeningTypes[model.id] = defaultOpeningType;
 
-          // 가격 계산을 Promise 배열에 추가 (병렬 처리)
-          pricePromises.push(calculatePrice(model.id, defaultPlanGroup, defaultOpeningType, true));
+          // 전역 캐시에서 먼저 확인
+          const cached = getCachedPrice(model.id, defaultPlanGroup, defaultOpeningType, carrier);
+          if (cached) {
+            // 캐시에서 즉시 상태 업데이트
+            setCalculatedPrices(prev => ({
+              ...prev,
+              [model.id]: {
+                storeSupportWithAddon: cached.storeSupportWithAddon || 0,
+                storeSupportWithoutAddon: cached.storeSupportWithoutAddon || 0,
+                purchasePriceWithAddon: cached.purchasePriceWithAddon || 0,
+                purchasePriceWithoutAddon: cached.purchasePriceWithoutAddon || 0
+              }
+            }));
+          } else {
+            // 캐시에 없으면 가격 계산을 Promise 배열에 추가 (병렬 처리)
+            pricePromises.push(calculatePrice(model.id, defaultPlanGroup, defaultOpeningType, true));
+          }
         }
       }
 
@@ -144,7 +176,7 @@ const MobileListTab = ({ onProductSelect }) => {
 
       // 모든 가격 계산을 병렬로 실행
       if (pricePromises.length > 0) {
-        await Promise.all(pricePromises);
+        await Promise.allSettled(pricePromises);
       }
     };
 
@@ -391,7 +423,7 @@ const MobileListTab = ({ onProductSelect }) => {
     return tags.length > 0 ? tags.join(', ') : '선택';
   };
 
-  // 가격 계산 함수 (요금제군과 유형 모두 필요) - 캐시 사용 및 병렬 처리 지원
+  // 가격 계산 함수 (요금제군과 유형 모두 필요) - 전역 캐시 사용 및 병렬 처리 지원
   const calculatePrice = async (modelId, planGroup, openingType, useCache = true) => {
     if (!planGroup || !openingType) {
       return;
@@ -400,19 +432,21 @@ const MobileListTab = ({ onProductSelect }) => {
     const carrier = getCurrentCarrier();
     const cacheKey = `${modelId}-${planGroup}-${openingType}-${carrier}`;
     
-    // 캐시 확인
-    if (useCache && priceCache[cacheKey]) {
-      const cached = priceCache[cacheKey];
-      setCalculatedPrices(prev => ({
-        ...prev,
-        [modelId]: {
-          storeSupportWithAddon: cached.storeSupportWithAddon,
-          storeSupportWithoutAddon: cached.storeSupportWithoutAddon,
-          purchasePriceWithAddon: cached.purchasePriceWithAddon,
-          purchasePriceWithoutAddon: cached.purchasePriceWithoutAddon
-        }
-      }));
-      return;
+    // 전역 캐시 확인
+    if (useCache) {
+      const cached = getCachedPrice(modelId, planGroup, openingType, carrier);
+      if (cached) {
+        setCalculatedPrices(prev => ({
+          ...prev,
+          [modelId]: {
+            storeSupportWithAddon: cached.storeSupportWithAddon || 0,
+            storeSupportWithoutAddon: cached.storeSupportWithoutAddon || 0,
+            purchasePriceWithAddon: cached.purchasePriceWithAddon || 0,
+            purchasePriceWithoutAddon: cached.purchasePriceWithoutAddon || 0
+          }
+        }));
+        return;
+      }
     }
 
     // 중복 요청 방지
@@ -423,10 +457,10 @@ const MobileListTab = ({ onProductSelect }) => {
           setCalculatedPrices(prev => ({
             ...prev,
             [modelId]: {
-              storeSupportWithAddon: result.storeSupportWithAddon,
-              storeSupportWithoutAddon: result.storeSupportWithoutAddon,
-              purchasePriceWithAddon: result.purchasePriceWithAddon,
-              purchasePriceWithoutAddon: result.purchasePriceWithoutAddon
+              storeSupportWithAddon: result.storeSupportWithAddon || 0,
+              storeSupportWithoutAddon: result.storeSupportWithoutAddon || 0,
+              purchasePriceWithAddon: result.purchasePriceWithAddon || 0,
+              purchasePriceWithoutAddon: result.purchasePriceWithoutAddon || 0
             }
           }));
         }
@@ -440,25 +474,22 @@ const MobileListTab = ({ onProductSelect }) => {
     const pricePromise = directStoreApi.calculateMobilePrice(modelId, planGroup, openingType, carrier)
       .then(result => {
         if (result.success) {
-          // 캐시에 저장
-          setPriceCache(prev => ({
-            ...prev,
-            [cacheKey]: {
-              storeSupportWithAddon: result.storeSupportWithAddon,
-              storeSupportWithoutAddon: result.storeSupportWithoutAddon,
-              purchasePriceWithAddon: result.purchasePriceWithAddon,
-              purchasePriceWithoutAddon: result.purchasePriceWithoutAddon
-            }
-          }));
+          // 전역 캐시에 저장
+          setCachedPrice(modelId, planGroup, openingType, carrier, {
+            storeSupportWithAddon: result.storeSupportWithAddon || 0,
+            storeSupportWithoutAddon: result.storeSupportWithoutAddon || 0,
+            purchasePriceWithAddon: result.purchasePriceWithAddon || 0,
+            purchasePriceWithoutAddon: result.purchasePriceWithoutAddon || 0
+          });
           
           // 상태 업데이트
           setCalculatedPrices(prev => ({
             ...prev,
             [modelId]: {
-              storeSupportWithAddon: result.storeSupportWithAddon,
-              storeSupportWithoutAddon: result.storeSupportWithoutAddon,
-              purchasePriceWithAddon: result.purchasePriceWithAddon,
-              purchasePriceWithoutAddon: result.purchasePriceWithoutAddon
+              storeSupportWithAddon: result.storeSupportWithAddon || 0,
+              storeSupportWithoutAddon: result.storeSupportWithoutAddon || 0,
+              purchasePriceWithAddon: result.purchasePriceWithAddon || 0,
+              purchasePriceWithoutAddon: result.purchasePriceWithoutAddon || 0
             }
           }));
         }
