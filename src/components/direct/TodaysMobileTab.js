@@ -161,8 +161,8 @@ const ProductCard = ({ product, isPremium, onSelect, compact, theme, priceData: 
 
       <Box sx={{ 
         position: 'relative', 
-        pt: compact ? '60%' : '70%',  // 컴팩트 모드에서 이미지 영역 비율 감소
-        minHeight: compact ? 200 : 240,  // 컴팩트 모드에서 최소 높이 감소
+        pt: compact ? '55%' : '70%',  // 컴팩트 모드에서 이미지 영역 비율 더 감소
+        minHeight: compact ? 180 : 240,  // 컴팩트 모드에서 최소 높이 더 감소
         background: `linear-gradient(135deg, ${cardTheme.primary}10 0%, ${cardTheme.secondary}10 100%)`,
         borderRadius: '16px 16px 0 0', 
         overflow: 'hidden',
@@ -190,7 +190,7 @@ const ProductCard = ({ product, isPremium, onSelect, compact, theme, priceData: 
         />
       </Box>
 
-      <CardContent sx={{ flex: '1 1 auto', p: compact ? 1.2 : 2, minHeight: 0, overflow: 'visible' }}>
+      <CardContent sx={{ flex: '1 1 auto', p: compact ? 1.0 : 2, minHeight: 0, overflow: 'visible' }}>
         <Stack direction="row" spacing={1} mb={1}>
           <Chip
             label={product.carrier}
@@ -209,7 +209,7 @@ const ProductCard = ({ product, isPremium, onSelect, compact, theme, priceData: 
 
         <Stack spacing={1.5} sx={{ 
           background: `linear-gradient(135deg, ${cardTheme.primary}08 0%, ${cardTheme.secondary}08 100%)`,
-          p: compact ? 1.2 : 2, 
+          p: compact ? 1.0 : 2, 
           borderRadius: 2,
           border: `1px solid ${cardTheme.primary}20`
         }}>
@@ -227,6 +227,7 @@ const ProductCard = ({ product, isPremium, onSelect, compact, theme, priceData: 
             gridTemplateColumns: 'auto 1fr 1fr 1fr',
             gap: 1,
             alignItems: 'center',
+            justifyItems: 'center',
             fontSize: compact ? '0.75rem' : '0.8rem'
           }}>
             {/* 헤더 */}
@@ -248,7 +249,7 @@ const ProductCard = ({ product, isPremium, onSelect, compact, theme, priceData: 
               이통사지원금
             </Typography>
             {['010신규', 'MNP', '기변'].map((type) => (
-              <Box key={type} sx={{ textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Box key={type} sx={{ textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
                 {finalPriceData[type].loading ? (
                   <CircularProgress size={12} />
                 ) : (
@@ -264,7 +265,7 @@ const ProductCard = ({ product, isPremium, onSelect, compact, theme, priceData: 
               대리점지원금
             </Typography>
             {['010신규', 'MNP', '기변'].map((type) => (
-              <Box key={type} sx={{ textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Box key={type} sx={{ textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
                 {finalPriceData[type].loading ? (
                   <CircularProgress size={12} />
                 ) : (
@@ -280,7 +281,7 @@ const ProductCard = ({ product, isPremium, onSelect, compact, theme, priceData: 
               최종구매가
             </Typography>
             {['010신규', 'MNP', '기변'].map((type) => (
-              <Box key={type} sx={{ textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Box key={type} sx={{ textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
                 {finalPriceData[type].loading ? (
                   <CircularProgress size={12} />
                 ) : (

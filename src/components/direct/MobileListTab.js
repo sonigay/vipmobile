@@ -97,8 +97,15 @@ const MobileListTab = ({ onProductSelect }) => {
 
       // 모든 모델에 대해 기본값 설정 및 가격 계산 준비
       for (const model of mobileList) {
-        // 이미 값이 설정되어 있으면 스킵
+        // 초기 로딩 시에는 기존 값이 있어도 기본값으로 재설정하지 않음
+        // 단, 값이 없을 때만 기본값 설정
         if (newPlanGroups[model.id] && newOpeningTypes[model.id]) {
+          // 값이 이미 있으면 가격만 다시 계산 (요금제군이나 유형이 변경되었을 수 있음)
+          const existingPlanGroup = newPlanGroups[model.id];
+          const existingOpeningType = newOpeningTypes[model.id];
+          if (planGroups.includes(existingPlanGroup)) {
+            pricePromises.push(calculatePrice(model.id, existingPlanGroup, existingOpeningType, true));
+          }
           continue;
         }
 
