@@ -1021,11 +1021,6 @@ function setupDirectRoutes(app) {
           deduction: -Math.abs(Number(row[4] || 0))  // 부가미유치 차감금액 (음수 처리)
         }));
       
-      // 부가서비스 추가금액 합계 (부가유치)
-      const totalAddonIncentive = addonList.reduce((sum, addon) => sum + (addon.incentive || 0), 0);
-      // 부가서비스 차감금액 합계 (부가미유치)
-      const totalAddonDeduction = addonList.reduce((sum, addon) => sum + (addon.deduction || 0), 0);
-      
       const requiredAddons = addonList
         .filter(addon => addon.deduction < 0)  // 차감금액이 음수인 경우 (미유치 시 차감되는 부가서비스)
         .map(addon => addon.name);
