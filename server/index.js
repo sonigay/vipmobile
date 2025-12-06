@@ -4579,6 +4579,15 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
         sheetSaveSuccess = true;
         console.log(`✅ [이미지 업로드] Google Sheets 추가 성공`);
       }
+      
+      // 이미지 업로드 성공 시 캐시 무효화 (직영점 모드 캐시)
+      try {
+        const { invalidateDirectStoreCache } = require('./directRoutes');
+        invalidateDirectStoreCache(carrier);
+        console.log(`🔄 [이미지 업로드] 캐시 무효화 완료: 통신사=${carrier}`);
+      } catch (cacheError) {
+        console.warn('⚠️ [이미지 업로드] 캐시 무효화 실패 (무시):', cacheError.message);
+      }
     } catch (sheetError) {
       console.error('❌ [이미지 업로드] Google Sheets 저장 오류:', sheetError);
       console.error('❌ [이미지 업로드] 스택 트레이스:', sheetError.stack);

@@ -52,6 +52,21 @@ function setCache(key, data, ttlMs = 60 * 1000) {
 
 function deleteCache(key) {
   cacheStore.delete(key);
+  console.log(`[Direct] 캐시 무효화: ${key}`);
+}
+
+// 캐시 무효화 함수를 외부에서 사용할 수 있도록 export
+function invalidateDirectStoreCache(carrier = null) {
+  if (carrier) {
+    deleteCache(`mobiles-${carrier}`);
+  } else {
+    // 모든 통신사 캐시 무효화
+    deleteCache('mobiles-SK');
+    deleteCache('mobiles-KT');
+    deleteCache('mobiles-LG');
+  }
+  deleteCache('todays-mobiles');
+  console.log(`[Direct] 모든 직영점 캐시 무효화 완료`);
 }
 
 // 시트 ID 조회 헬퍼 함수
@@ -1674,4 +1689,6 @@ function setupDirectRoutes(app) {
 }
 
 module.exports = setupDirectRoutes;
+module.exports.invalidateDirectStoreCache = invalidateDirectStoreCache;
+module.exports.deleteCache = deleteCache;
 
