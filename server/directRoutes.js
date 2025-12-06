@@ -1194,6 +1194,27 @@ function setupDirectRoutes(app) {
               imgUrl = imageMap.get(model);
             }
             
+            // 여전히 없으면 유사한 키 찾기 (공백, 하이픈 등 차이 무시)
+            if (!imgUrl && imageMap.size > 0) {
+              const modelNormalized = model.replace(/[\s-_]/g, '').toLowerCase();
+              const mapKeys = Array.from(imageMap.keys());
+              
+              for (const mapKey of mapKeys) {
+                const keyNormalized = mapKey.replace(/[\s-_]/g, '').toLowerCase();
+                // 통신사 부분 제거 후 비교
+                const keyWithoutCarrier = mapKey.includes(':') ? mapKey.split(':')[1] : mapKey;
+                const keyNormalizedWithoutCarrier = keyWithoutCarrier.replace(/[\s-_]/g, '').toLowerCase();
+                
+                if (keyNormalizedWithoutCarrier === modelNormalized || 
+                    keyNormalized.includes(modelNormalized) || 
+                    modelNormalized.includes(keyNormalizedWithoutCarrier)) {
+                  imgUrl = imageMap.get(mapKey);
+                  console.log(`[Direct] ✅ 유사 키로 이미지 찾음: 모델명=${model}, 맵키=${mapKey}`);
+                  break;
+                }
+              }
+            }
+            
             // 디버깅: 이미지를 찾지 못한 경우 상세 로그
             if (!imgUrl && imageMap.size > 0) {
               const mapKeys = Array.from(imageMap.keys());
@@ -1210,9 +1231,6 @@ function setupDirectRoutes(app) {
                 맵키전체: mapKeys,
                 유사키: matchingKeys
               });
-            } else if (imgUrl) {
-              // 성공한 경우는 간단히만 로그 (너무 많으면 로그가 과도해짐)
-              // console.log(`[Direct] ✅ 이미지 찾음: 모델명=${model}, 키=${key}, URL=${imgUrl.substring(0, 50)}...`);
             }
             return imgUrl || '';
           })(),

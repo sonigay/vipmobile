@@ -3838,6 +3838,25 @@ app.get('/api/direct/mobiles', async (req, res) => {
             imgUrl = imageMap.get(modelCode);
           }
           
+          // 여전히 없으면 유사한 키 찾기 (공백, 하이픈 등 차이 무시)
+          if (!imgUrl && imageMap.size > 0) {
+            const modelNormalized = modelCode.replace(/[\s-_]/g, '').toLowerCase();
+            const mapKeys = Array.from(imageMap.keys());
+            
+            for (const mapKey of mapKeys) {
+              const keyWithoutCarrier = mapKey.includes(':') ? mapKey.split(':')[1] : mapKey;
+              const keyNormalized = keyWithoutCarrier.replace(/[\s-_]/g, '').toLowerCase();
+              
+              if (keyNormalized === modelNormalized || 
+                  keyNormalized.includes(modelNormalized) || 
+                  modelNormalized.includes(keyNormalized)) {
+                imgUrl = imageMap.get(mapKey);
+                console.log(`[Direct] ✅ 오늘의휴대폰 유사 키로 이미지 찾음: 모델코드=${modelCode}, 맵키=${mapKey}`);
+                break;
+              }
+            }
+          }
+          
           // 디버깅: 이미지를 찾지 못한 경우
           if (!imgUrl && imageMap.size > 0) {
             const mapKeys = Array.from(imageMap.keys());
