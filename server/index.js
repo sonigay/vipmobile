@@ -3796,18 +3796,38 @@ app.get('/api/direct/mobiles', async (req, res) => {
       const modelName = (row[2] || '').trim(); // 모델명 (모델ID와 동일)
       const imageUrl = (row[5] || '').trim();
       
-      // 현재 조회 중인 통신사와 일치하는 경우만 매핑
-      if (imageUrl && (!rowCarrier || rowCarrier === carrier)) {
+      // 이미지 URL이 없으면 건너뛰기
+      if (!imageUrl) {
+        return;
+      }
+      
+      // 통신사 필터링: 현재 조회 중인 통신사와 정확히 일치하는 경우만 매핑
+      // 통신사가 비어있으면 해당 행을 건너뛰어 잘못된 매핑 방지
+      if (!rowCarrier) {
+        console.log(`[Direct] ⚠️ 오늘의휴대폰: 통신사가 비어있는 이미지 행 건너뛰기: 모델ID=${modelId}, 모델명=${modelName}`);
+        return;
+      }
+      
+      // 통신사가 일치하는 경우만 매핑
+      if (rowCarrier === carrier) {
         // 모델ID와 모델명 중 하나라도 있으면 사용 (둘 다 실제 모델 코드와 동일)
         const actualModelCode = modelId || modelName;
         
         if (actualModelCode) {
-          // 통신사+모델코드 조합으로 키 생성 (가장 정확한 매칭)
+          // 원본 모델 코드로 키 생성 (정확한 매칭)
           const key = `${carrier}:${actualModelCode}`;
           imageMap.set(key, imageUrl);
-          
-          // 모델코드만으로도 조회 가능하도록 (하위 호환 및 편의성)
           imageMap.set(actualModelCode, imageUrl);
+          
+          // 정규화된 모델 코드로도 키 생성 (형식 차이 무시)
+          const normalizedCode = normalizeModelCode(actualModelCode);
+          if (normalizedCode && normalizedCode !== actualModelCode.toLowerCase()) {
+            const normalizedKey = `${carrier}:${normalizedCode}`;
+            imageMap.set(normalizedKey, imageUrl);
+            imageMap.set(normalizedCode, imageUrl);
+          }
+        } else {
+          console.log(`[Direct] ⚠️ 오늘의휴대폰: 모델코드가 없는 이미지 행 건너뛰기: 통신사=${rowCarrier}`);
         }
       }
     });
@@ -3829,23 +3849,35 @@ app.get('/api/direct/mobiles', async (req, res) => {
         storeSupportNoAddon: parseInt(row[5] || 0),
         image: (() => {
           const modelCode = row[0] || modelId;
-          // 통신사+모델코드 조합으로 먼저 조회 (가장 정확)
+          // 1. 통신사+모델코드 조합으로 먼저 조회 (가장 정확)
           const key = `${carrier}:${modelCode}`;
           let imgUrl = imageMap.get(key);
           
-          // 없으면 모델코드만으로 조회 (하위 호환)
+          // 2. 없으면 모델코드만으로 조회 (하위 호환)
           if (!imgUrl) {
             imgUrl = imageMap.get(modelCode);
           }
           
-          // 여전히 없으면 유사한 키 찾기 (공백, 하이픈 등 차이 무시)
+          // 3. 정규화된 키로 조회 (형식 차이 무시)
+          if (!imgUrl) {
+            const normalizedModel = normalizeModelCode(modelCode);
+            if (normalizedModel) {
+              const normalizedKey = `${carrier}:${normalizedModel}`;
+              imgUrl = imageMap.get(normalizedKey);
+              if (!imgUrl) {
+                imgUrl = imageMap.get(normalizedModel);
+              }
+            }
+          }
+          
+          // 4. 여전히 없으면 유사한 키 찾기 (공백, 하이픈 등 차이 무시)
           if (!imgUrl && imageMap.size > 0) {
-            const modelNormalized = modelCode.replace(/[\s-_]/g, '').toLowerCase();
+            const modelNormalized = normalizeModelCode(modelCode);
             const mapKeys = Array.from(imageMap.keys());
             
             for (const mapKey of mapKeys) {
               const keyWithoutCarrier = mapKey.includes(':') ? mapKey.split(':')[1] : mapKey;
-              const keyNormalized = keyWithoutCarrier.replace(/[\s-_]/g, '').toLowerCase();
+              const keyNormalized = normalizeModelCode(keyWithoutCarrier);
               
               if (keyNormalized === modelNormalized || 
                   keyNormalized.includes(modelNormalized) || 
@@ -4204,6 +4236,12 @@ const directStoreUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 } // 10MB 제한
 });
+
+// 모델 코드 정규화 함수 (공백, 하이픈, 언더스코어 제거, 소문자 변환)
+function normalizeModelCode(modelCode) {
+  if (!modelCode) return '';
+  return modelCode.replace(/[\s\-_]/g, '').toLowerCase();
+}
 
 // 모델명과 펫네임에서 제조사 추출 함수 (대소문자 구분 없음)
 function extractManufacturer(modelName, petName = '') {
@@ -4599,19 +4637,33 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
         console.log(`✅ [이미지 업로드] Google Sheets 추가 성공`);
       }
       
-      // 이미지 업로드 성공 시 캐시 무효화 (직영점 모드 캐시)
-      try {
-        const { invalidateDirectStoreCache } = require('./directRoutes');
-        invalidateDirectStoreCache(carrier);
-        console.log(`🔄 [이미지 업로드] 캐시 무효화 완료: 통신사=${carrier}`);
-      } catch (cacheError) {
-        console.warn('⚠️ [이미지 업로드] 캐시 무효화 실패 (무시):', cacheError.message);
+      // 구글시트 저장 완료 확인 후 캐시 무효화 (직영점 모드 캐시)
+      // 저장이 완료된 후에만 캐시를 무효화하여 최신 데이터가 반영되도록 함
+      if (sheetSaveSuccess) {
+        try {
+          const { invalidateDirectStoreCache } = require('./directRoutes');
+          invalidateDirectStoreCache(carrier);
+          console.log(`🔄 [이미지 업로드] 캐시 무효화 완료: 통신사=${carrier} (구글시트 저장 완료 후)`);
+        } catch (cacheError) {
+          console.warn('⚠️ [이미지 업로드] 캐시 무효화 실패 (무시):', cacheError.message);
+        }
+      } else {
+        console.warn('⚠️ [이미지 업로드] 구글시트 저장 실패로 인해 캐시 무효화 건너뜀');
       }
     } catch (sheetError) {
       console.error('❌ [이미지 업로드] Google Sheets 저장 오류:', sheetError);
       console.error('❌ [이미지 업로드] 스택 트레이스:', sheetError.stack);
       
       // Discord 업로드는 성공했지만 Google Sheets 저장 실패
+      // 최신 데이터 반영을 위해 캐시는 무효화 (다음 요청 시 구글시트에서 다시 읽음)
+      try {
+        const { invalidateDirectStoreCache } = require('./directRoutes');
+        invalidateDirectStoreCache(carrier);
+        console.log(`🔄 [이미지 업로드] 캐시 무효화 완료: 통신사=${carrier} (구글시트 저장 실패 후에도 무효화)`);
+      } catch (cacheError) {
+        console.warn('⚠️ [이미지 업로드] 캐시 무효화 실패 (무시):', cacheError.message);
+      }
+      
       // 사용자에게 경고와 함께 성공 응답 반환 (이미지 URL은 사용 가능)
       const elapsedTime = Date.now() - startTime;
       console.warn(`⚠️ [이미지 업로드] Discord 업로드는 성공했지만 Google Sheets 저장 실패 (${elapsedTime}ms)`);
@@ -4640,6 +4692,170 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
     return res.status(500).json({
       success: false,
       error: `이미지 업로드에 실패했습니다: ${error.message}`,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
+// POST /api/direct/upload-transition-page-image: 연결페이지 이미지 업로드 (Discord)
+app.post('/api/direct/upload-transition-page-image', directStoreUpload.single('image'), async (req, res) => {
+  const startTime = Date.now();
+  let imageUrl = null;
+  let discordUploadSuccess = false;
+  
+  try {
+    console.log('📤 [연결페이지 이미지 업로드] 요청 시작');
+    
+    if (!req.file) {
+      console.error('❌ [연결페이지 이미지 업로드] 파일이 없습니다.');
+      return res.status(400).json({
+        success: false,
+        error: '이미지 파일이 없습니다.'
+      });
+    }
+
+    const file = req.file;
+    const carrier = req.body.carrier || 'SK';
+    const category = req.body.category || 'premium';
+    
+    console.log(`📤 [연결페이지 이미지 업로드] 통신사: ${carrier}, 카테고리: ${category}, 파일명: ${file.originalname}, 크기: ${file.size} bytes`);
+
+    // Discord 봇 초기화 확인
+    if (!DISCORD_LOGGING_ENABLED || !discordBot) {
+      console.error('❌ [연결페이지 이미지 업로드] Discord 봇이 초기화되지 않았습니다.');
+      return res.status(500).json({
+        success: false,
+        error: 'Discord 봇이 초기화되지 않았습니다.'
+      });
+    }
+
+    // Discord 봇이 준비될 때까지 대기
+    if (!discordBot.isReady()) {
+      console.log('⏳ [연결페이지 이미지 업로드] Discord 봇 준비 대기 중...');
+      for (let i = 0; i < 10; i++) {
+        if (discordBot.isReady()) break;
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+
+    if (!discordBot.isReady()) {
+      console.error('❌ [연결페이지 이미지 업로드] Discord 봇이 준비되지 않았습니다.');
+      return res.status(500).json({
+        success: false,
+        error: 'Discord 봇이 준비되지 않았습니다.'
+      });
+    }
+
+    // 포럼 채널 가져오기
+    const forumChannelId = DISCORD_STORE_FORUM_CHANNEL_ID;
+    
+    if (!forumChannelId) {
+      console.error('❌ [연결페이지 이미지 업로드] Discord 포럼 채널 ID가 설정되지 않았습니다.');
+      return res.status(500).json({
+        success: false,
+        error: 'Discord 포럼 채널 ID가 설정되지 않았습니다.'
+      });
+    }
+    
+    let forumChannel;
+    try {
+      forumChannel = await discordBot.channels.fetch(forumChannelId);
+    } catch (fetchError) {
+      console.error(`❌ [연결페이지 이미지 업로드] Discord 포럼 채널 가져오기 실패:`, fetchError);
+      return res.status(500).json({
+        success: false,
+        error: `Discord 포럼 채널을 가져올 수 없습니다: ${fetchError.message}`
+      });
+    }
+    
+    if (!forumChannel) {
+      console.error(`❌ [연결페이지 이미지 업로드] Discord 포럼 채널을 찾을 수 없습니다: ${forumChannelId}`);
+      return res.status(500).json({
+        success: false,
+        error: `Discord 포럼 채널을 찾을 수 없습니다: ${forumChannelId}`
+      });
+    }
+
+    // "연결페이지" 포스트 찾기 또는 생성
+    const postName = '연결페이지';
+    let transitionPost;
+    
+    try {
+      // 활성 스레드에서 찾기
+      const activeThreads = await forumChannel.threads.fetchActive();
+      transitionPost = Array.from(activeThreads.threads.values()).find(
+        thread => thread.name === postName
+      );
+      
+      if (!transitionPost) {
+        // 아카이브된 스레드에서 찾기
+        try {
+          const archivedThreads = await forumChannel.threads.fetchArchived({ limit: 100 });
+          transitionPost = Array.from(archivedThreads.threads.values()).find(
+            thread => thread.name === postName
+          );
+        } catch (archivedError) {
+          console.warn('아카이브된 스레드 조회 실패:', archivedError);
+        }
+      }
+      
+      if (!transitionPost) {
+        // 포스트 생성
+        console.log(`📌 [연결페이지 이미지 업로드] 새 포스트 생성: ${postName}`);
+        transitionPost = await forumChannel.threads.create({
+          name: postName,
+          message: {
+            content: '연결페이지 이미지 저장'
+          },
+          appliedTags: []
+        });
+        console.log(`✅ [연결페이지 이미지 업로드] 새 포스트 생성 완료: ${postName} (ID: ${transitionPost.id})`);
+      }
+    } catch (postError) {
+      console.error('❌ [연결페이지 이미지 업로드] 연결페이지 포스트 찾기/생성 실패:', postError);
+      return res.status(500).json({
+        success: false,
+        error: `연결페이지 포스트 찾기/생성 실패: ${postError.message}`
+      });
+    }
+
+    // 이미지 업로드
+    const filename = `transition-page-${carrier}-${category}-${Date.now()}.${file.originalname.split('.').pop()}`;
+    console.log(`📤 [연결페이지 이미지 업로드] Discord에 업로드 시작: ${filename}`);
+    
+    try {
+      const attachment = {
+        attachment: file.buffer,
+        name: filename
+      };
+      
+      const message = await transitionPost.send({ files: [attachment] });
+      imageUrl = message.attachments.first().url;
+      discordUploadSuccess = true;
+      console.log(`✅ [연결페이지 이미지 업로드] Discord 업로드 성공: ${imageUrl}`);
+    } catch (uploadError) {
+      console.error('❌ [연결페이지 이미지 업로드] Discord 업로드 실패:', uploadError);
+      return res.status(500).json({
+        success: false,
+        error: `Discord 이미지 업로드 실패: ${uploadError.message}`
+      });
+    }
+
+    const elapsedTime = Date.now() - startTime;
+    console.log(`✅ [연결페이지 이미지 업로드] 완료 (${elapsedTime}ms)`);
+
+    return res.json({
+      success: true,
+      imageUrl: imageUrl
+    });
+  } catch (error) {
+    const elapsedTime = Date.now() - startTime;
+    console.error(`❌ [연결페이지 이미지 업로드] 전체 프로세스 오류 (${elapsedTime}ms):`, error);
+    console.error('❌ [연결페이지 이미지 업로드] 스택 트레이스:', error.stack);
+    
+    return res.status(500).json({
+      success: false,
+      error: `연결페이지 이미지 업로드에 실패했습니다: ${error.message}`,
       details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }

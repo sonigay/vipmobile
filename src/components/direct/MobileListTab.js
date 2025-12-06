@@ -165,13 +165,6 @@ const MobileListTab = ({ onProductSelect }) => {
         throw new Error(result?.error || '이미지 업로드에 실패했습니다.');
       }
 
-      // 성공 시 리스트 업데이트 (이미지 URL 반영)
-      setMobileList(prevList => prevList.map(item =>
-        item.id === uploadingModelId
-          ? { ...item, image: result.imageUrl } // 서버에서 imageUrl을 반환한다고 가정
-          : item
-      ));
-
       // 경고가 있으면 함께 표시
       if (result.warning) {
         alert(`이미지가 업로드되었습니다.\n\n⚠️ 경고: ${result.warning}`);
@@ -180,6 +173,33 @@ const MobileListTab = ({ onProductSelect }) => {
       }
       
       console.log('✅ [이미지 업로드] 성공:', result.imageUrl);
+      
+      // 서버에서 최신 데이터를 다시 가져와서 UI에 반영
+      // 구글시트에 저장된 최신 이미지 URL을 포함한 전체 데이터를 가져옴
+      try {
+        console.log('🔄 [이미지 업로드] 서버에서 최신 데이터 재로딩 중...');
+        const freshData = await directStoreApi.getMobileList(carrier);
+        setMobileList(freshData || []);
+        console.log('✅ [이미지 업로드] 최신 데이터 재로딩 완료');
+        
+        // 이미지 업로드 성공 이벤트 발생 (오늘의휴대폰 페이지 등 다른 컴포넌트에서 데이터 재로딩)
+        window.dispatchEvent(new CustomEvent('imageUploaded', { 
+          detail: { carrier, modelId: actualModelId, imageUrl: result.imageUrl } 
+        }));
+      } catch (reloadError) {
+        console.warn('⚠️ [이미지 업로드] 최신 데이터 재로딩 실패, 로컬 상태만 업데이트:', reloadError);
+        // 재로딩 실패 시 로컬 상태만 업데이트 (fallback)
+        setMobileList(prevList => prevList.map(item =>
+          item.id === uploadingModelId
+            ? { ...item, image: result.imageUrl }
+            : item
+        ));
+        
+        // 재로딩 실패해도 이벤트는 발생 (다른 컴포넌트에서 시도)
+        window.dispatchEvent(new CustomEvent('imageUploaded', { 
+          detail: { carrier, modelId: actualModelId, imageUrl: result.imageUrl } 
+        }));
+      }
     } catch (err) {
       console.error('❌ [이미지 업로드] 실패:', err);
       const errorMessage = err.message || err.toString() || '이미지 업로드에 실패했습니다.';

@@ -326,4 +326,86 @@ export const directStoreApi = {
         }
     },
 
+    // === 메인페이지 문구 설정 ===
+
+    // 메인페이지 문구 조회
+    getMainPageTexts: async () => {
+        try {
+            const response = await fetch(`${BASE_URL}/main-page-texts`);
+            if (!response.ok) throw new Error('문구 조회 실패');
+            return response.json();
+        } catch (err) {
+            console.error('문구 조회 실패:', err);
+            return { success: false, error: err.message };
+        }
+    },
+
+    // 메인헤더 문구만 조회
+    getMainHeaderText: async () => {
+        try {
+            const response = await fetch(`${BASE_URL}/main-page-texts`);
+            if (!response.ok) throw new Error('메인헤더 문구 조회 실패');
+            const data = await response.json();
+            return { success: true, data: data.data?.mainHeader || null };
+        } catch (err) {
+            console.error('메인헤더 문구 조회 실패:', err);
+            return { success: false, error: err.message };
+        }
+    },
+
+    // 연결페이지 문구 조회
+    getTransitionPageText: async (carrier, category) => {
+        try {
+            const response = await fetch(`${BASE_URL}/main-page-texts`);
+            if (!response.ok) throw new Error('연결페이지 문구 조회 실패');
+            const data = await response.json();
+            const text = data.data?.transitionPages?.[carrier]?.[category] || null;
+            return { success: true, data: text };
+        } catch (err) {
+            console.error('연결페이지 문구 조회 실패:', err);
+            return { success: false, error: err.message };
+        }
+    },
+
+    // 문구 저장
+    saveMainPageText: async (carrier, category, textType, content, imageUrl = '') => {
+        try {
+            const response = await fetch(`${BASE_URL}/main-page-texts`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ carrier, category, textType, content, imageUrl })
+            });
+            if (!response.ok) throw new Error('문구 저장 실패');
+            return response.json();
+        } catch (err) {
+            console.error('문구 저장 실패:', err);
+            return { success: false, error: err.message };
+        }
+    },
+
+    // 연결페이지 이미지 업로드
+    uploadTransitionPageImage: async (file, carrier, category) => {
+        try {
+            const formData = new FormData();
+            formData.append('image', file);
+            formData.append('carrier', carrier);
+            formData.append('category', category);
+
+            const response = await fetch(`${BASE_URL}/upload-transition-page-image`, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || '이미지 업로드 실패');
+            }
+
+            return response.json();
+        } catch (err) {
+            console.error('연결페이지 이미지 업로드 실패:', err);
+            return { success: false, error: err.message };
+        }
+    },
+
 };

@@ -19,7 +19,8 @@ import {
   Refresh as RefreshIcon,
   Settings as SettingsIcon,
   Link as LinkIcon,
-  Assessment as AssessmentIcon
+  Assessment as AssessmentIcon,
+  TextFields as TextFieldsIcon
 } from '@mui/icons-material';
 
 import { getModeColor, getModeTitle } from '../config/modeConfig';
@@ -29,6 +30,7 @@ import directStoreTheme from '../theme/DirectStoreTheme';
 // 탭 컴포넌트 임포트
 import PolicySettingsTab from './direct/management/PolicySettingsTab';
 import LinkSettingsTab from './direct/management/LinkSettingsTab';
+import MainPageTextSettingsTab from './direct/management/MainPageTextSettingsTab';
 import DirectSalesReportTab from './direct/DirectSalesReportTab';
 import OpeningInfoPage from './direct/OpeningInfoPage';
 
@@ -83,6 +85,9 @@ const DirectStoreManagementMode = ({
     }
     if (hasLinkPermission) {
       tabs.push({ key: 'link', label: '링크 설정', icon: <LinkIcon />, component: <LinkSettingsTab /> });
+    }
+    if (hasLinkPermission) {
+      tabs.push({ key: 'mainPageText', label: '메인페이지문구설정', icon: <TextFieldsIcon />, component: <MainPageTextSettingsTab /> });
     }
     if (hasSalesReportPermission) {
       tabs.push({ 

@@ -16,11 +16,13 @@ import {
 } from '@mui/material';
 import {
   ShoppingCart as ShoppingCartIcon,
-  Refresh as RefreshIcon
+  Refresh as RefreshIcon,
+  PlayArrow as PlayArrowIcon,
+  Pause as PauseIcon
 } from '@mui/icons-material';
 import { directStoreApi } from '../../api/directStoreApi';
 
-const ProductCard = ({ product, isPremium, onSelect, compact }) => {
+const ProductCard = ({ product, isPremium, onSelect, compact, theme }) => {
   const getCarrierChipColor = (carrier) => {
     switch (carrier) {
       case 'SK': return 'info'; // 하늘색 계열
@@ -28,6 +30,14 @@ const ProductCard = ({ product, isPremium, onSelect, compact }) => {
       case 'LG': return 'error'; // 핑크/레드 계열
       default: return 'default';
     }
+  };
+  
+  const cardTheme = theme || {
+    primary: '#ffd700',
+    secondary: '#ffed4e',
+    cardBg: 'rgba(255, 255, 255, 0.95)',
+    accent: '#f57f17',
+    text: '#f57f17'
   };
 
   const tagChips = [];
@@ -40,15 +50,21 @@ const ProductCard = ({ product, isPremium, onSelect, compact }) => {
   return (
     <Card
       sx={{
-        height: 'auto',  // 내용에 맞게 자동 높이
-        minHeight: compact ? 380 : 420,  // 최소 높이만 설정
+        height: 'auto',
+        minHeight: compact ? 380 : 420,
         display: 'flex',
         flexDirection: 'column',
         position: 'relative',
         overflow: 'visible',
         cursor: 'pointer',
-        transition: 'transform 0.2s',
-        '&:hover': { transform: 'translateY(-5px)', boxShadow: 6 }
+        backgroundColor: cardTheme.cardBg,
+        border: `2px solid ${cardTheme.primary}30`,
+        transition: 'all 0.3s ease',
+        '&:hover': { 
+          transform: 'translateY(-5px)', 
+          boxShadow: `0 8px 24px ${cardTheme.primary}40`,
+          borderColor: cardTheme.primary
+        }
       }}
       onClick={() => onSelect(product)}
     >
@@ -77,11 +93,12 @@ const ProductCard = ({ product, isPremium, onSelect, compact }) => {
 
       <Box sx={{ 
         position: 'relative', 
-        pt: compact ? '50%' : '60%',  // 이미지 영역 비율 조정 (사진이 잘리지 않도록)
-        minHeight: compact ? 120 : 150,  // 최소 높이 설정
-        bgcolor: '#FAFAFA', 
+        pt: compact ? '50%' : '60%',
+        minHeight: compact ? 120 : 150,
+        background: `linear-gradient(135deg, ${cardTheme.primary}10 0%, ${cardTheme.secondary}10 100%)`,
         borderRadius: '16px 16px 0 0', 
-        overflow: 'hidden' 
+        overflow: 'hidden',
+        borderBottom: `2px solid ${cardTheme.primary}20`
       }}>
         <CardMedia
           component="img"
@@ -118,16 +135,21 @@ const ProductCard = ({ product, isPremium, onSelect, compact }) => {
           {product.petName}
         </Typography>
 
-        <Stack spacing={1} sx={{ bgcolor: '#F5F5F5', p: compact ? 1 : 1.5, borderRadius: 2 }}>
+        <Stack spacing={1} sx={{ 
+          background: `linear-gradient(135deg, ${cardTheme.primary}08 0%, ${cardTheme.secondary}08 100%)`,
+          p: compact ? 1 : 1.5, 
+          borderRadius: 2,
+          border: `1px solid ${cardTheme.primary}20`
+        }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
             <Typography variant="body2" color="text.secondary">출고가</Typography>
-            <Typography variant="body2" sx={{ textDecoration: 'line-through' }}>
+            <Typography variant="body2" sx={{ textDecoration: 'line-through', color: 'text.secondary' }}>
               {product.factoryPrice?.toLocaleString()}원
             </Typography>
           </Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography variant="body1" fontWeight="bold" color="primary">구매가</Typography>
-            <Typography variant={compact ? 'h6' : 'h5'} fontWeight="bold" color="primary">
+            <Typography variant="body1" fontWeight="bold" sx={{ color: cardTheme.text }}>구매가</Typography>
+            <Typography variant={compact ? 'h6' : 'h5'} fontWeight="bold" sx={{ color: cardTheme.primary }}>
               {(product.purchasePrice || product.purchasePriceWithAddon || product.purchasePriceWithoutAddon)?.toLocaleString()}원
             </Typography>
           </Box>
@@ -146,7 +168,18 @@ const ProductCard = ({ product, isPremium, onSelect, compact }) => {
           fullWidth
           startIcon={<ShoppingCartIcon />}
           size={compact ? 'medium' : 'large'}
-          sx={{ borderRadius: 2 }}
+          sx={{ 
+            borderRadius: 2,
+            backgroundColor: cardTheme.primary,
+            color: 'white',
+            fontWeight: 'bold',
+            '&:hover': {
+              backgroundColor: cardTheme.accent,
+              transform: 'scale(1.02)',
+              boxShadow: `0 4px 12px ${cardTheme.primary}60`
+            },
+            transition: 'all 0.2s ease'
+          }}
           onClick={(e) => {
             e.stopPropagation();
             onSelect(product);
@@ -165,6 +198,15 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [compact, setCompact] = useState(true);
+  const [mainHeaderText, setMainHeaderText] = useState('');
+  const [currentCarrier, setCurrentCarrier] = useState(null); // 현재 표시 중인 통신사 (테마용)
+  
+  // 슬라이드쇼 관련 상태
+  const [isSlideshowActive, setIsSlideshowActive] = useState(false);
+  const [slideshowData, setSlideshowData] = useState([]); // 슬라이드쇼용 데이터 구조
+  const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+  const [isTransitionPage, setIsTransitionPage] = useState(false);
+  const [transitionPageData, setTransitionPageData] = useState(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -189,6 +231,203 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
 
   useEffect(() => {
     fetchData();
+    loadMainHeaderText();
+  }, [fetchData]);
+
+  // 메인헤더 문구 로드
+  const loadMainHeaderText = async () => {
+    try {
+      const response = await directStoreApi.getMainHeaderText();
+      if (response.success && response.data) {
+        setMainHeaderText(response.data.content || '');
+      }
+    } catch (err) {
+      console.error('메인헤더 문구 로드 실패:', err);
+    }
+  };
+
+  // 슬라이드쇼용 데이터 준비: 모든 통신사의 체크된 상품 가져오기
+  const prepareSlideshowData = useCallback(async () => {
+    try {
+      const carriers = ['SK', 'KT', 'LG'];
+      const allCheckedProducts = [];
+      
+      // 각 통신사별로 체크된 상품 가져오기
+      for (const carrier of carriers) {
+        try {
+          const mobileList = await directStoreApi.getMobileList(carrier);
+          // 체크된 상품 필터링 (isPopular, isRecommended, isCheap, isPremium, isBudget 중 하나라도 true)
+          const checked = mobileList.filter(product => 
+            product.isPopular || 
+            product.isRecommended || 
+            product.isCheap || 
+            product.isPremium || 
+            product.isBudget
+          );
+          
+          if (checked.length > 0) {
+            allCheckedProducts.push({
+              carrier,
+              products: checked,
+              count: checked.length
+            });
+          }
+        } catch (err) {
+          console.warn(`${carrier} 통신사 데이터 가져오기 실패:`, err);
+        }
+      }
+      
+      // 체크된 상품 수가 많은 순서로 정렬
+      allCheckedProducts.sort((a, b) => b.count - a.count);
+      
+      // 슬라이드쇼 데이터 구조 생성
+      const slideshowItems = [];
+      
+      for (let i = 0; i < allCheckedProducts.length; i++) {
+        const carrierData = allCheckedProducts[i];
+        const { carrier, products } = carrierData;
+        
+        // 프리미엄과 중저가 분리
+        const premium = products.filter(p => p.isPremium);
+        const budget = products.filter(p => p.isBudget);
+        
+        // 프리미엄 상품이 있으면
+        if (premium.length > 0) {
+          // 다음에 표시될 상품이 있으면 연결페이지 추가 (마지막 그룹이 아니거나 중저가 상품이 있으면)
+          const hasNext = i < allCheckedProducts.length - 1 || budget.length > 0;
+          if (hasNext) {
+            const transitionText = await directStoreApi.getTransitionPageText(carrier, 'premium');
+            slideshowItems.push({
+              type: 'transition',
+              carrier,
+              category: 'premium',
+              content: transitionText.data?.content || `이어서 ${carrier} 프리미엄 상품 안내입니다.`,
+              imageUrl: transitionText.data?.imageUrl || ''
+            });
+          }
+          
+          // 프리미엄 상품들 추가
+          premium.forEach((product, idx) => {
+            slideshowItems.push({
+              type: 'product',
+              product,
+              carrier
+            });
+          });
+        }
+        
+        // 중저가 상품이 있으면
+        if (budget.length > 0) {
+          // 다음에 표시될 상품이 있으면 연결페이지 추가 (마지막 통신사가 아니면)
+          const hasNext = i < allCheckedProducts.length - 1;
+          if (hasNext) {
+            const transitionText = await directStoreApi.getTransitionPageText(carrier, 'budget');
+            slideshowItems.push({
+              type: 'transition',
+              carrier,
+              category: 'budget',
+              content: transitionText.data?.content || `이어서 ${carrier} 중저가 상품 안내입니다.`,
+              imageUrl: transitionText.data?.imageUrl || ''
+            });
+          }
+          
+          // 중저가 상품들 추가
+          budget.forEach(product => {
+            slideshowItems.push({
+              type: 'product',
+              product,
+              carrier
+            });
+          });
+        }
+      }
+      
+      setSlideshowData(slideshowItems);
+      return slideshowItems;
+    } catch (err) {
+      console.error('슬라이드쇼 데이터 준비 실패:', err);
+      return [];
+    }
+  }, []);
+
+  // 슬라이드쇼 시작/중지
+  const toggleSlideshow = useCallback(async () => {
+    if (!isSlideshowActive) {
+      // 슬라이드쇼 시작
+      const data = await prepareSlideshowData();
+      if (data.length === 0) {
+        alert('슬라이드쇼할 체크된 상품이 없습니다.');
+        return;
+      }
+      setIsSlideshowActive(true);
+      setCurrentSlideIndex(0);
+      const firstItem = data[0];
+      setIsTransitionPage(firstItem?.type === 'transition');
+      setTransitionPageData(firstItem?.type === 'transition' ? firstItem : null);
+      if (firstItem?.type === 'product') {
+        setCurrentCarrier(firstItem.carrier);
+      } else if (firstItem?.type === 'transition') {
+        setCurrentCarrier(firstItem.carrier);
+      }
+    } else {
+      // 슬라이드쇼 중지
+      setIsSlideshowActive(false);
+      setCurrentSlideIndex(0);
+      setIsTransitionPage(false);
+      setTransitionPageData(null);
+    }
+  }, [isSlideshowActive, prepareSlideshowData]);
+
+  // 슬라이드쇼 자동 진행
+  useEffect(() => {
+    if (!isSlideshowActive || slideshowData.length === 0) return;
+    
+    const currentItem = slideshowData[currentSlideIndex];
+    const displayDuration = currentItem?.type === 'transition' ? 3000 : 5000;
+    
+    const timeout = setTimeout(() => {
+      setCurrentSlideIndex(prev => {
+        const nextIndex = prev + 1;
+        
+        if (nextIndex >= slideshowData.length) {
+          // 마지막 슬라이드 후 처음으로 돌아가기
+          setIsSlideshowActive(false);
+          setCurrentSlideIndex(0);
+          setIsTransitionPage(false);
+          setTransitionPageData(null);
+          return 0;
+        }
+        
+        const nextItem = slideshowData[nextIndex];
+        setIsTransitionPage(nextItem.type === 'transition');
+        setTransitionPageData(nextItem.type === 'transition' ? nextItem : null);
+        
+        if (nextItem.type === 'product') {
+          setCurrentCarrier(nextItem.carrier);
+        }
+        
+        return nextIndex;
+      });
+    }, displayDuration);
+    
+    return () => clearTimeout(timeout);
+  }, [isSlideshowActive, slideshowData, currentSlideIndex]);
+
+  // 이미지 업로드 이벤트 리스너: 이미지 업로드 성공 시 데이터 재로딩
+  useEffect(() => {
+    const handleImageUploaded = (event) => {
+      console.log('🔄 [오늘의휴대폰] 이미지 업로드 이벤트 수신, 데이터 재로딩...', event.detail);
+      // 약간의 지연 후 재로딩 (구글시트 저장 완료 대기)
+      setTimeout(() => {
+        fetchData();
+      }, 1000); // 1초 후 재로딩
+    };
+
+    window.addEventListener('imageUploaded', handleImageUploaded);
+    
+    return () => {
+      window.removeEventListener('imageUploaded', handleImageUploaded);
+    };
   }, [fetchData]);
 
   if (loading) {
@@ -208,9 +447,65 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
   }
 
   // 프리미엄과 중저가를 하나의 배열로 합치기 (프리미엄 먼저, 중저가 나중에)
-  const displayPremiumPhones = premiumPhones.slice(0, 6);
-  const displayBudgetPhones = budgetPhones.slice(0, 3);
+  // 표시 개수 조정: 프리미엄 6개→3개, 중저가 3개→1~2개
+  const displayPremiumPhones = premiumPhones.slice(0, 3);
+  const displayBudgetPhones = budgetPhones.slice(0, 2);
   const allProducts = [...displayPremiumPhones, ...displayBudgetPhones];
+  
+  // 현재 표시 중인 통신사 감지 (테마용)
+  useEffect(() => {
+    if (allProducts.length > 0) {
+      // 첫 번째 상품의 통신사를 기본값으로 사용
+      const firstCarrier = allProducts[0]?.carrier;
+      if (firstCarrier) {
+        setCurrentCarrier(firstCarrier);
+      }
+    }
+  }, [allProducts]);
+  
+  // 통신사별 테마 색상 정의
+  const getCarrierTheme = (carrier) => {
+    switch (carrier) {
+      case 'SK':
+        return {
+          primary: '#1976d2', // 파란색
+          secondary: '#42a5f5',
+          background: 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 50%, #90caf9 100%)',
+          cardBg: 'rgba(255, 255, 255, 0.95)',
+          accent: '#1565c0',
+          text: '#0d47a1'
+        };
+      case 'KT':
+        return {
+          primary: '#2e7d32', // 녹색
+          secondary: '#66bb6a',
+          background: 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 50%, #a5d6a7 100%)',
+          cardBg: 'rgba(255, 255, 255, 0.95)',
+          accent: '#1b5e20',
+          text: '#1b5e20'
+        };
+      case 'LG':
+        return {
+          primary: '#c2185b', // 핫핑크
+          secondary: '#f06292',
+          background: 'linear-gradient(135deg, #fce4ec 0%, #f8bbd0 50%, #f48fb1 100%)',
+          cardBg: 'rgba(255, 255, 255, 0.95)',
+          accent: '#ad1457',
+          text: '#880e4f'
+        };
+      default:
+        return {
+          primary: '#ffd700', // 골드 (기본값)
+          secondary: '#ffed4e',
+          background: 'linear-gradient(135deg, #fff9e6 0%, #ffe082 50%, #ffd54f 100%)',
+          cardBg: 'rgba(255, 255, 255, 0.95)',
+          accent: '#f57f17',
+          text: '#f57f17'
+        };
+    }
+  };
+  
+  const theme = getCarrierTheme(currentCarrier);
 
   return (
     <Box
@@ -219,78 +514,330 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
         overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
-        p: isFullScreen ? (compact ? 1 : 1.5) : (compact ? 1.5 : 2),
-        bgcolor: 'background.default',
-        transition: 'all 0.3s ease'
+        background: theme.background,
+        transition: 'all 0.5s ease',
+        position: 'relative'
       }}
     >
-      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={compact ? 1.5 : 2}>
-          <Typography variant="h6" fontWeight="bold">오늘의 휴대폰</Typography>
-          <Stack direction="row" spacing={1}>
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<RefreshIcon />}
-              onClick={fetchData}
-              disabled={loading}
+      {/* 헤더 영역: 메인헤더 문구 + 제목 + 버튼 */}
+      <Box
+        sx={{
+          p: isFullScreen ? (compact ? 2 : 3) : (compact ? 2 : 2.5),
+          pb: isFullScreen && mainHeaderText ? (compact ? 1.5 : 2) : (compact ? 1.5 : 2),
+          background: isFullScreen ? 'transparent' : `linear-gradient(to bottom, ${theme.cardBg}, transparent)`,
+          transition: 'all 0.3s ease'
+        }}
+      >
+        {/* 메인헤더 문구 */}
+        {mainHeaderText && (
+          <Box
+            sx={{
+              mb: isFullScreen ? 2 : 1.5,
+              textAlign: 'center',
+              py: isFullScreen ? 3 : 2,
+              px: 2,
+              borderRadius: 2,
+              background: isFullScreen 
+                ? `linear-gradient(135deg, ${theme.cardBg} 0%, rgba(255,255,255,0.8) 100%)`
+                : 'transparent',
+              boxShadow: isFullScreen ? 3 : 0,
+              transition: 'all 0.3s ease'
+            }}
+          >
+            <Typography
+              variant={isFullScreen ? 'h5' : 'h6'}
+              sx={{
+                fontWeight: 'bold',
+                color: theme.text,
+                lineHeight: 1.6,
+                textShadow: isFullScreen ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
+              }}
             >
-              새로고침
-            </Button>
-            <Button
-              variant={compact ? 'contained' : 'outlined'}
-              size="small"
-              onClick={() => setCompact(prev => !prev)}
-              sx={{ minWidth: 100 }}
+              {mainHeaderText}
+            </Typography>
+          </Box>
+        )}
+        
+        {/* 제목과 버튼 영역 */}
+        {!isFullScreen && (
+          <Stack direction="row" justifyContent="space-between" alignItems="center">
+            <Typography 
+              variant="h6" 
+              fontWeight="bold"
+              sx={{ color: theme.text }}
             >
-              {compact ? '컴팩트' : '넉넉하게'}
-            </Button>
+              오늘의 휴대폰
+            </Typography>
+            <Stack direction="row" spacing={1}>
+              <Button
+                variant={isSlideshowActive ? 'contained' : 'outlined'}
+                size="small"
+                startIcon={isSlideshowActive ? <PauseIcon /> : <PlayArrowIcon />}
+                onClick={toggleSlideshow}
+                sx={{
+                  ...(isSlideshowActive ? {
+                    backgroundColor: theme.primary,
+                    color: 'white',
+                    '&:hover': {
+                      backgroundColor: theme.accent
+                    }
+                  } : {
+                    borderColor: theme.primary,
+                    color: theme.primary,
+                    '&:hover': {
+                      borderColor: theme.accent,
+                      backgroundColor: `${theme.primary}15`
+                    }
+                  })
+                }}
+              >
+                {isSlideshowActive ? '슬라이드쇼 중지' : '슬라이드쇼 시작'}
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<RefreshIcon />}
+                onClick={fetchData}
+                disabled={loading || isSlideshowActive}
+                sx={{
+                  borderColor: theme.primary,
+                  color: theme.primary,
+                  '&:hover': {
+                    borderColor: theme.accent,
+                    backgroundColor: `${theme.primary}15`
+                  }
+                }}
+              >
+                새로고침
+              </Button>
+              <Button
+                variant={compact ? 'contained' : 'outlined'}
+                size="small"
+                onClick={() => setCompact(prev => !prev)}
+                disabled={isSlideshowActive}
+                sx={{
+                  minWidth: 100,
+                  ...(compact ? {
+                    backgroundColor: theme.primary,
+                    color: 'white',
+                    '&:hover': {
+                      backgroundColor: theme.accent
+                    }
+                  } : {
+                    borderColor: theme.primary,
+                    color: theme.primary,
+                    '&:hover': {
+                      borderColor: theme.accent,
+                      backgroundColor: `${theme.primary}15`
+                    }
+                  })
+                }}
+              >
+                {compact ? '컴팩트' : '넉넉하게'}
+              </Button>
+            </Stack>
           </Stack>
-        </Stack>
-
-        <Box
-          sx={{
-            display: 'grid',
-            gap: compact ? (isFullScreen ? 1 : 1.5) : (isFullScreen ? 1.5 : 2),
-            gridTemplateColumns: {
-              xs: 'repeat(2, 1fr)',   // 모바일: 2열
-              sm: 'repeat(3, 1fr)',    // 태블릿: 3열
-              md: 'repeat(4, 1fr)',    // 작은 PC: 4열
-              lg: 'repeat(5, 1fr)',    // 큰 PC: 5열
-              xl: 'repeat(6, 1fr)'     // 초대형: 6열
-            },
-            gridAutoRows: 'auto',  // 내용에 맞게 자동 높이 조정 (행 수 제한 없음)
-            alignContent: 'start',
-            alignItems: 'stretch',  // 카드들이 같은 높이를 가지도록 (하지만 autoRows로 인해 내용에 맞게 조정됨)
-            overflowY: 'auto',
-            overflowX: 'hidden',
-            flex: 1,
-            '&::-webkit-scrollbar': { width: '6px' },
-            '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(0,0,0,0.2)', borderRadius: '3px' }
-          }}
-        >
-          {allProducts.map((product) => {
-            // 프리미엄인지 중저가인지 태그로 판단
-            const isPremium = product.isPremium || false;
-            return (
-              <ProductCard
-                key={product.id}
-                product={product}
-                isPremium={isPremium}
-                onSelect={onProductSelect}
-                compact={compact}
-              />
-            );
-          })}
-          {allProducts.length === 0 && (
-            <Box sx={{ gridColumn: '1 / -1', gridRow: '1 / -1' }}>
-              <Typography color="text.secondary" align="center" py={4}>
-                등록된 휴대폰이 없습니다.
-              </Typography>
-            </Box>
-          )}
-        </Box>
+        )}
       </Box>
+
+      <Box 
+        sx={{ 
+          flex: 1, 
+          display: 'flex', 
+          flexDirection: 'column', 
+          overflow: 'hidden', 
+          width: '100%', 
+          maxWidth: '100%',
+          px: isFullScreen ? (compact ? 1 : 1.5) : (compact ? 1.5 : 2),
+          pb: isFullScreen ? (compact ? 1 : 1.5) : (compact ? 1.5 : 2),
+          position: 'relative'
+        }}
+      >
+        {/* 슬라이드쇼 모드 */}
+        {isSlideshowActive && slideshowData.length > 0 && (
+          <Box
+            sx={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              position: 'relative',
+              overflow: 'hidden'
+            }}
+          >
+            {isTransitionPage && transitionPageData ? (
+              // 연결페이지 표시 (통신사별 테마 적용)
+              (() => {
+                const transitionTheme = getCarrierTheme(transitionPageData.carrier);
+                return (
+                  <Box
+                    sx={{
+                      width: '100%',
+                      height: '100%',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      textAlign: 'center',
+                      p: 4,
+                      animation: 'fadeIn 0.5s ease-in',
+                      background: `linear-gradient(135deg, ${transitionTheme.cardBg} 0%, ${transitionTheme.primary}10 100%)`
+                    }}
+                  >
+                    {transitionPageData.imageUrl ? (
+                      <>
+                        <CardMedia
+                          component="img"
+                          image={transitionPageData.imageUrl}
+                          alt="연결페이지 이미지"
+                          sx={{
+                            maxWidth: '60%',
+                            maxHeight: '50%',
+                            objectFit: 'contain',
+                            mb: 3,
+                            borderRadius: 2,
+                            boxShadow: `0 8px 24px ${transitionTheme.primary}40`,
+                            border: `3px solid ${transitionTheme.primary}30`
+                          }}
+                        />
+                        <Typography
+                          variant="h4"
+                          sx={{
+                            fontWeight: 'bold',
+                            color: transitionTheme.text,
+                            mt: 2,
+                            textShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                            px: 2
+                          }}
+                        >
+                          {transitionPageData.content}
+                        </Typography>
+                      </>
+                    ) : (
+                      <Typography
+                        variant="h2"
+                        sx={{
+                          fontWeight: 'bold',
+                          color: transitionTheme.text,
+                          textShadow: `0 4px 12px ${transitionTheme.primary}30`,
+                          lineHeight: 1.5,
+                          px: 4,
+                          py: 3,
+                          borderRadius: 4,
+                          background: `linear-gradient(135deg, ${transitionTheme.cardBg} 0%, ${transitionTheme.primary}08 100%)`,
+                          border: `2px solid ${transitionTheme.primary}30`,
+                          boxShadow: `0 8px 32px ${transitionTheme.primary}20`
+                        }}
+                      >
+                        {transitionPageData.content}
+                      </Typography>
+                    )}
+                  </Box>
+                );
+              })()
+            ) : (
+              // 상품 표시
+              slideshowData[currentSlideIndex]?.type === 'product' && (
+                <Box
+                  sx={{
+                    width: '100%',
+                    height: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    animation: 'slideIn 0.5s ease-out'
+                  }}
+                >
+                  <Box sx={{ maxWidth: '90%', width: '100%' }}>
+                    <ProductCard
+                      product={slideshowData[currentSlideIndex].product}
+                      isPremium={slideshowData[currentSlideIndex].product.isPremium || false}
+                      onSelect={onProductSelect}
+                      compact={false}
+                      theme={getCarrierTheme(slideshowData[currentSlideIndex].carrier)}
+                    />
+                  </Box>
+                </Box>
+              )
+            )}
+          </Box>
+        )}
+
+        {/* 일반 모드: 그리드 표시 */}
+        {!isSlideshowActive && (
+          <Box
+            sx={{
+              display: 'grid',
+              gap: compact ? (isFullScreen ? 1 : 1.5) : (isFullScreen ? 1.5 : 2),
+              gridTemplateColumns: {
+                xs: 'repeat(2, 1fr)',
+                sm: 'repeat(3, 1fr)',
+                md: 'repeat(4, 1fr)',
+                lg: 'repeat(5, 1fr)',
+                xl: 'repeat(6, 1fr)'
+              },
+              gridAutoRows: 'auto',
+              alignContent: 'start',
+              alignItems: 'stretch',
+              overflowY: 'auto',
+              overflowX: 'hidden',
+              flex: 1,
+              '&::-webkit-scrollbar': { width: '6px' },
+              '&::-webkit-scrollbar-thumb': { 
+                bgcolor: `${theme.primary}80`, 
+                borderRadius: '3px',
+                '&:hover': {
+                  bgcolor: theme.primary
+                }
+              }
+            }}
+          >
+            {allProducts.map((product) => {
+              const isPremium = product.isPremium || false;
+              return (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  isPremium={isPremium}
+                  onSelect={onProductSelect}
+                  compact={compact}
+                  theme={getCarrierTheme(product.carrier)}
+                />
+              );
+            })}
+            {allProducts.length === 0 && (
+              <Box sx={{ gridColumn: '1 / -1', gridRow: '1 / -1' }}>
+                <Typography color="text.secondary" align="center" py={4}>
+                  등록된 휴대폰이 없습니다.
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        )}
+      </Box>
+      
+      <style>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+        @keyframes slideIn {
+          from {
+            opacity: 0;
+            transform: translateX(50px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+      `}</style>
     </Box>
   );
 };

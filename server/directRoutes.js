@@ -7,6 +7,7 @@ const SHEET_POLICY_ADDON = '직영점_정책_부가서비스';
 const SHEET_POLICY_INSURANCE = '직영점_정책_보험상품';
 const SHEET_POLICY_SPECIAL = '직영점_정책_별도';
 const SHEET_SETTINGS = '직영점_설정';
+const SHEET_MAIN_PAGE_TEXTS = '직영점_메인페이지문구';
 
 // 시트 헤더 정의
 const HEADERS_POLICY_MARGIN = ['통신사', '마진'];
@@ -14,6 +15,7 @@ const HEADERS_POLICY_ADDON = ['통신사', '서비스명', '월요금', '유치�
 const HEADERS_POLICY_INSURANCE = ['통신사', '보험상품명', '출고가최소', '출고가최대', '월요금', '유치추가금액', '미유치차감금액'];
 const HEADERS_POLICY_SPECIAL = ['통신사', '정책명', '추가금액', '차감금액', '적용여부'];
 const HEADERS_SETTINGS = ['통신사', '설정유형', '시트ID', '시트URL', '설정값JSON'];
+const HEADERS_MAIN_PAGE_TEXTS = ['통신사', '카테고리', '설정유형', '문구내용', '이미지URL', '수정일시'];
 
 function createSheetsClient() {
   const GOOGLE_SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
@@ -53,6 +55,12 @@ function setCache(key, data, ttlMs = 60 * 1000) {
 function deleteCache(key) {
   cacheStore.delete(key);
   console.log(`[Direct] 캐시 무효화: ${key}`);
+}
+
+// 모델 코드 정규화 함수 (공백, 하이픈, 언더스코어 제거, 소문자 변환)
+function normalizeModelCode(modelCode) {
+  if (!modelCode) return '';
+  return modelCode.replace(/[\s\-_]/g, '').toLowerCase();
 }
 
 // 캐시 무효화 함수를 외부에서 사용할 수 있도록 export
@@ -1033,18 +1041,38 @@ function setupDirectRoutes(app) {
         const modelName = (row[2] || '').trim(); // 모델명 (모델ID와 동일)
         const imageUrl = (row[5] || '').trim();
         
-        // 현재 조회 중인 통신사와 일치하는 경우만 매핑
-        if (imageUrl && (!rowCarrier || rowCarrier === carrierParam)) {
+        // 이미지 URL이 없으면 건너뛰기
+        if (!imageUrl) {
+          return;
+        }
+        
+        // 통신사 필터링: 현재 조회 중인 통신사와 정확히 일치하는 경우만 매핑
+        // 통신사가 비어있으면 해당 행을 건너뛰어 잘못된 매핑 방지
+        if (!rowCarrier) {
+          console.log(`[Direct] ⚠️ 통신사가 비어있는 이미지 행 건너뛰기: 모델ID=${modelId}, 모델명=${modelName}`);
+          return;
+        }
+        
+        // 통신사가 일치하는 경우만 매핑
+        if (rowCarrier === carrierParam) {
           // 모델ID와 모델명 중 하나라도 있으면 사용 (둘 다 실제 모델 코드와 동일)
           const actualModelCode = modelId || modelName;
           
           if (actualModelCode) {
-            // 통신사+모델코드 조합으로 키 생성 (가장 정확한 매칭)
+            // 원본 모델 코드로 키 생성 (정확한 매칭)
             const key = `${carrierParam}:${actualModelCode}`;
             imageMap.set(key, imageUrl);
-            
-            // 모델코드만으로도 조회 가능하도록 (하위 호환 및 편의성)
             imageMap.set(actualModelCode, imageUrl);
+            
+            // 정규화된 모델 코드로도 키 생성 (형식 차이 무시)
+            const normalizedCode = normalizeModelCode(actualModelCode);
+            if (normalizedCode && normalizedCode !== actualModelCode.toLowerCase()) {
+              const normalizedKey = `${carrierParam}:${normalizedCode}`;
+              imageMap.set(normalizedKey, imageUrl);
+              imageMap.set(normalizedCode, imageUrl);
+            }
+          } else {
+            console.log(`[Direct] ⚠️ 모델코드가 없는 이미지 행 건너뛰기: 통신사=${rowCarrier}`);
           }
         }
       });
@@ -1185,29 +1213,40 @@ function setupDirectRoutes(app) {
           purchasePriceWithAddon: purchasePriceWithAddon,
           purchasePriceWithoutAddon: purchasePriceWithoutAddon,
           image: (() => {
-            // 통신사+모델명 조합으로 먼저 조회 (가장 정확)
+            // 1. 통신사+모델명 조합으로 먼저 조회 (가장 정확)
             const key = `${carrierParam}:${model}`;
             let imgUrl = imageMap.get(key);
             
-            // 없으면 모델명만으로 조회 (하위 호환)
+            // 2. 없으면 모델명만으로 조회 (하위 호환)
             if (!imgUrl) {
               imgUrl = imageMap.get(model);
             }
             
-            // 여전히 없으면 유사한 키 찾기 (공백, 하이픈 등 차이 무시)
+            // 3. 정규화된 키로 조회 (형식 차이 무시)
+            if (!imgUrl) {
+              const normalizedModel = normalizeModelCode(model);
+              if (normalizedModel) {
+                const normalizedKey = `${carrierParam}:${normalizedModel}`;
+                imgUrl = imageMap.get(normalizedKey);
+                if (!imgUrl) {
+                  imgUrl = imageMap.get(normalizedModel);
+                }
+              }
+            }
+            
+            // 4. 여전히 없으면 유사한 키 찾기 (공백, 하이픈 등 차이 무시)
             if (!imgUrl && imageMap.size > 0) {
-              const modelNormalized = model.replace(/[\s-_]/g, '').toLowerCase();
+              const modelNormalized = normalizeModelCode(model);
               const mapKeys = Array.from(imageMap.keys());
               
               for (const mapKey of mapKeys) {
-                const keyNormalized = mapKey.replace(/[\s-_]/g, '').toLowerCase();
                 // 통신사 부분 제거 후 비교
                 const keyWithoutCarrier = mapKey.includes(':') ? mapKey.split(':')[1] : mapKey;
-                const keyNormalizedWithoutCarrier = keyWithoutCarrier.replace(/[\s-_]/g, '').toLowerCase();
+                const keyNormalized = normalizeModelCode(keyWithoutCarrier);
                 
-                if (keyNormalizedWithoutCarrier === modelNormalized || 
+                if (keyNormalized === modelNormalized || 
                     keyNormalized.includes(modelNormalized) || 
-                    modelNormalized.includes(keyNormalizedWithoutCarrier)) {
+                    modelNormalized.includes(keyNormalized)) {
                   imgUrl = imageMap.get(mapKey);
                   console.log(`[Direct] ✅ 유사 키로 이미지 찾음: 모델명=${model}, 맵키=${mapKey}`);
                   break;
@@ -1700,6 +1739,138 @@ function setupDirectRoutes(app) {
     } catch (error) {
       console.error('[Direct] mobiles calculate GET error:', error);
       res.status(500).json({ success: false, error: '계산 실패', message: error.message });
+    }
+  });
+
+  // GET /api/direct/main-page-texts: 메인페이지 문구 조회
+  router.get('/main-page-texts', async (req, res) => {
+    try {
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      
+      // 시트 헤더 확인 및 생성
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_MAIN_PAGE_TEXTS, HEADERS_MAIN_PAGE_TEXTS);
+      
+      // 데이터 조회
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${SHEET_MAIN_PAGE_TEXTS}!A:F`
+      });
+      
+      const rows = (response.data.values || []).slice(1); // 헤더 제외
+      
+      // 데이터 파싱
+      const texts = {
+        mainHeader: null,
+        transitionPages: {}
+      };
+      
+      rows.forEach(row => {
+        const carrier = (row[0] || '').trim();
+        const category = (row[1] || '').trim();
+        const textType = (row[2] || '').trim();
+        const content = (row[3] || '').trim();
+        const imageUrl = (row[4] || '').trim();
+        const updatedAt = (row[5] || '').trim();
+        
+        if (textType === 'mainHeader') {
+          texts.mainHeader = {
+            content,
+            imageUrl,
+            updatedAt
+          };
+        } else if (textType === 'transitionPage' && carrier && category) {
+          if (!texts.transitionPages[carrier]) {
+            texts.transitionPages[carrier] = {};
+          }
+          texts.transitionPages[carrier][category] = {
+            content,
+            imageUrl,
+            updatedAt
+          };
+        }
+      });
+      
+      res.json({ success: true, data: texts });
+    } catch (error) {
+      console.error('[Direct] main-page-texts GET error:', error);
+      res.status(500).json({ success: false, error: '문구 조회 실패', message: error.message });
+    }
+  });
+
+  // POST /api/direct/main-page-texts: 메인페이지 문구 저장/업데이트
+  router.post('/main-page-texts', async (req, res) => {
+    try {
+      const { carrier, category, textType, content, imageUrl } = req.body;
+      
+      if (!textType || (textType !== 'mainHeader' && textType !== 'transitionPage')) {
+        return res.status(400).json({ success: false, error: '설정유형이 올바르지 않습니다.' });
+      }
+      
+      if (textType === 'transitionPage' && (!carrier || !category)) {
+        return res.status(400).json({ success: false, error: '통신사와 카테고리가 필요합니다.' });
+      }
+      
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      
+      // 시트 헤더 확인 및 생성
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_MAIN_PAGE_TEXTS, HEADERS_MAIN_PAGE_TEXTS);
+      
+      // 기존 데이터 조회
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${SHEET_MAIN_PAGE_TEXTS}!A:F`
+      });
+      
+      const rows = (response.data.values || []).slice(1);
+      const now = new Date().toISOString();
+      
+      // 기존 행 찾기
+      let existingRowIndex = -1;
+      if (textType === 'mainHeader') {
+        existingRowIndex = rows.findIndex(row => (row[2] || '').trim() === 'mainHeader');
+      } else if (textType === 'transitionPage') {
+        existingRowIndex = rows.findIndex(row => 
+          (row[0] || '').trim() === carrier &&
+          (row[1] || '').trim() === category &&
+          (row[2] || '').trim() === 'transitionPage'
+        );
+      }
+      
+      const newRow = [
+        textType === 'mainHeader' ? '' : carrier,
+        textType === 'mainHeader' ? '' : category,
+        textType,
+        content || '',
+        imageUrl || '',
+        now
+      ];
+      
+      if (existingRowIndex !== -1) {
+        // 기존 행 업데이트
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_MAIN_PAGE_TEXTS}!A${existingRowIndex + 2}:F${existingRowIndex + 2}`,
+          valueInputOption: 'USER_ENTERED',
+          resource: { values: [newRow] }
+        });
+      } else {
+        // 새 행 추가
+        await sheets.spreadsheets.values.append({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_MAIN_PAGE_TEXTS}!A:F`,
+          valueInputOption: 'USER_ENTERED',
+          insertDataOption: 'INSERT_ROWS',
+          resource: { values: [newRow] }
+        });
+      }
+      
+      // 캐시 무효화
+      deleteCache('main-page-texts');
+      
+      res.json({ success: true, message: '문구가 저장되었습니다.' });
+    } catch (error) {
+      console.error('[Direct] main-page-texts POST error:', error);
+      res.status(500).json({ success: false, error: '문구 저장 실패', message: error.message });
     }
   });
 
