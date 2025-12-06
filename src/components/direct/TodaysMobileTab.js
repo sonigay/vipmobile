@@ -68,9 +68,13 @@ const ProductCard = ({ product, isPremium, onSelect, compact, theme, priceData: 
   if (product.isRecommended) tagChips.push({ label: '추천', color: 'success' });
   if (product.isCheap) tagChips.push({ label: '저렴', color: 'info' });
 
-  // 각 유형별 가격 정보 로드 (props로 받은 priceData가 없을 때만)
+  // 각 유형별 가격 정보 로드 (props로 받은 priceData가 없거나 null일 때만)
   useEffect(() => {
-    if (propPriceData || hasLoadedRef.current || !product.id || !product.carrier) return;
+    // propPriceData가 null이거나 undefined가 아니고, 모든 유형이 loading이 false이면 스킵
+    if (propPriceData && propPriceData['010신규'] && propPriceData['010신규'].loading === false) {
+      return;
+    }
+    if (hasLoadedRef.current || !product.id || !product.carrier) return;
     
     const loadPrices = async () => {
       hasLoadedRef.current = true;
@@ -227,19 +231,18 @@ const ProductCard = ({ product, isPremium, onSelect, compact, theme, priceData: 
             gridTemplateColumns: 'auto 1fr 1fr 1fr',
             gap: 1,
             alignItems: 'center',
-            justifyItems: 'center',
             fontSize: compact ? '0.75rem' : '0.8rem'
           }}>
             {/* 헤더 */}
-            <Box sx={{ gridColumn: '1 / -1', display: 'flex', gap: 1.5, pb: 0.5, borderBottom: `1px solid ${cardTheme.primary}20` }}>
-              <Box sx={{ flex: 1 }}></Box>
-              <Box sx={{ flex: 1, textAlign: 'center' }}>
+            <Box sx={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: 'auto 1fr 1fr 1fr', gap: 1, pb: 0.5, borderBottom: `1px solid ${cardTheme.primary}20` }}>
+              <Box></Box>
+              <Box sx={{ textAlign: 'center' }}>
                 <Typography variant="caption" color="text.secondary" fontWeight="medium">010신규</Typography>
               </Box>
-              <Box sx={{ flex: 1, textAlign: 'center' }}>
+              <Box sx={{ textAlign: 'center' }}>
                 <Typography variant="caption" color="text.secondary" fontWeight="medium">MNP</Typography>
               </Box>
-              <Box sx={{ flex: 1, textAlign: 'center' }}>
+              <Box sx={{ textAlign: 'center' }}>
                 <Typography variant="caption" color="text.secondary" fontWeight="medium">기변</Typography>
               </Box>
             </Box>
@@ -384,11 +387,15 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
   const loadMainHeaderText = useCallback(async () => {
     try {
       const response = await directStoreApi.getMainHeaderText();
-      if (response.success && response.data) {
-        setMainHeaderText(response.data.content || '');
+      if (response.success && response.data && response.data.content) {
+        setMainHeaderText(response.data.content);
+      } else {
+        // 데이터가 없거나 실패한 경우에도 빈 문자열로 설정하여 조건부 렌더링이 작동하도록
+        setMainHeaderText('');
       }
     } catch (err) {
       console.error('메인헤더 문구 로드 실패:', err);
+      setMainHeaderText('');
     }
   }, []);
 
@@ -471,8 +478,9 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
       // 모든 가격 로드 완료 대기
       if (pricePromises.length > 0) {
         await Promise.all(pricePromises);
-        setPriceCache(newCache);
       }
+      // 캐시 업데이트 (Promise.all 완료 후)
+      setPriceCache(newCache);
       
       // 슬라이드쇼 데이터 구조 생성 (3개씩 그룹화 - 그리드가 3열이므로)
       const slideshowItems = [];
@@ -798,7 +806,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
     for (const openingType of ['010신규', 'MNP', '기변']) {
       const cacheKey = `${product.id}-${planGroup}-${openingType}-${product.carrier}`;
       const cached = priceCache[cacheKey];
-      if (cached) {
+      if (cached && cached.publicSupport !== undefined) {
         priceData[openingType] = {
           publicSupport: cached.publicSupport || 0,
           storeSupport: cached.storeSupport || 0,
@@ -809,6 +817,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
       }
     }
     
+    // 캐시가 있으면 priceData 반환, 없으면 null 반환하여 ProductCard에서 자체 로드하도록
     return hasCachedData ? priceData : null;
   }, [priceCache]);
 
@@ -894,7 +903,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
         }}
       >
         {/* 메인헤더 문구 */}
-        {mainHeaderText && (
+        {mainHeaderText && mainHeaderText.trim() && (
           <Box
             sx={{
               mb: isFullScreen ? 2 : 1.5,
@@ -904,8 +913,9 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
               borderRadius: 2,
               background: isFullScreen 
                 ? `linear-gradient(135deg, ${theme.cardBg} 0%, rgba(255,255,255,0.8) 100%)`
-                : 'transparent',
-              boxShadow: isFullScreen ? 3 : 0,
+                : `linear-gradient(135deg, ${theme.primary}08 0%, ${theme.secondary}08 100%)`,
+              boxShadow: isFullScreen ? 3 : 1,
+              border: isFullScreen ? 'none' : `1px solid ${theme.primary}20`,
               transition: 'all 0.3s ease'
             }}
           >
