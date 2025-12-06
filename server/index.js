@@ -4168,22 +4168,103 @@ const directStoreUpload = multer({
   limits: { fileSize: 10 * 1024 * 1024 } // 10MB 제한
 });
 
-// 모델명에서 제조사 추출 함수
-function extractManufacturer(modelName) {
-  if (!modelName) return '기타';
-  const model = modelName.toUpperCase();
+// 모델명과 펫네임에서 제조사 추출 함수 (대소문자 구분 없음)
+function extractManufacturer(modelName, petName = '') {
+  if (!modelName && !petName) return '기타';
   
-  if (model.startsWith('SM-') || model.includes('SAMSUNG') || model.includes('갤럭시')) {
+  // 대소문자 구분 없이 체크하기 위해 모두 대문자로 변환
+  const model = (modelName || '').toUpperCase().trim();
+  const pet = (petName || '').toUpperCase().trim();
+  const combined = `${model} ${pet}`.trim();
+  
+  // 원본 텍스트도 보관 (정규식 매칭용)
+  const modelOriginal = (modelName || '').trim();
+  const petOriginal = (petName || '').trim();
+  const combinedOriginal = `${modelOriginal} ${petOriginal}`.trim();
+  
+  // 삼성: SM-로 시작하거나 SAMSUNG, 갤럭시 포함 (대소문자 구분 없음)
+  if (
+    /^SM-/i.test(modelOriginal) || // SM-로 시작 (대소문자 구분 없음)
+    /samsung/i.test(combinedOriginal) || 
+    /갤럭시/i.test(combinedOriginal) || 
+    /galaxy/i.test(combinedOriginal) ||
+    model.startsWith('SM-') ||
+    model.includes('SAMSUNG') ||
+    model.includes('갤럭시') ||
+    model.includes('GALAXY') ||
+    pet.includes('갤럭시') ||
+    pet.includes('GALAXY') ||
+    combined.includes('갤럭시') ||
+    combined.includes('GALAXY')
+  ) {
     return '삼성';
-  } else if (model.includes('IPHONE') || model.includes('IPAD') || model.includes('APPLE')) {
+  } 
+  // 애플: iPhone, iPad, Apple 포함 (대소문자 구분 없음)
+  // 또는 모델명이 A로 시작하는 숫자 (애플 제품 코드: A2847 등)
+  // 또는 한글 "아이폰", "아이패드" 포함
+  else if (
+    /iphone/i.test(combinedOriginal) ||
+    /ipad/i.test(combinedOriginal) ||
+    /apple/i.test(combinedOriginal) ||
+    /아이폰/i.test(combinedOriginal) ||
+    /아이패드/i.test(combinedOriginal) ||
+    /^A\d+/i.test(modelOriginal) || // A로 시작하는 숫자 (애플 제품 코드, 대소문자 구분 없음)
+    model.includes('IPHONE') || 
+    model.includes('IPAD') || 
+    model.includes('APPLE') ||
+    model.includes('아이폰') ||
+    model.includes('아이패드') ||
+    pet.includes('아이폰') ||
+    pet.includes('아이패드') ||
+    pet.includes('IPHONE') ||
+    pet.includes('IPAD') ||
+    combined.includes('아이폰') ||
+    combined.includes('아이패드') ||
+    combined.includes('IPHONE') ||
+    combined.includes('IPAD')
+  ) {
     return '애플';
-  } else if (model.includes('LG') || model.includes('VELVET') || model.includes('G')) {
+  } 
+  // LG: LG 포함 (단, "갤럭시"와 겹치지 않도록 주의, 대소문자 구분 없음)
+  else if (
+    (/^lg\s/i.test(modelOriginal) || /lg\s/i.test(petOriginal) || /lg\s/i.test(combinedOriginal)) && // LG로 시작
+    !/galaxy/i.test(combinedOriginal) && // 갤럭시가 아닌 경우
+    (model.includes('LG') || model.includes('VELVET') || pet.includes('LG') || pet.includes('VELVET')) && 
+    !combined.includes('GALAXY')
+  ) {
     return 'LG';
-  } else if (model.includes('XIAOMI') || model.includes('샤오미') || model.includes('MI ')) {
+  } 
+  // 샤오미: XIAOMI, 샤오미, MI 포함 (대소문자 구분 없음)
+  else if (
+    /xiaomi/i.test(combinedOriginal) ||
+    /샤오미/i.test(combinedOriginal) ||
+    /\bmi\s/i.test(combinedOriginal) || // MI로 시작하는 단어 (대소문자 구분 없음)
+    model.includes('XIAOMI') || 
+    model.includes('샤오미') || 
+    model.includes('MI ') ||
+    pet.includes('샤오미') ||
+    pet.includes('XIAOMI') ||
+    combined.includes('샤오미') ||
+    combined.includes('XIAOMI')
+  ) {
     return '샤오미';
-  } else if (model.includes('OPPO') || model.includes('원플러스')) {
+  } 
+  // OPPO: OPPO, 원플러스 포함 (대소문자 구분 없음)
+  else if (
+    /oppo/i.test(combinedOriginal) ||
+    /원플러스/i.test(combinedOriginal) ||
+    /oneplus/i.test(combinedOriginal) ||
+    model.includes('OPPO') || 
+    model.includes('원플러스') || 
+    model.includes('ONEPLUS') ||
+    pet.includes('OPPO') ||
+    pet.includes('원플러스') ||
+    combined.includes('OPPO') ||
+    combined.includes('원플러스')
+  ) {
     return 'OPPO';
-  } else {
+  } 
+  else {
     return '기타';
   }
 }
@@ -4284,9 +4365,9 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
     
     console.log(`📤 [이미지 업로드] 클라이언트 ID: ${clientModelId}, 모델ID(모델명): ${modelId}, 통신사: ${carrier}, 펫네임: ${petName}, 파일명: ${file.originalname}, 크기: ${file.size} bytes`);
 
-    // 제조사 추출
-    const manufacturer = extractManufacturer(modelName);
-    console.log(`📤 [이미지 업로드] 추출된 제조사: ${manufacturer}`);
+    // 제조사 추출 (모델명과 펫네임 모두 체크)
+    const manufacturer = extractManufacturer(modelName, petName);
+    console.log(`📤 [이미지 업로드] 추출된 제조사: ${manufacturer} (모델명: ${modelName}, 펫네임: ${petName})`);
 
     // Discord 봇 초기화 확인
     if (!DISCORD_LOGGING_ENABLED || !discordBot) {
