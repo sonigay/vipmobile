@@ -205,41 +205,75 @@ const MobileListTab = ({ onProductSelect }) => {
   };
 
   const handleTagChange = async (modelId, tagType, checked) => {
+    const currentMobile = mobileList.find(m => m.id === modelId);
+    if (!currentMobile) return;
+
+    // 이전 상태 백업 (에러 시 롤백용)
+    const previousTags = {
+      isPopular: currentMobile.isPopular || false,
+      isRecommended: currentMobile.isRecommended || false,
+      isCheap: currentMobile.isCheap || false,
+      isPremium: currentMobile.isPremium || false,
+      isBudget: currentMobile.isBudget || false
+    };
+
+    // 새로운 태그 상태
+    const newTags = {
+      isPopular: tagType === 'popular' ? checked : currentMobile.isPopular || false,
+      isRecommended: tagType === 'recommend' ? checked : currentMobile.isRecommended || false,
+      isCheap: tagType === 'cheap' ? checked : currentMobile.isCheap || false,
+      isPremium: tagType === 'premium' ? checked : currentMobile.isPremium || false,
+      isBudget: tagType === 'budget' ? checked : currentMobile.isBudget || false
+    };
+
+    // 낙관적 업데이트: UI를 먼저 업데이트 (즉시 반응)
+    setMobileList(prevList => prevList.map(item => 
+      item.id === modelId 
+        ? { 
+            ...item, 
+            ...newTags, 
+            tags: Object.keys(newTags).filter(k => newTags[k])
+          }
+        : item
+    ));
+
+    // 백그라운드에서 API 호출 (비동기)
     try {
-      const currentMobile = mobileList.find(m => m.id === modelId);
-      const tags = {
-        isPopular: tagType === 'popular' ? checked : currentMobile?.isPopular || false,
-        isRecommended: tagType === 'recommend' ? checked : currentMobile?.isRecommended || false,
-        isCheap: tagType === 'cheap' ? checked : currentMobile?.isCheap || false,
-        isPremium: tagType === 'premium' ? checked : currentMobile?.isPremium || false,
-        isBudget: tagType === 'budget' ? checked : currentMobile?.isBudget || false
-      };
-      
-      // 태그 외에도 모델 정보 전달하여 시트에 함께 저장되도록 함
       const payload = {
-        ...tags,
-        model: currentMobile?.model,
-        petName: currentMobile?.petName,
-        carrier: currentMobile?.carrier,
-        factoryPrice: currentMobile?.factoryPrice,
-        publicSupport: currentMobile?.publicSupport,
-        storeSupport: currentMobile?.storeSupportWithAddon,
-        storeSupportNoAddon: currentMobile?.storeSupportNoAddon,
-        requiredAddons: currentMobile?.requiredAddons,
-        image: currentMobile?.image
+        ...newTags,
+        model: currentMobile.model,
+        petName: currentMobile.petName,
+        carrier: currentMobile.carrier,
+        factoryPrice: currentMobile.factoryPrice,
+        publicSupport: currentMobile.publicSupport,
+        storeSupport: currentMobile.storeSupportWithAddon,
+        storeSupportNoAddon: currentMobile.storeSupportWithoutAddon,
+        requiredAddons: currentMobile.requiredAddons,
+        image: currentMobile.image
       };
 
-      await directStoreApi.updateMobileTags(modelId, payload);
+      const result = await directStoreApi.updateMobileTags(modelId, payload);
       
-      // 로컬 상태 업데이트
-      setMobileList(prevList => prevList.map(item => 
-        item.id === modelId 
-          ? { ...item, ...tags, tags: Object.keys(tags).filter(k => tags[k]) }
-          : item
-      ));
+      // API 호출 성공 시 추가 처리 없음 (이미 UI 업데이트됨)
+      if (!result || !result.success) {
+        throw new Error(result?.error || '태그 업데이트 실패');
+      }
     } catch (err) {
       console.error('구분 태그 업데이트 실패:', err);
-      alert('구분 태그 업데이트에 실패했습니다.');
+      
+      // 에러 발생 시 이전 상태로 롤백
+      setMobileList(prevList => prevList.map(item => 
+        item.id === modelId 
+          ? { 
+              ...item, 
+              ...previousTags, 
+              tags: Object.keys(previousTags).filter(k => previousTags[k])
+            }
+          : item
+      ));
+      
+      // 사용자에게 에러 알림 (선택적 - 너무 자주 뜨면 방해될 수 있음)
+      // alert('구분 태그 업데이트에 실패했습니다. 다시 시도해주세요.');
     }
   };
 
