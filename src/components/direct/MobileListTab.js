@@ -44,7 +44,11 @@ const MobileListTab = ({ onProductSelect }) => {
   const [tagMenuAnchor, setTagMenuAnchor] = useState({}); // { modelId: anchorElement }
   const [planGroups, setPlanGroups] = useState([]); // 요금제군 목록
   const [selectedPlanGroups, setSelectedPlanGroups] = useState({}); // { modelId: planGroup }
+  const [selectedOpeningTypes, setSelectedOpeningTypes] = useState({}); // { modelId: openingType } - 010신규, MNP, 기변
   const [calculatedPrices, setCalculatedPrices] = useState({}); // { modelId: { storeSupportWithAddon, storeSupportWithoutAddon, purchasePriceWithAddon, purchasePriceWithoutAddon } }
+  
+  // 개통 유형 목록 (고정)
+  const openingTypes = ['010신규', 'MNP', '기변'];
 
   const handleCarrierChange = (event, newValue) => {
     setCarrierTab(newValue);
@@ -312,6 +316,31 @@ const MobileListTab = ({ onProductSelect }) => {
     return tags.length > 0 ? tags.join(', ') : '선택';
   };
 
+  // 가격 계산 함수 (요금제군과 유형 모두 필요)
+  const calculatePrice = async (modelId, planGroup, openingType) => {
+    if (!planGroup || !openingType) {
+      return;
+    }
+
+    try {
+      const carrier = getCurrentCarrier();
+      const result = await directStoreApi.calculateMobilePrice(modelId, planGroup, openingType, carrier);
+      if (result.success) {
+        setCalculatedPrices(prev => ({
+          ...prev,
+          [modelId]: {
+            storeSupportWithAddon: result.storeSupportWithAddon,
+            storeSupportWithoutAddon: result.storeSupportWithoutAddon,
+            purchasePriceWithAddon: result.purchasePriceWithAddon,
+            purchasePriceWithoutAddon: result.purchasePriceWithoutAddon
+          }
+        }));
+      }
+    } catch (err) {
+      console.error('가격 계산 실패:', err);
+    }
+  };
+
   // 요금제군 선택 핸들러
   const handlePlanGroupChange = async (modelId, planGroup) => {
     if (!planGroup) {
@@ -330,22 +359,33 @@ const MobileListTab = ({ onProductSelect }) => {
 
     setSelectedPlanGroups(prev => ({ ...prev, [modelId]: planGroup }));
 
-    try {
-      const carrier = getCurrentCarrier();
-      const result = await directStoreApi.calculateMobilePrice(modelId, planGroup, '010신규', carrier);
-      if (result.success) {
-        setCalculatedPrices(prev => ({
-          ...prev,
-          [modelId]: {
-            storeSupportWithAddon: result.storeSupportWithAddon,
-            storeSupportWithoutAddon: result.storeSupportWithoutAddon,
-            purchasePriceWithAddon: result.purchasePriceWithAddon,
-            purchasePriceWithoutAddon: result.purchasePriceWithoutAddon
-          }
-        }));
-      }
-    } catch (err) {
-      console.error('가격 계산 실패:', err);
+    // 선택된 유형이 있으면 해당 유형으로 계산, 없으면 기본값 '010신규'로 계산
+    const openingType = selectedOpeningTypes[modelId] || '010신규';
+    await calculatePrice(modelId, planGroup, openingType);
+  };
+
+  // 유형 선택 핸들러
+  const handleOpeningTypeChange = async (modelId, openingType) => {
+    if (!openingType) {
+      setSelectedOpeningTypes(prev => {
+        const newState = { ...prev };
+        delete newState[modelId];
+        return newState;
+      });
+      setCalculatedPrices(prev => {
+        const newState = { ...prev };
+        delete newState[modelId];
+        return newState;
+      });
+      return;
+    }
+
+    setSelectedOpeningTypes(prev => ({ ...prev, [modelId]: openingType }));
+
+    // 선택된 요금제군이 있으면 해당 요금제군과 유형으로 계산
+    const planGroup = selectedPlanGroups[modelId];
+    if (planGroup) {
+      await calculatePrice(modelId, planGroup, openingType);
     }
   };
 
@@ -417,6 +457,7 @@ const MobileListTab = ({ onProductSelect }) => {
                 <TableCell align="center" width="100">이미지</TableCell>
                 <TableCell align="center" width="220">모델명 / 펫네임</TableCell>
                 <TableCell align="center" width="120">요금제군</TableCell>
+                <TableCell align="center" width="100">유형</TableCell>
                 <TableCell align="center" width="100">출고가</TableCell>
                 <TableCell align="center" width="100">이통사지원금</TableCell>
                 <TableCell align="center" colSpan={2} width="180" sx={{ borderLeft: '1px solid rgba(81, 81, 81, 0.5)' }}>
@@ -438,7 +479,7 @@ const MobileListTab = ({ onProductSelect }) => {
             <TableBody>
               {mobileList.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} align="center" sx={{ py: 5 }}>
+                  <TableCell colSpan={10} align="center" sx={{ py: 5 }}>
                     <Typography color="text.secondary">표시할 데이터가 없습니다.</Typography>
                   </TableCell>
                 </TableRow>
@@ -591,6 +632,22 @@ const MobileListTab = ({ onProductSelect }) => {
                             />
                           )}
                           sx={{ minWidth: 120 }}
+                        />
+                      </TableCell>
+                      <TableCell align="center" onClick={(e) => e.stopPropagation()}>
+                        <Autocomplete
+                          size="small"
+                          options={openingTypes}
+                          value={selectedOpeningTypes[row.id] || null}
+                          onChange={(e, newValue) => handleOpeningTypeChange(row.id, newValue)}
+                          renderInput={(params) => (
+                            <TextField
+                              {...params}
+                              placeholder="유형 선택"
+                              sx={{ minWidth: 80 }}
+                            />
+                          )}
+                          sx={{ minWidth: 100 }}
                         />
                       </TableCell>
                       <TableCell align="center">
