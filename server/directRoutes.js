@@ -145,6 +145,28 @@ async function getLinkSettings(carrier) {
   return carrierSettings;
 }
 
+// 시트 데이터 읽기 함수 (캐시 적용)
+async function getSheetData(sheetId, range, ttlMs = 10 * 60 * 1000) {
+  const cacheKey = `sheet-data-${sheetId}-${range}`;
+  const cached = getCache(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  const { sheets } = createSheetsClient();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: sheetId,
+    range: range,
+    majorDimension: 'ROWS',
+    valueRenderOption: 'UNFORMATTED_VALUE'
+  });
+  const data = (res.data.values || []).slice(1);
+
+  // 캐시 저장
+  setCache(cacheKey, data, ttlMs);
+  return data;
+}
+
 function deleteCache(key) {
   cacheStore.delete(key);
   console.log(`[Direct] 캐시 무효화: ${key}`);
@@ -1780,14 +1802,8 @@ function setupDirectRoutes(app) {
       }
       const modelIndex = parseInt(parts[2], 10);
 
-      // 정책표에서 모델 정보 가져오기
-      const modelDataRes = await sheets.spreadsheets.values.get({
-        spreadsheetId: policySheetId,
-        range: modelRange,
-        majorDimension: 'ROWS',
-        valueRenderOption: 'UNFORMATTED_VALUE'
-      });
-      const modelData = (modelDataRes.data.values || []).slice(1);
+      // 정책표에서 모델 정보 가져오기 (캐시 사용)
+      const modelData = await getSheetData(policySheetId, modelRange);
       const modelRow = modelData[modelIndex];
       
       if (!modelRow) {
@@ -1805,27 +1821,15 @@ function setupDirectRoutes(app) {
         
         if (factoryPriceRange && modelRange && supportSheetId) {
           try {
-            const [modelDataRes, factoryPriceRes] = await Promise.all([
-              sheets.spreadsheets.values.get({
-                spreadsheetId: supportSheetId,
-                range: modelRange,
-                majorDimension: 'ROWS',
-                valueRenderOption: 'UNFORMATTED_VALUE'
-              }),
-              sheets.spreadsheets.values.get({
-                spreadsheetId: supportSheetId,
-                range: factoryPriceRange,
-                majorDimension: 'ROWS',
-                valueRenderOption: 'UNFORMATTED_VALUE'
-              })
+            // 이통사 지원금 시트 데이터 가져오기 (캐시 사용)
+            const [supportModelData, factoryPriceData] = await Promise.all([
+              getSheetData(supportSheetId, modelRange),
+              getSheetData(supportSheetId, factoryPriceRange)
             ]);
-            
-            const modelData = (modelDataRes.data.values || []).slice(1);
-            const factoryPriceData = (factoryPriceRes.data.values || []).slice(1);
             
             // 정책표의 모델명으로 이통사 지원금 시트에서 매칭
             const policyModel = modelRow[0] || '';
-            const supportModelIndex = modelData.findIndex(row => (row[0] || '').toString().trim() === policyModel);
+            const supportModelIndex = supportModelData.findIndex(row => (row[0] || '').toString().trim() === policyModel);
             if (supportModelIndex >= 0) {
               factoryPrice = Number(factoryPriceData[supportModelIndex]?.[0] || 0);
             }
@@ -1842,13 +1846,8 @@ function setupDirectRoutes(app) {
       let policyRebate = 0;
       if (rebateRange && policySheetId) {
         try {
-          const rebateRes = await sheets.spreadsheets.values.get({
-            spreadsheetId: policySheetId,
-            range: rebateRange,
-            majorDimension: 'ROWS',
-            valueRenderOption: 'UNFORMATTED_VALUE'
-          });
-          const rebateValues = (rebateRes.data.values || []).slice(1);
+          // 정책표 리베이트 가져오기 (캐시 사용)
+          const rebateValues = await getSheetData(policySheetId, rebateRange);
           policyRebate = Number(rebateValues[modelIndex]?.[0] || 0) * 10000; // 만원 단위 변환
         } catch (err) {
           console.warn(`[Direct] ${planGroup} ${openingType} 리베이트 읽기 실패:`, err);
@@ -1880,23 +1879,11 @@ function setupDirectRoutes(app) {
         
         if (supportRange && modelRange && supportSheetId) {
           try {
-            const [modelDataRes, supportRes] = await Promise.all([
-              sheets.spreadsheets.values.get({
-                spreadsheetId: supportSheetId,
-                range: modelRange,
-                majorDimension: 'ROWS',
-                valueRenderOption: 'UNFORMATTED_VALUE'
-              }),
-              sheets.spreadsheets.values.get({
-                spreadsheetId: supportSheetId,
-                range: supportRange,
-                majorDimension: 'ROWS',
-                valueRenderOption: 'UNFORMATTED_VALUE'
-              })
+            // 이통사 지원금 데이터 가져오기 (캐시 사용)
+            const [supportModelData, supportValues] = await Promise.all([
+              getSheetData(supportSheetId, modelRange),
+              getSheetData(supportSheetId, supportRange)
             ]);
-            
-            const modelData = (modelDataRes.data.values || []).slice(1);
-            const supportValues = (supportRes.data.values || []).slice(1);
             
             // 정책표의 모델명으로 이통사 지원금 시트에서 매칭
             const policyModel = modelRow[0] || '';
