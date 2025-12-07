@@ -37,6 +37,7 @@ function createSheetsClient() {
 
 // 간단한 메모리 캐시 (TTL)
 const cacheStore = new Map(); // key -> { data, expires }
+const pendingRequests = new Map(); // key -> Promise (동시 요청 방지)
 
 function getCache(key) {
   const entry = cacheStore.get(key);
@@ -52,119 +53,132 @@ function setCache(key, data, ttlMs = 60 * 1000) {
   cacheStore.set(key, { data, expires: Date.now() + ttlMs });
 }
 
-// 정책 설정 읽기 함수 (캐시 적용)
+// 동시 요청 방지를 위한 래퍼 함수
+async function withRequestDeduplication(key, fetchFn) {
+  // 캐시 확인
+  const cached = getCache(key);
+  if (cached) {
+    return cached;
+  }
+
+  // 이미 진행 중인 요청이 있으면 대기
+  if (pendingRequests.has(key)) {
+    return pendingRequests.get(key);
+  }
+
+  // 새로운 요청 시작
+  const promise = fetchFn()
+    .then(data => {
+      setCache(key, data, 10 * 60 * 1000); // 10분 캐시
+      pendingRequests.delete(key);
+      return data;
+    })
+    .catch(err => {
+      pendingRequests.delete(key);
+      throw err;
+    });
+
+  pendingRequests.set(key, promise);
+  return promise;
+}
+
+// 정책 설정 읽기 함수 (캐시 적용, 동시 요청 방지)
 async function getPolicySettings(carrier) {
   const cacheKey = `policy-settings-${carrier}`;
-  const cached = getCache(cacheKey);
-  if (cached) {
-    return cached;
-  }
+  
+  return withRequestDeduplication(cacheKey, async () => {
+    const { sheets, SPREADSHEET_ID } = createSheetsClient();
 
-  const { sheets, SPREADSHEET_ID } = createSheetsClient();
+    // 마진 설정 읽기
+    await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_MARGIN, HEADERS_POLICY_MARGIN);
+    const marginRes = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: SHEET_POLICY_MARGIN
+    });
+    const marginRows = (marginRes.data.values || []).slice(1);
+    const marginRow = marginRows.find(row => (row[0] || '').trim() === carrier);
+    const baseMargin = marginRow ? Number(marginRow[1] || 0) : 50000;
 
-  // 마진 설정 읽기
-  await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_MARGIN, HEADERS_POLICY_MARGIN);
-  const marginRes = await sheets.spreadsheets.values.get({
-    spreadsheetId: SPREADSHEET_ID,
-    range: SHEET_POLICY_MARGIN
+    // 부가서비스, 보험상품, 별도정책 병렬 읽기
+    const [addonRes, insuranceRes, specialRes] = await Promise.all([
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: SHEET_POLICY_ADDON
+      }),
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: SHEET_POLICY_INSURANCE
+      }),
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: SHEET_POLICY_SPECIAL
+      })
+    ]);
+
+    const addonRows = (addonRes.data.values || []).slice(1);
+    const addonList = addonRows
+      .filter(row => (row[0] || '').trim() === carrier)
+      .map(row => ({
+        incentive: Number(row[3] || 0),
+        deduction: -Math.abs(Number(row[4] || 0))  // 부가미유치 차감금액 (음수 처리)
+      }));
+
+    const insuranceRows = (insuranceRes.data.values || []).slice(1);
+    const insuranceList = insuranceRows
+      .filter(row => (row[0] || '').trim() === carrier)
+      .map(row => ({
+        incentive: Number(row[5] || 0), // 보험 유치 추가금액
+        deduction: -Math.abs(Number(row[6] || 0))  // 보험 미유치 차감금액 (음수 처리)
+      }));
+
+    const specialRows = (specialRes.data.values || []).slice(1);
+    const specialPolicies = specialRows
+      .filter(row => (row[0] || '').trim() === carrier && (row[4] || '').toString().toLowerCase() === 'true')
+      .map(row => ({
+        addition: Number(row[2] || 0),
+        deduction: Number(row[3] || 0)
+      }));
+
+    return {
+      baseMargin,
+      addonList,
+      insuranceList,
+      specialPolicies
+    };
   });
-  const marginRows = (marginRes.data.values || []).slice(1);
-  const marginRow = marginRows.find(row => (row[0] || '').trim() === carrier);
-  const baseMargin = marginRow ? Number(marginRow[1] || 0) : 50000;
-
-  // 부가서비스, 보험상품, 별도정책 병렬 읽기
-  const [addonRes, insuranceRes, specialRes] = await Promise.all([
-    sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range: SHEET_POLICY_ADDON
-    }),
-    sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range: SHEET_POLICY_INSURANCE
-    }),
-    sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range: SHEET_POLICY_SPECIAL
-    })
-  ]);
-
-  const addonRows = (addonRes.data.values || []).slice(1);
-  const addonList = addonRows
-    .filter(row => (row[0] || '').trim() === carrier)
-    .map(row => ({
-      incentive: Number(row[3] || 0),
-      deduction: -Math.abs(Number(row[4] || 0))  // 부가미유치 차감금액 (음수 처리)
-    }));
-
-  const insuranceRows = (insuranceRes.data.values || []).slice(1);
-  const insuranceList = insuranceRows
-    .filter(row => (row[0] || '').trim() === carrier)
-    .map(row => ({
-      incentive: Number(row[5] || 0), // 보험 유치 추가금액
-      deduction: -Math.abs(Number(row[6] || 0))  // 보험 미유치 차감금액 (음수 처리)
-    }));
-
-  const specialRows = (specialRes.data.values || []).slice(1);
-  const specialPolicies = specialRows
-    .filter(row => (row[0] || '').trim() === carrier && (row[4] || '').toString().toLowerCase() === 'true')
-    .map(row => ({
-      addition: Number(row[2] || 0),
-      deduction: Number(row[3] || 0)
-    }));
-
-  const policySettings = {
-    baseMargin,
-    addonList,
-    insuranceList,
-    specialPolicies
-  };
-
-  // 10분 캐시
-  setCache(cacheKey, policySettings, 10 * 60 * 1000);
-  return policySettings;
 }
 
-// 링크 설정 읽기 함수 (캐시 적용)
+// 링크 설정 읽기 함수 (캐시 적용, 동시 요청 방지)
 async function getLinkSettings(carrier) {
   const cacheKey = `link-settings-${carrier}`;
-  const cached = getCache(cacheKey);
-  if (cached) {
-    return cached;
-  }
-
-  const { sheets, SPREADSHEET_ID } = createSheetsClient();
-  const linkSettingsRes = await sheets.spreadsheets.values.get({
-    spreadsheetId: SPREADSHEET_ID,
-    range: SHEET_SETTINGS
+  
+  return withRequestDeduplication(cacheKey, async () => {
+    const { sheets, SPREADSHEET_ID } = createSheetsClient();
+    const linkSettingsRes = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: SHEET_SETTINGS
+    });
+    const linkSettingsRows = (linkSettingsRes.data.values || []).slice(1);
+    const carrierSettings = linkSettingsRows.filter(row => (row[0] || '').trim() === carrier);
+    return carrierSettings;
   });
-  const linkSettingsRows = (linkSettingsRes.data.values || []).slice(1);
-  const carrierSettings = linkSettingsRows.filter(row => (row[0] || '').trim() === carrier);
-
-  // 10분 캐시
-  setCache(cacheKey, carrierSettings, 10 * 60 * 1000);
-  return carrierSettings;
 }
 
-// 시트 데이터 읽기 함수 (캐시 적용)
+// 시트 데이터 읽기 함수 (캐시 적용, 동시 요청 방지)
 async function getSheetData(sheetId, range, ttlMs = 10 * 60 * 1000) {
   const cacheKey = `sheet-data-${sheetId}-${range}`;
-  const cached = getCache(cacheKey);
-  if (cached) {
-    return cached;
-  }
-
-  const { sheets } = createSheetsClient();
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: sheetId,
-    range: range,
-    majorDimension: 'ROWS',
-    valueRenderOption: 'UNFORMATTED_VALUE'
+  
+  return withRequestDeduplication(cacheKey, async () => {
+    const { sheets } = createSheetsClient();
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: sheetId,
+      range: range,
+      majorDimension: 'ROWS',
+      valueRenderOption: 'UNFORMATTED_VALUE'
+    });
+    const data = (res.data.values || []).slice(1);
+    return data;
   });
-  const data = (res.data.values || []).slice(1);
-
-  // 캐시 저장
-  setCache(cacheKey, data, ttlMs);
-  return data;
 }
 
 function deleteCache(key) {
