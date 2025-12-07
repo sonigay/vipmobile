@@ -39,6 +39,10 @@ function createSheetsClient() {
 const cacheStore = new Map(); // key -> { data, expires }
 const pendingRequests = new Map(); // key -> Promise (동시 요청 방지)
 
+// Rate limiting을 위한 마지막 요청 시간 추적
+let lastApiCallTime = 0;
+const MIN_API_INTERVAL_MS = 100; // 최소 100ms 간격으로 API 호출
+
 function getCache(key) {
   const entry = cacheStore.get(key);
   if (!entry) return null;
@@ -53,7 +57,33 @@ function setCache(key, data, ttlMs = 60 * 1000) {
   cacheStore.set(key, { data, expires: Date.now() + ttlMs });
 }
 
-// 동시 요청 방지를 위한 래퍼 함수
+// Rate limit 에러 발생 시 재시도하는 래퍼 함수
+async function withRetry(fn, maxRetries = 3, baseDelay = 1000) {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      // Rate limiting: 최소 간격 유지
+      const now = Date.now();
+      const timeSinceLastCall = now - lastApiCallTime;
+      if (timeSinceLastCall < MIN_API_INTERVAL_MS) {
+        await new Promise(resolve => setTimeout(resolve, MIN_API_INTERVAL_MS - timeSinceLastCall));
+      }
+      lastApiCallTime = Date.now();
+
+      return await fn();
+    } catch (error) {
+      // Rate limit 에러인 경우에만 재시도
+      if (error.code === 429 && attempt < maxRetries - 1) {
+        const delay = baseDelay * Math.pow(2, attempt); // Exponential backoff
+        console.warn(`[Direct] Rate limit 에러 발생, ${delay}ms 후 재시도 (${attempt + 1}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+      throw error;
+    }
+  }
+}
+
+// 동시 요청 방지를 위한 래퍼 함수 (재시도 로직 포함)
 async function withRequestDeduplication(key, fetchFn) {
   // 캐시 확인
   const cached = getCache(key);
@@ -66,8 +96,8 @@ async function withRequestDeduplication(key, fetchFn) {
     return pendingRequests.get(key);
   }
 
-  // 새로운 요청 시작
-  const promise = fetchFn()
+  // 새로운 요청 시작 (재시도 로직 포함)
+  const promise = withRetry(fetchFn)
     .then(data => {
       setCache(key, data, 10 * 60 * 1000); // 10분 캐시
       pendingRequests.delete(key);
@@ -223,11 +253,13 @@ async function ensureSheetHeaders(sheets, spreadsheetId, sheetName, headers) {
     const firstRow = res.data.values && res.data.values[0] ? res.data.values[0] : [];
     const needsInit = firstRow.length === 0 || headers.some((h, i) => (firstRow[i] || '') !== h);
     if (needsInit) {
-      await sheets.spreadsheets.values.update({
-        spreadsheetId,
-        range: `${sheetName}!A1:${String.fromCharCode(65 + headers.length - 1)}1`,
-        valueInputOption: 'USER_ENTERED',
-        resource: { values: [headers] }
+      await withRetry(async () => {
+        return await sheets.spreadsheets.values.update({
+          spreadsheetId,
+          range: `${sheetName}!A1:${String.fromCharCode(65 + headers.length - 1)}1`,
+          valueInputOption: 'USER_ENTERED',
+          resource: { values: [headers] }
+        });
       });
     }
     return headers;
