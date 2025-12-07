@@ -1887,7 +1887,7 @@ function setupDirectRoutes(app) {
             
             // 정책표의 모델명으로 이통사 지원금 시트에서 매칭
             const policyModel = modelRow[0] || '';
-            const supportModelIndex = modelData.findIndex(row => (row[0] || '').toString().trim() === policyModel);
+            const supportModelIndex = supportModelData.findIndex(row => (row[0] || '').toString().trim() === policyModel);
             if (supportModelIndex >= 0) {
               publicSupport = Number(supportValues[supportModelIndex]?.[0] || 0);
             }
