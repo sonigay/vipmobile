@@ -52,6 +52,99 @@ function setCache(key, data, ttlMs = 60 * 1000) {
   cacheStore.set(key, { data, expires: Date.now() + ttlMs });
 }
 
+// 정책 설정 읽기 함수 (캐시 적용)
+async function getPolicySettings(carrier) {
+  const cacheKey = `policy-settings-${carrier}`;
+  const cached = getCache(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  const { sheets, SPREADSHEET_ID } = createSheetsClient();
+
+  // 마진 설정 읽기
+  await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_MARGIN, HEADERS_POLICY_MARGIN);
+  const marginRes = await sheets.spreadsheets.values.get({
+    spreadsheetId: SPREADSHEET_ID,
+    range: SHEET_POLICY_MARGIN
+  });
+  const marginRows = (marginRes.data.values || []).slice(1);
+  const marginRow = marginRows.find(row => (row[0] || '').trim() === carrier);
+  const baseMargin = marginRow ? Number(marginRow[1] || 0) : 50000;
+
+  // 부가서비스, 보험상품, 별도정책 병렬 읽기
+  const [addonRes, insuranceRes, specialRes] = await Promise.all([
+    sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: SHEET_POLICY_ADDON
+    }),
+    sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: SHEET_POLICY_INSURANCE
+    }),
+    sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: SHEET_POLICY_SPECIAL
+    })
+  ]);
+
+  const addonRows = (addonRes.data.values || []).slice(1);
+  const addonList = addonRows
+    .filter(row => (row[0] || '').trim() === carrier)
+    .map(row => ({
+      incentive: Number(row[3] || 0),
+      deduction: -Math.abs(Number(row[4] || 0))  // 부가미유치 차감금액 (음수 처리)
+    }));
+
+  const insuranceRows = (insuranceRes.data.values || []).slice(1);
+  const insuranceList = insuranceRows
+    .filter(row => (row[0] || '').trim() === carrier)
+    .map(row => ({
+      incentive: Number(row[5] || 0), // 보험 유치 추가금액
+      deduction: -Math.abs(Number(row[6] || 0))  // 보험 미유치 차감금액 (음수 처리)
+    }));
+
+  const specialRows = (specialRes.data.values || []).slice(1);
+  const specialPolicies = specialRows
+    .filter(row => (row[0] || '').trim() === carrier && (row[4] || '').toString().toLowerCase() === 'true')
+    .map(row => ({
+      addition: Number(row[2] || 0),
+      deduction: Number(row[3] || 0)
+    }));
+
+  const policySettings = {
+    baseMargin,
+    addonList,
+    insuranceList,
+    specialPolicies
+  };
+
+  // 10분 캐시
+  setCache(cacheKey, policySettings, 10 * 60 * 1000);
+  return policySettings;
+}
+
+// 링크 설정 읽기 함수 (캐시 적용)
+async function getLinkSettings(carrier) {
+  const cacheKey = `link-settings-${carrier}`;
+  const cached = getCache(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  const { sheets, SPREADSHEET_ID } = createSheetsClient();
+  const linkSettingsRes = await sheets.spreadsheets.values.get({
+    spreadsheetId: SPREADSHEET_ID,
+    range: SHEET_SETTINGS
+  });
+  const linkSettingsRows = (linkSettingsRes.data.values || []).slice(1);
+  const carrierSettings = linkSettingsRows.filter(row => (row[0] || '').trim() === carrier);
+
+  // 10분 캐시
+  setCache(cacheKey, carrierSettings, 10 * 60 * 1000);
+  return carrierSettings;
+}
+
 function deleteCache(key) {
   cacheStore.delete(key);
   console.log(`[Direct] 캐시 무효화: ${key}`);
@@ -424,6 +517,9 @@ function setupDirectRoutes(app) {
         }
       }
 
+      // 정책 설정 캐시 무효화
+      deleteCache(`policy-settings-${carrier}`);
+
       res.json({ success: true });
     } catch (error) {
       console.error('[Direct] policy-settings POST error:', error);
@@ -778,6 +874,9 @@ function setupDirectRoutes(app) {
           });
         }
       }
+
+      // 링크 설정 캐시 무효화
+      deleteCache(`link-settings-${carrier}`);
 
       res.json({ success: true });
     } catch (error) {
@@ -1662,13 +1761,8 @@ function setupDirectRoutes(app) {
 
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
 
-      // 모델 정보 가져오기 (정책표 시트에서)
-      const linkSettingsRes = await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: SHEET_SETTINGS
-      });
-      const linkSettingsRows = (linkSettingsRes.data.values || []).slice(1);
-      const carrierSettings = linkSettingsRows.filter(row => (row[0] || '').trim() === carrier);
+      // 링크 설정 가져오기 (캐시 사용)
+      const carrierSettings = await getLinkSettings(carrier);
       const policyRow = carrierSettings.find(row => (row[1] || '').trim() === 'policy');
       
       if (!policyRow) {
@@ -1761,45 +1855,9 @@ function setupDirectRoutes(app) {
         }
       }
 
-      // 정책설정 가져오기
-      const marginRes = await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: SHEET_POLICY_MARGIN
-      });
-      const marginRows = (marginRes.data.values || []).slice(1);
-      const marginRow = marginRows.find(row => (row[0] || '').trim() === carrier);
-      const baseMargin = marginRow ? Number(marginRow[1] || 0) : 50000;
-
-      const [addonRes, insuranceRes, specialRes] = await Promise.all([
-        sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: SHEET_POLICY_ADDON
-        }),
-        sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: SHEET_POLICY_INSURANCE
-        }),
-        sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: SHEET_POLICY_SPECIAL
-        })
-      ]);
-      
-      const addonRows = (addonRes.data.values || []).slice(1);
-      const addonList = addonRows
-        .filter(row => (row[0] || '').trim() === carrier)
-        .map(row => ({
-          incentive: Number(row[3] || 0),
-          deduction: -Math.abs(Number(row[4] || 0))  // 부가미유치 차감금액 (음수 처리)
-        }));
-      
-      const insuranceRows = (insuranceRes.data.values || []).slice(1);
-      const insuranceList = insuranceRows
-        .filter(row => (row[0] || '').trim() === carrier)
-        .map(row => ({
-          incentive: Number(row[5] || 0), // 보험 유치 추가금액
-          deduction: -Math.abs(Number(row[6] || 0))  // 보험 미유치 차감금액 (음수 처리)
-        }));
+      // 정책설정 가져오기 (캐시 사용)
+      const policySettings = await getPolicySettings(carrier);
+      const { baseMargin, addonList, insuranceList, specialPolicies } = policySettings;
       
       // 부가서비스 + 보험상품 추가금액 합계 (부가유치)
       const totalAddonIncentive = addonList.reduce((sum, addon) => sum + (addon.incentive || 0), 0) +
@@ -1808,13 +1866,6 @@ function setupDirectRoutes(app) {
       const totalAddonDeduction = addonList.reduce((sum, addon) => sum + (addon.deduction || 0), 0) +
                                   insuranceList.reduce((sum, insurance) => sum + (insurance.deduction || 0), 0);
 
-      const specialRows = (specialRes.data.values || []).slice(1);
-      const specialPolicies = specialRows
-        .filter(row => (row[0] || '').trim() === carrier && (row[4] || '').toString().toLowerCase() === 'true')
-        .map(row => ({
-          addition: Number(row[2] || 0),
-          deduction: Number(row[3] || 0)
-        }));
       const totalSpecialAddition = specialPolicies.reduce((sum, policy) => sum + (policy.addition || 0), 0);
       const totalSpecialDeduction = specialPolicies.reduce((sum, policy) => sum + (policy.deduction || 0), 0);
 
