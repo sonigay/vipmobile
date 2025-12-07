@@ -192,9 +192,11 @@ async function getLinkSettings(carrier) {
   
   return withRequestDeduplication(cacheKey, async () => {
     const { sheets, SPREADSHEET_ID } = createSheetsClient();
-    const linkSettingsRes = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range: SHEET_SETTINGS
+    const linkSettingsRes = await withRetry(async () => {
+      return await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: SHEET_SETTINGS
+      });
     });
     const linkSettingsRows = (linkSettingsRes.data.values || []).slice(1);
     const carrierSettings = linkSettingsRows.filter(row => (row[0] || '').trim() === carrier);
@@ -208,11 +210,13 @@ async function getSheetData(sheetId, range, ttlMs = 10 * 60 * 1000) {
   
   return withRequestDeduplication(cacheKey, async () => {
     const { sheets } = createSheetsClient();
-    const res = await sheets.spreadsheets.values.get({
-      spreadsheetId: sheetId,
-      range: range,
-      majorDimension: 'ROWS',
-      valueRenderOption: 'UNFORMATTED_VALUE'
+    const res = await withRetry(async () => {
+      return await sheets.spreadsheets.values.get({
+        spreadsheetId: sheetId,
+        range: range,
+        majorDimension: 'ROWS',
+        valueRenderOption: 'UNFORMATTED_VALUE'
+      });
     });
     const data = (res.data.values || []).slice(1);
     return data;
