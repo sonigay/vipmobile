@@ -278,27 +278,31 @@ async function ensureSheetHeaders(sheets, spreadsheetId, sheetName, headers) {
     }
     return headers;
   } catch (error) {
-    // 시트가 없으면 생성
+    // 시트가 없으면 생성 (재시도 로직 포함)
     if (error.code === 400) {
       try {
-        await sheets.spreadsheets.batchUpdate({
-          spreadsheetId,
-          resource: {
-            requests: [{
-              addSheet: {
-                properties: {
-                  title: sheetName
+        await withRetry(async () => {
+          return await sheets.spreadsheets.batchUpdate({
+            spreadsheetId,
+            resource: {
+              requests: [{
+                addSheet: {
+                  properties: {
+                    title: sheetName
+                  }
                 }
-              }
-            }]
-          }
+              }]
+            }
+          });
         });
-        // 헤더 작성
-        await sheets.spreadsheets.values.update({
-          spreadsheetId,
-          range: `${sheetName}!A1:${String.fromCharCode(65 + headers.length - 1)}1`,
-          valueInputOption: 'USER_ENTERED',
-          resource: { values: [headers] }
+        // 헤더 작성 (재시도 로직 포함)
+        await withRetry(async () => {
+          return await sheets.spreadsheets.values.update({
+            spreadsheetId,
+            range: `${sheetName}!A1:${String.fromCharCode(65 + headers.length - 1)}1`,
+            valueInputOption: 'USER_ENTERED',
+            resource: { values: [headers] }
+          });
         });
       } catch (createError) {
         console.error(`[Direct] Failed to create sheet ${sheetName}:`, createError);
