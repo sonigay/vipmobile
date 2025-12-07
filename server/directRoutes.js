@@ -121,27 +121,35 @@ async function getPolicySettings(carrier) {
 
     // 마진 설정 읽기
     await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_MARGIN, HEADERS_POLICY_MARGIN);
-    const marginRes = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range: SHEET_POLICY_MARGIN
+    const marginRes = await withRetry(async () => {
+      return await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: SHEET_POLICY_MARGIN
+      });
     });
     const marginRows = (marginRes.data.values || []).slice(1);
     const marginRow = marginRows.find(row => (row[0] || '').trim() === carrier);
     const baseMargin = marginRow ? Number(marginRow[1] || 0) : 50000;
 
-    // 부가서비스, 보험상품, 별도정책 병렬 읽기
+    // 부가서비스, 보험상품, 별도정책 병렬 읽기 (재시도 로직 포함)
     const [addonRes, insuranceRes, specialRes] = await Promise.all([
-      sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: SHEET_POLICY_ADDON
+      withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: SHEET_POLICY_ADDON
+        });
       }),
-      sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: SHEET_POLICY_INSURANCE
+      withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: SHEET_POLICY_INSURANCE
+        });
       }),
-      sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: SHEET_POLICY_SPECIAL
+      withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: SHEET_POLICY_SPECIAL
+        });
       })
     ]);
 
@@ -245,10 +253,12 @@ async function getSheetId(sheets, spreadsheetId, sheetName) {
 
 async function ensureSheetHeaders(sheets, spreadsheetId, sheetName, headers) {
   try {
-    // 시트 존재 여부 확인 및 헤더 확인
-    const res = await sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range: `${sheetName}!1:1`
+    // 시트 존재 여부 확인 및 헤더 확인 (재시도 로직 포함)
+    const res = await withRetry(async () => {
+      return await sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: `${sheetName}!1:1`
+      });
     });
     const firstRow = res.data.values && res.data.values[0] ? res.data.values[0] : [];
     const needsInit = firstRow.length === 0 || headers.some((h, i) => (firstRow[i] || '') !== h);
