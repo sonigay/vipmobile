@@ -1152,64 +1152,92 @@ function setupDirectRoutes(app) {
       // 3. 정책표 설정은 이미 위에서 읽었으므로 재사용
       // policyRow, policySettingsJson, policySheetId는 이미 선언됨
 
-      // 4. 요금제군별 이통사지원금 범위 읽기 (병렬 처리로 최적화)
+      // 4. 요금제군별 이통사지원금 범위 읽기 (batchGet으로 최적화하여 API 호출 수 감소)
       const planGroupSupportData = {};
-      const supportPromises = Object.entries(planGroupRanges).map(async ([planGroup, range]) => {
-        if (range) {
-          try {
-            const response = await sheets.spreadsheets.values.get({
-              spreadsheetId: supportSheetId,
-              range: range,
-              majorDimension: 'ROWS',
-              valueRenderOption: 'UNFORMATTED_VALUE'
-            });
-            return { planGroup, data: response.data.values || [] };
-          } catch (err) {
-            console.warn(`[Direct] ${planGroup} 지원금 범위 읽기 실패:`, err);
-            return { planGroup, data: [] };
-          }
-        }
-        return { planGroup, data: [] };
-      });
+      const supportRanges = [];
+      const supportRangeMap = {}; // range -> planGroup 매핑
       
-      const supportResults = await Promise.all(supportPromises);
-      supportResults.forEach(({ planGroup, data }) => {
-        planGroupSupportData[planGroup] = data;
-      });
+      for (const [planGroup, range] of Object.entries(planGroupRanges)) {
+        if (range) {
+          supportRanges.push(range);
+          supportRangeMap[range] = planGroup;
+        } else {
+          planGroupSupportData[planGroup] = [];
+        }
+      }
+      
+      if (supportRanges.length > 0) {
+        try {
+          const response = await sheets.spreadsheets.values.batchGet({
+            spreadsheetId: supportSheetId,
+            ranges: supportRanges,
+            majorDimension: 'ROWS',
+            valueRenderOption: 'UNFORMATTED_VALUE'
+          });
+          
+          response.data.valueRanges.forEach((valueRange, index) => {
+            const range = supportRanges[index];
+            const planGroup = supportRangeMap[range];
+            planGroupSupportData[planGroup] = valueRange.values || [];
+          });
+        } catch (err) {
+          console.warn(`[Direct] 지원금 범위 batchGet 실패:`, err);
+          // 실패 시 빈 배열로 초기화
+          Object.keys(planGroupRanges).forEach(planGroup => {
+            if (!planGroupSupportData[planGroup]) {
+              planGroupSupportData[planGroup] = [];
+            }
+          });
+        }
+      }
 
-      // 5. 정책표 설정에서 요금제군 & 유형별 리베이트 읽기 (병렬 처리로 최적화)
+      // 5. 정책표 설정에서 요금제군 & 유형별 리베이트 읽기 (batchGet으로 최적화하여 API 호출 수 감소)
       const policyRebateData = {}; // { '115군': { '010신규': [값들], 'MNP': [값들], '기변': [값들] } }
       if (policySheetId && policySettingsJson.planGroupRanges) {
-        const rebatePromises = [];
+        const rebateRanges = [];
+        const rebateRangeMap = []; // [{ planGroup, openingType, range }]
+        
         for (const [planGroup, typeRanges] of Object.entries(policySettingsJson.planGroupRanges)) {
           if (typeof typeRanges === 'object') {
             policyRebateData[planGroup] = {};
             for (const [openingType, range] of Object.entries(typeRanges)) {
               if (range) {
-                rebatePromises.push(
-                  sheets.spreadsheets.values.get({
-                    spreadsheetId: policySheetId,
-                    range: range,
-                    majorDimension: 'ROWS',
-                    valueRenderOption: 'UNFORMATTED_VALUE'
-                  })
-                  .then(response => {
-                    // 만원 단위로 저장되어 있으므로 *10000 적용
-                    const values = (response.data.values || []).map(row => 
-                      Number((row[0] || 0).toString().replace(/,/g, '')) * 10000
-                    );
-                    policyRebateData[planGroup][openingType] = values;
-                  })
-                  .catch(err => {
-                    console.warn(`[Direct] ${planGroup} ${openingType} 리베이트 범위 읽기 실패:`, err);
-                    policyRebateData[planGroup][openingType] = [];
-                  })
-                );
+                rebateRanges.push(range);
+                rebateRangeMap.push({ planGroup, openingType, range });
+              } else {
+                policyRebateData[planGroup][openingType] = [];
               }
             }
           }
         }
-        await Promise.all(rebatePromises);
+        
+        if (rebateRanges.length > 0) {
+          try {
+            const response = await sheets.spreadsheets.values.batchGet({
+              spreadsheetId: policySheetId,
+              ranges: rebateRanges,
+              majorDimension: 'ROWS',
+              valueRenderOption: 'UNFORMATTED_VALUE'
+            });
+            
+            response.data.valueRanges.forEach((valueRange, index) => {
+              const { planGroup, openingType } = rebateRangeMap[index];
+              // 만원 단위로 저장되어 있으므로 *10000 적용
+              const values = (valueRange.values || []).map(row => 
+                Number((row[0] || 0).toString().replace(/,/g, '')) * 10000
+              );
+              policyRebateData[planGroup][openingType] = values;
+            });
+          } catch (err) {
+            console.warn(`[Direct] 리베이트 범위 batchGet 실패:`, err);
+            // 실패 시 빈 배열로 초기화
+            rebateRangeMap.forEach(({ planGroup, openingType }) => {
+              if (!policyRebateData[planGroup][openingType]) {
+                policyRebateData[planGroup][openingType] = [];
+              }
+            });
+          }
+        }
       }
 
       // 6. 정책설정에서 마진, 부가서비스, 보험상품, 별도정책 정보 읽기 (병렬 처리로 최적화)
