@@ -33,9 +33,16 @@ export const directStoreApi = {
                 const errorData = await response.json().catch(() => ({}));
                 throw new Error(errorData.error || `오늘의 휴대폰 조회 실패 (${response.status})`);
             }
-            const data = await response.json();
-            // 백엔드에서 { premium: [], budget: [] } 형식으로 반환
+            const payload = await response.json();
+            const data = payload.data || payload;
+            // 백엔드에서 { success, data: { premium, budget }, meta } 형식 또는 기존 { premium, budget }
             const result = data.premium && data.budget ? data : { premium: data.premium || [], budget: data.budget || [] };
+            if (payload.meta) {
+                Object.defineProperty(result, '__meta', {
+                    value: payload.meta,
+                    enumerable: false
+                });
+            }
             // 빈 배열이어도 반환 (에러가 아님)
             return result;
         } catch (err) {
@@ -82,7 +89,15 @@ export const directStoreApi = {
             }
             const data = await response.json();
             // 백엔드에서 배열을 직접 반환하거나, { success: true, data: [...] } 형식일 수 있음
-            return Array.isArray(data) ? data : (data.data || data.mobileList || []);
+            const list = Array.isArray(data) ? data : (data.data || data.mobileList || []);
+            const meta = Array.isArray(data) ? (data.meta || {}) : (data.meta || {});
+            if (list && meta) {
+                Object.defineProperty(list, '__meta', {
+                    value: meta,
+                    enumerable: false
+                });
+            }
+            return list;
         } catch (err) {
             console.warn('휴대폰 목록 API 호출 실패, Mock 데이터 사용:', err);
             // API 실패 시 Mock 데이터 반환 (fallback)
