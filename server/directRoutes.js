@@ -1513,6 +1513,15 @@ function setupDirectRoutes(app) {
             }
             
             planGroupSupportData[planGroup] = supportMap;
+            
+            // 디버깅: planGroupSupportData 생성 확인
+            console.log(`[Direct] planGroupSupportData 생성 완료:`, {
+              요금제군: planGroup,
+              범위: range,
+              시작행: startRow,
+              맵크기: Object.keys(supportMap).length,
+              맵키샘플: Object.keys(supportMap).slice(0, 10)
+            });
           });
         } catch (err) {
           console.warn(`[Direct] 지원금 범위 batchGet 실패:`, err);
@@ -2303,9 +2312,10 @@ function setupDirectRoutes(app) {
                 모델명: model,
                 요금제군: selectedPlanGroup,
                 개통유형: supportOpeningType,
-                시도한키: supportKeys.slice(0, 5),
+                시도한키: supportKeys.slice(0, 10),
                 맵에있는키수: Object.keys(planGroupSupportData[selectedPlanGroup] || {}).length,
-                맵에있는키샘플: Object.keys(planGroupSupportData[selectedPlanGroup] || {}).slice(0, 5)
+                맵에있는키샘플: Object.keys(planGroupSupportData[selectedPlanGroup] || {}).slice(0, 10),
+                맵에있는키전체: Object.keys(planGroupSupportData[selectedPlanGroup] || {}).filter(k => k.includes(model) || (normalizedModel && k.includes(normalizedModel)))
               });
             } else {
               console.log(`[Direct] ✅ planGroupSupportData에서 값 찾음:`, {
@@ -2316,6 +2326,26 @@ function setupDirectRoutes(app) {
                 이통사지원금: publicSupport
               });
             }
+          }
+        } else {
+          // planGroupSupportData가 없거나 selectedPlanGroup이 없는 경우
+          const carrierSupportProblemModels = [
+            'SM-S926N256', 'SM-S926N512', 'SM-S928N256', 'SM-S928N512',
+            'UIP17-256', 'UIP17-512', 'UIPA-256', 'UIPA-512', 'UIPA-1T',
+            'UIP17PR-256', 'UIP17PR-512', 'UIP17PR-1T'
+          ];
+          const shouldLog = carrierSupportProblemModels.some(pm => 
+            model === pm || model.toLowerCase() === pm.toLowerCase() || 
+            (normalizedModel && normalizedModel.toLowerCase() === pm.toLowerCase())
+          );
+          
+          if (shouldLog) {
+            console.warn(`[Direct] ⚠️ planGroupSupportData가 없음:`, {
+              모델명: model,
+              요금제군: selectedPlanGroup,
+              planGroupSupportData존재: !!planGroupSupportData[selectedPlanGroup],
+              planGroupSupportData키목록: Object.keys(planGroupSupportData || {})
+            });
           }
         }
         
