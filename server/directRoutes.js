@@ -1502,6 +1502,24 @@ function setupDirectRoutes(app) {
       const maxRows = Math.max(modelData.length, petNameData.length);
       const mobileList = [];
       
+      // 디버깅 대상 모델 목록 (이통사지원금 + 대리점지원금 문제 모델)
+      const debugTargetModels = [
+        'SM-S926N256', 'SM-S926N512', 'SM-S928N256', 'SM-S928N512',
+        'UIP17-256', 'UIP17-512', 'UIPA-256', 'UIPA-512', 'UIPA-1T',
+        'UIP17PR-256', 'UIP17PR-512', 'UIP17PR-1T',
+        'SM-F766N256', 'SM-S731N', 'SM-S937N256', 'SM-A166L', 
+        'A2633-128', 'AT-M140L'
+      ];
+      
+      // 디버깅 대상 모델인지 확인하는 헬퍼 함수
+      const isDebugTarget = (modelName) => {
+        const normalizedModel = normalizeModelCode(modelName);
+        return debugTargetModels.some(pm => 
+          modelName === pm || modelName.toLowerCase() === pm.toLowerCase() || 
+          (normalizedModel && normalizedModel.toLowerCase() === pm.toLowerCase())
+        );
+      };
+      
       for (let i = 0; i < maxRows; i++) {
         const model = (modelData[i]?.[0] || '').toString().trim();
         if (!model) continue; // 빈 행 스킵
@@ -1806,14 +1824,11 @@ function setupDirectRoutes(app) {
           'UIP17-256', 'UIP17-512', 'UIPA-256', 'UIPA-512', 'UIPA-1T',
           'UIP17PR-256', 'UIP17PR-512', 'UIP17PR-1T'
         ];
-        const carrierSupportProblemTypes = ['번호이동', '010신규/기변', 'MNP', '010신규', '기변'];
-        const shouldLogCarrierSupport = carrierSupportProblemModels.some(pm => {
-          const modelMatch = model === pm || model.toLowerCase() === pm.toLowerCase() || 
-            (normalizedModel && normalizedModel.toLowerCase() === pm.toLowerCase());
-          const typeMatch = carrierSupportProblemTypes.includes(matchedOpeningType) ||
-            openingTypeList.some(ot => carrierSupportProblemTypes.includes(ot));
-          return modelMatch && typeMatch;
-        });
+        // 이통사지원금 문제 모델은 모든 개통유형에서 로그 출력
+        const shouldLogCarrierSupport = carrierSupportProblemModels.some(pm => 
+          model === pm || model.toLowerCase() === pm.toLowerCase() || 
+          (normalizedModel && normalizedModel.toLowerCase() === pm.toLowerCase())
+        );
         
         if (shouldLogCarrierSupport) {
           if (!supportDebugInfo.found) {
@@ -1901,27 +1916,31 @@ function setupDirectRoutes(app) {
         // 디버깅: UIP 관련 모델명에 대한 상세 로그
         if (tagMap.size > 0 && (model.includes('UIP') || model.includes('uip'))) {
           if (tags.isPremium || tags.isBudget) {
-            console.log(`[Direct] ✅ UIP 태그 찾음: 모델명=${model}, isPremium=${tags.isPremium}, isBudget=${tags.isBudget}`);
+            if (isDebugTarget(model)) {
+              console.log(`[Direct] ✅ UIP 태그 찾음: 모델명=${model}, isPremium=${tags.isPremium}, isBudget=${tags.isBudget}`);
+            }
           } else {
-            const mapKeys = Array.from(tagMap.keys());
-            const matchingKeys = mapKeys.filter(k => {
-              const kLower = k.toLowerCase();
-              const modelLower = model.toLowerCase();
-              const normalizedModel = normalizeModelCode(model);
-              const normalizedModelLower = normalizedModel ? normalizedModel.toLowerCase() : '';
-              return kLower.includes(modelLower) || 
-                     modelLower.includes(kLower) || 
-                     kLower === modelLower ||
-                     (normalizedModelLower && (kLower.includes(normalizedModelLower) || normalizedModelLower.includes(kLower)));
-            });
-            console.log(`[Direct] ⚠️ UIP 태그를 찾을 수 없음:`, {
-              통신사: carrierParam,
-              모델명: model,
-              정규화된모델명: normalizeModelCode(model),
-              태그맵크기: tagMap.size,
-              태그맵키전체: mapKeys.slice(0, 30), // 처음 30개
-              유사키: matchingKeys
-            });
+            if (isDebugTarget(model)) {
+              const mapKeys = Array.from(tagMap.keys());
+              const matchingKeys = mapKeys.filter(k => {
+                const kLower = k.toLowerCase();
+                const modelLower = model.toLowerCase();
+                const normalizedModel = normalizeModelCode(model);
+                const normalizedModelLower = normalizedModel ? normalizedModel.toLowerCase() : '';
+                return kLower.includes(modelLower) || 
+                       modelLower.includes(kLower) || 
+                       kLower === modelLower ||
+                       (normalizedModelLower && (kLower.includes(normalizedModelLower) || normalizedModelLower.includes(kLower)));
+              });
+              console.log(`[Direct] ⚠️ UIP 태그를 찾을 수 없음:`, {
+                통신사: carrierParam,
+                모델명: model,
+                정규화된모델명: normalizeModelCode(model),
+                태그맵크기: tagMap.size,
+                태그맵키전체: mapKeys.slice(0, 30), // 처음 30개
+                유사키: matchingKeys
+              });
+            }
           }
         }
 
@@ -1974,14 +1993,16 @@ function setupDirectRoutes(app) {
                     keyNormalized.includes(modelNormalized) || 
                     modelNormalized.includes(keyNormalized)) {
                   imgUrl = imageMap.get(mapKey);
-                  console.log(`[Direct] ✅ 유사 키로 이미지 찾음: 모델명=${model}, 맵키=${mapKey}`);
+                  if (isDebugTarget(model)) {
+                    console.log(`[Direct] ✅ 유사 키로 이미지 찾음: 모델명=${model}, 맵키=${mapKey}`);
+                  }
                   break;
                 }
               }
             }
             
-            // 디버깅: 이미지를 찾지 못한 경우 상세 로그
-            if (!imgUrl && imageMap.size > 0) {
+            // 디버깅: 이미지를 찾지 못한 경우 상세 로그 (디버깅 대상 모델만)
+            if (!imgUrl && imageMap.size > 0 && isDebugTarget(model)) {
               const mapKeys = Array.from(imageMap.keys());
               const matchingKeys = mapKeys.filter(k => {
                 const kLower = k.toLowerCase();
