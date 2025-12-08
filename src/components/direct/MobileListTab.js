@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Box,
   Tabs,
@@ -453,18 +453,25 @@ const MobileListTab = ({ onProductSelect }) => {
     }
   };
 
-  const handleTagMenuOpen = (event, modelId) => {
+  const handleTagMenuOpen = useCallback((event, modelId) => {
     event.stopPropagation();
-    setTagMenuAnchor(prev => ({ ...prev, [modelId]: event.currentTarget }));
-  };
-
-  const handleTagMenuClose = (modelId) => {
+    event.preventDefault();
     setTagMenuAnchor(prev => {
+      // 이미 열려있으면 즉시 반환 (중복 방지)
+      if (prev[modelId]) return prev;
+      return { ...prev, [modelId]: event.currentTarget };
+    });
+  }, []);
+
+  const handleTagMenuClose = useCallback((modelId) => {
+    setTagMenuAnchor(prev => {
+      // 이미 닫혀있으면 즉시 반환 (중복 방지)
+      if (!prev[modelId]) return prev;
       const newState = { ...prev };
       delete newState[modelId];
       return newState;
     });
-  };
+  }, []);
 
   const handleTagChange = async (modelId, tagType, checked) => {
     const currentMobile = mobileList.find(m => m.id === modelId);

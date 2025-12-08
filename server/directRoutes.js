@@ -234,6 +234,27 @@ function normalizeModelCode(modelCode) {
   return modelCode.replace(/[\s\-_]/g, '').toLowerCase();
 }
 
+// 하이픈 변형 생성 함수 (하이픈 유무/위치 차이 처리)
+function generateHyphenVariants(modelCode) {
+  if (!modelCode) return [];
+  const variants = [modelCode]; // 원본 포함
+  
+  // 하이픈이 있는 경우: 하이픈 제거
+  if (modelCode.includes('-')) {
+    variants.push(modelCode.replace(/-/g, ''));
+  }
+  
+  // 하이픈이 없는 경우: 일반적인 위치에 하이픈 추가 시도
+  if (!modelCode.includes('-')) {
+    // 숫자 앞에 하이픈 추가 (예: UIP17PR256 → UIP17PR-256)
+    variants.push(modelCode.replace(/([A-Z])(\d+)/g, '$1-$2'));
+    // 숫자 뒤에 하이픈 추가 (예: SM-S928N256 → SM-S928N-256)
+    variants.push(modelCode.replace(/(\d+)([A-Z])/g, '$1-$2'));
+  }
+  
+  return [...new Set(variants)]; // 중복 제거
+}
+
 // 개통유형 문자열을 표준화하여 배열로 반환 (예: "010신규/기변" → ['010신규','기변'])
 function parseOpeningTypes(raw) {
   const text = (raw || '').toString().toLowerCase();
@@ -1218,19 +1239,38 @@ function setupDirectRoutes(app) {
               } else {
                 // 모델명+개통유형 조합으로 저장 (정확한 매칭용)
                 const normalizedModel = normalizeModelCode(supportModel);
+                const hyphenVariants = generateHyphenVariants(supportModel);
                 
                 openingTypes.forEach(ot => {
+                  // 원본 모델명
                   const key = `${supportModel}|${ot}`;
                   supportSheetData[key] = entry;
                   
-                  // 정규화된 모델명+개통유형 조합으로도 저장
+                  // 대소문자 변형
+                  supportSheetData[`${supportModel.toLowerCase()}|${ot}`] = entry;
+                  supportSheetData[`${supportModel.toUpperCase()}|${ot}`] = entry;
+                  
+                  // 하이픈 변형 (원본 우선, 하이픈 변형은 폴백)
+                  hyphenVariants.forEach(variant => {
+                    if (variant !== supportModel) {
+                      const variantKey = `${variant}|${ot}`;
+                      if (!supportSheetData[variantKey]) {
+                        supportSheetData[variantKey] = entry;
+                      }
+                      supportSheetData[`${variant.toLowerCase()}|${ot}`] = entry;
+                      supportSheetData[`${variant.toUpperCase()}|${ot}`] = entry;
+                    }
+                  });
+                  
+                  // 정규화된 모델명 (마지막 폴백)
                   if (normalizedModel) {
-                    supportSheetData[`${normalizedModel}|${ot}`] = entry;
+                    const normalizedKey = `${normalizedModel}|${ot}`;
+                    if (!supportSheetData[normalizedKey]) {
+                      supportSheetData[normalizedKey] = entry;
+                    }
                     supportSheetData[`${normalizedModel.toLowerCase()}|${ot}`] = entry;
                     supportSheetData[`${normalizedModel.toUpperCase()}|${ot}`] = entry;
                   }
-                  supportSheetData[`${supportModel.toLowerCase()}|${ot}`] = entry;
-                  supportSheetData[`${supportModel.toUpperCase()}|${ot}`] = entry;
                 });
                 
                 // "번호이동" → MNP 매핑
@@ -1336,8 +1376,8 @@ function setupDirectRoutes(app) {
       // 3. 정책표 설정은 이미 위에서 읽었으므로 재사용
       // policyRow, policySettingsJson, policySheetId는 이미 선언됨
 
-      // 4. 요금제군별 이통사지원금 범위 읽기 (batchGet으로 최적화하여 API 호출 수 감소)
-      const planGroupSupportData = {};
+      // 4. 요금제군별 이통사지원금 범위 읽기 (모델명+개통유형 복합키 맵으로 저장)
+      const planGroupSupportData = {}; // { '115군': { 'UIP17PR-256|MNP': 550000, ... } }
       const supportRanges = [];
       const supportRangeMap = {}; // range -> planGroup 매핑
       
@@ -1346,7 +1386,7 @@ function setupDirectRoutes(app) {
           supportRanges.push(range);
           supportRangeMap[range] = planGroup;
         } else {
-          planGroupSupportData[planGroup] = [];
+          planGroupSupportData[planGroup] = {};
         }
       }
       
@@ -1362,14 +1402,114 @@ function setupDirectRoutes(app) {
           response.data.valueRanges.forEach((valueRange, index) => {
             const range = supportRanges[index];
             const planGroup = supportRangeMap[range];
-            planGroupSupportData[planGroup] = valueRange.values || [];
+            const supportValues = valueRange.values || [];
+            
+            // 모델명+개통유형 복합키 맵으로 변환
+            // supportModelData와 supportOpeningTypeData를 사용하여 모델명과 개통유형 매칭
+            const supportMap = {};
+            const maxRows = Math.max(
+              supportModelData.length,
+              supportOpeningTypeData.length,
+              supportValues.length
+            );
+            
+            for (let j = 0; j < maxRows; j++) {
+              const model = (supportModelData[j]?.[0] || '').toString().trim();
+              if (!model) continue;
+              
+              const openingTypeRaw = (supportOpeningTypeData[j]?.[0] || '').toString().trim();
+              const openingTypes = parseOpeningTypes(openingTypeRaw);
+              const supportValue = Number((supportValues[j]?.[0] || 0).toString().replace(/,/g, '')) || 0;
+              
+              // 각 개통유형에 대해 복합키 생성
+              if (openingTypeRaw === '전유형' || openingTypes.includes('전유형')) {
+                // 전유형인 경우 모든 개통유형에 매핑
+                ['010신규', 'MNP', '기변'].forEach(ot => {
+                  const key = `${model}|${ot}`;
+                  if (!supportMap[key]) {
+                    supportMap[key] = supportValue;
+                  }
+                  // 대소문자 변형
+                  supportMap[`${model.toLowerCase()}|${ot}`] = supportValue;
+                  supportMap[`${model.toUpperCase()}|${ot}`] = supportValue;
+                  // 정규화된 모델명
+                  const normalizedModel = normalizeModelCode(model);
+                  if (normalizedModel) {
+                    supportMap[`${normalizedModel}|${ot}`] = supportValue;
+                    supportMap[`${normalizedModel.toLowerCase()}|${ot}`] = supportValue;
+                    supportMap[`${normalizedModel.toUpperCase()}|${ot}`] = supportValue;
+                  }
+                });
+              } else {
+                // 각 개통유형에 대해 복합키 생성
+                openingTypes.forEach(ot => {
+                  const key = `${model}|${ot}`;
+                  if (!supportMap[key]) {
+                    supportMap[key] = supportValue;
+                  }
+                  // 대소문자 변형
+                  supportMap[`${model.toLowerCase()}|${ot}`] = supportValue;
+                  supportMap[`${model.toUpperCase()}|${ot}`] = supportValue;
+                  // 정규화된 모델명
+                  const normalizedModel = normalizeModelCode(model);
+                  if (normalizedModel) {
+                    supportMap[`${normalizedModel}|${ot}`] = supportValue;
+                    supportMap[`${normalizedModel.toLowerCase()}|${ot}`] = supportValue;
+                    supportMap[`${normalizedModel.toUpperCase()}|${ot}`] = supportValue;
+                  }
+                });
+                
+                // "번호이동" → MNP 매핑
+                if (openingTypeRaw === '번호이동' || openingTypes.includes('번호이동')) {
+                  const mnpKeys = [
+                    `${model}|MNP`,
+                    `${model.toLowerCase()}|MNP`,
+                    `${model.toUpperCase()}|MNP`
+                  ];
+                  const normalizedModel = normalizeModelCode(model);
+                  if (normalizedModel) {
+                    mnpKeys.push(
+                      `${normalizedModel}|MNP`,
+                      `${normalizedModel.toLowerCase()}|MNP`,
+                      `${normalizedModel.toUpperCase()}|MNP`
+                    );
+                  }
+                  mnpKeys.forEach(key => {
+                    if (!supportMap[key]) {
+                      supportMap[key] = supportValue;
+                    }
+                  });
+                }
+                
+                // "010신규/기변" → 010신규와 기변 매핑
+                if (openingTypeRaw === '010신규/기변' ||
+                    (openingTypes.includes('010신규') && openingTypes.includes('기변'))) {
+                  ['010신규', '기변'].forEach(ot => {
+                    const key = `${model}|${ot}`;
+                    if (!supportMap[key]) {
+                      supportMap[key] = supportValue;
+                    }
+                    supportMap[`${model.toLowerCase()}|${ot}`] = supportValue;
+                    supportMap[`${model.toUpperCase()}|${ot}`] = supportValue;
+                    const normalizedModel = normalizeModelCode(model);
+                    if (normalizedModel) {
+                      supportMap[`${normalizedModel}|${ot}`] = supportValue;
+                      supportMap[`${normalizedModel.toLowerCase()}|${ot}`] = supportValue;
+                      supportMap[`${normalizedModel.toUpperCase()}|${ot}`] = supportValue;
+                    }
+                  });
+                }
+              }
+            }
+            
+            planGroupSupportData[planGroup] = supportMap;
           });
         } catch (err) {
           console.warn(`[Direct] 지원금 범위 batchGet 실패:`, err);
-          // 실패 시 빈 배열로 초기화
+          // 실패 시 빈 객체로 초기화
           Object.keys(planGroupRanges).forEach(planGroup => {
             if (!planGroupSupportData[planGroup]) {
-              planGroupSupportData[planGroup] = [];
+              planGroupSupportData[planGroup] = {};
             }
           });
         }
@@ -1683,13 +1823,31 @@ function setupDirectRoutes(app) {
         const petName = (petNameData[i]?.[0] || model).toString().trim();
         
         // 모델명을 기준으로 이통사 지원금 시트에서 데이터 찾기
+        // 매칭 순서: 원본 → 대소문자 변형 → 하이픈 변형 → 정규화
         const normalizedModel = normalizeModelCode(model);
-        let supportData = supportSheetData[model] ||
+        let supportData = supportSheetData[model] || // 원본 최우선
           supportSheetData[model.toLowerCase()] ||
-          supportSheetData[model.toUpperCase()] ||
-          (normalizedModel ? supportSheetData[normalizedModel] ||
+          supportSheetData[model.toUpperCase()];
+        
+        // 하이픈 변형 시도
+        if (!supportData) {
+          const hyphenVariants = generateHyphenVariants(model);
+          for (const variant of hyphenVariants) {
+            if (variant !== model) {
+              supportData = supportSheetData[variant] ||
+                supportSheetData[variant.toLowerCase()] ||
+                supportSheetData[variant.toUpperCase()];
+              if (supportData) break;
+            }
+          }
+        }
+        
+        // 정규화된 모델명 (마지막 폴백)
+        if (!supportData && normalizedModel) {
+          supportData = supportSheetData[normalizedModel] ||
             supportSheetData[normalizedModel.toLowerCase()] ||
-            supportSheetData[normalizedModel.toUpperCase()] : null);
+            supportSheetData[normalizedModel.toUpperCase()];
+        }
         if (!supportData) {
           console.warn(`[Direct] 모델명 ${model}에 대한 이통사 지원금 데이터를 찾을 수 없습니다. 기본값(0)으로 계속 진행합니다.`);
           supportData = {
@@ -1940,12 +2098,26 @@ function setupDirectRoutes(app) {
           supportDebugInfo.triedOpeningTypes.push(tryType);
           
           // normalizedModel은 이미 위에서 선언됨 (1467번 라인)
-          const supportKey = `${model}|${tryType}`;
+          // 매칭 순서: 원본 → 대소문자 변형 → 하이픈 변형 → 정규화
           const candidateKeys = [
-            supportKey,
+            `${model}|${tryType}`, // 원본 최우선
             `${model.toLowerCase()}|${tryType}`,
             `${model.toUpperCase()}|${tryType}`,
           ];
+          
+          // 하이픈 변형 추가 (원본 매칭 실패 시 시도)
+          const hyphenVariants = generateHyphenVariants(model);
+          hyphenVariants.forEach(variant => {
+            if (variant !== model) {
+              candidateKeys.push(
+                `${variant}|${tryType}`,
+                `${variant.toLowerCase()}|${tryType}`,
+                `${variant.toUpperCase()}|${tryType}`
+              );
+            }
+          });
+          
+          // 정규화된 모델명 (마지막 폴백)
           if (normalizedModel) {
             candidateKeys.push(
               `${normalizedModel}|${tryType}`,
@@ -1972,10 +2144,24 @@ function setupDirectRoutes(app) {
           // "번호이동"과 "MNP" 양방향 매칭
           if (tryType === 'MNP') {
             const mnpKeys = [
-              `${model}|번호이동`,
+              `${model}|번호이동`, // 원본 최우선
               `${model.toLowerCase()}|번호이동`,
               `${model.toUpperCase()}|번호이동`,
             ];
+            
+            // 하이픈 변형 추가
+            const hyphenVariants = generateHyphenVariants(model);
+            hyphenVariants.forEach(variant => {
+              if (variant !== model) {
+                mnpKeys.push(
+                  `${variant}|번호이동`,
+                  `${variant.toLowerCase()}|번호이동`,
+                  `${variant.toUpperCase()}|번호이동`
+                );
+              }
+            });
+            
+            // 정규화된 모델명 (마지막 폴백)
             if (normalizedModel) {
               mnpKeys.push(
                 `${normalizedModel}|번호이동`,
@@ -1983,6 +2169,7 @@ function setupDirectRoutes(app) {
                 `${normalizedModel.toUpperCase()}|번호이동`
               );
             }
+            
             for (const key of mnpKeys) {
               if (supportSheetData[key]) {
                 finalSupportData = supportSheetData[key];
@@ -2000,10 +2187,24 @@ function setupDirectRoutes(app) {
           // "010신규/기변" 매칭
           if (tryType === '010신규' || tryType === '기변') {
             const combinedKeys = [
-              `${model}|010신규/기변`,
+              `${model}|010신규/기변`, // 원본 최우선
               `${model.toLowerCase()}|010신규/기변`,
               `${model.toUpperCase()}|010신규/기변`,
             ];
+            
+            // 하이픈 변형 추가
+            const hyphenVariants = generateHyphenVariants(model);
+            hyphenVariants.forEach(variant => {
+              if (variant !== model) {
+                combinedKeys.push(
+                  `${variant}|010신규/기변`,
+                  `${variant.toLowerCase()}|010신규/기변`,
+                  `${variant.toUpperCase()}|010신규/기변`
+                );
+              }
+            });
+            
+            // 정규화된 모델명 (마지막 폴백)
             if (normalizedModel) {
               combinedKeys.push(
                 `${normalizedModel}|010신규/기변`,
@@ -2011,6 +2212,7 @@ function setupDirectRoutes(app) {
                 `${normalizedModel.toUpperCase()}|010신규/기변`
               );
             }
+            
             for (const key of combinedKeys) {
               if (supportSheetData[key]) {
                 finalSupportData = supportSheetData[key];
@@ -2034,9 +2236,43 @@ function setupDirectRoutes(app) {
         supportDebugInfo.finalRowIndex = finalSupportRowIndex;
         
         let publicSupport = 0;
-        // finalSupportRowIndex를 사용하여 이통사 지원금 시트의 해당 행 데이터 가져오기
-        if (selectedPlanGroup && planGroupSupportData[selectedPlanGroup]?.[finalSupportRowIndex]?.[0] !== undefined) {
-          publicSupport = Number(planGroupSupportData[selectedPlanGroup][finalSupportRowIndex][0]) || 0;
+        // 모델명+개통유형 복합키로 요금제군별 이통사지원금 직접 조회
+        if (selectedPlanGroup && planGroupSupportData[selectedPlanGroup]) {
+          // 시도할 키 목록: 원본 → 대소문자 변형 → 하이픈 변형 → 정규화
+          const supportKeys = [
+            `${model}|${supportOpeningType}`, // 원본 최우선
+            `${model.toLowerCase()}|${supportOpeningType}`,
+            `${model.toUpperCase()}|${supportOpeningType}`
+          ];
+          
+          // 하이픈 변형 추가
+          const hyphenVariants = generateHyphenVariants(model);
+          hyphenVariants.forEach(variant => {
+            if (variant !== model) {
+              supportKeys.push(
+                `${variant}|${supportOpeningType}`,
+                `${variant.toLowerCase()}|${supportOpeningType}`,
+                `${variant.toUpperCase()}|${supportOpeningType}`
+              );
+            }
+          });
+          
+          // 정규화된 모델명 (마지막 폴백)
+          if (normalizedModel) {
+            supportKeys.push(
+              `${normalizedModel}|${supportOpeningType}`,
+              `${normalizedModel.toLowerCase()}|${supportOpeningType}`,
+              `${normalizedModel.toUpperCase()}|${supportOpeningType}`
+            );
+          }
+          
+          // 키를 순서대로 시도하여 값 찾기
+          for (const key of supportKeys) {
+            if (planGroupSupportData[selectedPlanGroup][key] !== undefined) {
+              publicSupport = Number(planGroupSupportData[selectedPlanGroup][key]) || 0;
+              break;
+            }
+          }
         }
         
         // 이통사지원금 매칭 디버깅 로그 (이통사지원금 문제 모델만)
