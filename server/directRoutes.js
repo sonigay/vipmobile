@@ -1444,6 +1444,39 @@ function setupDirectRoutes(app) {
         // 개통유형을 표준화 (010신규, MNP, 기변)
         let openingType = openingTypeList[0] || '010신규';
 
+        // 구분 태그 가져오기 (원본 모델명, 정규화된 모델명, 대소문자 변형 모두 시도)
+        // 요금제군 선택을 위해 먼저 태그를 가져와야 함
+        let tags = tagMap.get(model) || {};
+        if (!tags || Object.keys(tags).length === 0) {
+          // 대소문자 변형 시도
+          tags = tagMap.get(model.toLowerCase()) || tagMap.get(model.toUpperCase()) || {};
+        }
+        if (!tags || Object.keys(tags).length === 0) {
+          // 정규화된 모델명으로 시도
+          const normalizedModel = normalizeModelCode(model);
+          if (normalizedModel) {
+            tags = tagMap.get(normalizedModel) || tagMap.get(normalizedModel.toLowerCase()) || tagMap.get(normalizedModel.toUpperCase()) || {};
+          }
+        }
+        // 여전히 찾지 못했으면 유사 매칭 시도
+        if ((!tags || Object.keys(tags).length === 0) && tagMap.size > 0) {
+          const modelLower = model.toLowerCase();
+          const normalizedModel = normalizeModelCode(model);
+          const normalizedModelLower = normalizedModel ? normalizedModel.toLowerCase() : '';
+          
+          for (const [key, value] of tagMap.entries()) {
+            const keyLower = key.toLowerCase();
+            // 정확한 일치 또는 포함 관계 확인
+            if (keyLower === modelLower || 
+                keyLower === normalizedModelLower ||
+                (normalizedModelLower && (keyLower.includes(normalizedModelLower) || normalizedModelLower.includes(keyLower))) ||
+                (modelLower && (keyLower.includes(modelLower) || modelLower.includes(keyLower)))) {
+              tags = value;
+              break;
+            }
+          }
+        }
+
         // 요금제군 선택: 중저가 태그가 명시된 경우 33군 우선, 아니면 115군 우선, 없으면 첫 번째
         const planGroupKeys = Object.keys(planGroupRanges || {});
         const isBudget = tags.isBudget === true && tags.isPremium !== true;
@@ -1509,39 +1542,7 @@ function setupDirectRoutes(app) {
           - storeSupportWithoutAddon  // 대리점추가지원금 (정책표리베이트 - 마진 + 부가서비스차감 + 별도정책차감 포함)
         );
 
-        // 구분 태그 가져오기 (원본 모델명, 정규화된 모델명, 대소문자 변형 모두 시도)
-        let tags = tagMap.get(model) || {};
-        if (!tags || Object.keys(tags).length === 0) {
-          // 대소문자 변형 시도
-          tags = tagMap.get(model.toLowerCase()) || tagMap.get(model.toUpperCase()) || {};
-        }
-        if (!tags || Object.keys(tags).length === 0) {
-          // 정규화된 모델명으로 시도
-          const normalizedModel = normalizeModelCode(model);
-          if (normalizedModel) {
-            tags = tagMap.get(normalizedModel) || tagMap.get(normalizedModel.toLowerCase()) || tagMap.get(normalizedModel.toUpperCase()) || {};
-          }
-        }
-        // 여전히 찾지 못했으면 유사 매칭 시도
-        if ((!tags || Object.keys(tags).length === 0) && tagMap.size > 0) {
-          const modelLower = model.toLowerCase();
-          const normalizedModel = normalizeModelCode(model);
-          const normalizedModelLower = normalizedModel ? normalizedModel.toLowerCase() : '';
-          
-          for (const [key, value] of tagMap.entries()) {
-            const keyLower = key.toLowerCase();
-            // 정확한 일치 또는 포함 관계 확인
-            if (keyLower === modelLower || 
-                keyLower === normalizedModelLower ||
-                (normalizedModelLower && (keyLower.includes(normalizedModelLower) || normalizedModelLower.includes(keyLower))) ||
-                (modelLower && (keyLower.includes(modelLower) || modelLower.includes(keyLower)))) {
-              tags = value;
-              console.log(`[Direct] ✅ 유사 매칭으로 태그 찾음: 모델명=${model}, 맵키=${key}`);
-              break;
-            }
-          }
-        }
-        
+        // tags는 이미 위에서 초기화됨 (요금제군 선택을 위해)
         const tagsArray = [];
         if (tags.isPopular) tagsArray.push('popular');
         if (tags.isRecommended) tagsArray.push('recommend');
@@ -1684,6 +1685,10 @@ function setupDirectRoutes(app) {
       if (cached) {
         if (includeMeta) {
           const isEmpty = (cached.length || 0) === 0;
+          let errorMsg = '';
+          if (isEmpty) {
+            errorMsg = '링크설정 시트에서 다음을 확인해주세요:\n1. 정책표 설정 (통신사별 policy 행)\n2. 이통사지원금 설정 (통신사별 support 행)\n3. 정책표 시트에 모델 데이터 존재 여부\n4. 이통사지원금 시트에 모델 데이터 존재 여부';
+          }
           return res.json({
             data: cached,
             meta: {
@@ -1692,7 +1697,7 @@ function setupDirectRoutes(app) {
               empty: isEmpty,
               cached: true,
               timestamp: Date.now(),
-              ...(isEmpty ? { error: '링크설정에서 정책표/이통사지원금 설정을 확인해주세요. 또는 정책표 시트에 모델 데이터가 없을 수 있습니다.' } : {})
+              ...(isEmpty ? { error: errorMsg } : {})
             }
           });
         }
@@ -1704,6 +1709,11 @@ function setupDirectRoutes(app) {
       setCache(cacheKey, mobileList, 5 * 60 * 1000); // 5분 캐시 (로딩 시간 최적화)
       if (includeMeta) {
         const isEmpty = (mobileList.length || 0) === 0;
+        // 서버 로그에서 확인된 일반적인 원인들
+        let errorMsg = '';
+        if (isEmpty) {
+          errorMsg = '링크설정 시트에서 다음을 확인해주세요:\n1. 정책표 설정 (통신사별 policy 행)\n2. 이통사지원금 설정 (통신사별 support 행)\n3. 정책표 시트에 모델 데이터 존재 여부\n4. 이통사지원금 시트에 모델 데이터 존재 여부';
+        }
         return res.json({
           data: mobileList,
           meta: {
@@ -1712,7 +1722,7 @@ function setupDirectRoutes(app) {
             empty: isEmpty,
             cached: false,
             timestamp: Date.now(),
-            ...(isEmpty ? { error: '링크설정에서 정책표/이통사지원금 설정을 확인해주세요. 또는 정책표 시트에 모델 데이터가 없을 수 있습니다.' } : {})
+            ...(isEmpty ? { error: errorMsg } : {})
           }
         });
       }
