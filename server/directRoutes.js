@@ -2653,100 +2653,155 @@ function setupDirectRoutes(app) {
               openingTypeRange ? getSheetData(supportSheetId, openingTypeRange) : Promise.resolve([])
             ]);
             
+            console.log(`[Direct] /calculate 이통사지원금 조회:`, {
+              modelId,
+              policyModel: (modelRow[0] || '').toString().trim(),
+              planGroup,
+              openingType,
+              openingTypeRange: openingTypeRange || '(없음)',
+              supportOpeningTypeDataLength: supportOpeningTypeData.length,
+              supportModelDataLength: supportModelData.length,
+              supportValuesLength: supportValues.length
+            });
+            
             // 정책표의 모델명으로 이통사 지원금 시트에서 매칭
             const policyModel = (modelRow[0] || '').toString().trim();
             const policyModelNormalized = normalizeModelCode(policyModel);
             
-            // 같은 모델의 모든 행 찾기
-            const matchingRows = [];
-            for (let i = 0; i < supportModelData.length; i++) {
-              const target = (supportModelData[i]?.[0] || '').toString().trim();
-              if (!target) continue;
-              
-              let isMatch = false;
-              if (target === policyModel) {
-                isMatch = true;
-              } else {
+            // openingTypeRange가 없으면 기존 로직 사용 (인덱스 기반)
+            if (!openingTypeRange || supportOpeningTypeData.length === 0) {
+              console.log(`[Direct] /calculate 이통사지원금: openingTypeRange 없음, 인덱스 기반 매칭 사용`);
+              const supportModelIndex = supportModelData.findIndex(row => {
+                const target = (row[0] || '').toString().trim();
+                if (!target) return false;
+                if (target === policyModel) return true;
                 const normalized = normalizeModelCode(target);
-                if (normalized && normalized === policyModelNormalized) {
-                  isMatch = true;
-                }
-              }
-              
-              if (isMatch) {
-                const openingTypeRaw = supportOpeningTypeData[i]?.[0] ? 
-                  (supportOpeningTypeData[i][0] || '').toString().trim() : '';
-                const supportValue = Number(supportValues[i]?.[0] || 0);
-                matchingRows.push({
-                  rowIndex: i,
-                  openingTypeRaw,
-                  supportValue
+                return normalized && (normalized === policyModelNormalized);
+              });
+              if (supportModelIndex >= 0) {
+                publicSupport = Number(supportValues[supportModelIndex]?.[0] || 0);
+                console.log(`[Direct] /calculate 이통사지원금 (인덱스 기반):`, {
+                  modelId,
+                  policyModel: (modelRow[0] || '').toString().trim(),
+                  planGroup,
+                  openingType,
+                  supportModelIndex,
+                  publicSupport
                 });
               }
-            }
-            
-            if (matchingRows.length > 0) {
-              // 같은 모델에 "번호이동"과 "010신규/기변"이 모두 있는지 확인
-              const hasNumberPort = matchingRows.some(r => 
-                r.openingTypeRaw === '번호이동' || parseOpeningTypes(r.openingTypeRaw).includes('번호이동')
-              );
-              const hasNewChange = matchingRows.some(r => 
-                r.openingTypeRaw === '010신규/기변' || 
-                (parseOpeningTypes(r.openingTypeRaw).includes('010신규') && 
-                 parseOpeningTypes(r.openingTypeRaw).includes('기변'))
-              );
-              const shouldIgnoreAllTypes = hasNumberPort && hasNewChange;
-              
-              // 개통유형에 맞는 행 찾기
-              let matchedRow = null;
-              
-              // 1. 정확한 개통유형 매칭 시도
-              for (const row of matchingRows) {
-                const rowOpeningTypes = parseOpeningTypes(row.openingTypeRaw);
+            } else {
+              // openingTypeRange가 있으면 개통유형 기반 매칭
+              // 같은 모델의 모든 행 찾기
+              const matchingRows = [];
+              for (let i = 0; i < supportModelData.length; i++) {
+                const target = (supportModelData[i]?.[0] || '').toString().trim();
+                if (!target) continue;
                 
-                // 전유형이고 무시해야 하면 스킵
-                if (shouldIgnoreAllTypes && (row.openingTypeRaw === '전유형' || rowOpeningTypes.includes('전유형'))) {
-                  continue;
+                let isMatch = false;
+                if (target === policyModel) {
+                  isMatch = true;
+                } else {
+                  const normalized = normalizeModelCode(target);
+                  if (normalized && normalized === policyModelNormalized) {
+                    isMatch = true;
+                  }
                 }
                 
-                // 정확한 매칭
-                if (rowOpeningTypes.includes(openingType)) {
-                  matchedRow = row;
-                  break;
-                }
-                
-                // "번호이동" → MNP 매핑
-                if (openingType === 'MNP' && (row.openingTypeRaw === '번호이동' || rowOpeningTypes.includes('번호이동'))) {
-                  matchedRow = row;
-                  break;
-                }
-                
-                // "010신규/기변" → 010신규와 기변 매핑
-                if ((openingType === '010신규' || openingType === '기변') && 
-                    (row.openingTypeRaw === '010신규/기변' || 
-                     (rowOpeningTypes.includes('010신규') && rowOpeningTypes.includes('기변')))) {
-                  matchedRow = row;
-                  break;
+                if (isMatch) {
+                  const openingTypeRaw = supportOpeningTypeData[i]?.[0] ? 
+                    (supportOpeningTypeData[i][0] || '').toString().trim() : '';
+                  const supportValue = Number(supportValues[i]?.[0] || 0);
+                  matchingRows.push({
+                    rowIndex: i,
+                    openingTypeRaw,
+                    supportValue
+                  });
                 }
               }
               
-              // 2. 전유형 찾기 (shouldIgnoreAllTypes가 false일 때만)
-              if (!matchedRow && !shouldIgnoreAllTypes) {
-                const allTypesRow = matchingRows.find(r => 
-                  r.openingTypeRaw === '전유형' || parseOpeningTypes(r.openingTypeRaw).includes('전유형')
+              if (matchingRows.length > 0) {
+                // 같은 모델에 "번호이동"과 "010신규/기변"이 모두 있는지 확인
+                const hasNumberPort = matchingRows.some(r => 
+                  r.openingTypeRaw === '번호이동' || parseOpeningTypes(r.openingTypeRaw).includes('번호이동')
                 );
-                if (allTypesRow) {
-                  matchedRow = allTypesRow;
+                const hasNewChange = matchingRows.some(r => 
+                  r.openingTypeRaw === '010신규/기변' || 
+                  (parseOpeningTypes(r.openingTypeRaw).includes('010신규') && 
+                   parseOpeningTypes(r.openingTypeRaw).includes('기변'))
+                );
+                const shouldIgnoreAllTypes = hasNumberPort && hasNewChange;
+                
+                // 개통유형에 맞는 행 찾기
+                let matchedRow = null;
+                
+                // 1. 정확한 개통유형 매칭 시도
+                for (const row of matchingRows) {
+                  const rowOpeningTypes = parseOpeningTypes(row.openingTypeRaw);
+                  
+                  // 전유형이고 무시해야 하면 스킵
+                  if (shouldIgnoreAllTypes && (row.openingTypeRaw === '전유형' || rowOpeningTypes.includes('전유형'))) {
+                    continue;
+                  }
+                  
+                  // 정확한 매칭
+                  if (rowOpeningTypes.includes(openingType)) {
+                    matchedRow = row;
+                    break;
+                  }
+                  
+                  // "번호이동" → MNP 매핑
+                  if (openingType === 'MNP' && (row.openingTypeRaw === '번호이동' || rowOpeningTypes.includes('번호이동'))) {
+                    matchedRow = row;
+                    break;
+                  }
+                  
+                  // "010신규/기변" → 010신규와 기변 매핑
+                  if ((openingType === '010신규' || openingType === '기변') && 
+                      (row.openingTypeRaw === '010신규/기변' || 
+                       (rowOpeningTypes.includes('010신규') && rowOpeningTypes.includes('기변')))) {
+                    matchedRow = row;
+                    break;
+                  }
                 }
-              }
-              
-              // 3. 첫 번째 행 사용 (폴백)
-              if (!matchedRow && matchingRows.length > 0) {
-                matchedRow = matchingRows[0];
-              }
-              
-              if (matchedRow) {
-                publicSupport = matchedRow.supportValue;
+                
+                // 2. 전유형 찾기 (shouldIgnoreAllTypes가 false일 때만)
+                if (!matchedRow && !shouldIgnoreAllTypes) {
+                  const allTypesRow = matchingRows.find(r => 
+                    r.openingTypeRaw === '전유형' || parseOpeningTypes(r.openingTypeRaw).includes('전유형')
+                  );
+                  if (allTypesRow) {
+                    matchedRow = allTypesRow;
+                  }
+                }
+                
+                // 3. 첫 번째 행 사용 (폴백)
+                if (!matchedRow && matchingRows.length > 0) {
+                  matchedRow = matchingRows[0];
+                }
+                
+                if (matchedRow) {
+                  publicSupport = matchedRow.supportValue;
+                  console.log(`[Direct] /calculate 이통사지원금 매칭 성공:`, {
+                    modelId,
+                    policyModel: (modelRow[0] || '').toString().trim(),
+                    planGroup,
+                    openingType,
+                    matchedOpeningTypeRaw: matchedRow.openingTypeRaw,
+                    publicSupport
+                  });
+                } else {
+                  console.warn(`[Direct] /calculate 이통사지원금 매칭 실패:`, {
+                    modelId,
+                    policyModel: (modelRow[0] || '').toString().trim(),
+                    planGroup,
+                    openingType,
+                    matchingRowsCount: matchingRows.length,
+                    matchingRows: matchingRows.map(r => ({
+                      openingTypeRaw: r.openingTypeRaw,
+                      supportValue: r.supportValue
+                    }))
+                  });
+                }
               }
             }
           } catch (err) {
