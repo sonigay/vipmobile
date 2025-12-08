@@ -1118,58 +1118,173 @@ function setupDirectRoutes(app) {
             supportOpeningTypeData.length
           );
           
+          // 1단계: 모델별로 모든 개통유형 수집
+          const modelOpeningTypesMap = {}; // { model: [{ openingTypeRaw, openingTypes, rowIndex, factoryPrice }] }
+          
           for (let j = 0; j < maxSupportRows; j++) {
             const supportModel = (supportModelData[j]?.[0] || '').toString().trim();
             if (!supportModel) continue;
 
             const openingTypeRaw = (supportOpeningTypeData[j]?.[0] || '').toString().trim();
             const openingTypes = parseOpeningTypes(openingTypeRaw);
-            const entry = {
-              factoryPrice: Number(supportFactoryPriceData[j]?.[0] || 0),
-              openingType: openingTypes[0] || '010신규', // 주 개통유형
-              openingTypes,
-              rowIndex: j // 요금제군별 지원금 매칭용
-            };
-
-            // 원본 모델명으로 저장 (개통유형 고려 없이, 폴백용)
-            if (!supportSheetData[supportModel]) {
-              supportSheetData[supportModel] = entry;
+            const factoryPrice = Number(supportFactoryPriceData[j]?.[0] || 0);
+            
+            if (!modelOpeningTypesMap[supportModel]) {
+              modelOpeningTypesMap[supportModel] = [];
             }
-
-            // 모델명+개통유형 조합으로 저장 (정확한 매칭용)
-            openingTypes.forEach(ot => {
-              const key = `${supportModel}|${ot}`;
-              supportSheetData[key] = entry;
+            
+            modelOpeningTypesMap[supportModel].push({
+              openingTypeRaw,
+              openingTypes,
+              rowIndex: j,
+              factoryPrice
+            });
+          }
+          
+          // 2단계: 전유형 처리 후 저장
+          for (const [supportModel, entries] of Object.entries(modelOpeningTypesMap)) {
+            // 같은 모델에 "번호이동"과 "010신규/기변"이 모두 있는지 확인
+            const hasNumberPort = entries.some(e => 
+              e.openingTypeRaw === '번호이동' || e.openingTypes.includes('번호이동')
+            );
+            const hasNewChange = entries.some(e => 
+              e.openingTypeRaw === '010신규/기변' || 
+              (e.openingTypes.includes('010신규') && e.openingTypes.includes('기변'))
+            );
+            const hasAllTypes = entries.some(e => 
+              e.openingTypeRaw === '전유형' || e.openingTypes.includes('전유형')
+            );
+            
+            // "번호이동"과 "010신규/기변"이 모두 있으면 전유형 무시
+            const shouldIgnoreAllTypes = hasNumberPort && hasNewChange;
+            
+            for (const entryData of entries) {
+              const { openingTypeRaw, openingTypes, rowIndex, factoryPrice } = entryData;
               
-              // 정규화된 모델명+개통유형 조합으로도 저장
+              // 전유형이고 무시해야 하면 스킵
+              if (shouldIgnoreAllTypes && (openingTypeRaw === '전유형' || openingTypes.includes('전유형'))) {
+                continue;
+              }
+              
+              const entry = {
+                factoryPrice,
+                openingType: openingTypes[0] || '010신규',
+                openingTypes,
+                rowIndex
+              };
+              
+              // 원본 모델명으로 저장 (개통유형 고려 없이, 폴백용)
+              if (!supportSheetData[supportModel]) {
+                supportSheetData[supportModel] = entry;
+              }
+              
+              // 전유형인 경우 모든 개통유형에 매핑
+              if (openingTypeRaw === '전유형' || openingTypes.includes('전유형')) {
+                const allTypes = ['010신규', 'MNP', '기변', '번호이동'];
+                allTypes.forEach(ot => {
+                  const key = `${supportModel}|${ot}`;
+                  supportSheetData[key] = entry;
+                  
+                  const normalizedModel = normalizeModelCode(supportModel);
+                  if (normalizedModel) {
+                    supportSheetData[`${normalizedModel}|${ot}`] = entry;
+                    supportSheetData[`${normalizedModel.toLowerCase()}|${ot}`] = entry;
+                    supportSheetData[`${normalizedModel.toUpperCase()}|${ot}`] = entry;
+                  }
+                  supportSheetData[`${supportModel.toLowerCase()}|${ot}`] = entry;
+                  supportSheetData[`${supportModel.toUpperCase()}|${ot}`] = entry;
+                });
+              } else {
+                // 모델명+개통유형 조합으로 저장 (정확한 매칭용)
+                const normalizedModel = normalizeModelCode(supportModel);
+                
+                openingTypes.forEach(ot => {
+                  const key = `${supportModel}|${ot}`;
+                  supportSheetData[key] = entry;
+                  
+                  // 정규화된 모델명+개통유형 조합으로도 저장
+                  if (normalizedModel) {
+                    supportSheetData[`${normalizedModel}|${ot}`] = entry;
+                    supportSheetData[`${normalizedModel.toLowerCase()}|${ot}`] = entry;
+                    supportSheetData[`${normalizedModel.toUpperCase()}|${ot}`] = entry;
+                  }
+                  supportSheetData[`${supportModel.toLowerCase()}|${ot}`] = entry;
+                  supportSheetData[`${supportModel.toUpperCase()}|${ot}`] = entry;
+                });
+                
+                // "번호이동" → MNP 매핑
+                if (openingTypeRaw === '번호이동' || openingTypes.includes('번호이동')) {
+                  const mnpKeys = [
+                    `${supportModel}|MNP`,
+                    `${supportModel.toLowerCase()}|MNP`,
+                    `${supportModel.toUpperCase()}|MNP`
+                  ];
+                  if (normalizedModel) {
+                    mnpKeys.push(
+                      `${normalizedModel}|MNP`,
+                      `${normalizedModel.toLowerCase()}|MNP`,
+                      `${normalizedModel.toUpperCase()}|MNP`
+                    );
+                  }
+                  mnpKeys.forEach(key => {
+                    if (!supportSheetData[key]) {
+                      supportSheetData[key] = entry;
+                    }
+                  });
+                }
+                
+                // "010신규/기변" → 010신규와 기변 매핑
+                if (openingTypeRaw === '010신규/기변' || 
+                    (openingTypes.includes('010신규') && openingTypes.includes('기변'))) {
+                  ['010신규', '기변'].forEach(ot => {
+                    const key = `${supportModel}|${ot}`;
+                    if (!supportSheetData[key]) {
+                      supportSheetData[key] = entry;
+                    }
+                    if (normalizedModel) {
+                      const normalizedKeys = [
+                        `${normalizedModel}|${ot}`,
+                        `${normalizedModel.toLowerCase()}|${ot}`,
+                        `${normalizedModel.toUpperCase()}|${ot}`
+                      ];
+                      normalizedKeys.forEach(k => {
+                        if (!supportSheetData[k]) {
+                          supportSheetData[k] = entry;
+                        }
+                      });
+                    }
+                    const lowerUpperKeys = [
+                      `${supportModel.toLowerCase()}|${ot}`,
+                      `${supportModel.toUpperCase()}|${ot}`
+                    ];
+                    lowerUpperKeys.forEach(k => {
+                      if (!supportSheetData[k]) {
+                        supportSheetData[k] = entry;
+                      }
+                    });
+                  });
+                }
+              }
+              
+              // 정규화/대소문자 변형 키로도 저장하여 매칭 강화 (폴백용)
               const normalizedModel = normalizeModelCode(supportModel);
               if (normalizedModel) {
-                supportSheetData[`${normalizedModel}|${ot}`] = entry;
-                supportSheetData[`${normalizedModel.toLowerCase()}|${ot}`] = entry;
-                supportSheetData[`${normalizedModel.toUpperCase()}|${ot}`] = entry;
+                if (!supportSheetData[normalizedModel]) {
+                  supportSheetData[normalizedModel] = entry;
+                }
+                if (!supportSheetData[normalizedModel.toLowerCase()]) {
+                  supportSheetData[normalizedModel.toLowerCase()] = entry;
+                }
+                if (!supportSheetData[normalizedModel.toUpperCase()]) {
+                  supportSheetData[normalizedModel.toUpperCase()] = entry;
+                }
               }
-              supportSheetData[`${supportModel.toLowerCase()}|${ot}`] = entry;
-              supportSheetData[`${supportModel.toUpperCase()}|${ot}`] = entry;
-            });
-
-            // 정규화/대소문자 변형 키로도 저장하여 매칭 강화 (폴백용)
-            const normalizedModel = normalizeModelCode(supportModel);
-            if (normalizedModel) {
-              if (!supportSheetData[normalizedModel]) {
-                supportSheetData[normalizedModel] = entry;
+              if (!supportSheetData[supportModel.toLowerCase()]) {
+                supportSheetData[supportModel.toLowerCase()] = entry;
               }
-              if (!supportSheetData[normalizedModel.toLowerCase()]) {
-                supportSheetData[normalizedModel.toLowerCase()] = entry;
+              if (!supportSheetData[supportModel.toUpperCase()]) {
+                supportSheetData[supportModel.toUpperCase()] = entry;
               }
-              if (!supportSheetData[normalizedModel.toUpperCase()]) {
-                supportSheetData[normalizedModel.toUpperCase()] = entry;
-              }
-            }
-            if (!supportSheetData[supportModel.toLowerCase()]) {
-              supportSheetData[supportModel.toLowerCase()] = entry;
-            }
-            if (!supportSheetData[supportModel.toUpperCase()]) {
-              supportSheetData[supportModel.toUpperCase()] = entry;
             }
           }
         } catch (err) {
