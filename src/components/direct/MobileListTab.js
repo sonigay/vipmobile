@@ -146,9 +146,20 @@ const MobileListTab = ({ onProductSelect }) => {
                   storeSupportWithAddon: cached.storeSupportWithAddon || 0,
                   storeSupportWithoutAddon: cached.storeSupportWithoutAddon || 0,
                   purchasePriceWithAddon: cached.purchasePriceWithAddon || 0,
-                  purchasePriceWithoutAddon: cached.purchasePriceWithoutAddon || 0
+                  purchasePriceWithoutAddon: cached.purchasePriceWithoutAddon || 0,
+                  publicSupport: cached.publicSupport || 0
                 }
               }));
+              // mobileList 상태도 업데이트
+              setMobileList(prevList => prevList.map(item => 
+                item.id === model.id 
+                  ? { 
+                      ...item, 
+                      publicSupport: cached.publicSupport || item.publicSupport || 0,
+                      support: cached.publicSupport || item.support || item.publicSupport || 0
+                    }
+                  : item
+              ));
             } else {
               // 캐시에 없으면 API 호출
               pricePromises.push(calculatePrice(model.id, existingPlanGroup, existingOpeningType, true));
@@ -191,9 +202,20 @@ const MobileListTab = ({ onProductSelect }) => {
                 storeSupportWithAddon: cached.storeSupportWithAddon || 0,
                 storeSupportWithoutAddon: cached.storeSupportWithoutAddon || 0,
                 purchasePriceWithAddon: cached.purchasePriceWithAddon || 0,
-                purchasePriceWithoutAddon: cached.purchasePriceWithoutAddon || 0
+                purchasePriceWithoutAddon: cached.purchasePriceWithoutAddon || 0,
+                publicSupport: cached.publicSupport || 0
               }
             }));
+            // mobileList 상태도 업데이트
+            setMobileList(prevList => prevList.map(item => 
+              item.id === model.id 
+                ? { 
+                    ...item, 
+                    publicSupport: cached.publicSupport || item.publicSupport || 0,
+                    support: cached.publicSupport || item.support || item.publicSupport || 0
+                  }
+                : item
+            ));
           } else {
             // 캐시에 없으면 가격 계산을 Promise 배열에 추가 (병렬 처리)
             pricePromises.push(calculatePrice(model.id, defaultPlanGroup, defaultOpeningType, true));
@@ -519,9 +541,20 @@ const MobileListTab = ({ onProductSelect }) => {
             storeSupportWithAddon: cached.storeSupportWithAddon || 0,
             storeSupportWithoutAddon: cached.storeSupportWithoutAddon || 0,
             purchasePriceWithAddon: cached.purchasePriceWithAddon || 0,
-            purchasePriceWithoutAddon: cached.purchasePriceWithoutAddon || 0
+            purchasePriceWithoutAddon: cached.purchasePriceWithoutAddon || 0,
+            publicSupport: cached.publicSupport || 0
           }
         }));
+        // mobileList 상태도 업데이트
+        setMobileList(prevList => prevList.map(item => 
+          item.id === modelId 
+            ? { 
+                ...item, 
+                publicSupport: cached.publicSupport || item.publicSupport || 0,
+                support: cached.publicSupport || item.support || item.publicSupport || 0
+              }
+            : item
+        ));
         return;
       }
     }
@@ -537,9 +570,20 @@ const MobileListTab = ({ onProductSelect }) => {
               storeSupportWithAddon: result.storeSupportWithAddon || 0,
               storeSupportWithoutAddon: result.storeSupportWithoutAddon || 0,
               purchasePriceWithAddon: result.purchasePriceWithAddon || 0,
-              purchasePriceWithoutAddon: result.purchasePriceWithoutAddon || 0
+              purchasePriceWithoutAddon: result.purchasePriceWithoutAddon || 0,
+              publicSupport: result.publicSupport || 0
             }
           }));
+          // mobileList 상태도 업데이트
+          setMobileList(prevList => prevList.map(item => 
+            item.id === modelId 
+              ? { 
+                  ...item, 
+                  publicSupport: result.publicSupport || item.publicSupport || 0,
+                  support: result.publicSupport || item.support || item.publicSupport || 0
+                }
+              : item
+          ));
         }
       } catch (err) {
         console.error('가격 계산 실패 (대기 중 요청):', err);
@@ -556,19 +600,32 @@ const MobileListTab = ({ onProductSelect }) => {
             storeSupportWithAddon: result.storeSupportWithAddon || 0,
             storeSupportWithoutAddon: result.storeSupportWithoutAddon || 0,
             purchasePriceWithAddon: result.purchasePriceWithAddon || 0,
-            purchasePriceWithoutAddon: result.purchasePriceWithoutAddon || 0
+            purchasePriceWithoutAddon: result.purchasePriceWithoutAddon || 0,
+            publicSupport: result.publicSupport || 0
           });
           
-          // 상태 업데이트
+          // 상태 업데이트 (이통사지원금 포함)
           setCalculatedPrices(prev => ({
             ...prev,
             [modelId]: {
               storeSupportWithAddon: result.storeSupportWithAddon || 0,
               storeSupportWithoutAddon: result.storeSupportWithoutAddon || 0,
               purchasePriceWithAddon: result.purchasePriceWithAddon || 0,
-              purchasePriceWithoutAddon: result.purchasePriceWithoutAddon || 0
+              purchasePriceWithoutAddon: result.purchasePriceWithoutAddon || 0,
+              publicSupport: result.publicSupport || 0
             }
           }));
+          
+          // mobileList 상태도 업데이트 (이통사지원금 반영)
+          setMobileList(prevList => prevList.map(item => 
+            item.id === modelId 
+              ? { 
+                  ...item, 
+                  publicSupport: result.publicSupport || item.publicSupport || 0,
+                  support: result.publicSupport || item.support || item.publicSupport || 0
+                }
+              : item
+          ));
         }
         pendingRequestsRef.current.delete(cacheKey);
         return result;
