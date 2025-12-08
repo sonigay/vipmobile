@@ -1219,21 +1219,42 @@ function setupDirectRoutes(app) {
         }
       }
 
-      // 5. 정책표 설정에서 요금제군 & 유형별 리베이트 읽기 (batchGet으로 최적화하여 API 호출 수 감소)
-      const policyRebateData = {}; // { '115군': { '010신규': [값들], 'MNP': [값들], '기변': [값들] } }
-      if (policySheetId && policySettingsJson.planGroupRanges) {
+      // 5. 정책표 설정에서 요금제군 & 유형별 리베이트 읽기 (모델명 기준 매핑)
+      // { '115군': { '010신규': { 'SM-S926N256': 690000, ... }, 'MNP': { 'SM-S926N256': 700000, ... } } }
+      const policyRebateData = {};
+      const policyRebateDataByIndex = {}; // 폴백용: 인덱스 기반 배열도 유지
+      
+      if (policySheetId && policySettingsJson.planGroupRanges && modelRange) {
+        // 정책표 시트에서 모델명 읽기
+        let policyModelData = [];
+        try {
+          const modelResponse = await sheets.spreadsheets.values.get({
+            spreadsheetId: policySheetId,
+            range: modelRange,
+            majorDimension: 'ROWS',
+            valueRenderOption: 'UNFORMATTED_VALUE'
+          });
+          policyModelData = (modelResponse.data.values || []).map(row => 
+            (row[0] || '').toString().trim()
+          );
+        } catch (err) {
+          console.warn(`[Direct] 정책표 모델명 읽기 실패:`, err);
+        }
+        
         const rebateRanges = [];
         const rebateRangeMap = []; // [{ planGroup, openingType, range }]
         
         for (const [planGroup, typeRanges] of Object.entries(policySettingsJson.planGroupRanges)) {
           if (typeof typeRanges === 'object') {
             policyRebateData[planGroup] = {};
+            policyRebateDataByIndex[planGroup] = {};
             for (const [openingType, range] of Object.entries(typeRanges)) {
               if (range) {
                 rebateRanges.push(range);
                 rebateRangeMap.push({ planGroup, openingType, range });
               } else {
-                policyRebateData[planGroup][openingType] = [];
+                policyRebateData[planGroup][openingType] = {};
+                policyRebateDataByIndex[planGroup][openingType] = [];
               }
             }
           }
@@ -1250,18 +1271,42 @@ function setupDirectRoutes(app) {
             
             response.data.valueRanges.forEach((valueRange, index) => {
               const { planGroup, openingType } = rebateRangeMap[index];
-              // 만원 단위로 저장되어 있으므로 *10000 적용
               const values = (valueRange.values || []).map(row => 
                 Number((row[0] || 0).toString().replace(/,/g, '')) * 10000
               );
-              policyRebateData[planGroup][openingType] = values;
+              
+              // 인덱스 기반 배열 저장 (폴백용)
+              policyRebateDataByIndex[planGroup][openingType] = values;
+              
+              // 모델명 기준 맵 저장
+              const rebateMap = {};
+              const maxLen = Math.min(policyModelData.length, values.length);
+              for (let i = 0; i < maxLen; i++) {
+                const model = policyModelData[i];
+                if (model) {
+                  // 원본 모델명으로 저장
+                  rebateMap[model] = values[i] || 0;
+                  
+                  // 정규화된 모델명으로도 저장
+                  const normalizedModel = normalizeModelCode(model);
+                  if (normalizedModel && normalizedModel !== model) {
+                    rebateMap[normalizedModel] = values[i] || 0;
+                    rebateMap[normalizedModel.toLowerCase()] = values[i] || 0;
+                    rebateMap[normalizedModel.toUpperCase()] = values[i] || 0;
+                  }
+                  rebateMap[model.toLowerCase()] = values[i] || 0;
+                  rebateMap[model.toUpperCase()] = values[i] || 0;
+                }
+              }
+              policyRebateData[planGroup][openingType] = rebateMap;
             });
           } catch (err) {
             console.warn(`[Direct] 리베이트 범위 batchGet 실패:`, err);
-            // 실패 시 빈 배열로 초기화
+            // 실패 시 빈 객체로 초기화
             rebateRangeMap.forEach(({ planGroup, openingType }) => {
               if (!policyRebateData[planGroup][openingType]) {
-                policyRebateData[planGroup][openingType] = [];
+                policyRebateData[planGroup][openingType] = {};
+                policyRebateDataByIndex[planGroup][openingType] = [];
               }
             });
           }
@@ -1542,31 +1587,123 @@ function setupDirectRoutes(app) {
         } else if (planGroupRanges['115군']) {
           selectedPlanGroup = '115군';
         }
-        // 정책표 리베이트 가져오기 (요금제군 & 유형별)
-        // 정책표 시트의 행 인덱스 i 사용 (정책표 시트가 기준이므로)
+        // 정책표 리베이트 가져오기 (요금제군 & 유형별, 모델명 기준 매핑)
         let policyRebate = 0;
         let matchedOpeningType = '010신규'; // 이통사지원금 매칭에 사용할 개통유형
+        const rebateDebugInfo = {
+          model,
+          normalizedModel,
+          selectedPlanGroup,
+          candidateTypes: [],
+          matched: false,
+          matchedKey: null,
+          matchedValue: null,
+          fallbackUsed: false
+        };
+        
         if (selectedPlanGroup && policyRebateData[selectedPlanGroup]) {
           // 개통유형 리스트 중 먼저 매칭되는 값을 사용, 없으면 010신규로 폴백
           const candidateTypes = openingTypeList && openingTypeList.length > 0 ? openingTypeList : ['010신규'];
+          rebateDebugInfo.candidateTypes = candidateTypes;
           let matched = false;
+          
+          // 모델명 기준으로 리베이트 찾기
           for (const ot of candidateTypes) {
-            if (policyRebateData[selectedPlanGroup]?.[ot]?.[i] !== undefined) {
-              policyRebate = policyRebateData[selectedPlanGroup][ot][i] || 0;
-              matchedOpeningType = ot; // 매칭된 개통유형 저장
-              matched = true;
-              break;
+            const rebateMap = policyRebateData[selectedPlanGroup]?.[ot];
+            if (rebateMap && typeof rebateMap === 'object') {
+              // 모델명으로 직접 찾기
+              let rebateValue = rebateMap[model];
+              let matchedKey = model;
+              
+              if (rebateValue === undefined) {
+                rebateValue = rebateMap[model.toLowerCase()];
+                matchedKey = model.toLowerCase();
+              }
+              if (rebateValue === undefined) {
+                rebateValue = rebateMap[model.toUpperCase()];
+                matchedKey = model.toUpperCase();
+              }
+              if (rebateValue === undefined && normalizedModel) {
+                rebateValue = rebateMap[normalizedModel];
+                matchedKey = normalizedModel;
+              }
+              if (rebateValue === undefined && normalizedModel) {
+                rebateValue = rebateMap[normalizedModel.toLowerCase()];
+                matchedKey = normalizedModel.toLowerCase();
+              }
+              if (rebateValue === undefined && normalizedModel) {
+                rebateValue = rebateMap[normalizedModel.toUpperCase()];
+                matchedKey = normalizedModel.toUpperCase();
+              }
+              
+              if (rebateValue !== undefined) {
+                policyRebate = rebateValue || 0;
+                matchedOpeningType = ot;
+                matched = true;
+                rebateDebugInfo.matched = true;
+                rebateDebugInfo.matchedKey = `${matchedKey} (개통유형: ${ot})`;
+                rebateDebugInfo.matchedValue = policyRebate;
+                break;
+              }
             }
           }
-          if (!matched && policyRebateData[selectedPlanGroup]?.['010신규']?.[i] !== undefined) {
-            policyRebate = policyRebateData[selectedPlanGroup]['010신규'][i] || 0;
-            matchedOpeningType = '010신규';
+          
+          // 모델명 기준 매칭 실패 시 인덱스 기반 폴백 (하위 호환)
+          if (!matched && policyRebateDataByIndex[selectedPlanGroup]) {
+            rebateDebugInfo.fallbackUsed = true;
+            for (const ot of candidateTypes) {
+              if (policyRebateDataByIndex[selectedPlanGroup]?.[ot]?.[i] !== undefined) {
+                policyRebate = policyRebateDataByIndex[selectedPlanGroup][ot][i] || 0;
+                matchedOpeningType = ot;
+                matched = true;
+                rebateDebugInfo.matched = true;
+                rebateDebugInfo.matchedKey = `인덱스[${i}] (개통유형: ${ot}, 폴백)`;
+                rebateDebugInfo.matchedValue = policyRebate;
+                break;
+              }
+            }
+            if (!matched && policyRebateDataByIndex[selectedPlanGroup]?.['010신규']?.[i] !== undefined) {
+              policyRebate = policyRebateDataByIndex[selectedPlanGroup]['010신규'][i] || 0;
+              matchedOpeningType = '010신규';
+              rebateDebugInfo.matched = true;
+              rebateDebugInfo.matchedKey = `인덱스[${i}] (개통유형: 010신규, 폴백)`;
+              rebateDebugInfo.matchedValue = policyRebate;
+            }
           }
+        }
+        
+        // 정책표 리베이트 매칭 디버깅 로그
+        if (!rebateDebugInfo.matched) {
+          console.warn(`[Direct] ⚠️ 정책표 리베이트 매칭 실패:`, {
+            모델명: model,
+            정규화된모델명: normalizedModel,
+            요금제군: selectedPlanGroup,
+            시도한개통유형: rebateDebugInfo.candidateTypes,
+            정책표데이터존재: !!policyRebateData[selectedPlanGroup]
+          });
+        } else {
+          console.log(`[Direct] ✅ 정책표 리베이트 매칭 성공:`, {
+            모델명: model,
+            요금제군: selectedPlanGroup,
+            개통유형: matchedOpeningType,
+            매칭키: rebateDebugInfo.matchedKey,
+            리베이트금액: policyRebate,
+            폴백사용: rebateDebugInfo.fallbackUsed
+          });
         }
 
         // 모델명+개통유형 조합으로 정확한 이통사지원금 행 찾기
         let finalSupportData = supportData;
         let finalSupportRowIndex = supportRowIndex;
+        const supportDebugInfo = {
+          model,
+          normalizedModel,
+          matchedOpeningType,
+          initialRowIndex: supportRowIndex,
+          matchedKey: null,
+          finalRowIndex: null,
+          found: false
+        };
         
         // 정책표에서 매칭된 개통유형과 모델명 조합으로 다시 찾기
         // normalizedModel은 이미 위에서 선언됨 (1467번 라인)
@@ -1588,12 +1725,14 @@ function setupDirectRoutes(app) {
           if (supportSheetData[key]) {
             finalSupportData = supportSheetData[key];
             finalSupportRowIndex = finalSupportData.rowIndex;
+            supportDebugInfo.matchedKey = key;
+            supportDebugInfo.found = true;
             break;
           }
         }
         
         // 개통유형이 "번호이동"인 경우 "MNP"로도 시도
-        if (matchedOpeningType === 'MNP' || matchedOpeningType === '번호이동') {
+        if (!supportDebugInfo.found && (matchedOpeningType === 'MNP' || matchedOpeningType === '번호이동')) {
           const mnpKeys = [
             `${model}|번호이동`,
             `${model.toLowerCase()}|번호이동`,
@@ -1610,13 +1749,15 @@ function setupDirectRoutes(app) {
             if (supportSheetData[key]) {
               finalSupportData = supportSheetData[key];
               finalSupportRowIndex = finalSupportData.rowIndex;
+              supportDebugInfo.matchedKey = key;
+              supportDebugInfo.found = true;
               break;
             }
           }
         }
         
         // 개통유형이 "010신규/기변"인 경우 각각 시도
-        if (matchedOpeningType === '010신규' || matchedOpeningType === '기변') {
+        if (!supportDebugInfo.found && (matchedOpeningType === '010신규' || matchedOpeningType === '기변')) {
           const combinedKeys = [
             `${model}|010신규/기변`,
             `${model.toLowerCase()}|010신규/기변`,
@@ -1633,15 +1774,39 @@ function setupDirectRoutes(app) {
             if (supportSheetData[key]) {
               finalSupportData = supportSheetData[key];
               finalSupportRowIndex = finalSupportData.rowIndex;
+              supportDebugInfo.matchedKey = key;
+              supportDebugInfo.found = true;
               break;
             }
           }
         }
 
+        supportDebugInfo.finalRowIndex = finalSupportRowIndex;
+        
         let publicSupport = 0;
         // finalSupportRowIndex를 사용하여 이통사 지원금 시트의 해당 행 데이터 가져오기
         if (selectedPlanGroup && planGroupSupportData[selectedPlanGroup]?.[finalSupportRowIndex]?.[0] !== undefined) {
           publicSupport = Number(planGroupSupportData[selectedPlanGroup][finalSupportRowIndex][0]) || 0;
+        }
+        
+        // 이통사지원금 매칭 디버깅 로그
+        if (!supportDebugInfo.found) {
+          console.warn(`[Direct] ⚠️ 이통사지원금 매칭 실패:`, {
+            모델명: model,
+            정규화된모델명: normalizedModel,
+            개통유형: matchedOpeningType,
+            초기행인덱스: supportDebugInfo.initialRowIndex,
+            시도한키: candidateKeys.slice(0, 3),
+            이통사지원금데이터존재: !!supportSheetData[model]
+          });
+        } else {
+          console.log(`[Direct] ✅ 이통사지원금 매칭 성공:`, {
+            모델명: model,
+            개통유형: matchedOpeningType,
+            매칭키: supportDebugInfo.matchedKey,
+            행인덱스: finalSupportRowIndex,
+            이통사지원금: publicSupport
+          });
         }
 
         // 대리점 지원금 계산
@@ -1659,6 +1824,26 @@ function setupDirectRoutes(app) {
           + totalAddonDeduction // 부가서비스 차감금액
           + totalSpecialDeduction // 별도정책 차감금액
         );
+        
+        // 최종 계산값 디버깅 로그
+        console.log(`[Direct] 💰 최종 계산값:`, {
+          모델명: model,
+          펫네임: petName,
+          요금제군: selectedPlanGroup,
+          개통유형: matchedOpeningType,
+          출고가: factoryPrice,
+          이통사지원금: publicSupport,
+          정책표리베이트: policyRebate,
+          마진: baseMargin,
+          부가서비스추가: totalAddonIncentive,
+          부가서비스차감: totalAddonDeduction,
+          별도정책추가: totalSpecialAddition,
+          별도정책차감: totalSpecialDeduction,
+          대리점지원금_부가유치: storeSupportWithAddon,
+          대리점지원금_부가미유치: storeSupportWithoutAddon,
+          계산상세_부가유치: `${policyRebate} - ${baseMargin} + ${totalAddonIncentive} + ${totalSpecialAddition} = ${storeSupportWithAddon}`,
+          계산상세_부가미유치: `${policyRebate} - ${baseMargin} + ${totalAddonDeduction} + ${totalSpecialDeduction} = ${storeSupportWithoutAddon}`
+        });
 
         // 구매가 계산
         // 대리점추가지원금에 이미 정책표리베이트, 마진, 부가서비스, 별도정책이 포함되어 있으므로
