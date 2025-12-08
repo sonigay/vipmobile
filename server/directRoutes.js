@@ -1991,6 +1991,12 @@ function setupDirectRoutes(app) {
   // GET /api/direct/main-page-texts: 메인페이지 문구 조회
   router.get('/main-page-texts', async (req, res) => {
     try {
+      const cacheKey = 'main-page-texts';
+      const cached = getCache(cacheKey);
+      if (cached) {
+        return res.json(cached);
+      }
+
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
       
       // 시트 헤더 확인 및 생성
@@ -2036,9 +2042,17 @@ function setupDirectRoutes(app) {
         }
       });
       
-      res.json({ success: true, data: texts });
+      const payload = { success: true, data: texts };
+      // 시트에 정상적으로 접근되었을 때만 캐시 저장
+      setCache(cacheKey, payload, 5 * 60 * 1000); // 5분 캐시
+      res.json(payload);
     } catch (error) {
       console.error('[Direct] main-page-texts GET error:', error);
+      const cached = getCache('main-page-texts');
+      if (cached) {
+        // 시트 오류 시 마지막 성공 응답을 반환해 빈 값으로 덮어쓰는 문제 방지
+        return res.json(cached);
+      }
       res.status(500).json({ success: false, error: '문구 조회 실패', message: error.message });
     }
   });

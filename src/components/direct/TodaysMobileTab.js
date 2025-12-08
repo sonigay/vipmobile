@@ -374,7 +374,15 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [compact, setCompact] = useState(true);
-  const [mainHeaderText, setMainHeaderText] = useState('');
+  const [mainHeaderText, setMainHeaderText] = useState(() => {
+    try {
+      return typeof window !== 'undefined'
+        ? localStorage.getItem('direct-main-header-text') || ''
+        : '';
+    } catch {
+      return '';
+    }
+  });
   const [currentCarrier, setCurrentCarrier] = useState(null); // 현재 표시 중인 통신사 (테마용)
   
   // 슬라이드쇼 관련 상태
@@ -420,8 +428,16 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
   const loadMainHeaderText = useCallback(async () => {
     try {
       const response = await directStoreApi.getMainHeaderText();
-      if (response.success && response.data) {
-        setMainHeaderText(response.data.content || '');
+      if (response.success && response.data && response.data.content) {
+        const content = response.data.content;
+        setMainHeaderText(content);
+        try {
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('direct-main-header-text', content);
+          }
+        } catch {
+          // 로컬스토리지 접근 실패 시에는 조용히 무시
+        }
       }
     } catch (err) {
       console.error('메인헤더 문구 로드 실패:', err);
