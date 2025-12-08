@@ -737,7 +737,12 @@ const MobileListTab = ({ onProductSelect }) => {
 
     // 선택된 유형이 있으면 해당 유형으로 계산, 없으면 기본값 '010신규'로 계산
     const openingType = selectedOpeningTypes[modelId] || '010신규';
-    await calculatePrice(modelId, planGroup, openingType);
+    try {
+      await calculatePrice(modelId, planGroup, openingType);
+    } catch (err) {
+      console.error('요금제군 변경 시 가격 계산 실패:', err, { modelId, planGroup, openingType });
+      // 에러 발생 시에도 무한 재시도 방지를 위해 상태는 유지
+    }
   };
 
   // 유형 선택 핸들러
