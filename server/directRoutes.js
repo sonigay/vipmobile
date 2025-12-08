@@ -1569,8 +1569,8 @@ function setupDirectRoutes(app) {
         let finalSupportRowIndex = supportRowIndex;
         
         // 정책표에서 매칭된 개통유형과 모델명 조합으로 다시 찾기
+        // normalizedModel은 이미 위에서 선언됨 (1467번 라인)
         const supportKey = `${model}|${matchedOpeningType}`;
-        const normalizedModel = normalizeModelCode(model);
         const candidateKeys = [
           supportKey,
           `${model.toLowerCase()}|${matchedOpeningType}`,
