@@ -71,16 +71,22 @@ export const directStoreApi = {
     },
 
     // 휴대폰 목록 조회 (필터링 포함)
-    getMobileList: async (carrier) => {
+    getMobileList: async (carrier, options = {}) => {
         try {
             const params = new URLSearchParams();
             if (carrier) params.append('carrier', carrier);
+            if (options.withMeta) params.append('meta', '1');
 
             const response = await fetch(`${BASE_URL}/mobiles?${params.toString()}`);
             if (!response.ok) {
                 throw new Error('휴대폰 목록 조회 실패');
             }
             const data = await response.json();
+            if (options.withMeta) {
+                const list = Array.isArray(data) ? data : (data.data || data.mobileList || []);
+                const meta = data.meta || {};
+                return { list, meta };
+            }
             // 백엔드에서 배열을 직접 반환하거나, { success: true, data: [...] } 형식일 수 있음
             return Array.isArray(data) ? data : (data.data || data.mobileList || []);
         } catch (err) {

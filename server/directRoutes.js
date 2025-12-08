@@ -1678,15 +1678,44 @@ function setupDirectRoutes(app) {
   router.get('/mobiles', async (req, res) => {
     try {
       const carrier = req.query.carrier || 'SK';
+      const includeMeta = req.query.meta === '1';
       const cacheKey = `mobiles-${carrier}`;
       const cached = getCache(cacheKey);
       if (cached) {
+        if (includeMeta) {
+          const isEmpty = (cached.length || 0) === 0;
+          return res.json({
+            data: cached,
+            meta: {
+              carrier,
+              count: cached.length || 0,
+              empty: isEmpty,
+              cached: true,
+              timestamp: Date.now(),
+              ...(isEmpty ? { error: '링크설정에서 정책표/이통사지원금 설정을 확인해주세요. 또는 정책표 시트에 모델 데이터가 없을 수 있습니다.' } : {})
+            }
+          });
+        }
         return res.json(cached);
       }
 
       const mobileList = await getMobileList(carrier);
       // getMobileList가 빈 배열을 반환해도 정상 응답으로 처리
       setCache(cacheKey, mobileList, 5 * 60 * 1000); // 5분 캐시 (로딩 시간 최적화)
+      if (includeMeta) {
+        const isEmpty = (mobileList.length || 0) === 0;
+        return res.json({
+          data: mobileList,
+          meta: {
+            carrier,
+            count: mobileList.length || 0,
+            empty: isEmpty,
+            cached: false,
+            timestamp: Date.now(),
+            ...(isEmpty ? { error: '링크설정에서 정책표/이통사지원금 설정을 확인해주세요. 또는 정책표 시트에 모델 데이터가 없을 수 있습니다.' } : {})
+          }
+        });
+      }
       res.json(mobileList);
     } catch (error) {
       console.error(`[Direct] mobiles GET error (통신사: ${req.query.carrier || 'SK'}):`, error);

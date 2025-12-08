@@ -82,15 +82,15 @@ const MobileListTab = ({ onProductSelect }) => {
           pricing: { ...prev.pricing, status: 'idle', message: '' }
         }));
         const carrier = getCurrentCarrier();
-        const data = await directStoreApi.getMobileList(carrier);
-        const list = data || [];
-        setMobileList(list);
+        const { list, meta } = await directStoreApi.getMobileList(carrier, { withMeta: true }) || {};
+        const safeList = list || [];
+        setMobileList(safeList);
         setSteps(prev => ({
           ...prev,
           fetch: {
             ...prev.fetch,
-            status: list.length > 0 ? 'success' : 'empty',
-            message: list.length > 0 ? '' : '수신된 데이터가 없습니다.'
+          status: safeList.length > 0 ? 'success' : 'empty',
+          message: safeList.length > 0 ? '' : (meta?.error || '수신된 데이터가 없습니다.')
           }
         }));
       } catch (err) {
@@ -230,15 +230,15 @@ const MobileListTab = ({ onProductSelect }) => {
         pricing: { ...prev.pricing, status: 'idle', message: '' }
       }));
       const carrier = getCurrentCarrier();
-      const data = await directStoreApi.getMobileList(carrier);
-      const list = data || [];
-      setMobileList(list);
+      const { list, meta } = await directStoreApi.getMobileList(carrier, { withMeta: true }) || {};
+      const safeList = list || [];
+      setMobileList(safeList);
       setSteps(prev => ({
         ...prev,
         fetch: {
           ...prev.fetch,
-          status: list.length > 0 ? 'success' : 'empty',
-          message: list.length > 0 ? '' : '수신된 데이터가 없습니다.'
+          status: safeList.length > 0 ? 'success' : 'empty',
+          message: safeList.length > 0 ? '' : (meta?.error || '수신된 데이터가 없습니다.')
         }
       }));
     } catch (err) {
