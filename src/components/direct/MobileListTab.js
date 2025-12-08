@@ -31,7 +31,8 @@ import {
   Edit as EditIcon,
   Recommend as RecommendIcon,
   Star as StarIcon,
-  Label as LabelIcon
+  Label as LabelIcon,
+  Refresh as RefreshIcon
 } from '@mui/icons-material';
 import { Checkbox } from '@mui/material';
 import { directStoreApi } from '../../api/directStoreApi';
@@ -218,6 +219,40 @@ const MobileListTab = ({ onProductSelect }) => {
 
     setDefaultValues();
   }, [mobileList, planGroups]);
+
+  const handleReload = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      setSteps(prev => ({
+        ...prev,
+        fetch: { ...prev.fetch, status: 'loading', message: '재로딩 중' },
+        pricing: { ...prev.pricing, status: 'idle', message: '' }
+      }));
+      const carrier = getCurrentCarrier();
+      const data = await directStoreApi.getMobileList(carrier);
+      const list = data || [];
+      setMobileList(list);
+      setSteps(prev => ({
+        ...prev,
+        fetch: {
+          ...prev.fetch,
+          status: list.length > 0 ? 'success' : 'empty',
+          message: list.length > 0 ? '' : '수신된 데이터가 없습니다.'
+        }
+      }));
+    } catch (err) {
+      console.error('휴대폰 목록 재로딩 실패:', err);
+      setError('데이터를 불러오는 중 오류가 발생했습니다.');
+      setMobileList([]);
+      setSteps(prev => ({
+        ...prev,
+        fetch: { ...prev.fetch, status: 'error', message: '재로딩 실패' }
+      }));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // 요금제군 목록 로드 (캐싱으로 최적화)
   useEffect(() => {
@@ -614,21 +649,33 @@ const MobileListTab = ({ onProductSelect }) => {
       </Typography>
 
       {/* 로딩 단계 표시 (칩만 표시, 기능 없음) */}
-      <Box sx={{ mb: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-        {Object.entries(steps).map(([key, step]) => (
-          <Chip
-            key={key}
-            label={`${step.label}${step.message ? `: ${step.message}` : ''}`}
-            size="small"
-            color={
-              step.status === 'success' ? 'success' :
-              step.status === 'loading' ? 'info' :
-              step.status === 'empty' ? 'default' :
-              step.status === 'error' ? 'error' : 'default'
-            }
-            variant={step.status === 'success' ? 'filled' : 'outlined'}
-          />
-        ))}
+      <Box sx={{ mb: 2, display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+          {Object.entries(steps).map(([key, step]) => (
+            <Chip
+              key={key}
+              label={`${step.label}${step.message ? `: ${step.message}` : ''}`}
+              size="small"
+              color={
+                step.status === 'success' ? 'success' :
+                step.status === 'loading' ? 'info' :
+                step.status === 'empty' ? 'default' :
+                step.status === 'error' ? 'error' : 'default'
+              }
+              variant={step.status === 'success' ? 'filled' : 'outlined'}
+            />
+          ))}
+        </Box>
+        <Button
+          variant="outlined"
+          size="small"
+          onClick={handleReload}
+          startIcon={<RefreshIcon />}
+          disabled={loading}
+          sx={{ ml: 'auto' }}
+        >
+          새로고침
+        </Button>
       </Box>
 
       {/* 통신사 탭 */}
