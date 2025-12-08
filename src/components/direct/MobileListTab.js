@@ -591,9 +591,20 @@ const MobileListTab = ({ onProductSelect }) => {
       return;
     }
 
+    // 모델명 찾기 (404 에러 방지를 위해)
+    const currentModel = mobileList.find(m => m.id === modelId);
+    const modelName = currentModel?.model || null;
+    
     // API 호출
-    const pricePromise = directStoreApi.calculateMobilePrice(modelId, planGroup, openingType, carrier)
+    const pricePromise = directStoreApi.calculateMobilePrice(modelId, planGroup, openingType, carrier, modelName)
       .then(result => {
+        // 404 에러는 재시도하지 않음
+        if (result.status === 404) {
+          console.warn('모델을 찾을 수 없음 (404):', { modelId, modelName, planGroup, openingType, carrier });
+          pendingRequestsRef.current.delete(cacheKey);
+          return result;
+        }
+        
         if (result.success) {
           // 전역 캐시에 저장
           setCachedPrice(modelId, planGroup, openingType, carrier, {
@@ -631,7 +642,7 @@ const MobileListTab = ({ onProductSelect }) => {
         return result;
       })
       .catch(err => {
-        console.error('가격 계산 실패:', err, { modelId, planGroup, openingType, carrier });
+        console.error('가격 계산 실패:', err, { modelId, modelName, planGroup, openingType, carrier });
         pendingRequestsRef.current.delete(cacheKey);
         // 에러 발생 시에도 상태를 업데이트하여 무한 재시도 방지
         // 실패한 요청을 null로 표시하여 재시도 방지

@@ -2584,12 +2584,46 @@ function setupDirectRoutes(app) {
       // 정책표에서 모델 정보 가져오기 (캐시 사용)
       const modelData = await getSheetData(policySheetId, modelRange);
       
+      let modelRow = null;
+      
       // 인덱스 범위 체크
-      if (isNaN(modelIndex) || modelIndex < 0 || modelIndex >= modelData.length) {
-        console.error(`[Direct] /calculate 모델 인덱스 범위 초과:`, {
+      if (!isNaN(modelIndex) && modelIndex >= 0 && modelIndex < modelData.length) {
+        modelRow = modelData[modelIndex];
+        if (modelRow && modelRow[0]) {
+          // 인덱스로 찾기 성공
+        } else {
+          modelRow = null; // 빈 행이면 null로 설정
+        }
+      }
+      
+      // 인덱스로 찾기 실패 시 모델명으로 찾기 시도 (query parameter로 modelName 전달 시)
+      if (!modelRow && req.query.modelName) {
+        const targetModelName = req.query.modelName.trim();
+        const targetModelNormalized = normalizeModelCode(targetModelName);
+        
+        for (let i = 0; i < modelData.length; i++) {
+          const rowModel = (modelData[i]?.[0] || '').toString().trim();
+          if (!rowModel) continue;
+          
+          if (rowModel === targetModelName) {
+            modelRow = modelData[i];
+            break;
+          }
+          
+          const normalized = normalizeModelCode(rowModel);
+          if (normalized && targetModelNormalized && normalized === targetModelNormalized) {
+            modelRow = modelData[i];
+            break;
+          }
+        }
+      }
+      
+      if (!modelRow || !modelRow[0]) {
+        console.error(`[Direct] /calculate 모델을 찾을 수 없음:`, {
           modelId,
           modelIndex,
           modelDataLength: modelData.length,
+          modelName: req.query.modelName || '(없음)',
           planGroup,
           openingType,
           carrier
@@ -2598,20 +2632,6 @@ function setupDirectRoutes(app) {
           success: false, 
           error: `모델을 찾을 수 없습니다. (인덱스: ${modelIndex}, 범위: 0-${modelData.length - 1})` 
         });
-      }
-      
-      const modelRow = modelData[modelIndex];
-      
-      if (!modelRow || !modelRow[0]) {
-        console.error(`[Direct] /calculate 모델 행이 비어있음:`, {
-          modelId,
-          modelIndex,
-          modelDataLength: modelData.length,
-          planGroup,
-          openingType,
-          carrier
-        });
-        return res.status(404).json({ success: false, error: '모델을 찾을 수 없습니다.' });
       }
 
       // 출고가 가져오기 (이통사 지원금 시트에서)

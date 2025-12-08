@@ -326,14 +326,24 @@ export const directStoreApi = {
     },
 
     // 요금제군별 대리점지원금 및 구매가 계산
-    calculateMobilePrice: async (modelId, planGroup, openingType, carrier) => {
+    calculateMobilePrice: async (modelId, planGroup, openingType, carrier, modelName = null) => {
         try {
             const params = new URLSearchParams();
             params.append('planGroup', planGroup);
             params.append('openingType', openingType || '010신규');
             params.append('carrier', carrier);
+            if (modelName) {
+                params.append('modelName', modelName);
+            }
             const response = await fetch(`${BASE_URL}/mobiles/${modelId}/calculate?${params.toString()}`);
-            if (!response.ok) throw new Error('가격 계산 실패');
+            if (!response.ok) {
+                // 404 에러는 모델을 찾을 수 없는 것이므로 재시도하지 않음
+                if (response.status === 404) {
+                    const errorData = await response.json().catch(() => ({}));
+                    return { success: false, error: errorData.error || '모델을 찾을 수 없습니다.', status: 404 };
+                }
+                throw new Error('가격 계산 실패');
+            }
             return response.json();
         } catch (err) {
             console.warn('가격 계산 API 호출 실패:', err);
