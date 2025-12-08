@@ -613,6 +613,24 @@ const MobileListTab = ({ onProductSelect }) => {
         휴대폰 목록
       </Typography>
 
+      {/* 로딩 단계 표시 (칩만 표시, 기능 없음) */}
+      <Box sx={{ mb: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+        {Object.entries(steps).map(([key, step]) => (
+          <Chip
+            key={key}
+            label={`${step.label}${step.message ? `: ${step.message}` : ''}`}
+            size="small"
+            color={
+              step.status === 'success' ? 'success' :
+              step.status === 'loading' ? 'info' :
+              step.status === 'empty' ? 'default' :
+              step.status === 'error' ? 'error' : 'default'
+            }
+            variant={step.status === 'success' ? 'filled' : 'outlined'}
+          />
+        ))}
+      </Box>
+
       {/* 통신사 탭 */}
       <Paper sx={{ mb: 3, borderRadius: 2, overflow: 'hidden' }}>
         <Tabs
