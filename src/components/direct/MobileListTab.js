@@ -631,9 +631,16 @@ const MobileListTab = ({ onProductSelect }) => {
         return result;
       })
       .catch(err => {
-        console.error('가격 계산 실패:', err);
+        console.error('가격 계산 실패:', err, { modelId, planGroup, openingType, carrier });
         pendingRequestsRef.current.delete(cacheKey);
-        throw err;
+        // 에러 발생 시에도 상태를 업데이트하여 무한 재시도 방지
+        // 실패한 요청을 null로 표시하여 재시도 방지
+        setCalculatedPrices(prev => ({
+          ...prev,
+          [modelId]: prev[modelId] || null // 기존 값 유지 또는 null
+        }));
+        // 에러를 다시 throw하지 않고 실패한 결과 반환
+        return { success: false, error: err.message || '가격 계산 실패' };
       });
 
     pendingRequestsRef.current.set(cacheKey, pricePromise);
@@ -684,7 +691,12 @@ const MobileListTab = ({ onProductSelect }) => {
     // 선택된 요금제군이 있으면 해당 요금제군과 유형으로 계산
     const planGroup = selectedPlanGroups[modelId];
     if (planGroup) {
-      await calculatePrice(modelId, planGroup, openingType);
+      try {
+        await calculatePrice(modelId, planGroup, openingType);
+      } catch (err) {
+        console.error('개통유형 변경 시 가격 계산 실패:', err, { modelId, planGroup, openingType });
+        // 에러 발생 시에도 무한 재시도 방지를 위해 상태는 유지
+      }
     }
   };
 
