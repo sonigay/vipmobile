@@ -392,11 +392,6 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
   const [isTransitionPage, setIsTransitionPage] = useState(false);
   const [transitionPageData, setTransitionPageData] = useState(null);
   const [isSlideshowDataLoading, setIsSlideshowDataLoading] = useState(true); // 초기값을 true로 설정하여 로딩 상태로 시작
-  const [loadSteps, setLoadSteps] = useState({
-    mobiles: { label: '오늘의 휴대폰', status: 'idle', message: '' },
-    header: { label: '메인 헤더 문구', status: 'idle', message: '' },
-    slideshow: { label: '슬라이드쇼 데이터', status: 'idle', message: '' }
-  });
   
   // 일반 모드에서 수동 슬라이드 탐색용 상태
   const [manualSlideIndex, setManualSlideIndex] = useState(0);
@@ -409,39 +404,21 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
     try {
       setLoading(true);
       setError(null);
-      setLoadSteps(prev => ({
-        ...prev,
-        mobiles: { ...prev.mobiles, status: 'loading', message: '' }
-      }));
       const data = await directStoreApi.getTodaysMobiles();
 
       // 데이터가 있으면 설정, 없으면 빈 배열 (에러 아님)
       if (data) {
         setPremiumPhones(Array.isArray(data.premium) ? data.premium : []);
         setBudgetPhones(Array.isArray(data.budget) ? data.budget : []);
-        const hasData = (Array.isArray(data.premium) && data.premium.length > 0) ||
-          (Array.isArray(data.budget) && data.budget.length > 0);
-        setLoadSteps(prev => ({
-          ...prev,
-          mobiles: { ...prev.mobiles, status: hasData ? 'success' : 'empty', message: hasData ? '' : '등록된 데이터가 없습니다.' }
-        }));
       } else {
         setPremiumPhones([]);
         setBudgetPhones([]);
-        setLoadSteps(prev => ({
-          ...prev,
-          mobiles: { ...prev.mobiles, status: 'empty', message: '응답이 비어 있습니다.' }
-        }));
       }
     } catch (err) {
       console.error('오늘의 휴대폰 데이터 로딩 실패:', err);
       setError('데이터를 불러오는 중 오류가 발생했습니다. 서버 연결을 확인해주세요.');
       setPremiumPhones([]);
       setBudgetPhones([]);
-      setLoadSteps(prev => ({
-        ...prev,
-        mobiles: { ...prev.mobiles, status: 'error', message: '데이터 로드 실패' }
-      }));
     } finally {
       setLoading(false);
     }
@@ -450,10 +427,6 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
   // 메인헤더 문구 로드
   const loadMainHeaderText = useCallback(async () => {
     try {
-      setLoadSteps(prev => ({
-        ...prev,
-        header: { ...prev.header, status: 'loading', message: '' }
-      }));
       const response = await directStoreApi.getMainHeaderText();
       if (response.success && response.data && response.data.content) {
         const content = response.data.content;
@@ -465,32 +438,15 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
         } catch {
           // 로컬스토리지 접근 실패 시에는 조용히 무시
         }
-        setLoadSteps(prev => ({
-          ...prev,
-          header: { ...prev.header, status: 'success', message: '' }
-        }));
-      } else {
-        setLoadSteps(prev => ({
-          ...prev,
-          header: { ...prev.header, status: 'empty', message: '문구 응답이 없습니다.' }
-        }));
       }
     } catch (err) {
       console.error('메인헤더 문구 로드 실패:', err);
-      setLoadSteps(prev => ({
-        ...prev,
-        header: { ...prev.header, status: 'error', message: '문구 로드 실패' }
-      }));
     }
   }, []);
 
   // 슬라이드쇼용 데이터 준비: 모든 통신사의 체크된 상품 가져오기
   const prepareSlideshowData = useCallback(async () => {
     try {
-      setLoadSteps(prev => ({
-        ...prev,
-        slideshow: { ...prev.slideshow, status: 'loading', message: '' }
-      }));
       const carriers = ['SK', 'KT', 'LG'];
       const allCheckedProducts = [];
       
@@ -677,32 +633,28 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
       }
       
       setSlideshowData(slideshowItems);
-      setLoadSteps(prev => ({
-        ...prev,
-        slideshow: {
-          ...prev.slideshow,
-          status: slideshowItems.length > 0 ? 'success' : 'empty',
-          message: slideshowItems.length > 0 ? '' : '체크된 상품이 없습니다.'
-        }
-      }));
       return slideshowItems;
     } catch (err) {
       console.error('슬라이드쇼 데이터 준비 실패:', err);
       setSlideshowData([]); // 실패 시에도 빈 배열 설정
-      setLoadSteps(prev => ({
-        ...prev,
-        slideshow: { ...prev.slideshow, status: 'error', message: '슬라이드쇼 데이터 실패' }
-      }));
       return [];
     }
   }, []);
 
   useEffect(() => {
     const initializeData = async () => {
-      await reloadAll();
+      await fetchData();
+      await loadMainHeaderText();
+      // 일반 모드에서도 슬라이드쇼 데이터 준비
+      setIsSlideshowDataLoading(true);
+      try {
+        await prepareSlideshowData();
+      } finally {
+        setIsSlideshowDataLoading(false);
+      }
     };
     initializeData();
-  }, [reloadAll]);
+  }, [fetchData, loadMainHeaderText, prepareSlideshowData]);
 
   // 슬라이드쇼 로딩 상태
   const [isSlideshowLoading, setIsSlideshowLoading] = useState(false);
@@ -710,26 +662,6 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
   // 슬라이드쇼 반복 옵션
   const [isSlideshowLooping, setIsSlideshowLooping] = useState(false);
   const [showRepeatDialog, setShowRepeatDialog] = useState(false);
-
-  const resetLoadSteps = () => {
-    setLoadSteps({
-      mobiles: { label: '오늘의 휴대폰', status: 'idle', message: '' },
-      header: { label: '메인 헤더 문구', status: 'idle', message: '' },
-      slideshow: { label: '슬라이드쇼 데이터', status: 'idle', message: '' }
-    });
-  };
-
-  const reloadAll = useCallback(async () => {
-    resetLoadSteps();
-    setIsSlideshowDataLoading(true);
-    try {
-      await fetchData();
-      await loadMainHeaderText();
-      await prepareSlideshowData();
-    } finally {
-      setIsSlideshowDataLoading(false);
-    }
-  }, [fetchData, loadMainHeaderText, prepareSlideshowData]);
 
   // 슬라이드쇼 시작/중지
   const toggleSlideshow = useCallback(async () => {
@@ -1096,7 +1028,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                 variant="outlined"
                 size="small"
                 startIcon={<RefreshIcon />}
-                onClick={reloadAll}
+                onClick={fetchData}
                 disabled={loading || isSlideshowActive}
                 sx={{
                   borderColor: theme.primary,
@@ -1137,24 +1069,6 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
             </Stack>
           </Stack>
         )}
-        {/* 로딩 단계 표시 */}
-        <Box sx={{ mt: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-          {Object.entries(loadSteps).map(([key, step]) => (
-            <Chip
-              key={key}
-              label={`${step.label}${step.message ? `: ${step.message}` : ''}`}
-              size="small"
-              color={
-                step.status === 'success' ? 'success' :
-                step.status === 'loading' ? 'info' :
-                step.status === 'empty' ? 'default' :
-                step.status === 'error' ? 'error' : 'default'
-              }
-              variant={step.status === 'success' ? 'filled' : 'outlined'}
-              sx={{ fontWeight: 'bold' }}
-            />
-          ))}
-        </Box>
       </Box>
 
       <Box 

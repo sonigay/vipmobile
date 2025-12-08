@@ -1681,29 +1681,18 @@ function setupDirectRoutes(app) {
       const cacheKey = `mobiles-${carrier}`;
       const cached = getCache(cacheKey);
       if (cached) {
-        return res.json({ ...cached, meta: { ...(cached.meta || {}), cached: true } });
+        return res.json(cached);
       }
 
       const mobileList = await getMobileList(carrier);
-      const payload = {
-        success: true,
-        data: mobileList,
-        meta: {
-          carrier,
-          count: mobileList.length,
-          empty: mobileList.length === 0,
-          cached: false,
-          timestamp: Date.now()
-        }
-      };
       // getMobileList가 빈 배열을 반환해도 정상 응답으로 처리
-      setCache(cacheKey, payload, 5 * 60 * 1000); // 5분 캐시 (로딩 시간 최적화)
-      res.json(payload);
+      setCache(cacheKey, mobileList, 5 * 60 * 1000); // 5분 캐시 (로딩 시간 최적화)
+      res.json(mobileList);
     } catch (error) {
       console.error(`[Direct] mobiles GET error (통신사: ${req.query.carrier || 'SK'}):`, error);
       console.error('[Direct] Error stack:', error.stack);
       // 에러 발생 시에도 빈 배열 반환 (500 에러 대신)
-      res.json({ success: false, data: [], meta: { carrier: req.query.carrier || 'SK', empty: true, error: 'mobiles fetch failed' } });
+      res.json([]);
     }
   });
 
@@ -1756,25 +1745,11 @@ function setupDirectRoutes(app) {
         }));
 
       const result = { premium, budget };
-      const payload = {
-        success: true,
-        data: result,
-        meta: {
-          cached: false,
-          timestamp: Date.now(),
-          premiumCount: premium.length,
-          budgetCount: budget.length
-        }
-      };
-      setCache(cacheKey, payload, 5 * 60 * 1000); // 5분 캐시 (로딩 시간 최적화)
-      res.json(payload);
+      setCache(cacheKey, result, 5 * 60 * 1000); // 5분 캐시 (로딩 시간 최적화)
+      res.json(result);
     } catch (error) {
       console.error('[Direct] todays-mobiles GET error:', error);
-      res.status(500).json({
-        success: false,
-        data: { premium: [], budget: [] },
-        meta: { error: '오늘의 휴대폰 조회 실패', message: error.message, premiumCount: 0, budgetCount: 0 }
-      });
+      res.status(500).json({ success: false, error: '오늘의 휴대폰 조회 실패', message: error.message });
     }
   });
 

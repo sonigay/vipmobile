@@ -31,8 +31,7 @@ import {
   Edit as EditIcon,
   Recommend as RecommendIcon,
   Star as StarIcon,
-  Label as LabelIcon,
-  Refresh as RefreshIcon
+  Label as LabelIcon
 } from '@mui/icons-material';
 import { Checkbox } from '@mui/material';
 import { directStoreApi } from '../../api/directStoreApi';
@@ -43,10 +42,6 @@ const MobileListTab = ({ onProductSelect }) => {
   const [mobileList, setMobileList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [steps, setSteps] = useState({
-    fetch: { label: '목록 로드', status: 'idle', message: '' },
-    pricing: { label: '기본 요금/지원금 반영', status: 'idle', message: '' }
-  });
   const [tagMenuAnchor, setTagMenuAnchor] = useState({}); // { modelId: anchorElement }
   const [planGroups, setPlanGroups] = useState([]); // 요금제군 목록
   const [selectedPlanGroups, setSelectedPlanGroups] = useState({}); // { modelId: planGroup }
@@ -75,31 +70,13 @@ const MobileListTab = ({ onProductSelect }) => {
       try {
         setLoading(true);
         setError(null);
-        setSteps(prev => ({
-          ...prev,
-          fetch: { ...prev.fetch, status: 'loading', message: '' },
-          pricing: { ...prev.pricing, status: 'idle', message: '' }
-        }));
         const carrier = getCurrentCarrier();
         const data = await directStoreApi.getMobileList(carrier);
-        const list = data || [];
-        setMobileList(list);
-        setSteps(prev => ({
-          ...prev,
-          fetch: {
-            ...prev.fetch,
-            status: list.length > 0 ? 'success' : 'empty',
-            message: list.length > 0 ? '' : '수신된 데이터가 없습니다.'
-          }
-        }));
+        setMobileList(data || []);
       } catch (err) {
         console.error('휴대폰 목록 로딩 실패:', err);
         setError('데이터를 불러오는 중 오류가 발생했습니다.');
         setMobileList([]);
-        setSteps(prev => ({
-          ...prev,
-          fetch: { ...prev.fetch, status: 'error', message: '목록 요청 실패' }
-        }));
       } finally {
         setLoading(false);
       }
@@ -113,10 +90,6 @@ const MobileListTab = ({ onProductSelect }) => {
     if (mobileList.length === 0 || planGroups.length === 0) return;
 
     const setDefaultValues = async () => {
-      setSteps(prev => ({
-        ...prev,
-        pricing: { ...prev.pricing, status: 'loading', message: '' }
-      }));
       const carrier = getCurrentCarrier();
       const newPlanGroups = { ...selectedPlanGroups };
       const newOpeningTypes = { ...selectedOpeningTypes };
@@ -204,15 +177,6 @@ const MobileListTab = ({ onProductSelect }) => {
       // 모든 가격 계산을 병렬로 실행
       if (pricePromises.length > 0) {
         await Promise.allSettled(pricePromises);
-        setSteps(prev => ({
-          ...prev,
-          pricing: { ...prev.pricing, status: 'success', message: '' }
-        }));
-      } else {
-        setSteps(prev => ({
-          ...prev,
-          pricing: { ...prev.pricing, status: 'success', message: '' }
-        }));
       }
     };
 
@@ -644,83 +608,6 @@ const MobileListTab = ({ onProductSelect }) => {
       )}
 
       {/* 로딩 인디케이터 */}
-      {/* 진행 상태 표시 */}
-      <Box sx={{ mb: 2, display: 'flex', gap: 2, alignItems: 'center' }}>
-        <Box sx={{ minWidth: 140 }}>
-          <Typography variant="body2" sx={{ fontWeight: 'bold' }}>로딩 진행</Typography>
-          <Box sx={{ display: 'flex', gap: 1, mt: 0.5, flexWrap: 'wrap' }}>
-            {Object.entries(steps).map(([key, step]) => (
-              <Chip
-                key={key}
-                label={`${step.label}${step.message ? `: ${step.message}` : ''}`}
-                size="small"
-                color={
-                  step.status === 'success' ? 'success' :
-                  step.status === 'loading' ? 'info' :
-                  step.status === 'empty' ? 'default' :
-                  step.status === 'error' ? 'error' : 'default'
-                }
-                variant={step.status === 'success' ? 'filled' : 'outlined'}
-              />
-            ))}
-          </Box>
-        </Box>
-        <Box sx={{ flex: 1 }}>
-          <Typography variant="caption" color="text.secondary">
-            로딩이 오래 걸리면 새로고침을 눌러주세요.
-          </Typography>
-        </Box>
-        <Button
-          variant="outlined"
-          size="small"
-          onClick={() => {
-            // 재로딩: 현재 통신사 기준으로 다시 로드
-            const carrier = getCurrentCarrier();
-            setMobileList([]);
-            setCalculatedPrices({});
-            setSelectedPlanGroups({});
-            setSelectedOpeningTypes({});
-            setPlanGroups([]);
-            // fetchMobileList는 carrierTab 의존으로 호출되므로 강제 호출용
-            (async () => {
-              try {
-                setLoading(true);
-                setError(null);
-                setSteps(prev => ({
-                  ...prev,
-                  fetch: { ...prev.fetch, status: 'loading', message: '재로딩 중' },
-                  pricing: { ...prev.pricing, status: 'idle', message: '' }
-                }));
-                const data = await directStoreApi.getMobileList(carrier);
-                const list = data || [];
-                setMobileList(list);
-                setSteps(prev => ({
-                  ...prev,
-                  fetch: {
-                    ...prev.fetch,
-                    status: list.length > 0 ? 'success' : 'empty',
-                    message: list.length > 0 ? '' : '수신된 데이터가 없습니다.'
-                  }
-                }));
-              } catch (err) {
-                console.error('휴대폰 목록 재로딩 실패:', err);
-                setError('데이터를 불러오는 중 오류가 발생했습니다.');
-                setSteps(prev => ({
-                  ...prev,
-                  fetch: { ...prev.fetch, status: 'error', message: '재로딩 실패' }
-                }));
-              } finally {
-                setLoading(false);
-              }
-            })();
-          }}
-          startIcon={<RefreshIcon />}
-          disabled={loading}
-        >
-          새로고침
-        </Button>
-      </Box>
-
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', p: 5 }}>
           <CircularProgress />
