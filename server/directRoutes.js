@@ -1669,6 +1669,18 @@ function setupDirectRoutes(app) {
     } catch (error) {
       console.error(`[Direct] getMobileList error (통신사: ${carrier || 'SK'}):`, error);
       console.error('[Direct] Error stack:', error.stack);
+      
+      // Rate limit 에러인지 확인
+      const isRateLimitError = error.code === 429 || 
+        (error.response && error.response.status === 429) ||
+        (error.message && error.message.includes('Quota exceeded')) ||
+        (error.message && error.message.includes('rateLimitExceeded'));
+      
+      if (isRateLimitError) {
+        // Rate limit 에러인 경우 특별한 객체 반환 (캐시 저장 방지용)
+        return { __rateLimitError: true, __carrier: carrier };
+      }
+      
       // 에러를 throw하지 않고 빈 배열 반환하여 다른 통신사 데이터는 정상적으로 가져올 수 있도록 함
       return [];
     }
@@ -1687,7 +1699,7 @@ function setupDirectRoutes(app) {
           const isEmpty = (cached.length || 0) === 0;
           let errorMsg = '';
           if (isEmpty) {
-            errorMsg = '링크설정 시트에서 다음을 확인해주세요:\n1. 정책표 설정 (통신사별 policy 행)\n2. 이통사지원금 설정 (통신사별 support 행)\n3. 정책표 시트에 모델 데이터 존재 여부\n4. 이통사지원금 시트에 모델 데이터 존재 여부';
+            errorMsg = '데이터가 없습니다. 다음을 확인해주세요:\n1. 링크설정 시트: 정책표 설정 (통신사별 policy 행), 이통사지원금 설정 (통신사별 support 행)\n2. 정책표 시트에 모델 데이터 존재 여부\n3. 이통사지원금 시트에 모델 데이터 존재 여부\n4. Google Sheets API 할당량 초과 가능성 (잠시 후 재시도)';
           }
           return res.json({
             data: cached,
@@ -1704,9 +1716,35 @@ function setupDirectRoutes(app) {
         return res.json(cached);
       }
 
-      const mobileList = await getMobileList(carrier);
-      // getMobileList가 빈 배열을 반환해도 정상 응답으로 처리
-      setCache(cacheKey, mobileList, 5 * 60 * 1000); // 5분 캐시 (로딩 시간 최적화)
+      const mobileListResult = await getMobileList(carrier);
+      
+      // Rate limit 에러인 경우 처리
+      if (mobileListResult && typeof mobileListResult === 'object' && mobileListResult.__rateLimitError) {
+        const errorMsg = 'Google Sheets API 할당량 초과로 데이터를 가져올 수 없습니다. 잠시 후 다시 시도해주세요.';
+        if (includeMeta) {
+          return res.json({
+            data: [],
+            meta: {
+              carrier,
+              count: 0,
+              empty: true,
+              cached: false,
+              timestamp: Date.now(),
+              error: errorMsg,
+              rateLimitError: true
+            }
+          });
+        }
+        return res.json([]);
+      }
+      
+      const mobileList = Array.isArray(mobileListResult) ? mobileListResult : [];
+      
+      // Rate limit 에러가 아닌 경우에만 캐시 저장 (빈 배열이어도 저장)
+      if (!(mobileListResult && typeof mobileListResult === 'object' && mobileListResult.__rateLimitError)) {
+        setCache(cacheKey, mobileList, 5 * 60 * 1000); // 5분 캐시 (로딩 시간 최적화)
+      }
+      
       if (includeMeta) {
         const isEmpty = (mobileList.length || 0) === 0;
         // 서버 로그에서 확인된 일반적인 원인들
