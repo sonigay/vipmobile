@@ -42,6 +42,11 @@ const MobileListTab = ({ onProductSelect }) => {
   const [mobileList, setMobileList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  // 로딩 단계 상태 (UI 없이 상태만 추적)
+  const [steps, setSteps] = useState({
+    fetch: { label: '목록 로드', status: 'idle', message: '' },
+    pricing: { label: '기본 요금/지원금 반영', status: 'idle', message: '' }
+  });
   const [tagMenuAnchor, setTagMenuAnchor] = useState({}); // { modelId: anchorElement }
   const [planGroups, setPlanGroups] = useState([]); // 요금제군 목록
   const [selectedPlanGroups, setSelectedPlanGroups] = useState({}); // { modelId: planGroup }
@@ -70,13 +75,31 @@ const MobileListTab = ({ onProductSelect }) => {
       try {
         setLoading(true);
         setError(null);
+        setSteps(prev => ({
+          ...prev,
+          fetch: { ...prev.fetch, status: 'loading', message: '' },
+          pricing: { ...prev.pricing, status: 'idle', message: '' }
+        }));
         const carrier = getCurrentCarrier();
         const data = await directStoreApi.getMobileList(carrier);
-        setMobileList(data || []);
+        const list = data || [];
+        setMobileList(list);
+        setSteps(prev => ({
+          ...prev,
+          fetch: {
+            ...prev.fetch,
+            status: list.length > 0 ? 'success' : 'empty',
+            message: list.length > 0 ? '' : '수신된 데이터가 없습니다.'
+          }
+        }));
       } catch (err) {
         console.error('휴대폰 목록 로딩 실패:', err);
         setError('데이터를 불러오는 중 오류가 발생했습니다.');
         setMobileList([]);
+        setSteps(prev => ({
+          ...prev,
+          fetch: { ...prev.fetch, status: 'error', message: '목록 요청 실패' }
+        }));
       } finally {
         setLoading(false);
       }
@@ -90,6 +113,10 @@ const MobileListTab = ({ onProductSelect }) => {
     if (mobileList.length === 0 || planGroups.length === 0) return;
 
     const setDefaultValues = async () => {
+      setSteps(prev => ({
+        ...prev,
+        pricing: { ...prev.pricing, status: 'loading', message: '' }
+      }));
       const carrier = getCurrentCarrier();
       const newPlanGroups = { ...selectedPlanGroups };
       const newOpeningTypes = { ...selectedOpeningTypes };
@@ -177,6 +204,15 @@ const MobileListTab = ({ onProductSelect }) => {
       // 모든 가격 계산을 병렬로 실행
       if (pricePromises.length > 0) {
         await Promise.allSettled(pricePromises);
+        setSteps(prev => ({
+          ...prev,
+          pricing: { ...prev.pricing, status: 'success', message: '' }
+        }));
+      } else {
+        setSteps(prev => ({
+          ...prev,
+          pricing: { ...prev.pricing, status: 'success', message: '' }
+        }));
       }
     };
 
