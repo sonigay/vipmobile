@@ -285,6 +285,16 @@ async function getSheetId(sheets, spreadsheetId, sheetName) {
 }
 
 async function ensureSheetHeaders(sheets, spreadsheetId, sheetName, headers) {
+  // 캐시 키 생성
+  const cacheKey = `headers-${sheetName}-${spreadsheetId}`;
+  const CACHE_TTL = 5 * 60 * 1000; // 5분
+  
+  // 캐시 확인
+  const cached = getCache(cacheKey);
+  if (cached) {
+    return cached;
+  }
+  
   try {
     // 시트 존재 여부 확인 및 헤더 확인 (재시도 로직 포함)
     const res = await withRetry(async () => {
@@ -304,7 +314,12 @@ async function ensureSheetHeaders(sheets, spreadsheetId, sheetName, headers) {
           resource: { values: [headers] }
         });
       });
+      // 헤더 업데이트 후 캐시 무효화 (다음 호출에서 다시 확인)
+      // 캐시하지 않고 바로 반환
+      return headers;
     }
+    // 헤더가 정상이면 캐시에 저장
+    setCache(cacheKey, headers, CACHE_TTL);
     return headers;
   } catch (error) {
     // 시트가 없으면 생성 (재시도 로직 포함)
@@ -333,11 +348,17 @@ async function ensureSheetHeaders(sheets, spreadsheetId, sheetName, headers) {
             resource: { values: [headers] }
           });
         });
+        // 시트 생성 후 캐시에 저장
+        setCache(cacheKey, headers, CACHE_TTL);
       } catch (createError) {
         console.error(`[Direct] Failed to create sheet ${sheetName}:`, createError);
+        // 에러 발생 시 캐시 삭제
+        cacheStore.delete(cacheKey);
         throw createError;
       }
     } else {
+      // 에러 발생 시 캐시 삭제
+      cacheStore.delete(cacheKey);
       throw error;
     }
     return headers;
@@ -1888,49 +1909,68 @@ function setupDirectRoutes(app) {
         let finalSupportData = supportData;
         let finalSupportRowIndex = supportRowIndex;
         
-        // 이통사지원금 매칭에 사용할 개통유형: 정책표에서 매칭된 개통유형 사용 (각 모델에 맞는 정확한 값)
-        const supportOpeningType = matchedOpeningType;
+        // 이통사지원금 매칭에 사용할 개통유형: 초기 로드 시 기본값(MNP) 우선 사용
+        // 정책표 리베이트 매칭 결과는 참고용으로만 사용
+        // 초기 로드 시 프론트엔드 기본값은 항상 MNP이므로, MNP를 먼저 시도
+        const defaultOpeningTypeForSupport = 'MNP';
         
         const supportDebugInfo = {
           model,
           normalizedModel,
-          matchedOpeningType: supportOpeningType,
+          matchedOpeningType: matchedOpeningType,
           initialRowIndex: supportRowIndex,
           matchedKey: null,
           finalRowIndex: null,
-          found: false
+          found: false,
+          triedOpeningTypes: []
         };
         
-        // 프론트엔드 기본값 또는 정책표에서 매칭된 개통유형과 모델명 조합으로 찾기
-        // normalizedModel은 이미 위에서 선언됨 (1467번 라인)
-        const supportKey = `${model}|${supportOpeningType}`;
-        const candidateKeys = [
-          supportKey,
-          `${model.toLowerCase()}|${supportOpeningType}`,
-          `${model.toUpperCase()}|${supportOpeningType}`,
-        ];
-        if (normalizedModel) {
-          candidateKeys.push(
-            `${normalizedModel}|${supportOpeningType}`,
-            `${normalizedModel.toLowerCase()}|${supportOpeningType}`,
-            `${normalizedModel.toUpperCase()}|${supportOpeningType}`
-          );
+        // 시도할 개통유형 순서: MNP 우선, 그 다음 정책표 매칭 결과, 그 다음 다른 개통유형
+        const tryOpeningTypes = [defaultOpeningTypeForSupport];
+        if (matchedOpeningType && matchedOpeningType !== defaultOpeningTypeForSupport) {
+          tryOpeningTypes.push(matchedOpeningType);
         }
+        // 다른 개통유형도 추가 (010신규, 기변)
+        if (!tryOpeningTypes.includes('010신규')) tryOpeningTypes.push('010신규');
+        if (!tryOpeningTypes.includes('기변')) tryOpeningTypes.push('기변');
         
-        for (const key of candidateKeys) {
-          if (supportSheetData[key]) {
-            finalSupportData = supportSheetData[key];
-            finalSupportRowIndex = finalSupportData.rowIndex;
-            supportDebugInfo.matchedKey = key;
-            supportDebugInfo.found = true;
-            break;
+        // 각 개통유형을 순서대로 시도
+        let supportOpeningType = null;
+        for (const tryType of tryOpeningTypes) {
+          supportDebugInfo.triedOpeningTypes.push(tryType);
+          
+          // normalizedModel은 이미 위에서 선언됨 (1467번 라인)
+          const supportKey = `${model}|${tryType}`;
+          const candidateKeys = [
+            supportKey,
+            `${model.toLowerCase()}|${tryType}`,
+            `${model.toUpperCase()}|${tryType}`,
+          ];
+          if (normalizedModel) {
+            candidateKeys.push(
+              `${normalizedModel}|${tryType}`,
+              `${normalizedModel.toLowerCase()}|${tryType}`,
+              `${normalizedModel.toUpperCase()}|${tryType}`
+            );
           }
-        }
-        
-        // 개통유형이 "번호이동"과 "MNP"를 양방향으로 매칭
-        if (!supportDebugInfo.found) {
-          if (supportOpeningType === 'MNP') {
-            // MNP일 때 "번호이동"으로도 시도
+          
+          let foundForThisType = false;
+          for (const key of candidateKeys) {
+            if (supportSheetData[key]) {
+              finalSupportData = supportSheetData[key];
+              finalSupportRowIndex = finalSupportData.rowIndex;
+              supportDebugInfo.matchedKey = key;
+              supportDebugInfo.found = true;
+              supportOpeningType = tryType;
+              foundForThisType = true;
+              break;
+            }
+          }
+          
+          if (foundForThisType) break;
+          
+          // "번호이동"과 "MNP" 양방향 매칭
+          if (tryType === 'MNP') {
             const mnpKeys = [
               `${model}|번호이동`,
               `${model.toLowerCase()}|번호이동`,
@@ -1949,58 +1989,46 @@ function setupDirectRoutes(app) {
                 finalSupportRowIndex = finalSupportData.rowIndex;
                 supportDebugInfo.matchedKey = key;
                 supportDebugInfo.found = true;
+                supportOpeningType = 'MNP';
+                foundForThisType = true;
                 break;
               }
             }
-          } else if (supportOpeningType === '번호이동') {
-            // 번호이동일 때 "MNP"로도 시도
-            const mnpKeys = [
-              `${model}|MNP`,
-              `${model.toLowerCase()}|MNP`,
-              `${model.toUpperCase()}|MNP`,
+            if (foundForThisType) break;
+          }
+          
+          // "010신규/기변" 매칭
+          if (tryType === '010신규' || tryType === '기변') {
+            const combinedKeys = [
+              `${model}|010신규/기변`,
+              `${model.toLowerCase()}|010신규/기변`,
+              `${model.toUpperCase()}|010신규/기변`,
             ];
             if (normalizedModel) {
-              mnpKeys.push(
-                `${normalizedModel}|MNP`,
-                `${normalizedModel.toLowerCase()}|MNP`,
-                `${normalizedModel.toUpperCase()}|MNP`
+              combinedKeys.push(
+                `${normalizedModel}|010신규/기변`,
+                `${normalizedModel.toLowerCase()}|010신규/기변`,
+                `${normalizedModel.toUpperCase()}|010신규/기변`
               );
             }
-            for (const key of mnpKeys) {
+            for (const key of combinedKeys) {
               if (supportSheetData[key]) {
                 finalSupportData = supportSheetData[key];
                 finalSupportRowIndex = finalSupportData.rowIndex;
                 supportDebugInfo.matchedKey = key;
                 supportDebugInfo.found = true;
+                supportOpeningType = tryType;
+                foundForThisType = true;
                 break;
               }
             }
+            if (foundForThisType) break;
           }
         }
         
-        // 개통유형이 "010신규/기변"인 경우 각각 시도
-        if (!supportDebugInfo.found && (supportOpeningType === '010신규' || supportOpeningType === '기변')) {
-          const combinedKeys = [
-            `${model}|010신규/기변`,
-            `${model.toLowerCase()}|010신규/기변`,
-            `${model.toUpperCase()}|010신규/기변`,
-          ];
-          if (normalizedModel) {
-            combinedKeys.push(
-              `${normalizedModel}|010신규/기변`,
-              `${normalizedModel.toLowerCase()}|010신규/기변`,
-              `${normalizedModel.toUpperCase()}|010신규/기변`
-            );
-          }
-          for (const key of combinedKeys) {
-            if (supportSheetData[key]) {
-              finalSupportData = supportSheetData[key];
-              finalSupportRowIndex = finalSupportData.rowIndex;
-              supportDebugInfo.matchedKey = key;
-              supportDebugInfo.found = true;
-              break;
-            }
-          }
+        // 매칭된 개통유형이 없으면 기본값 사용
+        if (!supportOpeningType) {
+          supportOpeningType = defaultOpeningTypeForSupport;
         }
 
         supportDebugInfo.finalRowIndex = finalSupportRowIndex;
@@ -2028,18 +2056,18 @@ function setupDirectRoutes(app) {
             console.warn(`[Direct] ⚠️ 이통사지원금 매칭 실패:`, {
               모델명: model,
               정규화된모델명: normalizedModel,
-              개통유형: supportOpeningType,
+              최종개통유형: supportOpeningType,
               정책표매칭개통유형: matchedOpeningType,
-              개통유형리스트: openingTypeList,
+              시도한개통유형: supportDebugInfo.triedOpeningTypes,
               초기행인덱스: supportDebugInfo.initialRowIndex,
-              시도한키: candidateKeys.slice(0, 3),
               이통사지원금데이터존재: !!supportSheetData[model]
             });
           } else {
             console.log(`[Direct] ✅ 이통사지원금 매칭 성공:`, {
               모델명: model,
-              개통유형: supportOpeningType,
+              최종개통유형: supportOpeningType,
               정책표매칭개통유형: matchedOpeningType,
+              시도한개통유형: supportDebugInfo.triedOpeningTypes,
               매칭키: supportDebugInfo.matchedKey,
               행인덱스: finalSupportRowIndex,
               이통사지원금: publicSupport

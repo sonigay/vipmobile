@@ -54,12 +54,17 @@ const MobileListTab = ({ onProductSelect }) => {
   const [selectedOpeningTypes, setSelectedOpeningTypes] = useState({}); // { modelId: openingType } - 010신규, MNP, 기변
   const [calculatedPrices, setCalculatedPrices] = useState({}); // { modelId: { storeSupportWithAddon, storeSupportWithoutAddon, purchasePriceWithAddon, purchasePriceWithoutAddon } }
   const pendingRequestsRef = useRef(new Map()); // { cacheKey: Promise } - 중복 요청 방지
+  const initializedRef = useRef(false); // 초기화 완료 여부 추적
+  const userSelectedOpeningTypesRef = useRef(new Set()); // 사용자가 수동으로 선택한 개통유형 추적
   
   // 개통 유형 목록 (고정)
   const openingTypes = ['010신규', 'MNP', '기변'];
 
   const handleCarrierChange = (event, newValue) => {
     setCarrierTab(newValue);
+    // 통신사 변경 시 초기화 상태 리셋
+    initializedRef.current = false;
+    userSelectedOpeningTypesRef.current.clear();
   };
 
   const getCurrentCarrier = () => {
@@ -117,6 +122,11 @@ const MobileListTab = ({ onProductSelect }) => {
     if (mobileList.length === 0 || planGroups.length === 0) return;
 
     const setDefaultValues = async () => {
+      // 이미 초기화되었고, 사용자가 수동으로 선택한 값이 있으면 건너뛰기
+      if (initializedRef.current && userSelectedOpeningTypesRef.current.size > 0) {
+        return;
+      }
+      
       setSteps(prev => ({
         ...prev,
         pricing: { ...prev.pricing, status: 'loading', message: '' }
@@ -130,6 +140,20 @@ const MobileListTab = ({ onProductSelect }) => {
       const cacheEntries = [];
       
       for (const model of mobileList) {
+        // 사용자가 수동으로 선택한 개통유형은 보존
+        if (userSelectedOpeningTypesRef.current.has(model.id)) {
+          // 사용자 선택값이 있으면 그대로 유지하고 가격만 재계산
+          const existingPlanGroup = newPlanGroups[model.id];
+          const existingOpeningType = newOpeningTypes[model.id];
+          if (existingPlanGroup && existingOpeningType && planGroups.includes(existingPlanGroup)) {
+            const cached = getCachedPrice(model.id, existingPlanGroup, existingOpeningType, carrier);
+            if (!cached) {
+              pricePromises.push(calculatePrice(model.id, existingPlanGroup, existingOpeningType, true));
+            }
+          }
+          continue;
+        }
+        
         // 초기 로딩 시에는 기존 값이 있어도 기본값으로 재설정하지 않음
         // 단, 값이 없을 때만 기본값 설정
         if (newPlanGroups[model.id] && newOpeningTypes[model.id]) {
@@ -240,6 +264,9 @@ const MobileListTab = ({ onProductSelect }) => {
           pricing: { ...prev.pricing, status: 'success', message: '' }
         }));
       }
+      
+      // 초기화 완료 표시
+      initializedRef.current = true;
     };
 
     setDefaultValues();
@@ -493,6 +520,31 @@ const MobileListTab = ({ onProductSelect }) => {
       if (!result || !result.success) {
         throw new Error(result?.error || '태그 업데이트 실패');
       }
+      
+      // 태그 변경 시 요금제군이 변경될 수 있으므로 재계산
+      // 중저가/프리미엄 태그 변경 시 요금제군 기본값 재계산
+      const updatedMobile = mobileList.find(m => m.id === modelId);
+      if (updatedMobile && (tagType === 'budget' || tagType === 'premium')) {
+        const isPremium = updatedMobile.isPremium || false;
+        const isBudget = updatedMobile.isBudget || false;
+        
+        let newPlanGroup = '115군';
+        if (isPremium && !isBudget) {
+          newPlanGroup = '115군';
+        } else if (isBudget && !isPremium) {
+          newPlanGroup = '33군';
+        } else {
+          newPlanGroup = '115군';
+        }
+        
+        // 요금제군이 변경되었으면 업데이트 및 재계산
+        const currentPlanGroup = selectedPlanGroups[modelId];
+        if (currentPlanGroup !== newPlanGroup && planGroups.includes(newPlanGroup)) {
+          setSelectedPlanGroups(prev => ({ ...prev, [modelId]: newPlanGroup }));
+          const currentOpeningType = selectedOpeningTypes[modelId] || 'MNP';
+          calculatePrice(modelId, newPlanGroup, currentOpeningType, false); // 캐시 무시하고 재계산
+        }
+      }
     } catch (err) {
       console.error('구분 태그 업데이트 실패:', err);
       
@@ -694,9 +746,14 @@ const MobileListTab = ({ onProductSelect }) => {
         delete newState[modelId];
         return newState;
       });
+      // 사용자 선택 추적에서 제거
+      userSelectedOpeningTypesRef.current.delete(modelId);
       return;
     }
 
+    // 사용자가 수동으로 선택한 것으로 표시
+    userSelectedOpeningTypesRef.current.add(modelId);
+    
     setSelectedOpeningTypes(prev => ({ ...prev, [modelId]: openingType }));
 
     // 선택된 요금제군이 있으면 해당 요금제군과 유형으로 계산
