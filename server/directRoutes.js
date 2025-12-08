@@ -1003,9 +1003,10 @@ function setupDirectRoutes(app) {
   // === 상품 데이터 ===
 
   // mobiles 데이터를 가져오는 공통 함수
-  async function getMobileList(carrier) {
+  async function getMobileList(carrier, options = {}) {
     try {
       const carrierParam = carrier || 'SK';
+      const { defaultPlanGroup, defaultOpeningType } = options;
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
 
       // 1. 링크설정에서 정책표 설정과 이통사 지원금 설정 읽기
@@ -1596,11 +1597,15 @@ function setupDirectRoutes(app) {
           }
         }
 
-        // 요금제군 선택: 중저가 태그가 명시된 경우 33군 우선, 아니면 115군 우선, 없으면 첫 번째
+        // 요금제군 선택: 프론트엔드에서 전달된 기본값 우선, 없으면 중저가 태그가 명시된 경우 33군 우선, 아니면 115군 우선, 없으면 첫 번째
         const planGroupKeys = Object.keys(planGroupRanges || {});
         const isBudget = tags.isBudget === true && tags.isPremium !== true;
         let selectedPlanGroup = planGroupKeys[0];
-        if (isBudget && planGroupRanges['33군']) {
+        
+        // 프론트엔드에서 전달된 기본 요금제군이 있으면 우선 사용
+        if (defaultPlanGroup && planGroupRanges[defaultPlanGroup]) {
+          selectedPlanGroup = defaultPlanGroup;
+        } else if (isBudget && planGroupRanges['33군']) {
           selectedPlanGroup = '33군';
         } else if (planGroupRanges['115군']) {
           selectedPlanGroup = '115군';
@@ -1620,15 +1625,36 @@ function setupDirectRoutes(app) {
         };
         
         if (selectedPlanGroup && policyRebateData[selectedPlanGroup]) {
-          // 정책표에 실제로 있는 개통유형을 먼저 확인
+          // 정책표에 실제로 있는 개통유형 확인
           const availableTypes = Object.keys(policyRebateData[selectedPlanGroup] || {});
-          // 정책표에 있는 개통유형 + 이통사지원금 시트의 개통유형을 합쳐서 시도
-          let candidateTypes = [
-            ...availableTypes, // 정책표에 실제로 있는 개통유형 우선
-            ...(openingTypeList || [])
-          ].filter((v, i, arr) => arr.indexOf(v) === i); // 중복 제거
           
-          // "번호이동"과 "MNP" 양방향 매칭 추가
+          // 프론트엔드에서 전달된 기본 개통유형을 최우선으로 사용
+          // 그 다음 이통사지원금 시트의 개통유형, 마지막으로 정책표에 있는 개통유형
+          let candidateTypes = [];
+          
+          // 기본 개통유형이 있으면 최우선
+          if (defaultOpeningType) {
+            candidateTypes.push(defaultOpeningType);
+            // "번호이동"과 "MNP" 양방향 매칭
+            if (defaultOpeningType === '번호이동' && !candidateTypes.includes('MNP')) {
+              candidateTypes.push('MNP');
+            } else if (defaultOpeningType === 'MNP' && !candidateTypes.includes('번호이동')) {
+              candidateTypes.push('번호이동');
+            }
+          }
+          
+          // 이통사지원금 시트의 개통유형 추가
+          if (openingTypeList && openingTypeList.length > 0) {
+            candidateTypes.push(...openingTypeList);
+          }
+          
+          // 정책표에 있는 개통유형 추가
+          candidateTypes.push(...availableTypes);
+          
+          // 중복 제거
+          candidateTypes = candidateTypes.filter((v, i, arr) => arr.indexOf(v) === i);
+          
+          // "번호이동"과 "MNP" 양방향 매칭 추가 (아직 추가되지 않은 경우)
           if (candidateTypes.includes('번호이동') && !candidateTypes.includes('MNP')) {
             candidateTypes.push('MNP');
           }
@@ -1743,29 +1769,33 @@ function setupDirectRoutes(app) {
         // 모델명+개통유형 조합으로 정확한 이통사지원금 행 찾기
         let finalSupportData = supportData;
         let finalSupportRowIndex = supportRowIndex;
+        
+        // 이통사지원금 매칭에 사용할 개통유형: 프론트엔드 기본값 우선, 없으면 정책표에서 매칭된 개통유형
+        const supportOpeningType = defaultOpeningType || matchedOpeningType;
+        
         const supportDebugInfo = {
           model,
           normalizedModel,
-          matchedOpeningType,
+          matchedOpeningType: supportOpeningType,
           initialRowIndex: supportRowIndex,
           matchedKey: null,
           finalRowIndex: null,
           found: false
         };
         
-        // 정책표에서 매칭된 개통유형과 모델명 조합으로 다시 찾기
+        // 프론트엔드 기본값 또는 정책표에서 매칭된 개통유형과 모델명 조합으로 찾기
         // normalizedModel은 이미 위에서 선언됨 (1467번 라인)
-        const supportKey = `${model}|${matchedOpeningType}`;
+        const supportKey = `${model}|${supportOpeningType}`;
         const candidateKeys = [
           supportKey,
-          `${model.toLowerCase()}|${matchedOpeningType}`,
-          `${model.toUpperCase()}|${matchedOpeningType}`,
+          `${model.toLowerCase()}|${supportOpeningType}`,
+          `${model.toUpperCase()}|${supportOpeningType}`,
         ];
         if (normalizedModel) {
           candidateKeys.push(
-            `${normalizedModel}|${matchedOpeningType}`,
-            `${normalizedModel.toLowerCase()}|${matchedOpeningType}`,
-            `${normalizedModel.toUpperCase()}|${matchedOpeningType}`
+            `${normalizedModel}|${supportOpeningType}`,
+            `${normalizedModel.toLowerCase()}|${supportOpeningType}`,
+            `${normalizedModel.toUpperCase()}|${supportOpeningType}`
           );
         }
         
@@ -1781,7 +1811,7 @@ function setupDirectRoutes(app) {
         
         // 개통유형이 "번호이동"과 "MNP"를 양방향으로 매칭
         if (!supportDebugInfo.found) {
-          if (matchedOpeningType === 'MNP') {
+          if (supportOpeningType === 'MNP') {
             // MNP일 때 "번호이동"으로도 시도
             const mnpKeys = [
               `${model}|번호이동`,
@@ -1804,7 +1834,7 @@ function setupDirectRoutes(app) {
                 break;
               }
             }
-          } else if (matchedOpeningType === '번호이동') {
+          } else if (supportOpeningType === '번호이동') {
             // 번호이동일 때 "MNP"로도 시도
             const mnpKeys = [
               `${model}|MNP`,
@@ -1831,7 +1861,7 @@ function setupDirectRoutes(app) {
         }
         
         // 개통유형이 "010신규/기변"인 경우 각각 시도
-        if (!supportDebugInfo.found && (matchedOpeningType === '010신규' || matchedOpeningType === '기변')) {
+        if (!supportDebugInfo.found && (supportOpeningType === '010신규' || supportOpeningType === '기변')) {
           const combinedKeys = [
             `${model}|010신규/기변`,
             `${model.toLowerCase()}|010신규/기변`,
@@ -1880,7 +1910,9 @@ function setupDirectRoutes(app) {
             console.warn(`[Direct] ⚠️ 이통사지원금 매칭 실패:`, {
               모델명: model,
               정규화된모델명: normalizedModel,
-              개통유형: matchedOpeningType,
+              개통유형: supportOpeningType,
+              기본개통유형: defaultOpeningType,
+              정책표매칭개통유형: matchedOpeningType,
               개통유형리스트: openingTypeList,
               초기행인덱스: supportDebugInfo.initialRowIndex,
               시도한키: candidateKeys.slice(0, 3),
@@ -1889,7 +1921,9 @@ function setupDirectRoutes(app) {
           } else {
             console.log(`[Direct] ✅ 이통사지원금 매칭 성공:`, {
               모델명: model,
-              개통유형: matchedOpeningType,
+              개통유형: supportOpeningType,
+              기본개통유형: defaultOpeningType,
+              정책표매칭개통유형: matchedOpeningType,
               매칭키: supportDebugInfo.matchedKey,
               행인덱스: finalSupportRowIndex,
               이통사지원금: publicSupport
@@ -1919,7 +1953,10 @@ function setupDirectRoutes(app) {
             모델명: model,
             펫네임: petName,
             요금제군: selectedPlanGroup,
-            개통유형: matchedOpeningType,
+            기본요금제군: defaultPlanGroup,
+            개통유형: supportOpeningType,
+            기본개통유형: defaultOpeningType,
+            정책표매칭개통유형: matchedOpeningType,
             출고가: factoryPrice,
             이통사지원금: publicSupport,
             정책표리베이트: policyRebate,
@@ -2106,7 +2143,13 @@ function setupDirectRoutes(app) {
     try {
       const carrier = req.query.carrier || 'SK';
       const includeMeta = req.query.meta === '1';
-      const cacheKey = `mobiles-${carrier}`;
+      const defaultPlanGroup = req.query.planGroup; // 프론트엔드에서 선택한 기본 요금제군
+      const defaultOpeningType = req.query.openingType; // 프론트엔드에서 선택한 기본 개통유형
+      
+      // 기본값이 있으면 캐시 키에 포함 (다른 기본값으로 요청하면 다른 결과가 나올 수 있음)
+      const cacheKey = defaultPlanGroup || defaultOpeningType 
+        ? `mobiles-${carrier}-${defaultPlanGroup || ''}-${defaultOpeningType || ''}`
+        : `mobiles-${carrier}`;
       const cached = getCache(cacheKey);
       if (cached) {
         if (includeMeta) {
@@ -2130,7 +2173,10 @@ function setupDirectRoutes(app) {
         return res.json(cached);
       }
 
-      const mobileListResult = await getMobileList(carrier);
+      const mobileListResult = await getMobileList(carrier, {
+        defaultPlanGroup,
+        defaultOpeningType
+      });
       
       // Rate limit 에러인 경우 처리
       if (mobileListResult && typeof mobileListResult === 'object' && mobileListResult.__rateLimitError) {
