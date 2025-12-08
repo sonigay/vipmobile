@@ -82,7 +82,10 @@ const MobileListTab = ({ onProductSelect }) => {
           pricing: { ...prev.pricing, status: 'idle', message: '' }
         }));
         const carrier = getCurrentCarrier();
-        const { list, meta } = await directStoreApi.getMobileList(carrier, { withMeta: true }) || {};
+        
+        const { list, meta } = await directStoreApi.getMobileList(carrier, { 
+          withMeta: true
+        }) || {};
         const safeList = list || [];
         setMobileList(safeList);
         setSteps(prev => ({
@@ -230,7 +233,10 @@ const MobileListTab = ({ onProductSelect }) => {
         pricing: { ...prev.pricing, status: 'idle', message: '' }
       }));
       const carrier = getCurrentCarrier();
-      const { list, meta } = await directStoreApi.getMobileList(carrier, { withMeta: true }) || {};
+      
+      const { list, meta } = await directStoreApi.getMobileList(carrier, { 
+        withMeta: true
+      }) || {};
       const safeList = list || [];
       setMobileList(safeList);
       setSteps(prev => ({
