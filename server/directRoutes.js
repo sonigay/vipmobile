@@ -1409,15 +1409,20 @@ function setupDirectRoutes(app) {
         
         // 모델명을 기준으로 이통사 지원금 시트에서 데이터 찾기
         const normalizedModel = normalizeModelCode(model);
-        const supportData = supportSheetData[model] ||
+        let supportData = supportSheetData[model] ||
           supportSheetData[model.toLowerCase()] ||
           supportSheetData[model.toUpperCase()] ||
           (normalizedModel ? supportSheetData[normalizedModel] ||
             supportSheetData[normalizedModel.toLowerCase()] ||
             supportSheetData[normalizedModel.toUpperCase()] : null);
         if (!supportData) {
-          console.warn(`[Direct] 모델명 ${model}에 대한 이통사 지원금 데이터를 찾을 수 없습니다.`);
-          continue; // 해당 모델에 대한 지원금 데이터가 없으면 스킵
+          console.warn(`[Direct] 모델명 ${model}에 대한 이통사 지원금 데이터를 찾을 수 없습니다. 기본값(0)으로 계속 진행합니다.`);
+          supportData = {
+            factoryPrice: 0,
+            openingType: '010신규',
+            openingTypes: ['010신규'],
+            rowIndex: i // 요금제군별 지원금 매칭 기본값
+          };
         }
         
         const factoryPrice = supportData.factoryPrice || 0;
@@ -1439,30 +1444,37 @@ function setupDirectRoutes(app) {
         // 개통유형을 표준화 (010신규, MNP, 기변)
         let openingType = openingTypeList[0] || '010신규';
 
-        // 첫 번째 요금제군을 기본값으로 사용 (실제로는 선택된 요금제군을 사용해야 함)
-        const firstPlanGroup = Object.keys(planGroupRanges)[0];
+        // 요금제군 선택: 중저가 태그가 명시된 경우 33군 우선, 아니면 115군 우선, 없으면 첫 번째
+        const planGroupKeys = Object.keys(planGroupRanges || {});
+        const isBudget = tags.isBudget === true && tags.isPremium !== true;
+        let selectedPlanGroup = planGroupKeys[0];
+        if (isBudget && planGroupRanges['33군']) {
+          selectedPlanGroup = '33군';
+        } else if (planGroupRanges['115군']) {
+          selectedPlanGroup = '115군';
+        }
         let publicSupport = 0;
         // supportRowIndex를 사용하여 이통사 지원금 시트의 해당 행 데이터 가져오기
-        if (firstPlanGroup && planGroupSupportData[firstPlanGroup]?.[supportRowIndex]?.[0]) {
-          publicSupport = Number(planGroupSupportData[firstPlanGroup][supportRowIndex][0]) || 0;
+        if (selectedPlanGroup && planGroupSupportData[selectedPlanGroup]?.[supportRowIndex]?.[0] !== undefined) {
+          publicSupport = Number(planGroupSupportData[selectedPlanGroup][supportRowIndex][0]) || 0;
         }
 
         // 정책표 리베이트 가져오기 (요금제군 & 유형별)
         // 정책표 시트의 행 인덱스 i 사용 (정책표 시트가 기준이므로)
         let policyRebate = 0;
-        if (firstPlanGroup && policyRebateData[firstPlanGroup]) {
+        if (selectedPlanGroup && policyRebateData[selectedPlanGroup]) {
           // 개통유형 리스트 중 먼저 매칭되는 값을 사용, 없으면 010신규로 폴백
           const candidateTypes = openingTypeList && openingTypeList.length > 0 ? openingTypeList : ['010신규'];
           let matched = false;
           for (const ot of candidateTypes) {
-            if (policyRebateData[firstPlanGroup]?.[ot]?.[i] !== undefined) {
-              policyRebate = policyRebateData[firstPlanGroup][ot][i] || 0;
+            if (policyRebateData[selectedPlanGroup]?.[ot]?.[i] !== undefined) {
+              policyRebate = policyRebateData[selectedPlanGroup][ot][i] || 0;
               matched = true;
               break;
             }
           }
-          if (!matched && policyRebateData[firstPlanGroup]?.['010신규']?.[i] !== undefined) {
-            policyRebate = policyRebateData[firstPlanGroup]['010신규'][i] || 0;
+          if (!matched && policyRebateData[selectedPlanGroup]?.['010신규']?.[i] !== undefined) {
+            policyRebate = policyRebateData[selectedPlanGroup]['010신규'][i] || 0;
           }
         }
 
