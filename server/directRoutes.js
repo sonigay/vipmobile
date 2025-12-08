@@ -234,6 +234,35 @@ function normalizeModelCode(modelCode) {
   return modelCode.replace(/[\s\-_]/g, '').toLowerCase();
 }
 
+// 개통유형 문자열을 표준화하여 배열로 반환 (예: "010신규/기변" → ['010신규','기변'])
+function parseOpeningTypes(raw) {
+  const text = (raw || '').toString().toLowerCase();
+  // 전유형 키워드가 있으면 전부 포함
+  if (text.includes('전유형') || text.includes('전체') || text.includes('모두')) {
+    return ['010신규', 'MNP', '기변'];
+  }
+
+  const types = [];
+  if (text.includes('010') || text.includes('신규')) types.push('010신규');
+  if (text.includes('mnp') || text.includes('번호이동')) types.push('MNP');
+  if (text.includes('기변') || text.includes('기기변경')) types.push('기변');
+
+  // 쉼표나 슬래시로 분리되어 있을 수 있으므로 추가 파싱
+  if (types.length === 0 && (text.includes('/') || text.includes(','))) {
+    const tokens = text.split(/[\/,]/).map(t => t.trim());
+    tokens.forEach(token => {
+      if (token.includes('010') || token.includes('신규')) types.push('010신규');
+      if (token.includes('mnp') || token.includes('번호이동')) types.push('MNP');
+      if (token.includes('기변') || token.includes('기기변경')) types.push('기변');
+    });
+  }
+
+  // 기본값
+  if (types.length === 0) return ['010신규'];
+  // 중복 제거
+  return [...new Set(types)];
+}
+
 // 캐시 무효화 함수를 외부에서 사용할 수 있도록 export
 function invalidateDirectStoreCache(carrier = null) {
   if (carrier) {
@@ -1056,7 +1085,7 @@ function setupDirectRoutes(app) {
       // 이통사 지원금 시트에서 모델명, 출고가, 개통유형 읽기 (모델명 기준으로 매칭)
       const supportModelRange = supportSettingsJson.modelRange || '';
       
-      let supportSheetData = {}; // { model: { factoryPrice, openingType, rowIndex } }
+      let supportSheetData = {}; // { key: { factoryPrice, openingType, openingTypes: [], rowIndex } }
       
       if (supportModelRange && factoryPriceRange && openingTypeRange) {
         try {
@@ -1092,12 +1121,28 @@ function setupDirectRoutes(app) {
           for (let j = 0; j < maxSupportRows; j++) {
             const supportModel = (supportModelData[j]?.[0] || '').toString().trim();
             if (!supportModel) continue;
-            
-            supportSheetData[supportModel] = {
+
+            const openingTypeRaw = (supportOpeningTypeData[j]?.[0] || '').toString().trim();
+            const openingTypes = parseOpeningTypes(openingTypeRaw);
+            const entry = {
               factoryPrice: Number(supportFactoryPriceData[j]?.[0] || 0),
-              openingType: (supportOpeningTypeData[j]?.[0] || '').toString().trim(),
+              openingType: openingTypes[0] || '010신규', // 주 개통유형
+              openingTypes,
               rowIndex: j // 요금제군별 지원금 매칭용
             };
+
+            // 원본 모델명으로 저장
+            supportSheetData[supportModel] = entry;
+
+            // 정규화/대소문자 변형 키로도 저장하여 매칭 강화
+            const normalizedModel = normalizeModelCode(supportModel);
+            if (normalizedModel) {
+              supportSheetData[normalizedModel] = entry;
+              supportSheetData[normalizedModel.toLowerCase()] = entry;
+              supportSheetData[normalizedModel.toUpperCase()] = entry;
+            }
+            supportSheetData[supportModel.toLowerCase()] = entry;
+            supportSheetData[supportModel.toUpperCase()] = entry;
           }
         } catch (err) {
           console.warn('[Direct] 이통사 지원금 시트 데이터 읽기 실패:', err);
@@ -1363,7 +1408,13 @@ function setupDirectRoutes(app) {
         const petName = (petNameData[i]?.[0] || model).toString().trim();
         
         // 모델명을 기준으로 이통사 지원금 시트에서 데이터 찾기
-        const supportData = supportSheetData[model];
+        const normalizedModel = normalizeModelCode(model);
+        const supportData = supportSheetData[model] ||
+          supportSheetData[model.toLowerCase()] ||
+          supportSheetData[model.toUpperCase()] ||
+          (normalizedModel ? supportSheetData[normalizedModel] ||
+            supportSheetData[normalizedModel.toLowerCase()] ||
+            supportSheetData[normalizedModel.toUpperCase()] : null);
         if (!supportData) {
           console.warn(`[Direct] 모델명 ${model}에 대한 이통사 지원금 데이터를 찾을 수 없습니다.`);
           continue; // 해당 모델에 대한 지원금 데이터가 없으면 스킵
@@ -1371,6 +1422,9 @@ function setupDirectRoutes(app) {
         
         const factoryPrice = supportData.factoryPrice || 0;
         const openingTypeStr = supportData.openingType || '';
+        const openingTypeList = supportData.openingTypes && supportData.openingTypes.length > 0
+          ? supportData.openingTypes
+          : parseOpeningTypes(openingTypeStr);
         const supportRowIndex = supportData.rowIndex || i; // 요금제군별 지원금 매칭용
 
         // 출고가에 맞는 보험상품 찾기
@@ -1383,12 +1437,7 @@ function setupDirectRoutes(app) {
         const insuranceName = matchingInsurance ? matchingInsurance.name : '';
         
         // 개통유형을 표준화 (010신규, MNP, 기변)
-        let openingType = '010신규';
-        if (openingTypeStr.includes('MNP') || openingTypeStr.includes('번호이동')) {
-          openingType = 'MNP';
-        } else if (openingTypeStr.includes('기변') || openingTypeStr.includes('기기변경')) {
-          openingType = '기변';
-        }
+        let openingType = openingTypeList[0] || '010신규';
 
         // 첫 번째 요금제군을 기본값으로 사용 (실제로는 선택된 요금제군을 사용해야 함)
         const firstPlanGroup = Object.keys(planGroupRanges)[0];
@@ -1401,8 +1450,20 @@ function setupDirectRoutes(app) {
         // 정책표 리베이트 가져오기 (요금제군 & 유형별)
         // 정책표 시트의 행 인덱스 i 사용 (정책표 시트가 기준이므로)
         let policyRebate = 0;
-        if (firstPlanGroup && policyRebateData[firstPlanGroup]?.[openingType]?.[i] !== undefined) {
-          policyRebate = policyRebateData[firstPlanGroup][openingType][i] || 0;
+        if (firstPlanGroup && policyRebateData[firstPlanGroup]) {
+          // 개통유형 리스트 중 먼저 매칭되는 값을 사용, 없으면 010신규로 폴백
+          const candidateTypes = openingTypeList && openingTypeList.length > 0 ? openingTypeList : ['010신규'];
+          let matched = false;
+          for (const ot of candidateTypes) {
+            if (policyRebateData[firstPlanGroup]?.[ot]?.[i] !== undefined) {
+              policyRebate = policyRebateData[firstPlanGroup][ot][i] || 0;
+              matched = true;
+              break;
+            }
+          }
+          if (!matched && policyRebateData[firstPlanGroup]?.['010신규']?.[i] !== undefined) {
+            policyRebate = policyRebateData[firstPlanGroup]['010신규'][i] || 0;
+          }
         }
 
         // 대리점 지원금 계산
@@ -1892,8 +1953,15 @@ function setupDirectRoutes(app) {
             ]);
             
             // 정책표의 모델명으로 이통사 지원금 시트에서 매칭
-            const policyModel = modelRow[0] || '';
-            const supportModelIndex = supportModelData.findIndex(row => (row[0] || '').toString().trim() === policyModel);
+            const policyModel = (modelRow[0] || '').toString().trim();
+            const policyModelNormalized = normalizeModelCode(policyModel);
+            const supportModelIndex = supportModelData.findIndex(row => {
+              const target = (row[0] || '').toString().trim();
+              if (!target) return false;
+              if (target === policyModel) return true;
+              const normalized = normalizeModelCode(target);
+              return normalized && (normalized === policyModelNormalized);
+            });
             if (supportModelIndex >= 0) {
               factoryPrice = Number(factoryPriceData[supportModelIndex]?.[0] || 0);
             }
@@ -1950,8 +2018,15 @@ function setupDirectRoutes(app) {
             ]);
             
             // 정책표의 모델명으로 이통사 지원금 시트에서 매칭
-            const policyModel = modelRow[0] || '';
-            const supportModelIndex = supportModelData.findIndex(row => (row[0] || '').toString().trim() === policyModel);
+            const policyModel = (modelRow[0] || '').toString().trim();
+            const policyModelNormalized = normalizeModelCode(policyModel);
+            const supportModelIndex = supportModelData.findIndex(row => {
+              const target = (row[0] || '').toString().trim();
+              if (!target) return false;
+              if (target === policyModel) return true;
+              const normalized = normalizeModelCode(target);
+              return normalized && (normalized === policyModelNormalized);
+            });
             if (supportModelIndex >= 0) {
               publicSupport = Number(supportValues[supportModelIndex]?.[0] || 0);
             }
