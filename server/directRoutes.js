@@ -1131,18 +1131,46 @@ function setupDirectRoutes(app) {
               rowIndex: j // 요금제군별 지원금 매칭용
             };
 
-            // 원본 모델명으로 저장
-            supportSheetData[supportModel] = entry;
+            // 원본 모델명으로 저장 (개통유형 고려 없이, 폴백용)
+            if (!supportSheetData[supportModel]) {
+              supportSheetData[supportModel] = entry;
+            }
 
-            // 정규화/대소문자 변형 키로도 저장하여 매칭 강화
+            // 모델명+개통유형 조합으로 저장 (정확한 매칭용)
+            openingTypes.forEach(ot => {
+              const key = `${supportModel}|${ot}`;
+              supportSheetData[key] = entry;
+              
+              // 정규화된 모델명+개통유형 조합으로도 저장
+              const normalizedModel = normalizeModelCode(supportModel);
+              if (normalizedModel) {
+                supportSheetData[`${normalizedModel}|${ot}`] = entry;
+                supportSheetData[`${normalizedModel.toLowerCase()}|${ot}`] = entry;
+                supportSheetData[`${normalizedModel.toUpperCase()}|${ot}`] = entry;
+              }
+              supportSheetData[`${supportModel.toLowerCase()}|${ot}`] = entry;
+              supportSheetData[`${supportModel.toUpperCase()}|${ot}`] = entry;
+            });
+
+            // 정규화/대소문자 변형 키로도 저장하여 매칭 강화 (폴백용)
             const normalizedModel = normalizeModelCode(supportModel);
             if (normalizedModel) {
-              supportSheetData[normalizedModel] = entry;
-              supportSheetData[normalizedModel.toLowerCase()] = entry;
-              supportSheetData[normalizedModel.toUpperCase()] = entry;
+              if (!supportSheetData[normalizedModel]) {
+                supportSheetData[normalizedModel] = entry;
+              }
+              if (!supportSheetData[normalizedModel.toLowerCase()]) {
+                supportSheetData[normalizedModel.toLowerCase()] = entry;
+              }
+              if (!supportSheetData[normalizedModel.toUpperCase()]) {
+                supportSheetData[normalizedModel.toUpperCase()] = entry;
+              }
             }
-            supportSheetData[supportModel.toLowerCase()] = entry;
-            supportSheetData[supportModel.toUpperCase()] = entry;
+            if (!supportSheetData[supportModel.toLowerCase()]) {
+              supportSheetData[supportModel.toLowerCase()] = entry;
+            }
+            if (!supportSheetData[supportModel.toUpperCase()]) {
+              supportSheetData[supportModel.toUpperCase()] = entry;
+            }
           }
         } catch (err) {
           console.warn('[Direct] 이통사 지원금 시트 데이터 읽기 실패:', err);
@@ -1514,15 +1542,10 @@ function setupDirectRoutes(app) {
         } else if (planGroupRanges['115군']) {
           selectedPlanGroup = '115군';
         }
-        let publicSupport = 0;
-        // supportRowIndex를 사용하여 이통사 지원금 시트의 해당 행 데이터 가져오기
-        if (selectedPlanGroup && planGroupSupportData[selectedPlanGroup]?.[supportRowIndex]?.[0] !== undefined) {
-          publicSupport = Number(planGroupSupportData[selectedPlanGroup][supportRowIndex][0]) || 0;
-        }
-
         // 정책표 리베이트 가져오기 (요금제군 & 유형별)
         // 정책표 시트의 행 인덱스 i 사용 (정책표 시트가 기준이므로)
         let policyRebate = 0;
+        let matchedOpeningType = '010신규'; // 이통사지원금 매칭에 사용할 개통유형
         if (selectedPlanGroup && policyRebateData[selectedPlanGroup]) {
           // 개통유형 리스트 중 먼저 매칭되는 값을 사용, 없으면 010신규로 폴백
           const candidateTypes = openingTypeList && openingTypeList.length > 0 ? openingTypeList : ['010신규'];
@@ -1530,13 +1553,95 @@ function setupDirectRoutes(app) {
           for (const ot of candidateTypes) {
             if (policyRebateData[selectedPlanGroup]?.[ot]?.[i] !== undefined) {
               policyRebate = policyRebateData[selectedPlanGroup][ot][i] || 0;
+              matchedOpeningType = ot; // 매칭된 개통유형 저장
               matched = true;
               break;
             }
           }
           if (!matched && policyRebateData[selectedPlanGroup]?.['010신규']?.[i] !== undefined) {
             policyRebate = policyRebateData[selectedPlanGroup]['010신규'][i] || 0;
+            matchedOpeningType = '010신규';
           }
+        }
+
+        // 모델명+개통유형 조합으로 정확한 이통사지원금 행 찾기
+        let finalSupportData = supportData;
+        let finalSupportRowIndex = supportRowIndex;
+        
+        // 정책표에서 매칭된 개통유형과 모델명 조합으로 다시 찾기
+        const supportKey = `${model}|${matchedOpeningType}`;
+        const normalizedModel = normalizeModelCode(model);
+        const candidateKeys = [
+          supportKey,
+          `${model.toLowerCase()}|${matchedOpeningType}`,
+          `${model.toUpperCase()}|${matchedOpeningType}`,
+        ];
+        if (normalizedModel) {
+          candidateKeys.push(
+            `${normalizedModel}|${matchedOpeningType}`,
+            `${normalizedModel.toLowerCase()}|${matchedOpeningType}`,
+            `${normalizedModel.toUpperCase()}|${matchedOpeningType}`
+          );
+        }
+        
+        for (const key of candidateKeys) {
+          if (supportSheetData[key]) {
+            finalSupportData = supportSheetData[key];
+            finalSupportRowIndex = finalSupportData.rowIndex;
+            break;
+          }
+        }
+        
+        // 개통유형이 "번호이동"인 경우 "MNP"로도 시도
+        if (matchedOpeningType === 'MNP' || matchedOpeningType === '번호이동') {
+          const mnpKeys = [
+            `${model}|번호이동`,
+            `${model.toLowerCase()}|번호이동`,
+            `${model.toUpperCase()}|번호이동`,
+          ];
+          if (normalizedModel) {
+            mnpKeys.push(
+              `${normalizedModel}|번호이동`,
+              `${normalizedModel.toLowerCase()}|번호이동`,
+              `${normalizedModel.toUpperCase()}|번호이동`
+            );
+          }
+          for (const key of mnpKeys) {
+            if (supportSheetData[key]) {
+              finalSupportData = supportSheetData[key];
+              finalSupportRowIndex = finalSupportData.rowIndex;
+              break;
+            }
+          }
+        }
+        
+        // 개통유형이 "010신규/기변"인 경우 각각 시도
+        if (matchedOpeningType === '010신규' || matchedOpeningType === '기변') {
+          const combinedKeys = [
+            `${model}|010신규/기변`,
+            `${model.toLowerCase()}|010신규/기변`,
+            `${model.toUpperCase()}|010신규/기변`,
+          ];
+          if (normalizedModel) {
+            combinedKeys.push(
+              `${normalizedModel}|010신규/기변`,
+              `${normalizedModel.toLowerCase()}|010신규/기변`,
+              `${normalizedModel.toUpperCase()}|010신규/기변`
+            );
+          }
+          for (const key of combinedKeys) {
+            if (supportSheetData[key]) {
+              finalSupportData = supportSheetData[key];
+              finalSupportRowIndex = finalSupportData.rowIndex;
+              break;
+            }
+          }
+        }
+
+        let publicSupport = 0;
+        // finalSupportRowIndex를 사용하여 이통사 지원금 시트의 해당 행 데이터 가져오기
+        if (selectedPlanGroup && planGroupSupportData[selectedPlanGroup]?.[finalSupportRowIndex]?.[0] !== undefined) {
+          publicSupport = Number(planGroupSupportData[selectedPlanGroup][finalSupportRowIndex][0]) || 0;
         }
 
         // 대리점 지원금 계산
