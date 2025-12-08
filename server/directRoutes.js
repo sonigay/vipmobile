@@ -1404,20 +1404,30 @@ function setupDirectRoutes(app) {
             const planGroup = supportRangeMap[range];
             const supportValues = valueRange.values || [];
             
+            // 범위 문자열에서 시작 행 번호 추출 (예: 'F9:F97' -> 9)
+            // 시트 이름이 포함된 경우도 처리 (예: "'시트명'!F9:F97" -> 9)
+            let startRow = 0;
+            const rangeMatch = range.match(/(?:'[^']+'!)?[A-Z]+(\d+)/);
+            if (rangeMatch) {
+              startRow = parseInt(rangeMatch[1], 10) - 1; // 0-based index로 변환
+            }
+            
             // 모델명+개통유형 복합키 맵으로 변환
-            // supportModelData와 supportOpeningTypeData를 사용하여 모델명과 개통유형 매칭
+            // supportModelData와 supportOpeningTypeData의 해당 범위만 사용
             const supportMap = {};
-            const maxRows = Math.max(
-              supportModelData.length,
-              supportOpeningTypeData.length,
+            const maxRows = Math.min(
+              supportModelData.length - startRow,
+              supportOpeningTypeData.length - startRow,
               supportValues.length
             );
             
             for (let j = 0; j < maxRows; j++) {
-              const model = (supportModelData[j]?.[0] || '').toString().trim();
+              // 전체 시트의 startRow+j 인덱스 사용
+              const modelIndex = startRow + j;
+              const model = (supportModelData[modelIndex]?.[0] || '').toString().trim();
               if (!model) continue;
               
-              const openingTypeRaw = (supportOpeningTypeData[j]?.[0] || '').toString().trim();
+              const openingTypeRaw = (supportOpeningTypeData[modelIndex]?.[0] || '').toString().trim();
               const openingTypes = parseOpeningTypes(openingTypeRaw);
               const supportValue = Number((supportValues[j]?.[0] || 0).toString().replace(/,/g, '')) || 0;
               
@@ -2267,10 +2277,44 @@ function setupDirectRoutes(app) {
           }
           
           // 키를 순서대로 시도하여 값 찾기
+          let foundKey = null;
           for (const key of supportKeys) {
             if (planGroupSupportData[selectedPlanGroup][key] !== undefined) {
               publicSupport = Number(planGroupSupportData[selectedPlanGroup][key]) || 0;
+              foundKey = key;
               break;
+            }
+          }
+          
+          // 디버깅: 문제 모델에 대해 상세 로그
+          const carrierSupportProblemModels = [
+            'SM-S926N256', 'SM-S926N512', 'SM-S928N256', 'SM-S928N512',
+            'UIP17-256', 'UIP17-512', 'UIPA-256', 'UIPA-512', 'UIPA-1T',
+            'UIP17PR-256', 'UIP17PR-512', 'UIP17PR-1T'
+          ];
+          const shouldLog = carrierSupportProblemModels.some(pm => 
+            model === pm || model.toLowerCase() === pm.toLowerCase() || 
+            (normalizedModel && normalizedModel.toLowerCase() === pm.toLowerCase())
+          );
+          
+          if (shouldLog) {
+            if (!foundKey) {
+              console.warn(`[Direct] ⚠️ planGroupSupportData에서 키를 찾을 수 없음:`, {
+                모델명: model,
+                요금제군: selectedPlanGroup,
+                개통유형: supportOpeningType,
+                시도한키: supportKeys.slice(0, 5),
+                맵에있는키수: Object.keys(planGroupSupportData[selectedPlanGroup] || {}).length,
+                맵에있는키샘플: Object.keys(planGroupSupportData[selectedPlanGroup] || {}).slice(0, 5)
+              });
+            } else {
+              console.log(`[Direct] ✅ planGroupSupportData에서 값 찾음:`, {
+                모델명: model,
+                요금제군: selectedPlanGroup,
+                개통유형: supportOpeningType,
+                찾은키: foundKey,
+                이통사지원금: publicSupport
+              });
             }
           }
         }
