@@ -1236,6 +1236,26 @@ function setupDirectRoutes(app) {
                 // "010신규/기변" → 010신규와 기변 매핑
                 if (openingTypeRaw === '010신규/기변' || 
                     (openingTypes.includes('010신규') && openingTypes.includes('기변'))) {
+                  // 원본 "010신규/기변" 키로도 저장
+                  const originalKeys = [
+                    `${supportModel}|010신규/기변`,
+                    `${supportModel.toLowerCase()}|010신규/기변`,
+                    `${supportModel.toUpperCase()}|010신규/기변`
+                  ];
+                  if (normalizedModel) {
+                    originalKeys.push(
+                      `${normalizedModel}|010신규/기변`,
+                      `${normalizedModel.toLowerCase()}|010신규/기변`,
+                      `${normalizedModel.toUpperCase()}|010신규/기변`
+                    );
+                  }
+                  originalKeys.forEach(key => {
+                    if (!supportSheetData[key]) {
+                      supportSheetData[key] = entry;
+                    }
+                  });
+                  
+                  // "010신규"와 "기변"으로도 각각 저장
                   ['010신규', '기변'].forEach(ot => {
                     const key = `${supportModel}|${ot}`;
                     if (!supportSheetData[key]) {
@@ -2563,9 +2583,34 @@ function setupDirectRoutes(app) {
 
       // 정책표에서 모델 정보 가져오기 (캐시 사용)
       const modelData = await getSheetData(policySheetId, modelRange);
+      
+      // 인덱스 범위 체크
+      if (isNaN(modelIndex) || modelIndex < 0 || modelIndex >= modelData.length) {
+        console.error(`[Direct] /calculate 모델 인덱스 범위 초과:`, {
+          modelId,
+          modelIndex,
+          modelDataLength: modelData.length,
+          planGroup,
+          openingType,
+          carrier
+        });
+        return res.status(404).json({ 
+          success: false, 
+          error: `모델을 찾을 수 없습니다. (인덱스: ${modelIndex}, 범위: 0-${modelData.length - 1})` 
+        });
+      }
+      
       const modelRow = modelData[modelIndex];
       
-      if (!modelRow) {
+      if (!modelRow || !modelRow[0]) {
+        console.error(`[Direct] /calculate 모델 행이 비어있음:`, {
+          modelId,
+          modelIndex,
+          modelDataLength: modelData.length,
+          planGroup,
+          openingType,
+          carrier
+        });
         return res.status(404).json({ success: false, error: '모델을 찾을 수 없습니다.' });
       }
 
@@ -2737,13 +2782,14 @@ function setupDirectRoutes(app) {
                 // 1. 정확한 개통유형 매칭 시도
                 for (const row of matchingRows) {
                   const rowOpeningTypes = parseOpeningTypes(row.openingTypeRaw);
+                  const rowOpeningTypeRawLower = (row.openingTypeRaw || '').toLowerCase();
                   
                   // 전유형이고 무시해야 하면 스킵
                   if (shouldIgnoreAllTypes && (row.openingTypeRaw === '전유형' || rowOpeningTypes.includes('전유형'))) {
                     continue;
                   }
                   
-                  // 정확한 매칭
+                  // 정확한 매칭 (파싱된 타입에 포함되는지 확인)
                   if (rowOpeningTypes.includes(openingType)) {
                     matchedRow = row;
                     break;
@@ -2756,11 +2802,22 @@ function setupDirectRoutes(app) {
                   }
                   
                   // "010신규/기변" → 010신규와 기변 매핑
-                  if ((openingType === '010신규' || openingType === '기변') && 
-                      (row.openingTypeRaw === '010신규/기변' || 
-                       (rowOpeningTypes.includes('010신규') && rowOpeningTypes.includes('기변')))) {
-                    matchedRow = row;
-                    break;
+                  // 원본 문자열에 "010신규"나 "기변"이 포함되어 있는지 직접 확인
+                  if (openingType === '010신규') {
+                    // "010신규/기변" 또는 "010신규"가 포함되어 있으면 매칭
+                    if (rowOpeningTypeRawLower.includes('010신규') || 
+                        rowOpeningTypeRawLower.includes('010') && rowOpeningTypeRawLower.includes('신규') ||
+                        rowOpeningTypes.includes('010신규')) {
+                      matchedRow = row;
+                      break;
+                    }
+                  } else if (openingType === '기변') {
+                    // "010신규/기변" 또는 "기변"이 포함되어 있으면 매칭
+                    if (rowOpeningTypeRawLower.includes('기변') || 
+                        rowOpeningTypes.includes('기변')) {
+                      matchedRow = row;
+                      break;
+                    }
                   }
                 }
                 
