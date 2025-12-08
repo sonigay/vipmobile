@@ -1620,8 +1620,27 @@ function setupDirectRoutes(app) {
         };
         
         if (selectedPlanGroup && policyRebateData[selectedPlanGroup]) {
-          // 개통유형 리스트 중 먼저 매칭되는 값을 사용, 없으면 010신규로 폴백
-          const candidateTypes = openingTypeList && openingTypeList.length > 0 ? openingTypeList : ['010신규'];
+          // 정책표에 실제로 있는 개통유형을 먼저 확인
+          const availableTypes = Object.keys(policyRebateData[selectedPlanGroup] || {});
+          // 정책표에 있는 개통유형 + 이통사지원금 시트의 개통유형을 합쳐서 시도
+          let candidateTypes = [
+            ...availableTypes, // 정책표에 실제로 있는 개통유형 우선
+            ...(openingTypeList || [])
+          ].filter((v, i, arr) => arr.indexOf(v) === i); // 중복 제거
+          
+          // "번호이동"과 "MNP" 양방향 매칭 추가
+          if (candidateTypes.includes('번호이동') && !candidateTypes.includes('MNP')) {
+            candidateTypes.push('MNP');
+          }
+          if (candidateTypes.includes('MNP') && !candidateTypes.includes('번호이동')) {
+            candidateTypes.push('번호이동');
+          }
+          
+          // 후보가 없으면 기본값
+          if (candidateTypes.length === 0) {
+            candidateTypes.push('010신규');
+          }
+          
           rebateDebugInfo.candidateTypes = candidateTypes;
           let matched = false;
           
@@ -1760,27 +1779,53 @@ function setupDirectRoutes(app) {
           }
         }
         
-        // 개통유형이 "번호이동"인 경우 "MNP"로도 시도
-        if (!supportDebugInfo.found && (matchedOpeningType === 'MNP' || matchedOpeningType === '번호이동')) {
-          const mnpKeys = [
-            `${model}|번호이동`,
-            `${model.toLowerCase()}|번호이동`,
-            `${model.toUpperCase()}|번호이동`,
-          ];
-          if (normalizedModel) {
-            mnpKeys.push(
-              `${normalizedModel}|번호이동`,
-              `${normalizedModel.toLowerCase()}|번호이동`,
-              `${normalizedModel.toUpperCase()}|번호이동`
-            );
-          }
-          for (const key of mnpKeys) {
-            if (supportSheetData[key]) {
-              finalSupportData = supportSheetData[key];
-              finalSupportRowIndex = finalSupportData.rowIndex;
-              supportDebugInfo.matchedKey = key;
-              supportDebugInfo.found = true;
-              break;
+        // 개통유형이 "번호이동"과 "MNP"를 양방향으로 매칭
+        if (!supportDebugInfo.found) {
+          if (matchedOpeningType === 'MNP') {
+            // MNP일 때 "번호이동"으로도 시도
+            const mnpKeys = [
+              `${model}|번호이동`,
+              `${model.toLowerCase()}|번호이동`,
+              `${model.toUpperCase()}|번호이동`,
+            ];
+            if (normalizedModel) {
+              mnpKeys.push(
+                `${normalizedModel}|번호이동`,
+                `${normalizedModel.toLowerCase()}|번호이동`,
+                `${normalizedModel.toUpperCase()}|번호이동`
+              );
+            }
+            for (const key of mnpKeys) {
+              if (supportSheetData[key]) {
+                finalSupportData = supportSheetData[key];
+                finalSupportRowIndex = finalSupportData.rowIndex;
+                supportDebugInfo.matchedKey = key;
+                supportDebugInfo.found = true;
+                break;
+              }
+            }
+          } else if (matchedOpeningType === '번호이동') {
+            // 번호이동일 때 "MNP"로도 시도
+            const mnpKeys = [
+              `${model}|MNP`,
+              `${model.toLowerCase()}|MNP`,
+              `${model.toUpperCase()}|MNP`,
+            ];
+            if (normalizedModel) {
+              mnpKeys.push(
+                `${normalizedModel}|MNP`,
+                `${normalizedModel.toLowerCase()}|MNP`,
+                `${normalizedModel.toUpperCase()}|MNP`
+              );
+            }
+            for (const key of mnpKeys) {
+              if (supportSheetData[key]) {
+                finalSupportData = supportSheetData[key];
+                finalSupportRowIndex = finalSupportData.rowIndex;
+                supportDebugInfo.matchedKey = key;
+                supportDebugInfo.found = true;
+                break;
+              }
             }
           }
         }
