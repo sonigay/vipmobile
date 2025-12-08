@@ -1672,24 +1672,35 @@ function setupDirectRoutes(app) {
           }
         }
         
-        // 정책표 리베이트 매칭 디버깅 로그
-        if (!rebateDebugInfo.matched) {
-          console.warn(`[Direct] ⚠️ 정책표 리베이트 매칭 실패:`, {
-            모델명: model,
-            정규화된모델명: normalizedModel,
-            요금제군: selectedPlanGroup,
-            시도한개통유형: rebateDebugInfo.candidateTypes,
-            정책표데이터존재: !!policyRebateData[selectedPlanGroup]
-          });
-        } else {
-          console.log(`[Direct] ✅ 정책표 리베이트 매칭 성공:`, {
-            모델명: model,
-            요금제군: selectedPlanGroup,
-            개통유형: matchedOpeningType,
-            매칭키: rebateDebugInfo.matchedKey,
-            리베이트금액: policyRebate,
-            폴백사용: rebateDebugInfo.fallbackUsed
-          });
+        // 정책표 리베이트 매칭 디버깅 로그 (대리점지원금 문제 모델만)
+        const storeSupportProblemModels = [
+          'SM-F766N256', 'SM-S731N', 'SM-S937N256', 'SM-A166L', 
+          'UIP17PR-256', 'A2633-128', 'AT-M140L'
+        ];
+        const shouldLogRebate = storeSupportProblemModels.some(pm => 
+          model === pm || model.toLowerCase() === pm.toLowerCase() || 
+          (normalizedModel && normalizedModel.toLowerCase() === pm.toLowerCase())
+        );
+        
+        if (shouldLogRebate) {
+          if (!rebateDebugInfo.matched) {
+            console.warn(`[Direct] ⚠️ 정책표 리베이트 매칭 실패:`, {
+              모델명: model,
+              정규화된모델명: normalizedModel,
+              요금제군: selectedPlanGroup,
+              시도한개통유형: rebateDebugInfo.candidateTypes,
+              정책표데이터존재: !!policyRebateData[selectedPlanGroup]
+            });
+          } else {
+            console.log(`[Direct] ✅ 정책표 리베이트 매칭 성공:`, {
+              모델명: model,
+              요금제군: selectedPlanGroup,
+              개통유형: matchedOpeningType,
+              매칭키: rebateDebugInfo.matchedKey,
+              리베이트금액: policyRebate,
+              폴백사용: rebateDebugInfo.fallbackUsed
+            });
+          }
         }
 
         // 모델명+개통유형 조합으로 정확한 이통사지원금 행 찾기
@@ -1789,24 +1800,41 @@ function setupDirectRoutes(app) {
           publicSupport = Number(planGroupSupportData[selectedPlanGroup][finalSupportRowIndex][0]) || 0;
         }
         
-        // 이통사지원금 매칭 디버깅 로그
-        if (!supportDebugInfo.found) {
-          console.warn(`[Direct] ⚠️ 이통사지원금 매칭 실패:`, {
-            모델명: model,
-            정규화된모델명: normalizedModel,
-            개통유형: matchedOpeningType,
-            초기행인덱스: supportDebugInfo.initialRowIndex,
-            시도한키: candidateKeys.slice(0, 3),
-            이통사지원금데이터존재: !!supportSheetData[model]
-          });
-        } else {
-          console.log(`[Direct] ✅ 이통사지원금 매칭 성공:`, {
-            모델명: model,
-            개통유형: matchedOpeningType,
-            매칭키: supportDebugInfo.matchedKey,
-            행인덱스: finalSupportRowIndex,
-            이통사지원금: publicSupport
-          });
+        // 이통사지원금 매칭 디버깅 로그 (이통사지원금 문제 모델만)
+        const carrierSupportProblemModels = [
+          'SM-S926N256', 'SM-S926N512', 'SM-S928N256', 'SM-S928N512',
+          'UIP17-256', 'UIP17-512', 'UIPA-256', 'UIPA-512', 'UIPA-1T',
+          'UIP17PR-256', 'UIP17PR-512', 'UIP17PR-1T'
+        ];
+        const carrierSupportProblemTypes = ['번호이동', '010신규/기변', 'MNP', '010신규', '기변'];
+        const shouldLogCarrierSupport = carrierSupportProblemModels.some(pm => {
+          const modelMatch = model === pm || model.toLowerCase() === pm.toLowerCase() || 
+            (normalizedModel && normalizedModel.toLowerCase() === pm.toLowerCase());
+          const typeMatch = carrierSupportProblemTypes.includes(matchedOpeningType) ||
+            openingTypeList.some(ot => carrierSupportProblemTypes.includes(ot));
+          return modelMatch && typeMatch;
+        });
+        
+        if (shouldLogCarrierSupport) {
+          if (!supportDebugInfo.found) {
+            console.warn(`[Direct] ⚠️ 이통사지원금 매칭 실패:`, {
+              모델명: model,
+              정규화된모델명: normalizedModel,
+              개통유형: matchedOpeningType,
+              개통유형리스트: openingTypeList,
+              초기행인덱스: supportDebugInfo.initialRowIndex,
+              시도한키: candidateKeys.slice(0, 3),
+              이통사지원금데이터존재: !!supportSheetData[model]
+            });
+          } else {
+            console.log(`[Direct] ✅ 이통사지원금 매칭 성공:`, {
+              모델명: model,
+              개통유형: matchedOpeningType,
+              매칭키: supportDebugInfo.matchedKey,
+              행인덱스: finalSupportRowIndex,
+              이통사지원금: publicSupport
+            });
+          }
         }
 
         // 대리점 지원금 계산
@@ -1825,25 +1853,27 @@ function setupDirectRoutes(app) {
           + totalSpecialDeduction // 별도정책 차감금액
         );
         
-        // 최종 계산값 디버깅 로그
-        console.log(`[Direct] 💰 최종 계산값:`, {
-          모델명: model,
-          펫네임: petName,
-          요금제군: selectedPlanGroup,
-          개통유형: matchedOpeningType,
-          출고가: factoryPrice,
-          이통사지원금: publicSupport,
-          정책표리베이트: policyRebate,
-          마진: baseMargin,
-          부가서비스추가: totalAddonIncentive,
-          부가서비스차감: totalAddonDeduction,
-          별도정책추가: totalSpecialAddition,
-          별도정책차감: totalSpecialDeduction,
-          대리점지원금_부가유치: storeSupportWithAddon,
-          대리점지원금_부가미유치: storeSupportWithoutAddon,
-          계산상세_부가유치: `${policyRebate} - ${baseMargin} + ${totalAddonIncentive} + ${totalSpecialAddition} = ${storeSupportWithAddon}`,
-          계산상세_부가미유치: `${policyRebate} - ${baseMargin} + ${totalAddonDeduction} + ${totalSpecialDeduction} = ${storeSupportWithoutAddon}`
-        });
+        // 최종 계산값 디버깅 로그 (대리점지원금 문제 모델만)
+        if (shouldLogRebate) {
+          console.log(`[Direct] 💰 최종 계산값:`, {
+            모델명: model,
+            펫네임: petName,
+            요금제군: selectedPlanGroup,
+            개통유형: matchedOpeningType,
+            출고가: factoryPrice,
+            이통사지원금: publicSupport,
+            정책표리베이트: policyRebate,
+            마진: baseMargin,
+            부가서비스추가: totalAddonIncentive,
+            부가서비스차감: totalAddonDeduction,
+            별도정책추가: totalSpecialAddition,
+            별도정책차감: totalSpecialDeduction,
+            대리점지원금_부가유치: storeSupportWithAddon,
+            대리점지원금_부가미유치: storeSupportWithoutAddon,
+            계산상세_부가유치: `${policyRebate} - ${baseMargin} + ${totalAddonIncentive} + ${totalSpecialAddition} = ${storeSupportWithAddon}`,
+            계산상세_부가미유치: `${policyRebate} - ${baseMargin} + ${totalAddonDeduction} + ${totalSpecialDeduction} = ${storeSupportWithoutAddon}`
+          });
+        }
 
         // 구매가 계산
         // 대리점추가지원금에 이미 정책표리베이트, 마진, 부가서비스, 별도정책이 포함되어 있으므로
