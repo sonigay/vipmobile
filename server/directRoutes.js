@@ -1412,17 +1412,16 @@ function setupDirectRoutes(app) {
         });
         
         let supportMapBuilt = false;
-        if (supportRanges.length > 0 && supportModelData.length > 0) {
-          if (openingTypeRange && supportOpeningTypeData.length > 0) {
-            try {
-              const response = await sheets.spreadsheets.values.batchGet({
-                spreadsheetId: supportSheetId,
-                ranges: supportRanges,
-                majorDimension: 'ROWS',
-                valueRenderOption: 'UNFORMATTED_VALUE'
-              });
-            
-            response.data.valueRanges.forEach((valueRange, index) => {
+        if (supportRanges.length > 0 && supportModelData.length > 0 && supportOpeningTypeData.length > 0) {
+          try {
+            const response = await sheets.spreadsheets.values.batchGet({
+              spreadsheetId: supportSheetId,
+              ranges: supportRanges,
+              majorDimension: 'ROWS',
+              valueRenderOption: 'UNFORMATTED_VALUE'
+            });
+          
+          response.data.valueRanges.forEach((valueRange, index) => {
             const range = supportRanges[index];
             const planGroup = supportRangeMap[range];
             const supportValues = valueRange.values || [];
@@ -1663,39 +1662,32 @@ function setupDirectRoutes(app) {
             });
           });
             supportMapBuilt = true;
-          } catch (err) {
-            console.warn(`[Direct] 지원금 범위 batchGet 실패:`, err);
-            // 실패 시 빈 객체로 초기화
-            Object.keys(planGroupRanges).forEach(planGroup => {
-              if (!planGroupSupportData[planGroup]) {
-                planGroupSupportData[planGroup] = {};
-              }
-            });
-          }
-          } else {
-            // openingTypeRange 미설정이면 캐시 생성 생략 (폴백 사용)
-            console.warn('[Direct] planGroupSupportData 생성 스킵: openingTypeRange 미설정 또는 데이터 없음', {
-              supportRangesLength: supportRanges.length,
-              supportModelDataLength: supportModelData.length,
-              supportOpeningTypeDataLength: supportOpeningTypeData.length,
-              openingTypeRange존재: !!openingTypeRange
-            });
-          }
+        } catch (err) {
+          console.warn(`[Direct] 지원금 범위 batchGet 실패:`, err);
+          // 실패 시 빈 객체로 초기화
+          Object.keys(planGroupRanges).forEach(planGroup => {
+            if (!planGroupSupportData[planGroup]) {
+              planGroupSupportData[planGroup] = {};
+            }
+          });
+        }
+
+        // supportRanges 처리 블록 종료
+        // (planGroupSupportData 캐시 저장은 범위 처리 후 실행)
         }
         
-        // planGroupSupportData 캐시는 완성된 경우에만 저장
+        // planGroupSupportData는 완성된 경우에만 캐시 저장
         if (supportMapBuilt) {
-        
-        // planGroupSupportData를 캐시에 저장 (5분 TTL)
-        setCache(planGroupSupportDataCacheKey, planGroupSupportData, 5 * 60 * 1000);
-        console.log(`[Direct] planGroupSupportData 캐시 저장 완료:`, {
-          캐시키: planGroupSupportDataCacheKey,
-          요금제군목록: Object.keys(planGroupSupportData),
-          총요금제군수: Object.keys(planGroupSupportData).length
-        });
+          setCache(planGroupSupportDataCacheKey, planGroupSupportData, 5 * 60 * 1000);
+          console.log(`[Direct] planGroupSupportData 캐시 저장 완료:`, {
+            캐시키: planGroupSupportDataCacheKey,
+            요금제군목록: Object.keys(planGroupSupportData),
+            총요금제군수: Object.keys(planGroupSupportData).length
+          });
         } else {
           // 미생성 시 기존 캐시 삭제하여 폴백 강제
           deleteCache(planGroupSupportDataCacheKey);
+          console.warn('[Direct] planGroupSupportData 캐시 저장 생략 (supportMapBuilt=false)');
         }
       } else {
         console.log(`[Direct] planGroupSupportData 캐시에서 로드:`, {
@@ -3323,6 +3315,94 @@ function setupDirectRoutes(app) {
               찾은키: foundKey,
               publicSupport
             });
+            // 캐시 값이 0이면 폴백 시트 조회를 한 번 더 시도 (잘못된 캐시 값 방지)
+            if (publicSupport === 0 && supportRange && modelRange && supportSheetId) {
+              try {
+                const [supportModelDataFB, supportValuesFB, supportOpeningTypeDataFB] = await Promise.all([
+                  getSheetData(supportSheetId, modelRange),
+                  getSheetData(supportSheetId, supportRange),
+                  openingTypeRange ? getSheetData(supportSheetId, openingTypeRange) : Promise.resolve([])
+                ]);
+                const fallbackSupport = (() => {
+                  if (openingTypeRange && supportOpeningTypeDataFB.length > 0) {
+                    // 범위 기반 키 생성 재시도
+                    let startRowFB = 0;
+                    let rangeWithoutSheetFB = supportRange;
+                    const sheetMatchFB = supportRange.match(/^'[^']+'!/);
+                    if (sheetMatchFB) {
+                      rangeWithoutSheetFB = supportRange.replace(/^'[^']+'!/, '');
+                    }
+                    const rangeMatchFB = rangeWithoutSheetFB.match(/[A-Z]+(\d+)/);
+                    if (rangeMatchFB) {
+                      startRowFB = parseInt(rangeMatchFB[1], 10) - 1;
+                    }
+                    const supportMapFB = {};
+                    const maxRowsFB = Math.min(
+                      supportModelDataFB.length - startRowFB,
+                      supportOpeningTypeDataFB.length - startRowFB,
+                      supportValuesFB.length
+                    );
+                    for (let j = 0; j < maxRowsFB; j++) {
+                      const modelIndexFB = startRowFB + j;
+                      const modelFB = (supportModelDataFB[modelIndexFB]?.[0] || '').toString().trim();
+                      if (!modelFB) continue;
+                      const openingTypeRawFB = (supportOpeningTypeDataFB[modelIndexFB]?.[0] || '').toString().trim();
+                      const openingTypesFB = parseOpeningTypes(openingTypeRawFB);
+                      const supportValueFB = Number((supportValuesFB[j]?.[0] || 0).toString().replace(/,/g, '')) || 0;
+                      const hyphenVariantsFB = generateHyphenVariants(modelFB);
+                      const normalizedModelFB = normalizeModelCode(modelFB);
+                      const addKeys = (ot) => {
+                        const variants = [modelFB, ...hyphenVariantsFB, normalizedModelFB].filter(Boolean);
+                        variants.forEach(v => {
+                          supportMapFB[`${v}|${ot}`] = supportValueFB;
+                          supportMapFB[`${v.toLowerCase()}|${ot}`] = supportValueFB;
+                          supportMapFB[`${v.toUpperCase()}|${ot}`] = supportValueFB;
+                        });
+                      };
+                      if (openingTypeRawFB === '전유형' || openingTypesFB.includes('전유형')) {
+                        ['010신규', 'MNP', '기변'].forEach(addKeys);
+                      } else {
+                        openingTypesFB.forEach(addKeys);
+                        if (openingTypeRawFB === '번호이동' || openingTypesFB.includes('번호이동')) addKeys('MNP');
+                        if (openingTypeRawFB === '010신규/기변' ||
+                            (openingTypesFB.includes('010신규') && openingTypesFB.includes('기변'))) {
+                          addKeys('010신규'); addKeys('기변');
+                        }
+                      }
+                    }
+                    const fbKeys = supportKeys;
+                    for (const k of fbKeys) {
+                      if (supportMapFB[k] !== undefined) return Number(supportMapFB[k]) || 0;
+                    }
+                    return 0;
+                  } else {
+                    // openingTypeRange 없으면 인덱스 기반
+                    const idx = supportModelDataFB.findIndex(row => {
+                      const target = (row[0] || '').toString().trim();
+                      if (!target) return false;
+                      if (target === policyModel) return true;
+                      const normalized = normalizeModelCode(target);
+                      return normalized && normalized === policyModelNormalized;
+                    });
+                    if (idx >= 0) {
+                      return Number(supportValuesFB[idx]?.[0] || 0);
+                    }
+                    return 0;
+                  }
+                })();
+                if (fallbackSupport > 0) {
+                  publicSupport = fallbackSupport;
+                  console.log('[Direct] /calculate 캐시 0원 폴백 성공:', {
+                    modelId,
+                    planGroup,
+                    openingType,
+                    fallbackSupport
+                  });
+                }
+              } catch (fbErr) {
+                console.warn('[Direct] /calculate 캐시 0원 폴백 실패:', fbErr);
+              }
+            }
           } else {
             console.warn(`[Direct] /calculate 이통사지원금 매칭 실패 (캐시 사용):`, {
               modelId,
@@ -3812,4 +3892,3 @@ function setupDirectRoutes(app) {
 module.exports = setupDirectRoutes;
 module.exports.invalidateDirectStoreCache = invalidateDirectStoreCache;
 module.exports.deleteCache = deleteCache;
-
