@@ -1395,6 +1395,14 @@ function setupDirectRoutes(app) {
       let planGroupSupportModelData = [];
       let planGroupSupportOpeningTypeData = [];
       
+      console.log(`[Direct] planGroupSupportData 생성 준비:`, {
+        supportModelRange: supportModelRange || '(없음)',
+        openingTypeRange: openingTypeRange || '(없음)',
+        supportRanges길이: supportRanges.length,
+        planGroupRanges키목록: Object.keys(planGroupRanges),
+        planGroupRanges값목록: Object.values(planGroupRanges)
+      });
+      
       if (supportModelRange && openingTypeRange && supportRanges.length > 0) {
         try {
           [planGroupSupportModelData, planGroupSupportOpeningTypeData] = await Promise.all([
@@ -1411,9 +1419,22 @@ function setupDirectRoutes(app) {
               valueRenderOption: 'UNFORMATTED_VALUE'
             }).then(r => r.data.values || []).catch(() => []) : Promise.resolve([])
           ]);
+          
+          console.log(`[Direct] planGroupSupportData 생성을 위한 데이터 읽기 완료:`, {
+            planGroupSupportModelData길이: planGroupSupportModelData.length,
+            planGroupSupportOpeningTypeData길이: planGroupSupportOpeningTypeData.length,
+            planGroupSupportModelData샘플: planGroupSupportModelData.slice(0, 5).map(r => r[0]),
+            planGroupSupportOpeningTypeData샘플: planGroupSupportOpeningTypeData.slice(0, 5).map(r => r[0])
+          });
         } catch (err) {
           console.warn('[Direct] planGroupSupportData 생성을 위한 모델명/개통유형 데이터 읽기 실패:', err);
         }
+      } else {
+        console.warn(`[Direct] planGroupSupportData 생성 조건 불만족:`, {
+          supportModelRange존재: !!supportModelRange,
+          openingTypeRange존재: !!openingTypeRange,
+          supportRanges길이: supportRanges.length
+        });
       }
       
       if (supportRanges.length > 0) {
