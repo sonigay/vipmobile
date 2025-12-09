@@ -1390,6 +1390,32 @@ function setupDirectRoutes(app) {
         }
       }
       
+      // planGroupSupportData 생성을 위해 supportModelData와 supportOpeningTypeData 필요
+      // supportSheetData 생성 시 이미 가져왔지만, 스코프가 다르므로 다시 가져오기
+      let planGroupSupportModelData = [];
+      let planGroupSupportOpeningTypeData = [];
+      
+      if (supportModelRange && openingTypeRange && supportRanges.length > 0) {
+        try {
+          [planGroupSupportModelData, planGroupSupportOpeningTypeData] = await Promise.all([
+            sheets.spreadsheets.values.get({
+              spreadsheetId: supportSheetId,
+              range: supportModelRange,
+              majorDimension: 'ROWS',
+              valueRenderOption: 'UNFORMATTED_VALUE'
+            }).then(r => r.data.values || []).catch(() => []),
+            openingTypeRange ? sheets.spreadsheets.values.get({
+              spreadsheetId: supportSheetId,
+              range: openingTypeRange,
+              majorDimension: 'ROWS',
+              valueRenderOption: 'UNFORMATTED_VALUE'
+            }).then(r => r.data.values || []).catch(() => []) : Promise.resolve([])
+          ]);
+        } catch (err) {
+          console.warn('[Direct] planGroupSupportData 생성을 위한 모델명/개통유형 데이터 읽기 실패:', err);
+        }
+      }
+      
       if (supportRanges.length > 0) {
         try {
           const response = await sheets.spreadsheets.values.batchGet({
@@ -1422,7 +1448,7 @@ function setupDirectRoutes(app) {
             if (rangeMatch) {
               const rowNumber = parseInt(rangeMatch[1], 10);
               // Google Sheets는 1-based이지만 배열은 0-based이므로 -1
-              // 하지만 supportModelData는 이미 헤더를 제외한 데이터이므로 추가 조정 필요
+              // 하지만 planGroupSupportModelData는 이미 헤더를 제외한 데이터이므로 추가 조정 필요
               // 실제로는 범위가 F9:F97이면 9행부터 시작하는 것이 맞음
               startRow = rowNumber - 1; // 0-based index로 변환
             }
@@ -1433,27 +1459,27 @@ function setupDirectRoutes(app) {
               시트제거후: rangeWithoutSheet,
               추출된행번호: rangeMatch ? parseInt(rangeMatch[1], 10) : null,
               계산된startRow: startRow,
-              supportModelData길이: supportModelData.length,
-              supportOpeningTypeData길이: supportOpeningTypeData.length,
+              planGroupSupportModelData길이: planGroupSupportModelData.length,
+              planGroupSupportOpeningTypeData길이: planGroupSupportOpeningTypeData.length,
               supportValues길이: supportValues.length
             });
             
             // 모델명+개통유형 복합키 맵으로 변환
-            // supportModelData와 supportOpeningTypeData의 해당 범위만 사용
+            // planGroupSupportModelData와 planGroupSupportOpeningTypeData의 해당 범위만 사용
             const supportMap = {};
             const maxRows = Math.min(
-              supportModelData.length - startRow,
-              supportOpeningTypeData.length - startRow,
+              planGroupSupportModelData.length - startRow,
+              planGroupSupportOpeningTypeData.length - startRow,
               supportValues.length
             );
             
             for (let j = 0; j < maxRows; j++) {
               // 전체 시트의 startRow+j 인덱스 사용
               const modelIndex = startRow + j;
-              const model = (supportModelData[modelIndex]?.[0] || '').toString().trim();
+              const model = (planGroupSupportModelData[modelIndex]?.[0] || '').toString().trim();
               if (!model) continue;
               
-              const openingTypeRaw = (supportOpeningTypeData[modelIndex]?.[0] || '').toString().trim();
+              const openingTypeRaw = (planGroupSupportOpeningTypeData[modelIndex]?.[0] || '').toString().trim();
               const openingTypes = parseOpeningTypes(openingTypeRaw);
               const supportValue = Number((supportValues[j]?.[0] || 0).toString().replace(/,/g, '')) || 0;
               
