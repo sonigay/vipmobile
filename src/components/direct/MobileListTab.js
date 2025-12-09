@@ -134,7 +134,7 @@ const MobileListTab = ({ onProductSelect }) => {
       const carrier = getCurrentCarrier();
       const newPlanGroups = { ...selectedPlanGroups };
       const newOpeningTypes = { ...selectedOpeningTypes };
-      const pricePromises = [];
+      const calculationQueue = [];
 
       // 모든 모델에 대해 기본값 설정 및 가격 계산 준비
       const cacheEntries = [];
@@ -148,7 +148,11 @@ const MobileListTab = ({ onProductSelect }) => {
           if (existingPlanGroup && existingOpeningType && planGroups.includes(existingPlanGroup)) {
             const cached = getCachedPrice(model.id, existingPlanGroup, existingOpeningType, carrier);
             if (!cached) {
-              pricePromises.push(calculatePrice(model.id, existingPlanGroup, existingOpeningType, true));
+              calculationQueue.push({
+                modelId: model.id,
+                planGroup: existingPlanGroup,
+                openingType: existingOpeningType
+              });
             }
           }
           continue;
@@ -185,8 +189,12 @@ const MobileListTab = ({ onProductSelect }) => {
                   : item
               ));
             } else {
-              // 캐시에 없으면 API 호출
-              pricePromises.push(calculatePrice(model.id, existingPlanGroup, existingOpeningType, true));
+              // 캐시에 없으면 계산 대기열에 추가
+              calculationQueue.push({
+                modelId: model.id,
+                planGroup: existingPlanGroup,
+                openingType: existingOpeningType
+              });
             }
           }
           continue;
@@ -251,8 +259,12 @@ const MobileListTab = ({ onProductSelect }) => {
               : item
           ));
         } else {
-          // 캐시에 없으면 가격 계산을 Promise 배열에 추가 (병렬 처리)
-          pricePromises.push(calculatePrice(model.id, finalPlanGroup, defaultOpeningType, true));
+          // 캐시에 없으면 계산 대기열에 추가 (실행은 나중에 배치 처리)
+          calculationQueue.push({
+            modelId: model.id,
+            planGroup: finalPlanGroup,
+            openingType: defaultOpeningType
+          });
         }
       }
 
@@ -260,9 +272,25 @@ const MobileListTab = ({ onProductSelect }) => {
       setSelectedPlanGroups(newPlanGroups);
       setSelectedOpeningTypes(newOpeningTypes);
 
-      // 모든 가격 계산을 병렬로 실행
-      if (pricePromises.length > 0) {
-        await Promise.allSettled(pricePromises);
+      // 가격 계산 배치 처리 (API 과부하 방지)
+      if (calculationQueue.length > 0) {
+        const BATCH_SIZE = 5; // 동시 실행 수 제한
+        const DELAY_MS = 200; // 배치 간 지연 시간
+
+        for (let i = 0; i < calculationQueue.length; i += BATCH_SIZE) {
+          const batch = calculationQueue.slice(i, i + BATCH_SIZE);
+
+          // 배치 실행
+          await Promise.allSettled(batch.map(item =>
+            calculatePrice(item.modelId, item.planGroup, item.openingType, true)
+          ));
+
+          // 마지막 배치가 아니면 지연
+          if (i + BATCH_SIZE < calculationQueue.length) {
+            await new Promise(resolve => setTimeout(resolve, DELAY_MS));
+          }
+        }
+
         setSteps(prev => ({
           ...prev,
           pricing: { ...prev.pricing, status: 'success', message: '' }

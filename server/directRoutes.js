@@ -3197,7 +3197,7 @@ function setupDirectRoutes(app) {
               publicSupport
             });
             // 캐시 값이 0이면 폴백 시트 조회를 한 번 더 시도 (잘못된 캐시 값 방지)
-            if (publicSupport === 0 && supportRange && modelRange && supportSheetId) {
+            if (false && publicSupport === 0 && supportRange && modelRange && supportSheetId) {
               try {
                 const [supportModelDataFB, supportValuesFB, supportOpeningTypeDataFB] = await Promise.all([
                   getSheetData(supportSheetId, modelRange),
