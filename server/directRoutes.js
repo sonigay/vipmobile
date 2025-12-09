@@ -690,17 +690,8 @@ function setupDirectRoutes(app) {
   router.get('/link-settings', async (req, res) => {
     try {
       const carrier = req.query.carrier || 'SK';
-      const { sheets, SPREADSHEET_ID } = createSheetsClient();
-
-      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_SETTINGS, HEADERS_SETTINGS);
-      const settingsRes = await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: SHEET_SETTINGS
-      });
-      const settingsRows = (settingsRes.data.values || []).slice(1);
-
-      // 통신사별 설정 필터링
-      const carrierSettings = settingsRows.filter(row => (row[0] || '').trim() === carrier);
+      // 캐시된 링크 설정 사용 (중복 호출 및 rate limit 감소)
+      const carrierSettings = await getLinkSettings(carrier);
 
       // 설정 유형별로 그룹화
       const planGroupRow = carrierSettings.find(row => (row[1] || '').trim() === 'planGroup');
