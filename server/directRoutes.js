@@ -3518,12 +3518,6 @@ function setupDirectRoutes(app) {
                 }
               }
 
-              // 아래 코드는 이제 사용하지 않음 (위의 addKeys 함수로 통합)
-              if (false) {
-                  // "010신규/기변" → 010신규와 기변 매핑 (이미 위의 addKeys로 처리됨)
-                }
-              }
-
               // 모델명+개통유형 복합키로 직접 조회 (getMobileList와 동일)
               const supportKeys = [
                 `${policyModel}|${openingType}`,
