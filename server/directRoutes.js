@@ -1381,39 +1381,44 @@ function setupDirectRoutes(app) {
       // policyRow, policySettingsJson, policySheetId는 이미 선언됨
 
       // 4. 요금제군별 이통사지원금 범위 읽기 (모델명+개통유형 복합키 맵으로 저장)
-      const planGroupSupportData = {}; // { '115군': { 'UIP17PR-256|MNP': 550000, ... } }
-      const supportRanges = [];
-      const supportRangeMap = {}; // range -> planGroup 매핑
+      // planGroupSupportData를 캐시하여 /calculate 엔드포인트에서도 재사용
+      const planGroupSupportDataCacheKey = `planGroupSupportData-${carrierParam}`;
+      let planGroupSupportData = getCache(planGroupSupportDataCacheKey);
       
-      for (const [planGroup, range] of Object.entries(planGroupRanges)) {
-        if (range) {
-          supportRanges.push(range);
-          supportRangeMap[range] = planGroup;
-        } else {
-          planGroupSupportData[planGroup] = {};
+      if (!planGroupSupportData) {
+        planGroupSupportData = {}; // { '115군': { 'UIP17PR-256|MNP': 550000, ... } }
+        const supportRanges = [];
+        const supportRangeMap = {}; // range -> planGroup 매핑
+        
+        for (const [planGroup, range] of Object.entries(planGroupRanges)) {
+          if (range) {
+            supportRanges.push(range);
+            supportRangeMap[range] = planGroup;
+          } else {
+            planGroupSupportData[planGroup] = {};
+          }
         }
-      }
-      
-      // planGroupSupportData 생성을 위해 supportModelData와 supportOpeningTypeData 재사용
-      // supportSheetData 생성 시 이미 가져왔으므로 재사용 (API 호출 절약)
-      console.log(`[Direct] planGroupSupportData 생성 준비:`, {
-        supportModelRange: supportModelRange || '(없음)',
-        openingTypeRange: openingTypeRange || '(없음)',
-        supportRanges길이: supportRanges.length,
-        planGroupRanges키목록: Object.keys(planGroupRanges),
-        planGroupRanges값목록: Object.values(planGroupRanges),
-        supportModelData길이: supportModelData.length,
-        supportOpeningTypeData길이: supportOpeningTypeData.length
-      });
-      
-      if (supportRanges.length > 0) {
-        try {
-          const response = await sheets.spreadsheets.values.batchGet({
-            spreadsheetId: supportSheetId,
-            ranges: supportRanges,
-            majorDimension: 'ROWS',
-            valueRenderOption: 'UNFORMATTED_VALUE'
-          });
+        
+        // planGroupSupportData 생성을 위해 supportModelData와 supportOpeningTypeData 재사용
+        // supportSheetData 생성 시 이미 가져왔으므로 재사용 (API 호출 절약)
+        console.log(`[Direct] planGroupSupportData 생성 준비:`, {
+          supportModelRange: supportModelRange || '(없음)',
+          openingTypeRange: openingTypeRange || '(없음)',
+          supportRanges길이: supportRanges.length,
+          planGroupRanges키목록: Object.keys(planGroupRanges),
+          planGroupRanges값목록: Object.values(planGroupRanges),
+          supportModelData길이: supportModelData.length,
+          supportOpeningTypeData길이: supportOpeningTypeData.length
+        });
+        
+        if (supportRanges.length > 0 && supportModelData.length > 0 && supportOpeningTypeData.length > 0) {
+          try {
+            const response = await sheets.spreadsheets.values.batchGet({
+              spreadsheetId: supportSheetId,
+              ranges: supportRanges,
+              majorDimension: 'ROWS',
+              valueRenderOption: 'UNFORMATTED_VALUE'
+            });
           
           response.data.valueRanges.forEach((valueRange, index) => {
             const range = supportRanges[index];
@@ -1664,6 +1669,24 @@ function setupDirectRoutes(app) {
             }
           });
         }
+
+        // supportRanges 처리 블록 종료
+        // (planGroupSupportData 캐시 저장은 범위 처리 후 실행)
+        }
+        
+        // planGroupSupportData를 캐시에 저장 (5분 TTL)
+        setCache(planGroupSupportDataCacheKey, planGroupSupportData, 5 * 60 * 1000);
+        console.log(`[Direct] planGroupSupportData 캐시 저장 완료:`, {
+          캐시키: planGroupSupportDataCacheKey,
+          요금제군목록: Object.keys(planGroupSupportData),
+          총요금제군수: Object.keys(planGroupSupportData).length
+        });
+      } else {
+        console.log(`[Direct] planGroupSupportData 캐시에서 로드:`, {
+          캐시키: planGroupSupportDataCacheKey,
+          요금제군목록: Object.keys(planGroupSupportData),
+          총요금제군수: Object.keys(planGroupSupportData).length
+        });
       }
 
       // 5. 정책표 설정에서 요금제군 & 유형별 리베이트 읽기 (모델명 기준 매핑)
@@ -3179,7 +3202,124 @@ function setupDirectRoutes(app) {
         const modelRange = supportSettingsJson.modelRange || '';
         const openingTypeRange = supportSettingsJson.openingTypeRange || '';
         
-        if (supportRange && modelRange && supportSheetId) {
+        // planGroupSupportData를 캐시에서 가져오기 (getMobileList에서 생성한 것 재사용)
+        const planGroupSupportDataCacheKey = `planGroupSupportData-${carrier}`;
+        const planGroupSupportData = getCache(planGroupSupportDataCacheKey);
+        
+        if (planGroupSupportData && planGroupSupportData[planGroup]) {
+          // 캐시에서 planGroupSupportData를 찾았으면 직접 사용 (API 호출 없음)
+          const policyModel = (modelRow[0] || '').toString().trim();
+          const policyModelNormalized = normalizeModelCode(policyModel);
+          
+          // 시도할 키 목록: 원본 → 대소문자 변형 → 하이픈 변형 → 정규화
+          const supportKeys = [
+            `${policyModel}|${openingType}`,
+            `${policyModel.toLowerCase()}|${openingType}`,
+            `${policyModel.toUpperCase()}|${openingType}`
+          ];
+          
+          // 하이픈 변형 추가
+          const hyphenVariants = generateHyphenVariants(policyModel);
+          hyphenVariants.forEach(variant => {
+            if (variant !== policyModel) {
+              supportKeys.push(
+                `${variant}|${openingType}`,
+                `${variant.toLowerCase()}|${openingType}`,
+                `${variant.toUpperCase()}|${openingType}`
+              );
+            }
+          });
+          
+          if (policyModelNormalized) {
+            supportKeys.push(
+              `${policyModelNormalized}|${openingType}`,
+              `${policyModelNormalized.toLowerCase()}|${openingType}`,
+              `${policyModelNormalized.toUpperCase()}|${openingType}`
+            );
+          }
+          
+          // "번호이동" → MNP 매핑도 시도
+          if (openingType === 'MNP') {
+            supportKeys.push(
+              `${policyModel}|번호이동`,
+              `${policyModel.toLowerCase()}|번호이동`,
+              `${policyModel.toUpperCase()}|번호이동`
+            );
+            hyphenVariants.forEach(variant => {
+              if (variant !== policyModel) {
+                supportKeys.push(
+                  `${variant}|번호이동`,
+                  `${variant.toLowerCase()}|번호이동`,
+                  `${variant.toUpperCase()}|번호이동`
+                );
+              }
+            });
+            if (policyModelNormalized) {
+              supportKeys.push(
+                `${policyModelNormalized}|번호이동`,
+                `${policyModelNormalized.toLowerCase()}|번호이동`,
+                `${policyModelNormalized.toUpperCase()}|번호이동`
+              );
+            }
+          }
+          
+          // "010신규/기변" 매핑도 시도
+          if (openingType === '010신규' || openingType === '기변') {
+            supportKeys.push(
+              `${policyModel}|010신규/기변`,
+              `${policyModel.toLowerCase()}|010신규/기변`,
+              `${policyModel.toUpperCase()}|010신규/기변`
+            );
+            hyphenVariants.forEach(variant => {
+              if (variant !== policyModel) {
+                supportKeys.push(
+                  `${variant}|010신규/기변`,
+                  `${variant.toLowerCase()}|010신규/기변`,
+                  `${variant.toUpperCase()}|010신규/기변`
+                );
+              }
+            });
+            if (policyModelNormalized) {
+              supportKeys.push(
+                `${policyModelNormalized}|010신규/기변`,
+                `${policyModelNormalized.toLowerCase()}|010신규/기변`,
+                `${policyModelNormalized.toUpperCase()}|010신규/기변`
+              );
+            }
+          }
+          
+          // 키를 순서대로 시도하여 값 찾기
+          let foundKey = null;
+          for (const key of supportKeys) {
+            if (planGroupSupportData[planGroup][key] !== undefined) {
+              publicSupport = Number(planGroupSupportData[planGroup][key]) || 0;
+              foundKey = key;
+              break;
+            }
+          }
+          
+          if (foundKey) {
+            console.log(`[Direct] /calculate 이통사지원금 매칭 성공 (캐시 사용):`, {
+              modelId,
+              policyModel: (modelRow[0] || '').toString().trim(),
+              planGroup,
+              openingType,
+              찾은키: foundKey,
+              publicSupport
+            });
+          } else {
+            console.warn(`[Direct] /calculate 이통사지원금 매칭 실패 (캐시 사용):`, {
+              modelId,
+              policyModel: (modelRow[0] || '').toString().trim(),
+              planGroup,
+              openingType,
+              시도한키: supportKeys.slice(0, 10),
+              맵크기: Object.keys(planGroupSupportData[planGroup] || {}).length,
+              맵키샘플: Object.keys(planGroupSupportData[planGroup] || {}).slice(0, 10)
+            });
+          }
+        } else if (supportRange && modelRange && supportSheetId) {
+          // 캐시에 없으면 기존 로직 사용 (폴백)
           try {
             // 이통사 지원금 데이터 가져오기 (캐시 사용)
             const [supportModelData, supportValues, supportOpeningTypeData] = await Promise.all([
@@ -3188,7 +3328,7 @@ function setupDirectRoutes(app) {
               openingTypeRange ? getSheetData(supportSheetId, openingTypeRange) : Promise.resolve([])
             ]);
             
-            console.log(`[Direct] /calculate 이통사지원금 조회:`, {
+            console.log(`[Direct] /calculate 이통사지원금 조회 (폴백):`, {
               modelId,
               policyModel: (modelRow[0] || '').toString().trim(),
               planGroup,
@@ -3462,8 +3602,18 @@ function setupDirectRoutes(app) {
               }
             }
           } catch (err) {
-            console.warn(`[Direct] ${planGroup} 이통사지원금 읽기 실패:`, err);
+            console.warn(`[Direct] ${planGroup} 이통사지원금 읽기 실패 (폴백):`, err);
           }
+        } else {
+          console.warn(`[Direct] /calculate planGroupSupportData 캐시 없음 및 폴백 조건 불만족:`, {
+            modelId,
+            planGroup,
+            캐시키: planGroupSupportDataCacheKey,
+            캐시존재: !!planGroupSupportData,
+            supportRange존재: !!supportRange,
+            modelRange존재: !!modelRange,
+            supportSheetId존재: !!supportSheetId
+          });
         }
       }
 
