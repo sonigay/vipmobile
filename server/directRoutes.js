@@ -1447,6 +1447,9 @@ function setupDirectRoutes(app) {
                 supportValues.length
               );
 
+              // 공백 행을 건너뛰기 위해 실제 데이터 행만 추적
+              let validRowIndex = 0; // supportValues의 실제 인덱스 (공백 행 제외)
+
               for (let j = 0; j < maxRows; j++) {
                 // 정확한 행 인덱스 계산
                 const modelIndex = startRow + j;
@@ -1454,70 +1457,89 @@ function setupDirectRoutes(app) {
                 // 모델명이 없는 공백 행은 철저히 무시 (데이터 밀림 방지)
                 const model = (supportModelData[modelIndex]?.[0] || '').toString().trim();
                 const openingTypeRaw = (supportOpeningTypeData[modelIndex]?.[0] || '').toString().trim();
-                const supportValueStr = (supportValues[j]?.[0] || 0).toString().replace(/,/g, '');
-                const supportValue = Number(supportValueStr) || 0;
-
+                
+                // 공백 행이면 건너뛰기 (supportValues 인덱스는 증가시키지 않음)
                 if (!model) continue;
+
+                // 공백 행이 아닌 경우에만 supportValues 인덱스 사용
+                const supportValueStr = (supportValues[validRowIndex]?.[0] || 0).toString().replace(/,/g, '');
+                const supportValue = Number(supportValueStr) || 0;
+                validRowIndex++; // 다음 유효한 행으로 이동
 
                 const normalizedModel = normalizeModelCode(model);
                 const openingTypes = parseOpeningTypes(openingTypeRaw);
+
+                // 하이픈 변형 생성 (조회 시와 동일한 로직)
+                const hyphenVariants = generateHyphenVariants(model);
+
+                // 디버깅: 특정 모델의 원본 데이터 확인
+                if (model.includes('UIP17') || model.includes('SM-S93') || model.includes('SM-S926')) {
+                  console.log(`[Direct] Sheet Raw Data:`, {
+                    model,
+                    openingTypeRaw,
+                    supportValue,
+                    normalizedModel,
+                    openingTypes,
+                    hyphenVariants
+                  });
+                }
+
+                // 키 생성 헬퍼 함수 (모든 변형 생성)
+                const addKeys = (openingType) => {
+                  // 원본 모델명 변형
+                  supportMap[`${model}|${openingType}`] = supportValue;
+                  supportMap[`${model.toLowerCase()}|${openingType}`] = supportValue;
+                  supportMap[`${model.toUpperCase()}|${openingType}`] = supportValue;
+
+                  // 하이픈 변형
+                  hyphenVariants.forEach(variant => {
+                    if (variant && variant !== model) {
+                      supportMap[`${variant}|${openingType}`] = supportValue;
+                      supportMap[`${variant.toLowerCase()}|${openingType}`] = supportValue;
+                      supportMap[`${variant.toUpperCase()}|${openingType}`] = supportValue;
+                    }
+                  });
+
+                  // 정규화된 모델명 변형 (대소문자 포함)
+                  if (normalizedModel) {
+                    supportMap[`${normalizedModel}|${openingType}`] = supportValue;
+                    supportMap[`${normalizedModel.toLowerCase()}|${openingType}`] = supportValue;
+                    supportMap[`${normalizedModel.toUpperCase()}|${openingType}`] = supportValue;
+                  }
+                };
 
                 // 매핑 타겟 설정
                 // 1. 전유형 처리
                 if (openingTypeRaw === '전유형' || openingTypes.includes('전유형')) {
                   // 전유형인 경우 모든 유형에 매핑
                   const allTargets = ['010신규', '기변', 'MNP', '번호이동', '010신규/기변'];
-                  allTargets.forEach(ot => {
-                    // 기본 키
-                    supportMap[`${model}|${ot}`] = supportValue;
-                    // 대소문자
-                    supportMap[`${model.toLowerCase()}|${ot}`] = supportValue;
-                    supportMap[`${model.toUpperCase()}|${ot}`] = supportValue;
-                    // 정규화 키 (용량/하이픈 처리됨)
-                    if (normalizedModel) {
-                      supportMap[`${normalizedModel}|${ot}`] = supportValue;
-                    }
-                  });
+                  allTargets.forEach(ot => addKeys(ot));
                 } else {
                   // 2. 개별 유형 처리
 
                   // (A) 기본 파싱된 유형들 매핑 (010신규, MNP, 기변)
-                  openingTypes.forEach(ot => {
-                    supportMap[`${model}|${ot}`] = supportValue;
-                    supportMap[`${model.toLowerCase()}|${ot}`] = supportValue;
-                    supportMap[`${model.toUpperCase()}|${ot}`] = supportValue;
-                    if (normalizedModel) {
-                      supportMap[`${normalizedModel}|${ot}`] = supportValue;
-                    }
-                  });
+                  openingTypes.forEach(ot => addKeys(ot));
 
                   // (B) "MNP" <-> "번호이동" 상호 매핑
                   if (openingTypes.includes('MNP') || openingTypeRaw.includes('번호이동')) {
                     const mnpTargets = ['MNP', '번호이동'];
-                    mnpTargets.forEach(ot => {
-                      supportMap[`${model}|${ot}`] = supportValue;
-                      supportMap[`${model.toLowerCase()}|${ot}`] = supportValue;
-                      supportMap[`${model.toUpperCase()}|${ot}`] = supportValue;
-                      if (normalizedModel) {
-                        supportMap[`${normalizedModel}|${ot}`] = supportValue;
-                      }
-                    });
+                    mnpTargets.forEach(ot => addKeys(ot));
                   }
 
                   // (C) "010신규" / "기변" <-> "010신규/기변" 상호 매핑
                   // "010신규/기변" Row는 010신규, 기변, 010신규/기변 키 모두에 매핑되어야 함
                   if (openingTypeRaw.includes('010신규/기변') ||
                     (openingTypes.includes('010신규') && openingTypes.includes('기변'))) {
-
                     const newChangeTargets = ['010신규', '기변', '010신규/기변'];
-                    newChangeTargets.forEach(ot => {
-                      supportMap[`${model}|${ot}`] = supportValue;
-                      supportMap[`${model.toLowerCase()}|${ot}`] = supportValue;
-                      supportMap[`${model.toUpperCase()}|${ot}`] = supportValue;
-                      if (normalizedModel) {
-                        supportMap[`${normalizedModel}|${ot}`] = supportValue;
-                      }
-                    });
+                    newChangeTargets.forEach(ot => addKeys(ot));
+                  }
+
+                  // (D) 개별 유형이 "010신규" 또는 "기변"인 경우 "010신규/기변"에도 매핑
+                  if (openingTypes.includes('010신규') && !openingTypes.includes('기변')) {
+                    addKeys('010신규/기변');
+                  }
+                  if (openingTypes.includes('기변') && !openingTypes.includes('010신규')) {
+                    addKeys('010신규/기변');
                   }
                 }
               }
@@ -2352,22 +2374,38 @@ function setupDirectRoutes(app) {
 
           if (shouldLog) {
             if (!foundKey) {
+              const mapKeys = Object.keys(planGroupSupportData[selectedPlanGroup] || {});
+              const relatedKeys = mapKeys.filter(k => {
+                const keyModel = k.split('|')[0];
+                return keyModel === model || 
+                       keyModel === model.toLowerCase() || 
+                       keyModel === model.toUpperCase() ||
+                       (normalizedModel && (keyModel === normalizedModel || keyModel === normalizedModel.toLowerCase() || keyModel === normalizedModel.toUpperCase()));
+              });
+              
               console.warn(`[Direct] ⚠️ planGroupSupportData에서 키를 찾을 수 없음:`, {
                 모델명: model,
+                정규화된모델명: normalizedModel,
                 요금제군: selectedPlanGroup,
                 개통유형: supportOpeningType,
-                시도한키: supportKeys.slice(0, 10),
-                맵에있는키수: Object.keys(planGroupSupportData[selectedPlanGroup] || {}).length,
-                맵에있는키샘플: Object.keys(planGroupSupportData[selectedPlanGroup] || {}).slice(0, 10),
-                맵에있는키전체: Object.keys(planGroupSupportData[selectedPlanGroup] || {}).filter(k => k.includes(model) || (normalizedModel && k.includes(normalizedModel)))
+                시도한키전체: supportKeys,
+                시도한키수: supportKeys.length,
+                맵에있는키수: mapKeys.length,
+                맵에있는키샘플: mapKeys.slice(0, 20),
+                관련키목록: relatedKeys,
+                관련키수: relatedKeys.length,
+                맵에있는개통유형목록: [...new Set(mapKeys.map(k => k.split('|')[1]))].slice(0, 10),
+                planGroupSupportData존재: !!planGroupSupportData[selectedPlanGroup]
               });
             } else {
               console.log(`[Direct] ✅ planGroupSupportData에서 값 찾음:`, {
                 모델명: model,
+                정규화된모델명: normalizedModel,
                 요금제군: selectedPlanGroup,
                 개통유형: supportOpeningType,
                 찾은키: foundKey,
-                이통사지원금: publicSupport
+                이통사지원금: publicSupport,
+                시도한키순서: supportKeys.indexOf(foundKey) + 1
               });
             }
           }
@@ -3223,31 +3261,72 @@ function setupDirectRoutes(app) {
                       supportOpeningTypeDataFB.length - startRowFB,
                       supportValuesFB.length
                     );
+                    // 공백 행을 건너뛰기 위해 실제 데이터 행만 추적
+                    let validRowIndexFB = 0; // supportValuesFB의 실제 인덱스 (공백 행 제외)
+
                     for (let j = 0; j < maxRowsFB; j++) {
                       const modelIndexFB = startRowFB + j;
                       const modelFB = (supportModelDataFB[modelIndexFB]?.[0] || '').toString().trim();
+                      
+                      // 공백 행이면 건너뛰기 (supportValuesFB 인덱스는 증가시키지 않음)
                       if (!modelFB) continue;
+
+                      // 공백 행이 아닌 경우에만 supportValuesFB 인덱스 사용
+                      const supportValueStrFB = (supportValuesFB[validRowIndexFB]?.[0] || 0).toString().replace(/,/g, '');
+                      const supportValueFB = Number(supportValueStrFB) || 0;
+                      validRowIndexFB++; // 다음 유효한 행으로 이동
+
                       const openingTypeRawFB = (supportOpeningTypeDataFB[modelIndexFB]?.[0] || '').toString().trim();
                       const openingTypesFB = parseOpeningTypes(openingTypeRawFB);
-                      const supportValueFB = Number((supportValuesFB[j]?.[0] || 0).toString().replace(/,/g, '')) || 0;
                       const hyphenVariantsFB = generateHyphenVariants(modelFB);
                       const normalizedModelFB = normalizeModelCode(modelFB);
+                      
                       const addKeys = (ot) => {
-                        const variants = [modelFB, ...hyphenVariantsFB, normalizedModelFB].filter(Boolean);
-                        variants.forEach(v => {
-                          supportMapFB[`${v}|${ot}`] = supportValueFB;
-                          supportMapFB[`${v.toLowerCase()}|${ot}`] = supportValueFB;
-                          supportMapFB[`${v.toUpperCase()}|${ot}`] = supportValueFB;
+                        // 원본 모델명 변형
+                        supportMapFB[`${modelFB}|${ot}`] = supportValueFB;
+                        supportMapFB[`${modelFB.toLowerCase()}|${ot}`] = supportValueFB;
+                        supportMapFB[`${modelFB.toUpperCase()}|${ot}`] = supportValueFB;
+
+                        // 하이픈 변형
+                        hyphenVariantsFB.forEach(variant => {
+                          if (variant && variant !== modelFB) {
+                            supportMapFB[`${variant}|${ot}`] = supportValueFB;
+                            supportMapFB[`${variant.toLowerCase()}|${ot}`] = supportValueFB;
+                            supportMapFB[`${variant.toUpperCase()}|${ot}`] = supportValueFB;
+                          }
                         });
+
+                        // 정규화된 모델명 변형 (대소문자 포함)
+                        if (normalizedModelFB) {
+                          supportMapFB[`${normalizedModelFB}|${ot}`] = supportValueFB;
+                          supportMapFB[`${normalizedModelFB.toLowerCase()}|${ot}`] = supportValueFB;
+                          supportMapFB[`${normalizedModelFB.toUpperCase()}|${ot}`] = supportValueFB;
+                        }
                       };
+                      
                       if (openingTypeRawFB === '전유형' || openingTypesFB.includes('전유형')) {
-                        ['010신규', 'MNP', '기변'].forEach(addKeys);
+                        ['010신규', '기변', 'MNP', '번호이동', '010신규/기변'].forEach(addKeys);
                       } else {
+                        // 기본 파싱된 유형들 매핑
                         openingTypesFB.forEach(addKeys);
-                        if (openingTypeRawFB === '번호이동' || openingTypesFB.includes('번호이동')) addKeys('MNP');
+                        
+                        // "MNP" <-> "번호이동" 상호 매핑
+                        if (openingTypesFB.includes('MNP') || openingTypeRawFB.includes('번호이동')) {
+                          ['MNP', '번호이동'].forEach(addKeys);
+                        }
+                        
+                        // "010신규/기변" 매핑
                         if (openingTypeRawFB === '010신규/기변' ||
                           (openingTypesFB.includes('010신규') && openingTypesFB.includes('기변'))) {
-                          addKeys('010신규'); addKeys('기변');
+                          ['010신규', '기변', '010신규/기변'].forEach(addKeys);
+                        }
+                        
+                        // 개별 유형이 "010신규" 또는 "기변"인 경우 "010신규/기변"에도 매핑
+                        if (openingTypesFB.includes('010신규') && !openingTypesFB.includes('기변')) {
+                          addKeys('010신규/기변');
+                        }
+                        if (openingTypesFB.includes('기변') && !openingTypesFB.includes('010신규')) {
+                          addKeys('010신규/기변');
                         }
                       }
                     }
@@ -3365,109 +3444,83 @@ function setupDirectRoutes(app) {
                 supportValues.length
               );
 
+              // 공백 행을 건너뛰기 위해 실제 데이터 행만 추적
+              let validRowIndex = 0; // supportValues의 실제 인덱스 (공백 행 제외)
+
               for (let j = 0; j < maxRows; j++) {
                 const modelIndex = startRow + j;
                 const model = (supportModelData[modelIndex]?.[0] || '').toString().trim();
+                
+                // 공백 행이면 건너뛰기 (supportValues 인덱스는 증가시키지 않음)
                 if (!model) continue;
+
+                // 공백 행이 아닌 경우에만 supportValues 인덱스 사용
+                const supportValueStr = (supportValues[validRowIndex]?.[0] || 0).toString().replace(/,/g, '');
+                const supportValue = Number(supportValueStr) || 0;
+                validRowIndex++; // 다음 유효한 행으로 이동
 
                 const openingTypeRaw = (supportOpeningTypeData[modelIndex]?.[0] || '').toString().trim();
                 const openingTypes = parseOpeningTypes(openingTypeRaw);
-                const supportValue = Number((supportValues[j]?.[0] || 0).toString().replace(/,/g, '')) || 0;
 
                 // 하이픈 변형 생성
                 const hyphenVariants = generateHyphenVariants(model);
                 const normalizedModel = normalizeModelCode(model);
 
+                // 키 생성 헬퍼 함수 (모든 변형 생성)
+                const addKeys = (openingType) => {
+                  // 원본 모델명 변형
+                  supportMap[`${model}|${openingType}`] = supportValue;
+                  supportMap[`${model.toLowerCase()}|${openingType}`] = supportValue;
+                  supportMap[`${model.toUpperCase()}|${openingType}`] = supportValue;
+
+                  // 하이픈 변형
+                  hyphenVariants.forEach(variant => {
+                    if (variant && variant !== model) {
+                      supportMap[`${variant}|${openingType}`] = supportValue;
+                      supportMap[`${variant.toLowerCase()}|${openingType}`] = supportValue;
+                      supportMap[`${variant.toUpperCase()}|${openingType}`] = supportValue;
+                    }
+                  });
+
+                  // 정규화된 모델명 변형 (대소문자 포함)
+                  if (normalizedModel) {
+                    supportMap[`${normalizedModel}|${openingType}`] = supportValue;
+                    supportMap[`${normalizedModel.toLowerCase()}|${openingType}`] = supportValue;
+                    supportMap[`${normalizedModel.toUpperCase()}|${openingType}`] = supportValue;
+                  }
+                };
+
                 // 각 개통유형에 대해 복합키 생성
                 if (openingTypeRaw === '전유형' || openingTypes.includes('전유형')) {
-                  ['010신규', 'MNP', '기변'].forEach(ot => {
-                    const key = `${model}|${ot}`;
-                    if (!supportMap[key]) supportMap[key] = supportValue;
-                    supportMap[`${model.toLowerCase()}|${ot}`] = supportValue;
-                    supportMap[`${model.toUpperCase()}|${ot}`] = supportValue;
-
-                    hyphenVariants.forEach(variant => {
-                      if (variant !== model) {
-                        const variantKey = `${variant}|${ot}`;
-                        if (!supportMap[variantKey]) supportMap[variantKey] = supportValue;
-                        supportMap[`${variant.toLowerCase()}|${ot}`] = supportValue;
-                        supportMap[`${variant.toUpperCase()}|${ot}`] = supportValue;
-                      }
-                    });
-
-                    if (normalizedModel) {
-                      const normalizedKey = `${normalizedModel}|${ot}`;
-                      if (!supportMap[normalizedKey]) supportMap[normalizedKey] = supportValue;
-                      supportMap[`${normalizedModel.toLowerCase()}|${ot}`] = supportValue;
-                      supportMap[`${normalizedModel.toUpperCase()}|${ot}`] = supportValue;
-                    }
-                  });
+                  ['010신규', '기변', 'MNP', '번호이동', '010신규/기변'].forEach(ot => addKeys(ot));
                 } else {
-                  openingTypes.forEach(ot => {
-                    const key = `${model}|${ot}`;
-                    if (!supportMap[key]) supportMap[key] = supportValue;
-                    supportMap[`${model.toLowerCase()}|${ot}`] = supportValue;
-                    supportMap[`${model.toUpperCase()}|${ot}`] = supportValue;
+                  // 기본 파싱된 유형들 매핑
+                  openingTypes.forEach(ot => addKeys(ot));
 
-                    hyphenVariants.forEach(variant => {
-                      if (variant !== model) {
-                        const variantKey = `${variant}|${ot}`;
-                        if (!supportMap[variantKey]) supportMap[variantKey] = supportValue;
-                        supportMap[`${variant.toLowerCase()}|${ot}`] = supportValue;
-                        supportMap[`${variant.toUpperCase()}|${ot}`] = supportValue;
-                      }
-                    });
-
-                    if (normalizedModel) {
-                      const normalizedKey = `${normalizedModel}|${ot}`;
-                      if (!supportMap[normalizedKey]) supportMap[normalizedKey] = supportValue;
-                      supportMap[`${normalizedModel.toLowerCase()}|${ot}`] = supportValue;
-                      supportMap[`${normalizedModel.toUpperCase()}|${ot}`] = supportValue;
-                    }
-                  });
-
-                  // "번호이동" → MNP 매핑
-                  if (openingTypeRaw === '번호이동' || openingTypes.includes('번호이동')) {
-                    const mnpKeys = [`${model}|MNP`, `${model.toLowerCase()}|MNP`, `${model.toUpperCase()}|MNP`];
-                    hyphenVariants.forEach(variant => {
-                      if (variant !== model) {
-                        mnpKeys.push(`${variant}|MNP`, `${variant.toLowerCase()}|MNP`, `${variant.toUpperCase()}|MNP`);
-                      }
-                    });
-                    if (normalizedModel) {
-                      mnpKeys.push(`${normalizedModel}|MNP`, `${normalizedModel.toLowerCase()}|MNP`, `${normalizedModel.toUpperCase()}|MNP`);
-                    }
-                    mnpKeys.forEach(key => {
-                      if (!supportMap[key]) supportMap[key] = supportValue;
-                    });
+                  // "MNP" <-> "번호이동" 상호 매핑
+                  if (openingTypes.includes('MNP') || openingTypeRaw.includes('번호이동')) {
+                    ['MNP', '번호이동'].forEach(ot => addKeys(ot));
                   }
 
-                  // "010신규/기변" → 010신규와 기변 매핑
+                  // "010신규/기변" 매핑
                   if (openingTypeRaw === '010신규/기변' ||
                     (openingTypes.includes('010신규') && openingTypes.includes('기변'))) {
-                    ['010신규', '기변'].forEach(ot => {
-                      const key = `${model}|${ot}`;
-                      if (!supportMap[key]) supportMap[key] = supportValue;
-                      supportMap[`${model.toLowerCase()}|${ot}`] = supportValue;
-                      supportMap[`${model.toUpperCase()}|${ot}`] = supportValue;
-
-                      hyphenVariants.forEach(variant => {
-                        if (variant !== model) {
-                          const variantKey = `${variant}|${ot}`;
-                          if (!supportMap[variantKey]) supportMap[variantKey] = supportValue;
-                          supportMap[`${variant.toLowerCase()}|${ot}`] = supportValue;
-                          supportMap[`${variant.toUpperCase()}|${ot}`] = supportValue;
-                        }
-                      });
-
-                      if (normalizedModel) {
-                        const normalizedKey = `${normalizedModel}|${ot}`;
-                        if (!supportMap[normalizedKey]) supportMap[normalizedKey] = supportValue;
-                        supportMap[`${normalizedModel.toLowerCase()}|${ot}`] = supportValue;
-                        supportMap[`${normalizedModel.toUpperCase()}|${ot}`] = supportValue;
-                      }
-                    });
+                    ['010신규', '기변', '010신규/기변'].forEach(ot => addKeys(ot));
                   }
+
+                  // 개별 유형이 "010신규" 또는 "기변"인 경우 "010신규/기변"에도 매핑
+                  if (openingTypes.includes('010신규') && !openingTypes.includes('기변')) {
+                    addKeys('010신규/기변');
+                  }
+                  if (openingTypes.includes('기변') && !openingTypes.includes('010신규')) {
+                    addKeys('010신규/기변');
+                  }
+                }
+              }
+
+              // 아래 코드는 이제 사용하지 않음 (위의 addKeys 함수로 통합)
+              if (false) {
+                  // "010신규/기변" → 010신규와 기변 매핑 (이미 위의 addKeys로 처리됨)
                 }
               }
 
