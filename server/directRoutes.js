@@ -1376,7 +1376,17 @@ function setupDirectRoutes(app) {
       const planGroupSupportDataCacheKey = `planGroupSupportData-${carrierParam}`;
       let planGroupSupportData = getCache(planGroupSupportDataCacheKey);
 
-      if (!planGroupSupportData) {
+      // 캐시가 비어있거나 유효하지 않으면 재생성
+      const isCacheValid = planGroupSupportData && 
+        Object.keys(planGroupSupportData).length > 0 &&
+        Object.values(planGroupSupportData).some(map => map && Object.keys(map).length > 0);
+
+      if (!isCacheValid) {
+        // 캐시가 비어있으면 삭제하고 재생성
+        if (planGroupSupportData && Object.keys(planGroupSupportData).length === 0) {
+          deleteCache(planGroupSupportDataCacheKey);
+          console.warn(`[Direct] planGroupSupportData 캐시가 비어있어 삭제하고 재생성합니다.`);
+        }
         planGroupSupportData = {}; // { '115군': { 'UIP17PR-256|MNP': 550000, ... } }
         const supportRanges = [];
         const supportRangeMap = {}; // range -> planGroup 매핑
@@ -1581,11 +1591,18 @@ function setupDirectRoutes(app) {
 
         // planGroupSupportData는 완성된 경우에만 캐시 저장
         if (supportMapBuilt) {
+          // 각 요금제군별 맵 크기 확인
+          const planGroupSizes = {};
+          Object.keys(planGroupSupportData).forEach(pg => {
+            planGroupSizes[pg] = Object.keys(planGroupSupportData[pg] || {}).length;
+          });
+          
           setCache(planGroupSupportDataCacheKey, planGroupSupportData, 5 * 60 * 1000);
           console.log(`[Direct] planGroupSupportData 캐시 저장 완료:`, {
             캐시키: planGroupSupportDataCacheKey,
             요금제군목록: Object.keys(planGroupSupportData),
-            총요금제군수: Object.keys(planGroupSupportData).length
+            총요금제군수: Object.keys(planGroupSupportData).length,
+            요금제군별맵크기: planGroupSizes
           });
         } else {
           // 미생성 시 기존 캐시 삭제하여 폴백 강제
@@ -1593,10 +1610,18 @@ function setupDirectRoutes(app) {
           console.warn('[Direct] planGroupSupportData 캐시 저장 생략 (supportMapBuilt=false)');
         }
       } else {
+        // 캐시에서 로드한 경우 각 요금제군별 맵 크기 확인
+        const planGroupSizes = {};
+        Object.keys(planGroupSupportData || {}).forEach(pg => {
+          planGroupSizes[pg] = Object.keys(planGroupSupportData[pg] || {}).length;
+        });
+        
         console.log(`[Direct] planGroupSupportData 캐시에서 로드:`, {
           캐시키: planGroupSupportDataCacheKey,
-          요금제군목록: Object.keys(planGroupSupportData),
-          총요금제군수: Object.keys(planGroupSupportData).length
+          요금제군목록: Object.keys(planGroupSupportData || {}),
+          총요금제군수: Object.keys(planGroupSupportData || {}).length,
+          요금제군별맵크기: planGroupSizes,
+          캐시유효성: isCacheValid
         });
       }
 
