@@ -115,7 +115,7 @@ async function withRequestDeduplication(key, fetchFn) {
 // 정책 설정 읽기 함수 (캐시 적용, 동시 요청 방지)
 async function getPolicySettings(carrier) {
   const cacheKey = `policy-settings-${carrier}`;
-  
+
   return withRequestDeduplication(cacheKey, async () => {
     const { sheets, SPREADSHEET_ID } = createSheetsClient();
 
@@ -189,7 +189,7 @@ async function getPolicySettings(carrier) {
 // 링크 설정 읽기 함수 (캐시 적용, 동시 요청 방지)
 async function getLinkSettings(carrier) {
   const cacheKey = `link-settings-${carrier}`;
-  
+
   return withRequestDeduplication(cacheKey, async () => {
     const { sheets, SPREADSHEET_ID } = createSheetsClient();
     const linkSettingsRes = await withRetry(async () => {
@@ -207,7 +207,7 @@ async function getLinkSettings(carrier) {
 // 시트 데이터 읽기 함수 (캐시 적용, 동시 요청 방지)
 async function getSheetData(sheetId, range, ttlMs = 10 * 60 * 1000) {
   const cacheKey = `sheet-data-${sheetId}-${range}`;
-  
+
   return withRequestDeduplication(cacheKey, async () => {
     const { sheets } = createSheetsClient();
     const res = await withRetry(async () => {
@@ -228,59 +228,59 @@ function deleteCache(key) {
   console.log(`[Direct] 캐시 무효화: ${key}`);
 }
 
-// 모델 코드 정규화 함수 (공백, 하이픈, 언더스코어 제거, 소문자 변환)
+// 모델 코드 정규화 함수 (공백, 하이픈, 언더스코어 제거, 소문자 변환, 용량 표기 통일)
 function normalizeModelCode(modelCode) {
   if (!modelCode) return '';
-  return modelCode.replace(/[\s\-_]/g, '').toLowerCase();
+  let normalized = modelCode.toString().trim().toUpperCase();
+
+  // 1. 공백, 하이픈, 언더스코어 제거
+  normalized = normalized.replace(/[\s\-_]/g, '');
+
+  // 2. 용량 표기 통일 (사용자 피드백 반영)
+  // 256G, 256GB -> 256
+  // 512G, 512GB -> 512
+  // 128G, 128GB -> 128
+  // 끝에 G나 GB가 붙은 경우 제거
+  normalized = normalized.replace(/(\d+)(GB|G)$/, '$1');
+
+  // 1T, 1TB -> 1T 통일
+  // 끝에 TB가 붙은 경우 T로 변경
+  normalized = normalized.replace(/(\d+)TB$/, '$1T');
+
+  return normalized;
 }
 
-// 하이픈 변형 생성 함수 (하이픈 유무/위치 차이 처리)
+// 하이픈 변형 생성 함수 - 더 이상 주력으로 사용하지 않지만 호환성을 위해 유지
 function generateHyphenVariants(modelCode) {
   if (!modelCode) return [];
-  const variants = [modelCode]; // 원본 포함
-  
-  // 하이픈이 있는 경우: 하이픈 제거
-  if (modelCode.includes('-')) {
-    variants.push(modelCode.replace(/-/g, ''));
-  }
-  
-  // 하이픈이 없는 경우: 일반적인 위치에 하이픈 추가 시도
-  if (!modelCode.includes('-')) {
-    // 숫자 앞에 하이픈 추가 (예: UIP17PR256 → UIP17PR-256)
-    variants.push(modelCode.replace(/([A-Z])(\d+)/g, '$1-$2'));
-    // 숫자 뒤에 하이픈 추가 (예: SM-S928N256 → SM-S928N-256)
-    variants.push(modelCode.replace(/(\d+)([A-Z])/g, '$1-$2'));
-  }
-  
-  return [...new Set(variants)]; // 중복 제거
+  const normalized = normalizeModelCode(modelCode);
+  return [modelCode, normalized];
 }
 
-// 개통유형 문자열을 표준화하여 배열로 반환 (예: "010신규/기변" → ['010신규','기변'])
+// 개통유형 문자열을 표준화하여 배열로 반환
+// 내부적으로 사용하는 표준 유형: '010신규', 'MNP', '기변'
 function parseOpeningTypes(raw) {
-  const text = (raw || '').toString().toLowerCase();
-  // 전유형 키워드가 있으면 전부 포함
+  const text = (raw || '').toString().toLowerCase().replace(/\s/g, '');
+
+  // 전유형 키워드 처리
   if (text.includes('전유형') || text.includes('전체') || text.includes('모두')) {
     return ['010신규', 'MNP', '기변'];
   }
 
   const types = [];
-  if (text.includes('010') || text.includes('신규')) types.push('010신규');
-  if (text.includes('mnp') || text.includes('번호이동')) types.push('MNP');
-  if (text.includes('기변') || text.includes('기기변경')) types.push('기변');
 
-  // 쉼표나 슬래시로 분리되어 있을 수 있으므로 추가 파싱
-  if (types.length === 0 && (text.includes('/') || text.includes(','))) {
-    const tokens = text.split(/[\/,]/).map(t => t.trim());
-    tokens.forEach(token => {
-      if (token.includes('010') || token.includes('신규')) types.push('010신규');
-      if (token.includes('mnp') || token.includes('번호이동')) types.push('MNP');
-      if (token.includes('기변') || token.includes('기기변경')) types.push('기변');
-    });
-  }
+  // 010 신규 (시트의 '010신규/기변' 매핑용)
+  if (text.includes('010') || text.includes('신규')) types.push('010신규');
+
+  // MNP / 번호이동
+  if (text.includes('mnp') || text.includes('번호이동')) types.push('MNP');
+
+  // 기변 (시트의 '010신규/기변' 매핑용)
+  if (text.includes('기변') || text.includes('기기변경')) types.push('기변');
 
   // 기본값
   if (types.length === 0) return ['010신규'];
-  // 중복 제거
+
   return [...new Set(types)];
 }
 
@@ -309,13 +309,13 @@ async function ensureSheetHeaders(sheets, spreadsheetId, sheetName, headers) {
   // 캐시 키 생성
   const cacheKey = `headers-${sheetName}-${spreadsheetId}`;
   const CACHE_TTL = 5 * 60 * 1000; // 5분
-  
+
   // 캐시 확인
   const cached = getCache(cacheKey);
   if (cached) {
     return cached;
   }
-  
+
   try {
     // 시트 존재 여부 확인 및 헤더 확인 (재시도 로직 포함)
     const res = await withRetry(async () => {
@@ -473,7 +473,7 @@ function setupDirectRoutes(app) {
     }
   });
 
-      // POST /api/direct/policy-settings?carrier=SK
+  // POST /api/direct/policy-settings?carrier=SK
   router.post('/policy-settings', async (req, res) => {
     try {
       const carrier = req.query.carrier || 'SK';
@@ -787,7 +787,7 @@ function setupDirectRoutes(app) {
       }
 
       const { sheets } = createSheetsClient();
-      
+
       // 시트에서 범위 읽기
       // majorDimension: 'ROWS'를 사용하여 모든 행을 가져오고, 빈 행도 포함
       const response = await sheets.spreadsheets.values.get({
@@ -798,7 +798,7 @@ function setupDirectRoutes(app) {
       });
 
       const values = response.data.values || [];
-      
+
       if (unique === 'true') {
         // 유니크한 값 추출 (빈 값 제외, 공백 제거)
         // flat()으로 모든 행의 값을 하나의 배열로 만들고, 빈 값은 제외
@@ -812,7 +812,7 @@ function setupDirectRoutes(app) {
             })
             .filter(v => v.length > 0)
         )].sort();
-        
+
         res.json({
           success: true,
           data: uniqueValues,
@@ -843,7 +843,7 @@ function setupDirectRoutes(app) {
       }
 
       const { sheets } = createSheetsClient();
-      
+
       // 시트에서 범위 읽기
       // majorDimension: 'ROWS'를 사용하여 모든 행을 가져오고, 빈 행도 포함
       const response = await sheets.spreadsheets.values.get({
@@ -1048,7 +1048,7 @@ function setupDirectRoutes(app) {
         range: SHEET_SETTINGS
       });
       const settingsRows = (settingsRes.data.values || []).slice(1);
-      
+
       // 정책표 설정에서 모델명, 펫네임 가져오기 (프롬프트 기준)
       const policyRow = settingsRows.find(row => (row[0] || '').trim() === carrierParam && (row[1] || '').trim() === 'policy');
       if (!policyRow || !policyRow[2]) {
@@ -1119,11 +1119,11 @@ function setupDirectRoutes(app) {
       const supportModelRange = supportSettingsJson.modelRange || '';
 
       let supportSheetData = {}; // { key: { factoryPrice, openingType, openingTypes: [], rowIndex } }
-      
+
       // planGroupSupportData 생성을 위해 상위 스코프에 저장
       let supportModelData = [];
       let supportOpeningTypeData = [];
-      
+
       if (supportModelRange && factoryPriceRange && openingTypeRange) {
         try {
           // 이통사 지원금 시트에서 모델명, 출고가, 개통유형 읽기
@@ -1154,10 +1154,10 @@ function setupDirectRoutes(app) {
             supportFactoryPriceData.length,
             supportOpeningTypeData.length
           );
-          
+
           // 1단계: 모델별로 모든 개통유형 수집
           const modelOpeningTypesMap = {}; // { model: [{ openingTypeRaw, openingTypes, rowIndex, factoryPrice }] }
-          
+
           for (let j = 0; j < maxSupportRows; j++) {
             const supportModel = (supportModelData[j]?.[0] || '').toString().trim();
             if (!supportModel) continue;
@@ -1165,11 +1165,11 @@ function setupDirectRoutes(app) {
             const openingTypeRaw = (supportOpeningTypeData[j]?.[0] || '').toString().trim();
             const openingTypes = parseOpeningTypes(openingTypeRaw);
             const factoryPrice = Number(supportFactoryPriceData[j]?.[0] || 0);
-            
+
             if (!modelOpeningTypesMap[supportModel]) {
               modelOpeningTypesMap[supportModel] = [];
             }
-            
+
             modelOpeningTypesMap[supportModel].push({
               openingTypeRaw,
               openingTypes,
@@ -1177,51 +1177,51 @@ function setupDirectRoutes(app) {
               factoryPrice
             });
           }
-          
+
           // 2단계: 전유형 처리 후 저장
           for (const [supportModel, entries] of Object.entries(modelOpeningTypesMap)) {
             // 같은 모델에 "번호이동"과 "010신규/기변"이 모두 있는지 확인
-            const hasNumberPort = entries.some(e => 
+            const hasNumberPort = entries.some(e =>
               e.openingTypeRaw === '번호이동' || e.openingTypes.includes('번호이동')
             );
-            const hasNewChange = entries.some(e => 
-              e.openingTypeRaw === '010신규/기변' || 
+            const hasNewChange = entries.some(e =>
+              e.openingTypeRaw === '010신규/기변' ||
               (e.openingTypes.includes('010신규') && e.openingTypes.includes('기변'))
             );
-            const hasAllTypes = entries.some(e => 
+            const hasAllTypes = entries.some(e =>
               e.openingTypeRaw === '전유형' || e.openingTypes.includes('전유형')
             );
-            
+
             // "번호이동"과 "010신규/기변"이 모두 있으면 전유형 무시
             const shouldIgnoreAllTypes = hasNumberPort && hasNewChange;
-            
+
             for (const entryData of entries) {
               const { openingTypeRaw, openingTypes, rowIndex, factoryPrice } = entryData;
-              
+
               // 전유형이고 무시해야 하면 스킵
               if (shouldIgnoreAllTypes && (openingTypeRaw === '전유형' || openingTypes.includes('전유형'))) {
                 continue;
               }
-              
+
               const entry = {
                 factoryPrice,
                 openingType: openingTypes[0] || '010신규',
                 openingTypes,
                 rowIndex
               };
-              
+
               // 원본 모델명으로 저장 (개통유형 고려 없이, 폴백용)
               if (!supportSheetData[supportModel]) {
                 supportSheetData[supportModel] = entry;
               }
-              
+
               // 전유형인 경우 모든 개통유형에 매핑
               if (openingTypeRaw === '전유형' || openingTypes.includes('전유형')) {
                 const allTypes = ['010신규', 'MNP', '기변', '번호이동'];
                 allTypes.forEach(ot => {
                   const key = `${supportModel}|${ot}`;
                   supportSheetData[key] = entry;
-                  
+
                   const normalizedModel = normalizeModelCode(supportModel);
                   if (normalizedModel) {
                     supportSheetData[`${normalizedModel}|${ot}`] = entry;
@@ -1235,16 +1235,16 @@ function setupDirectRoutes(app) {
                 // 모델명+개통유형 조합으로 저장 (정확한 매칭용)
                 const normalizedModel = normalizeModelCode(supportModel);
                 const hyphenVariants = generateHyphenVariants(supportModel);
-                
+
                 openingTypes.forEach(ot => {
                   // 원본 모델명
                   const key = `${supportModel}|${ot}`;
                   supportSheetData[key] = entry;
-                  
+
                   // 대소문자 변형
                   supportSheetData[`${supportModel.toLowerCase()}|${ot}`] = entry;
                   supportSheetData[`${supportModel.toUpperCase()}|${ot}`] = entry;
-                  
+
                   // 하이픈 변형 (원본 우선, 하이픈 변형은 폴백)
                   hyphenVariants.forEach(variant => {
                     if (variant !== supportModel) {
@@ -1256,7 +1256,7 @@ function setupDirectRoutes(app) {
                       supportSheetData[`${variant.toUpperCase()}|${ot}`] = entry;
                     }
                   });
-                  
+
                   // 정규화된 모델명 (마지막 폴백)
                   if (normalizedModel) {
                     const normalizedKey = `${normalizedModel}|${ot}`;
@@ -1267,7 +1267,7 @@ function setupDirectRoutes(app) {
                     supportSheetData[`${normalizedModel.toUpperCase()}|${ot}`] = entry;
                   }
                 });
-                
+
                 // "번호이동" → MNP 매핑
                 if (openingTypeRaw === '번호이동' || openingTypes.includes('번호이동')) {
                   const mnpKeys = [
@@ -1288,10 +1288,10 @@ function setupDirectRoutes(app) {
                     }
                   });
                 }
-                
+
                 // "010신규/기변" → 010신규와 기변 매핑
-                if (openingTypeRaw === '010신규/기변' || 
-                    (openingTypes.includes('010신규') && openingTypes.includes('기변'))) {
+                if (openingTypeRaw === '010신규/기변' ||
+                  (openingTypes.includes('010신규') && openingTypes.includes('기변'))) {
                   // 원본 "010신규/기변" 키로도 저장
                   const originalKeys = [
                     `${supportModel}|010신규/기변`,
@@ -1310,7 +1310,7 @@ function setupDirectRoutes(app) {
                       supportSheetData[key] = entry;
                     }
                   });
-                  
+
                   // "010신규"와 "기변"으로도 각각 저장
                   ['010신규', '기변'].forEach(ot => {
                     const key = `${supportModel}|${ot}`;
@@ -1341,7 +1341,7 @@ function setupDirectRoutes(app) {
                   });
                 }
               }
-              
+
               // 정규화/대소문자 변형 키로도 저장하여 매칭 강화 (폴백용)
               const normalizedModel = normalizeModelCode(supportModel);
               if (normalizedModel) {
@@ -1375,12 +1375,12 @@ function setupDirectRoutes(app) {
       // planGroupSupportData를 캐시하여 /calculate 엔드포인트에서도 재사용
       const planGroupSupportDataCacheKey = `planGroupSupportData-${carrierParam}`;
       let planGroupSupportData = getCache(planGroupSupportDataCacheKey);
-      
+
       if (!planGroupSupportData) {
         planGroupSupportData = {}; // { '115군': { 'UIP17PR-256|MNP': 550000, ... } }
         const supportRanges = [];
         const supportRangeMap = {}; // range -> planGroup 매핑
-        
+
         for (const [planGroup, range] of Object.entries(planGroupRanges)) {
           if (range) {
             supportRanges.push(range);
@@ -1389,7 +1389,7 @@ function setupDirectRoutes(app) {
             planGroupSupportData[planGroup] = {};
           }
         }
-        
+
         // planGroupSupportData 생성을 위해 supportModelData와 supportOpeningTypeData 재사용
         // supportSheetData 생성 시 이미 가져왔으므로 재사용 (API 호출 절약)
         console.log(`[Direct] planGroupSupportData 생성 준비:`, {
@@ -1401,7 +1401,7 @@ function setupDirectRoutes(app) {
           supportModelData길이: supportModelData.length,
           supportOpeningTypeData길이: supportOpeningTypeData.length
         });
-        
+
         let supportMapBuilt = false;
         if (supportRanges.length > 0 && supportModelData.length > 0 && supportOpeningTypeData.length > 0) {
           try {
@@ -1411,262 +1411,152 @@ function setupDirectRoutes(app) {
               majorDimension: 'ROWS',
               valueRenderOption: 'UNFORMATTED_VALUE'
             });
-          
-          response.data.valueRanges.forEach((valueRange, index) => {
-            const range = supportRanges[index];
-            const planGroup = supportRangeMap[range];
-            const supportValues = valueRange.values || [];
-            
-            // 범위 문자열에서 시작 행 번호 추출 (예: 'F9:F97' -> 8, 'F10:F97' -> 9)
-            // 시트 이름이 포함된 경우도 처리 (예: "'시트명'!F9:F97" -> 8)
-            // Google Sheets 범위 형식: '시트명'!A1:Z100 또는 A1:Z100
-            let startRow = 0;
-            
-            // 시트 이름 제거 (있는 경우)
-            let rangeWithoutSheet = range;
-            const sheetMatch = range.match(/^'[^']+'!/);
-            if (sheetMatch) {
-              rangeWithoutSheet = range.replace(/^'[^']+'!/, '');
-            }
-            
-            // 범위에서 시작 행 번호 추출 (예: 'F9:F97' -> 9, 'A10:Z100' -> 10)
-            // 형식: [열][행]:[열][행] 또는 [열][행]
-            const rangeMatch = rangeWithoutSheet.match(/[A-Z]+(\d+)/);
-            if (rangeMatch) {
-              const rowNumber = parseInt(rangeMatch[1], 10);
-              // Google Sheets는 1-based이지만 배열은 0-based이므로 -1
-              // 하지만 planGroupSupportModelData는 이미 헤더를 제외한 데이터이므로 추가 조정 필요
-              // 실제로는 범위가 F9:F97이면 9행부터 시작하는 것이 맞음
-              startRow = rowNumber - 1; // 0-based index로 변환
-            }
-            
-            // 디버깅: 시작 행 확인
-            console.log(`[Direct] planGroupSupportData 범위 파싱:`, {
-              원본범위: range,
-              시트제거후: rangeWithoutSheet,
-              추출된행번호: rangeMatch ? parseInt(rangeMatch[1], 10) : null,
-              계산된startRow: startRow,
-              supportModelData길이: supportModelData.length,
-              supportOpeningTypeData길이: supportOpeningTypeData.length,
-              supportValues길이: supportValues.length
-            });
-            
-            // 모델명+개통유형 복합키 맵으로 변환
-            // supportModelData와 supportOpeningTypeData의 해당 범위만 사용
-            const supportMap = {};
-            const maxRows = Math.min(
-              supportModelData.length - startRow,
-              supportOpeningTypeData.length - startRow,
-              supportValues.length
-            );
-            
-            // 문제 모델 검증을 위한 디버깅
-            const debugModels = ['UIP17PR-256', 'SM-S928N256', 'SM-S926N256'];
-            const debugRows = [];
-            
-            for (let j = 0; j < maxRows; j++) {
-              // 전체 시트의 startRow+j 인덱스 사용
-              const modelIndex = startRow + j;
-              const model = (supportModelData[modelIndex]?.[0] || '').toString().trim();
-              if (!model) continue;
-              
-              const openingTypeRaw = (supportOpeningTypeData[modelIndex]?.[0] || '').toString().trim();
-              const openingTypes = parseOpeningTypes(openingTypeRaw);
-              const supportValue = Number((supportValues[j]?.[0] || 0).toString().replace(/,/g, '')) || 0;
-              
-              // 문제 모델 디버깅
-              if (debugModels.some(dm => model === dm || model.toLowerCase() === dm.toLowerCase())) {
-                debugRows.push({
-                  j,
-                  modelIndex,
-                  model,
-                  openingTypeRaw,
-                  supportValue,
-                  supportValuesJ: supportValues[j]?.[0]
-                });
+
+            response.data.valueRanges.forEach((valueRange, index) => {
+              const range = supportRanges[index];
+              const planGroup = supportRangeMap[range];
+              const supportValues = valueRange.values || [];
+
+              // 범위 문자열에서 시작 행 번호 추출 (예: 'F9:F97' -> 9행)
+              let startRow = 0; // 0-based index (실제 행번호 - 1)
+
+              // 시트 이름 제거 (있는 경우)
+              let rangeWithoutSheet = range;
+              const sheetMatch = range.match(/^'[^']+'!/);
+              if (sheetMatch) {
+                rangeWithoutSheet = range.replace(/^'[^']+'!/, '');
               }
-              
-              // 각 개통유형에 대해 복합키 생성
-              // 하이픈 변형 생성 (supportSheetData와 동일한 로직)
-              const hyphenVariants = generateHyphenVariants(model);
-              const normalizedModel = normalizeModelCode(model);
-              
-              if (openingTypeRaw === '전유형' || openingTypes.includes('전유형')) {
-                // 전유형인 경우 모든 개통유형에 매핑
-                ['010신규', 'MNP', '기변'].forEach(ot => {
-                  // 원본 모델명
-                  const key = `${model}|${ot}`;
-                  if (!supportMap[key]) {
-                    supportMap[key] = supportValue;
-                  }
-                  // 대소문자 변형
-                  supportMap[`${model.toLowerCase()}|${ot}`] = supportValue;
-                  supportMap[`${model.toUpperCase()}|${ot}`] = supportValue;
-                  
-                  // 하이픈 변형 추가
-                  hyphenVariants.forEach(variant => {
-                    if (variant !== model) {
-                      const variantKey = `${variant}|${ot}`;
-                      if (!supportMap[variantKey]) {
-                        supportMap[variantKey] = supportValue;
-                      }
-                      supportMap[`${variant.toLowerCase()}|${ot}`] = supportValue;
-                      supportMap[`${variant.toUpperCase()}|${ot}`] = supportValue;
-                    }
-                  });
-                  
-                  // 정규화된 모델명 (마지막 폴백)
-                  if (normalizedModel) {
-                    const normalizedKey = `${normalizedModel}|${ot}`;
-                    if (!supportMap[normalizedKey]) {
-                      supportMap[normalizedKey] = supportValue;
-                    }
-                    supportMap[`${normalizedModel.toLowerCase()}|${ot}`] = supportValue;
-                    supportMap[`${normalizedModel.toUpperCase()}|${ot}`] = supportValue;
-                  }
-                });
-              } else {
-                // 각 개통유형에 대해 복합키 생성
-                openingTypes.forEach(ot => {
-                  // 원본 모델명
-                  const key = `${model}|${ot}`;
-                  if (!supportMap[key]) {
-                    supportMap[key] = supportValue;
-                  }
-                  // 대소문자 변형
-                  supportMap[`${model.toLowerCase()}|${ot}`] = supportValue;
-                  supportMap[`${model.toUpperCase()}|${ot}`] = supportValue;
-                  
-                  // 하이픈 변형 추가
-                  hyphenVariants.forEach(variant => {
-                    if (variant !== model) {
-                      const variantKey = `${variant}|${ot}`;
-                      if (!supportMap[variantKey]) {
-                        supportMap[variantKey] = supportValue;
-                      }
-                      supportMap[`${variant.toLowerCase()}|${ot}`] = supportValue;
-                      supportMap[`${variant.toUpperCase()}|${ot}`] = supportValue;
-                    }
-                  });
-                  
-                  // 정규화된 모델명 (마지막 폴백)
-                  if (normalizedModel) {
-                    const normalizedKey = `${normalizedModel}|${ot}`;
-                    if (!supportMap[normalizedKey]) {
-                      supportMap[normalizedKey] = supportValue;
-                    }
-                    supportMap[`${normalizedModel.toLowerCase()}|${ot}`] = supportValue;
-                    supportMap[`${normalizedModel.toUpperCase()}|${ot}`] = supportValue;
-                  }
-                });
-                
-                // "번호이동" → MNP 매핑
-                if (openingTypeRaw === '번호이동' || openingTypes.includes('번호이동')) {
-                  const mnpKeys = [
-                    `${model}|MNP`,
-                    `${model.toLowerCase()}|MNP`,
-                    `${model.toUpperCase()}|MNP`
-                  ];
-                  
-                  // 하이픈 변형 추가
-                  hyphenVariants.forEach(variant => {
-                    if (variant !== model) {
-                      mnpKeys.push(
-                        `${variant}|MNP`,
-                        `${variant.toLowerCase()}|MNP`,
-                        `${variant.toUpperCase()}|MNP`
-                      );
-                    }
-                  });
-                  
-                  // 정규화된 모델명 (마지막 폴백)
-                  if (normalizedModel) {
-                    mnpKeys.push(
-                      `${normalizedModel}|MNP`,
-                      `${normalizedModel.toLowerCase()}|MNP`,
-                      `${normalizedModel.toUpperCase()}|MNP`
-                    );
-                  }
-                  
-                  mnpKeys.forEach(key => {
-                    if (!supportMap[key]) {
-                      supportMap[key] = supportValue;
-                    }
-                  });
-                }
-                
-                // "010신규/기변" → 010신규와 기변 매핑
-                if (openingTypeRaw === '010신규/기변' ||
-                    (openingTypes.includes('010신규') && openingTypes.includes('기변'))) {
-                  ['010신규', '기변'].forEach(ot => {
-                    const key = `${model}|${ot}`;
-                    if (!supportMap[key]) {
-                      supportMap[key] = supportValue;
-                    }
+
+              // 범위에서 시작 행 번호 추출 (예: 'F9:F97' -> 9)
+              const rangeMatch = rangeWithoutSheet.match(/[A-Z]+(\d+)/);
+              if (rangeMatch) {
+                const rowNumber = parseInt(rangeMatch[1], 10);
+                startRow = rowNumber - 1; // 0-based index로 변환
+              }
+
+              // 모델명+개통유형 복합키 맵으로 변환
+              const supportMap = {};
+
+              // 주의: supportModelData는 시트 전체 데이터일 수도, 부분 데이터일 수도 있음.
+              // 보통 getMobileList 시작 부분에서 가져온 supportModelData는 supportModelRange에 정해진 전체 범위임.
+              // 따라서 startRow 오프셋을 적용해야 정확한 행을 찾을 수 있음.
+
+              const maxRows = Math.min(
+                supportModelData.length - startRow,
+                supportOpeningTypeData.length - startRow,
+                supportValues.length
+              );
+
+              for (let j = 0; j < maxRows; j++) {
+                // 정확한 행 인덱스 계산
+                const modelIndex = startRow + j;
+
+                // 모델명이 없는 공백 행은 철저히 무시 (데이터 밀림 방지)
+                const model = (supportModelData[modelIndex]?.[0] || '').toString().trim();
+                const openingTypeRaw = (supportOpeningTypeData[modelIndex]?.[0] || '').toString().trim();
+                const supportValueStr = (supportValues[j]?.[0] || 0).toString().replace(/,/g, '');
+                const supportValue = Number(supportValueStr) || 0;
+
+                if (!model) continue;
+
+                const normalizedModel = normalizeModelCode(model);
+                const openingTypes = parseOpeningTypes(openingTypeRaw);
+
+                // 매핑 타겟 설정
+                // 1. 전유형 처리
+                if (openingTypeRaw === '전유형' || openingTypes.includes('전유형')) {
+                  // 전유형인 경우 모든 유형에 매핑
+                  const allTargets = ['010신규', '기변', 'MNP', '번호이동', '010신규/기변'];
+                  allTargets.forEach(ot => {
+                    // 기본 키
+                    supportMap[`${model}|${ot}`] = supportValue;
+                    // 대소문자
                     supportMap[`${model.toLowerCase()}|${ot}`] = supportValue;
                     supportMap[`${model.toUpperCase()}|${ot}`] = supportValue;
-                    
-                    // 하이픈 변형 추가
-                    hyphenVariants.forEach(variant => {
-                      if (variant !== model) {
-                        const variantKey = `${variant}|${ot}`;
-                        if (!supportMap[variantKey]) {
-                          supportMap[variantKey] = supportValue;
-                        }
-                        supportMap[`${variant.toLowerCase()}|${ot}`] = supportValue;
-                        supportMap[`${variant.toUpperCase()}|${ot}`] = supportValue;
-                      }
-                    });
-                    
-                    // 정규화된 모델명 (마지막 폴백)
+                    // 정규화 키 (용량/하이픈 처리됨)
                     if (normalizedModel) {
-                      const normalizedKey = `${normalizedModel}|${ot}`;
-                      if (!supportMap[normalizedKey]) {
-                        supportMap[normalizedKey] = supportValue;
-                      }
-                      supportMap[`${normalizedModel.toLowerCase()}|${ot}`] = supportValue;
-                      supportMap[`${normalizedModel.toUpperCase()}|${ot}`] = supportValue;
+                      supportMap[`${normalizedModel}|${ot}`] = supportValue;
                     }
                   });
+                } else {
+                  // 2. 개별 유형 처리
+
+                  // (A) 기본 파싱된 유형들 매핑 (010신규, MNP, 기변)
+                  openingTypes.forEach(ot => {
+                    supportMap[`${model}|${ot}`] = supportValue;
+                    supportMap[`${model.toLowerCase()}|${ot}`] = supportValue;
+                    supportMap[`${model.toUpperCase()}|${ot}`] = supportValue;
+                    if (normalizedModel) {
+                      supportMap[`${normalizedModel}|${ot}`] = supportValue;
+                    }
+                  });
+
+                  // (B) "MNP" <-> "번호이동" 상호 매핑
+                  if (openingTypes.includes('MNP') || openingTypeRaw.includes('번호이동')) {
+                    const mnpTargets = ['MNP', '번호이동'];
+                    mnpTargets.forEach(ot => {
+                      supportMap[`${model}|${ot}`] = supportValue;
+                      supportMap[`${model.toLowerCase()}|${ot}`] = supportValue;
+                      supportMap[`${model.toUpperCase()}|${ot}`] = supportValue;
+                      if (normalizedModel) {
+                        supportMap[`${normalizedModel}|${ot}`] = supportValue;
+                      }
+                    });
+                  }
+
+                  // (C) "010신규" / "기변" <-> "010신규/기변" 상호 매핑
+                  // "010신규/기변" Row는 010신규, 기변, 010신규/기변 키 모두에 매핑되어야 함
+                  if (openingTypeRaw.includes('010신규/기변') ||
+                    (openingTypes.includes('010신규') && openingTypes.includes('기변'))) {
+
+                    const newChangeTargets = ['010신규', '기변', '010신규/기변'];
+                    newChangeTargets.forEach(ot => {
+                      supportMap[`${model}|${ot}`] = supportValue;
+                      supportMap[`${model.toLowerCase()}|${ot}`] = supportValue;
+                      supportMap[`${model.toUpperCase()}|${ot}`] = supportValue;
+                      if (normalizedModel) {
+                        supportMap[`${normalizedModel}|${ot}`] = supportValue;
+                      }
+                    });
+                  }
                 }
               }
-            }
-            
-            planGroupSupportData[planGroup] = supportMap;
-            
-            // 디버깅: planGroupSupportData 생성 확인
-            console.log(`[Direct] planGroupSupportData 생성 완료:`, {
-              요금제군: planGroup,
-              범위: range,
-              시작행: startRow,
-              맵크기: Object.keys(supportMap).length,
-              맵키샘플: Object.keys(supportMap).slice(0, 10),
-              문제모델디버깅: debugRows.length > 0 ? debugRows : undefined,
-              문제모델저장값: debugModels.map(dm => {
-                const keys = Object.keys(supportMap).filter(k => k.includes(dm));
-                return {
-                  모델: dm,
-                  찾은키: keys.slice(0, 5),
-                  저장된값: keys.map(k => ({ 키: k, 값: supportMap[k] })).slice(0, 5)
-                };
-              })
+
+              planGroupSupportData[planGroup] = supportMap;
+
+              // 디버깅: planGroupSupportData 생성 확인
+              console.log(`[Direct] planGroupSupportData 생성 완료:`, {
+                요금제군: planGroup,
+                범위: range,
+                시작행: startRow,
+                맵크기: Object.keys(supportMap).length,
+                맵키샘플: Object.keys(supportMap).slice(0, 10),
+                문제모델디버깅: debugRows.length > 0 ? debugRows : undefined,
+                문제모델저장값: debugModels.map(dm => {
+                  const keys = Object.keys(supportMap).filter(k => k.includes(dm));
+                  return {
+                    모델: dm,
+                    찾은키: keys.slice(0, 5),
+                    저장된값: keys.map(k => ({ 키: k, 값: supportMap[k] })).slice(0, 5)
+                  };
+                })
+              });
             });
-          });
             supportMapBuilt = true;
-        } catch (err) {
-          console.warn(`[Direct] 지원금 범위 batchGet 실패:`, err);
-          // 실패 시 빈 객체로 초기화
-          Object.keys(planGroupRanges).forEach(planGroup => {
-            if (!planGroupSupportData[planGroup]) {
-              planGroupSupportData[planGroup] = {};
-            }
-          });
+          } catch (err) {
+            console.warn(`[Direct] 지원금 범위 batchGet 실패:`, err);
+            // 실패 시 빈 객체로 초기화
+            Object.keys(planGroupRanges).forEach(planGroup => {
+              if (!planGroupSupportData[planGroup]) {
+                planGroupSupportData[planGroup] = {};
+              }
+            });
+          }
+
+          // supportRanges 처리 블록 종료
+          // (planGroupSupportData 캐시 저장은 범위 처리 후 실행)
         }
 
-        // supportRanges 처리 블록 종료
-        // (planGroupSupportData 캐시 저장은 범위 처리 후 실행)
-        }
-        
         // planGroupSupportData는 완성된 경우에만 캐시 저장
         if (supportMapBuilt) {
           setCache(planGroupSupportDataCacheKey, planGroupSupportData, 5 * 60 * 1000);
@@ -1692,7 +1582,7 @@ function setupDirectRoutes(app) {
       // { '115군': { '010신규': { 'SM-S926N256': 690000, ... }, 'MNP': { 'SM-S926N256': 700000, ... } } }
       const policyRebateData = {};
       const policyRebateDataByIndex = {}; // 폴백용: 인덱스 기반 배열도 유지
-      
+
       if (policySheetId && policySettingsJson.planGroupRanges && modelRange) {
         // 정책표 시트에서 모델명 읽기
         let policyModelData = [];
@@ -1703,16 +1593,16 @@ function setupDirectRoutes(app) {
             majorDimension: 'ROWS',
             valueRenderOption: 'UNFORMATTED_VALUE'
           });
-          policyModelData = (modelResponse.data.values || []).map(row => 
+          policyModelData = (modelResponse.data.values || []).map(row =>
             (row[0] || '').toString().trim()
           );
         } catch (err) {
           console.warn(`[Direct] 정책표 모델명 읽기 실패:`, err);
         }
-        
+
         const rebateRanges = [];
         const rebateRangeMap = []; // [{ planGroup, openingType, range }]
-        
+
         for (const [planGroup, typeRanges] of Object.entries(policySettingsJson.planGroupRanges)) {
           if (typeof typeRanges === 'object') {
             policyRebateData[planGroup] = {};
@@ -1728,7 +1618,7 @@ function setupDirectRoutes(app) {
             }
           }
         }
-        
+
         if (rebateRanges.length > 0) {
           try {
             const response = await sheets.spreadsheets.values.batchGet({
@@ -1737,16 +1627,16 @@ function setupDirectRoutes(app) {
               majorDimension: 'ROWS',
               valueRenderOption: 'UNFORMATTED_VALUE'
             });
-            
+
             response.data.valueRanges.forEach((valueRange, index) => {
               const { planGroup, openingType } = rebateRangeMap[index];
-              const values = (valueRange.values || []).map(row => 
+              const values = (valueRange.values || []).map(row =>
                 Number((row[0] || 0).toString().replace(/,/g, '')) * 10000
               );
-              
+
               // 인덱스 기반 배열 저장 (폴백용)
               policyRebateDataByIndex[planGroup][openingType] = values;
-              
+
               // 모델명 기준 맵 저장
               const rebateMap = {};
               const maxLen = Math.min(policyModelData.length, values.length);
@@ -1755,7 +1645,7 @@ function setupDirectRoutes(app) {
                 if (model) {
                   // 원본 모델명으로 저장
                   rebateMap[model] = values[i] || 0;
-                  
+
                   // 정규화된 모델명으로도 저장
                   const normalizedModel = normalizeModelCode(model);
                   if (normalizedModel && normalizedModel !== model) {
@@ -1805,7 +1695,7 @@ function setupDirectRoutes(app) {
             range: SHEET_POLICY_SPECIAL
           }))
       ]);
-      
+
       const marginRows = (marginRes.data.values || []).slice(1);
       const marginRow = marginRows.find(row => (row[0] || '').trim() === carrierParam);
       const baseMargin = marginRow ? Number(marginRow[1] || 0) : 50000;
@@ -1820,7 +1710,7 @@ function setupDirectRoutes(app) {
           incentive: Number(row[3] || 0), // 부가유치 추가금액
           deduction: -Math.abs(Number(row[4] || 0))  // 부가미유치 차감금액 (음수 처리)
         }));
-      
+
       const requiredAddons = addonList
         .filter(addon => addon.deduction < 0)  // 차감금액이 음수인 경우 (미유치 시 차감되는 부가서비스)
         .map(addon => addon.name);
@@ -1847,14 +1737,14 @@ function setupDirectRoutes(app) {
           addition: Number(row[2] || 0), // 추가금액
           deduction: Number(row[3] || 0)  // 차감금액
         }));
-      
+
       // 부가서비스 + 보험상품 추가금액 합계 (부가유치)
       const totalAddonIncentive = addonList.reduce((sum, addon) => sum + (addon.incentive || 0), 0) +
-                                  insuranceList.reduce((sum, insurance) => sum + (insurance.incentive || 0), 0);
+        insuranceList.reduce((sum, insurance) => sum + (insurance.incentive || 0), 0);
       // 부가서비스 + 보험상품 차감금액 합계 (부가미유치)
       const totalAddonDeduction = addonList.reduce((sum, addon) => sum + (addon.deduction || 0), 0) +
-                                  insuranceList.reduce((sum, insurance) => sum + (insurance.deduction || 0), 0);
-      
+        insuranceList.reduce((sum, insurance) => sum + (insurance.deduction || 0), 0);
+
       // 별도정책 추가금액 합계
       const totalSpecialAddition = specialPolicies.reduce((sum, policy) => sum + (policy.addition || 0), 0);
       // 별도정책 차감금액 합계
@@ -1872,7 +1762,7 @@ function setupDirectRoutes(app) {
           range: '직영점_오늘의휴대폰!A:Z'
         }).catch(() => ({ data: { values: [] } }))
       ]);
-      
+
       const imageRows = (imageRes.data.values || []).slice(1);
       const imageMap = new Map();
       imageRows.forEach(row => {
@@ -1881,30 +1771,30 @@ function setupDirectRoutes(app) {
         const modelId = (row[1] || '').trim(); // 모델ID (실제 모델 코드)
         const modelName = (row[2] || '').trim(); // 모델명 (모델ID와 동일)
         const imageUrl = (row[5] || '').trim();
-        
+
         // 이미지 URL이 없으면 건너뛰기
         if (!imageUrl) {
           return;
         }
-        
+
         // 통신사 필터링: 현재 조회 중인 통신사와 정확히 일치하는 경우만 매핑
         // 통신사가 비어있으면 해당 행을 건너뛰어 잘못된 매핑 방지
         if (!rowCarrier) {
           console.log(`[Direct] ⚠️ 통신사가 비어있는 이미지 행 건너뛰기: 모델ID=${modelId}, 모델명=${modelName}`);
           return;
         }
-        
+
         // 통신사가 일치하는 경우만 매핑
         if (rowCarrier === carrierParam) {
           // 모델ID와 모델명 중 하나라도 있으면 사용 (둘 다 실제 모델 코드와 동일)
           const actualModelCode = modelId || modelName;
-          
+
           if (actualModelCode) {
             // 원본 모델 코드로 키 생성 (정확한 매칭)
             const key = `${carrierParam}:${actualModelCode}`;
             imageMap.set(key, imageUrl);
             imageMap.set(actualModelCode, imageUrl);
-            
+
             // 정규화된 모델 코드로도 키 생성 (형식 차이 무시)
             const normalizedCode = normalizeModelCode(actualModelCode);
             if (normalizedCode && normalizedCode !== actualModelCode.toLowerCase()) {
@@ -1917,7 +1807,7 @@ function setupDirectRoutes(app) {
           }
         }
       });
-      
+
       console.log(`[Direct] 이미지 맵 크기: ${imageMap.size}, 통신사: ${carrierParam}`);
       // 디버깅: 이미지 맵의 키들 출력 (처음 20개)
       if (imageMap.size > 0) {
@@ -1970,38 +1860,38 @@ function setupDirectRoutes(app) {
       // 9. 데이터 조합 (모델명 기준으로 매칭)
       const maxRows = Math.max(modelData.length, petNameData.length);
       const mobileList = [];
-      
+
       // 디버깅 대상 모델 목록 (이통사지원금 + 대리점지원금 문제 모델)
       const debugTargetModels = [
         'SM-S926N256', 'SM-S926N512', 'SM-S928N256', 'SM-S928N512',
         'UIP17-256', 'UIP17-512', 'UIPA-256', 'UIPA-512', 'UIPA-1T',
         'UIP17PR-256', 'UIP17PR-512', 'UIP17PR-1T',
-        'SM-F766N256', 'SM-S731N', 'SM-S937N256', 'SM-A166L', 
+        'SM-F766N256', 'SM-S731N', 'SM-S937N256', 'SM-A166L',
         'A2633-128', 'AT-M140L'
       ];
-      
+
       // 디버깅 대상 모델인지 확인하는 헬퍼 함수
       const isDebugTarget = (modelName) => {
         const normalizedModel = normalizeModelCode(modelName);
-        return debugTargetModels.some(pm => 
-          modelName === pm || modelName.toLowerCase() === pm.toLowerCase() || 
+        return debugTargetModels.some(pm =>
+          modelName === pm || modelName.toLowerCase() === pm.toLowerCase() ||
           (normalizedModel && normalizedModel.toLowerCase() === pm.toLowerCase())
         );
       };
-      
+
       for (let i = 0; i < maxRows; i++) {
         const model = (modelData[i]?.[0] || '').toString().trim();
         if (!model) continue; // 빈 행 스킵
 
         const petName = (petNameData[i]?.[0] || model).toString().trim();
-        
+
         // 모델명을 기준으로 이통사 지원금 시트에서 데이터 찾기
         // 매칭 순서: 원본 → 대소문자 변형 → 하이픈 변형 → 정규화
         const normalizedModel = normalizeModelCode(model);
         let supportData = supportSheetData[model] || // 원본 최우선
           supportSheetData[model.toLowerCase()] ||
           supportSheetData[model.toUpperCase()];
-        
+
         // 하이픈 변형 시도
         if (!supportData) {
           const hyphenVariants = generateHyphenVariants(model);
@@ -2014,7 +1904,7 @@ function setupDirectRoutes(app) {
             }
           }
         }
-        
+
         // 정규화된 모델명 (마지막 폴백)
         if (!supportData && normalizedModel) {
           supportData = supportSheetData[normalizedModel] ||
@@ -2030,7 +1920,7 @@ function setupDirectRoutes(app) {
             rowIndex: i // 요금제군별 지원금 매칭 기본값
           };
         }
-        
+
         const factoryPrice = supportData.factoryPrice || 0;
         const openingTypeStr = supportData.openingType || '';
         const openingTypeList = supportData.openingTypes && supportData.openingTypes.length > 0
@@ -2046,7 +1936,7 @@ function setupDirectRoutes(app) {
         });
         const insuranceFee = matchingInsurance ? matchingInsurance.fee : 0;
         const insuranceName = matchingInsurance ? matchingInsurance.name : '';
-        
+
         // 개통유형을 표준화 (010신규, MNP, 기변)
         let openingType = openingTypeList[0] || '010신규';
 
@@ -2069,14 +1959,14 @@ function setupDirectRoutes(app) {
           const modelLower = model.toLowerCase();
           const normalizedModel = normalizeModelCode(model);
           const normalizedModelLower = normalizedModel ? normalizedModel.toLowerCase() : '';
-          
+
           for (const [key, value] of tagMap.entries()) {
             const keyLower = key.toLowerCase();
             // 정확한 일치 또는 포함 관계 확인
-            if (keyLower === modelLower || 
-                keyLower === normalizedModelLower ||
-                (normalizedModelLower && (keyLower.includes(normalizedModelLower) || normalizedModelLower.includes(keyLower))) ||
-                (modelLower && (keyLower.includes(modelLower) || modelLower.includes(keyLower)))) {
+            if (keyLower === modelLower ||
+              keyLower === normalizedModelLower ||
+              (normalizedModelLower && (keyLower.includes(normalizedModelLower) || normalizedModelLower.includes(keyLower))) ||
+              (modelLower && (keyLower.includes(modelLower) || modelLower.includes(keyLower)))) {
               tags = value;
               break;
             }
@@ -2087,7 +1977,7 @@ function setupDirectRoutes(app) {
         const planGroupKeys = Object.keys(planGroupRanges || {});
         const isBudget = tags.isBudget === true && tags.isPremium !== true;
         let selectedPlanGroup = planGroupKeys[0];
-        
+
         // 각 모델의 태그 기반으로 요금제군 결정
         if (isBudget && planGroupRanges['33군']) {
           selectedPlanGroup = '33군';
@@ -2109,37 +1999,37 @@ function setupDirectRoutes(app) {
           matchedValue: null,
           fallbackUsed: false
         };
-        
+
         if (selectedPlanGroup && policyRebateData[selectedPlanGroup]) {
           // 정책표에 실제로 있는 개통유형 확인
           const availableTypes = Object.keys(policyRebateData[selectedPlanGroup] || {});
-          
+
           // 로드 전 기본값(MNP)을 최우선으로 사용
           // 그 다음 정책표에 있는 개통유형
           let candidateTypes = [];
-          
+
           // 로드 전 기본값: MNP 최우선
           candidateTypes.push(defaultOpeningTypeForRebate);
-          
+
           // "번호이동"과 "MNP" 양방향 매칭
           if (!candidateTypes.includes('번호이동')) {
             candidateTypes.push('번호이동');
           }
-          
+
           // 정책표에 있는 개통유형 추가 (보조)
           candidateTypes.push(...availableTypes);
-          
+
           // 중복 제거
           candidateTypes = candidateTypes.filter((v, i, arr) => arr.indexOf(v) === i);
-          
+
           // 후보가 없으면 기본값
           if (candidateTypes.length === 0) {
             candidateTypes.push('010신규');
           }
-          
+
           rebateDebugInfo.candidateTypes = candidateTypes;
           let matched = false;
-          
+
           // 모델명 기준으로 리베이트 찾기
           for (const ot of candidateTypes) {
             const rebateMap = policyRebateData[selectedPlanGroup]?.[ot];
@@ -2147,7 +2037,7 @@ function setupDirectRoutes(app) {
               // 모델명으로 직접 찾기
               let rebateValue = rebateMap[model];
               let matchedKey = model;
-              
+
               if (rebateValue === undefined) {
                 rebateValue = rebateMap[model.toLowerCase()];
                 matchedKey = model.toLowerCase();
@@ -2168,7 +2058,7 @@ function setupDirectRoutes(app) {
                 rebateValue = rebateMap[normalizedModel.toUpperCase()];
                 matchedKey = normalizedModel.toUpperCase();
               }
-              
+
               if (rebateValue !== undefined) {
                 policyRebate = rebateValue || 0;
                 matchedOpeningType = ot;
@@ -2180,7 +2070,7 @@ function setupDirectRoutes(app) {
               }
             }
           }
-          
+
           // 모델명 기준 매칭 실패 시 인덱스 기반 폴백 (하위 호환)
           if (!matched && policyRebateDataByIndex[selectedPlanGroup]) {
             rebateDebugInfo.fallbackUsed = true;
@@ -2204,17 +2094,17 @@ function setupDirectRoutes(app) {
             }
           }
         }
-        
+
         // 정책표 리베이트 매칭 디버깅 로그 (대리점지원금 문제 모델만)
         const storeSupportProblemModels = [
-          'SM-F766N256', 'SM-S731N', 'SM-S937N256', 'SM-A166L', 
+          'SM-F766N256', 'SM-S731N', 'SM-S937N256', 'SM-A166L',
           'UIP17PR-256', 'A2633-128', 'AT-M140L'
         ];
-        const shouldLogRebate = storeSupportProblemModels.some(pm => 
-          model === pm || model.toLowerCase() === pm.toLowerCase() || 
+        const shouldLogRebate = storeSupportProblemModels.some(pm =>
+          model === pm || model.toLowerCase() === pm.toLowerCase() ||
           (normalizedModel && normalizedModel.toLowerCase() === pm.toLowerCase())
         );
-        
+
         if (shouldLogRebate) {
           if (!rebateDebugInfo.matched) {
             console.warn(`[Direct] ⚠️ 정책표 리베이트 매칭 실패:`, {
@@ -2239,12 +2129,12 @@ function setupDirectRoutes(app) {
         // 모델명+개통유형 조합으로 정확한 이통사지원금 행 찾기
         let finalSupportData = supportData;
         let finalSupportRowIndex = supportRowIndex;
-        
+
         // 이통사지원금 매칭에 사용할 개통유형: 초기 로드 시 기본값(MNP) 우선 사용
         // 정책표 리베이트 매칭 결과는 참고용으로만 사용
         // 초기 로드 시 프론트엔드 기본값은 항상 MNP이므로, MNP를 먼저 시도
         const defaultOpeningTypeForSupport = 'MNP';
-        
+
         const supportDebugInfo = {
           model,
           normalizedModel,
@@ -2255,7 +2145,7 @@ function setupDirectRoutes(app) {
           found: false,
           triedOpeningTypes: []
         };
-        
+
         // 시도할 개통유형 순서: MNP 우선, 그 다음 정책표 매칭 결과, 그 다음 다른 개통유형
         const tryOpeningTypes = [defaultOpeningTypeForSupport];
         if (matchedOpeningType && matchedOpeningType !== defaultOpeningTypeForSupport) {
@@ -2264,12 +2154,12 @@ function setupDirectRoutes(app) {
         // 다른 개통유형도 추가 (010신규, 기변)
         if (!tryOpeningTypes.includes('010신규')) tryOpeningTypes.push('010신규');
         if (!tryOpeningTypes.includes('기변')) tryOpeningTypes.push('기변');
-        
+
         // 각 개통유형을 순서대로 시도
         let supportOpeningType = null;
         for (const tryType of tryOpeningTypes) {
           supportDebugInfo.triedOpeningTypes.push(tryType);
-          
+
           // normalizedModel은 이미 위에서 선언됨 (1467번 라인)
           // 매칭 순서: 원본 → 대소문자 변형 → 하이픈 변형 → 정규화
           const candidateKeys = [
@@ -2277,7 +2167,7 @@ function setupDirectRoutes(app) {
             `${model.toLowerCase()}|${tryType}`,
             `${model.toUpperCase()}|${tryType}`,
           ];
-          
+
           // 하이픈 변형 추가 (원본 매칭 실패 시 시도)
           const hyphenVariants = generateHyphenVariants(model);
           hyphenVariants.forEach(variant => {
@@ -2289,7 +2179,7 @@ function setupDirectRoutes(app) {
               );
             }
           });
-          
+
           // 정규화된 모델명 (마지막 폴백)
           if (normalizedModel) {
             candidateKeys.push(
@@ -2298,7 +2188,7 @@ function setupDirectRoutes(app) {
               `${normalizedModel.toUpperCase()}|${tryType}`
             );
           }
-          
+
           let foundForThisType = false;
           for (const key of candidateKeys) {
             if (supportSheetData[key]) {
@@ -2311,9 +2201,9 @@ function setupDirectRoutes(app) {
               break;
             }
           }
-          
+
           if (foundForThisType) break;
-          
+
           // "번호이동"과 "MNP" 양방향 매칭
           if (tryType === 'MNP') {
             const mnpKeys = [
@@ -2321,7 +2211,7 @@ function setupDirectRoutes(app) {
               `${model.toLowerCase()}|번호이동`,
               `${model.toUpperCase()}|번호이동`,
             ];
-            
+
             // 하이픈 변형 추가
             const hyphenVariants = generateHyphenVariants(model);
             hyphenVariants.forEach(variant => {
@@ -2333,7 +2223,7 @@ function setupDirectRoutes(app) {
                 );
               }
             });
-            
+
             // 정규화된 모델명 (마지막 폴백)
             if (normalizedModel) {
               mnpKeys.push(
@@ -2342,7 +2232,7 @@ function setupDirectRoutes(app) {
                 `${normalizedModel.toUpperCase()}|번호이동`
               );
             }
-            
+
             for (const key of mnpKeys) {
               if (supportSheetData[key]) {
                 finalSupportData = supportSheetData[key];
@@ -2356,7 +2246,7 @@ function setupDirectRoutes(app) {
             }
             if (foundForThisType) break;
           }
-          
+
           // "010신규/기변" 매칭
           if (tryType === '010신규' || tryType === '기변') {
             const combinedKeys = [
@@ -2364,7 +2254,7 @@ function setupDirectRoutes(app) {
               `${model.toLowerCase()}|010신규/기변`,
               `${model.toUpperCase()}|010신규/기변`,
             ];
-            
+
             // 하이픈 변형 추가
             const hyphenVariants = generateHyphenVariants(model);
             hyphenVariants.forEach(variant => {
@@ -2376,7 +2266,7 @@ function setupDirectRoutes(app) {
                 );
               }
             });
-            
+
             // 정규화된 모델명 (마지막 폴백)
             if (normalizedModel) {
               combinedKeys.push(
@@ -2385,7 +2275,7 @@ function setupDirectRoutes(app) {
                 `${normalizedModel.toUpperCase()}|010신규/기변`
               );
             }
-            
+
             for (const key of combinedKeys) {
               if (supportSheetData[key]) {
                 finalSupportData = supportSheetData[key];
@@ -2400,14 +2290,14 @@ function setupDirectRoutes(app) {
             if (foundForThisType) break;
           }
         }
-        
+
         // 매칭된 개통유형이 없으면 기본값 사용
         if (!supportOpeningType) {
           supportOpeningType = defaultOpeningTypeForSupport;
         }
 
         supportDebugInfo.finalRowIndex = finalSupportRowIndex;
-        
+
         let publicSupport = 0;
         // 모델명+개통유형 복합키로 요금제군별 이통사지원금 직접 조회
         if (selectedPlanGroup && planGroupSupportData[selectedPlanGroup]) {
@@ -2417,7 +2307,7 @@ function setupDirectRoutes(app) {
             `${model.toLowerCase()}|${supportOpeningType}`,
             `${model.toUpperCase()}|${supportOpeningType}`
           ];
-          
+
           // 하이픈 변형 추가
           const hyphenVariants = generateHyphenVariants(model);
           hyphenVariants.forEach(variant => {
@@ -2429,7 +2319,7 @@ function setupDirectRoutes(app) {
               );
             }
           });
-          
+
           // 정규화된 모델명 (마지막 폴백)
           if (normalizedModel) {
             supportKeys.push(
@@ -2438,7 +2328,7 @@ function setupDirectRoutes(app) {
               `${normalizedModel.toUpperCase()}|${supportOpeningType}`
             );
           }
-          
+
           // 키를 순서대로 시도하여 값 찾기
           let foundKey = null;
           for (const key of supportKeys) {
@@ -2448,18 +2338,18 @@ function setupDirectRoutes(app) {
               break;
             }
           }
-          
+
           // 디버깅: 문제 모델에 대해 상세 로그
           const carrierSupportProblemModels = [
             'SM-S926N256', 'SM-S926N512', 'SM-S928N256', 'SM-S928N512',
             'UIP17-256', 'UIP17-512', 'UIPA-256', 'UIPA-512', 'UIPA-1T',
             'UIP17PR-256', 'UIP17PR-512', 'UIP17PR-1T'
           ];
-          const shouldLog = carrierSupportProblemModels.some(pm => 
-            model === pm || model.toLowerCase() === pm.toLowerCase() || 
+          const shouldLog = carrierSupportProblemModels.some(pm =>
+            model === pm || model.toLowerCase() === pm.toLowerCase() ||
             (normalizedModel && normalizedModel.toLowerCase() === pm.toLowerCase())
           );
-          
+
           if (shouldLog) {
             if (!foundKey) {
               console.warn(`[Direct] ⚠️ planGroupSupportData에서 키를 찾을 수 없음:`, {
@@ -2488,11 +2378,11 @@ function setupDirectRoutes(app) {
             'UIP17-256', 'UIP17-512', 'UIPA-256', 'UIPA-512', 'UIPA-1T',
             'UIP17PR-256', 'UIP17PR-512', 'UIP17PR-1T'
           ];
-          const shouldLog = carrierSupportProblemModels.some(pm => 
-            model === pm || model.toLowerCase() === pm.toLowerCase() || 
+          const shouldLog = carrierSupportProblemModels.some(pm =>
+            model === pm || model.toLowerCase() === pm.toLowerCase() ||
             (normalizedModel && normalizedModel.toLowerCase() === pm.toLowerCase())
           );
-          
+
           if (shouldLog) {
             console.warn(`[Direct] ⚠️ planGroupSupportData가 없음:`, {
               모델명: model,
@@ -2502,7 +2392,7 @@ function setupDirectRoutes(app) {
             });
           }
         }
-        
+
         // 이통사지원금 매칭 디버깅 로그 (이통사지원금 문제 모델만)
         const carrierSupportProblemModels = [
           'SM-S926N256', 'SM-S926N512', 'SM-S928N256', 'SM-S928N512',
@@ -2510,11 +2400,11 @@ function setupDirectRoutes(app) {
           'UIP17PR-256', 'UIP17PR-512', 'UIP17PR-1T'
         ];
         // 이통사지원금 문제 모델은 모든 개통유형에서 로그 출력
-        const shouldLogCarrierSupport = carrierSupportProblemModels.some(pm => 
-          model === pm || model.toLowerCase() === pm.toLowerCase() || 
+        const shouldLogCarrierSupport = carrierSupportProblemModels.some(pm =>
+          model === pm || model.toLowerCase() === pm.toLowerCase() ||
           (normalizedModel && normalizedModel.toLowerCase() === pm.toLowerCase())
         );
-        
+
         if (shouldLogCarrierSupport) {
           if (!supportDebugInfo.found) {
             console.warn(`[Direct] ⚠️ 이통사지원금 매칭 실패:`, {
@@ -2554,7 +2444,7 @@ function setupDirectRoutes(app) {
           + totalAddonDeduction // 부가서비스 차감금액
           + totalSpecialDeduction // 별도정책 차감금액
         );
-        
+
         // 최종 계산값 디버깅 로그 (대리점지원금 문제 모델만)
         if (shouldLogRebate) {
           console.log(`[Direct] 💰 최종 계산값:`, {
@@ -2581,14 +2471,14 @@ function setupDirectRoutes(app) {
         // 구매가 계산
         // 대리점추가지원금에 이미 정책표리베이트, 마진, 부가서비스, 별도정책이 포함되어 있으므로
         // 구매가 = 출고가 - 이통사지원금 - 대리점추가지원금
-        const purchasePriceWithAddon = Math.max(0, 
-          factoryPrice 
+        const purchasePriceWithAddon = Math.max(0,
+          factoryPrice
           - publicSupport       // 이통사지원금 요금제구간별
           - storeSupportWithAddon  // 대리점추가지원금 (정책표리베이트 - 마진 + 부가서비스추가 + 별도정책추가 포함)
         );
-        
-        const purchasePriceWithoutAddon = Math.max(0, 
-          factoryPrice 
+
+        const purchasePriceWithoutAddon = Math.max(0,
+          factoryPrice
           - publicSupport       // 이통사지원금 요금제구간별
           - storeSupportWithoutAddon  // 대리점추가지원금 (정책표리베이트 - 마진 + 부가서비스차감 + 별도정책차감 포함)
         );
@@ -2600,7 +2490,7 @@ function setupDirectRoutes(app) {
         if (tags.isCheap) tagsArray.push('cheap');
         if (tags.isPremium) tagsArray.push('premium');
         if (tags.isBudget) tagsArray.push('budget');
-        
+
         // 디버깅: UIP 관련 모델명에 대한 상세 로그
         if (tagMap.size > 0 && (model.includes('UIP') || model.includes('uip'))) {
           if (tags.isPremium || tags.isBudget) {
@@ -2615,10 +2505,10 @@ function setupDirectRoutes(app) {
                 const modelLower = model.toLowerCase();
                 const normalizedModel = normalizeModelCode(model);
                 const normalizedModelLower = normalizedModel ? normalizedModel.toLowerCase() : '';
-                return kLower.includes(modelLower) || 
-                       modelLower.includes(kLower) || 
-                       kLower === modelLower ||
-                       (normalizedModelLower && (kLower.includes(normalizedModelLower) || normalizedModelLower.includes(kLower)));
+                return kLower.includes(modelLower) ||
+                  modelLower.includes(kLower) ||
+                  kLower === modelLower ||
+                  (normalizedModelLower && (kLower.includes(normalizedModelLower) || normalizedModelLower.includes(kLower)));
               });
               console.log(`[Direct] ⚠️ UIP 태그를 찾을 수 없음:`, {
                 통신사: carrierParam,
@@ -2649,12 +2539,12 @@ function setupDirectRoutes(app) {
             // 1. 통신사+모델명 조합으로 먼저 조회 (가장 정확)
             const key = `${carrierParam}:${model}`;
             let imgUrl = imageMap.get(key);
-            
+
             // 2. 없으면 모델명만으로 조회 (하위 호환)
             if (!imgUrl) {
               imgUrl = imageMap.get(model);
             }
-            
+
             // 3. 정규화된 키로 조회 (형식 차이 무시)
             if (!imgUrl) {
               const normalizedModel = normalizeModelCode(model);
@@ -2666,20 +2556,20 @@ function setupDirectRoutes(app) {
                 }
               }
             }
-            
+
             // 4. 여전히 없으면 유사한 키 찾기 (공백, 하이픈 등 차이 무시)
             if (!imgUrl && imageMap.size > 0) {
               const modelNormalized = normalizeModelCode(model);
               const mapKeys = Array.from(imageMap.keys());
-              
+
               for (const mapKey of mapKeys) {
                 // 통신사 부분 제거 후 비교
                 const keyWithoutCarrier = mapKey.includes(':') ? mapKey.split(':')[1] : mapKey;
                 const keyNormalized = normalizeModelCode(keyWithoutCarrier);
-                
-                if (keyNormalized === modelNormalized || 
-                    keyNormalized.includes(modelNormalized) || 
-                    modelNormalized.includes(keyNormalized)) {
+
+                if (keyNormalized === modelNormalized ||
+                  keyNormalized.includes(modelNormalized) ||
+                  modelNormalized.includes(keyNormalized)) {
                   imgUrl = imageMap.get(mapKey);
                   if (isDebugTarget(model)) {
                     console.log(`[Direct] ✅ 유사 키로 이미지 찾음: 모델명=${model}, 맵키=${mapKey}`);
@@ -2688,7 +2578,7 @@ function setupDirectRoutes(app) {
                 }
               }
             }
-            
+
             // 디버깅: 이미지를 찾지 못한 경우 상세 로그 (디버깅 대상 모델만)
             if (!imgUrl && imageMap.size > 0 && isDebugTarget(model)) {
               const mapKeys = Array.from(imageMap.keys());
@@ -2726,18 +2616,18 @@ function setupDirectRoutes(app) {
     } catch (error) {
       console.error(`[Direct] getMobileList error (통신사: ${carrier || 'SK'}):`, error);
       console.error('[Direct] Error stack:', error.stack);
-      
+
       // Rate limit 에러인지 확인
-      const isRateLimitError = error.code === 429 || 
+      const isRateLimitError = error.code === 429 ||
         (error.response && error.response.status === 429) ||
         (error.message && error.message.includes('Quota exceeded')) ||
         (error.message && error.message.includes('rateLimitExceeded'));
-      
+
       if (isRateLimitError) {
         // Rate limit 에러인 경우 특별한 객체 반환 (캐시 저장 방지용)
         return { __rateLimitError: true, __carrier: carrier };
       }
-      
+
       // 에러를 throw하지 않고 빈 배열 반환하여 다른 통신사 데이터는 정상적으로 가져올 수 있도록 함
       return [];
     }
@@ -2774,7 +2664,7 @@ function setupDirectRoutes(app) {
       }
 
       const mobileListResult = await getMobileList(carrier);
-      
+
       // Rate limit 에러인 경우 처리
       if (mobileListResult && typeof mobileListResult === 'object' && mobileListResult.__rateLimitError) {
         const errorMsg = 'Google Sheets API 할당량 초과로 데이터를 가져올 수 없습니다. 잠시 후 다시 시도해주세요.';
@@ -2794,14 +2684,14 @@ function setupDirectRoutes(app) {
         }
         return res.json([]);
       }
-      
+
       const mobileList = Array.isArray(mobileListResult) ? mobileListResult : [];
-      
+
       // Rate limit 에러가 아닌 경우에만 캐시 저장 (빈 배열이어도 저장)
       if (!(mobileListResult && typeof mobileListResult === 'object' && mobileListResult.__rateLimitError)) {
         setCache(cacheKey, mobileList, 5 * 60 * 1000); // 5분 캐시 (로딩 시간 최적화)
       }
-      
+
       if (includeMeta) {
         const isEmpty = (mobileList.length || 0) === 0;
         // 서버 로그에서 확인된 일반적인 원인들
@@ -2846,13 +2736,13 @@ function setupDirectRoutes(app) {
       }
 
       // 각 통신사별로 mobiles 데이터 가져오기 (병렬 처리로 최적화)
-      const mobileListPromises = carriers.map(carrier => 
+      const mobileListPromises = carriers.map(carrier =>
         getMobileList(carrier).catch(err => {
           console.warn(`[Direct] ${carrier} 통신사 데이터 가져오기 실패:`, err);
           return []; // 에러 시 빈 배열 반환
         })
       );
-      
+
       const mobileLists = await Promise.all(mobileListPromises);
       mobileLists.forEach(mobileList => {
         allMobiles.push(...mobileList);
@@ -2914,16 +2804,16 @@ function setupDirectRoutes(app) {
       if (parts.length < 3) {
         return res.status(400).json({ success: false, error: '잘못된 모델 ID 형식입니다.' });
       }
-      
+
       const carrier = carrierFromBody || parts[1]; // SK, KT, LG
       const index = parseInt(parts[2], 10);
-      
+
       if (isNaN(index)) {
         return res.status(400).json({ success: false, error: '잘못된 모델 인덱스입니다.' });
       }
-      
+
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
-      
+
       // 링크설정에서 정책표 설정 읽기
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_SETTINGS, HEADERS_SETTINGS);
       const settingsRes = await sheets.spreadsheets.values.get({
@@ -2931,7 +2821,7 @@ function setupDirectRoutes(app) {
         range: SHEET_SETTINGS
       });
       const settingsRows = (settingsRes.data.values || []).slice(1);
-      
+
       const policyRow = settingsRows.find(row => (row[0] || '').trim() === carrier && (row[1] || '').trim() === 'policy');
       if (!policyRow || !policyRow[2]) {
         return res.status(404).json({ success: false, error: `${carrier} 정책표 설정을 찾을 수 없습니다.` });
@@ -2940,7 +2830,7 @@ function setupDirectRoutes(app) {
       const policySettingsJson = policyRow[4] ? JSON.parse(policyRow[4]) : {};
       const policySheetId = policyRow[2].trim();
       const modelRange = policySettingsJson.modelRange || '';
-      
+
       if (!modelRange) {
         return res.status(404).json({ success: false, error: `${carrier} 정책표 설정에서 모델명 범위가 누락되었습니다.` });
       }
@@ -2968,7 +2858,7 @@ function setupDirectRoutes(app) {
       if (!modelName) {
         return res.status(404).json({ success: false, error: '모델을 찾을 수 없습니다.' });
       }
-      
+
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, '직영점_오늘의휴대폰', [
         '모델명', '펫네임', '통신사', '출고가', '이통사지원금', '대리점지원금(부가유치)', '대리점지원금(부가미유치)', '이미지', '필수부가서비스', '인기', '추천', '저렴', '프리미엄', '중저가'
       ]);
@@ -2982,7 +2872,7 @@ function setupDirectRoutes(app) {
 
       // 해당 모델명의 행 찾기
       const rowIndex = todaysRows.findIndex(row => (row[0] || '').trim() === modelName);
-      
+
       // 기존 행 정보 확보
       const existingRow = todaysRows[rowIndex] || [];
       const toText = (v) => (v === undefined || v === null ? '' : v);
@@ -3047,7 +2937,7 @@ function setupDirectRoutes(app) {
     try {
       const { modelId } = req.params;
       const { planGroup, openingType = '010신규', carrier } = req.query;
-      
+
       if (!planGroup || !carrier) {
         return res.status(400).json({ success: false, error: 'planGroup과 carrier가 필요합니다.' });
       }
@@ -3057,7 +2947,7 @@ function setupDirectRoutes(app) {
       // 링크 설정 가져오기 (캐시 사용)
       const carrierSettings = await getLinkSettings(carrier);
       const policyRow = carrierSettings.find(row => (row[1] || '').trim() === 'policy');
-      
+
       if (!policyRow) {
         return res.status(404).json({ success: false, error: '정책표 설정을 찾을 수 없습니다.' });
       }
@@ -3065,7 +2955,7 @@ function setupDirectRoutes(app) {
       const policySettingsJson = policyRow[4] ? JSON.parse(policyRow[4]) : {};
       const policySheetId = policyRow[2] || '';
       const modelRange = policySettingsJson.modelRange || '';
-      
+
       // 모델 인덱스 추출 (modelId에서)
       const parts = modelId.split('-');
       if (parts.length < 3) {
@@ -3075,9 +2965,9 @@ function setupDirectRoutes(app) {
 
       // 정책표에서 모델 정보 가져오기 (캐시 사용)
       const modelData = await getSheetData(policySheetId, modelRange);
-      
+
       let modelRow = null;
-      
+
       // 인덱스 범위 체크
       if (!isNaN(modelIndex) && modelIndex >= 0 && modelIndex < modelData.length) {
         modelRow = modelData[modelIndex];
@@ -3087,21 +2977,21 @@ function setupDirectRoutes(app) {
           modelRow = null; // 빈 행이면 null로 설정
         }
       }
-      
+
       // 인덱스로 찾기 실패 시 모델명으로 찾기 시도 (query parameter로 modelName 전달 시)
       if (!modelRow && req.query.modelName) {
         const targetModelName = req.query.modelName.trim();
         const targetModelNormalized = normalizeModelCode(targetModelName);
-        
+
         for (let i = 0; i < modelData.length; i++) {
           const rowModel = (modelData[i]?.[0] || '').toString().trim();
           if (!rowModel) continue;
-          
+
           if (rowModel === targetModelName) {
             modelRow = modelData[i];
             break;
           }
-          
+
           const normalized = normalizeModelCode(rowModel);
           if (normalized && targetModelNormalized && normalized === targetModelNormalized) {
             modelRow = modelData[i];
@@ -3109,7 +2999,7 @@ function setupDirectRoutes(app) {
           }
         }
       }
-      
+
       if (!modelRow || !modelRow[0]) {
         console.error(`[Direct] /calculate 모델을 찾을 수 없음:`, {
           modelId,
@@ -3120,9 +3010,9 @@ function setupDirectRoutes(app) {
           openingType,
           carrier
         });
-        return res.status(404).json({ 
-          success: false, 
-          error: `모델을 찾을 수 없습니다. (인덱스: ${modelIndex}, 범위: 0-${modelData.length - 1})` 
+        return res.status(404).json({
+          success: false,
+          error: `모델을 찾을 수 없습니다. (인덱스: ${modelIndex}, 범위: 0-${modelData.length - 1})`
         });
       }
 
@@ -3134,7 +3024,7 @@ function setupDirectRoutes(app) {
         const supportSheetId = supportRow[2] || '';
         const factoryPriceRange = supportSettingsJson.factoryPriceRange || '';
         const modelRange = supportSettingsJson.modelRange || '';
-        
+
         if (factoryPriceRange && modelRange && supportSheetId) {
           try {
             // 이통사 지원금 시트 데이터 가져오기 (캐시 사용)
@@ -3142,7 +3032,7 @@ function setupDirectRoutes(app) {
               getSheetData(supportSheetId, modelRange),
               getSheetData(supportSheetId, factoryPriceRange)
             ]);
-            
+
             // 정책표의 모델명으로 이통사 지원금 시트에서 매칭
             const policyModel = (modelRow[0] || '').toString().trim();
             const policyModelNormalized = normalizeModelCode(policyModel);
@@ -3165,7 +3055,7 @@ function setupDirectRoutes(app) {
       // 정책표 리베이트 가져오기
       const planGroupRanges = policySettingsJson.planGroupRanges || {};
       const rebateRange = planGroupRanges[planGroup]?.[openingType];
-      
+
       let policyRebate = 0;
       if (rebateRange && policySheetId) {
         try {
@@ -3180,13 +3070,13 @@ function setupDirectRoutes(app) {
       // 정책설정 가져오기 (캐시 사용)
       const policySettings = await getPolicySettings(carrier);
       const { baseMargin, addonList, insuranceList, specialPolicies } = policySettings;
-      
+
       // 부가서비스 + 보험상품 추가금액 합계 (부가유치)
       const totalAddonIncentive = addonList.reduce((sum, addon) => sum + (addon.incentive || 0), 0) +
-                                  insuranceList.reduce((sum, insurance) => sum + (insurance.incentive || 0), 0);
+        insuranceList.reduce((sum, insurance) => sum + (insurance.incentive || 0), 0);
       // 부가서비스 + 보험상품 차감금액 합계 (부가미유치)
       const totalAddonDeduction = addonList.reduce((sum, addon) => sum + (addon.deduction || 0), 0) +
-                                  insuranceList.reduce((sum, insurance) => sum + (insurance.deduction || 0), 0);
+        insuranceList.reduce((sum, insurance) => sum + (insurance.deduction || 0), 0);
 
       const totalSpecialAddition = specialPolicies.reduce((sum, policy) => sum + (policy.addition || 0), 0);
       const totalSpecialDeduction = specialPolicies.reduce((sum, policy) => sum + (policy.deduction || 0), 0);
@@ -3200,23 +3090,23 @@ function setupDirectRoutes(app) {
         const supportRange = planGroupRanges[planGroup];
         const modelRange = supportSettingsJson.modelRange || '';
         const openingTypeRange = supportSettingsJson.openingTypeRange || '';
-        
+
         // planGroupSupportData를 캐시에서 가져오기 (getMobileList에서 생성한 것 재사용)
         const planGroupSupportDataCacheKey = `planGroupSupportData-${carrier}`;
         const planGroupSupportData = getCache(planGroupSupportDataCacheKey);
-        
+
         if (planGroupSupportData && planGroupSupportData[planGroup]) {
           // 캐시에서 planGroupSupportData를 찾았으면 직접 사용 (API 호출 없음)
           const policyModel = (modelRow[0] || '').toString().trim();
           const policyModelNormalized = normalizeModelCode(policyModel);
-          
+
           // 시도할 키 목록: 원본 → 대소문자 변형 → 하이픈 변형 → 정규화
           const supportKeys = [
             `${policyModel}|${openingType}`,
             `${policyModel.toLowerCase()}|${openingType}`,
             `${policyModel.toUpperCase()}|${openingType}`
           ];
-          
+
           // 하이픈 변형 추가
           const hyphenVariants = generateHyphenVariants(policyModel);
           hyphenVariants.forEach(variant => {
@@ -3228,7 +3118,7 @@ function setupDirectRoutes(app) {
               );
             }
           });
-          
+
           if (policyModelNormalized) {
             supportKeys.push(
               `${policyModelNormalized}|${openingType}`,
@@ -3236,7 +3126,7 @@ function setupDirectRoutes(app) {
               `${policyModelNormalized.toUpperCase()}|${openingType}`
             );
           }
-          
+
           // "번호이동" → MNP 매핑도 시도
           if (openingType === 'MNP') {
             supportKeys.push(
@@ -3261,7 +3151,7 @@ function setupDirectRoutes(app) {
               );
             }
           }
-          
+
           // "010신규/기변" 매핑도 시도
           if (openingType === '010신규' || openingType === '기변') {
             supportKeys.push(
@@ -3286,7 +3176,7 @@ function setupDirectRoutes(app) {
               );
             }
           }
-          
+
           // 키를 순서대로 시도하여 값 찾기
           let foundKey = null;
           for (const key of supportKeys) {
@@ -3296,7 +3186,7 @@ function setupDirectRoutes(app) {
               break;
             }
           }
-          
+
           if (foundKey) {
             console.log(`[Direct] /calculate 이통사지원금 매칭 성공 (캐시 사용):`, {
               modelId,
@@ -3356,7 +3246,7 @@ function setupDirectRoutes(app) {
                         openingTypesFB.forEach(addKeys);
                         if (openingTypeRawFB === '번호이동' || openingTypesFB.includes('번호이동')) addKeys('MNP');
                         if (openingTypeRawFB === '010신규/기변' ||
-                            (openingTypesFB.includes('010신규') && openingTypesFB.includes('기변'))) {
+                          (openingTypesFB.includes('010신규') && openingTypesFB.includes('기변'))) {
                           addKeys('010신규'); addKeys('기변');
                         }
                       }
@@ -3414,7 +3304,7 @@ function setupDirectRoutes(app) {
               getSheetData(supportSheetId, supportRange),
               openingTypeRange ? getSheetData(supportSheetId, openingTypeRange) : Promise.resolve([])
             ]);
-            
+
             console.log(`[Direct] /calculate 이통사지원금 조회 (폴백):`, {
               modelId,
               policyModel: (modelRow[0] || '').toString().trim(),
@@ -3425,11 +3315,11 @@ function setupDirectRoutes(app) {
               supportModelDataLength: supportModelData.length,
               supportValuesLength: supportValues.length
             });
-            
+
             // 정책표의 모델명으로 이통사 지원금 시트에서 매칭
             const policyModel = (modelRow[0] || '').toString().trim();
             const policyModelNormalized = normalizeModelCode(policyModel);
-            
+
             // getMobileList와 동일한 로직: planGroupSupportData 생성하여 사용
             // openingTypeRange가 없으면 인덱스 기반으로만 매칭
             if (!openingTypeRange || supportOpeningTypeData.length === 0) {
@@ -3466,7 +3356,7 @@ function setupDirectRoutes(app) {
                 const rowNumber = parseInt(rangeMatch[1], 10);
                 startRow = rowNumber - 1; // 0-based index로 변환
               }
-              
+
               // 모델명+개통유형 복합키 맵 생성 (getMobileList와 동일한 로직)
               const supportMap = {};
               const maxRows = Math.min(
@@ -3474,20 +3364,20 @@ function setupDirectRoutes(app) {
                 supportOpeningTypeData.length - startRow,
                 supportValues.length
               );
-              
+
               for (let j = 0; j < maxRows; j++) {
                 const modelIndex = startRow + j;
                 const model = (supportModelData[modelIndex]?.[0] || '').toString().trim();
                 if (!model) continue;
-                
+
                 const openingTypeRaw = (supportOpeningTypeData[modelIndex]?.[0] || '').toString().trim();
                 const openingTypes = parseOpeningTypes(openingTypeRaw);
                 const supportValue = Number((supportValues[j]?.[0] || 0).toString().replace(/,/g, '')) || 0;
-                
+
                 // 하이픈 변형 생성
                 const hyphenVariants = generateHyphenVariants(model);
                 const normalizedModel = normalizeModelCode(model);
-                
+
                 // 각 개통유형에 대해 복합키 생성
                 if (openingTypeRaw === '전유형' || openingTypes.includes('전유형')) {
                   ['010신규', 'MNP', '기변'].forEach(ot => {
@@ -3495,7 +3385,7 @@ function setupDirectRoutes(app) {
                     if (!supportMap[key]) supportMap[key] = supportValue;
                     supportMap[`${model.toLowerCase()}|${ot}`] = supportValue;
                     supportMap[`${model.toUpperCase()}|${ot}`] = supportValue;
-                    
+
                     hyphenVariants.forEach(variant => {
                       if (variant !== model) {
                         const variantKey = `${variant}|${ot}`;
@@ -3504,7 +3394,7 @@ function setupDirectRoutes(app) {
                         supportMap[`${variant.toUpperCase()}|${ot}`] = supportValue;
                       }
                     });
-                    
+
                     if (normalizedModel) {
                       const normalizedKey = `${normalizedModel}|${ot}`;
                       if (!supportMap[normalizedKey]) supportMap[normalizedKey] = supportValue;
@@ -3518,7 +3408,7 @@ function setupDirectRoutes(app) {
                     if (!supportMap[key]) supportMap[key] = supportValue;
                     supportMap[`${model.toLowerCase()}|${ot}`] = supportValue;
                     supportMap[`${model.toUpperCase()}|${ot}`] = supportValue;
-                    
+
                     hyphenVariants.forEach(variant => {
                       if (variant !== model) {
                         const variantKey = `${variant}|${ot}`;
@@ -3527,7 +3417,7 @@ function setupDirectRoutes(app) {
                         supportMap[`${variant.toUpperCase()}|${ot}`] = supportValue;
                       }
                     });
-                    
+
                     if (normalizedModel) {
                       const normalizedKey = `${normalizedModel}|${ot}`;
                       if (!supportMap[normalizedKey]) supportMap[normalizedKey] = supportValue;
@@ -3535,7 +3425,7 @@ function setupDirectRoutes(app) {
                       supportMap[`${normalizedModel.toUpperCase()}|${ot}`] = supportValue;
                     }
                   });
-                  
+
                   // "번호이동" → MNP 매핑
                   if (openingTypeRaw === '번호이동' || openingTypes.includes('번호이동')) {
                     const mnpKeys = [`${model}|MNP`, `${model.toLowerCase()}|MNP`, `${model.toUpperCase()}|MNP`];
@@ -3551,16 +3441,16 @@ function setupDirectRoutes(app) {
                       if (!supportMap[key]) supportMap[key] = supportValue;
                     });
                   }
-                  
+
                   // "010신규/기변" → 010신규와 기변 매핑
                   if (openingTypeRaw === '010신규/기변' ||
-                      (openingTypes.includes('010신규') && openingTypes.includes('기변'))) {
+                    (openingTypes.includes('010신규') && openingTypes.includes('기변'))) {
                     ['010신규', '기변'].forEach(ot => {
                       const key = `${model}|${ot}`;
                       if (!supportMap[key]) supportMap[key] = supportValue;
                       supportMap[`${model.toLowerCase()}|${ot}`] = supportValue;
                       supportMap[`${model.toUpperCase()}|${ot}`] = supportValue;
-                      
+
                       hyphenVariants.forEach(variant => {
                         if (variant !== model) {
                           const variantKey = `${variant}|${ot}`;
@@ -3569,7 +3459,7 @@ function setupDirectRoutes(app) {
                           supportMap[`${variant.toUpperCase()}|${ot}`] = supportValue;
                         }
                       });
-                      
+
                       if (normalizedModel) {
                         const normalizedKey = `${normalizedModel}|${ot}`;
                         if (!supportMap[normalizedKey]) supportMap[normalizedKey] = supportValue;
@@ -3580,14 +3470,14 @@ function setupDirectRoutes(app) {
                   }
                 }
               }
-              
+
               // 모델명+개통유형 복합키로 직접 조회 (getMobileList와 동일)
               const supportKeys = [
                 `${policyModel}|${openingType}`,
                 `${policyModel.toLowerCase()}|${openingType}`,
                 `${policyModel.toUpperCase()}|${openingType}`
               ];
-              
+
               const policyHyphenVariants = generateHyphenVariants(policyModel);
               policyHyphenVariants.forEach(variant => {
                 if (variant !== policyModel) {
@@ -3598,7 +3488,7 @@ function setupDirectRoutes(app) {
                   );
                 }
               });
-              
+
               if (policyModelNormalized) {
                 supportKeys.push(
                   `${policyModelNormalized}|${openingType}`,
@@ -3606,7 +3496,7 @@ function setupDirectRoutes(app) {
                   `${policyModelNormalized.toUpperCase()}|${openingType}`
                 );
               }
-              
+
               // "번호이동" → MNP 매핑도 시도
               if (openingType === 'MNP') {
                 supportKeys.push(
@@ -3631,7 +3521,7 @@ function setupDirectRoutes(app) {
                   );
                 }
               }
-              
+
               // "010신규/기변" 매핑도 시도
               if (openingType === '010신규' || openingType === '기변') {
                 supportKeys.push(
@@ -3656,7 +3546,7 @@ function setupDirectRoutes(app) {
                   );
                 }
               }
-              
+
               // 키를 순서대로 시도하여 값 찾기
               let foundKey = null;
               for (const key of supportKeys) {
@@ -3666,7 +3556,7 @@ function setupDirectRoutes(app) {
                   break;
                 }
               }
-              
+
               if (foundKey) {
                 console.log(`[Direct] /calculate 이통사지원금 매칭 성공:`, {
                   modelId,
@@ -3741,24 +3631,24 @@ function setupDirectRoutes(app) {
       }
 
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
-      
+
       // 시트 헤더 확인 및 생성
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_MAIN_PAGE_TEXTS, HEADERS_MAIN_PAGE_TEXTS);
-      
+
       // 데이터 조회
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
         range: `${SHEET_MAIN_PAGE_TEXTS}!A:F`
       });
-      
+
       const rows = (response.data.values || []).slice(1); // 헤더 제외
-      
+
       // 데이터 파싱
       const texts = {
         mainHeader: null,
         transitionPages: {}
       };
-      
+
       rows.forEach(row => {
         const carrier = (row[0] || '').trim();
         const category = (row[1] || '').trim();
@@ -3766,7 +3656,7 @@ function setupDirectRoutes(app) {
         const content = (row[3] || '').trim();
         const imageUrl = (row[4] || '').trim();
         const updatedAt = (row[5] || '').trim();
-        
+
         if (textType === 'mainHeader') {
           texts.mainHeader = {
             content,
@@ -3784,7 +3674,7 @@ function setupDirectRoutes(app) {
           };
         }
       });
-      
+
       const payload = { success: true, data: texts };
       // 시트에 정상적으로 접근되었을 때만 캐시 저장
       setCache(cacheKey, payload, 5 * 60 * 1000); // 5분 캐시
@@ -3804,41 +3694,41 @@ function setupDirectRoutes(app) {
   router.post('/main-page-texts', async (req, res) => {
     try {
       const { carrier, category, textType, content, imageUrl } = req.body;
-      
+
       if (!textType || (textType !== 'mainHeader' && textType !== 'transitionPage')) {
         return res.status(400).json({ success: false, error: '설정유형이 올바르지 않습니다.' });
       }
-      
+
       if (textType === 'transitionPage' && (!carrier || !category)) {
         return res.status(400).json({ success: false, error: '통신사와 카테고리가 필요합니다.' });
       }
-      
+
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
-      
+
       // 시트 헤더 확인 및 생성
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_MAIN_PAGE_TEXTS, HEADERS_MAIN_PAGE_TEXTS);
-      
+
       // 기존 데이터 조회
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
         range: `${SHEET_MAIN_PAGE_TEXTS}!A:F`
       });
-      
+
       const rows = (response.data.values || []).slice(1);
       const now = new Date().toISOString();
-      
+
       // 기존 행 찾기
       let existingRowIndex = -1;
       if (textType === 'mainHeader') {
         existingRowIndex = rows.findIndex(row => (row[2] || '').trim() === 'mainHeader');
       } else if (textType === 'transitionPage') {
-        existingRowIndex = rows.findIndex(row => 
+        existingRowIndex = rows.findIndex(row =>
           (row[0] || '').trim() === carrier &&
           (row[1] || '').trim() === category &&
           (row[2] || '').trim() === 'transitionPage'
         );
       }
-      
+
       const newRow = [
         textType === 'mainHeader' ? '' : carrier,
         textType === 'mainHeader' ? '' : category,
@@ -3847,7 +3737,7 @@ function setupDirectRoutes(app) {
         imageUrl || '',
         now
       ];
-      
+
       if (existingRowIndex !== -1) {
         // 기존 행 업데이트
         await sheets.spreadsheets.values.update({
@@ -3866,10 +3756,10 @@ function setupDirectRoutes(app) {
           resource: { values: [newRow] }
         });
       }
-      
+
       // 캐시 무효화
       deleteCache('main-page-texts');
-      
+
       res.json({ success: true, message: '문구가 저장되었습니다.' });
     } catch (error) {
       console.error('[Direct] main-page-texts POST error:', error);

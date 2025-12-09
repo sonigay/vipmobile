@@ -56,7 +56,7 @@ const MobileListTab = ({ onProductSelect }) => {
   const pendingRequestsRef = useRef(new Map()); // { cacheKey: Promise } - 중복 요청 방지
   const initializedRef = useRef(false); // 초기화 완료 여부 추적
   const userSelectedOpeningTypesRef = useRef(new Set()); // 사용자가 수동으로 선택한 개통유형 추적
-  
+
   // 개통 유형 목록 (고정)
   const openingTypes = ['010신규', 'MNP', '기변'];
 
@@ -87,8 +87,8 @@ const MobileListTab = ({ onProductSelect }) => {
           pricing: { ...prev.pricing, status: 'idle', message: '' }
         }));
         const carrier = getCurrentCarrier();
-        
-        const { list, meta } = await directStoreApi.getMobileList(carrier, { 
+
+        const { list, meta } = await directStoreApi.getMobileList(carrier, {
           withMeta: true
         }) || {};
         const safeList = list || [];
@@ -97,8 +97,8 @@ const MobileListTab = ({ onProductSelect }) => {
           ...prev,
           fetch: {
             ...prev.fetch,
-          status: safeList.length > 0 ? 'success' : 'empty',
-          message: safeList.length > 0 ? '' : (meta?.error || '수신된 데이터가 없습니다.')
+            status: safeList.length > 0 ? 'success' : 'empty',
+            message: safeList.length > 0 ? '' : (meta?.error || '수신된 데이터가 없습니다.')
           }
         }));
       } catch (err) {
@@ -126,7 +126,7 @@ const MobileListTab = ({ onProductSelect }) => {
       if (initializedRef.current && userSelectedOpeningTypesRef.current.size > 0) {
         return;
       }
-      
+
       setSteps(prev => ({
         ...prev,
         pricing: { ...prev.pricing, status: 'loading', message: '' }
@@ -138,7 +138,7 @@ const MobileListTab = ({ onProductSelect }) => {
 
       // 모든 모델에 대해 기본값 설정 및 가격 계산 준비
       const cacheEntries = [];
-      
+
       for (const model of mobileList) {
         // 사용자가 수동으로 선택한 개통유형은 보존
         if (userSelectedOpeningTypesRef.current.has(model.id)) {
@@ -153,7 +153,7 @@ const MobileListTab = ({ onProductSelect }) => {
           }
           continue;
         }
-        
+
         // 초기 로딩 시에는 기존 값이 있어도 기본값으로 재설정하지 않음
         // 단, 값이 없을 때만 기본값 설정
         if (newPlanGroups[model.id] && newOpeningTypes[model.id]) {
@@ -175,13 +175,13 @@ const MobileListTab = ({ onProductSelect }) => {
                 }
               }));
               // mobileList 상태도 업데이트
-              setMobileList(prevList => prevList.map(item => 
-                item.id === model.id 
-                  ? { 
-                      ...item, 
-                      publicSupport: cached.publicSupport || item.publicSupport || 0,
-                      support: cached.publicSupport || item.support || item.publicSupport || 0
-                    }
+              setMobileList(prevList => prevList.map(item =>
+                item.id === model.id
+                  ? {
+                    ...item,
+                    publicSupport: cached.publicSupport || item.publicSupport || 0,
+                    support: cached.publicSupport || item.support || item.publicSupport || 0
+                  }
                   : item
               ));
             } else {
@@ -196,54 +196,63 @@ const MobileListTab = ({ onProductSelect }) => {
         const isPremium = model.isPremium || false;
         const isBudget = model.isBudget || false;
 
-        // 기본값 결정
-        let defaultPlanGroup = '115군'; // 기본값: 115군
-        const defaultOpeningType = 'MNP'; // 기본값: MNP
+        // 기본값 결정 (사용자 요구사항에 맞춘 엄격한 규칙)
+        let defaultPlanGroup = '115군'; // 기본값 (미선택/기타): 115군
+        const defaultOpeningType = 'MNP'; // 기본값 (모든 경우): MNP (번호이동)
 
-        if (isPremium && !isBudget) {
-          // 프리미엄만 체크: 115군
+        if (isPremium) {
+          // 프리미엄: 115군
           defaultPlanGroup = '115군';
-        } else if (isBudget && !isPremium) {
-          // 중저가만 체크: 33군
+        } else if (isBudget) {
+          // 중저가: 33군 (프리미엄이 아닐 때만)
           defaultPlanGroup = '33군';
         } else {
-          // 둘 다 체크 또는 둘 다 없음: 115군 (프리미엄 우선)
+          // 둘 다 체크 안됨: 115군
           defaultPlanGroup = '115군';
         }
 
-        // 요금제군이 목록에 있는지 확인
-        if (planGroups.includes(defaultPlanGroup)) {
-          newPlanGroups[model.id] = defaultPlanGroup;
-          newOpeningTypes[model.id] = defaultOpeningType;
-
-          // 전역 캐시에서 먼저 확인
-          const cached = getCachedPrice(model.id, defaultPlanGroup, defaultOpeningType, carrier);
-          if (cached) {
-            // 캐시에서 즉시 상태 업데이트
-            setCalculatedPrices(prev => ({
-              ...prev,
-              [model.id]: {
-                storeSupportWithAddon: cached.storeSupportWithAddon || 0,
-                storeSupportWithoutAddon: cached.storeSupportWithoutAddon || 0,
-                purchasePriceWithAddon: cached.purchasePriceWithAddon || 0,
-                purchasePriceWithoutAddon: cached.purchasePriceWithoutAddon || 0,
-                publicSupport: cached.publicSupport || 0
-              }
-            }));
-            // mobileList 상태도 업데이트
-            setMobileList(prevList => prevList.map(item => 
-              item.id === model.id 
-                ? { 
-                    ...item, 
-                    publicSupport: cached.publicSupport || item.publicSupport || 0,
-                    support: cached.publicSupport || item.support || item.publicSupport || 0
-                  }
-                : item
-            ));
+        // 요금제군이 목록에 있는지 확인 (없으면 첫 번째 요금제군 사용)
+        let finalPlanGroup = defaultPlanGroup;
+        if (!planGroups.includes(defaultPlanGroup)) {
+          // 기본값이 목록에 없으면 목록의 첫 번째 값 사용 (혹은 할당 안함)
+          if (planGroups.length > 0) {
+            finalPlanGroup = planGroups[0];
           } else {
-            // 캐시에 없으면 가격 계산을 Promise 배열에 추가 (병렬 처리)
-            pricePromises.push(calculatePrice(model.id, defaultPlanGroup, defaultOpeningType, true));
+            // 요금제군 목록 자체가 비었으면 건너뛰기
+            continue;
           }
+        }
+
+        newPlanGroups[model.id] = finalPlanGroup;
+        newOpeningTypes[model.id] = defaultOpeningType;
+
+        // 전역 캐시에서 먼저 확인
+        const cached = getCachedPrice(model.id, finalPlanGroup, defaultOpeningType, carrier);
+        if (cached) {
+          // 캐시에서 즉시 상태 업데이트
+          setCalculatedPrices(prev => ({
+            ...prev,
+            [model.id]: {
+              storeSupportWithAddon: cached.storeSupportWithAddon || 0,
+              storeSupportWithoutAddon: cached.storeSupportWithoutAddon || 0,
+              purchasePriceWithAddon: cached.purchasePriceWithAddon || 0,
+              purchasePriceWithoutAddon: cached.purchasePriceWithoutAddon || 0,
+              publicSupport: cached.publicSupport || 0
+            }
+          }));
+          // mobileList 상태도 업데이트
+          setMobileList(prevList => prevList.map(item =>
+            item.id === model.id
+              ? {
+                ...item,
+                publicSupport: cached.publicSupport || item.publicSupport || 0,
+                support: cached.publicSupport || item.support || item.publicSupport || 0
+              }
+              : item
+          ));
+        } else {
+          // 캐시에 없으면 가격 계산을 Promise 배열에 추가 (병렬 처리)
+          pricePromises.push(calculatePrice(model.id, finalPlanGroup, defaultOpeningType, true));
         }
       }
 
@@ -264,7 +273,7 @@ const MobileListTab = ({ onProductSelect }) => {
           pricing: { ...prev.pricing, status: 'success', message: '' }
         }));
       }
-      
+
       // 초기화 완료 표시
       initializedRef.current = true;
     };
@@ -282,8 +291,8 @@ const MobileListTab = ({ onProductSelect }) => {
         pricing: { ...prev.pricing, status: 'idle', message: '' }
       }));
       const carrier = getCurrentCarrier();
-      
-      const { list, meta } = await directStoreApi.getMobileList(carrier, { 
+
+      const { list, meta } = await directStoreApi.getMobileList(carrier, {
         withMeta: true
       }) || {};
       const safeList = list || [];
@@ -316,7 +325,7 @@ const MobileListTab = ({ onProductSelect }) => {
         const carrier = getCurrentCarrier();
         const cacheKey = `planGroups-${carrier}`;
         const cached = sessionStorage.getItem(cacheKey);
-        
+
         if (cached) {
           try {
             const cachedData = JSON.parse(cached);
@@ -329,7 +338,7 @@ const MobileListTab = ({ onProductSelect }) => {
             // 캐시 파싱 실패 시 무시
           }
         }
-        
+
         const linkSettings = await directStoreApi.getLinkSettings(carrier);
         if (linkSettings.success && linkSettings.planGroup) {
           const planGroups = linkSettings.planGroup.planGroups || [];
@@ -373,19 +382,19 @@ const MobileListTab = ({ onProductSelect }) => {
       const carrier = getCurrentCarrier();
       const modelName = currentModel?.model || uploadingModelId;
       const petName = currentModel?.petName || modelName;
-      
+
       // 모델ID는 실제 모델 코드(모델명)로 사용 (동적 ID 대신)
       // 서버에서도 modelId = modelName으로 처리하므로 일관성 유지
       const actualModelId = modelName; // 실제 모델 코드를 modelId로 사용
 
-      console.log('📤 [이미지 업로드] 시작:', { 
+      console.log('📤 [이미지 업로드] 시작:', {
         clientId: uploadingModelId, // 클라이언트 ID (참고용)
         modelId: actualModelId,      // 실제 모델 코드 (서버에 전송)
-        carrier, 
+        carrier,
         modelName,
         petName,
-        fileName: file.name, 
-        fileSize: file.size 
+        fileName: file.name,
+        fileSize: file.size
       });
 
       // API 호출 (실제 모델 코드를 modelId로 전송)
@@ -401,9 +410,9 @@ const MobileListTab = ({ onProductSelect }) => {
       } else {
         alert('이미지가 성공적으로 업로드되었습니다.');
       }
-      
+
       console.log('✅ [이미지 업로드] 성공:', result.imageUrl);
-      
+
       // 서버에서 최신 데이터를 다시 가져와서 UI에 반영
       // 구글시트에 저장된 최신 이미지 URL을 포함한 전체 데이터를 가져옴
       try {
@@ -411,10 +420,10 @@ const MobileListTab = ({ onProductSelect }) => {
         const freshData = await directStoreApi.getMobileList(carrier);
         setMobileList(freshData || []);
         console.log('✅ [이미지 업로드] 최신 데이터 재로딩 완료');
-        
+
         // 이미지 업로드 성공 이벤트 발생 (오늘의휴대폰 페이지 등 다른 컴포넌트에서 데이터 재로딩)
-        window.dispatchEvent(new CustomEvent('imageUploaded', { 
-          detail: { carrier, modelId: actualModelId, imageUrl: result.imageUrl } 
+        window.dispatchEvent(new CustomEvent('imageUploaded', {
+          detail: { carrier, modelId: actualModelId, imageUrl: result.imageUrl }
         }));
       } catch (reloadError) {
         console.warn('⚠️ [이미지 업로드] 최신 데이터 재로딩 실패, 로컬 상태만 업데이트:', reloadError);
@@ -424,10 +433,10 @@ const MobileListTab = ({ onProductSelect }) => {
             ? { ...item, image: result.imageUrl }
             : item
         ));
-        
+
         // 재로딩 실패해도 이벤트는 발생 (다른 컴포넌트에서 시도)
-        window.dispatchEvent(new CustomEvent('imageUploaded', { 
-          detail: { carrier, modelId: actualModelId, imageUrl: result.imageUrl } 
+        window.dispatchEvent(new CustomEvent('imageUploaded', {
+          detail: { carrier, modelId: actualModelId, imageUrl: result.imageUrl }
         }));
       }
     } catch (err) {
@@ -496,13 +505,13 @@ const MobileListTab = ({ onProductSelect }) => {
     };
 
     // 낙관적 업데이트: UI를 먼저 업데이트 (즉시 반응)
-    setMobileList(prevList => prevList.map(item => 
-      item.id === modelId 
-        ? { 
-            ...item, 
-            ...newTags, 
-            tags: Object.keys(newTags).filter(k => newTags[k])
-          }
+    setMobileList(prevList => prevList.map(item =>
+      item.id === modelId
+        ? {
+          ...item,
+          ...newTags,
+          tags: Object.keys(newTags).filter(k => newTags[k])
+        }
         : item
     ));
 
@@ -522,19 +531,19 @@ const MobileListTab = ({ onProductSelect }) => {
       };
 
       const result = await directStoreApi.updateMobileTags(modelId, payload);
-      
+
       // API 호출 성공 시 추가 처리 없음 (이미 UI 업데이트됨)
       if (!result || !result.success) {
         throw new Error(result?.error || '태그 업데이트 실패');
       }
-      
+
       // 태그 변경 시 요금제군이 변경될 수 있으므로 재계산
       // 중저가/프리미엄 태그 변경 시 요금제군 기본값 재계산
       const updatedMobile = mobileList.find(m => m.id === modelId);
       if (updatedMobile && (tagType === 'budget' || tagType === 'premium')) {
         const isPremium = updatedMobile.isPremium || false;
         const isBudget = updatedMobile.isBudget || false;
-        
+
         let newPlanGroup = '115군';
         if (isPremium && !isBudget) {
           newPlanGroup = '115군';
@@ -543,7 +552,7 @@ const MobileListTab = ({ onProductSelect }) => {
         } else {
           newPlanGroup = '115군';
         }
-        
+
         // 요금제군이 변경되었으면 업데이트 및 재계산
         const currentPlanGroup = selectedPlanGroups[modelId];
         if (currentPlanGroup !== newPlanGroup && planGroups.includes(newPlanGroup)) {
@@ -554,18 +563,18 @@ const MobileListTab = ({ onProductSelect }) => {
       }
     } catch (err) {
       console.error('구분 태그 업데이트 실패:', err);
-      
+
       // 에러 발생 시 이전 상태로 롤백
-      setMobileList(prevList => prevList.map(item => 
-        item.id === modelId 
-          ? { 
-              ...item, 
-              ...previousTags, 
-              tags: Object.keys(previousTags).filter(k => previousTags[k])
-            }
+      setMobileList(prevList => prevList.map(item =>
+        item.id === modelId
+          ? {
+            ...item,
+            ...previousTags,
+            tags: Object.keys(previousTags).filter(k => previousTags[k])
+          }
           : item
       ));
-      
+
       // 사용자에게 에러 알림 (선택적 - 너무 자주 뜨면 방해될 수 있음)
       // alert('구분 태그 업데이트에 실패했습니다. 다시 시도해주세요.');
     }
@@ -589,7 +598,7 @@ const MobileListTab = ({ onProductSelect }) => {
 
     const carrier = getCurrentCarrier();
     const cacheKey = `${modelId}-${planGroup}-${openingType}-${carrier}`;
-    
+
     // 전역 캐시 확인
     if (useCache) {
       const cached = getCachedPrice(modelId, planGroup, openingType, carrier);
@@ -605,13 +614,13 @@ const MobileListTab = ({ onProductSelect }) => {
           }
         }));
         // mobileList 상태도 업데이트
-        setMobileList(prevList => prevList.map(item => 
-          item.id === modelId 
-            ? { 
-                ...item, 
-                publicSupport: cached.publicSupport || item.publicSupport || 0,
-                support: cached.publicSupport || item.support || item.publicSupport || 0
-              }
+        setMobileList(prevList => prevList.map(item =>
+          item.id === modelId
+            ? {
+              ...item,
+              publicSupport: cached.publicSupport || item.publicSupport || 0,
+              support: cached.publicSupport || item.support || item.publicSupport || 0
+            }
             : item
         ));
         return;
@@ -634,13 +643,13 @@ const MobileListTab = ({ onProductSelect }) => {
             }
           }));
           // mobileList 상태도 업데이트
-          setMobileList(prevList => prevList.map(item => 
-            item.id === modelId 
-              ? { 
-                  ...item, 
-                  publicSupport: result.publicSupport || item.publicSupport || 0,
-                  support: result.publicSupport || item.support || item.publicSupport || 0
-                }
+          setMobileList(prevList => prevList.map(item =>
+            item.id === modelId
+              ? {
+                ...item,
+                publicSupport: result.publicSupport || item.publicSupport || 0,
+                support: result.publicSupport || item.support || item.publicSupport || 0
+              }
               : item
           ));
         }
@@ -653,7 +662,7 @@ const MobileListTab = ({ onProductSelect }) => {
     // 모델명 찾기 (404 에러 방지를 위해)
     const currentModel = mobileList.find(m => m.id === modelId);
     const modelName = currentModel?.model || null;
-    
+
     // API 호출
     const pricePromise = directStoreApi.calculateMobilePrice(modelId, planGroup, openingType, carrier, modelName)
       .then(result => {
@@ -663,7 +672,7 @@ const MobileListTab = ({ onProductSelect }) => {
           pendingRequestsRef.current.delete(cacheKey);
           return result;
         }
-        
+
         if (result.success) {
           // 전역 캐시에 저장
           setCachedPrice(modelId, planGroup, openingType, carrier, {
@@ -673,7 +682,7 @@ const MobileListTab = ({ onProductSelect }) => {
             purchasePriceWithoutAddon: result.purchasePriceWithoutAddon || 0,
             publicSupport: result.publicSupport || 0
           });
-          
+
           // 상태 업데이트 (이통사지원금 포함)
           setCalculatedPrices(prev => ({
             ...prev,
@@ -685,15 +694,15 @@ const MobileListTab = ({ onProductSelect }) => {
               publicSupport: result.publicSupport || 0
             }
           }));
-          
+
           // mobileList 상태도 업데이트 (이통사지원금 반영)
-          setMobileList(prevList => prevList.map(item => 
-            item.id === modelId 
-              ? { 
-                  ...item, 
-                  publicSupport: result.publicSupport || item.publicSupport || 0,
-                  support: result.publicSupport || item.support || item.publicSupport || 0
-                }
+          setMobileList(prevList => prevList.map(item =>
+            item.id === modelId
+              ? {
+                ...item,
+                publicSupport: result.publicSupport || item.publicSupport || 0,
+                support: result.publicSupport || item.support || item.publicSupport || 0
+              }
               : item
           ));
         }
@@ -765,7 +774,7 @@ const MobileListTab = ({ onProductSelect }) => {
 
     // 사용자가 수동으로 선택한 것으로 표시
     userSelectedOpeningTypesRef.current.add(modelId);
-    
+
     setSelectedOpeningTypes(prev => ({ ...prev, [modelId]: openingType }));
 
     // 선택된 요금제군이 있으면 해당 요금제군과 유형으로 계산
@@ -813,9 +822,9 @@ const MobileListTab = ({ onProductSelect }) => {
               size="small"
               color={
                 step.status === 'success' ? 'success' :
-                step.status === 'loading' ? 'info' :
-                step.status === 'empty' ? 'default' :
-                step.status === 'error' ? 'error' : 'default'
+                  step.status === 'loading' ? 'info' :
+                    step.status === 'empty' ? 'default' :
+                      step.status === 'error' ? 'error' : 'default'
               }
               variant={step.status === 'success' ? 'filled' : 'outlined'}
             />
@@ -923,7 +932,7 @@ const MobileListTab = ({ onProductSelect }) => {
                           size="small"
                           startIcon={<LabelIcon />}
                           onClick={(e) => handleTagMenuOpen(e, row.id)}
-                          sx={{ 
+                          sx={{
                             minWidth: 100,
                             textTransform: 'none',
                             fontSize: '0.75rem',
@@ -1072,9 +1081,9 @@ const MobileListTab = ({ onProductSelect }) => {
                         />
                       </TableCell>
                       <TableCell align="center">
-                        <Typography 
-                          variant="body1" 
-                          sx={{ 
+                        <Typography
+                          variant="body1"
+                          sx={{
                             textDecoration: 'line-through',
                             color: 'text.secondary'
                           }}
@@ -1088,24 +1097,24 @@ const MobileListTab = ({ onProductSelect }) => {
 
                       {/* 대리점 지원금 */}
                       <TableCell align="center" sx={{ borderLeft: '1px solid rgba(81, 81, 81, 0.3)', width: '90px' }}>
-                        <Typography 
-                          variant="body1" 
-                          sx={{ 
-                            fontSize: '1.1rem', 
-                            fontWeight: 'bold', 
-                            color: 'info.main' 
+                        <Typography
+                          variant="body1"
+                          sx={{
+                            fontSize: '1.1rem',
+                            fontWeight: 'bold',
+                            color: 'info.main'
                           }}
                         >
                           {getDisplayValue(row, 'storeSupportWithAddon')?.toLocaleString() || (row.storeSupport || row.storeSupportWithAddon)?.toLocaleString() || '-'}
                         </Typography>
                       </TableCell>
                       <TableCell align="center" sx={{ width: '90px' }}>
-                        <Typography 
-                          variant="body1" 
-                          sx={{ 
-                            fontSize: '1.1rem', 
-                            fontWeight: 'bold', 
-                            color: 'warning.main' 
+                        <Typography
+                          variant="body1"
+                          sx={{
+                            fontSize: '1.1rem',
+                            fontWeight: 'bold',
+                            color: 'warning.main'
                           }}
                         >
                           {getDisplayValue(row, 'storeSupportWithoutAddon')?.toLocaleString() || row.storeSupportNoAddon?.toLocaleString() || '-'}
@@ -1114,24 +1123,24 @@ const MobileListTab = ({ onProductSelect }) => {
 
                       {/* 구매가 (할부원금) */}
                       <TableCell align="center" sx={{ borderLeft: '1px solid rgba(81, 81, 81, 0.3)', bgcolor: 'rgba(212, 175, 55, 0.05)', width: '90px' }}>
-                        <Typography 
-                          variant="body1" 
-                          sx={{ 
-                            fontSize: '1.15rem', 
-                            fontWeight: 'bold', 
-                            color: 'primary.main' 
+                        <Typography
+                          variant="body1"
+                          sx={{
+                            fontSize: '1.15rem',
+                            fontWeight: 'bold',
+                            color: 'primary.main'
                           }}
                         >
                           {getDisplayValue(row, 'purchasePriceWithAddon')?.toLocaleString() || purchasePriceAddon.toLocaleString()}
                         </Typography>
                       </TableCell>
                       <TableCell align="center" sx={{ bgcolor: 'rgba(212, 175, 55, 0.05)', width: '90px' }}>
-                        <Typography 
-                          variant="body1" 
-                          sx={{ 
-                            fontSize: '1.15rem', 
-                            fontWeight: 'bold', 
-                            color: 'success.main' 
+                        <Typography
+                          variant="body1"
+                          sx={{
+                            fontSize: '1.15rem',
+                            fontWeight: 'bold',
+                            color: 'success.main'
                           }}
                         >
                           {getDisplayValue(row, 'purchasePriceWithoutAddon')?.toLocaleString() || purchasePriceNoAddon.toLocaleString()}
