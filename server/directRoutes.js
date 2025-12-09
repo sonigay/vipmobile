@@ -1413,6 +1413,10 @@ function setupDirectRoutes(app) {
         });
 
         let supportMapBuilt = false;
+        if (supportRanges.length === 0) {
+          console.warn(`[Direct] planGroupSupportData 생성 실패: supportRanges가 비어있습니다. planGroupRanges 설정을 확인하세요.`);
+        }
+
         if (supportRanges.length > 0 && supportModelData.length > 0 && supportOpeningTypeData.length > 0) {
           try {
             const response = await sheets.spreadsheets.values.batchGet({
@@ -1459,6 +1463,17 @@ function setupDirectRoutes(app) {
 
               // 공백 행을 건너뛰기 위해 실제 데이터 행만 추적
               let validRowIndex = 0; // supportValues의 실제 인덱스 (공백 행 제외)
+
+              if (maxRows <= 0) {
+                console.warn(`[Direct] planGroupSupportData 생성 실패: maxRows가 0 이하`, {
+                  range,
+                  planGroup,
+                  startRow,
+                  supportModelDataLength: supportModelData.length,
+                  supportOpeningTypeDataLength: supportOpeningTypeData.length,
+                  supportValuesLength: supportValues.length
+                });
+              }
 
               for (let j = 0; j < maxRows; j++) {
                 // 정확한 행 인덱스 계산
