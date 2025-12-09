@@ -1411,16 +1411,18 @@ function setupDirectRoutes(app) {
           supportOpeningTypeData길이: supportOpeningTypeData.length
         });
         
-        if (supportRanges.length > 0 && supportModelData.length > 0 && supportOpeningTypeData.length > 0) {
-          try {
-            const response = await sheets.spreadsheets.values.batchGet({
-              spreadsheetId: supportSheetId,
-              ranges: supportRanges,
-              majorDimension: 'ROWS',
-              valueRenderOption: 'UNFORMATTED_VALUE'
-            });
-          
-          response.data.valueRanges.forEach((valueRange, index) => {
+        let supportMapBuilt = false;
+        if (supportRanges.length > 0 && supportModelData.length > 0) {
+          if (openingTypeRange && supportOpeningTypeData.length > 0) {
+            try {
+              const response = await sheets.spreadsheets.values.batchGet({
+                spreadsheetId: supportSheetId,
+                ranges: supportRanges,
+                majorDimension: 'ROWS',
+                valueRenderOption: 'UNFORMATTED_VALUE'
+              });
+            
+            response.data.valueRanges.forEach((valueRange, index) => {
             const range = supportRanges[index];
             const planGroup = supportRangeMap[range];
             const supportValues = valueRange.values || [];
@@ -1660,19 +1662,29 @@ function setupDirectRoutes(app) {
               })
             });
           });
-        } catch (err) {
-          console.warn(`[Direct] 지원금 범위 batchGet 실패:`, err);
-          // 실패 시 빈 객체로 초기화
-          Object.keys(planGroupRanges).forEach(planGroup => {
-            if (!planGroupSupportData[planGroup]) {
-              planGroupSupportData[planGroup] = {};
-            }
-          });
+            supportMapBuilt = true;
+          } catch (err) {
+            console.warn(`[Direct] 지원금 범위 batchGet 실패:`, err);
+            // 실패 시 빈 객체로 초기화
+            Object.keys(planGroupRanges).forEach(planGroup => {
+              if (!planGroupSupportData[planGroup]) {
+                planGroupSupportData[planGroup] = {};
+              }
+            });
+          }
+          } else {
+            // openingTypeRange 미설정이면 캐시 생성 생략 (폴백 사용)
+            console.warn('[Direct] planGroupSupportData 생성 스킵: openingTypeRange 미설정 또는 데이터 없음', {
+              supportRangesLength: supportRanges.length,
+              supportModelDataLength: supportModelData.length,
+              supportOpeningTypeDataLength: supportOpeningTypeData.length,
+              openingTypeRange존재: !!openingTypeRange
+            });
+          }
         }
-
-        // supportRanges 처리 블록 종료
-        // (planGroupSupportData 캐시 저장은 범위 처리 후 실행)
-        }
+        
+        // planGroupSupportData 캐시는 완성된 경우에만 저장
+        if (supportMapBuilt) {
         
         // planGroupSupportData를 캐시에 저장 (5분 TTL)
         setCache(planGroupSupportDataCacheKey, planGroupSupportData, 5 * 60 * 1000);
@@ -1681,6 +1693,10 @@ function setupDirectRoutes(app) {
           요금제군목록: Object.keys(planGroupSupportData),
           총요금제군수: Object.keys(planGroupSupportData).length
         });
+        } else {
+          // 미생성 시 기존 캐시 삭제하여 폴백 강제
+          deleteCache(planGroupSupportDataCacheKey);
+        }
       } else {
         console.log(`[Direct] planGroupSupportData 캐시에서 로드:`, {
           캐시키: planGroupSupportDataCacheKey,
