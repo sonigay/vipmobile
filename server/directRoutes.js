@@ -1126,13 +1126,17 @@ function setupDirectRoutes(app) {
       // 모델명을 기준으로 다른 시트의 데이터를 매칭해야 함
       // 이통사 지원금 시트에서 모델명, 출고가, 개통유형 읽기 (모델명 기준으로 매칭)
       const supportModelRange = supportSettingsJson.modelRange || '';
-      
+
       let supportSheetData = {}; // { key: { factoryPrice, openingType, openingTypes: [], rowIndex } }
+      
+      // planGroupSupportData 생성을 위해 상위 스코프에 저장
+      let supportModelData = [];
+      let supportOpeningTypeData = [];
       
       if (supportModelRange && factoryPriceRange && openingTypeRange) {
         try {
           // 이통사 지원금 시트에서 모델명, 출고가, 개통유형 읽기
-          const [supportModelData, supportFactoryPriceData, supportOpeningTypeData] = await Promise.all([
+          [supportModelData, supportFactoryPriceData, supportOpeningTypeData] = await Promise.all([
             sheets.spreadsheets.values.get({
               spreadsheetId: supportSheetId,
               range: supportModelRange,
@@ -1390,52 +1394,17 @@ function setupDirectRoutes(app) {
         }
       }
       
-      // planGroupSupportData 생성을 위해 supportModelData와 supportOpeningTypeData 필요
-      // supportSheetData 생성 시 이미 가져왔지만, 스코프가 다르므로 다시 가져오기
-      let planGroupSupportModelData = [];
-      let planGroupSupportOpeningTypeData = [];
-      
+      // planGroupSupportData 생성을 위해 supportModelData와 supportOpeningTypeData 재사용
+      // supportSheetData 생성 시 이미 가져왔으므로 재사용 (API 호출 절약)
       console.log(`[Direct] planGroupSupportData 생성 준비:`, {
         supportModelRange: supportModelRange || '(없음)',
         openingTypeRange: openingTypeRange || '(없음)',
         supportRanges길이: supportRanges.length,
         planGroupRanges키목록: Object.keys(planGroupRanges),
-        planGroupRanges값목록: Object.values(planGroupRanges)
+        planGroupRanges값목록: Object.values(planGroupRanges),
+        supportModelData길이: supportModelData.length,
+        supportOpeningTypeData길이: supportOpeningTypeData.length
       });
-      
-      if (supportModelRange && openingTypeRange && supportRanges.length > 0) {
-        try {
-          [planGroupSupportModelData, planGroupSupportOpeningTypeData] = await Promise.all([
-            sheets.spreadsheets.values.get({
-              spreadsheetId: supportSheetId,
-              range: supportModelRange,
-              majorDimension: 'ROWS',
-              valueRenderOption: 'UNFORMATTED_VALUE'
-            }).then(r => r.data.values || []).catch(() => []),
-            openingTypeRange ? sheets.spreadsheets.values.get({
-              spreadsheetId: supportSheetId,
-              range: openingTypeRange,
-              majorDimension: 'ROWS',
-              valueRenderOption: 'UNFORMATTED_VALUE'
-            }).then(r => r.data.values || []).catch(() => []) : Promise.resolve([])
-          ]);
-          
-          console.log(`[Direct] planGroupSupportData 생성을 위한 데이터 읽기 완료:`, {
-            planGroupSupportModelData길이: planGroupSupportModelData.length,
-            planGroupSupportOpeningTypeData길이: planGroupSupportOpeningTypeData.length,
-            planGroupSupportModelData샘플: planGroupSupportModelData.slice(0, 5).map(r => r[0]),
-            planGroupSupportOpeningTypeData샘플: planGroupSupportOpeningTypeData.slice(0, 5).map(r => r[0])
-          });
-        } catch (err) {
-          console.warn('[Direct] planGroupSupportData 생성을 위한 모델명/개통유형 데이터 읽기 실패:', err);
-        }
-      } else {
-        console.warn(`[Direct] planGroupSupportData 생성 조건 불만족:`, {
-          supportModelRange존재: !!supportModelRange,
-          openingTypeRange존재: !!openingTypeRange,
-          supportRanges길이: supportRanges.length
-        });
-      }
       
       if (supportRanges.length > 0) {
         try {
@@ -1480,29 +1449,45 @@ function setupDirectRoutes(app) {
               시트제거후: rangeWithoutSheet,
               추출된행번호: rangeMatch ? parseInt(rangeMatch[1], 10) : null,
               계산된startRow: startRow,
-              planGroupSupportModelData길이: planGroupSupportModelData.length,
-              planGroupSupportOpeningTypeData길이: planGroupSupportOpeningTypeData.length,
+              supportModelData길이: supportModelData.length,
+              supportOpeningTypeData길이: supportOpeningTypeData.length,
               supportValues길이: supportValues.length
             });
             
             // 모델명+개통유형 복합키 맵으로 변환
-            // planGroupSupportModelData와 planGroupSupportOpeningTypeData의 해당 범위만 사용
+            // supportModelData와 supportOpeningTypeData의 해당 범위만 사용
             const supportMap = {};
             const maxRows = Math.min(
-              planGroupSupportModelData.length - startRow,
-              planGroupSupportOpeningTypeData.length - startRow,
+              supportModelData.length - startRow,
+              supportOpeningTypeData.length - startRow,
               supportValues.length
             );
+            
+            // 문제 모델 검증을 위한 디버깅
+            const debugModels = ['UIP17PR-256', 'SM-S928N256', 'SM-S926N256'];
+            const debugRows = [];
             
             for (let j = 0; j < maxRows; j++) {
               // 전체 시트의 startRow+j 인덱스 사용
               const modelIndex = startRow + j;
-              const model = (planGroupSupportModelData[modelIndex]?.[0] || '').toString().trim();
+              const model = (supportModelData[modelIndex]?.[0] || '').toString().trim();
               if (!model) continue;
               
-              const openingTypeRaw = (planGroupSupportOpeningTypeData[modelIndex]?.[0] || '').toString().trim();
+              const openingTypeRaw = (supportOpeningTypeData[modelIndex]?.[0] || '').toString().trim();
               const openingTypes = parseOpeningTypes(openingTypeRaw);
               const supportValue = Number((supportValues[j]?.[0] || 0).toString().replace(/,/g, '')) || 0;
+              
+              // 문제 모델 디버깅
+              if (debugModels.some(dm => model === dm || model.toLowerCase() === dm.toLowerCase())) {
+                debugRows.push({
+                  j,
+                  modelIndex,
+                  model,
+                  openingTypeRaw,
+                  supportValue,
+                  supportValuesJ: supportValues[j]?.[0]
+                });
+              }
               
               // 각 개통유형에 대해 복합키 생성
               // 하이픈 변형 생성 (supportSheetData와 동일한 로직)
@@ -1658,7 +1643,16 @@ function setupDirectRoutes(app) {
               범위: range,
               시작행: startRow,
               맵크기: Object.keys(supportMap).length,
-              맵키샘플: Object.keys(supportMap).slice(0, 10)
+              맵키샘플: Object.keys(supportMap).slice(0, 10),
+              문제모델디버깅: debugRows.length > 0 ? debugRows : undefined,
+              문제모델저장값: debugModels.map(dm => {
+                const keys = Object.keys(supportMap).filter(k => k.includes(dm));
+                return {
+                  모델: dm,
+                  찾은키: keys.slice(0, 5),
+                  저장된값: keys.map(k => ({ 키: k, 값: supportMap[k] })).slice(0, 5)
+                };
+              })
             });
           });
         } catch (err) {
