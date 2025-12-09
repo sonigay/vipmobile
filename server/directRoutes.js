@@ -1430,6 +1430,10 @@ function setupDirectRoutes(app) {
               const range = supportRanges[index];
               const planGroup = supportRangeMap[range];
               const supportValues = valueRange.values || [];
+              
+              // 디버깅용 변수 정의
+              const debugRows = [];
+              const debugModels = ['UIP17-256', 'SM-S926N256', 'SM-S928N256', 'UIP17PR-256'];
 
               // 범위 문자열에서 시작 행 번호 추출 (예: 'F9:F97' -> 9행)
               let startRow = 0; // 0-based index (실제 행번호 - 1)
