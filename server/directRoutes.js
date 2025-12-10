@@ -3146,6 +3146,18 @@ function setupDirectRoutes(app) {
           // 🔥 핵심 수정: req.query.modelName이 있으면 우선 사용 (정책표 모델명보다 정확)
           const primaryModel = req.query.modelName ? req.query.modelName.trim() : policyModel;
           const primaryModelNormalized = normalizeModelCode(primaryModel);
+          
+          // 🔥 디버그: UIP17PR-256 관련 로그
+          if (modelId === 'mobile-LG-23' || modelId?.includes('UIP17PR') || primaryModel?.includes('UIP17PR') || policyModel?.includes('UIP17PR')) {
+            console.log(`🔍 [Direct] /calculate 모델명 비교:`, {
+              modelId,
+              queryModelName: req.query.modelName,
+              primaryModel,
+              policyModel,
+              planGroup,
+              openingType
+            });
+          }
 
           // 시도할 키 목록: query modelName 우선 → 정책표 모델명 → 대소문자 변형 → 하이픈 변형 → 정규화
           const supportKeys = [
@@ -3296,14 +3308,17 @@ function setupDirectRoutes(app) {
 
           if (foundKey) {
             // 🔥 디버그: 키 매칭 성공 로그 (SM-S928N256 또는 UIP17PR-256)
-            if (modelId === 'mobile-LG-16' || modelId === 'mobile-LG-23' || modelId?.includes('UIP17PR') || policyModel?.includes('UIP17PR')) {
+            if (modelId === 'mobile-LG-16' || modelId === 'mobile-LG-23' || modelId?.includes('UIP17PR') || policyModel?.includes('UIP17PR') || primaryModel?.includes('UIP17PR')) {
               console.log(`✅ [Direct] /calculate 키 매칭 성공:`, {
                 modelId,
+                queryModelName: req.query.modelName,
+                primaryModel,
                 policyModel,
                 planGroup,
                 openingType,
                 foundKey,
-                publicSupport
+                publicSupport,
+                시도한키목록: supportKeys.slice(0, 10)
               });
             }
           } else {
