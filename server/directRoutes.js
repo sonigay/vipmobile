@@ -2192,16 +2192,8 @@ function setupDirectRoutes(app) {
               시도한개통유형: rebateDebugInfo.candidateTypes,
               정책표데이터존재: !!policyRebateData[selectedPlanGroup]
             });
-          } else {
-            console.log(`[Direct] ✅ 정책표 리베이트 매칭 성공:`, {
-              모델명: model,
-              요금제군: selectedPlanGroup,
-              개통유형: matchedOpeningType,
-              매칭키: rebateDebugInfo.matchedKey,
-              리베이트금액: policyRebate,
-              폴백사용: rebateDebugInfo.fallbackUsed
-            });
           }
+          // 성공 로그 제거 (불필요한 로그 정리)
         }
 
         // 모델명+개통유형 조합으로 정확한 이통사지원금 행 찾기
@@ -2510,17 +2502,8 @@ function setupDirectRoutes(app) {
               초기행인덱스: supportDebugInfo.initialRowIndex,
               이통사지원금데이터존재: !!supportSheetData[model]
             });
-          } else {
-            console.log(`[Direct] ✅ 이통사지원금 매칭 성공:`, {
-              모델명: model,
-              최종개통유형: supportOpeningType,
-              정책표매칭개통유형: matchedOpeningType,
-              시도한개통유형: supportDebugInfo.triedOpeningTypes,
-              매칭키: supportDebugInfo.matchedKey,
-              행인덱스: finalSupportRowIndex,
-              이통사지원금: publicSupport
-            });
           }
+          // 성공 로그 제거 (불필요한 로그 정리)
         }
 
         // 대리점 지원금 계산
@@ -2706,115 +2689,14 @@ function setupDirectRoutes(app) {
         mobileList.push(mobile);
       }
 
-      // ========== 디버깅: 양쪽 데이터 비교 로그 ==========
-      console.log(`\n${'='.repeat(80)}`);
-      console.log(`[Direct] 📊 데이터 비교 디버그 (통신사: ${carrier})`);
-      console.log(`${'='.repeat(80)}`);
+      // ========== 간소화된 디버깅 요약 ==========
+      // 115군의 SM-S926N256 값만 확인 (핵심 검증용)
+      const testPlanGroup = '115군';
+      const testModel = 'SM-S926N256';
+      const testKey = `${testModel}|MNP`;
+      const testValue = planGroupSupportData[testPlanGroup]?.[testKey];
       
-      // 1. 휴대폰 목록 (정책표) 데이터
-      console.log(`\n[1] 휴대폰 목록 (정책표) - 총 ${mobileList.length}개 모델:`);
-      console.log('-'.repeat(60));
-      mobileList.slice(0, 20).forEach((m, idx) => {
-        console.log(`  ${idx + 1}. 모델명: "${m.model}" | 펫네임: "${m.petName}" | 기본요금제군: "${m.defaultPlanGroup || '(없음)'}" | 기본개통유형: "${m.defaultOpeningType || '(없음)'}"`);
-      });
-      if (mobileList.length > 20) {
-        console.log(`  ... 외 ${mobileList.length - 20}개 모델 생략`);
-      }
-      
-      // 2. 이통사 지원금 시트 데이터 (supportSheetData)
-      const supportModels = [...new Set(Object.keys(supportSheetData || {}).map(k => k.split('|')[0]))];
-      console.log(`\n[2] 이통사 지원금 시트 (supportSheetData) - 고유 모델 ${supportModels.length}개:`);
-      console.log('-'.repeat(60));
-      supportModels.slice(0, 20).forEach((model, idx) => {
-        const entry = supportSheetData[model] || supportSheetData[`${model}|MNP`] || supportSheetData[`${model}|010신규`];
-        console.log(`  ${idx + 1}. 모델명: "${model}" | 출고가: ${entry?.factoryPrice || 0} | 개통유형: ${entry?.openingTypes?.join(', ') || entry?.openingType || '(없음)'}`);
-      });
-      if (supportModels.length > 20) {
-        console.log(`  ... 외 ${supportModels.length - 20}개 모델 생략`);
-      }
-      
-      // 3. 요금제군별 이통사지원금 데이터 (planGroupSupportData)
-      console.log(`\n[3] 요금제군별 이통사지원금 (planGroupSupportData):`);
-      console.log('-'.repeat(60));
-      Object.keys(planGroupSupportData || {}).forEach(planGroup => {
-        const pgData = planGroupSupportData[planGroup] || {};
-        const keys = Object.keys(pgData);
-        const uniqueModels = [...new Set(keys.map(k => k.split('|')[0]))];
-        const uniqueTypes = [...new Set(keys.map(k => k.split('|')[1]))];
-        console.log(`  📁 ${planGroup}: 총 ${keys.length}개 키 (모델 ${uniqueModels.length}개 × 개통유형 ${uniqueTypes.length}개)`);
-        console.log(`     개통유형: ${uniqueTypes.join(', ')}`);
-        console.log(`     모델 샘플: ${uniqueModels.slice(0, 10).join(', ')}${uniqueModels.length > 10 ? '...' : ''}`);
-        // 샘플 키-값 쌍
-        console.log(`     키-값 샘플:`);
-        keys.slice(0, 5).forEach(k => {
-          console.log(`       "${k}" = ${pgData[k]}`);
-        });
-      });
-      
-      // 4. 매칭 현황 분석
-      console.log(`\n[4] 매칭 현황 분석:`);
-      console.log('-'.repeat(60));
-      const matchingResults = mobileList.map(m => {
-        const model = m.model;
-        const normalizedModel = normalizeModelCode(model);
-        const planGroup = m.defaultPlanGroup || '115군';
-        const openingType = m.defaultOpeningType || 'MNP';
-        
-        // supportSheetData에서 매칭 확인
-        const supportDataFound = !!(
-          supportSheetData[model] || 
-          supportSheetData[`${model}|${openingType}`] ||
-          supportSheetData[normalizedModel] ||
-          supportSheetData[`${normalizedModel}|${openingType}`]
-        );
-        
-        // planGroupSupportData에서 매칭 확인
-        const pgData = planGroupSupportData[planGroup] || {};
-        const planGroupFound = !!(
-          pgData[`${model}|${openingType}`] ||
-          pgData[`${model.toLowerCase()}|${openingType}`] ||
-          pgData[`${normalizedModel}|${openingType}`] ||
-          pgData[`${normalizedModel?.toLowerCase()}|${openingType}`]
-        );
-        
-        return {
-          model,
-          normalizedModel,
-          planGroup,
-          openingType,
-          supportDataFound,
-          planGroupFound,
-          publicSupport: m.publicSupport || m.support || 0
-        };
-      });
-      
-      const successCount = matchingResults.filter(r => r.planGroupFound).length;
-      const failCount = matchingResults.filter(r => !r.planGroupFound).length;
-      
-      console.log(`  ✅ 이통사지원금 매칭 성공: ${successCount}개`);
-      console.log(`  ❌ 이통사지원금 매칭 실패: ${failCount}개`);
-      
-      if (failCount > 0) {
-        console.log(`\n  [매칭 실패 모델 상세]:`);
-        matchingResults.filter(r => !r.planGroupFound).slice(0, 15).forEach((r, idx) => {
-          console.log(`    ${idx + 1}. "${r.model}" (정규화: "${r.normalizedModel}") | 요금제군: ${r.planGroup} | 개통유형: ${r.openingType}`);
-          // 해당 요금제군에서 비슷한 키 찾기
-          const pgData = planGroupSupportData[r.planGroup] || {};
-          const similarKeys = Object.keys(pgData).filter(k => {
-            const keyModel = k.split('|')[0].toLowerCase();
-            return keyModel.includes(r.model.toLowerCase().substring(0, 5)) ||
-                   r.model.toLowerCase().includes(keyModel.substring(0, 5));
-          }).slice(0, 5);
-          if (similarKeys.length > 0) {
-            console.log(`       💡 유사한 키: ${similarKeys.join(', ')}`);
-          }
-        });
-        if (failCount > 15) {
-          console.log(`    ... 외 ${failCount - 15}개 모델 생략`);
-        }
-      }
-      
-      console.log(`\n${'='.repeat(80)}\n`);
+      console.log(`\n🔥 [${carrier}] 이통사지원금 요약: 모델 ${mobileList.length}개, 115군 ${testModel}|MNP = ${testValue ?? '(없음)'}`);
       // ========== 디버깅 끝 ==========
 
       return mobileList;
@@ -3206,24 +3088,20 @@ function setupDirectRoutes(app) {
       }
 
       if (!modelRow || !modelRow[0]) {
-        // 인덱스 범위 초과인 경우 상세 로그
+        // 인덱스 범위 초과인 경우 - 경고 로그만 남기고 기본값 반환 (404 대신)
         const isIndexOutOfRange = modelIndex >= modelData.length;
-        console.error(`[Direct] /calculate 모델을 찾을 수 없음:`, {
-          modelId,
-          modelIndex,
-          modelDataLength: modelData.length,
-          modelName: req.query.modelName || '(없음)',
-          planGroup,
-          openingType,
-          carrier,
-          indexOutOfRange: isIndexOutOfRange,
-          suggestion: isIndexOutOfRange 
-            ? `정책표 모델 범위(modelRange) 설정을 확인하세요. 현재 ${modelData.length}개 모델만 읽어옴.`
-            : '해당 인덱스에 모델 데이터가 없습니다.'
-        });
-        return res.status(404).json({
-          success: false,
-          error: isIndexOutOfRange 
+        console.warn(`[Direct] /calculate 모델 범위 초과 (기본값 반환): ${modelId} (인덱스: ${modelIndex}/${modelData.length})`);
+        
+        // 기본값 반환 (에러 대신)
+        return res.json({
+          success: true,
+          publicSupport: 0,
+          storeSupportWithAddon: 0,
+          storeSupportWithoutAddon: 0,
+          purchasePriceWithAddon: 0,
+          purchasePriceWithoutAddon: 0,
+          factoryPrice: 0,
+          warning: isIndexOutOfRange 
             ? `모델 인덱스가 범위를 초과했습니다. (인덱스: ${modelIndex}, 최대: ${modelData.length - 1}). 정책표 설정의 modelRange를 확인하세요.`
             : `모델을 찾을 수 없습니다. (인덱스: ${modelIndex})`
         });
@@ -3401,14 +3279,7 @@ function setupDirectRoutes(app) {
           }
 
           if (foundKey) {
-            console.log(`[Direct] /calculate 이통사지원금 매칭 성공 (캐시 사용):`, {
-              modelId,
-              policyModel: (modelRow[0] || '').toString().trim(),
-              planGroup,
-              openingType,
-              찾은키: foundKey,
-              publicSupport
-            });
+            // 성공 로그 제거 (불필요한 로그 정리)
             // 캐시 값이 0이면 폴백 시트 조회를 한 번 더 시도 (잘못된 캐시 값 방지)
             if (false && publicSupport === 0 && supportRange && modelRange && supportSheetId) {
               try {
@@ -3776,14 +3647,7 @@ function setupDirectRoutes(app) {
               }
 
               if (foundKey) {
-                console.log(`[Direct] /calculate 이통사지원금 매칭 성공:`, {
-                  modelId,
-                  policyModel: (modelRow[0] || '').toString().trim(),
-                  planGroup,
-                  openingType,
-                  찾은키: foundKey,
-                  publicSupport
-                });
+                // 성공 로그 제거 (불필요한 로그 정리)
               } else {
                 console.warn(`[Direct] /calculate 이통사지원금 매칭 실패:`, {
                   modelId,

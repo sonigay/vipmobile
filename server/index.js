@@ -88,14 +88,10 @@ app.use(cors({
     // 환경 변수 도메인과 기본 도메인 합치기
     const allowedOrigins = [...corsOrigins, ...defaultOrigins];
     
-    console.log('CORS allowed origins:', allowedOrigins);
-    console.log('CORS request origin:', origin);
-    
     // origin이 없거나 허용된 도메인에 포함되어 있으면 허용
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      console.log('CORS blocked origin:', origin);
       // 개발 환경에서는 모든 origin 허용 (디버깅용)
       if (process.env.NODE_ENV !== 'production') {
         callback(null, true);
