@@ -57,8 +57,8 @@ function setCache(key, data, ttlMs = 60 * 1000) {
   cacheStore.set(key, { data, expires: Date.now() + ttlMs });
 }
 
-// Rate limit 에러 발생 시 재시도하는 래퍼 함수
-async function withRetry(fn, maxRetries = 3, baseDelay = 1000) {
+// Rate limit 에러 발생 시 재시도하는 래퍼 함수 (개선: 더 긴 대기 시간, jitter 추가)
+async function withRetry(fn, maxRetries = 5, baseDelay = 2000) {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       // Rate limiting: 최소 간격 유지
@@ -72,9 +72,15 @@ async function withRetry(fn, maxRetries = 3, baseDelay = 1000) {
       return await fn();
     } catch (error) {
       // Rate limit 에러인 경우에만 재시도
-      if (error.code === 429 && attempt < maxRetries - 1) {
-        const delay = baseDelay * Math.pow(2, attempt); // Exponential backoff
-        console.warn(`[Direct] Rate limit 에러 발생, ${delay}ms 후 재시도 (${attempt + 1}/${maxRetries})`);
+      const isRateLimitError = error.code === 429 || 
+        (error.response && error.response.status === 429) ||
+        (error.message && error.message.includes('Quota exceeded'));
+        
+      if (isRateLimitError && attempt < maxRetries - 1) {
+        // Exponential backoff with jitter (랜덤 지연 추가로 동시 요청 분산)
+        const jitter = Math.random() * 1000; // 0~1초 랜덤
+        const delay = baseDelay * Math.pow(2, attempt) + jitter;
+        console.warn(`[Direct] Rate limit 에러 발생, ${Math.round(delay)}ms 후 재시도 (${attempt + 1}/${maxRetries})`);
         await new Promise(resolve => setTimeout(resolve, delay));
         continue;
       }
@@ -3190,6 +3196,8 @@ function setupDirectRoutes(app) {
       }
 
       if (!modelRow || !modelRow[0]) {
+        // 인덱스 범위 초과인 경우 상세 로그
+        const isIndexOutOfRange = modelIndex >= modelData.length;
         console.error(`[Direct] /calculate 모델을 찾을 수 없음:`, {
           modelId,
           modelIndex,
@@ -3197,11 +3205,17 @@ function setupDirectRoutes(app) {
           modelName: req.query.modelName || '(없음)',
           planGroup,
           openingType,
-          carrier
+          carrier,
+          indexOutOfRange: isIndexOutOfRange,
+          suggestion: isIndexOutOfRange 
+            ? `정책표 모델 범위(modelRange) 설정을 확인하세요. 현재 ${modelData.length}개 모델만 읽어옴.`
+            : '해당 인덱스에 모델 데이터가 없습니다.'
         });
         return res.status(404).json({
           success: false,
-          error: `모델을 찾을 수 없습니다. (인덱스: ${modelIndex}, 범위: 0-${modelData.length - 1})`
+          error: isIndexOutOfRange 
+            ? `모델 인덱스가 범위를 초과했습니다. (인덱스: ${modelIndex}, 최대: ${modelData.length - 1}). 정책표 설정의 modelRange를 확인하세요.`
+            : `모델을 찾을 수 없습니다. (인덱스: ${modelIndex})`
         });
       }
 
