@@ -92,14 +92,6 @@ const MobileListTab = ({ onProductSelect }) => {
           withMeta: true
         }) || {};
         const safeList = list || [];
-        
-        // #region agent log
-        const uipModel = safeList.find(m => m.model?.includes('UIP17PR-256') || m.id?.includes('UIP17PR'));
-        if (uipModel) {
-          fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:94',message:'초기 mobileList 로드',data:{modelId:uipModel.id,model:uipModel.model,publicSupport:uipModel.publicSupport,support:uipModel.support,carrier},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-        }
-        // #endregion
-        
         setMobileList(safeList);
         setSteps(prev => ({
           ...prev,
@@ -174,7 +166,13 @@ const MobileListTab = ({ onProductSelect }) => {
           const existingOpeningType = newOpeningTypes[model.id];
           if (planGroups.includes(existingPlanGroup)) {
             const cached = getCachedPrice(model.id, existingPlanGroup, existingOpeningType, carrier);
-            if (cached) {
+            // 🔥 캐시 값 검증: 초기 로드 시 서버에서 받은 publicSupport 값과 캐시 값이 크게 다르면 캐시 무시
+            const serverPublicSupport = model.publicSupport || model.support || 0;
+            const cachePublicSupport = cached?.publicSupport || 0;
+            const isCacheValueInvalid = cached && serverPublicSupport > 0 && 
+              Math.abs(cachePublicSupport - serverPublicSupport) > 100000; // 10만원 이상 차이나면 잘못된 캐시로 간주
+            
+            if (cached && !isCacheValueInvalid) {
               // 캐시에서 즉시 상태 업데이트
               setCalculatedPrices(prev => ({
                 ...prev,
@@ -190,10 +188,10 @@ const MobileListTab = ({ onProductSelect }) => {
               setMobileList(prevList => prevList.map(item =>
                 item.id === model.id
                   ? {
-                    ...item,
-                    publicSupport: cached.publicSupport || item.publicSupport || 0,
-                    support: cached.publicSupport || item.support || item.publicSupport || 0
-                  }
+                      ...item,
+                      publicSupport: cached.publicSupport || item.publicSupport || 0,
+                      support: cached.publicSupport || item.support || item.publicSupport || 0
+                    }
                   : item
               ));
             } else {
@@ -244,7 +242,13 @@ const MobileListTab = ({ onProductSelect }) => {
 
         // 전역 캐시에서 먼저 확인
         const cached = getCachedPrice(model.id, finalPlanGroup, defaultOpeningType, carrier);
-        if (cached) {
+        // 🔥 캐시 값 검증: 초기 로드 시 서버에서 받은 publicSupport 값과 캐시 값이 크게 다르면 캐시 무시
+        const serverPublicSupport = model.publicSupport || model.support || 0;
+        const cachePublicSupport = cached?.publicSupport || 0;
+        const isCacheValueInvalid = cached && serverPublicSupport > 0 && 
+          Math.abs(cachePublicSupport - serverPublicSupport) > 100000; // 10만원 이상 차이나면 잘못된 캐시로 간주
+        
+        if (cached && !isCacheValueInvalid) {
           // 캐시에서 즉시 상태 업데이트
           setCalculatedPrices(prev => ({
             ...prev,
@@ -260,10 +264,10 @@ const MobileListTab = ({ onProductSelect }) => {
           setMobileList(prevList => prevList.map(item =>
             item.id === model.id
               ? {
-                ...item,
-                publicSupport: cached.publicSupport || item.publicSupport || 0,
-                support: cached.publicSupport || item.support || item.publicSupport || 0
-              }
+                  ...item,
+                  publicSupport: cached.publicSupport || item.publicSupport || 0,
+                  support: cached.publicSupport || item.support || item.publicSupport || 0
+                }
               : item
           ));
         } else {
@@ -636,12 +640,6 @@ const MobileListTab = ({ onProductSelect }) => {
     const currentModel = mobileList.find(m => m.id === modelId);
     const carrier = currentModel?.carrier || getCurrentCarrier();
     
-    // #region agent log
-    if (currentModel?.model?.includes('UIP17PR') || modelId?.includes('UIP17PR')) {
-      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:622',message:'calculatePrice 함수 호출',data:{modelId,planGroup,openingType,carrier,currentModelPublicSupport:currentModel?.publicSupport,currentModelSupport:currentModel?.support},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-    }
-    // #endregion
-    
     // carrier가 현재 탭과 다르면 요청 스킵 (탭 전환 중 발생하는 잘못된 요청 방지)
     const currentTabCarrier = getCurrentCarrier();
     if (carrier !== currentTabCarrier) {
@@ -654,12 +652,13 @@ const MobileListTab = ({ onProductSelect }) => {
     // 전역 캐시 확인
     if (useCache) {
       const cached = getCachedPrice(modelId, planGroup, openingType, carrier);
-      if (cached) {
-        // #region agent log
-        if (currentModel?.model?.includes('UIP17PR') || modelId?.includes('UIP17PR')) {
-          fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:648',message:'캐시에서 값 사용',data:{modelId,planGroup,openingType,carrier,cachedPublicSupport:cached.publicSupport},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-        }
-        // #endregion
+      // 🔥 캐시 값 검증: 서버에서 받은 publicSupport 값과 캐시 값이 크게 다르면 캐시 무시
+      const serverPublicSupport = currentModel?.publicSupport || currentModel?.support || 0;
+      const cachePublicSupport = cached?.publicSupport || 0;
+      const isCacheValueInvalid = cached && serverPublicSupport > 0 && 
+        Math.abs(cachePublicSupport - serverPublicSupport) > 100000; // 10만원 이상 차이나면 잘못된 캐시로 간주
+      
+      if (cached && !isCacheValueInvalid) {
         setCalculatedPrices(prev => ({
           ...prev,
           [modelId]: {
@@ -730,12 +729,6 @@ const MobileListTab = ({ onProductSelect }) => {
         }
 
         if (result.success) {
-          // #region agent log
-          if (modelName?.includes('UIP17PR') || modelId?.includes('UIP17PR')) {
-            fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:713',message:'calculatePrice API 응답 성공',data:{modelId,modelName,planGroup,openingType,carrier,publicSupport:result.publicSupport,storeSupportWithAddon:result.storeSupportWithAddon},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-          }
-          // #endregion
-
           // 전역 캐시에 저장
           setCachedPrice(modelId, planGroup, openingType, carrier, {
             storeSupportWithAddon: result.storeSupportWithAddon || 0,
@@ -756,12 +749,6 @@ const MobileListTab = ({ onProductSelect }) => {
               publicSupport: result.publicSupport || 0
             }
           }));
-
-          // #region agent log
-          if (modelName?.includes('UIP17PR') || modelId?.includes('UIP17PR')) {
-            fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:733',message:'calculatedPrices 상태 업데이트 후',data:{modelId,publicSupport:result.publicSupport},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-          }
-          // #endregion
 
           // mobileList 상태도 업데이트 (이통사지원금 반영)
           setMobileList(prevList => prevList.map(item =>
@@ -860,11 +847,6 @@ const MobileListTab = ({ onProductSelect }) => {
   // 표시할 값 가져오기 (계산된 값이 있으면 사용, 없으면 원래 값)
   const getDisplayValue = (row, field) => {
     const calculated = calculatedPrices[row.id];
-    // #region agent log
-    if (field === 'publicSupport' && (row.model === 'UIP17PR-256' || row.id?.includes('UIP17PR'))) {
-      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:830',message:'getDisplayValue 호출',data:{modelId:row.id,model:row.model,field,calculatedValue:calculated?.[field],rowValue:row[field],hasCalculated:!!calculated},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-    }
-    // #endregion
     if (calculated && calculatedPrices[row.id]) {
       return calculated[field];
     }
