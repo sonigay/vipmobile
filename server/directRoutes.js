@@ -3142,18 +3142,36 @@ function setupDirectRoutes(app) {
           // 캐시에서 planGroupSupportData를 찾았으면 직접 사용 (API 호출 없음)
           const policyModel = (modelRow[0] || '').toString().trim();
           const policyModelNormalized = normalizeModelCode(policyModel);
+          
+          // 🔥 핵심 수정: req.query.modelName이 있으면 우선 사용 (정책표 모델명보다 정확)
+          const primaryModel = req.query.modelName ? req.query.modelName.trim() : policyModel;
+          const primaryModelNormalized = normalizeModelCode(primaryModel);
 
-          // 시도할 키 목록: 원본 → 대소문자 변형 → 하이픈 변형 → 정규화
+          // 시도할 키 목록: query modelName 우선 → 정책표 모델명 → 대소문자 변형 → 하이픈 변형 → 정규화
           const supportKeys = [
-            `${policyModel}|${openingType}`,
+            `${primaryModel}|${openingType}`,  // query modelName 우선
+            `${primaryModel.toLowerCase()}|${openingType}`,
+            `${primaryModel.toUpperCase()}|${openingType}`,
+            `${policyModel}|${openingType}`,  // 정책표 모델명도 시도
             `${policyModel.toLowerCase()}|${openingType}`,
             `${policyModel.toUpperCase()}|${openingType}`
           ];
 
-          // 하이픈 변형 추가
-          const hyphenVariants = generateHyphenVariants(policyModel);
-          hyphenVariants.forEach(variant => {
-            if (variant !== policyModel) {
+          // 하이픈 변형 추가 (primaryModel 우선, policyModel도 시도)
+          const primaryHyphenVariants = generateHyphenVariants(primaryModel);
+          primaryHyphenVariants.forEach(variant => {
+            if (variant !== primaryModel) {
+              supportKeys.push(
+                `${variant}|${openingType}`,
+                `${variant.toLowerCase()}|${openingType}`,
+                `${variant.toUpperCase()}|${openingType}`
+              );
+            }
+          });
+          
+          const policyHyphenVariants = generateHyphenVariants(policyModel);
+          policyHyphenVariants.forEach(variant => {
+            if (variant !== policyModel && variant !== primaryModel) {
               supportKeys.push(
                 `${variant}|${openingType}`,
                 `${variant.toLowerCase()}|${openingType}`,
@@ -3162,7 +3180,15 @@ function setupDirectRoutes(app) {
             }
           });
 
-          if (policyModelNormalized) {
+          if (primaryModelNormalized) {
+            supportKeys.push(
+              `${primaryModelNormalized}|${openingType}`,
+              `${primaryModelNormalized.toLowerCase()}|${openingType}`,
+              `${primaryModelNormalized.toUpperCase()}|${openingType}`
+            );
+          }
+          
+          if (policyModelNormalized && policyModelNormalized !== primaryModelNormalized) {
             supportKeys.push(
               `${policyModelNormalized}|${openingType}`,
               `${policyModelNormalized.toLowerCase()}|${openingType}`,
@@ -3173,12 +3199,15 @@ function setupDirectRoutes(app) {
           // "번호이동" → MNP 매핑도 시도
           if (openingType === 'MNP') {
             supportKeys.push(
+              `${primaryModel}|번호이동`,
+              `${primaryModel.toLowerCase()}|번호이동`,
+              `${primaryModel.toUpperCase()}|번호이동`,
               `${policyModel}|번호이동`,
               `${policyModel.toLowerCase()}|번호이동`,
               `${policyModel.toUpperCase()}|번호이동`
             );
-            hyphenVariants.forEach(variant => {
-              if (variant !== policyModel) {
+            primaryHyphenVariants.forEach(variant => {
+              if (variant !== primaryModel) {
                 supportKeys.push(
                   `${variant}|번호이동`,
                   `${variant.toLowerCase()}|번호이동`,
@@ -3186,7 +3215,23 @@ function setupDirectRoutes(app) {
                 );
               }
             });
-            if (policyModelNormalized) {
+            policyHyphenVariants.forEach(variant => {
+              if (variant !== policyModel && variant !== primaryModel) {
+                supportKeys.push(
+                  `${variant}|번호이동`,
+                  `${variant.toLowerCase()}|번호이동`,
+                  `${variant.toUpperCase()}|번호이동`
+                );
+              }
+            });
+            if (primaryModelNormalized) {
+              supportKeys.push(
+                `${primaryModelNormalized}|번호이동`,
+                `${primaryModelNormalized.toLowerCase()}|번호이동`,
+                `${primaryModelNormalized.toUpperCase()}|번호이동`
+              );
+            }
+            if (policyModelNormalized && policyModelNormalized !== primaryModelNormalized) {
               supportKeys.push(
                 `${policyModelNormalized}|번호이동`,
                 `${policyModelNormalized.toLowerCase()}|번호이동`,
@@ -3198,12 +3243,15 @@ function setupDirectRoutes(app) {
           // "010신규/기변" 매핑도 시도
           if (openingType === '010신규' || openingType === '기변') {
             supportKeys.push(
+              `${primaryModel}|010신규/기변`,
+              `${primaryModel.toLowerCase()}|010신규/기변`,
+              `${primaryModel.toUpperCase()}|010신규/기변`,
               `${policyModel}|010신규/기변`,
               `${policyModel.toLowerCase()}|010신규/기변`,
               `${policyModel.toUpperCase()}|010신규/기변`
             );
-            hyphenVariants.forEach(variant => {
-              if (variant !== policyModel) {
+            primaryHyphenVariants.forEach(variant => {
+              if (variant !== primaryModel) {
                 supportKeys.push(
                   `${variant}|010신규/기변`,
                   `${variant.toLowerCase()}|010신규/기변`,
@@ -3211,7 +3259,23 @@ function setupDirectRoutes(app) {
                 );
               }
             });
-            if (policyModelNormalized) {
+            policyHyphenVariants.forEach(variant => {
+              if (variant !== policyModel && variant !== primaryModel) {
+                supportKeys.push(
+                  `${variant}|010신규/기변`,
+                  `${variant.toLowerCase()}|010신규/기변`,
+                  `${variant.toUpperCase()}|010신규/기변`
+                );
+              }
+            });
+            if (primaryModelNormalized) {
+              supportKeys.push(
+                `${primaryModelNormalized}|010신규/기변`,
+                `${primaryModelNormalized.toLowerCase()}|010신규/기변`,
+                `${primaryModelNormalized.toUpperCase()}|010신규/기변`
+              );
+            }
+            if (policyModelNormalized && policyModelNormalized !== primaryModelNormalized) {
               supportKeys.push(
                 `${policyModelNormalized}|010신규/기변`,
                 `${policyModelNormalized.toLowerCase()}|010신규/기변`,
