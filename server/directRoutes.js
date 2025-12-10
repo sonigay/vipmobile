@@ -2939,6 +2939,11 @@ function setupDirectRoutes(app) {
     try {
       const { modelId } = req.params;
       const { planGroup, openingType = '010신규', carrier } = req.query;
+      
+      // 🔥 UIP17PR-256 디버그: /calculate 호출 확인
+      if (modelId === 'mobile-LG-23' || modelId?.includes('UIP17PR')) {
+        console.log(`📡 [Direct] /calculate 호출:`, { modelId, planGroup, openingType, carrier });
+      }
 
       if (!planGroup || !carrier) {
         return res.status(400).json({ success: false, error: 'planGroup과 carrier가 필요합니다.' });
@@ -3227,7 +3232,7 @@ function setupDirectRoutes(app) {
 
           if (foundKey) {
             // 🔥 디버그: 키 매칭 성공 로그 (SM-S928N256 또는 UIP17PR-256)
-            if ((modelId === 'mobile-LG-16' || modelId === 'mobile-LG-23' || policyModel.includes('UIP17PR')) && planGroup === '115군') {
+            if (modelId === 'mobile-LG-16' || modelId === 'mobile-LG-23' || modelId?.includes('UIP17PR') || policyModel?.includes('UIP17PR')) {
               console.log(`✅ [Direct] /calculate 키 매칭 성공:`, {
                 modelId,
                 policyModel,
@@ -3239,7 +3244,7 @@ function setupDirectRoutes(app) {
             }
           } else {
             // 🔥 UIP17PR-256 키 매칭 실패 시 상세 로그
-            if ((modelId === 'mobile-LG-23' || policyModel.includes('UIP17PR')) && planGroup === '115군') {
+            if (modelId === 'mobile-LG-23' || modelId?.includes('UIP17PR') || policyModel?.includes('UIP17PR')) {
               const availableKeys = Object.keys(planGroupSupportData[planGroup] || {})
                 .filter(k => k.includes('UIP17PR') || k.includes('uip17pr'))
                 .slice(0, 10);
