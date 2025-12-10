@@ -2102,6 +2102,21 @@ function setupDirectRoutes(app) {
                 rebateValue = rebateMap[model.toUpperCase()];
                 matchedKey = model.toUpperCase();
               }
+              
+              // 🔥 개선: 하이픈 변형도 시도
+              if (rebateValue === undefined) {
+                const hyphenVariants = generateHyphenVariants(model);
+                for (const variant of hyphenVariants) {
+                  if (variant !== model) {
+                    rebateValue = rebateMap[variant] || rebateMap[variant.toLowerCase()] || rebateMap[variant.toUpperCase()];
+                    if (rebateValue !== undefined) {
+                      matchedKey = variant;
+                      break;
+                    }
+                  }
+                }
+              }
+              
               if (rebateValue === undefined && normalizedModel) {
                 rebateValue = rebateMap[normalizedModel];
                 matchedKey = normalizedModel;
@@ -2976,10 +2991,60 @@ function setupDirectRoutes(app) {
       let modelRow = null;
 
       // 인덱스 범위 체크
+      let actualModelIndex = modelIndex; // 실제 사용할 인덱스 (요청 모델명과 일치하는 행의 인덱스)
       if (!isNaN(modelIndex) && modelIndex >= 0 && modelIndex < modelData.length) {
         modelRow = modelData[modelIndex];
         if (modelRow && modelRow[0]) {
           // 인덱스로 찾기 성공
+          // 🔥 핵심 개선: 인덱스로 찾은 모델명이 요청 모델명과 다를 때, 정책표 전체를 스캔해서 같은 모델 찾기
+          if (req.query.modelName) {
+            const targetModelName = req.query.modelName.trim();
+            const policyModel = (modelRow[0] || '').toString().trim();
+            
+            // 정규화 후 다른 모델인지 확인
+            const targetNormalized = normalizeModelCode(targetModelName);
+            const policyNormalized = normalizeModelCode(policyModel);
+            
+            if (targetNormalized !== policyNormalized) {
+              // 정규화 후 다른 모델이면 정책표 전체를 스캔해서 요청 모델명과 일치하는 행 찾기
+              let foundIndex = -1;
+              
+              // 1단계: 정확히 일치하는 모델명 찾기
+              for (let i = 0; i < modelData.length; i++) {
+                const rowModel = (modelData[i]?.[0] || '').toString().trim();
+                if (!rowModel) continue;
+                
+                if (rowModel === targetModelName) {
+                  foundIndex = i;
+                  modelRow = modelData[i];
+                  break;
+                }
+              }
+              
+              // 2단계: 정규화된 모델명으로 찾기 (정확히 일치하지 않을 때만)
+              if (foundIndex < 0) {
+                for (let i = 0; i < modelData.length; i++) {
+                  const rowModel = (modelData[i]?.[0] || '').toString().trim();
+                  if (!rowModel) continue;
+                  
+                  const normalized = normalizeModelCode(rowModel);
+                  if (normalized && targetNormalized && normalized === targetNormalized) {
+                    foundIndex = i;
+                    modelRow = modelData[i];
+                    console.warn(`[Direct] /calculate 정책표 모델명 불일치: 요청=${targetModelName}, 정책표=${rowModel} (정규화 후 일치, 인덱스 ${modelIndex} → ${i}로 변경)`);
+                    break;
+                  }
+                }
+              }
+              
+              if (foundIndex >= 0) {
+                actualModelIndex = foundIndex; // 실제 사용할 인덱스 업데이트
+                console.log(`[Direct] /calculate 같은 모델 찾기 성공: 요청=${targetModelName}, 정책표 인덱스 ${modelIndex}의 모델명=${policyModel} → 인덱스 ${foundIndex}의 모델명=${(modelRow[0] || '').toString().trim()} 사용`);
+              } else {
+                console.warn(`[Direct] /calculate 같은 모델 찾기 실패: 요청=${targetModelName}, 정책표 인덱스 ${modelIndex}의 모델명=${policyModel} (정규화 후도 다름, 원래 인덱스 사용)`);
+              }
+            }
+          }
         } else {
           modelRow = null; // 빈 행이면 null로 설정
         }
@@ -2998,6 +3063,7 @@ function setupDirectRoutes(app) {
 
           if (rowModel === targetModelName) {
             modelRow = modelData[i];
+            actualModelIndex = i; // 실제 사용할 인덱스 업데이트
             break;
           }
         }
@@ -3011,9 +3077,10 @@ function setupDirectRoutes(app) {
             const normalized = normalizeModelCode(rowModel);
             if (normalized && targetModelNormalized && normalized === targetModelNormalized) {
               modelRow = modelData[i];
+              actualModelIndex = i; // 실제 사용할 인덱스 업데이트
               // 🔥 경고: 정책표 모델명이 요청 모델명과 다름
               if (rowModel !== targetModelName) {
-                console.warn(`[Direct] /calculate 정책표 모델명 불일치: 요청=${targetModelName}, 정책표=${rowModel} (정규화 후 일치)`);
+                console.warn(`[Direct] /calculate 정책표 모델명 불일치: 요청=${targetModelName}, 정책표=${rowModel} (정규화 후 일치, 인덱스 ${i} 사용)`);
               }
               break;
             }
@@ -3058,18 +3125,41 @@ function setupDirectRoutes(app) {
               getSheetData(supportSheetId, factoryPriceRange)
             ]);
 
-            // 정책표의 모델명으로 이통사 지원금 시트에서 매칭
+            // 🔥 핵심 개선: 요청 모델명으로 이통사 지원금 시트에서 매칭 (정책표 모델명이 잘못되어도 올바른 값 찾기)
+            const targetModelName = req.query.modelName ? req.query.modelName.trim() : (modelRow[0] || '').toString().trim();
+            const targetModelNormalized = normalizeModelCode(targetModelName);
             const policyModel = (modelRow[0] || '').toString().trim();
             const policyModelNormalized = normalizeModelCode(policyModel);
-            const supportModelIndex = supportModelData.findIndex(row => {
-              const target = (row[0] || '').toString().trim();
-              if (!target) return false;
-              if (target === policyModel) return true;
-              const normalized = normalizeModelCode(target);
-              return normalized && (normalized === policyModelNormalized);
-            });
+            
+            let supportModelIndex = -1;
+            
+            // 1단계: 요청 모델명으로 정확히 일치하는 행 찾기
+            if (req.query.modelName) {
+              supportModelIndex = supportModelData.findIndex(row => {
+                const target = (row[0] || '').toString().trim();
+                if (!target) return false;
+                if (target === targetModelName) return true;
+                const normalized = normalizeModelCode(target);
+                return normalized && (normalized === targetModelNormalized);
+              });
+            }
+            
+            // 2단계: 요청 모델명으로 찾지 못했으면 정책표 모델명으로 찾기 (폴백)
+            if (supportModelIndex < 0) {
+              supportModelIndex = supportModelData.findIndex(row => {
+                const target = (row[0] || '').toString().trim();
+                if (!target) return false;
+                if (target === policyModel) return true;
+                const normalized = normalizeModelCode(target);
+                return normalized && (normalized === policyModelNormalized);
+              });
+            }
+            
             if (supportModelIndex >= 0) {
               factoryPrice = Number(factoryPriceData[supportModelIndex]?.[0] || 0);
+              if (req.query.modelName && targetModelName !== policyModel) {
+                console.log(`[Direct] /calculate 출고가 매칭: 요청 모델명=${targetModelName}, 정책표 모델명=${policyModel}, 인덱스=${supportModelIndex}`);
+              }
             }
           } catch (err) {
             console.warn('[Direct] 출고가 읽기 실패:', err);
@@ -3085,8 +3175,9 @@ function setupDirectRoutes(app) {
       if (rebateRange && policySheetId) {
         try {
           // 정책표 리베이트 가져오기 (캐시 사용)
+          // 🔥 핵심 개선: actualModelIndex 사용 (요청 모델명과 일치하는 행의 인덱스)
           const rebateValues = await getSheetData(policySheetId, rebateRange);
-          policyRebate = Number(rebateValues[modelIndex]?.[0] || 0) * 10000; // 만원 단위 변환
+          policyRebate = Number(rebateValues[actualModelIndex]?.[0] || 0) * 10000; // 만원 단위 변환
         } catch (err) {
           console.warn(`[Direct] ${planGroup} ${openingType} 리베이트 읽기 실패:`, err);
         }
@@ -3161,13 +3252,14 @@ function setupDirectRoutes(app) {
           const primaryModel = req.query.modelName ? req.query.modelName.trim() : policyModel;
           const primaryModelNormalized = normalizeModelCode(primaryModel);
           
+          // 🔥 핵심 수정: 정규화 후 다른 모델명인지 확인 (다른 모델이면 정책표 모델명 제외)
+          const isDifferentModel = primaryModelNormalized && policyModelNormalized && 
+                                   primaryModelNormalized !== policyModelNormalized;
+          
           // 🔥 경고: 정책표 모델명과 요청 모델명이 다를 때 경고 (정규화 후에도 다르면)
           if (req.query.modelName && policyModel && req.query.modelName.trim() !== policyModel) {
-            const queryNormalized = normalizeModelCode(req.query.modelName);
-            const policyNormalized = normalizeModelCode(policyModel);
-            // 정규화 후에도 다르면 경고 (정규화 후 같으면 정상적인 변형)
-            if (queryNormalized !== policyNormalized) {
-              console.warn(`[Direct] /calculate ⚠️ 정책표 모델명 불일치: 요청=${req.query.modelName}, 정책표=${policyModel} (인덱스 ${modelIndex}, 정규화 후도 다름)`);
+            if (isDifferentModel) {
+              console.warn(`[Direct] /calculate ⚠️ 정책표 모델명 불일치 (다른 모델): 요청=${req.query.modelName}, 정책표=${policyModel} (인덱스 ${modelIndex}, 정규화 후도 다름 - 정책표 모델명 제외)`);
             }
           }
           
@@ -3178,23 +3270,32 @@ function setupDirectRoutes(app) {
               queryModelName: req.query.modelName,
               primaryModel,
               policyModel,
+              primaryModelNormalized,
+              policyModelNormalized,
+              isDifferentModel,
               planGroup,
               openingType,
               모델명일치: req.query.modelName?.trim() === policyModel
             });
           }
 
-          // 시도할 키 목록: query modelName 우선 → 정책표 모델명 → 대소문자 변형 → 하이픈 변형 → 정규화
+          // 시도할 키 목록: query modelName 우선 → 정책표 모델명(정규화 후 같을 때만) → 대소문자 변형 → 하이픈 변형 → 정규화
           const supportKeys = [
             `${primaryModel}|${openingType}`,  // query modelName 우선
             `${primaryModel.toLowerCase()}|${openingType}`,
-            `${primaryModel.toUpperCase()}|${openingType}`,
-            `${policyModel}|${openingType}`,  // 정책표 모델명도 시도
-            `${policyModel.toLowerCase()}|${openingType}`,
-            `${policyModel.toUpperCase()}|${openingType}`
+            `${primaryModel.toUpperCase()}|${openingType}`
           ];
+          
+          // 🔥 핵심 수정: 정규화 후 같은 모델일 때만 정책표 모델명 추가 (다른 모델이면 제외)
+          if (!isDifferentModel && policyModel && policyModel !== primaryModel) {
+            supportKeys.push(
+              `${policyModel}|${openingType}`,
+              `${policyModel.toLowerCase()}|${openingType}`,
+              `${policyModel.toUpperCase()}|${openingType}`
+            );
+          }
 
-          // 하이픈 변형 추가 (primaryModel 우선, policyModel도 시도)
+          // 하이픈 변형 추가 (primaryModel 우선)
           const primaryHyphenVariants = generateHyphenVariants(primaryModel);
           primaryHyphenVariants.forEach(variant => {
             if (variant !== primaryModel) {
@@ -3206,16 +3307,22 @@ function setupDirectRoutes(app) {
             }
           });
           
-          const policyHyphenVariants = generateHyphenVariants(policyModel);
-          policyHyphenVariants.forEach(variant => {
-            if (variant !== policyModel && variant !== primaryModel) {
-              supportKeys.push(
-                `${variant}|${openingType}`,
-                `${variant.toLowerCase()}|${openingType}`,
-                `${variant.toUpperCase()}|${openingType}`
-              );
-            }
-          });
+          // 🔥 핵심 수정: 정규화 후 같은 모델일 때만 정책표 모델명의 하이픈 변형 추가
+          if (!isDifferentModel && policyModel && policyModel !== primaryModel) {
+            const policyHyphenVariants = generateHyphenVariants(policyModel);
+            policyHyphenVariants.forEach(variant => {
+              // primaryModel의 하이픈 변형과도 중복 체크
+              const variantNormalized = normalizeModelCode(variant);
+              if (variant !== policyModel && variant !== primaryModel && 
+                  variantNormalized === primaryModelNormalized) {
+                supportKeys.push(
+                  `${variant}|${openingType}`,
+                  `${variant.toLowerCase()}|${openingType}`,
+                  `${variant.toUpperCase()}|${openingType}`
+                );
+              }
+            });
+          }
 
           if (primaryModelNormalized) {
             supportKeys.push(
@@ -3225,24 +3332,26 @@ function setupDirectRoutes(app) {
             );
           }
           
-          if (policyModelNormalized && policyModelNormalized !== primaryModelNormalized) {
-            supportKeys.push(
-              `${policyModelNormalized}|${openingType}`,
-              `${policyModelNormalized.toLowerCase()}|${openingType}`,
-              `${policyModelNormalized.toUpperCase()}|${openingType}`
-            );
-          }
+          // 🔥 핵심 수정: 정규화 후 같은 모델일 때만 정책표 모델명의 정규화된 버전 추가
+          // (이미 위에서 isDifferentModel 체크로 제외됨)
 
           // "번호이동" → MNP 매핑도 시도
           if (openingType === 'MNP') {
             supportKeys.push(
               `${primaryModel}|번호이동`,
               `${primaryModel.toLowerCase()}|번호이동`,
-              `${primaryModel.toUpperCase()}|번호이동`,
-              `${policyModel}|번호이동`,
-              `${policyModel.toLowerCase()}|번호이동`,
-              `${policyModel.toUpperCase()}|번호이동`
+              `${primaryModel.toUpperCase()}|번호이동`
             );
+            
+            // 🔥 핵심 수정: 정규화 후 같은 모델일 때만 정책표 모델명 추가
+            if (!isDifferentModel && policyModel && policyModel !== primaryModel) {
+              supportKeys.push(
+                `${policyModel}|번호이동`,
+                `${policyModel.toLowerCase()}|번호이동`,
+                `${policyModel.toUpperCase()}|번호이동`
+              );
+            }
+            
             primaryHyphenVariants.forEach(variant => {
               if (variant !== primaryModel) {
                 supportKeys.push(
@@ -3252,15 +3361,23 @@ function setupDirectRoutes(app) {
                 );
               }
             });
-            policyHyphenVariants.forEach(variant => {
-              if (variant !== policyModel && variant !== primaryModel) {
-                supportKeys.push(
-                  `${variant}|번호이동`,
-                  `${variant.toLowerCase()}|번호이동`,
-                  `${variant.toUpperCase()}|번호이동`
-                );
-              }
-            });
+            
+            // 🔥 핵심 수정: 정규화 후 같은 모델일 때만 정책표 모델명의 하이픈 변형 추가
+            if (!isDifferentModel && policyModel && policyModel !== primaryModel) {
+              const policyHyphenVariants = generateHyphenVariants(policyModel);
+              policyHyphenVariants.forEach(variant => {
+                const variantNormalized = normalizeModelCode(variant);
+                if (variant !== policyModel && variant !== primaryModel && 
+                    variantNormalized === primaryModelNormalized) {
+                  supportKeys.push(
+                    `${variant}|번호이동`,
+                    `${variant.toLowerCase()}|번호이동`,
+                    `${variant.toUpperCase()}|번호이동`
+                  );
+                }
+              });
+            }
+            
             if (primaryModelNormalized) {
               supportKeys.push(
                 `${primaryModelNormalized}|번호이동`,
@@ -3268,13 +3385,9 @@ function setupDirectRoutes(app) {
                 `${primaryModelNormalized.toUpperCase()}|번호이동`
               );
             }
-            if (policyModelNormalized && policyModelNormalized !== primaryModelNormalized) {
-              supportKeys.push(
-                `${policyModelNormalized}|번호이동`,
-                `${policyModelNormalized.toLowerCase()}|번호이동`,
-                `${policyModelNormalized.toUpperCase()}|번호이동`
-              );
-            }
+            
+            // 🔥 핵심 수정: 정규화 후 같은 모델일 때만 정책표 모델명의 정규화된 버전 추가
+            // (이미 위에서 isDifferentModel 체크로 제외됨)
           }
 
           // "010신규/기변" 매핑도 시도
@@ -3282,11 +3395,18 @@ function setupDirectRoutes(app) {
             supportKeys.push(
               `${primaryModel}|010신규/기변`,
               `${primaryModel.toLowerCase()}|010신규/기변`,
-              `${primaryModel.toUpperCase()}|010신규/기변`,
-              `${policyModel}|010신규/기변`,
-              `${policyModel.toLowerCase()}|010신규/기변`,
-              `${policyModel.toUpperCase()}|010신규/기변`
+              `${primaryModel.toUpperCase()}|010신규/기변`
             );
+            
+            // 🔥 핵심 수정: 정규화 후 같은 모델일 때만 정책표 모델명 추가
+            if (!isDifferentModel && policyModel && policyModel !== primaryModel) {
+              supportKeys.push(
+                `${policyModel}|010신규/기변`,
+                `${policyModel.toLowerCase()}|010신규/기변`,
+                `${policyModel.toUpperCase()}|010신규/기변`
+              );
+            }
+            
             primaryHyphenVariants.forEach(variant => {
               if (variant !== primaryModel) {
                 supportKeys.push(
@@ -3296,15 +3416,23 @@ function setupDirectRoutes(app) {
                 );
               }
             });
-            policyHyphenVariants.forEach(variant => {
-              if (variant !== policyModel && variant !== primaryModel) {
-                supportKeys.push(
-                  `${variant}|010신규/기변`,
-                  `${variant.toLowerCase()}|010신규/기변`,
-                  `${variant.toUpperCase()}|010신규/기변`
-                );
-              }
-            });
+            
+            // 🔥 핵심 수정: 정규화 후 같은 모델일 때만 정책표 모델명의 하이픈 변형 추가
+            if (!isDifferentModel && policyModel && policyModel !== primaryModel) {
+              const policyHyphenVariants = generateHyphenVariants(policyModel);
+              policyHyphenVariants.forEach(variant => {
+                const variantNormalized = normalizeModelCode(variant);
+                if (variant !== policyModel && variant !== primaryModel && 
+                    variantNormalized === primaryModelNormalized) {
+                  supportKeys.push(
+                    `${variant}|010신규/기변`,
+                    `${variant.toLowerCase()}|010신규/기변`,
+                    `${variant.toUpperCase()}|010신규/기변`
+                  );
+                }
+              });
+            }
+            
             if (primaryModelNormalized) {
               supportKeys.push(
                 `${primaryModelNormalized}|010신규/기변`,
@@ -3312,13 +3440,9 @@ function setupDirectRoutes(app) {
                 `${primaryModelNormalized.toUpperCase()}|010신규/기변`
               );
             }
-            if (policyModelNormalized && policyModelNormalized !== primaryModelNormalized) {
-              supportKeys.push(
-                `${policyModelNormalized}|010신규/기변`,
-                `${policyModelNormalized.toLowerCase()}|010신규/기변`,
-                `${policyModelNormalized.toUpperCase()}|010신규/기변`
-              );
-            }
+            
+            // 🔥 핵심 수정: 정규화 후 같은 모델일 때만 정책표 모델명의 정규화된 버전 추가
+            // (이미 위에서 isDifferentModel 체크로 제외됨)
           }
 
           // 키를 순서대로 시도하여 값 찾기
@@ -3512,7 +3636,9 @@ function setupDirectRoutes(app) {
               supportValuesLength: supportValues.length
             });
 
-            // 정책표의 모델명으로 이통사 지원금 시트에서 매칭
+            // 🔥 핵심 개선: 요청 모델명으로 이통사 지원금 시트에서 매칭 (정책표 모델명이 잘못되어도 올바른 값 찾기)
+            const targetModelName = req.query.modelName ? req.query.modelName.trim() : (modelRow[0] || '').toString().trim();
+            const targetModelNormalized = normalizeModelCode(targetModelName);
             const policyModel = (modelRow[0] || '').toString().trim();
             const policyModelNormalized = normalizeModelCode(policyModel);
 
@@ -3520,18 +3646,37 @@ function setupDirectRoutes(app) {
             // openingTypeRange가 없으면 인덱스 기반으로만 매칭
             if (!openingTypeRange || supportOpeningTypeData.length === 0) {
               console.log(`[Direct] /calculate 이통사지원금: openingTypeRange 없음, 인덱스 기반 매칭 사용`);
-              const supportModelIndex = supportModelData.findIndex(row => {
-                const target = (row[0] || '').toString().trim();
-                if (!target) return false;
-                if (target === policyModel) return true;
-                const normalized = normalizeModelCode(target);
-                return normalized && (normalized === policyModelNormalized);
-              });
+              
+              let supportModelIndex = -1;
+              
+              // 1단계: 요청 모델명으로 정확히 일치하는 행 찾기
+              if (req.query.modelName) {
+                supportModelIndex = supportModelData.findIndex(row => {
+                  const target = (row[0] || '').toString().trim();
+                  if (!target) return false;
+                  if (target === targetModelName) return true;
+                  const normalized = normalizeModelCode(target);
+                  return normalized && (normalized === targetModelNormalized);
+                });
+              }
+              
+              // 2단계: 요청 모델명으로 찾지 못했으면 정책표 모델명으로 찾기 (폴백)
+              if (supportModelIndex < 0) {
+                supportModelIndex = supportModelData.findIndex(row => {
+                  const target = (row[0] || '').toString().trim();
+                  if (!target) return false;
+                  if (target === policyModel) return true;
+                  const normalized = normalizeModelCode(target);
+                  return normalized && (normalized === policyModelNormalized);
+                });
+              }
+              
               if (supportModelIndex >= 0) {
                 publicSupport = Number(supportValues[supportModelIndex]?.[0] || 0);
                 console.log(`[Direct] /calculate 이통사지원금 (인덱스 기반):`, {
                   modelId,
-                  policyModel: (modelRow[0] || '').toString().trim(),
+                  요청모델명: targetModelName,
+                  정책표모델명: policyModel,
                   planGroup,
                   openingType,
                   supportModelIndex,
