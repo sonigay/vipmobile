@@ -1135,27 +1135,38 @@ async function fetchSheetValuesDirectly(sheetName, spreadsheetId = SPREADSHEET_I
     
     return data;
   } catch (error) {
-    // 429 에러 (Rate Limit) 처리 - Exponential Backoff 재시도 (최대 3회)
-    if (error.code === 429 || error.message?.includes('rateLimitExceeded') || error.response?.status === 429) {
+    // 재시도 대상 에러: 429 (Rate Limit), 500 (Internal Server Error), 503 (Service Unavailable), 타임아웃
+    const isRetryableError = error.code === 429 ||
+                            error.response?.status === 429 ||
+                            error.response?.status === 500 ||
+                            error.response?.status === 503 ||
+                            error.message?.includes('rateLimitExceeded') ||
+                            error.message?.includes('Internal error encountered') ||
+                            error.type === 'request-timeout' ||
+                            error.message?.includes('network timeout');
+
+    if (isRetryableError) {
       const maxRetries = 3;
       let retryCount = 0;
-      
+
       while (retryCount < maxRetries) {
-        const waitTime = Math.min(500 * Math.pow(2, retryCount), 60000); // 0.5s → 1s → 2s (최대 60초)
-        console.log(`⚠️ [API-LIMIT] Google API 할당량 초과 (429). ${waitTime/1000}초 대기 후 재시도 (${retryCount + 1}/${maxRetries})...`);
+        const waitTime = Math.min(1000 * Math.pow(2, retryCount), 60000); // 1s → 2s → 4s (최대 60초)
+        const errorType = error.code === 429 || error.response?.status === 429 ? 'API-LIMIT' :
+                         error.type === 'request-timeout' ? 'TIMEOUT' : 'SERVER-ERROR';
+        console.log(`⚠️ [${errorType}] Google API 에러. ${waitTime/1000}초 대기 후 재시도 (${retryCount + 1}/${maxRetries})...`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
-        
+
         try {
           const retryResponse = await sheets.spreadsheets.values.get({
             spreadsheetId: spreadsheetId,
             range: range
           });
-          console.log(`✅ [API-LIMIT] 재시도 성공 (${retryCount + 1}/${maxRetries})`);
+          console.log(`✅ [${errorType}] 재시도 성공 (${retryCount + 1}/${maxRetries})`);
           return retryResponse.data.values || [];
         } catch (retryError) {
           retryCount++;
           if (retryCount >= maxRetries) {
-            console.error(`❌ [API-LIMIT] 재시도 모두 실패 (${maxRetries}회 시도)`);
+            console.error(`❌ [${errorType}] 재시도 모두 실패 (${maxRetries}회 시도)`);
             throw retryError;
           }
         }
@@ -5362,17 +5373,32 @@ async function checkAndUpdateAddresses() {
       if (status === "사용") await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
-    // 일괄 업데이트 실행
+    // 일괄 업데이트 실행 (배치 크기 제한으로 분할)
     console.log(`🔍 [주소업데이트] 업데이트할 좌표 수: ${updates.length}개`);
     if (updates.length > 0) {
       console.log('🔍 [주소업데이트] Google Sheets 일괄 업데이트 시작');
-      await sheets.spreadsheets.values.batchUpdate({
-        spreadsheetId: SPREADSHEET_ID,
-        resource: {
-          valueInputOption: 'USER_ENTERED',
-          data: updates
+
+      // 배치를 50개씩 분할하여 API 제한 피하기
+      const BATCH_SIZE = 50;
+      const batches = [];
+      for (let i = 0; i < updates.length; i += BATCH_SIZE) {
+        batches.push(updates.slice(i, i + BATCH_SIZE));
+      }
+
+      console.log(`🔍 [주소업데이트] ${batches.length}개 배치로 분할하여 업데이트 진행`);
+
+      for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+        const batch = batches[batchIndex];
+        console.log(`🔄 [주소업데이트] 배치 ${batchIndex + 1}/${batches.length} 업데이트 중 (${batch.length}개 항목)`);
+
+        await updateBatchWithRetry(batch, batchIndex + 1, batches.length);
+
+        // 배치 간 간격 추가 (API 제한 방지)
+        if (batchIndex < batches.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
         }
-      });
+      }
+
       console.log('✅ [주소업데이트] Google Sheets 일괄 업데이트 완료');
     } else {
       console.log('⏭️ [주소업데이트] 업데이트할 좌표가 없음');
@@ -5380,6 +5406,39 @@ async function checkAndUpdateAddresses() {
     console.log('✅ [주소업데이트] 주소 업데이트 함수 완료');
   } catch (error) {
     console.error('❌ [주소업데이트] Error in checkAndUpdateAddresses:', error);
+  }
+}
+
+// 배치 업데이트를 재시도 로직과 함께 실행하는 함수
+async function updateBatchWithRetry(batch, batchIndex, totalBatches, retryCount = 0) {
+  const maxRetries = 3;
+
+  try {
+    await sheets.spreadsheets.values.batchUpdate({
+      spreadsheetId: SPREADSHEET_ID,
+      resource: {
+        valueInputOption: 'USER_ENTERED',
+        data: batch
+      }
+    });
+  } catch (error) {
+    console.error(`❌ [주소업데이트] 배치 ${batchIndex}/${totalBatches} 업데이트 실패:`, error.message);
+
+    // 429 에러 (Rate Limit) 또는 500/503 에러의 경우 재시도
+    if ((error.code === 429 || error.response?.status === 429 ||
+         error.response?.status === 500 || error.response?.status === 503 ||
+         error.message?.includes('Internal error encountered') ||
+         error.message?.includes('rateLimitExceeded')) && retryCount < maxRetries) {
+
+      const waitTime = Math.min(2000 * Math.pow(2, retryCount), 30000); // 2s → 4s → 8s (최대 30초)
+      console.log(`⏳ [주소업데이트] 재시도 대기 중... (${waitTime/1000}초, 시도 ${retryCount + 1}/${maxRetries})`);
+
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+      return updateBatchWithRetry(batch, batchIndex, totalBatches, retryCount + 1);
+    }
+
+    // 최대 재시도 횟수 초과 또는 다른 에러의 경우
+    throw error;
   }
 }
 
