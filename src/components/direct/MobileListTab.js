@@ -624,7 +624,17 @@ const MobileListTab = ({ onProductSelect }) => {
       return;
     }
 
-    const carrier = getCurrentCarrier();
+    // 모델에서 carrier 정보 추출 (모델 ID 형식: mobile-{carrier}-{index})
+    const currentModel = mobileList.find(m => m.id === modelId);
+    const carrier = currentModel?.carrier || getCurrentCarrier();
+    
+    // carrier가 현재 탭과 다르면 요청 스킵 (탭 전환 중 발생하는 잘못된 요청 방지)
+    const currentTabCarrier = getCurrentCarrier();
+    if (carrier !== currentTabCarrier) {
+      console.log(`[MobileListTab] 캐리어 불일치로 요청 스킵: modelCarrier=${carrier}, tabCarrier=${currentTabCarrier}`);
+      return;
+    }
+    
     const cacheKey = `${modelId}-${planGroup}-${openingType}-${carrier}`;
 
     // 전역 캐시 확인
@@ -687,8 +697,7 @@ const MobileListTab = ({ onProductSelect }) => {
       return;
     }
 
-    // 모델명 찾기 (404 에러 방지를 위해)
-    const currentModel = mobileList.find(m => m.id === modelId);
+    // 모델명 찾기 (404 에러 방지를 위해) - currentModel은 이미 위에서 찾음
     const modelName = currentModel?.model || null;
 
     // API 호출
