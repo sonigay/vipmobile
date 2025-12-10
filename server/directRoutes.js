@@ -3381,23 +3381,6 @@ function setupDirectRoutes(app) {
                 console.warn('[Direct] /calculate 캐시 0원 폴백 실패:', fbErr);
               }
             }
-          } else {
-            // 🔥 핵심 디버그: 키 매칭 실패 시 상세 로그
-            const availableKeys = Object.keys(planGroupSupportData[planGroup] || {});
-            const matchingKeys = availableKeys.filter(k => k.includes(policyModel) || k.includes(policyModelNormalized));
-            console.warn(`⚠️ [Direct] /calculate 이통사지원금 매칭 실패 (캐시 사용):`, {
-              modelId,
-              policyModel,
-              policyModelNormalized,
-              planGroup,
-              openingType,
-              시도한키수: supportKeys.length,
-              시도한키샘플: supportKeys.slice(0, 15),
-              맵크기: availableKeys.length,
-              매칭가능한키: matchingKeys.slice(0, 10),
-              맵키샘플: availableKeys.slice(0, 20)
-            });
-          }
         } else if (supportRange && modelRange && supportSheetId) {
           // 캐시에 없으면 기존 로직 사용 (폴백)
           try {
