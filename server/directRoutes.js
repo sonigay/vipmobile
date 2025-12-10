@@ -3086,14 +3086,33 @@ function setupDirectRoutes(app) {
         const planGroupSupportDataCacheKey = `planGroupSupportData-${carrier}-${CACHE_VERSION}`;
         let planGroupSupportData = getCache(planGroupSupportDataCacheKey);
 
-        // 🔥 핵심 수정: 캐시 미스 시 getMobileList를 호출하여 캐시 생성
+        // 🔥 핵심 수정: 캐시 미스 시 getMobileList를 호출하여 캐시 생성 (중복 호출 방지)
         if (!planGroupSupportData || !planGroupSupportData[planGroup]) {
-          console.log(`[Direct] /calculate 캐시 미스 - getMobileList 호출하여 캐시 생성: ${carrier}`);
-          try {
-            await getMobileList(carrier);
-            planGroupSupportData = getCache(planGroupSupportDataCacheKey);
-          } catch (err) {
-            console.warn(`[Direct] /calculate getMobileList 호출 실패:`, err.message);
+          const pendingKey = `getMobileList-${carrier}`;
+          
+          // 이미 진행 중인 getMobileList 호출이 있으면 그 결과를 기다림
+          if (pendingRequests.has(pendingKey)) {
+            console.log(`[Direct] /calculate 캐시 미스 - 진행 중인 getMobileList 대기: ${carrier}`);
+            try {
+              await pendingRequests.get(pendingKey);
+              planGroupSupportData = getCache(planGroupSupportDataCacheKey);
+            } catch (err) {
+              console.warn(`[Direct] /calculate getMobileList 대기 실패:`, err.message);
+            }
+          } else {
+            // 새로운 getMobileList 호출 시작
+            console.log(`[Direct] /calculate 캐시 미스 - getMobileList 호출 시작: ${carrier}`);
+            const mobileListPromise = getMobileList(carrier);
+            pendingRequests.set(pendingKey, mobileListPromise);
+            
+            try {
+              await mobileListPromise;
+              planGroupSupportData = getCache(planGroupSupportDataCacheKey);
+            } catch (err) {
+              console.warn(`[Direct] /calculate getMobileList 호출 실패:`, err.message);
+            } finally {
+              pendingRequests.delete(pendingKey);
+            }
           }
         }
 
