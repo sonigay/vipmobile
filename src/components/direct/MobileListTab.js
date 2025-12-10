@@ -1129,7 +1129,7 @@ const MobileListTab = ({ onProductSelect }) => {
                         </Typography>
                       </TableCell>
                       <TableCell align="center" sx={{ color: 'info.main' }}>
-                        {(row.support || row.publicSupport)?.toLocaleString()}
+                        {getDisplayValue(row, 'publicSupport')?.toLocaleString() || (row.support || row.publicSupport)?.toLocaleString()}
                       </TableCell>
 
                       {/* 대리점 지원금 */}

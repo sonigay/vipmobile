@@ -2034,6 +2034,12 @@ function setupDirectRoutes(app) {
         } else if (planGroupRanges['115군']) {
           selectedPlanGroup = '115군';
         }
+        
+        // 🔥 UIP17PR-256 디버그: 요금제군 선택 로직
+        if (model === 'UIP17PR-256') {
+          console.log(`🔥 [UIP17PR-256 요금제군 선택]:`, { model, isBudget, selectedPlanGroup, 'tags.isBudget': tags.isBudget, 'tags.isPremium': tags.isPremium });
+        }
+        
         // 정책표 리베이트 가져오기 (요금제군 & 유형별, 모델명 기준 매핑)
         // 로드 전 기본값: 태그와 관계없이 항상 MNP 사용
         let policyRebate = 0;
@@ -2405,8 +2411,10 @@ function setupDirectRoutes(app) {
               
               // 실패 로그 (문제 분석용)
               console.warn(`[Direct] ⚠️ 키 없음: ${model}|${supportOpeningType} (${selectedPlanGroup})`);
+            } else if (model === 'UIP17PR-256') {
+              // 🔥 UIP17PR-256 성공 로그
+              console.log(`🔥 [UIP17PR-256 이통사지원금 조회]:`, { selectedPlanGroup, foundKey, publicSupport });
             }
-            // 성공 로그 제거
           }
         } else {
           // planGroupSupportData가 없거나 selectedPlanGroup이 없는 경우
@@ -3227,6 +3235,21 @@ function setupDirectRoutes(app) {
                 openingType,
                 foundKey,
                 publicSupport
+              });
+            }
+          } else {
+            // 🔥 UIP17PR-256 키 매칭 실패 시 상세 로그
+            if ((modelId === 'mobile-LG-23' || policyModel.includes('UIP17PR')) && planGroup === '115군') {
+              const availableKeys = Object.keys(planGroupSupportData[planGroup] || {})
+                .filter(k => k.includes('UIP17PR') || k.includes('uip17pr'))
+                .slice(0, 10);
+              console.warn(`⚠️ [Direct] /calculate UIP17PR-256 키 매칭 실패:`, {
+                modelId,
+                policyModel,
+                planGroup,
+                openingType,
+                시도한키목록: supportKeys.slice(0, 5),
+                사용가능한키목록: availableKeys
               });
             }
             // 캐시 값이 0이면 폴백 시트 조회를 한 번 더 시도 (잘못된 캐시 값 방지)
