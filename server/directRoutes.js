@@ -2986,10 +2986,12 @@ function setupDirectRoutes(app) {
       }
 
       // 인덱스로 찾기 실패 시 모델명으로 찾기 시도 (query parameter로 modelName 전달 시)
+      // 🔥 핵심 수정: req.query.modelName이 있으면 정확히 일치하는 모델명을 우선 찾음
       if (!modelRow && req.query.modelName) {
         const targetModelName = req.query.modelName.trim();
         const targetModelNormalized = normalizeModelCode(targetModelName);
 
+        // 1단계: 정확히 일치하는 모델명 찾기
         for (let i = 0; i < modelData.length; i++) {
           const rowModel = (modelData[i]?.[0] || '').toString().trim();
           if (!rowModel) continue;
@@ -2998,11 +3000,23 @@ function setupDirectRoutes(app) {
             modelRow = modelData[i];
             break;
           }
+        }
 
-          const normalized = normalizeModelCode(rowModel);
-          if (normalized && targetModelNormalized && normalized === targetModelNormalized) {
-            modelRow = modelData[i];
-            break;
+        // 2단계: 정규화된 모델명으로 찾기 (정확히 일치하지 않을 때만)
+        if (!modelRow) {
+          for (let i = 0; i < modelData.length; i++) {
+            const rowModel = (modelData[i]?.[0] || '').toString().trim();
+            if (!rowModel) continue;
+
+            const normalized = normalizeModelCode(rowModel);
+            if (normalized && targetModelNormalized && normalized === targetModelNormalized) {
+              modelRow = modelData[i];
+              // 🔥 경고: 정책표 모델명이 요청 모델명과 다름
+              if (rowModel !== targetModelName) {
+                console.warn(`[Direct] /calculate 정책표 모델명 불일치: 요청=${targetModelName}, 정책표=${rowModel} (정규화 후 일치)`);
+              }
+              break;
+            }
           }
         }
       }
@@ -3147,6 +3161,16 @@ function setupDirectRoutes(app) {
           const primaryModel = req.query.modelName ? req.query.modelName.trim() : policyModel;
           const primaryModelNormalized = normalizeModelCode(primaryModel);
           
+          // 🔥 경고: 정책표 모델명과 요청 모델명이 다를 때 경고 (정규화 후에도 다르면)
+          if (req.query.modelName && policyModel && req.query.modelName.trim() !== policyModel) {
+            const queryNormalized = normalizeModelCode(req.query.modelName);
+            const policyNormalized = normalizeModelCode(policyModel);
+            // 정규화 후에도 다르면 경고 (정규화 후 같으면 정상적인 변형)
+            if (queryNormalized !== policyNormalized) {
+              console.warn(`[Direct] /calculate ⚠️ 정책표 모델명 불일치: 요청=${req.query.modelName}, 정책표=${policyModel} (인덱스 ${modelIndex}, 정규화 후도 다름)`);
+            }
+          }
+          
           // 🔥 디버그: UIP17PR-256 관련 로그
           if (modelId === 'mobile-LG-23' || modelId?.includes('UIP17PR') || primaryModel?.includes('UIP17PR') || policyModel?.includes('UIP17PR')) {
             console.log(`🔍 [Direct] /calculate 모델명 비교:`, {
@@ -3155,7 +3179,8 @@ function setupDirectRoutes(app) {
               primaryModel,
               policyModel,
               planGroup,
-              openingType
+              openingType,
+              모델명일치: req.query.modelName?.trim() === policyModel
             });
           }
 
