@@ -1382,7 +1382,7 @@ function setupDirectRoutes(app) {
       // 4. 요금제군별 이통사지원금 범위 읽기 (모델명+개통유형 복합키 맵으로 저장)
       // planGroupSupportData를 캐시하여 /calculate 엔드포인트에서도 재사용
       // 🔥 캐시 버전: 버그 수정 시 버전을 올려서 이전 캐시 무효화
-      const CACHE_VERSION = 'v3'; // v3: 전유형 덮어쓰기 버그 수정
+      const CACHE_VERSION = 'v4'; // v4: /calculate 캐시 미스 시 getMobileList 호출
       const planGroupSupportDataCacheKey = `planGroupSupportData-${carrierParam}-${CACHE_VERSION}`;
       let planGroupSupportData = getCache(planGroupSupportDataCacheKey);
 
@@ -2611,7 +2611,7 @@ function setupDirectRoutes(app) {
       const carrier = req.query.carrier || 'SK';
       const includeMeta = req.query.meta === '1';
       // 🔥 캐시 버전: 버그 수정 시 버전을 올려서 이전 캐시 무효화
-      const MOBILES_CACHE_VERSION = 'v3';
+      const MOBILES_CACHE_VERSION = 'v4'; // v4: /calculate 캐시 미스 시 getMobileList 호출
       const cacheKey = `mobiles-${carrier}-${MOBILES_CACHE_VERSION}`;
       const cached = getCache(cacheKey);
       if (cached) {
@@ -2708,7 +2708,7 @@ function setupDirectRoutes(app) {
 
       // 캐시 확인
       // 🔥 캐시 버전: 버그 수정 시 버전을 올려서 이전 캐시 무효화
-      const TODAYS_CACHE_VERSION = 'v3';
+      const TODAYS_CACHE_VERSION = 'v4'; // v4: /calculate 캐시 미스 시 getMobileList 호출
       const cacheKey = `todays-mobiles-${TODAYS_CACHE_VERSION}`;
       const cached = getCache(cacheKey);
       if (cached) {
@@ -3084,7 +3084,18 @@ function setupDirectRoutes(app) {
         // 🔥 캐시 버전: getMobileList와 동일한 버전 사용
         const CACHE_VERSION = 'v4'; // v4: SM-S928N256 800,000원 정상 표시
         const planGroupSupportDataCacheKey = `planGroupSupportData-${carrier}-${CACHE_VERSION}`;
-        const planGroupSupportData = getCache(planGroupSupportDataCacheKey);
+        let planGroupSupportData = getCache(planGroupSupportDataCacheKey);
+
+        // 🔥 핵심 수정: 캐시 미스 시 getMobileList를 호출하여 캐시 생성
+        if (!planGroupSupportData || !planGroupSupportData[planGroup]) {
+          console.log(`[Direct] /calculate 캐시 미스 - getMobileList 호출하여 캐시 생성: ${carrier}`);
+          try {
+            await getMobileList(carrier);
+            planGroupSupportData = getCache(planGroupSupportDataCacheKey);
+          } catch (err) {
+            console.warn(`[Direct] /calculate getMobileList 호출 실패:`, err.message);
+          }
+        }
 
         if (planGroupSupportData && planGroupSupportData[planGroup]) {
           // 캐시에서 planGroupSupportData를 찾았으면 직접 사용 (API 호출 없음)
@@ -3179,7 +3190,17 @@ function setupDirectRoutes(app) {
           }
 
           if (foundKey) {
-            // 성공 로그 제거 (불필요한 로그 정리)
+            // 🔥 디버그: 키 매칭 성공 로그
+            if (modelId === 'mobile-LG-16' && planGroup === '115군') {
+              console.log(`✅ [Direct] /calculate 키 매칭 성공:`, {
+                modelId,
+                policyModel,
+                planGroup,
+                openingType,
+                foundKey,
+                publicSupport
+              });
+            }
             // 캐시 값이 0이면 폴백 시트 조회를 한 번 더 시도 (잘못된 캐시 값 방지)
             if (false && publicSupport === 0 && supportRange && modelRange && supportSheetId) {
               try {
@@ -3310,14 +3331,20 @@ function setupDirectRoutes(app) {
               }
             }
           } else {
-            console.warn(`[Direct] /calculate 이통사지원금 매칭 실패 (캐시 사용):`, {
+            // 🔥 핵심 디버그: 키 매칭 실패 시 상세 로그
+            const availableKeys = Object.keys(planGroupSupportData[planGroup] || {});
+            const matchingKeys = availableKeys.filter(k => k.includes(policyModel) || k.includes(policyModelNormalized));
+            console.warn(`⚠️ [Direct] /calculate 이통사지원금 매칭 실패 (캐시 사용):`, {
               modelId,
-              policyModel: (modelRow[0] || '').toString().trim(),
+              policyModel,
+              policyModelNormalized,
               planGroup,
               openingType,
-              시도한키: supportKeys.slice(0, 10),
-              맵크기: Object.keys(planGroupSupportData[planGroup] || {}).length,
-              맵키샘플: Object.keys(planGroupSupportData[planGroup] || {}).slice(0, 10)
+              시도한키수: supportKeys.length,
+              시도한키샘플: supportKeys.slice(0, 15),
+              맵크기: availableKeys.length,
+              매칭가능한키: matchingKeys.slice(0, 10),
+              맵키샘플: availableKeys.slice(0, 20)
             });
           }
         } else if (supportRange && modelRange && supportSheetId) {

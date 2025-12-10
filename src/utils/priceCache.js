@@ -4,7 +4,9 @@
  * sessionStorage를 사용하여 새로고침 후에도 유지 (1시간 만료)
  */
 
-const CACHE_KEY = 'directStore_priceCache';
+// 🔥 캐시 버전: 서버 버그 수정 시 버전을 올려서 이전 캐시 무효화
+const CACHE_VERSION = 'v4'; // v4: /calculate 캐시 미스 시 getMobileList 호출
+const CACHE_KEY = `directStore_priceCache_${CACHE_VERSION}`;
 const CACHE_EXPIRY = 60 * 60 * 1000; // 1시간 (밀리초)
 
 /**
