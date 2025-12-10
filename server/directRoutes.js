@@ -1624,6 +1624,15 @@ function setupDirectRoutes(app) {
             planGroupSizes[pg] = Object.keys(planGroupSupportData[pg] || {}).length;
           });
           
+          // 🔥 UIP17PR-256 디버그: 캐시 저장 전 값 확인
+          if (planGroupSupportData['115군']) {
+            const uip17prKeys = Object.keys(planGroupSupportData['115군']).filter(k => k.includes('UIP17PR'));
+            console.log(`🔥 [UIP17PR-256 캐시 저장 전] 115군 키:`, uip17prKeys.slice(0, 10));
+            uip17prKeys.forEach(k => {
+              console.log(`   ${k} = ${planGroupSupportData['115군'][k]}`);
+            });
+          }
+          
           setCache(planGroupSupportDataCacheKey, planGroupSupportData, 5 * 60 * 1000);
         } else {
           // 미생성 시 기존 캐시 삭제하여 폴백 강제
@@ -3209,8 +3218,8 @@ function setupDirectRoutes(app) {
           }
 
           if (foundKey) {
-            // 🔥 디버그: 키 매칭 성공 로그
-            if (modelId === 'mobile-LG-16' && planGroup === '115군') {
+            // 🔥 디버그: 키 매칭 성공 로그 (SM-S928N256 또는 UIP17PR-256)
+            if ((modelId === 'mobile-LG-16' || modelId === 'mobile-LG-23' || policyModel.includes('UIP17PR')) && planGroup === '115군') {
               console.log(`✅ [Direct] /calculate 키 매칭 성공:`, {
                 modelId,
                 policyModel,
