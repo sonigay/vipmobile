@@ -92,6 +92,14 @@ const MobileListTab = ({ onProductSelect }) => {
           withMeta: true
         }) || {};
         const safeList = list || [];
+        
+        // #region agent log
+        const uipModel = safeList.find(m => m.model?.includes('UIP17PR-256') || m.id?.includes('UIP17PR'));
+        if (uipModel) {
+          fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:94',message:'초기 mobileList 로드',data:{modelId:uipModel.id,model:uipModel.model,publicSupport:uipModel.publicSupport,support:uipModel.support,carrier},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        }
+        // #endregion
+        
         setMobileList(safeList);
         setSteps(prev => ({
           ...prev,
@@ -628,6 +636,12 @@ const MobileListTab = ({ onProductSelect }) => {
     const currentModel = mobileList.find(m => m.id === modelId);
     const carrier = currentModel?.carrier || getCurrentCarrier();
     
+    // #region agent log
+    if (currentModel?.model?.includes('UIP17PR') || modelId?.includes('UIP17PR')) {
+      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:622',message:'calculatePrice 함수 호출',data:{modelId,planGroup,openingType,carrier,currentModelPublicSupport:currentModel?.publicSupport,currentModelSupport:currentModel?.support},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    }
+    // #endregion
+    
     // carrier가 현재 탭과 다르면 요청 스킵 (탭 전환 중 발생하는 잘못된 요청 방지)
     const currentTabCarrier = getCurrentCarrier();
     if (carrier !== currentTabCarrier) {
@@ -641,6 +655,11 @@ const MobileListTab = ({ onProductSelect }) => {
     if (useCache) {
       const cached = getCachedPrice(modelId, planGroup, openingType, carrier);
       if (cached) {
+        // #region agent log
+        if (currentModel?.model?.includes('UIP17PR') || modelId?.includes('UIP17PR')) {
+          fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:648',message:'캐시에서 값 사용',data:{modelId,planGroup,openingType,carrier,cachedPublicSupport:cached.publicSupport},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        }
+        // #endregion
         setCalculatedPrices(prev => ({
           ...prev,
           [modelId]: {
@@ -655,10 +674,10 @@ const MobileListTab = ({ onProductSelect }) => {
         setMobileList(prevList => prevList.map(item =>
           item.id === modelId
             ? {
-              ...item,
-              publicSupport: cached.publicSupport || item.publicSupport || 0,
-              support: cached.publicSupport || item.support || item.publicSupport || 0
-            }
+                ...item,
+                publicSupport: cached.publicSupport || item.publicSupport || 0,
+                support: cached.publicSupport || item.support || item.publicSupport || 0
+              }
             : item
         ));
         return;
@@ -711,6 +730,12 @@ const MobileListTab = ({ onProductSelect }) => {
         }
 
         if (result.success) {
+          // #region agent log
+          if (modelName?.includes('UIP17PR') || modelId?.includes('UIP17PR')) {
+            fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:713',message:'calculatePrice API 응답 성공',data:{modelId,modelName,planGroup,openingType,carrier,publicSupport:result.publicSupport,storeSupportWithAddon:result.storeSupportWithAddon},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+          }
+          // #endregion
+
           // 전역 캐시에 저장
           setCachedPrice(modelId, planGroup, openingType, carrier, {
             storeSupportWithAddon: result.storeSupportWithAddon || 0,
@@ -731,6 +756,12 @@ const MobileListTab = ({ onProductSelect }) => {
               publicSupport: result.publicSupport || 0
             }
           }));
+
+          // #region agent log
+          if (modelName?.includes('UIP17PR') || modelId?.includes('UIP17PR')) {
+            fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:733',message:'calculatedPrices 상태 업데이트 후',data:{modelId,publicSupport:result.publicSupport},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+          }
+          // #endregion
 
           // mobileList 상태도 업데이트 (이통사지원금 반영)
           setMobileList(prevList => prevList.map(item =>
@@ -829,6 +860,11 @@ const MobileListTab = ({ onProductSelect }) => {
   // 표시할 값 가져오기 (계산된 값이 있으면 사용, 없으면 원래 값)
   const getDisplayValue = (row, field) => {
     const calculated = calculatedPrices[row.id];
+    // #region agent log
+    if (field === 'publicSupport' && (row.model === 'UIP17PR-256' || row.id?.includes('UIP17PR'))) {
+      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:830',message:'getDisplayValue 호출',data:{modelId:row.id,model:row.model,field,calculatedValue:calculated?.[field],rowValue:row[field],hasCalculated:!!calculated},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+    }
+    // #endregion
     if (calculated && calculatedPrices[row.id]) {
       return calculated[field];
     }

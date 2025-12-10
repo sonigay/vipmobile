@@ -2509,6 +2509,12 @@ function setupDirectRoutes(app) {
         // 디버깅: UIP 관련 모델명에 대한 상세 로그
         // UIP 태그 로그 제거 (불필요한 로그 정리)
 
+        // #region agent log
+        if (model === 'UIP17PR-256' || model?.includes('UIP17PR-256')) {
+          fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'directRoutes.js:2512',message:'UIP17PR-256 초기 publicSupport 설정',data:{model,carrier:carrierParam,publicSupport,selectedPlanGroup,id:`mobile-${carrierParam}-${i}`},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        }
+        // #endregion
+
         const mobile = {
           id: `mobile-${carrierParam}-${i}`,
           model: model,
@@ -3229,6 +3235,12 @@ function setupDirectRoutes(app) {
               break;
             }
           }
+
+          // #region agent log
+          if (modelId?.includes('UIP17PR') || policyModel?.includes('UIP17PR')) {
+            fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'directRoutes.js:3225',message:'/calculate API publicSupport 계산 결과',data:{modelId,policyModel,planGroup,openingType,foundKey,publicSupport,supportKeys:supportKeys.slice(0,5)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+          }
+          // #endregion
 
           if (foundKey) {
             // 🔥 디버그: 키 매칭 성공 로그 (SM-S928N256 또는 UIP17PR-256)
