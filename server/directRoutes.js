@@ -1437,6 +1437,16 @@ function setupDirectRoutes(app) {
               const planGroup = supportRangeMap[range];
               const supportValues = valueRange.values || [];
               
+              // 🔥 핵심 디버그: supportValues의 실제 내용 확인
+              if (planGroup === '115군') {
+                console.log(`\n🔥🔥🔥 [핵심 디버그] 115군 supportValues 확인:`);
+                console.log(`  범위: ${range}`);
+                console.log(`  supportValues 길이: ${supportValues.length}`);
+                console.log(`  supportValues 첫 5개:`, supportValues.slice(0, 5));
+                console.log(`  supportModelData 첫 5개:`, supportModelData.slice(0, 5));
+                console.log(`  supportOpeningTypeData 첫 5개:`, supportOpeningTypeData.slice(0, 5));
+              }
+              
               // 디버깅용 변수 정의
               const debugRows = [];
               const debugModels = ['UIP17-256', 'SM-S926N256', 'SM-S928N256', 'UIP17PR-256'];
