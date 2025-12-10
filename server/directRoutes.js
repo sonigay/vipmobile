@@ -2694,6 +2694,117 @@ function setupDirectRoutes(app) {
         mobileList.push(mobile);
       }
 
+      // ========== 디버깅: 양쪽 데이터 비교 로그 ==========
+      console.log(`\n${'='.repeat(80)}`);
+      console.log(`[Direct] 📊 데이터 비교 디버그 (통신사: ${carrier})`);
+      console.log(`${'='.repeat(80)}`);
+      
+      // 1. 휴대폰 목록 (정책표) 데이터
+      console.log(`\n[1] 휴대폰 목록 (정책표) - 총 ${mobileList.length}개 모델:`);
+      console.log('-'.repeat(60));
+      mobileList.slice(0, 20).forEach((m, idx) => {
+        console.log(`  ${idx + 1}. 모델명: "${m.model}" | 펫네임: "${m.petName}" | 기본요금제군: "${m.defaultPlanGroup || '(없음)'}" | 기본개통유형: "${m.defaultOpeningType || '(없음)'}"`);
+      });
+      if (mobileList.length > 20) {
+        console.log(`  ... 외 ${mobileList.length - 20}개 모델 생략`);
+      }
+      
+      // 2. 이통사 지원금 시트 데이터 (supportSheetData)
+      const supportModels = [...new Set(Object.keys(supportSheetData || {}).map(k => k.split('|')[0]))];
+      console.log(`\n[2] 이통사 지원금 시트 (supportSheetData) - 고유 모델 ${supportModels.length}개:`);
+      console.log('-'.repeat(60));
+      supportModels.slice(0, 20).forEach((model, idx) => {
+        const entry = supportSheetData[model] || supportSheetData[`${model}|MNP`] || supportSheetData[`${model}|010신규`];
+        console.log(`  ${idx + 1}. 모델명: "${model}" | 출고가: ${entry?.factoryPrice || 0} | 개통유형: ${entry?.openingTypes?.join(', ') || entry?.openingType || '(없음)'}`);
+      });
+      if (supportModels.length > 20) {
+        console.log(`  ... 외 ${supportModels.length - 20}개 모델 생략`);
+      }
+      
+      // 3. 요금제군별 이통사지원금 데이터 (planGroupSupportData)
+      console.log(`\n[3] 요금제군별 이통사지원금 (planGroupSupportData):`);
+      console.log('-'.repeat(60));
+      Object.keys(planGroupSupportData || {}).forEach(planGroup => {
+        const pgData = planGroupSupportData[planGroup] || {};
+        const keys = Object.keys(pgData);
+        const uniqueModels = [...new Set(keys.map(k => k.split('|')[0]))];
+        const uniqueTypes = [...new Set(keys.map(k => k.split('|')[1]))];
+        console.log(`  📁 ${planGroup}: 총 ${keys.length}개 키 (모델 ${uniqueModels.length}개 × 개통유형 ${uniqueTypes.length}개)`);
+        console.log(`     개통유형: ${uniqueTypes.join(', ')}`);
+        console.log(`     모델 샘플: ${uniqueModels.slice(0, 10).join(', ')}${uniqueModels.length > 10 ? '...' : ''}`);
+        // 샘플 키-값 쌍
+        console.log(`     키-값 샘플:`);
+        keys.slice(0, 5).forEach(k => {
+          console.log(`       "${k}" = ${pgData[k]}`);
+        });
+      });
+      
+      // 4. 매칭 현황 분석
+      console.log(`\n[4] 매칭 현황 분석:`);
+      console.log('-'.repeat(60));
+      const matchingResults = mobileList.map(m => {
+        const model = m.model;
+        const normalizedModel = normalizeModelCode(model);
+        const planGroup = m.defaultPlanGroup || '115군';
+        const openingType = m.defaultOpeningType || 'MNP';
+        
+        // supportSheetData에서 매칭 확인
+        const supportDataFound = !!(
+          supportSheetData[model] || 
+          supportSheetData[`${model}|${openingType}`] ||
+          supportSheetData[normalizedModel] ||
+          supportSheetData[`${normalizedModel}|${openingType}`]
+        );
+        
+        // planGroupSupportData에서 매칭 확인
+        const pgData = planGroupSupportData[planGroup] || {};
+        const planGroupFound = !!(
+          pgData[`${model}|${openingType}`] ||
+          pgData[`${model.toLowerCase()}|${openingType}`] ||
+          pgData[`${normalizedModel}|${openingType}`] ||
+          pgData[`${normalizedModel?.toLowerCase()}|${openingType}`]
+        );
+        
+        return {
+          model,
+          normalizedModel,
+          planGroup,
+          openingType,
+          supportDataFound,
+          planGroupFound,
+          publicSupport: m.publicSupport || m.support || 0
+        };
+      });
+      
+      const successCount = matchingResults.filter(r => r.planGroupFound).length;
+      const failCount = matchingResults.filter(r => !r.planGroupFound).length;
+      
+      console.log(`  ✅ 이통사지원금 매칭 성공: ${successCount}개`);
+      console.log(`  ❌ 이통사지원금 매칭 실패: ${failCount}개`);
+      
+      if (failCount > 0) {
+        console.log(`\n  [매칭 실패 모델 상세]:`);
+        matchingResults.filter(r => !r.planGroupFound).slice(0, 15).forEach((r, idx) => {
+          console.log(`    ${idx + 1}. "${r.model}" (정규화: "${r.normalizedModel}") | 요금제군: ${r.planGroup} | 개통유형: ${r.openingType}`);
+          // 해당 요금제군에서 비슷한 키 찾기
+          const pgData = planGroupSupportData[r.planGroup] || {};
+          const similarKeys = Object.keys(pgData).filter(k => {
+            const keyModel = k.split('|')[0].toLowerCase();
+            return keyModel.includes(r.model.toLowerCase().substring(0, 5)) ||
+                   r.model.toLowerCase().includes(keyModel.substring(0, 5));
+          }).slice(0, 5);
+          if (similarKeys.length > 0) {
+            console.log(`       💡 유사한 키: ${similarKeys.join(', ')}`);
+          }
+        });
+        if (failCount > 15) {
+          console.log(`    ... 외 ${failCount - 15}개 모델 생략`);
+        }
+      }
+      
+      console.log(`\n${'='.repeat(80)}\n`);
+      // ========== 디버깅 끝 ==========
+
       return mobileList;
     } catch (error) {
       console.error(`[Direct] getMobileList error (통신사: ${carrier || 'SK'}):`, error);
