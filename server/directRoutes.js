@@ -1381,7 +1381,9 @@ function setupDirectRoutes(app) {
 
       // 4. 요금제군별 이통사지원금 범위 읽기 (모델명+개통유형 복합키 맵으로 저장)
       // planGroupSupportData를 캐시하여 /calculate 엔드포인트에서도 재사용
-      const planGroupSupportDataCacheKey = `planGroupSupportData-${carrierParam}`;
+      // 🔥 캐시 버전: 버그 수정 시 버전을 올려서 이전 캐시 무효화
+      const CACHE_VERSION = 'v3'; // v3: 전유형 덮어쓰기 버그 수정
+      const planGroupSupportDataCacheKey = `planGroupSupportData-${carrierParam}-${CACHE_VERSION}`;
       let planGroupSupportData = getCache(planGroupSupportDataCacheKey);
 
       // 캐시가 비어있거나 유효하지 않으면 재생성
@@ -3060,7 +3062,9 @@ function setupDirectRoutes(app) {
         const openingTypeRange = supportSettingsJson.openingTypeRange || '';
 
         // planGroupSupportData를 캐시에서 가져오기 (getMobileList에서 생성한 것 재사용)
-        const planGroupSupportDataCacheKey = `planGroupSupportData-${carrier}`;
+        // 🔥 캐시 버전: getMobileList와 동일한 버전 사용
+        const CACHE_VERSION = 'v3'; // v3: 전유형 덮어쓰기 버그 수정
+        const planGroupSupportDataCacheKey = `planGroupSupportData-${carrier}-${CACHE_VERSION}`;
         const planGroupSupportData = getCache(planGroupSupportDataCacheKey);
 
         if (planGroupSupportData && planGroupSupportData[planGroup]) {
@@ -3385,32 +3389,47 @@ function setupDirectRoutes(app) {
                 const hyphenVariants = generateHyphenVariants(model);
                 const normalizedModel = normalizeModelCode(model);
 
+                // 🔥 전유형 행 덮어쓰기 방지 (getMobileList와 동일)
+                const isAllType = openingTypeRaw === '전유형' || openingTypes.includes('전유형');
+
                 // 키 생성 헬퍼 함수 (모든 변형 생성)
                 const addKeys = (openingType) => {
+                  const setIfBetter = (key, value) => {
+                    // 1. 새 값이 0이고 기존 값이 0보다 크면 덮어쓰지 않음
+                    if (value === 0 && supportMap[key] && supportMap[key] > 0) {
+                      return;
+                    }
+                    // 2. 전유형 행은 기존 값이 있으면 절대 덮어쓰지 않음
+                    if (isAllType && supportMap[key] !== undefined) {
+                      return;
+                    }
+                    supportMap[key] = value;
+                  };
+
                   // 원본 모델명 변형
-                  supportMap[`${model}|${openingType}`] = supportValue;
-                  supportMap[`${model.toLowerCase()}|${openingType}`] = supportValue;
-                  supportMap[`${model.toUpperCase()}|${openingType}`] = supportValue;
+                  setIfBetter(`${model}|${openingType}`, supportValue);
+                  setIfBetter(`${model.toLowerCase()}|${openingType}`, supportValue);
+                  setIfBetter(`${model.toUpperCase()}|${openingType}`, supportValue);
 
                   // 하이픈 변형
                   hyphenVariants.forEach(variant => {
                     if (variant && variant !== model) {
-                      supportMap[`${variant}|${openingType}`] = supportValue;
-                      supportMap[`${variant.toLowerCase()}|${openingType}`] = supportValue;
-                      supportMap[`${variant.toUpperCase()}|${openingType}`] = supportValue;
+                      setIfBetter(`${variant}|${openingType}`, supportValue);
+                      setIfBetter(`${variant.toLowerCase()}|${openingType}`, supportValue);
+                      setIfBetter(`${variant.toUpperCase()}|${openingType}`, supportValue);
                     }
                   });
 
                   // 정규화된 모델명 변형 (대소문자 포함)
                   if (normalizedModel) {
-                    supportMap[`${normalizedModel}|${openingType}`] = supportValue;
-                    supportMap[`${normalizedModel.toLowerCase()}|${openingType}`] = supportValue;
-                    supportMap[`${normalizedModel.toUpperCase()}|${openingType}`] = supportValue;
+                    setIfBetter(`${normalizedModel}|${openingType}`, supportValue);
+                    setIfBetter(`${normalizedModel.toLowerCase()}|${openingType}`, supportValue);
+                    setIfBetter(`${normalizedModel.toUpperCase()}|${openingType}`, supportValue);
                   }
                 };
 
                 // 각 개통유형에 대해 복합키 생성
-                if (openingTypeRaw === '전유형' || openingTypes.includes('전유형')) {
+                if (isAllType) {
                   ['010신규', '기변', 'MNP', '번호이동', '010신규/기변'].forEach(ot => addKeys(ot));
                 } else {
                   // 기본 파싱된 유형들 매핑
