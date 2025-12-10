@@ -1455,18 +1455,14 @@ function setupDirectRoutes(app) {
               // 모델명+개통유형 복합키 맵으로 변환
               const supportMap = {};
 
-              // 주의: supportModelData는 시트 전체 데이터일 수도, 부분 데이터일 수도 있음.
-              // 보통 getMobileList 시작 부분에서 가져온 supportModelData는 supportModelRange에 정해진 전체 범위임.
-              // 따라서 startRow 오프셋을 적용해야 정확한 행을 찾을 수 있음.
+              // 모든 범위(modelRange, openingTypeRange, planGroupRange)가 같은 시작 행에서 시작하므로
+              // 오프셋 없이 동일한 인덱스를 사용 (2024-12-10 버그 수정)
 
               const maxRows = Math.min(
-                supportModelData.length - startRow,
-                supportOpeningTypeData.length - startRow,
+                supportModelData.length,
+                supportOpeningTypeData.length,
                 supportValues.length
               );
-
-              // 공백 행을 건너뛰기 위해 실제 데이터 행만 추적
-              let validRowIndex = 0; // supportValues의 실제 인덱스 (공백 행 제외)
 
               if (maxRows <= 0) {
                 console.warn(`[Direct] planGroupSupportData 생성 실패: maxRows가 0 이하`, {
@@ -1480,20 +1476,20 @@ function setupDirectRoutes(app) {
               }
 
               for (let j = 0; j < maxRows; j++) {
-                // 정확한 행 인덱스 계산
-                const modelIndex = startRow + j;
+                // 모든 범위(modelRange, openingTypeRange, planGroupRange)가 같은 시작 행에서 시작하므로
+                // 오프셋 없이 동일한 인덱스 j를 사용해야 함
+                // (이전 버그: startRow 오프셋을 적용하여 잘못된 행을 읽음)
 
                 // 모델명이 없는 공백 행은 철저히 무시 (데이터 밀림 방지)
-                const model = (supportModelData[modelIndex]?.[0] || '').toString().trim();
-                const openingTypeRaw = (supportOpeningTypeData[modelIndex]?.[0] || '').toString().trim();
+                const model = (supportModelData[j]?.[0] || '').toString().trim();
+                const openingTypeRaw = (supportOpeningTypeData[j]?.[0] || '').toString().trim();
                 
-                // 공백 행이면 건너뛰기 (supportValues 인덱스는 증가시키지 않음)
+                // 공백 행이면 건너뛰기
                 if (!model) continue;
 
-                // 공백 행이 아닌 경우에만 supportValues 인덱스 사용
-                const supportValueStr = (supportValues[validRowIndex]?.[0] || 0).toString().replace(/,/g, '');
+                // 모든 범위가 같은 행에서 시작하므로 같은 인덱스 j 사용
+                const supportValueStr = (supportValues[j]?.[0] || 0).toString().replace(/,/g, '');
                 const supportValue = Number(supportValueStr) || 0;
-                validRowIndex++; // 다음 유효한 행으로 이동
 
                 const normalizedModel = normalizeModelCode(model);
                 const openingTypes = parseOpeningTypes(openingTypeRaw);
@@ -3592,29 +3588,25 @@ function setupDirectRoutes(app) {
               }
 
               // 모델명+개통유형 복합키 맵 생성 (getMobileList와 동일한 로직)
+              // 모든 범위가 같은 시작 행에서 시작하므로 오프셋 없이 동일한 인덱스 사용 (2024-12-10 버그 수정)
               const supportMap = {};
               const maxRows = Math.min(
-                supportModelData.length - startRow,
-                supportOpeningTypeData.length - startRow,
+                supportModelData.length,
+                supportOpeningTypeData.length,
                 supportValues.length
               );
 
-              // 공백 행을 건너뛰기 위해 실제 데이터 행만 추적
-              let validRowIndex = 0; // supportValues의 실제 인덱스 (공백 행 제외)
-
               for (let j = 0; j < maxRows; j++) {
-                const modelIndex = startRow + j;
-                const model = (supportModelData[modelIndex]?.[0] || '').toString().trim();
+                const model = (supportModelData[j]?.[0] || '').toString().trim();
                 
-                // 공백 행이면 건너뛰기 (supportValues 인덱스는 증가시키지 않음)
+                // 공백 행이면 건너뛰기
                 if (!model) continue;
 
-                // 공백 행이 아닌 경우에만 supportValues 인덱스 사용
-                const supportValueStr = (supportValues[validRowIndex]?.[0] || 0).toString().replace(/,/g, '');
+                // 모든 범위가 같은 행에서 시작하므로 같은 인덱스 j 사용
+                const supportValueStr = (supportValues[j]?.[0] || 0).toString().replace(/,/g, '');
                 const supportValue = Number(supportValueStr) || 0;
-                validRowIndex++; // 다음 유효한 행으로 이동
 
-                const openingTypeRaw = (supportOpeningTypeData[modelIndex]?.[0] || '').toString().trim();
+                const openingTypeRaw = (supportOpeningTypeData[j]?.[0] || '').toString().trim();
                 const openingTypes = parseOpeningTypes(openingTypeRaw);
 
                 // 하이픈 변형 생성
