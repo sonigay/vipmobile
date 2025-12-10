@@ -2602,10 +2602,17 @@ function setupDirectRoutes(app) {
   // GET /api/direct/mobiles?carrier=SK
   // 링크설정에서 시트 링크와 범위를 읽어서 휴대폰 목록 동적 생성
   router.get('/mobiles', async (req, res) => {
+    // 🔥 브라우저 캐시 방지 (304 응답 방지)
+    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+    
     try {
       const carrier = req.query.carrier || 'SK';
       const includeMeta = req.query.meta === '1';
-      const cacheKey = `mobiles-${carrier}`;
+      // 🔥 캐시 버전: 버그 수정 시 버전을 올려서 이전 캐시 무효화
+      const MOBILES_CACHE_VERSION = 'v3';
+      const cacheKey = `mobiles-${carrier}-${MOBILES_CACHE_VERSION}`;
       const cached = getCache(cacheKey);
       if (cached) {
         if (includeMeta) {
@@ -2689,13 +2696,20 @@ function setupDirectRoutes(app) {
   // GET /api/direct/todays-mobiles
   // 오늘의 휴대폰 조회 (모든 통신사 데이터에서 구분 태그 기반 필터링)
   router.get('/todays-mobiles', async (req, res) => {
+    // 🔥 브라우저 캐시 방지 (304 응답 방지)
+    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+    
     try {
       // 모든 통신사 데이터 가져오기 (SK, KT, LG)
       const carriers = ['SK', 'KT', 'LG'];
       const allMobiles = [];
 
       // 캐시 확인
-      const cacheKey = `todays-mobiles`;
+      // 🔥 캐시 버전: 버그 수정 시 버전을 올려서 이전 캐시 무효화
+      const TODAYS_CACHE_VERSION = 'v3';
+      const cacheKey = `todays-mobiles-${TODAYS_CACHE_VERSION}`;
       const cached = getCache(cacheKey);
       if (cached) {
         return res.json(cached);
@@ -2900,6 +2914,11 @@ function setupDirectRoutes(app) {
   // GET /api/direct/mobiles/:modelId/calculate?planGroup=xxx&openingType=xxx&carrier=SK
   // 요금제군별 대리점지원금 및 구매가 계산
   router.get('/mobiles/:modelId/calculate', async (req, res) => {
+    // 🔥 브라우저 캐시 방지 (304 응답 방지)
+    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+    
     try {
       const { modelId } = req.params;
       const { planGroup, openingType = '010신규', carrier } = req.query;
