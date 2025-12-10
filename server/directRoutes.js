@@ -1511,9 +1511,9 @@ function setupDirectRoutes(app) {
                 const supportValueStr = (supportValues[j]?.[0] || 0).toString().replace(/,/g, '');
                 const supportValue = Number(supportValueStr) || 0;
 
-                // 🔥 SM-S928N256 디버그: 이 모델의 모든 행 데이터 확인
-                if (model === 'SM-S928N256' && planGroup === '115군') {
-                  console.log(`🔥 [SM-S928N256 디버그] 행 ${j + 9}: 개통유형="${openingTypeRaw}", H열값=${supportValues[j]?.[0]}, 파싱값=${supportValue}`);
+                // 🔥 디버그: 특정 모델의 모든 행 데이터 확인
+                if ((model === 'SM-S928N256' || model === 'UIP17PR-256') && planGroup === '115군') {
+                  console.log(`🔥 [${model} 디버그] 행 ${j + 9}: 개통유형="${openingTypeRaw}", H열값=${supportValues[j]?.[0]}, 파싱값=${supportValue}`);
                 }
 
                 const normalizedModel = normalizeModelCode(model);
