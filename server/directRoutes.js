@@ -3381,6 +3381,7 @@ function setupDirectRoutes(app) {
                 console.warn('[Direct] /calculate 캐시 0원 폴백 실패:', fbErr);
               }
             }
+          }
         } else if (supportRange && modelRange && supportSheetId) {
           // 캐시에 없으면 기존 로직 사용 (폴백)
           try {
