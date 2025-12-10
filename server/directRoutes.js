@@ -3082,7 +3082,7 @@ function setupDirectRoutes(app) {
 
         // planGroupSupportData를 캐시에서 가져오기 (getMobileList에서 생성한 것 재사용)
         // 🔥 캐시 버전: getMobileList와 동일한 버전 사용
-        const CACHE_VERSION = 'v3'; // v3: 전유형 덮어쓰기 버그 수정
+        const CACHE_VERSION = 'v4'; // v4: SM-S928N256 800,000원 정상 표시
         const planGroupSupportDataCacheKey = `planGroupSupportData-${carrier}-${CACHE_VERSION}`;
         const planGroupSupportData = getCache(planGroupSupportDataCacheKey);
 
