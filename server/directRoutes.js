@@ -1513,39 +1513,36 @@ function setupDirectRoutes(app) {
                 // 하이픈 변형 생성 (조회 시와 동일한 로직)
                 const hyphenVariants = generateHyphenVariants(model);
 
-                // 디버깅: 특정 모델의 원본 데이터 확인
-                if (model.includes('UIP17') || model.includes('SM-S93') || model.includes('SM-S926')) {
-                  console.log(`[Direct] Sheet Raw Data:`, {
-                    model,
-                    openingTypeRaw,
-                    supportValue,
-                    normalizedModel,
-                    openingTypes,
-                    hyphenVariants
-                  });
-                }
-
                 // 키 생성 헬퍼 함수 (모든 변형 생성)
+                // 🔥 핵심 수정: 0원인 경우 기존 값을 덮어쓰지 않음 (전유형 행 처리)
                 const addKeys = (openingType) => {
+                  const setIfBetter = (key, value) => {
+                    // 새 값이 0이고 기존 값이 0보다 크면 덮어쓰지 않음
+                    if (value === 0 && supportMap[key] && supportMap[key] > 0) {
+                      return; // 기존 값 유지
+                    }
+                    supportMap[key] = value;
+                  };
+                  
                   // 원본 모델명 변형
-                  supportMap[`${model}|${openingType}`] = supportValue;
-                  supportMap[`${model.toLowerCase()}|${openingType}`] = supportValue;
-                  supportMap[`${model.toUpperCase()}|${openingType}`] = supportValue;
+                  setIfBetter(`${model}|${openingType}`, supportValue);
+                  setIfBetter(`${model.toLowerCase()}|${openingType}`, supportValue);
+                  setIfBetter(`${model.toUpperCase()}|${openingType}`, supportValue);
 
                   // 하이픈 변형
                   hyphenVariants.forEach(variant => {
                     if (variant && variant !== model) {
-                      supportMap[`${variant}|${openingType}`] = supportValue;
-                      supportMap[`${variant.toLowerCase()}|${openingType}`] = supportValue;
-                      supportMap[`${variant.toUpperCase()}|${openingType}`] = supportValue;
+                      setIfBetter(`${variant}|${openingType}`, supportValue);
+                      setIfBetter(`${variant.toLowerCase()}|${openingType}`, supportValue);
+                      setIfBetter(`${variant.toUpperCase()}|${openingType}`, supportValue);
                     }
                   });
 
                   // 정규화된 모델명 변형 (대소문자 포함)
                   if (normalizedModel) {
-                    supportMap[`${normalizedModel}|${openingType}`] = supportValue;
-                    supportMap[`${normalizedModel.toLowerCase()}|${openingType}`] = supportValue;
-                    supportMap[`${normalizedModel.toUpperCase()}|${openingType}`] = supportValue;
+                    setIfBetter(`${normalizedModel}|${openingType}`, supportValue);
+                    setIfBetter(`${normalizedModel.toLowerCase()}|${openingType}`, supportValue);
+                    setIfBetter(`${normalizedModel.toUpperCase()}|${openingType}`, supportValue);
                   }
                 };
 
@@ -1587,23 +1584,7 @@ function setupDirectRoutes(app) {
 
               planGroupSupportData[planGroup] = supportMap;
 
-              // 디버깅: planGroupSupportData 생성 확인
-              console.log(`[Direct] planGroupSupportData 생성 완료:`, {
-                요금제군: planGroup,
-                범위: range,
-                시작행: startRow,
-                맵크기: Object.keys(supportMap).length,
-                맵키샘플: Object.keys(supportMap).slice(0, 10),
-                문제모델디버깅: debugRows.length > 0 ? debugRows : undefined,
-                문제모델저장값: debugModels.map(dm => {
-                  const keys = Object.keys(supportMap).filter(k => k.includes(dm));
-                  return {
-                    모델: dm,
-                    찾은키: keys.slice(0, 5),
-                    저장된값: keys.map(k => ({ 키: k, 값: supportMap[k] })).slice(0, 5)
-                  };
-                })
-              });
+              // 디버깅 로그 간소화
             });
             supportMapBuilt = true;
           } catch (err) {
@@ -1629,31 +1610,13 @@ function setupDirectRoutes(app) {
           });
           
           setCache(planGroupSupportDataCacheKey, planGroupSupportData, 5 * 60 * 1000);
-          console.log(`[Direct] planGroupSupportData 캐시 저장 완료:`, {
-            캐시키: planGroupSupportDataCacheKey,
-            요금제군목록: Object.keys(planGroupSupportData),
-            총요금제군수: Object.keys(planGroupSupportData).length,
-            요금제군별맵크기: planGroupSizes
-          });
         } else {
           // 미생성 시 기존 캐시 삭제하여 폴백 강제
           deleteCache(planGroupSupportDataCacheKey);
           console.warn('[Direct] planGroupSupportData 캐시 저장 생략 (supportMapBuilt=false)');
         }
       } else {
-        // 캐시에서 로드한 경우 각 요금제군별 맵 크기 확인
-        const planGroupSizes = {};
-        Object.keys(planGroupSupportData || {}).forEach(pg => {
-          planGroupSizes[pg] = Object.keys(planGroupSupportData[pg] || {}).length;
-        });
-        
-        console.log(`[Direct] planGroupSupportData 캐시에서 로드:`, {
-          캐시키: planGroupSupportDataCacheKey,
-          요금제군목록: Object.keys(planGroupSupportData || {}),
-          총요금제군수: Object.keys(planGroupSupportData || {}).length,
-          요금제군별맵크기: planGroupSizes,
-          캐시유효성: isCacheValid
-        });
+        // 캐시에서 로드 완료 (로그 간소화)
       }
 
       // 5. 정책표 설정에서 요금제군 & 유형별 리베이트 읽기 (모델명 기준 매핑)
@@ -1886,15 +1849,6 @@ function setupDirectRoutes(app) {
         }
       });
 
-      console.log(`[Direct] 이미지 맵 크기: ${imageMap.size}, 통신사: ${carrierParam}`);
-      // 디버깅: 이미지 맵의 키들 출력 (처음 20개)
-      if (imageMap.size > 0) {
-        const mapKeys = Array.from(imageMap.keys());
-        console.log(`[Direct] 이미지 맵 키 전체 (${mapKeys.length}개):`, mapKeys);
-      } else {
-        console.warn(`[Direct] 이미지 맵이 비어있습니다. 통신사: ${carrierParam}`);
-      }
-
       // 8. 직영점_오늘의휴대폰 시트에서 구분(인기/추천/저렴/프리미엄/중저가) 태그 읽기
       let tagMap = new Map(); // { model: { isPopular, isRecommended, isCheap, isPremium, isBudget } }
       try {
@@ -1925,12 +1879,6 @@ function setupDirectRoutes(app) {
             }
           }
         });
-        console.log(`[Direct] 태그 맵 크기: ${tagMap.size}, 통신사: ${carrierParam}`);
-        // UIP 관련 모델명이 있는지 확인
-        const uipKeys = Array.from(tagMap.keys()).filter(k => k.includes('UIP') || k.includes('uip'));
-        if (uipKeys.length > 0) {
-          console.log(`[Direct] UIP 관련 태그 키:`, uipKeys);
-        }
       } catch (err) {
         console.warn('[Direct] 직영점_오늘의휴대폰 시트 읽기 실패:', err);
       }
@@ -2431,31 +2379,10 @@ function setupDirectRoutes(app) {
                        (normalizedModel && (keyModel === normalizedModel || keyModel === normalizedModel.toLowerCase() || keyModel === normalizedModel.toUpperCase()));
               });
               
-              console.warn(`[Direct] ⚠️ planGroupSupportData에서 키를 찾을 수 없음:`, {
-                모델명: model,
-                정규화된모델명: normalizedModel,
-                요금제군: selectedPlanGroup,
-                개통유형: supportOpeningType,
-                시도한키전체: supportKeys,
-                시도한키수: supportKeys.length,
-                맵에있는키수: mapKeys.length,
-                맵에있는키샘플: mapKeys.slice(0, 20),
-                관련키목록: relatedKeys,
-                관련키수: relatedKeys.length,
-                맵에있는개통유형목록: [...new Set(mapKeys.map(k => k.split('|')[1]))].slice(0, 10),
-                planGroupSupportData존재: !!planGroupSupportData[selectedPlanGroup]
-              });
-            } else {
-              console.log(`[Direct] ✅ planGroupSupportData에서 값 찾음:`, {
-                모델명: model,
-                정규화된모델명: normalizedModel,
-                요금제군: selectedPlanGroup,
-                개통유형: supportOpeningType,
-                찾은키: foundKey,
-                이통사지원금: publicSupport,
-                시도한키순서: supportKeys.indexOf(foundKey) + 1
-              });
+              // 실패 로그 (문제 분석용)
+              console.warn(`[Direct] ⚠️ 키 없음: ${model}|${supportOpeningType} (${selectedPlanGroup})`);
             }
+            // 성공 로그 제거
           }
         } else {
           // planGroupSupportData가 없거나 selectedPlanGroup이 없는 경우
@@ -2522,28 +2449,7 @@ function setupDirectRoutes(app) {
           + totalSpecialDeduction // 별도정책 차감금액
         );
 
-        // 최종 계산값 디버깅 로그 (대리점지원금 문제 모델만)
-        if (shouldLogRebate) {
-          console.log(`[Direct] 💰 최종 계산값:`, {
-            모델명: model,
-            펫네임: petName,
-            요금제군: selectedPlanGroup,
-            개통유형: supportOpeningType,
-            정책표매칭개통유형: matchedOpeningType,
-            출고가: factoryPrice,
-            이통사지원금: publicSupport,
-            정책표리베이트: policyRebate,
-            마진: baseMargin,
-            부가서비스추가: totalAddonIncentive,
-            부가서비스차감: totalAddonDeduction,
-            별도정책추가: totalSpecialAddition,
-            별도정책차감: totalSpecialDeduction,
-            대리점지원금_부가유치: storeSupportWithAddon,
-            대리점지원금_부가미유치: storeSupportWithoutAddon,
-            계산상세_부가유치: `${policyRebate} - ${baseMargin} + ${totalAddonIncentive} + ${totalSpecialAddition} = ${storeSupportWithAddon}`,
-            계산상세_부가미유치: `${policyRebate} - ${baseMargin} + ${totalAddonDeduction} + ${totalSpecialDeduction} = ${storeSupportWithoutAddon}`
-          });
-        }
+        // 로그 제거 (불필요한 로그 정리)
 
         // 구매가 계산
         // 대리점추가지원금에 이미 정책표리베이트, 마진, 부가서비스, 별도정책이 포함되어 있으므로
@@ -2569,35 +2475,7 @@ function setupDirectRoutes(app) {
         if (tags.isBudget) tagsArray.push('budget');
 
         // 디버깅: UIP 관련 모델명에 대한 상세 로그
-        if (tagMap.size > 0 && (model.includes('UIP') || model.includes('uip'))) {
-          if (tags.isPremium || tags.isBudget) {
-            if (isDebugTarget(model)) {
-              console.log(`[Direct] ✅ UIP 태그 찾음: 모델명=${model}, isPremium=${tags.isPremium}, isBudget=${tags.isBudget}`);
-            }
-          } else {
-            if (isDebugTarget(model)) {
-              const mapKeys = Array.from(tagMap.keys());
-              const matchingKeys = mapKeys.filter(k => {
-                const kLower = k.toLowerCase();
-                const modelLower = model.toLowerCase();
-                const normalizedModel = normalizeModelCode(model);
-                const normalizedModelLower = normalizedModel ? normalizedModel.toLowerCase() : '';
-                return kLower.includes(modelLower) ||
-                  modelLower.includes(kLower) ||
-                  kLower === modelLower ||
-                  (normalizedModelLower && (kLower.includes(normalizedModelLower) || normalizedModelLower.includes(kLower)));
-              });
-              console.log(`[Direct] ⚠️ UIP 태그를 찾을 수 없음:`, {
-                통신사: carrierParam,
-                모델명: model,
-                정규화된모델명: normalizeModelCode(model),
-                태그맵크기: tagMap.size,
-                태그맵키전체: mapKeys.slice(0, 30), // 처음 30개
-                유사키: matchingKeys
-              });
-            }
-          }
-        }
+        // UIP 태그 로그 제거 (불필요한 로그 정리)
 
         const mobile = {
           id: `mobile-${carrierParam}-${i}`,
@@ -2656,23 +2534,6 @@ function setupDirectRoutes(app) {
               }
             }
 
-            // 디버깅: 이미지를 찾지 못한 경우 상세 로그 (디버깅 대상 모델만)
-            if (!imgUrl && imageMap.size > 0 && isDebugTarget(model)) {
-              const mapKeys = Array.from(imageMap.keys());
-              const matchingKeys = mapKeys.filter(k => {
-                const kLower = k.toLowerCase();
-                const modelLower = model.toLowerCase();
-                return kLower.includes(modelLower) || modelLower.includes(kLower) || kLower === modelLower;
-              });
-              console.log(`[Direct] ⚠️ 이미지를 찾을 수 없음:`, {
-                통신사: carrierParam,
-                모델명: model,
-                조회키: key,
-                맵크기: imageMap.size,
-                맵키전체: mapKeys,
-                유사키: matchingKeys
-              });
-            }
             return imgUrl || '';
           })(),
           tags: tagsArray,
