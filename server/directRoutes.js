@@ -1382,7 +1382,7 @@ function setupDirectRoutes(app) {
       // 4. 요금제군별 이통사지원금 범위 읽기 (모델명+개통유형 복합키 맵으로 저장)
       // planGroupSupportData를 캐시하여 /calculate 엔드포인트에서도 재사용
       // 🔥 캐시 버전: 버그 수정 시 버전을 올려서 이전 캐시 무효화
-      const CACHE_VERSION = 'v4'; // v4: /calculate 캐시 미스 시 getMobileList 호출
+      const CACHE_VERSION = 'v5'; // v5: 33군 및 기변 캐시 문제 수정
       const planGroupSupportDataCacheKey = `planGroupSupportData-${carrierParam}-${CACHE_VERSION}`;
       let planGroupSupportData = getCache(planGroupSupportDataCacheKey);
 
@@ -2611,7 +2611,7 @@ function setupDirectRoutes(app) {
       const carrier = req.query.carrier || 'SK';
       const includeMeta = req.query.meta === '1';
       // 🔥 캐시 버전: 버그 수정 시 버전을 올려서 이전 캐시 무효화
-      const MOBILES_CACHE_VERSION = 'v4'; // v4: /calculate 캐시 미스 시 getMobileList 호출
+      const MOBILES_CACHE_VERSION = 'v5'; // v5: 33군 및 기변 캐시 문제 수정
       const cacheKey = `mobiles-${carrier}-${MOBILES_CACHE_VERSION}`;
       const cached = getCache(cacheKey);
       if (cached) {
@@ -2708,7 +2708,7 @@ function setupDirectRoutes(app) {
 
       // 캐시 확인
       // 🔥 캐시 버전: 버그 수정 시 버전을 올려서 이전 캐시 무효화
-      const TODAYS_CACHE_VERSION = 'v4'; // v4: /calculate 캐시 미스 시 getMobileList 호출
+      const TODAYS_CACHE_VERSION = 'v5'; // v5: 33군 및 기변 캐시 문제 수정
       const cacheKey = `todays-mobiles-${TODAYS_CACHE_VERSION}`;
       const cached = getCache(cacheKey);
       if (cached) {
@@ -3082,7 +3082,7 @@ function setupDirectRoutes(app) {
 
         // planGroupSupportData를 캐시에서 가져오기 (getMobileList에서 생성한 것 재사용)
         // 🔥 캐시 버전: getMobileList와 동일한 버전 사용
-        const CACHE_VERSION = 'v4'; // v4: SM-S928N256 800,000원 정상 표시
+        const CACHE_VERSION = 'v5'; // v5: 33군 및 기변 캐시 문제 수정
         const planGroupSupportDataCacheKey = `planGroupSupportData-${carrier}-${CACHE_VERSION}`;
         let planGroupSupportData = getCache(planGroupSupportDataCacheKey);
 
