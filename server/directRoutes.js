@@ -1049,9 +1049,11 @@ function setupDirectRoutes(app) {
 
       // 1. 링크설정에서 정책표 설정과 이통사 지원금 설정 읽기
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_SETTINGS, HEADERS_SETTINGS);
-      const settingsRes = await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: SHEET_SETTINGS
+      const settingsRes = await withRetry(async () => {
+        return sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: SHEET_SETTINGS
+        });
       });
       const settingsRows = (settingsRes.data.values || []).slice(1);
 
@@ -1507,6 +1509,11 @@ function setupDirectRoutes(app) {
                 const supportValueStr = (supportValues[j]?.[0] || 0).toString().replace(/,/g, '');
                 const supportValue = Number(supportValueStr) || 0;
 
+                // 🔥 SM-S928N256 디버그: 이 모델의 모든 행 데이터 확인
+                if (model === 'SM-S928N256' && planGroup === '115군') {
+                  console.log(`🔥 [SM-S928N256 디버그] 행 ${j + 9}: 개통유형="${openingTypeRaw}", H열값=${supportValues[j]?.[0]}, 파싱값=${supportValue}`);
+                }
+
                 const normalizedModel = normalizeModelCode(model);
                 const openingTypes = parseOpeningTypes(openingTypeRaw);
 
@@ -1514,12 +1521,18 @@ function setupDirectRoutes(app) {
                 const hyphenVariants = generateHyphenVariants(model);
 
                 // 키 생성 헬퍼 함수 (모든 변형 생성)
-                // 🔥 핵심 수정: 0원인 경우 기존 값을 덮어쓰지 않음 (전유형 행 처리)
+                // 🔥 핵심 수정: 전유형 행은 기존 값이 있으면 절대 덮어쓰지 않음
+                const isAllType = openingTypeRaw === '전유형' || openingTypes.includes('전유형');
+                
                 const addKeys = (openingType) => {
                   const setIfBetter = (key, value) => {
-                    // 새 값이 0이고 기존 값이 0보다 크면 덮어쓰지 않음
+                    // 1. 새 값이 0이고 기존 값이 0보다 크면 덮어쓰지 않음
                     if (value === 0 && supportMap[key] && supportMap[key] > 0) {
                       return; // 기존 값 유지
+                    }
+                    // 2. 🔥 전유형 행은 기존 값이 있으면 절대 덮어쓰지 않음 (개별 유형 우선)
+                    if (isAllType && supportMap[key] !== undefined) {
+                      return; // 기존 값 유지 (번호이동/010신규 등 개별 유형이 우선)
                     }
                     supportMap[key] = value;
                   };
@@ -2553,11 +2566,14 @@ function setupDirectRoutes(app) {
       // ========== 간소화된 디버깅 요약 ==========
       // 115군의 SM-S926N256 값만 확인 (핵심 검증용)
       const testPlanGroup = '115군';
-      const testModel = 'SM-S926N256';
-      const testKey = `${testModel}|MNP`;
-      const testValue = planGroupSupportData[testPlanGroup]?.[testKey];
+      const testModel1 = 'SM-S926N256';
+      const testModel2 = 'SM-S928N256';
+      const testValue1 = planGroupSupportData[testPlanGroup]?.[`${testModel1}|MNP`];
+      const testValue2 = planGroupSupportData[testPlanGroup]?.[`${testModel2}|MNP`];
       
-      console.log(`\n🔥 [${carrier}] 이통사지원금 요약: 모델 ${mobileList.length}개, 115군 ${testModel}|MNP = ${testValue ?? '(없음)'}`);
+      console.log(`\n🔥 [${carrier}] 이통사지원금 요약: 모델 ${mobileList.length}개`);
+      console.log(`   ${testModel1}|MNP = ${testValue1 ?? '(없음)'} (예상: 690,000)`);
+      console.log(`   ${testModel2}|MNP = ${testValue2 ?? '(없음)'} (예상: 800,000)`);
       // ========== 디버깅 끝 ==========
 
       return mobileList;
