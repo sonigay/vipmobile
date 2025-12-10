@@ -176,36 +176,6 @@ export const directStoreApi = {
 
     // 이미지 업로드
     uploadImage: async (file, modelId, carrier, modelName, petName) => {
-        // 404 방지를 위한 fallback 로직 추가
-        try {
-            const response = await fetch(`${BASE_URL}/upload-image`, {
-                method: 'POST',
-                body: formData
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                const errorMessage = data?.error || `이미지 업로드 실패 (${response.status})`;
-                throw new Error(errorMessage);
-            }
-
-            return data;
-        } catch (error) {
-            // 404 오류 시 기본 이미지 URL 반환 (에러 방지)
-            console.warn('이미지 업로드 실패, 기본 이미지 사용:', error);
-            return {
-                success: true,
-                imageUrl: 'https://via.placeholder.com/300x300?text=No+Image',
-                fallback: true
-            };
-        }
-    },
-
-    // 기존 이미지 업로드 함수는 제거 (중복)
-
-    // 이미지 업로드 (기존 함수)
-    // uploadImage: async (file, modelId, carrier, modelName, petName) => {
         const formData = new FormData();
         formData.append('image', file);
         if (modelId) formData.append('modelId', modelId);
@@ -222,7 +192,6 @@ export const directStoreApi = {
             const data = await response.json();
 
             if (!response.ok) {
-                // 서버에서 반환한 에러 메시지 사용
                 const errorMessage = data?.error || `이미지 업로드 실패 (${response.status})`;
                 throw new Error(errorMessage);
             }
