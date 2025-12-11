@@ -4264,8 +4264,26 @@ function extractManufacturer(modelName, petName = '') {
   const petOriginal = (petName || '').trim();
   const combinedOriginal = `${modelOriginal} ${petOriginal}`.trim();
   
+  // 🔥 디버그: 제조사 추출 과정 로깅 (SM-F766N256 같은 문제 모델)
+  const isDebugTarget = modelOriginal && (
+    modelOriginal.includes('SM-F766N256') || 
+    modelOriginal.includes('UIP17PR-256') ||
+    modelOriginal.startsWith('SM-')
+  );
+  if (isDebugTarget) {
+    console.log(`🔍 [extractManufacturer] 디버그:`, {
+      modelName,
+      petName,
+      modelOriginal,
+      petOriginal,
+      model,
+      pet,
+      combinedOriginal
+    });
+  }
+  
   // 삼성: SM-로 시작하거나 SAMSUNG, 갤럭시 포함 (대소문자 구분 없음)
-  if (
+  const isSamsung = (
     /^SM-/i.test(modelOriginal) || // SM-로 시작 (대소문자 구분 없음)
     /samsung/i.test(combinedOriginal) || 
     /갤럭시/i.test(combinedOriginal) || 
@@ -4278,7 +4296,12 @@ function extractManufacturer(modelName, petName = '') {
     pet.includes('GALAXY') ||
     combined.includes('갤럭시') ||
     combined.includes('GALAXY')
-  ) {
+  );
+  
+  if (isSamsung) {
+    if (isDebugTarget) {
+      console.log(`✅ [extractManufacturer] 삼성으로 인식:`, { modelOriginal, petOriginal });
+    }
     return '삼성';
   } 
   // 애플: iPhone, iPad, Apple 포함 (대소문자 구분 없음)
@@ -4349,6 +4372,9 @@ function extractManufacturer(modelName, petName = '') {
     return 'OPPO';
   } 
   else {
+    if (isDebugTarget) {
+      console.log(`⚠️ [extractManufacturer] 제조사 인식 실패, '기타' 반환:`, { modelOriginal, petOriginal });
+    }
     return '기타';
   }
 }
@@ -4452,6 +4478,11 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
     // 제조사 추출 (모델명과 펫네임 모두 체크)
     const manufacturer = extractManufacturer(modelName, petName);
     console.log(`📤 [이미지 업로드] 추출된 제조사: ${manufacturer} (모델명: ${modelName}, 펫네임: ${petName})`);
+    
+    // 🔥 디버그: 제조사 추출 실패 시 상세 로그
+    if (!manufacturer || manufacturer.trim() === '' || manufacturer === '기타') {
+      console.warn(`⚠️ [이미지 업로드] 제조사 추출 실패 또는 '기타': 모델명=${modelName}, 펫네임=${petName}, 추출된제조사=${manufacturer}`);
+    }
 
     // Discord 봇 초기화 확인
     if (!DISCORD_LOGGING_ENABLED || !discordBot) {
@@ -4545,6 +4576,9 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
     // 🔥 개선: manufacturer가 빈 문자열이면 기본값 사용 (하이픈 두 개 연속 방지)
     const safeManufacturer = manufacturer && manufacturer.trim() ? manufacturer.trim() : '기타';
     const filename = `direct-store-${carrier}-${safeManufacturer}-${modelId}-${Date.now()}.${file.originalname.split('.').pop()}`;
+    
+    // 🔥 디버그: 파일명 생성 확인
+    console.log(`📤 [이미지 업로드] 파일명 생성: ${filename} (manufacturer=${manufacturer}, safeManufacturer=${safeManufacturer}, carrier=${carrier}, modelId=${modelId})`);
     console.log(`📤 [이미지 업로드] Discord에 업로드 시작: ${filename} (포스트: ${carrierPost.name}, 스레드: ${targetThread.name})`);
     
     try {
