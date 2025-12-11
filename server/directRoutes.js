@@ -1,5 +1,17 @@
 const express = require('express');
 const { google } = require('googleapis');
+const fs = require('fs');
+const path = require('path');
+
+// 디버그 로그 파일 경로
+const DEBUG_LOG_PATH = path.join(__dirname, '..', '.cursor', 'debug.log');
+function writeDebug(payload) {
+  try {
+    fs.appendFileSync(DEBUG_LOG_PATH, JSON.stringify(payload) + '\n');
+  } catch (err) {
+    // ignore logging failures
+  }
+}
 
 // 직영점 모드 시트 이름
 const SHEET_POLICY_MARGIN = '직영점_정책_마진';
@@ -3935,37 +3947,33 @@ function setupDirectRoutes(app) {
 
       // #region agent log
       // 지원금/구매가 계산 값 기록 (불일치 원인 추적)
-      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({
-          location:'directRoutes.js:/calculate',
-          message:'계산 결과',
-          data:{
-            modelId,
-            modelName: primaryModel?.model || modelId,
-            carrier,
-            planGroup,
-            openingType,
-            factoryPrice,
-            publicSupport,
-            policyRebate,
-            baseMargin,
-            totalAddonIncentive,
-            totalSpecialAddition,
-            totalAddonDeduction,
-            totalSpecialDeduction,
-            storeSupportWithAddon,
-            storeSupportWithoutAddon,
-            purchasePriceWithAddon,
-            purchasePriceWithoutAddon
-          },
-          timestamp:Date.now(),
-          sessionId:'debug-session',
-          runId:'run1',
-          hypothesisId:'S'
-        })
-      }).catch(()=>{});
+      writeDebug({
+        location:'directRoutes.js:/calculate',
+        message:'계산 결과',
+        data:{
+          modelId,
+          modelName: primaryModel?.model || modelId,
+          carrier,
+          planGroup,
+          openingType,
+          factoryPrice,
+          publicSupport,
+          policyRebate,
+          baseMargin,
+          totalAddonIncentive,
+          totalSpecialAddition,
+          totalAddonDeduction,
+          totalSpecialDeduction,
+          storeSupportWithAddon,
+          storeSupportWithoutAddon,
+          purchasePriceWithAddon,
+          purchasePriceWithoutAddon
+        },
+        timestamp:Date.now(),
+        sessionId:'debug-session',
+        runId:'run1',
+        hypothesisId:'S'
+      });
       // #endregion
 
       res.json({
