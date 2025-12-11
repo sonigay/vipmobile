@@ -734,12 +734,16 @@ const MobileListTab = ({ onProductSelect }) => {
           if ((result.storeSupportWithAddon === 0 || result.storeSupportWithoutAddon === 0) && currentModel) {
             fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:calculatePrice',message:'API 응답에서 대리점지원금 0 확인',data:{modelId,modelName,planGroup,openingType,carrier,apiStoreSupportWithAddon:result.storeSupportWithAddon,apiStoreSupportWithoutAddon:result.storeSupportWithoutAddon,rowStoreSupport:currentModel.storeSupport,rowStoreSupportWithAddon:currentModel.storeSupportWithAddon,rowStoreSupportNoAddon:currentModel.storeSupportNoAddon,apiPublicSupport:result.publicSupport},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
           }
-          // 구매가 계산 문제 확인
-          if (currentModel && (result.purchasePriceWithAddon === 0 || result.purchasePriceWithoutAddon === 0)) {
+          // 구매가 계산 불일치 확인 (API 응답과 예상값이 다를 때)
+          if (currentModel) {
             const expectedPurchasePriceWithAddon = (currentModel.factoryPrice || 0) - (result.publicSupport || currentModel.publicSupport || currentModel.support || 0) - (result.storeSupportWithAddon || currentModel.storeSupport || currentModel.storeSupportWithAddon || 0);
             const expectedPurchasePriceWithoutAddon = (currentModel.factoryPrice || 0) - (result.publicSupport || currentModel.publicSupport || currentModel.support || 0) - (result.storeSupportWithoutAddon || currentModel.storeSupportNoAddon || 0);
-            if (expectedPurchasePriceWithAddon > 0 || expectedPurchasePriceWithoutAddon > 0) {
-              fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:calculatePrice',message:'API 응답에서 구매가 0 확인',data:{modelId,modelName,planGroup,openingType,carrier,apiPurchasePriceWithAddon:result.purchasePriceWithAddon,apiPurchasePriceWithoutAddon:result.purchasePriceWithoutAddon,expectedPurchasePriceWithAddon,expectedPurchasePriceWithoutAddon,apiFactoryPrice:currentModel.factoryPrice,apiPublicSupport:result.publicSupport,apiStoreSupportWithAddon:result.storeSupportWithAddon,apiStoreSupportWithoutAddon:result.storeSupportWithoutAddon},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'})}).catch(()=>{});
+            // API 응답의 구매가와 예상값이 다를 때 로깅 (0도 정상일 수 있으므로 모든 불일치 로깅)
+            if (result.purchasePriceWithAddon !== expectedPurchasePriceWithAddon) {
+              fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:calculatePrice',message:'API 응답 구매가(부가유치) 불일치',data:{modelId,modelName,planGroup,openingType,carrier,apiPurchasePriceWithAddon:result.purchasePriceWithAddon,expectedPurchasePriceWithAddon,difference:Math.abs(result.purchasePriceWithAddon - expectedPurchasePriceWithAddon),apiFactoryPrice:currentModel.factoryPrice,apiPublicSupport:result.publicSupport,apiStoreSupportWithAddon:result.storeSupportWithAddon},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'})}).catch(()=>{});
+            }
+            if (result.purchasePriceWithoutAddon !== expectedPurchasePriceWithoutAddon) {
+              fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:calculatePrice',message:'API 응답 구매가(부가미유치) 불일치',data:{modelId,modelName,planGroup,openingType,carrier,apiPurchasePriceWithoutAddon:result.purchasePriceWithoutAddon,expectedPurchasePriceWithoutAddon,difference:Math.abs(result.purchasePriceWithoutAddon - expectedPurchasePriceWithoutAddon),apiFactoryPrice:currentModel.factoryPrice,apiPublicSupport:result.publicSupport,apiStoreSupportWithoutAddon:result.storeSupportWithoutAddon},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'I'})}).catch(()=>{});
             }
           }
           // #endregion
@@ -1228,9 +1232,9 @@ const MobileListTab = ({ onProductSelect }) => {
                               ? displayValue.toLocaleString()
                               : purchasePriceAddon.toLocaleString();
                             // #region agent log
-                            // 구매가가 0이거나 계산이 잘못된 경우 로깅
-                            if ((displayValue === 0 || displayValue === undefined || displayValue === null) && purchasePriceAddon > 0) {
-                              fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:render',message:'구매가(부가유치) 계산 문제 확인',data:{modelId:row.id,displayValue,calculatedPrices:calculatedPrices[row.id],purchasePriceAddon,rowFactoryPrice:row.factoryPrice,rowSupport:row.support,rowPublicSupport:row.publicSupport,rowStoreSupport:row.storeSupport,finalValue},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+                            // 구매가가 계산값과 다를 때 로깅 (0도 정상일 수 있으므로 모든 불일치 로깅)
+                            if (displayValue !== undefined && displayValue !== null && displayValue !== purchasePriceAddon) {
+                              fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:render',message:'구매가(부가유치) 계산 불일치 확인',data:{modelId:row.id,displayValue,calculatedPrices:calculatedPrices[row.id],purchasePriceAddon,rowFactoryPrice:row.factoryPrice,rowSupport:row.support,rowPublicSupport:row.publicSupport,rowStoreSupport:row.storeSupport,rowStoreSupportWithAddon:row.storeSupportWithAddon,difference:Math.abs(displayValue - purchasePriceAddon),finalValue},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
                             }
                             // #endregion
                             return finalValue;
@@ -1252,9 +1256,9 @@ const MobileListTab = ({ onProductSelect }) => {
                               ? displayValue.toLocaleString()
                               : purchasePriceNoAddon.toLocaleString();
                             // #region agent log
-                            // 구매가가 0이거나 계산이 잘못된 경우 로깅
-                            if ((displayValue === 0 || displayValue === undefined || displayValue === null) && purchasePriceNoAddon > 0) {
-                              fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:render',message:'구매가(부가미유치) 계산 문제 확인',data:{modelId:row.id,displayValue,calculatedPrices:calculatedPrices[row.id],purchasePriceNoAddon,rowFactoryPrice:row.factoryPrice,rowSupport:row.support,rowPublicSupport:row.publicSupport,rowStoreSupportNoAddon:row.storeSupportNoAddon,finalValue},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
+                            // 구매가가 계산값과 다를 때 로깅 (0도 정상일 수 있으므로 모든 불일치 로깅)
+                            if (displayValue !== undefined && displayValue !== null && displayValue !== purchasePriceNoAddon) {
+                              fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:render',message:'구매가(부가미유치) 계산 불일치 확인',data:{modelId:row.id,displayValue,calculatedPrices:calculatedPrices[row.id],purchasePriceNoAddon,rowFactoryPrice:row.factoryPrice,rowSupport:row.support,rowPublicSupport:row.publicSupport,rowStoreSupportNoAddon:row.storeSupportNoAddon,difference:Math.abs(displayValue - purchasePriceNoAddon),finalValue},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
                             }
                             // #endregion
                             return finalValue;
