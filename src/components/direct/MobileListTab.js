@@ -729,9 +729,6 @@ const MobileListTab = ({ onProductSelect }) => {
         }
 
         if (result.success) {
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:calculatePrice',message:'API 응답 확인',data:{modelId,planGroup,openingType,carrier,resultStoreSupportWithAddon:result.storeSupportWithAddon,resultStoreSupportWithoutAddon:result.storeSupportWithoutAddon,resultPublicSupport:result.publicSupport,resultKeys:Object.keys(result)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-          // #endregion
           // 전역 캐시에 저장
           setCachedPrice(modelId, planGroup, openingType, carrier, {
             storeSupportWithAddon: result.storeSupportWithAddon || 0,
@@ -850,12 +847,13 @@ const MobileListTab = ({ onProductSelect }) => {
   // 표시할 값 가져오기 (계산된 값이 있으면 사용, 없으면 원래 값)
   const getDisplayValue = (row, field) => {
     const calculated = calculatedPrices[row.id];
-    // #region agent log
-    if (field === 'storeSupportWithAddon' || field === 'storeSupportWithoutAddon') {
-      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:getDisplayValue',message:'대리점지원금 표시값 확인',data:{modelId:row.id,field,calculatedValue:calculated?.[field],rowValue:row[field],hasCalculated:!!calculated,calculatedKeys:calculated?Object.keys(calculated):[]},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    }
-    // #endregion
-    if (calculated && calculatedPrices[row.id]) {
+    // 계산된 값이 있고, 해당 필드가 존재하면 사용
+    // 단, 대리점지원금의 경우 0이면 fallback 사용 (0은 유효하지 않은 값으로 간주)
+    if (calculated && calculatedPrices[row.id] && calculated[field] !== undefined) {
+      // 대리점지원금 필드이고 값이 0이면 fallback 사용
+      if ((field === 'storeSupportWithAddon' || field === 'storeSupportWithoutAddon') && calculated[field] === 0) {
+        return row[field];
+      }
       return calculated[field];
     }
     return row[field];
@@ -1171,12 +1169,10 @@ const MobileListTab = ({ onProductSelect }) => {
                           {(() => {
                             const displayValue = getDisplayValue(row, 'storeSupportWithAddon');
                             const fallbackValue = row.storeSupport || row.storeSupportWithAddon;
-                            const finalValue = displayValue?.toLocaleString() || fallbackValue?.toLocaleString() || '-';
-                            // #region agent log
-                            if (finalValue === '0' || finalValue === '-') {
-                              fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:render',message:'대리점지원금(부가유치) 표시값 최종 확인',data:{modelId:row.id,displayValue,fallbackValue,rowStoreSupport:row.storeSupport,rowStoreSupportWithAddon:row.storeSupportWithAddon,calculatedPrices:calculatedPrices[row.id],finalValue},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-                            }
-                            // #endregion
+                            // displayValue가 0이거나 없으면 fallback 사용
+                            const finalValue = (displayValue && displayValue !== 0) 
+                              ? displayValue.toLocaleString() 
+                              : (fallbackValue ? fallbackValue.toLocaleString() : '-');
                             return finalValue;
                           })()}
                         </Typography>
@@ -1193,12 +1189,10 @@ const MobileListTab = ({ onProductSelect }) => {
                           {(() => {
                             const displayValue = getDisplayValue(row, 'storeSupportWithoutAddon');
                             const fallbackValue = row.storeSupportNoAddon;
-                            const finalValue = displayValue?.toLocaleString() || fallbackValue?.toLocaleString() || '-';
-                            // #region agent log
-                            if (finalValue === '0' || finalValue === '-') {
-                              fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:render',message:'대리점지원금(부가미유치) 표시값 최종 확인',data:{modelId:row.id,displayValue,fallbackValue,rowStoreSupportNoAddon:row.storeSupportNoAddon,calculatedPrices:calculatedPrices[row.id],finalValue},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-                            }
-                            // #endregion
+                            // displayValue가 0이거나 없으면 fallback 사용
+                            const finalValue = (displayValue && displayValue !== 0) 
+                              ? displayValue.toLocaleString() 
+                              : (fallbackValue ? fallbackValue.toLocaleString() : '-');
                             return finalValue;
                           })()}
                         </Typography>
