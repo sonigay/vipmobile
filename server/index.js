@@ -4307,8 +4307,10 @@ function extractManufacturer(modelName, petName = '') {
   ) {
     return '애플';
   } 
-  // LG: LG 포함 (단, "갤럭시"와 겹치지 않도록 주의, 대소문자 구분 없음)
+  // LG: LG 포함 또는 UIP/UIPA로 시작하는 모델 (LG 벨벳 시리즈, 대소문자 구분 없음)
   else if (
+    /^UIP/i.test(modelOriginal) || // UIP, UIPA, UIP17 등으로 시작
+    /^UIPA/i.test(modelOriginal) ||
     (/^lg\s/i.test(modelOriginal) || /lg\s/i.test(petOriginal) || /lg\s/i.test(combinedOriginal)) && // LG로 시작
     !/galaxy/i.test(combinedOriginal) && // 갤럭시가 아닌 경우
     (model.includes('LG') || model.includes('VELVET') || pet.includes('LG') || pet.includes('VELVET')) && 
@@ -4540,7 +4542,9 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
     }
 
     // 이미지 업로드
-    const filename = `direct-store-${carrier}-${manufacturer}-${modelId}-${Date.now()}.${file.originalname.split('.').pop()}`;
+    // 🔥 개선: manufacturer가 빈 문자열이면 기본값 사용 (하이픈 두 개 연속 방지)
+    const safeManufacturer = manufacturer && manufacturer.trim() ? manufacturer.trim() : '기타';
+    const filename = `direct-store-${carrier}-${safeManufacturer}-${modelId}-${Date.now()}.${file.originalname.split('.').pop()}`;
     console.log(`📤 [이미지 업로드] Discord에 업로드 시작: ${filename} (포스트: ${carrierPost.name}, 스레드: ${targetThread.name})`);
     
     try {
