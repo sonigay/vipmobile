@@ -903,6 +903,9 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                                                                 );
                                                                 
                                                                 if (result.success) {
+                                                                    // 🔥 개선: 이통사지원금도 업데이트
+                                                                    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OpeningInfoPage.js:907',message:'가입유형 변경 시 이통사지원금 업데이트',data:{openingType:newOpeningType,planGroup,publicSupport:result.publicSupport,storeSupportWithAddon:result.storeSupportWithAddon,storeSupportWithoutAddon:result.storeSupportWithoutAddon},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+                                                                    setPublicSupport(result.publicSupport || 0);
                                                                     setStoreSupportWithAddon(result.storeSupportWithAddon || 0);
                                                                     setStoreSupportWithoutAddon(result.storeSupportWithoutAddon || 0);
                                                                 }
@@ -954,7 +957,67 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                                         <RadioGroup
                                             row
                                             value={formData.contractType}
-                                            onChange={(e) => setFormData({ ...formData, contractType: e.target.value })}
+                                            onChange={(e) => {
+                                                const newContractType = e.target.value;
+                                                setFormData({ ...formData, contractType: newContractType });
+                                                
+                                                // 🔥 개선: 선택약정일 때 이통사지원금 0으로 설정
+                                                if (newContractType === 'selected') {
+                                                    setPublicSupport(0);
+                                                } else {
+                                                    // 일반약정으로 변경 시 이통사지원금 재계산
+                                                    if (formData.plan && selectedPlanGroup && (initialData?.id || initialData?.model)) {
+                                                        const planGroup = planGroups.find(p => p.name === formData.plan)?.group || selectedPlanGroup;
+                                                        if (planGroup) {
+                                                            (async () => {
+                                                                try {
+                                                                    const openingTypeMap = {
+                                                                        'NEW': '010신규',
+                                                                        'MNP': 'MNP',
+                                                                        'CHANGE': '기변'
+                                                                    };
+                                                                    const openingType = openingTypeMap[formData.openingType] || '010신규';
+                                                                    
+                                                                    let modelId = initialData?.id;
+                                                                    let foundMobile = null;
+                                                                    if (!modelId && initialData?.model) {
+                                                                        try {
+                                                                            const mobileList = await directStoreApi.getMobileList(selectedCarrier);
+                                                                            foundMobile = mobileList.find(m => 
+                                                                                m.model === initialData.model && 
+                                                                                m.carrier === selectedCarrier
+                                                                            );
+                                                                            if (foundMobile) {
+                                                                                modelId = foundMobile.id;
+                                                                            }
+                                                                        } catch (err) {
+                                                                            console.warn('모델 ID 찾기 실패:', err);
+                                                                        }
+                                                                    }
+                                                                    
+                                                                    if (modelId) {
+                                                                        const modelName = initialData?.model || foundMobile?.model || null;
+                                                                        const result = await directStoreApi.calculateMobilePrice(
+                                                                            modelId,
+                                                                            planGroup,
+                                                                            openingType,
+                                                                            selectedCarrier,
+                                                                            modelName
+                                                                        );
+                                                                        
+                                                                        if (result.success) {
+                                                                            fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OpeningInfoPage.js:1003',message:'일반약정 변경 시 이통사지원금 재계산',data:{contractType:'standard',planGroup,openingType,publicSupport:result.publicSupport},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+                                                                            setPublicSupport(result.publicSupport || 0);
+                                                                        }
+                                                                    }
+                                                                } catch (err) {
+                                                                    console.error('이통사지원금 계산 실패:', err);
+                                                                }
+                                                            })();
+                                                        }
+                                                    }
+                                                }
+                                            }}
                                         >
                                             <FormControlLabel value="standard" control={<Radio />} label="일반약정" />
                                             <FormControlLabel value="selected" control={<Radio />} label="선택약정" />
@@ -1225,6 +1288,9 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                                                             );
                                                             
                                                             if (result.success) {
+                                                                // 🔥 개선: 이통사지원금도 업데이트
+                                                                fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OpeningInfoPage.js:1292',message:'요금제 변경 시 이통사지원금 업데이트',data:{plan:newValue.name,planGroup,openingType,publicSupport:result.publicSupport,storeSupportWithAddon:result.storeSupportWithAddon,storeSupportWithoutAddon:result.storeSupportWithoutAddon},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+                                                                setPublicSupport(result.publicSupport || 0);
                                                                 setStoreSupportWithAddon(result.storeSupportWithAddon || 0);
                                                                 setStoreSupportWithoutAddon(result.storeSupportWithoutAddon || 0);
                                                             }
@@ -1238,6 +1304,7 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                                                 setSelectedPlanGroup('');
                                                 setPlanBasicFee(0);
                                                 // 초기값으로 복원
+                                                setPublicSupport(initialData?.publicSupport || initialData?.support || 0);
                                                 setStoreSupportWithAddon(initialData?.storeSupport || 0);
                                                 setStoreSupportWithoutAddon(initialData?.storeSupportNoAddon || 0);
                                             }
