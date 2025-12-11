@@ -734,16 +734,25 @@ const MobileListTab = ({ onProductSelect }) => {
           if ((result.storeSupportWithAddon === 0 || result.storeSupportWithoutAddon === 0) && currentModel) {
             fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:calculatePrice',message:'API 응답에서 대리점지원금 0 확인',data:{modelId,modelName,planGroup,openingType,carrier,apiStoreSupportWithAddon:result.storeSupportWithAddon,apiStoreSupportWithoutAddon:result.storeSupportWithoutAddon,rowStoreSupport:currentModel.storeSupport,rowStoreSupportWithAddon:currentModel.storeSupportWithAddon,rowStoreSupportNoAddon:currentModel.storeSupportNoAddon,apiPublicSupport:result.publicSupport},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
           }
-          // 구매가 계산 불일치 확인 (API 응답과 예상값이 다를 때)
+          // 구매가/대리점지원금 불일치 확인 (API 응답과 예상값이 다를 때)
           if (currentModel) {
             const expectedPurchasePriceWithAddon = (currentModel.factoryPrice || 0) - (result.publicSupport || currentModel.publicSupport || currentModel.support || 0) - (result.storeSupportWithAddon || currentModel.storeSupport || currentModel.storeSupportWithAddon || 0);
             const expectedPurchasePriceWithoutAddon = (currentModel.factoryPrice || 0) - (result.publicSupport || currentModel.publicSupport || currentModel.support || 0) - (result.storeSupportWithoutAddon || currentModel.storeSupportNoAddon || 0);
+            const expectedStoreSupportWithAddon = result.storeSupportWithAddon || currentModel.storeSupport || currentModel.storeSupportWithAddon || 0;
+            const expectedStoreSupportWithoutAddon = result.storeSupportWithoutAddon || currentModel.storeSupportNoAddon || 0;
             // API 응답의 구매가와 예상값이 다를 때 로깅 (0도 정상일 수 있으므로 모든 불일치 로깅)
             if (result.purchasePriceWithAddon !== expectedPurchasePriceWithAddon) {
               fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:calculatePrice',message:'API 응답 구매가(부가유치) 불일치',data:{modelId,modelName,planGroup,openingType,carrier,apiPurchasePriceWithAddon:result.purchasePriceWithAddon,expectedPurchasePriceWithAddon,difference:Math.abs(result.purchasePriceWithAddon - expectedPurchasePriceWithAddon),apiFactoryPrice:currentModel.factoryPrice,apiPublicSupport:result.publicSupport,apiStoreSupportWithAddon:result.storeSupportWithAddon},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'})}).catch(()=>{});
             }
             if (result.purchasePriceWithoutAddon !== expectedPurchasePriceWithoutAddon) {
               fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:calculatePrice',message:'API 응답 구매가(부가미유치) 불일치',data:{modelId,modelName,planGroup,openingType,carrier,apiPurchasePriceWithoutAddon:result.purchasePriceWithoutAddon,expectedPurchasePriceWithoutAddon,difference:Math.abs(result.purchasePriceWithoutAddon - expectedPurchasePriceWithoutAddon),apiFactoryPrice:currentModel.factoryPrice,apiPublicSupport:result.publicSupport,apiStoreSupportWithoutAddon:result.storeSupportWithoutAddon},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'I'})}).catch(()=>{});
+            }
+            // 대리점지원금 불일치 로깅
+            if (result.storeSupportWithAddon !== expectedStoreSupportWithAddon) {
+              fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:calculatePrice',message:'API 응답 대리점지원금(부가유치) 불일치',data:{modelId,modelName,planGroup,openingType,carrier,apiStoreSupportWithAddon:result.storeSupportWithAddon,expectedStoreSupportWithAddon,difference:Math.abs(result.storeSupportWithAddon - expectedStoreSupportWithAddon)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'SS-C'})}).catch(()=>{});
+            }
+            if (result.storeSupportWithoutAddon !== expectedStoreSupportWithoutAddon) {
+              fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:calculatePrice',message:'API 응답 대리점지원금(부가미유치) 불일치',data:{modelId,modelName,planGroup,openingType,carrier,apiStoreSupportWithoutAddon:result.storeSupportWithoutAddon,expectedStoreSupportWithoutAddon,difference:Math.abs(result.storeSupportWithoutAddon - expectedStoreSupportWithoutAddon)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'SS-D'})}).catch(()=>{});
             }
           }
           // #endregion
@@ -1187,10 +1196,15 @@ const MobileListTab = ({ onProductSelect }) => {
                           {(() => {
                             const displayValue = getDisplayValue(row, 'storeSupportWithAddon');
                             const fallbackValue = row.storeSupport || row.storeSupportWithAddon;
-                            // displayValue가 0이거나 없으면 fallback 사용
-                            const finalValue = (displayValue && displayValue !== 0) 
-                              ? displayValue.toLocaleString() 
-                              : (fallbackValue ? fallbackValue.toLocaleString() : '-');
+                            const finalValue = (displayValue !== undefined && displayValue !== null && displayValue !== 0)
+                              ? displayValue.toLocaleString()
+                              : (fallbackValue !== undefined && fallbackValue !== null ? fallbackValue.toLocaleString() : '-');
+                            // #region agent log
+                            // 부가유치 대리점지원금 불일치 로깅
+                            if (displayValue !== undefined && displayValue !== null && fallbackValue !== undefined && fallbackValue !== null && displayValue !== fallbackValue) {
+                              fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:render',message:'대리점지원금(부가유치) 불일치',data:{modelId:row.id,displayValue,fallbackValue,calculatedPrices:calculatedPrices[row.id],rowStoreSupport:row.storeSupport,rowStoreSupportWithAddon:row.storeSupportWithAddon},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'SS-A'})}).catch(()=>{});
+                            }
+                            // #endregion
                             return finalValue;
                           })()}
                         </Typography>
@@ -1207,10 +1221,15 @@ const MobileListTab = ({ onProductSelect }) => {
                           {(() => {
                             const displayValue = getDisplayValue(row, 'storeSupportWithoutAddon');
                             const fallbackValue = row.storeSupportNoAddon;
-                            // displayValue가 0이거나 없으면 fallback 사용
-                            const finalValue = (displayValue && displayValue !== 0) 
-                              ? displayValue.toLocaleString() 
-                              : (fallbackValue ? fallbackValue.toLocaleString() : '-');
+                            const finalValue = (displayValue !== undefined && displayValue !== null && displayValue !== 0)
+                              ? displayValue.toLocaleString()
+                              : (fallbackValue !== undefined && fallbackValue !== null ? fallbackValue.toLocaleString() : '-');
+                            // #region agent log
+                            // 부가미유치 대리점지원금 불일치 로깅
+                            if (displayValue !== undefined && displayValue !== null && fallbackValue !== undefined && fallbackValue !== null && displayValue !== fallbackValue) {
+                              fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:render',message:'대리점지원금(부가미유치) 불일치',data:{modelId:row.id,displayValue,fallbackValue,calculatedPrices:calculatedPrices[row.id],rowStoreSupportNoAddon:row.storeSupportNoAddon},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'SS-B'})}).catch(()=>{});
+                            }
+                            // #endregion
                             return finalValue;
                           })()}
                         </Typography>
