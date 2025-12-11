@@ -5,7 +5,7 @@
  */
 
 // 🔥 캐시 버전: 서버 버그 수정 시 버전을 올려서 이전 캐시 무효화
-const CACHE_VERSION = 'v6'; // v6: UIP17PR-256 publicSupport 잘못된 캐시 값 문제 수정
+const CACHE_VERSION = 'v7'; // v7: 잘못된 sessionStorage 값 강제 무효화
 const CACHE_KEY = `directStore_priceCache_${CACHE_VERSION}`;
 const CACHE_EXPIRY = 60 * 60 * 1000; // 1시간 (밀리초)
 
