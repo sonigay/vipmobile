@@ -62,7 +62,8 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
 
     // 단말/지원금 기본값 정리 (휴대폰목록/오늘의휴대폰에서 전달된 데이터 사용)
     const factoryPrice = initialData?.factoryPrice || 0;
-    const publicSupport = initialData?.publicSupport || initialData?.support || 0; // 이통사 지원금
+    // 🔥 개선: publicSupport를 state로 변경하여 요금제군/개통유형 변경 시 업데이트 가능하도록
+    const [publicSupport, setPublicSupport] = useState(initialData?.publicSupport || initialData?.support || 0); // 이통사 지원금
     const [storeSupportWithAddon, setStoreSupportWithAddon] = useState(initialData?.storeSupport || 0); // 부가유치시 대리점추가지원금
     const [storeSupportWithoutAddon, setStoreSupportWithoutAddon] = useState(initialData?.storeSupportNoAddon || 0); // 부가미유치시 대리점추가지원금
 
@@ -340,10 +341,11 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                 
                 // 모델 ID 찾기
                 let modelId = initialData?.id;
+                let foundMobile = null; // 🔥 개선: 스코프 문제 해결을 위해 블록 밖에서 선언
                 if (!modelId && initialData?.model) {
                     try {
                         const mobileList = await directStoreApi.getMobileList(selectedCarrier);
-                        const foundMobile = mobileList.find(m => 
+                        foundMobile = mobileList.find(m => 
                             m.model === initialData.model && 
                             m.carrier === selectedCarrier
                         );
@@ -356,14 +358,19 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                 }
                 
                 if (modelId) {
+                    // 🔥 개선: modelName 전달 (휴대폰목록 페이지와 동일하게)
+                    const modelName = initialData?.model || foundMobile?.model || null;
                     const result = await directStoreApi.calculateMobilePrice(
                         modelId,
                         foundPlan.group,
                         openingType,
-                        selectedCarrier
+                        selectedCarrier,
+                        modelName
                     );
                     
                     if (result.success) {
+                        // 🔥 개선: publicSupport도 업데이트 (요금제군/개통유형 변경 시)
+                        setPublicSupport(result.publicSupport || initialData?.publicSupport || initialData?.support || 0);
                         setStoreSupportWithAddon(result.storeSupportWithAddon || 0);
                         setStoreSupportWithoutAddon(result.storeSupportWithoutAddon || 0);
                     }
@@ -868,10 +875,11 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                                                             
                                                             // 모델 ID가 없으면 모델명과 통신사로 생성 (임시)
                                                             let modelId = initialData?.id;
+                                                            let foundMobile = null; // 🔥 개선: 스코프 문제 해결을 위해 블록 밖에서 선언
                                                             if (!modelId && initialData?.model) {
                                                                 try {
                                                                     const mobileList = await directStoreApi.getMobileList(selectedCarrier);
-                                                                    const foundMobile = mobileList.find(m => 
+                                                                    foundMobile = mobileList.find(m => 
                                                                         m.model === initialData.model && 
                                                                         m.carrier === selectedCarrier
                                                                     );
@@ -884,11 +892,14 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                                                             }
                                                             
                                                             if (modelId) {
+                                                                // 🔥 개선: modelName 전달 (휴대폰목록 페이지와 동일하게)
+                                                                const modelName = initialData?.model || foundMobile?.model || null;
                                                                 const result = await directStoreApi.calculateMobilePrice(
                                                                     modelId,
                                                                     planGroup,
                                                                     openingType,
-                                                                    selectedCarrier
+                                                                    selectedCarrier,
+                                                                    modelName
                                                                 );
                                                                 
                                                                 if (result.success) {
@@ -1185,11 +1196,12 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                                                         
                                                         // 모델 ID가 없으면 모델명과 통신사로 생성 (임시)
                                                         let modelId = initialData?.id;
+                                                        let foundMobile = null; // 🔥 개선: 스코프 문제 해결을 위해 블록 밖에서 선언
                                                         if (!modelId && initialData?.model) {
                                                             // 모바일 목록에서 해당 모델 찾기
                                                             try {
                                                                 const mobileList = await directStoreApi.getMobileList(selectedCarrier);
-                                                                const foundMobile = mobileList.find(m => 
+                                                                foundMobile = mobileList.find(m => 
                                                                     m.model === initialData.model && 
                                                                     m.carrier === selectedCarrier
                                                                 );
@@ -1202,11 +1214,14 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                                                         }
                                                         
                                                         if (modelId) {
+                                                            // 🔥 개선: modelName 전달 (휴대폰목록 페이지와 동일하게)
+                                                            const modelName = initialData?.model || foundMobile?.model || null;
                                                             const result = await directStoreApi.calculateMobilePrice(
                                                                 modelId,
                                                                 planGroup,
                                                                 openingType,
-                                                                selectedCarrier
+                                                                selectedCarrier,
+                                                                modelName
                                                             );
                                                             
                                                             if (result.success) {

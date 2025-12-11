@@ -93,7 +93,14 @@ const ProductCard = ({ product, isPremium, onSelect, compact, theme, priceData: 
       let allCached = true;
       for (const openingType of openingTypes) {
         const cached = getCachedPrice(product.id, defaultPlanGroup, openingType, product.carrier);
-        if (cached && (cached.publicSupport !== undefined || cached.storeSupport !== undefined)) {
+        
+        // 🔥 개선: 캐시 값 검증 (휴대폰목록 페이지와 동일하게)
+        const serverPublicSupport = product.publicSupport || product.support || 0;
+        const cachePublicSupport = cached?.publicSupport || 0;
+        const isCacheValueInvalid = cached && serverPublicSupport > 0 && 
+          Math.abs(cachePublicSupport - serverPublicSupport) > 100000; // 10만원 이상 차이나면 잘못된 캐시로 간주
+        
+        if (cached && !isCacheValueInvalid && (cached.publicSupport !== undefined || cached.storeSupport !== undefined)) {
           newPriceData[openingType] = {
             publicSupport: cached.publicSupport || 0,
             storeSupport: cached.storeSupport || cached.storeSupportWithAddon || 0,
@@ -117,11 +124,13 @@ const ProductCard = ({ product, isPremium, onSelect, compact, theme, priceData: 
         if (newPriceData[openingType].loading === false) continue;
 
         try {
+          // 🔥 개선: modelName 전달 (휴대폰목록 페이지와 동일하게)
           const result = await directStoreApi.calculateMobilePrice(
             product.id,
             defaultPlanGroup,
             openingType,
-            product.carrier
+            product.carrier,
+            product.model || null
           );
 
           if (result.success) {
@@ -538,18 +547,27 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
         for (const openingType of ['010신규', 'MNP', '기변']) {
           // 전역 캐시 확인
           const cached = getCachedPrice(product.id, planGroup, openingType, product.carrier);
-          if (cached) {
-            // 캐시에 있으면 스킵
+          
+          // 🔥 개선: 캐시 값 검증 (휴대폰목록 페이지와 동일하게)
+          const serverPublicSupport = product.publicSupport || product.support || 0;
+          const cachePublicSupport = cached?.publicSupport || 0;
+          const isCacheValueInvalid = cached && serverPublicSupport > 0 && 
+            Math.abs(cachePublicSupport - serverPublicSupport) > 100000; // 10만원 이상 차이나면 잘못된 캐시로 간주
+          
+          if (cached && !isCacheValueInvalid) {
+            // 캐시에 있고 유효하면 스킵
             continue;
           }
           
-          // 캐시에 없으면 API 호출
+          // 캐시에 없거나 유효하지 않으면 API 호출
+          // 🔥 개선: modelName 전달 (휴대폰목록 페이지와 동일하게)
           pricePromises.push(
             directStoreApi.calculateMobilePrice(
               product.id,
               planGroup,
               openingType,
-              product.carrier
+              product.carrier,
+              product.model || null
             ).then(result => {
               if (result.success) {
                 cacheEntries.push({
