@@ -649,6 +649,10 @@ const MobileListTab = ({ onProductSelect }) => {
     
     const cacheKey = `${modelId}-${planGroup}-${openingType}-${carrier}`;
 
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:calculatePrice',message:'entry',data:{modelId,planGroup,openingType,carrier,cacheKey,useCache},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'C-entry'})}).catch(()=>{});
+    // #endregion
+
     // 전역 캐시 확인
     if (useCache) {
       const cached = getCachedPrice(modelId, planGroup, openingType, carrier);
@@ -659,6 +663,9 @@ const MobileListTab = ({ onProductSelect }) => {
         Math.abs(cachePublicSupport - serverPublicSupport) > 100000; // 10만원 이상 차이나면 잘못된 캐시로 간주
       
       if (cached && !isCacheValueInvalid) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:calculatePrice',message:'cache hit',data:{modelId,planGroup,openingType,carrier,cacheKey,cached},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'C-cache'})}).catch(()=>{});
+        // #endregion
         setCalculatedPrices(prev => ({
           ...prev,
           [modelId]: {

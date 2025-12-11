@@ -2982,6 +2982,17 @@ function setupDirectRoutes(app) {
   // GET /api/direct/mobiles/:modelId/calculate?planGroup=xxx&openingType=xxx&carrier=SK
   // 요금제군별 대리점지원금 및 구매가 계산
   router.get('/mobiles/:modelId/calculate', async (req, res) => {
+    // #region agent log
+    writeDebug({
+      location:'directRoutes.js:/calculate',
+      message:'entry',
+      data:{modelId:req.params.modelId,query:req.query},
+      timestamp:Date.now(),
+      sessionId:'debug-session',
+      runId:'run2',
+      hypothesisId:'S-entry'
+    });
+    // #endregion
     // 🔥 브라우저 캐시 방지 (304 응답 방지)
     res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.set('Pragma', 'no-cache');
@@ -3962,7 +3973,7 @@ function setupDirectRoutes(app) {
         message:'계산 결과',
         data:{
           modelId,
-          modelName: primaryModel?.model || modelId,
+          modelName: (typeof primaryModel !== 'undefined' ? primaryModel : (req.query.modelName ? req.query.modelName.trim() : ((modelRow?.[0] || '').toString().trim()))) || modelId,
           carrier,
           planGroup,
           openingType,
