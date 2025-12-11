@@ -13,6 +13,16 @@ function writeDebug(payload) {
   }
 }
 
+function logDebug(payload) {
+  writeDebug(payload);
+  // HTTP 로깅 (기존 클라이언트와 동일 endpoint)
+  fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  }).catch(() => {});
+}
+
 // 직영점 모드 시트 이름
 const SHEET_POLICY_MARGIN = '직영점_정책_마진';
 const SHEET_POLICY_ADDON = '직영점_정책_부가서비스';
@@ -3947,7 +3957,7 @@ function setupDirectRoutes(app) {
 
       // #region agent log
       // 지원금/구매가 계산 값 기록 (불일치 원인 추적)
-      writeDebug({
+      logDebug({
         location:'directRoutes.js:/calculate',
         message:'계산 결과',
         data:{
