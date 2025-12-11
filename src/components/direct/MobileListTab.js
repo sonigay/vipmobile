@@ -729,6 +729,12 @@ const MobileListTab = ({ onProductSelect }) => {
         }
 
         if (result.success) {
+          // #region agent log
+          // API 응답에서 0이 오는 경우 로깅
+          if ((result.storeSupportWithAddon === 0 || result.storeSupportWithoutAddon === 0) && currentModel) {
+            fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:calculatePrice',message:'API 응답에서 대리점지원금 0 확인',data:{modelId,modelName,planGroup,openingType,carrier,apiStoreSupportWithAddon:result.storeSupportWithAddon,apiStoreSupportWithoutAddon:result.storeSupportWithoutAddon,rowStoreSupport:currentModel.storeSupport,rowStoreSupportWithAddon:currentModel.storeSupportWithAddon,rowStoreSupportNoAddon:currentModel.storeSupportNoAddon,apiPublicSupport:result.publicSupport},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+          }
+          // #endregion
           // 전역 캐시에 저장
           setCachedPrice(modelId, planGroup, openingType, carrier, {
             storeSupportWithAddon: result.storeSupportWithAddon || 0,
