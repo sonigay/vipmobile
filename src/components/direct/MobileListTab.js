@@ -734,6 +734,14 @@ const MobileListTab = ({ onProductSelect }) => {
           if ((result.storeSupportWithAddon === 0 || result.storeSupportWithoutAddon === 0) && currentModel) {
             fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:calculatePrice',message:'API 응답에서 대리점지원금 0 확인',data:{modelId,modelName,planGroup,openingType,carrier,apiStoreSupportWithAddon:result.storeSupportWithAddon,apiStoreSupportWithoutAddon:result.storeSupportWithoutAddon,rowStoreSupport:currentModel.storeSupport,rowStoreSupportWithAddon:currentModel.storeSupportWithAddon,rowStoreSupportNoAddon:currentModel.storeSupportNoAddon,apiPublicSupport:result.publicSupport},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
           }
+          // 구매가 계산 문제 확인
+          if (currentModel && (result.purchasePriceWithAddon === 0 || result.purchasePriceWithoutAddon === 0)) {
+            const expectedPurchasePriceWithAddon = (currentModel.factoryPrice || 0) - (result.publicSupport || currentModel.publicSupport || currentModel.support || 0) - (result.storeSupportWithAddon || currentModel.storeSupport || currentModel.storeSupportWithAddon || 0);
+            const expectedPurchasePriceWithoutAddon = (currentModel.factoryPrice || 0) - (result.publicSupport || currentModel.publicSupport || currentModel.support || 0) - (result.storeSupportWithoutAddon || currentModel.storeSupportNoAddon || 0);
+            if (expectedPurchasePriceWithAddon > 0 || expectedPurchasePriceWithoutAddon > 0) {
+              fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:calculatePrice',message:'API 응답에서 구매가 0 확인',data:{modelId,modelName,planGroup,openingType,carrier,apiPurchasePriceWithAddon:result.purchasePriceWithAddon,apiPurchasePriceWithoutAddon:result.purchasePriceWithoutAddon,expectedPurchasePriceWithAddon,expectedPurchasePriceWithoutAddon,apiFactoryPrice:currentModel.factoryPrice,apiPublicSupport:result.publicSupport,apiStoreSupportWithAddon:result.storeSupportWithAddon,apiStoreSupportWithoutAddon:result.storeSupportWithoutAddon},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'})}).catch(()=>{});
+            }
+          }
           // #endregion
           // 전역 캐시에 저장
           setCachedPrice(modelId, planGroup, openingType, carrier, {
@@ -1214,7 +1222,19 @@ const MobileListTab = ({ onProductSelect }) => {
                             color: 'primary.main'
                           }}
                         >
-                          {getDisplayValue(row, 'purchasePriceWithAddon')?.toLocaleString() || purchasePriceAddon.toLocaleString()}
+                          {(() => {
+                            const displayValue = getDisplayValue(row, 'purchasePriceWithAddon');
+                            const finalValue = displayValue !== undefined && displayValue !== null
+                              ? displayValue.toLocaleString()
+                              : purchasePriceAddon.toLocaleString();
+                            // #region agent log
+                            // 구매가가 0이거나 계산이 잘못된 경우 로깅
+                            if ((displayValue === 0 || displayValue === undefined || displayValue === null) && purchasePriceAddon > 0) {
+                              fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:render',message:'구매가(부가유치) 계산 문제 확인',data:{modelId:row.id,displayValue,calculatedPrices:calculatedPrices[row.id],purchasePriceAddon,rowFactoryPrice:row.factoryPrice,rowSupport:row.support,rowPublicSupport:row.publicSupport,rowStoreSupport:row.storeSupport,finalValue},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+                            }
+                            // #endregion
+                            return finalValue;
+                          })()}
                         </Typography>
                       </TableCell>
                       <TableCell align="center" sx={{ bgcolor: 'rgba(212, 175, 55, 0.05)', width: '90px' }}>
@@ -1226,7 +1246,19 @@ const MobileListTab = ({ onProductSelect }) => {
                             color: 'success.main'
                           }}
                         >
-                          {getDisplayValue(row, 'purchasePriceWithoutAddon')?.toLocaleString() || purchasePriceNoAddon.toLocaleString()}
+                          {(() => {
+                            const displayValue = getDisplayValue(row, 'purchasePriceWithoutAddon');
+                            const finalValue = displayValue !== undefined && displayValue !== null
+                              ? displayValue.toLocaleString()
+                              : purchasePriceNoAddon.toLocaleString();
+                            // #region agent log
+                            // 구매가가 0이거나 계산이 잘못된 경우 로깅
+                            if ((displayValue === 0 || displayValue === undefined || displayValue === null) && purchasePriceNoAddon > 0) {
+                              fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:render',message:'구매가(부가미유치) 계산 문제 확인',data:{modelId:row.id,displayValue,calculatedPrices:calculatedPrices[row.id],purchasePriceNoAddon,rowFactoryPrice:row.factoryPrice,rowSupport:row.support,rowPublicSupport:row.publicSupport,rowStoreSupportNoAddon:row.storeSupportNoAddon,finalValue},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
+                            }
+                            // #endregion
+                            return finalValue;
+                          })()}
                         </Typography>
                       </TableCell>
                     </TableRow>
