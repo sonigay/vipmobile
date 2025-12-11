@@ -3934,39 +3934,38 @@ function setupDirectRoutes(app) {
       const purchasePriceWithoutAddon = Math.max(0, factoryPrice - publicSupport - storeSupportWithoutAddon);
 
       // #region agent log
-      // 지원금/구매가 계산 값 확인 (0 또는 불일치 추적)
-      if (storeSupportWithAddon === 0 || storeSupportWithoutAddon === 0 || purchasePriceWithAddon === 0 || purchasePriceWithoutAddon === 0) {
-        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({
-            location:'directRoutes.js:/calculate',
-            message:'계산 결과 확인',
-            data:{
-              modelId,
-              carrier,
-              planGroup,
-              openingType,
-              factoryPrice,
-              publicSupport,
-              policyRebate,
-              baseMargin,
-              totalAddonIncentive,
-              totalSpecialAddition,
-              totalAddonDeduction,
-              totalSpecialDeduction,
-              storeSupportWithAddon,
-              storeSupportWithoutAddon,
-              purchasePriceWithAddon,
-              purchasePriceWithoutAddon
-            },
-            timestamp:Date.now(),
-            sessionId:'debug-session',
-            runId:'run1',
-            hypothesisId:'S'
-          })
-        }).catch(()=>{});
-      }
+      // 지원금/구매가 계산 값 기록 (불일치 원인 추적)
+      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          location:'directRoutes.js:/calculate',
+          message:'계산 결과',
+          data:{
+            modelId,
+            modelName: primaryModel?.model || modelId,
+            carrier,
+            planGroup,
+            openingType,
+            factoryPrice,
+            publicSupport,
+            policyRebate,
+            baseMargin,
+            totalAddonIncentive,
+            totalSpecialAddition,
+            totalAddonDeduction,
+            totalSpecialDeduction,
+            storeSupportWithAddon,
+            storeSupportWithoutAddon,
+            purchasePriceWithAddon,
+            purchasePriceWithoutAddon
+          },
+          timestamp:Date.now(),
+          sessionId:'debug-session',
+          runId:'run1',
+          hypothesisId:'S'
+        })
+      }).catch(()=>{});
       // #endregion
 
       res.json({
