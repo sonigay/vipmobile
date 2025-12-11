@@ -1686,12 +1686,15 @@ function setupDirectRoutes(app) {
 
         if (rebateRanges.length > 0) {
           try {
-            const response = await sheets.spreadsheets.values.batchGet({
-              spreadsheetId: policySheetId,
-              ranges: rebateRanges,
-              majorDimension: 'ROWS',
-              valueRenderOption: 'UNFORMATTED_VALUE'
-            });
+            // 🔥 개선: Rate Limit 에러 재시도 로직 적용
+            const response = await withRetry(async () => {
+              return await sheets.spreadsheets.values.batchGet({
+                spreadsheetId: policySheetId,
+                ranges: rebateRanges,
+                majorDimension: 'ROWS',
+                valueRenderOption: 'UNFORMATTED_VALUE'
+              });
+            }, 5, 3000); // 최대 5회 재시도, 기본 지연 3초
 
             response.data.valueRanges.forEach((valueRange, index) => {
               const { planGroup, openingType } = rebateRangeMap[index];
@@ -1725,7 +1728,18 @@ function setupDirectRoutes(app) {
               policyRebateData[planGroup][openingType] = rebateMap;
             });
           } catch (err) {
-            console.warn(`[Direct] 리베이트 범위 batchGet 실패:`, err);
+            // Rate Limit 에러인지 확인
+            const isRateLimitError = err.code === 429 || 
+              (err.response && err.response.status === 429) ||
+              (err.message && err.message.includes('Quota exceeded')) ||
+              (err.message && err.message.includes('rateLimitExceeded'));
+            
+            if (isRateLimitError) {
+              console.warn(`[Direct] 리베이트 범위 batchGet Rate Limit 에러 (재시도 실패):`, err.message || err.code);
+            } else {
+              console.warn(`[Direct] 리베이트 범위 batchGet 실패:`, err.message || err);
+            }
+            
             // 실패 시 빈 객체로 초기화
             rebateRangeMap.forEach(({ planGroup, openingType }) => {
               if (!policyRebateData[planGroup][openingType]) {
