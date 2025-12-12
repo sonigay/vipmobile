@@ -56,6 +56,8 @@ const MobileListTab = ({ onProductSelect }) => {
   const pendingRequestsRef = useRef(new Map()); // { cacheKey: Promise } - 중복 요청 방지
   const initializedRef = useRef(false); // 초기화 완료 여부 추적
   const userSelectedOpeningTypesRef = useRef(new Set()); // 사용자가 수동으로 선택한 개통유형 추적
+  const priceCalculationQueueRef = useRef([]); // 가격 계산 요청 큐
+  const isProcessingQueueRef = useRef(false); // 큐 처리 중 여부
 
   // 개통 유형 목록 (고정)
   const openingTypes = ['010신규', 'MNP', '기변'];
@@ -284,29 +286,26 @@ const MobileListTab = ({ onProductSelect }) => {
       setSelectedPlanGroups(newPlanGroups);
       setSelectedOpeningTypes(newOpeningTypes);
 
-      // 가격 계산 배치 처리 (API 과부하 방지)
+      // 가격 계산 배치 처리 (큐 시스템 사용)
       if (calculationQueue.length > 0) {
-        const BATCH_SIZE = 5; // 동시 실행 수 제한
-        const DELAY_MS = 200; // 배치 간 지연 시간
+        // 모든 계산 요청을 큐에 추가
+        calculationQueue.forEach(item => {
+          calculatePrice(item.modelId, item.planGroup, item.openingType, true);
+        });
 
-        for (let i = 0; i < calculationQueue.length; i += BATCH_SIZE) {
-          const batch = calculationQueue.slice(i, i + BATCH_SIZE);
-
-          // 배치 실행
-          await Promise.allSettled(batch.map(item =>
-            calculatePrice(item.modelId, item.planGroup, item.openingType, true)
-          ));
-
-          // 마지막 배치가 아니면 지연
-          if (i + BATCH_SIZE < calculationQueue.length) {
-            await new Promise(resolve => setTimeout(resolve, DELAY_MS));
-          }
-        }
-
+        // 큐 처리가 완료될 때까지 대기 (비동기로 처리되므로 상태만 업데이트)
         setSteps(prev => ({
           ...prev,
-          pricing: { ...prev.pricing, status: 'success', message: '' }
+          pricing: { ...prev.pricing, status: 'loading', message: '가격 계산 중...' }
         }));
+
+        // 큐 처리 완료를 대략적으로 추정 (모든 요청이 큐에 추가된 후 약간의 시간 후 완료로 표시)
+        setTimeout(() => {
+          setSteps(prev => ({
+            ...prev,
+            pricing: { ...prev.pricing, status: 'success', message: '' }
+          }));
+        }, Math.max(1000, calculationQueue.length * 200)); // 최소 1초, 요청 수에 비례
       } else {
         setSteps(prev => ({
           ...prev,
@@ -630,32 +629,94 @@ const MobileListTab = ({ onProductSelect }) => {
     return tags.length > 0 ? tags.join(', ') : '선택';
   };
 
-  // 가격 계산 함수 (요금제군과 유형 모두 필요) - 전역 캐시 사용 및 병렬 처리 지원
-  const calculatePrice = async (modelId, planGroup, openingType, useCache = true) => {
+  // 가격 계산 요청 큐 처리 함수
+  const processPriceCalculationQueue = async () => {
+    if (isProcessingQueueRef.current || priceCalculationQueueRef.current.length === 0) {
+      return;
+    }
+
+    isProcessingQueueRef.current = true;
+
+    try {
+      // 큐에서 중복 제거 (같은 cacheKey는 하나만 유지)
+      const uniqueQueue = [];
+      const seenKeys = new Set();
+      
+      for (const item of priceCalculationQueueRef.current) {
+        const cacheKey = `${item.modelId}-${item.planGroup}-${item.openingType}-${item.carrier}`;
+        if (!seenKeys.has(cacheKey)) {
+          seenKeys.add(cacheKey);
+          uniqueQueue.push(item);
+        }
+      }
+
+      priceCalculationQueueRef.current = [];
+
+      // 배치 처리 설정 (캐시 비활성화 시 더 보수적으로)
+      const BATCH_SIZE = 3; // 동시 실행 수 제한 (5 -> 3으로 감소)
+      const DELAY_MS = 500; // 배치 간 지연 시간 (200ms -> 500ms로 증가)
+
+      for (let i = 0; i < uniqueQueue.length; i += BATCH_SIZE) {
+        const batch = uniqueQueue.slice(i, i + BATCH_SIZE);
+
+        // 배치 실행
+        await Promise.allSettled(
+          batch.map(item =>
+            calculatePriceInternal(
+              item.modelId,
+              item.planGroup,
+              item.openingType,
+              item.useCache,
+              item.carrier
+            ).catch(err => {
+              console.error(`가격 계산 실패 (큐 처리):`, {
+                modelId: item.modelId,
+                planGroup: item.planGroup,
+                openingType: item.openingType,
+                error: err
+              });
+            })
+          )
+        );
+
+        // 마지막 배치가 아니면 지연
+        if (i + BATCH_SIZE < uniqueQueue.length) {
+          await new Promise(resolve => setTimeout(resolve, DELAY_MS));
+        }
+      }
+    } finally {
+      isProcessingQueueRef.current = false;
+
+      // 큐에 새로운 항목이 추가되었으면 다시 처리
+      if (priceCalculationQueueRef.current.length > 0) {
+        // 다음 이벤트 루프에서 처리
+        setTimeout(() => processPriceCalculationQueue(), 100);
+      }
+    }
+  };
+
+  // 내부 가격 계산 함수 (실제 API 호출)
+  const calculatePriceInternal = async (modelId, planGroup, openingType, useCache = true, carrier = null) => {
     if (!planGroup || !openingType) {
       return;
     }
 
     // 모델에서 carrier 정보 추출 (모델 ID 형식: mobile-{carrier}-{index})
     const currentModel = mobileList.find(m => m.id === modelId);
-    const carrier = currentModel?.carrier || getCurrentCarrier();
+    const modelCarrier = carrier || currentModel?.carrier || getCurrentCarrier();
     
     // carrier가 현재 탭과 다르면 요청 스킵 (탭 전환 중 발생하는 잘못된 요청 방지)
     const currentTabCarrier = getCurrentCarrier();
-    if (carrier !== currentTabCarrier) {
-      console.log(`[MobileListTab] 캐리어 불일치로 요청 스킵: modelCarrier=${carrier}, tabCarrier=${currentTabCarrier}`);
+    if (modelCarrier !== currentTabCarrier) {
+      console.log(`[MobileListTab] 캐리어 불일치로 요청 스킵: modelCarrier=${modelCarrier}, tabCarrier=${currentTabCarrier}`);
       return;
     }
     
-    const cacheKey = `${modelId}-${planGroup}-${openingType}-${carrier}`;
-
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:calculatePrice',message:'entry',data:{modelId,planGroup,openingType,carrier,cacheKey,useCache},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'C-entry'})}).catch(()=>{});
-    // #endregion
+    const cacheKey = `${modelId}-${planGroup}-${openingType}-${modelCarrier}`;
 
     // 전역 캐시 확인
     if (useCache) {
-      const cached = getCachedPrice(modelId, planGroup, openingType, carrier);
+      const cached = getCachedPrice(modelId, planGroup, openingType, modelCarrier);
       // 🔥 캐시 값 검증: 서버에서 받은 publicSupport 값과 캐시 값이 크게 다르면 캐시 무시
       const serverPublicSupport = currentModel?.publicSupport || currentModel?.support || 0;
       const cachePublicSupport = cached?.publicSupport || 0;
@@ -663,9 +724,6 @@ const MobileListTab = ({ onProductSelect }) => {
         Math.abs(cachePublicSupport - serverPublicSupport) > 100000; // 10만원 이상 차이나면 잘못된 캐시로 간주
       
       if (cached && !isCacheValueInvalid) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:calculatePrice',message:'cache hit',data:{modelId,planGroup,openingType,carrier,cacheKey,cached},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'C-cache'})}).catch(()=>{});
-        // #endregion
         setCalculatedPrices(prev => ({
           ...prev,
           [modelId]: {
@@ -726,53 +784,136 @@ const MobileListTab = ({ onProductSelect }) => {
     const modelName = currentModel?.model || null;
 
     // API 호출
-    const pricePromise = directStoreApi.calculateMobilePrice(modelId, planGroup, openingType, carrier, modelName)
+    const pricePromise = directStoreApi.calculateMobilePrice(modelId, planGroup, openingType, modelCarrier, modelName)
       .then(result => {
         // 404 에러는 재시도하지 않음
         if (result.status === 404) {
-          console.warn('모델을 찾을 수 없음 (404):', { modelId, modelName, planGroup, openingType, carrier });
-          pendingRequestsRef.current.delete(cacheKey);
-          return result;
+          console.warn('모델을 찾을 수 없음 (404):', { modelId, modelName, planGroup, openingType, carrier: modelCarrier });
+          return { success: false, status: 404 };
         }
 
-        if (result.success) {
-          // #region agent log
-          // API 응답에서 0이 오는 경우 로깅
-          if ((result.storeSupportWithAddon === 0 || result.storeSupportWithoutAddon === 0) && currentModel) {
-            fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:calculatePrice',message:'API 응답에서 대리점지원금 0 확인',data:{modelId,modelName,planGroup,openingType,carrier,apiStoreSupportWithAddon:result.storeSupportWithAddon,apiStoreSupportWithoutAddon:result.storeSupportWithoutAddon,rowStoreSupport:currentModel.storeSupport,rowStoreSupportWithAddon:currentModel.storeSupportWithAddon,rowStoreSupportNoAddon:currentModel.storeSupportNoAddon,apiPublicSupport:result.publicSupport},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-          }
-          // 구매가/대리점지원금 불일치 확인 (API 응답과 예상값이 다를 때)
-          if (currentModel) {
-            const expectedPurchasePriceWithAddon = (currentModel.factoryPrice || 0) - (result.publicSupport || currentModel.publicSupport || currentModel.support || 0) - (result.storeSupportWithAddon || currentModel.storeSupport || currentModel.storeSupportWithAddon || 0);
-            const expectedPurchasePriceWithoutAddon = (currentModel.factoryPrice || 0) - (result.publicSupport || currentModel.publicSupport || currentModel.support || 0) - (result.storeSupportWithoutAddon || currentModel.storeSupportNoAddon || 0);
-            const expectedStoreSupportWithAddon = result.storeSupportWithAddon || currentModel.storeSupport || currentModel.storeSupportWithAddon || 0;
-            const expectedStoreSupportWithoutAddon = result.storeSupportWithoutAddon || currentModel.storeSupportNoAddon || 0;
-            // API 응답의 구매가와 예상값이 다를 때 로깅 (0도 정상일 수 있으므로 모든 불일치 로깅)
-            if (result.purchasePriceWithAddon !== expectedPurchasePriceWithAddon) {
-              fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:calculatePrice',message:'API 응답 구매가(부가유치) 불일치',data:{modelId,modelName,planGroup,openingType,carrier,apiPurchasePriceWithAddon:result.purchasePriceWithAddon,expectedPurchasePriceWithAddon,difference:Math.abs(result.purchasePriceWithAddon - expectedPurchasePriceWithAddon),apiFactoryPrice:currentModel.factoryPrice,apiPublicSupport:result.publicSupport,apiStoreSupportWithAddon:result.storeSupportWithAddon},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'})}).catch(()=>{});
-            }
-            if (result.purchasePriceWithoutAddon !== expectedPurchasePriceWithoutAddon) {
-              fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:calculatePrice',message:'API 응답 구매가(부가미유치) 불일치',data:{modelId,modelName,planGroup,openingType,carrier,apiPurchasePriceWithoutAddon:result.purchasePriceWithoutAddon,expectedPurchasePriceWithoutAddon,difference:Math.abs(result.purchasePriceWithoutAddon - expectedPurchasePriceWithoutAddon),apiFactoryPrice:currentModel.factoryPrice,apiPublicSupport:result.publicSupport,apiStoreSupportWithoutAddon:result.storeSupportWithoutAddon},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'I'})}).catch(()=>{});
-            }
-            // 대리점지원금 불일치 로깅
-            if (result.storeSupportWithAddon !== expectedStoreSupportWithAddon) {
-              fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:calculatePrice',message:'API 응답 대리점지원금(부가유치) 불일치',data:{modelId,modelName,planGroup,openingType,carrier,apiStoreSupportWithAddon:result.storeSupportWithAddon,expectedStoreSupportWithAddon,difference:Math.abs(result.storeSupportWithAddon - expectedStoreSupportWithAddon)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'SS-C'})}).catch(()=>{});
-            }
-            if (result.storeSupportWithoutAddon !== expectedStoreSupportWithoutAddon) {
-              fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:calculatePrice',message:'API 응답 대리점지원금(부가미유치) 불일치',data:{modelId,modelName,planGroup,openingType,carrier,apiStoreSupportWithoutAddon:result.storeSupportWithoutAddon,expectedStoreSupportWithoutAddon,difference:Math.abs(result.storeSupportWithoutAddon - expectedStoreSupportWithoutAddon)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'SS-D'})}).catch(()=>{});
-            }
-          }
-          // #endregion
-          // 전역 캐시에 저장
-          setCachedPrice(modelId, planGroup, openingType, carrier, {
-            storeSupportWithAddon: result.storeSupportWithAddon || 0,
-            storeSupportWithoutAddon: result.storeSupportWithoutAddon || 0,
-            purchasePriceWithAddon: result.purchasePriceWithAddon || 0,
-            purchasePriceWithoutAddon: result.purchasePriceWithoutAddon || 0,
-            publicSupport: result.publicSupport || 0
-          });
+        if (!result || !result.success) {
+          throw new Error(result?.error || '가격 계산에 실패했습니다.');
+        }
 
-          // 상태 업데이트 (이통사지원금 포함)
+        return {
+          success: true,
+          storeSupportWithAddon: result.storeSupportWithAddon || 0,
+          storeSupportWithoutAddon: result.storeSupportWithoutAddon || 0,
+          purchasePriceWithAddon: result.purchasePriceWithAddon || 0,
+          purchasePriceWithoutAddon: result.purchasePriceWithoutAddon || 0,
+          publicSupport: result.publicSupport || 0
+        };
+      })
+      .catch(err => {
+        console.error('가격 계산 API 호출 실패:', err, { modelId, planGroup, openingType, carrier: modelCarrier });
+        return { success: false, error: err.message || err.toString() };
+      })
+      .finally(() => {
+        // 요청 완료 후 pendingRequests에서 제거
+        pendingRequestsRef.current.delete(cacheKey);
+      });
+
+    // pendingRequests에 추가
+    pendingRequestsRef.current.set(cacheKey, pricePromise);
+
+    const result = await pricePromise;
+
+    if (result.success) {
+      // 캐시에 저장
+      if (useCache) {
+        setCachedPrice(modelId, planGroup, openingType, modelCarrier, {
+          storeSupportWithAddon: result.storeSupportWithAddon,
+          storeSupportWithoutAddon: result.storeSupportWithoutAddon,
+          purchasePriceWithAddon: result.purchasePriceWithAddon,
+          purchasePriceWithoutAddon: result.purchasePriceWithoutAddon,
+          publicSupport: result.publicSupport
+        });
+      }
+
+      // 상태 업데이트
+      setCalculatedPrices(prev => ({
+        ...prev,
+        [modelId]: {
+          storeSupportWithAddon: result.storeSupportWithAddon || 0,
+          storeSupportWithoutAddon: result.storeSupportWithoutAddon || 0,
+          purchasePriceWithAddon: result.purchasePriceWithAddon || 0,
+          purchasePriceWithoutAddon: result.purchasePriceWithoutAddon || 0,
+          publicSupport: result.publicSupport || 0
+        }
+      }));
+
+      // mobileList 상태도 업데이트
+      setMobileList(prevList => prevList.map(item =>
+        item.id === modelId
+          ? {
+            ...item,
+            publicSupport: result.publicSupport || item.publicSupport || 0,
+            support: result.publicSupport || item.support || item.publicSupport || 0
+          }
+          : item
+      ));
+    }
+  };
+
+  // 가격 계산 함수 (요금제군과 유형 모두 필요) - 큐를 통한 배치 처리
+  const calculatePrice = async (modelId, planGroup, openingType, useCache = true) => {
+    if (!planGroup || !openingType) {
+      return;
+    }
+
+    // 모델에서 carrier 정보 추출 (모델 ID 형식: mobile-{carrier}-{index})
+    const currentModel = mobileList.find(m => m.id === modelId);
+    const carrier = currentModel?.carrier || getCurrentCarrier();
+    
+    // carrier가 현재 탭과 다르면 요청 스킵 (탭 전환 중 발생하는 잘못된 요청 방지)
+    const currentTabCarrier = getCurrentCarrier();
+    if (carrier !== currentTabCarrier) {
+      console.log(`[MobileListTab] 캐리어 불일치로 요청 스킵: modelCarrier=${carrier}, tabCarrier=${currentTabCarrier}`);
+      return;
+    }
+    
+    const cacheKey = `${modelId}-${planGroup}-${openingType}-${carrier}`;
+
+    // 전역 캐시 확인 (캐시가 있으면 즉시 반환)
+    if (useCache) {
+      const cached = getCachedPrice(modelId, planGroup, openingType, carrier);
+      // 🔥 캐시 값 검증: 서버에서 받은 publicSupport 값과 캐시 값이 크게 다르면 캐시 무시
+      const serverPublicSupport = currentModel?.publicSupport || currentModel?.support || 0;
+      const cachePublicSupport = cached?.publicSupport || 0;
+      const isCacheValueInvalid = cached && serverPublicSupport > 0 && 
+        Math.abs(cachePublicSupport - serverPublicSupport) > 100000; // 10만원 이상 차이나면 잘못된 캐시로 간주
+      
+      if (cached && !isCacheValueInvalid) {
+        setCalculatedPrices(prev => ({
+          ...prev,
+          [modelId]: {
+            storeSupportWithAddon: cached.storeSupportWithAddon || 0,
+            storeSupportWithoutAddon: cached.storeSupportWithoutAddon || 0,
+            purchasePriceWithAddon: cached.purchasePriceWithAddon || 0,
+            purchasePriceWithoutAddon: cached.purchasePriceWithoutAddon || 0,
+            publicSupport: cached.publicSupport || 0
+          }
+        }));
+        // mobileList 상태도 업데이트
+        setMobileList(prevList => prevList.map(item =>
+          item.id === modelId
+            ? {
+                ...item,
+                publicSupport: cached.publicSupport || item.publicSupport || 0,
+                support: cached.publicSupport || item.support || item.publicSupport || 0
+              }
+            : item
+        ));
+        return;
+      }
+    }
+
+    // 중복 요청 방지 (이미 큐에 있거나 처리 중인 요청)
+    if (pendingRequestsRef.current.has(cacheKey)) {
+      try {
+        const result = await pendingRequestsRef.current.get(cacheKey);
+        if (result && result.success) {
           setCalculatedPrices(prev => ({
             ...prev,
             [modelId]: {
@@ -783,8 +924,7 @@ const MobileListTab = ({ onProductSelect }) => {
               publicSupport: result.publicSupport || 0
             }
           }));
-
-          // mobileList 상태도 업데이트 (이통사지원금 반영)
+          // mobileList 상태도 업데이트
           setMobileList(prevList => prevList.map(item =>
             item.id === modelId
               ? {
@@ -795,24 +935,23 @@ const MobileListTab = ({ onProductSelect }) => {
               : item
           ));
         }
-        pendingRequestsRef.current.delete(cacheKey);
-        return result;
-      })
-      .catch(err => {
-        console.error('가격 계산 실패:', err, { modelId, modelName, planGroup, openingType, carrier });
-        pendingRequestsRef.current.delete(cacheKey);
-        // 에러 발생 시에도 상태를 업데이트하여 무한 재시도 방지
-        // 실패한 요청을 null로 표시하여 재시도 방지
-        setCalculatedPrices(prev => ({
-          ...prev,
-          [modelId]: prev[modelId] || null // 기존 값 유지 또는 null
-        }));
-        // 에러를 다시 throw하지 않고 실패한 결과 반환
-        return { success: false, error: err.message || '가격 계산 실패' };
-      });
+      } catch (err) {
+        console.error('가격 계산 실패 (대기 중 요청):', err);
+      }
+      return;
+    }
 
-    pendingRequestsRef.current.set(cacheKey, pricePromise);
-    return pricePromise;
+    // 큐에 추가
+    priceCalculationQueueRef.current.push({
+      modelId,
+      planGroup,
+      openingType,
+      carrier,
+      useCache
+    });
+
+    // 큐 처리 시작 (비동기로 실행)
+    processPriceCalculationQueue();
   };
 
   // 요금제군 선택 핸들러
