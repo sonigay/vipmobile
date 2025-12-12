@@ -653,30 +653,59 @@ const MobileListTab = ({ onProductSelect }) => {
       priceCalculationQueueRef.current = [];
 
       // 배치 처리 설정 (캐시 비활성화 시 더 보수적으로)
-      const BATCH_SIZE = 3; // 동시 실행 수 제한 (5 -> 3으로 감소)
-      const DELAY_MS = 500; // 배치 간 지연 시간 (200ms -> 500ms로 증가)
+      const BATCH_SIZE = 2; // 동시 실행 수 제한 (3 -> 2로 감소)
+      const DELAY_MS = 1000; // 배치 간 지연 시간 (500ms -> 1000ms로 증가)
+      const MAX_RETRIES = 2; // 최대 재시도 횟수
+      const INITIAL_RETRY_DELAY = 2000; // 초기 재시도 지연 (2초)
 
       for (let i = 0; i < uniqueQueue.length; i += BATCH_SIZE) {
         const batch = uniqueQueue.slice(i, i + BATCH_SIZE);
 
-        // 배치 실행
+        // 배치 실행 (재시도 로직 포함)
         await Promise.allSettled(
-          batch.map(item =>
-            calculatePriceInternal(
-              item.modelId,
-              item.planGroup,
-              item.openingType,
-              item.useCache,
-              item.carrier
-            ).catch(err => {
-              console.error(`가격 계산 실패 (큐 처리):`, {
-                modelId: item.modelId,
-                planGroup: item.planGroup,
-                openingType: item.openingType,
-                error: err
-              });
-            })
-          )
+          batch.map(async (item, batchIndex) => {
+            let retries = 0;
+            let lastError = null;
+
+            while (retries <= MAX_RETRIES) {
+              try {
+                await calculatePriceInternal(
+                  item.modelId,
+                  item.planGroup,
+                  item.openingType,
+                  item.useCache,
+                  item.carrier
+                );
+                return; // 성공 시 종료
+              } catch (err) {
+                lastError = err;
+                const isNetworkError = err.message?.includes('Failed to fetch') || 
+                                     err.message?.includes('ERR_INSUFFICIENT_RESOURCES') ||
+                                     err.message?.includes('NetworkError');
+                
+                // 네트워크 에러가 아니거나 최대 재시도 횟수에 도달하면 종료
+                if (!isNetworkError || retries >= MAX_RETRIES) {
+                  console.error(`가격 계산 실패 (큐 처리):`, {
+                    modelId: item.modelId,
+                    planGroup: item.planGroup,
+                    openingType: item.openingType,
+                    retries,
+                    error: err
+                  });
+                  break;
+                }
+
+                // 지수 백오프로 재시도
+                const retryDelay = INITIAL_RETRY_DELAY * Math.pow(2, retries) + (batchIndex * 100);
+                console.warn(`가격 계산 재시도 (${retries + 1}/${MAX_RETRIES}):`, {
+                  modelId: item.modelId,
+                  delay: retryDelay
+                });
+                await new Promise(resolve => setTimeout(resolve, retryDelay));
+                retries++;
+              }
+            }
+          })
         );
 
         // 마지막 배치가 아니면 지연
@@ -689,8 +718,8 @@ const MobileListTab = ({ onProductSelect }) => {
 
       // 큐에 새로운 항목이 추가되었으면 다시 처리
       if (priceCalculationQueueRef.current.length > 0) {
-        // 다음 이벤트 루프에서 처리
-        setTimeout(() => processPriceCalculationQueue(), 100);
+        // 다음 이벤트 루프에서 처리 (지연 시간 증가)
+        setTimeout(() => processPriceCalculationQueue(), 200);
       }
     }
   };
@@ -939,6 +968,31 @@ const MobileListTab = ({ onProductSelect }) => {
         console.error('가격 계산 실패 (대기 중 요청):', err);
       }
       return;
+    }
+
+    // 큐 크기 제한 (너무 많은 요청 방지)
+    const MAX_QUEUE_SIZE = 100;
+    if (priceCalculationQueueRef.current.length >= MAX_QUEUE_SIZE) {
+      console.warn(`[MobileListTab] 큐 크기 제한 도달 (${MAX_QUEUE_SIZE}), 요청 스킵:`, {
+        modelId,
+        planGroup,
+        openingType,
+        carrier
+      });
+      return;
+    }
+
+    // 중복 체크 (같은 요청이 이미 큐에 있으면 스킵)
+    const isDuplicate = priceCalculationQueueRef.current.some(item => {
+      const itemKey = `${item.modelId}-${item.planGroup}-${item.openingType}-${item.carrier}`;
+      return itemKey === cacheKey;
+    });
+
+    if (isDuplicate) {
+      // 중복이지만 큐가 처리 중이 아니면 추가 (처리 중이면 스킵)
+      if (isProcessingQueueRef.current) {
+        return;
+      }
     }
 
     // 큐에 추가
@@ -1257,7 +1311,12 @@ const MobileListTab = ({ onProductSelect }) => {
                         <Box sx={{ position: 'relative', display: 'inline-block' }}>
                           <Avatar
                             variant="rounded"
-                            src={row.image}
+                            src={row.image || undefined}
+                            onError={(e) => {
+                              // 이미지 로드 실패 시 src를 제거하여 기본 아이콘만 표시
+                              e.target.src = '';
+                              e.target.onerror = null; // 무한 루프 방지
+                            }}
                             sx={{ width: 60, height: 60, bgcolor: 'background.subtle' }}
                           >
                             <PhotoCameraIcon />

@@ -1857,15 +1857,30 @@ function setupDirectRoutes(app) {
         sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
           range: '직영점_모델이미지!A:G'
-        }).catch(() => ({ data: { values: [] } })),
+        }).catch((err) => {
+          console.error(`[Direct] ⚠️ 직영점_모델이미지 시트 읽기 실패:`, err.message);
+          return { data: { values: [] } };
+        }),
         sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
           range: '직영점_오늘의휴대폰!A:Z'
-        }).catch(() => ({ data: { values: [] } }))
+        }).catch((err) => {
+          console.error(`[Direct] ⚠️ 직영점_오늘의휴대폰 시트 읽기 실패:`, err.message);
+          return { data: { values: [] } };
+        })
       ]);
 
       const imageRows = (imageRes.data.values || []).slice(1);
       const imageMap = new Map();
+      
+      // 이미지 시트 읽기 결과 로깅
+      if (imageRows.length === 0) {
+        console.warn(`[Direct] ⚠️ 직영점_모델이미지 시트에 데이터가 없습니다. 통신사=${carrierParam}`);
+      } else {
+        console.log(`[Direct] ✅ 직영점_모델이미지 시트 읽기 성공: ${imageRows.length}개 행, 통신사=${carrierParam}`);
+      }
+      
+      let imageMapCount = 0; // 매핑된 이미지 수 추적
       imageRows.forEach(row => {
         // 통신사(A열, 인덱스 0), 모델ID(B열, 인덱스 1), 모델명(C열, 인덱스 2), 이미지URL(F열, 인덱스 5) 매핑
         const rowCarrier = (row[0] || '').trim();
@@ -1895,6 +1910,7 @@ function setupDirectRoutes(app) {
             const key = `${carrierParam}:${actualModelCode}`;
             imageMap.set(key, imageUrl);
             imageMap.set(actualModelCode, imageUrl);
+            imageMapCount++;
 
             // 정규화된 모델 코드로도 키 생성 (형식 차이 무시)
             const normalizedCode = normalizeModelCode(actualModelCode);
@@ -1908,6 +1924,9 @@ function setupDirectRoutes(app) {
           }
         }
       });
+      
+      // 이미지 맵 생성 결과 로깅
+      console.log(`[Direct] ✅ imageMap 생성 완료: 통신사=${carrierParam}, 매핑된 이미지 수=${imageMapCount}, imageMap 크기=${imageMap.size}`);
 
       // 8. 직영점_오늘의휴대폰 시트에서 구분(인기/추천/저렴/프리미엄/중저가) 태그 읽기
       let tagMap = new Map(); // { model: { isPopular, isRecommended, isCheap, isPremium, isBudget } }
@@ -2577,10 +2596,12 @@ function setupDirectRoutes(app) {
             // 1. 통신사+모델명 조합으로 먼저 조회 (가장 정확)
             const key = `${carrierParam}:${model}`;
             let imgUrl = imageMap.get(key);
+            let foundVia = imgUrl ? `key1:${key}` : null;
 
             // 2. 없으면 모델명만으로 조회 (하위 호환)
             if (!imgUrl) {
               imgUrl = imageMap.get(model);
+              if (imgUrl) foundVia = `key2:${model}`;
             }
 
             // 3. 정규화된 키로 조회 (형식 차이 무시)
@@ -2589,8 +2610,11 @@ function setupDirectRoutes(app) {
               if (normalizedModel) {
                 const normalizedKey = `${carrierParam}:${normalizedModel}`;
                 imgUrl = imageMap.get(normalizedKey);
-                if (!imgUrl) {
+                if (imgUrl) {
+                  foundVia = `key3:${normalizedKey}`;
+                } else {
                   imgUrl = imageMap.get(normalizedModel);
+                  if (imgUrl) foundVia = `key4:${normalizedModel}`;
                 }
               }
             }
@@ -2609,11 +2633,40 @@ function setupDirectRoutes(app) {
                   keyNormalized.includes(modelNormalized) ||
                   modelNormalized.includes(keyNormalized)) {
                   imgUrl = imageMap.get(mapKey);
-                  if (isDebugTarget(model)) {
-                    console.log(`[Direct] ✅ 유사 키로 이미지 찾음: 모델명=${model}, 맵키=${mapKey}`);
+                  if (imgUrl) {
+                    foundVia = `key5:${mapKey}`;
+                    if (isDebugTarget(model)) {
+                      console.log(`[Direct] ✅ 유사 키로 이미지 찾음: 모델명=${model}, 맵키=${mapKey}`);
+                    }
                   }
                   break;
                 }
+              }
+            }
+
+            // 이미지 찾기 결과 로깅
+            if (imgUrl) {
+              if (isDebugTarget(model) || i < 3) { // 처음 3개 모델 또는 디버그 타겟만 로깅
+                console.log(`[Direct] ✅ 이미지 찾음: 통신사=${carrierParam}, 모델명=${model}, 방법=${foundVia}, URL=${imgUrl.substring(0, 50)}...`);
+              }
+            } else {
+              // 이미지 URL이 없을 때 상세 로깅 (디버깅용)
+              if (imageMap.size > 0) {
+                console.log(`[Direct] ⚠️ 이미지를 찾을 수 없음: 통신사=${carrierParam}, 모델명=${model}, imageMap 크기=${imageMap.size}`);
+                // 검색한 키들 로깅
+                const normalizedModel = normalizeModelCode(model);
+                const searchedKeys = [
+                  `${carrierParam}:${model}`,
+                  model,
+                  normalizedModel ? `${carrierParam}:${normalizedModel}` : null,
+                  normalizedModel || null
+                ].filter(Boolean);
+                console.log(`[Direct] 검색한 키들:`, searchedKeys);
+                // 처음 10개 키만 로깅 (너무 많으면 방지)
+                const sampleKeys = Array.from(imageMap.keys()).slice(0, 10);
+                console.log(`[Direct] imageMap 샘플 키 (처음 10개):`, sampleKeys);
+              } else {
+                console.log(`[Direct] ⚠️ imageMap이 비어있음: 통신사=${carrierParam}, 모델명=${model}`);
               }
             }
 
