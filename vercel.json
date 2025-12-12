@@ -7,6 +7,7 @@
     "REACT_APP_API_URL": "https://vipmobile-backend.cloudtype.app",
     "REACT_APP_LOGGING_ENABLED": "true",
     "REACT_APP_PUSH_NOTIFICATIONS_ENABLED": "true",
+    "REACT_APP_DISABLE_PRICE_CACHE": "true",
     "GENERATE_SOURCEMAP": "false",
     "INLINE_RUNTIME_CHUNK": "false",
     "CI": "false",

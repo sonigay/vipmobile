@@ -9,6 +9,13 @@ const CACHE_VERSION = 'v7'; // v7: 잘못된 sessionStorage 값 강제 무효화
 const CACHE_KEY = `directStore_priceCache_${CACHE_VERSION}`;
 const CACHE_EXPIRY = 60 * 60 * 1000; // 1시간 (밀리초)
 
+// 🔥 개발 중 캐시 비활성화 플래그
+// 환경 변수로 제어: REACT_APP_DISABLE_PRICE_CACHE=true
+// 또는 localStorage에 'disablePriceCache' 키가 있으면 비활성화
+const DISABLE_CACHE = 
+  process.env.REACT_APP_DISABLE_PRICE_CACHE === 'true' ||
+  (typeof localStorage !== 'undefined' && localStorage.getItem('disablePriceCache') === 'true');
+
 /**
  * 캐시에서 가격 데이터 가져오기
  * @param {string} modelId - 모델 ID
@@ -18,6 +25,14 @@ const CACHE_EXPIRY = 60 * 60 * 1000; // 1시간 (밀리초)
  * @returns {object|null} 캐시된 가격 데이터 또는 null
  */
 export const getCachedPrice = (modelId, planGroup, openingType, carrier) => {
+  // 🔥 캐시 비활성화 플래그 확인
+  if (DISABLE_CACHE) {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[priceCache] 캐시 비활성화됨 - 항상 API 호출');
+    }
+    return null;
+  }
+
   try {
     const cacheData = sessionStorage.getItem(CACHE_KEY);
     if (!cacheData) return null;
@@ -47,6 +62,14 @@ export const getCachedPrice = (modelId, planGroup, openingType, carrier) => {
  * @param {object} priceData - 가격 데이터
  */
 export const setCachedPrice = (modelId, planGroup, openingType, carrier, priceData) => {
+  // 🔥 캐시 비활성화 플래그 확인
+  if (DISABLE_CACHE) {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[priceCache] 캐시 비활성화됨 - 저장하지 않음');
+    }
+    return;
+  }
+
   try {
     const cacheKey = `${modelId}-${planGroup}-${openingType}-${carrier}`;
     
@@ -86,6 +109,14 @@ export const setCachedPrice = (modelId, planGroup, openingType, carrier, priceDa
  * @param {Array} priceEntries - [{ modelId, planGroup, openingType, carrier, priceData }, ...]
  */
 export const setCachedPricesBatch = (priceEntries) => {
+  // 🔥 캐시 비활성화 플래그 확인
+  if (DISABLE_CACHE) {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[priceCache] 캐시 비활성화됨 - 배치 저장하지 않음');
+    }
+    return;
+  }
+
   try {
     let cacheData = sessionStorage.getItem(CACHE_KEY);
     let cache = {};
@@ -138,7 +169,7 @@ export const getCacheStats = () => {
   try {
     const cacheData = sessionStorage.getItem(CACHE_KEY);
     if (!cacheData) {
-      return { count: 0, age: 0, expired: false };
+      return { count: 0, age: 0, expired: false, disabled: DISABLE_CACHE };
     }
 
     const { cache, timestamp } = JSON.parse(cacheData);
@@ -149,10 +180,51 @@ export const getCacheStats = () => {
       count: Object.keys(cache || {}).length,
       age: Math.floor(age / 1000 / 60), // 분 단위
       expired,
+      disabled: DISABLE_CACHE,
       timestamp: new Date(timestamp).toLocaleString()
     };
   } catch (err) {
-    return { count: 0, age: 0, expired: true, error: err.message };
+    return { count: 0, age: 0, expired: true, disabled: DISABLE_CACHE, error: err.message };
   }
 };
+
+/**
+ * 캐시 비활성화/활성화 (런타임 제어)
+ * @param {boolean} disable - true면 비활성화, false면 활성화
+ */
+export const setCacheDisabled = (disable) => {
+  if (typeof localStorage !== 'undefined') {
+    if (disable) {
+      localStorage.setItem('disablePriceCache', 'true');
+      console.log('✅ [priceCache] 캐시가 비활성화되었습니다. 페이지를 새로고침하면 적용됩니다.');
+    } else {
+      localStorage.removeItem('disablePriceCache');
+      console.log('✅ [priceCache] 캐시가 활성화되었습니다. 페이지를 새로고침하면 적용됩니다.');
+    }
+  }
+};
+
+/**
+ * 캐시 비활성화 상태 확인
+ * @returns {boolean} 캐시가 비활성화되었는지 여부
+ */
+export const isCacheDisabled = () => {
+  return DISABLE_CACHE;
+};
+
+// 개발 환경에서 전역 함수로 노출 (브라우저 콘솔에서 사용 가능)
+if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
+  window.priceCache = {
+    disable: () => setCacheDisabled(true),
+    enable: () => setCacheDisabled(false),
+    stats: () => {
+      const stats = getCacheStats();
+      console.table(stats);
+      return stats;
+    },
+    clear: clearPriceCache,
+    isDisabled: isCacheDisabled
+  };
+  console.log('💡 [priceCache] 개발 모드: 브라우저 콘솔에서 window.priceCache.disable() 또는 window.priceCache.enable() 사용 가능');
+}
 
