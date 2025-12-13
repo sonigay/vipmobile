@@ -4576,14 +4576,32 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
     // 🔥 개선: manufacturer가 빈 문자열이면 기본값 사용 (하이픈 두 개 연속 방지)
     const safeManufacturer = manufacturer && manufacturer.trim() ? manufacturer.trim() : '기타';
     
-    // 🔥 개선: 파일명에 하이픈이 포함된 경우를 대비하여 하이픈을 언더스코어로 치환
-    // 또는 연속된 하이픈을 하나로 통합
-    const safeCarrier = (carrier || '').trim().replace(/-+/g, '-').replace(/^-|-$/g, '') || 'SK';
-    const safeModelId = (modelId || '').trim().replace(/-+/g, '-').replace(/^-|-$/g, '') || 'unknown';
-    const safeManufacturerFinal = safeManufacturer.replace(/-+/g, '-').replace(/^-|-$/g, '') || '기타';
+    // 🔥 개선: 각 부분을 정규화하여 이중 하이픈 방지
+    const normalizePart = (str) => {
+      if (!str) return '';
+      return str.trim()
+        .replace(/-+/g, '-')  // 연속된 하이픈을 단일 하이픈로
+        .replace(/^-|-$/g, '')  // 앞뒤 하이픈 제거
+        .replace(/\s+/g, '-');  // 공백을 하이픈으로 변환
+    };
     
-    // 파일명 생성: 연속된 하이픈 방지
-    const filename = `direct-store-${safeCarrier}-${safeManufacturerFinal}-${safeModelId}-${Date.now()}.${file.originalname.split('.').pop()}`.replace(/-+/g, '-');
+    const safeCarrier = normalizePart(carrier) || 'SK';
+    const safeModelId = normalizePart(modelId) || 'unknown';
+    const safeManufacturerFinal = normalizePart(safeManufacturer) || '기타';
+    
+    // 파일명 생성: 각 부분을 조합하고 최종적으로 이중 하이픈 제거
+    const fileExtension = file.originalname.split('.').pop() || 'jpg';
+    const filenameParts = [
+      'direct-store',
+      safeCarrier,
+      safeManufacturerFinal,
+      safeModelId,
+      String(Date.now()),
+      fileExtension
+    ].filter(Boolean); // 빈 문자열 제거
+    
+    // 각 부분을 하이픈으로 연결하고 최종적으로 이중 하이픈 제거
+    let filename = filenameParts.join('-').replace(/-+/g, '-');
     
     // 🔥 디버그: 파일명 생성 확인
     console.log(`📤 [이미지 업로드] 파일명 생성: ${filename} (manufacturer=${manufacturer}, safeManufacturer=${safeManufacturerFinal}, carrier=${carrier}->${safeCarrier}, modelId=${modelId}->${safeModelId})`);
@@ -4599,6 +4617,21 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
       }
 
       imageUrl = message.attachments.first().url;
+      // 🔥 개선: Discord URL에서 이중 하이픈 정규화
+      try {
+        const urlObj = new URL(imageUrl);
+        const pathParts = urlObj.pathname.split('/');
+        const filename = pathParts[pathParts.length - 1];
+        if (filename.includes('--')) {
+          const normalizedFilename = filename.replace(/--+/g, '-');
+          pathParts[pathParts.length - 1] = normalizedFilename;
+          urlObj.pathname = pathParts.join('/');
+          imageUrl = urlObj.toString();
+        }
+      } catch (urlError) {
+        // URL 파싱 실패 시 문자열 치환으로 처리
+        imageUrl = imageUrl.replace(/--+/g, '-');
+      }
       discordUploadSuccess = true;
       console.log(`✅ [이미지 업로드] Discord 업로드 성공: ${imageUrl} (포스트: ${carrierPost.name}, 스레드: ${targetThread.name})`);
     } catch (discordError) {

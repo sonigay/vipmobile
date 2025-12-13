@@ -1941,12 +1941,35 @@ function setupDirectRoutes(app) {
       }
       
       let imageMapCount = 0; // 매핑된 이미지 수 추적
+      // 이미지 URL 정규화 함수: 이중 하이픈을 단일 하이픈로 변환
+      const normalizeImageUrl = (url) => {
+        if (!url) return url;
+        try {
+          const urlObj = new URL(url);
+          const pathParts = urlObj.pathname.split('/');
+          const filename = pathParts[pathParts.length - 1];
+          if (filename.includes('--')) {
+            const normalizedFilename = filename.replace(/--+/g, '-');
+            pathParts[pathParts.length - 1] = normalizedFilename;
+            urlObj.pathname = pathParts.join('/');
+            return urlObj.toString();
+          }
+          return url;
+        } catch (err) {
+          // URL 파싱 실패 시 문자열 치환으로 처리
+          return url.replace(/--+/g, '-');
+        }
+      };
+      
       imageRows.forEach(row => {
         // 통신사(A열, 인덱스 0), 모델ID(B열, 인덱스 1), 모델명(C열, 인덱스 2), 이미지URL(F열, 인덱스 5) 매핑
         const rowCarrier = (row[0] || '').trim();
         const modelId = (row[1] || '').trim(); // 모델ID (실제 모델 코드)
         const modelName = (row[2] || '').trim(); // 모델명 (모델ID와 동일)
-        const imageUrl = (row[5] || '').trim();
+        let imageUrl = (row[5] || '').trim();
+        
+        // 이미지 URL 정규화: 이중 하이픈 제거
+        imageUrl = normalizeImageUrl(imageUrl);
 
         // 이미지 URL이 없으면 건너뛰기
         if (!imageUrl) {
