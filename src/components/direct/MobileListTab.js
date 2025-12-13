@@ -43,6 +43,8 @@ const MobileListTab = ({ onProductSelect }) => {
   const [mobileList, setMobileList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  // 초기화 완료 여부 (초기 로드 시 가격 계산 완료까지 로딩 표시)
+  const [isInitializing, setIsInitializing] = useState(false);
   // 로딩 단계 상태 (UI 없이 상태만 추적)
   const [steps, setSteps] = useState({
     fetch: { label: '목록 로드', status: 'idle', message: '' },
@@ -59,6 +61,7 @@ const MobileListTab = ({ onProductSelect }) => {
   const priceCalculationQueueRef = useRef([]); // 가격 계산 요청 큐
   const isProcessingQueueRef = useRef(false); // 큐 처리 중 여부
   const queueProcessingCountRef = useRef(0); // 큐 처리 재시도 횟수 (무한루프 방지)
+  const isInitializingRef = useRef(false); // 초기화 중 여부 (ref로 추적)
 
   // 개통 유형 목록 (고정)
   const openingTypes = ['010신규', 'MNP', '기변'];
@@ -67,7 +70,9 @@ const MobileListTab = ({ onProductSelect }) => {
     setCarrierTab(newValue);
     // 통신사 변경 시 초기화 상태 리셋
     initializedRef.current = false;
+    isInitializingRef.current = false;
     userSelectedOpeningTypesRef.current.clear();
+    setIsInitializing(false); // 초기화 상태도 리셋
   };
 
   const getCurrentCarrier = () => {
@@ -125,7 +130,14 @@ const MobileListTab = ({ onProductSelect }) => {
 
   // 초기 로딩 시 구분 태그에 따라 요금제군/유형 기본값 설정
   useEffect(() => {
-    if (mobileList.length === 0 || planGroups.length === 0) return;
+    if (mobileList.length === 0 || planGroups.length === 0) {
+      // 데이터가 없으면 초기화 상태 해제
+      if (isInitializingRef.current) {
+        isInitializingRef.current = false;
+        setIsInitializing(false);
+      }
+      return;
+    }
 
     const setDefaultValues = async () => {
       // 이미 초기화되었고, 사용자가 수동으로 선택한 값이 있으면 건너뛰기
@@ -141,6 +153,12 @@ const MobileListTab = ({ onProductSelect }) => {
         if (hasExistingValues) {
           return;
         }
+      }
+
+      // 초기 로드 시에만 초기화 상태 활성화
+      if (!initializedRef.current) {
+        isInitializingRef.current = true;
+        setIsInitializing(true);
       }
 
       setSteps(prev => ({
@@ -401,22 +419,71 @@ const MobileListTab = ({ onProductSelect }) => {
           pricing: { ...prev.pricing, status: 'loading', message: '가격 계산 중...' }
         }));
 
-        // 큐 처리 완료를 대략적으로 추정 (모든 요청이 큐에 추가된 후 약간의 시간 후 완료로 표시)
-        setTimeout(() => {
-          setSteps(prev => ({
-            ...prev,
-            pricing: { ...prev.pricing, status: 'success', message: '' }
-          }));
-        }, Math.max(1000, calculationQueue.length * 200)); // 최소 1초, 요청 수에 비례
+        // 초기 로드 시 큐 처리 완료를 대기하여 초기화 상태 해제
+        if (!initializedRef.current) {
+          // 큐 처리 완료를 확인하는 함수
+          let checkCount = 0;
+          const MAX_CHECK_COUNT = 120; // 최대 60초 대기 (0.5초 * 120)
+          const checkQueueCompletion = () => {
+            checkCount++;
+            
+            // 최대 확인 횟수 초과 시 강제로 초기화 완료
+            if (checkCount > MAX_CHECK_COUNT) {
+              console.warn('초기화 대기 시간 초과, 강제로 초기화 완료');
+              setSteps(prev => ({
+                ...prev,
+                pricing: { ...prev.pricing, status: 'success', message: '' }
+              }));
+              initializedRef.current = true;
+              isInitializingRef.current = false;
+              setIsInitializing(false);
+              return;
+            }
+            
+            // 큐가 비어있고 처리 중이 아니면 완료
+            if (priceCalculationQueueRef.current.length === 0 && !isProcessingQueueRef.current) {
+              // 약간의 지연 후 다시 확인 (마지막 요청이 완료될 시간 확보)
+              setTimeout(() => {
+                if (priceCalculationQueueRef.current.length === 0 && !isProcessingQueueRef.current) {
+                  setSteps(prev => ({
+                    ...prev,
+                    pricing: { ...prev.pricing, status: 'success', message: '' }
+                  }));
+                  initializedRef.current = true;
+                  isInitializingRef.current = false;
+                  setIsInitializing(false);
+                } else {
+                  // 아직 처리 중이면 다시 확인
+                  checkQueueCompletion();
+                }
+              }, 500);
+            } else {
+              // 아직 처리 중이면 다시 확인
+              setTimeout(checkQueueCompletion, 500);
+            }
+          };
+          
+          // 첫 확인 시작
+          setTimeout(checkQueueCompletion, 1000);
+        } else {
+          // 초기화 후에는 기존 로직 사용
+          setTimeout(() => {
+            setSteps(prev => ({
+              ...prev,
+              pricing: { ...prev.pricing, status: 'success', message: '' }
+            }));
+          }, Math.max(1000, calculationQueue.length * 200));
+        }
       } else {
         setSteps(prev => ({
           ...prev,
           pricing: { ...prev.pricing, status: 'success', message: '' }
         }));
+        // 계산할 항목이 없으면 즉시 초기화 완료
+        initializedRef.current = true;
+        isInitializingRef.current = false;
+        setIsInitializing(false);
       }
-
-      // 초기화 완료 표시
-      initializedRef.current = true;
     };
 
     setDefaultValues();
@@ -867,6 +934,22 @@ const MobileListTab = ({ onProductSelect }) => {
       } else {
         // 큐가 비어있으면 재시도 횟수 리셋
         queueProcessingCountRef.current = 0;
+        
+        // 초기화 중이고 큐가 비어있으면 초기화 완료
+        if (isInitializingRef.current && priceCalculationQueueRef.current.length === 0) {
+          // 약간의 지연 후 확인 (마지막 요청 완료 대기)
+          setTimeout(() => {
+            if (priceCalculationQueueRef.current.length === 0 && !isProcessingQueueRef.current) {
+              isInitializingRef.current = false;
+              setIsInitializing(false);
+              initializedRef.current = true;
+              setSteps(prev => ({
+                ...prev,
+                pricing: { ...prev.pricing, status: 'success', message: '' }
+              }));
+            }
+          }, 500);
+        }
       }
     }
   };
@@ -1330,9 +1413,12 @@ const MobileListTab = ({ onProductSelect }) => {
       )}
 
       {/* 로딩 인디케이터 */}
-      {loading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', p: 5 }}>
+      {loading || isInitializing ? (
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: 5, gap: 2 }}>
           <CircularProgress />
+          <Typography variant="body2" color="text.secondary">
+            {isInitializing ? '가격 정보를 계산하는 중...' : '데이터를 불러오는 중...'}
+          </Typography>
         </Box>
       ) : (
         /* 상품 테이블 */
