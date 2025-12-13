@@ -454,7 +454,11 @@ const MobileListTab = ({ onProductSelect }) => {
 
       // 서버에서 최신 데이터를 다시 가져와서 UI에 반영
       // 구글시트에 저장된 최신 이미지 URL을 포함한 전체 데이터를 가져옴
+      // Google Sheets 저장 완료를 기다리기 위해 지연 시간 추가
       try {
+        console.log('🔄 [이미지 업로드] Google Sheets 저장 완료 대기 중... (2초)');
+        await new Promise(resolve => setTimeout(resolve, 2000)); // 2초 대기
+        
         console.log('🔄 [이미지 업로드] 서버에서 최신 데이터 재로딩 중...');
         const freshData = await directStoreApi.getMobileList(carrier);
         setMobileList(freshData || []);
@@ -1311,11 +1315,23 @@ const MobileListTab = ({ onProductSelect }) => {
                         <Box sx={{ position: 'relative', display: 'inline-block' }}>
                           <Avatar
                             variant="rounded"
-                            src={row.image || undefined}
+                            src={row.image ? `${row.image}${row.image.includes('?') ? '&' : '?'}_t=${Date.now()}` : undefined}
                             onError={(e) => {
-                              // 이미지 로드 실패 시 src를 제거하여 기본 아이콘만 표시
-                              e.target.src = '';
-                              e.target.onerror = null; // 무한 루프 방지
+                              const originalSrc = e.target.src.split('?')[0]; // 쿼리 파라미터 제거
+                              const retryCount = parseInt(e.target.dataset.retryCount || '0');
+                              
+                              // 최대 2회 재시도 (총 3회 시도)
+                              if (retryCount < 2 && originalSrc) {
+                                e.target.dataset.retryCount = String(retryCount + 1);
+                                // 캐시 버스팅을 위해 타임스탬프 추가하여 재시도
+                                setTimeout(() => {
+                                  e.target.src = `${originalSrc}${originalSrc.includes('?') ? '&' : '?'}_t=${Date.now()}&retry=${retryCount + 1}`;
+                                }, 1000 * (retryCount + 1)); // 1초, 2초 지연 후 재시도
+                              } else {
+                                // 재시도 실패 시 src를 제거하여 기본 아이콘만 표시
+                                e.target.src = '';
+                                e.target.onerror = null; // 무한 루프 방지
+                              }
                             }}
                             sx={{ width: 60, height: 60, bgcolor: 'background.subtle' }}
                           >
