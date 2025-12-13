@@ -58,6 +58,7 @@ const MobileListTab = ({ onProductSelect }) => {
   const userSelectedOpeningTypesRef = useRef(new Set()); // 사용자가 수동으로 선택한 개통유형 추적
   const priceCalculationQueueRef = useRef([]); // 가격 계산 요청 큐
   const isProcessingQueueRef = useRef(false); // 큐 처리 중 여부
+  const queueProcessingCountRef = useRef(0); // 큐 처리 재시도 횟수 (무한루프 방지)
 
   // 개통 유형 목록 (고정)
   const openingTypes = ['010신규', 'MNP', '기변'];
@@ -642,7 +643,19 @@ const MobileListTab = ({ onProductSelect }) => {
       return;
     }
 
+    // 무한루프 방지: 최대 재시도 횟수 제한 (100회)
+    const MAX_QUEUE_PROCESSING_ATTEMPTS = 100;
+    if (queueProcessingCountRef.current >= MAX_QUEUE_PROCESSING_ATTEMPTS) {
+      console.warn('큐 처리 최대 재시도 횟수 초과, 처리 중단:', {
+        count: queueProcessingCountRef.current,
+        queueSize: priceCalculationQueueRef.current.length
+      });
+      queueProcessingCountRef.current = 0; // 리셋
+      return;
+    }
+
     isProcessingQueueRef.current = true;
+    queueProcessingCountRef.current++;
 
     try {
       // 큐에서 중복 제거 (같은 cacheKey는 하나만 유지)
@@ -752,6 +765,9 @@ const MobileListTab = ({ onProductSelect }) => {
       if (priceCalculationQueueRef.current.length > 0) {
         // 다음 이벤트 루프에서 처리 (지연 시간 증가 - ERR_INSUFFICIENT_RESOURCES 에러 방지)
         setTimeout(() => processPriceCalculationQueue(), 500); // 200ms -> 500ms로 증가
+      } else {
+        // 큐가 비어있으면 재시도 횟수 리셋
+        queueProcessingCountRef.current = 0;
       }
     }
   };
