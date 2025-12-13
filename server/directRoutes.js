@@ -1589,13 +1589,14 @@ function setupDirectRoutes(app) {
                 const supportValueStr = (supportValues[j]?.[0] || 0).toString().replace(/,/g, '');
                 const supportValue = Number(supportValueStr) || 0;
 
-                // 🔥 디버그: 특정 모델의 모든 행 데이터 확인
-                if ((model === 'SM-S928N256' || model === 'UIP17PR-256') && planGroup === '115군') {
-                  console.log(`🔥 [${model} 디버그] 행 ${j + 9}: 개통유형="${openingTypeRaw}", H열값=${supportValues[j]?.[0]}, 파싱값=${supportValue}`);
-                }
-
                 const normalizedModel = normalizeModelCode(model);
                 const openingTypes = parseOpeningTypes(openingTypeRaw);
+
+                // 🔥 디버그: 특정 모델의 모든 행 데이터 확인 (openingTypes 파싱 후)
+                // 시트에서 실제로 읽은 원본 데이터 확인 (데이터 밀림 확인용)
+                if ((model === 'SM-S928N256' || model === 'UIP17PR-256') && planGroup === '115군') {
+                  console.log(`🔥 [${model} 원본데이터] 행 ${j + 9}: 모델="${model}", 개통유형원본="${openingTypeRaw}", 지원금원본=${supportValues[j]?.[0]}, 파싱된유형=[${openingTypes.join(',')}], 파싱값=${supportValue}`);
+                }
 
                 // 하이픈 변형 생성 (조회 시와 동일한 로직)
                 const hyphenVariants = generateHyphenVariants(model);
@@ -1613,6 +1614,16 @@ function setupDirectRoutes(app) {
                     // 2. 🔥 전유형 행은 기존 값이 있으면 절대 덮어쓰지 않음 (개별 유형 우선)
                     if (isAllType && supportMap[key] !== undefined) {
                       return; // 기존 값 유지 (번호이동/010신규 등 개별 유형이 우선)
+                    }
+                    // 3. 🔥 개별 유형 행이 "010신규/기변" 키를 덮어쓰지 않도록 방지
+                    // "010신규/기변" 키는 명시적 "010신규/기변" 행에서만 설정되어야 함
+                    if (key.includes('|010신규/기변') && !isAllType && 
+                        openingTypeRaw !== '010신규/기변' && 
+                        !(openingTypes.includes('010신규') && openingTypes.includes('기변'))) {
+                      // 개별 유형(010신규 또는 기변)이 "010신규/기변" 키를 덮어쓰려고 할 때
+                      if (supportMap[key] !== undefined) {
+                        return; // 기존 값 유지 (명시적 "010신규/기변" 행이 우선)
+                      }
                     }
                     supportMap[key] = value;
                   };
@@ -1666,12 +1677,20 @@ function setupDirectRoutes(app) {
                   }
 
                   // (D) 개별 유형이 "010신규" 또는 "기변"인 경우 "010신규/기변"에도 매핑
-                  if (openingTypes.includes('010신규') && !openingTypes.includes('기변')) {
-                    addKeys('010신규/기변');
-                  }
-                  if (openingTypes.includes('기변') && !openingTypes.includes('010신규')) {
-                    addKeys('010신규/기변');
-                  }
+                  // 🔥 수정: 개별 유형 행은 자신의 키에만 값을 설정하고, "010신규/기변" 키는 설정하지 않음
+                  // "010신규/기변" 키는 명시적 "010신규/기변" 행에서만 설정되어야 함
+                  // (이전 로직이 개별 유형 행이 "010신규/기변" 키를 덮어써서 값이 섞이는 문제 발생)
+                  // 주석 처리: 개별 유형 행이 "010신규/기변" 키를 설정하지 않도록 함
+                  // if (openingTypes.includes('010신규') && !openingTypes.includes('기변')) {
+                  //   if (supportMap[`${model}|010신규/기변`] === undefined) {
+                  //     addKeys('010신규/기변');
+                  //   }
+                  // }
+                  // if (openingTypes.includes('기변') && !openingTypes.includes('010신규')) {
+                  //   if (supportMap[`${model}|010신규/기변`] === undefined) {
+                  //     addKeys('010신규/기변');
+                  //   }
+                  // }
                 }
               }
 
@@ -3429,6 +3448,21 @@ function setupDirectRoutes(app) {
                 const supportValueStr = (supportValues[j]?.[0] || 0).toString().replace(/,/g, '');
                 const supportValue = Number(supportValueStr) || 0;
 
+                // 🔥 디버그: SM-S928N256의 경우 상세 로그
+                if (model === 'SM-S928N256' && pg === '115군') {
+                  console.log(`🔥 [SM-S928N256 calculate 디버그] 행 ${j}: 개통유형="${openingTypeRaw}", 지원금=${supportValue}`);
+                  if (j > 0 && j < maxRows - 1) {
+                    const prevModel = (supportModelData[j-1]?.[0] || '').toString().trim();
+                    const prevOpeningType = (supportOpeningTypeData[j-1]?.[0] || '').toString().trim();
+                    const prevValue = (supportValues[j-1]?.[0] || 0).toString();
+                    const nextModel = (supportModelData[j+1]?.[0] || '').toString().trim();
+                    const nextOpeningType = (supportOpeningTypeData[j+1]?.[0] || '').toString().trim();
+                    const nextValue = (supportValues[j+1]?.[0] || 0).toString();
+                    console.log(`🔥 [SM-S928N256 calculate 디버그] 이전 행: 모델="${prevModel}", 유형="${prevOpeningType}", 값=${prevValue}`);
+                    console.log(`🔥 [SM-S928N256 calculate 디버그] 다음 행: 모델="${nextModel}", 유형="${nextOpeningType}", 값=${nextValue}`);
+                  }
+                }
+
                 const normalizedModel = normalizeModelCode(model);
                 const openingTypes = parseOpeningTypes(openingTypeRaw);
                 const hyphenVariants = generateHyphenVariants(model);
@@ -3438,6 +3472,12 @@ function setupDirectRoutes(app) {
                   const setIfBetter = (key, value) => {
                     if (value === 0 && supportMap[key] && supportMap[key] > 0) return;
                     if (isAllType && supportMap[key] !== undefined) return;
+                    // 🔥 개별 유형 행이 "010신규/기변" 키를 덮어쓰지 않도록 방지
+                    if (key.includes('|010신규/기변') && !isAllType && 
+                        openingTypeRaw !== '010신규/기변' && 
+                        !(openingTypes.includes('010신규') && openingTypes.includes('기변'))) {
+                      if (supportMap[key] !== undefined) return;
+                    }
                     supportMap[key] = value;
                   };
                   
@@ -3474,12 +3514,20 @@ function setupDirectRoutes(app) {
                     ['010신규', '기변', '010신규/기변'].forEach(ot => addKeys(ot));
                   }
                   
-                  if (openingTypes.includes('010신규') && !openingTypes.includes('기변')) {
-                    addKeys('010신규/기변');
-                  }
-                  if (openingTypes.includes('기변') && !openingTypes.includes('010신규')) {
-                    addKeys('010신규/기변');
-                  }
+                  // 개별 유형이 "010신규" 또는 "기변"인 경우 "010신규/기변"에도 매핑
+                  // 🔥 수정: 개별 유형 행은 자신의 키에만 값을 설정하고, "010신규/기변" 키는 설정하지 않음
+                  // "010신규/기변" 키는 명시적 "010신규/기변" 행에서만 설정되어야 함
+                  // 주석 처리: 개별 유형 행이 "010신규/기변" 키를 설정하지 않도록 함
+                  // if (openingTypes.includes('010신규') && !openingTypes.includes('기변')) {
+                  //   if (supportMap[`${model}|010신규/기변`] === undefined) {
+                  //     addKeys('010신규/기변');
+                  //   }
+                  // }
+                  // if (openingTypes.includes('기변') && !openingTypes.includes('010신규')) {
+                  //   if (supportMap[`${model}|010신규/기변`] === undefined) {
+                  //     addKeys('010신규/기변');
+                  //   }
+                  // }
                 }
               }
 
@@ -3694,17 +3742,38 @@ function setupDirectRoutes(app) {
 
           // 키를 순서대로 시도하여 값 찾기
           let foundKey = null;
+          let foundValue = null;
           for (const key of supportKeys) {
             if (planGroupSupportData[planGroup][key] !== undefined) {
-              publicSupport = Number(planGroupSupportData[planGroup][key]) || 0;
+              foundValue = Number(planGroupSupportData[planGroup][key]) || 0;
               foundKey = key;
               break;
             }
           }
 
+          // 🔥 디버그: SM-S928N256의 경우 모든 가능한 키와 값 확인
+          if (primaryModel === 'SM-S928N256' || policyModel === 'SM-S928N256') {
+            const allPossibleKeys = [
+              `${primaryModel}|010신규`,
+              `${primaryModel}|MNP`,
+              `${primaryModel}|기변`,
+              `${primaryModel}|번호이동`,
+              `${primaryModel}|010신규/기변`
+            ];
+            const availableValues = {};
+            allPossibleKeys.forEach(key => {
+              if (planGroupSupportData[planGroup][key] !== undefined) {
+                availableValues[key] = planGroupSupportData[planGroup][key];
+              }
+            });
+            console.log(`🔥 [SM-S928N256 디버그] 사용 가능한 모든 키와 값:`, availableValues);
+            console.log(`🔥 [SM-S928N256 디버그] 요청 openingType: ${openingType}, 찾은 키: ${foundKey}, 찾은 값: ${foundValue}`);
+          }
+
           if (foundKey) {
+            publicSupport = foundValue;
             // 🔥 디버그: 키 매칭 성공 로그 (SM-S928N256 또는 UIP17PR-256)
-            if (modelId === 'mobile-LG-16' || modelId === 'mobile-LG-23' || modelId?.includes('UIP17PR') || policyModel?.includes('UIP17PR') || primaryModel?.includes('UIP17PR')) {
+            if (modelId === 'mobile-LG-16' || modelId === 'mobile-LG-23' || modelId?.includes('UIP17PR') || policyModel?.includes('UIP17PR') || primaryModel?.includes('UIP17PR') || primaryModel === 'SM-S928N256' || policyModel === 'SM-S928N256') {
               console.log(`✅ [Direct] /calculate 키 매칭 성공:`, {
                 modelId,
                 queryModelName: req.query.modelName,
@@ -3820,12 +3889,18 @@ function setupDirectRoutes(app) {
                         }
                         
                         // 개별 유형이 "010신규" 또는 "기변"인 경우 "010신규/기변"에도 매핑
-                        if (openingTypesFB.includes('010신규') && !openingTypesFB.includes('기변')) {
-                          addKeys('010신규/기변');
-                        }
-                        if (openingTypesFB.includes('기변') && !openingTypesFB.includes('010신규')) {
-                          addKeys('010신규/기변');
-                        }
+                        // 🔥 수정: 개별 유형 행은 자신의 키에만 값을 설정하고, "010신규/기변" 키는 설정하지 않음
+                        // 주석 처리: 개별 유형 행이 "010신규/기변" 키를 설정하지 않도록 함
+                        // if (openingTypesFB.includes('010신규') && !openingTypesFB.includes('기변')) {
+                        //   if (supportMapFB[`${modelFB}|010신규/기변`] === undefined) {
+                        //     addKeys('010신규/기변');
+                        //   }
+                        // }
+                        // if (openingTypesFB.includes('기변') && !openingTypesFB.includes('010신규')) {
+                        //   if (supportMapFB[`${modelFB}|010신규/기변`] === undefined) {
+                        //     addKeys('010신규/기변');
+                        //   }
+                        // }
                       }
                     }
                     const fbKeys = supportKeys;
@@ -3987,6 +4062,12 @@ function setupDirectRoutes(app) {
                     if (isAllType && supportMap[key] !== undefined) {
                       return;
                     }
+                    // 3. 🔥 개별 유형 행이 "010신규/기변" 키를 덮어쓰지 않도록 방지
+                    if (key.includes('|010신규/기변') && !isAllType && 
+                        openingTypeRaw !== '010신규/기변' && 
+                        !(openingTypes.includes('010신규') && openingTypes.includes('기변'))) {
+                      if (supportMap[key] !== undefined) return;
+                    }
                     supportMap[key] = value;
                   };
 
@@ -4031,12 +4112,19 @@ function setupDirectRoutes(app) {
                   }
 
                   // 개별 유형이 "010신규" 또는 "기변"인 경우 "010신규/기변"에도 매핑
-                  if (openingTypes.includes('010신규') && !openingTypes.includes('기변')) {
-                    addKeys('010신규/기변');
-                  }
-                  if (openingTypes.includes('기변') && !openingTypes.includes('010신규')) {
-                    addKeys('010신규/기변');
-                  }
+                  // 🔥 수정: 개별 유형 행은 자신의 키에만 값을 설정하고, "010신규/기변" 키는 설정하지 않음
+                  // "010신규/기변" 키는 명시적 "010신규/기변" 행에서만 설정되어야 함
+                  // 주석 처리: 개별 유형 행이 "010신규/기변" 키를 설정하지 않도록 함
+                  // if (openingTypes.includes('010신규') && !openingTypes.includes('기변')) {
+                  //   if (supportMap[`${model}|010신규/기변`] === undefined) {
+                  //     addKeys('010신규/기변');
+                  //   }
+                  // }
+                  // if (openingTypes.includes('기변') && !openingTypes.includes('010신규')) {
+                  //   if (supportMap[`${model}|010신규/기변`] === undefined) {
+                  //     addKeys('010신규/기변');
+                  //   }
+                  // }
                 }
               }
 
