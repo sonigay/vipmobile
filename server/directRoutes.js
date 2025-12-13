@@ -87,25 +87,45 @@ async function withRetry(fn, maxRetries = 5, baseDelay = 2000) {
       const now = Date.now();
       const timeSinceLastCall = now - lastApiCallTime;
       if (timeSinceLastCall < MIN_API_INTERVAL_MS) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'directRoutes.js:90',message:'Rate limiting 대기',data:{waitTime:MIN_API_INTERVAL_MS-timeSinceLastCall,timeSinceLastCall},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3'})}).catch(()=>{});
+        // #endregion
         await new Promise(resolve => setTimeout(resolve, MIN_API_INTERVAL_MS - timeSinceLastCall));
       }
       lastApiCallTime = Date.now();
 
       return await fn();
     } catch (error) {
-      // Rate limit 에러인 경우에만 재시도
-      const isRateLimitError = error.code === 429 || 
+      // Rate limit 에러 감지 개선 (더 많은 케이스 처리)
+      const isRateLimitError = 
+        error.code === 429 || 
         (error.response && error.response.status === 429) ||
-        (error.message && error.message.includes('Quota exceeded'));
+        (error.response && error.response.data && error.response.data.error && 
+         (error.response.data.error.status === 'RESOURCE_EXHAUSTED' || 
+          error.response.data.error.message && error.response.data.error.message.includes('Quota exceeded'))) ||
+        (error.message && (
+          error.message.includes('Quota exceeded') ||
+          error.message.includes('RESOURCE_EXHAUSTED') ||
+          error.message.includes('429') ||
+          error.message.includes('rateLimitExceeded')
+        ));
         
       if (isRateLimitError && attempt < maxRetries - 1) {
         // Exponential backoff with jitter (랜덤 지연 추가로 동시 요청 분산)
         const jitter = Math.random() * 1000; // 0~1초 랜덤
         const delay = baseDelay * Math.pow(2, attempt) + jitter;
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'directRoutes.js:105',message:'Rate limit 에러 재시도',data:{attempt:attempt+1,maxRetries,delay:Math.round(delay),errorCode:error.code,errorStatus:error.response?.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+        // #endregion
         console.warn(`[Direct] Rate limit 에러 발생, ${Math.round(delay)}ms 후 재시도 (${attempt + 1}/${maxRetries})`);
         await new Promise(resolve => setTimeout(resolve, delay));
         continue;
       }
+      // #region agent log
+      if (isRateLimitError) {
+        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'directRoutes.js:109',message:'Rate limit 에러 최종 실패',data:{attempt:attempt+1,maxRetries,errorCode:error.code,errorStatus:error.response?.status,errorMessage:error.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+      }
+      // #endregion
       throw error;
     }
   }
@@ -1065,6 +1085,9 @@ function setupDirectRoutes(app) {
 
   // mobiles 데이터를 가져오는 공통 함수
   async function getMobileList(carrier, options = {}) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'directRoutes.js:1087',message:'getMobileList 호출 시작',data:{carrier,options},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
+    // #endregion
     try {
       const carrierParam = carrier || 'SK';
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
@@ -1129,18 +1152,30 @@ function setupDirectRoutes(app) {
       }
 
       // 2. 정책표 시트에서 모델명, 펫네임 읽기 (기준 데이터)
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'directRoutes.js:1132',message:'정책표 모델명/펫네임 읽기 시작',data:{carrier:carrierParam,modelRange,petNameRange},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+      // #endregion
       const [modelData, petNameData] = await Promise.all([
-        modelRange ? sheets.spreadsheets.values.get({
-          spreadsheetId: policySheetId,
-          range: modelRange,
-          majorDimension: 'ROWS',
-          valueRenderOption: 'UNFORMATTED_VALUE'
-        }).then(r => r.data.values || []).catch(() => []) : Promise.resolve([]),
-        petNameRange ? sheets.spreadsheets.values.get({
-          spreadsheetId: policySheetId,
-          range: petNameRange,
-          majorDimension: 'ROWS',
-          valueRenderOption: 'UNFORMATTED_VALUE'
+        modelRange ? withRetry(async () => {
+          return await sheets.spreadsheets.values.get({
+            spreadsheetId: policySheetId,
+            range: modelRange,
+            majorDimension: 'ROWS',
+            valueRenderOption: 'UNFORMATTED_VALUE'
+          });
+        }).then(r => r.data.values || []).catch((err) => {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'directRoutes.js:1138',message:'정책표 모델명 읽기 실패',data:{error:err.message,code:err.code},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+          // #endregion
+          return [];
+        }) : Promise.resolve([]),
+        petNameRange ? withRetry(async () => {
+          return await sheets.spreadsheets.values.get({
+            spreadsheetId: policySheetId,
+            range: petNameRange,
+            majorDimension: 'ROWS',
+            valueRenderOption: 'UNFORMATTED_VALUE'
+          });
         }).then(r => r.data.values || []).catch(() => []) : Promise.resolve([])
       ]);
 
@@ -1157,24 +1192,33 @@ function setupDirectRoutes(app) {
       if (supportModelRange && factoryPriceRange && openingTypeRange) {
         try {
           // 이통사 지원금 시트에서 모델명, 출고가, 개통유형 읽기
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'directRoutes.js:1159',message:'이통사 지원금 시트 읽기 시작',data:{carrier:carrierParam},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H4'})}).catch(()=>{});
+          // #endregion
           [supportModelData, supportFactoryPriceData, supportOpeningTypeData] = await Promise.all([
-            sheets.spreadsheets.values.get({
-              spreadsheetId: supportSheetId,
-              range: supportModelRange,
-              majorDimension: 'ROWS',
-              valueRenderOption: 'UNFORMATTED_VALUE'
+            withRetry(async () => {
+              return await sheets.spreadsheets.values.get({
+                spreadsheetId: supportSheetId,
+                range: supportModelRange,
+                majorDimension: 'ROWS',
+                valueRenderOption: 'UNFORMATTED_VALUE'
+              });
             }).then(r => r.data.values || []).catch(() => []),
-            factoryPriceRange ? sheets.spreadsheets.values.get({
-              spreadsheetId: supportSheetId,
-              range: factoryPriceRange,
-              majorDimension: 'ROWS',
-              valueRenderOption: 'UNFORMATTED_VALUE'
+            factoryPriceRange ? withRetry(async () => {
+              return await sheets.spreadsheets.values.get({
+                spreadsheetId: supportSheetId,
+                range: factoryPriceRange,
+                majorDimension: 'ROWS',
+                valueRenderOption: 'UNFORMATTED_VALUE'
+              });
             }).then(r => r.data.values || []).catch(() => []) : Promise.resolve([]),
-            openingTypeRange ? sheets.spreadsheets.values.get({
-              spreadsheetId: supportSheetId,
-              range: openingTypeRange,
-              majorDimension: 'ROWS',
-              valueRenderOption: 'UNFORMATTED_VALUE'
+            openingTypeRange ? withRetry(async () => {
+              return await sheets.spreadsheets.values.get({
+                spreadsheetId: supportSheetId,
+                range: openingTypeRange,
+                majorDimension: 'ROWS',
+                valueRenderOption: 'UNFORMATTED_VALUE'
+              });
             }).then(r => r.data.values || []).catch(() => []) : Promise.resolve([])
           ]);
 
@@ -1451,12 +1495,17 @@ function setupDirectRoutes(app) {
 
         if (supportRanges.length > 0 && supportModelData.length > 0 && supportOpeningTypeData.length > 0) {
           try {
-            const response = await sheets.spreadsheets.values.batchGet({
-              spreadsheetId: supportSheetId,
-              ranges: supportRanges,
-              majorDimension: 'ROWS',
-              valueRenderOption: 'UNFORMATTED_VALUE'
-            });
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'directRoutes.js:1454',message:'지원금 범위 batchGet 시작',data:{carrier:carrierParam,rangesCount:supportRanges.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H4'})}).catch(()=>{});
+            // #endregion
+            const response = await withRetry(async () => {
+              return await sheets.spreadsheets.values.batchGet({
+                spreadsheetId: supportSheetId,
+                ranges: supportRanges,
+                majorDimension: 'ROWS',
+                valueRenderOption: 'UNFORMATTED_VALUE'
+              });
+            }, 5, 3000);
 
             response.data.valueRanges.forEach((valueRange, index) => {
               const range = supportRanges[index];
@@ -1674,16 +1723,27 @@ function setupDirectRoutes(app) {
         // 정책표 시트에서 모델명 읽기
         let policyModelData = [];
         try {
-          const modelResponse = await sheets.spreadsheets.values.get({
-            spreadsheetId: policySheetId,
-            range: modelRange,
-            majorDimension: 'ROWS',
-            valueRenderOption: 'UNFORMATTED_VALUE'
-          });
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'directRoutes.js:1677',message:'정책표 모델명 읽기 시작 (리베이트용)',data:{carrier:carrierParam,modelRange},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+          // #endregion
+          const modelResponse = await withRetry(async () => {
+            return await sheets.spreadsheets.values.get({
+              spreadsheetId: policySheetId,
+              range: modelRange,
+              majorDimension: 'ROWS',
+              valueRenderOption: 'UNFORMATTED_VALUE'
+            });
+          }, 5, 3000);
           policyModelData = (modelResponse.data.values || []).map(row =>
             (row[0] || '').toString().trim()
           );
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'directRoutes.js:1683',message:'정책표 모델명 읽기 성공',data:{carrier:carrierParam,modelCount:policyModelData.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+          // #endregion
         } catch (err) {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'directRoutes.js:1687',message:'정책표 모델명 읽기 실패',data:{carrier:carrierParam,error:err.message,code:err.code,status:err.response?.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+          // #endregion
           console.warn(`[Direct] 정책표 모델명 읽기 실패:`, err);
         }
 
