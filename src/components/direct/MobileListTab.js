@@ -129,8 +129,18 @@ const MobileListTab = ({ onProductSelect }) => {
 
     const setDefaultValues = async () => {
       // 이미 초기화되었고, 사용자가 수동으로 선택한 값이 있으면 건너뛰기
-      if (initializedRef.current && userSelectedOpeningTypesRef.current.size > 0) {
-        return;
+      // 🔥 초기 로드 완료 후에는 사용자 선택값이 있으면 절대 덮어쓰지 않음
+      if (initializedRef.current) {
+        // 초기화 완료 후에는 사용자 선택값이 있으면 건너뛰기
+        if (userSelectedOpeningTypesRef.current.size > 0) {
+          return;
+        }
+        // 초기화 완료 후에는 기존 값이 있으면 건너뛰기 (사용자가 변경했을 수 있음)
+        const hasExistingValues = Object.keys(selectedOpeningTypes).length > 0 || 
+                                   Object.keys(selectedPlanGroups).length > 0;
+        if (hasExistingValues) {
+          return;
+        }
       }
 
       setSteps(prev => ({
@@ -139,8 +149,19 @@ const MobileListTab = ({ onProductSelect }) => {
       }));
       const carrier = getCurrentCarrier();
       const newPlanGroups = { ...selectedPlanGroups };
+      // 🔥 사용자가 수동으로 선택한 개통유형은 현재 상태에서 가져오기 (초기 로드 시 덮어쓰기 방지)
       const newOpeningTypes = { ...selectedOpeningTypes };
+      // 사용자가 수동으로 선택한 개통유형은 보존
+      userSelectedOpeningTypesRef.current.forEach(modelId => {
+        if (selectedOpeningTypes[modelId]) {
+          newOpeningTypes[modelId] = selectedOpeningTypes[modelId];
+        }
+      });
       const calculationQueue = [];
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:setDefaultValues',message:'초기값 설정 시작',data:{mobileListLength:mobileList.length,userSelectedCount:userSelectedOpeningTypesRef.current.size,initialized:initializedRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'INIT-1'})}).catch(()=>{});
+      // #endregion
 
       // 모든 모델에 대해 기본값 설정 및 가격 계산 준비
       const cacheEntries = [];
@@ -176,7 +197,13 @@ const MobileListTab = ({ onProductSelect }) => {
 
         // 초기 로딩 시에는 기존 값이 있어도 기본값으로 재설정하지 않음
         // 단, 값이 없을 때만 기본값 설정
+        // 🔥 사용자가 수동으로 선택한 개통유형이 있으면 절대 덮어쓰지 않음
         if (newPlanGroups[model.id] && newOpeningTypes[model.id]) {
+          // 사용자가 수동으로 선택한 경우는 건너뛰기 (이미 위에서 처리됨)
+          if (userSelectedOpeningTypesRef.current.has(model.id)) {
+            continue;
+          }
+          
           // 값이 이미 있으면 전역 캐시에서 먼저 확인
           const existingPlanGroup = newPlanGroups[model.id];
           const existingOpeningType = newOpeningTypes[model.id];
@@ -263,6 +290,16 @@ const MobileListTab = ({ onProductSelect }) => {
           }
         }
 
+        // 🔥 사용자가 수동으로 선택한 개통유형이 있으면 기본값으로 덮어쓰지 않음
+        if (userSelectedOpeningTypesRef.current.has(model.id)) {
+          // 사용자 선택값 유지, 기본값 설정하지 않음
+          if (!newPlanGroups[model.id]) {
+            newPlanGroups[model.id] = finalPlanGroup;
+          }
+          // newOpeningTypes는 사용자 선택값 유지 (변경하지 않음)
+          continue;
+        }
+
         newPlanGroups[model.id] = finalPlanGroup;
         newOpeningTypes[model.id] = defaultOpeningType;
 
@@ -323,8 +360,33 @@ const MobileListTab = ({ onProductSelect }) => {
       }
 
       // 상태 먼저 업데이트 (UI에 즉시 반영)
-      setSelectedPlanGroups(newPlanGroups);
-      setSelectedOpeningTypes(newOpeningTypes);
+      // 🔥 사용자가 수동으로 선택한 개통유형은 보존 (초기 로드 시 덮어쓰기 방지)
+      setSelectedPlanGroups(prev => {
+        const merged = { ...newPlanGroups };
+        // 사용자가 수동으로 선택한 요금제군은 유지
+        userSelectedOpeningTypesRef.current.forEach(modelId => {
+          if (prev[modelId]) {
+            merged[modelId] = prev[modelId];
+          }
+        });
+        return merged;
+      });
+      setSelectedOpeningTypes(prev => {
+        const merged = { ...newOpeningTypes };
+        // 사용자가 수동으로 선택한 개통유형은 유지 (절대 덮어쓰지 않음)
+        userSelectedOpeningTypesRef.current.forEach(modelId => {
+          if (prev[modelId]) {
+            merged[modelId] = prev[modelId];
+          }
+        });
+        // 🔥 초기 로드 시에도 현재 상태의 사용자 선택값을 우선 보존
+        Object.keys(prev).forEach(modelId => {
+          if (userSelectedOpeningTypesRef.current.has(modelId) && prev[modelId]) {
+            merged[modelId] = prev[modelId];
+          }
+        });
+        return merged;
+      });
 
       // 가격 계산 배치 처리 (큐 시스템 사용)
       if (calculationQueue.length > 0) {
@@ -358,7 +420,8 @@ const MobileListTab = ({ onProductSelect }) => {
     };
 
     setDefaultValues();
-  }, [mobileList, planGroups]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mobileList, planGroups]); // selectedOpeningTypes, selectedPlanGroups는 의존성에서 제외 (무한루프 방지)
 
   const handleReload = async () => {
     try {
@@ -1128,6 +1191,10 @@ const MobileListTab = ({ onProductSelect }) => {
 
   // 유형 선택 핸들러
   const handleOpeningTypeChange = async (modelId, openingType) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:handleOpeningTypeChange',message:'개통유형 변경 시작',data:{modelId,openingType,initialized:initializedRef.current,currentValue:selectedOpeningTypes[modelId]},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'INIT-2'})}).catch(()=>{});
+    // #endregion
+    
     if (!openingType) {
       setSelectedOpeningTypes(prev => {
         const newState = { ...prev };
@@ -1144,10 +1211,19 @@ const MobileListTab = ({ onProductSelect }) => {
       return;
     }
 
-    // 사용자가 수동으로 선택한 것으로 표시
+    // 🔥 사용자가 수동으로 선택한 것으로 표시 (초기 로드 시 덮어쓰기 방지)
+    // 이 작업을 상태 업데이트 전에 수행하여 setDefaultValues가 실행되어도 보존되도록 함
     userSelectedOpeningTypesRef.current.add(modelId);
 
-    setSelectedOpeningTypes(prev => ({ ...prev, [modelId]: openingType }));
+    // 🔥 상태 업데이트: 함수형 업데이트로 이전 상태를 보존하면서 새 값 설정
+    // 즉시 반영되도록 동기적으로 업데이트
+    setSelectedOpeningTypes(prev => {
+      const newState = { ...prev, [modelId]: openingType };
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:handleOpeningTypeChange',message:'개통유형 상태 업데이트',data:{modelId,openingType,prevValue:prev[modelId],newValue:openingType,userSelectedSet:Array.from(userSelectedOpeningTypesRef.current)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'INIT-2'})}).catch(()=>{});
+      // #endregion
+      return newState;
+    });
 
     // 선택된 요금제군이 있으면 해당 요금제군과 유형으로 계산
     const planGroup = selectedPlanGroups[modelId];
