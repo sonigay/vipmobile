@@ -34,6 +34,8 @@ import {
     Checkbox
 } from '@mui/icons-material';
 import { directStoreApi } from '../../../api/directStoreApi';
+import { directStoreApiClient } from '../../../api/directStoreApiClient';
+import { LoadingState, ErrorState } from '../common';
 
 // 구글 시트 ID 추출 함수 (전체 URL 또는 ID만 입력 가능)
 const extractSheetId = (value = '') => {
@@ -107,7 +109,7 @@ const LinkSettingsTab = () => {
             try {
                 setLoading(true);
                 const carrier = getCurrentCarrier();
-                const data = await directStoreApi.getLinkSettings(carrier);
+                const data = await directStoreApiClient.getLinkSettings(carrier);
                 
                 if (data.success) {
                     if (data.planGroup) {
@@ -189,7 +191,7 @@ const LinkSettingsTab = () => {
                 return;
             }
 
-            const result = await directStoreApi.fetchPlanGroups(sheetId, planGroupSettings.planGroupRange);
+            const result = await directStoreApiClient.fetchPlanGroups(sheetId, planGroupSettings.planGroupRange);
             if (result.success && result.planGroups) {
                 setPlanGroupSettings(prev => ({
                     ...prev,
@@ -226,7 +228,7 @@ const LinkSettingsTab = () => {
                 return;
             }
 
-            const result = await directStoreApi.fetchRangeData(sheetId, range, useUnique);
+            const result = await directStoreApiClient.fetchRangeData(sheetId, range, useUnique);
             if (result.success && result.data) {
                 let previewData = result.data.flat().slice(0, 20); // 최대 20개만 미리보기
                 
@@ -315,7 +317,7 @@ const LinkSettingsTab = () => {
             
             // 저장 후 자동으로 다시 로드 (planGroups 자동 추출 반영)
             if (type === 'planGroup') {
-                const reloadData = await directStoreApi.getLinkSettings(carrier);
+                const reloadData = await directStoreApiClient.getLinkSettings(carrier);
                 if (reloadData.success && reloadData.planGroup) {
                     setPlanGroupSettings({
                         link: reloadData.planGroup.link || reloadData.planGroup.sheetId || '',
@@ -339,8 +341,16 @@ const LinkSettingsTab = () => {
         }
     };
 
+    if (loading) {
+        return <LoadingState message="링크 설정을 불러오는 중..." />;
+    }
+
     return (
         <Box sx={{ p: 3, height: '100%', overflow: 'auto' }}>
+            {error && (
+                <ErrorState error={error} onRetry={() => window.location.reload()} title="링크 설정 로드 실패" />
+            )}
+            
             <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', mb: 3 }}>
                 링크 설정
             </Typography>

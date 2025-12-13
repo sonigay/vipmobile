@@ -30,6 +30,8 @@ import {
   PhotoCamera as PhotoCameraIcon
 } from '@mui/icons-material';
 import { directStoreApi } from '../../../api/directStoreApi';
+import { directStoreApiClient } from '../../../api/directStoreApiClient';
+import { LoadingState, ErrorState } from '../common';
 
 const MainPageTextSettingsTab = () => {
   const [loading, setLoading] = useState(false);
@@ -63,7 +65,7 @@ const MainPageTextSettingsTab = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await directStoreApi.getMainPageTexts();
+      const response = await directStoreApiClient.getMainPageTexts();
       
       if (response.success && response.data) {
         if (response.data.mainHeader) {
@@ -104,7 +106,7 @@ const MainPageTextSettingsTab = () => {
   const handleImageUpload = async (file) => {
     try {
       setUploadingImage(true);
-      const result = await directStoreApi.uploadTransitionPageImage(
+      const result = await directStoreApiClient.uploadTransitionPageImage(
         file,
         transitionForm.carrier,
         transitionForm.category
@@ -129,7 +131,7 @@ const MainPageTextSettingsTab = () => {
       setSaving(true);
       setError(null);
       
-      const response = await directStoreApi.saveMainPageText('', '', 'mainHeader', mainHeaderForm.content, mainHeaderForm.imageUrl);
+      const response = await directStoreApiClient.saveMainPageText('', '', 'mainHeader', mainHeaderForm.content, mainHeaderForm.imageUrl);
       
       if (response.success) {
         setMainHeader(mainHeaderForm);
@@ -152,7 +154,7 @@ const MainPageTextSettingsTab = () => {
       setSaving(true);
       setError(null);
       
-      const response = await directStoreApi.saveMainPageText(
+      const response = await directStoreApiClient.saveMainPageText(
         transitionForm.carrier,
         transitionForm.category,
         'transitionPage',
@@ -201,19 +203,13 @@ const MainPageTextSettingsTab = () => {
   ];
 
   if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-        <CircularProgress />
-      </Box>
-    );
+    return <LoadingState message="문구 설정을 불러오는 중..." />;
   }
 
   return (
     <Box sx={{ p: 3, height: '100%', overflow: 'auto' }}>
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
+        <ErrorState error={error} onRetry={loadData} title="문구 설정 로드 실패" />
       )}
 
       <Typography variant="h5" gutterBottom sx={{ mb: 3, fontWeight: 'bold' }}>

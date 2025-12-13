@@ -36,6 +36,8 @@ import {
     Save as SaveIcon
 } from '@mui/icons-material';
 import { directStoreApi } from '../../../api/directStoreApi';
+import { directStoreApiClient } from '../../../api/directStoreApiClient';
+import { LoadingState, ErrorState } from '../common';
 
 const PolicySettingsTab = () => {
     const [carrierTab, setCarrierTab] = useState(0);
@@ -91,7 +93,7 @@ const PolicySettingsTab = () => {
             try {
                 setLoading(true);
                 const carrier = getCurrentCarrier();
-                const data = await directStoreApi.getPolicySettings(carrier);
+                const data = await directStoreApiClient.getPolicySettings(carrier);
                 
                 if (data.success) {
                     if (data.margin) {
@@ -202,7 +204,7 @@ const PolicySettingsTab = () => {
                 settings = { special: { list: specialPolicies } };
             }
 
-            await directStoreApi.savePolicySettings(carrier, settings);
+            await directStoreApiClient.savePolicySettings(carrier, settings);
             setSuccessMessage('설정이 저장되었습니다.');
             
             if (type === 'margin') setOpenMarginModal(false);
@@ -216,8 +218,16 @@ const PolicySettingsTab = () => {
         }
     };
 
+    if (loading) {
+        return <LoadingState message="정책 설정을 불러오는 중..." />;
+    }
+
     return (
         <Box sx={{ p: 3, height: '100%', overflow: 'auto' }}>
+            {error && (
+                <ErrorState error={error} onRetry={() => window.location.reload()} title="정책 설정 로드 실패" />
+            )}
+            
             <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', mb: 3 }}>
                 정책 설정
             </Typography>

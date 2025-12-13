@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   Box,
   Tabs,
@@ -36,7 +36,13 @@ import {
 } from '@mui/icons-material';
 import { Checkbox } from '@mui/material';
 import { directStoreApi } from '../../api/directStoreApi';
+import { directStoreApiClient } from '../../api/directStoreApiClient';
 import { getCachedPrice, setCachedPrice, setCachedPricesBatch } from '../../utils/priceCache';
+import { LoadingState, ErrorState, EmptyState } from './common';
+import { ModernTable, ModernTableCell, HoverableTableRow } from './common/ModernTable';
+import { formatPrice } from '../../utils/directStoreUtils';
+import { MobileListRow } from './MobileListRow';
+import { debugLog } from '../../utils/debugLogger';
 
 const MobileListTab = ({ onProductSelect }) => {
   const [carrierTab, setCarrierTab] = useState(0); // 0: SK, 1: KT, 2: LG
@@ -99,7 +105,7 @@ const MobileListTab = ({ onProductSelect }) => {
         }));
         const carrier = getCurrentCarrier();
 
-        const { list, meta } = await directStoreApi.getMobileList(carrier, {
+        const { list, meta } = await directStoreApiClient.getMobileList(carrier, {
           withMeta: true
         }) || {};
         const safeList = list || [];
@@ -114,9 +120,12 @@ const MobileListTab = ({ onProductSelect }) => {
         }));
       } catch (err) {
         console.error('휴대폰 목록 로딩 실패:', err);
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:fetchMobileList',message:'휴대폰 목록 로딩 실패',data:{carrier:getCurrentCarrier(),errorMessage:err.message,errorName:err.name,errorStack:err.stack?.split('\n').slice(0,3).join('|')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E10'})}).catch(()=>{});
-        // #endregion
+        debugLog('MobileListTab.js:fetchMobileList', '휴대폰 목록 로딩 실패', {
+          carrier: getCurrentCarrier(),
+          errorMessage: err.message,
+          errorName: err.name,
+          errorStack: err.stack?.split('\n').slice(0, 3).join('|')
+        }, 'debug-session', 'run1', 'E10');
         setError('데이터를 불러오는 중 오류가 발생했습니다.');
         setMobileList([]);
         setSteps(prev => ({
@@ -180,10 +189,12 @@ const MobileListTab = ({ onProductSelect }) => {
         }
       });
       const calculationQueue = [];
-      
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:setDefaultValues',message:'초기값 설정 시작',data:{mobileListLength:mobileList.length,userSelectedCount:userSelectedOpeningTypesRef.current.size,initialized:initializedRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'INIT-1'})}).catch(()=>{});
-      // #endregion
+
+      debugLog('MobileListTab.js:setDefaultValues', '초기값 설정 시작', {
+        mobileListLength: mobileList.length,
+        userSelectedCount: userSelectedOpeningTypesRef.current.size,
+        initialized: initializedRef.current
+      }, 'debug-session', 'run1', 'INIT-1');
 
       // 모든 모델에 대해 기본값 설정 및 가격 계산 준비
       const cacheEntries = [];
@@ -327,9 +338,12 @@ const MobileListTab = ({ onProductSelect }) => {
 
         // 🔥 초기 로드 시에는 캐시를 사용하지 않고 항상 서버에서 새로 계산
         if (!initializedRef.current) {
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:setDefaultValues',message:'초기 로드 시 캐시 사용 안함',data:{modelId:model.id,planGroup:finalPlanGroup,openingType:defaultOpeningType,carrier},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'CACHE-1'})}).catch(()=>{});
-          // #endregion
+          debugLog('MobileListTab.js:setDefaultValues', '초기 로드 시 캐시 사용 안함', {
+            modelId: model.id,
+            planGroup: finalPlanGroup,
+            openingType: defaultOpeningType,
+            carrier
+          }, 'debug-session', 'run1', 'CACHE-1');
           // 초기 로드 시에는 항상 계산 대기열에 추가
           calculationQueue.push({
             modelId: model.id,
@@ -337,9 +351,12 @@ const MobileListTab = ({ onProductSelect }) => {
             openingType: defaultOpeningType
           });
         } else {
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:setDefaultValues',message:'초기화 후 캐시 확인',data:{modelId:model.id,planGroup:finalPlanGroup,openingType:defaultOpeningType,carrier},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'CACHE-2'})}).catch(()=>{});
-          // #endregion
+          debugLog('MobileListTab.js:setDefaultValues', '초기화 후 캐시 확인', {
+            modelId: model.id,
+            planGroup: finalPlanGroup,
+            openingType: defaultOpeningType,
+            carrier
+          }, 'debug-session', 'run1', 'CACHE-2');
           // 초기화 후에는 캐시 확인
           const cached = getCachedPrice(model.id, finalPlanGroup, defaultOpeningType, carrier);
           // 🔥 캐시 값 검증: 초기 로드 시 서버에서 받은 publicSupport 값과 캐시 값이 크게 다르면 캐시 무시
@@ -544,9 +561,9 @@ const MobileListTab = ({ onProductSelect }) => {
       }));
       const carrier = getCurrentCarrier();
 
-      const { list, meta } = await directStoreApi.getMobileList(carrier, {
-        withMeta: true
-      }) || {};
+        const { list, meta } = await directStoreApiClient.getMobileList(carrier, {
+          withMeta: true
+        }) || {};
       const safeList = list || [];
       setMobileList(safeList);
       setSteps(prev => ({
@@ -591,7 +608,7 @@ const MobileListTab = ({ onProductSelect }) => {
           }
         }
 
-        const linkSettings = await directStoreApi.getLinkSettings(carrier);
+        const linkSettings = await directStoreApiClient.getLinkSettings(carrier);
         if (linkSettings.success && linkSettings.planGroup) {
           const planGroups = linkSettings.planGroup.planGroups || [];
           setPlanGroups(planGroups);
@@ -614,13 +631,13 @@ const MobileListTab = ({ onProductSelect }) => {
 
   // ... (existing useEffect)
 
-  const handleImageUploadClick = (modelId) => {
+  const handleImageUploadClick = useCallback((modelId) => {
     setUploadingModelId(modelId);
     if (fileInputRef.current) {
       fileInputRef.current.value = ''; // Reset file input
       fileInputRef.current.click();
     }
-  };
+  }, []);
 
   const handleFileChange = async (event) => {
     const file = event.target.files?.[0];
@@ -673,7 +690,7 @@ const MobileListTab = ({ onProductSelect }) => {
         await new Promise(resolve => setTimeout(resolve, 2000)); // 2초 대기
         
         console.log('🔄 [이미지 업로드] 서버에서 최신 데이터 재로딩 중...');
-        const freshData = await directStoreApi.getMobileList(carrier);
+        const freshData = await directStoreApiClient.getMobileList(carrier);
         setMobileList(freshData || []);
         console.log('✅ [이미지 업로드] 최신 데이터 재로딩 완료');
 
@@ -705,7 +722,7 @@ const MobileListTab = ({ onProductSelect }) => {
     }
   };
 
-  const handleRowClick = (model) => {
+  const handleRowClick = useCallback((model) => {
     if (onProductSelect) {
       // 선택된 요금제군과 유형을 포함하여 전달
       const planGroup = selectedPlanGroups[model.id] || null;
@@ -716,7 +733,7 @@ const MobileListTab = ({ onProductSelect }) => {
         openingType
       });
     }
-  };
+  }, [onProductSelect, selectedPlanGroups, selectedOpeningTypes]);
 
   const handleTagMenuOpen = useCallback((event, modelId) => {
     event.stopPropagation();
@@ -786,7 +803,7 @@ const MobileListTab = ({ onProductSelect }) => {
         image: currentMobile.image
       };
 
-      const result = await directStoreApi.updateMobileTags(modelId, payload);
+        const result = await directStoreApiClient.updateMobileTags(modelId, payload);
 
       // API 호출 성공 시 추가 처리 없음 (이미 UI 업데이트됨)
       if (!result || !result.success) {
@@ -836,7 +853,7 @@ const MobileListTab = ({ onProductSelect }) => {
     }
   };
 
-  const getSelectedTags = (row) => {
+  const getSelectedTags = useCallback((row) => {
     const tags = [];
     if (row.isPopular) tags.push('인기');
     if (row.isRecommended) tags.push('추천');
@@ -844,7 +861,7 @@ const MobileListTab = ({ onProductSelect }) => {
     if (row.isPremium) tags.push('프리미엄');
     if (row.isBudget) tags.push('중저가');
     return tags.length > 0 ? tags.join(', ') : '선택';
-  };
+  }, []);
 
   // 가격 계산 요청 큐 처리 함수
   const processPriceCalculationQueue = async () => {
@@ -883,9 +900,10 @@ const MobileListTab = ({ onProductSelect }) => {
       const uniqueSize = uniqueQueue.length;
       priceCalculationQueueRef.current = [];
 
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:processPriceCalculationQueue',message:'큐 처리 시작',data:{queueSize,uniqueSize},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E0'})}).catch(()=>{});
-      // #endregion
+      debugLog('MobileListTab.js:processPriceCalculationQueue', '큐 처리 시작', {
+        queueSize,
+        uniqueSize
+      }, 'debug-session', 'run1', 'E0');
 
       // 배치 처리 설정 (ERR_INSUFFICIENT_RESOURCES 에러 방지를 위해 더 보수적으로)
       const BATCH_SIZE = 1; // 동시 실행 수 제한 (2 -> 1로 감소: 한 번에 하나씩만 처리)
@@ -918,9 +936,16 @@ const MobileListTab = ({ onProductSelect }) => {
                                      err.message?.includes('ERR_INSUFFICIENT_RESOURCES') ||
                                      err.message?.includes('NetworkError');
                 
-                // #region agent log
-                fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:processPriceCalculationQueue',message:'가격 계산 에러 발생',data:{modelId:item.modelId,planGroup:item.planGroup,openingType:item.openingType,retries,isNetworkError,errorMessage:err.message,errorName:err.name,errorStack:err.stack?.split('\n').slice(0,3).join('|')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E1'})}).catch(()=>{});
-                // #endregion
+                debugLog('MobileListTab.js:processPriceCalculationQueue', '가격 계산 에러 발생', {
+                  modelId: item.modelId,
+                  planGroup: item.planGroup,
+                  openingType: item.openingType,
+                  retries,
+                  isNetworkError,
+                  errorMessage: err.message,
+                  errorName: err.name,
+                  errorStack: err.stack?.split('\n').slice(0, 3).join('|')
+                }, 'debug-session', 'run1', 'E1');
                 
                 // 네트워크 에러가 아니거나 최대 재시도 횟수에 도달하면 종료
                 if (!isNetworkError || retries >= MAX_RETRIES) {
@@ -931,9 +956,15 @@ const MobileListTab = ({ onProductSelect }) => {
                     retries,
                     error: err
                   });
-                  // #region agent log
-                  fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:processPriceCalculationQueue',message:'가격 계산 최종 실패',data:{modelId:item.modelId,planGroup:item.planGroup,openingType:item.openingType,retries,isNetworkError,reason:!isNetworkError ? '네트워크 에러 아님' : '최대 재시도 횟수 초과',errorMessage:err.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E2'})}).catch(()=>{});
-                  // #endregion
+                  debugLog('MobileListTab.js:processPriceCalculationQueue', '가격 계산 최종 실패', {
+                    modelId: item.modelId,
+                    planGroup: item.planGroup,
+                    openingType: item.openingType,
+                    retries,
+                    isNetworkError,
+                    reason: !isNetworkError ? '네트워크 에러 아님' : '최대 재시도 횟수 초과',
+                    errorMessage: err.message
+                  }, 'debug-session', 'run1', 'E2');
                   break;
                 }
 
@@ -943,9 +974,15 @@ const MobileListTab = ({ onProductSelect }) => {
                   modelId: item.modelId,
                   delay: retryDelay
                 });
-                // #region agent log
-                fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:processPriceCalculationQueue',message:'가격 계산 재시도 스케줄링',data:{modelId:item.modelId,planGroup:item.planGroup,openingType:item.openingType,retries:retries+1,maxRetries:MAX_RETRIES,retryDelay,isNetworkError},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E3'})}).catch(()=>{});
-                // #endregion
+                debugLog('MobileListTab.js:processPriceCalculationQueue', '가격 계산 재시도 스케줄링', {
+                  modelId: item.modelId,
+                  planGroup: item.planGroup,
+                  openingType: item.openingType,
+                  retries: retries + 1,
+                  maxRetries: MAX_RETRIES,
+                  retryDelay,
+                  isNetworkError
+                }, 'debug-session', 'run1', 'E3');
                 await new Promise(resolve => setTimeout(resolve, retryDelay));
                 retries++;
               }
@@ -959,13 +996,16 @@ const MobileListTab = ({ onProductSelect }) => {
         }
       }
       
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:processPriceCalculationQueue',message:'큐 처리 완료',data:{processedCount:uniqueQueue.length,remainingQueue:priceCalculationQueueRef.current.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E8'})}).catch(()=>{});
-      // #endregion
+      debugLog('MobileListTab.js:processPriceCalculationQueue', '큐 처리 완료', {
+        processedCount: uniqueQueue.length,
+        remainingQueue: priceCalculationQueueRef.current.length
+      }, 'debug-session', 'run1', 'E8');
     } catch (queueError) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:processPriceCalculationQueue',message:'큐 처리 중 예외 발생',data:{errorMessage:queueError.message,errorName:queueError.name,queueSize:priceCalculationQueueRef.current.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E9'})}).catch(()=>{});
-      // #endregion
+      debugLog('MobileListTab.js:processPriceCalculationQueue', '큐 처리 중 예외 발생', {
+        errorMessage: queueError.message,
+        errorName: queueError.name,
+        queueSize: priceCalculationQueueRef.current.length
+      }, 'debug-session', 'run1', 'E9');
       console.error('큐 처리 중 예외 발생:', queueError);
     } finally {
       isProcessingQueueRef.current = false;
@@ -1086,7 +1126,7 @@ const MobileListTab = ({ onProductSelect }) => {
     const modelName = currentModel?.model || null;
 
     // API 호출
-    const pricePromise = directStoreApi.calculateMobilePrice(modelId, planGroup, openingType, modelCarrier, modelName)
+    const pricePromise = directStoreApiClient.calculateMobilePrice(modelId, planGroup, openingType, modelCarrier, modelName)
       .then(result => {
         // 404 에러는 재시도하지 않음
         if (result.status === 404) {
@@ -1109,9 +1149,17 @@ const MobileListTab = ({ onProductSelect }) => {
       })
       .catch(err => {
         console.error('가격 계산 API 호출 실패:', err, { modelId, planGroup, openingType, carrier: modelCarrier });
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:calculatePriceInternal',message:'가격 계산 API 호출 실패',data:{modelId,planGroup,openingType,carrier:modelCarrier,modelName,errorMessage:err.message,errorName:err.name,errorStatus:err.status,errorCode:err.code},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E5'})}).catch(()=>{});
-        // #endregion
+        debugLog('MobileListTab.js:calculatePriceInternal', '가격 계산 API 호출 실패', {
+          modelId,
+          planGroup,
+          openingType,
+          carrier: modelCarrier,
+          modelName,
+          errorMessage: err.message,
+          errorName: err.name,
+          errorStatus: err.status,
+          errorCode: err.code
+        }, 'debug-session', 'run1', 'E5');
         return { success: false, error: err.message || err.toString() };
       })
       .finally(() => {
@@ -1306,20 +1354,27 @@ const MobileListTab = ({ onProductSelect }) => {
     const openingType = selectedOpeningTypes[modelId] || '010신규';
     try {
       await calculatePrice(modelId, planGroup, openingType);
-    } catch (err) {
-      console.error('요금제군 변경 시 가격 계산 실패:', err, { modelId, planGroup, openingType });
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:handlePlanGroupChange',message:'요금제군 변경 시 가격 계산 실패',data:{modelId,planGroup,openingType,errorMessage:err.message,errorName:err.name},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E6'})}).catch(()=>{});
-      // #endregion
-      // 에러 발생 시에도 무한 재시도 방지를 위해 상태는 유지
-    }
+      } catch (err) {
+        console.error('요금제군 변경 시 가격 계산 실패:', err, { modelId, planGroup, openingType });
+        debugLog('MobileListTab.js:handlePlanGroupChange', '요금제군 변경 시 가격 계산 실패', {
+          modelId,
+          planGroup,
+          openingType,
+          errorMessage: err.message,
+          errorName: err.name
+        }, 'debug-session', 'run1', 'E6');
+        // 에러 발생 시에도 무한 재시도 방지를 위해 상태는 유지
+      }
   };
 
   // 유형 선택 핸들러
   const handleOpeningTypeChange = async (modelId, openingType) => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:handleOpeningTypeChange',message:'개통유형 변경 시작',data:{modelId,openingType,initialized:initializedRef.current,currentValue:selectedOpeningTypes[modelId]},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'INIT-2'})}).catch(()=>{});
-    // #endregion
+    debugLog('MobileListTab.js:handleOpeningTypeChange', '개통유형 변경 시작', {
+      modelId,
+      openingType,
+      initialized: initializedRef.current,
+      currentValue: selectedOpeningTypes[modelId]
+    }, 'debug-session', 'run1', 'INIT-2');
     
     if (!openingType) {
       setSelectedOpeningTypes(prev => {
@@ -1345,9 +1400,13 @@ const MobileListTab = ({ onProductSelect }) => {
     // 즉시 반영되도록 동기적으로 업데이트
     setSelectedOpeningTypes(prev => {
       const newState = { ...prev, [modelId]: openingType };
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:handleOpeningTypeChange',message:'개통유형 상태 업데이트',data:{modelId,openingType,prevValue:prev[modelId],newValue:openingType,userSelectedSet:Array.from(userSelectedOpeningTypesRef.current)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'INIT-2'})}).catch(()=>{});
-      // #endregion
+      debugLog('MobileListTab.js:handleOpeningTypeChange', '개통유형 상태 업데이트', {
+        modelId,
+        openingType,
+        prevValue: prev[modelId],
+        newValue: openingType,
+        userSelectedSet: Array.from(userSelectedOpeningTypesRef.current)
+      }, 'debug-session', 'run1', 'INIT-2');
       return newState;
     });
 
@@ -1358,16 +1417,20 @@ const MobileListTab = ({ onProductSelect }) => {
         await calculatePrice(modelId, planGroup, openingType);
       } catch (err) {
         console.error('개통유형 변경 시 가격 계산 실패:', err, { modelId, planGroup, openingType });
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:handleOpeningTypeChange',message:'개통유형 변경 시 가격 계산 실패',data:{modelId,planGroup,openingType,errorMessage:err.message,errorName:err.name},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E7'})}).catch(()=>{});
-        // #endregion
+        debugLog('MobileListTab.js:handleOpeningTypeChange', '개통유형 변경 시 가격 계산 실패', {
+          modelId,
+          planGroup,
+          openingType,
+          errorMessage: err.message,
+          errorName: err.name
+        }, 'debug-session', 'run1', 'E7');
         // 에러 발생 시에도 무한 재시도 방지를 위해 상태는 유지
       }
     }
   };
 
-  // 표시할 값 가져오기 (계산된 값이 있으면 사용, 없으면 원래 값)
-  const getDisplayValue = (row, field) => {
+  // 표시할 값 가져오기 (계산된 값이 있으면 사용, 없으면 원래 값) - 메모이제이션
+  const getDisplayValue = useCallback((row, field) => {
     const calculated = calculatedPrices[row.id];
     // 계산된 값이 있고, 해당 필드가 존재하면 사용
     // 단, 대리점지원금의 경우 0이면 fallback 사용 (0은 유효하지 않은 값으로 간주)
@@ -1379,7 +1442,7 @@ const MobileListTab = ({ onProductSelect }) => {
       return calculated[field];
     }
     return row[field];
-  };
+  }, [calculatedPrices]);
 
   return (
     <Box sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -1452,403 +1515,72 @@ const MobileListTab = ({ onProductSelect }) => {
 
       {/* 에러 메시지 */}
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
+        <ErrorState error={error} onRetry={handleReload} title="데이터 로딩 실패" />
       )}
 
       {/* 로딩 인디케이터 */}
       {loading || isInitializing ? (
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: 5, gap: 2 }}>
-          <CircularProgress />
-          <Typography variant="body2" color="text.secondary">
-            {isInitializing ? '가격 정보를 계산하는 중...' : '데이터를 불러오는 중...'}
-          </Typography>
-        </Box>
+        <LoadingState 
+          message={isInitializing ? '가격 정보를 계산하는 중...' : '데이터를 불러오는 중...'} 
+        />
       ) : (
         /* 상품 테이블 */
-        <TableContainer component={Paper} sx={{ flexGrow: 1, borderRadius: 2, boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }}>
+        <ModernTable sx={{ flexGrow: 1 }}>
           <Table stickyHeader>
             <TableHead>
               <TableRow>
-                <TableCell align="center" width="120">구분</TableCell>
-                <TableCell align="center" width="100">이미지</TableCell>
-                <TableCell align="center" width="220">모델명 / 펫네임</TableCell>
-                <TableCell align="center" width="120">요금제군</TableCell>
-                <TableCell align="center" width="100">유형</TableCell>
-                <TableCell align="center" width="100">출고가</TableCell>
-                <TableCell align="center" width="100">이통사지원금</TableCell>
-                <TableCell align="center" colSpan={2} width="180" sx={{ borderLeft: '1px solid rgba(81, 81, 81, 0.5)' }}>
+                <ModernTableCell align="center" width="120">구분</ModernTableCell>
+                <ModernTableCell align="center" width="100">이미지</ModernTableCell>
+                <ModernTableCell align="center" width="220">모델명 / 펫네임</ModernTableCell>
+                <ModernTableCell align="center" width="120">요금제군</ModernTableCell>
+                <ModernTableCell align="center" width="100">유형</ModernTableCell>
+                <ModernTableCell align="center" width="100">출고가</ModernTableCell>
+                <ModernTableCell align="center" width="100">이통사지원금</ModernTableCell>
+                <ModernTableCell align="center" colSpan={2} width="180" sx={{ borderLeft: '1px solid rgba(81, 81, 81, 0.5)' }}>
                   대리점 지원금
                   <Box sx={{ display: 'flex', justifyContent: 'space-around', fontSize: '0.75rem', color: 'text.secondary', mt: 0.5 }}>
                     <span>부가유치</span>
                     <span>미유치</span>
                   </Box>
-                </TableCell>
-                <TableCell align="center" colSpan={2} width="180" sx={{ borderLeft: '1px solid rgba(81, 81, 81, 0.5)', bgcolor: 'rgba(212, 175, 55, 0.1)' }}>
+                </ModernTableCell>
+                <ModernTableCell align="center" colSpan={2} width="180" sx={{ borderLeft: '1px solid rgba(81, 81, 81, 0.5)', bgcolor: 'rgba(212, 175, 55, 0.1)' }}>
                   구매가 (할부원금)
                   <Box sx={{ display: 'flex', justifyContent: 'space-around', fontSize: '0.75rem', color: 'text.secondary', mt: 0.5 }}>
                     <span>부가유치</span>
                     <span>미유치</span>
                   </Box>
-                </TableCell>
+                </ModernTableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {mobileList.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={11} align="center" sx={{ py: 5 }}>
-                    <Typography color="text.secondary">표시할 데이터가 없습니다.</Typography>
-                  </TableCell>
-                </TableRow>
+                <EmptyTableRow colSpan={11} message="표시할 데이터가 없습니다." />
               ) : (
-                mobileList.map((row) => {
-                  // directStoreApi에서 이미 계산된 값 사용
-                  const purchasePriceAddon = row.purchasePriceWithAddon || (row.factoryPrice || 0) - (row.support || row.publicSupport || 0) - (row.storeSupport || 0);
-                  const purchasePriceNoAddon = row.purchasePriceWithoutAddon || (row.factoryPrice || 0) - (row.support || row.publicSupport || 0) - (row.storeSupportNoAddon || 0);
-
-                  return (
-                    <TableRow
-                      key={row.id}
-                      hover
-                      sx={{ cursor: 'pointer' }}
-                      onClick={() => handleRowClick(row)}
-                    >
-                      <TableCell align="center" onClick={(e) => e.stopPropagation()}>
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          startIcon={<LabelIcon />}
-                          onClick={(e) => handleTagMenuOpen(e, row.id)}
-                          sx={{
-                            minWidth: 100,
-                            textTransform: 'none',
-                            fontSize: '0.75rem',
-                            py: 0.5
-                          }}
-                        >
-                          {getSelectedTags(row)}
-                        </Button>
-                        <Menu
-                          anchorEl={tagMenuAnchor[row.id]}
-                          open={Boolean(tagMenuAnchor[row.id])}
-                          onClose={() => handleTagMenuClose(row.id)}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <MenuItem onClick={(e) => {
-                            e.stopPropagation();
-                            handleTagChange(row.id, 'popular', !row.isPopular);
-                          }}>
-                            <ListItemIcon>
-                              <Checkbox
-                                checked={row.isPopular || false}
-                                size="small"
-                              />
-                            </ListItemIcon>
-                            <ListItemText>
-                              <Chip icon={<StarIcon />} label="인기" color="secondary" size="small" />
-                            </ListItemText>
-                          </MenuItem>
-                          <MenuItem onClick={(e) => {
-                            e.stopPropagation();
-                            handleTagChange(row.id, 'recommend', !row.isRecommended);
-                          }}>
-                            <ListItemIcon>
-                              <Checkbox
-                                checked={row.isRecommended || false}
-                                size="small"
-                              />
-                            </ListItemIcon>
-                            <ListItemText>
-                              <Chip icon={<RecommendIcon />} label="추천" color="primary" size="small" />
-                            </ListItemText>
-                          </MenuItem>
-                          <MenuItem onClick={(e) => {
-                            e.stopPropagation();
-                            handleTagChange(row.id, 'cheap', !row.isCheap);
-                          }}>
-                            <ListItemIcon>
-                              <Checkbox
-                                checked={row.isCheap || false}
-                                size="small"
-                              />
-                            </ListItemIcon>
-                            <ListItemText>
-                              <Chip label="저렴" color="success" size="small" />
-                            </ListItemText>
-                          </MenuItem>
-                          <MenuItem onClick={(e) => {
-                            e.stopPropagation();
-                            handleTagChange(row.id, 'premium', !row.isPremium);
-                          }}>
-                            <ListItemIcon>
-                              <Checkbox
-                                checked={row.isPremium || false}
-                                size="small"
-                              />
-                            </ListItemIcon>
-                            <ListItemText>
-                              <Chip label="프리미엄" color="warning" size="small" />
-                            </ListItemText>
-                          </MenuItem>
-                          <MenuItem onClick={(e) => {
-                            e.stopPropagation();
-                            handleTagChange(row.id, 'budget', !row.isBudget);
-                          }}>
-                            <ListItemIcon>
-                              <Checkbox
-                                checked={row.isBudget || false}
-                                size="small"
-                              />
-                            </ListItemIcon>
-                            <ListItemText>
-                              <Chip label="중저가" color="info" size="small" />
-                            </ListItemText>
-                          </MenuItem>
-                        </Menu>
-                      </TableCell>
-                      <TableCell align="center" onClick={(e) => e.stopPropagation()}>
-                        <Box sx={{ position: 'relative', display: 'inline-block' }}>
-                          <Avatar
-                            variant="rounded"
-                            src={row.image ? (() => {
-                              // #region agent log
-                              fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:imageSrc',message:'이미지 URL 초기값',data:{originalUrl:row.image,modelId:row.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
-                              // #endregion
-                              // 이미지 URL 정규화: 이중 하이픈을 단일 하이픈로 변환
-                              let normalizedUrl = row.image;
-                              // URL 경로 부분에서 이중 하이픈을 단일 하이픈로 변환
-                              try {
-                                const urlObj = new URL(normalizedUrl);
-                                const pathParts = urlObj.pathname.split('/');
-                                const filename = pathParts[pathParts.length - 1];
-                                if (filename.includes('--')) {
-                                  const normalizedFilename = filename.replace(/--+/g, '-');
-                                  pathParts[pathParts.length - 1] = normalizedFilename;
-                                  urlObj.pathname = pathParts.join('/');
-                                  normalizedUrl = urlObj.toString();
-                                }
-                              } catch (e) {
-                                // URL 파싱 실패 시 문자열 치환으로 처리
-                                normalizedUrl = normalizedUrl.replace(/--+/g, '-');
-                              }
-                              
-                              // 🔥 개선: 쿼리 파라미터 추가 시 이중 앰퍼샌드 방지
-                              let finalUrl = normalizedUrl;
-                              if (normalizedUrl.includes('?')) {
-                                // 이미 쿼리 파라미터가 있는 경우
-                                const urlEndsWithAmpersand = normalizedUrl.endsWith('&');
-                                const urlEndsWithQuestion = normalizedUrl.endsWith('?');
-                                if (urlEndsWithAmpersand) {
-                                  // 끝에 &가 있으면 그대로 사용 (&& 방지)
-                                  finalUrl = `${normalizedUrl}_t=${Date.now()}`;
-                                } else if (urlEndsWithQuestion) {
-                                  // 끝에 ?만 있으면 그대로 사용
-                                  finalUrl = `${normalizedUrl}_t=${Date.now()}`;
-                                } else {
-                                  // 끝에 값이 있으면 & 추가
-                                  finalUrl = `${normalizedUrl}&_t=${Date.now()}`;
-                                }
-                              } else {
-                                // 쿼리 파라미터가 없으면 ? 추가
-                                finalUrl = `${normalizedUrl}?_t=${Date.now()}`;
-                              }
-                              
-                              // #region agent log
-                              fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:imageSrc',message:'이미지 URL 최종값',data:{originalUrl:row.image,normalizedUrl,finalUrl,modelId:row.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
-                              // #endregion
-                              return finalUrl;
-                            })() : undefined}
-                            onError={(e) => {
-                              // 🔥 이미 재시도 포기 상태인 경우 즉시 중단 (무한 루프 방지)
-                              if (e.target.dataset.gaveUp === 'true') {
-                                e.target.onerror = null; // 에러 핸들러 제거
-                                return;
-                              }
-                              
-                              // 🔥 404 에러는 즉시 포기 (이미지가 존재하지 않음)
-                              // 이미지 로드 실패는 콘솔에 에러를 남기지 않고 조용히 처리
-                              e.target.dataset.gaveUp = 'true';
-                              e.target.src = ''; // 빈 문자열로 설정하여 추가 시도 방지
-                              e.target.onerror = null; // 무한 루프 방지: 에러 핸들러 제거
-                            }}
-                            sx={{ width: 60, height: 60, bgcolor: 'background.subtle' }}
-                          >
-                            <PhotoCameraIcon />
-                          </Avatar>
-                          <IconButton
-                            size="small"
-                            sx={{
-                              position: 'absolute',
-                              bottom: -8,
-                              right: -8,
-                              bgcolor: 'background.paper',
-                              boxShadow: 1,
-                              '&:hover': { bgcolor: 'primary.main', color: 'black' }
-                            }}
-                            onClick={() => handleImageUploadClick(row.id)}
-                          >
-                            <EditIcon fontSize="small" />
-                          </IconButton>
-                        </Box>
-                      </TableCell>
-                      <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>
-                        <Typography variant="body1" fontWeight="bold" sx={{ fontSize: '0.95rem' }}>{row.petName}</Typography>
-                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>{row.model}</Typography>
-                      </TableCell>
-                      <TableCell align="center" onClick={(e) => e.stopPropagation()}>
-                        <Autocomplete
-                          size="small"
-                          options={planGroups}
-                          value={selectedPlanGroups[row.id] || null}
-                          onChange={(e, newValue) => handlePlanGroupChange(row.id, newValue)}
-                          renderInput={(params) => (
-                            <TextField
-                              {...params}
-                              placeholder="요금제군 선택"
-                              sx={{ minWidth: 100 }}
-                            />
-                          )}
-                          sx={{ minWidth: 120 }}
-                        />
-                      </TableCell>
-                      <TableCell align="center" onClick={(e) => e.stopPropagation()}>
-                        <Autocomplete
-                          size="small"
-                          options={openingTypes}
-                          value={selectedOpeningTypes[row.id] || null}
-                          onChange={(e, newValue) => handleOpeningTypeChange(row.id, newValue)}
-                          renderInput={(params) => (
-                            <TextField
-                              {...params}
-                              placeholder="유형 선택"
-                              sx={{ minWidth: 80 }}
-                            />
-                          )}
-                          sx={{ minWidth: 100 }}
-                        />
-                      </TableCell>
-                      <TableCell align="center">
-                        <Typography
-                          variant="body1"
-                          sx={{
-                            textDecoration: 'line-through',
-                            color: 'text.secondary'
-                          }}
-                        >
-                          {row.factoryPrice?.toLocaleString()}
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="center" sx={{ color: 'info.main' }}>
-                        {getDisplayValue(row, 'publicSupport')?.toLocaleString() || row.publicSupport?.toLocaleString() || row.support?.toLocaleString()}
-                      </TableCell>
-
-                      {/* 대리점 지원금 */}
-                      <TableCell align="center" sx={{ borderLeft: '1px solid rgba(81, 81, 81, 0.3)', width: '90px' }}>
-                        <Typography
-                          variant="body1"
-                          sx={{
-                            fontSize: '1.1rem',
-                            fontWeight: 'bold',
-                            color: 'info.main'
-                          }}
-                        >
-                          {(() => {
-                            const displayValue = getDisplayValue(row, 'storeSupportWithAddon');
-                            const fallbackValue = row.storeSupport || row.storeSupportWithAddon;
-                            const finalValue = (displayValue !== undefined && displayValue !== null && displayValue !== 0)
-                              ? displayValue.toLocaleString()
-                              : (fallbackValue !== undefined && fallbackValue !== null ? fallbackValue.toLocaleString() : '-');
-                            // #region agent log
-                            // 부가유치 대리점지원금 불일치 로깅
-                            if (displayValue !== undefined && displayValue !== null && fallbackValue !== undefined && fallbackValue !== null && displayValue !== fallbackValue) {
-                              fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:render',message:'대리점지원금(부가유치) 불일치',data:{modelId:row.id,displayValue,fallbackValue,calculatedPrices:calculatedPrices[row.id],rowStoreSupport:row.storeSupport,rowStoreSupportWithAddon:row.storeSupportWithAddon},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'SS-A'})}).catch(()=>{});
-                            }
-                            // #endregion
-                            return finalValue;
-                          })()}
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="center" sx={{ width: '90px' }}>
-                        <Typography
-                          variant="body1"
-                          sx={{
-                            fontSize: '1.1rem',
-                            fontWeight: 'bold',
-                            color: 'warning.main'
-                          }}
-                        >
-                          {(() => {
-                            const displayValue = getDisplayValue(row, 'storeSupportWithoutAddon');
-                            const fallbackValue = row.storeSupportNoAddon;
-                            const finalValue = (displayValue !== undefined && displayValue !== null && displayValue !== 0)
-                              ? displayValue.toLocaleString()
-                              : (fallbackValue !== undefined && fallbackValue !== null ? fallbackValue.toLocaleString() : '-');
-                            // #region agent log
-                            // 부가미유치 대리점지원금 불일치 로깅
-                            if (displayValue !== undefined && displayValue !== null && fallbackValue !== undefined && fallbackValue !== null && displayValue !== fallbackValue) {
-                              fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:render',message:'대리점지원금(부가미유치) 불일치',data:{modelId:row.id,displayValue,fallbackValue,calculatedPrices:calculatedPrices[row.id],rowStoreSupportNoAddon:row.storeSupportNoAddon},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'SS-B'})}).catch(()=>{});
-                            }
-                            // #endregion
-                            return finalValue;
-                          })()}
-                        </Typography>
-                      </TableCell>
-
-                      {/* 구매가 (할부원금) */}
-                      <TableCell align="center" sx={{ borderLeft: '1px solid rgba(81, 81, 81, 0.3)', bgcolor: 'rgba(212, 175, 55, 0.05)', width: '90px' }}>
-                        <Typography
-                          variant="body1"
-                          sx={{
-                            fontSize: '1.15rem',
-                            fontWeight: 'bold',
-                            color: 'primary.main'
-                          }}
-                        >
-                          {(() => {
-                            const displayValue = getDisplayValue(row, 'purchasePriceWithAddon');
-                            const finalValue = displayValue !== undefined && displayValue !== null
-                              ? displayValue.toLocaleString()
-                              : purchasePriceAddon.toLocaleString();
-                            // #region agent log
-                            // 구매가가 계산값과 다를 때 로깅 (0도 정상일 수 있으므로 모든 불일치 로깅)
-                            if (displayValue !== undefined && displayValue !== null && displayValue !== purchasePriceAddon) {
-                              fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:render',message:'구매가(부가유치) 계산 불일치 확인',data:{modelId:row.id,displayValue,calculatedPrices:calculatedPrices[row.id],purchasePriceAddon,rowFactoryPrice:row.factoryPrice,rowSupport:row.support,rowPublicSupport:row.publicSupport,rowStoreSupport:row.storeSupport,rowStoreSupportWithAddon:row.storeSupportWithAddon,difference:Math.abs(displayValue - purchasePriceAddon),finalValue},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
-                            }
-                            // #endregion
-                            return finalValue;
-                          })()}
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="center" sx={{ bgcolor: 'rgba(212, 175, 55, 0.05)', width: '90px' }}>
-                        <Typography
-                          variant="body1"
-                          sx={{
-                            fontSize: '1.15rem',
-                            fontWeight: 'bold',
-                            color: 'success.main'
-                          }}
-                        >
-                          {(() => {
-                            const displayValue = getDisplayValue(row, 'purchasePriceWithoutAddon');
-                            const finalValue = displayValue !== undefined && displayValue !== null
-                              ? displayValue.toLocaleString()
-                              : purchasePriceNoAddon.toLocaleString();
-                            // #region agent log
-                            // 구매가가 계산값과 다를 때 로깅 (0도 정상일 수 있으므로 모든 불일치 로깅)
-                            if (displayValue !== undefined && displayValue !== null && displayValue !== purchasePriceNoAddon) {
-                              fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:render',message:'구매가(부가미유치) 계산 불일치 확인',data:{modelId:row.id,displayValue,calculatedPrices:calculatedPrices[row.id],purchasePriceNoAddon,rowFactoryPrice:row.factoryPrice,rowSupport:row.support,rowPublicSupport:row.publicSupport,rowStoreSupportNoAddon:row.storeSupportNoAddon,difference:Math.abs(displayValue - purchasePriceNoAddon),finalValue},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
-                            }
-                            // #endregion
-                            return finalValue;
-                          })()}
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
+                mobileList.map((row) => (
+                  <MobileListRow
+                    key={row.id}
+                    row={row}
+                    planGroups={planGroups}
+                    openingTypes={openingTypes}
+                    selectedPlanGroup={selectedPlanGroups[row.id] || null}
+                    selectedOpeningType={selectedOpeningTypes[row.id] || null}
+                    calculatedPrice={calculatedPrices[row.id] || null}
+                    tagMenuAnchor={tagMenuAnchor}
+                    onRowClick={handleRowClick}
+                    onTagMenuOpen={handleTagMenuOpen}
+                    onTagMenuClose={handleTagMenuClose}
+                    onTagChange={handleTagChange}
+                    onPlanGroupChange={handlePlanGroupChange}
+                    onOpeningTypeChange={handleOpeningTypeChange}
+                    onImageUploadClick={handleImageUploadClick}
+                    getSelectedTags={getSelectedTags}
+                    getDisplayValue={getDisplayValue}
+                  />
+                ))
               )}
             </TableBody>
           </Table>
-        </TableContainer>
+        </ModernTable>
       )}
     </Box>
   );

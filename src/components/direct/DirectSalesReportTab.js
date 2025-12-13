@@ -36,6 +36,9 @@ import {
     Edit as EditIcon
 } from '@mui/icons-material';
 import { directStoreApi } from '../../api/directStoreApi';
+import { directStoreApiClient } from '../../api/directStoreApiClient';
+import { ModernTable, ModernTableCell, HoverableTableRow, EmptyTableRow } from './common/ModernTable';
+import { LoadingState, ErrorState } from './common';
 
 const DirectSalesReportTab = ({ onRowClick, loggedInStore, isManagementMode = false }) => {
     const [searchTerm, setSearchTerm] = useState('');
@@ -54,7 +57,7 @@ const DirectSalesReportTab = ({ onRowClick, loggedInStore, isManagementMode = fa
                 setError(null);
                 // 직영점 모드: 해당 매장만, 관리 모드: 전체
                 const filters = isManagementMode ? {} : { storeId: loggedInStore?.id };
-                const data = await directStoreApi.getSalesReports(filters);
+                const data = await directStoreApiClient.getSalesReports(filters);
                 setSalesData(data || []);
             } catch (err) {
                 console.error('판매일보 로딩 실패:', err);
@@ -129,7 +132,7 @@ const DirectSalesReportTab = ({ onRowClick, loggedInStore, isManagementMode = fa
         try {
             setUpdating(true);
             const rowId = selectedRow.id || selectedRow.번호;
-            await directStoreApi.updateSalesReport(rowId, { status: newStatus });
+            await directStoreApiClient.updateSalesReport(rowId, { status: newStatus });
             
             // 로컬 상태 업데이트
             setSalesData(prev => prev.map(item => 
@@ -184,51 +187,43 @@ const DirectSalesReportTab = ({ onRowClick, loggedInStore, isManagementMode = fa
             </Box>
 
             {error && (
-                <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
+                <ErrorState error={error} onRetry={() => window.location.reload()} />
             )}
 
             {loading ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', p: 5 }}>
-                    <CircularProgress />
-                </Box>
+                <LoadingState message="판매일보를 불러오는 중..." />
             ) : (
-                <TableContainer component={Paper} sx={{ flexGrow: 1, borderRadius: 2, boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }}>
+                <ModernTable sx={{ flexGrow: 1 }}>
                     <Table stickyHeader size="small">
                         <TableHead>
                             <TableRow>
-                                <TableCell align="center" width="60">번호</TableCell>
-                                {isManagementMode && <TableCell align="center" width="100">업체명</TableCell>}
-                                <TableCell align="center" width="100">판매일시</TableCell>
-                                <TableCell align="center" width="80">고객명</TableCell>
-                                <TableCell align="center" width="100">CTN</TableCell>
-                                <TableCell align="center" width="60">통신사</TableCell>
-                                <TableCell width="120">단말기모델명</TableCell>
-                                <TableCell align="center" width="60">색상</TableCell>
-                                <TableCell align="center" width="80">개통유형</TableCell>
-                                <TableCell align="center" width="80">할부구분</TableCell>
-                                <TableCell align="center" width="80">할부개월</TableCell>
-                                <TableCell align="center" width="80">약정</TableCell>
-                                <TableCell width="100">요금제</TableCell>
-                                <TableCell align="center" width="80">상태</TableCell>
-                                <TableCell align="center" width="100">관리</TableCell>
+                                <ModernTableCell align="center" width="60">번호</ModernTableCell>
+                                {isManagementMode && <ModernTableCell align="center" width="100">업체명</ModernTableCell>}
+                                <ModernTableCell align="center" width="100">판매일시</ModernTableCell>
+                                <ModernTableCell align="center" width="80">고객명</ModernTableCell>
+                                <ModernTableCell align="center" width="100">CTN</ModernTableCell>
+                                <ModernTableCell align="center" width="60">통신사</ModernTableCell>
+                                <ModernTableCell width="120">단말기모델명</ModernTableCell>
+                                <ModernTableCell align="center" width="60">색상</ModernTableCell>
+                                <ModernTableCell align="center" width="80">개통유형</ModernTableCell>
+                                <ModernTableCell align="center" width="80">할부구분</ModernTableCell>
+                                <ModernTableCell align="center" width="80">할부개월</ModernTableCell>
+                                <ModernTableCell align="center" width="80">약정</ModernTableCell>
+                                <ModernTableCell width="100">요금제</ModernTableCell>
+                                <ModernTableCell align="center" width="80">상태</ModernTableCell>
+                                <ModernTableCell align="center" width="100">관리</ModernTableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
                             {filteredData.length === 0 ? (
-                                <TableRow>
-                                    <TableCell colSpan={isManagementMode ? 15 : 14} align="center" sx={{ py: 5 }}>
-                                        <Typography color="text.secondary">표시할 데이터가 없습니다.</Typography>
-                                    </TableCell>
-                                </TableRow>
+                                <EmptyTableRow colSpan={isManagementMode ? 15 : 14} message="표시할 데이터가 없습니다." />
                             ) : (
                                 filteredData.map((row, idx) => {
                                     const rowNumber = row.번호 || row.id || (idx + 1);
                                     const status = row.status || row.상태 || '개통대기';
                                     return (
-                                        <TableRow
+                                        <HoverableTableRow
                                             key={row.id || row.번호 || idx}
-                                            hover
-                                            sx={{ cursor: 'pointer' }}
                                             onClick={() => handleRowClick(row)}
                                         >
                                             <TableCell align="center">{rowNumber}</TableCell>
@@ -261,13 +256,13 @@ const DirectSalesReportTab = ({ onRowClick, loggedInStore, isManagementMode = fa
                                                     </IconButton>
                                                 </Tooltip>
                                             </TableCell>
-                                        </TableRow>
+                                        </HoverableTableRow>
                                     );
                                 })
                             )}
                         </TableBody>
                     </Table>
-                </TableContainer>
+                </ModernTable>
             )}
 
             {/* 상태 변경 다이얼로그 */}

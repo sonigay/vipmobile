@@ -31,6 +31,7 @@ import {
 import AppUpdatePopup from './AppUpdatePopup';
 import { getModeColor, getModeTitle } from '../config/modeConfig';
 import directStoreTheme from '../theme/DirectStoreTheme';
+import directStoreThemeV2 from '../theme/DirectStoreThemeV2';
 
 // 탭 컴포넌트 임포트
 import TodaysMobileTab from './direct/TodaysMobileTab';
@@ -295,8 +296,11 @@ const DirectStoreMode = ({
   }
 
   // 인증 완료 후 메인 화면
+  // 새로운 테마 사용 (V2)
+  const theme = directStoreThemeV2;
+
   return (
-    <ThemeProvider theme={directStoreTheme}>
+    <ThemeProvider theme={theme}>
       <CssBaseline />
       <Box sx={{
         minHeight: '100vh',

@@ -26,6 +26,7 @@ import {
 import { getModeColor, getModeTitle } from '../config/modeConfig';
 import AppUpdatePopup from './AppUpdatePopup';
 import directStoreTheme from '../theme/DirectStoreTheme';
+import directStoreThemeV2 from '../theme/DirectStoreThemeV2';
 
 // 탭 컴포넌트 임포트
 import PolicySettingsTab from './direct/management/PolicySettingsTab';
@@ -118,8 +119,11 @@ const DirectStoreManagementMode = ({
   };
 
 
+  // 새로운 테마 사용 (V2)
+  const theme = directStoreThemeV2;
+
   return (
-    <ThemeProvider theme={directStoreTheme}>
+    <ThemeProvider theme={theme}>
       <CssBaseline />
       <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', display: 'flex', flexDirection: 'column' }}>
         {selectedReport ? (
