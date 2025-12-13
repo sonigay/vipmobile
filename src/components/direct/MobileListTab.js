@@ -1529,66 +1529,66 @@ const MobileListTab = ({ onProductSelect }) => {
                               return finalUrl;
                             })() : undefined}
                             onError={(e) => {
-                              // #region agent log
-                              fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:imageOnError',message:'이미지 로드 에러 발생',data:{currentSrc:e.target.src,gaveUp:e.target.dataset.gaveUp,retryCount:e.target.dataset.retryCount},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
-                              // #endregion
-                              // 이미 재시도 포기 상태인 경우 즉시 중단
+                              // 🔥 이미 재시도 포기 상태인 경우 즉시 중단 (무한 루프 방지)
                               if (e.target.dataset.gaveUp === 'true') {
+                                e.target.onerror = null; // 에러 핸들러 제거
                                 return;
                               }
                               
-                              const currentSrc = e.target.src;
-                              // URL에서 쿼리 파라미터 제거 (첫 번째 ? 이후 모두 제거)
-                              const urlParts = currentSrc.split('?');
-                              let originalSrc = urlParts[0];
-                              
-                              // 이중 하이픈 정규화 시도
-                              try {
-                                const urlObj = new URL(originalSrc);
-                                const pathParts = urlObj.pathname.split('/');
-                                const filename = pathParts[pathParts.length - 1];
-                                if (filename.includes('--')) {
-                                  const normalizedFilename = filename.replace(/--+/g, '-');
-                                  pathParts[pathParts.length - 1] = normalizedFilename;
-                                  urlObj.pathname = pathParts.join('/');
-                                  originalSrc = urlObj.toString();
-                                }
-                              } catch (err) {
-                                // URL 파싱 실패 시 문자열 치환으로 처리
-                                originalSrc = originalSrc.replace(/--+/g, '-');
-                              }
-                              
+                              // 🔥 404 에러는 즉시 포기 (이미지가 존재하지 않음)
                               const retryCount = parseInt(e.target.dataset.retryCount || '0');
                               
                               // #region agent log
-                              fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:imageOnError',message:'이미지 재시도 준비',data:{currentSrc,originalSrc,retryCount},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
+                              fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:imageOnError',message:'이미지 로드 에러 발생',data:{currentSrc:e.target.src,gaveUp:e.target.dataset.gaveUp,retryCount},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
                               // #endregion
                               
-                              // 최대 1회만 재시도 (총 2회 시도) - 무한 재시도 방지
-                              if (retryCount < 1 && originalSrc && originalSrc.trim() !== '') {
+                              // 🔥 최대 1회만 재시도하고, 재시도 후에도 실패하면 즉시 포기
+                              if (retryCount < 1) {
                                 e.target.dataset.retryCount = String(retryCount + 1);
-                                // 정규화된 URL로 재시도 (쿼리 파라미터는 ?로 시작)
-                                const newSrc = `${originalSrc}?_t=${Date.now()}&retry=${retryCount + 1}`;
+                                
+                                const currentSrc = e.target.src;
+                                // URL에서 쿼리 파라미터 제거 (첫 번째 ? 이후 모두 제거)
+                                const urlParts = currentSrc.split('?');
+                                let originalSrc = urlParts[0];
+                                
+                                // 이중 하이픈 정규화 시도
+                                try {
+                                  const urlObj = new URL(originalSrc);
+                                  const pathParts = urlObj.pathname.split('/');
+                                  const filename = pathParts[pathParts.length - 1];
+                                  if (filename.includes('--')) {
+                                    const normalizedFilename = filename.replace(/--+/g, '-');
+                                    pathParts[pathParts.length - 1] = normalizedFilename;
+                                    urlObj.pathname = pathParts.join('/');
+                                    originalSrc = urlObj.toString();
+                                  }
+                                } catch (err) {
+                                  // URL 파싱 실패 시 문자열 치환으로 처리
+                                  originalSrc = originalSrc.replace(/--+/g, '-');
+                                }
                                 
                                 // #region agent log
-                                fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:imageOnError',message:'이미지 재시도 URL 생성',data:{originalSrc,newSrc,retryCount},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
+                                fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:imageOnError',message:'이미지 재시도 URL 생성',data:{originalSrc,retryCount},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
                                 // #endregion
+                                
+                                // 정규화된 URL로 재시도 (쿼리 파라미터는 ?로 시작)
+                                const newSrc = `${originalSrc}?_t=${Date.now()}&retry=${retryCount + 1}`;
                                 
                                 setTimeout(() => {
                                   // 재시도 전에 다시 확인
                                   if (e.target.dataset.gaveUp !== 'true') {
                                     e.target.src = newSrc;
                                   }
-                                }, 1000); // 1초 지연 후 재시도
+                                }, 500); // 0.5초 지연 후 재시도 (1초 -> 0.5초로 단축)
                               } else {
-                                // 재시도 실패 시 즉시 포기하고 기본 아이콘만 표시
+                                // 🔥 재시도 실패 시 즉시 포기하고 기본 아이콘만 표시
                                 e.target.dataset.gaveUp = 'true';
-                                e.target.src = '';
-                                e.target.onerror = null; // 무한 루프 방지
+                                e.target.src = ''; // 빈 문자열로 설정하여 추가 시도 방지
+                                e.target.onerror = null; // 무한 루프 방지: 에러 핸들러 제거
                                 e.target.dataset.retryCount = '0'; // 재시도 카운터 초기화
                                 
                                 // #region agent log
-                                fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:imageOnError',message:'이미지 재시도 포기',data:{originalSrc,retryCount},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
+                                fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:imageOnError',message:'이미지 재시도 포기',data:{currentSrc:e.target.src,retryCount},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
                                 // #endregion
                               }
                             }}
