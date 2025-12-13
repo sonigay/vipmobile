@@ -34,7 +34,7 @@ import {
 import { directStoreApi } from '../../api/directStoreApi';
 import { getCachedPrice, setCachedPrice, setCachedPricesBatch } from '../../utils/priceCache';
 
-const ProductCard = ({ product, isPremium, onSelect, compact, theme, priceData: propPriceData }) => {
+const ProductCard = ({ product, isPremium, onSelect, compact, theme, priceData: propPriceData, onPriceCalculated }) => {
   const [priceData, setPriceData] = useState({
     '010신규': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: true },
     'MNP': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: true },
@@ -115,6 +115,10 @@ const ProductCard = ({ product, isPremium, onSelect, compact, theme, priceData: 
       // 모든 데이터가 캐시에 있으면 API 호출 없이 종료
       if (allCached) {
         setPriceData(newPriceData);
+        // 가격 계산 완료를 부모 컴포넌트에 알림
+        if (onPriceCalculated) {
+          onPriceCalculated(product.id, newPriceData);
+        }
         return;
       }
 
@@ -157,10 +161,15 @@ const ProductCard = ({ product, isPremium, onSelect, compact, theme, priceData: 
       }
 
       setPriceData(newPriceData);
+      
+      // 가격 계산 완료를 부모 컴포넌트에 알림
+      if (onPriceCalculated) {
+        onPriceCalculated(product.id, newPriceData);
+      }
     };
 
     loadPrices();
-  }, [product.id, product.carrier, product.isPremium, product.isBudget, propPriceData]);
+  }, [product.id, product.carrier, product.isPremium, product.isBudget, propPriceData, onPriceCalculated]);
 
   return (
     <Card
@@ -383,6 +392,10 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [compact, setCompact] = useState(true);
+  const [isInitializing, setIsInitializing] = useState(false); // 초기화 중 여부
+  const expectedCalculationsRef = useRef(new Set()); // 초기 로드 시 계산 예상되는 상품 ID 목록
+  const calculatedPricesRef = useRef(new Map()); // 계산된 가격 데이터 (productId -> priceData)
+  const initStartTimeRef = useRef(null); // 초기화 시작 시간
   const [mainHeaderText, setMainHeaderText] = useState(() => {
     try {
       return typeof window !== 'undefined'
@@ -860,6 +873,98 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
     return combined.slice(0, 3); // 최대 3개만 표시
   }, [premiumPhones, budgetPhones]);
 
+  // 모든 상품의 가격 계산 완료 확인
+  useEffect(() => {
+    // 초기화 중이 아니면 확인하지 않음
+    if (!isInitializing || allProducts.length === 0) {
+      return;
+    }
+
+    // 예상 계산 목록이 비어있으면 확인하지 않음
+    if (expectedCalculationsRef.current.size === 0) {
+      return;
+    }
+
+    // 최대 대기 시간 체크
+    if (!initStartTimeRef.current) {
+      initStartTimeRef.current = Date.now();
+    }
+    const MAX_WAIT_TIME = 150000; // 최대 150초 대기
+    const elapsedTime = Date.now() - initStartTimeRef.current;
+
+    // 모든 예상 상품의 가격이 계산되었는지 확인
+    const calculatedProductIds = new Set(calculatedPricesRef.current.keys());
+    const allCalculated = Array.from(expectedCalculationsRef.current).every(productId => {
+      const priceData = calculatedPricesRef.current.get(productId);
+      // 각 유형(010신규, MNP, 기변)의 loading이 모두 false여야 함
+      return priceData && 
+             priceData['010신규']?.loading === false &&
+             priceData['MNP']?.loading === false &&
+             priceData['기변']?.loading === false;
+    });
+
+    // 최대 대기 시간 초과 시 강제로 초기화 완료
+    if (elapsedTime > MAX_WAIT_TIME) {
+      console.warn('오늘의휴대폰 초기화 대기 시간 초과, 강제로 초기화 완료', {
+        expectedCount: expectedCalculationsRef.current.size,
+        calculatedCount: calculatedProductIds.size,
+        missingProducts: Array.from(expectedCalculationsRef.current).filter(id => !calculatedProductIds.has(id))
+      });
+      setIsInitializing(false);
+      expectedCalculationsRef.current.clear();
+      initStartTimeRef.current = null;
+      return;
+    }
+
+    if (allCalculated) {
+      // 약간의 지연 후 다시 확인 (마지막 요청이 완료될 시간 확보)
+      const timeoutId = setTimeout(() => {
+        const finalAllCalculated = Array.from(expectedCalculationsRef.current).every(productId => {
+          const priceData = calculatedPricesRef.current.get(productId);
+          return priceData && 
+                 priceData['010신규']?.loading === false &&
+                 priceData['MNP']?.loading === false &&
+                 priceData['기변']?.loading === false;
+        });
+
+        if (finalAllCalculated) {
+          setIsInitializing(false);
+          expectedCalculationsRef.current.clear();
+          initStartTimeRef.current = null;
+        }
+      }, 500);
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [allProducts, isInitializing, priceCalculationTrigger]);
+
+  // allProducts가 변경될 때 가격 계산 시작
+  useEffect(() => {
+    if (allProducts.length === 0) {
+      setIsInitializing(false);
+      return;
+    }
+
+    // 초기화 시작
+    setIsInitializing(true);
+    initStartTimeRef.current = Date.now();
+    expectedCalculationsRef.current.clear();
+    calculatedPricesRef.current.clear();
+
+    // 모든 상품 ID를 예상 목록에 추가
+    allProducts.forEach(product => {
+      if (product.id) {
+        expectedCalculationsRef.current.add(product.id);
+        // 초기 가격 데이터 설정
+        calculatedPricesRef.current.set(product.id, {
+          '010신규': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: true },
+          'MNP': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: true },
+          '기변': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: true }
+        });
+      }
+    });
+  }, [allProducts.map(p => p.id).join(',')]); // 상품 ID 목록이 변경될 때만 실행
+
   // 일반 모드에서 수동 슬라이드 탐색 함수
   const handleManualSlideChange = useCallback((direction) => {
     if (slideshowData.length === 0) return;
@@ -926,6 +1031,18 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
   const getPriceDataFromCache = useCallback((product) => {
     if (!product.id || !product.carrier) return null;
     
+    // calculatedPricesRef에서 먼저 확인
+    if (calculatedPricesRef.current.has(product.id)) {
+      const cachedPriceData = calculatedPricesRef.current.get(product.id);
+      // 모든 유형이 로드 완료되었는지 확인
+      const allLoaded = cachedPriceData['010신규']?.loading === false &&
+                        cachedPriceData['MNP']?.loading === false &&
+                        cachedPriceData['기변']?.loading === false;
+      if (allLoaded) {
+        return cachedPriceData;
+      }
+    }
+    
     const planGroup = product.isBudget && !product.isPremium ? '33군' : '115군';
     const priceData = {
       '010신규': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: true },
@@ -949,6 +1066,16 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
     
     // 캐시가 있으면 priceData 반환, 없으면 null 반환하여 ProductCard에서 자체 로드하도록
     return hasCachedData ? priceData : null;
+  }, []);
+
+  // 가격 계산 완료 상태 (재렌더링 트리거용)
+  const [priceCalculationTrigger, setPriceCalculationTrigger] = useState(0);
+
+  // 가격 계산 완료 콜백
+  const handlePriceCalculated = useCallback((productId, priceData) => {
+    calculatedPricesRef.current.set(productId, priceData);
+    // 상태 업데이트를 트리거하기 위해 강제로 재렌더링
+    setPriceCalculationTrigger(prev => prev + 1);
   }, []);
 
   const getCarrierTheme = (carrier) => {
@@ -995,10 +1122,13 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
   const theme = getCarrierTheme(currentCarrier);
 
   // Early return은 모든 훅 호출 이후에 위치
-  if (loading) {
+  if (loading || isInitializing) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100%', gap: 2 }}>
         <CircularProgress />
+        <Typography variant="body2" color="text.secondary">
+          {isInitializing ? '가격 정보를 계산하는 중...' : '데이터를 불러오는 중...'}
+        </Typography>
       </Box>
     );
   }
@@ -1283,6 +1413,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                       compact={compact}
                       theme={getCarrierTheme(slideshowData[currentSlideIndex].carrier)}
                       priceData={getPriceDataFromCache(product)}
+                      onPriceCalculated={handlePriceCalculated}
                     />
                   ))}
                 </Box>
@@ -1471,6 +1602,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                           compact={compact}
                           theme={getCarrierTheme(slideshowData[manualSlideIndex].carrier)}
                           priceData={getPriceDataFromCache(product)}
+                          onPriceCalculated={handlePriceCalculated}
                         />
                       ))}
                     </Box>
@@ -1518,6 +1650,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                       compact={compact}
                       theme={getCarrierTheme(product.carrier)}
                       priceData={getPriceDataFromCache(product)}
+                      onPriceCalculated={handlePriceCalculated}
                     />
                   );
                 })}
