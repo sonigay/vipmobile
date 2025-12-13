@@ -4575,10 +4575,18 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
     // 이미지 업로드
     // 🔥 개선: manufacturer가 빈 문자열이면 기본값 사용 (하이픈 두 개 연속 방지)
     const safeManufacturer = manufacturer && manufacturer.trim() ? manufacturer.trim() : '기타';
-    const filename = `direct-store-${carrier}-${safeManufacturer}-${modelId}-${Date.now()}.${file.originalname.split('.').pop()}`;
+    
+    // 🔥 개선: 파일명에 하이픈이 포함된 경우를 대비하여 하이픈을 언더스코어로 치환
+    // 또는 연속된 하이픈을 하나로 통합
+    const safeCarrier = (carrier || '').trim().replace(/-+/g, '-').replace(/^-|-$/g, '') || 'SK';
+    const safeModelId = (modelId || '').trim().replace(/-+/g, '-').replace(/^-|-$/g, '') || 'unknown';
+    const safeManufacturerFinal = safeManufacturer.replace(/-+/g, '-').replace(/^-|-$/g, '') || '기타';
+    
+    // 파일명 생성: 연속된 하이픈 방지
+    const filename = `direct-store-${safeCarrier}-${safeManufacturerFinal}-${safeModelId}-${Date.now()}.${file.originalname.split('.').pop()}`.replace(/-+/g, '-');
     
     // 🔥 디버그: 파일명 생성 확인
-    console.log(`📤 [이미지 업로드] 파일명 생성: ${filename} (manufacturer=${manufacturer}, safeManufacturer=${safeManufacturer}, carrier=${carrier}, modelId=${modelId})`);
+    console.log(`📤 [이미지 업로드] 파일명 생성: ${filename} (manufacturer=${manufacturer}, safeManufacturer=${safeManufacturerFinal}, carrier=${carrier}->${safeCarrier}, modelId=${modelId}->${safeModelId})`);
     console.log(`📤 [이미지 업로드] Discord에 업로드 시작: ${filename} (포스트: ${carrierPost.name}, 스레드: ${targetThread.name})`);
     
     try {

@@ -105,6 +105,9 @@ const MobileListTab = ({ onProductSelect }) => {
         }));
       } catch (err) {
         console.error('휴대폰 목록 로딩 실패:', err);
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:fetchMobileList',message:'휴대폰 목록 로딩 실패',data:{carrier:getCurrentCarrier(),errorMessage:err.message,errorName:err.name,errorStack:err.stack?.split('\n').slice(0,3).join('|')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E10'})}).catch(()=>{});
+        // #endregion
         setError('데이터를 불러오는 중 오류가 발생했습니다.');
         setMobileList([]);
         setSteps(prev => ({
@@ -654,13 +657,19 @@ const MobileListTab = ({ onProductSelect }) => {
         }
       }
 
+      const queueSize = priceCalculationQueueRef.current.length;
+      const uniqueSize = uniqueQueue.length;
       priceCalculationQueueRef.current = [];
 
-      // 배치 처리 설정 (캐시 비활성화 시 더 보수적으로)
-      const BATCH_SIZE = 2; // 동시 실행 수 제한 (3 -> 2로 감소)
-      const DELAY_MS = 1000; // 배치 간 지연 시간 (500ms -> 1000ms로 증가)
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:processPriceCalculationQueue',message:'큐 처리 시작',data:{queueSize,uniqueSize},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E0'})}).catch(()=>{});
+      // #endregion
+
+      // 배치 처리 설정 (ERR_INSUFFICIENT_RESOURCES 에러 방지를 위해 더 보수적으로)
+      const BATCH_SIZE = 1; // 동시 실행 수 제한 (2 -> 1로 감소: 한 번에 하나씩만 처리)
+      const DELAY_MS = 1500; // 배치 간 지연 시간 (1000ms -> 1500ms로 증가)
       const MAX_RETRIES = 2; // 최대 재시도 횟수
-      const INITIAL_RETRY_DELAY = 2000; // 초기 재시도 지연 (2초)
+      const INITIAL_RETRY_DELAY = 3000; // 초기 재시도 지연 (2초 -> 3초로 증가)
 
       for (let i = 0; i < uniqueQueue.length; i += BATCH_SIZE) {
         const batch = uniqueQueue.slice(i, i + BATCH_SIZE);
@@ -687,6 +696,10 @@ const MobileListTab = ({ onProductSelect }) => {
                                      err.message?.includes('ERR_INSUFFICIENT_RESOURCES') ||
                                      err.message?.includes('NetworkError');
                 
+                // #region agent log
+                fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:processPriceCalculationQueue',message:'가격 계산 에러 발생',data:{modelId:item.modelId,planGroup:item.planGroup,openingType:item.openingType,retries,isNetworkError,errorMessage:err.message,errorName:err.name,errorStack:err.stack?.split('\n').slice(0,3).join('|')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E1'})}).catch(()=>{});
+                // #endregion
+                
                 // 네트워크 에러가 아니거나 최대 재시도 횟수에 도달하면 종료
                 if (!isNetworkError || retries >= MAX_RETRIES) {
                   console.error(`가격 계산 실패 (큐 처리):`, {
@@ -696,6 +709,9 @@ const MobileListTab = ({ onProductSelect }) => {
                     retries,
                     error: err
                   });
+                  // #region agent log
+                  fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:processPriceCalculationQueue',message:'가격 계산 최종 실패',data:{modelId:item.modelId,planGroup:item.planGroup,openingType:item.openingType,retries,isNetworkError,reason:!isNetworkError ? '네트워크 에러 아님' : '최대 재시도 횟수 초과',errorMessage:err.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E2'})}).catch(()=>{});
+                  // #endregion
                   break;
                 }
 
@@ -705,6 +721,9 @@ const MobileListTab = ({ onProductSelect }) => {
                   modelId: item.modelId,
                   delay: retryDelay
                 });
+                // #region agent log
+                fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:processPriceCalculationQueue',message:'가격 계산 재시도 스케줄링',data:{modelId:item.modelId,planGroup:item.planGroup,openingType:item.openingType,retries:retries+1,maxRetries:MAX_RETRIES,retryDelay,isNetworkError},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E3'})}).catch(()=>{});
+                // #endregion
                 await new Promise(resolve => setTimeout(resolve, retryDelay));
                 retries++;
               }
@@ -717,13 +736,22 @@ const MobileListTab = ({ onProductSelect }) => {
           await new Promise(resolve => setTimeout(resolve, DELAY_MS));
         }
       }
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:processPriceCalculationQueue',message:'큐 처리 완료',data:{processedCount:uniqueQueue.length,remainingQueue:priceCalculationQueueRef.current.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E8'})}).catch(()=>{});
+      // #endregion
+    } catch (queueError) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:processPriceCalculationQueue',message:'큐 처리 중 예외 발생',data:{errorMessage:queueError.message,errorName:queueError.name,queueSize:priceCalculationQueueRef.current.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E9'})}).catch(()=>{});
+      // #endregion
+      console.error('큐 처리 중 예외 발생:', queueError);
     } finally {
       isProcessingQueueRef.current = false;
 
       // 큐에 새로운 항목이 추가되었으면 다시 처리
       if (priceCalculationQueueRef.current.length > 0) {
-        // 다음 이벤트 루프에서 처리 (지연 시간 증가)
-        setTimeout(() => processPriceCalculationQueue(), 200);
+        // 다음 이벤트 루프에서 처리 (지연 시간 증가 - ERR_INSUFFICIENT_RESOURCES 에러 방지)
+        setTimeout(() => processPriceCalculationQueue(), 500); // 200ms -> 500ms로 증가
       }
     }
   };
@@ -840,6 +868,9 @@ const MobileListTab = ({ onProductSelect }) => {
       })
       .catch(err => {
         console.error('가격 계산 API 호출 실패:', err, { modelId, planGroup, openingType, carrier: modelCarrier });
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:calculatePriceInternal',message:'가격 계산 API 호출 실패',data:{modelId,planGroup,openingType,carrier:modelCarrier,modelName,errorMessage:err.message,errorName:err.name,errorStatus:err.status,errorCode:err.code},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E5'})}).catch(()=>{});
+        // #endregion
         return { success: false, error: err.message || err.toString() };
       })
       .finally(() => {
@@ -974,8 +1005,8 @@ const MobileListTab = ({ onProductSelect }) => {
       return;
     }
 
-    // 큐 크기 제한 (너무 많은 요청 방지)
-    const MAX_QUEUE_SIZE = 100;
+    // 큐 크기 제한 (너무 많은 요청 방지 - ERR_INSUFFICIENT_RESOURCES 에러 방지)
+    const MAX_QUEUE_SIZE = 50; // 100 -> 50으로 감소
     if (priceCalculationQueueRef.current.length >= MAX_QUEUE_SIZE) {
       console.warn(`[MobileListTab] 큐 크기 제한 도달 (${MAX_QUEUE_SIZE}), 요청 스킵:`, {
         modelId,
@@ -1036,6 +1067,9 @@ const MobileListTab = ({ onProductSelect }) => {
       await calculatePrice(modelId, planGroup, openingType);
     } catch (err) {
       console.error('요금제군 변경 시 가격 계산 실패:', err, { modelId, planGroup, openingType });
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:handlePlanGroupChange',message:'요금제군 변경 시 가격 계산 실패',data:{modelId,planGroup,openingType,errorMessage:err.message,errorName:err.name},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E6'})}).catch(()=>{});
+      // #endregion
       // 에러 발생 시에도 무한 재시도 방지를 위해 상태는 유지
     }
   };
@@ -1070,6 +1104,9 @@ const MobileListTab = ({ onProductSelect }) => {
         await calculatePrice(modelId, planGroup, openingType);
       } catch (err) {
         console.error('개통유형 변경 시 가격 계산 실패:', err, { modelId, planGroup, openingType });
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:handleOpeningTypeChange',message:'개통유형 변경 시 가격 계산 실패',data:{modelId,planGroup,openingType,errorMessage:err.message,errorName:err.name},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E7'})}).catch(()=>{});
+        // #endregion
         // 에러 발생 시에도 무한 재시도 방지를 위해 상태는 유지
       }
     }
@@ -1317,20 +1354,42 @@ const MobileListTab = ({ onProductSelect }) => {
                             variant="rounded"
                             src={row.image ? `${row.image}${row.image.includes('?') ? '&' : '?'}_t=${Date.now()}` : undefined}
                             onError={(e) => {
-                              const originalSrc = e.target.src.split('?')[0]; // 쿼리 파라미터 제거
+                              // #region agent log
+                              fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:onError',message:'이미지 로드 실패',data:{currentSrc:e.target.src,modelId:row.id,modelName:row.model,imageUrl:row.image,retryCount:parseInt(e.target.dataset.retryCount || '0')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+                              // #endregion
+                              
+                              const currentSrc = e.target.src;
+                              // URL에서 쿼리 파라미터 제거 (첫 번째 ? 이후 모두 제거)
+                              const urlParts = currentSrc.split('?');
+                              const originalSrc = urlParts[0];
                               const retryCount = parseInt(e.target.dataset.retryCount || '0');
                               
+                              // #region agent log
+                              fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:onError',message:'재시도 로직 실행',data:{originalSrc,retryCount,willRetry:retryCount < 2 && originalSrc},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+                              // #endregion
+                              
                               // 최대 2회 재시도 (총 3회 시도)
-                              if (retryCount < 2 && originalSrc) {
+                              if (retryCount < 2 && originalSrc && originalSrc.trim() !== '') {
                                 e.target.dataset.retryCount = String(retryCount + 1);
                                 // 캐시 버스팅을 위해 타임스탬프 추가하여 재시도
+                                const newSrc = `${originalSrc}?_t=${Date.now()}&retry=${retryCount + 1}`;
+                                
+                                // #region agent log
+                                fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:onError',message:'재시도 스케줄링',data:{newSrc,retryCount:retryCount + 1,delay:1000 * (retryCount + 1)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+                                // #endregion
+                                
                                 setTimeout(() => {
-                                  e.target.src = `${originalSrc}${originalSrc.includes('?') ? '&' : '?'}_t=${Date.now()}&retry=${retryCount + 1}`;
+                                  e.target.src = newSrc;
                                 }, 1000 * (retryCount + 1)); // 1초, 2초 지연 후 재시도
                               } else {
                                 // 재시도 실패 시 src를 제거하여 기본 아이콘만 표시
+                                // #region agent log
+                                fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:onError',message:'재시도 포기, 기본 아이콘 표시',data:{retryCount,originalSrc,reason:retryCount >= 2 ? '최대 재시도 횟수 초과' : !originalSrc || originalSrc.trim() === '' ? '원본 URL 없음' : '알 수 없음'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+                                // #endregion
+                                
                                 e.target.src = '';
                                 e.target.onerror = null; // 무한 루프 방지
+                                e.target.dataset.retryCount = '0'; // 재시도 카운터 초기화
                               }
                             }}
                             sx={{ width: 60, height: 60, bgcolor: 'background.subtle' }}
