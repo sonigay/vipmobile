@@ -152,13 +152,23 @@ const MobileListTab = ({ onProductSelect }) => {
           const existingPlanGroup = newPlanGroups[model.id];
           const existingOpeningType = newOpeningTypes[model.id];
           if (existingPlanGroup && existingOpeningType && planGroups.includes(existingPlanGroup)) {
-            const cached = getCachedPrice(model.id, existingPlanGroup, existingOpeningType, carrier);
-            if (!cached) {
+            // 🔥 초기 로드 시에는 캐시를 사용하지 않고 항상 서버에서 새로 계산
+            if (!initializedRef.current) {
               calculationQueue.push({
                 modelId: model.id,
                 planGroup: existingPlanGroup,
                 openingType: existingOpeningType
               });
+            } else {
+              // 초기화 후에는 캐시 확인
+              const cached = getCachedPrice(model.id, existingPlanGroup, existingOpeningType, carrier);
+              if (!cached) {
+                calculationQueue.push({
+                  modelId: model.id,
+                  planGroup: existingPlanGroup,
+                  openingType: existingOpeningType
+                });
+              }
             }
           }
           continue;
@@ -171,42 +181,52 @@ const MobileListTab = ({ onProductSelect }) => {
           const existingPlanGroup = newPlanGroups[model.id];
           const existingOpeningType = newOpeningTypes[model.id];
           if (planGroups.includes(existingPlanGroup)) {
-            const cached = getCachedPrice(model.id, existingPlanGroup, existingOpeningType, carrier);
-            // 🔥 캐시 값 검증: 초기 로드 시 서버에서 받은 publicSupport 값과 캐시 값이 크게 다르면 캐시 무시
-            const serverPublicSupport = model.publicSupport || model.support || 0;
-            const cachePublicSupport = cached?.publicSupport || 0;
-            const isCacheValueInvalid = cached && serverPublicSupport > 0 && 
-              Math.abs(cachePublicSupport - serverPublicSupport) > 100000; // 10만원 이상 차이나면 잘못된 캐시로 간주
-            
-            if (cached && !isCacheValueInvalid) {
-              // 캐시에서 즉시 상태 업데이트
-              setCalculatedPrices(prev => ({
-                ...prev,
-                [model.id]: {
-                  storeSupportWithAddon: cached.storeSupportWithAddon || 0,
-                  storeSupportWithoutAddon: cached.storeSupportWithoutAddon || 0,
-                  purchasePriceWithAddon: cached.purchasePriceWithAddon || 0,
-                  purchasePriceWithoutAddon: cached.purchasePriceWithoutAddon || 0,
-                  publicSupport: cached.publicSupport || 0
-                }
-              }));
-              // mobileList 상태도 업데이트
-              setMobileList(prevList => prevList.map(item =>
-                item.id === model.id
-                  ? {
-                      ...item,
-                      publicSupport: cached.publicSupport || item.publicSupport || 0,
-                      support: cached.publicSupport || item.support || item.publicSupport || 0
-                    }
-                  : item
-              ));
-            } else {
-              // 캐시에 없으면 계산 대기열에 추가
+            // 🔥 초기 로드 시에는 캐시를 사용하지 않고 항상 서버에서 새로 계산
+            if (!initializedRef.current) {
               calculationQueue.push({
                 modelId: model.id,
                 planGroup: existingPlanGroup,
                 openingType: existingOpeningType
               });
+            } else {
+              // 초기화 후에는 캐시 확인
+              const cached = getCachedPrice(model.id, existingPlanGroup, existingOpeningType, carrier);
+              // 🔥 캐시 값 검증: 초기 로드 시 서버에서 받은 publicSupport 값과 캐시 값이 크게 다르면 캐시 무시
+              const serverPublicSupport = model.publicSupport || model.support || 0;
+              const cachePublicSupport = cached?.publicSupport || 0;
+              const isCacheValueInvalid = cached && serverPublicSupport > 0 && 
+                Math.abs(cachePublicSupport - serverPublicSupport) > 100000; // 10만원 이상 차이나면 잘못된 캐시로 간주
+              
+              if (cached && !isCacheValueInvalid) {
+                // 캐시에서 즉시 상태 업데이트
+                setCalculatedPrices(prev => ({
+                  ...prev,
+                  [model.id]: {
+                    storeSupportWithAddon: cached.storeSupportWithAddon || 0,
+                    storeSupportWithoutAddon: cached.storeSupportWithoutAddon || 0,
+                    purchasePriceWithAddon: cached.purchasePriceWithAddon || 0,
+                    purchasePriceWithoutAddon: cached.purchasePriceWithoutAddon || 0,
+                    publicSupport: cached.publicSupport || 0
+                  }
+                }));
+                // mobileList 상태도 업데이트
+                setMobileList(prevList => prevList.map(item =>
+                  item.id === model.id
+                    ? {
+                        ...item,
+                        publicSupport: cached.publicSupport || item.publicSupport || 0,
+                        support: cached.publicSupport || item.support || item.publicSupport || 0
+                      }
+                    : item
+                ));
+              } else {
+                // 캐시에 없으면 계산 대기열에 추가
+                calculationQueue.push({
+                  modelId: model.id,
+                  planGroup: existingPlanGroup,
+                  openingType: existingOpeningType
+                });
+              }
             }
           }
           continue;
@@ -246,43 +266,59 @@ const MobileListTab = ({ onProductSelect }) => {
         newPlanGroups[model.id] = finalPlanGroup;
         newOpeningTypes[model.id] = defaultOpeningType;
 
-        // 전역 캐시에서 먼저 확인
-        const cached = getCachedPrice(model.id, finalPlanGroup, defaultOpeningType, carrier);
-        // 🔥 캐시 값 검증: 초기 로드 시 서버에서 받은 publicSupport 값과 캐시 값이 크게 다르면 캐시 무시
-        const serverPublicSupport = model.publicSupport || model.support || 0;
-        const cachePublicSupport = cached?.publicSupport || 0;
-        const isCacheValueInvalid = cached && serverPublicSupport > 0 && 
-          Math.abs(cachePublicSupport - serverPublicSupport) > 100000; // 10만원 이상 차이나면 잘못된 캐시로 간주
-        
-        if (cached && !isCacheValueInvalid) {
-          // 캐시에서 즉시 상태 업데이트
-          setCalculatedPrices(prev => ({
-            ...prev,
-            [model.id]: {
-              storeSupportWithAddon: cached.storeSupportWithAddon || 0,
-              storeSupportWithoutAddon: cached.storeSupportWithoutAddon || 0,
-              purchasePriceWithAddon: cached.purchasePriceWithAddon || 0,
-              purchasePriceWithoutAddon: cached.purchasePriceWithoutAddon || 0,
-              publicSupport: cached.publicSupport || 0
-            }
-          }));
-          // mobileList 상태도 업데이트
-          setMobileList(prevList => prevList.map(item =>
-            item.id === model.id
-              ? {
-                  ...item,
-                  publicSupport: cached.publicSupport || item.publicSupport || 0,
-                  support: cached.publicSupport || item.support || item.publicSupport || 0
-                }
-              : item
-          ));
-        } else {
-          // 캐시에 없으면 계산 대기열에 추가 (실행은 나중에 배치 처리)
+        // 🔥 초기 로드 시에는 캐시를 사용하지 않고 항상 서버에서 새로 계산
+        if (!initializedRef.current) {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:setDefaultValues',message:'초기 로드 시 캐시 사용 안함',data:{modelId:model.id,planGroup:finalPlanGroup,openingType:defaultOpeningType,carrier},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'CACHE-1'})}).catch(()=>{});
+          // #endregion
+          // 초기 로드 시에는 항상 계산 대기열에 추가
           calculationQueue.push({
             modelId: model.id,
             planGroup: finalPlanGroup,
             openingType: defaultOpeningType
           });
+        } else {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:setDefaultValues',message:'초기화 후 캐시 확인',data:{modelId:model.id,planGroup:finalPlanGroup,openingType:defaultOpeningType,carrier},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'CACHE-2'})}).catch(()=>{});
+          // #endregion
+          // 초기화 후에는 캐시 확인
+          const cached = getCachedPrice(model.id, finalPlanGroup, defaultOpeningType, carrier);
+          // 🔥 캐시 값 검증: 초기 로드 시 서버에서 받은 publicSupport 값과 캐시 값이 크게 다르면 캐시 무시
+          const serverPublicSupport = model.publicSupport || model.support || 0;
+          const cachePublicSupport = cached?.publicSupport || 0;
+          const isCacheValueInvalid = cached && serverPublicSupport > 0 && 
+            Math.abs(cachePublicSupport - serverPublicSupport) > 100000; // 10만원 이상 차이나면 잘못된 캐시로 간주
+          
+          if (cached && !isCacheValueInvalid) {
+            // 캐시에서 즉시 상태 업데이트
+            setCalculatedPrices(prev => ({
+              ...prev,
+              [model.id]: {
+                storeSupportWithAddon: cached.storeSupportWithAddon || 0,
+                storeSupportWithoutAddon: cached.storeSupportWithoutAddon || 0,
+                purchasePriceWithAddon: cached.purchasePriceWithAddon || 0,
+                purchasePriceWithoutAddon: cached.purchasePriceWithoutAddon || 0,
+                publicSupport: cached.publicSupport || 0
+              }
+            }));
+            // mobileList 상태도 업데이트
+            setMobileList(prevList => prevList.map(item =>
+              item.id === model.id
+                ? {
+                    ...item,
+                    publicSupport: cached.publicSupport || item.publicSupport || 0,
+                    support: cached.publicSupport || item.support || item.publicSupport || 0
+                  }
+                : item
+            ));
+          } else {
+            // 캐시에 없으면 계산 대기열에 추가 (실행은 나중에 배치 처리)
+            calculationQueue.push({
+              modelId: model.id,
+              planGroup: finalPlanGroup,
+              openingType: defaultOpeningType
+            });
+          }
         }
       }
 
@@ -1369,6 +1405,9 @@ const MobileListTab = ({ onProductSelect }) => {
                           <Avatar
                             variant="rounded"
                             src={row.image ? (() => {
+                              // #region agent log
+                              fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:imageSrc',message:'이미지 URL 초기값',data:{originalUrl:row.image,modelId:row.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+                              // #endregion
                               // 이미지 URL 정규화: 이중 하이픈을 단일 하이픈로 변환
                               let normalizedUrl = row.image;
                               // URL 경로 부분에서 이중 하이픈을 단일 하이픈로 변환
@@ -1386,9 +1425,37 @@ const MobileListTab = ({ onProductSelect }) => {
                                 // URL 파싱 실패 시 문자열 치환으로 처리
                                 normalizedUrl = normalizedUrl.replace(/--+/g, '-');
                               }
-                              return `${normalizedUrl}${normalizedUrl.includes('?') ? '&' : '?'}_t=${Date.now()}`;
+                              
+                              // 🔥 개선: 쿼리 파라미터 추가 시 이중 앰퍼샌드 방지
+                              let finalUrl = normalizedUrl;
+                              if (normalizedUrl.includes('?')) {
+                                // 이미 쿼리 파라미터가 있는 경우
+                                const urlEndsWithAmpersand = normalizedUrl.endsWith('&');
+                                const urlEndsWithQuestion = normalizedUrl.endsWith('?');
+                                if (urlEndsWithAmpersand) {
+                                  // 끝에 &가 있으면 그대로 사용 (&& 방지)
+                                  finalUrl = `${normalizedUrl}_t=${Date.now()}`;
+                                } else if (urlEndsWithQuestion) {
+                                  // 끝에 ?만 있으면 그대로 사용
+                                  finalUrl = `${normalizedUrl}_t=${Date.now()}`;
+                                } else {
+                                  // 끝에 값이 있으면 & 추가
+                                  finalUrl = `${normalizedUrl}&_t=${Date.now()}`;
+                                }
+                              } else {
+                                // 쿼리 파라미터가 없으면 ? 추가
+                                finalUrl = `${normalizedUrl}?_t=${Date.now()}`;
+                              }
+                              
+                              // #region agent log
+                              fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:imageSrc',message:'이미지 URL 최종값',data:{originalUrl:row.image,normalizedUrl,finalUrl,modelId:row.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+                              // #endregion
+                              return finalUrl;
                             })() : undefined}
                             onError={(e) => {
+                              // #region agent log
+                              fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:imageOnError',message:'이미지 로드 에러 발생',data:{currentSrc:e.target.src,gaveUp:e.target.dataset.gaveUp,retryCount:e.target.dataset.retryCount},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
+                              // #endregion
                               // 이미 재시도 포기 상태인 경우 즉시 중단
                               if (e.target.dataset.gaveUp === 'true') {
                                 return;
@@ -1417,11 +1484,19 @@ const MobileListTab = ({ onProductSelect }) => {
                               
                               const retryCount = parseInt(e.target.dataset.retryCount || '0');
                               
+                              // #region agent log
+                              fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:imageOnError',message:'이미지 재시도 준비',data:{currentSrc,originalSrc,retryCount},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
+                              // #endregion
+                              
                               // 최대 1회만 재시도 (총 2회 시도) - 무한 재시도 방지
                               if (retryCount < 1 && originalSrc && originalSrc.trim() !== '') {
                                 e.target.dataset.retryCount = String(retryCount + 1);
-                                // 정규화된 URL로 재시도
+                                // 정규화된 URL로 재시도 (쿼리 파라미터는 ?로 시작)
                                 const newSrc = `${originalSrc}?_t=${Date.now()}&retry=${retryCount + 1}`;
+                                
+                                // #region agent log
+                                fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:imageOnError',message:'이미지 재시도 URL 생성',data:{originalSrc,newSrc,retryCount},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
+                                // #endregion
                                 
                                 setTimeout(() => {
                                   // 재시도 전에 다시 확인
@@ -1435,6 +1510,10 @@ const MobileListTab = ({ onProductSelect }) => {
                                 e.target.src = '';
                                 e.target.onerror = null; // 무한 루프 방지
                                 e.target.dataset.retryCount = '0'; // 재시도 카운터 초기화
+                                
+                                // #region agent log
+                                fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:imageOnError',message:'이미지 재시도 포기',data:{originalSrc,retryCount},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
+                                // #endregion
                               }
                             }}
                             sx={{ width: 60, height: 60, bgcolor: 'background.subtle' }}
