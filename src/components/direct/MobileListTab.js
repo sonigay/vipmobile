@@ -62,6 +62,8 @@ const MobileListTab = ({ onProductSelect }) => {
   const isProcessingQueueRef = useRef(false); // 큐 처리 중 여부
   const queueProcessingCountRef = useRef(0); // 큐 처리 재시도 횟수 (무한루프 방지)
   const isInitializingRef = useRef(false); // 초기화 중 여부 (ref로 추적)
+  const expectedCalculationsRef = useRef(new Set()); // 초기 로드 시 계산 예상되는 모델 ID 목록
+  const initStartTimeRef = useRef(null); // 초기화 시작 시간
 
   // 개통 유형 목록 (고정)
   const openingTypes = ['010신규', 'MNP', '기변'];
@@ -72,6 +74,7 @@ const MobileListTab = ({ onProductSelect }) => {
     initializedRef.current = false;
     isInitializingRef.current = false;
     userSelectedOpeningTypesRef.current.clear();
+    expectedCalculationsRef.current.clear();
     setIsInitializing(false); // 초기화 상태도 리셋
   };
 
@@ -158,6 +161,7 @@ const MobileListTab = ({ onProductSelect }) => {
       // 초기 로드 시에만 초기화 상태 활성화
       if (!initializedRef.current) {
         isInitializingRef.current = true;
+        initStartTimeRef.current = Date.now();
         setIsInitializing(true);
       }
 
@@ -408,6 +412,13 @@ const MobileListTab = ({ onProductSelect }) => {
 
       // 가격 계산 배치 처리 (큐 시스템 사용)
       if (calculationQueue.length > 0) {
+        // 초기 로드 시 계산 예상되는 모델 목록 저장
+        if (!initializedRef.current) {
+          calculationQueue.forEach(item => {
+            expectedCalculationsRef.current.add(item.modelId);
+          });
+        }
+
         // 모든 계산 요청을 큐에 추가
         calculationQueue.forEach(item => {
           calculatePrice(item.modelId, item.planGroup, item.openingType, true);
@@ -419,52 +430,11 @@ const MobileListTab = ({ onProductSelect }) => {
           pricing: { ...prev.pricing, status: 'loading', message: '가격 계산 중...' }
         }));
 
-        // 초기 로드 시 큐 처리 완료를 대기하여 초기화 상태 해제
+        // 초기 로드 시에는 useEffect에서 가격 계산 완료를 확인
+        // (calculatedPrices 상태 변경을 감지하여 자동으로 확인)
         if (!initializedRef.current) {
-          // 큐 처리 완료를 확인하는 함수
-          let checkCount = 0;
-          const MAX_CHECK_COUNT = 120; // 최대 60초 대기 (0.5초 * 120)
-          const checkQueueCompletion = () => {
-            checkCount++;
-            
-            // 최대 확인 횟수 초과 시 강제로 초기화 완료
-            if (checkCount > MAX_CHECK_COUNT) {
-              console.warn('초기화 대기 시간 초과, 강제로 초기화 완료');
-              setSteps(prev => ({
-                ...prev,
-                pricing: { ...prev.pricing, status: 'success', message: '' }
-              }));
-              initializedRef.current = true;
-              isInitializingRef.current = false;
-              setIsInitializing(false);
-              return;
-            }
-            
-            // 큐가 비어있고 처리 중이 아니면 완료
-            if (priceCalculationQueueRef.current.length === 0 && !isProcessingQueueRef.current) {
-              // 약간의 지연 후 다시 확인 (마지막 요청이 완료될 시간 확보)
-              setTimeout(() => {
-                if (priceCalculationQueueRef.current.length === 0 && !isProcessingQueueRef.current) {
-                  setSteps(prev => ({
-                    ...prev,
-                    pricing: { ...prev.pricing, status: 'success', message: '' }
-                  }));
-                  initializedRef.current = true;
-                  isInitializingRef.current = false;
-                  setIsInitializing(false);
-                } else {
-                  // 아직 처리 중이면 다시 확인
-                  checkQueueCompletion();
-                }
-              }, 500);
-            } else {
-              // 아직 처리 중이면 다시 확인
-              setTimeout(checkQueueCompletion, 500);
-            }
-          };
-          
-          // 첫 확인 시작
-          setTimeout(checkQueueCompletion, 1000);
+          // 첫 확인 시작 (큐에 추가된 후 약간의 지연)
+          // useEffect에서 실제 완료 여부를 확인하므로 여기서는 상태만 설정
         } else {
           // 초기화 후에는 기존 로직 사용
           setTimeout(() => {
@@ -489,6 +459,79 @@ const MobileListTab = ({ onProductSelect }) => {
     setDefaultValues();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mobileList, planGroups]); // selectedOpeningTypes, selectedPlanGroups는 의존성에서 제외 (무한루프 방지)
+
+  // 초기 로드 시 모든 가격 계산 완료 확인
+  useEffect(() => {
+    // 초기화 중이 아니면 확인하지 않음
+    if (!isInitializingRef.current || initializedRef.current) {
+      return;
+    }
+
+    // 예상 계산 목록이 비어있으면 확인하지 않음
+    if (expectedCalculationsRef.current.size === 0) {
+      return;
+    }
+
+    // 최대 대기 시간 체크
+    if (!initStartTimeRef.current) {
+      initStartTimeRef.current = Date.now();
+    }
+    const MAX_WAIT_TIME = 150000; // 최대 150초 대기
+    const elapsedTime = Date.now() - initStartTimeRef.current;
+
+    // 큐가 비어있고 처리 중이 아니며, 모든 예상 모델의 가격이 계산되었는지 확인
+    const queueEmpty = priceCalculationQueueRef.current.length === 0;
+    const notProcessing = !isProcessingQueueRef.current;
+    const calculatedModelIds = new Set(Object.keys(calculatedPrices));
+    const allCalculated = Array.from(expectedCalculationsRef.current).every(modelId => 
+      calculatedModelIds.has(modelId)
+    );
+
+    // 최대 대기 시간 초과 시 강제로 초기화 완료
+    if (elapsedTime > MAX_WAIT_TIME) {
+      console.warn('초기화 대기 시간 초과, 강제로 초기화 완료', {
+        expectedCount: expectedCalculationsRef.current.size,
+        calculatedCount: calculatedModelIds.size,
+        missingModels: Array.from(expectedCalculationsRef.current).filter(id => !calculatedModelIds.has(id))
+      });
+      setSteps(prev => ({
+        ...prev,
+        pricing: { ...prev.pricing, status: 'success', message: '' }
+      }));
+      initializedRef.current = true;
+      isInitializingRef.current = false;
+      setIsInitializing(false);
+      expectedCalculationsRef.current.clear();
+      initStartTimeRef.current = null;
+      return;
+    }
+
+    if (queueEmpty && notProcessing && allCalculated) {
+      // 약간의 지연 후 다시 확인 (마지막 요청이 완료될 시간 확보)
+      const timeoutId = setTimeout(() => {
+        const finalQueueEmpty = priceCalculationQueueRef.current.length === 0;
+        const finalNotProcessing = !isProcessingQueueRef.current;
+        const finalCalculatedModelIds = new Set(Object.keys(calculatedPrices));
+        const finalAllCalculated = Array.from(expectedCalculationsRef.current).every(modelId => 
+          finalCalculatedModelIds.has(modelId)
+        );
+
+        if (finalQueueEmpty && finalNotProcessing && finalAllCalculated) {
+          setSteps(prev => ({
+            ...prev,
+            pricing: { ...prev.pricing, status: 'success', message: '' }
+          }));
+          initializedRef.current = true;
+          isInitializingRef.current = false;
+          setIsInitializing(false);
+          expectedCalculationsRef.current.clear();
+          initStartTimeRef.current = null;
+        }
+      }, 500);
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [calculatedPrices]); // calculatedPrices가 변경될 때마다 확인
 
   const handleReload = async () => {
     try {
@@ -1622,61 +1665,10 @@ const MobileListTab = ({ onProductSelect }) => {
                               }
                               
                               // 🔥 404 에러는 즉시 포기 (이미지가 존재하지 않음)
-                              const retryCount = parseInt(e.target.dataset.retryCount || '0');
-                              
-                              // #region agent log
-                              fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:imageOnError',message:'이미지 로드 에러 발생',data:{currentSrc:e.target.src,gaveUp:e.target.dataset.gaveUp,retryCount},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
-                              // #endregion
-                              
-                              // 🔥 최대 1회만 재시도하고, 재시도 후에도 실패하면 즉시 포기
-                              if (retryCount < 1) {
-                                e.target.dataset.retryCount = String(retryCount + 1);
-                                
-                                const currentSrc = e.target.src;
-                                // URL에서 쿼리 파라미터 제거 (첫 번째 ? 이후 모두 제거)
-                                const urlParts = currentSrc.split('?');
-                                let originalSrc = urlParts[0];
-                                
-                                // 이중 하이픈 정규화 시도
-                                try {
-                                  const urlObj = new URL(originalSrc);
-                                  const pathParts = urlObj.pathname.split('/');
-                                  const filename = pathParts[pathParts.length - 1];
-                                  if (filename.includes('--')) {
-                                    const normalizedFilename = filename.replace(/--+/g, '-');
-                                    pathParts[pathParts.length - 1] = normalizedFilename;
-                                    urlObj.pathname = pathParts.join('/');
-                                    originalSrc = urlObj.toString();
-                                  }
-                                } catch (err) {
-                                  // URL 파싱 실패 시 문자열 치환으로 처리
-                                  originalSrc = originalSrc.replace(/--+/g, '-');
-                                }
-                                
-                                // #region agent log
-                                fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:imageOnError',message:'이미지 재시도 URL 생성',data:{originalSrc,retryCount},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
-                                // #endregion
-                                
-                                // 정규화된 URL로 재시도 (쿼리 파라미터는 ?로 시작)
-                                const newSrc = `${originalSrc}?_t=${Date.now()}&retry=${retryCount + 1}`;
-                                
-                                setTimeout(() => {
-                                  // 재시도 전에 다시 확인
-                                  if (e.target.dataset.gaveUp !== 'true') {
-                                    e.target.src = newSrc;
-                                  }
-                                }, 500); // 0.5초 지연 후 재시도 (1초 -> 0.5초로 단축)
-                              } else {
-                                // 🔥 재시도 실패 시 즉시 포기하고 기본 아이콘만 표시
-                                e.target.dataset.gaveUp = 'true';
-                                e.target.src = ''; // 빈 문자열로 설정하여 추가 시도 방지
-                                e.target.onerror = null; // 무한 루프 방지: 에러 핸들러 제거
-                                e.target.dataset.retryCount = '0'; // 재시도 카운터 초기화
-                                
-                                // #region agent log
-                                fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:imageOnError',message:'이미지 재시도 포기',data:{currentSrc:e.target.src,retryCount},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
-                                // #endregion
-                              }
+                              // 이미지 로드 실패는 콘솔에 에러를 남기지 않고 조용히 처리
+                              e.target.dataset.gaveUp = 'true';
+                              e.target.src = ''; // 빈 문자열로 설정하여 추가 시도 방지
+                              e.target.onerror = null; // 무한 루프 방지: 에러 핸들러 제거
                             }}
                             sx={{ width: 60, height: 60, bgcolor: 'background.subtle' }}
                           >
