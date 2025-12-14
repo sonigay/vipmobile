@@ -78,13 +78,28 @@ function TodaysProductCard(props) {
   
   // 각 유형별 가격 정보 로드 (props로 받은 priceData가 없거나 null일 때만)
   useEffect(() => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysProductCard.js:useEffect',message:'useEffect 진입',data:{productId:product?.id,hasPropPriceData:!!propPriceData,propPriceDataLoading:propPriceData?.['010신규']?.loading,hasLoaded:hasLoadedRef.current,hasProduct:!!product,hasCarrier:!!product?.carrier},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H6'})}).catch(()=>{});
+    // #endregion
+    
     // propPriceData가 null이거나 undefined가 아니고, 모든 유형이 loading이 false이면 스킵
     if (propPriceData && propPriceData['010신규'] && propPriceData['010신규'].loading === false) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysProductCard.js:useEffect',message:'propPriceData로 인해 스킵',data:{productId:product?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H6'})}).catch(()=>{});
+      // #endregion
       return;
     }
-    if (hasLoadedRef.current || !product || !product.id || !product.carrier) return;
+    if (hasLoadedRef.current || !product || !product.id || !product.carrier) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysProductCard.js:useEffect',message:'조건 불만족으로 스킵',data:{productId:product?.id,hasLoaded:hasLoadedRef.current,hasProduct:!!product,hasId:!!product?.id,hasCarrier:!!product?.carrier},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H6'})}).catch(()=>{});
+      // #endregion
+      return;
+    }
     
     const loadPrices = async () => {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysProductCard.js:loadPrices',message:'loadPrices 함수 시작',data:{productId:product?.id,model:product?.model,carrier:product?.carrier},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H7'})}).catch(()=>{});
+      // #endregion
       hasLoadedRef.current = true;
       
       // 기본 요금제군 결정 (프리미엄/중저가에 따라)
@@ -95,6 +110,10 @@ function TodaysProductCard(props) {
 
       const openingTypes = ['010신규', 'MNP', '기변'];
       const newPriceData = { ...priceData };
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysProductCard.js:loadPrices',message:'캐시 확인 시작',data:{productId:product?.id,defaultPlanGroup},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H7'})}).catch(()=>{});
+      // #endregion
 
       // 먼저 전역 캐시에서 확인
       let allCached = true;
@@ -121,12 +140,19 @@ function TodaysProductCard(props) {
 
       // 모든 데이터가 캐시에 있으면 즉시 업데이트
       if (allCached) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysProductCard.js:loadPrices',message:'모든 데이터 캐시에서 로드 완료',data:{productId:product?.id,hasCallback:!!onPriceCalculated},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H7'})}).catch(()=>{});
+        // #endregion
         setPriceData(newPriceData);
         if (onPriceCalculated) {
           onPriceCalculated(product.id, newPriceData);
         }
         return;
       }
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysProductCard.js:loadPrices',message:'캐시에 없는 데이터 API 호출 시작',data:{productId:product?.id,allCached},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H7'})}).catch(()=>{});
+      // #endregion
 
       // 캐시에 없는 데이터만 API 호출
       for (const openingType of openingTypes) {
