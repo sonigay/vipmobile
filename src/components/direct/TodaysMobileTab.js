@@ -113,7 +113,151 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
   const [isSlideshowLooping, setIsSlideshowLooping] = useState(false);
   const [showRepeatDialog, setShowRepeatDialog] = useState(false);
   
+  // 가격 계산 완료 상태 (재렌더링 트리거용) - Rules of Hooks 준수를 위해 최상단으로 이동
+  const [priceCalculationTrigger, setPriceCalculationTrigger] = useState(0);
+  
   // 가격 캐시는 전역 유틸리티 사용 (제거됨)
+
+  // 통신사별 테마 함수 - useCallback으로 정의하여 TDZ 문제 방지 (Rules of Hooks 준수를 위해 최상단으로 이동)
+  const getCarrierTheme = useCallback((carrier) => {
+    switch (carrier) {
+      case 'SK':
+        return {
+          primary: '#1976d2', // 파란색
+          secondary: '#42a5f5',
+          background: 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 50%, #90caf9 100%)',
+          cardBg: 'rgba(255, 255, 255, 0.95)',
+          accent: '#1565c0',
+          text: '#0d47a1'
+        };
+      case 'KT':
+        return {
+          primary: '#2e7d32', // 녹색
+          secondary: '#66bb6a',
+          background: 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 50%, #a5d6a7 100%)',
+          cardBg: 'rgba(255, 255, 255, 0.95)',
+          accent: '#1b5e20',
+          text: '#1b5e20'
+        };
+      case 'LG':
+        return {
+          primary: '#c2185b', // 핫핑크
+          secondary: '#f06292',
+          background: 'linear-gradient(135deg, #fce4ec 0%, #f8bbd0 50%, #f48fb1 100%)',
+          cardBg: 'rgba(255, 255, 255, 0.95)',
+          accent: '#ad1457',
+          text: '#880e4f'
+        };
+      default:
+        return {
+          primary: '#ffd700', // 골드 (기본값)
+          secondary: '#ffed4e',
+          background: 'linear-gradient(135deg, #fff9e6 0%, #ffe082 50%, #ffd54f 100%)',
+          cardBg: 'rgba(255, 255, 255, 0.95)',
+          accent: '#f57f17',
+          text: '#f57f17'
+        };
+    }
+  }, []);
+
+  // 전역 캐시에서 가격 데이터 가져오기 - Rules of Hooks 준수를 위해 최상단으로 이동
+  const getPriceDataFromCache = useCallback((product) => {
+    if (!product.id || !product.carrier) return null;
+    
+    // calculatedPricesRef에서 먼저 확인
+    if (calculatedPricesRef.current.has(product.id)) {
+      const cachedPriceData = calculatedPricesRef.current.get(product.id);
+      // 모든 유형이 로드 완료되었는지 확인
+      const allLoaded = cachedPriceData['010신규']?.loading === false &&
+                        cachedPriceData['MNP']?.loading === false &&
+                        cachedPriceData['기변']?.loading === false;
+      if (allLoaded) {
+        return cachedPriceData;
+      }
+    }
+    
+    const planGroup = product.isBudget && !product.isPremium ? '33군' : '115군';
+    const priceData = {
+      '010신규': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: true },
+      'MNP': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: true },
+      '기변': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: true }
+    };
+    
+    let hasCachedData = false;
+    for (const openingType of ['010신규', 'MNP', '기변']) {
+      const cached = getCachedPrice(product.id, planGroup, openingType, product.carrier);
+      if (cached && (cached.publicSupport !== undefined || cached.storeSupport !== undefined)) {
+        priceData[openingType] = {
+          publicSupport: cached.publicSupport || 0,
+          storeSupport: cached.storeSupport || cached.storeSupportWithAddon || 0,
+          purchasePrice: cached.purchasePrice || cached.purchasePriceWithAddon || 0,
+          loading: false
+        };
+        hasCachedData = true;
+      }
+    }
+    
+    // 캐시가 있으면 priceData 반환, 없으면 null 반환하여 ProductCard에서 자체 로드하도록
+    return hasCachedData ? priceData : null;
+  }, []);
+
+  // 가격 계산 완료 콜백 - Rules of Hooks 준수를 위해 최상단으로 이동
+  const handlePriceCalculated = useCallback((productId, priceData) => {
+    calculatedPricesRef.current.set(productId, priceData);
+    // 상태 업데이트를 트리거하기 위해 강제로 재렌더링
+    setPriceCalculationTrigger(prev => prev + 1);
+  }, []);
+
+  // 프리미엄과 중저가를 하나의 배열로 합치기 - Rules of Hooks 준수를 위해 최상단으로 이동
+  const allProducts = useMemo(() => {
+    const premium = Array.isArray(premiumPhones) ? premiumPhones.slice(0, 3) : [];
+    const budget = Array.isArray(budgetPhones) ? budgetPhones.slice(0, 2) : [];
+    const combined = [...premium, ...budget];
+    return combined.slice(0, 3); // 최대 3개만 표시
+  }, [premiumPhones, budgetPhones]);
+
+  // 통신사별 테마 색상 - Rules of Hooks 준수를 위해 최상단으로 이동
+  const theme = useMemo(() => {
+    const carrier = currentCarrier || 'SK'; // 기본값
+    switch (carrier) {
+      case 'SK':
+        return {
+          primary: '#1976d2', // 파란색
+          secondary: '#42a5f5',
+          background: 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 50%, #90caf9 100%)',
+          cardBg: 'rgba(255, 255, 255, 0.95)',
+          accent: '#1565c0',
+          text: '#0d47a1'
+        };
+      case 'KT':
+        return {
+          primary: '#2e7d32', // 녹색
+          secondary: '#66bb6a',
+          background: 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 50%, #a5d6a7 100%)',
+          cardBg: 'rgba(255, 255, 255, 0.95)',
+          accent: '#1b5e20',
+          text: '#1b5e20'
+        };
+      case 'LG':
+        return {
+          primary: '#c2185b', // 핫핑크
+          secondary: '#f06292',
+          background: 'linear-gradient(135deg, #fce4ec 0%, #f8bbd0 50%, #f48fb1 100%)',
+          cardBg: 'rgba(255, 255, 255, 0.95)',
+          accent: '#ad1457',
+          text: '#880e4f'
+        };
+      default:
+        return {
+          primary: '#ffd700', // 골드 (기본값)
+          secondary: '#ffed4e',
+          background: 'linear-gradient(135deg, #fff9e6 0%, #ffe082 50%, #ffd54f 100%)',
+          cardBg: 'rgba(255, 255, 255, 0.95)',
+          accent: '#f57f17',
+          text: '#f57f17'
+        };
+    }
+  }, [currentCarrier]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -544,14 +688,6 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
     };
   }, [fetchData]);
 
-  // 프리미엄과 중저가를 하나의 배열로 합치기 (프리미엄 먼저, 중저가 나중에)
-  // 총 3개만 표시 (프리미엄 우선)
-  const allProducts = useMemo(() => {
-    const premium = Array.isArray(premiumPhones) ? premiumPhones.slice(0, 3) : [];
-    const budget = Array.isArray(budgetPhones) ? budgetPhones.slice(0, 2) : [];
-    const combined = [...premium, ...budget];
-    return combined.slice(0, 3); // 최대 3개만 표시
-  }, [premiumPhones, budgetPhones]);
 
   // 모든 상품의 가격 계산 완료 확인
   useEffect(() => {
@@ -706,142 +842,6 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
     }
   }, [allProducts, isSlideshowActive, isSlideshowDataLoading, slideshowData.length, currentCarrier]);
   
-  // 통신사별 테마 색상 정의
-  // 전역 캐시에서 가격 데이터 가져오기
-  const getPriceDataFromCache = useCallback((product) => {
-    if (!product.id || !product.carrier) return null;
-    
-    // calculatedPricesRef에서 먼저 확인
-    if (calculatedPricesRef.current.has(product.id)) {
-      const cachedPriceData = calculatedPricesRef.current.get(product.id);
-      // 모든 유형이 로드 완료되었는지 확인
-      const allLoaded = cachedPriceData['010신규']?.loading === false &&
-                        cachedPriceData['MNP']?.loading === false &&
-                        cachedPriceData['기변']?.loading === false;
-      if (allLoaded) {
-        return cachedPriceData;
-      }
-    }
-    
-    const planGroup = product.isBudget && !product.isPremium ? '33군' : '115군';
-    const priceData = {
-      '010신규': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: true },
-      'MNP': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: true },
-      '기변': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: true }
-    };
-    
-    let hasCachedData = false;
-    for (const openingType of ['010신규', 'MNP', '기변']) {
-      const cached = getCachedPrice(product.id, planGroup, openingType, product.carrier);
-      if (cached && (cached.publicSupport !== undefined || cached.storeSupport !== undefined)) {
-        priceData[openingType] = {
-          publicSupport: cached.publicSupport || 0,
-          storeSupport: cached.storeSupport || cached.storeSupportWithAddon || 0,
-          purchasePrice: cached.purchasePrice || cached.purchasePriceWithAddon || 0,
-          loading: false
-        };
-        hasCachedData = true;
-      }
-    }
-    
-    // 캐시가 있으면 priceData 반환, 없으면 null 반환하여 ProductCard에서 자체 로드하도록
-    return hasCachedData ? priceData : null;
-  }, []);
-
-  // 가격 계산 완료 상태 (재렌더링 트리거용)
-  const [priceCalculationTrigger, setPriceCalculationTrigger] = useState(0);
-
-  // 가격 계산 완료 콜백
-  const handlePriceCalculated = useCallback((productId, priceData) => {
-    calculatedPricesRef.current.set(productId, priceData);
-    // 상태 업데이트를 트리거하기 위해 강제로 재렌더링
-    setPriceCalculationTrigger(prev => prev + 1);
-  }, []);
-
-  // 통신사별 테마 함수 - useCallback으로 정의하여 TDZ 문제 방지
-  const getCarrierTheme = useCallback((carrier) => {
-    switch (carrier) {
-      case 'SK':
-        return {
-          primary: '#1976d2', // 파란색
-          secondary: '#42a5f5',
-          background: 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 50%, #90caf9 100%)',
-          cardBg: 'rgba(255, 255, 255, 0.95)',
-          accent: '#1565c0',
-          text: '#0d47a1'
-        };
-      case 'KT':
-        return {
-          primary: '#2e7d32', // 녹색
-          secondary: '#66bb6a',
-          background: 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 50%, #a5d6a7 100%)',
-          cardBg: 'rgba(255, 255, 255, 0.95)',
-          accent: '#1b5e20',
-          text: '#1b5e20'
-        };
-      case 'LG':
-        return {
-          primary: '#c2185b', // 핫핑크
-          secondary: '#f06292',
-          background: 'linear-gradient(135deg, #fce4ec 0%, #f8bbd0 50%, #f48fb1 100%)',
-          cardBg: 'rgba(255, 255, 255, 0.95)',
-          accent: '#ad1457',
-          text: '#880e4f'
-        };
-      default:
-        return {
-          primary: '#ffd700', // 골드 (기본값)
-          secondary: '#ffed4e',
-          background: 'linear-gradient(135deg, #fff9e6 0%, #ffe082 50%, #ffd54f 100%)',
-          cardBg: 'rgba(255, 255, 255, 0.95)',
-          accent: '#f57f17',
-          text: '#f57f17'
-        };
-    }
-  }, []);
-
-  // 통신사별 테마 색상 - 직접 계산하여 초기화 순서 문제 방지
-  const theme = useMemo(() => {
-    const carrier = currentCarrier || 'SK'; // 기본값
-    switch (carrier) {
-      case 'SK':
-        return {
-          primary: '#1976d2', // 파란색
-          secondary: '#42a5f5',
-          background: 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 50%, #90caf9 100%)',
-          cardBg: 'rgba(255, 255, 255, 0.95)',
-          accent: '#1565c0',
-          text: '#0d47a1'
-        };
-      case 'KT':
-        return {
-          primary: '#2e7d32', // 녹색
-          secondary: '#66bb6a',
-          background: 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 50%, #a5d6a7 100%)',
-          cardBg: 'rgba(255, 255, 255, 0.95)',
-          accent: '#1b5e20',
-          text: '#1b5e20'
-        };
-      case 'LG':
-        return {
-          primary: '#c2185b', // 핫핑크
-          secondary: '#f06292',
-          background: 'linear-gradient(135deg, #fce4ec 0%, #f8bbd0 50%, #f48fb1 100%)',
-          cardBg: 'rgba(255, 255, 255, 0.95)',
-          accent: '#ad1457',
-          text: '#880e4f'
-        };
-      default:
-        return {
-          primary: '#ffd700', // 골드 (기본값)
-          secondary: '#ffed4e',
-          background: 'linear-gradient(135deg, #fff9e6 0%, #ffe082 50%, #ffd54f 100%)',
-          cardBg: 'rgba(255, 255, 255, 0.95)',
-          accent: '#f57f17',
-          text: '#f57f17'
-        };
-    }
-  }, [currentCarrier]);
 
   // Early return은 모든 훅 호출 이후에 위치
   if (loading || isInitializing) {
