@@ -153,8 +153,16 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                         cachedPriceData['MNP']?.loading === false &&
                         cachedPriceData['기변']?.loading === false;
       if (allLoaded) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:getPriceDataFromCache',message:'calculatedPricesRef에서 완료된 데이터 반환',data:{productId:product.id,allLoaded},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H8'})}).catch(()=>{});
+        // #endregion
         return cachedPriceData;
       }
+      // 🔥 개선: 로드 중인 데이터는 null 반환하여 ProductCard에서 계속 로드하도록 함
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:getPriceDataFromCache',message:'calculatedPricesRef에 데이터 있지만 아직 로딩 중, null 반환',data:{productId:product.id,allLoaded},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H8'})}).catch(()=>{});
+      // #endregion
+      return null;
     }
     
     const planGroup = product.isBudget && !product.isPremium ? '33군' : '115군';
@@ -182,7 +190,9 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
     fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:getPriceDataFromCache',message:'캐시 확인 완료',data:{productId:product.id,planGroup,hasCachedData,returnValue:hasCachedData?'priceData':'null'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H8'})}).catch(()=>{});
     // #endregion
     
-    // 캐시가 있으면 priceData 반환, 없으면 null 반환하여 ProductCard에서 자체 로드하도록
+    // 🔥 개선: 캐시가 있으면 priceData 반환, 없으면 null 반환하여 ProductCard에서 자체 로드하도록
+    // 이전에는 캐시가 없어도 loading: true인 priceData를 반환했는데, 이로 인해 ProductCard의 useEffect가 스킵될 수 있었음
+    // 이제는 캐시가 없으면 null을 반환하여 ProductCard가 자체적으로 가격을 로드하도록 함
     return hasCachedData ? priceData : null;
   }, []);
 

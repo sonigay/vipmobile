@@ -82,10 +82,14 @@ function TodaysProductCard(props) {
     fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysProductCard.js:useEffect',message:'useEffect 진입',data:{productId:product?.id,hasPropPriceData:!!propPriceData,propPriceDataLoading:propPriceData?.['010신규']?.loading,hasLoaded:hasLoadedRef.current,hasProduct:!!product,hasCarrier:!!product?.carrier},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H6'})}).catch(()=>{});
     // #endregion
     
-    // propPriceData가 null이거나 undefined가 아니고, 모든 유형이 loading이 false이면 스킵
-    if (propPriceData && propPriceData['010신규'] && propPriceData['010신규'].loading === false) {
+    // 🔥 개선: propPriceData가 있고 모든 유형이 로드 완료되었을 때만 스킵
+    // propPriceData가 있지만 loading이 true인 경우에는 API 호출을 진행해야 함
+    if (propPriceData && propPriceData['010신규'] && 
+        propPriceData['010신규'].loading === false &&
+        propPriceData['MNP'] && propPriceData['MNP'].loading === false &&
+        propPriceData['기변'] && propPriceData['기변'].loading === false) {
       // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysProductCard.js:useEffect',message:'propPriceData로 인해 스킵',data:{productId:product?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H6'})}).catch(()=>{});
+      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysProductCard.js:useEffect',message:'propPriceData로 인해 스킵 (모든 데이터 로드 완료)',data:{productId:product?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H6'})}).catch(()=>{});
       // #endregion
       return;
     }
