@@ -48,10 +48,8 @@ const TodaysProductCard = ({
   });
   const hasLoadedRef = useRef(false);
   
-  // props로 받은 priceData가 있으면 사용 (초기화 순서 문제 방지를 위해 useMemo 사용)
-  const finalPriceData = useMemo(() => {
-    return propPriceData || priceData;
-  }, [propPriceData, priceData]);
+  // props로 받은 priceData가 있으면 사용 (초기화 순서 문제 방지 - useMemo 제거하고 직접 계산)
+  const finalPriceData = propPriceData || priceData;
 
   const getCarrierChipColor = (carrier) => {
     switch (carrier) {
