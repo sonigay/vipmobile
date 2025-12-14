@@ -756,7 +756,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
     setPriceCalculationTrigger(prev => prev + 1);
   }, []);
 
-  const getCarrierTheme = (carrier) => {
+  const getCarrierTheme = useCallback((carrier) => {
     switch (carrier) {
       case 'SK':
         return {
@@ -795,9 +795,9 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
           text: '#f57f17'
         };
     }
-  };
+  }, []);
   
-  const theme = getCarrierTheme(currentCarrier);
+  const theme = useMemo(() => getCarrierTheme(currentCarrier), [getCarrierTheme, currentCarrier]);
 
   // Early return은 모든 훅 호출 이후에 위치
   if (loading || isInitializing) {
