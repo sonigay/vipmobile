@@ -2,7 +2,7 @@
  * 오늘의 휴대폰 ProductCard 컴포넌트
  * TodaysMobileTab에서 분리된 제품 카드 컴포넌트
  */
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Card,
   CardContent,
@@ -49,7 +49,7 @@ const TodaysProductCard = ({
   const hasLoadedRef = useRef(false);
   
   // props로 받은 priceData가 있으면 사용 (초기화 순서 문제 방지를 위해 useMemo 사용)
-  const finalPriceData = React.useMemo(() => {
+  const finalPriceData = useMemo(() => {
     return propPriceData || priceData;
   }, [propPriceData, priceData]);
 
@@ -63,7 +63,7 @@ const TodaysProductCard = ({
   };
   
   // cardTheme 계산을 useMemo로 감싸서 초기화 순서 문제 방지
-  const cardTheme = React.useMemo(() => {
+  const cardTheme = useMemo(() => {
     return theme || {
       primary: '#ffd700',
       secondary: '#ffed4e',
