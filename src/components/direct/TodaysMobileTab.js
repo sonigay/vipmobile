@@ -1103,7 +1103,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
               (() => {
                 // #region agent log
                 try {
-                  fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:before-slideshowData-check',message:'slideshowData 조건 체크 전',data:{hasSlideshowData:!!slideshowData,slideshowDataLength:slideshowData?.length,currentSlideIndex,hasCurrentSlide:!!slideshowData?.[currentSlideIndex]},timestamp:Date.now(),sessionId:'debug-session',runId:'render-check',hypothesisId:'RENDER-ORDER'})}).catch(()=>{});
+                  fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:before-slideshowData-check',message:'slideshowData 조건 체크 전',data:{hasSlideshowData:!!slideshowData,slideshowDataLength:slideshowData?.length,currentSlideIndex,hasCurrentSlide:!!slideshowData?.[currentSlideIndex]},timestamp:Date.now(),sessionId:'debug-session',runId:'debug-run-8',hypothesisId:'D'})}).catch(()=>{});
                 } catch (e) {}
                 // #endregion
                 const currentSlide = slideshowData?.[currentSlideIndex];
@@ -1112,20 +1112,11 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                 
                 // #region agent log
                 try {
-                  fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:before-products-map',message:'products.map 시작 전',data:{productsLength:currentSlide.products?.length,hasCarrier:!!currentSlide.carrier},timestamp:Date.now(),sessionId:'debug-session',runId:'debug-run-5',hypothesisId:'C'})}).catch(()=>{});
+                  fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:before-products-map',message:'products.map 시작 전',data:{productsLength:currentSlide.products?.length,hasCarrier:!!currentSlide.carrier,hasGetPriceDataFromCache:!!getPriceDataFromCache,hasHandlePriceCalculated:!!handlePriceCalculated},timestamp:Date.now(),sessionId:'debug-session',runId:'debug-run-8',hypothesisId:'D'})}).catch(()=>{});
                 } catch (e) {}
                 // #endregion
                 
-                const safeCarrier = currentSlide.carrier || 'SK';
-                const safeGetCarrierTheme = typeof getCarrierTheme === 'function' ? getCarrierTheme : () => ({
-                  primary: '#ffd700',
-                  secondary: '#ffed4e',
-                  cardBg: 'rgba(255, 255, 255, 0.95)',
-                  accent: '#f57f17',
-                  text: '#f57f17'
-                });
-                const safeGetPriceDataFromCache = typeof getPriceDataFromCache === 'function' ? getPriceDataFromCache : () => null;
-                const safeHandlePriceCalculated = typeof handlePriceCalculated === 'function' ? handlePriceCalculated : () => {};
+                const carrier = currentSlide.carrier || 'SK';
                 
                 return (
                 <Box
@@ -1163,29 +1154,24 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                     
                     // #region agent log
                     try {
-                      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:before-TodaysProductCard-render',message:'TodaysProductCard 렌더링 전',data:{hasProduct:!!product,productId:product?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'debug-run-5',hypothesisId:'C'})}).catch(()=>{});
+                      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:before-TodaysProductCard-render',message:'TodaysProductCard 렌더링 전',data:{hasProduct:!!product,productId:product?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'debug-run-8',hypothesisId:'D'})}).catch(()=>{});
                     } catch (e) {}
                     // #endregion
                     
-                    try {
-                      const carrierTheme = safeGetCarrierTheme(safeCarrier);
-                      const cachedPriceData = safeGetPriceDataFromCache(product);
-                      return (
-                        <TodaysProductCard
-                          key={product.id || `${product.model}-${product.carrier}`}
-                          product={product}
-                          isPremium={product.isPremium === true}
-                          onSelect={onProductSelect}
-                          compact={compact}
-                          theme={carrierTheme}
-                          priceData={cachedPriceData}
-                          onPriceCalculated={safeHandlePriceCalculated}
-                        />
-                      );
-                    } catch (error) {
-                      console.error('Error rendering TodaysProductCard:', error);
-                      return null;
-                    }
+                    const carrierTheme = getCarrierTheme(carrier);
+                    const cachedPriceData = getPriceDataFromCache(product);
+                    return (
+                      <TodaysProductCard
+                        key={product.id || `${product.model}-${product.carrier}`}
+                        product={product}
+                        isPremium={product.isPremium === true}
+                        onSelect={onProductSelect}
+                        compact={compact}
+                        theme={carrierTheme}
+                        priceData={cachedPriceData}
+                        onPriceCalculated={handlePriceCalculated}
+                      />
+                    );
                   })}
                 </Box>
                 );
@@ -1344,16 +1330,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                     const isManualProductGroup = manualSlide?.type === 'productGroup' && manualSlide?.products;
                     if (!isManualProductGroup || !manualSlide?.products || !Array.isArray(manualSlide.products)) return null;
                     
-                    const safeManualCarrier = manualSlide.carrier || 'SK';
-                    const safeGetCarrierTheme2 = typeof getCarrierTheme === 'function' ? getCarrierTheme : () => ({
-                      primary: '#ffd700',
-                      secondary: '#ffed4e',
-                      cardBg: 'rgba(255, 255, 255, 0.95)',
-                      accent: '#f57f17',
-                      text: '#f57f17'
-                    });
-                    const safeGetPriceDataFromCache2 = typeof getPriceDataFromCache === 'function' ? getPriceDataFromCache : () => null;
-                    const safeHandlePriceCalculated2 = typeof handlePriceCalculated === 'function' ? handlePriceCalculated : () => {};
+                    const manualCarrier = manualSlide.carrier || 'SK';
                     
                     return (
                     <Box
@@ -1395,25 +1372,20 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                         } catch (e) {}
                         // #endregion
                         
-                        try {
-                          const carrierTheme = safeGetCarrierTheme2(safeManualCarrier);
-                          const cachedPriceData = safeGetPriceDataFromCache2(product);
-                          return (
-                            <TodaysProductCard
-                              key={product.id || `${product.model}-${product.carrier}`}
-                              product={product}
-                              isPremium={product.isPremium === true}
-                              onSelect={onProductSelect}
-                              compact={compact}
-                              theme={carrierTheme}
-                              priceData={cachedPriceData}
-                              onPriceCalculated={safeHandlePriceCalculated2}
-                            />
-                          );
-                        } catch (error) {
-                          console.error('Error rendering TodaysProductCard (manual):', error);
-                          return null;
-                        }
+                        const carrierTheme = getCarrierTheme(manualCarrier);
+                        const cachedPriceData = getPriceDataFromCache(product);
+                        return (
+                          <TodaysProductCard
+                            key={product.id || `${product.model}-${product.carrier}`}
+                            product={product}
+                            isPremium={product.isPremium === true}
+                            onSelect={onProductSelect}
+                            compact={compact}
+                            theme={carrierTheme}
+                            priceData={cachedPriceData}
+                            onPriceCalculated={handlePriceCalculated}
+                          />
+                        );
                       })}
                     </Box>
                     );
@@ -1459,36 +1431,21 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                   if (!product || typeof product !== 'object') return null;
                   
                   const isPremium = product.isPremium || false;
-                  const safeCarrier3 = product.carrier || 'SK';
-                  const safeGetCarrierTheme3 = typeof getCarrierTheme === 'function' ? getCarrierTheme : () => ({
-                    primary: '#ffd700',
-                    secondary: '#ffed4e',
-                    cardBg: 'rgba(255, 255, 255, 0.95)',
-                    accent: '#f57f17',
-                    text: '#f57f17'
-                  });
-                  const safeGetPriceDataFromCache3 = typeof getPriceDataFromCache === 'function' ? getPriceDataFromCache : () => null;
-                  const safeHandlePriceCalculated3 = typeof handlePriceCalculated === 'function' ? handlePriceCalculated : () => {};
-                  
-                  try {
-                    const carrierTheme = safeGetCarrierTheme3(safeCarrier3);
-                    const cachedPriceData = safeGetPriceDataFromCache3(product);
-                    return (
-                      <TodaysProductCard
-                        key={product.id}
-                        product={product}
-                        isPremium={isPremium}
-                        onSelect={onProductSelect}
-                        compact={compact}
-                        theme={carrierTheme}
-                        priceData={cachedPriceData}
-                        onPriceCalculated={safeHandlePriceCalculated3}
-                      />
-                    );
-                  } catch (error) {
-                    console.error('Error rendering TodaysProductCard (allProducts):', error);
-                    return null;
-                  }
+                  const productCarrier = product.carrier || 'SK';
+                  const carrierTheme = getCarrierTheme(productCarrier);
+                  const cachedPriceData = getPriceDataFromCache(product);
+                  return (
+                    <TodaysProductCard
+                      key={product.id}
+                      product={product}
+                      isPremium={isPremium}
+                      onSelect={onProductSelect}
+                      compact={compact}
+                      theme={carrierTheme}
+                      priceData={cachedPriceData}
+                      onPriceCalculated={handlePriceCalculated}
+                    />
+                  );
                 })}
                 {allProducts.length === 0 && (
                   <Box sx={{ gridColumn: '1 / -1', gridRow: '1 / -1' }}>
