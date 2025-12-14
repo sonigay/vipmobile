@@ -27,10 +27,11 @@ try {
 } catch (e) {}
 // #endregion
 
-const TodaysProductCard = (props) => {
+// 함수 선언으로 변경하여 hoisting으로 TDZ 문제 방지
+function TodaysProductCard(props) {
   // #region agent log
   try {
-    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysProductCard.js:function-entry',message:'TodaysProductCard 함수 진입',data:{hasProps:!!props,propsKeys:props?Object.keys(props).join(','):'none'},timestamp:Date.now(),sessionId:'debug-session',runId:'debug-run-3',hypothesisId:'A,B'})}).catch(()=>{});
+    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysProductCard.js:function-entry',message:'TodaysProductCard 함수 진입',data:{hasProps:!!props,propsKeys:props?Object.keys(props).join(','):'none'},timestamp:Date.now(),sessionId:'debug-session',runId:'debug-run-4',hypothesisId:'A'})}).catch(()=>{});
   } catch (e) {}
   // #endregion
   
@@ -463,6 +464,6 @@ const TodaysProductCard = (props) => {
       </CardActions>
     </Card>
   );
-};
+}
 
 export default TodaysProductCard;
