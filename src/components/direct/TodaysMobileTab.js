@@ -1151,11 +1151,24 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                 }}
               >
                 {currentSlide.products.map((product) => {
-                  if (!product || typeof product !== 'object') return null;
+                  if (!product || typeof product !== 'object') {
+                    // #region agent log
+                    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:render',message:'product 유효성 검사 실패',data:{hasProduct:!!product,productType:typeof product},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H9'})}).catch(()=>{});
+                    // #endregion
+                    return null;
+                  }
                   
+                  // #region agent log
+                  fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:render',message:'TodaysProductCard 렌더링 시작',data:{productId:product?.id,productModel:product?.model,productCarrier:product?.carrier},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H9'})}).catch(()=>{});
+                  // #endregion
                   
                   const carrierTheme = getCarrierTheme(carrier);
                   const cachedPriceData = getPriceDataFromCache(product);
+                  
+                  // #region agent log
+                  fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:render',message:'getPriceDataFromCache 호출 완료',data:{productId:product?.id,hasCachedPriceData:!!cachedPriceData,cachedPriceDataKeys:cachedPriceData?Object.keys(cachedPriceData):[]},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H9'})}).catch(()=>{});
+                  // #endregion
+                  
                   return (
                     <TodaysProductCard
                       key={product.id || `${product.model}-${product.carrier}`}

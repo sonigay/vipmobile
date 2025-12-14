@@ -441,6 +441,9 @@ const MobileListTab = ({ onProductSelect }) => {
           calculationQueue.forEach(item => {
             expectedCalculationsRef.current.add(item.modelId);
           });
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:setDefaultValues',message:'expectedCalculationsRef에 모델 추가',data:{expectedCount:expectedCalculationsRef.current.size,expectedModelIds:Array.from(expectedCalculationsRef.current),calculationQueueLength:calculationQueue.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M5'})}).catch(()=>{});
+          // #endregion
         }
 
         // 모든 계산 요청을 큐에 추가
@@ -510,6 +513,10 @@ const MobileListTab = ({ onProductSelect }) => {
     const allCalculated = Array.from(expectedCalculationsRef.current).every(modelId => 
       calculatedModelIds.has(modelId)
     );
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:useEffect-init-check',message:'초기화 완료 체크',data:{queueEmpty,notProcessing,expectedCount:expectedCalculationsRef.current.size,calculatedCount:calculatedModelIds.size,allCalculated,expectedModelIds:Array.from(expectedCalculationsRef.current),calculatedModelIds:Array.from(calculatedModelIds),missingModels:Array.from(expectedCalculationsRef.current).filter(id=>!calculatedModelIds.has(id)),elapsedTime:initStartTimeRef.current?Date.now()-initStartTimeRef.current:0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M3'})}).catch(()=>{});
+    // #endregion
 
     // 최대 대기 시간 초과 시 강제로 초기화 완료
     if (elapsedTime > MAX_WAIT_TIME) {
@@ -1201,16 +1208,22 @@ const MobileListTab = ({ onProductSelect }) => {
       }
 
       // 상태 업데이트
-      setCalculatedPrices(prev => ({
-        ...prev,
-        [modelId]: {
-          storeSupportWithAddon: result.storeSupportWithAddon || 0,
-          storeSupportWithoutAddon: result.storeSupportWithoutAddon || 0,
-          purchasePriceWithAddon: result.purchasePriceWithAddon || 0,
-          purchasePriceWithoutAddon: result.purchasePriceWithoutAddon || 0,
-          publicSupport: result.publicSupport || 0
-        }
-      }));
+      setCalculatedPrices(prev => {
+        const newPrices = {
+          ...prev,
+          [modelId]: {
+            storeSupportWithAddon: result.storeSupportWithAddon || 0,
+            storeSupportWithoutAddon: result.storeSupportWithoutAddon || 0,
+            purchasePriceWithAddon: result.purchasePriceWithAddon || 0,
+            purchasePriceWithoutAddon: result.purchasePriceWithoutAddon || 0,
+            publicSupport: result.publicSupport || 0
+          }
+        };
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:calculatePriceInternal',message:'calculatedPrices 업데이트 (API 성공)',data:{modelId,publicSupport:result.publicSupport,calculatedCount:Object.keys(newPrices).length,expectedCount:expectedCalculationsRef.current.size,isInExpected:expectedCalculationsRef.current.has(modelId),expectedModelIds:Array.from(expectedCalculationsRef.current)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M4'})}).catch(()=>{});
+        // #endregion
+        return newPrices;
+      });
 
       // mobileList 상태도 업데이트
       setMobileList(prevList => prevList.map(item =>
