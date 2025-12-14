@@ -2,7 +2,7 @@
  * 오늘의 휴대폰 ProductCard 컴포넌트
  * TodaysMobileTab에서 분리된 제품 카드 컴포넌트
  */
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Card,
   CardContent,
@@ -474,6 +474,5 @@ function TodaysProductCard(props) {
 // Named export도 추가하여 lazy loading TDZ 문제 방지
 export { TodaysProductCard };
 
-// Default export를 안전하게 래핑하여 React.lazy TDZ 문제 방지
-const TodaysProductCardDefault = TodaysProductCard;
-export default TodaysProductCardDefault;
+// Default export - 함수 선언은 hoisted되므로 직접 export 가능
+export default TodaysProductCard;
