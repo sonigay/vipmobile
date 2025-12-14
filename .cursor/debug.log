@@ -1,0 +1,3 @@
+{"location":"TodaysMobileTab.js:getPriceDataFromCache","message":"calculatedPricesRef에서 완료된 데이터 반환","data":{"productId":"mobile-LG-1","allLoaded":true},"timestamp":1765718447587,"sessionId":"debug-session","runId":"run1","hypothesisId":"H8"}
+{"location":"TodaysMobileTab.js:getPriceDataFromCache","message":"calculatedPricesRef에서 완료된 데이터 반환","data":{"productId":"mobile-LG-8","allLoaded":true},"timestamp":1765718447587,"sessionId":"debug-session","runId":"run1","hypothesisId":"H8"}
+{"location":"TodaysMobileTab.js:getPriceDataFromCache","message":"calculatedPricesRef에서 완료된 데이터 반환","data":{"productId":"mobile-LG-9","allLoaded":true},"timestamp":1765718447587,"sessionId":"debug-session","runId":"run1","hypothesisId":"H8"}

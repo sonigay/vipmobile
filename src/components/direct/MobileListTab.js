@@ -779,10 +779,22 @@ const MobileListTab = ({ onProductSelect }) => {
         const freshData = await directStoreApiClient.getMobileList(carrier);
         
         // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:handleFileChange',message:'최신 데이터 재로딩 완료',data:{carrier,dataCount:freshData?.length,uploadedModelImage:freshData?.find(m=>m.id===uploadingModelId)?.image,expectedImageUrl:result.imageUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'I6'})}).catch(()=>{});
+        const uploadedModel = freshData?.find(m => m.id === uploadingModelId);
+        const uploadedModelImage = uploadedModel?.image || '';
+        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:handleFileChange',message:'최신 데이터 재로딩 완료',data:{carrier,dataCount:freshData?.length,uploadedModelId,uploadedModelImage,expectedImageUrl:result.imageUrl,modelName:currentModel?.model,modelMatch:uploadedModel?.model === currentModel?.model},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'I6'})}).catch(()=>{});
         // #endregion
         
-        setMobileList(freshData || []);
+        // 🔥 개선: 이미지가 없으면 로컬 상태 유지 (서버 매칭 실패 시에도 UI에 이미지 표시)
+        if (uploadedModelImage) {
+          setMobileList(freshData || []);
+        } else {
+          console.warn('⚠️ [이미지 업로드] 서버에서 이미지를 찾지 못함, 로컬 상태 유지:', {
+            uploadingModelId,
+            modelName: currentModel?.model,
+            expectedImageUrl: result.imageUrl
+          });
+          // 로컬 상태는 이미 업데이트되었으므로 그대로 유지
+        }
         console.log('✅ [이미지 업로드] 최신 데이터 재로딩 완료');
 
         // 이미지 업로드 성공 이벤트 발생 (오늘의휴대폰 페이지 등 다른 컴포넌트에서 데이터 재로딩)
@@ -1536,9 +1548,10 @@ const MobileListTab = ({ onProductSelect }) => {
   // 표시할 값 가져오기 (계산된 값이 있으면 사용, 없으면 원래 값) - 메모이제이션
   const getDisplayValue = useCallback((row, field, selectedOpeningType = null) => {
     // 🔥 개선: openingType별로 저장된 값을 가져오도록 수정
-    const openingType = selectedOpeningType || selectedOpeningTypes[row.id] || null;
-    const priceKey = openingType ? `${row.id}-${openingType}` : null;
-    const calculated = priceKey ? calculatedPrices[priceKey] : null;
+    // openingType이 null이면 기본값 'MNP' 사용 (초기 로드 시 selectedOpeningTypes가 빈 객체일 수 있음)
+    const openingType = selectedOpeningType || selectedOpeningTypes[row.id] || 'MNP';
+    const priceKey = `${row.id}-${openingType}`;
+    const calculated = calculatedPrices[priceKey] || null;
     
     // #region agent log
     if (field === 'publicSupport') {
@@ -1694,31 +1707,34 @@ const MobileListTab = ({ onProductSelect }) => {
               {mobileList.length === 0 ? (
                 <EmptyTableRow colSpan={11} message="표시할 데이터가 없습니다." />
               ) : (
-                mobileList.map((row) => (
-                  <MobileListRow
-                    key={row.id}
-                    row={row}
-                    planGroups={planGroups}
-                    openingTypes={openingTypes}
-                    selectedPlanGroup={selectedPlanGroups[row.id] || null}
-                    selectedOpeningType={selectedOpeningTypes[row.id] || null}
-                    calculatedPrice={(() => {
-                      const openingType = selectedOpeningTypes[row.id];
-                      const priceKey = openingType ? `${row.id}-${openingType}` : null;
-                      return priceKey ? calculatedPrices[priceKey] || null : null;
-                    })()}
-                    tagMenuAnchor={tagMenuAnchor}
-                    onRowClick={handleRowClick}
-                    onTagMenuOpen={handleTagMenuOpen}
-                    onTagMenuClose={handleTagMenuClose}
-                    onTagChange={handleTagChange}
-                    onPlanGroupChange={handlePlanGroupChange}
-                    onOpeningTypeChange={handleOpeningTypeChange}
-                    onImageUploadClick={handleImageUploadClick}
-                    getSelectedTags={getSelectedTags}
-                    getDisplayValue={getDisplayValue}
-                  />
-                ))
+                mobileList.map((row) => {
+                  // 🔥 성능 최적화: openingType과 calculatedPrice 계산 최적화
+                  const openingType = selectedOpeningTypes[row.id] || 'MNP';
+                  const priceKey = `${row.id}-${openingType}`;
+                  const calculatedPrice = calculatedPrices[priceKey] || null;
+                  
+                  return (
+                    <MobileListRow
+                      key={row.id}
+                      row={row}
+                      planGroups={planGroups}
+                      openingTypes={openingTypes}
+                      selectedPlanGroup={selectedPlanGroups[row.id] || null}
+                      selectedOpeningType={openingType}
+                      calculatedPrice={calculatedPrice}
+                      tagMenuAnchor={tagMenuAnchor}
+                      onRowClick={handleRowClick}
+                      onTagMenuOpen={handleTagMenuOpen}
+                      onTagMenuClose={handleTagMenuClose}
+                      onTagChange={handleTagChange}
+                      onPlanGroupChange={handlePlanGroupChange}
+                      onOpeningTypeChange={handleOpeningTypeChange}
+                      onImageUploadClick={handleImageUploadClick}
+                      getSelectedTags={getSelectedTags}
+                      getDisplayValue={getDisplayValue}
+                    />
+                  );
+                })
               )}
             </TableBody>
           </Table>
