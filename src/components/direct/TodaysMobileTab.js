@@ -1098,85 +1098,83 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                   </Box>
                 );
               })()
-            ) : (
+            ) : (() => {
               // 상품 그룹 표시 (6개씩 그리드)
-              (() => {
-                // #region agent log
-                try {
-                  fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:before-slideshowData-check',message:'slideshowData 조건 체크 전',data:{hasSlideshowData:!!slideshowData,slideshowDataLength:slideshowData?.length,currentSlideIndex,hasCurrentSlide:!!slideshowData?.[currentSlideIndex]},timestamp:Date.now(),sessionId:'debug-session',runId:'debug-run-8',hypothesisId:'D'})}).catch(()=>{});
-                } catch (e) {}
-                // #endregion
-                const currentSlide = slideshowData?.[currentSlideIndex];
-                const isProductGroup = currentSlide?.type === 'productGroup' && currentSlide?.products;
-                if (!isProductGroup || !currentSlide?.products || !Array.isArray(currentSlide.products)) return null;
-                
-                // #region agent log
-                try {
-                  fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:before-products-map',message:'products.map 시작 전',data:{productsLength:currentSlide.products?.length,hasCarrier:!!currentSlide.carrier,hasGetPriceDataFromCache:!!getPriceDataFromCache,hasHandlePriceCalculated:!!handlePriceCalculated},timestamp:Date.now(),sessionId:'debug-session',runId:'debug-run-8',hypothesisId:'D'})}).catch(()=>{});
-                } catch (e) {}
-                // #endregion
-                
-                const carrier = currentSlide.carrier || 'SK';
-                
-                return (
-                <Box
-                  sx={{
-                    width: '100%',
-                    height: '100%',
-                    display: 'grid',
-                    gap: compact ? (isFullScreen ? 1 : 1.5) : (isFullScreen ? 1.5 : 2),
-                    gridTemplateColumns: {
-                      xs: 'repeat(1, 1fr)',  // 모바일: 1열
-                      sm: 'repeat(2, 1fr)',  // 태블릿: 2열
-                      md: 'repeat(2, 1fr)',  // 작은PC: 2열
-                      lg: 'repeat(3, 1fr)',  // 큰PC: 3열
-                      xl: 'repeat(3, 1fr)'   // 매우 큰 화면: 3열
-                    },
-                    gridAutoRows: 'auto',
-                    alignContent: 'start',
-                    alignItems: 'stretch',
-                    overflowY: 'auto',
-                    overflowX: 'hidden',
-                    p: isFullScreen ? (compact ? 1 : 1.5) : (compact ? 1.5 : 2),
-                    animation: 'slideIn 0.5s ease-out',
-                    '&::-webkit-scrollbar': { width: '6px' },
-                    '&::-webkit-scrollbar-thumb': { 
-                      bgcolor: `${theme.primary}80`, 
-                      borderRadius: '3px',
-                      '&:hover': {
-                        bgcolor: theme.primary
-                      }
+              // #region agent log
+              try {
+                fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:before-slideshowData-check',message:'slideshowData 조건 체크 전',data:{hasSlideshowData:!!slideshowData,slideshowDataLength:slideshowData?.length,currentSlideIndex,hasCurrentSlide:!!slideshowData?.[currentSlideIndex]},timestamp:Date.now(),sessionId:'debug-session',runId:'debug-run-9',hypothesisId:'E'})}).catch(()=>{});
+              } catch (e) {}
+              // #endregion
+              const currentSlide = slideshowData?.[currentSlideIndex];
+              const isProductGroup = currentSlide?.type === 'productGroup' && currentSlide?.products;
+              if (!isProductGroup || !currentSlide?.products || !Array.isArray(currentSlide.products)) return null;
+              
+              // #region agent log
+              try {
+                fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:before-products-map',message:'products.map 시작 전',data:{productsLength:currentSlide.products?.length,hasCarrier:!!currentSlide.carrier,hasGetPriceDataFromCache:!!getPriceDataFromCache,hasHandlePriceCalculated:!!handlePriceCalculated},timestamp:Date.now(),sessionId:'debug-session',runId:'debug-run-9',hypothesisId:'E'})}).catch(()=>{});
+              } catch (e) {}
+              // #endregion
+              
+              const carrier = currentSlide.carrier || 'SK';
+              
+              return (
+              <Box
+                sx={{
+                  width: '100%',
+                  height: '100%',
+                  display: 'grid',
+                  gap: compact ? (isFullScreen ? 1 : 1.5) : (isFullScreen ? 1.5 : 2),
+                  gridTemplateColumns: {
+                    xs: 'repeat(1, 1fr)',  // 모바일: 1열
+                    sm: 'repeat(2, 1fr)',  // 태블릿: 2열
+                    md: 'repeat(2, 1fr)',  // 작은PC: 2열
+                    lg: 'repeat(3, 1fr)',  // 큰PC: 3열
+                    xl: 'repeat(3, 1fr)'   // 매우 큰 화면: 3열
+                  },
+                  gridAutoRows: 'auto',
+                  alignContent: 'start',
+                  alignItems: 'stretch',
+                  overflowY: 'auto',
+                  overflowX: 'hidden',
+                  p: isFullScreen ? (compact ? 1 : 1.5) : (compact ? 1.5 : 2),
+                  animation: 'slideIn 0.5s ease-out',
+                  '&::-webkit-scrollbar': { width: '6px' },
+                  '&::-webkit-scrollbar-thumb': { 
+                    bgcolor: `${theme.primary}80`, 
+                    borderRadius: '3px',
+                    '&:hover': {
+                      bgcolor: theme.primary
                     }
-                  }}
-                >
-                  {currentSlide.products.map((product) => {
-                    if (!product || typeof product !== 'object') return null;
-                    
-                    // #region agent log
-                    try {
-                      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:before-TodaysProductCard-render',message:'TodaysProductCard 렌더링 전',data:{hasProduct:!!product,productId:product?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'debug-run-8',hypothesisId:'D'})}).catch(()=>{});
-                    } catch (e) {}
-                    // #endregion
-                    
-                    const carrierTheme = getCarrierTheme(carrier);
-                    const cachedPriceData = getPriceDataFromCache(product);
-                    return (
-                      <TodaysProductCard
-                        key={product.id || `${product.model}-${product.carrier}`}
-                        product={product}
-                        isPremium={product.isPremium === true}
-                        onSelect={onProductSelect}
-                        compact={compact}
-                        theme={carrierTheme}
-                        priceData={cachedPriceData}
-                        onPriceCalculated={handlePriceCalculated}
-                      />
-                    );
-                  })}
-                </Box>
-                );
-              })()
-            )}
+                  }
+                }}
+              >
+                {currentSlide.products.map((product) => {
+                  if (!product || typeof product !== 'object') return null;
+                  
+                  // #region agent log
+                  try {
+                    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:before-TodaysProductCard-render',message:'TodaysProductCard 렌더링 전',data:{hasProduct:!!product,productId:product?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'debug-run-9',hypothesisId:'E'})}).catch(()=>{});
+                  } catch (e) {}
+                  // #endregion
+                  
+                  const carrierTheme = getCarrierTheme(carrier);
+                  const cachedPriceData = getPriceDataFromCache(product);
+                  return (
+                    <TodaysProductCard
+                      key={product.id || `${product.model}-${product.carrier}`}
+                      product={product}
+                      isPremium={product.isPremium === true}
+                      onSelect={onProductSelect}
+                      compact={compact}
+                      theme={carrierTheme}
+                      priceData={cachedPriceData}
+                      onPriceCalculated={handlePriceCalculated}
+                    />
+                  );
+                })}
+              </Box>
+              );
+            })()}
           </Box>
         )}
 
@@ -1318,79 +1316,77 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                       </Box>
                     );
                   })()
-                ) : (
+                ) : (() => {
                   // 상품 그룹 표시
-                  (() => {
-                    // #region agent log
-                    try {
-                      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:before-slideshowData-check-2',message:'slideshowData 조건 체크 전 (manual)',data:{hasSlideshowData:!!slideshowData,slideshowDataLength:slideshowData?.length,manualSlideIndex,hasManualSlide:!!slideshowData?.[manualSlideIndex]},timestamp:Date.now(),sessionId:'debug-session',runId:'render-check',hypothesisId:'RENDER-ORDER'})}).catch(()=>{});
-                    } catch (e) {}
-                    // #endregion
-                    const manualSlide = slideshowData?.[manualSlideIndex];
-                    const isManualProductGroup = manualSlide?.type === 'productGroup' && manualSlide?.products;
-                    if (!isManualProductGroup || !manualSlide?.products || !Array.isArray(manualSlide.products)) return null;
-                    
-                    const manualCarrier = manualSlide.carrier || 'SK';
-                    
-                    return (
-                    <Box
-                      sx={{
-                        width: '100%',
-                        height: '100%',
-                        display: 'grid',
-                        gap: compact ? (isFullScreen ? 1 : 1.5) : (isFullScreen ? 1.5 : 2),
-                        gridTemplateColumns: {
-                          xs: 'repeat(1, 1fr)',  // 모바일: 1열
-                          sm: 'repeat(2, 1fr)',  // 태블릿: 2열
-                          md: 'repeat(2, 1fr)',  // 작은PC: 2열
-                          lg: 'repeat(3, 1fr)',  // 큰PC: 3열
-                          xl: 'repeat(3, 1fr)'   // 매우 큰 화면: 3열
-                        },
-                        gridAutoRows: 'auto',
-                        alignContent: 'start',
-                        alignItems: 'stretch',
-                        overflowY: 'auto',
-                        overflowX: 'hidden',
-                        p: isFullScreen ? (compact ? 1 : 1.5) : (compact ? 1.5 : 2),
-                        animation: 'slideIn 0.5s ease-out',
-                        '&::-webkit-scrollbar': { width: '6px' },
-                        '&::-webkit-scrollbar-thumb': { 
-                          bgcolor: `${theme.primary}80`, 
-                          borderRadius: '3px',
-                          '&:hover': {
-                            bgcolor: theme.primary
-                          }
+                  // #region agent log
+                  try {
+                    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:before-slideshowData-check-2',message:'slideshowData 조건 체크 전 (manual)',data:{hasSlideshowData:!!slideshowData,slideshowDataLength:slideshowData?.length,manualSlideIndex,hasManualSlide:!!slideshowData?.[manualSlideIndex]},timestamp:Date.now(),sessionId:'debug-session',runId:'debug-run-9',hypothesisId:'E'})}).catch(()=>{});
+                  } catch (e) {}
+                  // #endregion
+                  const manualSlide = slideshowData?.[manualSlideIndex];
+                  const isManualProductGroup = manualSlide?.type === 'productGroup' && manualSlide?.products;
+                  if (!isManualProductGroup || !manualSlide?.products || !Array.isArray(manualSlide.products)) return null;
+                  
+                  const manualCarrier = manualSlide.carrier || 'SK';
+                  
+                  return (
+                  <Box
+                    sx={{
+                      width: '100%',
+                      height: '100%',
+                      display: 'grid',
+                      gap: compact ? (isFullScreen ? 1 : 1.5) : (isFullScreen ? 1.5 : 2),
+                      gridTemplateColumns: {
+                        xs: 'repeat(1, 1fr)',  // 모바일: 1열
+                        sm: 'repeat(2, 1fr)',  // 태블릿: 2열
+                        md: 'repeat(2, 1fr)',  // 작은PC: 2열
+                        lg: 'repeat(3, 1fr)',  // 큰PC: 3열
+                        xl: 'repeat(3, 1fr)'   // 매우 큰 화면: 3열
+                      },
+                      gridAutoRows: 'auto',
+                      alignContent: 'start',
+                      alignItems: 'stretch',
+                      overflowY: 'auto',
+                      overflowX: 'hidden',
+                      p: isFullScreen ? (compact ? 1 : 1.5) : (compact ? 1.5 : 2),
+                      animation: 'slideIn 0.5s ease-out',
+                      '&::-webkit-scrollbar': { width: '6px' },
+                      '&::-webkit-scrollbar-thumb': { 
+                        bgcolor: `${theme.primary}80`, 
+                        borderRadius: '3px',
+                        '&:hover': {
+                          bgcolor: theme.primary
                         }
-                      }}
-                    >
-                      {manualSlide.products.map((product) => {
-                        if (!product || typeof product !== 'object') return null;
-                        
-                        // #region agent log
-                        try {
-                          fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:before-TodaysProductCard-render-2',message:'TodaysProductCard 렌더링 전 (manual)',data:{hasProduct:!!product},timestamp:Date.now(),sessionId:'debug-session',runId:'debug-run-5',hypothesisId:'C'})}).catch(()=>{});
-                        } catch (e) {}
-                        // #endregion
-                        
-                        const carrierTheme = getCarrierTheme(manualCarrier);
-                        const cachedPriceData = getPriceDataFromCache(product);
-                        return (
-                          <TodaysProductCard
-                            key={product.id || `${product.model}-${product.carrier}`}
-                            product={product}
-                            isPremium={product.isPremium === true}
-                            onSelect={onProductSelect}
-                            compact={compact}
-                            theme={carrierTheme}
-                            priceData={cachedPriceData}
-                            onPriceCalculated={handlePriceCalculated}
-                          />
-                        );
-                      })}
-                    </Box>
-                    );
-                  })()
-                )}
+                      }
+                    }}
+                  >
+                    {manualSlide.products.map((product) => {
+                      if (!product || typeof product !== 'object') return null;
+                      
+                      // #region agent log
+                      try {
+                        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:before-TodaysProductCard-render-2',message:'TodaysProductCard 렌더링 전 (manual)',data:{hasProduct:!!product},timestamp:Date.now(),sessionId:'debug-session',runId:'debug-run-9',hypothesisId:'E'})}).catch(()=>{});
+                      } catch (e) {}
+                      // #endregion
+                      
+                      const carrierTheme = getCarrierTheme(manualCarrier);
+                      const cachedPriceData = getPriceDataFromCache(product);
+                      return (
+                        <TodaysProductCard
+                          key={product.id || `${product.model}-${product.carrier}`}
+                          product={product}
+                          isPremium={product.isPremium === true}
+                          onSelect={onProductSelect}
+                          compact={compact}
+                          theme={carrierTheme}
+                          priceData={cachedPriceData}
+                          onPriceCalculated={handlePriceCalculated}
+                        />
+                      );
+                    })}
+                  </Box>
+                  );
+                })()}
               </>
             ) : (
               // 슬라이드쇼 데이터가 없으면 기본 그리드 표시 (슬라이드쇼 데이터 로딩이 완료된 후에만 표시)
