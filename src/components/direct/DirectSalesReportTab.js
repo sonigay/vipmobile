@@ -41,6 +41,12 @@ import { LoadingState } from './common/LoadingState';
 import { ErrorState } from './common/ErrorState';
 import { ModernTable, ModernTableCell, HoverableTableRow, EmptyTableRow } from './common/ModernTable';
 
+// #region agent log
+try {
+  fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'DirectSalesReportTab.js:component-init',message:'DirectSalesReportTab 컴포넌트 초기화',data:{isManagementMode},timestamp:Date.now(),sessionId:'debug-session',runId:'render-check',hypothesisId:'RENDER-ORDER'})}).catch(()=>{});
+} catch (e) {}
+// #endregion
+
 const DirectSalesReportTab = ({ onRowClick, loggedInStore, isManagementMode = false }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [salesData, setSalesData] = useState([]);
