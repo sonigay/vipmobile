@@ -37,8 +37,7 @@ import {
 } from '@mui/icons-material';
 import { directStoreApi } from '../../api/directStoreApi';
 import { directStoreApiClient } from '../../api/directStoreApiClient';
-import { ModernTable, ModernTableCell, HoverableTableRow, EmptyTableRow } from './common/ModernTable';
-import { LoadingState, ErrorState } from './common';
+import { LoadingState, ErrorState, ModernTable, ModernTableCell, HoverableTableRow, EmptyTableRow } from './common';
 
 const DirectSalesReportTab = ({ onRowClick, loggedInStore, isManagementMode = false }) => {
     const [searchTerm, setSearchTerm] = useState('');
