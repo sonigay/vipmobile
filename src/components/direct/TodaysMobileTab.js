@@ -819,6 +819,12 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
     );
   }
 
+  // #region agent log
+  try {
+    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:before-return',message:'TodaysMobileTab return 문 시작',data:{hasTheme:!!theme,hasSlideshowData:!!slideshowData,slideshowDataLength:slideshowData?.length,currentSlideIndex,hasGetCarrierTheme:typeof getCarrierTheme !== 'undefined'},timestamp:Date.now(),sessionId:'debug-session',runId:'render-check',hypothesisId:'RENDER-ORDER'})}).catch(()=>{});
+  } catch (e) {}
+  // #endregion
+
   return (
     <Box
       sx={{
@@ -1051,7 +1057,15 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
               })()
             ) : (
               // 상품 그룹 표시 (6개씩 그리드)
-              slideshowData[currentSlideIndex]?.type === 'productGroup' && slideshowData[currentSlideIndex]?.products && (
+              (() => {
+                // #region agent log
+                try {
+                  fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:before-slideshowData-check',message:'slideshowData 조건 체크 전',data:{hasSlideshowData:!!slideshowData,slideshowDataLength:slideshowData?.length,currentSlideIndex,hasCurrentSlide:!!slideshowData?.[currentSlideIndex]},timestamp:Date.now(),sessionId:'debug-session',runId:'render-check',hypothesisId:'RENDER-ORDER'})}).catch(()=>{});
+                } catch (e) {}
+                // #endregion
+                const currentSlide = slideshowData?.[currentSlideIndex];
+                const isProductGroup = currentSlide?.type === 'productGroup' && currentSlide?.products;
+                return isProductGroup && (
                 <Box
                   sx={{
                     width: '100%',
@@ -1082,13 +1096,13 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                     }
                   }}
                 >
-                  {slideshowData[currentSlideIndex].products.map((product) => {
+                  {currentSlide.products.map((product) => {
                     // #region agent log
                     try {
                       fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:before-TodaysProductCard-render',message:'TodaysProductCard 렌더링 전',data:{hasProduct:!!product,hasGetCarrierTheme:typeof getCarrierTheme !== 'undefined',hasGetPriceDataFromCache:typeof getPriceDataFromCache !== 'undefined',hasHandlePriceCalculated:typeof handlePriceCalculated !== 'undefined'},timestamp:Date.now(),sessionId:'debug-session',runId:'render-check',hypothesisId:'RENDER-ORDER'})}).catch(()=>{});
                     } catch (e) {}
                     // #endregion
-                    const carrierTheme = getCarrierTheme(slideshowData[currentSlideIndex].carrier);
+                    const carrierTheme = getCarrierTheme(currentSlide.carrier);
                     const cachedPriceData = getPriceDataFromCache(product);
                     return (
                       <TodaysProductCard
@@ -1104,7 +1118,8 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                     );
                   })}
                 </Box>
-              )
+              );
+              })()
             )}
           </Box>
         )}
@@ -1249,7 +1264,15 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                   })()
                 ) : (
                   // 상품 그룹 표시
-                  slideshowData[manualSlideIndex]?.type === 'productGroup' && slideshowData[manualSlideIndex]?.products && (
+                  (() => {
+                    // #region agent log
+                    try {
+                      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:before-slideshowData-check-2',message:'slideshowData 조건 체크 전 (manual)',data:{hasSlideshowData:!!slideshowData,slideshowDataLength:slideshowData?.length,manualSlideIndex,hasManualSlide:!!slideshowData?.[manualSlideIndex]},timestamp:Date.now(),sessionId:'debug-session',runId:'render-check',hypothesisId:'RENDER-ORDER'})}).catch(()=>{});
+                    } catch (e) {}
+                    // #endregion
+                    const manualSlide = slideshowData?.[manualSlideIndex];
+                    const isManualProductGroup = manualSlide?.type === 'productGroup' && manualSlide?.products;
+                    return isManualProductGroup && (
                     <Box
                       sx={{
                         width: '100%',
@@ -1280,13 +1303,13 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                         }
                       }}
                     >
-                      {slideshowData[manualSlideIndex].products.map((product) => {
+                      {manualSlide.products.map((product) => {
                         // #region agent log
                         try {
                           fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:before-TodaysProductCard-render-2',message:'TodaysProductCard 렌더링 전 (manual)',data:{hasProduct:!!product},timestamp:Date.now(),sessionId:'debug-session',runId:'render-check',hypothesisId:'RENDER-ORDER'})}).catch(()=>{});
                         } catch (e) {}
                         // #endregion
-                        const carrierTheme = getCarrierTheme(slideshowData[manualSlideIndex].carrier);
+                        const carrierTheme = getCarrierTheme(manualSlide.carrier);
                         const cachedPriceData = getPriceDataFromCache(product);
                         return (
                           <TodaysProductCard
@@ -1302,7 +1325,8 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                         );
                       })}
                     </Box>
-                  )
+                  );
+                  })()
                 )}
               </>
             ) : (
