@@ -31,7 +31,8 @@ import {
 } from '@mui/icons-material';
 import { directStoreApi } from '../../../api/directStoreApi';
 import { directStoreApiClient } from '../../../api/directStoreApiClient';
-import { LoadingState, ErrorState } from '../common';
+import { LoadingState } from '../common/LoadingState';
+import { ErrorState } from '../common/ErrorState';
 
 const MainPageTextSettingsTab = () => {
   const [loading, setLoading] = useState(false);

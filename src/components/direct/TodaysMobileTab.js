@@ -33,7 +33,8 @@ import {
 } from '@mui/icons-material';
 import { directStoreApiClient } from '../../api/directStoreApiClient';
 import { getCachedPrice, setCachedPrice, setCachedPricesBatch } from '../../utils/priceCache';
-import { LoadingState, ErrorState, EmptyState } from './common';
+import { LoadingState } from './common/LoadingState';
+import { ErrorState, EmptyState } from './common/ErrorState';
 import TodaysProductCard from './TodaysProductCard';
 
 // ProductCard는 TodaysProductCard로 대체됨 (하위 호환성을 위해 유지)

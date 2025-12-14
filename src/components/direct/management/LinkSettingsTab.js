@@ -35,7 +35,8 @@ import {
 } from '@mui/icons-material';
 import { directStoreApi } from '../../../api/directStoreApi';
 import { directStoreApiClient } from '../../../api/directStoreApiClient';
-import { LoadingState, ErrorState } from '../common';
+import { LoadingState } from '../common/LoadingState';
+import { ErrorState } from '../common/ErrorState';
 
 // 구글 시트 ID 추출 함수 (전체 URL 또는 ID만 입력 가능)
 const extractSheetId = (value = '') => {
