@@ -91,6 +91,9 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
     // 요금제 그룹 로드 (링크설정에서 가져오기)
     useEffect(() => {
         const loadPlanGroups = async () => {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OpeningInfoPage.js:loadPlanGroups',message:'요금제 그룹 로드 시작',data:{carrier:selectedCarrier},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'O1'})}).catch(()=>{});
+            // #endregion
             try {
                 const linkSettings = await directStoreApiClient.getLinkSettings(selectedCarrier);
                 if (linkSettings.success && linkSettings.planGroup) {
@@ -348,6 +351,10 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                 if (modelId) {
                     // 🔥 개선: modelName 전달 (휴대폰목록 페이지와 동일하게)
                     const modelName = initialData?.model || foundMobile?.model || null;
+                    // #region agent log
+                    const calcStartTime = Date.now();
+                    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OpeningInfoPage.js:loadPlanGroups',message:'가격 계산 시작',data:{modelId,planGroup:foundPlan.group,openingType,carrier:selectedCarrier,modelName},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'O2'})}).catch(()=>{});
+                    // #endregion
                     const result = await directStoreApiClient.calculateMobilePrice(
                         modelId,
                         foundPlan.group,
@@ -355,6 +362,10 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                         selectedCarrier,
                         modelName
                     );
+                    const calcDuration = Date.now() - calcStartTime;
+                    // #region agent log
+                    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OpeningInfoPage.js:loadPlanGroups',message:'가격 계산 완료',data:{modelId,success:result?.success,duration:calcDuration,publicSupport:result?.publicSupport},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'O2'})}).catch(()=>{});
+                    // #endregion
                     
                     if (result.success) {
                         // 🔥 개선: publicSupport도 업데이트 (요금제군/개통유형 변경 시)

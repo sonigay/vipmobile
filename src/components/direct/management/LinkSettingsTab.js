@@ -107,10 +107,18 @@ const LinkSettingsTab = () => {
     // 설정 로드
     useEffect(() => {
         const loadSettings = async () => {
+            // #region agent log
+            const carrier = getCurrentCarrier();
+            fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LinkSettingsTab.js:loadSettings',message:'링크 설정 로드 시작',data:{carrier},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'L1'})}).catch(()=>{});
+            // #endregion
             try {
                 setLoading(true);
-                const carrier = getCurrentCarrier();
+                const startTime = Date.now();
                 const data = await directStoreApiClient.getLinkSettings(carrier);
+                const duration = Date.now() - startTime;
+                // #region agent log
+                fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LinkSettingsTab.js:loadSettings',message:'링크 설정 로드 완료',data:{carrier,success:data?.success,duration,hasPlanGroup:!!data?.planGroup,hasSupport:!!data?.support,hasPolicy:!!data?.policy},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'L1'})}).catch(()=>{});
+                // #endregion
                 
                 if (data.success) {
                     if (data.planGroup) {
@@ -263,9 +271,12 @@ const LinkSettingsTab = () => {
     };
 
     const handleSave = async (type) => {
+        // #region agent log
+        const carrier = getCurrentCarrier();
+        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LinkSettingsTab.js:handleSave',message:'링크 설정 저장 시작',data:{type,carrier},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'L2'})}).catch(()=>{});
+        // #endregion
         try {
             setSaving(true);
-            const carrier = getCurrentCarrier();
             let settings = {};
 
             if (type === 'planGroup') {
@@ -313,7 +324,12 @@ const LinkSettingsTab = () => {
                 };
             }
 
+            const startTime = Date.now();
             await directStoreApi.saveLinkSettings(carrier, settings);
+            const duration = Date.now() - startTime;
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LinkSettingsTab.js:handleSave',message:'링크 설정 저장 완료',data:{type,carrier,duration},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'L2'})}).catch(()=>{});
+            // #endregion
             setSuccessMessage('설정이 저장되었습니다.');
             
             // 저장 후 자동으로 다시 로드 (planGroups 자동 추출 반영)

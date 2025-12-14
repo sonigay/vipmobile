@@ -63,10 +63,19 @@ const MainPageTextSettingsTab = () => {
   }, []);
 
   const loadData = async () => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MainPageTextSettingsTab.js:loadData',message:'문구 설정 로드 시작',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'T1'})}).catch(()=>{});
+    // #endregion
     try {
       setLoading(true);
       setError(null);
+      const startTime = Date.now();
       const response = await directStoreApiClient.getMainPageTexts();
+      const duration = Date.now() - startTime;
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MainPageTextSettingsTab.js:loadData',message:'문구 설정 로드 완료',data:{success:response?.success,duration,hasMainHeader:!!response?.data?.mainHeader,transitionPageCount:Object.keys(response?.data?.transitionPages||{}).length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'T1'})}).catch(()=>{});
+      // #endregion
       
       if (response.success && response.data) {
         if (response.data.mainHeader) {
@@ -128,11 +137,19 @@ const MainPageTextSettingsTab = () => {
   };
 
   const handleSaveMainHeader = async () => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MainPageTextSettingsTab.js:handleSaveMainHeader',message:'메인헤더 저장 시작',data:{hasContent:!!mainHeaderForm.content,hasImage:!!mainHeaderForm.imageUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'T2'})}).catch(()=>{});
+    // #endregion
     try {
       setSaving(true);
       setError(null);
       
+      const startTime = Date.now();
       const response = await directStoreApiClient.saveMainPageText('', '', 'mainHeader', mainHeaderForm.content, mainHeaderForm.imageUrl);
+      const duration = Date.now() - startTime;
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MainPageTextSettingsTab.js:handleSaveMainHeader',message:'메인헤더 저장 완료',data:{success:response?.success,duration},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'T2'})}).catch(()=>{});
+      // #endregion
       
       if (response.success) {
         setMainHeader(mainHeaderForm);
@@ -151,10 +168,14 @@ const MainPageTextSettingsTab = () => {
   };
 
   const handleSaveTransition = async () => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MainPageTextSettingsTab.js:handleSaveTransition',message:'전환 페이지 저장 시작',data:{carrier:transitionForm.carrier,category:transitionForm.category,hasContent:!!transitionForm.content,hasImage:!!transitionForm.imageUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'T3'})}).catch(()=>{});
+    // #endregion
     try {
       setSaving(true);
       setError(null);
       
+      const startTime = Date.now();
       const response = await directStoreApiClient.saveMainPageText(
         transitionForm.carrier,
         transitionForm.category,
@@ -162,6 +183,10 @@ const MainPageTextSettingsTab = () => {
         transitionForm.content,
         transitionForm.imageUrl
       );
+      const duration = Date.now() - startTime;
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MainPageTextSettingsTab.js:handleSaveTransition',message:'전환 페이지 저장 완료',data:{carrier:transitionForm.carrier,category:transitionForm.category,success:response?.success,duration},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'T3'})}).catch(()=>{});
+      // #endregion
       
       if (response.success) {
         if (!transitionPages[transitionForm.carrier]) {

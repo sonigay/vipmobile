@@ -96,6 +96,9 @@ const MobileListTab = ({ onProductSelect }) => {
 
   useEffect(() => {
     const fetchMobileList = async () => {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:fetchMobileList',message:'휴대폰 목록 로드 시작',data:{carrier:getCurrentCarrier()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M1'})}).catch(()=>{});
+      // #endregion
       try {
         setLoading(true);
         setError(null);
@@ -119,6 +122,9 @@ const MobileListTab = ({ onProductSelect }) => {
             message: safeList.length > 0 ? '' : (meta?.error || '수신된 데이터가 없습니다.')
           }
         }));
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:fetchMobileList',message:'휴대폰 목록 로드 완료',data:{carrier:getCurrentCarrier(),count:safeList.length,hasMeta:!!meta},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M1'})}).catch(()=>{});
+        // #endregion
       } catch (err) {
         console.error('휴대폰 목록 로딩 실패:', err);
         debugLog('MobileListTab.js:fetchMobileList', '휴대폰 목록 로딩 실패', {
@@ -1048,6 +1054,10 @@ const MobileListTab = ({ onProductSelect }) => {
     const currentModel = mobileList.find(m => m.id === modelId);
     const modelCarrier = carrier || currentModel?.carrier || getCurrentCarrier();
     
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:calculatePriceInternal',message:'가격 계산 시작',data:{modelId,planGroup,openingType,useCache,modelCarrier,modelName:currentModel?.model},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M2'})}).catch(()=>{});
+    // #endregion
+    
     // carrier가 현재 탭과 다르면 요청 스킵 (탭 전환 중 발생하는 잘못된 요청 방지)
     const currentTabCarrier = getCurrentCarrier();
     if (modelCarrier !== currentTabCarrier) {
@@ -1127,8 +1137,13 @@ const MobileListTab = ({ onProductSelect }) => {
     const modelName = currentModel?.model || null;
 
     // API 호출
+    const startTime = Date.now();
     const pricePromise = directStoreApiClient.calculateMobilePrice(modelId, planGroup, openingType, modelCarrier, modelName)
       .then(result => {
+        // #region agent log
+        const duration = Date.now() - startTime;
+        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:calculatePriceInternal',message:'가격 계산 API 완료',data:{modelId,planGroup,openingType,success:result?.success,duration,publicSupport:result?.publicSupport},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M2'})}).catch(()=>{});
+        // #endregion
         // 404 에러는 재시도하지 않음
         if (result.status === 404) {
           console.warn('모델을 찾을 수 없음 (404):', { modelId, modelName, planGroup, openingType, carrier: modelCarrier });

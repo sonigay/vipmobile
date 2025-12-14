@@ -53,14 +53,25 @@ const DirectSalesReportTab = ({ onRowClick, loggedInStore, isManagementMode = fa
 
     useEffect(() => {
         const fetchSalesData = async () => {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'DirectSalesReportTab.js:fetchSalesData',message:'판매일보 로드 시작',data:{isManagementMode,storeId:loggedInStore?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D1'})}).catch(()=>{});
+            // #endregion
             try {
                 setLoading(true);
                 setError(null);
                 // 직영점 모드: 해당 매장만, 관리 모드: 전체
                 const filters = isManagementMode ? {} : { storeId: loggedInStore?.id };
+                const startTime = Date.now();
                 const data = await directStoreApiClient.getSalesReports(filters);
+                const duration = Date.now() - startTime;
                 setSalesData(data || []);
+                // #region agent log
+                fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'DirectSalesReportTab.js:fetchSalesData',message:'판매일보 로드 완료',data:{count:data?.length||0,duration},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D1'})}).catch(()=>{});
+                // #endregion
             } catch (err) {
+                // #region agent log
+                fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'DirectSalesReportTab.js:fetchSalesData',message:'판매일보 로드 실패',data:{error:err?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D1'})}).catch(()=>{});
+                // #endregion
                 console.error('판매일보 로딩 실패:', err);
                 setError('데이터를 불러오는 중 오류가 발생했습니다.');
                 setSalesData([]);
@@ -130,10 +141,18 @@ const DirectSalesReportTab = ({ onRowClick, loggedInStore, isManagementMode = fa
     const handleStatusUpdate = async () => {
         if (!selectedRow || !newStatus) return;
 
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'DirectSalesReportTab.js:handleStatusUpdate',message:'상태 업데이트 시작',data:{rowId:selectedRow?.id||selectedRow?.번호,oldStatus:selectedRow?.status||selectedRow?.상태,newStatus},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D2'})}).catch(()=>{});
+        // #endregion
         try {
             setUpdating(true);
             const rowId = selectedRow.id || selectedRow.번호;
+            const startTime = Date.now();
             await directStoreApiClient.updateSalesReport(rowId, { status: newStatus });
+            const duration = Date.now() - startTime;
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'DirectSalesReportTab.js:handleStatusUpdate',message:'상태 업데이트 완료',data:{rowId,duration},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D2'})}).catch(()=>{});
+            // #endregion
             
             // 로컬 상태 업데이트
             setSalesData(prev => prev.map(item => 

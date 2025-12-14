@@ -91,10 +91,18 @@ const PolicySettingsTab = () => {
     // 설정 로드
     useEffect(() => {
         const loadSettings = async () => {
+            // #region agent log
+            const carrier = getCurrentCarrier();
+            fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PolicySettingsTab.js:loadSettings',message:'정책 설정 로드 시작',data:{carrier},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'P1'})}).catch(()=>{});
+            // #endregion
             try {
                 setLoading(true);
-                const carrier = getCurrentCarrier();
+                const startTime = Date.now();
                 const data = await directStoreApiClient.getPolicySettings(carrier);
+                const duration = Date.now() - startTime;
+                // #region agent log
+                fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PolicySettingsTab.js:loadSettings',message:'정책 설정 로드 완료',data:{carrier,success:data?.success,duration,hasMargin:!!data?.margin,addonCount:data?.addon?.list?.length||0,insuranceCount:data?.insurance?.list?.length||0,specialCount:data?.special?.list?.length||0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'P1'})}).catch(()=>{});
+                // #endregion
                 
                 if (data.success) {
                     if (data.margin) {
@@ -192,9 +200,12 @@ const PolicySettingsTab = () => {
     };
 
     const handleSave = async (type) => {
+        // #region agent log
+        const carrier = getCurrentCarrier();
+        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PolicySettingsTab.js:handleSave',message:'정책 설정 저장 시작',data:{type,carrier},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'P2'})}).catch(()=>{});
+        // #endregion
         try {
             setSaving(true);
-            const carrier = getCurrentCarrier();
             let settings = {};
 
             if (type === 'margin') {
@@ -205,7 +216,12 @@ const PolicySettingsTab = () => {
                 settings = { special: { list: specialPolicies } };
             }
 
+            const startTime = Date.now();
             await directStoreApiClient.savePolicySettings(carrier, settings);
+            const duration = Date.now() - startTime;
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PolicySettingsTab.js:handleSave',message:'정책 설정 저장 완료',data:{type,carrier,duration},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'P2'})}).catch(()=>{});
+            // #endregion
             setSuccessMessage('설정이 저장되었습니다.');
             
             if (type === 'margin') setOpenMarginModal(false);
