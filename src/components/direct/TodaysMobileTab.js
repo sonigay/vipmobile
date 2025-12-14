@@ -173,6 +173,10 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
       }
     }
     
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:getPriceDataFromCache',message:'캐시 확인 완료',data:{productId:product.id,planGroup,hasCachedData,returnValue:hasCachedData?'priceData':'null'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H8'})}).catch(()=>{});
+    // #endregion
+    
     // 캐시가 있으면 priceData 반환, 없으면 null 반환하여 ProductCard에서 자체 로드하도록
     return hasCachedData ? priceData : null;
   }, []);
