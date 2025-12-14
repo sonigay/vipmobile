@@ -2452,6 +2452,7 @@ function setupDirectRoutes(app) {
           }
 
           // "010신규/기변" 매칭
+          // 🔥 핵심 수정: '010신규'나 '기변'을 선택했을 때, 둘 다 '010신규/기변' 키를 찾고 supportOpeningType도 '010신규/기변'으로 설정
           if (tryType === '010신규' || tryType === '기변') {
             const combinedKeys = [
               `${model}|010신규/기변`, // 원본 최우선
@@ -2486,7 +2487,8 @@ function setupDirectRoutes(app) {
                 finalSupportRowIndex = finalSupportData.rowIndex;
                 supportDebugInfo.matchedKey = key;
                 supportDebugInfo.found = true;
-                supportOpeningType = tryType;
+                // 🔥 핵심 수정: '010신규'나 '기변'을 선택했을 때, supportOpeningType을 '010신규/기변'으로 설정
+                supportOpeningType = '010신규/기변';
                 foundForThisType = true;
                 break;
               }

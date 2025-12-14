@@ -712,9 +712,6 @@ const MobileListTab = ({ onProductSelect }) => {
       // 서버에서도 modelId = modelName으로 처리하므로 일관성 유지
       const actualModelId = modelName; // 실제 모델 코드를 modelId로 사용
 
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:handleFileChange',message:'이미지 업로드 시작',data:{clientId:uploadingModelId,modelId:actualModelId,carrier,modelName,petName,fileName:file.name,fileSize:file.size,currentImage:currentModel?.image},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'I1'})}).catch(()=>{});
-      // #endregion
 
       console.log('📤 [이미지 업로드] 시작:', {
         clientId: uploadingModelId, // 클라이언트 ID (참고용)
@@ -729,22 +726,13 @@ const MobileListTab = ({ onProductSelect }) => {
       // API 호출 (실제 모델 코드를 modelId로 전송)
       const result = await directStoreApi.uploadImage(file, actualModelId, carrier, modelName, petName);
 
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:handleFileChange',message:'이미지 업로드 API 응답',data:{success:result?.success,imageUrl:result?.imageUrl,warning:result?.warning,error:result?.error,modelId:result?.modelId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'I2'})}).catch(()=>{});
-      // #endregion
 
       if (!result || !result.success) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:handleFileChange',message:'이미지 업로드 API 실패',data:{error:result?.error,success:result?.success},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'I3'})}).catch(()=>{});
-        // #endregion
         throw new Error(result?.error || '이미지 업로드에 실패했습니다.');
       }
 
       // imageUrl이 없으면 에러
       if (!result.imageUrl) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:handleFileChange',message:'이미지 업로드 성공했지만 imageUrl 없음',data:{result},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'I4'})}).catch(()=>{});
-        // #endregion
         throw new Error('이미지 URL을 받지 못했습니다.');
       }
 
@@ -764,9 +752,6 @@ const MobileListTab = ({ onProductSelect }) => {
           : item
       ));
 
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:handleFileChange',message:'로컬 상태 업데이트 완료',data:{modelId:uploadingModelId,imageUrl:result.imageUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'I5'})}).catch(()=>{});
-      // #endregion
 
       // 서버에서 최신 데이터를 다시 가져와서 UI에 반영
       // 구글시트에 저장된 최신 이미지 URL을 포함한 전체 데이터를 가져옴
@@ -778,17 +763,32 @@ const MobileListTab = ({ onProductSelect }) => {
         console.log('🔄 [이미지 업로드] 서버에서 최신 데이터 재로딩 중...');
         const freshData = await directStoreApiClient.getMobileList(carrier);
         
-        // #region agent log
-        const uploadedModel = freshData?.find(m => m.id === uploadingModelId);
+        // 🔥 핵심 수정: 모델명으로 매칭 (ID가 다를 수 있음)
+        const uploadedModel = freshData?.find(m => 
+          m.id === uploadingModelId || 
+          m.model === modelName ||
+          (m.id && m.id.includes(modelName))
+        );
         const uploadedModelImage = uploadedModel?.image || '';
-        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:handleFileChange',message:'최신 데이터 재로딩 완료',data:{carrier,dataCount:freshData?.length,uploadedModelId,uploadedModelImage,expectedImageUrl:result.imageUrl,modelName:currentModel?.model,modelMatch:uploadedModel?.model === currentModel?.model},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'I6'})}).catch(()=>{});
-        // #endregion
         
-        // 🔥 개선: 이미지가 없으면 로컬 상태 유지 (서버 매칭 실패 시에도 UI에 이미지 표시)
+        // 🔥 개선: 이미지가 있으면 서버 데이터로 업데이트, 없으면 로컬 상태 유지
         if (uploadedModelImage) {
           setMobileList(freshData || []);
+        } else if (uploadedModel) {
+          // 모델은 찾았지만 이미지가 없는 경우, 로컬 상태의 이미지로 업데이트
+          setMobileList(prevList => prevList.map(item => {
+            if (item.id === uploadingModelId) {
+              return { ...item, image: result.imageUrl };
+            }
+            const matched = freshData?.find(m => 
+              m.id === item.id || 
+              m.model === item.model ||
+              (m.id && m.id.includes(item.model))
+            );
+            return matched ? { ...matched, image: item.image || matched.image } : item;
+          }));
         } else {
-          console.warn('⚠️ [이미지 업로드] 서버에서 이미지를 찾지 못함, 로컬 상태 유지:', {
+          console.warn('⚠️ [이미지 업로드] 서버에서 모델을 찾지 못함, 로컬 상태 유지:', {
             uploadingModelId,
             modelName: currentModel?.model,
             expectedImageUrl: result.imageUrl
@@ -803,9 +803,6 @@ const MobileListTab = ({ onProductSelect }) => {
         }));
       } catch (reloadError) {
         console.warn('⚠️ [이미지 업로드] 최신 데이터 재로딩 실패, 로컬 상태만 업데이트:', reloadError);
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:handleFileChange',message:'최신 데이터 재로딩 실패',data:{error:reloadError.message,modelId:uploadingModelId,imageUrl:result.imageUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'I7'})}).catch(()=>{});
-        // #endregion
         // 재로딩 실패해도 이벤트는 발생 (다른 컴포넌트에서 시도)
         window.dispatchEvent(new CustomEvent('imageUploaded', {
           detail: { carrier, modelId: actualModelId, imageUrl: result.imageUrl }
@@ -813,9 +810,6 @@ const MobileListTab = ({ onProductSelect }) => {
       }
     } catch (err) {
       console.error('❌ [이미지 업로드] 실패:', err);
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:handleFileChange',message:'이미지 업로드 전체 실패',data:{error:err.message,stack:err.stack,modelId:uploadingModelId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'I8'})}).catch(()=>{});
-      // #endregion
       const errorMessage = err.message || err.toString() || '이미지 업로드에 실패했습니다.';
       alert(`이미지 업로드에 실패했습니다.\n\n오류: ${errorMessage}`);
     } finally {
@@ -1319,9 +1313,6 @@ const MobileListTab = ({ onProductSelect }) => {
       // 🔥 개선: mobileList의 publicSupport는 openingType별로 저장하지 않음
       // mobileList는 서버에서 받은 초기값을 유지하고, calculatedPrices에서 openingType별 값을 가져옴
       // 따라서 mobileList 업데이트는 하지 않음 (getDisplayValue가 calculatedPrices에서 값을 가져오므로)
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:calculatePriceInternal',message:'mobileList 업데이트 스킵 (calculatedPrices만 사용)',data:{modelId,openingType,resultPublicSupport:result.publicSupport,priceKey:`${modelId}-${openingType}`},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M13'})}).catch(()=>{});
-      // #endregion
     }
   };
 
@@ -1553,45 +1544,30 @@ const MobileListTab = ({ onProductSelect }) => {
     const priceKey = `${row.id}-${openingType}`;
     const calculated = calculatedPrices[priceKey] || null;
     
-    // #region agent log
-    if (field === 'publicSupport') {
-      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:getDisplayValue',message:'getDisplayValue - publicSupport (시작)',data:{modelId:row.id,field,selectedOpeningTypeParam:selectedOpeningType,selectedOpeningTypeFromState:selectedOpeningTypes[row.id],openingType,priceKey,hasCalculated:!!calculated,calculatedKeys:Object.keys(calculatedPrices).filter(k=>k.startsWith(row.id))},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M12'})}).catch(()=>{});
-    }
-    // #endregion
+    // 🔥 성능 최적화: 디버그 로그 제거 (불필요한 네트워크 요청 제거)
+    // 디버그 로그는 문제 발생 시에만 활성화
     // 계산된 값이 있고, 해당 필드가 존재하면 사용
     // 단, 대리점지원금의 경우 0이면 fallback 사용 (0은 유효하지 않은 값으로 간주)
     if (calculated && calculated[field] !== undefined) {
       // 대리점지원금 필드이고 값이 0이면 fallback 사용
       if ((field === 'storeSupportWithAddon' || field === 'storeSupportWithoutAddon') && calculated[field] === 0) {
-        // #region agent log
-        if (field === 'publicSupport') {
-          fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:getDisplayValue',message:'getDisplayValue - publicSupport (fallback)',data:{modelId:row.id,field,calculatedValue:calculated[field],rowValue:row[field],calculatedPublicSupport:calculated.publicSupport,rowPublicSupport:row.publicSupport},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M10'})}).catch(()=>{});
-        }
-        // #endregion
         return row[field];
       }
-      // #region agent log
-      if (field === 'publicSupport') {
-        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:getDisplayValue',message:'getDisplayValue - publicSupport (calculated)',data:{modelId:row.id,field,openingType,priceKey,calculatedValue:calculated[field],calculatedOpeningType:calculated.openingType,rowValue:row[field],calculatedPublicSupport:calculated.publicSupport,rowPublicSupport:row.publicSupport},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M10'})}).catch(()=>{});
-      }
-      // #endregion
       // 🔥 개선: openingType이 일치하는지 확인
-      if (calculated.openingType && calculated.openingType !== openingType) {
-        // #region agent log
-        if (field === 'publicSupport') {
-          fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:getDisplayValue',message:'getDisplayValue - publicSupport (openingType 불일치)',data:{modelId:row.id,field,openingType,calculatedOpeningType:calculated.openingType,priceKey,calculatedValue:calculated[field],rowValue:row[field]},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M14'})}).catch(()=>{});
-        }
-        // #endregion
+      // '010신규'나 '기변'은 서버에서 '010신규/기변'으로 변환되므로, 이를 고려하여 비교
+      const normalizedCalculatedOpeningType = calculated.openingType === '010신규/기변' 
+        ? (openingType === '010신규' || openingType === '기변' ? '010신규/기변' : calculated.openingType)
+        : calculated.openingType;
+      const normalizedOpeningType = (openingType === '010신규' || openingType === '기변') 
+        ? '010신규/기변' 
+        : openingType;
+      
+      if (calculated.openingType && normalizedCalculatedOpeningType !== normalizedOpeningType) {
         // openingType이 일치하지 않으면 row 값 반환
         return row[field];
       }
       return calculated[field];
     }
-    // #region agent log
-    if (field === 'publicSupport') {
-      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:getDisplayValue',message:'getDisplayValue - publicSupport (row fallback)',data:{modelId:row.id,field,calculatedValue:calculated?.[field],rowValue:row[field],calculatedPublicSupport:calculated?.publicSupport,rowPublicSupport:row.publicSupport,hasCalculated:!!calculated},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M10'})}).catch(()=>{});
-    }
-    // #endregion
     return row[field];
   }, [calculatedPrices]);
 

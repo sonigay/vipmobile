@@ -139,9 +139,6 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
   // 전역 캐시에서 가격 데이터 가져오기 - Rules of Hooks 준수를 위해 최상단으로 이동
   const getPriceDataFromCache = useCallback((product) => {
     if (!product.id || !product.carrier) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:getPriceDataFromCache',message:'product 조건 불만족으로 null 반환',data:{hasProduct:!!product,hasId:!!product?.id,hasCarrier:!!product?.carrier},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H8'})}).catch(()=>{});
-      // #endregion
       return null;
     }
     
@@ -153,15 +150,9 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                         cachedPriceData['MNP']?.loading === false &&
                         cachedPriceData['기변']?.loading === false;
       if (allLoaded) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:getPriceDataFromCache',message:'calculatedPricesRef에서 완료된 데이터 반환',data:{productId:product.id,allLoaded},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H8'})}).catch(()=>{});
-        // #endregion
         return cachedPriceData;
       }
       // 🔥 개선: 로드 중인 데이터는 null 반환하여 ProductCard에서 계속 로드하도록 함
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:getPriceDataFromCache',message:'calculatedPricesRef에 데이터 있지만 아직 로딩 중, null 반환',data:{productId:product.id,allLoaded},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H8'})}).catch(()=>{});
-      // #endregion
       return null;
     }
     
@@ -186,9 +177,6 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
       }
     }
     
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:getPriceDataFromCache',message:'캐시 확인 완료',data:{productId:product.id,planGroup,hasCachedData,returnValue:hasCachedData?'priceData':'null'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H8'})}).catch(()=>{});
-    // #endregion
     
     // 🔥 개선: 캐시가 있으면 priceData 반환, 없으면 null 반환하여 ProductCard에서 자체 로드하도록
     // 이전에는 캐시가 없어도 loading: true인 priceData를 반환했는데, 이로 인해 ProductCard의 useEffect가 스킵될 수 있었음
@@ -198,9 +186,6 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
 
   // 가격 계산 완료 콜백 - Rules of Hooks 준수를 위해 최상단으로 이동
   const handlePriceCalculated = useCallback((productId, priceData) => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:handlePriceCalculated',message:'가격 계산 완료 콜백 호출',data:{productId,priceDataKeys:Object.keys(priceData||{}),loadingStates:priceData?Object.fromEntries(Object.entries(priceData).map(([k,v])=>[k,v?.loading])):{},calculatedCount:calculatedPricesRef.current.size,expectedCount:expectedCalculationsRef.current.size},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
-    // #endregion
     calculatedPricesRef.current.set(productId, priceData);
     // 상태 업데이트를 트리거하기 위해 강제로 재렌더링
     setPriceCalculationTrigger(prev => prev + 1);
@@ -726,9 +711,6 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
       status['기변'] === false
     );
     
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:useEffect-calculation-check',message:'가격 계산 상태 확인',data:{elapsedTime:Math.round(elapsedTime/1000),maxWaitTime:MAX_WAIT_TIME/1000,expectedCount:expectedCalculationsRef.current.size,calculatedCount:calculatedProductIds.size,allCalculated,calculationStatus:calculationStatus.slice(0,5),isInitializing},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
-    // #endregion
 
     // 최대 대기 시간 초과 시 강제로 초기화 완료
     if (elapsedTime > MAX_WAIT_TIME) {
@@ -793,9 +775,6 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
       }
     });
     
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:useEffect-init',message:'가격 계산 초기화 시작',data:{productCount:allProducts.length,productIds,expectedCount:expectedCalculationsRef.current.size},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3'})}).catch(()=>{});
-    // #endregion
   }, [allProducts.map(p => p.id).join(',')]); // 상품 ID 목록이 변경될 때만 실행
 
   // 일반 모드에서 수동 슬라이드 탐색 함수
@@ -1152,22 +1131,13 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
               >
                 {currentSlide.products.map((product) => {
                   if (!product || typeof product !== 'object') {
-                    // #region agent log
-                    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:render',message:'product 유효성 검사 실패',data:{hasProduct:!!product,productType:typeof product},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H9'})}).catch(()=>{});
-                    // #endregion
                     return null;
                   }
                   
-                  // #region agent log
-                  fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:render',message:'TodaysProductCard 렌더링 시작',data:{productId:product?.id,productModel:product?.model,productCarrier:product?.carrier},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H9'})}).catch(()=>{});
-                  // #endregion
                   
                   const carrierTheme = getCarrierTheme(carrier);
                   const cachedPriceData = getPriceDataFromCache(product);
                   
-                  // #region agent log
-                  fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:render',message:'getPriceDataFromCache 호출 완료',data:{productId:product?.id,hasCachedPriceData:!!cachedPriceData,cachedPriceDataKeys:cachedPriceData?Object.keys(cachedPriceData):[]},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H9'})}).catch(()=>{});
-                  // #endregion
                   
                   return (
                     <TodaysProductCard
