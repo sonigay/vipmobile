@@ -3121,6 +3121,7 @@ function setupDirectRoutes(app) {
   // GET /api/direct/mobiles/:modelId/calculate?planGroup=xxx&openingType=xxx&carrier=SK
   // 요금제군별 대리점지원금 및 구매가 계산
   router.get('/mobiles/:modelId/calculate', async (req, res) => {
+    req._startTime = Date.now(); // 요청 시작 시간 기록
     // #region agent log
     writeDebug({
       location:'directRoutes.js:/calculate',
@@ -3128,7 +3129,7 @@ function setupDirectRoutes(app) {
       data:{modelId:req.params.modelId,query:req.query},
       timestamp:Date.now(),
       sessionId:'debug-session',
-      runId:'run2',
+      runId:'run1',
       hypothesisId:'S-entry'
     });
     // #endregion
@@ -4286,6 +4287,30 @@ function setupDirectRoutes(app) {
       });
       // #endregion
 
+      // #region agent log
+      const responseStartTime = Date.now();
+      const requestDuration = responseStartTime - (req._startTime || responseStartTime);
+      writeDebug({
+        location:'directRoutes.js:/calculate',
+        message:'응답 반환',
+        data:{
+          modelId,
+          planGroup,
+          openingType,
+          carrier,
+          success:true,
+          publicSupport,
+          storeSupportWithAddon,
+          purchasePriceWithAddon,
+          requestDuration:req._startTime?requestDuration:undefined
+        },
+        timestamp:Date.now(),
+        sessionId:'debug-session',
+        runId:'run1',
+        hypothesisId:'S-response'
+      });
+      // #endregion
+      
       res.json({
         success: true,
         storeSupportWithAddon,
@@ -4296,6 +4321,23 @@ function setupDirectRoutes(app) {
         publicSupport
       });
     } catch (error) {
+      // #region agent log
+      writeDebug({
+        location:'directRoutes.js:/calculate',
+        message:'에러 발생',
+        data:{
+          modelId:req.params?.modelId,
+          planGroup:req.query?.planGroup,
+          openingType:req.query?.openingType,
+          error:error?.message,
+          errorStack:error?.stack?.substring(0,200)
+        },
+        timestamp:Date.now(),
+        sessionId:'debug-session',
+        runId:'run1',
+        hypothesisId:'S-error'
+      });
+      // #endregion
       console.error('[Direct] mobiles calculate GET error:', error);
       res.status(500).json({ success: false, error: '계산 실패', message: error.message });
     }

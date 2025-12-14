@@ -133,8 +133,13 @@ function TodaysProductCard(props) {
         // 이미 캐시에서 가져온 데이터는 스킵
         if (newPriceData[openingType].loading === false) continue;
 
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysProductCard.js:loadPrices',message:'가격 계산 API 호출 시작',data:{productId:product?.id,model:product?.model,carrier:product?.carrier,planGroup:defaultPlanGroup,openingType},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H4'})}).catch(()=>{});
+        // #endregion
+        
         try {
           // 🔥 개선: modelName 전달 및 개선된 API 클라이언트 사용
+          const startTime = Date.now();
           const result = await directStoreApiClient.calculateMobilePrice(
             product.id,
             defaultPlanGroup,
@@ -142,6 +147,11 @@ function TodaysProductCard(props) {
             product.carrier,
             product.model || null
           );
+          const duration = Date.now() - startTime;
+
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysProductCard.js:loadPrices',message:'가격 계산 API 호출 완료',data:{productId:product?.id,openingType,success:result?.success,duration,publicSupport:result?.publicSupport},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H4'})}).catch(()=>{});
+          // #endregion
 
           if (result.success) {
             // 전역 캐시에 저장
@@ -161,12 +171,21 @@ function TodaysProductCard(props) {
             newPriceData[openingType].loading = false;
           }
         } catch (err) {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysProductCard.js:loadPrices',message:'가격 계산 API 호출 실패',data:{productId:product?.id,openingType,error:err?.message,errorStack:err?.stack?.substring(0,200)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H4'})}).catch(()=>{});
+          // #endregion
           console.error(`가격 계산 실패 (${openingType}):`, err);
           newPriceData[openingType].loading = false;
         }
       }
 
       setPriceData(newPriceData);
+      
+      // #region agent log
+      const allLoaded = Object.values(newPriceData).every(d => d.loading === false);
+      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysProductCard.js:loadPrices',message:'가격 데이터 로드 완료',data:{productId:product?.id,allLoaded,priceDataKeys:Object.keys(newPriceData),loadingStates:Object.fromEntries(Object.entries(newPriceData).map(([k,v])=>[k,v?.loading])),hasCallback:!!onPriceCalculated},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H5'})}).catch(()=>{});
+      // #endregion
+      
       if (onPriceCalculated) {
         onPriceCalculated(product.id, newPriceData);
       }

@@ -179,6 +179,9 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
 
   // 가격 계산 완료 콜백 - Rules of Hooks 준수를 위해 최상단으로 이동
   const handlePriceCalculated = useCallback((productId, priceData) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:handlePriceCalculated',message:'가격 계산 완료 콜백 호출',data:{productId,priceDataKeys:Object.keys(priceData||{}),loadingStates:priceData?Object.fromEntries(Object.entries(priceData).map(([k,v])=>[k,v?.loading])):{},calculatedCount:calculatedPricesRef.current.size,expectedCount:expectedCalculationsRef.current.size},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+    // #endregion
     calculatedPricesRef.current.set(productId, priceData);
     // 상태 업데이트를 트리거하기 위해 강제로 재렌더링
     setPriceCalculationTrigger(prev => prev + 1);
@@ -686,14 +689,27 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
 
     // 모든 예상 상품의 가격이 계산되었는지 확인
     const calculatedProductIds = new Set(calculatedPricesRef.current.keys());
-    const allCalculated = Array.from(expectedCalculationsRef.current).every(productId => {
+    const calculationStatus = Array.from(expectedCalculationsRef.current).map(productId => {
       const priceData = calculatedPricesRef.current.get(productId);
-      // 각 유형(010신규, MNP, 기변)의 loading이 모두 false여야 함
-      return priceData && 
-             priceData['010신규']?.loading === false &&
-             priceData['MNP']?.loading === false &&
-             priceData['기변']?.loading === false;
+      const status = {
+        productId,
+        hasData: !!priceData,
+        '010신규': priceData?.['010신규']?.loading !== false,
+        'MNP': priceData?.['MNP']?.loading !== false,
+        '기변': priceData?.['기변']?.loading !== false
+      };
+      return status;
     });
+    const allCalculated = calculationStatus.every(status => 
+      status.hasData && 
+      status['010신규'] === false &&
+      status['MNP'] === false &&
+      status['기변'] === false
+    );
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:useEffect-calculation-check',message:'가격 계산 상태 확인',data:{elapsedTime:Math.round(elapsedTime/1000),maxWaitTime:MAX_WAIT_TIME/1000,expectedCount:expectedCalculationsRef.current.size,calculatedCount:calculatedProductIds.size,allCalculated,calculationStatus:calculationStatus.slice(0,5),isInitializing},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
+    // #endregion
 
     // 최대 대기 시간 초과 시 강제로 초기화 완료
     if (elapsedTime > MAX_WAIT_TIME) {
@@ -744,9 +760,11 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
     calculatedPricesRef.current.clear();
 
     // 모든 상품 ID를 예상 목록에 추가
+    const productIds = [];
     allProducts.forEach(product => {
       if (product.id) {
         expectedCalculationsRef.current.add(product.id);
+        productIds.push(product.id);
         // 초기 가격 데이터 설정
         calculatedPricesRef.current.set(product.id, {
           '010신규': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: true },
@@ -755,6 +773,10 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
         });
       }
     });
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:useEffect-init',message:'가격 계산 초기화 시작',data:{productCount:allProducts.length,productIds,expectedCount:expectedCalculationsRef.current.size},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3'})}).catch(()=>{});
+    // #endregion
   }, [allProducts.map(p => p.id).join(',')]); // 상품 ID 목록이 변경될 때만 실행
 
   // 일반 모드에서 수동 슬라이드 탐색 함수
