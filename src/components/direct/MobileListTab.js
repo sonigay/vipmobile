@@ -706,6 +706,10 @@ const MobileListTab = ({ onProductSelect }) => {
       // 서버에서도 modelId = modelName으로 처리하므로 일관성 유지
       const actualModelId = modelName; // 실제 모델 코드를 modelId로 사용
 
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:handleFileChange',message:'이미지 업로드 시작',data:{clientId:uploadingModelId,modelId:actualModelId,carrier,modelName,petName,fileName:file.name,fileSize:file.size,currentImage:currentModel?.image},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'I1'})}).catch(()=>{});
+      // #endregion
+
       console.log('📤 [이미지 업로드] 시작:', {
         clientId: uploadingModelId, // 클라이언트 ID (참고용)
         modelId: actualModelId,      // 실제 모델 코드 (서버에 전송)
@@ -719,8 +723,23 @@ const MobileListTab = ({ onProductSelect }) => {
       // API 호출 (실제 모델 코드를 modelId로 전송)
       const result = await directStoreApi.uploadImage(file, actualModelId, carrier, modelName, petName);
 
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:handleFileChange',message:'이미지 업로드 API 응답',data:{success:result?.success,imageUrl:result?.imageUrl,warning:result?.warning,error:result?.error,modelId:result?.modelId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'I2'})}).catch(()=>{});
+      // #endregion
+
       if (!result || !result.success) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:handleFileChange',message:'이미지 업로드 API 실패',data:{error:result?.error,success:result?.success},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'I3'})}).catch(()=>{});
+        // #endregion
         throw new Error(result?.error || '이미지 업로드에 실패했습니다.');
+      }
+
+      // imageUrl이 없으면 에러
+      if (!result.imageUrl) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:handleFileChange',message:'이미지 업로드 성공했지만 imageUrl 없음',data:{result},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'I4'})}).catch(()=>{});
+        // #endregion
+        throw new Error('이미지 URL을 받지 못했습니다.');
       }
 
       // 경고가 있으면 함께 표시
@@ -732,15 +751,31 @@ const MobileListTab = ({ onProductSelect }) => {
 
       console.log('✅ [이미지 업로드] 성공:', result.imageUrl);
 
+      // 🔥 개선: 즉시 로컬 상태 업데이트 (UI 반영)
+      setMobileList(prevList => prevList.map(item =>
+        item.id === uploadingModelId
+          ? { ...item, image: result.imageUrl }
+          : item
+      ));
+
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:handleFileChange',message:'로컬 상태 업데이트 완료',data:{modelId:uploadingModelId,imageUrl:result.imageUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'I5'})}).catch(()=>{});
+      // #endregion
+
       // 서버에서 최신 데이터를 다시 가져와서 UI에 반영
       // 구글시트에 저장된 최신 이미지 URL을 포함한 전체 데이터를 가져옴
       // Google Sheets 저장 완료를 기다리기 위해 지연 시간 추가
       try {
-        console.log('🔄 [이미지 업로드] Google Sheets 저장 완료 대기 중... (2초)');
-        await new Promise(resolve => setTimeout(resolve, 2000)); // 2초 대기
+        console.log('🔄 [이미지 업로드] Google Sheets 저장 완료 대기 중... (3초)');
+        await new Promise(resolve => setTimeout(resolve, 3000)); // 2초 -> 3초로 증가
         
         console.log('🔄 [이미지 업로드] 서버에서 최신 데이터 재로딩 중...');
         const freshData = await directStoreApiClient.getMobileList(carrier);
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:handleFileChange',message:'최신 데이터 재로딩 완료',data:{carrier,dataCount:freshData?.length,uploadedModelImage:freshData?.find(m=>m.id===uploadingModelId)?.image,expectedImageUrl:result.imageUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'I6'})}).catch(()=>{});
+        // #endregion
+        
         setMobileList(freshData || []);
         console.log('✅ [이미지 업로드] 최신 데이터 재로딩 완료');
 
@@ -750,13 +785,9 @@ const MobileListTab = ({ onProductSelect }) => {
         }));
       } catch (reloadError) {
         console.warn('⚠️ [이미지 업로드] 최신 데이터 재로딩 실패, 로컬 상태만 업데이트:', reloadError);
-        // 재로딩 실패 시 로컬 상태만 업데이트 (fallback)
-        setMobileList(prevList => prevList.map(item =>
-          item.id === uploadingModelId
-            ? { ...item, image: result.imageUrl }
-            : item
-        ));
-
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:handleFileChange',message:'최신 데이터 재로딩 실패',data:{error:reloadError.message,modelId:uploadingModelId,imageUrl:result.imageUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'I7'})}).catch(()=>{});
+        // #endregion
         // 재로딩 실패해도 이벤트는 발생 (다른 컴포넌트에서 시도)
         window.dispatchEvent(new CustomEvent('imageUploaded', {
           detail: { carrier, modelId: actualModelId, imageUrl: result.imageUrl }
@@ -764,6 +795,9 @@ const MobileListTab = ({ onProductSelect }) => {
       }
     } catch (err) {
       console.error('❌ [이미지 업로드] 실패:', err);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:handleFileChange',message:'이미지 업로드 전체 실패',data:{error:err.message,stack:err.stack,modelId:uploadingModelId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'I8'})}).catch(()=>{});
+      // #endregion
       const errorMessage = err.message || err.toString() || '이미지 업로드에 실패했습니다.';
       alert(`이미지 업로드에 실패했습니다.\n\n오류: ${errorMessage}`);
     } finally {
