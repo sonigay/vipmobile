@@ -60,16 +60,14 @@ const TodaysProductCard = ({
     }
   };
   
-  // cardTheme 계산을 useMemo로 감싸서 초기화 순서 문제 방지
-  const cardTheme = useMemo(() => {
-    return theme || {
-      primary: '#ffd700',
-      secondary: '#ffed4e',
-      cardBg: 'rgba(255, 255, 255, 0.95)',
-      accent: '#f57f17',
-      text: '#f57f17'
-    };
-  }, [theme]);
+  // cardTheme 계산 (초기화 순서 문제 방지를 위해 useMemo 제거)
+  const cardTheme = theme || {
+    primary: '#ffd700',
+    secondary: '#ffed4e',
+    cardBg: 'rgba(255, 255, 255, 0.95)',
+    accent: '#f57f17',
+    text: '#f57f17'
+  };
 
   const tagChips = [];
   if (product.isPremium) tagChips.push({ label: '프리미엄', color: 'primary' });
