@@ -106,6 +106,13 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
   const [isManualTransitionPage, setIsManualTransitionPage] = useState(false);
   const [manualTransitionPageData, setManualTransitionPageData] = useState(null);
   
+  // 슬라이드쇼 로딩 상태 (Rules of Hooks 준수를 위해 최상단으로 이동)
+  const [isSlideshowLoading, setIsSlideshowLoading] = useState(false);
+  
+  // 슬라이드쇼 반복 옵션 (Rules of Hooks 준수를 위해 최상단으로 이동)
+  const [isSlideshowLooping, setIsSlideshowLooping] = useState(false);
+  const [showRepeatDialog, setShowRepeatDialog] = useState(false);
+  
   // 가격 캐시는 전역 유틸리티 사용 (제거됨)
 
   const fetchData = useCallback(async () => {
@@ -423,13 +430,6 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
     };
     initializeData();
   }, [fetchData, loadMainHeaderText, prepareSlideshowData]);
-
-  // 슬라이드쇼 로딩 상태
-  const [isSlideshowLoading, setIsSlideshowLoading] = useState(false);
-  
-  // 슬라이드쇼 반복 옵션
-  const [isSlideshowLooping, setIsSlideshowLooping] = useState(false);
-  const [showRepeatDialog, setShowRepeatDialog] = useState(false);
 
   // 슬라이드쇼 시작/중지
   const toggleSlideshow = useCallback(async () => {
