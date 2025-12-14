@@ -60,6 +60,11 @@ try {
 }
 
 const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
+  // #region agent log
+  try {
+    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:component-init',message:'TodaysMobileTab 컴포넌트 초기화',data:{isFullScreen,hasOnProductSelect:typeof onProductSelect !== 'undefined'},timestamp:Date.now(),sessionId:'debug-session',runId:'render-check',hypothesisId:'RENDER-ORDER'})}).catch(()=>{});
+  } catch (e) {}
+  // #endregion
   const [premiumPhones, setPremiumPhones] = useState([]);
   const [budgetPhones, setBudgetPhones] = useState([]);
   const [loading, setLoading] = useState(true);

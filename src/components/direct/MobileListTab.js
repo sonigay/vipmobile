@@ -68,6 +68,11 @@ try {
 }
 
 const MobileListTab = ({ onProductSelect }) => {
+  // #region agent log
+  try {
+    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:component-init',message:'MobileListTab 컴포넌트 초기화',data:{hasOnProductSelect:typeof onProductSelect !== 'undefined'},timestamp:Date.now(),sessionId:'debug-session',runId:'render-check',hypothesisId:'RENDER-ORDER'})}).catch(()=>{});
+  } catch (e) {}
+  // #endregion
   const [carrierTab, setCarrierTab] = useState(0); // 0: SK, 1: KT, 2: LG
   const [mobileList, setMobileList] = useState([]);
   const [loading, setLoading] = useState(false);

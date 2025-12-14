@@ -21,6 +21,12 @@ import {
 import { directStoreApiClient } from '../../api/directStoreApiClient';
 import { getCachedPrice, setCachedPrice, setCachedPricesBatch } from '../../utils/priceCache';
 
+// #region agent log
+try {
+  fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysProductCard.js:module-init',message:'TodaysProductCard 모듈 초기화 시작',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'init-check',hypothesisId:'INIT-ORDER'})}).catch(()=>{});
+} catch (e) {}
+// #endregion
+
 const TodaysProductCard = ({ 
   product, 
   isPremium, 
