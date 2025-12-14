@@ -1082,18 +1082,27 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                     }
                   }}
                 >
-                  {slideshowData[currentSlideIndex].products.map((product) => (
-                    <TodaysProductCard
-                      key={product.id || `${product.model}-${product.carrier}`}
-                      product={product}
-                      isPremium={product.isPremium === true}
-                      onSelect={onProductSelect}
-                      compact={compact}
-                      theme={getCarrierTheme(slideshowData[currentSlideIndex].carrier)}
-                      priceData={getPriceDataFromCache(product)}
-                      onPriceCalculated={handlePriceCalculated}
-                    />
-                  ))}
+                  {slideshowData[currentSlideIndex].products.map((product) => {
+                    // #region agent log
+                    try {
+                      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:before-TodaysProductCard-render',message:'TodaysProductCard 렌더링 전',data:{hasProduct:!!product,hasGetCarrierTheme:typeof getCarrierTheme !== 'undefined',hasGetPriceDataFromCache:typeof getPriceDataFromCache !== 'undefined',hasHandlePriceCalculated:typeof handlePriceCalculated !== 'undefined'},timestamp:Date.now(),sessionId:'debug-session',runId:'render-check',hypothesisId:'RENDER-ORDER'})}).catch(()=>{});
+                    } catch (e) {}
+                    // #endregion
+                    const carrierTheme = getCarrierTheme(slideshowData[currentSlideIndex].carrier);
+                    const cachedPriceData = getPriceDataFromCache(product);
+                    return (
+                      <TodaysProductCard
+                        key={product.id || `${product.model}-${product.carrier}`}
+                        product={product}
+                        isPremium={product.isPremium === true}
+                        onSelect={onProductSelect}
+                        compact={compact}
+                        theme={carrierTheme}
+                        priceData={cachedPriceData}
+                        onPriceCalculated={handlePriceCalculated}
+                      />
+                    );
+                  })}
                 </Box>
               )
             )}
@@ -1271,18 +1280,27 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                         }
                       }}
                     >
-                      {slideshowData[manualSlideIndex].products.map((product) => (
-                        <TodaysProductCard
-                          key={product.id || `${product.model}-${product.carrier}`}
-                          product={product}
-                          isPremium={product.isPremium === true}
-                          onSelect={onProductSelect}
-                          compact={compact}
-                          theme={getCarrierTheme(slideshowData[manualSlideIndex].carrier)}
-                          priceData={getPriceDataFromCache(product)}
-                          onPriceCalculated={handlePriceCalculated}
-                        />
-                      ))}
+                      {slideshowData[manualSlideIndex].products.map((product) => {
+                        // #region agent log
+                        try {
+                          fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:before-TodaysProductCard-render-2',message:'TodaysProductCard 렌더링 전 (manual)',data:{hasProduct:!!product},timestamp:Date.now(),sessionId:'debug-session',runId:'render-check',hypothesisId:'RENDER-ORDER'})}).catch(()=>{});
+                        } catch (e) {}
+                        // #endregion
+                        const carrierTheme = getCarrierTheme(slideshowData[manualSlideIndex].carrier);
+                        const cachedPriceData = getPriceDataFromCache(product);
+                        return (
+                          <TodaysProductCard
+                            key={product.id || `${product.model}-${product.carrier}`}
+                            product={product}
+                            isPremium={product.isPremium === true}
+                            onSelect={onProductSelect}
+                            compact={compact}
+                            theme={carrierTheme}
+                            priceData={cachedPriceData}
+                            onPriceCalculated={handlePriceCalculated}
+                          />
+                        );
+                      })}
                     </Box>
                   )
                 )}
@@ -1318,7 +1336,14 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                 }}
               >
                 {allProducts.map((product) => {
+                  // #region agent log
+                  try {
+                    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:before-TodaysProductCard-render-3',message:'TodaysProductCard 렌더링 전 (allProducts)',data:{hasProduct:!!product},timestamp:Date.now(),sessionId:'debug-session',runId:'render-check',hypothesisId:'RENDER-ORDER'})}).catch(()=>{});
+                  } catch (e) {}
+                  // #endregion
                   const isPremium = product.isPremium || false;
+                  const carrierTheme = getCarrierTheme(product.carrier);
+                  const cachedPriceData = getPriceDataFromCache(product);
                   return (
                     <TodaysProductCard
                       key={product.id}
@@ -1326,8 +1351,8 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                       isPremium={isPremium}
                       onSelect={onProductSelect}
                       compact={compact}
-                      theme={getCarrierTheme(product.carrier)}
-                      priceData={getPriceDataFromCache(product)}
+                      theme={carrierTheme}
+                      priceData={cachedPriceData}
                       onPriceCalculated={handlePriceCalculated}
                     />
                   );
