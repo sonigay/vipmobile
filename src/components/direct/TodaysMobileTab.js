@@ -756,50 +756,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
     setPriceCalculationTrigger(prev => prev + 1);
   }, []);
 
-  // 통신사별 테마 색상 - useMemo로 직접 계산하여 초기화 순서 문제 방지
-  const theme = useMemo(() => {
-    const carrier = currentCarrier || 'SK'; // 기본값
-    switch (carrier) {
-      case 'SK':
-        return {
-          primary: '#1976d2', // 파란색
-          secondary: '#42a5f5',
-          background: 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 50%, #90caf9 100%)',
-          cardBg: 'rgba(255, 255, 255, 0.95)',
-          accent: '#1565c0',
-          text: '#0d47a1'
-        };
-      case 'KT':
-        return {
-          primary: '#2e7d32', // 녹색
-          secondary: '#66bb6a',
-          background: 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 50%, #a5d6a7 100%)',
-          cardBg: 'rgba(255, 255, 255, 0.95)',
-          accent: '#1b5e20',
-          text: '#1b5e20'
-        };
-      case 'LG':
-        return {
-          primary: '#c2185b', // 핫핑크
-          secondary: '#f06292',
-          background: 'linear-gradient(135deg, #fce4ec 0%, #f8bbd0 50%, #f48fb1 100%)',
-          cardBg: 'rgba(255, 255, 255, 0.95)',
-          accent: '#ad1457',
-          text: '#880e4f'
-        };
-      default:
-        return {
-          primary: '#ffd700', // 골드 (기본값)
-          secondary: '#ffed4e',
-          background: 'linear-gradient(135deg, #fff9e6 0%, #ffe082 50%, #ffd54f 100%)',
-          cardBg: 'rgba(255, 255, 255, 0.95)',
-          accent: '#f57f17',
-          text: '#f57f17'
-        };
-    }
-  }, [currentCarrier]);
-
-  // getCarrierTheme 함수는 다른 곳에서도 사용되므로 유지
+  // getCarrierTheme 함수를 먼저 정의 (JSX에서 사용되므로 초기화 순서 중요)
   const getCarrierTheme = useCallback((carrier) => {
     switch (carrier) {
       case 'SK':
@@ -840,6 +797,12 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
         };
     }
   }, []);
+
+  // 통신사별 테마 색상 - getCarrierTheme 함수를 사용하여 계산
+  const theme = useMemo(() => {
+    const carrier = currentCarrier || 'SK'; // 기본값
+    return getCarrierTheme(carrier);
+  }, [currentCarrier, getCarrierTheme]);
 
   // Early return은 모든 훅 호출 이후에 위치
   if (loading || isInitializing) {
