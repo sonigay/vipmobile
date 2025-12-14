@@ -137,47 +137,58 @@ function TodaysProductCard(props) {
       }
       
 
-      // 캐시에 없는 데이터만 API 호출
-      for (const openingType of openingTypes) {
-        // 이미 캐시에서 가져온 데이터는 스킵
-        if (newPriceData[openingType].loading === false) continue;
+      // 🔥 성능 최적화: 캐시에 없는 데이터를 병렬로 API 호출 (순차 호출 대신)
+      const apiPromises = openingTypes
+        .filter(openingType => newPriceData[openingType].loading !== false) // 캐시에서 가져온 데이터는 제외
+        .map(async (openingType) => {
+          try {
+            const result = await directStoreApiClient.calculateMobilePrice(
+              product.id,
+              defaultPlanGroup,
+              openingType,
+              product.carrier,
+              product.model || null
+            );
 
-        
-        try {
-          // 🔥 개선: modelName 전달 및 개선된 API 클라이언트 사용
-          const startTime = Date.now();
-          const result = await directStoreApiClient.calculateMobilePrice(
-            product.id,
-            defaultPlanGroup,
-            openingType,
-            product.carrier,
-            product.model || null
-          );
-          const duration = Date.now() - startTime;
+            if (result.success) {
+              // 전역 캐시에 저장
+              setCachedPrice(product.id, defaultPlanGroup, openingType, product.carrier, {
+                publicSupport: result.publicSupport || 0,
+                storeSupport: result.storeSupportWithAddon || 0,
+                purchasePrice: result.purchasePriceWithAddon || 0
+              });
 
-
-          if (result.success) {
-            // 전역 캐시에 저장
-            setCachedPrice(product.id, defaultPlanGroup, openingType, product.carrier, {
-              publicSupport: result.publicSupport || 0,
-              storeSupport: result.storeSupportWithAddon || 0,
-              purchasePrice: result.purchasePriceWithAddon || 0
-            });
-
-            newPriceData[openingType] = {
-              publicSupport: result.publicSupport || 0,
-              storeSupport: result.storeSupportWithAddon || 0,
-              purchasePrice: result.purchasePriceWithAddon || 0,
-              loading: false
+              return {
+                openingType,
+                data: {
+                  publicSupport: result.publicSupport || 0,
+                  storeSupport: result.storeSupportWithAddon || 0,
+                  purchasePrice: result.purchasePriceWithAddon || 0,
+                  loading: false
+                }
+              };
+            } else {
+              return {
+                openingType,
+                data: { ...newPriceData[openingType], loading: false }
+              };
+            }
+          } catch (err) {
+            console.error(`가격 계산 실패 (${openingType}):`, err);
+            return {
+              openingType,
+              data: { ...newPriceData[openingType], loading: false }
             };
-          } else {
-            newPriceData[openingType].loading = false;
           }
-        } catch (err) {
-          console.error(`가격 계산 실패 (${openingType}):`, err);
-          newPriceData[openingType].loading = false;
-        }
-      }
+        });
+
+      // 모든 API 호출을 병렬로 실행하고 결과를 기다림
+      const results = await Promise.all(apiPromises);
+      
+      // 결과를 newPriceData에 반영
+      results.forEach(({ openingType, data }) => {
+        newPriceData[openingType] = data;
+      });
 
       setPriceData(newPriceData);
       

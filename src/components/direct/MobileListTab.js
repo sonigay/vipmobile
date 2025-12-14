@@ -96,9 +96,7 @@ const MobileListTab = ({ onProductSelect }) => {
 
   useEffect(() => {
     const fetchMobileList = async () => {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:fetchMobileList',message:'휴대폰 목록 로드 시작',data:{carrier:getCurrentCarrier()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M1'})}).catch(()=>{});
-      // #endregion
+      // 디버그 로그 제거 (성능 최적화)
       try {
         setLoading(true);
         setError(null);
@@ -122,17 +120,10 @@ const MobileListTab = ({ onProductSelect }) => {
             message: safeList.length > 0 ? '' : (meta?.error || '수신된 데이터가 없습니다.')
           }
         }));
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:fetchMobileList',message:'휴대폰 목록 로드 완료',data:{carrier:getCurrentCarrier(),count:safeList.length,hasMeta:!!meta},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M1'})}).catch(()=>{});
-        // #endregion
+        // 디버그 로그 제거 (성능 최적화)
       } catch (err) {
         console.error('휴대폰 목록 로딩 실패:', err);
-        debugLog('MobileListTab.js:fetchMobileList', '휴대폰 목록 로딩 실패', {
-          carrier: getCurrentCarrier(),
-          errorMessage: err.message,
-          errorName: err.name,
-          errorStack: err.stack?.split('\n').slice(0, 3).join('|')
-        }, 'debug-session', 'run1', 'E10');
+        // 디버그 로그 제거 (성능 최적화)
         setError('데이터를 불러오는 중 오류가 발생했습니다.');
         setMobileList([]);
         setSteps(prev => ({
@@ -175,9 +166,7 @@ const MobileListTab = ({ onProductSelect }) => {
 
       // 🔥 개선: 이미 초기화 중이면 건너뛰기 (중복 호출 방지)
       if (isInitializingRef.current) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:setDefaultValues',message:'이미 초기화 중이므로 스킵',data:{initialized:initializedRef.current,isInitializing:isInitializingRef.current,expectedCount:expectedCalculationsRef.current.size},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M6'})}).catch(()=>{});
-        // #endregion
+        // 디버그 로그 제거 (성능 최적화)
         return;
       }
 
@@ -204,11 +193,7 @@ const MobileListTab = ({ onProductSelect }) => {
       });
       const calculationQueue = [];
 
-      debugLog('MobileListTab.js:setDefaultValues', '초기값 설정 시작', {
-        mobileListLength: mobileList.length,
-        userSelectedCount: userSelectedOpeningTypesRef.current.size,
-        initialized: initializedRef.current
-      }, 'debug-session', 'run1', 'INIT-1');
+      // 디버그 로그 제거 (성능 최적화)
 
       // 모든 모델에 대해 기본값 설정 및 가격 계산 준비
       const cacheEntries = [];
@@ -355,12 +340,7 @@ const MobileListTab = ({ onProductSelect }) => {
 
         // 🔥 초기 로드 시에는 캐시를 사용하지 않고 항상 서버에서 새로 계산
         if (!initializedRef.current) {
-          debugLog('MobileListTab.js:setDefaultValues', '초기 로드 시 캐시 사용 안함', {
-            modelId: model.id,
-            planGroup: finalPlanGroup,
-            openingType: defaultOpeningType,
-            carrier
-          }, 'debug-session', 'run1', 'CACHE-1');
+          // 디버그 로그 제거 (성능 최적화)
           // 초기 로드 시에는 항상 계산 대기열에 추가
           calculationQueue.push({
             modelId: model.id,
@@ -368,12 +348,7 @@ const MobileListTab = ({ onProductSelect }) => {
             openingType: defaultOpeningType
           });
         } else {
-          debugLog('MobileListTab.js:setDefaultValues', '초기화 후 캐시 확인', {
-            modelId: model.id,
-            planGroup: finalPlanGroup,
-            openingType: defaultOpeningType,
-            carrier
-          }, 'debug-session', 'run1', 'CACHE-2');
+          // 디버그 로그 제거 (성능 최적화)
           // 초기화 후에는 캐시 확인
           const cached = getCachedPrice(model.id, finalPlanGroup, defaultOpeningType, carrier);
           // 🔥 캐시 값 검증: 초기 로드 시 서버에서 받은 publicSupport 값과 캐시 값이 크게 다르면 캐시 무시
@@ -454,9 +429,7 @@ const MobileListTab = ({ onProductSelect }) => {
           calculationQueue.forEach(item => {
             expectedCalculationsRef.current.add(item.modelId);
           });
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:setDefaultValues',message:'expectedCalculationsRef에 모델 추가',data:{expectedCount:expectedCalculationsRef.current.size,expectedModelIds:Array.from(expectedCalculationsRef.current),calculationQueueLength:calculationQueue.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M5'})}).catch(()=>{});
-          // #endregion
+          // 디버그 로그 제거 (성능 최적화)
         }
 
         // 모든 계산 요청을 큐에 추가
@@ -506,9 +479,7 @@ const MobileListTab = ({ onProductSelect }) => {
     if (!isInitializingRef.current || initializedRef.current) {
       // 🔥 개선: 초기화가 완료되었는데 isInitializing 상태가 true로 남아있으면 강제로 false로 설정
       if (initializedRef.current && isInitializing) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:useEffect-init-check',message:'초기화 완료되었지만 isInitializing이 true, 강제로 false 설정',data:{initialized:initializedRef.current,isInitializing,isInitializingRef:isInitializingRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M8'})}).catch(()=>{});
-        // #endregion
+        // 디버그 로그 제거 (성능 최적화)
         setIsInitializing(false);
       }
       return;
@@ -546,9 +517,7 @@ const MobileListTab = ({ onProductSelect }) => {
       calculatedModelIds.has(modelId)
     );
     
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:useEffect-init-check',message:'초기화 완료 체크',data:{queueEmpty,notProcessing,expectedCount:expectedCalculationsRef.current.size,calculatedCount:calculatedModelIds.size,allCalculated,expectedModelIds:Array.from(expectedCalculationsRef.current),calculatedModelIds:Array.from(calculatedModelIds),missingModels:Array.from(expectedCalculationsRef.current).filter(id=>!calculatedModelIds.has(id)),elapsedTime:initStartTimeRef.current?Date.now()-initStartTimeRef.current:0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M3'})}).catch(()=>{});
-    // #endregion
+    // 디버그 로그 제거 (성능 최적화)
 
     // 최대 대기 시간 초과 시 강제로 초기화 완료
     if (elapsedTime > MAX_WAIT_TIME) {
@@ -583,9 +552,7 @@ const MobileListTab = ({ onProductSelect }) => {
         // 🔥 개선: 모든 계산이 완료되고 처리 중이 아니면 초기화 완료
         // 큐에 남은 항목이 있어도 예상된 모든 모델의 계산이 완료되었으면 초기화 완료
         if (finalAllCalculated && finalNotProcessing) {
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:useEffect-init-check',message:'초기화 완료 (모든 계산 완료)',data:{expectedCount:expectedCalculationsRef.current.size,calculatedCount:finalCalculatedModelIds.size,queueSize:priceCalculationQueueRef.current.length,isInitializingBefore:isInitializingRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M7'})}).catch(()=>{});
-          // #endregion
+          // 디버그 로그 제거 (성능 최적화)
           setSteps(prev => ({
             ...prev,
             pricing: { ...prev.pricing, status: 'success', message: '' }
@@ -596,9 +563,7 @@ const MobileListTab = ({ onProductSelect }) => {
           setIsInitializing(false);
           expectedCalculationsRef.current.clear();
           initStartTimeRef.current = null;
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:useEffect-init-check',message:'setIsInitializing(false) 호출 완료',data:{initialized:initializedRef.current,isInitializingRef:isInitializingRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M9'})}).catch(()=>{});
-          // #endregion
+          // 디버그 로그 제거 (성능 최적화)
         }
       }, 500);
 
@@ -1017,10 +982,7 @@ const MobileListTab = ({ onProductSelect }) => {
       const uniqueSize = uniqueQueue.length;
       priceCalculationQueueRef.current = [];
 
-      debugLog('MobileListTab.js:processPriceCalculationQueue', '큐 처리 시작', {
-        queueSize,
-        uniqueSize
-      }, 'debug-session', 'run1', 'E0');
+      // 디버그 로그 제거 (성능 최적화)
 
       // 배치 처리 설정 (ERR_INSUFFICIENT_RESOURCES 에러 방지를 위해 더 보수적으로)
       const BATCH_SIZE = 1; // 동시 실행 수 제한 (2 -> 1로 감소: 한 번에 하나씩만 처리)
@@ -1053,16 +1015,7 @@ const MobileListTab = ({ onProductSelect }) => {
                                      err.message?.includes('ERR_INSUFFICIENT_RESOURCES') ||
                                      err.message?.includes('NetworkError');
                 
-                debugLog('MobileListTab.js:processPriceCalculationQueue', '가격 계산 에러 발생', {
-                  modelId: item.modelId,
-                  planGroup: item.planGroup,
-                  openingType: item.openingType,
-                  retries,
-                  isNetworkError,
-                  errorMessage: err.message,
-                  errorName: err.name,
-                  errorStack: err.stack?.split('\n').slice(0, 3).join('|')
-                }, 'debug-session', 'run1', 'E1');
+                // 디버그 로그 제거 (성능 최적화)
                 
                 // 네트워크 에러가 아니거나 최대 재시도 횟수에 도달하면 종료
                 if (!isNetworkError || retries >= MAX_RETRIES) {
@@ -1073,15 +1026,7 @@ const MobileListTab = ({ onProductSelect }) => {
                     retries,
                     error: err
                   });
-                  debugLog('MobileListTab.js:processPriceCalculationQueue', '가격 계산 최종 실패', {
-                    modelId: item.modelId,
-                    planGroup: item.planGroup,
-                    openingType: item.openingType,
-                    retries,
-                    isNetworkError,
-                    reason: !isNetworkError ? '네트워크 에러 아님' : '최대 재시도 횟수 초과',
-                    errorMessage: err.message
-                  }, 'debug-session', 'run1', 'E2');
+                  // 디버그 로그 제거 (성능 최적화)
                   break;
                 }
 
@@ -1091,15 +1036,7 @@ const MobileListTab = ({ onProductSelect }) => {
                   modelId: item.modelId,
                   delay: retryDelay
                 });
-                debugLog('MobileListTab.js:processPriceCalculationQueue', '가격 계산 재시도 스케줄링', {
-                  modelId: item.modelId,
-                  planGroup: item.planGroup,
-                  openingType: item.openingType,
-                  retries: retries + 1,
-                  maxRetries: MAX_RETRIES,
-                  retryDelay,
-                  isNetworkError
-                }, 'debug-session', 'run1', 'E3');
+                // 디버그 로그 제거 (성능 최적화)
                 await new Promise(resolve => setTimeout(resolve, retryDelay));
                 retries++;
               }
@@ -1113,16 +1050,9 @@ const MobileListTab = ({ onProductSelect }) => {
         }
       }
       
-      debugLog('MobileListTab.js:processPriceCalculationQueue', '큐 처리 완료', {
-        processedCount: uniqueQueue.length,
-        remainingQueue: priceCalculationQueueRef.current.length
-      }, 'debug-session', 'run1', 'E8');
+      // 디버그 로그 제거 (성능 최적화)
     } catch (queueError) {
-      debugLog('MobileListTab.js:processPriceCalculationQueue', '큐 처리 중 예외 발생', {
-        errorMessage: queueError.message,
-        errorName: queueError.name,
-        queueSize: priceCalculationQueueRef.current.length
-      }, 'debug-session', 'run1', 'E9');
+      // 디버그 로그 제거 (성능 최적화)
       console.error('큐 처리 중 예외 발생:', queueError);
     } finally {
       isProcessingQueueRef.current = false;
@@ -1164,9 +1094,7 @@ const MobileListTab = ({ onProductSelect }) => {
     const currentModel = mobileList.find(m => m.id === modelId);
     const modelCarrier = carrier || currentModel?.carrier || getCurrentCarrier();
     
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:calculatePriceInternal',message:'가격 계산 시작',data:{modelId,planGroup,openingType,useCache,modelCarrier,modelName:currentModel?.model},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M2'})}).catch(()=>{});
-    // #endregion
+    // 디버그 로그 제거 (성능 최적화)
     
     // carrier가 현재 탭과 다르면 요청 스킵 (탭 전환 중 발생하는 잘못된 요청 방지)
     const currentTabCarrier = getCurrentCarrier();
@@ -1211,31 +1139,26 @@ const MobileListTab = ({ onProductSelect }) => {
       }
     }
 
-    // 중복 요청 방지
+    // 🔥 성능 최적화: 중복 요청 방지 강화
+    // 같은 요청이 이미 진행 중이면 기다림 (중복 API 호출 방지)
     if (pendingRequestsRef.current.has(cacheKey)) {
       try {
         const result = await pendingRequestsRef.current.get(cacheKey);
         if (result.success) {
+          // 🔥 개선: openingType별로 값을 저장하도록 키를 modelId + openingType으로 변경
+          const priceKey = `${modelId}-${openingType}`;
           setCalculatedPrices(prev => ({
             ...prev,
-            [modelId]: {
+            [priceKey]: {
               storeSupportWithAddon: result.storeSupportWithAddon || 0,
               storeSupportWithoutAddon: result.storeSupportWithoutAddon || 0,
               purchasePriceWithAddon: result.purchasePriceWithAddon || 0,
               purchasePriceWithoutAddon: result.purchasePriceWithoutAddon || 0,
-              publicSupport: result.publicSupport || 0
+              publicSupport: result.publicSupport || 0,
+              openingType: openingType
             }
           }));
-          // mobileList 상태도 업데이트
-          setMobileList(prevList => prevList.map(item =>
-            item.id === modelId
-              ? {
-                ...item,
-                publicSupport: result.publicSupport || item.publicSupport || 0,
-                support: result.publicSupport || item.support || item.publicSupport || 0
-              }
-              : item
-          ));
+          // mobileList 상태는 업데이트하지 않음 (getDisplayValue가 calculatedPrices에서 값을 가져오므로)
         }
       } catch (err) {
         console.error('가격 계산 실패 (대기 중 요청):', err);
@@ -1250,10 +1173,7 @@ const MobileListTab = ({ onProductSelect }) => {
     const startTime = Date.now();
     const pricePromise = directStoreApiClient.calculateMobilePrice(modelId, planGroup, openingType, modelCarrier, modelName)
       .then(result => {
-        // #region agent log
-        const duration = Date.now() - startTime;
-        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:calculatePriceInternal',message:'가격 계산 API 완료',data:{modelId,planGroup,openingType,success:result?.success,duration,publicSupport:result?.publicSupport},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M2'})}).catch(()=>{});
-        // #endregion
+        // 디버그 로그 제거 (성능 최적화)
         // 404 에러는 재시도하지 않음
         if (result.status === 404) {
           console.warn('모델을 찾을 수 없음 (404):', { modelId, modelName, planGroup, openingType, carrier: modelCarrier });
@@ -1275,17 +1195,7 @@ const MobileListTab = ({ onProductSelect }) => {
       })
       .catch(err => {
         console.error('가격 계산 API 호출 실패:', err, { modelId, planGroup, openingType, carrier: modelCarrier });
-        debugLog('MobileListTab.js:calculatePriceInternal', '가격 계산 API 호출 실패', {
-          modelId,
-          planGroup,
-          openingType,
-          carrier: modelCarrier,
-          modelName,
-          errorMessage: err.message,
-          errorName: err.name,
-          errorStatus: err.status,
-          errorCode: err.code
-        }, 'debug-session', 'run1', 'E5');
+        // 디버그 로그 제거 (성능 최적화)
         return { success: false, error: err.message || err.toString() };
       })
       .finally(() => {
@@ -1325,9 +1235,7 @@ const MobileListTab = ({ onProductSelect }) => {
             openingType: openingType // openingType 정보도 저장
           }
         };
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:calculatePriceInternal',message:'calculatedPrices 업데이트 (API 성공)',data:{modelId,openingType,priceKey,publicSupport:result.publicSupport,calculatedCount:Object.keys(newPrices).length,expectedCount:expectedCalculationsRef.current.size,isInExpected:expectedCalculationsRef.current.has(modelId),expectedModelIds:Array.from(expectedCalculationsRef.current)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M4'})}).catch(()=>{});
-        // #endregion
+        // 디버그 로그 제거 (성능 최적화)
         return newPrices;
       });
 
@@ -1484,25 +1392,14 @@ const MobileListTab = ({ onProductSelect }) => {
       await calculatePrice(modelId, planGroup, openingType);
       } catch (err) {
         console.error('요금제군 변경 시 가격 계산 실패:', err, { modelId, planGroup, openingType });
-        debugLog('MobileListTab.js:handlePlanGroupChange', '요금제군 변경 시 가격 계산 실패', {
-          modelId,
-          planGroup,
-          openingType,
-          errorMessage: err.message,
-          errorName: err.name
-        }, 'debug-session', 'run1', 'E6');
+        // 디버그 로그 제거 (성능 최적화)
         // 에러 발생 시에도 무한 재시도 방지를 위해 상태는 유지
       }
   };
 
   // 유형 선택 핸들러
   const handleOpeningTypeChange = async (modelId, openingType) => {
-    debugLog('MobileListTab.js:handleOpeningTypeChange', '개통유형 변경 시작', {
-      modelId,
-      openingType,
-      initialized: initializedRef.current,
-      currentValue: selectedOpeningTypes[modelId]
-    }, 'debug-session', 'run1', 'INIT-2');
+    // 디버그 로그 제거 (성능 최적화)
     
     if (!openingType) {
       setSelectedOpeningTypes(prev => {
@@ -1528,13 +1425,7 @@ const MobileListTab = ({ onProductSelect }) => {
     // 즉시 반영되도록 동기적으로 업데이트
     setSelectedOpeningTypes(prev => {
       const newState = { ...prev, [modelId]: openingType };
-      debugLog('MobileListTab.js:handleOpeningTypeChange', '개통유형 상태 업데이트', {
-        modelId,
-        openingType,
-        prevValue: prev[modelId],
-        newValue: openingType,
-        userSelectedSet: Array.from(userSelectedOpeningTypesRef.current)
-      }, 'debug-session', 'run1', 'INIT-2');
+      // 디버그 로그 제거 (성능 최적화)
       return newState;
     });
 
@@ -1545,13 +1436,7 @@ const MobileListTab = ({ onProductSelect }) => {
         await calculatePrice(modelId, planGroup, openingType);
       } catch (err) {
         console.error('개통유형 변경 시 가격 계산 실패:', err, { modelId, planGroup, openingType });
-        debugLog('MobileListTab.js:handleOpeningTypeChange', '개통유형 변경 시 가격 계산 실패', {
-          modelId,
-          planGroup,
-          openingType,
-          errorMessage: err.message,
-          errorName: err.name
-        }, 'debug-session', 'run1', 'E7');
+        // 디버그 로그 제거 (성능 최적화)
         // 에러 발생 시에도 무한 재시도 방지를 위해 상태는 유지
       }
     }
