@@ -409,6 +409,9 @@ const MobileListRowComponent = ({
 // React.memo로 메모이제이션하여 불필요한 리렌더링 방지
 export const MobileListRow = memo(MobileListRowComponent, (prevProps, nextProps) => {
   // 주요 props 비교 - true를 반환하면 리렌더링 안 함, false를 반환하면 리렌더링 함
+  // 🔥 개선: image URL 변경을 정확히 감지하도록 개선
+  const imageChanged = prevProps.row.image !== nextProps.row.image;
+  
   const isEqual = (
     prevProps.row.id === nextProps.row.id &&
     prevProps.selectedPlanGroup === nextProps.selectedPlanGroup &&
@@ -420,7 +423,7 @@ export const MobileListRow = memo(MobileListRowComponent, (prevProps, nextProps)
     prevProps.row.isCheap === nextProps.row.isCheap &&
     prevProps.row.isPremium === nextProps.row.isPremium &&
     prevProps.row.isBudget === nextProps.row.isBudget &&
-    prevProps.row.image === nextProps.row.image &&
+    !imageChanged && // 🔥 개선: image 변경 감지 (변경되면 리렌더링)
     prevProps.row.petName === nextProps.row.petName &&
     prevProps.row.model === nextProps.row.model &&
     prevProps.row.factoryPrice === nextProps.row.factoryPrice

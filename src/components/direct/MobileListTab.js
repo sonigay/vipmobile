@@ -751,35 +751,44 @@ const MobileListTab = ({ onProductSelect }) => {
           freshDataCount: freshData?.length
         });
         
-        // 🔥 개선: 이미지가 있으면 서버 데이터로 업데이트, 없으면 로컬 상태의 이미지로 업데이트
-        if (uploadedModel) {
-          if (uploadedModel.image) {
-            // 서버에서 이미지를 찾았으면 전체 데이터 업데이트
-            setMobileList(freshData || []);
-            console.log('✅ [이미지 업로드] 서버에서 이미지 찾음, 전체 데이터 업데이트');
-          } else {
-            // 모델은 찾았지만 이미지가 없는 경우, 로컬 상태의 이미지로 업데이트
-            setMobileList(prevList => prevList.map(item => {
+        // 🔥 핵심 수정: 이미지 업데이트 로직 개선
+        if (uploadedModel && uploadedModel.image) {
+          // 서버에서 이미지를 찾았으면 전체 데이터 업데이트
+          setMobileList(freshData || []);
+          console.log('✅ [이미지 업로드] 서버에서 이미지 찾음, 전체 데이터 업데이트');
+        } else {
+          // 🔥 핵심 수정: 서버에서 이미지를 찾지 못했거나 모델을 찾지 못한 경우
+          // 로컬 상태를 강제로 업데이트하여 이미지가 즉시 표시되도록 함
+          setMobileList(prevList => {
+            const updatedList = prevList.map(item => {
+              // 업로드한 모델과 일치하는 항목 찾기
               if (item.id === uploadingModelId || item.model === modelName) {
+                // 이미지 URL을 강제로 업데이트
                 return { ...item, image: result.imageUrl };
               }
-              // 다른 모델들도 업데이트
+              // 다른 모델들도 freshData에서 업데이트
               const matched = freshData?.find(m => 
-                m.id === item.id || 
-                m.model === item.model
+                (m.id && item.id && m.id === item.id) || 
+                (m.model && item.model && m.model === item.model)
               );
-              return matched ? { ...matched, image: item.image || matched.image } : item;
-            }));
-            console.log('✅ [이미지 업로드] 모델 찾음, 로컬 이미지로 업데이트');
-          }
-        } else {
-          // 모델을 찾지 못한 경우, 로컬 상태만 업데이트 (이미 위에서 업데이트됨)
-          console.warn('⚠️ [이미지 업로드] 서버에서 모델을 찾지 못함, 로컬 상태 유지:', {
-            uploadingModelId,
-            modelName: currentModel?.model,
-            expectedImageUrl: result.imageUrl,
-            freshDataModels: freshData?.slice(0, 5).map(m => ({ id: m.id, model: m.model }))
+              if (matched) {
+                // freshData에 이미지가 있으면 사용, 없으면 기존 이미지 유지
+                return { ...matched, image: matched.image || item.image };
+              }
+              return item;
+            });
+            
+            // 업로드한 모델이 리스트에 없으면 추가 (안전장치)
+            const hasUploadedModel = updatedList.some(item => 
+              item.id === uploadingModelId || item.model === modelName
+            );
+            if (!hasUploadedModel && currentModel) {
+              updatedList.push({ ...currentModel, image: result.imageUrl });
+            }
+            
+            return updatedList;
           });
+          console.log('✅ [이미지 업로드] 로컬 상태 강제 업데이트 완료');
         }
         console.log('✅ [이미지 업로드] 최신 데이터 재로딩 완료');
 

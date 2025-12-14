@@ -1669,18 +1669,17 @@ function setupDirectRoutes(app) {
                   // (A) 기본 파싱된 유형들 매핑 (010신규, MNP, 기변)
                   openingTypes.forEach(ot => addKeys(ot, false));
 
-                  // 🔥 핵심 수정: 상호 매핑은 정확한 키가 없을 때만 설정
-                  // (B) "MNP" <-> "번호이동" 상호 매핑
-                  if (openingTypes.includes('MNP') || openingTypeRaw.includes('번호이동')) {
-                    const otherType = openingTypeRaw.includes('번호이동') ? 'MNP' : '번호이동';
-                    // 🔥 핵심: 정확한 키가 없을 때만 상호 매핑 설정
-                    const exactKeyForOther = `${model}|${otherType}`;
-                    if (supportMap[exactKeyForOther] === undefined) {
-                      // 정확한 키가 없으면 상호 매핑으로 설정
-                      addKeys(otherType, true); // 명시적 매핑
-                    }
-                    // 정확한 키가 이미 있으면 상호 매핑하지 않음 (정확한 키가 우선)
-                  }
+                  // 🔥 핵심 수정: 상호 매핑 제거 - 정확한 키만 사용
+                  // (B) "MNP" <-> "번호이동" 상호 매핑 제거
+                  // 문제: 상호 매핑으로 설정된 키는 나중에 정확한 키가 처리될 때 덮어쓰지 않아서 값이 섞임
+                  // 해결: 상호 매핑을 완전히 제거하고, 정확한 키만 사용
+                  // if (openingTypes.includes('MNP') || openingTypeRaw.includes('번호이동')) {
+                  //   const otherType = openingTypeRaw.includes('번호이동') ? 'MNP' : '번호이동';
+                  //   const exactKeyForOther = `${model}|${otherType}`;
+                  //   if (supportMap[exactKeyForOther] === undefined) {
+                  //     addKeys(otherType, true);
+                  //   }
+                  // }
 
                   // (C) "010신규" / "기변" <-> "010신규/기변" 상호 매핑
                   // "010신규/기변" Row는 010신규, 기변, 010신규/기변 키 모두에 매핑되어야 함
@@ -3496,18 +3495,17 @@ function setupDirectRoutes(app) {
                   // 🔥 핵심 수정: 정확한 키를 먼저 설정 (isExplicitMapping=false)
                   openingTypes.forEach(ot => addKeys(ot, false));
                   
-                  // 🔥 핵심 수정: 상호 매핑은 정확한 키가 없을 때만 설정
-                  // "MNP" <-> "번호이동" 상호 매핑
-                  if (openingTypes.includes('MNP') || openingTypeRaw.includes('번호이동')) {
-                    const otherType = openingTypeRaw.includes('번호이동') ? 'MNP' : '번호이동';
-                    // 🔥 핵심: 정확한 키가 없을 때만 상호 매핑 설정
-                    const exactKeyForOther = `${model}|${otherType}`;
-                    if (supportMap[exactKeyForOther] === undefined) {
-                      // 정확한 키가 없으면 상호 매핑으로 설정
-                      addKeys(otherType, true); // 명시적 매핑
-                    }
-                    // 정확한 키가 이미 있으면 상호 매핑하지 않음 (정확한 키가 우선)
-                  }
+                  // 🔥 핵심 수정: 상호 매핑 제거 - 정확한 키만 사용
+                  // "MNP" <-> "번호이동" 상호 매핑 제거
+                  // 문제: 상호 매핑으로 설정된 키는 나중에 정확한 키가 처리될 때 덮어쓰지 않아서 값이 섞임
+                  // 해결: 상호 매핑을 완전히 제거하고, 정확한 키만 사용
+                  // if (openingTypes.includes('MNP') || openingTypeRaw.includes('번호이동')) {
+                  //   const otherType = openingTypeRaw.includes('번호이동') ? 'MNP' : '번호이동';
+                  //   const exactKeyForOther = `${model}|${otherType}`;
+                  //   if (supportMap[exactKeyForOther] === undefined) {
+                  //     addKeys(otherType, true);
+                  //   }
+                  // }
                   
                   if (openingTypeRaw.includes('010신규/기변') ||
                     (openingTypes.includes('010신규') && openingTypes.includes('기변'))) {
@@ -3617,60 +3615,12 @@ function setupDirectRoutes(app) {
           // 🔥 핵심 수정: 정규화 후 같은 모델일 때만 정책표 모델명의 정규화된 버전 추가
           // (이미 위에서 isDifferentModel 체크로 제외됨)
 
-          // "번호이동" → MNP 매핑도 시도
-          if (openingType === 'MNP') {
-            supportKeys.push(
-              `${primaryModel}|번호이동`,
-              `${primaryModel.toLowerCase()}|번호이동`,
-              `${primaryModel.toUpperCase()}|번호이동`
-            );
-            
-            // 🔥 핵심 수정: 정규화 후 같은 모델일 때만 정책표 모델명 추가
-            if (!isDifferentModel && policyModel && policyModel !== primaryModel) {
-              supportKeys.push(
-                `${policyModel}|번호이동`,
-                `${policyModel.toLowerCase()}|번호이동`,
-                `${policyModel.toUpperCase()}|번호이동`
-              );
-            }
-            
-            primaryHyphenVariants.forEach(variant => {
-              if (variant !== primaryModel) {
-                supportKeys.push(
-                  `${variant}|번호이동`,
-                  `${variant.toLowerCase()}|번호이동`,
-                  `${variant.toUpperCase()}|번호이동`
-                );
-              }
-            });
-            
-            // 🔥 핵심 수정: 정규화 후 같은 모델일 때만 정책표 모델명의 하이픈 변형 추가
-            if (!isDifferentModel && policyModel && policyModel !== primaryModel) {
-              const policyHyphenVariants = generateHyphenVariants(policyModel);
-              policyHyphenVariants.forEach(variant => {
-                const variantNormalized = normalizeModelCode(variant);
-                if (variant !== policyModel && variant !== primaryModel && 
-                    variantNormalized === primaryModelNormalized) {
-                  supportKeys.push(
-                    `${variant}|번호이동`,
-                    `${variant.toLowerCase()}|번호이동`,
-                    `${variant.toUpperCase()}|번호이동`
-                  );
-                }
-              });
-            }
-            
-            if (primaryModelNormalized) {
-              supportKeys.push(
-                `${primaryModelNormalized}|번호이동`,
-                `${primaryModelNormalized.toLowerCase()}|번호이동`,
-                `${primaryModelNormalized.toUpperCase()}|번호이동`
-              );
-            }
-            
-            // 🔥 핵심 수정: 정규화 후 같은 모델일 때만 정책표 모델명의 정규화된 버전 추가
-            // (이미 위에서 isDifferentModel 체크로 제외됨)
-          }
+          // 🔥 핵심 수정: "번호이동" → MNP 매핑 제거
+          // 문제: 상호 매핑으로 인해 값이 섞이는 문제 발생
+          // 해결: 정확한 키만 사용 (MNP 요청 시 MNP 키만, 번호이동 요청 시 번호이동 키만)
+          // if (openingType === 'MNP') {
+          //   supportKeys.push(...);
+          // }
 
           // "010신규/기변" 매핑도 시도
           if (openingType === '010신규' || openingType === '기변') {
