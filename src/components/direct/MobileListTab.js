@@ -159,8 +159,7 @@ const MobileListTab = ({ onProductSelect }) => {
     }
 
     const setDefaultValues = async () => {
-      // 이미 초기화되었고, 사용자가 수동으로 선택한 값이 있으면 건너뛰기
-      // 🔥 초기 로드 완료 후에는 사용자 선택값이 있으면 절대 덮어쓰지 않음
+      // 🔥 개선: 이미 초기화가 완료되었으면 건너뛰기 (중복 호출 방지)
       if (initializedRef.current) {
         // 초기화 완료 후에는 사용자 선택값이 있으면 건너뛰기
         if (userSelectedOpeningTypesRef.current.size > 0) {
@@ -172,6 +171,14 @@ const MobileListTab = ({ onProductSelect }) => {
         if (hasExistingValues) {
           return;
         }
+      }
+
+      // 🔥 개선: 이미 초기화 중이면 건너뛰기 (중복 호출 방지)
+      if (isInitializingRef.current) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:setDefaultValues',message:'이미 초기화 중이므로 스킵',data:{initialized:initializedRef.current,isInitializing:isInitializingRef.current,expectedCount:expectedCalculationsRef.current.size},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M6'})}).catch(()=>{});
+        // #endregion
+        return;
       }
 
       // 초기 로드 시에만 초기화 상태 활성화
@@ -537,17 +544,23 @@ const MobileListTab = ({ onProductSelect }) => {
       return;
     }
 
-    if (queueEmpty && notProcessing && allCalculated) {
+    // 🔥 개선: 큐가 비어있지 않아도 모든 계산이 완료되면 초기화 완료
+    // 큐에 남은 항목이 있어도 이미 예상된 모든 모델의 가격이 계산되었으면 초기화 완료
+    if (allCalculated && notProcessing) {
       // 약간의 지연 후 다시 확인 (마지막 요청이 완료될 시간 확보)
       const timeoutId = setTimeout(() => {
-        const finalQueueEmpty = priceCalculationQueueRef.current.length === 0;
-        const finalNotProcessing = !isProcessingQueueRef.current;
         const finalCalculatedModelIds = new Set(Object.keys(calculatedPrices));
         const finalAllCalculated = Array.from(expectedCalculationsRef.current).every(modelId => 
           finalCalculatedModelIds.has(modelId)
         );
+        const finalNotProcessing = !isProcessingQueueRef.current;
 
-        if (finalQueueEmpty && finalNotProcessing && finalAllCalculated) {
+        // 🔥 개선: 모든 계산이 완료되고 처리 중이 아니면 초기화 완료
+        // 큐에 남은 항목이 있어도 예상된 모든 모델의 계산이 완료되었으면 초기화 완료
+        if (finalAllCalculated && finalNotProcessing) {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:useEffect-init-check',message:'초기화 완료 (모든 계산 완료)',data:{expectedCount:expectedCalculationsRef.current.size,calculatedCount:finalCalculatedModelIds.size,queueSize:priceCalculationQueueRef.current.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M7'})}).catch(()=>{});
+          // #endregion
           setSteps(prev => ({
             ...prev,
             pricing: { ...prev.pricing, status: 'success', message: '' }
