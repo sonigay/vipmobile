@@ -1065,7 +1065,8 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                 // #endregion
                 const currentSlide = slideshowData?.[currentSlideIndex];
                 const isProductGroup = currentSlide?.type === 'productGroup' && currentSlide?.products;
-                return isProductGroup && (
+                if (!isProductGroup) return null;
+                return (
                 <Box
                   sx={{
                     width: '100%',
@@ -1118,7 +1119,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                     );
                   })}
                 </Box>
-              );
+                );
               })()
             )}
           </Box>
@@ -1325,7 +1326,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                         );
                       })}
                     </Box>
-                  );
+                    );
                   })()
                 )}
               </>
