@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import {
   Box,
   Typography,
@@ -27,13 +27,14 @@ import { getModeColor, getModeTitle } from '../config/modeConfig';
 import AppUpdatePopup from './AppUpdatePopup';
 import directStoreTheme from '../theme/DirectStoreTheme';
 import directStoreThemeV2 from '../theme/DirectStoreThemeV2';
+import ErrorBoundary from './ErrorBoundary';
 
-// 탭 컴포넌트 임포트
-import PolicySettingsTab from './direct/management/PolicySettingsTab';
-import LinkSettingsTab from './direct/management/LinkSettingsTab';
-import MainPageTextSettingsTab from './direct/management/MainPageTextSettingsTab';
-import DirectSalesReportTab from './direct/DirectSalesReportTab';
-import OpeningInfoPage from './direct/OpeningInfoPage';
+// 탭 컴포넌트를 lazy loading으로 변경하여 초기화 순서 문제 해결
+const PolicySettingsTab = lazy(() => import('./direct/management/PolicySettingsTab'));
+const LinkSettingsTab = lazy(() => import('./direct/management/LinkSettingsTab'));
+const MainPageTextSettingsTab = lazy(() => import('./direct/management/MainPageTextSettingsTab'));
+const DirectSalesReportTab = lazy(() => import('./direct/DirectSalesReportTab'));
+const OpeningInfoPage = lazy(() => import('./direct/OpeningInfoPage'));
 
 const DirectStoreManagementMode = ({
   loggedInStore,
@@ -79,31 +80,33 @@ const DirectStoreManagementMode = ({
   const hasSalesReportPermission = permissionValue === 'M' || permissionValue === 'S' || permissionValue === 'O';
 
   // 사용 가능한 탭 목록 생성 (권한에 따라)
+  // lazy loading을 위해 컴포넌트를 직접 렌더링하지 않고 탭 정보만 저장
   const availableTabs = React.useMemo(() => {
     const tabs = [];
     if (hasPolicyPermission) {
-      tabs.push({ key: 'policy', label: '정책 설정', icon: <SettingsIcon />, component: <PolicySettingsTab /> });
+      tabs.push({ key: 'policy', label: '정책 설정', icon: <SettingsIcon />, componentName: 'PolicySettingsTab' });
     }
     if (hasLinkPermission) {
-      tabs.push({ key: 'link', label: '링크 설정', icon: <LinkIcon />, component: <LinkSettingsTab /> });
+      tabs.push({ key: 'link', label: '링크 설정', icon: <LinkIcon />, componentName: 'LinkSettingsTab' });
     }
     if (hasLinkPermission) {
-      tabs.push({ key: 'mainPageText', label: '메인페이지문구설정', icon: <TextFieldsIcon />, component: <MainPageTextSettingsTab /> });
+      tabs.push({ key: 'mainPageText', label: '메인페이지문구설정', icon: <TextFieldsIcon />, componentName: 'MainPageTextSettingsTab' });
     }
     if (hasSalesReportPermission) {
       tabs.push({ 
         key: 'sales', 
         label: '전체 판매일보', 
         icon: <AssessmentIcon />, 
-        component: <DirectSalesReportTab 
-          onRowClick={handleReportSelect} 
-          loggedInStore={loggedInStore}
-          isManagementMode={true}
-        /> 
+        componentName: 'DirectSalesReportTab',
+        props: {
+          onRowClick: handleReportSelect,
+          loggedInStore: loggedInStore,
+          isManagementMode: true
+        }
       });
     }
     return tabs;
-  }, [hasPolicyPermission, hasLinkPermission, hasSalesReportPermission, handleReportSelect]);
+  }, [hasPolicyPermission, hasLinkPermission, hasSalesReportPermission, handleReportSelect, loggedInStore]);
 
   // 현재 활성 탭이 사용 가능한 탭인지 확인하고, 아니면 첫 번째 사용 가능한 탭으로 변경
   useEffect(() => {
@@ -128,10 +131,14 @@ const DirectStoreManagementMode = ({
       <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', display: 'flex', flexDirection: 'column' }}>
         {selectedReport ? (
           <Box sx={{ flexGrow: 1, height: '100vh', overflow: 'auto' }}>
-            <OpeningInfoPage
-              initialData={selectedReport}
-              onBack={handleBackToReports}
-            />
+            <ErrorBoundary name="OpeningInfoPage (Management)">
+              <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}><CircularProgress /></Box>}>
+                <OpeningInfoPage
+                  initialData={selectedReport}
+                  onBack={handleBackToReports}
+                />
+              </Suspense>
+            </ErrorBoundary>
           </Box>
         ) : (
           <>
@@ -172,16 +179,33 @@ const DirectStoreManagementMode = ({
             </AppBar>
 
             <Box sx={{ flexGrow: 1, overflow: 'hidden' }}>
-              {availableTabs.map((tab, index) => (
-                <Box 
-                  key={tab.key}
-                  role="tabpanel" 
-                  hidden={activeTab !== index} 
-                  sx={{ height: '100%', display: activeTab === index ? 'block' : 'none' }}
-                >
-                  {tab.component}
-                </Box>
-              ))}
+              {availableTabs.map((tab, index) => {
+                let Component = null;
+                if (tab.componentName === 'PolicySettingsTab') {
+                  Component = PolicySettingsTab;
+                } else if (tab.componentName === 'LinkSettingsTab') {
+                  Component = LinkSettingsTab;
+                } else if (tab.componentName === 'MainPageTextSettingsTab') {
+                  Component = MainPageTextSettingsTab;
+                } else if (tab.componentName === 'DirectSalesReportTab') {
+                  Component = DirectSalesReportTab;
+                }
+                
+                return (
+                  <Box 
+                    key={tab.key}
+                    role="tabpanel" 
+                    hidden={activeTab !== index} 
+                    sx={{ height: '100%', display: activeTab === index ? 'block' : 'none' }}
+                  >
+                    <ErrorBoundary name={tab.componentName || tab.key}>
+                      <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}><CircularProgress /></Box>}>
+                        {Component && <Component {...(tab.props || {})} />}
+                      </Suspense>
+                    </ErrorBoundary>
+                  </Box>
+                );
+              })}
             </Box>
           </>
         )}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import {
   Box,
   Paper,
@@ -32,13 +32,13 @@ import AppUpdatePopup from './AppUpdatePopup';
 import { getModeColor, getModeTitle } from '../config/modeConfig';
 import directStoreTheme from '../theme/DirectStoreTheme';
 import directStoreThemeV2 from '../theme/DirectStoreThemeV2';
+import ErrorBoundary from './ErrorBoundary';
 
-// 탭 컴포넌트 임포트
-import TodaysMobileTab from './direct/TodaysMobileTab';
-import MobileListTab from './direct/MobileListTab';
-import DirectSalesReportTab from './direct/DirectSalesReportTab';
-
-import OpeningInfoPage from './direct/OpeningInfoPage';
+// 탭 컴포넌트를 lazy loading으로 변경하여 초기화 순서 문제 해결
+const TodaysMobileTab = lazy(() => import('./direct/TodaysMobileTab'));
+const MobileListTab = lazy(() => import('./direct/MobileListTab'));
+const DirectSalesReportTab = lazy(() => import('./direct/DirectSalesReportTab'));
+const OpeningInfoPage = lazy(() => import('./direct/OpeningInfoPage'));
 
 const DirectStoreMode = ({
   loggedInStore,
@@ -312,11 +312,15 @@ const DirectStoreMode = ({
         {selectedProduct ? (
           <Fade in={true}>
             <Box sx={{ flexGrow: 1, height: '100vh', overflow: 'auto' }}>
-              <OpeningInfoPage
-                initialData={selectedProduct}
-                onBack={handleBackToStore}
-                loggedInStore={loggedInStore}
-              />
+              <ErrorBoundary name="OpeningInfoPage">
+                <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}><CircularProgress /></Box>}>
+                  <OpeningInfoPage
+                    initialData={selectedProduct}
+                    onBack={handleBackToStore}
+                    loggedInStore={loggedInStore}
+                  />
+                </Suspense>
+              </ErrorBoundary>
             </Box>
           </Fade>
         ) : (
@@ -391,10 +395,14 @@ const DirectStoreMode = ({
                   </IconButton>
                 </Box>
 
-                <TodaysMobileTab
-                  isFullScreen={isFullScreen}
-                  onProductSelect={handleProductSelect}
-                />
+                <ErrorBoundary name="TodaysMobileTab">
+                  <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}><CircularProgress /></Box>}>
+                    <TodaysMobileTab
+                      isFullScreen={isFullScreen}
+                      onProductSelect={handleProductSelect}
+                    />
+                  </Suspense>
+                </ErrorBoundary>
               </Box>
 
               {/* 휴대폰 목록 탭 */}
@@ -403,7 +411,11 @@ const DirectStoreMode = ({
                 hidden={activeTab !== 1}
                 sx={{ height: '100%', display: activeTab === 1 ? 'block' : 'none' }}
               >
-                <MobileListTab onProductSelect={handleProductSelect} />
+                <ErrorBoundary name="MobileListTab">
+                  <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}><CircularProgress /></Box>}>
+                    <MobileListTab onProductSelect={handleProductSelect} />
+                  </Suspense>
+                </ErrorBoundary>
               </Box>
 
               {/* 판매일보 탭 */}
@@ -412,11 +424,15 @@ const DirectStoreMode = ({
                 hidden={activeTab !== 2}
                 sx={{ height: '100%', display: activeTab === 2 ? 'block' : 'none' }}
               >
-                <DirectSalesReportTab 
-                  onRowClick={handleProductSelect} 
-                  loggedInStore={loggedInStore}
-                  isManagementMode={false}
-                />
+                <ErrorBoundary name="DirectSalesReportTab">
+                  <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}><CircularProgress /></Box>}>
+                    <DirectSalesReportTab 
+                      onRowClick={handleProductSelect} 
+                      loggedInStore={loggedInStore}
+                      isManagementMode={false}
+                    />
+                  </Suspense>
+                </ErrorBoundary>
               </Box>
             </Box>
           </>
