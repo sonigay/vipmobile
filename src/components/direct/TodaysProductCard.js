@@ -30,11 +30,7 @@ try {
 // 함수 선언으로 변경하여 hoisting으로 TDZ 문제 방지
 // React.lazy와의 호환성을 위해 함수를 즉시 평가 가능한 형태로 정의
 function TodaysProductCard(props) {
-  // Early return for invalid props to prevent TDZ issues
-  if (!props) {
-    return null;
-  }
-  
+  // CRITICAL: React hooks MUST be called before any conditional returns
   // 모든 React hooks를 최상단에서 먼저 호출하여 TDZ 문제 방지
   const [priceData, setPriceData] = useState({
     '010신규': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: true },
@@ -43,9 +39,14 @@ function TodaysProductCard(props) {
   });
   const hasLoadedRef = useRef(false);
   
+  // Early return for invalid props AFTER hooks (React rules of hooks)
+  if (!props) {
+    return null;
+  }
+  
   // #region agent log
   try {
-    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysProductCard.js:function-entry',message:'TodaysProductCard 함수 진입',data:{hasProps:!!props,propsKeys:props?Object.keys(props).join(','):'none'},timestamp:Date.now(),sessionId:'debug-session',runId:'debug-run-6',hypothesisId:'A'})}).catch(()=>{});
+    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysProductCard.js:function-entry',message:'TodaysProductCard 함수 진입',data:{hasProps:!!props,propsKeys:props?Object.keys(props).join(','):'none'},timestamp:Date.now(),sessionId:'debug-session',runId:'debug-run-7',hypothesisId:'A'})}).catch(()=>{});
   } catch (e) {}
   // #endregion
   
