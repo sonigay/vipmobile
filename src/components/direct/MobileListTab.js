@@ -39,7 +39,7 @@ import { directStoreApi } from '../../api/directStoreApi';
 import { directStoreApiClient } from '../../api/directStoreApiClient';
 import { getCachedPrice, setCachedPrice, setCachedPricesBatch } from '../../utils/priceCache';
 import { LoadingState, ErrorState, EmptyState } from './common';
-import { ModernTable, ModernTableCell, HoverableTableRow } from './common/ModernTable';
+import { ModernTable, ModernTableCell, HoverableTableRow, EmptyTableRow } from './common/ModernTable';
 import { formatPrice } from '../../utils/directStoreUtils';
 import { MobileListRow } from './MobileListRow';
 import { debugLog } from '../../utils/debugLogger';
