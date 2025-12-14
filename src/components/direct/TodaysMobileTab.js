@@ -756,8 +756,8 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
     setPriceCalculationTrigger(prev => prev + 1);
   }, []);
 
-  // getCarrierTheme 함수를 일반 함수로 정의 (useCallback 제거로 초기화 순서 문제 방지)
-  const getCarrierTheme = (carrier) => {
+  // getCarrierTheme 함수를 함수 선언으로 정의 (호이스팅으로 JSX에서 사용 가능)
+  function getCarrierTheme(carrier) {
     switch (carrier) {
       case 'SK':
         return {
@@ -796,7 +796,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
           text: '#f57f17'
         };
     }
-  };
+  }
 
   // 통신사별 테마 색상 - 직접 계산하여 초기화 순서 문제 방지
   const theme = useMemo(() => {
