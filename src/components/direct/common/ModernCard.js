@@ -4,11 +4,13 @@
  */
 import React from 'react';
 import { Card, CardContent, CardMedia, Box, Typography, Chip, Stack, alpha } from '@mui/material';
-import { useTheme } from '@mui/material/styles';
 import { formatPrice } from '../../../utils/directStoreUtils';
 
 /**
  * 모던한 제품 카드 컴포넌트
+ * 
+ * 주의: useTheme() hook 사용을 제거하여 초기화 순서 문제를 방지합니다.
+ * 대신 sx prop의 함수형 theme을 사용합니다.
  */
 export const ModernProductCard = ({
   product,
@@ -19,8 +21,6 @@ export const ModernProductCard = ({
   loading = false,
   ...props
 }) => {
-  const theme = useTheme();
-  const carrierColors = theme.carrierColors || {};
 
   const currentPrice = priceData?.[selectedOpeningType] || {};
   const purchasePrice = currentPrice.purchasePrice || currentPrice.purchasePriceWithAddon || 0;
@@ -47,7 +47,7 @@ export const ModernProductCard = ({
             width: '100%',
             paddingTop: '75%', // 4:3 비율
             overflow: 'hidden',
-            backgroundColor: theme.palette.background.subtle,
+            backgroundColor: 'background.subtle',
           }}
         >
           <CardMedia
@@ -73,16 +73,16 @@ export const ModernProductCard = ({
             <Chip
               label={product.carrier}
               size="small"
-              sx={{
+              sx={(theme) => ({
                 position: 'absolute',
                 top: 12,
                 right: 12,
-                backgroundColor: carrierColors[product.carrier]?.primary || theme.palette.primary.main,
+                backgroundColor: theme.carrierColors?.[product.carrier]?.primary || theme.palette.primary.main,
                 color: '#ffffff',
                 fontWeight: 700,
                 fontSize: '0.75rem',
                 boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-              }}
+              })}
             />
           )}
 
@@ -118,12 +118,12 @@ export const ModernProductCard = ({
               <Chip
                 label="추천"
                 size="small"
-                sx={{
+                sx={(theme) => ({
                   fontSize: '0.7rem',
                   height: 24,
                   background: `linear-gradient(135deg, ${theme.palette.success.main}, ${theme.palette.success.dark})`,
                   color: '#ffffff',
-                }}
+                })}
               />
             )}
           </Stack>
@@ -137,7 +137,7 @@ export const ModernProductCard = ({
           sx={{
             fontWeight: 700,
             mb: 0.5,
-            color: theme.palette.text.primary,
+            color: 'text.primary',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
@@ -150,7 +150,7 @@ export const ModernProductCard = ({
         <Typography
           variant="body2"
           sx={{
-            color: theme.palette.text.secondary,
+            color: 'text.secondary',
             mb: 2,
             fontSize: '0.8125rem',
           }}
@@ -160,11 +160,11 @@ export const ModernProductCard = ({
 
         {/* 가격 정보 */}
         <Box
-          sx={{
+          sx={(theme) => ({
             mt: 'auto',
             pt: 2,
             borderTop: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
-          }}
+          })}
         >
           {loading ? (
             <Typography variant="body2" color="text.secondary">
@@ -178,13 +178,13 @@ export const ModernProductCard = ({
                 </Typography>
                 <Typography
                   variant="h6"
-                  sx={{
+                  sx={(theme) => ({
                     fontWeight: 700,
                     background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
                     WebkitBackgroundClip: 'text',
                     WebkitTextFillColor: 'transparent',
                     backgroundClip: 'text',
-                  }}
+                  })}
                 >
                   {formatPrice(purchasePrice)}원
                 </Typography>
@@ -212,11 +212,9 @@ export const ModernProductCard = ({
  * 간소화된 카드 컴포넌트 (목록 뷰용)
  */
 export const CompactProductCard = ({ product, onSelect, ...props }) => {
-  const theme = useTheme();
-
   return (
     <Card
-      sx={{
+      sx={(theme) => ({
         display: 'flex',
         cursor: onSelect ? 'pointer' : 'default',
         transition: 'all 0.2s ease',
@@ -224,7 +222,7 @@ export const CompactProductCard = ({ product, onSelect, ...props }) => {
           backgroundColor: alpha(theme.palette.primary.main, 0.04),
         },
         ...props.sx,
-      }}
+      })}
       onClick={onSelect}
       {...props}
     >
@@ -235,7 +233,7 @@ export const CompactProductCard = ({ product, onSelect, ...props }) => {
             minWidth: 120,
             height: 120,
             position: 'relative',
-            backgroundColor: theme.palette.background.subtle,
+            backgroundColor: 'background.subtle',
           }}
         >
           <CardMedia

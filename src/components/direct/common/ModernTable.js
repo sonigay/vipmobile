@@ -1,6 +1,9 @@
 /**
  * 모던한 테이블 컴포넌트
  * 새로운 디자인 시스템에 맞춘 테이블 컴포넌트
+ * 
+ * 주의: useTheme() hook 사용을 제거하여 초기화 순서 문제를 방지합니다.
+ * 대신 sx prop의 theme을 사용하거나 기본값을 사용합니다.
  */
 import React from 'react';
 import {
@@ -15,20 +18,17 @@ import {
   Typography,
   alpha,
 } from '@mui/material';
-import { useTheme } from '@mui/material/styles';
 
 /**
  * 모던한 테이블 컨테이너
  */
 export const ModernTable = ({ children, sx, ...props }) => {
-  const theme = useTheme();
-
   return (
     <TableContainer
       component={Paper}
       sx={{
         borderRadius: 2,
-        border: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
+        border: (theme) => `1px solid ${alpha(theme.palette.divider, 0.5)}`,
         overflow: 'hidden',
         ...sx,
       }}
@@ -43,15 +43,13 @@ export const ModernTable = ({ children, sx, ...props }) => {
  * 모던한 테이블 헤더 셀
  */
 export const ModernTableCell = ({ children, align = 'left', sx, ...props }) => {
-  const theme = useTheme();
-
   return (
     <TableCell
       align={align}
       sx={{
         fontWeight: 600,
         fontSize: '0.875rem',
-        color: theme.palette.text.primary,
+        color: 'text.primary',
         ...sx,
       }}
       {...props}
@@ -65,8 +63,6 @@ export const ModernTableCell = ({ children, align = 'left', sx, ...props }) => {
  * 호버 효과가 있는 테이블 행
  */
 export const HoverableTableRow = ({ children, onClick, sx, ...props }) => {
-  const theme = useTheme();
-
   return (
     <TableRow
       onClick={onClick}
@@ -74,7 +70,7 @@ export const HoverableTableRow = ({ children, onClick, sx, ...props }) => {
         cursor: onClick ? 'pointer' : 'default',
         transition: 'background-color 0.2s ease',
         '&:hover': {
-          backgroundColor: alpha(theme.palette.primary.main, 0.04),
+          backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.04),
         },
         ...sx,
       }}
