@@ -4132,11 +4132,15 @@ function setupDirectRoutes(app) {
               }
 
               // 모델명+개통유형 복합키로 직접 조회 (getMobileList와 동일)
-              const supportKeys = [
+              // 🔥 핵심 수정: 정확한 openingType 키를 먼저 찾도록 순서 조정
+              const supportKeys = [];
+              
+              // 1단계: 정확한 openingType 키를 최우선으로 추가
+              supportKeys.push(
                 `${policyModel}|${openingType}`,
                 `${policyModel.toLowerCase()}|${openingType}`,
                 `${policyModel.toUpperCase()}|${openingType}`
-              ];
+              );
 
               const policyHyphenVariants = generateHyphenVariants(policyModel);
               policyHyphenVariants.forEach(variant => {
@@ -4157,7 +4161,8 @@ function setupDirectRoutes(app) {
                 );
               }
 
-              // "번호이동" → MNP 매핑도 시도
+              // 2단계: openingType별 대체 키 추가 (정확한 키를 찾지 못한 경우에만 사용)
+              // "번호이동" → MNP 매핑 (MNP일 때만)
               if (openingType === 'MNP') {
                 supportKeys.push(
                   `${policyModel}|번호이동`,
@@ -4182,8 +4187,8 @@ function setupDirectRoutes(app) {
                 }
               }
 
-              // "010신규/기변" 매핑도 시도
-              if (openingType === '010신규' || openingType === '기변') {
+              // "010신규/기변" 매핑 (010신규나 기변일 때만, MNP가 아닐 때만)
+              if ((openingType === '010신규' || openingType === '기변') && openingType !== 'MNP') {
                 supportKeys.push(
                   `${policyModel}|010신규/기변`,
                   `${policyModel.toLowerCase()}|010신규/기변`,

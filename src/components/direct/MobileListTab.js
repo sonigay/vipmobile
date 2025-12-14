@@ -763,37 +763,58 @@ const MobileListTab = ({ onProductSelect }) => {
         console.log('🔄 [이미지 업로드] 서버에서 최신 데이터 재로딩 중...');
         const freshData = await directStoreApiClient.getMobileList(carrier);
         
-        // 🔥 핵심 수정: 모델명으로 매칭 (ID가 다를 수 있음)
-        const uploadedModel = freshData?.find(m => 
-          m.id === uploadingModelId || 
-          m.model === modelName ||
-          (m.id && m.id.includes(modelName))
-        );
-        const uploadedModelImage = uploadedModel?.image || '';
+        // 🔥 핵심 수정: 모델명으로 정확히 매칭 (ID가 다를 수 있음)
+        // 1순위: 모델명으로 정확히 일치하는 모델 찾기
+        const uploadedModel = freshData?.find(m => {
+          // 모델명이 정확히 일치하는 경우
+          if (m.model === modelName) return true;
+          // ID에 모델명이 포함된 경우
+          if (m.id && m.id.includes(modelName)) return true;
+          // 클라이언트 ID와 일치하는 경우
+          if (m.id === uploadingModelId) return true;
+          return false;
+        });
         
-        // 🔥 개선: 이미지가 있으면 서버 데이터로 업데이트, 없으면 로컬 상태 유지
-        if (uploadedModelImage) {
-          setMobileList(freshData || []);
-        } else if (uploadedModel) {
-          // 모델은 찾았지만 이미지가 없는 경우, 로컬 상태의 이미지로 업데이트
-          setMobileList(prevList => prevList.map(item => {
-            if (item.id === uploadingModelId) {
-              return { ...item, image: result.imageUrl };
-            }
-            const matched = freshData?.find(m => 
-              m.id === item.id || 
-              m.model === item.model ||
-              (m.id && m.id.includes(item.model))
-            );
-            return matched ? { ...matched, image: item.image || matched.image } : item;
-          }));
+        console.log('🔍 [이미지 업로드] 모델 매칭 결과:', {
+          uploadingModelId,
+          modelName,
+          foundModel: uploadedModel ? {
+            id: uploadedModel.id,
+            model: uploadedModel.model,
+            image: uploadedModel.image
+          } : null,
+          freshDataCount: freshData?.length
+        });
+        
+        // 🔥 개선: 이미지가 있으면 서버 데이터로 업데이트, 없으면 로컬 상태의 이미지로 업데이트
+        if (uploadedModel) {
+          if (uploadedModel.image) {
+            // 서버에서 이미지를 찾았으면 전체 데이터 업데이트
+            setMobileList(freshData || []);
+            console.log('✅ [이미지 업로드] 서버에서 이미지 찾음, 전체 데이터 업데이트');
+          } else {
+            // 모델은 찾았지만 이미지가 없는 경우, 로컬 상태의 이미지로 업데이트
+            setMobileList(prevList => prevList.map(item => {
+              if (item.id === uploadingModelId || item.model === modelName) {
+                return { ...item, image: result.imageUrl };
+              }
+              // 다른 모델들도 업데이트
+              const matched = freshData?.find(m => 
+                m.id === item.id || 
+                m.model === item.model
+              );
+              return matched ? { ...matched, image: item.image || matched.image } : item;
+            }));
+            console.log('✅ [이미지 업로드] 모델 찾음, 로컬 이미지로 업데이트');
+          }
         } else {
+          // 모델을 찾지 못한 경우, 로컬 상태만 업데이트 (이미 위에서 업데이트됨)
           console.warn('⚠️ [이미지 업로드] 서버에서 모델을 찾지 못함, 로컬 상태 유지:', {
             uploadingModelId,
             modelName: currentModel?.model,
-            expectedImageUrl: result.imageUrl
+            expectedImageUrl: result.imageUrl,
+            freshDataModels: freshData?.slice(0, 5).map(m => ({ id: m.id, model: m.model }))
           });
-          // 로컬 상태는 이미 업데이트되었으므로 그대로 유지
         }
         console.log('✅ [이미지 업로드] 최신 데이터 재로딩 완료');
 
