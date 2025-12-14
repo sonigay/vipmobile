@@ -498,6 +498,13 @@ const MobileListTab = ({ onProductSelect }) => {
   useEffect(() => {
     // 초기화 중이 아니면 확인하지 않음
     if (!isInitializingRef.current || initializedRef.current) {
+      // 🔥 개선: 초기화가 완료되었는데 isInitializing 상태가 true로 남아있으면 강제로 false로 설정
+      if (initializedRef.current && isInitializing) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:useEffect-init-check',message:'초기화 완료되었지만 isInitializing이 true, 강제로 false 설정',data:{initialized:initializedRef.current,isInitializing,isInitializingRef:isInitializingRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M8'})}).catch(()=>{});
+        // #endregion
+        setIsInitializing(false);
+      }
       return;
     }
 
@@ -559,7 +566,7 @@ const MobileListTab = ({ onProductSelect }) => {
         // 큐에 남은 항목이 있어도 예상된 모든 모델의 계산이 완료되었으면 초기화 완료
         if (finalAllCalculated && finalNotProcessing) {
           // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:useEffect-init-check',message:'초기화 완료 (모든 계산 완료)',data:{expectedCount:expectedCalculationsRef.current.size,calculatedCount:finalCalculatedModelIds.size,queueSize:priceCalculationQueueRef.current.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M7'})}).catch(()=>{});
+          fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:useEffect-init-check',message:'초기화 완료 (모든 계산 완료)',data:{expectedCount:expectedCalculationsRef.current.size,calculatedCount:finalCalculatedModelIds.size,queueSize:priceCalculationQueueRef.current.length,isInitializingBefore:isInitializingRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M7'})}).catch(()=>{});
           // #endregion
           setSteps(prev => ({
             ...prev,
@@ -567,9 +574,13 @@ const MobileListTab = ({ onProductSelect }) => {
           }));
           initializedRef.current = true;
           isInitializingRef.current = false;
+          // 🔥 개선: 상태 업데이트를 명시적으로 확인
           setIsInitializing(false);
           expectedCalculationsRef.current.clear();
           initStartTimeRef.current = null;
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:useEffect-init-check',message:'setIsInitializing(false) 호출 완료',data:{initialized:initializedRef.current,isInitializingRef:isInitializingRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M9'})}).catch(()=>{});
+          // #endregion
         }
       }, 500);
 
@@ -1239,15 +1250,26 @@ const MobileListTab = ({ onProductSelect }) => {
       });
 
       // mobileList 상태도 업데이트
-      setMobileList(prevList => prevList.map(item =>
-        item.id === modelId
-          ? {
-            ...item,
-            publicSupport: result.publicSupport || item.publicSupport || 0,
-            support: result.publicSupport || item.support || item.publicSupport || 0
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:calculatePriceInternal',message:'mobileList 업데이트 전',data:{modelId,resultPublicSupport:result.publicSupport,resultStoreSupportWithAddon:result.storeSupportWithAddon,resultStoreSupportWithoutAddon:result.storeSupportWithoutAddon},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M11'})}).catch(()=>{});
+      // #endregion
+      setMobileList(prevList => {
+        const updatedList = prevList.map(item => {
+          if (item.id === modelId) {
+            const updatedItem = {
+              ...item,
+              publicSupport: result.publicSupport || item.publicSupport || 0,
+              support: result.publicSupport || item.support || item.publicSupport || 0
+            };
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:calculatePriceInternal',message:'mobileList 업데이트',data:{modelId,oldPublicSupport:item.publicSupport,oldSupport:item.support,newPublicSupport:updatedItem.publicSupport,newSupport:updatedItem.support,resultPublicSupport:result.publicSupport},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M11'})}).catch(()=>{});
+            // #endregion
+            return updatedItem;
           }
-          : item
-      ));
+          return item;
+        });
+        return updatedList;
+      });
     }
   };
 
@@ -1479,10 +1501,25 @@ const MobileListTab = ({ onProductSelect }) => {
     if (calculated && calculatedPrices[row.id] && calculated[field] !== undefined) {
       // 대리점지원금 필드이고 값이 0이면 fallback 사용
       if ((field === 'storeSupportWithAddon' || field === 'storeSupportWithoutAddon') && calculated[field] === 0) {
+        // #region agent log
+        if (field === 'publicSupport') {
+          fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:getDisplayValue',message:'getDisplayValue - publicSupport (fallback)',data:{modelId:row.id,field,calculatedValue:calculated[field],rowValue:row[field],calculatedPublicSupport:calculated.publicSupport,rowPublicSupport:row.publicSupport},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M10'})}).catch(()=>{});
+        }
+        // #endregion
         return row[field];
       }
+      // #region agent log
+      if (field === 'publicSupport') {
+        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:getDisplayValue',message:'getDisplayValue - publicSupport (calculated)',data:{modelId:row.id,field,calculatedValue:calculated[field],rowValue:row[field],calculatedPublicSupport:calculated.publicSupport,rowPublicSupport:row.publicSupport},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M10'})}).catch(()=>{});
+      }
+      // #endregion
       return calculated[field];
     }
+    // #region agent log
+    if (field === 'publicSupport') {
+      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:getDisplayValue',message:'getDisplayValue - publicSupport (row fallback)',data:{modelId:row.id,field,calculatedValue:calculated?.[field],rowValue:row[field],calculatedPublicSupport:calculated?.publicSupport,rowPublicSupport:row.publicSupport,hasCalculated:!!calculated},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M10'})}).catch(()=>{});
+    }
+    // #endregion
     return row[field];
   }, [calculatedPrices]);
 
