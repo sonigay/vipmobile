@@ -4590,26 +4590,36 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
     const safeManufacturerFinal = normalizePart(safeManufacturer) || '기타';
     
     // 파일명 생성: 각 부분을 조합하고 최종적으로 이중 하이픈 제거
-    const fileExtension = file.originalname.split('.').pop() || 'jpg';
+    // 🔥 개선: 파일 확장자를 올바르게 추출하고 이미지로 인식되도록 확장자 보장
+    const originalExtension = file.originalname.split('.').pop()?.toLowerCase() || '';
+    const validImageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+    const fileExtension = validImageExtensions.includes(originalExtension) ? originalExtension : 'jpg';
+    
     const filenameParts = [
       'direct-store',
       safeCarrier,
       safeManufacturerFinal,
       safeModelId,
-      String(Date.now()),
-      fileExtension
+      String(Date.now())
     ].filter(Boolean); // 빈 문자열 제거
     
     // 각 부분을 하이픈으로 연결하고 최종적으로 이중 하이픈 제거
-    let filename = filenameParts.join('-').replace(/-+/g, '-');
+    // 🔥 개선: 확장자를 별도로 추가하여 확장자가 항상 포함되도록 보장
+    // 파일명 형식: direct-store-{carrier}-{manufacturer}-{modelId}-{timestamp}.{extension}
+    let baseFilename = filenameParts.join('-').replace(/-+/g, '-');
+    let filename = `${baseFilename}.${fileExtension}`;
     
     // 🔥 디버그: 파일명 생성 확인
-    console.log(`📤 [이미지 업로드] 파일명 생성: ${filename} (manufacturer=${manufacturer}, safeManufacturer=${safeManufacturerFinal}, carrier=${carrier}->${safeCarrier}, modelId=${modelId}->${safeModelId})`);
+    console.log(`📤 [이미지 업로드] 파일명 생성: ${filename} (원본확장자=${originalExtension}, 최종확장자=${fileExtension}, manufacturer=${manufacturer}, safeManufacturer=${safeManufacturerFinal}, carrier=${carrier}->${safeCarrier}, modelId=${modelId}->${safeModelId})`);
     console.log(`📤 [이미지 업로드] Discord에 업로드 시작: ${filename} (포스트: ${carrierPost.name}, 스레드: ${targetThread.name})`);
     
     try {
       const { AttachmentBuilder } = require('discord.js');
-      const attachment = new AttachmentBuilder(file.buffer, { name: filename });
+      // 🔥 개선: 이미지로 인식되도록 description 추가 및 파일명에 확장자 보장
+      const attachment = new AttachmentBuilder(file.buffer, { 
+        name: filename,
+        description: `상품 이미지: ${modelName} (${petName})`
+      });
       const message = await targetThread.send({ files: [attachment] });
 
       if (!message || !message.attachments || !message.attachments.first()) {

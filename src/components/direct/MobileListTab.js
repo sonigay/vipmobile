@@ -273,14 +273,17 @@ const MobileListTab = ({ onProductSelect }) => {
               
               if (cached && !isCacheValueInvalid) {
                 // 캐시에서 즉시 상태 업데이트
+                // 🔥 개선: openingType별로 저장하도록 키를 modelId-openingType으로 변경
+                const priceKey = `${model.id}-${existingOpeningType}`;
                 setCalculatedPrices(prev => ({
                   ...prev,
-                  [model.id]: {
+                  [priceKey]: {
                     storeSupportWithAddon: cached.storeSupportWithAddon || 0,
                     storeSupportWithoutAddon: cached.storeSupportWithoutAddon || 0,
                     purchasePriceWithAddon: cached.purchasePriceWithAddon || 0,
                     purchasePriceWithoutAddon: cached.purchasePriceWithoutAddon || 0,
-                    publicSupport: cached.publicSupport || 0
+                    publicSupport: cached.publicSupport || 0,
+                    openingType: existingOpeningType
                   }
                 }));
                 // mobileList 상태도 업데이트
@@ -381,14 +384,17 @@ const MobileListTab = ({ onProductSelect }) => {
           
           if (cached && !isCacheValueInvalid) {
             // 캐시에서 즉시 상태 업데이트
+            // 🔥 개선: openingType별로 저장하도록 키를 modelId-openingType으로 변경
+            const priceKey = `${model.id}-${defaultOpeningType}`;
             setCalculatedPrices(prev => ({
               ...prev,
-              [model.id]: {
+              [priceKey]: {
                 storeSupportWithAddon: cached.storeSupportWithAddon || 0,
                 storeSupportWithoutAddon: cached.storeSupportWithoutAddon || 0,
                 purchasePriceWithAddon: cached.purchasePriceWithAddon || 0,
                 purchasePriceWithoutAddon: cached.purchasePriceWithoutAddon || 0,
-                publicSupport: cached.publicSupport || 0
+                publicSupport: cached.publicSupport || 0,
+                openingType: defaultOpeningType
               }
             }));
             // mobileList 상태도 업데이트
@@ -1548,6 +1554,12 @@ const MobileListTab = ({ onProductSelect }) => {
     const openingType = selectedOpeningType || selectedOpeningTypes[row.id] || null;
     const priceKey = openingType ? `${row.id}-${openingType}` : null;
     const calculated = priceKey ? calculatedPrices[priceKey] : null;
+    
+    // #region agent log
+    if (field === 'publicSupport') {
+      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:getDisplayValue',message:'getDisplayValue - publicSupport (시작)',data:{modelId:row.id,field,selectedOpeningTypeParam:selectedOpeningType,selectedOpeningTypeFromState:selectedOpeningTypes[row.id],openingType,priceKey,hasCalculated:!!calculated,calculatedKeys:Object.keys(calculatedPrices).filter(k=>k.startsWith(row.id))},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M12'})}).catch(()=>{});
+    }
+    // #endregion
     // 계산된 값이 있고, 해당 필드가 존재하면 사용
     // 단, 대리점지원금의 경우 0이면 fallback 사용 (0은 유효하지 않은 값으로 간주)
     if (calculated && calculated[field] !== undefined) {

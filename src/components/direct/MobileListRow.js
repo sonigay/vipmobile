@@ -322,7 +322,7 @@ const MobileListRowComponent = ({
           }}
         >
           {(() => {
-            const displayValue = getDisplayValue(row, 'storeSupportWithoutAddon');
+            const displayValue = getDisplayValue(row, 'storeSupportWithoutAddon', selectedOpeningType);
             const fallbackValue = row.storeSupportNoAddon;
             const finalValue = (displayValue !== undefined && displayValue !== null && displayValue !== 0)
               ? displayValue.toLocaleString()
