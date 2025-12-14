@@ -523,7 +523,19 @@ const MobileListTab = ({ onProductSelect }) => {
     // 큐가 비어있고 처리 중이 아니며, 모든 예상 모델의 가격이 계산되었는지 확인
     const queueEmpty = priceCalculationQueueRef.current.length === 0;
     const notProcessing = !isProcessingQueueRef.current;
-    const calculatedModelIds = new Set(Object.keys(calculatedPrices));
+    // 🔥 개선: openingType별로 저장되므로 키에서 modelId만 추출
+    const calculatedModelIds = new Set(
+      Object.keys(calculatedPrices)
+        .map(key => {
+          // 키 형식: "modelId-openingType" 또는 "modelId"
+          const parts = key.split('-');
+          if (parts.length >= 3) {
+            // "mobile-LG-0-MNP" 형식
+            return parts.slice(0, -1).join('-');
+          }
+          return key; // 기존 형식 호환
+        })
+    );
     const allCalculated = Array.from(expectedCalculationsRef.current).every(modelId => 
       calculatedModelIds.has(modelId)
     );
@@ -1232,19 +1244,22 @@ const MobileListTab = ({ onProductSelect }) => {
       }
 
       // 상태 업데이트
+      // 🔥 개선: openingType별로 값을 저장하도록 키를 modelId + openingType으로 변경
+      const priceKey = `${modelId}-${openingType}`;
       setCalculatedPrices(prev => {
         const newPrices = {
           ...prev,
-          [modelId]: {
+          [priceKey]: {
             storeSupportWithAddon: result.storeSupportWithAddon || 0,
             storeSupportWithoutAddon: result.storeSupportWithoutAddon || 0,
             purchasePriceWithAddon: result.purchasePriceWithAddon || 0,
             purchasePriceWithoutAddon: result.purchasePriceWithoutAddon || 0,
-            publicSupport: result.publicSupport || 0
+            publicSupport: result.publicSupport || 0,
+            openingType: openingType // openingType 정보도 저장
           }
         };
         // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:calculatePriceInternal',message:'calculatedPrices 업데이트 (API 성공)',data:{modelId,publicSupport:result.publicSupport,calculatedCount:Object.keys(newPrices).length,expectedCount:expectedCalculationsRef.current.size,isInExpected:expectedCalculationsRef.current.has(modelId),expectedModelIds:Array.from(expectedCalculationsRef.current)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M4'})}).catch(()=>{});
+        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:calculatePriceInternal',message:'calculatedPrices 업데이트 (API 성공)',data:{modelId,openingType,priceKey,publicSupport:result.publicSupport,calculatedCount:Object.keys(newPrices).length,expectedCount:expectedCalculationsRef.current.size,isInExpected:expectedCalculationsRef.current.has(modelId),expectedModelIds:Array.from(expectedCalculationsRef.current)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M4'})}).catch(()=>{});
         // #endregion
         return newPrices;
       });
@@ -1494,11 +1509,14 @@ const MobileListTab = ({ onProductSelect }) => {
   };
 
   // 표시할 값 가져오기 (계산된 값이 있으면 사용, 없으면 원래 값) - 메모이제이션
-  const getDisplayValue = useCallback((row, field) => {
-    const calculated = calculatedPrices[row.id];
+  const getDisplayValue = useCallback((row, field, selectedOpeningType = null) => {
+    // 🔥 개선: openingType별로 저장된 값을 가져오도록 수정
+    const openingType = selectedOpeningType || selectedOpeningTypes[row.id] || null;
+    const priceKey = openingType ? `${row.id}-${openingType}` : null;
+    const calculated = priceKey ? calculatedPrices[priceKey] : null;
     // 계산된 값이 있고, 해당 필드가 존재하면 사용
     // 단, 대리점지원금의 경우 0이면 fallback 사용 (0은 유효하지 않은 값으로 간주)
-    if (calculated && calculatedPrices[row.id] && calculated[field] !== undefined) {
+    if (calculated && calculated[field] !== undefined) {
       // 대리점지원금 필드이고 값이 0이면 fallback 사용
       if ((field === 'storeSupportWithAddon' || field === 'storeSupportWithoutAddon') && calculated[field] === 0) {
         // #region agent log
@@ -1643,7 +1661,11 @@ const MobileListTab = ({ onProductSelect }) => {
                     openingTypes={openingTypes}
                     selectedPlanGroup={selectedPlanGroups[row.id] || null}
                     selectedOpeningType={selectedOpeningTypes[row.id] || null}
-                    calculatedPrice={calculatedPrices[row.id] || null}
+                    calculatedPrice={(() => {
+                      const openingType = selectedOpeningTypes[row.id];
+                      const priceKey = openingType ? `${row.id}-${openingType}` : null;
+                      return priceKey ? calculatedPrices[priceKey] || null : null;
+                    })()}
                     tagMenuAnchor={tagMenuAnchor}
                     onRowClick={handleRowClick}
                     onTagMenuOpen={handleTagMenuOpen}

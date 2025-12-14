@@ -286,7 +286,7 @@ const MobileListRowComponent = ({
       </TableCell>
       
       <TableCell align="center" sx={{ color: 'info.main' }}>
-        {getDisplayValue(row, 'publicSupport')?.toLocaleString() || 
+        {getDisplayValue(row, 'publicSupport', selectedOpeningType)?.toLocaleString() || 
          row.publicSupport?.toLocaleString() || 
          row.support?.toLocaleString()}
       </TableCell>
@@ -302,7 +302,7 @@ const MobileListRowComponent = ({
           }}
         >
           {(() => {
-            const displayValue = getDisplayValue(row, 'storeSupportWithAddon');
+            const displayValue = getDisplayValue(row, 'storeSupportWithAddon', selectedOpeningType);
             const fallbackValue = row.storeSupport || row.storeSupportWithAddon;
             const finalValue = (displayValue !== undefined && displayValue !== null && displayValue !== 0)
               ? displayValue.toLocaleString()
@@ -343,7 +343,7 @@ const MobileListRowComponent = ({
           }}
         >
           {(() => {
-            const displayValue = getDisplayValue(row, 'purchasePriceWithAddon');
+            const displayValue = getDisplayValue(row, 'purchasePriceWithAddon', selectedOpeningType);
             const finalValue = displayValue !== undefined && displayValue !== null
               ? displayValue.toLocaleString()
               : purchasePriceAddon.toLocaleString();
@@ -362,7 +362,7 @@ const MobileListRowComponent = ({
           }}
         >
           {(() => {
-            const displayValue = getDisplayValue(row, 'purchasePriceWithoutAddon');
+            const displayValue = getDisplayValue(row, 'purchasePriceWithoutAddon', selectedOpeningType);
             const finalValue = displayValue !== undefined && displayValue !== null
               ? displayValue.toLocaleString()
               : purchasePriceNoAddon.toLocaleString();
