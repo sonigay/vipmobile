@@ -27,18 +27,37 @@ try {
 } catch (e) {}
 // #endregion
 
-const TodaysProductCard = ({ 
-  product, 
-  isPremium, 
-  onSelect, 
-  compact, 
-  theme, 
-  priceData: propPriceData, 
-  onPriceCalculated 
-}) => {
+const TodaysProductCard = (props) => {
   // #region agent log
   try {
-    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysProductCard.js:render-start',message:'TodaysProductCard 렌더링 시작',data:{hasProduct:!!product,productId:product?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'render-check',hypothesisId:'RENDER-ORDER'})}).catch(()=>{});
+    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysProductCard.js:function-entry',message:'TodaysProductCard 함수 진입',data:{hasProps:!!props,propsKeys:props?Object.keys(props).join(','):'none'},timestamp:Date.now(),sessionId:'debug-session',runId:'debug-run-3',hypothesisId:'A,B'})}).catch(()=>{});
+  } catch (e) {}
+  // #endregion
+  
+  // #region agent log
+  try {
+    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysProductCard.js:before-destructure',message:'파라미터 destructuring 전',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'debug-run-3',hypothesisId:'A'})}).catch(()=>{});
+  } catch (e) {}
+  // #endregion
+  const { 
+    product, 
+    isPremium, 
+    onSelect, 
+    compact, 
+    theme, 
+    priceData: propPriceData, 
+    onPriceCalculated 
+  } = props || {};
+  
+  // #region agent log
+  try {
+    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysProductCard.js:after-destructure',message:'파라미터 destructuring 후',data:{hasProduct:!!product,hasTheme:!!theme,hasPropPriceData:!!propPriceData},timestamp:Date.now(),sessionId:'debug-session',runId:'debug-run-3',hypothesisId:'A,B'})}).catch(()=>{});
+  } catch (e) {}
+  // #endregion
+  
+  // #region agent log
+  try {
+    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysProductCard.js:before-usestate',message:'useState 호출 전',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'debug-run-3',hypothesisId:'A'})}).catch(()=>{});
   } catch (e) {}
   // #endregion
   const [priceData, setPriceData] = useState({
@@ -46,11 +65,33 @@ const TodaysProductCard = ({
     'MNP': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: true },
     '기변': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: true }
   });
+  
+  // #region agent log
+  try {
+    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysProductCard.js:after-usestate',message:'useState 호출 후',data:{hasPriceData:!!priceData},timestamp:Date.now(),sessionId:'debug-session',runId:'debug-run-3',hypothesisId:'A'})}).catch(()=>{});
+  } catch (e) {}
+  // #endregion
   const hasLoadedRef = useRef(false);
   
+  // #region agent log
+  try {
+    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysProductCard.js:before-finalPriceData',message:'finalPriceData 선언 전',data:{hasPropPriceData:!!propPriceData,hasPriceData:!!priceData},timestamp:Date.now(),sessionId:'debug-session',runId:'debug-run-3',hypothesisId:'A,B'})}).catch(()=>{});
+  } catch (e) {}
+  // #endregion
   // props로 받은 priceData가 있으면 사용 (초기화 순서 문제 방지 - useMemo 제거하고 직접 계산)
   const finalPriceData = propPriceData || priceData;
+  
+  // #region agent log
+  try {
+    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysProductCard.js:after-finalPriceData',message:'finalPriceData 선언 후',data:{hasFinalPriceData:!!finalPriceData},timestamp:Date.now(),sessionId:'debug-session',runId:'debug-run-3',hypothesisId:'A,B'})}).catch(()=>{});
+  } catch (e) {}
+  // #endregion
 
+  // #region agent log
+  try {
+    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysProductCard.js:before-getCarrierChipColor',message:'getCarrierChipColor 선언 전',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'debug-run-3',hypothesisId:'A'})}).catch(()=>{});
+  } catch (e) {}
+  // #endregion
   const getCarrierChipColor = (carrier) => {
     switch (carrier) {
       case 'SK': return 'info'; // 하늘색 계열
@@ -60,6 +101,11 @@ const TodaysProductCard = ({
     }
   };
   
+  // #region agent log
+  try {
+    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysProductCard.js:before-cardTheme',message:'cardTheme 선언 전',data:{hasTheme:!!theme},timestamp:Date.now(),sessionId:'debug-session',runId:'debug-run-3',hypothesisId:'A,B'})}).catch(()=>{});
+  } catch (e) {}
+  // #endregion
   // cardTheme 계산 (초기화 순서 문제 방지를 위해 useMemo 제거)
   const cardTheme = theme || {
     primary: '#ffd700',
@@ -68,21 +114,43 @@ const TodaysProductCard = ({
     accent: '#f57f17',
     text: '#f57f17'
   };
+  
+  // #region agent log
+  try {
+    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysProductCard.js:after-cardTheme',message:'cardTheme 선언 후',data:{hasCardTheme:!!cardTheme},timestamp:Date.now(),sessionId:'debug-session',runId:'debug-run-3',hypothesisId:'A,B'})}).catch(()=>{});
+  } catch (e) {}
+  // #endregion
 
+  // #region agent log
+  try {
+    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysProductCard.js:before-tagChips',message:'tagChips 선언 전',data:{hasProduct:!!product},timestamp:Date.now(),sessionId:'debug-session',runId:'debug-run-3',hypothesisId:'A,B'})}).catch(()=>{});
+  } catch (e) {}
+  // #endregion
   const tagChips = [];
-  if (product.isPremium) tagChips.push({ label: '프리미엄', color: 'primary' });
-  if (product.isBudget) tagChips.push({ label: '중저가', color: 'secondary' });
-  if (product.isPopular) tagChips.push({ label: '인기', color: 'warning' });
-  if (product.isRecommended) tagChips.push({ label: '추천', color: 'success' });
-  if (product.isCheap) tagChips.push({ label: '저렴', color: 'info' });
+  if (product && product.isPremium) tagChips.push({ label: '프리미엄', color: 'primary' });
+  if (product && product.isBudget) tagChips.push({ label: '중저가', color: 'secondary' });
+  if (product && product.isPopular) tagChips.push({ label: '인기', color: 'warning' });
+  if (product && product.isRecommended) tagChips.push({ label: '추천', color: 'success' });
+  if (product && product.isCheap) tagChips.push({ label: '저렴', color: 'info' });
+  
+  // #region agent log
+  try {
+    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysProductCard.js:after-tagChips',message:'tagChips 선언 후',data:{tagChipsLength:tagChips.length},timestamp:Date.now(),sessionId:'debug-session',runId:'debug-run-3',hypothesisId:'A,B'})}).catch(()=>{});
+  } catch (e) {}
+  // #endregion
 
   // 각 유형별 가격 정보 로드 (props로 받은 priceData가 없거나 null일 때만)
   useEffect(() => {
+    // #region agent log
+    try {
+      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysProductCard.js:useEffect-entry',message:'useEffect 진입',data:{hasProduct:!!product,productId:product?.id,hasPropPriceData:!!propPriceData},timestamp:Date.now(),sessionId:'debug-session',runId:'debug-run-3',hypothesisId:'A,B'})}).catch(()=>{});
+    } catch (e) {}
+    // #endregion
     // propPriceData가 null이거나 undefined가 아니고, 모든 유형이 loading이 false이면 스킵
     if (propPriceData && propPriceData['010신규'] && propPriceData['010신규'].loading === false) {
       return;
     }
-    if (hasLoadedRef.current || !product.id || !product.carrier) return;
+    if (hasLoadedRef.current || !product || !product.id || !product.carrier) return;
     
     const loadPrices = async () => {
       hasLoadedRef.current = true;
@@ -173,7 +241,13 @@ const TodaysProductCard = ({
     };
 
     loadPrices();
-  }, [product.id, product.carrier, product.model, product.isBudget, product.isPremium, propPriceData]);
+  }, [product?.id, product?.carrier, product?.model, product?.isBudget, product?.isPremium, propPriceData]);
+
+  // #region agent log
+  try {
+    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysProductCard.js:before-return',message:'return 문 시작 전',data:{hasProduct:!!product,hasCardTheme:!!cardTheme,hasFinalPriceData:!!finalPriceData},timestamp:Date.now(),sessionId:'debug-session',runId:'debug-run-3',hypothesisId:'A,B'})}).catch(()=>{});
+  } catch (e) {}
+  // #endregion
 
   return (
     <Card
@@ -194,7 +268,7 @@ const TodaysProductCard = ({
           zIndex: 1
         }
       }}
-      onClick={() => onSelect(product)}
+      onClick={() => product && onSelect && onSelect(product)}
     >
       {/* 태그 칩들 */}
       {tagChips.length > 0 && (
