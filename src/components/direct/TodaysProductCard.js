@@ -473,4 +473,7 @@ function TodaysProductCard(props) {
 
 // Named export도 추가하여 lazy loading TDZ 문제 방지
 export { TodaysProductCard };
-export default TodaysProductCard;
+
+// Default export를 안전하게 래핑하여 React.lazy TDZ 문제 방지
+const TodaysProductCardDefault = TodaysProductCard;
+export default TodaysProductCardDefault;
