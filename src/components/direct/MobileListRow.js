@@ -28,7 +28,7 @@ import {
   Label as LabelIcon
 } from '@mui/icons-material';
 import { Checkbox } from '@mui/material';
-import { HoverableTableRow } from './common';
+import { HoverableTableRow } from './common/ModernTable';
 import { debugLog } from '../../utils/debugLogger';
 
 const MobileListRowComponent = ({

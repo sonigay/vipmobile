@@ -1,14 +1,22 @@
 /**
  * 직영점모드 공통 컴포넌트 export
  * 
- * 주의: export 순서가 중요합니다. 의존성이 없는 컴포넌트부터 export합니다.
+ * 주의: re-export는 초기화 순서 문제를 일으킬 수 있으므로,
+ * 각 파일에서 직접 import하는 것을 권장합니다.
+ * 
+ * 이 파일은 하위 호환성을 위해 유지하되, 새로운 코드에서는
+ * 각 파일에서 직접 import하세요.
+ * 
+ * 예: import { ModernTable } from './common/ModernTable';
+ *    import { LoadingState } from './common/LoadingState';
  */
-// 1. 기본 컴포넌트 (의존성 없음)
+
+// 기본 컴포넌트
 export { LoadingState, SkeletonLoader } from './LoadingState';
 export { ErrorState, EmptyState } from './ErrorState';
 
-// 2. 테이블 컴포넌트 (MUI 의존성만 있음)
-export { ModernTable, ModernTableCell, HoverableTableRow, EmptyTableRow } from './ModernTable';
+// 테이블 컴포넌트 - 직접 import 권장
+// export { ModernTable, ModernTableCell, HoverableTableRow, EmptyTableRow } from './ModernTable';
 
-// 3. 가격 표시 컴포넌트
+// 가격 표시 컴포넌트
 export { PriceDisplay, PriceComparison } from './PriceDisplay';
