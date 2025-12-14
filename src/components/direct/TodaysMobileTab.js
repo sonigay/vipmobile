@@ -138,7 +138,12 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
 
   // 전역 캐시에서 가격 데이터 가져오기 - Rules of Hooks 준수를 위해 최상단으로 이동
   const getPriceDataFromCache = useCallback((product) => {
-    if (!product.id || !product.carrier) return null;
+    if (!product.id || !product.carrier) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:getPriceDataFromCache',message:'product 조건 불만족으로 null 반환',data:{hasProduct:!!product,hasId:!!product?.id,hasCarrier:!!product?.carrier},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H8'})}).catch(()=>{});
+      // #endregion
+      return null;
+    }
     
     // calculatedPricesRef에서 먼저 확인
     if (calculatedPricesRef.current.has(product.id)) {
