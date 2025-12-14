@@ -37,8 +37,27 @@ import { LoadingState } from './common/LoadingState';
 import { ErrorState, EmptyState } from './common/ErrorState';
 import TodaysProductCard from './TodaysProductCard';
 
-// ProductCard는 TodaysProductCard로 대체됨 (하위 호환성을 위해 유지)
-const ProductCard = TodaysProductCard;
+// ProductCard는 TodaysProductCard로 직접 사용 (초기화 순서 문제 방지)
+// const ProductCard = TodaysProductCard; // 제거: 초기화 순서 문제 가능성
+
+// 컴포넌트 초기화 로깅
+try {
+  fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      location: 'TodaysMobileTab.js:module-init',
+      message: 'TodaysMobileTab 모듈 초기화 시작',
+      data: { hasTodaysProductCard: typeof TodaysProductCard !== 'undefined' },
+      timestamp: Date.now(),
+      sessionId: 'debug-session',
+      runId: 'init-check',
+      hypothesisId: 'INIT-ORDER'
+    })
+  }).catch(() => {});
+} catch (e) {
+  // 로깅 실패 무시
+}
 
 const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
   const [premiumPhones, setPremiumPhones] = useState([]);
@@ -1059,7 +1078,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                   }}
                 >
                   {slideshowData[currentSlideIndex].products.map((product) => (
-                    <ProductCard
+                    <TodaysProductCard
                       key={product.id || `${product.model}-${product.carrier}`}
                       product={product}
                       isPremium={product.isPremium === true}
@@ -1248,7 +1267,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                       }}
                     >
                       {slideshowData[manualSlideIndex].products.map((product) => (
-                        <ProductCard
+                        <TodaysProductCard
                           key={product.id || `${product.model}-${product.carrier}`}
                           product={product}
                           isPremium={product.isPremium === true}
@@ -1296,7 +1315,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                 {allProducts.map((product) => {
                   const isPremium = product.isPremium || false;
                   return (
-                    <ProductCard
+                    <TodaysProductCard
                       key={product.id}
                       product={product}
                       isPremium={isPremium}

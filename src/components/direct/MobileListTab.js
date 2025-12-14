@@ -45,6 +45,28 @@ import { formatPrice } from '../../utils/directStoreUtils';
 import { MobileListRow } from './MobileListRow';
 import { debugLog } from '../../utils/debugLogger';
 
+// 컴포넌트 초기화 로깅
+try {
+  fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      location: 'MobileListTab.js:module-init',
+      message: 'MobileListTab 모듈 초기화 시작',
+      data: { 
+        hasMobileListRow: typeof MobileListRow !== 'undefined',
+        hasModernTable: typeof ModernTable !== 'undefined'
+      },
+      timestamp: Date.now(),
+      sessionId: 'debug-session',
+      runId: 'init-check',
+      hypothesisId: 'INIT-ORDER'
+    })
+  }).catch(() => {});
+} catch (e) {
+  // 로깅 실패 무시
+}
+
 const MobileListTab = ({ onProductSelect }) => {
   const [carrierTab, setCarrierTab] = useState(0); // 0: SK, 1: KT, 2: LG
   const [mobileList, setMobileList] = useState([]);
