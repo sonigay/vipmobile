@@ -30,6 +30,7 @@ import {
 import { Checkbox } from '@mui/material';
 import { HoverableTableRow } from './common/ModernTable';
 import { debugLog } from '../../utils/debugLogger';
+import { getProxyImageUrl } from '../../api';
 
 
 const MobileListRowComponent = ({
@@ -175,19 +176,24 @@ const MobileListRowComponent = ({
                 normalizedUrl = normalizedUrl.replace(/--+/g, '-');
               }
               
-              let finalUrl = normalizedUrl;
-              if (normalizedUrl.includes('?')) {
-                const urlEndsWithAmpersand = normalizedUrl.endsWith('&');
-                const urlEndsWithQuestion = normalizedUrl.endsWith('?');
-                if (urlEndsWithAmpersand) {
-                  finalUrl = `${normalizedUrl}_t=${Date.now()}`;
-                } else if (urlEndsWithQuestion) {
-                  finalUrl = `${normalizedUrl}_t=${Date.now()}`;
+              // 🔥 핵심 수정: Discord CDN URL인 경우 프록시를 통해 로드
+              let finalUrl = getProxyImageUrl(normalizedUrl);
+              
+              // 캐시 무효화를 위한 타임스탬프 추가 (프록시 URL이 아닌 경우만)
+              if (!finalUrl.includes('/api/meetings/proxy-image')) {
+                if (finalUrl.includes('?')) {
+                  const urlEndsWithAmpersand = finalUrl.endsWith('&');
+                  const urlEndsWithQuestion = finalUrl.endsWith('?');
+                  if (urlEndsWithAmpersand) {
+                    finalUrl = `${finalUrl}_t=${Date.now()}`;
+                  } else if (urlEndsWithQuestion) {
+                    finalUrl = `${finalUrl}_t=${Date.now()}`;
+                  } else {
+                    finalUrl = `${finalUrl}&_t=${Date.now()}`;
+                  }
                 } else {
-                  finalUrl = `${normalizedUrl}&_t=${Date.now()}`;
+                  finalUrl = `${finalUrl}?_t=${Date.now()}`;
                 }
-              } else {
-                finalUrl = `${normalizedUrl}?_t=${Date.now()}`;
               }
               
               // 디버그 로그 (개발 환경에서만)
@@ -195,19 +201,45 @@ const MobileListRowComponent = ({
                 originalUrl: row.image,
                 normalizedUrl,
                 finalUrl,
-                modelId: row.id
+                modelId: row.id,
+                isProxy: finalUrl.includes('/api/meetings/proxy-image')
               });
               
               return finalUrl;
             })() : undefined}
             onError={(e) => {
+              // 🔥 개선: 404 에러 처리 개선
               if (e.target.dataset.gaveUp === 'true') {
                 e.target.onerror = null;
                 return;
               }
+              
+              // 프록시를 사용하지 않았고 Discord CDN URL인 경우 프록시로 재시도
+              const originalUrl = row.image;
+              if (originalUrl && 
+                  (originalUrl.includes('cdn.discordapp.com') || originalUrl.includes('media.discordapp.net')) &&
+                  !e.target.src.includes('/api/meetings/proxy-image')) {
+                const proxyUrl = getProxyImageUrl(originalUrl);
+                e.target.src = proxyUrl;
+                e.target.dataset.retryCount = (parseInt(e.target.dataset.retryCount || '0') + 1).toString();
+                if (parseInt(e.target.dataset.retryCount) < 2) {
+                  return; // 재시도
+                }
+              }
+              
+              // 재시도 실패 또는 프록시가 아닌 경우 빈 이미지로 처리
               e.target.dataset.gaveUp = 'true';
               e.target.src = '';
               e.target.onerror = null;
+              
+              if (process.env.NODE_ENV === 'development') {
+                console.warn('⚠️ [MobileListRow] 이미지 로드 실패:', {
+                  modelId: row.id,
+                  modelName: row.model,
+                  originalUrl: row.image,
+                  attemptedUrl: e.target.src || 'N/A'
+                });
+              }
             }}
             sx={{ width: 60, height: 60, bgcolor: 'background.subtle' }}
           >

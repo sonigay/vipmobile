@@ -3159,8 +3159,8 @@ async function proxyDiscordImage(req, res) {
       });
     }
 
-    // Discord CDN URL인지 확인
-    if (!imageUrl.includes('cdn.discordapp.com')) {
+    // Discord CDN URL인지 확인 (cdn.discordapp.com 또는 media.discordapp.net)
+    if (!imageUrl.includes('cdn.discordapp.com') && !imageUrl.includes('media.discordapp.net')) {
       return res.status(400).json({
         success: false,
         error: 'Discord CDN URL만 허용됩니다.'
@@ -3183,6 +3183,11 @@ async function proxyDiscordImage(req, res) {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
       }, (response) => {
+        // 🔥 개선: 404 에러를 포함한 모든 에러 상태 코드 처리
+        if (response.statusCode === 404) {
+          reject(new Error(`이미지를 찾을 수 없습니다 (404): ${imageUrl.substring(0, 100)}...`));
+          return;
+        }
         if (response.statusCode !== 200) {
           reject(new Error(`이미지 가져오기 실패: ${response.statusCode} ${response.statusMessage}`));
           return;

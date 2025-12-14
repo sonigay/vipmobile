@@ -688,35 +688,52 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
     if (!initStartTimeRef.current) {
       initStartTimeRef.current = Date.now();
     }
-    const MAX_WAIT_TIME = 150000; // 최대 150초 대기
+    const MAX_WAIT_TIME = 30000; // 🔥 성능 최적화: 최대 30초 대기 (150초 → 30초)
+    const MIN_PRODUCTS_TO_SHOW = 3; // 🔥 점진적 로딩: 최소 3개 상품이 계산되면 화면 표시
     const elapsedTime = Date.now() - initStartTimeRef.current;
 
-    // 모든 예상 상품의 가격이 계산되었는지 확인
+    // 🔥 성능 최적화: 점진적 로딩 - 계산 완료된 상품 수 확인
     const calculatedProductIds = new Set(calculatedPricesRef.current.keys());
     const calculationStatus = Array.from(expectedCalculationsRef.current).map(productId => {
       const priceData = calculatedPricesRef.current.get(productId);
-      const status = {
+      const hasAtLeastOneType = priceData && (
+        priceData['010신규']?.loading === false ||
+        priceData['MNP']?.loading === false ||
+        priceData['기변']?.loading === false
+      );
+      const allTypesCalculated = priceData && 
+        priceData['010신규']?.loading === false &&
+        priceData['MNP']?.loading === false &&
+        priceData['기변']?.loading === false;
+      return {
         productId,
         hasData: !!priceData,
-        '010신규': priceData?.['010신규']?.loading !== false,
-        'MNP': priceData?.['MNP']?.loading !== false,
-        '기변': priceData?.['기변']?.loading !== false
+        hasAtLeastOneType,
+        allTypesCalculated
       };
-      return status;
     });
-    const allCalculated = calculationStatus.every(status => 
-      status.hasData && 
-      status['010신규'] === false &&
-      status['MNP'] === false &&
-      status['기변'] === false
-    );
     
+    // 최소 하나의 개통유형이라도 계산된 상품 수
+    const productsWithAtLeastOneType = calculationStatus.filter(s => s.hasAtLeastOneType).length;
+    
+    // 모든 개통유형이 계산된 상품 수
+    const allCalculated = calculationStatus.every(status => status.allTypesCalculated);
+    
+    // 🔥 점진적 로딩: 최소 상품 수가 계산되면 화면 표시 시작
+    if (productsWithAtLeastOneType >= MIN_PRODUCTS_TO_SHOW && elapsedTime > 2000) {
+      // 최소 2초는 기다린 후, 최소 상품 수가 계산되면 화면 표시
+      setIsInitializing(false);
+      expectedCalculationsRef.current.clear();
+      initStartTimeRef.current = null;
+      return;
+    }
 
     // 최대 대기 시간 초과 시 강제로 초기화 완료
     if (elapsedTime > MAX_WAIT_TIME) {
       console.warn('오늘의휴대폰 초기화 대기 시간 초과, 강제로 초기화 완료', {
         expectedCount: expectedCalculationsRef.current.size,
         calculatedCount: calculatedProductIds.size,
+        productsWithAtLeastOneType,
         missingProducts: Array.from(expectedCalculationsRef.current).filter(id => !calculatedProductIds.has(id))
       });
       setIsInitializing(false);
@@ -725,25 +742,12 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
       return;
     }
 
+    // 모든 상품의 모든 개통유형이 계산 완료되면 즉시 화면 표시
     if (allCalculated) {
-      // 약간의 지연 후 다시 확인 (마지막 요청이 완료될 시간 확보)
-      const timeoutId = setTimeout(() => {
-        const finalAllCalculated = Array.from(expectedCalculationsRef.current).every(productId => {
-          const priceData = calculatedPricesRef.current.get(productId);
-          return priceData && 
-                 priceData['010신규']?.loading === false &&
-                 priceData['MNP']?.loading === false &&
-                 priceData['기변']?.loading === false;
-        });
-
-        if (finalAllCalculated) {
-          setIsInitializing(false);
-          expectedCalculationsRef.current.clear();
-          initStartTimeRef.current = null;
-        }
-      }, 500);
-
-      return () => clearTimeout(timeoutId);
+      setIsInitializing(false);
+      expectedCalculationsRef.current.clear();
+      initStartTimeRef.current = null;
+      return;
     }
   }, [allProducts, isInitializing, priceCalculationTrigger]);
 
@@ -839,17 +843,21 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
   }, [allProducts, isSlideshowActive, isSlideshowDataLoading, slideshowData.length, currentCarrier]);
   
 
-  // Early return은 모든 훅 호출 이후에 위치
-  if (loading || isInitializing) {
+  // 🔥 성능 최적화: 점진적 로딩 - 데이터 로딩 중일 때만 전체 화면 로딩 표시
+  // isInitializing일 때는 부분 로딩 허용 (계산 완료된 상품부터 표시)
+  if (loading) {
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100%', gap: 2 }}>
         <CircularProgress />
         <Typography variant="body2" color="text.secondary">
-          {isInitializing ? '가격 정보를 계산하는 중...' : '데이터를 불러오는 중...'}
+          데이터를 불러오는 중...
         </Typography>
       </Box>
     );
   }
+  
+  // 🔥 점진적 로딩: isInitializing일 때도 화면 표시 (로딩 중인 가격은 스켈레톤 표시)
+  // 계산 완료된 상품부터 즉시 표시하여 사용자 대기 시간 최소화
 
   if (error) {
     return (

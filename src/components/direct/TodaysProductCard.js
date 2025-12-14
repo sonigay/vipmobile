@@ -20,6 +20,7 @@ import {
 } from '@mui/icons-material';
 import { directStoreApiClient } from '../../api/directStoreApiClient';
 import { getCachedPrice, setCachedPrice, setCachedPricesBatch } from '../../utils/priceCache';
+import { getProxyImageUrl } from '../../api';
 
 // 함수 선언으로 변경하여 hoisting으로 TDZ 문제 방지
 // React.lazy와의 호환성을 위해 함수를 즉시 평가 가능한 형태로 정의
@@ -258,11 +259,34 @@ function TodaysProductCard(props) {
       }}>
         <CardMedia
           component="img"
-          image={product.image || ''}
+          image={product.image ? getProxyImageUrl(product.image) : ''}
           alt={product.petName}
           onError={(e) => {
-            // 이미지 로드 실패 시 빈 이미지로 처리
+            // 🔥 개선: 404 에러 처리 개선
+            // 프록시를 사용하지 않았고 Discord CDN URL인 경우 프록시로 재시도
+            const originalUrl = product.image;
+            if (originalUrl && 
+                (originalUrl.includes('cdn.discordapp.com') || originalUrl.includes('media.discordapp.net')) &&
+                !e.target.src.includes('/api/meetings/proxy-image')) {
+              const proxyUrl = getProxyImageUrl(originalUrl);
+              e.target.src = proxyUrl;
+              e.target.dataset.retryCount = (parseInt(e.target.dataset.retryCount || '0') + 1).toString();
+              if (parseInt(e.target.dataset.retryCount) < 2) {
+                return; // 재시도
+              }
+            }
+            
+            // 재시도 실패 또는 프록시가 아닌 경우 빈 이미지로 처리
             e.target.style.display = 'none';
+            
+            if (process.env.NODE_ENV === 'development') {
+              console.warn('⚠️ [TodaysProductCard] 이미지 로드 실패:', {
+                productId: product.id,
+                productName: product.petName,
+                originalUrl: product.image,
+                attemptedUrl: e.target.src || 'N/A'
+              });
+            }
           }}
           sx={{
             position: 'absolute',

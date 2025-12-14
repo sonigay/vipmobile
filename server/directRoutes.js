@@ -1602,18 +1602,22 @@ function setupDirectRoutes(app) {
                     if (isExplicit && supportMap[key] !== undefined) {
                       // 키에서 openingType 추출
                       const keyOpeningType = key.split('|')[1];
+                      
+                      // 🔥 핵심 수정: 상호 매핑 시 정확한 키가 이미 있으면 절대 덮어쓰지 않음
+                      // "MNP" <-> "번호이동" 상호 매핑인 경우
+                      if ((keyOpeningType === 'MNP' && (openingTypeRaw === '번호이동' || openingTypes.includes('번호이동'))) ||
+                          (keyOpeningType === '번호이동' && (openingTypeRaw === 'MNP' || openingTypes.includes('MNP')))) {
+                        // 상호 매핑이지만, 정확한 키가 이미 설정되어 있으면 덮어쓰지 않음
+                        // 예: "MNP" 키에 정확한 값이 있으면 "번호이동" 행의 상호 매핑 값으로 덮어쓰지 않음
+                        const exactKeyForTarget = `${model}|${keyOpeningType}`;
+                        if (supportMap[exactKeyForTarget] !== undefined) {
+                          return; // 정확한 키가 있으면 상호 매핑 값으로 덮어쓰지 않음
+                        }
+                      }
+                      
                       // 현재 행의 openingTypeRaw와 정확히 일치하는 키는 덮어쓰지 않음
                       if (keyOpeningType === openingTypeRaw) {
                         return; // 정확한 키는 보호
-                      }
-                      // "MNP" <-> "번호이동" 상호 매핑 시, 정확한 키가 이미 있으면 덮어쓰지 않음
-                      if ((keyOpeningType === 'MNP' && openingTypeRaw === '번호이동') ||
-                          (keyOpeningType === '번호이동' && openingTypeRaw === 'MNP')) {
-                        // 상호 매핑이지만, 정확한 키가 이미 설정되어 있으면 덮어쓰지 않음
-                        const exactKey = `${model}|${openingTypeRaw}`;
-                        if (supportMap[exactKey] !== undefined) {
-                          return; // 정확한 키가 있으면 상호 매핑 값으로 덮어쓰지 않음
-                        }
                       }
                     }
                     
@@ -1665,13 +1669,17 @@ function setupDirectRoutes(app) {
                   // (A) 기본 파싱된 유형들 매핑 (010신규, MNP, 기변)
                   openingTypes.forEach(ot => addKeys(ot, false));
 
-                  // 🔥 핵심 수정: 상호 매핑은 명시적 매핑으로 처리 (기존 정확한 키가 있으면 덮어쓰지 않음)
+                  // 🔥 핵심 수정: 상호 매핑은 정확한 키가 없을 때만 설정
                   // (B) "MNP" <-> "번호이동" 상호 매핑
                   if (openingTypes.includes('MNP') || openingTypeRaw.includes('번호이동')) {
-                    // "MNP" 행이면 "번호이동"에도 매핑, "번호이동" 행이면 "MNP"에도 매핑
-                    // 하지만 정확한 키가 이미 있으면 덮어쓰지 않음
                     const otherType = openingTypeRaw.includes('번호이동') ? 'MNP' : '번호이동';
-                    addKeys(otherType, true); // 명시적 매핑
+                    // 🔥 핵심: 정확한 키가 없을 때만 상호 매핑 설정
+                    const exactKeyForOther = `${model}|${otherType}`;
+                    if (supportMap[exactKeyForOther] === undefined) {
+                      // 정확한 키가 없으면 상호 매핑으로 설정
+                      addKeys(otherType, true); // 명시적 매핑
+                    }
+                    // 정확한 키가 이미 있으면 상호 매핑하지 않음 (정확한 키가 우선)
                   }
 
                   // (C) "010신규" / "기변" <-> "010신규/기변" 상호 매핑
@@ -3434,18 +3442,22 @@ function setupDirectRoutes(app) {
                     if (isExplicit && supportMap[key] !== undefined) {
                       // 키에서 openingType 추출
                       const keyOpeningType = key.split('|')[1];
+                      
+                      // 🔥 핵심 수정: 상호 매핑 시 정확한 키가 이미 있으면 절대 덮어쓰지 않음
+                      // "MNP" <-> "번호이동" 상호 매핑인 경우
+                      if ((keyOpeningType === 'MNP' && (openingTypeRaw === '번호이동' || openingTypes.includes('번호이동'))) ||
+                          (keyOpeningType === '번호이동' && (openingTypeRaw === 'MNP' || openingTypes.includes('MNP')))) {
+                        // 상호 매핑이지만, 정확한 키가 이미 설정되어 있으면 덮어쓰지 않음
+                        // 예: "MNP" 키에 정확한 값이 있으면 "번호이동" 행의 상호 매핑 값으로 덮어쓰지 않음
+                        const exactKeyForTarget = `${model}|${keyOpeningType}`;
+                        if (supportMap[exactKeyForTarget] !== undefined) {
+                          return; // 정확한 키가 있으면 상호 매핑 값으로 덮어쓰지 않음
+                        }
+                      }
+                      
                       // 현재 행의 openingTypeRaw와 정확히 일치하는 키는 덮어쓰지 않음
                       if (keyOpeningType === openingTypeRaw) {
                         return; // 정확한 키는 보호
-                      }
-                      // "MNP" <-> "번호이동" 상호 매핑 시, 정확한 키가 이미 있으면 덮어쓰지 않음
-                      if ((keyOpeningType === 'MNP' && openingTypeRaw === '번호이동') ||
-                          (keyOpeningType === '번호이동' && openingTypeRaw === 'MNP')) {
-                        // 상호 매핑이지만, 정확한 키가 이미 설정되어 있으면 덮어쓰지 않음
-                        const exactKey = `${model}|${openingTypeRaw}`;
-                        if (supportMap[exactKey] !== undefined) {
-                          return; // 정확한 키가 있으면 상호 매핑 값으로 덮어쓰지 않음
-                        }
                       }
                     }
                     
@@ -3484,12 +3496,17 @@ function setupDirectRoutes(app) {
                   // 🔥 핵심 수정: 정확한 키를 먼저 설정 (isExplicitMapping=false)
                   openingTypes.forEach(ot => addKeys(ot, false));
                   
-                  // 🔥 핵심 수정: 상호 매핑은 명시적 매핑으로 처리 (기존 정확한 키가 있으면 덮어쓰지 않음)
+                  // 🔥 핵심 수정: 상호 매핑은 정확한 키가 없을 때만 설정
+                  // "MNP" <-> "번호이동" 상호 매핑
                   if (openingTypes.includes('MNP') || openingTypeRaw.includes('번호이동')) {
-                    // "MNP" 행이면 "번호이동"에도 매핑, "번호이동" 행이면 "MNP"에도 매핑
-                    // 하지만 정확한 키가 이미 있으면 덮어쓰지 않음
                     const otherType = openingTypeRaw.includes('번호이동') ? 'MNP' : '번호이동';
-                    addKeys(otherType, true); // 명시적 매핑
+                    // 🔥 핵심: 정확한 키가 없을 때만 상호 매핑 설정
+                    const exactKeyForOther = `${model}|${otherType}`;
+                    if (supportMap[exactKeyForOther] === undefined) {
+                      // 정확한 키가 없으면 상호 매핑으로 설정
+                      addKeys(otherType, true); // 명시적 매핑
+                    }
+                    // 정확한 키가 이미 있으면 상호 매핑하지 않음 (정확한 키가 우선)
                   }
                   
                   if (openingTypeRaw.includes('010신규/기변') ||
