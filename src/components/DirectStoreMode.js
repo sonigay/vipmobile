@@ -1,4 +1,4 @@
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Paper,
@@ -35,10 +35,11 @@ import directStoreThemeV2 from '../theme/DirectStoreThemeV2';
 import ErrorBoundary from './ErrorBoundary';
 
 // 탭 컴포넌트를 lazy loading으로 변경하여 초기화 순서 문제 해결
-const TodaysMobileTab = lazy(() => import('./direct/TodaysMobileTab'));
-const MobileListTab = lazy(() => import('./direct/MobileListTab'));
-const DirectSalesReportTab = lazy(() => import('./direct/DirectSalesReportTab'));
-const OpeningInfoPage = lazy(() => import('./direct/OpeningInfoPage'));
+// TDZ 문제 디버깅을 위해 임시로 일반 import로 변경
+import TodaysMobileTab from './direct/TodaysMobileTab';
+import MobileListTab from './direct/MobileListTab';
+import DirectSalesReportTab from './direct/DirectSalesReportTab';
+import OpeningInfoPage from './direct/OpeningInfoPage';
 
 const DirectStoreMode = ({
   loggedInStore,
@@ -313,13 +314,11 @@ const DirectStoreMode = ({
           <Fade in={true}>
             <Box sx={{ flexGrow: 1, height: '100vh', overflow: 'auto' }}>
               <ErrorBoundary name="OpeningInfoPage">
-                <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}><CircularProgress /></Box>}>
-                  <OpeningInfoPage
-                    initialData={selectedProduct}
-                    onBack={handleBackToStore}
-                    loggedInStore={loggedInStore}
-                  />
-                </Suspense>
+                <OpeningInfoPage
+                  initialData={selectedProduct}
+                  onBack={handleBackToStore}
+                  loggedInStore={loggedInStore}
+                />
               </ErrorBoundary>
             </Box>
           </Fade>
@@ -396,12 +395,10 @@ const DirectStoreMode = ({
                 </Box>
 
                 <ErrorBoundary name="TodaysMobileTab">
-                  <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}><CircularProgress /></Box>}>
-                    <TodaysMobileTab
-                      isFullScreen={isFullScreen}
-                      onProductSelect={handleProductSelect}
-                    />
-                  </Suspense>
+                  <TodaysMobileTab
+                    isFullScreen={isFullScreen}
+                    onProductSelect={handleProductSelect}
+                  />
                 </ErrorBoundary>
               </Box>
 
@@ -412,9 +409,7 @@ const DirectStoreMode = ({
                 sx={{ height: '100%', display: activeTab === 1 ? 'block' : 'none' }}
               >
                 <ErrorBoundary name="MobileListTab">
-                  <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}><CircularProgress /></Box>}>
-                    <MobileListTab onProductSelect={handleProductSelect} />
-                  </Suspense>
+                  <MobileListTab onProductSelect={handleProductSelect} />
                 </ErrorBoundary>
               </Box>
 
@@ -425,13 +420,11 @@ const DirectStoreMode = ({
                 sx={{ height: '100%', display: activeTab === 2 ? 'block' : 'none' }}
               >
                 <ErrorBoundary name="DirectSalesReportTab">
-                  <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}><CircularProgress /></Box>}>
-                    <DirectSalesReportTab 
-                      onRowClick={handleProductSelect} 
-                      loggedInStore={loggedInStore}
-                      isManagementMode={false}
-                    />
-                  </Suspense>
+                  <DirectSalesReportTab 
+                    onRowClick={handleProductSelect} 
+                    loggedInStore={loggedInStore}
+                    isManagementMode={false}
+                  />
                 </ErrorBoundary>
               </Box>
             </Box>
