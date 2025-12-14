@@ -34,9 +34,18 @@ function TodaysProductCard(props) {
   if (!props) {
     return null;
   }
+  
+  // 모든 React hooks를 최상단에서 먼저 호출하여 TDZ 문제 방지
+  const [priceData, setPriceData] = useState({
+    '010신규': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: true },
+    'MNP': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: true },
+    '기변': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: true }
+  });
+  const hasLoadedRef = useRef(false);
+  
   // #region agent log
   try {
-    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysProductCard.js:function-entry',message:'TodaysProductCard 함수 진입',data:{hasProps:!!props,propsKeys:props?Object.keys(props).join(','):'none'},timestamp:Date.now(),sessionId:'debug-session',runId:'debug-run-4',hypothesisId:'A'})}).catch(()=>{});
+    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysProductCard.js:function-entry',message:'TodaysProductCard 함수 진입',data:{hasProps:!!props,propsKeys:props?Object.keys(props).join(','):'none'},timestamp:Date.now(),sessionId:'debug-session',runId:'debug-run-6',hypothesisId:'A'})}).catch(()=>{});
   } catch (e) {}
   // #endregion
   
@@ -61,23 +70,6 @@ function TodaysProductCard(props) {
   } catch (e) {}
   // #endregion
   
-  // #region agent log
-  try {
-    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysProductCard.js:before-usestate',message:'useState 호출 전',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'debug-run-3',hypothesisId:'A'})}).catch(()=>{});
-  } catch (e) {}
-  // #endregion
-  const [priceData, setPriceData] = useState({
-    '010신규': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: true },
-    'MNP': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: true },
-    '기변': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: true }
-  });
-  
-  // #region agent log
-  try {
-    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysProductCard.js:after-usestate',message:'useState 호출 후',data:{hasPriceData:!!priceData},timestamp:Date.now(),sessionId:'debug-session',runId:'debug-run-3',hypothesisId:'A'})}).catch(()=>{});
-  } catch (e) {}
-  // #endregion
-  const hasLoadedRef = useRef(false);
   
   // #region agent log
   try {
