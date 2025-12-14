@@ -797,7 +797,12 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
     }
   }, []);
   
-  const theme = useMemo(() => getCarrierTheme(currentCarrier), [getCarrierTheme, currentCarrier]);
+  const theme = useMemo(() => {
+    if (!currentCarrier) {
+      return getCarrierTheme('SK'); // 기본값
+    }
+    return getCarrierTheme(currentCarrier);
+  }, [currentCarrier]); // getCarrierTheme는 useCallback으로 고정되어 있으므로 의존성에서 제거
 
   // Early return은 모든 훅 호출 이후에 위치
   if (loading || isInitializing) {
