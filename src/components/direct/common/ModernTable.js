@@ -19,34 +19,10 @@ import {
   alpha,
 } from '@mui/material';
 
-// 컴포넌트 초기화 로깅
-try {
-  fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      location: 'ModernTable.js:module-init',
-      message: 'ModernTable 모듈 초기화 시작',
-      data: {},
-      timestamp: Date.now(),
-      sessionId: 'debug-session',
-      runId: 'init-check',
-      hypothesisId: 'INIT-ORDER'
-    })
-  }).catch(() => {});
-} catch (e) {
-  // 로깅 실패 무시
-}
-
 /**
  * 모던한 테이블 컨테이너
  */
 export const ModernTable = ({ children, sx, ...props }) => {
-  // #region agent log
-  try {
-    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ModernTable.js:render-start',message:'ModernTable 렌더링 시작',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'render-check',hypothesisId:'RENDER-ORDER'})}).catch(()=>{});
-  } catch (e) {}
-  // #endregion
   return (
     <TableContainer
       component={Paper}
@@ -67,11 +43,6 @@ export const ModernTable = ({ children, sx, ...props }) => {
  * 모던한 테이블 헤더 셀
  */
 export const ModernTableCell = ({ children, align = 'left', sx, ...props }) => {
-  // #region agent log
-  try {
-    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ModernTableCell.js:render-start',message:'ModernTableCell 렌더링 시작',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'render-check',hypothesisId:'RENDER-ORDER'})}).catch(()=>{});
-  } catch (e) {}
-  // #endregion
   return (
     <TableCell
       align={align}
@@ -92,11 +63,6 @@ export const ModernTableCell = ({ children, align = 'left', sx, ...props }) => {
  * 호버 효과가 있는 테이블 행
  */
 export const HoverableTableRow = ({ children, onClick, sx, ...props }) => {
-  // #region agent log
-  try {
-    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'HoverableTableRow.js:render-start',message:'HoverableTableRow 렌더링 시작',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'render-check',hypothesisId:'RENDER-ORDER'})}).catch(()=>{});
-  } catch (e) {}
-  // #endregion
   return (
     <TableRow
       onClick={onClick}

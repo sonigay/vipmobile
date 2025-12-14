@@ -44,11 +44,6 @@ import OpeningInfoFormSection from './OpeningInfoFormSection';
 import ContractInfoFormSection from './ContractInfoFormSection';
 
 const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
-    // #region agent log
-    try {
-      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OpeningInfoPage.js:component-init',message:'OpeningInfoPage 컴포넌트 초기화',data:{hasInitialData:!!initialData},timestamp:Date.now(),sessionId:'debug-session',runId:'render-check',hypothesisId:'RENDER-ORDER'})}).catch(()=>{});
-    } catch (e) {}
-    // #endregion
     const [selectedCarrier, setSelectedCarrier] = useState(initialData?.carrier || 'SK');
     const theme = CARRIER_THEMES[selectedCarrier] || CARRIER_THEMES['SK'];
     const [isSaving, setIsSaving] = useState(false);

@@ -42,31 +42,7 @@ import TodaysProductCard from './TodaysProductCard';
 
 // getCarrierTheme 함수는 컴포넌트 내부 useCallback으로 이동 (TDZ 문제 방지)
 
-// 컴포넌트 초기화 로깅
-try {
-  fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      location: 'TodaysMobileTab.js:module-init',
-      message: 'TodaysMobileTab 모듈 초기화 시작',
-      data: { hasTodaysProductCard: typeof TodaysProductCard !== 'undefined' },
-      timestamp: Date.now(),
-      sessionId: 'debug-session',
-      runId: 'init-check',
-      hypothesisId: 'INIT-ORDER'
-    })
-  }).catch(() => {});
-} catch (e) {
-  // 로깅 실패 무시
-}
-
 const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
-  // #region agent log
-  try {
-    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:component-init',message:'TodaysMobileTab 컴포넌트 초기화',data:{isFullScreen,hasOnProductSelect:typeof onProductSelect !== 'undefined'},timestamp:Date.now(),sessionId:'debug-session',runId:'render-check',hypothesisId:'RENDER-ORDER'})}).catch(()=>{});
-  } catch (e) {}
-  // #endregion
   const [premiumPhones, setPremiumPhones] = useState([]);
   const [budgetPhones, setBudgetPhones] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -863,12 +839,6 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
     );
   }
 
-  // #region agent log
-  try {
-    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:before-return',message:'TodaysMobileTab return 문 시작',data:{hasTheme:!!theme,hasSlideshowData:!!slideshowData,slideshowDataLength:slideshowData?.length,currentSlideIndex,hasGetCarrierTheme:typeof getCarrierTheme !== 'undefined'},timestamp:Date.now(),sessionId:'debug-session',runId:'render-check',hypothesisId:'RENDER-ORDER'})}).catch(()=>{});
-  } catch (e) {}
-  // #endregion
-
   return (
     <Box
       sx={{
@@ -1101,20 +1071,10 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
               })()
             ) : (() => {
               // 상품 그룹 표시 (6개씩 그리드)
-              // #region agent log
-              try {
-                fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:before-slideshowData-check',message:'slideshowData 조건 체크 전',data:{hasSlideshowData:!!slideshowData,slideshowDataLength:slideshowData?.length,currentSlideIndex,hasCurrentSlide:!!slideshowData?.[currentSlideIndex]},timestamp:Date.now(),sessionId:'debug-session',runId:'debug-run-9',hypothesisId:'E'})}).catch(()=>{});
-              } catch (e) {}
-              // #endregion
               const currentSlide = slideshowData?.[currentSlideIndex];
               const isProductGroup = currentSlide?.type === 'productGroup' && currentSlide?.products;
               if (!isProductGroup || !currentSlide?.products || !Array.isArray(currentSlide.products)) return null;
               
-              // #region agent log
-              try {
-                fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:before-products-map',message:'products.map 시작 전',data:{productsLength:currentSlide.products?.length,hasCarrier:!!currentSlide.carrier,hasGetPriceDataFromCache:!!getPriceDataFromCache,hasHandlePriceCalculated:!!handlePriceCalculated},timestamp:Date.now(),sessionId:'debug-session',runId:'debug-run-9',hypothesisId:'E'})}).catch(()=>{});
-              } catch (e) {}
-              // #endregion
               
               const carrier = currentSlide.carrier || 'SK';
               
@@ -1152,11 +1112,6 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                 {currentSlide.products.map((product) => {
                   if (!product || typeof product !== 'object') return null;
                   
-                  // #region agent log
-                  try {
-                    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:before-TodaysProductCard-render',message:'TodaysProductCard 렌더링 전',data:{hasProduct:!!product,productId:product?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'debug-run-9',hypothesisId:'E'})}).catch(()=>{});
-                  } catch (e) {}
-                  // #endregion
                   
                   const carrierTheme = getCarrierTheme(carrier);
                   const cachedPriceData = getPriceDataFromCache(product);
@@ -1319,11 +1274,6 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                   })()
                 ) : (() => {
                   // 상품 그룹 표시
-                  // #region agent log
-                  try {
-                    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:before-slideshowData-check-2',message:'slideshowData 조건 체크 전 (manual)',data:{hasSlideshowData:!!slideshowData,slideshowDataLength:slideshowData?.length,manualSlideIndex,hasManualSlide:!!slideshowData?.[manualSlideIndex]},timestamp:Date.now(),sessionId:'debug-session',runId:'debug-run-9',hypothesisId:'E'})}).catch(()=>{});
-                  } catch (e) {}
-                  // #endregion
                   const manualSlide = slideshowData?.[manualSlideIndex];
                   const isManualProductGroup = manualSlide?.type === 'productGroup' && manualSlide?.products;
                   if (!isManualProductGroup || !manualSlide?.products || !Array.isArray(manualSlide.products)) return null;
@@ -1364,11 +1314,6 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                     {manualSlide.products.map((product) => {
                       if (!product || typeof product !== 'object') return null;
                       
-                      // #region agent log
-                      try {
-                        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:before-TodaysProductCard-render-2',message:'TodaysProductCard 렌더링 전 (manual)',data:{hasProduct:!!product},timestamp:Date.now(),sessionId:'debug-session',runId:'debug-run-9',hypothesisId:'E'})}).catch(()=>{});
-                      } catch (e) {}
-                      // #endregion
                       
                       const carrierTheme = getCarrierTheme(manualCarrier);
                       const cachedPriceData = getPriceDataFromCache(product);
@@ -1420,11 +1365,6 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                 }}
               >
                 {allProducts.map((product) => {
-                  // #region agent log
-                  try {
-                    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysMobileTab.js:before-TodaysProductCard-render-3',message:'TodaysProductCard 렌더링 전 (allProducts)',data:{hasProduct:!!product},timestamp:Date.now(),sessionId:'debug-session',runId:'render-check',hypothesisId:'RENDER-ORDER'})}).catch(()=>{});
-                  } catch (e) {}
-                  // #endregion
                   if (!product || typeof product !== 'object') return null;
                   
                   const isPremium = product.isPremium || false;

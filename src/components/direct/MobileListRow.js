@@ -31,11 +31,6 @@ import { Checkbox } from '@mui/material';
 import { HoverableTableRow } from './common/ModernTable';
 import { debugLog } from '../../utils/debugLogger';
 
-// #region agent log
-try {
-  fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListRow.js:component-render-start',message:'MobileListRow 렌더링 시작',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'render-check',hypothesisId:'RENDER-ORDER'})}).catch(()=>{});
-} catch (e) {}
-// #endregion
 
 const MobileListRowComponent = ({
   row,
