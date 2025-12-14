@@ -1304,27 +1304,12 @@ const MobileListTab = ({ onProductSelect }) => {
         return newPrices;
       });
 
-      // mobileList 상태도 업데이트
+      // 🔥 개선: mobileList의 publicSupport는 openingType별로 저장하지 않음
+      // mobileList는 서버에서 받은 초기값을 유지하고, calculatedPrices에서 openingType별 값을 가져옴
+      // 따라서 mobileList 업데이트는 하지 않음 (getDisplayValue가 calculatedPrices에서 값을 가져오므로)
       // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:calculatePriceInternal',message:'mobileList 업데이트 전',data:{modelId,resultPublicSupport:result.publicSupport,resultStoreSupportWithAddon:result.storeSupportWithAddon,resultStoreSupportWithoutAddon:result.storeSupportWithoutAddon},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M11'})}).catch(()=>{});
+      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:calculatePriceInternal',message:'mobileList 업데이트 스킵 (calculatedPrices만 사용)',data:{modelId,openingType,resultPublicSupport:result.publicSupport,priceKey:`${modelId}-${openingType}`},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M13'})}).catch(()=>{});
       // #endregion
-      setMobileList(prevList => {
-        const updatedList = prevList.map(item => {
-          if (item.id === modelId) {
-            const updatedItem = {
-              ...item,
-              publicSupport: result.publicSupport || item.publicSupport || 0,
-              support: result.publicSupport || item.support || item.publicSupport || 0
-            };
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:calculatePriceInternal',message:'mobileList 업데이트',data:{modelId,oldPublicSupport:item.publicSupport,oldSupport:item.support,newPublicSupport:updatedItem.publicSupport,newSupport:updatedItem.support,resultPublicSupport:result.publicSupport},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M11'})}).catch(()=>{});
-            // #endregion
-            return updatedItem;
-          }
-          return item;
-        });
-        return updatedList;
-      });
     }
   };
 
@@ -1574,9 +1559,19 @@ const MobileListTab = ({ onProductSelect }) => {
       }
       // #region agent log
       if (field === 'publicSupport') {
-        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:getDisplayValue',message:'getDisplayValue - publicSupport (calculated)',data:{modelId:row.id,field,calculatedValue:calculated[field],rowValue:row[field],calculatedPublicSupport:calculated.publicSupport,rowPublicSupport:row.publicSupport},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M10'})}).catch(()=>{});
+        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:getDisplayValue',message:'getDisplayValue - publicSupport (calculated)',data:{modelId:row.id,field,openingType,priceKey,calculatedValue:calculated[field],calculatedOpeningType:calculated.openingType,rowValue:row[field],calculatedPublicSupport:calculated.publicSupport,rowPublicSupport:row.publicSupport},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M10'})}).catch(()=>{});
       }
       // #endregion
+      // 🔥 개선: openingType이 일치하는지 확인
+      if (calculated.openingType && calculated.openingType !== openingType) {
+        // #region agent log
+        if (field === 'publicSupport') {
+          fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MobileListTab.js:getDisplayValue',message:'getDisplayValue - publicSupport (openingType 불일치)',data:{modelId:row.id,field,openingType,calculatedOpeningType:calculated.openingType,priceKey,calculatedValue:calculated[field],rowValue:row[field]},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M14'})}).catch(()=>{});
+        }
+        // #endregion
+        // openingType이 일치하지 않으면 row 값 반환
+        return row[field];
+      }
       return calculated[field];
     }
     // #region agent log

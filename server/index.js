@@ -4680,12 +4680,34 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
       
       // 기존 행 찾기: 통신사 + 모델ID(모델명) 조합으로 찾기
       // 모델ID = 모델명으로 통일되어 있으므로, 통신사와 모델ID 조합으로 찾음
+      // 🔥 개선: 모델명 정규화 함수 사용하여 매칭 개선
+      const normalizeModelCode = (code) => {
+        if (!code) return '';
+        return code.trim()
+          .replace(/\s+/g, '')
+          .replace(/-/g, '')
+          .toUpperCase();
+      };
+      
+      const normalizedModelId = normalizeModelCode(modelId);
+      const normalizedModelName = normalizeModelCode(modelName);
+      
       const existingRowIndex = rows.findIndex(row => {
         const rowCarrier = (row[0] || '').trim();
         const rowModelId = (row[1] || '').trim(); // 모델ID (실제 모델 코드)
         const rowModelName = (row[2] || '').trim(); // 모델명 (동일)
-        // 모델ID 또는 모델명으로 매칭 (둘 다 실제 모델 코드와 동일)
-        return rowCarrier === carrier && (rowModelId === modelId || rowModelName === modelName);
+        
+        // 통신사가 일치하는지 확인
+        if (rowCarrier !== carrier) return false;
+        
+        // 정규화된 모델 코드로 매칭
+        const normalizedRowModelId = normalizeModelCode(rowModelId);
+        const normalizedRowModelName = normalizeModelCode(rowModelName);
+        
+        // 모델ID 또는 모델명으로 매칭 (정규화된 값으로 비교)
+        return (normalizedRowModelId === normalizedModelId || normalizedRowModelId === normalizedModelName ||
+                normalizedRowModelName === normalizedModelId || normalizedRowModelName === normalizedModelName ||
+                rowModelId === modelId || rowModelName === modelName);
       });
 
       // 7개 컬럼 데이터 구성: 통신사 | 모델ID | 모델명 | 펫네임 | 제조사 | 이미지URL | 비고
