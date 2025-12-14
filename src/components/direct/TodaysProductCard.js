@@ -36,6 +36,11 @@ const TodaysProductCard = ({
   priceData: propPriceData, 
   onPriceCalculated 
 }) => {
+  // #region agent log
+  try {
+    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TodaysProductCard.js:render-start',message:'TodaysProductCard 렌더링 시작',data:{hasProduct:!!product,productId:product?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'render-check',hypothesisId:'RENDER-ORDER'})}).catch(()=>{});
+  } catch (e) {}
+  // #endregion
   const [priceData, setPriceData] = useState({
     '010신규': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: true },
     'MNP': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: true },
