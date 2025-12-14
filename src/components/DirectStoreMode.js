@@ -56,7 +56,7 @@ const DirectStoreMode = ({
   const [password, setPassword] = useState('');
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
 
-  // 탭 상태 (0: 오늘의 휴대폰, 1: 휴대폰 목록, 2: 판매일보)
+  // 탭 상태 (0: 휴대폰 목록, 1: 오늘의 휴대폰, 2: 판매일보)
   const [activeTab, setActiveTab] = useState(0);
 
   // 전체화면 모드 상태 (오늘의 휴대폰 탭에서만 유효)
@@ -365,8 +365,8 @@ const DirectStoreMode = ({
                   centered
                   sx={{ borderBottom: 1, borderColor: 'divider' }}
                 >
-                  <Tab label="오늘의 휴대폰" />
                   <Tab label="휴대폰 목록" />
+                  <Tab label="오늘의 휴대폰" />
                   <Tab label="판매일보" />
                 </Tabs>
               </AppBar>
@@ -374,11 +374,22 @@ const DirectStoreMode = ({
 
             {/* 메인 컨텐츠 영역 */}
             <Box sx={{ flexGrow: 1, position: 'relative', overflow: 'hidden' }}>
-              {/* 오늘의 휴대폰 탭 */}
+              {/* 휴대폰 목록 탭 */}
               <Box
                 role="tabpanel"
                 hidden={activeTab !== 0}
                 sx={{ height: '100%', display: activeTab === 0 ? 'block' : 'none' }}
+              >
+                <ErrorBoundary name="MobileListTab">
+                  <MobileListTab onProductSelect={handleProductSelect} />
+                </ErrorBoundary>
+              </Box>
+
+              {/* 오늘의 휴대폰 탭 */}
+              <Box
+                role="tabpanel"
+                hidden={activeTab !== 1}
+                sx={{ height: '100%', display: activeTab === 1 ? 'block' : 'none' }}
               >
                 {/* 전체화면 토글 버튼 (오늘의 휴대폰 탭에서만 표시) */}
                 <Box sx={{ position: 'absolute', top: 16, right: 16, zIndex: 1000 }}>
@@ -399,17 +410,6 @@ const DirectStoreMode = ({
                     isFullScreen={isFullScreen}
                     onProductSelect={handleProductSelect}
                   />
-                </ErrorBoundary>
-              </Box>
-
-              {/* 휴대폰 목록 탭 */}
-              <Box
-                role="tabpanel"
-                hidden={activeTab !== 1}
-                sx={{ height: '100%', display: activeTab === 1 ? 'block' : 'none' }}
-              >
-                <ErrorBoundary name="MobileListTab">
-                  <MobileListTab onProductSelect={handleProductSelect} />
                 </ErrorBoundary>
               </Box>
 
