@@ -522,21 +522,45 @@ async function rebuildDeviceMaster(carriersParam) {
       return isNaN(n) ? 0 : n;
     });
 
-    let created = 0;
-    const maxLength = Math.max(flatModels.length, flatPrices.length);
+    // ⚠ 주의: 이통사 지원금 시트에는 중간중간 완전히 비어 있는 행(구분용 공백)이 섞여 있을 수 있다.
+    // 이러한 행은 모델/출고가 인덱스를 밀어버리므로, "모델명도 없고 출고가도 0"인 행은 여기서 제거하여
+    // 실제 데이터만 연속되게 만든 뒤, 그 인덱스를 기준으로 매핑한다.
+    const filteredModels = [];
+    const filteredPets = [];
+    const filteredMakers = [];
+    const filteredPrices = [];
 
+    const maxLength = Math.max(flatModels.length, flatPrices.length);
     for (let i = 0; i < maxLength; i++) {
       const modelName = flatModels[i];
+      const price = flatPrices[i] || 0;
+
+      // 모델명도 없고 출고가도 0이면 "완전히 빈 행"으로 간주하고 스킵
+      if (!modelName && price === 0) {
+        continue;
+      }
+
+      filteredModels.push(modelName);
+      filteredPets.push(flatPets[i] || modelName);
+      filteredMakers.push(flatMakers[i] || '');
+      filteredPrices.push(price);
+    }
+
+    let created = 0;
+    const effectiveLength = filteredModels.length;
+
+    for (let i = 0; i < effectiveLength; i++) {
+      const modelName = filteredModels[i];
       if (!modelName) continue; // 모델명이 없으면 스킵
 
-      const petName = flatPets[i] || modelName;
-      const factoryPrice = flatPrices[i] || 0;
+      const petName = filteredPets[i] || modelName;
+      const factoryPrice = filteredPrices[i] || 0;
 
       // "5G중고", "LTE중고" 등 구분용 라벨 행은 단말마스터에서 제외
       if (isDeviceCategoryRow(modelName, factoryPrice)) {
         continue;
       }
-      const maker = flatMakers[i] || ''; // 제조사가 없으면 빈칸 (추후 보완 가능)
+      const maker = filteredMakers[i] || ''; // 제조사가 없으면 빈칸 (추후 보완 가능)
 
       const normalizedCode = normalizeModelCode(modelName);
       const tags = tagMap.get(modelName) || {
@@ -615,7 +639,8 @@ async function rebuildPricingMaster(carriersParam) {
 
   const allRows = [];
   const perCarrierStats = {};
-  const todayStr = new Date().toISOString().split('T')[0];
+  // 기준일자는 문자열로 강제 입력하여 시리얼 숫자(46006 등)로 보이지 않도록 처리
+  const todayStr = `'${new Date().toISOString().split('T')[0]}`;
 
   for (const carrier of carriers) {
     // 해당 통신사의 모델들
@@ -644,6 +669,90 @@ async function rebuildPricingMaster(carriersParam) {
     if (!supportSheetId || !modelRange || !planGroupRanges) {
       perCarrierStats[carrier] = { count: 0, warning: 'support 설정 불완전 (시트ID/모델범위/요금제군범위 누락)' };
       continue;
+    }
+
+    // 2-1. 정책표 리베이트 설정 로딩 (요금제군/개통유형별)
+    const policyRow = settingsRows.find(r => (r[0] || '').toString().trim() === carrier && (r[1] || '').toString().trim() === 'policy');
+    const policyRebateData = {}; // { planGroup: { openingType: { model|normalizedModel: rebate } } }
+
+    if (policyRow && policyRow[2] && policyRow[4]) {
+      let policySettingsJson = {};
+      try {
+        policySettingsJson = JSON.parse(policyRow[4] || '{}');
+      } catch (e) {
+        console.warn(`[Direct][rebuildPricingMaster] ${carrier} 정책표 설정 JSON 파싱 실패:`, e.message);
+      }
+
+      const policySheetId = (policyRow[2] || '').toString().trim();
+      const policyModelRange = policySettingsJson.modelRange || '';
+      const policyPlanGroupRanges = policySettingsJson.planGroupRanges || {};
+
+      if (policySheetId && policyModelRange && policyPlanGroupRanges && Object.keys(policyPlanGroupRanges).length > 0) {
+        try {
+          // 1) 정책표 모델명 목록 읽기
+          const modelValues = await getSheetData(policySheetId, policyModelRange);
+          const policyModels = (modelValues || [])
+            .flat()
+            .map(v => (v || '').toString().trim());
+
+          // 2) 각 요금제군/개통유형별 리베이트 범위 읽기
+          for (const [pgName, typeRanges] of Object.entries(policyPlanGroupRanges)) {
+            if (typeof typeRanges !== 'object') continue;
+            if (!policyRebateData[pgName]) policyRebateData[pgName] = {};
+
+            for (const [openingType, range] of Object.entries(typeRanges)) {
+              if (!range) {
+                policyRebateData[pgName][openingType] = {};
+                continue;
+              }
+
+              try {
+                const rebateValues = await getSheetData(policySheetId, range);
+                const flatRebates = (rebateValues || [])
+                  .flat()
+                  .map(v => {
+                    const n = Number((v || '').toString().replace(/,/g, ''));
+                    // 정책표는 "단위(만원)"로 관리되는 경우가 많아 10,000을 곱해 원 단위로 변환
+                    return isNaN(n) ? 0 : n * 10000;
+                  });
+
+                const rebateMap = {};
+                const maxLen = Math.min(policyModels.length, flatRebates.length);
+                for (let i = 0; i < maxLen; i++) {
+                  const m = policyModels[i];
+                  if (!m) continue;
+                  const rebate = flatRebates[i] || 0;
+
+                  // 원본 모델명
+                  rebateMap[m] = rebate;
+
+                  // 정규화된 모델명/대소문자 변형도 함께 저장해 매칭 성공률을 높임
+                  const norm = normalizeModelCode(m);
+                  if (norm) {
+                    rebateMap[norm] = rebate;
+                    rebateMap[norm.toLowerCase()] = rebate;
+                    rebateMap[norm.toUpperCase()] = rebate;
+                  }
+                  rebateMap[m.toLowerCase()] = rebate;
+                  rebateMap[m.toUpperCase()] = rebate;
+                }
+
+                policyRebateData[pgName][openingType] = rebateMap;
+              } catch (err) {
+                console.warn(`[Direct][rebuildPricingMaster] ${carrier} 리베이트 범위 로딩 실패:`, {
+                  planGroup: pgName,
+                  openingType,
+                  range,
+                  error: err.message
+                });
+                policyRebateData[pgName][openingType] = {};
+              }
+            }
+          }
+        } catch (err) {
+          console.warn(`[Direct][rebuildPricingMaster] ${carrier} 정책표 리베이트 데이터 로딩 실패:`, err.message);
+        }
+      }
     }
 
     // 3. 지원금표(Support Sheet) 데이터 읽기
@@ -694,6 +803,11 @@ async function rebuildPricingMaster(carriersParam) {
       const modelId = mobileRow[1];   // Model ID
       const factoryPrice = Number(mobileRow[5] || 0);
 
+      // "5G중고", "LTE중고" 등 구분용 라벨 모델은 단말요금정책에서도 제외
+      if (isDeviceCategoryRow(modelName, factoryPrice)) {
+        continue;
+      }
+
       // 지원금표에서 해당 모델의 Index 찾기 (정확한 매칭 or 정규화 매칭)
       // supportModels와 mobileRow[2](ModelName) 매칭
       const supportIdx = supportModels.findIndex(m => m === modelName); // 엄격 매칭
@@ -711,11 +825,57 @@ async function rebuildPricingMaster(carriersParam) {
         }
 
         for (const openingType of openingTypes) {
-          // 개통유형별 차등이 있을 수 있음(별도 정책 시트에서 유형별 마진 가능하나 여기선 공통 처리)
-          // 추후 openingType에 따른 switch문을 추가하여 정교화 가능
+          // 정책표 리베이트 조회 (planGroup + openingType + modelName 기준)
+          let policyRebate = 0;
+          const rebateByGroup = policyRebateData[planGroup] || {};
+          const rebateMap = rebateByGroup[openingType] || {};
 
-          const storeSupportFull = Math.max(0, baseMargin - targetProfit); // 부가 유치 시
-          const storeSupportNone = Math.max(0, baseMargin - totalAddonDeduction - targetProfit); // 미유치 시
+          if (rebateMap && Object.keys(rebateMap).length > 0) {
+            const norm = normalizeModelCode(modelName);
+            const candidates = [
+              modelName,
+              modelName && modelName.toLowerCase(),
+              modelName && modelName.toUpperCase(),
+              norm,
+              norm && norm.toLowerCase(),
+              norm && norm.toUpperCase()
+            ].filter(Boolean);
+
+            for (const key of candidates) {
+              if (rebateMap[key] != null) {
+                policyRebate = Number(rebateMap[key] || 0);
+                break;
+              }
+            }
+          }
+
+          // 부가서비스/보험/별도정책 합산
+          const totalAddonIncentive = policySettings.addonList.reduce((acc, cur) => acc + (cur.incentive || 0), 0) +
+            policySettings.insuranceList.reduce((acc, cur) => acc + (cur.incentive || 0), 0);
+          const totalAddonDeduction = policySettings.addonList.reduce((acc, cur) => acc + (cur.deduction || 0), 0) +
+            policySettings.insuranceList.reduce((acc, cur) => acc + (cur.deduction || 0), 0);
+          const totalSpecialAddition = policySettings.specialPolicies.reduce((acc, cur) => acc + (cur.addition || 0), 0);
+          const totalSpecialDeduction = policySettings.specialPolicies.reduce((acc, cur) => acc + (cur.deduction || 0), 0);
+
+          // 기본 정책 마진 (기본마진 + 별도정책)
+          const baseMargin = policySettings.baseMargin + totalSpecialAddition - totalSpecialDeduction;
+
+          // 대리점추가지원금 계산
+          // 부가유치: 정책표리베이트 - 마진 + 부가서비스추가금액 + 별도정책추가금액
+          const storeSupportFull = Math.max(0,
+            policyRebate
+            - baseMargin
+            + totalAddonIncentive
+            + totalSpecialAddition
+          );
+
+          // 부가미유치: 정책표리베이트 - 마진 + 부가서비스차감금액 + 별도정책차감금액
+          const storeSupportNone = Math.max(0,
+            policyRebate
+            - baseMargin
+            + totalAddonDeduction
+            + totalSpecialDeduction
+          );
 
           allRows.push([
             carrier,
@@ -726,9 +886,9 @@ async function rebuildPricingMaster(carriersParam) {
             openingType,
             factoryPrice,
             publicSupport,
-            storeSupportFull, // 대리점추가지원금_부가유치
+            storeSupportFull, // 대리점추가지원금_부가유치 (정책표리베이트 + 마진/부가/보험/별도정책 반영)
             storeSupportNone, // 대리점추가지원금_부가미유치
-            baseMargin,       // 정책마진 (참고용)
+            policyRebate,     // 정책리베이트 (참고용)
             '',               // 정책ID
             todayStr,         // 기준일자
             ''                // 비고
