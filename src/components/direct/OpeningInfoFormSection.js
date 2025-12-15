@@ -43,21 +43,20 @@ const OpeningInfoFormSection = ({
                     };
                     const openingType = openingTypeMap[newOpeningType] || '010신규';
 
-                    // 모델 ID가 없으면 모델명과 통신사로 생성 (임시)
+                    // 모델 ID가 없으면 마스터 단말 데이터에서 조회
                     let modelId = initialData?.id;
-                    let foundMobile = null;
                     if (!modelId && initialData?.model) {
                         try {
-                            const mobileList = await directStoreApiClient.getMobileList(selectedCarrier);
-                            foundMobile = mobileList.find(m =>
-                                m.model === initialData.model &&
+                            const mobiles = await directStoreApiClient.getMobilesMaster(selectedCarrier);
+                            const foundMobile = mobiles.find(m =>
+                                (m.model === initialData.model || m.petName === initialData.model) &&
                                 m.carrier === selectedCarrier
                             );
                             if (foundMobile) {
-                                modelId = foundMobile.id;
+                                modelId = foundMobile.id || foundMobile.model;
                             }
                         } catch (err) {
-                            console.warn('모델 ID 찾기 실패:', err);
+                            console.warn('모델 ID 찾기 실패 (마스터 기준):', err);
                         }
                     }
 

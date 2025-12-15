@@ -550,6 +550,10 @@ async function rebuildDeviceMaster(carriersParam) {
     let created = 0;
     const effectiveLength = filteredModels.length;
 
+    // 먼저 carrier별 로우를 생성한 뒤,
+    // 정책표( policy 링크의 modelRange ) 순서에 맞춰 정렬한다.
+    const carrierRows = [];
+
     for (let i = 0; i < effectiveLength; i++) {
       const modelName = filteredModels[i];
       if (!modelName) continue; // 모델명이 없으면 스킵
@@ -571,7 +575,7 @@ async function rebuildDeviceMaster(carriersParam) {
       if (tags.isBudget) defaultPlanGroup = '33군';
       // 프리미엄/기타는 115군
 
-      allRows.push([
+      carrierRows.push([
         carrier,
         normalizedCode,   // 모델ID (정규화된 코드 사용)
         modelName,        // 원본 모델명
@@ -590,6 +594,76 @@ async function rebuildDeviceMaster(carriersParam) {
       ]);
       created++;
     }
+
+    // 정책표 링크 설정에서 모델 순서를 가져와 정렬 기준으로 사용
+    const policyRow = settingsRows.find(
+      row => (row[0] || '').toString().trim() === carrier &&
+        (row[1] || '').toString().trim() === 'policy'
+    );
+
+    const policyOrderMap = new Map(); // key: 모델명/정규화코드 -> index
+
+    if (policyRow && policyRow[2] && policyRow[4]) {
+      const policySheetId = (policyRow[2] || '').toString().trim();
+      let policyConfig = {};
+      try {
+        policyConfig = policyRow[4] ? JSON.parse(policyRow[4]) : {};
+      } catch (e) {
+        console.warn(`[Direct][rebuildDeviceMaster] ${carrier} policy 설정 JSON 파싱 실패:`, e.message);
+      }
+
+      const policyModelRange = policyConfig.modelRange;
+
+      if (policySheetId && policyModelRange) {
+        try {
+          const policyModels = await getSheetData(policySheetId, policyModelRange);
+          const flatPolicyModels = policyModels.flat().map(v => (v || '').toString().trim());
+
+          flatPolicyModels.forEach((name, idx) => {
+            if (!name) return;
+            const norm = normalizeModelCode(name);
+
+            if (!policyOrderMap.has(name)) {
+              policyOrderMap.set(name, idx);
+            }
+            if (norm && !policyOrderMap.has(norm)) {
+              policyOrderMap.set(norm, idx);
+            }
+          });
+        } catch (e) {
+          console.warn(`[Direct][rebuildDeviceMaster] ${carrier} policy 모델 범위 로딩 실패:`, e.message);
+        }
+      }
+    }
+
+    if (policyOrderMap.size > 0) {
+      // 정책표 모델 순서 기준 정렬
+      carrierRows.sort((a, b) => {
+        const modelA = (a[2] || '').toString().trim();
+        const modelB = (b[2] || '').toString().trim();
+        const normA = normalizeModelCode(modelA);
+        const normB = normalizeModelCode(modelB);
+
+        const idxA = policyOrderMap.has(modelA)
+          ? policyOrderMap.get(modelA)
+          : (policyOrderMap.has(normA) ? policyOrderMap.get(normA) : Number.MAX_SAFE_INTEGER);
+        const idxB = policyOrderMap.has(modelB)
+          ? policyOrderMap.get(modelB)
+          : (policyOrderMap.has(normB) ? policyOrderMap.get(normB) : Number.MAX_SAFE_INTEGER);
+
+        if (idxA === idxB) {
+          // 둘 다 정책표에 없거나 같은 인덱스면, 원래 순서 유지
+          return 0;
+        }
+        return idxA - idxB;
+      });
+    }
+
+    // 정렬된 carrierRows를 전체 allRows에 합치기
+    for (const row of carrierRows) {
+      allRows.push(row);
+    }
+
     perCarrierStats[carrier] = { count: created };
   }
 
