@@ -785,20 +785,18 @@ async function getSheetData(sheetId, range, ttlMs = 10 * 60 * 1000) {
 
 // 단말 마스터/요금정책 ETL에서 "구분 행(섹션 헤더)"을 걸러내기 위한 헬퍼
 // 예: '5G중고', 'LTE중고' 등은 실제 단말 모델이 아니며, 출고가/정책 범위도 비어 있는 경우가 많다.
+// 가격 필드가 잘못 매칭되어 0이 아니더라도, 모델명이 구분 라벨이면 무조건 제외한다.
 function isDeviceCategoryRow(modelName, factoryPrice) {
   const name = (modelName || '').toString().trim();
   if (!name) return false;
 
-  // 출고가가 0이거나 비어있고,
-  const price = Number(factoryPrice || 0);
-
   // 대표적인 구분 라벨들
-  if ((name === '5G중고' || name === 'LTE중고') && price === 0) {
+  if (name === '5G중고' || name === 'LTE중고') {
     return true;
   }
 
-  // 보다 일반적인 패턴: "...중고"와 같이 끝나며, 가격 정보가 없는 경우
-  if (/중고$/.test(name) && price === 0) {
+  // 보다 일반적인 패턴: "...중고"와 같이 끝나는 섹션 헤더
+  if (/중고$/.test(name)) {
     return true;
   }
 
