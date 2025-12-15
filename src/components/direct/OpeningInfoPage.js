@@ -29,7 +29,7 @@ import {
 } from '@mui/icons-material';
 import { directStoreApi } from '../../api/directStoreApi';
 import { directStoreApiClient } from '../../api/directStoreApiClient';
-import { 
+import {
     calculateInstallmentFee,
     calculatePlanFee,
     calculateRequiredAddonsFee,
@@ -88,150 +88,53 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
         posCode: ''
     });
 
-    // 요금제 그룹 로드 (링크설정에서 가져오기)
+    // 요금제 그룹 로드 (마스터 데이터 사용)
     useEffect(() => {
         const loadPlanGroups = async () => {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OpeningInfoPage.js:loadPlanGroups',message:'요금제 그룹 로드 시작',data:{carrier:selectedCarrier},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'O1'})}).catch(()=>{});
-            // #endregion
             try {
-                const linkSettings = await directStoreApiClient.getLinkSettings(selectedCarrier);
-                if (linkSettings.success && linkSettings.planGroup) {
-                    const planGroup = linkSettings.planGroup;
-                    const sheetId = planGroup.sheetId || planGroup.link;
-                    const planNameRange = planGroup.planNameRange || '';
-                    const planGroupRange = planGroup.planGroupRange || '';
-                    const basicFeeRange = planGroup.basicFeeRange || '';
+                // 마스터 데이터 API 호출
+                const plans = await directStoreApiClient.getPlansMaster(selectedCarrier);
 
-                    // planNameRange와 basicFeeRange가 있으면 실제 데이터를 가져옴
-                    if (sheetId && planNameRange && basicFeeRange) {
-                        try {
-                            const [planNameData, basicFeeData, planGroupData] = await Promise.all([
-                                directStoreApiClient.fetchRangeData(sheetId, planNameRange, false),
-                                directStoreApiClient.fetchRangeData(sheetId, basicFeeRange, false),
-                                planGroupRange ? directStoreApiClient.fetchRangeData(sheetId, planGroupRange, false) : Promise.resolve({ success: true, data: [] })
-                            ]);
+                if (plans && plans.length > 0) {
+                    // 데이터 변환 (프론트엔드 형식에 맞게)
+                    // Master Data Fields: planName, groupName, basicFee
+                    const formattedPlans = plans.map(p => ({
+                        name: `${p.planName}(${p.groupName})`,
+                        planName: p.planName,
+                        group: p.groupName,
+                        basicFee: Number(p.basicFee)
+                    }));
 
-                            // 데이터를 평탄화하고 빈 값 제거
-                            const planNames = (planNameData.data || []).flat().filter(v => v !== null && v !== undefined && String(v).trim() !== '');
-                            const basicFees = (basicFeeData.data || []).flat().filter(v => v !== null && v !== undefined);
-                            const planGroups = (planGroupData.data || []).flat().filter(v => v !== null && v !== undefined && String(v).trim() !== '');
+                    setPlanGroups(formattedPlans);
 
-                            // 같은 인덱스의 요금제명, 기본료, 요금제군을 매칭
-                            const maxLength = Math.max(planNames.length, basicFees.length, planGroups.length);
-                            const plans = [];
-                            
-                            for (let i = 0; i < maxLength; i++) {
-                                const planName = String(planNames[i] || '').trim();
-                                const basicFee = Number(basicFees[i] || 0);
-                                const group = String(planGroups[i] || '').trim();
-
-                                if (planName) {
-                                    // 요금제명(요금제군) 형식으로 표시
-                                    const displayName = group ? `${planName}(${group})` : planName;
-                                    plans.push({
-                                        name: displayName,
-                                        planName: planName,
-                                        group: group || planName,
-                                        basicFee: basicFee
-                                    });
-                                }
-                            }
-
-                            if (plans.length > 0) {
-                                setPlanGroups(plans);
-                                setSelectedPlanGroup(plans[0].name);
-                                setPlanBasicFee(plans[0].basicFee);
-                                setFormData(prev => ({ ...prev, plan: plans[0].name }));
-                            } else {
-                                // 데이터가 없으면 요금제군만 사용
-                                const fallbackPlans = (planGroup.planGroups || []).map((group, idx) => ({
-                                    name: group,
-                                    planName: group,
-                                    group: group,
-                                    basicFee: 89000 + (idx * 10000)
-                                }));
-                                setPlanGroups(fallbackPlans);
-                                if (fallbackPlans.length > 0) {
-                                    setSelectedPlanGroup(fallbackPlans[0].name);
-                                    setPlanBasicFee(fallbackPlans[0].basicFee);
-                                    setFormData(prev => ({ ...prev, plan: fallbackPlans[0].name }));
-                                }
-                            }
-                        } catch (rangeErr) {
-                            console.error('요금제 범위 데이터 읽기 실패:', rangeErr);
-                            // 범위 읽기 실패 시 요금제군만 사용
-                            const fallbackPlans = (planGroup.planGroups || []).map((group, idx) => ({
-                                name: group,
-                                planName: group,
-                                group: group,
-                                basicFee: 89000 + (idx * 10000)
-                            }));
-                            setPlanGroups(fallbackPlans);
-                            if (fallbackPlans.length > 0) {
-                                setSelectedPlanGroup(fallbackPlans[0].name);
-                                setPlanBasicFee(fallbackPlans[0].basicFee);
-                                setFormData(prev => ({ ...prev, plan: fallbackPlans[0].name }));
-                            }
-                        }
-                    } else {
-                        // 범위가 없으면 요금제군만 사용
-                        const fallbackPlans = (planGroup.planGroups || []).map((group, idx) => ({
-                            name: group,
-                            planName: group,
-                            group: group,
-                            basicFee: 89000 + (idx * 10000)
-                        }));
-                        setPlanGroups(fallbackPlans);
-                        if (fallbackPlans.length > 0) {
-                            setSelectedPlanGroup(fallbackPlans[0].name);
-                            setPlanBasicFee(fallbackPlans[0].basicFee);
-                            setFormData(prev => ({ ...prev, plan: fallbackPlans[0].name }));
-                        }
-                    }
-                } else {
-                    // 링크설정이 없으면 Mock 데이터 사용
-                    const mockPlans = [
-                        { name: '5GX 프라임(5GX프라임군)', planName: '5GX 프라임', group: '5GX프라임군', basicFee: 89000 },
-                        { name: '5GX 플래티넘(5GX플래티넘군)', planName: '5GX 플래티넘', group: '5GX플래티넘군', basicFee: 125000 },
-                        { name: 'T플랜 에센스(T플랜군)', planName: 'T플랜 에센스', group: 'T플랜군', basicFee: 75000 }
-                    ];
-                    setPlanGroups(mockPlans);
-                    if (mockPlans.length > 0) {
-                        setSelectedPlanGroup(mockPlans[0].name);
-                        setPlanBasicFee(mockPlans[0].basicFee);
-                        setFormData(prev => ({ ...prev, plan: mockPlans[0].name }));
-                    }
-                }
-            } catch (err) {
-                console.error('요금제 그룹 로드 실패:', err);
-                // 에러 시 Mock 데이터 사용
-                const mockPlans = [
-                    { name: '5GX 프라임(5GX프라임군)', planName: '5GX 프라임', group: '5GX프라임군', basicFee: 89000 },
-                    { name: '5GX 플래티넘(5GX플래티넘군)', planName: '5GX 플래티넘', group: '5GX플래티넘군', basicFee: 125000 }
-                ];
-                setPlanGroups(mockPlans);
-                if (mockPlans.length > 0) {
-                    // initialData에서 planGroup이 전달된 경우 해당 plan을 찾아서 설정
-                    let initialPlan = mockPlans[0];
+                    // 초기값 설정
+                    let initialPlan = formattedPlans[0];
                     if (initialData?.planGroup) {
-                        const foundPlan = mockPlans.find(p => 
-                            p.group === initialData.planGroup || 
+                        const foundPlan = formattedPlans.find(p =>
+                            p.group === initialData.planGroup ||
                             p.name.includes(initialData.planGroup)
                         );
                         if (foundPlan) {
                             initialPlan = foundPlan;
                         }
                     }
-                    
-                    setSelectedPlanGroup(initialPlan.name);
-                    setPlanBasicFee(initialPlan.basicFee);
-                    setFormData(prev => ({ ...prev, plan: initialPlan.name }));
+
+                    if (initialPlan) {
+                        setSelectedPlanGroup(initialPlan.name);
+                        setPlanBasicFee(initialPlan.basicFee);
+                        setFormData(prev => ({ ...prev, plan: initialPlan.name }));
+                    }
+                } else {
+                    console.warn('요금제 마스터 데이터가 비어있습니다.');
+                    setPlanGroups([]);
                 }
+            } catch (err) {
+                console.error('요금제 그룹 로드 실패:', err);
+                // 에러 처리 (필요시 Mock 데이터 등으로 폴백)
             }
         };
         loadPlanGroups();
-    }, [selectedCarrier]);
+    }, [selectedCarrier, initialData?.planGroup]);
 
     // 필수 부가서비스 및 보험상품 로드 (정책설정에서 가져오기)
     useEffect(() => {
@@ -241,7 +144,7 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                 const required = [];
                 const addonIncentives = [];
                 const insuranceIncentives = [];
-                
+
                 if (policySettings.success && policySettings.addon?.list) {
                     // 미유치차감금액이 있는 부가서비스를 필수 부가서비스로 간주
                     const addonList = policySettings.addon.list
@@ -252,14 +155,14 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                             type: 'addon'
                         }));
                     required.push(...addonList);
-                    
+
                     // 부가유치 시 유치되는 부가서비스 (incentive가 있는 항목)
                     const incentiveAddons = policySettings.addon.list
                         .filter(addon => addon.incentive > 0)
                         .map(addon => addon.name);
                     setAddonIncentiveList(incentiveAddons);
                 }
-                
+
                 // 보험상품: 출고가에 맞는 보험상품 찾기
                 if (policySettings.success && policySettings.insurance?.list && factoryPrice > 0) {
                     const matchingInsurance = policySettings.insurance.list.find(insurance => {
@@ -267,21 +170,21 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                         const maxPrice = insurance.maxPrice || 9999999;
                         return factoryPrice >= minPrice && factoryPrice <= maxPrice;
                     });
-                    
+
                     if (matchingInsurance) {
                         required.push({
                             name: matchingInsurance.name,
                             monthlyFee: matchingInsurance.fee || 0,
                             type: 'insurance'
                         });
-                        
+
                         // 부가유치 시 유치되는 보험상품 (incentive가 있는 경우)
                         if (matchingInsurance.incentive > 0) {
                             setInsuranceIncentiveList([matchingInsurance.name]);
                         }
                     }
                 }
-                
+
                 if (required.length > 0) {
                     setRequiredAddons(required);
                 } else {
@@ -303,20 +206,20 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
         loadRequiredAddons();
     }, [selectedCarrier, factoryPrice]);
 
-    // initialData에서 planGroup과 openingType이 전달된 경우 대리점지원금 자동 계산
+    // initialData에서 planGroup과 openingType이 전달된 경우 대리점지원금 자동 계산 (마스터 데이터 사용)
     useEffect(() => {
         const calculateInitialPrice = async () => {
-            if (!initialData?.planGroup || !initialData?.openingType || !planGroups.length) {
+            if (!initialData?.planGroup || !initialData?.openingType || !planGroups.length || !initialData?.id) {
                 return;
             }
 
             // planGroup에 해당하는 plan 찾기
-            const foundPlan = planGroups.find(p => 
-                p.group === initialData.planGroup || 
+            const foundPlan = planGroups.find(p =>
+                p.group === initialData.planGroup ||
                 p.name.includes(initialData.planGroup)
             );
 
-            if (!foundPlan || !(initialData?.id || initialData?.model)) {
+            if (!foundPlan) {
                 return;
             }
 
@@ -329,50 +232,22 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                     'CHANGE': '기변'
                 };
                 const openingType = openingTypeMap[initialData.openingType] || '010신규';
-                
-                // 모델 ID 찾기
-                let modelId = initialData?.id;
-                let foundMobile = null; // 🔥 개선: 스코프 문제 해결을 위해 블록 밖에서 선언
-                if (!modelId && initialData?.model) {
-                    try {
-                        const mobileList = await directStoreApiClient.getMobileList(selectedCarrier);
-                        foundMobile = mobileList.find(m => 
-                            m.model === initialData.model && 
-                            m.carrier === selectedCarrier
-                        );
-                        if (foundMobile) {
-                            modelId = foundMobile.id;
-                        }
-                    } catch (err) {
-                        console.warn('모델 ID 찾기 실패:', err);
-                    }
-                }
-                
-                if (modelId) {
-                    // 🔥 개선: modelName 전달 (휴대폰목록 페이지와 동일하게)
-                    const modelName = initialData?.model || foundMobile?.model || null;
-                    // #region agent log
-                    const calcStartTime = Date.now();
-                    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OpeningInfoPage.js:loadPlanGroups',message:'가격 계산 시작',data:{modelId,planGroup:foundPlan.group,openingType,carrier:selectedCarrier,modelName},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'O2'})}).catch(()=>{});
-                    // #endregion
-                    const result = await directStoreApiClient.calculateMobilePrice(
-                        modelId,
-                        foundPlan.group,
-                        openingType,
-                        selectedCarrier,
-                        modelName
-                    );
-                    const calcDuration = Date.now() - calcStartTime;
-                    // #region agent log
-                    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OpeningInfoPage.js:loadPlanGroups',message:'가격 계산 완료',data:{modelId,success:result?.success,duration:calcDuration,publicSupport:result?.publicSupport},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'O2'})}).catch(()=>{});
-                    // #endregion
-                    
-                    if (result.success) {
-                        // 🔥 개선: publicSupport도 업데이트 (요금제군/개통유형 변경 시)
-                        setPublicSupport(result.publicSupport || initialData?.publicSupport || initialData?.support || 0);
-                        setStoreSupportWithAddon(result.storeSupportWithAddon || 0);
-                        setStoreSupportWithoutAddon(result.storeSupportWithoutAddon || 0);
-                    }
+                const modelId = initialData.id;
+
+                // 마스터 가격 정책 조회
+                const pricingList = await directStoreApiClient.getMobilesPricing(selectedCarrier, {
+                    modelId: modelId,
+                    planGroup: foundPlan.group,
+                    openingType: openingType
+                });
+
+                if (pricingList && pricingList.length > 0) {
+                    const pricing = pricingList[0];
+
+                    // 값 업데이트
+                    setPublicSupport(pricing.publicSupport || initialData?.publicSupport || 0);
+                    setStoreSupportWithAddon(pricing.storeSupportWithAddon || 0);
+                    setStoreSupportWithoutAddon(pricing.storeSupportWithoutAddon || 0);
                 }
             } catch (err) {
                 console.error('초기 대리점지원금 계산 실패:', err);
@@ -380,7 +255,7 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
         };
 
         calculateInitialPrice();
-    }, [initialData?.planGroup, initialData?.openingType, planGroups, selectedCarrier, initialData?.id, initialData?.model]);
+    }, [initialData?.planGroup, initialData?.openingType, planGroups, selectedCarrier, initialData?.id]);
 
     // 계산 로직 (계산 엔진 사용)
     const getCurrentInstallmentPrincipal = () => {
@@ -751,7 +626,7 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                     />
                 </Stack>
             </Box>
-            
+
             {/* 인쇄용 제목 */}
             <Box className="print-only" sx={{ display: 'none', '@media print': { display: 'block', mb: 1 } }}>
                 <Typography variant="h5" sx={{ fontWeight: 'bold', color: theme.primary, textAlign: 'center' }}>
@@ -1009,7 +884,7 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                                                 setFormData({ ...formData, plan: newValue.name });
                                                 setSelectedPlanGroup(newValue.name);
                                                 setPlanBasicFee(newValue.basicFee || 0);
-                                                
+
                                                 // 요금제군 추출하여 대리점추가지원금 자동 계산
                                                 const planGroup = newValue.group || newValue.name;
                                                 if (planGroup && (initialData?.id || initialData?.model)) {
@@ -1020,7 +895,7 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                                                             'CHANGE': '기변'
                                                         };
                                                         const openingType = openingTypeMap[formData.openingType] || '010신규';
-                                                        
+
                                                         // 모델 ID가 없으면 모델명과 통신사로 생성 (임시)
                                                         let modelId = initialData?.id;
                                                         let foundMobile = null; // 🔥 개선: 스코프 문제 해결을 위해 블록 밖에서 선언
@@ -1028,8 +903,8 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                                                             // 모바일 목록에서 해당 모델 찾기
                                                             try {
                                                                 const mobileList = await directStoreApiClient.getMobileList(selectedCarrier);
-                                                                foundMobile = mobileList.find(m => 
-                                                                    m.model === initialData.model && 
+                                                                foundMobile = mobileList.find(m =>
+                                                                    m.model === initialData.model &&
                                                                     m.carrier === selectedCarrier
                                                                 );
                                                                 if (foundMobile) {
@@ -1039,7 +914,7 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                                                                 console.warn('모델 ID 찾기 실패:', err);
                                                             }
                                                         }
-                                                        
+
                                                         if (modelId) {
                                                             // 🔥 개선: modelName 전달 (휴대폰목록 페이지와 동일하게)
                                                             const modelName = initialData?.model || foundMobile?.model || null;
@@ -1050,16 +925,16 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                                                                 selectedCarrier,
                                                                 modelName
                                                             );
-                                                            
+
                                                             if (result.success) {
                                                                 // 🔥 개선: 이통사지원금도 업데이트
                                                                 debugLog('OpeningInfoPage.js:1292', '요금제 변경 시 이통사지원금 업데이트', {
-                                                                  plan: newValue.name,
-                                                                  planGroup,
-                                                                  openingType,
-                                                                  publicSupport: result.publicSupport,
-                                                                  storeSupportWithAddon: result.storeSupportWithAddon,
-                                                                  storeSupportWithoutAddon: result.storeSupportWithoutAddon
+                                                                    plan: newValue.name,
+                                                                    planGroup,
+                                                                    openingType,
+                                                                    publicSupport: result.publicSupport,
+                                                                    storeSupportWithAddon: result.storeSupportWithAddon,
+                                                                    storeSupportWithoutAddon: result.storeSupportWithoutAddon
                                                                 }, 'debug-session', 'run1', 'C');
                                                                 setPublicSupport(result.publicSupport || 0);
                                                                 setStoreSupportWithAddon(result.storeSupportWithAddon || 0);

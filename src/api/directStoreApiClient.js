@@ -40,7 +40,7 @@ const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const fetchWithRetry = async (url, options = {}, retryCount = 0) => {
   try {
     const response = await fetch(url, options);
-    
+
     // 성공 응답
     if (response.ok) {
       return response;
@@ -108,15 +108,69 @@ export const directStoreApiClient = {
   // === 상품 데이터 ===
 
   /**
+   * 단말 마스터 조회 (신규)
+   */
+  getMobilesMaster: async (carrier, options = {}) => {
+    try {
+      const params = new URLSearchParams();
+      if (carrier) params.append('carrier', carrier);
+
+      const response = await fetchWithRetry(`${BASE_URL}/mobiles-master?${params.toString()}`);
+      const data = await handleResponse(response, '단말 마스터 조회 실패');
+      return data.data || [];
+    } catch (error) {
+      console.error('단말 마스터 조회 실패:', error);
+      return [];
+    }
+  },
+
+  /**
+   * 요금제 마스터 조회 (신규)
+   */
+  getPlansMaster: async (carrier) => {
+    try {
+      const params = new URLSearchParams();
+      if (carrier) params.append('carrier', carrier);
+
+      const response = await fetchWithRetry(`${BASE_URL}/plans-master?${params.toString()}`);
+      const data = await handleResponse(response, '요금제 마스터 조회 실패');
+      return data.data || [];
+    } catch (error) {
+      console.error('요금제 마스터 조회 실패:', error);
+      return [];
+    }
+  },
+
+  /**
+   * 단말 요금정책 조회 (신규)
+   */
+  getMobilesPricing: async (carrier, filters = {}) => {
+    try {
+      const params = new URLSearchParams();
+      if (carrier) params.append('carrier', carrier);
+      if (filters.modelId) params.append('modelId', filters.modelId);
+      if (filters.planGroup) params.append('planGroup', filters.planGroup);
+      if (filters.openingType) params.append('openingType', filters.openingType);
+
+      const response = await fetchWithRetry(`${BASE_URL}/mobiles-pricing?${params.toString()}`);
+      const data = await handleResponse(response, '단말 요금정책 조회 실패');
+      return data.data || [];
+    } catch (error) {
+      console.error('단말 요금정책 조회 실패:', error);
+      return [];
+    }
+  },
+
+  /**
    * 오늘의 휴대폰 조회
    */
   getTodaysMobiles: async () => {
     try {
       const response = await fetchWithRetry(`${BASE_URL}/todays-mobiles`);
       const data = await handleResponse(response, '오늘의 휴대폰 조회 실패');
-      return data.premium && data.budget ? data : { 
-        premium: data.premium || [], 
-        budget: data.budget || [] 
+      return data.premium && data.budget ? data : {
+        premium: data.premium || [],
+        budget: data.budget || []
       };
     } catch (error) {
       console.error('오늘의 휴대폰 조회 실패:', error);
@@ -125,7 +179,7 @@ export const directStoreApiClient = {
   },
 
   /**
-   * 휴대폰 목록 조회
+   * 휴대폰 목록 조회 (Legacy: 마스터 API로 대체 예정)
    */
   getMobileList: async (carrier, options = {}) => {
     try {
@@ -135,13 +189,13 @@ export const directStoreApiClient = {
 
       const response = await fetchWithRetry(`${BASE_URL}/mobiles?${params.toString()}`);
       const data = await handleResponse(response, '휴대폰 목록 조회 실패');
-      
+
       if (options.withMeta) {
         const list = Array.isArray(data) ? data : (data.data || data.mobileList || []);
         const meta = data.meta || {};
         return { list, meta };
       }
-      
+
       return Array.isArray(data) ? data : (data.data || data.mobileList || []);
     } catch (error) {
       console.error('휴대폰 목록 조회 실패:', error);
@@ -310,7 +364,7 @@ export const directStoreApiClient = {
       params.append('sheetId', sheetId);
       params.append('range', range);
       if (unique) params.append('unique', 'true');
-      
+
       const response = await fetchWithRetry(`${BASE_URL}/link-settings/fetch-range?${params.toString()}`);
       return handleResponse(response, '범위 데이터 조회 실패');
     } catch (error) {
@@ -327,7 +381,7 @@ export const directStoreApiClient = {
       const params = new URLSearchParams();
       params.append('sheetId', sheetId);
       params.append('range', range);
-      
+
       const response = await fetchWithRetry(`${BASE_URL}/link-settings/plan-groups?${params.toString()}`);
       return handleResponse(response, '요금제군 조회 실패');
     } catch (error) {
@@ -348,15 +402,15 @@ export const directStoreApiClient = {
       if (modelName) {
         params.append('modelName', modelName);
       }
-      
+
       const response = await fetchWithRetry(`${BASE_URL}/mobiles/${modelId}/calculate?${params.toString()}`);
-      
+
       // 404 에러는 모델을 찾을 수 없는 것이므로 재시도하지 않음
       if (response.status === 404) {
         const errorData = await response.json().catch(() => ({}));
         return { success: false, error: errorData.error || '모델을 찾을 수 없습니다.', status: 404 };
       }
-      
+
       return handleResponse(response, '가격 계산 실패');
     } catch (error) {
       console.error('가격 계산 실패:', error);

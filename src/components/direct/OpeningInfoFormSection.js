@@ -30,7 +30,7 @@ const OpeningInfoFormSection = ({
 }) => {
     const handleOpeningTypeChange = async (newOpeningType) => {
         setFormData({ ...formData, openingType: newOpeningType });
-        
+
         // 요금제가 선택되어 있으면 대리점추가지원금 재계산
         if (formData.plan && selectedPlanGroup) {
             const planGroup = planGroups.find(p => p.name === formData.plan)?.group || selectedPlanGroup;
@@ -42,15 +42,15 @@ const OpeningInfoFormSection = ({
                         'CHANGE': '기변'
                     };
                     const openingType = openingTypeMap[newOpeningType] || '010신규';
-                    
+
                     // 모델 ID가 없으면 모델명과 통신사로 생성 (임시)
                     let modelId = initialData?.id;
                     let foundMobile = null;
                     if (!modelId && initialData?.model) {
                         try {
                             const mobileList = await directStoreApiClient.getMobileList(selectedCarrier);
-                            foundMobile = mobileList.find(m => 
-                                m.model === initialData.model && 
+                            foundMobile = mobileList.find(m =>
+                                m.model === initialData.model &&
                                 m.carrier === selectedCarrier
                             );
                             if (foundMobile) {
@@ -60,34 +60,35 @@ const OpeningInfoFormSection = ({
                             console.warn('모델 ID 찾기 실패:', err);
                         }
                     }
-                    
+
                     if (modelId) {
-                        // 🔥 개선: modelName 전달 (휴대폰목록 페이지와 동일하게)
-                        const modelName = initialData?.model || foundMobile?.model || null;
-                        const result = await directStoreApiClient.calculateMobilePrice(
-                            modelId,
-                            planGroup,
-                            openingType,
-                            selectedCarrier,
-                            modelName
-                        );
-                        
-                        if (result.success) {
-                            // 🔥 개선: 이통사지원금도 업데이트
+                        // 모델명은 로깅용으로만 사용하거나 생략 가능
+                        // 마스터 가격 정책 조회
+                        const pricingList = await directStoreApiClient.getMobilesPricing(selectedCarrier, {
+                            modelId: modelId,
+                            planGroup: planGroup,
+                            openingType: openingType
+                        });
+
+                        // 결과가 있으면 업데이트
+                        if (pricingList && pricingList.length > 0) {
+                            const pricing = pricingList[0];
+
                             debugLog('OpeningInfoFormSection.js', '가입유형 변경 시 이통사지원금 업데이트', {
                                 openingType: newOpeningType,
                                 planGroup,
-                                publicSupport: result.publicSupport,
-                                storeSupportWithAddon: result.storeSupportWithAddon,
-                                storeSupportWithoutAddon: result.storeSupportWithoutAddon
+                                publicSupport: pricing.publicSupport,
+                                storeSupportWithAddon: pricing.storeSupportWithAddon,
+                                storeSupportWithoutAddon: pricing.storeSupportWithoutAddon
                             }, 'debug-session', 'run1', 'A');
-                            setPublicSupport(result.publicSupport || 0);
-                            setStoreSupportWithAddon(result.storeSupportWithAddon || 0);
-                            setStoreSupportWithoutAddon(result.storeSupportWithoutAddon || 0);
+
+                            setPublicSupport(pricing.publicSupport || 0);
+                            setStoreSupportWithAddon(pricing.storeSupportWithAddon || 0);
+                            setStoreSupportWithoutAddon(pricing.storeSupportWithoutAddon || 0);
                         }
                     }
                 } catch (err) {
-                    console.error('대리점추가지원금 계산 실패:', err);
+                    console.error('대리점추가지원금 조회 실패:', err);
                 }
             }
         }
