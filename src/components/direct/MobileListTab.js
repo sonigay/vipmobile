@@ -785,3 +785,5 @@ const MobileListTab = ({ onProductSelect }) => {
 };
 
 export default MobileListTab;
+
+

@@ -20,7 +20,8 @@ import {
   Settings as SettingsIcon,
   Link as LinkIcon,
   Assessment as AssessmentIcon,
-  TextFields as TextFieldsIcon
+  TextFields as TextFieldsIcon,
+  Build as BuildIcon
 } from '@mui/icons-material';
 
 import { getModeColor, getModeTitle } from '../config/modeConfig';
@@ -45,6 +46,8 @@ const DirectStoreManagementMode = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
+  const [rebuilding, setRebuilding] = useState(false);
+  const [rebuildResult, setRebuildResult] = useState(null);
 
   // 인증 상태 (어플 접속 시 이미 검증됨)
   const [isAuthenticated] = useState(true);
@@ -70,8 +73,8 @@ const DirectStoreManagementMode = ({
 
   // 권한 확인
   const directStoreManagementPermission = loggedInStore?.modePermissions?.directStoreManagement;
-  const permissionValue = typeof directStoreManagementPermission === 'string' 
-    ? directStoreManagementPermission.trim().toUpperCase() 
+  const permissionValue = typeof directStoreManagementPermission === 'string'
+    ? directStoreManagementPermission.trim().toUpperCase()
     : (directStoreManagementPermission === true ? 'O' : '');
 
   // 탭별 권한 체크
@@ -93,10 +96,10 @@ const DirectStoreManagementMode = ({
       tabs.push({ key: 'mainPageText', label: '메인페이지문구설정', icon: <TextFieldsIcon />, componentName: 'MainPageTextSettingsTab' });
     }
     if (hasSalesReportPermission) {
-      tabs.push({ 
-        key: 'sales', 
-        label: '전체 판매일보', 
-        icon: <AssessmentIcon />, 
+      tabs.push({
+        key: 'sales',
+        label: '전체 판매일보',
+        icon: <AssessmentIcon />,
         componentName: 'DirectSalesReportTab',
         props: {
           onRowClick: handleReportSelect,
@@ -120,6 +123,32 @@ const DirectStoreManagementMode = ({
       setActiveTab(newValue);
     }
   };
+
+
+  const handleRebuildMaster = async () => {
+    if (!window.confirm('모든 통신사의 마스터 데이터를 재빌드하시겠습니까?\n이 작업은 수 초에서 수십 초가 소요될 수 있습니다.')) {
+      return;
+    }
+
+    try {
+      setRebuilding(true);
+      const result = await directStoreApiClient.rebuildMaster(); // 전체 통신사
+      if (result.success) {
+        alert('마스터 데이터 재빌드가 완료되었습니다.\n' +
+          `요금제: ${result.summary?.plans?.totalCount || 0}건\n` +
+          `단말: ${result.summary?.devices?.totalCount || 0}건\n` +
+          `정책: ${result.summary?.pricing?.totalCount || 0}건`);
+      } else {
+        alert('재빌드 실패: ' + (result.error || '알 수 없는 오류'));
+      }
+    } catch (err) {
+      console.error('재빌드 오류:', err);
+      alert('재빌드 중 오류가 발생했습니다.');
+    } finally {
+      setRebuilding(false);
+    }
+  };
+
 
 
   // 새로운 테마 사용 (V2)
@@ -149,6 +178,16 @@ const DirectStoreManagementMode = ({
                   {modeTitle}
                 </Typography>
 
+                <Button
+                  color="inherit"
+                  startIcon={rebuilding ? <CircularProgress size={20} color="inherit" /> : <BuildIcon />}
+                  onClick={handleRebuildMaster}
+                  disabled={rebuilding}
+                  sx={{ mr: 1, border: '1px solid rgba(255,255,255,0.3)' }}
+                >
+                  {rebuilding ? '빌드 중...' : '데이터 재빌드'}
+                </Button>
+
                 {onModeChange && availableModes && availableModes.length > 1 && (
                   <Button color="inherit" startIcon={<RefreshIcon />} onClick={onModeChange} sx={{ mr: 2 }}>
                     모드 변경
@@ -167,11 +206,11 @@ const DirectStoreManagementMode = ({
                   sx={{ borderBottom: 1, borderColor: 'divider' }}
                 >
                   {availableTabs.map((tab, index) => (
-                    <Tab 
+                    <Tab
                       key={tab.key}
-                      icon={tab.icon} 
-                      label={tab.label} 
-                      iconPosition="start" 
+                      icon={tab.icon}
+                      label={tab.label}
+                      iconPosition="start"
                     />
                   ))}
                 </Tabs>
@@ -190,12 +229,12 @@ const DirectStoreManagementMode = ({
                 } else if (tab.componentName === 'DirectSalesReportTab') {
                   Component = DirectSalesReportTab;
                 }
-                
+
                 return (
-                  <Box 
+                  <Box
                     key={tab.key}
-                    role="tabpanel" 
-                    hidden={activeTab !== index} 
+                    role="tabpanel"
+                    hidden={activeTab !== index}
                     sx={{ height: '100%', display: activeTab === index ? 'block' : 'none' }}
                   >
                     <ErrorBoundary name={tab.componentName || tab.key}>

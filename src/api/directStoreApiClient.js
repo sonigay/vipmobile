@@ -162,6 +162,20 @@ export const directStoreApiClient = {
   },
 
   /**
+   * 마스터 데이터 재빌드 트리거 (신규)
+   */
+  rebuildMaster: async (carrier) => {
+    const params = new URLSearchParams();
+    if (carrier) params.append('carrier', carrier);
+
+    // POST 요청으로 변경
+    const response = await fetchWithRetry(`${BASE_URL}/rebuild-master?${params.toString()}`, {
+      method: 'POST'
+    });
+    return handleResponse(response, '마스터 데이터 재빌드 실패');
+  },
+
+  /**
    * 오늘의 휴대폰 조회
    */
   getTodaysMobiles: async () => {
