@@ -30,6 +30,7 @@ const SHEET_POLICY_INSURANCE = '직영점_정책_보험상품';
 const SHEET_POLICY_SPECIAL = '직영점_정책_별도';
 const SHEET_SETTINGS = '직영점_설정';
 const SHEET_MAIN_PAGE_TEXTS = '직영점_메인페이지문구';
+const SHEET_PLAN_MASTER = '직영점_요금제마스터';
 
 // 시트 헤더 정의
 const HEADERS_POLICY_MARGIN = ['통신사', '마진'];
@@ -38,6 +39,7 @@ const HEADERS_POLICY_INSURANCE = ['통신사', '보험상품명', '출고가최�
 const HEADERS_POLICY_SPECIAL = ['통신사', '정책명', '추가금액', '차감금액', '적용여부'];
 const HEADERS_SETTINGS = ['통신사', '설정유형', '시트ID', '시트URL', '설정값JSON'];
 const HEADERS_MAIN_PAGE_TEXTS = ['통신사', '카테고리', '설정유형', '문구내용', '이미지URL', '수정일시'];
+const HEADERS_PLAN_MASTER = ['통신사', '요금제명', '요금제군', '기본료', '요금제코드', '사용여부', '비고'];
 
 function createSheetsClient() {
   const GOOGLE_SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
@@ -459,6 +461,388 @@ async function ensureSheetHeaders(sheets, spreadsheetId, sheetName, headers) {
 
 function setupDirectRoutes(app) {
   const router = express.Router();
+
+  // === 디버그/검증용 엔드포인트 ===
+
+  /**
+   * GET /api/direct/debug/link-settings?carrier=SK
+   *
+   * - 목적:
+   *   - 직영점관리모드의 링크설정에서 입력한 시트ID/범위가
+   *     실제 구글시트에서 올바르게 읽히는지 확인하기 위한 디버그용 API
+   * - 반환:
+   *   - carrier: 조회한 통신사
+   *   - rawSettings: 직영점_설정 시트에서 읽어온 원본 행들(planGroup/support/policy)
+   *   - parsed: 각 설정유형별 JSON 파싱 결과
+   *   - samples: 각 range의 상위/하위 일부 샘플 데이터
+   */
+  router.get('/debug/link-settings', async (req, res) => {
+    try {
+      const carrier = (req.query.carrier || 'SK').trim();
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+
+      // 직영점_설정 헤더 보장
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_SETTINGS, HEADERS_SETTINGS);
+
+      const settingsRes = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: SHEET_SETTINGS
+        });
+      });
+
+      const rows = (settingsRes.data.values || []).slice(1);
+      const carrierRows = rows.filter(row => (row[0] || '').toString().trim() === carrier);
+
+      const types = ['planGroup', 'support', 'policy'];
+      const parsed = {};
+      const samples = {};
+
+      for (const type of types) {
+        const row = carrierRows.find(r => (r[1] || '').toString().trim() === type);
+        if (!row) continue;
+
+        // C열: 시트ID/링크, E열: 설정 JSON
+        const sheetId = (row[2] || '').toString().trim();
+        let configJson = {};
+        try {
+          configJson = row[4] ? JSON.parse(row[4]) : {};
+        } catch (err) {
+          console.warn(`[Direct][debug/link-settings] ${carrier}/${type} JSON 파싱 실패:`, err.message);
+        }
+
+        parsed[type] = {
+          sheetId,
+          config: configJson
+        };
+
+        // range별 샘플 데이터 추출
+        const sampleForType = {};
+
+        const addRangeSample = async (label, range) => {
+          if (!sheetId || !range) return;
+          try {
+            const data = await getSheetData(sheetId, range);
+            const first = data.slice(0, 3);
+            const last = data.length > 6 ? data.slice(-3) : [];
+            sampleForType[label] = {
+              range,
+              totalRows: data.length,
+              firstRows: first,
+              lastRows: last
+            };
+          } catch (err) {
+            console.warn(`[Direct][debug/link-settings] ${carrier}/${type} range 샘플 로딩 실패:`, {
+              label,
+              range,
+              message: err.message
+            });
+            sampleForType[label] = {
+              range,
+              error: err.message
+            };
+          }
+        };
+
+        if (type === 'planGroup') {
+          await addRangeSample('planNameRange', configJson.planNameRange);
+          await addRangeSample('planGroupRange', configJson.planGroupRange);
+          await addRangeSample('basicFeeRange', configJson.basicFeeRange);
+        } else if (type === 'support') {
+          await addRangeSample('modelRange', configJson.modelRange);
+          await addRangeSample('petNameRange', configJson.petNameRange);
+          await addRangeSample('factoryPriceRange', configJson.factoryPriceRange);
+          await addRangeSample('openingTypeRange', configJson.openingTypeRange);
+          if (configJson.planGroupRanges && typeof configJson.planGroupRanges === 'object') {
+            for (const [groupKey, groupRange] of Object.entries(configJson.planGroupRanges)) {
+              await addRangeSample(`planGroupRanges.${groupKey}`, groupRange);
+            }
+          }
+        } else if (type === 'policy') {
+          await addRangeSample('modelRange', configJson.modelRange);
+          await addRangeSample('petNameRange', configJson.petNameRange);
+          if (configJson.planGroupRanges && typeof configJson.planGroupRanges === 'object') {
+            for (const [groupKey, groupRange] of Object.entries(configJson.planGroupRanges)) {
+              await addRangeSample(`planGroupRanges.${groupKey}`, groupRange);
+            }
+          }
+        }
+
+        samples[type] = sampleForType;
+      }
+
+      return res.json({
+        success: true,
+        carrier,
+        rawSettings: carrierRows,
+        parsed,
+        samples
+      });
+    } catch (error) {
+      console.error('[Direct][debug/link-settings] error:', error);
+      return res.status(500).json({
+        success: false,
+        error: '링크설정 디버그 조회 실패',
+        message: error.message
+      });
+    }
+  });
+
+  /**
+   * GET /api/direct/debug/rebuild-master-preview?carrier=SK
+   *
+   * - 목적:
+   *   - 마스터 시트 리팩토링 전에, 링크설정 기반 정규화(ETL)가
+   *     어떤 형태의 데이터를 만들어낼지 미리 확인하기 위한 프리뷰용 API
+   * - 현재 범위:
+   *   - 요금제 마스터(직영점_요금제마스터에 들어갈 데이터)의 샘플만 생성
+   *   - 단말/요금정책 마스터는 이후 단계에서 확장 예정
+   */
+  router.get('/debug/rebuild-master-preview', async (req, res) => {
+    try {
+      const carrier = (req.query.carrier || 'SK').trim();
+
+      // 직영점_설정에서 해당 통신사의 planGroup 설정을 getLinkSettings로 가져옴
+      const settingsRows = await getLinkSettings(carrier);
+      const planGroupRow = settingsRows.find(
+        row => (row[0] || '').toString().trim() === carrier &&
+               (row[1] || '').toString().trim() === 'planGroup'
+      );
+
+      if (!planGroupRow) {
+        return res.json({
+          success: false,
+          carrier,
+          error: 'planGroup 설정을 찾을 수 없습니다. 직영점_설정 시트를 확인해주세요.'
+        });
+      }
+
+      const sheetId = (planGroupRow[2] || '').toString().trim();
+      let configJson = {};
+      try {
+        configJson = planGroupRow[4] ? JSON.parse(planGroupRow[4]) : {};
+      } catch (err) {
+        console.warn('[Direct][debug/rebuild-master-preview] planGroup JSON 파싱 실패:', err.message);
+      }
+
+      const planNameRange = configJson.planNameRange || '';
+      const planGroupRange = configJson.planGroupRange || '';
+      const basicFeeRange = configJson.basicFeeRange || '';
+
+      const plansSample = [];
+
+      if (sheetId && (planNameRange || planGroupRange || basicFeeRange)) {
+        // 각 범위를 읽어서 인덱스 기준으로 매칭
+        const [planNames, planGroups, basicFees] = await Promise.all([
+          planNameRange ? getSheetData(sheetId, planNameRange) : Promise.resolve([]),
+          planGroupRange ? getSheetData(sheetId, planGroupRange) : Promise.resolve([]),
+          basicFeeRange ? getSheetData(sheetId, basicFeeRange) : Promise.resolve([])
+        ]);
+
+        const flatNames = planNames.flat().map(v => (v || '').toString().trim());
+        const flatGroups = planGroups.flat().map(v => (v || '').toString().trim());
+        const flatFees = basicFees.flat().map(v => Number(v || 0));
+
+        const maxLength = Math.max(flatNames.length, flatGroups.length, flatFees.length);
+        for (let i = 0; i < maxLength; i++) {
+          const planName = flatNames[i] || '';
+          const group = flatGroups[i] || '';
+          const fee = flatFees[i] || 0;
+          if (!planName && !group && !fee) continue;
+
+          plansSample.push({
+            carrier,
+            planName,
+            planGroup: group || planName,
+            basicFee: fee
+          });
+        }
+      }
+
+      return res.json({
+        success: true,
+        carrier,
+        plansSample: plansSample.slice(0, 50) // 너무 많을 경우를 대비해 상위 50개만
+      });
+    } catch (error) {
+      console.error('[Direct][debug/rebuild-master-preview] error:', error);
+      return res.status(500).json({
+        success: false,
+        error: '마스터 프리뷰 생성 실패',
+        message: error.message
+      });
+    }
+  });
+
+  /**
+   * POST /api/direct/plans-master/rebuild
+   *
+   * - 목적:
+   *   - 직영점_요금제마스터 시트를 링크설정 기반으로 재빌드(ETL)하는 실제 쓰기용 엔드포인트
+   * - 쿼리:
+   *   - carrier (선택): SK/KT/LG 중 하나. 없으면 세 통신사 모두 처리.
+   */
+  router.post('/plans-master/rebuild', async (req, res) => {
+    try {
+      const carrierParam = (req.query.carrier || '').trim().toUpperCase();
+      const carriers = carrierParam ? [carrierParam] : ['SK', 'KT', 'LG'];
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_PLAN_MASTER, HEADERS_PLAN_MASTER);
+
+      const allRows = [];
+      const perCarrierStats = {};
+
+      for (const carrier of carriers) {
+        const settingsRows = await getLinkSettings(carrier);
+        const planGroupRow = settingsRows.find(
+          row => (row[0] || '').toString().trim() === carrier &&
+                 (row[1] || '').toString().trim() === 'planGroup'
+        );
+
+        if (!planGroupRow) {
+          perCarrierStats[carrier] = { count: 0, warning: 'planGroup 설정을 찾을 수 없습니다.' };
+          continue;
+        }
+
+        const sheetId = (planGroupRow[2] || '').toString().trim();
+        let configJson = {};
+        try {
+          configJson = planGroupRow[4] ? JSON.parse(planGroupRow[4]) : {};
+        } catch (err) {
+          console.warn('[Direct][plans-master/rebuild] planGroup JSON 파싱 실패:', err.message);
+        }
+
+        const planNameRange = configJson.planNameRange || '';
+        const planGroupRange = configJson.planGroupRange || '';
+        const basicFeeRange = configJson.basicFeeRange || '';
+
+        if (!sheetId || !(planNameRange || planGroupRange || basicFeeRange)) {
+          perCarrierStats[carrier] = { count: 0, warning: '시트ID 또는 범위 설정이 없습니다.' };
+          continue;
+        }
+
+        const [planNames, planGroups, basicFees] = await Promise.all([
+          planNameRange ? getSheetData(sheetId, planNameRange) : Promise.resolve([]),
+          planGroupRange ? getSheetData(sheetId, planGroupRange) : Promise.resolve([]),
+          basicFeeRange ? getSheetData(sheetId, basicFeeRange) : Promise.resolve([])
+        ]);
+
+        const flatNames = planNames.flat().map(v => (v || '').toString().trim());
+        const flatGroups = planGroups.flat().map(v => (v || '').toString().trim());
+        const flatFees = basicFees.flat().map(v => Number(v || 0));
+
+        const maxLength = Math.max(flatNames.length, flatGroups.length, flatFees.length);
+        let created = 0;
+
+        for (let i = 0; i < maxLength; i++) {
+          const planName = flatNames[i] || '';
+          const group = flatGroups[i] || '';
+          const fee = flatFees[i] || 0;
+          if (!planName && !group && !fee) continue;
+
+          const displayGroup = group || planName;
+
+          allRows.push([
+            carrier,           // 통신사
+            planName,          // 요금제명
+            displayGroup,      // 요금제군
+            fee || 0,          // 기본료
+            '',                // 요금제코드 (추후 필요 시 사용)
+            'Y',               // 사용여부
+            ''                 // 비고
+          ]);
+          created++;
+        }
+
+        perCarrierStats[carrier] = { count: created };
+      }
+
+      // 기존 데이터 제거 후 새 데이터 쓰기
+      // 헤더는 유지하고 A2:G 영역을 비운 뒤 다시 채운다.
+      await withRetry(async () => {
+        return await sheets.spreadsheets.values.clear({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_PLAN_MASTER}!A2:G`
+        });
+      });
+
+      if (allRows.length > 0) {
+        await withRetry(async () => {
+          return await sheets.spreadsheets.values.append({
+            spreadsheetId: SPREADSHEET_ID,
+            range: SHEET_PLAN_MASTER,
+            valueInputOption: 'USER_ENTERED',
+            insertDataOption: 'INSERT_ROWS',
+            resource: { values: allRows }
+          });
+        });
+      }
+
+      return res.json({
+        success: true,
+        totalCount: allRows.length,
+        perCarrier: perCarrierStats
+      });
+    } catch (error) {
+      console.error('[Direct][plans-master/rebuild] error:', error);
+      return res.status(500).json({
+        success: false,
+        error: '요금제마스터 재빌드 실패',
+        message: error.message
+      });
+    }
+  });
+
+  /**
+   * GET /api/direct/plans-master
+   *
+   * - 목적:
+   *   - 직영점_요금제마스터 시트에서 정규화된 요금제 정보를 조회
+   * - 쿼리:
+   *   - carrier (선택): 필터용 통신사 코드
+   */
+  router.get('/plans-master', async (req, res) => {
+    try {
+      const carrierFilter = (req.query.carrier || '').trim().toUpperCase();
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_PLAN_MASTER, HEADERS_PLAN_MASTER);
+      const response = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: SHEET_PLAN_MASTER
+        });
+      });
+
+      const values = response.data.values || [];
+      if (values.length <= 1) {
+        return res.json({ success: true, data: [] });
+      }
+
+      const rows = values.slice(1);
+      const data = rows
+        .map(row => ({
+          carrier: (row[0] || '').toString().trim(),
+          planName: (row[1] || '').toString().trim(),
+          planGroup: (row[2] || '').toString().trim(),
+          basicFee: Number(row[3] || 0),
+          planCode: (row[4] || '').toString().trim(),
+          enabled: ((row[5] || '').toString().trim() || 'Y').toUpperCase() !== 'N',
+          note: (row[6] || '').toString().trim()
+        }))
+        .filter(item => !carrierFilter || item.carrier.toUpperCase() === carrierFilter);
+
+      return res.json({ success: true, data });
+    } catch (error) {
+      console.error('[Direct][plans-master] error:', error);
+      return res.status(500).json({
+        success: false,
+        error: '요금제마스터 조회 실패',
+        message: error.message
+      });
+    }
+  });
 
   // === 정책 설정 ===
 

@@ -1,0 +1,1602 @@
+## 직영점 모드(`DirectStoreMode`) & 직영점 관리 모드(`DirectStoreManagementMode`) 정리
+
+이 문서는 직영점 모드와 직영점 관리 모드가 **어떤 로직과 방식으로 구현되어 있는지**를 코드 기준으로 정리한 것입니다.
+
+---
+
+## 1. 공통 개념/구조
+
+- **모드 메타 정보 관리 (`modeConfig.js`)**
+  - `MODE_CONFIG.directStore`  
+    - **key**: `directStore`  
+    - **title**: `직영점 모드`  
+    - **category**: `general` (일반 모드)  
+    - **권한 시트 참조**: `일반모드권한관리!G열`, 업데이트 시트: `어플업데이트!X열`
+  - `MODE_CONFIG.directStoreManagement`  
+    - **key**: `directStoreManagement`  
+    - **title**: `직영점 관리 모드`  
+    - **category**: `admin` (관리자 모드)  
+    - **권한 시트 참조**: `대리점아이디관리!AE열`, 업데이트 시트: `어플업데이트!W열`
+  - 공통 유틸:
+    - `getModeColor(mode)`: 모드별 대표 색상
+    - `getModeTitle(mode)`: 모드별 제목
+    - `getModeIcon(mode)`: 모드별 아이콘
+
+- **테마/스타일**
+  - 두 모드 모두 `directStoreThemeV2`를 사용해 **동일한 V2 테마**를 적용.
+  - MUI `ThemeProvider` + `CssBaseline`를 통해 전체 화면 스타일 일괄 적용.
+
+- **업데이트 팝업 (`AppUpdatePopup`)**
+  - 두 모드 모두 상단 버튼을 통해 업데이트 팝업을 열 수 있음.
+  - 팝업에는 `mode` 값을 다르게 넣어 모드별 업데이트 정보를 분리:
+    - 직영점 모드: `mode="directStore"`
+    - 직영점 관리 모드: `mode="directStoreManagement"`
+
+- **공통 탭/페이지**
+  - `OpeningInfoPage`: 개통정보 상세/입력 화면
+  - `DirectSalesReportTab`: 판매일보 화면
+    - 직영점 모드: 점포 단위 판매일보 (`isManagementMode={false}`)
+    - 직영점 관리 모드: 전체/관리자 관점 판매일보 (`isManagementMode={true}`)
+
+---
+
+## 2. 직영점 모드 (`DirectStoreMode`)
+
+### 2-1. 진입/인증 흐름
+
+- **props**
+  - `loggedInStore`: 로그인한 매장 정보 (권한/보안 설정 포함)
+  - `onLogout`: 로그아웃 핸들러
+  - `onModeChange`, `availableModes`: 상단에서 다른 모드로 전환할 때 사용
+
+- **보안 설정**
+  - `requiresPassword`  
+    - `loggedInStore.directStoreSecurity.requiresPassword` 로부터 읽음.
+    - `true` 인 경우, 직영점 모드 접근 전에 **비밀번호 인증 UI** 표시.
+  - `alreadyAuthenticated`  
+    - `loggedInStore.directStoreSecurity.authenticated` 값을 이용.
+    - 이미 서버/다른 경로에서 인증된 경우, 바로 `isAuthenticated=true` 로 세팅.
+
+- **컴포넌트 내부 상태**
+  - `isAuthenticated`: 직영점 모드 비밀번호 인증 여부
+  - `password`, `showPasswordDialog`, `error`, `loading`: 비밀번호 입력 다이얼로그 관련 상태
+  - `activeTab`: 상단 탭 인덱스
+    - `0`: 휴대폰 목록 (`MobileListTab`)
+    - `1`: 오늘의 휴대폰 (`TodaysMobileTab`)
+    - `2`: 판매일보 (`DirectSalesReportTab`)
+  - `isFullScreen`: **오늘의 휴대폰 탭 전용 전체화면 모드** 플래그
+  - `selectedProduct`: 개통정보 입력 페이지에 넘길 **선택된 상품/판매 정보**
+
+- **비밀번호 인증 로직 (`handlePasswordSubmit`)**
+  - API 엔드포인트: `POST {API_URL}/api/verify-direct-store-password`
+  - 요청 바디:
+    - `storeId: loggedInStore.id`
+    - `password: 입력한 비밀번호`
+  - 응답 처리:
+    - `data.success && data.verified === true` 인 경우
+      - `isAuthenticated = true`
+      - 비밀번호 다이얼로그 닫고, 입력값 초기화
+    - 그 외:
+      - `data.error` 메시지 또는 기본 에러 메시지를 `error` 상태에 세팅
+  - 예외 발생 시:
+    - `'비밀번호 확인에 실패했습니다.'` 메시지 출력
+
+- **인증 전/후 UI 분기**
+  - `requiresPassword && !isAuthenticated` 이면 → **인증 화면 렌더링**:
+    - 상단 `AppBar`
+      - 제목: `getModeTitle('directStore', '직영점 모드')`
+      - `업데이트 확인` 버튼 → `showUpdatePopup=true`
+      - `모드 변경` 버튼 (여러 모드 가능한 경우)
+      - `로그아웃` 버튼
+    - 중앙 본문:
+      - `직영점 모드 접근` 카드
+      - `🔑 비밀번호 입력` 버튼 → 비밀번호 다이얼로그 열기
+    - 비밀번호 다이얼로그:
+      - 비밀번호 `TextField`
+      - `Enter` 키 또는 `확인` 버튼으로 `handlePasswordSubmit` 실행
+  - 이 외 (비밀번호가 필요 없거나 이미 인증된 상태) → **메인 직영점 화면 렌더링**
+
+### 2-2. 메인 레이아웃/탭 구조
+
+- **테마**
+  - `theme = directStoreThemeV2`
+
+- **상단 헤더/탭 (`AppBar` + `Tabs`)**
+  - `isFullScreen === false` 일 때만 `AppBar` 표시 (오늘의 휴대폰 전체화면에서는 숨김)
+  - `Toolbar`:
+    - 좌측: 모드 제목 (`{modeTitle}`)
+    - 우측:
+      - `업데이트 확인` 버튼 → 업데이트 팝업
+      - `모드 변경` 버튼 → `onModeChange`
+      - `로그아웃` 버튼
+  - `Tabs` (3개):
+    - index 0: `"휴대폰 목록"`
+    - index 1: `"오늘의 휴대폰"`
+    - index 2: `"판매일보"`
+  - `handleTabChange`:
+    - `activeTab` 변경
+    - 탭이 바뀌면 `isFullScreen` 강제 `false` (전체화면 강제 해제)
+
+- **본문 탭별 구성**
+
+1. **휴대폰 목록 탭 (index 0)**
+   - 컴포넌트: `MobileListTab`
+   - 에러 가드: `ErrorBoundary name="MobileListTab"`
+   - props:
+     - `onProductSelect={handleProductSelect}`
+   - 클릭 시 동작:
+     - `handleProductSelect(product)` → `selectedProduct`에 저장, `isFullScreen=false`
+     - 이후 `selectedProduct`가 truthy가 되면서, 개통정보 페이지로 진입.
+
+2. **오늘의 휴대폰 탭 (index 1)**
+   - 상단 우측에 **전체화면 토글 버튼**:
+     - `IconButton` + `FullscreenIcon` / `FullscreenExitIcon`
+     - `toggleFullScreen` 로직으로 `isFullScreen` 토글
+   - 컴포넌트: `TodaysMobileTab`
+   - props:
+     - `isFullScreen`
+     - `onProductSelect={handleProductSelect}`
+   - 전체화면 플래그에 따라 `AppBar` 표시 여부만 달라지고, 탭 내부 레이아웃은 `TodaysMobileTab`이 책임.
+
+3. **판매일보 탭 (index 2)**
+   - 컴포넌트: `DirectSalesReportTab`
+   - 에러 가드: `ErrorBoundary name="DirectSalesReportTab"`
+   - props:
+     - `onRowClick={handleProductSelect}`  
+       → 특정 판매 건 클릭 시 `OpeningInfoPage`로 이동
+     - `loggedInStore={loggedInStore}`
+     - `isManagementMode={false}`  
+       → 점포 단위/현장용 판매일보 모드로 동작
+
+### 2-3. 개통정보 페이지 연동 (`OpeningInfoPage`)
+
+- **선택 흐름**
+  - `MobileListTab` 또는 `TodaysMobileTab` 또는 `DirectSalesReportTab`에서 항목 클릭
+  - 각 탭에서 전달된 상품/판매 정보 → `handleProductSelect(product)` 호출
+  - `selectedProduct` 상태에 값이 들어가면, 메인 렌더링 분기에서:
+    - 상단/탭 UI 대신 `OpeningInfoPage` 전체 화면 표시
+
+- **렌더링 조건**
+  - `selectedProduct ? <OpeningInfoPage ... /> : <일반 탭 구조>` 형태
+
+- **props**
+  - `initialData={selectedProduct}`
+  - `onBack={handleBackToStore}`
+  - `loggedInStore={loggedInStore}`
+
+---
+
+## 3. 직영점 관리 모드 (`DirectStoreManagementMode`)
+
+### 3-1. 진입/권한 구조
+
+- **props**
+  - `loggedInStore`, `onLogout`, `onModeChange`, `availableModes` (직영점 모드와 동일한 구조)
+
+- **권한 값 파싱**
+  - `directStoreManagementPermission = loggedInStore.modePermissions.directStoreManagement`
+  - 문자열인 경우:
+    - `permissionValue = directStoreManagementPermission.trim().toUpperCase()`
+  - 불린/기타인 경우:
+    - `true` → `'O'` 로 간주 (조회 권한)
+    - 그 외 → `''`
+
+- **역할/권한 구분**
+  - `permissionValue === 'M'` : **관리자/마스터**
+  - `permissionValue === 'S'` : **서브 관리자(세팅 일부)**  
+  - `permissionValue === 'O'` : **조회 전용**
+
+- **탭별 권한 매핑**
+  - 정책 설정 탭(`policy`):
+    - `hasPolicyPermission = permissionValue === 'M' || permissionValue === 'S'`
+  - 링크 설정 탭(`link` / 메인페이지 문구 포함):
+    - `hasLinkPermission = permissionValue === 'M'`
+  - 전체 판매일보 탭(`sales`):
+    - `hasSalesReportPermission = M/S/O 모두 허용`
+
+- **인증 플로우**
+  - 직영점 관리 모드는 어플 전체 로그인/권한 체크를 이미 거친 뒤 진입하는 것으로 가정:
+    - `const [isAuthenticated] = useState(true);`
+    - 별도의 비밀번호 팝업/다이얼로그는 없음.
+
+### 3-2. 탭 선언/구성 (`availableTabs`)
+
+- **lazy loaded 탭 컴포넌트**
+  - `PolicySettingsTab` : `./direct/management/PolicySettingsTab`
+  - `LinkSettingsTab` : `./direct/management/LinkSettingsTab`
+  - `MainPageTextSettingsTab` : `./direct/management/MainPageTextSettingsTab`
+  - `DirectSalesReportTab` : `./direct/DirectSalesReportTab` (관리자용)
+  - `OpeningInfoPage` : `./direct/OpeningInfoPage`
+
+- **권한 기반 `availableTabs` 계산**
+  - `React.useMemo` 로 탭 리스트 생성:
+    - 정책 설정 탭 (Policy)
+      - 조건: `hasPolicyPermission === true`
+      - 구조:
+        - `key: 'policy'`
+        - `label: '정책 설정'`
+        - `icon: <SettingsIcon />`
+        - `componentName: 'PolicySettingsTab'`
+    - 링크 설정 탭 (Link)
+      - 조건: `hasLinkPermission === true` (M 권한 전용)
+      - 구조:
+        - `key: 'link'`
+        - `label: '링크 설정'`
+        - `icon: <LinkIcon />`
+        - `componentName: 'LinkSettingsTab'`
+    - 메인페이지 문구 설정 탭
+      - 조건: `hasLinkPermission === true` (링크 설정과 동일 조건)
+      - 구조:
+        - `key: 'mainPageText'`
+        - `label: '메인페이지문구설정'`
+        - `icon: <TextFieldsIcon />`
+        - `componentName: 'MainPageTextSettingsTab'`
+    - 전체 판매일보 탭
+      - 조건: `hasSalesReportPermission === true` (M/S/O)
+      - 구조:
+        - `key: 'sales'`
+        - `label: '전체 판매일보'`
+        - `icon: <AssessmentIcon />`
+        - `componentName: 'DirectSalesReportTab'`
+        - `props`:
+          - `onRowClick: handleReportSelect`
+          - `loggedInStore`
+          - `isManagementMode: true` (관리자 전용 모드 플래그)
+
+- **탭 인덱스 유효성 보정**
+  - `availableTabs.length` 가 변경될 때, 현재 `activeTab` 값이 범위를 벗어나면 0번으로 리셋:
+    - 예: 권한 변경/데이터 로딩 후 일부 탭이 사라지는 경우 대비.
+
+### 3-3. 레이아웃/렌더링 흐름
+
+- **상위 레이아웃**
+  - `ThemeProvider` + `directStoreThemeV2`
+  - `Box`로 전체 화면 구성 (`minHeight: '100vh'`, `flexDirection: 'column'`)
+
+- **상세보기(개통정보) 분기**
+  - 상태: `selectedReport`
+  - `selectedReport`가 있을 때:
+    - 상단 바/탭 없이, `OpeningInfoPage` 전체 화면 렌더링
+    - `ErrorBoundary name="OpeningInfoPage (Management)"` 로 감싸고, `Suspense + CircularProgress` 로 로딩 처리
+    - props:
+      - `initialData={selectedReport}`
+      - `onBack={handleBackToReports}` → `selectedReport = null`
+
+- **일반 탭 화면**
+  - 상단 `AppBar`:
+    - 좌측: `SettingsIcon` + `modeTitle` (`직영점 관리 모드`)
+    - 우측:
+      - (여러 모드 가능 시) `모드 변경` 버튼 → `onModeChange`
+      - `로그아웃` 버튼
+  - `Tabs`:
+    - `availableTabs`를 기준으로 동적으로 생성
+    - 아이콘 + 라벨 (`iconPosition="start"`)
+    - 인덱스: `Math.min(activeTab, availableTabs.length - 1)` 로 안전하게 제어
+
+- **탭별 패널 렌더링**
+  - `availableTabs.map(...)` 내부에서:
+    - 각 탭에 대해 `componentName`을 기반으로 실제 lazy 컴포넌트 선택:
+      - `'PolicySettingsTab'` → `PolicySettingsTab`
+      - `'LinkSettingsTab'` → `LinkSettingsTab`
+      - `'MainPageTextSettingsTab'` → `MainPageTextSettingsTab`
+      - `'DirectSalesReportTab'` → `DirectSalesReportTab`
+    - `role="tabpanel"`, `hidden={activeTab !== index}` 로 탭 활성/비활성 제어
+    - `ErrorBoundary` + `Suspense` 로 감싸서 **오류 및 로딩 처리** 통일.
+    - `tab.props` 가 존재하면 해당 props를 그대로 전달 (판매일보 탭에서 사용).
+
+### 3-4. 판매일보 & 개통정보 연동
+
+- **판매일보 탭 (`DirectSalesReportTab` with `isManagementMode=true`)**
+  - 각 행 클릭 시 `onRowClick` 호출 → `handleReportSelect(report)` 실행
+  - `selectedReport` 상태에 선택된 데이터 저장
+
+- **개통정보 페이지 (`OpeningInfoPage`)**
+  - `selectedReport`가 truthy일 때만 렌더링
+  - `onBack` 호출 시, `selectedReport=null`로 되돌려 다시 탭 화면으로 복귀
+
+---
+
+## 4. 두 모드의 차이점 요약
+
+- **권한/대상**
+  - **직영점 모드** (`DirectStoreMode`)
+    - 대상: **직영점 현장(점포)** 사용자를 위한 모드
+    - 권한 소스: `loggedInStore.directStoreSecurity` (비밀번호 필요 여부/인증 상태)
+    - 역할:
+      - 점포에서 **상품/재고/판매일보**를 조회하고, 개통정보 입력/확인을 수행
+  - **직영점 관리 모드** (`DirectStoreManagementMode`)
+    - 대상: **본사/관리자** 또는 직영점 운영 담당자
+    - 권한 소스: `loggedInStore.modePermissions.directStoreManagement` (M/S/O 단위)
+    - 역할:
+      - 전체 직영점 정책/링크/메인페이지 문구 설정
+      - 전체 판매일보 집계/조회 및 상세 확인
+
+- **인증 방식**
+  - 직영점 모드:
+    - 필요 시 별도 **비밀번호 인증 화면 + 다이얼로그**를 통해 추가 인증 수행.
+  - 직영점 관리 모드:
+    - 앱 전체 로그인/권한 검증 후 진입, 별도 비밀번호 팝업 없음.
+
+- **탭 구성**
+  - 직영점 모드:
+    - 휴대폰 목록 / 오늘의 휴대폰 / 판매일보
+    - 탭 고정, 권한에 따른 탭 제거나 비활성화 없음.
+  - 직영점 관리 모드:
+    - 정책 설정 / 링크 설정 / 메인페이지 문구 설정 / 전체 판매일보
+    - **권한(M/S/O)에 따라 노출되는 탭이 동적으로 달라짐**.
+
+- **판매일보 모드 차이**
+  - 직영점 모드:
+    - `isManagementMode={false}` → 점포 단위/현장용 뷰
+  - 직영점 관리 모드:
+    - `isManagementMode={true}` → 전체 집계/관리자용 뷰 (권한에 따라 접근)
+
+- **전체화면/UX**
+  - 직영점 모드:
+    - `오늘의 휴대폰` 탭에서 **전체화면 토글** 제공 (현장 디스플레이용으로 활용).
+  - 직영점 관리 모드:
+    - 정책/링크/문구/판매일보 위주의 관리 화면, 전체화면 토글은 별도 제공하지 않음.
+
+---
+
+## 5. 휴대폰 목록 / 오늘의 휴대폰 / 개통정보 입력 데이터 흐름
+
+### 5-1. 휴대폰 목록 탭 (`MobileListTab`) 데이터 흐름
+
+- **전체 흐름 개요**
+  - (1) 통신사 탭 선택 → (2) 리스트/요금제군 로딩 → (3) 각 단말의 요금제군/개통유형/가격 자동 계산 →  
+    (4) 사용자가 요금제군/유형/태그/이미지 등을 조정 → (5) 행 클릭 시 현재 선택 상태 포함해서 `OpeningInfoPage`로 전달.
+
+- **1) 진입 및 통신사 선택**
+  - 상단 통신사 탭:
+    - `carrierTab` 상태: `0(SKT) / 1(KT) / 2(LG)`  
+    - `getCurrentCarrier()`로 `SK / KT / LG` 문자열로 변환.
+  - 탭 변경 시:
+    - `handleCarrierChange`에서
+      - `carrierTab` 변경
+      - 초기화 관련 ref/state (`initializedRef`, `isInitializingRef`, `userSelectedOpeningTypesRef`, `expectedCalculationsRef`, `isInitializing`) 모두 리셋  
+      → 통신사 바뀌면 **다시 처음부터 목록/가격 계산**.
+
+- **2) 휴대폰 목록 로드**
+  - 훅: `useEffect(..., [carrierTab])`
+  - API:
+    - `directStoreApiClient.getMobileList(carrier, { withMeta: true })`
+  - 응답:
+    - `{ list, meta }` 구조
+    - `safeList = list || []` → `setMobileList(safeList)`
+    - `steps.fetch.status`:
+      - 성공 시: `success` 또는 데이터 없으면 `empty`
+      - 실패 시: `error` 와 함께 `error` 메시지 표시
+  - 재로딩 버튼(`새로고침`)도 동일한 API를 다시 호출 (`handleReload`).
+
+- **3) 요금제군 목록 로딩**
+  - 훅: `useEffect(..., [carrierTab])`
+  - 캐시 우선:
+    - `sessionStorage['planGroups-{carrier}']`를 5분 TTL로 사용
+  - API:
+    - 캐시가 없거나 만료된 경우 `directStoreApiClient.getLinkSettings(carrier)`
+    - 응답의 `planGroup.planGroups`에서 요금제군 리스트만 추출해 `setPlanGroups`.
+  - 이 데이터는 **기본 요금제군 선택** 및 **가격 계산 시 planGroup 값**으로 사용.
+
+- **4) 초기 요금제군/개통유형/가격 자동 세팅**
+  - 훅: `useEffect(..., [mobileList, planGroups])`
+  - 주요 상태/레퍼런스:
+    - `selectedPlanGroups`: `{ modelId: planGroup }`
+    - `selectedOpeningTypes`: `{ modelId: openingType }`
+    - `calculatedPrices`: `{ "{modelId}-{openingType}": { storeSupportWithAddon, ... } }`
+    - `expectedCalculationsRef`: 초기 계산이 예상되는 `modelId` 집합
+    - `priceCalculationQueueRef`: 가격 계산 작업 큐
+  - 동작:
+    1. `mobileList`와 `planGroups`가 준비되면 `setDefaultValues()` 실행.
+    2. 이미 초기화 완료 + 사용자 수동 선택이 있는 경우는 **기본값 덮어쓰기 방지**.
+    3. 각 단말(`model`)에 대해:
+       - 태그 기반 기본 요금제군:
+         - `isPremium === true` → `115군`
+         - `isBudget === true` → `33군`
+         - 둘 다 아니면 → `115군`
+       - 기본 개통유형: 항상 `'MNP'`
+       - `planGroups` 목록에 실제 존재하지 않으면 선호 순서:
+         - `planGroups[0]` (목록의 첫 번째) 또는 데이터 없으면 스킵.
+    4. `userSelectedOpeningTypesRef`에 기록된 모델은 **사용자 선택 유지**:
+       - 이미 선택된 개통유형/요금제군은 건드리지 않고, 부족한 정보만 채움.
+    5. 계산 큐에 가격 계산 요청 추가:
+       - `calculationQueue.push({ modelId, planGroup, openingType })`
+       - 초기 로딩 시에는 캐시를 무시하고 항상 서버 계산, 이후에는 캐시 검증 후 필요 시에만 서버 호출.
+    6. `setSelectedPlanGroups`, `setSelectedOpeningTypes`로 상태 업데이트.
+    7. 큐에 쌓인 항목을 `calculatePrice`/`calculatePriceInternal`을 통해 **배치 처리**.
+
+- **5) 가격 계산 로직**
+  - API:
+    - `directStoreApiClient.calculateMobilePrice(modelId, planGroup, openingType, carrier, modelName)`
+  - 캐시:
+    - `getCachedPrice` / `setCachedPrice` / `setCachedPricesBatch`
+    - `modelId`, `planGroup`, `openingType`, `carrier` 단위로 캐싱
+    - `publicSupport` 차이가 10만원 이상이면 **캐시 무효화** → 서버 값 우선.
+  - 큐 처리:
+    - `priceCalculationQueueRef`에 요청을 쌓고 `processPriceCalculationQueue()`에서:
+      - `BATCH_SIZE=1`, `DELAY_MS=1500ms`로 매우 조심스럽게 순차 실행
+      - `MAX_QUEUE_SIZE`, `MAX_QUEUE_PROCESSING_ATTEMPTS`로 폭주 방지
+    - 각 응답을 `calculatedPrices["{modelId}-{openingType}"]`에 저장.
+  - 초기화 완료 체크:
+    - `expectedCalculationsRef`와 현재 `calculatedPrices` 키를 비교해  
+      **모든(or 일정 수 이상) 모델의 가격 계산이 끝나면** `isInitializing=false`로 전환.
+
+- **6) UI에서 보여주는 값 결정 (`getDisplayValue`)**
+  - `MobileListTab` → `MobileListRow`로 `getDisplayValue`를 prop으로 넘김.
+  - 내부 로직:
+    - `openingType`에 맞는 `priceKey = "{row.id}-{openingType}"`로 `calculatedPrices` 조회.
+    - 계산된 값이 존재하고 `openingType`도 일치하면:
+      - 해당 필드(지원금/구매가 등)를 우선 사용.
+      - 단, 대리점 지원금 필드가 `0`이면 잘못된 값으로 보고 원래 `row` 값으로 fallback.
+    - 없거나 불일치 시:
+      - 서버에서 내려온 원본 `row[field]` 사용.
+  - 따라서 **화면에 보이는 금액**은 항상:
+    - "원본 데이터 + 선택한 요금제군/개통유형 기반 최신 계산값" 중 **가장 신뢰할 수 있는 값**.
+
+- **7) 사용자 입력/액션에 따른 데이터 변경**
+  - **요금제군 변경 (`handlePlanGroupChange`)**
+    - `selectedPlanGroups[modelId]` 업데이트.
+    - `selectedOpeningTypes[modelId]`가 있으면 그 openingType으로 재계산, 없으면 `'010신규'`로 계산.
+  - **개통유형 변경 (`handleOpeningTypeChange`)**
+    - `userSelectedOpeningTypesRef`에 `modelId`를 등록 (초기 기본값 로직이 덮어쓰지 못하게).
+    - `selectedOpeningTypes[modelId]`를 새로운 openingType으로 업데이트.
+    - 해당 모델에 선택된 요금제군이 있으면, 새 openingType 기준으로 가격 재계산.
+  - **구분 태그 변경 (`handleTagChange`)**
+    - `isPopular`, `isRecommended`, `isCheap`, `isPremium`, `isBudget` 등의 boolean 업데이트.
+    - 단말 행은 먼저 낙관적으로 로컬 업데이트 후,  
+      `directStoreApiClient.updateMobileTags(modelId, payload)`로 서버 반영.
+    - `premium`/`budget` 태그가 변하면:
+      - 자동 요금제군 로직에 따라 `33군/115군` 재선택 → 가격 재계산 발생.
+  - **이미지 업로드 (`handleImageUploadClick` + `handleFileChange`)**
+    - `directStoreApi.uploadImage(file, modelId, carrier, modelName, petName)` 호출.
+    - 성공 후:
+      - 현재 `mobileList`에서 해당 모델의 `image` 필드를 우선 업데이트.
+      - 이후 `getMobileList`로 서버 최신 데이터를 재조회해 동기화 시도.
+      - 마지막으로 `window.dispatchEvent(new CustomEvent('imageUploaded', ...))` 이벤트 발송  
+        → `TodaysMobileTab`에서 잡아서 자기 데이터를 재로딩.
+
+- **8) 개통정보 입력 페이지로의 데이터 전달 (`handleRowClick`)**
+  - 행 클릭 시:
+    - 현재 선택된 요금제군/개통유형을 포함해 `onProductSelect` 호출:
+      - `onProductSelect({ ...model, planGroup, openingType })`
+  - `DirectStoreMode`에서는:
+    - `handleProductSelect(selected)`가 `selectedProduct`에 저장
+    - `OpeningInfoPage initialData`로 그대로 전달
+    → **휴대폰 목록에서 선택한 요금제군/개통유형이 개통정보 입력화면의 초기값에 반영**.
+
+---
+
+### 5-2. 오늘의 휴대폰 탭 (`TodaysMobileTab`) 데이터 흐름
+
+- **전체 흐름 개요**
+  - (1) 오늘의 휴대폰 데이터 + 메인 헤더 문구 + 슬라이드쇼용 데이터 로드  
+    (2) 프리미엄/중저가 상품을 합쳐 화면에 표시  
+    (3) 각 카드에서 가격 계산(캐시/서버) → 캐시/전역 Map으로 공유  
+    (4) 카드 클릭 시 선택된 상품을 `OpeningInfoPage`로 전달.
+
+- **1) 기본 데이터 로딩 (`fetchData`)**
+  - 진입 시 `initializeData`에서 순차 실행:
+    1. `fetchData()`:
+       - `directStoreApiClient.getTodaysMobiles()`
+       - 응답 구조 예시:
+         - `data.premium`: 프리미엄 상품 배열
+         - `data.budget`: 중저가 상품 배열
+       - 각각 `setPremiumPhones`, `setBudgetPhones`로 저장.
+    2. `loadMainHeaderText()`:
+       - `directStoreApiClient.getMainHeaderText()`
+       - 문구(`content`)를 `mainHeaderText`/`localStorage('direct-main-header-text')`에 저장.
+    3. `prepareSlideshowData()`:
+       - (아래 슬라이드쇼 준비 로직 참고)
+
+- **2) 오늘의 휴대폰 상품 묶음 구성 (`allProducts`)**
+  - `premiumPhones` + `budgetPhones`에서:
+    - 프리미엄: `premium.slice(0, 3)`
+    - 중저가: `budget.slice(0, 2)`
+    - 합쳐서 최대 3개까지만 표시 (`combined.slice(0, 3)`)
+  - 이 `allProducts`는:
+    - 일반 그리드 모드에서 상품 리스트로 사용.
+    - 가격 초기화/계산 대상 목록으로도 사용.
+
+- **3) 가격 데이터 캐싱 (`getPriceDataFromCache`, `calculatedPricesRef`)**
+  - 가격 캐시 조회 함수 `getPriceDataFromCache(product)`:
+    - ① 먼저 `calculatedPricesRef.current` 안에 이미 계산된 데이터가 있는지 확인.
+      - `product.id` 키로 조회하고, `010신규/MNP/기변` 3개 유형 모두 `loading === false`이면 그대로 사용.
+      - 일부만 계산됐거나 없으면 `null` 반환 → 카드 단에서 자체 로딩.
+    - ② 전역 priceCache(`getCachedPrice`) 확인:
+      - planGroup:
+        - `isBudget && !isPremium` → `33군`
+        - 나머지 → `115군`
+      - openingType: `010신규/MNP/기변` 각각에 대해 캐시 조회.
+      - 어느 하나라도 캐시가 있으면 `priceData` 구조를 만들어 반환.
+  - 가격 계산 완료 콜백 `handlePriceCalculated(productId, priceData)`:
+    - 개별 카드(`TodaysProductCard`)가 서버 계산을 끝내면 호출.
+    - `calculatedPricesRef.current.set(productId, priceData)` 후 `priceCalculationTrigger` 증가 → 재렌더링 유도.
+
+- **4) allProducts 기준 가격 초기화 플로우**
+  - `allProducts` 변경 시:
+    - `expectedCalculationsRef`에 `product.id`들을 저장.
+    - `calculatedPricesRef`를 각 상품/각 유형에 대해 `loading: true` 상태로 초기화.
+  - 별도의 가격 계산 로직은 `TodaysProductCard` 내에서:
+    - 캐시 없으면 `directStoreApiClient.calculateMobilePrice(...)` 호출.
+    - 완료 후 `onPriceCalculated(productId, priceData)`로 상위에 결과 전달.
+  - 상위 `TodaysMobileTab`는:
+    - `isInitializing` 상태에서 `expectedCalculationsRef`/`calculatedPricesRef` 조합을 보고,
+      - 일정 수 이상(product 당 최소 한 유형) 계산 완료되면 `isInitializing=false` 전환 (점진적 로딩).
+      - 최대 30초 넘으면 강제로 로딩 종료.
+
+- **5) 슬라이드쇼 데이터 준비 및 캐싱 (`prepareSlideshowData`)**
+  - 슬라이드쇼 용도로 사용하는 데이터는 **체크(태그)된 상품** 기준:
+    1. `carriers = ['SK', 'KT', 'LG']` 각각에 대해:
+       - `directStoreApiClient.getMobileList(carrier)` 호출.
+       - `isPopular`, `isRecommended`, `isCheap`, `isPremium`, `isBudget` 중 하나라도 `true`인 상품만 필터.
+    2. 통신사별로:
+       - `premium = isPremium === true`
+       - `budget = isBudget === true`
+       - 각각 3개씩 슬라이드에 묶어 `type: 'productGroup'`으로 추가.
+       - 앞뒤 구간에는 `type: 'transition'` 슬라이드를 추가하여 회의용 연결페이지 역할.
+       - transition 텍스트/이미지는 `directStoreApiClient.getTransitionPageText(carrier, category)`로 가져옴.
+    3. 모든 상품에 대해 가격 미리 로드:
+       - `planGroup`: 프리미엄/중저가 규칙 동일.
+       - openingType 세 가지(`010신규, MNP, 기변`)에 대해  
+         `calculateMobilePrice`를 병렬 호출 → `setCachedPricesBatch`로 전역 캐시에 저장.
+  - 이 구조(`slideshowData`)는:
+    - 슬라이드쇼 모드 / 수동 슬라이드 모드에서 공통으로 사용.
+
+- **6) 이미지 변경 연동 (`imageUploaded` 이벤트 수신)**
+  - `MobileListTab`에서 이미지 업로드 성공 시:
+    - `window.dispatchEvent(new CustomEvent('imageUploaded', { detail: { carrier, modelId, imageUrl } }))`
+  - `TodaysMobileTab`에서는:
+    - `useEffect`에서 `imageUploaded` 이벤트 리스너 등록.
+    - 이벤트 수신 시:
+      - 1초 지연 후 `fetchData()` 재호출 → 오늘의 휴대폰 데이터 재로드  
+        → 이미지/태그 변경을 오늘의 휴대폰 화면에도 반영.
+
+- **7) 개통정보 입력 페이지로의 데이터 전달**
+  - 각 카드 컴포넌트 `TodaysProductCard`는:
+    - `onSelect={onProductSelect}` prop을 받아, 클릭 시 상위 `DirectStoreMode`에 선택 상품 전달.
+  - 전달 데이터:
+    - 최소한 `product` 전체 정보(모델명, carrier, factoryPrice 등) +  
+      (카드 내부 로직에 따라 필요 시 planGroup/openingType을 포함할 수 있음).
+  - 최종적으로 `DirectStoreMode`의 `handleProductSelect`를 통해  
+    `OpeningInfoPage initialData`로 전달되어, **오늘의 휴대폰에서 선택한 상품 정보가 개통정보 입력화면의 초기값**이 됨.
+
+---
+
+### 5-3. 개통정보 입력 페이지 (`OpeningInfoPage`) 데이터 흐름
+
+- **전체 흐름 개요**
+  - (1) `MobileListTab`/`TodaysMobileTab`/`판매일보`에서 선택된 데이터(`initialData`)를 받음  
+    (2) 통신사/요금제/정책 정보를 시트/설정에서 다시 조회해 폼 초기화  
+    (3) 계산 엔진을 이용해 할부원금/월 납부금/현금가 등 실시간 계산  
+    (4) `저장` 시 판매일보 시트 포맷에 맞춰 데이터를 조합해 서버에 기록.
+
+- **1) 진입 시 초기값 구성 (`initialData`)**
+  - `initialData`는 상위 모드에서 선택된 상품/판매 데이터:
+    - `carrier`, `factoryPrice`, `publicSupport` or `support`, `storeSupport`, `storeSupportNoAddon`
+    - (휴대폰목록에서 온 경우) `planGroup`, `openingType`
+    - (판매일보에서 온 경우) 이미 기록된 고객/개통 정보 포함 가능.
+  - 컴포넌트 초기 state:
+    - `selectedCarrier`: `initialData?.carrier || 'SK'`
+    - `factoryPrice`: `initialData?.factoryPrice || 0`
+    - `publicSupport`: `initialData?.publicSupport || initialData?.support || 0`
+    - `storeSupportWithAddon`: `initialData?.storeSupport || 0`
+    - `storeSupportWithoutAddon`: `initialData?.storeSupportNoAddon || 0`
+    - `formData.openingType`:
+      - `convertOpeningType(initialData?.openingType)` → `NEW/MNP/CHANGE`로 변환.
+    - 요금제/단말/유심/고객 정보 등은 initialData 혹은 빈 값으로 초기화.
+
+- **2) 요금제 그룹/요금제 목록 로드 (`loadPlanGroups`)**
+  - API: `directStoreApiClient.getLinkSettings(selectedCarrier)`
+  - 응답에서:
+    - `sheetId`, `planNameRange`, `planGroupRange`, `basicFeeRange` 정보를 이용해  
+      다시 `fetchRangeData` 3번 호출 → 실제 구글 시트의 요금제/요금제군/기본료를 읽어옴.
+  - 가공:
+    - 같은 인덱스의 값들을 묶어 `plans[]` 구조 생성:
+      - `{ name: "요금제명(요금제군)", planName, group, basicFee }`
+  - 폼에 반영:
+    - `setPlanGroups(plans)`
+    - 첫 번째 요금제를 `selectedPlanGroup`, `planBasicFee`, `formData.plan`에 반영.
+  - 실패/데이터 없음:
+    - `linkSettings.planGroup.planGroups`를 이용한 fallback 자동 생성  
+      (기본료는 임의 값으로 계단식으로 부여).
+
+- **3) 정책 기반 필수 부가서비스/보험상품 로드 (`loadRequiredAddons`)**
+  - API: `directStoreApi.getPolicySettings(selectedCarrier)`
+  - 부가서비스:
+    - `policySettings.addon.list` 중 `deduction > 0`인 항목 → 필수 부가서비스
+    - `incentive > 0`인 항목 → 부가유치 시 유치되는 부가서비스 이름을 `addonIncentiveList`로 별도 보관.
+  - 보험상품:
+    - `factoryPrice`가 일정 구간에 들어가는 보험상품 1개를 찾아 필수 리스트에 추가.
+    - `incentive > 0`이면 `insuranceIncentiveList`에 추가.
+  - 실패/정책 없음:
+    - `우주패스`, `V컬러링` 등 Mock 데이터를 필수 부가서비스로 세팅.
+
+- **4) initialData 기반 최초 대리점 지원금 자동 계산**
+  - 조건:
+    - `initialData.planGroup`과 `initialData.openingType`이 존재하고,
+    - `planGroups`까지 로드가 끝난 후.
+  - 동작:
+    1. `planGroups`에서 `initialData.planGroup`에 매칭되는 plan 찾기.
+    2. `openingTypeMap`으로 `NEW/MNP/CHANGE/010신규/기변` 문자열을 통일.
+    3. `modelId`:
+       - 우선 `initialData.id` 사용.
+       - 없으면 `getMobileList(selectedCarrier)` 호출로 model명+carrier로 매칭.
+    4. `calculateMobilePrice(modelId, planGroup, openingType, selectedCarrier, modelName)` 호출.
+    5. 성공 시:
+       - `publicSupport`, `storeSupportWithAddon`, `storeSupportWithoutAddon`를 **서버 계산값으로 갱신**.
+  - 이 로직 덕분에:
+    - 휴대폰 목록/오늘의 휴대폰에서 선택한 planGroup/openingType을 개통정보 페이지에서 그대로 이어받고,  
+      서버 계산 결과로 다시 정교하게 보정 가능.
+
+- **5) 요금제 변경 시 대리점 지원금/이통사 지원금 재계산**
+  - 요금제 `Autocomplete`에서 요금제 선택 변경 시:
+    1. `formData.plan`, `selectedPlanGroup`, `planBasicFee` 업데이트.
+    2. `planGroup = newValue.group || newValue.name` 추출.
+    3. `initialData.id` 혹은 `model+carrier` 조합으로 `modelId`를 찾음.
+    4. 현재 `formData.openingType`(`NEW/MNP/CHANGE`)을 `010신규/MNP/기변`으로 매핑.
+    5. 다시 `calculateMobilePrice(modelId, planGroup, openingType, selectedCarrier, modelName)` 호출.
+    6. 성공 시:
+       - `setPublicSupport`, `setStoreSupportWithAddon`, `setStoreSupportWithoutAddon`에 서버값 반영.
+  - 요금제 선택 해제 시:
+    - `publicSupport`, `storeSupportWithAddon`, `storeSupportWithoutAddon`를  
+      다시 `initialData` 값으로 롤백.
+
+- **6) 계산 엔진을 통한 실시간 금액 계산**
+  - 입력값:
+    - `factoryPrice`, `publicSupport`, `storeSupportWithAddon/WithoutAddon`
+    - `formData`의:
+      - `openingType`, `installmentPeriod`, `contractType`, `paymentType`, `withAddon`, `usePublicSupport`, `lgPremier`, `cashPrice` 등
+  - 사용 함수 (`directStoreCalculationEngine`):
+    - `calculateInstallmentPrincipalWithAddon / WithoutAddon`:
+      - 출고가 – 이통사 지원금 – 대리점추가지원금을 계산해 **할부원금** 산출.
+    - `calculateInstallmentFee`:
+      - 할부원금과 할부개월수로 **총 할부수수료 / 월 할부수수료** 계산.
+    - `calculatePlanFee`:
+      - 기본료, 약정/프리미어 여부로 실제 월 통신요금 계산.
+    - `calculateRequiredAddonsFee`:
+      - 필수 부가서비스 월 합계.
+    - `calculateTotalMonthlyFee`:
+      - 할부/현금 여부에 따라 **최종 월 납부금** 계산 (할부원금, 수수료, 요금제, 부가서비스 포함).
+    - `calculateCashPrice`:
+      - 현금 결제 시 필요한 금액 산출.
+  - `OpeningInfoPage`에서는 이 값들을:
+    - 좌측 폼(할부원금, 현금가 필드 등),
+    - 우측 요약 박스(단말기 금액/요금 금액/최종 월 납부금)에 실시간으로 표시.
+
+- **7) 저장(입력완료) 시 판매일보 데이터 생성 (`handleComplete`)**
+  - 전제 조건:
+    - 동의 체크(`agreementChecked`) 필수.
+    - 고객명/연락처, 요금제 필수.
+  - 생성되는 `saveData` 필드 요약:
+    - 매장/기본 정보:
+      - `posCode`, `company`, `storeName`, `storeId`, `soldAt(ISO)`.
+    - 고객/개통 정보:
+      - `customerName`, `customerContact`, `ctn`, `carrier`, `model`, `color`, `deviceSerial`
+      - `simModel`, `simSerial`, `openingType(NEW/MNP/CHANGE)`, `prevCarrier`, `installmentType(할부/현금)`,  
+        `installmentPeriod`, `contractType`, `plan`, `addons(필수 부가서비스 이름들)`.
+    - 금액/지원금:
+      - `factoryPrice`, `publicSupport`, `storeSupportWithAddon`, `storeSupportNoAddon`, `storeSupportWithoutAddon`.
+      - 참고용 계산값(시트에는 직접 저장하지 않더라도 포함):  
+        할부원금(부가유치/미유치), 할부수수료, 요금제/부가요금, 월 납부금, 현금가, 입금계좌 등.
+    - 초기 상태:
+      - `status: '개통대기'`
+  - API:
+    - `directStoreApiClient.createSalesReport(saveData)`
+  - 성공 시:
+    - 알림 후 `onBack()` 호출 → 모드로 돌아가도록 구성.
+
+---
+
+## 6. 추가로 보면 좋은 파일
+
+- `DirectStoreMode.js` : 직영점 모드 전체 구조/인증/탭 로직
+- `DirectStoreManagementMode.js` : 직영점 관리 모드 권한/탭/레이아웃 로직
+- `modeConfig.js` : 모드별 메타 정보/아이콘/색상/권한 시트 매핑
+- `DirectSalesReportTab.js` : 판매일보 로직 (두 모드가 모두 공유)
+- `OpeningInfoPage.js` : 개통정보 입력/상세 화면
+- `MobileListTab.js` / `MobileListRow.js` : 휴대폰 목록 데이터/행 렌더링/가격 계산 로직
+- `TodaysMobileTab.js` / `TodaysProductCard.js` : 오늘의 휴대폰 데이터/슬라이드쇼/카드별 가격 로딩 로직
+
+
+﻿
+
+## 7. 직영점 관련 구글 시트 구조 & 컬럼 매핑
+
+직영점 모드/직영점 관리 모드에서 사용하는 **구글 시트 구조**를 정리해두면,  
+리팩토링 시 어디를 건드려야 하는지 한눈에 볼 수 있습니다.
+
+---
+
+### 7-1. 권한/접속 관련 시트
+
+- **시트명**: `대리점아이디관리`
+  - **역할**: 관리자/모드 권한, 특히 **직영점 관리 모드 권한(M/S/O)** 을 관리.
+  - **주요 컬럼 (인덱스 기준, 0부터 시작)**:
+    - `agent[0]` (A열): 담당자/대상 이름
+    - `agent[1]` (B열): 자격/역할
+    - `agent[2]` (C열): ID
+    - `agent[7]` (H열) 이후: 여러 모드 권한 열 (재고, 정산, 검수 등)  
+      → `MODE_CONFIG` 의 `sheetRefs.admin` 주석이 각 모드별 열 위치를 설명.
+    - `agent[30]` (AE열): **직영점 관리 모드 권한**  
+      - 값: `'M' | 'S' | 'O' | ''`  
+      - 서버(`server/index.js`)에서:
+        - `directStoreManagementPermissionRaw = (agent[30] || '').toString().trim().toUpperCase();`
+        - `M/S/O` 인 경우에만 `loggedInStore.modePermissions.directStoreManagement` 로 노출.
+  - **데이터 흐름**
+    - 로그인 시:
+      - 서버가 `대리점아이디관리` 전체를 읽어 각 행을 사용자 계정으로 파싱.
+      - 열별 권한 플래그를 `loggedInStore.modePermissions`에 매핑.
+    - 클라이언트:
+      - `ModeSelector` / `modeConfig` / `DirectStoreManagementMode` 에서  
+        `loggedInStore.modePermissions.directStoreManagement` 값을 기반으로  
+        **접속 가능 여부 + 탭별 권한(hasPolicy/hasLink/hasSalesReport)** 을 결정.
+
+- **시트명**: `일반모드권한관리`
+  - **역할**: 일반 모드(직영점 모드 포함)의 권한 및 **직영점 모드 비밀번호** 관리.
+  - **주요 컬럼 (인덱스 기준)** (`server/index.js` 기준):
+    - `general[0]` (A열): 사용자 ID/식별자
+    - `general[1]..` : 기타 사용자 정보
+    - `general[6]` (G열): **직영점 모드 권한**
+      - 값: `'O'` 또는 `'M/S'` 등 (실제 사용은 `'O'`/`true` 중심)
+      - 서버에서 `hasDirectStoreMode` 플래그로 변환 후 `loggedInStore.modePermissions.directStore` 로 노출.
+    - `general[7]` (H열): **직영점 모드 비밀번호**
+  - **데이터 흐름**
+    - 로그인 시:
+      - 관리자가 아닌 계정은 `일반모드권한관리` 시트에서 한 번 더 검색.
+      - `G열` 값을 보고 `loggedInStore.modePermissions.directStore` 를 셋업.
+      - `H열` 비밀번호를 `loggedInStore.directStoreSecurity.password`/`requiresPassword` 등에 반영.
+    - 비밀번호 검증:
+      - `/api/verify-direct-store-password` 에서  
+        `일반모드권한관리!A:H` 범위를 읽어,  
+        해당 사용자 행의 **H열 값과 사용자가 입력한 비밀번호를 비교**.
+
+- **시트명**: `어플업데이트`
+  - **역할**: 모드별 업데이트 로그(변경 이력)를 저장. 직영점/직영점 관리 모드도 별도 열로 존재.
+  - **구조 요약**
+    - 범위: `어플업데이트!A:Y` (A~Y열, `server/index.js` 참고)
+    - 기본 규칙:
+      - `A열`: 날짜
+      - `C열`~`Y열`: 모드별 업데이트 내용 (각 모드 한 열씩)
+    - `modeColumnMap` (`server/index.js`) 중 직영점 관련:
+      - `directStoreManagement`: **W열(22)** — 직영점 관리 모드 업데이트
+      - `directStore`: **X열(23)** — 직영점 모드 업데이트
+  - **데이터 흐름**
+    - 조회:
+      - `/api/app-updates` → `어플업데이트` 전체를 가져와  
+        프론트의 `AppUpdatePopup` 에서 모드별로 필터링해 사용.
+    - 추가:
+      - `/api/app-updates` `POST` 호출 시:
+        - `modeColumnMap[mode]`로 열 인덱스를 찾고,
+        - `A열=날짜`, 해당 모드 열에 `content` 를 채워 한 행 append.
+    - 클라이언트:
+      - 직영점 모드/관리 모드의 업데이트 팝업에서  
+        `mode="directStore" | "directStoreManagement"` 로 호출하여  
+        각각 X/W열 내용을 보여줌.
+
+---
+
+### 7-2. 직영점 정책/설정 관련 시트
+
+- **시트명**: `직영점_정책_마진` (`SHEET_POLICY_MARGIN`)
+  - **헤더 (HEADERS_POLICY_MARGIN)**:
+    - A열: `통신사`
+    - B열: `마진`
+  - **데이터 흐름**
+    - `getPolicySettings(carrier)` / `/api/direct/policy-settings` 에서:
+      - 해당 `carrier` 행을 찾아 `baseMargin` 을 계산.
+    - 클라이언트:
+      - `OpeningInfoPage` 의 금액 계산 엔진에서  
+        직접 읽지는 않지만, **대리점 마진 정책의 베이스 값**으로 사용됨.
+
+- **시트명**: `직영점_정책_부가서비스` (`SHEET_POLICY_ADDON`)
+  - **헤더 (HEADERS_POLICY_ADDON)**:
+    - A열: `통신사`
+    - B열: `서비스명`
+    - C열: `월요금`
+    - D열: `유치추가금액` (부가 유치 시 추가 지원)
+    - E열: `미유치차감금액` (미유치 시 차감, 내부에서는 음수로 변환)
+  - **데이터 흐름**
+    - 서버 정책 로딩:
+      - `getPolicySettings` / `/api/direct/policy-settings` 에서:
+        - `carrier` 가 일치하는 행만 필터.
+        - 각 행을 `{ name, fee, incentive, deduction }` 구조로 변환:
+          - `incentive = D열`, `deduction = E열(음수 처리)`.
+      - 이 값들은:
+        - `OpeningInfoPage` 의 필수 부가서비스 / 부가유치 인센티브 계산에 사용.
+
+- **시트명**: `직영점_정책_보험상품` (`SHEET_POLICY_INSURANCE`)
+  - **헤더 (HEADERS_POLICY_INSURANCE)**:
+    - A열: `통신사`
+    - B열: `보험상품명`
+    - C열: `출고가최소`
+    - D열: `출고가최대`
+    - E열: `월요금`
+    - F열: `유치추가금액`
+    - G열: `미유치차감금액`
+  - **데이터 흐름**
+    - 정책 읽기:
+      - `/api/direct/policy-settings` 에서 `carrier` 필터 후,
+        `{ name, minPrice, maxPrice, fee, incentive, deduction }` 구조로 생성.
+    - 개통정보 페이지:
+      - `OpeningInfoPage` → `directStoreApi.getPolicySettings` 를 통해 가져온 후,
+        현재 단말 `factoryPrice` 가 `[minPrice, maxPrice]` 범위에 들어가는 보험상품을 1개 선택:
+        - 필수 부가서비스 리스트에 보험 항목으로 추가.
+        - `incentive > 0` 인 경우, `insuranceIncentiveList` 에도 반영.
+
+- **시트명**: `직영점_정책_별도` (`SHEET_POLICY_SPECIAL`)
+  - **헤더 (HEADERS_POLICY_SPECIAL)**:
+    - A열: `통신사`
+    - B열: `정책명`
+    - C열: `추가금액`
+    - D열: `차감금액`
+    - E열: `적용여부` (boolean)
+  - **데이터 흐름**
+    - `getPolicySettings` 에서:
+      - `carrier` 일치 + `E열 === true` 인 행만 필터해  
+        `{ addition: C열, deduction: D열 }` 리스트 생성.
+    - 이 값들은:
+      - 단말/요금제 조합에 따른 **별도 정책 금액(추가/차감)** 으로 합산되어  
+        최종 마진/지원금 계산에 반영.
+
+- **시트명**: `직영점_설정` (`SHEET_SETTINGS`)
+  - **헤더 (HEADERS_SETTINGS)**:
+    - A열: `통신사` (`SK/KT/LG`)
+    - B열: `설정유형` (`planGroup` | `support` | `policy`)
+    - C열: `시트ID` (또는 링크)
+    - D열: `시트URL` (현재는 비워두는 경우 많음)
+    - E열: `설정값JSON` (각 설정유형마다 구조가 다른 JSON)
+  - **설정유형별 JSON 구조**
+    - `planGroup` (요금제군 정보; `MobileListTab`/`OpeningInfoPage` 에서 사용):
+      - `planNameRange`: 요금제명 범위
+      - `planGroupRange`: 요금제군 범위
+      - `basicFeeRange`: 기본료 범위
+      - `planGroups`: 추출된 요금제군 목록 (선택지 캐싱 용도)
+    - `support` (이통사 지원금/정책표; `getMobileList` 에서 사용):
+      - `modelRange`: 모델명 범위
+      - `petNameRange`: 펫네임 범위
+      - `factoryPriceRange`: 출고가 범위
+      - `openingTypeRange`: 개통유형 범위
+      - `planGroupRanges`: 요금제군별 지원금 범위 맵
+    - `policy` (정책표; `getMobileList` 에서 모델/펫네임을 읽을 원본 시트 정의):
+      - `modelRange`, `petNameRange`
+      - `planGroupRanges`: 정책표 기준 요금제군 정의
+  - **데이터 흐름**
+    - 저장 (`POST /api/direct/link-settings`):
+      - 모드 설정 UI(`LinkSettingsTab`)에서 입력한 시트ID 및 범위를  
+        JSON 으로 포장해 `직영점_설정` A~E열에 한 줄씩 저장.
+      - `planGroup` 설정은 필요 시 `planGroupRange` 범위에서  
+        요금제군을 자동 추출하여 `planGroups` 에 채워 넣음.
+    - 읽기:
+      - `getMobileList`:
+        - `carrier + 'policy'` 행에서 정책표 시트ID와 `modelRange/petNameRange` 를 읽어  
+          **단말 목록의 원본 시트 + 범위** 를 결정.
+        - 같은 `설정유형='support'` 행에서 **이통사 지원금/정책표** 범위를 읽어  
+          가격 계산용 데이터를 구성.
+      - `OpeningInfoPage`:
+        - `linkSettings.planGroup` 내 `planNameRange/planGroupRange/basicFeeRange` 로  
+          실제 요금제명/요금제군/기본료를 구글시트에서 다시 읽어온 뒤,  
+          자동으로 Autocomplete 옵션을 구성.
+
+- **시트명**: `직영점_메인페이지문구` (`SHEET_MAIN_PAGE_TEXTS`)
+  - **헤더 (HEADERS_MAIN_PAGE_TEXTS)**:
+    - A열: `통신사` (`SK/KT/LG` 또는 공통)
+    - B열: `카테고리` (`premium` / `budget` / `common` 등)
+    - C열: `설정유형` (`mainHeader` / `transition` / 기타)
+    - D열: `문구내용`
+    - E열: `이미지URL`
+    - F열: `수정일시`
+  - **데이터 흐름**
+    - 조회 (`GET /api/direct/main-page-texts`):
+      - `directStoreApiClient.getMainHeaderText`:
+        - 응답 중 `data.mainHeader` 를 꺼내 `TodaysMobileTab` 의 상단 문구로 사용.
+      - `directStoreApiClient.getTransitionPageText(carrier, category)`:
+        - `transitionPages[carrier][category]` 를 꺼내 슬라이드쇼의 연결페이지 문구·이미지로 사용.
+    - 저장 (`POST /api/direct/main-page-texts`):
+      - `MainPageTextSettingsTab` 에서 carrier/category/textType 별로  
+        문구/이미지 URL을 작성하면, 한 행씩 `직영점_메인페이지문구`에 기록.
+
+---
+
+### 7-3. 직영점 상품/태그/이미지/판매일보 시트
+
+- **시트명**: `직영점_모델이미지`
+  - **컬럼 구조 (주석 기준)**:
+    - A열: `통신사`
+    - B열: `모델ID` (실제 모델 코드)
+    - C열: `모델명`
+    - D열: `펫네임`
+    - E열: `제조사`
+    - F열: `이미지URL`
+    - G열: `비고`
+  - **데이터 흐름**
+    - `getMobileList` (`server/directRoutes.js`):
+      - `직영점_모델이미지!A:G` 를 읽어,  
+        `(통신사+모델코드)` 기준으로 `imageMap` 을 구성.
+      - 각 단말 row에 매칭되는 이미지 URL을 붙여  
+        `MobileListTab` 의 `row.image` 로 내려줌.
+    - 이미지 업로드 (`/api/direct/upload-image`):
+      - 직영점 모드에서 업로드된 이미지 URL을  
+        해당 모델/통신사 행의 `F열` 에 저장하거나 새 행 추가.
+
+- **시트명**: `직영점_오늘의휴대폰`
+  - **컬럼 사용 (태그 부분, 주석 기준)**:
+    - A열: `모델명` (매칭 키)
+    - ...
+    - J열 (index 9): `isPopular` (`Y/TRUE`)
+    - K열 (10): `isRecommended`
+    - L열 (11): `isCheap`
+    - M열 (12): `isPremium`
+    - N열 (13): `isBudget`
+  - **데이터 흐름**
+    - 읽기:
+      - `getMobileList` 에서 `직영점_오늘의휴대폰!A:Z` 로 전체 로드 후,
+        `tagMap` 을 `{ model -> 태그들 }` 구조로 만들어 `mobileList` 각 행에 병합.
+      - `getTodaysMobiles` (`/api/direct/todays-mobiles`) 는  
+        이 태그 정보와 정책/지원금 데이터를 조합해  
+        `premium`/`budget` 리스트를 만들어 `TodaysMobileTab` 으로 내려줌.
+    - 쓰기:
+      - `updateMobileTags` (`PUT /api/direct/mobiles/:modelId/tags`) 호출 시:
+        - 먼저 `직영점_설정`에서 해당 carrier 의 policy/support 설정을 로딩.
+        - 이후 `직영점_오늘의휴대폰!A:Z` 에서 해당 모델 행을 찾고,  
+          J~N열의 태그 컬럼을 `Y/TRUE` 또는 빈 값으로 업데이트.
+
+- **시트명**: `직영점_판매일보`
+  - **헤더 (DIRECT_SALES_HEADERS, A~Z)**:
+    1. A열: `번호` (내부 ID, `sales-{timestamp}` 등)
+    2. B열: `POS코드`
+    3. C열: `업체명`
+    4. D열: `매장ID`
+    5. E열: `판매일시`
+    6. F열: `고객명`
+    7. G열: `CTN` (연락처)
+    8. H열: `통신사`
+    9. I열: `단말기모델명`
+    10. J열: `색상`
+    11. K열: `단말일련번호`
+    12. L열: `유심모델명`
+    13. M열: `유심일련번호`
+    14. N열: `개통유형` (신규/번호이동/기기변경 등 한글)
+    15. O열: `전통신사`
+    16. P열: `할부구분` (할부/현금)
+    17. Q열: `할부개월`
+    18. R열: `약정`
+    19. S열: `요금제`
+    20. T열: `부가서비스` (CSV 문자열)
+    21. U열: `출고가`
+    22. V열: `이통사지원금`
+    23. W열: `대리점추가지원금(부가유치)`
+    24. X열: `대리점추가지원금(부가미유치)`
+    25. Y열: `마진`
+    26. Z열: `상태` (개통대기/완료 등)
+  - **데이터 흐름**
+    - 조회 (`GET /api/direct/sales`):
+      - 헤더를 항상 `DIRECT_SALES_HEADERS`로 보정 후,  
+        A:Z 전체를 읽어 `DirectSalesReportTab` 에서 쓰기 쉬운 형태로 매핑.
+      - 각 열은 JS 객체의 다국어 키(한국어/영문)로 동시에 노출.
+    - 생성 (`POST /api/direct/sales` → `directStoreApiClient.createSalesReport`):
+      - `OpeningInfoPage` 의 `handleComplete` 가 만든 `saveData`를 바탕으로  
+        한 행의 배열을 만들어 A~Z열에 append.
+      - 개통유형은 `NEW/MNP/CHANGE` 를 한글(신규/번호이동/기기변경)으로 변환해 N열에 저장.
+    - 수정 (`PUT /api/direct/sales/:id`):
+      - A열의 `번호` 값으로 행을 찾아, 나머지 열을 덮어쓰는 방식으로 업데이트.
+
+---
+
+이 섹션을 기준으로, 이후 리팩토링 시  
+**“어떤 시트/어떤 열이 어느 화면/로직과 연결되어 있는지”** 를 빠르게 추적할 수 있습니다.
+
+
+## 8. 직영점 데이터 리팩토링 플랜 (마스터 시트 기반)
+
+이 섹션은 새로 만든 세 개의 마스터 시트:
+
+- `직영점_단말마스터`
+- `직영점_단말요금정책`
+- `직영점_요금제마스터`
+
+를 기반으로 **휴대폰목록 / 오늘의휴대폰 / 개통정보입력**의 데이터 흐름을 재구성하는 구체적인 리팩토링 플랜이다.
+
+---
+
+### 8-1. 목표 아키텍처 요약
+
+- **현재**:
+  - 런타임마다 `직영점_설정` → 개별 정책/지원금 시트(정책표, 지원금표, 오늘의휴대폰, 모델이미지 등)를 여러 번 읽고,
+  - 프론트에서 각종 조합/계산/캐시를 반복 수행.
+- **목표**:
+  - **1) 링크설정/정책/원본표 → 2) ETL(정규화/병합) → 3) 마스터 시트 덤프** 구조로 전환.
+  - 프론트는 **마스터 시트를 읽는 간단한 API**만 사용하고,  
+    복잡한 범위/시트 조합은 모두 서버 ETL에서 처리.
+
+---
+
+### 8-2. ETL(정규화) 파이프라인 설계
+
+#### 8-2-1. 공통 개념
+
+- **정규화 키(Normalized Key)**:
+  - 단말 요금/정책 레벨에서의 기본 키:
+    - `통신사` + `모델ID(또는 모델명)` + `요금제군` + `개통유형`
+  - 요금제 레벨에서는:
+    - `통신사` + `요금제코드` (또는 `요금제명 + 요금제군` 조합)
+
+- **파이프라인 실행 시점**
+  - 직영점관리모드에서:
+    - 관리자가 “데이터 재빌드” 버튼을 누를 때 수동 실행.
+  - 또는 서버 배치(크론)로:
+    - 새벽/매시간 등 일정 주기로 실행.
+
+#### 8-2-2. 단계 1 – 요금제 마스터 구축 (`직영점_요금제마스터`)
+
+- **입력 소스**
+  - `직영점_설정`의 `planGroup` 설정:
+    - `sheetId`, `planNameRange`, `planGroupRange`, `basicFeeRange`
+  - 실제 요금제 시트들 (통신사별 1개 이상).
+
+- **ETL 절차**
+  1. `직영점_설정`에서 각 통신사의 `planGroup` 설정 읽기.
+  2. `fetchRangeData` 또는 Sheets API로:
+     - `planNameRange` → 요금제명 리스트
+     - `planGroupRange` → 요금제군 리스트
+     - `basicFeeRange` → 기본료 리스트
+  3. 인덱스 기준으로 매칭해, 다음 구조로 정규화:
+     - `통신사, 요금제명, 요금제군, 기본료, 요금제코드(선택), 사용여부, 비고`
+  4. **`직영점_요금제마스터` 전체를 교체(write)**
+     - 기존 내용은 버리고 새 데이터로 A~G열 전체 overwrite.
+
+- **테스트 포인트**
+  - 통신사별 요금제 수가 원본과 일치하는지 확인.
+  - 대표 요금제 한두 개의 `요금제명/요금제군/기본료`가 원본과 정확히 일치하는지 확인.
+
+#### 8-2-3. 단계 2 – 단말 마스터 구축 (`직영점_단말마스터`)
+
+- **입력 소스**
+  - `직영점_설정`의 `policy/support` 설정:
+    - 정책표/지원금표 시트ID 및 모델/펫네임/출고가 범위 등.
+  - 기존 `직영점_모델이미지`:
+    - 통신사별 모델ID/모델명/펫네임/이미지.
+  - 기존 `직영점_오늘의휴대폰`:
+    - 태그 정보 (인기/추천/저렴/프리미엄/중저가).
+
+- **ETL 절차**
+  1. `직영점_설정`에서 각 통신사의 `policy` 설정을 읽어:
+     - 정책표 시트에서 `모델명/펫네임/제조사/출고가` 등을 읽어옴.
+  2. `직영점_모델이미지`에서:
+     - `통신사, 모델ID, 모델명, 펫네임, 제조사, 이미지URL`을 `통신사+모델코드` 기준으로 매핑.
+  3. `직영점_오늘의휴대폰`에서:
+     - 모델명 단위로 태그(`isPremium/isBudget/isPopular/isRecommended/isCheap`)를 정규화.
+  4. 위 세 가지 소스를 **모델ID/모델명 기준으로 머지**:
+     - 충돌시 우선순위:
+       1. `모델ID`가 명시된 행
+       2. 정규화된 모델코드(`normalizeModelCode`)가 일치하는 행
+       3. 모델명 단순 문자열 일치
+  5. 결과를 `직영점_단말마스터`에 덤프:
+     - `통신사, 모델ID, 모델명, 펫네임, 제조사, 출고가, 기본요금제군, isPremium, isBudget, isPopular, isRecommended, isCheap, 이미지URL, 사용여부, 비고`
+     - `기본요금제군`은:
+       - `isPremium === true` → `115군`
+       - `isBudget === true` → `33군`
+       - 둘 다 아니면 기본 `115군` (또는 설정에 따라 변경 가능).
+
+- **테스트 포인트**
+  - 기존 `MobileListTab` 에서 보이던 대표 모델들이 모두 `직영점_단말마스터`에 존재하는지 확인.
+  - 이미지/태그가 올바르게 매핑되는지 모델 몇 개를 샘플 검증.
+
+#### 8-2-4. 단계 3 – 단말 요금/정책 마스터 구축 (`직영점_단말요금정책`)
+
+- **입력 소스**
+  - `직영점_단말마스터`:
+    - 단말ID/출고가/기본요금제군/태그.
+  - `직영점_요금제마스터`:
+    - 요금제군/기본료/요금제코드.
+  - `직영점_정책_마진`, `직영점_정책_부가서비스`, `직영점_정책_보험상품`, `직영점_정책_별도`:
+    - 마진/부가/보험/별도 정책.
+  - 기존 이통사 지원금/정책표 설정(`직영점_설정`의 `support/policy`):
+    - 모델/요금제군/개통유형별 지원금 정보.
+
+- **ETL 절차**
+  1. 각 통신사/모델에 대해 `지원금/정책표`에서:
+     - `요금제군 × 개통유형(010신규/MNP/기변)` 조합으로  
+       `출고가, 이통사지원금, 대리점추가지원금(부가/미유치)`을 계산.
+  2. `직영점_정책_*` 시트에서:
+     - 해당 통신사의 마진/부가/보험/별도 정책을 읽고,
+     - 필요하다면 `정책마진` 필드를 별도로 계산(또는 0/미사용).
+  3. `직영점_요금제마스터`에서:
+     - `요금제군` + (필요 시 `요금제코드`) 기준으로 조인하여,  
+       추후 UI에서 요금제명을 쉽게 보여줄 수 있도록 **요금제코드/군만 저장**.
+  4. 최종 구조:
+     - `통신사, 모델ID, 모델명, 요금제군, 요금제코드, 개통유형, 출고가, 이통사지원금, 대리점추가지원금_부가유치, 대리점추가지원금_부가미유치, 정책마진, 정책ID, 기준일자, 비고`
+  5. 이 시트는 “정적 마스터”로, 런타임에는 **조회만** 수행.
+
+- **테스트 포인트**
+  - 기존 `calculateMobilePrice` 결과와 비교:
+    - 몇 개 모델/요금제군/개통유형 케이스를 뽑아,
+    - `직영점_단말요금정책`의 값과 API 계산 결과가 일치하는지 확인.
+
+---
+
+### 8-3. 서버 API 리팩토링 플랜
+
+#### 8-3-1. 새로운 마스터 조회 API
+
+- **1) 단말 마스터 조회**
+  - `GET /api/direct/mobiles-master?carrier=SK`
+  - 응답:
+    - `[{ carrier, modelId, model, petName, manufacturer, factoryPrice, defaultPlanGroup, isPremium, isBudget, isPopular, isRecommended, isCheap, imageUrl, enabled }]`
+  - 사용처:
+    - `MobileListTab`:
+      - 기존 `getMobileList` + 정책표/이미지/태그 조합 대신 이 API로 교체.
+    - `TodaysMobileTab`:
+      - 프리미엄/중저가의 기본 후보군으로 사용.
+
+- **2) 단말 요금/정책 조회**
+  - `GET /api/direct/mobiles-pricing?carrier=SK&modelId=...&planGroup=115군&openingType=MNP`
+  - 또는:
+  - `GET /api/direct/mobiles-pricing/bulk?carrier=SK` (전체 또는 대량 조회)
+  - 응답:
+    - `[{ carrier, modelId, model, planGroup, planCode, openingType, factoryPrice, publicSupport, storeSupportWithAddon, storeSupportWithoutAddon, policyMargin, policyId }]`
+  - 사용처:
+    - `MobileListTab`:
+      - 현재 선택된 `planGroup/openingType` 조합에 맞는 레코드만 필터해서 사용.
+    - `TodaysMobileTab`:
+      - 카드 별 가격을 마스터 값에서 우선 사용하고,  
+        필요 시 `calculateMobilePrice`로 재보정.
+    - `OpeningInfoPage`:
+      - 초기 진입/요금제 변경 시 **마스터 값**을 먼저 읽고,  
+        이후 계산 엔진에 전달.
+
+- **3) 요금제 마스터 조회**
+  - `GET /api/direct/plans-master?carrier=SK`
+  - 응답:
+    - `[{ carrier, planName, planGroup, basicFee, planCode, enabled }]`
+  - 사용처:
+    - `OpeningInfoPage` 요금제 Autocomplete:
+      - `직영점_요금제마스터` 기반으로 검색/선택 처리.
+
+#### 8-3-2. ETL 트리거 API
+
+- **경로 제안**:
+  - `POST /api/direct/rebuild-master?carrier=SK`
+- **동작**:
+  1. `carrier` 가 없으면 `['SK','KT','LG']` 전체 수행.
+  2. 8-2-2 ~ 8-2-4의 ETL을 순서대로 실행:
+     - `요금제마스터 → 단말마스터 → 단말요금정책`.
+  3. 완료 후:
+     - 변경된 레코드 수/에러 리스트 등을 응답으로 반환.
+- **사용처**:
+  - `DirectStoreManagementMode`의 `LinkSettingsTab` 또는 별도 “데이터 관리” 탭에:
+    - “마스터 데이터 재빌드” 버튼을 만들어 이 API를 호출.
+
+- **테스트 포인트**
+  - 통신사 하나(SK)만 대상으로 먼저 테스트:
+    - SK만 재빌드 → SK 관련 화면들이 정상 동작하는지 확인.
+  - KT/LG는 기존 API를 그대로 사용하다가, 검증이 끝난 후 순차적으로 전환.
+
+---
+
+### 8-4. 프론트엔드 리팩토링 단계
+
+#### 8-4-1. 1단계 – 데이터 소스 스위칭 (기능 유지)
+
+- **`MobileListTab`**
+  - 현재:
+    - `getMobileList` + `getLinkSettings` + `calculateMobilePrice` + 복잡한 캐시/큐.
+  - 1단계:
+    - 목록(단말 정보):
+      - `getMobileList` → `getMobilesMaster`(신규 API) 로 교체.
+    - 가격:
+      - `calculateMobilePrice` 유지하되,
+      - **가능하면 `직영점_단말요금정책`에서 바로 값을 읽는 헬퍼**를 먼저 사용:
+        - 없으면 fallback 으로 `calculateMobilePrice` 호출.
+    - 이 단계에서는 기존 캐시/큐를 **지우지 말고**,  
+      단지 입력 데이터를 마스터 기반으로 바꾸는 것에 집중.
+
+- **`TodaysMobileTab`**
+  - 현재:
+    - `getTodaysMobiles` + `getMobileList` + `calculateMobilePrice` + priceCache.
+  - 1단계:
+    - 슬라이드쇼용 데이터 준비에서:
+      - `getMobileList` 대신 `getMobilesMaster` 사용.
+    - 가격 계산:
+      - 먼저 `mobiles-pricing` 마스터 API에서 찾고,
+      - 없을 때만 `calculateMobilePrice` 호출.
+
+- **`OpeningInfoPage`**
+  - 현재:
+    - `getLinkSettings` → `fetchRangeData` → 정책표에서 다시 계산.
+  - 1단계:
+    - `initialData(planGroup/openingType)` 기준:
+      - `mobiles-pricing` 마스터 API를 먼저 호출해  
+        `publicSupport/storeSupportWithAddon/storeSupportWithoutAddon` 기본값을 세팅.
+    - 이후 로직(계산엔진, 저장 등)은 그대로 유지.
+
+#### 8-4-2. 2단계 – 불필요한 시트/로직 정리
+
+- `직영점_오늘의휴대폰`:
+  - 태그 정보가 `직영점_단말마스터`로 완전히 이전되면:
+    - 읽기/쓰기 로직을 점진적으로 **단말마스터 기준으로 교체**.
+    - 일정 기간 운영 후, 사용되지 않는다면 시트/코드 제거 고려.
+
+- `directStoreApiClient.calculateMobilePrice`:
+  - 마스터가 충분히 신뢰할 수 있는 수준이 되면:
+    - **예외 케이스/디버깅 용도**로만 남기고,
+    - 일반 흐름에서는 호출 빈도를 크게 줄이기.
+
+---
+
+### 8-5. 단계별 권장 테스트 시나리오
+
+- **1단계: 마스터 시트/ETL 검증**
+  - 각 통신사별로:
+    - 대표 모델 3개 × 요금제군 2개 × 개통유형 3개 조합 표를 만들고,
+    - `직영점_단말요금정책` 값과 기존 화면의 최종 금액이 일치하는지 비교.
+
+- **2단계: API 스위칭 후 화면 검증**
+  - `MobileListTab`:
+    - SK/KT/LG 탭 전환, 태그/이미지/가격이 기존과 동일하게 보이는지 확인.
+  - `TodaysMobileTab`:
+    - 프리미엄/중저가 카드 수, 가격, 슬라이드쇼 동작 확인.
+  - `OpeningInfoPage`:
+    - 휴대폰목록/오늘의휴대폰/판매일보 각각에서 진입 시  
+      초기 금액/월 납부금이 기존과 동일한지 확인.
+
+- **3단계: 구시트/구로직 제거 전 회귀 테스트**
+  - 최소 하루 이상 실제 데이터로 운영하면서:
+    - 판매일보 저장/수정,
+    - 이미지 업로드,
+    - 태그 변경,
+    - 업데이트 팝업 등 직영점 관련 기능이 모두 정상 동작하는지 확인.
+
+이 플랜대로 진행하면, 기존 기능을 유지한 상태에서 **에러를 최소화하면서**  
+점진적으로 마스터 기반 구조로 전환할 수 있다. 필요한 단계에서 테스트를 요청하면  
+해당 부분만 따로 체크리스트 형태로 더 세분화해 줄 수 있다.
+
+---
+
+### 8-6. 실제 작업용 순차 리팩토링 체크리스트 (링크설정/정규화 테스트 포함)
+
+아래 순서대로 하나씩 진행하고, 각 단계마다 테스트를 통과한 뒤 다음 단계로 넘어가는 것을 권장한다.
+
+#### 1단계 – 링크설정 범위 로딩 검증 (백엔드만)
+
+- **1-1. 링크설정 원본 로딩 테스트용 API/스크립트 추가**
+  - 임시(또는 영구) 디버그 엔드포인트 예:
+    - `GET /api/direct/debug/link-settings?carrier=SK`
+    - 내부에서:
+      - `직영점_설정`에서 `planGroup/support/policy` 설정 JSON을 그대로 반환.
+      - `fetchRangeData` 또는 Sheets API로 각 `planNameRange/planGroupRange/basicFeeRange` 를 실제로 읽어:
+        - “첫 3행/마지막 3행” 정도의 샘플 데이터도 같이 반환.
+- **1-2. 링크설정 UI와 시트의 싱크 확인**
+  - 각 통신사(SK/KT/LG)에 대해:
+    - 링크설정 탭에서 입력한 시트ID/범위와  
+      `debug/link-settings` 응답의 시트ID/범위가 정확히 일치하는지 확인.
+    - 응답에 포함된 샘플 데이터가 시트 내용과 동일한지 수동으로 비교.
+  - ✅ 이 단계까지 확인이 끝나면:
+    - 변경된 서버 코드를 커밋/푸시하고,
+    - 배포 후 링크설정 화면에서 실제로 범위를 수정/저장해 본 뒤  
+      `debug/link-settings` 결과와 비교하여 운영 환경에서도 동일하게 동작하는지 확인.
+
+#### 2단계 – 정규화(ETL) 1차 실행: 로그 기반 점검
+
+- **2-1. ETL 엔트리 포인트 구현**
+  - `POST /api/direct/rebuild-master?carrier=SK`:
+    - 현재는 실제 시트를 건드리지 말고:
+      - `직영점_설정` → 원본 시트들을 읽어서,
+      - 정규화/머지 결과를 **메모리에서만 계산 후 JSON으로 응답**.
+    - 응답 내용:
+      - `plansSample` (요금제마스터 샘플 몇 개),
+      - `devicesSample` (단말마스터 샘플 몇 개),
+      - `pricingSample` (단말요금정책 샘플 몇 개),
+      - `warnings` (매칭 실패, 중복, 이상치 등).
+- **2-2. 정규화 로직 검증**
+  - 실제 구글시트와 `plansSample/devicesSample/pricingSample` 을 비교:
+    - 모델명/요금제군/기본료/출고가/지원금이 기대값과 일치하는지 확인.
+    - `warnings` 에 중요한 문제가 없는지 확인:
+      - “어떤 이유로 어떤 모델/요금제 조합이 스킵되었는지”를 파악.
+  - ✅ 이 단계까지 문제 없으면:
+    - ETL 디버그 결과(샘플 JSON)를 기준으로 커밋/푸시 후,
+    - 재배포된 서버에서 동일한 `rebuild-master` 디버그 호출을 해 보고  
+      로컬/운영 환경 결과가 일관적인지 확인.
+
+#### 3단계 – 마스터 시트에 쓰기(Write) 활성화
+
+- **3-1. `직영점_요금제마스터` 덤프**
+  - 2단계에서 검증한 정규화 결과를:
+    - 기존 데이터를 **백업 시트**(예: `직영점_요금제마스터_backup_YYYYMMDD`)로 복사한 뒤,
+    - `직영점_요금제마스터` A:G 전체를 overwrite.
+  - 테스트:
+    - 임의의 요금제 5개를 골라 원본 시트와 값이 일치하는지 재확인.
+
+- **3-2. `직영점_단말마스터` 덤프**
+  - 동일 방식으로:
+    - 백업 시트를 만들고,
+    - 새로운 정규화 결과로 overwrite.
+  - 테스트:
+    - 기존 `MobileListTab`에서 보이던 대표 단말의 **모델명/펫네임/제조사/출고가/태그/이미지URL** 이  
+      `직영점_단말마스터`에서도 정확히 매칭되는지 수동 검증.
+
+- **3-3. `직영점_단말요금정책` 덤프**
+  - 백업 후 overwrite.
+  - 테스트:
+    - 각 통신사별로 2~3개 모델에 대해:
+      - 과거 화면 스크린샷/기록과 `직영점_단말요금정책` 의 값이 일치하는지 체크.
+  - ✅ 세 마스터 시트까지 값이 안정적으로 들어가는 것이 확인되면:
+    - 이 시점에서 한 차례 커밋/푸시/배포를 진행하고,
+    - 구글시트 UI에서 마스터 시트를 직접 열어 눈으로도 값 확인.
+
+#### 4단계 – 신규 마스터 조회 API 구현 및 부분 전환
+
+- **4-1. `mobiles-master` / `mobiles-pricing` / `plans-master` API 구현**
+  - `mobiles-master`:
+    - `직영점_단말마스터`를 읽어 JSON으로 반환.
+  - `mobiles-pricing`:
+    - `직영점_단말요금정책`에서 필터링 후 JSON 반환.
+  - `plans-master`:
+    - `직영점_요금제마스터`를 읽어 JSON 반환.
+
+- **4-2. 테스트용 토글 플래그 도입**
+  - 예: `.env` 또는 서버 설정에:
+    - `USE_DIRECT_MASTER=true/false`
+  - 프론트에서는:
+    - 플래그가 true일 때만 마스터 API를 사용하고,  
+      false일 때는 기존 API를 사용하도록 분기.
+
+- **4-3. 화면별 부분 전환 및 비교**
+  - 먼저 SK만:
+    - `MobileListTab` 에서 SK 탭만 `USE_DIRECT_MASTER=true` 로 전환하고,  
+      KT/LG는 기존 방식 유지.
+    - SK 탭에서:
+      - 재고/가격/태그/이미지 표현이 기존과 1:1로 일치하는지 확인.
+  - 동일 방식으로:
+    - `TodaysMobileTab` → SK만 마스터 API 사용.
+    - `OpeningInfoPage` → SK만 마스터 기반 초기값 사용.
+  - ✅ SK에 대한 부분 전환이 이상 없으면:
+    - 코드 상태를 커밋/푸시하고 배포한 다음,
+    - 실제 어플 화면에서 SK 탭/화면을 집중적으로 비교 테스트한 뒤  
+      이상 없으면 KT/LG에 대해서도 순차적으로 마스터 API 사용 비율을 늘려간다.
+
+#### 5단계 – 마스터 구조 안정화 후 기존 로직 정리
+
+- **5-1. 링크설정/정책표 직접조회 경로 축소**
+  - `MobileListTab` / `TodaysMobileTab` / `OpeningInfoPage` 에서:
+    - 현재는 링크설정+범위 조회 경로와 마스터 API 경로가 **둘 다 존재**.
+  - 안정화 후:
+    - 실제 화면에서는 마스터 API만 사용하고,
+    - 링크설정/범위 조회는 **ETL 및 관리 화면 전용**으로 한정.
+
+- **5-2. `직영점_오늘의휴대폰` 태그 저장 위치 재검토**
+  - 태그 정보를 `직영점_단말마스터`로 완전히 옮겼다면:
+    - `직영점_오늘의휴대폰` 은:
+      - 필요 시 회의용/슬라이드 구성용 보조 시트로 쓰거나,
+      - 더 이상 사용하지 않으면 제거 고려.
+
+- **5-3. `calculateMobilePrice` 호출 빈도 축소**
+  - 마스터 데이터와 화면이 충분히 검증되면:
+    - `calculateMobilePrice`는:
+      - 새 정책 적용 직후,
+      - 예외 케이스 디버깅 시에만 사용하는 보조 API로 축소.
+
+#### 6단계 – 불필요한 구글 시트/범위 정리
+
+- **6-1. 더 이상 사용하지 않는 시트 후보 정리**
+  - 마스터 구조로 완전히 전환된 뒤, 아래 시트/범위를 **“읽기 전용/히스토리”** 로 볼 수 있는지 검토:
+    - `직영점_오늘의휴대폰`:
+      - 태그/선정 정보가 `직영점_단말마스터`로 완전히 이관되었고,
+      - 코드 상에서도 더 이상 직접 참조하지 않는 것이 확인되면 삭제 후보.
+    - 기존 링크설정에 연결되어 있던 **구 단가표 시트 일부 범위**:
+      - 새 PRICE/MASTER 구조에서 완전히 대체되었고,
+      - `debug/link-settings` 와 ETL 코드 어디에서도 더 이상 참조하지 않는 범위.
+  - 실제 삭제 전에:
+    - 반드시 시트 전체를 백업(복제)하여 `_backup_YYYYMMDD` 형태로 보존.
+
+- **6-2. 시트/범위 삭제 전 최종 체크**
+  - 코드 검색:
+    - `직영점_오늘의휴대폰`, 오래된 단가표 시트명/범위 문자열로 `grep` 검색해  
+      참조가 0건인지 확인.
+  - 운영 테스트:
+    - 하루 이상 운영하면서:
+      - 이미지 업로드 → 태그 변경 → 오늘의휴대폰/휴대폰목록 화면 재기동까지  
+        모든 흐름이 마스터 시트/새 API만으로 잘 돌아가는지 확인.
+
+- **6-3. 삭제 및 최종 커밋/배포**
+  - 불필요 시트/범위를 제거한 뒤:
+    - 관련 정리 커밋 메시지에 “삭제한 시트/범위 목록”을 명시.
+    - 푸시/배포 후:
+      - 다시 한 번 직영점 모드/직영점 관리 모드 전체 플로우를 간단히 점검하여  
+        참조 누락으로 인한 장애가 없는지 확인.
+
+이 체크리스트를 그대로 따라가면,  
+링크설정에서 시트 범위가 제대로 읽히는지, 정규화가 올바르게 동작하는지,  
+각 단계마다 **테스트를 거치면서** 안전하게 리팩토링을 진행할 수 있다.
+
+---
+
+### 8-7. 배포/테스트 단위(커밋/푸시 최소화 전략)
+
+로컬에서 화면을 띄우기 어렵기 때문에, **여러 단계를 한 번에 묶어서 배포 후 테스트**할 수 있도록 큰 단위의 배포 플랜을 추천한다.
+
+#### 1차 배포 단위 – 링크설정/요금제마스터 기반 준비
+
+- 포함되는 코드 변경:
+  - `GET /api/direct/debug/link-settings?carrier=...`
+  - `GET /api/direct/debug/rebuild-master-preview?carrier=...`
+  - `직영점_요금제마스터` ETL 구현 및 쓰기 로직 (백엔드)
+  - `GET /api/direct/plans-master?carrier=...` (요금제마스터 조회 API)
+- 1차 배포 후 한 번에 진행할 테스트:
+  - **링크설정 디버그 확인**
+    - `/api/direct/debug/link-settings?carrier=SK/KT/LG`
+    - 링크설정 탭과 시트 범위/샘플 데이터가 일치하는지 확인.
+  - **요금제마스터 프리뷰 확인**
+    - `/api/direct/debug/rebuild-master-preview?carrier=SK/KT/LG`
+    - `plansSample` 과 원본 요금제 시트(요금제명/군/기본료)가 맞는지 샘플 비교.
+  - **실제 `직영점_요금제마스터` 시트 확인**
+    - 시트를 직접 열어 통신사별로 요금제 몇 개를 원본과 비교.
+  - **`plans-master` API 확인**
+    - `/api/direct/plans-master?carrier=SK`
+    - 응답 JSON과 `직영점_요금제마스터`가 1:1로 대응하는지 확인.
+
+#### 2차 배포 단위 – 단말마스터/요금정책마스터 + 화면 부분 전환
+
+- 포함되는 코드 변경:
+  - `직영점_단말마스터` ETL + 쓰기
+  - `직영점_단말요금정책` ETL + 쓰기
+  - `GET /api/direct/mobiles-master`, `GET /api/direct/mobiles-pricing`
+  - `MobileListTab` / `TodaysMobileTab` / `OpeningInfoPage` 의 부분 전환 (예: SK만 마스터 API 사용)
+  - `USE_DIRECT_MASTER` 와 같은 토글 플래그 도입으로, 필요 시 기존 경로로 롤백 가능하도록 함.
+- 2차 배포 후 테스트:
+  - `mobiles-master` / `mobiles-pricing` 응답과 각 마스터 시트를 비교.
+  - SK 탭/화면에서:
+    - 기존(배포 전 스크린샷/기록)과 값이 동일한지 비교:
+      - 휴대폰목록: 재고/가격/태그/이미지
+      - 오늘의휴대폰: 카드 수/가격/슬라이드쇼
+      - 개통정보입력: 초기 금액/월 납부금.
+  - KT/LG는 이 배포에서는 그대로 기존 방식 유지 → SK가 충분히 검증되면 이후 KT/LG를 순차 전환.
+
+#### 3차 배포 단위 – 구로직/구시트 정리
+
+- 포함되는 코드/시트 변경:
+  - 더 이상 사용하지 않는 시트/범위(`직영점_오늘의휴대폰` 등)를 백업 후 삭제.
+  - 링크설정/정책표 직접 조회 경로를 ETL/관리용으로만 남기고, 운영 화면은 마스터 전용으로 통일.
+- 3차 배포 후 테스트:
+  - 직영점 모드/관리 모드 전체 플로우(이미지 업로드, 태그 변경, 판매일보, 업데이트 팝업 등)를 빠르게 한 바퀴 돌며 참조 누락으로 인한 오류가 없는지 확인.
+
+---
+
+## 9. 이미지 업로드/로딩 파이프라인 정리 & 리팩토링 포인트
+
+### 9-1. 현재 이미지 파이프라인 개요
+
+- **업로드 흐름 (직영점 모드에서 한 단말의 이미지 업로드)**
+  1. `MobileListTab` → `MobileListRow`:
+     - 행의 `편집(연필)` 아이콘 클릭 → `onImageUploadClick(row.id)` 호출.
+     - `MobileListTab.handleImageUploadClick(modelId)`:
+       - 파일 인풋 열기 후 선택된 파일을 `handleFileChange`로 전달.
+  2. `MobileListTab.handleFileChange`:
+     - 현재 탭의 통신사(`SK/KT/LG`)와 선택된 행의 모델명/펫네임을 기준으로:
+       - `directStoreApi.uploadImage(file, actualModelId, carrier, modelName, petName)` 호출.
+       - 여기서 `actualModelId`는 “실제 모델 코드(모델명)”를 사용.
+  3. 서버 `/api/direct/upload-image` (`server/index.js`):
+     - `multer`로 파일 수신 (`directStoreUpload.single('image')`).
+     - Discord 봇을 통해 **제조사/통신사별 포스트(스레드)**를 찾거나 생성:
+       - `extractManufacturer` 로 제조사 추출 → `findOrCreateManufacturerThread`.
+     - Discord에 이미지 업로드 → Discord CDN URL(`imageUrl`) 획득.
+     - `직영점_모델이미지!A:G`를 읽고:
+       - `통신사(A)` + `모델ID(B)` + `모델명(C)` 조합(정규화 포함)으로 기존 행을 찾음.
+       - 기존 행이 있으면 업데이트, 없으면 새 행 append:
+         - `A: 통신사, B: 모델ID, C: 모델명, D: 펫네임, E: 제조사, F: 이미지URL, G: 비고`.
+     - 저장 후 `invalidateDirectStoreCache(carrier)` 호출로:
+       - `mobiles-{carrier}` 및 `todays-mobiles` 캐시 무효화.
+     - 최종 응답:
+       - `{ success, imageUrl, modelId, warning? }` 구조로 프론트에 전달.
+  4. `MobileListTab`:
+     - 응답 성공 시:
+       - 해당 행의 `row.image` 를 새 `imageUrl` 로 먼저 갱신 (낙관적 업데이트).
+       - 이후 `getMobileList(carrier)` 를 한 번 더 호출해 서버 기준 최신 데이터를 로드.
+       - `window.dispatchEvent('imageUploaded', { carrier, modelId, imageUrl })` 로 브로드캐스트.
+  5. `TodaysMobileTab`:
+     - `imageUploaded` 이벤트 리스너에서:
+       - 1초 후 `fetchData()`를 재호출하여 오늘의 휴대폰 데이터를 재로딩.
+
+- **로딩(표시) 흐름**
+  - 모든 직영점 관련 컴포넌트는 이미지 표시 시 **프록시 + 실패 재시도** 로직 사용:
+    - `getProxyImageUrl(imageUrl)` (`api.js`):
+      - Discord CDN(`cdn.discordapp.com` / `media.discordapp.net`)이면:
+        - `API_BASE_URL/api/meetings/proxy-image?url=...` 로 변환.
+        - 아니면 원본 URL 그대로 반환.
+    - `MobileListRow` / `TodaysProductCard`:
+      - `Avatar` / `CardMedia` 의 `src` 로 `getProxyImageUrl(row.image)` 사용.
+      - `onError` 에서:
+        - 최대 3회까지 프록시 ↔ 원본 URL을 번갈아 시도.
+        - 모두 실패 시 해당 이미지 요소를 숨기고 콘솔 경고(개발 환경에서만).
+
+---
+
+### 9-2. 리팩토링 시 유지/강화해야 할 보장 조건
+
+1. **Discord 업로드 → Sheets 쓰기 → 캐시 무효화 순서 보장**
+   - Discord 업로드 성공 시:
+     - `직영점_모델이미지` 저장이 완료된 후에만 캐시 무효화하는 현재 순서를 유지.
+     - 저장 실패 시에도:
+       - 캐시를 무효화하고, 경고 메시지와 함께 `imageUrl` 을 응답으로 반환 →  
+         프론트는 일단 이미지를 쓸 수 있어야 함.
+2. **모델 식별 규칙의 일관성**
+   - 서버 업로드:
+     - `modelId = modelName`(실제 모델 코드)로 통일.
+     - `normalizeModelCode` 로 공백/하이픈/용량 표기를 정규화 후 매칭.
+   - 프론트:
+     - `MobileListTab`는 업로드 시 `actualModelId = modelName` 을 server에 넘김.
+     - `직영점_단말마스터`/`직영점_단말요금정책` 에서도 **동일 규칙**으로 모델키를 구성해야 함.
+3. **프록시 URL / Discord CDN 처리**
+   - 어떤 경로로 이미지를 가져오더라도:
+     - 항상 `getProxyImageUrl` 을 거치도록 유지.
+   - Discord CDN이 아닌 URL이 들어오는 경우:
+     - 프록시를 거치지 않고 바로 로드 (기존 동작 유지).
+4. **재시도/폴백 로직 유지**
+   - `MobileListRow` / `TodaysProductCard` 의 `onError` 재시도 로직은:
+     - 프록시 → 원본 → 프록시 순으로 최대 3회까지 시도.
+     - 이 패턴을 변경하지 않고, 마스터 시트/새 API로 바꾸더라도 동일하게 동작해야 함.
+
+---
+
+### 9-3. 마스터 시트 도입 이후 이미지 파이프라인 연결
+
+#### 9-3-1. `직영점_단말마스터` 와 `직영점_모델이미지`의 관계
+
+- 리팩토링 후 권장 구조:
+  - **이미지의 “저장소”**:
+    - 여전히 Discord + `직영점_모델이미지`가 **단일 소스** 역할.
+  - **단말 마스터에서는 “정규화된 이미지 URL만 복제”**:
+    - ETL 단계에서:
+      - `직영점_모델이미지` 를 읽어 `(통신사+모델ID/모델명)` 기준으로 `imageUrl` 매핑.
+      - `직영점_단말마스터` 생성 시, 각 단말에 `이미지URL` 컬럼을 채움.
+  - 이렇게 하면:
+    - 런타임 조회 시에는 `직영점_단말마스터` 만 읽어도 이미지 URL을 바로 사용할 수 있고,
+    - 필요 시 `직영점_모델이미지`를 직접 참고해 디버깅/수정 가능.
+
+#### 9-3-2. 업로드 후 마스터와의 동기화 전략
+
+- 업로드 직후:
+  - 지금처럼:
+    - `직영점_모델이미지` 를 갱신하고,
+    - `invalidateDirectStoreCache(carrier)` 를 호출해 `mobiles-{carrier}`/`todays-mobiles` 캐시를 무효화.
+- 마스터 구조 도입 후 추가로 할 일:
+  - **선택 A – 마스터는 주기적 재빌드(배치)**:
+    - 이미지 업로드 직후:
+      - 마스터에는 즉시 반영되지 않지만,
+      - 프론트는 업로드 응답의 `imageUrl`을 바로 state에 반영하므로 사용자 경험에는 문제 없음.
+    - 일정 주기(예: 하루 1회)로 ETL을 돌려  
+      `직영점_단말마스터`의 `이미지URL` 도 최신 상태로 맞춤.
+  - **선택 B – 업로드 시 해당 단말만 부분 갱신**
+    - `/api/direct/upload-image`의 Sheets 저장 로직 후:
+      - `직영점_단말마스터` 에서 동일한 모델 행을 찾아,
+      - `이미지URL`만 새 URL로 업데이트하는 추가 로직을 넣을 수 있음.
+    - 이 경우:
+      - 업로드 직후에도 `mobiles-master` API가 이미 최신 이미지를 반환.
+  - 두 방식 모두:
+    - 프론트는 **업로드 성공 응답 → 로컬 상태 즉시 업데이트** 로  
+      항상 최신 이미지를 먼저 사용.
+
+---
+
+### 9-4. 코드 레벨 리팩토링 포인트 (요약)
+
+1. **업로드 엔드포인트 유지 (`/api/direct/upload-image`)**
+   - 구현은 이미 Discord + `직영점_모델이미지` + 캐시 무효화까지 완성도 높음.
+   - 바뀌는 점은:
+     - 필요 시 `직영점_단말마스터` 의 `이미지URL` 을 같이 업데이트하는 코드 추가(선택 B).
+
+2. **프론트 이미지 소스 전환**
+   - `MobileListTab` / `TodaysMobileTab`의 데이터 소스를  
+     마스터 API(`mobiles-master`)로 바꿀 때:
+     - 각 row/product의 `image` 필드가 **마스터에서 온 `이미지URL`** 이 되도록 매핑.
+   - `MobileListRow` / `TodaysProductCard` 의 렌더링 코드는 그대로 재사용:
+     - `getProxyImageUrl` + `onError` 재시도/폴백 로직을 변경하지 않고 유지.
+
+3. **테스트 체크리스트**
+   - 통신사별로 대표 모델 2~3개를 골라:
+     - 이미지 업로드 → 리스트 재진입 → `휴대폰목록`/`오늘의휴대폰` 모두에서  
+       새 이미지가 잘 보이는지 확인.
+   - 네트워크를 끊거나 프록시 API를 임시로 에러 응답하게 해:
+     - 프록시 실패 → 원본 → 프록시 순서로 재시도 로직이 정상 동작하는지 확인.
+   - ETL/마스터 도입 후:
+     - `직영점_단말마스터` 의 `이미지URL` 값과 `직영점_모델이미지` 의 값이  
+       일정 시간 후 결국 동일해지는지(배치 or 부분 갱신 전략에 따라) 점검.
