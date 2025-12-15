@@ -531,10 +531,15 @@ async function rebuildDeviceMaster(carriersParam) {
     const filteredMakers = [];
     const filteredPrices = [];
 
+    // ⚠ 중요: 원본 배열에서 같은 인덱스로 모델명과 출고가를 매칭하면,
+    // 중간에 중고 행이 끼어 있을 때 그 아래 모델들의 출고가가 밀려서 잘못 매칭됩니다.
+    // 해결: 모델명이 있는 행의 출고가는 같은 인덱스에서 가져오되,
+    // 중고 행을 제거한 후에는 인덱스가 재정렬되므로, 필터링된 배열 기준으로는 정확히 매칭됩니다.
+    // 단, 원본에서 모델명은 있는데 출고가가 0인 경우, 위/아래 인덱스를 확인해서 찾습니다.
     const maxLength = Math.max(flatModels.length, flatPrices.length);
     for (let i = 0; i < maxLength; i++) {
       const modelName = flatModels[i];
-      const price = flatPrices[i] || 0;
+      let price = flatPrices[i] || 0;
 
       // 1) 모델명도 없고 출고가도 0이면 "완전히 빈 행" → 스킵
       if (!modelName && price === 0) {
@@ -544,6 +549,27 @@ async function rebuildDeviceMaster(carriersParam) {
       // 2) 모델명이 중고 구분 라벨이면 (5G중고, LTE중고, ...중고) → 스킵
       if (isDeviceCategoryRow(modelName, price)) {
         continue;
+      }
+
+      // 3) 모델명은 있지만 출고가가 0인 경우, 위/아래 인덱스를 확인해서 실제 출고가를 찾습니다
+      //    (중고 행 때문에 출고가가 다른 인덱스로 밀려 있을 수 있음)
+      if (modelName && price === 0) {
+        // 위로 최대 2칸, 아래로 최대 2칸 확인
+        for (let offset = -2; offset <= 2; offset++) {
+          if (offset === 0) continue; // 자기 자신은 이미 확인함
+          const checkIdx = i + offset;
+          if (checkIdx < 0 || checkIdx >= flatPrices.length) continue;
+          
+          const candidatePrice = flatPrices[checkIdx] || 0;
+          const candidateModel = flatModels[checkIdx] || '';
+          
+          // 출고가가 있고, 그 행의 모델명이 비어있거나 중고 라벨이면
+          // 이 출고가가 현재 모델의 것일 가능성이 높음
+          if (candidatePrice > 0 && (!candidateModel || isDeviceCategoryRow(candidateModel, candidatePrice))) {
+            price = candidatePrice;
+            break;
+          }
+        }
       }
 
       filteredModels.push(modelName);
