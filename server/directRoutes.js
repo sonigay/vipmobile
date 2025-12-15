@@ -277,6 +277,107 @@ async function getLinkSettings(carrier) {
   });
 }
 
+// 요금제마스터(직영점_요금제마스터) 재빌드 헬퍼
+async function rebuildPlanMaster(carriersParam) {
+  const carriers = carriersParam && carriersParam.length > 0 ? carriersParam : ['SK', 'KT', 'LG'];
+  const { sheets, SPREADSHEET_ID } = createSheetsClient();
+
+  await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_PLAN_MASTER, HEADERS_PLAN_MASTER);
+
+  const allRows = [];
+  const perCarrierStats = {};
+
+  for (const carrier of carriers) {
+    const settingsRows = await getLinkSettings(carrier);
+    const planGroupRow = settingsRows.find(
+      row => (row[0] || '').toString().trim() === carrier &&
+             (row[1] || '').toString().trim() === 'planGroup'
+    );
+
+    if (!planGroupRow) {
+      perCarrierStats[carrier] = { count: 0, warning: 'planGroup 설정을 찾을 수 없습니다.' };
+      continue;
+    }
+
+    const sheetId = (planGroupRow[2] || '').toString().trim();
+    let configJson = {};
+    try {
+      configJson = planGroupRow[4] ? JSON.parse(planGroupRow[4]) : {};
+    } catch (err) {
+      console.warn('[Direct][rebuildPlanMaster] planGroup JSON 파싱 실패:', err.message);
+    }
+
+    const planNameRange = configJson.planNameRange || '';
+    const planGroupRange = configJson.planGroupRange || '';
+    const basicFeeRange = configJson.basicFeeRange || '';
+
+    if (!sheetId || !(planNameRange || planGroupRange || basicFeeRange)) {
+      perCarrierStats[carrier] = { count: 0, warning: '시트ID 또는 범위 설정이 없습니다.' };
+      continue;
+    }
+
+    const [planNames, planGroups, basicFees] = await Promise.all([
+      planNameRange ? getSheetData(sheetId, planNameRange) : Promise.resolve([]),
+      planGroupRange ? getSheetData(sheetId, planGroupRange) : Promise.resolve([]),
+      basicFeeRange ? getSheetData(sheetId, basicFeeRange) : Promise.resolve([])
+    ]);
+
+    const flatNames = planNames.flat().map(v => (v || '').toString().trim());
+    const flatGroups = planGroups.flat().map(v => (v || '').toString().trim());
+    const flatFees = basicFees.flat().map(v => Number(v || 0));
+
+    const maxLength = Math.max(flatNames.length, flatGroups.length, flatFees.length);
+    let created = 0;
+
+    for (let i = 0; i < maxLength; i++) {
+      const planName = flatNames[i] || '';
+      const group = flatGroups[i] || '';
+      const fee = flatFees[i] || 0;
+      if (!planName && !group && !fee) continue;
+
+      const displayGroup = group || planName;
+
+      allRows.push([
+        carrier,           // 통신사
+        planName,          // 요금제명
+        displayGroup,      // 요금제군
+        fee || 0,          // 기본료
+        '',                // 요금제코드 (추후 필요 시 사용)
+        'Y',               // 사용여부
+        ''                 // 비고
+      ]);
+      created++;
+    }
+
+    perCarrierStats[carrier] = { count: created };
+  }
+
+  // 기존 데이터 제거 후 새 데이터 쓰기 (헤더 유지)
+  await withRetry(async () => {
+    return await sheets.spreadsheets.values.clear({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SHEET_PLAN_MASTER}!A2:G`
+    });
+  });
+
+  if (allRows.length > 0) {
+    await withRetry(async () => {
+      return await sheets.spreadsheets.values.append({
+        spreadsheetId: SPREADSHEET_ID,
+        range: SHEET_PLAN_MASTER,
+        valueInputOption: 'USER_ENTERED',
+        insertDataOption: 'INSERT_ROWS',
+        resource: { values: allRows }
+      });
+    });
+  }
+
+  return {
+    totalCount: allRows.length,
+    perCarrier: perCarrierStats
+  };
+}
+
 // 시트 데이터 읽기 함수 (캐시 적용, 동시 요청 방지)
 async function getSheetData(sheetId, range, ttlMs = 10 * 60 * 1000) {
   const cacheKey = `sheet-data-${sheetId}-${range}`;
@@ -687,102 +788,12 @@ function setupDirectRoutes(app) {
       const carrierParam = (req.query.carrier || '').trim().toUpperCase();
       const carriers = carrierParam ? [carrierParam] : ['SK', 'KT', 'LG'];
 
-      const { sheets, SPREADSHEET_ID } = createSheetsClient();
-      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_PLAN_MASTER, HEADERS_PLAN_MASTER);
-
-      const allRows = [];
-      const perCarrierStats = {};
-
-      for (const carrier of carriers) {
-        const settingsRows = await getLinkSettings(carrier);
-        const planGroupRow = settingsRows.find(
-          row => (row[0] || '').toString().trim() === carrier &&
-                 (row[1] || '').toString().trim() === 'planGroup'
-        );
-
-        if (!planGroupRow) {
-          perCarrierStats[carrier] = { count: 0, warning: 'planGroup 설정을 찾을 수 없습니다.' };
-          continue;
-        }
-
-        const sheetId = (planGroupRow[2] || '').toString().trim();
-        let configJson = {};
-        try {
-          configJson = planGroupRow[4] ? JSON.parse(planGroupRow[4]) : {};
-        } catch (err) {
-          console.warn('[Direct][plans-master/rebuild] planGroup JSON 파싱 실패:', err.message);
-        }
-
-        const planNameRange = configJson.planNameRange || '';
-        const planGroupRange = configJson.planGroupRange || '';
-        const basicFeeRange = configJson.basicFeeRange || '';
-
-        if (!sheetId || !(planNameRange || planGroupRange || basicFeeRange)) {
-          perCarrierStats[carrier] = { count: 0, warning: '시트ID 또는 범위 설정이 없습니다.' };
-          continue;
-        }
-
-        const [planNames, planGroups, basicFees] = await Promise.all([
-          planNameRange ? getSheetData(sheetId, planNameRange) : Promise.resolve([]),
-          planGroupRange ? getSheetData(sheetId, planGroupRange) : Promise.resolve([]),
-          basicFeeRange ? getSheetData(sheetId, basicFeeRange) : Promise.resolve([])
-        ]);
-
-        const flatNames = planNames.flat().map(v => (v || '').toString().trim());
-        const flatGroups = planGroups.flat().map(v => (v || '').toString().trim());
-        const flatFees = basicFees.flat().map(v => Number(v || 0));
-
-        const maxLength = Math.max(flatNames.length, flatGroups.length, flatFees.length);
-        let created = 0;
-
-        for (let i = 0; i < maxLength; i++) {
-          const planName = flatNames[i] || '';
-          const group = flatGroups[i] || '';
-          const fee = flatFees[i] || 0;
-          if (!planName && !group && !fee) continue;
-
-          const displayGroup = group || planName;
-
-          allRows.push([
-            carrier,           // 통신사
-            planName,          // 요금제명
-            displayGroup,      // 요금제군
-            fee || 0,          // 기본료
-            '',                // 요금제코드 (추후 필요 시 사용)
-            'Y',               // 사용여부
-            ''                 // 비고
-          ]);
-          created++;
-        }
-
-        perCarrierStats[carrier] = { count: created };
-      }
-
-      // 기존 데이터 제거 후 새 데이터 쓰기
-      // 헤더는 유지하고 A2:G 영역을 비운 뒤 다시 채운다.
-      await withRetry(async () => {
-        return await sheets.spreadsheets.values.clear({
-          spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_PLAN_MASTER}!A2:G`
-        });
-      });
-
-      if (allRows.length > 0) {
-        await withRetry(async () => {
-          return await sheets.spreadsheets.values.append({
-            spreadsheetId: SPREADSHEET_ID,
-            range: SHEET_PLAN_MASTER,
-            valueInputOption: 'USER_ENTERED',
-            insertDataOption: 'INSERT_ROWS',
-            resource: { values: allRows }
-          });
-        });
-      }
+      const { totalCount, perCarrier } = await rebuildPlanMaster(carriers);
 
       return res.json({
         success: true,
-        totalCount: allRows.length,
-        perCarrier: perCarrierStats
+        totalCount,
+        perCarrier
       });
     } catch (error) {
       console.error('[Direct][plans-master/rebuild] error:', error);
@@ -1480,6 +1491,18 @@ function setupDirectRoutes(app) {
 
       // 링크 설정 캐시 무효화
       deleteCache(`link-settings-${carrier}`);
+
+      // 링크설정 저장 후 해당 통신사의 요금제마스터를 바로 재빌드
+      try {
+        const rebuildResult = await rebuildPlanMaster([carrier]);
+        console.log('[Direct] plans-master rebuilt after link-settings save:', {
+          carrier,
+          totalCount: rebuildResult.totalCount,
+          perCarrier: rebuildResult.perCarrier
+        });
+      } catch (rebuildError) {
+        console.warn('[Direct] plans-master rebuild failed after link-settings save (continuing):', rebuildError.message);
+      }
 
       res.json({ success: true });
     } catch (error) {
