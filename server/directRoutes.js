@@ -522,9 +522,10 @@ async function rebuildDeviceMaster(carriersParam) {
       return isNaN(n) ? 0 : n;
     });
 
-    // ⚠ 주의: 이통사 지원금 시트에는 중간중간 완전히 비어 있는 행(구분용 공백)이 섞여 있을 수 있다.
-    // 이러한 행은 모델/출고가 인덱스를 밀어버리므로, "모델명도 없고 출고가도 0"인 행은 여기서 제거하여
-    // 실제 데이터만 연속되게 만든 뒤, 그 인덱스를 기준으로 매핑한다.
+    // ⚠ 주의: 이통사 지원금 시트에는 중간중간 완전히 비어 있는 행 또는
+    // '5G중고', 'LTE중고' 등의 구분 라벨 행이 섞여 있을 수 있다.
+    // 이러한 행은 모델/출고가 인덱스를 밀어버리므로, 여기서 제거한 뒤
+    // 실제 데이터만 연속되게 만든 배열을 사용한다.
     const filteredModels = [];
     const filteredPets = [];
     const filteredMakers = [];
@@ -535,8 +536,13 @@ async function rebuildDeviceMaster(carriersParam) {
       const modelName = flatModels[i];
       const price = flatPrices[i] || 0;
 
-      // 모델명도 없고 출고가도 0이면 "완전히 빈 행"으로 간주하고 스킵
+      // 1) 모델명도 없고 출고가도 0이면 "완전히 빈 행" → 스킵
       if (!modelName && price === 0) {
+        continue;
+      }
+
+      // 2) 모델명이 중고 구분 라벨이면 (5G중고, LTE중고, ...중고) → 스킵
+      if (isDeviceCategoryRow(modelName, price)) {
         continue;
       }
 
@@ -555,11 +561,6 @@ async function rebuildDeviceMaster(carriersParam) {
 
       const petName = filteredPets[i] || modelName;
       const factoryPrice = filteredPrices[i] || 0;
-
-      // "5G중고", "LTE중고" 등 구분용 라벨 행은 단말마스터에서 제외
-      if (isDeviceCategoryRow(modelName, factoryPrice)) {
-        continue;
-      }
       const maker = filteredMakers[i] || ''; // 제조사가 없으면 빈칸 (추후 보완 가능)
 
       const normalizedCode = normalizeModelCode(modelName);
@@ -757,17 +758,52 @@ async function rebuildPricingMaster(carriersParam) {
 
     // 3. 지원금표(Support Sheet) 데이터 읽기
     // 모델명 리스트 (매칭용)
-    const supportModels = (await getSheetData(supportSheetId, modelRange)).flat().map(v => (v || '').toString().trim());
+    const supportModelsRaw = (await getSheetData(supportSheetId, modelRange)).flat().map(v => (v || '').toString().trim());
 
-    // 각 요금제군별 지원금 컬럼 읽기
-    const planGroupDataMap = {}; // Key: PlanGroup -> Array of Supports
+    // 각 요금제군별 지원금 컬럼 읽기 (원본 배열 보존)
+    const planGroupDataMapRaw = {}; // Key: PlanGroup -> Array of Supports
     for (const [pgName, pgRange] of Object.entries(planGroupRanges)) {
       if (!pgRange) continue;
       const supportValues = (await getSheetData(supportSheetId, pgRange)).flat();
-      planGroupDataMap[pgName] = supportValues.map(v => {
+      planGroupDataMapRaw[pgName] = supportValues.map(v => {
         const n = Number((v || '').toString().replace(/[^0-9.-]/g, ''));
         return isNaN(n) ? 0 : n;
       });
+    }
+
+    // 3-1. 지원금표에서 완전히 빈 행/중고 구분 행 제거하여 인덱스 정렬
+    const validIndexes = [];
+    const maxSupportLen = supportModelsRaw.length;
+
+    for (let i = 0; i < maxSupportLen; i++) {
+      const modelName = (supportModelsRaw[i] || '').toString().trim();
+
+      // 각 요금제군에서 이 인덱스의 지원금 합 (절대값 기준) 계산
+      let supportAbsSum = 0;
+      for (const arr of Object.values(planGroupDataMapRaw)) {
+        if (Array.isArray(arr) && i < arr.length) {
+          supportAbsSum += Math.abs(arr[i] || 0);
+        }
+      }
+
+      // 1) 모델명도 없고 모든 요금제군에서 지원금이 0이면 완전히 빈 행 → 스킵
+      if (!modelName && supportAbsSum === 0) {
+        continue;
+      }
+
+      // 2) 모델명이 '5G중고' / 'LTE중고' / '...중고' 와 같은 구분 라벨이면 스킵
+      if (isDeviceCategoryRow(modelName, 0)) {
+        continue;
+      }
+
+      validIndexes.push(i);
+    }
+
+    // 필터링된 모델/지원금 배열 생성 (이후 로직은 이 배열을 기준으로 진행)
+    const supportModels = validIndexes.map(idx => supportModelsRaw[idx]);
+    const planGroupDataMap = {};
+    for (const [pgName, arr] of Object.entries(planGroupDataMapRaw)) {
+      planGroupDataMap[pgName] = validIndexes.map(idx => (arr[idx] || 0));
     }
 
     // 4. 가격 계산 Loop
@@ -886,9 +922,9 @@ async function rebuildPricingMaster(carriersParam) {
             openingType,
             factoryPrice,
             publicSupport,
-            storeSupportFull, // 대리점추가지원금_부가유치 (정책표리베이트 + 마진/부가/보험/별도정책 반영)
+            storeSupportFull, // 대리점추가지원금_부가유치
             storeSupportNone, // 대리점추가지원금_부가미유치
-            policyRebate,     // 정책리베이트 (참고용)
+            baseMargin,       // 정책마진 (직영점_정책_마진 + 별도정책 반영)
             '',               // 정책ID
             todayStr,         // 기준일자
             ''                // 비고
