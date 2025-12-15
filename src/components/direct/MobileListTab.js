@@ -566,7 +566,8 @@ const MobileListTab = ({ onProductSelect }) => {
         if (currentPlanGroup !== newPlanGroup && planGroups.includes(newPlanGroup)) {
           setSelectedPlanGroups(prev => ({ ...prev, [modelId]: newPlanGroup }));
           const currentOpeningType = selectedOpeningTypes[modelId] || 'MNP';
-          calculatePrice(modelId, newPlanGroup, currentOpeningType, false); // 캐시 무시하고 재계산
+          // 로컬 가격 상태 동기식 업데이트
+          updatePriceState(modelId, newPlanGroup, currentOpeningType);
         }
       }
     } catch (err) {
@@ -585,6 +586,34 @@ const MobileListTab = ({ onProductSelect }) => {
 
       // 사용자에게 에러 알림 (선택적 - 너무 자주 뜨면 방해될 수 있음)
       // alert('구분 태그 업데이트에 실패했습니다. 다시 시도해주세요.');
+    }
+  };
+
+  // 요금제군 변경 시 상태 및 가격 업데이트
+  const handlePlanGroupChange = (modelId, newPlanGroup) => {
+    if (!newPlanGroup) return;
+
+    setSelectedPlanGroups(prev => ({
+      ...prev,
+      [modelId]: newPlanGroup
+    }));
+
+    const openingType = selectedOpeningTypes[modelId] || 'MNP';
+    updatePriceState(modelId, newPlanGroup, openingType);
+  };
+
+  // 개통유형 변경 시 상태 및 가격 업데이트
+  const handleOpeningTypeChange = (modelId, newOpeningType) => {
+    if (!newOpeningType) return;
+
+    setSelectedOpeningTypes(prev => ({
+      ...prev,
+      [modelId]: newOpeningType
+    }));
+
+    const planGroup = selectedPlanGroups[modelId];
+    if (planGroup) {
+      updatePriceState(modelId, planGroup, newOpeningType);
     }
   };
 
