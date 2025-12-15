@@ -1313,11 +1313,15 @@ function setupDirectRoutes(app) {
               }
 
               // 전유형인 경우 모든 개통유형에 매핑
+              // 🔥 핵심 수정: 전유형은 기존 값이 있으면 덮어쓰지 않음 (개별 유형 우선)
               if (openingTypeRaw === '전유형' || openingTypes.includes('전유형')) {
                 const allTypes = ['010신규', 'MNP', '기변', '번호이동'];
                 allTypes.forEach(ot => {
                   const key = `${supportModel}|${ot}`;
-                  supportSheetData[key] = entry;
+                  // 개별 유형이 이미 있으면 전유형 값으로 덮어쓰지 않음
+                  if (!supportSheetData[key]) {
+                    supportSheetData[key] = entry;
+                  }
 
                   const normalizedModel = normalizeModelCode(supportModel);
                   if (normalizedModel) {
@@ -1333,37 +1337,49 @@ function setupDirectRoutes(app) {
                 const normalizedModel = normalizeModelCode(supportModel);
                 const hyphenVariants = generateHyphenVariants(supportModel);
 
-                openingTypes.forEach(ot => {
-                  // 원본 모델명
-                  const key = `${supportModel}|${ot}`;
-                  supportSheetData[key] = entry;
+                // 🔥 핵심 수정: "번호이동" 행은 "번호이동" 키에만 설정, "MNP" 키에는 설정하지 않음
+                // parseOpeningTypes("번호이동")이 ['MNP']를 반환하므로, openingTypeRaw를 직접 사용
+                if (openingTypeRaw === '번호이동') {
+                  // "번호이동" 키에만 설정
+                  const 번호이동Key = `${supportModel}|번호이동`;
+                  if (!supportSheetData[번호이동Key]) {
+                    supportSheetData[번호이동Key] = entry;
+                  }
+                  // "MNP" 키에는 설정하지 않음 (정확한 "MNP" 행이 우선)
+                } else {
+                  // 다른 개통유형은 기존 로직대로 처리
+                  openingTypes.forEach(ot => {
+                    // 원본 모델명
+                    const key = `${supportModel}|${ot}`;
+                    supportSheetData[key] = entry;
 
-                  // 대소문자 변형
-                  supportSheetData[`${supportModel.toLowerCase()}|${ot}`] = entry;
-                  supportSheetData[`${supportModel.toUpperCase()}|${ot}`] = entry;
+                    // 대소문자 변형
+                    supportSheetData[`${supportModel.toLowerCase()}|${ot}`] = entry;
+                    supportSheetData[`${supportModel.toUpperCase()}|${ot}`] = entry;
 
-                  // 하이픈 변형 (원본 우선, 하이픈 변형은 폴백)
-                  hyphenVariants.forEach(variant => {
-                    if (variant !== supportModel) {
-                      const variantKey = `${variant}|${ot}`;
-                      if (!supportSheetData[variantKey]) {
-                        supportSheetData[variantKey] = entry;
+                    // 하이픈 변형 (원본 우선, 하이픈 변형은 폴백)
+                    hyphenVariants.forEach(variant => {
+                      if (variant !== supportModel) {
+                        const variantKey = `${variant}|${ot}`;
+                        if (!supportSheetData[variantKey]) {
+                          supportSheetData[variantKey] = entry;
+                        }
+                        supportSheetData[`${variant.toLowerCase()}|${ot}`] = entry;
+                        supportSheetData[`${variant.toUpperCase()}|${ot}`] = entry;
                       }
-                      supportSheetData[`${variant.toLowerCase()}|${ot}`] = entry;
-                      supportSheetData[`${variant.toUpperCase()}|${ot}`] = entry;
+                    });
+
+                    // 정규화된 모델명 (마지막 폴백)
+                    if (normalizedModel) {
+                      const normalizedKey = `${normalizedModel}|${ot}`;
+                      if (!supportSheetData[normalizedKey]) {
+                        supportSheetData[normalizedKey] = entry;
+                      }
+                      supportSheetData[`${normalizedModel.toLowerCase()}|${ot}`] = entry;
+                      supportSheetData[`${normalizedModel.toUpperCase()}|${ot}`] = entry;
                     }
                   });
-
-                  // 정규화된 모델명 (마지막 폴백)
-                  if (normalizedModel) {
-                    const normalizedKey = `${normalizedModel}|${ot}`;
-                    if (!supportSheetData[normalizedKey]) {
-                      supportSheetData[normalizedKey] = entry;
-                    }
-                    supportSheetData[`${normalizedModel.toLowerCase()}|${ot}`] = entry;
-                    supportSheetData[`${normalizedModel.toUpperCase()}|${ot}`] = entry;
-                  }
-                });
+                }
 
                 // 🔥 핵심 수정: "번호이동" → MNP 매핑 제거
                 // 문제: "번호이동" 행이 "MNP" 키에도 값을 설정하여 값이 섞이는 문제 발생
@@ -3567,6 +3583,24 @@ function setupDirectRoutes(app) {
             `${primaryModel.toLowerCase()}|${openingType}`,
             `${primaryModel.toUpperCase()}|${openingType}`
           ];
+          
+          // 🔥 핵심 수정: MNP 요청 시 "MNP" 키가 없으면 "번호이동" 키도 찾기
+          if (openingType === 'MNP') {
+            supportKeys.push(
+              `${primaryModel}|번호이동`,
+              `${primaryModel.toLowerCase()}|번호이동`,
+              `${primaryModel.toUpperCase()}|번호이동`
+            );
+          }
+          
+          // 🔥 핵심 수정: 번호이동 요청 시 "번호이동" 키가 없으면 "MNP" 키도 찾기
+          if (openingType === '번호이동') {
+            supportKeys.push(
+              `${primaryModel}|MNP`,
+              `${primaryModel.toLowerCase()}|MNP`,
+              `${primaryModel.toUpperCase()}|MNP`
+            );
+          }
           
           // 🔥 핵심 수정: 정규화 후 같은 모델일 때만 정책표 모델명 추가 (다른 모델이면 제외)
           if (!isDifferentModel && policyModel && policyModel !== primaryModel) {
