@@ -555,11 +555,7 @@ async function rebuildDeviceMaster(carriersParam) {
       if (!modelName) continue; // 모델명이 없으면 스킵
 
       const petName = filteredPets[i] || modelName;
-      let factoryPrice = filteredPrices[i] || 0;
-      // 5G중고 / LTE중고 같은 구분 행은 출고가를 항상 0으로 강제
-      if (isDeviceCategoryRow(modelName, factoryPrice)) {
-        factoryPrice = 0;
-      }
+      const factoryPrice = filteredPrices[i] || 0;
       const maker = filteredMakers[i] || ''; // 제조사가 없으면 빈칸 (추후 보완 가능)
 
       const normalizedCode = normalizeModelCode(modelName);
