@@ -1365,26 +1365,28 @@ function setupDirectRoutes(app) {
                   }
                 });
 
-                // "번호이동" → MNP 매핑
-                if (openingTypeRaw === '번호이동' || openingTypes.includes('번호이동')) {
-                  const mnpKeys = [
-                    `${supportModel}|MNP`,
-                    `${supportModel.toLowerCase()}|MNP`,
-                    `${supportModel.toUpperCase()}|MNP`
-                  ];
-                  if (normalizedModel) {
-                    mnpKeys.push(
-                      `${normalizedModel}|MNP`,
-                      `${normalizedModel.toLowerCase()}|MNP`,
-                      `${normalizedModel.toUpperCase()}|MNP`
-                    );
-                  }
-                  mnpKeys.forEach(key => {
-                    if (!supportSheetData[key]) {
-                      supportSheetData[key] = entry;
-                    }
-                  });
-                }
+                // 🔥 핵심 수정: "번호이동" → MNP 매핑 제거
+                // 문제: "번호이동" 행이 "MNP" 키에도 값을 설정하여 값이 섞이는 문제 발생
+                // 해결: 상호 매핑을 완전히 제거하고, 정확한 키만 사용
+                // if (openingTypeRaw === '번호이동' || openingTypes.includes('번호이동')) {
+                //   const mnpKeys = [
+                //     `${supportModel}|MNP`,
+                //     `${supportModel.toLowerCase()}|MNP`,
+                //     `${supportModel.toUpperCase()}|MNP`
+                //   ];
+                //   if (normalizedModel) {
+                //     mnpKeys.push(
+                //       `${normalizedModel}|MNP`,
+                //       `${normalizedModel.toLowerCase()}|MNP`,
+                //       `${normalizedModel.toUpperCase()}|MNP`
+                //     );
+                //   }
+                //   mnpKeys.forEach(key => {
+                //     if (!supportSheetData[key]) {
+                //       supportSheetData[key] = entry;
+                //     }
+                //   });
+                // }
 
                 // "010신규/기변" → 010신규와 기변 매핑
                 if (openingTypeRaw === '010신규/기변' ||

@@ -208,36 +208,53 @@ const MobileListRowComponent = ({
               return finalUrl;
             })() : undefined}
             onError={(e) => {
-              // 🔥 개선: 404 에러 처리 개선
-              if (e.target.dataset.gaveUp === 'true') {
+              // 🔥 핵심 수정: 이미지 로드 실패 처리 개선
+              const retryCount = parseInt(e.target.dataset.retryCount || '0');
+              
+              // 최대 3번까지 재시도
+              if (retryCount >= 3) {
+                e.target.dataset.gaveUp = 'true';
+                e.target.onerror = null;
+                e.target.style.display = 'none';
+                return;
+              }
+              
+              const originalUrl = row.image;
+              if (!originalUrl) {
+                e.target.dataset.gaveUp = 'true';
                 e.target.onerror = null;
                 return;
               }
               
-              // 프록시를 사용하지 않았고 Discord CDN URL인 경우 프록시로 재시도
-              const originalUrl = row.image;
-              if (originalUrl && 
-                  (originalUrl.includes('cdn.discordapp.com') || originalUrl.includes('media.discordapp.net')) &&
-                  !e.target.src.includes('/api/meetings/proxy-image')) {
-                const proxyUrl = getProxyImageUrl(originalUrl);
-                e.target.src = proxyUrl;
-                e.target.dataset.retryCount = (parseInt(e.target.dataset.retryCount || '0') + 1).toString();
-                if (parseInt(e.target.dataset.retryCount) < 2) {
-                  return; // 재시도
-                }
+              // 🔥 핵심 수정: 프록시 실패 시 원본 URL로 폴백
+              if (e.target.src.includes('/api/meetings/proxy-image')) {
+                // 프록시 실패 → 원본 URL로 직접 시도
+                e.target.src = originalUrl;
+                e.target.dataset.retryCount = (retryCount + 1).toString();
+                return;
               }
               
-              // 재시도 실패 또는 프록시가 아닌 경우 빈 이미지로 처리
+              // 원본 URL도 실패 → 프록시로 시도
+              if (originalUrl && 
+                  (originalUrl.includes('cdn.discordapp.com') || originalUrl.includes('media.discordapp.net'))) {
+                const proxyUrl = getProxyImageUrl(originalUrl);
+                e.target.src = proxyUrl;
+                e.target.dataset.retryCount = (retryCount + 1).toString();
+                return;
+              }
+              
+              // 모든 시도 실패
               e.target.dataset.gaveUp = 'true';
-              e.target.src = '';
               e.target.onerror = null;
+              e.target.style.display = 'none';
               
               if (process.env.NODE_ENV === 'development') {
                 console.warn('⚠️ [MobileListRow] 이미지 로드 실패:', {
                   modelId: row.id,
                   modelName: row.model,
                   originalUrl: row.image,
-                  attemptedUrl: e.target.src || 'N/A'
+                  attemptedUrl: e.target.src || 'N/A',
+                  retryCount
                 });
               }
             }}
