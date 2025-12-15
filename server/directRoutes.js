@@ -1426,9 +1426,13 @@ function setupDirectRoutes(app) {
                     }
                   });
 
-                  // "010신규"와 "기변"으로도 각각 저장
+                  // 🔥 핵심 수정: "010신규"와 "기변"으로도 각각 저장
+                  // 하지만 기존 값이 있으면 덮어쓰지 않음 (개별 유형 우선)
                   ['010신규', '기변'].forEach(ot => {
                     const key = `${supportModel}|${ot}`;
+                    // 🔥 핵심 수정: 기존 값이 있으면 덮어쓰지 않음 (개별 유형 우선)
+                    // "010신규/기변" 행이 "기변" 키에 값을 설정하려 할 때,
+                    // 이미 "기변" 키에 개별 유형 행의 값이 있으면 덮어쓰지 않음
                     if (!supportSheetData[key]) {
                       supportSheetData[key] = entry;
                     }
@@ -3170,100 +3174,69 @@ function setupDirectRoutes(app) {
       const modelData = await getSheetData(policySheetId, modelRange);
 
       let modelRow = null;
+      let actualModelIndex = -1;
 
-      // 인덱스 범위 체크
-      let actualModelIndex = modelIndex; // 실제 사용할 인덱스 (요청 모델명과 일치하는 행의 인덱스)
-      if (!isNaN(modelIndex) && modelIndex >= 0 && modelIndex < modelData.length) {
-        modelRow = modelData[modelIndex];
-        if (modelRow && modelRow[0]) {
-          // 인덱스로 찾기 성공
-          // 🔥 핵심 개선: 인덱스로 찾은 모델명이 요청 모델명과 다를 때, 정책표 전체를 스캔해서 같은 모델 찾기
-          if (req.query.modelName) {
-            const targetModelName = req.query.modelName.trim();
-            const policyModel = (modelRow[0] || '').toString().trim();
-            
-            // 정규화 후 다른 모델인지 확인
-            const targetNormalized = normalizeModelCode(targetModelName);
-            const policyNormalized = normalizeModelCode(policyModel);
-            
-            if (targetNormalized !== policyNormalized) {
-              // 정규화 후 다른 모델이면 정책표 전체를 스캔해서 요청 모델명과 일치하는 행 찾기
-              let foundIndex = -1;
-              
-              // 1단계: 정확히 일치하는 모델명 찾기
-              for (let i = 0; i < modelData.length; i++) {
-                const rowModel = (modelData[i]?.[0] || '').toString().trim();
-                if (!rowModel) continue;
-                
-                if (rowModel === targetModelName) {
-                  foundIndex = i;
-                  modelRow = modelData[i];
-                  break;
-                }
-              }
-              
-              // 2단계: 정규화된 모델명으로 찾기 (정확히 일치하지 않을 때만)
-              if (foundIndex < 0) {
-                for (let i = 0; i < modelData.length; i++) {
-                  const rowModel = (modelData[i]?.[0] || '').toString().trim();
-                  if (!rowModel) continue;
-                  
-                  const normalized = normalizeModelCode(rowModel);
-                  if (normalized && targetNormalized && normalized === targetNormalized) {
-                    foundIndex = i;
-                    modelRow = modelData[i];
-                    logWarningOnce(`model-mismatch-${targetModelName}-${rowModel}`, `[Direct] /calculate 정책표 모델명 불일치: 요청=${targetModelName}, 정책표=${rowModel} (정규화 후 일치, 인덱스 ${modelIndex} → ${i}로 변경)`);
-                    break;
-                  }
-                }
-              }
-              
-              if (foundIndex >= 0) {
-                actualModelIndex = foundIndex; // 실제 사용할 인덱스 업데이트
-                // 로그 제거 (성능 최적화)
-              } else {
-                logWarningOnce(`model-find-fail-${targetModelName}-${policyModel}`, `[Direct] /calculate 같은 모델 찾기 실패: 요청=${targetModelName}, 정책표 인덱스 ${modelIndex}의 모델명=${policyModel} (정규화 후도 다름, 원래 인덱스 사용)`);
-              }
-            }
-          }
-        } else {
-          modelRow = null; // 빈 행이면 null로 설정
-        }
-      }
-
-      // 인덱스로 찾기 실패 시 모델명으로 찾기 시도 (query parameter로 modelName 전달 시)
-      // 🔥 핵심 수정: req.query.modelName이 있으면 정확히 일치하는 모델명을 우선 찾음
-      if (!modelRow && req.query.modelName) {
-        const targetModelName = req.query.modelName.trim();
+      // 🔥 핵심 수정: 이통사 시트와 정책표 시트의 모델 행이 다르고 값도 다르기 때문에
+      // 정책표 인덱스로 찾지 말고 모델명으로 직접 찾기
+      // 1순위: req.query.modelName으로 찾기 (가장 정확)
+      // 2순위: 정책표 인덱스로 찾기 (폴백, 참고용)
+      
+      const targetModelName = req.query.modelName ? req.query.modelName.trim() : null;
+      
+      if (targetModelName) {
+        // 1순위: req.query.modelName으로 정확히 일치하는 모델명 찾기
         const targetModelNormalized = normalizeModelCode(targetModelName);
-
+        
         // 1단계: 정확히 일치하는 모델명 찾기
         for (let i = 0; i < modelData.length; i++) {
           const rowModel = (modelData[i]?.[0] || '').toString().trim();
           if (!rowModel) continue;
-
+          
           if (rowModel === targetModelName) {
             modelRow = modelData[i];
-            actualModelIndex = i; // 실제 사용할 인덱스 업데이트
+            actualModelIndex = i;
             break;
           }
         }
-
+        
         // 2단계: 정규화된 모델명으로 찾기 (정확히 일치하지 않을 때만)
         if (!modelRow) {
           for (let i = 0; i < modelData.length; i++) {
             const rowModel = (modelData[i]?.[0] || '').toString().trim();
             if (!rowModel) continue;
-
+            
             const normalized = normalizeModelCode(rowModel);
             if (normalized && targetModelNormalized && normalized === targetModelNormalized) {
               modelRow = modelData[i];
-              actualModelIndex = i; // 실제 사용할 인덱스 업데이트
+              actualModelIndex = i;
               // 🔥 경고: 정책표 모델명이 요청 모델명과 다름
               if (rowModel !== targetModelName) {
-                logWarningOnce(`model-mismatch-${targetModelName}-${rowModel}-2`, `[Direct] /calculate 정책표 모델명 불일치: 요청=${targetModelName}, 정책표=${rowModel} (정규화 후 일치, 인덱스 ${i} 사용)`);
+                logWarningOnce(`model-mismatch-${targetModelName}-${rowModel}`, `[Direct] /calculate 정책표 모델명 불일치: 요청=${targetModelName}, 정책표=${rowModel} (정규화 후 일치, 인덱스 ${i} 사용)`);
               }
               break;
+            }
+          }
+        }
+      }
+      
+      // 2순위: 정책표 인덱스로 찾기 (폴백, 참고용)
+      // req.query.modelName으로 찾지 못했을 때만 사용
+      if (!modelRow && !isNaN(modelIndex) && modelIndex >= 0 && modelIndex < modelData.length) {
+        const policyRow = modelData[modelIndex];
+        if (policyRow && policyRow[0]) {
+          // 정책표 인덱스로 찾은 모델명이 요청 모델명과 다를 수 있음
+          // 하지만 폴백으로 사용
+          modelRow = policyRow;
+          actualModelIndex = modelIndex;
+          
+          // 요청 모델명이 있으면 경고
+          if (targetModelName) {
+            const policyModel = (policyRow[0] || '').toString().trim();
+            const targetNormalized = normalizeModelCode(targetModelName);
+            const policyNormalized = normalizeModelCode(policyModel);
+            
+            if (targetNormalized !== policyNormalized) {
+              logWarningOnce(`model-index-fallback-${targetModelName}-${policyModel}`, `[Direct] /calculate 정책표 인덱스 폴백 사용: 요청=${targetModelName}, 정책표 인덱스 ${modelIndex}의 모델명=${policyModel} (정규화 후 다름, 폴백으로 사용)`);
             }
           }
         }
@@ -3353,10 +3326,64 @@ function setupDirectRoutes(app) {
       let policyRebate = 0;
       if (rebateRange && policySheetId) {
         try {
-          // 정책표 리베이트 가져오기 (캐시 사용)
-          // 🔥 핵심 개선: actualModelIndex 사용 (요청 모델명과 일치하는 행의 인덱스)
+          // 🔥 핵심 수정: 인덱스에 의존하지 않고 모델명으로 직접 찾기
+          // 공백 행이 있을 때 인덱스가 밀리고 당겨져서 잘못된 데이터를 가져오는 문제 해결
           const rebateValues = await getSheetData(policySheetId, rebateRange);
-          policyRebate = Number(rebateValues[actualModelIndex]?.[0] || 0) * 10000; // 만원 단위 변환
+          
+          // 모델명으로 직접 찾기 (인덱스 기반 접근 제거)
+          const targetModelName = req.query.modelName ? req.query.modelName.trim() : (modelRow[0] || '').toString().trim();
+          const targetModelNormalized = normalizeModelCode(targetModelName);
+          const policyModel = (modelRow[0] || '').toString().trim();
+          const policyModelNormalized = normalizeModelCode(policyModel);
+          
+          let rebateIndex = -1;
+          
+          // 1단계: 요청 모델명으로 정확히 일치하는 행 찾기
+          if (req.query.modelName) {
+            for (let i = 0; i < modelData.length && i < rebateValues.length; i++) {
+              const rowModel = (modelData[i]?.[0] || '').toString().trim();
+              if (!rowModel) continue; // 공백 행 건너뛰기
+              
+              if (rowModel === targetModelName) {
+                rebateIndex = i;
+                break;
+              }
+              
+              const normalized = normalizeModelCode(rowModel);
+              if (normalized && targetModelNormalized && normalized === targetModelNormalized) {
+                rebateIndex = i;
+                break;
+              }
+            }
+          }
+          
+          // 2단계: 요청 모델명으로 찾지 못했으면 정책표 모델명으로 찾기 (폴백)
+          if (rebateIndex < 0 && policyModel) {
+            for (let i = 0; i < modelData.length && i < rebateValues.length; i++) {
+              const rowModel = (modelData[i]?.[0] || '').toString().trim();
+              if (!rowModel) continue; // 공백 행 건너뛰기
+              
+              if (rowModel === policyModel) {
+                rebateIndex = i;
+                break;
+              }
+              
+              const normalized = normalizeModelCode(rowModel);
+              if (normalized && policyModelNormalized && normalized === policyModelNormalized) {
+                rebateIndex = i;
+                break;
+              }
+            }
+          }
+          
+          // 3단계: 여전히 찾지 못했으면 actualModelIndex 사용 (최후의 폴백)
+          if (rebateIndex < 0 && actualModelIndex >= 0 && actualModelIndex < rebateValues.length) {
+            rebateIndex = actualModelIndex;
+          }
+          
+          if (rebateIndex >= 0) {
+            policyRebate = Number(rebateValues[rebateIndex]?.[0] || 0) * 10000; // 만원 단위 변환
+          }
         } catch (err) {
           console.warn(`[Direct] ${planGroup} ${openingType} 리베이트 읽기 실패:`, err);
         }
@@ -3546,37 +3573,43 @@ function setupDirectRoutes(app) {
                         });
                       }
                     } else {
-                      // 다른 개통유형은 기존 로직대로 처리
-                      openingTypes.forEach(ot => {
-                        const key = `${model}|${ot}`;
-                        supportMap[key] = supportValue;
-                        // 대소문자 변형
-                        supportMap[`${model.toLowerCase()}|${ot}`] = supportValue;
-                        supportMap[`${model.toUpperCase()}|${ot}`] = supportValue;
-                        // 정규화된 모델명
-                        if (normalizedModel) {
-                          supportMap[`${normalizedModel}|${ot}`] = supportValue;
-                          supportMap[`${normalizedModel.toLowerCase()}|${ot}`] = supportValue;
-                          supportMap[`${normalizedModel.toUpperCase()}|${ot}`] = supportValue;
-                        }
-                        // 하이픈 변형
-                        hyphenVariants.forEach(variant => {
-                          if (variant !== model) {
-                            const variantKey = `${variant}|${ot}`;
-                            if (!supportMap[variantKey]) {
-                              supportMap[variantKey] = supportValue;
-                            }
-                            supportMap[`${variant.toLowerCase()}|${ot}`] = supportValue;
-                            supportMap[`${variant.toUpperCase()}|${ot}`] = supportValue;
-                          }
-                        });
-                      });
-
-                      // "010신규/기변" 행이면 "010신규", "기변", "010신규/기변" 모두에 매핑
+                      // 🔥 핵심 수정: "010신규/기변" 행은 "010신규", "기변", "010신규/기변" 모두에 매핑
+                      // 하지만 개별 유형("010신규" 또는 "기변") 행은 자신의 키에만 설정
                       if (openingTypeRaw.includes('010신규/기변') ||
                         (openingTypes.includes('010신규') && openingTypes.includes('기변'))) {
+                        // "010신규/기변" 행이면 "010신규", "기변", "010신규/기변" 모두에 매핑
                         ['010신규', '기변', '010신규/기변'].forEach(ot => {
                           const key = `${model}|${ot}`;
+                          // 🔥 핵심 수정: 기존 값이 있으면 덮어쓰지 않음 (개별 유형 우선)
+                          if (!supportMap[key]) {
+                            supportMap[key] = supportValue;
+                            // 대소문자 변형
+                            supportMap[`${model.toLowerCase()}|${ot}`] = supportValue;
+                            supportMap[`${model.toUpperCase()}|${ot}`] = supportValue;
+                            // 정규화된 모델명
+                            if (normalizedModel) {
+                              supportMap[`${normalizedModel}|${ot}`] = supportValue;
+                              supportMap[`${normalizedModel.toLowerCase()}|${ot}`] = supportValue;
+                              supportMap[`${normalizedModel.toUpperCase()}|${ot}`] = supportValue;
+                            }
+                            // 하이픈 변형
+                            hyphenVariants.forEach(variant => {
+                              if (variant !== model) {
+                                const variantKey = `${variant}|${ot}`;
+                                if (!supportMap[variantKey]) {
+                                  supportMap[variantKey] = supportValue;
+                                }
+                                supportMap[`${variant.toLowerCase()}|${ot}`] = supportValue;
+                                supportMap[`${variant.toUpperCase()}|${ot}`] = supportValue;
+                              }
+                            });
+                          }
+                        });
+                      } else {
+                        // 개별 유형("010신규" 또는 "기변")은 자신의 키에만 설정
+                        openingTypes.forEach(ot => {
+                          const key = `${model}|${ot}`;
+                          // 🔥 핵심 수정: 기존 값이 있으면 덮어쓰지 않음 (정확한 키 우선)
                           if (!supportMap[key]) {
                             supportMap[key] = supportValue;
                             // 대소문자 변형
@@ -3636,14 +3669,20 @@ function setupDirectRoutes(app) {
           
           // 디버그 로그 제거 (성능 최적화)
 
-          // 시도할 키 목록: query modelName 우선 → 정책표 모델명(정규화 후 같을 때만) → 대소문자 변형 → 하이픈 변형 → 정규화
-          const supportKeys = [
-            `${primaryModel}|${openingType}`,  // query modelName 우선
+          // 🔥 핵심 수정: 키 우선순위 명확화
+          // 1순위: 정확한 키 (예: MNP 요청 → MNP 키, 기변 요청 → 기변 키)
+          // 2순위: 폴백 키 (예: MNP 요청 → 번호이동 키, 기변 요청 → 010신규/기변 키)
+          const supportKeys = [];
+          
+          // 1순위: 정확한 키 (항상 먼저 시도)
+          supportKeys.push(
+            `${primaryModel}|${openingType}`,
             `${primaryModel.toLowerCase()}|${openingType}`,
             `${primaryModel.toUpperCase()}|${openingType}`
-          ];
+          );
           
-          // 🔥 핵심 수정: MNP 요청 시 "MNP" 키가 없으면 "번호이동" 키도 찾기
+          // 2순위: 폴백 키 (정확한 키가 없을 때만 사용)
+          // MNP 요청 시 "번호이동" 키도 찾기
           if (openingType === 'MNP') {
             supportKeys.push(
               `${primaryModel}|번호이동`,
@@ -3652,12 +3691,30 @@ function setupDirectRoutes(app) {
             );
           }
           
-          // 🔥 핵심 수정: 번호이동 요청 시 "번호이동" 키가 없으면 "MNP" 키도 찾기
+          // 번호이동 요청 시 "MNP" 키도 찾기
           if (openingType === '번호이동') {
             supportKeys.push(
               `${primaryModel}|MNP`,
               `${primaryModel.toLowerCase()}|MNP`,
               `${primaryModel.toUpperCase()}|MNP`
+            );
+          }
+          
+          // 기변 요청 시 "010신규/기변" 키도 찾기 (하지만 "기변" 키가 우선)
+          if (openingType === '기변') {
+            supportKeys.push(
+              `${primaryModel}|010신규/기변`,
+              `${primaryModel.toLowerCase()}|010신규/기변`,
+              `${primaryModel.toUpperCase()}|010신규/기변`
+            );
+          }
+          
+          // 010신규 요청 시 "010신규/기변" 키도 찾기 (하지만 "010신규" 키가 우선)
+          if (openingType === '010신규') {
+            supportKeys.push(
+              `${primaryModel}|010신규/기변`,
+              `${primaryModel.toLowerCase()}|010신규/기변`,
+              `${primaryModel.toUpperCase()}|010신규/기변`
             );
           }
           
@@ -3717,60 +3774,9 @@ function setupDirectRoutes(app) {
           //   supportKeys.push(...);
           // }
 
-          // "010신규/기변" 매핑도 시도
-          if (openingType === '010신규' || openingType === '기변') {
-            supportKeys.push(
-              `${primaryModel}|010신규/기변`,
-              `${primaryModel.toLowerCase()}|010신규/기변`,
-              `${primaryModel.toUpperCase()}|010신규/기변`
-            );
-            
-            // 🔥 핵심 수정: 정규화 후 같은 모델일 때만 정책표 모델명 추가
-            if (!isDifferentModel && policyModel && policyModel !== primaryModel) {
-              supportKeys.push(
-                `${policyModel}|010신규/기변`,
-                `${policyModel.toLowerCase()}|010신규/기변`,
-                `${policyModel.toUpperCase()}|010신규/기변`
-              );
-            }
-            
-            primaryHyphenVariants.forEach(variant => {
-              if (variant !== primaryModel) {
-                supportKeys.push(
-                  `${variant}|010신규/기변`,
-                  `${variant.toLowerCase()}|010신규/기변`,
-                  `${variant.toUpperCase()}|010신규/기변`
-                );
-              }
-            });
-            
-            // 🔥 핵심 수정: 정규화 후 같은 모델일 때만 정책표 모델명의 하이픈 변형 추가
-            if (!isDifferentModel && policyModel && policyModel !== primaryModel) {
-              const policyHyphenVariants = generateHyphenVariants(policyModel);
-              policyHyphenVariants.forEach(variant => {
-                const variantNormalized = normalizeModelCode(variant);
-                if (variant !== policyModel && variant !== primaryModel && 
-                    variantNormalized === primaryModelNormalized) {
-                  supportKeys.push(
-                    `${variant}|010신규/기변`,
-                    `${variant.toLowerCase()}|010신규/기변`,
-                    `${variant.toUpperCase()}|010신규/기변`
-                  );
-                }
-              });
-            }
-            
-            if (primaryModelNormalized) {
-              supportKeys.push(
-                `${primaryModelNormalized}|010신규/기변`,
-                `${primaryModelNormalized.toLowerCase()}|010신규/기변`,
-                `${primaryModelNormalized.toUpperCase()}|010신규/기변`
-              );
-            }
-            
-            // 🔥 핵심 수정: 정규화 후 같은 모델일 때만 정책표 모델명의 정규화된 버전 추가
-            // (이미 위에서 isDifferentModel 체크로 제외됨)
-          }
+          // 🔥 핵심 수정: "010신규/기변" 매핑은 위에서 이미 처리됨 (중복 제거)
+          // 기변 요청 시 "010신규/기변" 키는 위에서 이미 추가됨
+          // 010신규 요청 시 "010신규/기변" 키는 위에서 이미 추가됨
 
           // 키를 순서대로 시도하여 값 찾기
           let foundKey = null;
