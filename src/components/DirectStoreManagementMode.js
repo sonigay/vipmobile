@@ -29,6 +29,7 @@ import AppUpdatePopup from './AppUpdatePopup';
 import directStoreTheme from '../theme/DirectStoreTheme';
 import directStoreThemeV2 from '../theme/DirectStoreThemeV2';
 import ErrorBoundary from './ErrorBoundary';
+import { directStoreApiClient } from '../api/directStoreApiClient';
 
 // 탭 컴포넌트를 lazy loading으로 변경하여 초기화 순서 문제 해결
 const PolicySettingsTab = lazy(() => import('./direct/management/PolicySettingsTab'));
@@ -178,6 +179,17 @@ const DirectStoreManagementMode = ({
                   {modeTitle}
                 </Typography>
 
+                {/* 업데이트 확인 버튼 */}
+                <Button
+                  color="inherit"
+                  startIcon={<UpdateIcon />}
+                  onClick={() => setShowUpdatePopup(true)}
+                  sx={{ mr: 1, border: '1px solid rgba(255,255,255,0.3)' }}
+                >
+                  업데이트 확인
+                </Button>
+
+                {/* 데이터 재빌드 버튼 */}
                 <Button
                   color="inherit"
                   startIcon={rebuilding ? <CircularProgress size={20} color="inherit" /> : <BuildIcon />}
@@ -216,6 +228,14 @@ const DirectStoreManagementMode = ({
                 </Tabs>
               )}
             </AppBar>
+
+            {/* 업데이트 팝업 */}
+            <AppUpdatePopup
+              open={showUpdatePopup}
+              onClose={() => setShowUpdatePopup(false)}
+              mode="directStoreManagement"
+              loggedInStore={loggedInStore}
+            />
 
             <Box sx={{ flexGrow: 1, overflow: 'hidden' }}>
               {availableTabs.map((tab, index) => {
