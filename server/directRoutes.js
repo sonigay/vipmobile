@@ -522,56 +522,25 @@ async function rebuildDeviceMaster(carriersParam) {
       return isNaN(n) ? 0 : n;
     });
 
-    // ⚠ 주의: 이통사 지원금 시트에는 중간중간 완전히 비어 있는 행 또는
-    // '5G중고', 'LTE중고' 등의 구분 라벨 행이 섞여 있을 수 있다.
-    // 이러한 행은 모델/출고가 인덱스를 밀어버리므로, 여기서 제거한 뒤
-    // 실제 데이터만 연속되게 만든 배열을 사용한다.
+    // ⚠ 주의: 이통사 지원금 시트에는 중간중간 완전히 비어 있는 행이 섞여 있을 수 있다.
+    // 이러한 행은 의미가 없으므로, "모델명도 없고 출고가도 0"인 행만 제거하고
+    // 나머지 행(5G중고/LTE중고 포함)은 그대로 보존하여 인덱스를 유지한다.
     const filteredModels = [];
     const filteredPets = [];
     const filteredMakers = [];
     const filteredPrices = [];
 
-    // ⚠ 중요: 원본 배열에서 같은 인덱스로 모델명과 출고가를 매칭하면,
-    // 중간에 중고 행이 끼어 있을 때 그 아래 모델들의 출고가가 밀려서 잘못 매칭됩니다.
-    // 해결: 모델명이 있는 행의 출고가는 같은 인덱스에서 가져오되,
-    // 중고 행을 제거한 후에는 인덱스가 재정렬되므로, 필터링된 배열 기준으로는 정확히 매칭됩니다.
-    // 단, 원본에서 모델명은 있는데 출고가가 0인 경우, 위/아래 인덱스를 확인해서 찾습니다.
     const maxLength = Math.max(flatModels.length, flatPrices.length);
     for (let i = 0; i < maxLength; i++) {
       const modelName = flatModels[i];
-      let price = flatPrices[i] || 0;
+      const price = flatPrices[i] || 0;
 
       // 1) 모델명도 없고 출고가도 0이면 "완전히 빈 행" → 스킵
       if (!modelName && price === 0) {
         continue;
       }
 
-      // 2) 모델명이 중고 구분 라벨이면 (5G중고, LTE중고, ...중고) → 스킵
-      if (isDeviceCategoryRow(modelName, price)) {
-        continue;
-      }
-
-      // 3) 모델명은 있지만 출고가가 0인 경우, 위/아래 인덱스를 확인해서 실제 출고가를 찾습니다
-      //    (중고 행 때문에 출고가가 다른 인덱스로 밀려 있을 수 있음)
-      if (modelName && price === 0) {
-        // 위로 최대 2칸, 아래로 최대 2칸 확인
-        for (let offset = -2; offset <= 2; offset++) {
-          if (offset === 0) continue; // 자기 자신은 이미 확인함
-          const checkIdx = i + offset;
-          if (checkIdx < 0 || checkIdx >= flatPrices.length) continue;
-          
-          const candidatePrice = flatPrices[checkIdx] || 0;
-          const candidateModel = flatModels[checkIdx] || '';
-          
-          // 출고가가 있고, 그 행의 모델명이 비어있거나 중고 라벨이면
-          // 이 출고가가 현재 모델의 것일 가능성이 높음
-          if (candidatePrice > 0 && (!candidateModel || isDeviceCategoryRow(candidateModel, candidatePrice))) {
-            price = candidatePrice;
-            break;
-          }
-        }
-      }
-
+      // 2) 그 외의 경우(중고/실제 모델/0원 출고가 포함)는 그대로 유지
       filteredModels.push(modelName);
       filteredPets.push(flatPets[i] || modelName);
       filteredMakers.push(flatMakers[i] || '');
@@ -797,7 +766,7 @@ async function rebuildPricingMaster(carriersParam) {
       });
     }
 
-    // 3-1. 지원금표에서 완전히 빈 행/중고 구분 행 제거하여 인덱스 정렬
+    // 3-1. 지원금표에서 완전히 빈 행만 제거하여 인덱스 정렬
     const validIndexes = [];
     const maxSupportLen = supportModelsRaw.length;
 
@@ -817,11 +786,6 @@ async function rebuildPricingMaster(carriersParam) {
         continue;
       }
 
-      // 2) 모델명이 '5G중고' / 'LTE중고' / '...중고' 와 같은 구분 라벨이면 스킵
-      if (isDeviceCategoryRow(modelName, 0)) {
-        continue;
-      }
-
       validIndexes.push(i);
     }
 
@@ -830,6 +794,89 @@ async function rebuildPricingMaster(carriersParam) {
     const planGroupDataMap = {};
     for (const [pgName, arr] of Object.entries(planGroupDataMapRaw)) {
       planGroupDataMap[pgName] = validIndexes.map(idx => (arr[idx] || 0));
+    }
+
+    // 3-2. 요금제군 + 개통유형별 이통사지원금 맵 생성
+    // planGroupSupportData[planGroup][`${model}|openingType`] = supportValue
+    const planGroupSupportData = {};
+    const supportOpeningTypeRange = supportConfig.openingTypeRange || '';
+    let supportOpeningTypeRows = [];
+
+    if (supportOpeningTypeRange) {
+      supportOpeningTypeRows = await getSheetData(supportSheetId, supportOpeningTypeRange);
+    }
+
+    // 모델별 entry를 먼저 그룹핑 (openingTypeRaw, openingTypes, rowIndex)
+    const maxIndexedLen = validIndexes.length;
+    const modelEntriesMap = {}; // { modelName: [{ openingTypeRaw, openingTypes, rowIndex }] }
+
+    for (let idxPos = 0; idxPos < maxIndexedLen; idxPos++) {
+      const originalIndex = validIndexes[idxPos];
+      const modelName = (supportModelsRaw[originalIndex] || '').toString().trim();
+      if (!modelName) continue;
+
+      const openingTypeRaw = (supportOpeningTypeRows[originalIndex]?.[0] || '').toString().trim();
+      const openingTypes = parseOpeningTypes(openingTypeRaw);
+
+      if (!modelEntriesMap[modelName]) {
+        modelEntriesMap[modelName] = [];
+      }
+      modelEntriesMap[modelName].push({
+        openingTypeRaw,
+        openingTypes,
+        rowIndex: idxPos // idxPos = index into supportModels/planGroupDataMap[*]
+      });
+    }
+
+    // 요금제군별로, 위에서 만든 modelEntriesMap을 이용해 openingType별 지원금 맵 구성
+    for (const [pgName, supports] of Object.entries(planGroupDataMap)) {
+      const supportMap = {};
+
+      for (const [model, entries] of Object.entries(modelEntriesMap)) {
+        // 이 모델에 대해 번호이동/010신규/기변/전유형 구성 파악
+        const hasNumberPort = entries.some(e =>
+          e.openingTypeRaw === '번호이동' || e.openingTypes.includes('번호이동')
+        );
+        const hasNewChange = entries.some(e =>
+          e.openingTypeRaw === '010신규/기변' ||
+          (e.openingTypes.includes('010신규') && e.openingTypes.includes('기변'))
+        );
+
+        const shouldIgnoreAllTypes = hasNumberPort && hasNewChange;
+
+        for (const entry of entries) {
+          const { openingTypeRaw, openingTypes, rowIndex } = entry;
+          const supportValue = supports[rowIndex] || 0;
+
+          // 값이 0이면 굳이 등록하지 않아도 됨 (기본값 0)
+          if (!supportValue) continue;
+
+          const isAllType = openingTypeRaw === '전유형' || openingTypes.includes('전유형');
+
+          // 번호이동/010신규/기변이 모두 있는 경우 전유형은 무시
+          if (isAllType && shouldIgnoreAllTypes) {
+            continue;
+          }
+
+          if (isAllType) {
+            // 전유형: 별도 정의가 없을 때만 세 유형(010신규/MNP/기변)에 공통 적용
+            ['010신규', 'MNP', '기변'].forEach(ot => {
+              const key = `${model}|${ot}`;
+              if (supportMap[key] == null) {
+                supportMap[key] = supportValue;
+              }
+            });
+          } else {
+            // 번호이동/010신규/기변과 같은 구체적인 유형
+            openingTypes.forEach(ot => {
+              const key = `${model}|${ot}`;
+              supportMap[key] = supportValue;
+            });
+          }
+        }
+      }
+
+      planGroupSupportData[pgName] = supportMap;
     }
 
     // 4. 가격 계산 Loop
@@ -880,13 +927,17 @@ async function rebuildPricingMaster(carriersParam) {
       }
 
       for (const planGroup of Object.keys(planGroupDataMap)) {
-        // 해당 모델/요금제군의 공시지원금
-        let publicSupport = 0;
-        if (supportIdx !== -1 && planGroupDataMap[planGroup]) {
-          publicSupport = planGroupDataMap[planGroup][supportIdx] || 0;
-        }
+        // 해당 모델/요금제군/개통유형별 공시지원금 (planGroupSupportData 기반)
 
         for (const openingType of openingTypes) {
+          // 이통사지원금 조회 (planGroup + openingType + modelName 기준)
+          let publicSupport = 0;
+          const supportMapForGroup = planGroupSupportData[planGroup] || {};
+          const supportKey = `${modelName}|${openingType}`;
+          if (supportMapForGroup[supportKey] != null) {
+            publicSupport = Number(supportMapForGroup[supportKey] || 0);
+          }
+
           // 정책표 리베이트 조회 (planGroup + openingType + modelName 기준)
           let policyRebate = 0;
           const rebateByGroup = policyRebateData[planGroup] || {};
