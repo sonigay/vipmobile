@@ -926,6 +926,27 @@ async function rebuildPricingMaster(carriersParam) {
       const modelStartRow = extractStartRow(modelRange);
       const openingTypeStartRow = extractStartRow(supportOpeningTypeRange);
       openingTypeOffset = modelStartRow - openingTypeStartRow; // 음수일 수 있음
+      
+      // 디버깅 로그 (첫 번째 모델 확인용)
+      if (validIndexes.length > 0) {
+        const firstOriginalIndex = validIndexes[0];
+        const firstModelName = (supportModelsRaw[firstOriginalIndex] || '').toString().trim();
+        const firstOpeningTypeIndex = firstOriginalIndex + openingTypeOffset;
+        const firstOpeningTypeRaw = (supportOpeningTypeRows[firstOpeningTypeIndex]?.[0] || '').toString().trim();
+        
+        console.log(`[Direct][rebuildPricingMaster] ${carrier} openingTypeOffset 계산:`, {
+          modelRange,
+          openingTypeRange: supportOpeningTypeRange,
+          modelStartRow,
+          openingTypeStartRow,
+          openingTypeOffset,
+          firstModelName,
+          firstOriginalIndex,
+          firstOpeningTypeIndex,
+          firstOpeningTypeRaw,
+          supportOpeningTypeRowsLength: supportOpeningTypeRows.length
+        });
+      }
     }
 
     // 모델별 entry를 먼저 그룹핑 (openingTypeRaw, openingTypes, rowIndex)
@@ -938,8 +959,21 @@ async function rebuildPricingMaster(carriersParam) {
       if (!modelName) continue;
 
       // openingTypeRows 인덱스는 originalIndex에 오프셋을 적용
+      // originalIndex는 supportModelsRaw 배열의 인덱스 (실제 시트의 modelStartRow + originalIndex 행)
+      // openingTypeIndex는 supportOpeningTypeRows 배열의 인덱스 (실제 시트의 openingTypeStartRow + openingTypeIndex 행)
+      // 두 행이 같아야 하므로: modelStartRow + originalIndex = openingTypeStartRow + openingTypeIndex
+      // 따라서: openingTypeIndex = originalIndex + (modelStartRow - openingTypeStartRow) = originalIndex + openingTypeOffset
       const openingTypeIndex = originalIndex + openingTypeOffset;
-      const openingTypeRaw = (supportOpeningTypeRows[openingTypeIndex]?.[0] || '').toString().trim();
+      
+      // 배열 범위 체크 및 안전한 접근
+      let openingTypeRaw = '';
+      if (openingTypeIndex >= 0 && openingTypeIndex < supportOpeningTypeRows.length) {
+        openingTypeRaw = (supportOpeningTypeRows[openingTypeIndex]?.[0] || '').toString().trim();
+      } else if (process.env.NODE_ENV === 'development') {
+        // 개발 환경에서만 경고 로그
+        console.warn(`[Direct][rebuildPricingMaster] openingTypeIndex 범위 초과: originalIndex=${originalIndex}, offset=${openingTypeOffset}, calculatedIndex=${openingTypeIndex}, arrayLength=${supportOpeningTypeRows.length}`);
+      }
+      
       const openingTypes = parseOpeningTypes(openingTypeRaw);
 
       if (!modelEntriesMap[modelName]) {
@@ -1057,9 +1091,24 @@ async function rebuildPricingMaster(carriersParam) {
           // 이통사지원금 조회 (planGroup + openingType + modelName 기준)
           let publicSupport = 0;
           const supportMapForGroup = planGroupSupportData[planGroup] || {};
-          const supportKey = `${modelName}|${openingType}`;
-          if (supportMapForGroup[supportKey] != null) {
-            publicSupport = Number(supportMapForGroup[supportKey] || 0);
+          const supportKey1 = `${modelName}|${openingType}`;
+          const supportKey2 = `${normalizeModelCode(modelName)}|${openingType}`;
+          const supportDataEntry = supportMapForGroup[supportKey1] ||
+                                   supportMapForGroup[supportKey2];
+
+          if (supportDataEntry != null) {
+            publicSupport = Number(supportDataEntry) || 0;
+          } else if (process.env.NODE_ENV === 'development' && modelName.includes('SM-S926N256')) {
+            // 첫 번째 모델 디버깅용
+            console.warn(`[Direct][rebuildPricingMaster] ${carrier} 이통사지원금 조회 실패:`, {
+              modelName,
+              planGroup,
+              openingType,
+              supportKey1,
+              supportKey2,
+              supportMapKeys: Object.keys(supportMapForGroup).slice(0, 10),
+              supportMapForGroupSize: Object.keys(supportMapForGroup).length
+            });
           }
 
           // 정책표 리베이트 조회 (planGroup + openingType + modelName 기준)
