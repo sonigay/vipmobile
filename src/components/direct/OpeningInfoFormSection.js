@@ -92,7 +92,6 @@ const OpeningInfoFormSection = ({
                 } catch (err) {
                     console.error('대리점추가지원금 조회 실패:', err);
                 }
-            }
         }
     };
 
