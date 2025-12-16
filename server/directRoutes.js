@@ -911,6 +911,7 @@ async function rebuildPricingMaster(carriersParam) {
         const firstOpeningTypeRaw = (supportOpeningTypeRows[firstOriginalIndex]?.[0] || '').toString().trim();
         
         // 첫 번째 모델의 모든 행 찾기 (같은 모델명이 여러 행에 있을 수 있음)
+        // 주의: 모델명이 연속되지 않을 수 있으므로 validIndexes 전체를 검색
         const firstModelEntries = [];
         for (let i = 0; i < validIndexes.length; i++) {
           const idx = validIndexes[i];
@@ -922,10 +923,10 @@ async function rebuildPricingMaster(carriersParam) {
               openingTypeRaw: openingTypeRaw,
               parsedTypes: parseOpeningTypes(openingTypeRaw)
             });
-          } else {
-            // 다른 모델이 나오면 중단
-            break;
           }
+          // 다른 모델이 나와도 계속 검색 (같은 모델이 여러 행에 분산되어 있을 수 있음)
+          // 하지만 성능을 위해 처음 20개 행만 검색
+          if (i >= 20) break;
         }
         
         console.log(`[Direct][rebuildPricingMaster] ${carrier} openingType 데이터 확인:`, {

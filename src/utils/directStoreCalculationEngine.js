@@ -9,25 +9,70 @@ import { parsePrice, formatPrice } from './directStoreUtils';
  * 할부수수료 계산 (연 5.9%, 원리금균등상환)
  * @param {number} principal - 할부원금
  * @param {number} period - 할부기간 (개월)
- * @returns {{total: number, monthly: number}} 총 할부수수료, 월 할부수수료
+ * @returns {{
+ *   total: number,           // 총 할부수수료 (이자만)
+ *   monthly: number,         // 월 납입금 (원금+이자)
+ *   monthlyPrincipal: number, // 월 납부할부금 (원금 부분, 평균값)
+ *   monthlyFee: number,      // 월 할부수수료 (이자 부분, 평균값)
+ *   calculation: string      // 계산법 설명
+ * }}
  */
 export const calculateInstallmentFee = (principal, period) => {
   const rate = 0.059; // 연이율 5.9%
   
   if (period === 0 || principal === 0) {
-    return { total: 0, monthly: 0 };
+    return { 
+      total: 0, 
+      monthly: 0,
+      monthlyPrincipal: 0,
+      monthlyFee: 0,
+      calculation: '할부원금 또는 할부기간이 0원입니다.'
+    };
   }
 
-  const monthlyRate = rate / 12;
+  const monthlyRate = rate / 12; // 월이자율 = 5.9% / 12 = 약 0.4917%
+  
+  // 원리금균등상환 공식: 매월 동일한 금액 납입 (원금+이자)
+  // 공식: (원금 × 월이자율 × (1 + 월이자율)^기간) / ((1 + 월이자율)^기간 - 1)
   const monthlyPayment = 
     (principal * monthlyRate * Math.pow(1 + monthlyRate, period)) / 
     (Math.pow(1 + monthlyRate, period) - 1);
-  const totalPayment = monthlyPayment * period;
-  const totalFee = totalPayment - principal; // 총 할부수수료
+  
+  const totalPayment = monthlyPayment * period; // 총 납입금액
+  const totalFee = totalPayment - principal; // 총 할부수수료 (이자만)
+  
+  // 평균값 계산 (원리금균등상환은 매월 원금/이자 비율이 달라지므로 평균값 사용)
+  const monthlyPrincipal = principal / period; // 월 납부할부금 (원금 부분, 평균값)
+  const monthlyFee = totalFee / period; // 월 할부수수료 (이자 부분, 평균값)
+
+  // 계산법 설명
+  const calculation = `[계산법]
+• 할부원금: ${principal.toLocaleString()}원
+• 할부기간: ${period}개월
+• 연이율: ${(rate * 100).toFixed(2)}%
+• 월이자율: ${(monthlyRate * 100).toFixed(4)}%
+
+[원리금균등상환 공식]
+월 납입금 = (원금 × 월이자율 × (1 + 월이자율)^기간) / ((1 + 월이자율)^기간 - 1)
+         = ${monthlyPayment.toFixed(0).toLocaleString()}원
+
+[계산 결과]
+• 총 납입금액 = 월 납입금 × 기간 = ${totalPayment.toFixed(0).toLocaleString()}원
+• 총 할부수수료 = 총 납입금액 - 할부원금 = ${totalFee.toFixed(0).toLocaleString()}원
+• 월 납부할부금 = 할부원금 ÷ 기간 = ${monthlyPrincipal.toFixed(0).toLocaleString()}원 (평균값)
+• 월 할부수수료 = 총 할부수수료 ÷ 기간 = ${monthlyFee.toFixed(0).toLocaleString()}원 (평균값)
+• 월 납입금 = 월 납부할부금 + 월 할부수수료 = ${monthlyPayment.toFixed(0).toLocaleString()}원
+
+※ 원리금균등상환은 매월 납입금은 동일하지만, 원금과 이자의 비율이 달라집니다.
+  첫 달에는 이자가 많고 원금이 적으며, 마지막 달에는 이자가 적고 원금이 많습니다.
+  위 값은 평균값으로 계산된 것입니다.`;
 
   return {
-    total: Math.floor(totalFee / 10) * 10, // 10원 단위 절사
-    monthly: Math.floor(monthlyPayment / 10) * 10
+    total: Math.floor(totalFee / 10) * 10, // 총 할부수수료 (10원 단위 절사)
+    monthly: Math.floor(monthlyPayment / 10) * 10, // 월 납입금 (10원 단위 절사)
+    monthlyPrincipal: Math.floor(monthlyPrincipal / 10) * 10, // 월 납부할부금 (10원 단위 절사)
+    monthlyFee: Math.floor(monthlyFee / 10) * 10, // 월 할부수수료 (10원 단위 절사)
+    calculation: calculation
   };
 };
 
@@ -116,8 +161,10 @@ export const calculateTotalMonthlyFee = (
   planFee,
   addonsFee
 ) => {
+  // 현금 선택 시: 월 기본료 + 월 부가서비스 (월 할부금은 0원)
+  // 할부 선택 시: 월 할부금 + 월 기본료 + 월 부가서비스
   if (paymentType === 'cash') {
-    return 0; // 현금은 월 납부 없음
+    return planFee + addonsFee; // 현금은 할부금 없이 기본료와 부가서비스만
   }
 
   const installmentFee = calculateInstallmentFee(installmentPrincipal, installmentPeriod);

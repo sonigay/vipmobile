@@ -835,22 +835,91 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                                         <Grid item xs={12}>
                                             <Divider sx={{ my: 1 }} />
                                         </Grid>
+                                        <Grid item xs={12}>
+                                            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
+                                                할부 상세 내역
+                                            </Typography>
+                                        </Grid>
+                                        <Grid item xs={12}>
+                                            <TextField
+                                                label="총 할부원금"
+                                                fullWidth
+                                                value={installmentPrincipal.toLocaleString()}
+                                                InputProps={{ readOnly: true }}
+                                                helperText={`부가${formData.withAddon ? '유치' : '미유치'} 기준`}
+                                                sx={{ 
+                                                    '& .MuiInputBase-input': { 
+                                                        fontWeight: 'bold',
+                                                        color: theme.primary
+                                                    }
+                                                }}
+                                            />
+                                        </Grid>
                                         <Grid item xs={6}>
                                             <TextField
-                                                label="총 할부수수료"
+                                                label="월 납부할부금"
                                                 fullWidth
-                                                value={installmentFeeResult.total.toLocaleString()}
+                                                value={installmentFeeResult.monthlyPrincipal?.toLocaleString() || '0'}
                                                 InputProps={{ readOnly: true }}
+                                                helperText="원금 부분 (평균값)"
                                             />
                                         </Grid>
                                         <Grid item xs={6}>
                                             <TextField
                                                 label="월 할부수수료"
                                                 fullWidth
-                                                value={installmentFeeResult.monthly.toLocaleString()}
+                                                value={installmentFeeResult.monthlyFee?.toLocaleString() || '0'}
                                                 InputProps={{ readOnly: true }}
+                                                helperText="이자 부분 (평균값)"
                                             />
                                         </Grid>
+                                        <Grid item xs={12}>
+                                            <TextField
+                                                label="월 납입금"
+                                                fullWidth
+                                                value={installmentFeeResult.monthly.toLocaleString()}
+                                                InputProps={{ readOnly: true }}
+                                                helperText="월 납부할부금 + 월 할부수수료"
+                                                sx={{ 
+                                                    '& .MuiInputBase-input': { 
+                                                        fontWeight: 'bold',
+                                                        color: 'primary.main'
+                                                    }
+                                                }}
+                                            />
+                                        </Grid>
+                                        <Grid item xs={6}>
+                                            <TextField
+                                                label="총 할부수수료"
+                                                fullWidth
+                                                value={installmentFeeResult.total.toLocaleString()}
+                                                InputProps={{ readOnly: true }}
+                                                helperText="전체 기간 이자 합계"
+                                            />
+                                        </Grid>
+                                        <Grid item xs={6}>
+                                            <TextField
+                                                label="총 납입금액"
+                                                fullWidth
+                                                value={(installmentPrincipal + installmentFeeResult.total).toLocaleString()}
+                                                InputProps={{ readOnly: true }}
+                                                helperText="할부원금 + 총 할부수수료"
+                                            />
+                                        </Grid>
+                                        {installmentFeeResult.calculation && (
+                                            <Grid item xs={12}>
+                                                <Paper sx={{ p: 2, mt: 1, bgcolor: 'grey.50', border: '1px solid', borderColor: 'divider' }}>
+                                                    <Typography variant="caption" component="pre" sx={{ 
+                                                        whiteSpace: 'pre-wrap',
+                                                        fontFamily: 'monospace',
+                                                        fontSize: '0.75rem',
+                                                        lineHeight: 1.6
+                                                    }}>
+                                                        {installmentFeeResult.calculation}
+                                                    </Typography>
+                                                </Paper>
+                                            </Grid>
+                                        )}
                                     </>
                                 )}
                                 {formData.paymentType === 'cash' && (
@@ -1128,23 +1197,23 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                             <Divider sx={{ borderColor: 'rgba(255,255,255,0.2)', my: 2 }} />
 
                             {/* 최종 합계 */}
-                            {formData.paymentType === 'installment' && (
-                                <>
-                                    <Stack direction="row" justifyContent="space-between" mb={1}>
-                                        <Typography variant="body1">월 할부금</Typography>
-                                        <Typography variant="body1">{installmentFeeResult.monthly.toLocaleString()}원</Typography>
-                                    </Stack>
-                                    <Stack direction="row" justifyContent="space-between" mb={2}>
-                                        <Typography variant="body1">월 통신요금</Typography>
-                                        <Typography variant="body1">{planFeeResult.toLocaleString()}원</Typography>
-                                    </Stack>
-                                    {requiredAddons.length > 0 && (
-                                        <Stack direction="row" justifyContent="space-between" mb={2}>
-                                            <Typography variant="body1">월 부가서비스</Typography>
-                                            <Typography variant="body1">{addonsFeeResult.toLocaleString()}원</Typography>
-                                        </Stack>
-                                    )}
-                                </>
+                            <Stack direction="row" justifyContent="space-between" mb={1}>
+                                <Typography variant="body1">월 할부금</Typography>
+                                <Typography variant="body1">
+                                    {formData.paymentType === 'installment' 
+                                        ? installmentFeeResult.monthly.toLocaleString() 
+                                        : '0'}원
+                                </Typography>
+                            </Stack>
+                            <Stack direction="row" justifyContent="space-between" mb={2}>
+                                <Typography variant="body1">월 기본료</Typography>
+                                <Typography variant="body1">{planFeeResult.toLocaleString()}원</Typography>
+                            </Stack>
+                            {requiredAddons.length > 0 && (
+                                <Stack direction="row" justifyContent="space-between" mb={2}>
+                                    <Typography variant="body1">월 부가서비스</Typography>
+                                    <Typography variant="body1">{addonsFeeResult.toLocaleString()}원</Typography>
+                                </Stack>
                             )}
 
                             <Divider sx={{ borderColor: 'rgba(255,255,255,0.2)', mb: 2 }} />
