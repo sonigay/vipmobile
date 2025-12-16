@@ -305,14 +305,30 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
 
     // 마스터 가격 데이터에서 요금제군별로 찾기
     openingTypes.forEach(type => {
+      // 안전장치: 직영점_단말요금정책 시트에는 'MNP'로 저장되어 있지만,
+      // 혹시 모를 경우를 대비해 '번호이동'도 시도 (양방향 매핑)
+      const alternativeType = type === 'MNP' ? '번호이동' : (type === '번호이동' ? 'MNP' : null);
+      
       // 1순위: 요금제군별 키로 찾기 `${modelId}-${planGroup}-${openingType}`
       const planGroupKey = `${modelId}-${defaultPlanGroup}-${type}`;
       let pricing = masterPricing[planGroupKey];
+
+      // 1-1순위: 대체 타입으로 요금제군별 키 시도 (MNP <-> 번호이동)
+      if (!pricing && alternativeType) {
+        const altPlanGroupKey = `${modelId}-${defaultPlanGroup}-${alternativeType}`;
+        pricing = masterPricing[altPlanGroupKey];
+      }
 
       // 2순위: 기본 키로 찾기 `${modelId}-${openingType}` (요금제군별 키가 없을 때)
       if (!pricing) {
         const basicKey = `${modelId}-${type}`;
         pricing = masterPricing[basicKey];
+      }
+
+      // 2-1순위: 대체 타입으로 기본 키 시도 (MNP <-> 번호이동)
+      if (!pricing && alternativeType) {
+        const altBasicKey = `${modelId}-${alternativeType}`;
+        pricing = masterPricing[altBasicKey];
       }
 
       if (pricing) {

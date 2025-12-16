@@ -896,54 +896,27 @@ async function rebuildPricingMaster(carriersParam) {
     const planGroupSupportData = {};
     const supportOpeningTypeRange = supportConfig.openingTypeRange || '';
     let supportOpeningTypeRows = [];
-    let openingTypeOffset = 0; // openingTypeRange와 modelRange의 시작 행 차이
-
-    // 범위에서 시작 행 번호 추출 헬퍼 함수
-    const extractStartRow = (rangeStr) => {
-      if (!rangeStr) return 0;
-      // 시트 이름 제거 (있는 경우)
-      let rangeWithoutSheet = rangeStr;
-      const sheetMatch = rangeStr.match(/^'[^']+'!/);
-      if (sheetMatch) {
-        rangeWithoutSheet = rangeStr.replace(/^'[^']+'!/, '');
-      }
-      // 범위에서 시작 행 번호 추출 (예: 'A9:A100' -> 9)
-      const rangeMatch = rangeWithoutSheet.match(/[A-Z]+(\d+)/);
-      if (rangeMatch) {
-        return parseInt(rangeMatch[1], 10);
-      }
-      return 0;
-    };
+    // 🔥 핵심 수정: getMobileList와 동일하게 같은 인덱스 사용 (오프셋 없이)
+    // planGroupSupportData 생성 시에도 같은 인덱스를 사용하므로, 여기서도 같은 인덱스 사용
+    // supportModelsRaw와 supportOpeningTypeRows는 같은 시작 행에서 시작한다고 가정
 
     if (supportOpeningTypeRange) {
       supportOpeningTypeRows = await getSheetData(supportSheetId, supportOpeningTypeRange);
-      
-      // modelRange와 openingTypeRange의 시작 행 차이 계산
-      // supportModelsRaw[originalIndex]는 실제 시트의 (modelStartRow + originalIndex) 행
-      // supportOpeningTypeRows[openingTypeIndex]는 실제 시트의 (openingTypeStartRow + openingTypeIndex) 행
-      // 두 행이 같아야 하므로: modelStartRow + originalIndex = openingTypeStartRow + openingTypeIndex
-      // 따라서: openingTypeIndex = originalIndex + (modelStartRow - openingTypeStartRow)
-      const modelStartRow = extractStartRow(modelRange);
-      const openingTypeStartRow = extractStartRow(supportOpeningTypeRange);
-      openingTypeOffset = modelStartRow - openingTypeStartRow; // 음수일 수 있음
       
       // 디버깅 로그 (첫 번째 모델 확인용)
       if (validIndexes.length > 0) {
         const firstOriginalIndex = validIndexes[0];
         const firstModelName = (supportModelsRaw[firstOriginalIndex] || '').toString().trim();
-        const firstOpeningTypeIndex = firstOriginalIndex + openingTypeOffset;
-        const firstOpeningTypeRaw = (supportOpeningTypeRows[firstOpeningTypeIndex]?.[0] || '').toString().trim();
+        // 같은 인덱스 사용 (오프셋 없이)
+        const firstOpeningTypeRaw = (supportOpeningTypeRows[firstOriginalIndex]?.[0] || '').toString().trim();
         
-        console.log(`[Direct][rebuildPricingMaster] ${carrier} openingTypeOffset 계산:`, {
+        console.log(`[Direct][rebuildPricingMaster] ${carrier} openingType 데이터 확인:`, {
           modelRange,
           openingTypeRange: supportOpeningTypeRange,
-          modelStartRow,
-          openingTypeStartRow,
-          openingTypeOffset,
           firstModelName,
           firstOriginalIndex,
-          firstOpeningTypeIndex,
           firstOpeningTypeRaw,
+          supportModelsRawLength: supportModelsRaw.length,
           supportOpeningTypeRowsLength: supportOpeningTypeRows.length
         });
       }
@@ -958,12 +931,10 @@ async function rebuildPricingMaster(carriersParam) {
       const modelName = (supportModelsRaw[originalIndex] || '').toString().trim();
       if (!modelName) continue;
 
-      // openingTypeRows 인덱스는 originalIndex에 오프셋을 적용
-      // originalIndex는 supportModelsRaw 배열의 인덱스 (실제 시트의 modelStartRow + originalIndex 행)
-      // openingTypeIndex는 supportOpeningTypeRows 배열의 인덱스 (실제 시트의 openingTypeStartRow + openingTypeIndex 행)
-      // 두 행이 같아야 하므로: modelStartRow + originalIndex = openingTypeStartRow + openingTypeIndex
-      // 따라서: openingTypeIndex = originalIndex + (modelStartRow - openingTypeStartRow) = originalIndex + openingTypeOffset
-      const openingTypeIndex = originalIndex + openingTypeOffset;
+      // 🔥 핵심 수정: getMobileList와 동일하게 같은 인덱스 사용 (오프셋 없이)
+      // planGroupSupportData 생성 시에도 같은 인덱스를 사용하므로, 여기서도 같은 인덱스 사용
+      // supportModelsRaw와 supportOpeningTypeRows는 같은 시작 행에서 시작한다고 가정
+      const openingTypeIndex = originalIndex;
       
       // 배열 범위 체크 및 안전한 접근
       let openingTypeRaw = '';
@@ -971,7 +942,7 @@ async function rebuildPricingMaster(carriersParam) {
         openingTypeRaw = (supportOpeningTypeRows[openingTypeIndex]?.[0] || '').toString().trim();
       } else if (process.env.NODE_ENV === 'development') {
         // 개발 환경에서만 경고 로그
-        console.warn(`[Direct][rebuildPricingMaster] openingTypeIndex 범위 초과: originalIndex=${originalIndex}, offset=${openingTypeOffset}, calculatedIndex=${openingTypeIndex}, arrayLength=${supportOpeningTypeRows.length}`);
+        console.warn(`[Direct][rebuildPricingMaster] openingTypeIndex 범위 초과: originalIndex=${originalIndex}, calculatedIndex=${openingTypeIndex}, arrayLength=${supportOpeningTypeRows.length}`);
       }
       
       const openingTypes = parseOpeningTypes(openingTypeRaw);
@@ -1860,6 +1831,7 @@ function setupDirectRoutes(app) {
           const planGroup = (row[3] || '').toString().trim();
           const openingTypeRaw = (row[5] || '').toString().trim();
 
+          // 직영점_단말요금정책 시트에는 이미 'MNP'로 저장되어 있으므로 변환 불필요
           return {
             carrier,
             modelId,
