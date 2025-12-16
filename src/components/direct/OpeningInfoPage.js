@@ -265,6 +265,12 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
             : calculateInstallmentPrincipalWithoutAddon(factoryPrice, support, storeSupportWithoutAddon, formData.usePublicSupport);
     };
 
+    // 현금가 계산 함수
+    const getCashPrice = () => {
+        const principal = getCurrentInstallmentPrincipal();
+        return calculateCashPrice(principal, formData.cashPrice);
+    };
+
     // 계산된 값들을 메모이제이션하여 불필요한 재계산 방지
     const installmentPrincipal = getCurrentInstallmentPrincipal();
     const installmentFeeResult = calculateInstallmentFee(installmentPrincipal, formData.installmentPeriod);
@@ -737,16 +743,14 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                                         InputProps={{ readOnly: true }}
                                     />
                                 </Grid>
-                                {formData.usePublicSupport && (
-                                    <Grid item xs={6}>
-                                        <TextField
-                                            label="이통사 지원금"
-                                            fullWidth
-                                            value={publicSupport.toLocaleString()}
-                                            InputProps={{ readOnly: true }}
-                                        />
-                                    </Grid>
-                                )}
+                                <Grid item xs={6}>
+                                    <TextField
+                                        label="이통사 지원금"
+                                        fullWidth
+                                        value={formData.usePublicSupport ? publicSupport.toLocaleString() : '0'}
+                                        InputProps={{ readOnly: true }}
+                                    />
+                                </Grid>
                                 <Grid item xs={6}>
                                     <TextField
                                         label="대리점추가지원금 (부가유치)"
@@ -767,7 +771,11 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                                     <TextField
                                         label="할부원금 (부가유치)"
                                         fullWidth
-                                        value={calculateInstallmentPrincipalWithAddon().toLocaleString()}
+                                        value={(() => {
+                                            const support = formData.usePublicSupport ? publicSupport : 0;
+                                            const principal = calculateInstallmentPrincipalWithAddon(factoryPrice, support, storeSupportWithAddon, formData.usePublicSupport);
+                                            return isNaN(principal) ? 0 : principal;
+                                        })().toLocaleString()}
                                         InputProps={{ readOnly: true }}
                                         sx={{ input: { fontWeight: 'bold', color: theme.primary } }}
                                     />
@@ -776,7 +784,11 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                                     <TextField
                                         label="할부원금 (부가미유치)"
                                         fullWidth
-                                        value={calculateInstallmentPrincipalWithoutAddon().toLocaleString()}
+                                        value={(() => {
+                                            const support = formData.usePublicSupport ? publicSupport : 0;
+                                            const principal = calculateInstallmentPrincipalWithoutAddon(factoryPrice, support, storeSupportWithoutAddon, formData.usePublicSupport);
+                                            return isNaN(principal) ? 0 : principal;
+                                        })().toLocaleString()}
                                         InputProps={{ readOnly: true }}
                                         sx={{ input: { fontWeight: 'bold', color: theme.primary } }}
                                     />
@@ -900,15 +912,15 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                                                         let modelId = initialData?.id;
                                                         let foundMobile = null; // 🔥 개선: 스코프 문제 해결을 위해 블록 밖에서 선언
                                                         if (!modelId && initialData?.model) {
-                                                            // 모바일 목록에서 해당 모델 찾기
+                                                            // 마스터 데이터에서 해당 모델 찾기
                                                             try {
-                                                                const mobileList = await directStoreApiClient.getMobileList(selectedCarrier);
+                                                                const mobileList = await directStoreApiClient.getMobilesMaster(selectedCarrier);
                                                                 foundMobile = mobileList.find(m =>
                                                                     m.model === initialData.model &&
                                                                     m.carrier === selectedCarrier
                                                                 );
                                                                 if (foundMobile) {
-                                                                    modelId = foundMobile.id;
+                                                                    modelId = foundMobile.modelId || foundMobile.id;
                                                                 }
                                                             } catch (err) {
                                                                 console.warn('모델 ID 찾기 실패:', err);
@@ -916,29 +928,27 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                                                         }
 
                                                         if (modelId) {
-                                                            // 🔥 개선: modelName 전달 (휴대폰목록 페이지와 동일하게)
-                                                            const modelName = initialData?.model || foundMobile?.model || null;
-                                                            const result = await directStoreApiClient.calculateMobilePrice(
-                                                                modelId,
-                                                                planGroup,
-                                                                openingType,
-                                                                selectedCarrier,
-                                                                modelName
-                                                            );
+                                                            // 마스터 가격 정책 조회
+                                                            const pricingList = await directStoreApiClient.getMobilesPricing(selectedCarrier, {
+                                                                modelId: modelId,
+                                                                planGroup: planGroup,
+                                                                openingType: openingType
+                                                            });
 
-                                                            if (result.success) {
+                                                            if (pricingList && pricingList.length > 0) {
+                                                                const pricing = pricingList[0];
                                                                 // 🔥 개선: 이통사지원금도 업데이트
                                                                 debugLog('OpeningInfoPage.js:1292', '요금제 변경 시 이통사지원금 업데이트', {
                                                                     plan: newValue.name,
                                                                     planGroup,
                                                                     openingType,
-                                                                    publicSupport: result.publicSupport,
-                                                                    storeSupportWithAddon: result.storeSupportWithAddon,
-                                                                    storeSupportWithoutAddon: result.storeSupportWithoutAddon
+                                                                    publicSupport: pricing.publicSupport,
+                                                                    storeSupportWithAddon: pricing.storeSupportWithAddon,
+                                                                    storeSupportWithoutAddon: pricing.storeSupportWithoutAddon
                                                                 }, 'debug-session', 'run1', 'C');
-                                                                setPublicSupport(result.publicSupport || 0);
-                                                                setStoreSupportWithAddon(result.storeSupportWithAddon || 0);
-                                                                setStoreSupportWithoutAddon(result.storeSupportWithoutAddon || 0);
+                                                                setPublicSupport(pricing.publicSupport || 0);
+                                                                setStoreSupportWithAddon(pricing.storeSupportWithAddon || 0);
+                                                                setStoreSupportWithoutAddon(pricing.storeSupportWithoutAddon || 0);
                                                             }
                                                         }
                                                     } catch (err) {
@@ -972,6 +982,17 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                                 </Grid>
                                 {formData.plan && (
                                     <>
+                                        <Grid item xs={12}>
+                                            <TextField
+                                                label="요금제군"
+                                                fullWidth
+                                                value={(() => {
+                                                    const selectedPlan = planGroups.find(p => p.name === formData.plan);
+                                                    return selectedPlan?.group || 'N/A';
+                                                })()}
+                                                InputProps={{ readOnly: true }}
+                                            />
+                                        </Grid>
                                         <Grid item xs={12}>
                                             <TextField
                                                 label="기본료"

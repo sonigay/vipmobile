@@ -251,7 +251,7 @@ const MobileListTab = ({ onProductSelect }) => {
   // 하지만 여기서는 코드 교체가 목표이므로 간단히 유지.
 
   // 가격 Lookup 함수 (동기식)
-  const lookupPrice = (modelId, planGroup, openingType) => {
+  const lookupPrice = useCallback((modelId, planGroup, openingType) => {
     const key = `${modelId}-${planGroup}-${openingType}`;
     const priceData = pricingDataRef.current.get(key);
 
@@ -269,6 +269,15 @@ const MobileListTab = ({ onProductSelect }) => {
         openingType: openingType
       };
     }
+    
+    // 데이터를 찾지 못한 경우 디버깅 로그 (개발 환경에서만)
+    if (process.env.NODE_ENV === 'development') {
+      console.warn(`[MobileListTab] 가격 데이터를 찾지 못함: key=${key}, modelId=${modelId}, planGroup=${planGroup}, openingType=${openingType}`);
+      // pricingDataRef에 있는 키 목록 일부 출력 (디버깅용)
+      const availableKeys = Array.from(pricingDataRef.current.keys()).slice(0, 5);
+      console.log(`[MobileListTab] 사용 가능한 키 샘플:`, availableKeys);
+    }
+    
     // 데이터 없으면 0 리턴
     return {
       storeSupportWithAddon: 0,
@@ -278,10 +287,10 @@ const MobileListTab = ({ onProductSelect }) => {
       publicSupport: 0,
       openingType: openingType
     };
-  };
+  }, [mobileList]);
 
   // calculatePrice 대체 (동기식 상태 업데이트)
-  const updatePriceState = (modelId, planGroup, openingType) => {
+  const updatePriceState = useCallback((modelId, planGroup, openingType) => {
     const priceObj = lookupPrice(modelId, planGroup, openingType);
     const key = `${modelId}-${openingType}`;
 
@@ -289,7 +298,7 @@ const MobileListTab = ({ onProductSelect }) => {
       ...prev,
       [key]: priceObj
     }));
-  };
+  }, [lookupPrice]);
 
   const [uploadingModelId, setUploadingModelId] = useState(null);
   const fileInputRef = React.useRef(null);
@@ -590,32 +599,42 @@ const MobileListTab = ({ onProductSelect }) => {
   };
 
   // 요금제군 변경 시 상태 및 가격 업데이트
-  const handlePlanGroupChange = (modelId, newPlanGroup) => {
+  const handlePlanGroupChange = useCallback((modelId, newPlanGroup) => {
     if (!newPlanGroup) return;
 
-    setSelectedPlanGroups(prev => ({
-      ...prev,
-      [modelId]: newPlanGroup
-    }));
+    // 현재 openingType을 먼저 읽어서 가격 업데이트에 사용
+    setSelectedPlanGroups(prev => {
+      // 상태 업데이트
+      return {
+        ...prev,
+        [modelId]: newPlanGroup
+      };
+    });
 
-    const openingType = selectedOpeningTypes[modelId] || 'MNP';
-    updatePriceState(modelId, newPlanGroup, openingType);
-  };
+    // 상태 업데이트 후 가격 업데이트 (현재 openingType 사용)
+    const currentOpeningType = selectedOpeningTypes[modelId] || 'MNP';
+    updatePriceState(modelId, newPlanGroup, currentOpeningType);
+  }, [selectedOpeningTypes, updatePriceState]);
 
   // 개통유형 변경 시 상태 및 가격 업데이트
-  const handleOpeningTypeChange = (modelId, newOpeningType) => {
+  const handleOpeningTypeChange = useCallback((modelId, newOpeningType) => {
     if (!newOpeningType) return;
 
-    setSelectedOpeningTypes(prev => ({
-      ...prev,
-      [modelId]: newOpeningType
-    }));
+    // 현재 planGroup을 먼저 읽어서 가격 업데이트에 사용
+    setSelectedOpeningTypes(prev => {
+      // 상태 업데이트
+      return {
+        ...prev,
+        [modelId]: newOpeningType
+      };
+    });
 
-    const planGroup = selectedPlanGroups[modelId];
-    if (planGroup) {
-      updatePriceState(modelId, planGroup, newOpeningType);
+    // 상태 업데이트 후 가격 업데이트 (현재 planGroup 사용)
+    const currentPlanGroup = selectedPlanGroups[modelId] || planGroups[0] || '115군';
+    if (currentPlanGroup) {
+      updatePriceState(modelId, currentPlanGroup, newOpeningType);
     }
-  };
+  }, [selectedPlanGroups, planGroups, updatePriceState]);
 
   const getSelectedTags = useCallback((row) => {
     const tags = [];
@@ -662,7 +681,7 @@ const MobileListTab = ({ onProductSelect }) => {
       return calculated[field];
     }
     return row[field];
-  }, [calculatedPrices]);
+  }, [calculatedPrices, selectedOpeningTypes]);
 
   return (
     <Box sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>

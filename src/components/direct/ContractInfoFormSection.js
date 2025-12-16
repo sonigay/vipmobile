@@ -29,12 +29,13 @@ const ContractInfoFormSection = ({
     setPublicSupport
 }) => {
     const handleContractTypeChange = async (newContractType) => {
-        setFormData({ ...formData, contractType: newContractType });
-        
-        // 🔥 개선: 선택약정일 때 이통사지원금 0으로 설정
+        // 🔥 개선: 선택약정일 때 이통사지원금 0으로 설정하고 usePublicSupport를 false로
         if (newContractType === 'selected') {
             setPublicSupport(0);
+            setFormData(prev => ({ ...prev, contractType: newContractType, usePublicSupport: false }));
         } else {
+            // 일반약정으로 변경 시 usePublicSupport를 true로 설정
+            setFormData(prev => ({ ...prev, contractType: newContractType, usePublicSupport: true }));
             // 일반약정으로 변경 시 이통사지원금 재계산
             if (formData.plan && selectedPlanGroup && (initialData?.id || initialData?.model)) {
                 const planGroup = planGroups.find(p => p.name === formData.plan)?.group || selectedPlanGroup;
@@ -51,13 +52,14 @@ const ContractInfoFormSection = ({
                         let foundMobile = null;
                         if (!modelId && initialData?.model) {
                             try {
-                                const mobileList = await directStoreApiClient.getMobileList(selectedCarrier);
+                                // 마스터 데이터 사용
+                                const mobileList = await directStoreApiClient.getMobilesMaster(selectedCarrier);
                                 foundMobile = mobileList.find(m => 
                                     m.model === initialData.model && 
                                     m.carrier === selectedCarrier
                                 );
                                 if (foundMobile) {
-                                    modelId = foundMobile.id;
+                                    modelId = foundMobile.modelId || foundMobile.id;
                                 }
                             } catch (err) {
                                 console.warn('모델 ID 찾기 실패:', err);
@@ -65,23 +67,22 @@ const ContractInfoFormSection = ({
                         }
                         
                         if (modelId) {
-                            const modelName = initialData?.model || foundMobile?.model || null;
-                            const result = await directStoreApiClient.calculateMobilePrice(
-                                modelId,
-                                planGroup,
-                                openingType,
-                                selectedCarrier,
-                                modelName
-                            );
+                            // 마스터 가격 정책 조회
+                            const pricingList = await directStoreApiClient.getMobilesPricing(selectedCarrier, {
+                                modelId: modelId,
+                                planGroup: planGroup,
+                                openingType: openingType
+                            });
                             
-                            if (result.success) {
+                            if (pricingList && pricingList.length > 0) {
+                                const pricing = pricingList[0];
                                 debugLog('ContractInfoFormSection.js', '일반약정 변경 시 이통사지원금 재계산', {
                                     contractType: 'standard',
                                     planGroup,
                                     openingType,
-                                    publicSupport: result.publicSupport
+                                    publicSupport: pricing.publicSupport
                                 }, 'debug-session', 'run1', 'B');
-                                setPublicSupport(result.publicSupport || 0);
+                                setPublicSupport(pricing.publicSupport || 0);
                             }
                         }
                     } catch (err) {

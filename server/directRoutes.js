@@ -659,12 +659,33 @@ async function rebuildDeviceMaster(carriersParam) {
       });
     }
 
-    // 정렬된 carrierRows를 전체 allRows에 합치기
+    // 중복 제거: 정책표 순서를 유지하면서 모델명/정규화코드 기준으로 첫 번째만 유지
+    const seenModels = new Set(); // 이미 본 모델명/정규화코드 추적
+    const uniqueCarrierRows = [];
+
     for (const row of carrierRows) {
+      const modelName = (row[2] || '').toString().trim();
+      const normalizedCode = (row[1] || '').toString().trim(); // 모델ID (정규화된 코드)
+
+      // 중복 체크: 모델명 또는 정규화코드가 이미 나왔으면 스킵
+      if (seenModels.has(modelName) || seenModels.has(normalizedCode)) {
+        continue;
+      }
+
+      // 첫 번째로 나온 모델만 추가
+      seenModels.add(modelName);
+      if (normalizedCode && normalizedCode !== modelName) {
+        seenModels.add(normalizedCode);
+      }
+      uniqueCarrierRows.push(row);
+    }
+
+    // 중복 제거된 carrierRows를 전체 allRows에 합치기
+    for (const row of uniqueCarrierRows) {
       allRows.push(row);
     }
 
-    perCarrierStats[carrier] = { count: created };
+    perCarrierStats[carrier] = { count: uniqueCarrierRows.length };
   }
 
   // 기존 데이터 제거 후 새 데이터 쓰기
@@ -875,9 +896,36 @@ async function rebuildPricingMaster(carriersParam) {
     const planGroupSupportData = {};
     const supportOpeningTypeRange = supportConfig.openingTypeRange || '';
     let supportOpeningTypeRows = [];
+    let openingTypeOffset = 0; // openingTypeRange와 modelRange의 시작 행 차이
+
+    // 범위에서 시작 행 번호 추출 헬퍼 함수
+    const extractStartRow = (rangeStr) => {
+      if (!rangeStr) return 0;
+      // 시트 이름 제거 (있는 경우)
+      let rangeWithoutSheet = rangeStr;
+      const sheetMatch = rangeStr.match(/^'[^']+'!/);
+      if (sheetMatch) {
+        rangeWithoutSheet = rangeStr.replace(/^'[^']+'!/, '');
+      }
+      // 범위에서 시작 행 번호 추출 (예: 'A9:A100' -> 9)
+      const rangeMatch = rangeWithoutSheet.match(/[A-Z]+(\d+)/);
+      if (rangeMatch) {
+        return parseInt(rangeMatch[1], 10);
+      }
+      return 0;
+    };
 
     if (supportOpeningTypeRange) {
       supportOpeningTypeRows = await getSheetData(supportSheetId, supportOpeningTypeRange);
+      
+      // modelRange와 openingTypeRange의 시작 행 차이 계산
+      // supportModelsRaw[originalIndex]는 실제 시트의 (modelStartRow + originalIndex) 행
+      // supportOpeningTypeRows[openingTypeIndex]는 실제 시트의 (openingTypeStartRow + openingTypeIndex) 행
+      // 두 행이 같아야 하므로: modelStartRow + originalIndex = openingTypeStartRow + openingTypeIndex
+      // 따라서: openingTypeIndex = originalIndex + (modelStartRow - openingTypeStartRow)
+      const modelStartRow = extractStartRow(modelRange);
+      const openingTypeStartRow = extractStartRow(supportOpeningTypeRange);
+      openingTypeOffset = modelStartRow - openingTypeStartRow; // 음수일 수 있음
     }
 
     // 모델별 entry를 먼저 그룹핑 (openingTypeRaw, openingTypes, rowIndex)
@@ -889,7 +937,9 @@ async function rebuildPricingMaster(carriersParam) {
       const modelName = (supportModelsRaw[originalIndex] || '').toString().trim();
       if (!modelName) continue;
 
-      const openingTypeRaw = (supportOpeningTypeRows[originalIndex]?.[0] || '').toString().trim();
+      // openingTypeRows 인덱스는 originalIndex에 오프셋을 적용
+      const openingTypeIndex = originalIndex + openingTypeOffset;
+      const openingTypeRaw = (supportOpeningTypeRows[openingTypeIndex]?.[0] || '').toString().trim();
       const openingTypes = parseOpeningTypes(openingTypeRaw);
 
       if (!modelEntriesMap[modelName]) {
