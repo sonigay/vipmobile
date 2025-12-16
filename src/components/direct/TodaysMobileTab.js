@@ -258,7 +258,14 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
 
   // 가격 데이터 Lookup 함수 (TodaysProductCard용 prop 생성)
   const getPriceDataForProduct = useCallback((product) => {
-    if (!product || !product.id) return null;
+    // product가 없으면 기본값 반환 (null 대신 항상 객체 반환)
+    if (!product || !product.id) {
+      return {
+        '010신규': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: false },
+        'MNP': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: false },
+        '기변': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: false }
+      };
+    }
 
     const openingTypes = ['010신규', 'MNP', '기변'];
     const result = {};
@@ -268,6 +275,9 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
     if (product.isBudget && !product.isPremium) {
       defaultPlanGroup = '33군';
     }
+
+    // masterPricing이 비어있으면 기본값 반환 (로딩 완료 상태로 표시)
+    const isMasterPricingLoaded = Object.keys(masterPricing).length > 0;
 
     // 마스터 가격 데이터에서 요금제군별로 찾기
     openingTypes.forEach(type => {
@@ -289,17 +299,18 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
           loading: false
         };
       } else {
-        // 데이터가 없으면 0으로 초기화하되 loading: false (마스터 데이터 로드 완료 시점)
+        // 데이터가 없으면 0으로 초기화
+        // masterPricing이 로드되었으면 loading: false, 아직 로드 중이면 loading: true
         result[type] = {
           publicSupport: 0,
           storeSupport: 0,
           purchasePrice: 0,
-          loading: false // 이미 마스터 로드 완료됨
+          loading: !isMasterPricingLoaded // 마스터 데이터 로드 완료 여부에 따라 결정
         };
       }
     });
 
-    // 마스터 데이터를 사용하므로 항상 반환 (loading: false로 설정하여 API 호출 방지)
+    // 마스터 데이터를 사용하므로 항상 반환 (loading 상태는 masterPricing 로드 여부에 따라 결정)
     return result;
   }, [masterPricing]);
 

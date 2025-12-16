@@ -88,16 +88,19 @@ function TodaysProductCard(props) {
       return;
     }
 
-    // propPriceData가 없으면 기본값으로 설정 (마스터 데이터 로드 대기 중)
+    // propPriceData가 없으면 기본값으로 설정
+    // TodaysMobileTab의 getPriceDataForProduct가 항상 객체를 반환하므로
+    // 여기서는 기본값만 설정 (loading 상태는 propPriceData에서 관리)
     if (!product || !product.id) {
       return;
     }
 
-    // 마스터 데이터가 아직 로드되지 않았을 수 있으므로 기본값만 설정
+    // 기본값 설정 (propPriceData가 없을 때만 사용)
+    // 실제로는 TodaysMobileTab에서 항상 propPriceData를 전달하므로 이 코드는 거의 실행되지 않음
     const defaultPriceData = {
-      '010신규': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: true },
-      'MNP': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: true },
-      '기변': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: true }
+      '010신규': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: false },
+      'MNP': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: false },
+      '기변': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: false }
     };
     setPriceData(defaultPriceData);
   }, [product?.id, propPriceData, onPriceCalculated]);
