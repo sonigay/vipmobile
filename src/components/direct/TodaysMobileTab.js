@@ -173,19 +173,41 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
       // 2) `${modelId}-${planGroup}-${openingType}` -> priceObj (요금제군별 키)
       const pricingMap = {};
       allPricing.forEach(item => {
+        // purchasePrice 계산 (출고가 - 이통사지원금 - 대리점추가지원금)
+        const purchasePriceWithAddon = Math.max(0, 
+          (item.factoryPrice || 0) - (item.publicSupport || 0) - (item.storeSupportWithAddon || 0)
+        );
+        const purchasePriceWithoutAddon = Math.max(0,
+          (item.factoryPrice || 0) - (item.publicSupport || 0) - (item.storeSupportWithoutAddon || 0)
+        );
+
+        // 계산된 purchasePrice를 포함한 객체 생성
+        const priceItem = {
+          ...item,
+          purchasePriceWithAddon,
+          purchasePriceWithoutAddon
+        };
+
         const basicKey = `${item.modelId}-${item.openingType}`;
         const planGroupKey = `${item.modelId}-${item.planGroup}-${item.openingType}`;
         
         // 기본 키로 저장 (기존 호환성 유지)
         if (!pricingMap[basicKey]) {
-          pricingMap[basicKey] = item;
+          pricingMap[basicKey] = priceItem;
         }
         
         // 요금제군별 키로도 저장 (요금제군별 조회 가능)
-        pricingMap[planGroupKey] = item;
+        pricingMap[planGroupKey] = priceItem;
       });
 
       setMasterPricing(pricingMap);
+
+      // 디버깅: 마스터 가격 데이터 로드 확인
+      console.log('🔍 [TodaysMobileTab] 마스터 가격 데이터 로드 완료:', {
+        totalItems: allPricing.length,
+        pricingMapKeys: Object.keys(pricingMap).slice(0, 10), // 처음 10개 키만 표시
+        sampleItem: pricingMap[Object.keys(pricingMap)[0]] // 첫 번째 아이템 샘플
+      });
 
       setLoadSteps(prev => ({
         ...prev,
@@ -259,7 +281,9 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
   // 가격 데이터 Lookup 함수 (TodaysProductCard용 prop 생성)
   const getPriceDataForProduct = useCallback((product) => {
     // product가 없으면 기본값 반환 (null 대신 항상 객체 반환)
-    if (!product || !product.id) {
+    // product.id 또는 product.modelId 사용 (getMobilesMaster는 modelId를 반환)
+    const modelId = product?.modelId || product?.id;
+    if (!product || !modelId) {
       return {
         '010신규': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: false },
         'MNP': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: false },
@@ -271,7 +295,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
     const result = {};
 
     // 기본 요금제군 결정 (프리미엄/중저가에 따라)
-    let defaultPlanGroup = '115군';
+    let defaultPlanGroup = product.defaultPlanGroup || '115군';
     if (product.isBudget && !product.isPremium) {
       defaultPlanGroup = '33군';
     }
@@ -282,12 +306,12 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
     // 마스터 가격 데이터에서 요금제군별로 찾기
     openingTypes.forEach(type => {
       // 1순위: 요금제군별 키로 찾기 `${modelId}-${planGroup}-${openingType}`
-      const planGroupKey = `${product.id}-${defaultPlanGroup}-${type}`;
+      const planGroupKey = `${modelId}-${defaultPlanGroup}-${type}`;
       let pricing = masterPricing[planGroupKey];
 
       // 2순위: 기본 키로 찾기 `${modelId}-${openingType}` (요금제군별 키가 없을 때)
       if (!pricing) {
-        const basicKey = `${product.id}-${type}`;
+        const basicKey = `${modelId}-${type}`;
         pricing = masterPricing[basicKey];
       }
 
@@ -307,6 +331,20 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
           purchasePrice: 0,
           loading: !isMasterPricingLoaded // 마스터 데이터 로드 완료 여부에 따라 결정
         };
+        
+        // 디버깅: 데이터를 찾지 못한 경우
+        if (isMasterPricingLoaded) {
+          console.warn('⚠️ [TodaysMobileTab] 가격 데이터를 찾지 못함:', {
+            modelId: modelId,
+            productId: product.id,
+            productModelId: product.modelId,
+            productName: product.model || product.petName,
+            planGroup: defaultPlanGroup,
+            openingType: type,
+            searchedKeys: [`${modelId}-${defaultPlanGroup}-${type}`, `${modelId}-${type}`],
+            availableKeys: Object.keys(masterPricing).filter(k => k.includes(modelId)).slice(0, 5)
+          });
+        }
       }
     });
 
