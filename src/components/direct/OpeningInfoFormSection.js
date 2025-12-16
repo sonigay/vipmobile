@@ -32,9 +32,12 @@ const OpeningInfoFormSection = ({
         setFormData({ ...formData, openingType: newOpeningType });
 
         // 요금제가 선택되어 있으면 대리점추가지원금 재계산
-        if (formData.plan && selectedPlanGroup) {
-            const planGroup = planGroups.find(p => p.name === formData.plan)?.group || selectedPlanGroup;
-            if (planGroup && (initialData?.id || initialData?.model)) {
+        // 요금제가 없어도 initialData에 planGroup이 있으면 사용
+        const selectedPlan = formData.plan ? planGroups.find(p => p.name === formData.plan) : null;
+        const planGroup = selectedPlan?.group || null;
+        
+        if ((planGroup || initialData?.planGroup) && (initialData?.id || initialData?.model)) {
+            const targetPlanGroup = planGroup || initialData.planGroup;
                 try {
                     const openingTypeMap = {
                         'NEW': '010신규',
@@ -65,7 +68,7 @@ const OpeningInfoFormSection = ({
                         // 마스터 가격 정책 조회
                         const pricingList = await directStoreApiClient.getMobilesPricing(selectedCarrier, {
                             modelId: modelId,
-                            planGroup: planGroup,
+                            planGroup: targetPlanGroup,
                             openingType: openingType
                         });
 
@@ -75,7 +78,7 @@ const OpeningInfoFormSection = ({
 
                             debugLog('OpeningInfoFormSection.js', '가입유형 변경 시 이통사지원금 업데이트', {
                                 openingType: newOpeningType,
-                                planGroup,
+                                planGroup: targetPlanGroup,
                                 publicSupport: pricing.publicSupport,
                                 storeSupportWithAddon: pricing.storeSupportWithAddon,
                                 storeSupportWithoutAddon: pricing.storeSupportWithoutAddon

@@ -37,8 +37,10 @@ const ContractInfoFormSection = ({
             // 일반약정으로 변경 시 usePublicSupport를 true로 설정
             setFormData(prev => ({ ...prev, contractType: newContractType, usePublicSupport: true }));
             // 일반약정으로 변경 시 이통사지원금 재계산
-            if (formData.plan && selectedPlanGroup && (initialData?.id || initialData?.model)) {
-                const planGroup = planGroups.find(p => p.name === formData.plan)?.group || selectedPlanGroup;
+            if (formData.plan && (initialData?.id || initialData?.model)) {
+                // planGroups에서 선택된 요금제 찾기
+                const selectedPlan = planGroups.find(p => p.name === formData.plan);
+                const planGroup = selectedPlan?.group || null;
                 if (planGroup) {
                     try {
                         const openingTypeMap = {

@@ -97,11 +97,11 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
 
                 if (plans && plans.length > 0) {
                     // 데이터 변환 (프론트엔드 형식에 맞게)
-                    // Master Data Fields: planName, groupName, basicFee
+                    // Master Data Fields: planName, planGroup, basicFee
                     const formattedPlans = plans.map(p => ({
-                        name: `${p.planName}(${p.groupName})`,
+                        name: `${p.planName}(${p.planGroup})`,
                         planName: p.planName,
-                        group: p.groupName,
+                        group: p.planGroup, // 서버는 planGroup 필드를 반환
                         basicFee: Number(p.basicFee)
                     }));
 
@@ -248,6 +248,11 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                     setPublicSupport(pricing.publicSupport || initialData?.publicSupport || 0);
                     setStoreSupportWithAddon(pricing.storeSupportWithAddon || 0);
                     setStoreSupportWithoutAddon(pricing.storeSupportWithoutAddon || 0);
+                    
+                    // 일반약정이면 usePublicSupport를 true로 설정
+                    if (formData.contractType === 'standard') {
+                        setFormData(prev => ({ ...prev, usePublicSupport: true }));
+                    }
                 }
             } catch (err) {
                 console.error('초기 대리점지원금 계산 실패:', err);
@@ -255,7 +260,7 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
         };
 
         calculateInitialPrice();
-    }, [initialData?.planGroup, initialData?.openingType, planGroups, selectedCarrier, initialData?.id]);
+    }, [initialData?.planGroup, initialData?.openingType, planGroups, selectedCarrier, initialData?.id, formData.contractType]);
 
     // 계산 로직 (계산 엔진 사용)
     const getCurrentInstallmentPrincipal = () => {
