@@ -77,130 +77,30 @@ function TodaysProductCard(props) {
   if (product && product.isRecommended) tagChips.push({ label: '추천', color: 'success' });
   if (product && product.isCheap) tagChips.push({ label: '저렴', color: 'info' });
   
-  // 각 유형별 가격 정보 로드 (props로 받은 priceData가 없거나 null일 때만)
+  // 각 유형별 가격 정보 로드 (props로 받은 priceData가 있으면 사용, 없으면 마스터 데이터 기반으로 설정)
   useEffect(() => {
-    
-    // 🔥 개선: propPriceData가 있고 모든 유형이 로드 완료되었을 때만 스킵
-    // propPriceData가 있지만 loading이 true인 경우에는 API 호출을 진행해야 함
-    if (propPriceData && propPriceData['010신규'] && 
-        propPriceData['010신규'].loading === false &&
-        propPriceData['MNP'] && propPriceData['MNP'].loading === false &&
-        propPriceData['기변'] && propPriceData['기변'].loading === false) {
-      return;
-    }
-    if (hasLoadedRef.current || !product || !product.id || !product.carrier) {
-      return;
-    }
-    
-    const loadPrices = async () => {
-      hasLoadedRef.current = true;
-      
-      // 기본 요금제군 결정 (프리미엄/중저가에 따라)
-      let defaultPlanGroup = '115군';
-      if (product.isBudget && !product.isPremium) {
-        defaultPlanGroup = '33군';
-      }
-
-      const openingTypes = ['010신규', 'MNP', '기변'];
-      const newPriceData = { ...priceData };
-      
-
-      // 먼저 전역 캐시에서 확인
-      let allCached = true;
-      for (const openingType of openingTypes) {
-        const cached = getCachedPrice(product.id, defaultPlanGroup, openingType, product.carrier);
-        
-        // 🔥 개선: 캐시 값 검증 (휴대폰목록 페이지와 동일하게)
-        const serverPublicSupport = product.publicSupport || product.support || 0;
-        const cachePublicSupport = cached?.publicSupport || 0;
-        const isCacheValueInvalid = cached && serverPublicSupport > 0 && 
-          Math.abs(cachePublicSupport - serverPublicSupport) > 100000; // 10만원 이상 차이나면 잘못된 캐시로 간주
-        
-        if (cached && !isCacheValueInvalid && (cached.publicSupport !== undefined || cached.storeSupport !== undefined)) {
-          newPriceData[openingType] = {
-            publicSupport: cached.publicSupport || 0,
-            storeSupport: cached.storeSupport || cached.storeSupportWithAddon || 0,
-            purchasePrice: cached.purchasePrice || cached.purchasePriceWithAddon || 0,
-            loading: false
-          };
-        } else {
-          allCached = false;
-        }
-      }
-
-      // 모든 데이터가 캐시에 있으면 즉시 업데이트
-      if (allCached) {
-        setPriceData(newPriceData);
-        if (onPriceCalculated) {
-          onPriceCalculated(product.id, newPriceData);
-        }
-        return;
-      }
-      
-
-      // 🔥 성능 최적화: 캐시에 없는 데이터를 병렬로 API 호출 (순차 호출 대신)
-      const apiPromises = openingTypes
-        .filter(openingType => newPriceData[openingType].loading !== false) // 캐시에서 가져온 데이터는 제외
-        .map(async (openingType) => {
-          try {
-            const result = await directStoreApiClient.calculateMobilePrice(
-              product.id,
-              defaultPlanGroup,
-              openingType,
-              product.carrier,
-              product.model || null
-            );
-
-            if (result.success) {
-              // 전역 캐시에 저장
-              setCachedPrice(product.id, defaultPlanGroup, openingType, product.carrier, {
-                publicSupport: result.publicSupport || 0,
-                storeSupport: result.storeSupportWithAddon || 0,
-                purchasePrice: result.purchasePriceWithAddon || 0
-              });
-
-              return {
-                openingType,
-                data: {
-                  publicSupport: result.publicSupport || 0,
-                  storeSupport: result.storeSupportWithAddon || 0,
-                  purchasePrice: result.purchasePriceWithAddon || 0,
-                  loading: false
-                }
-              };
-            } else {
-              return {
-                openingType,
-                data: { ...newPriceData[openingType], loading: false }
-              };
-            }
-          } catch (err) {
-            console.error(`가격 계산 실패 (${openingType}):`, err);
-            return {
-              openingType,
-              data: { ...newPriceData[openingType], loading: false }
-            };
-          }
-        });
-
-      // 모든 API 호출을 병렬로 실행하고 결과를 기다림
-      const results = await Promise.all(apiPromises);
-      
-      // 결과를 newPriceData에 반영
-      results.forEach(({ openingType, data }) => {
-        newPriceData[openingType] = data;
-      });
-
-      setPriceData(newPriceData);
-      
-      
+    // propPriceData가 있으면 그대로 사용 (마스터 데이터에서 이미 로드됨)
+    if (propPriceData) {
+      setPriceData(propPriceData);
       if (onPriceCalculated) {
-        onPriceCalculated(product.id, newPriceData);
+        onPriceCalculated(product?.id, propPriceData);
       }
-    };
+      return;
+    }
 
-    loadPrices();
-  }, [product?.id, product?.carrier, product?.model, product?.isBudget, product?.isPremium, propPriceData]);
+    // propPriceData가 없으면 기본값으로 설정 (마스터 데이터 로드 대기 중)
+    if (!product || !product.id) {
+      return;
+    }
+
+    // 마스터 데이터가 아직 로드되지 않았을 수 있으므로 기본값만 설정
+    const defaultPriceData = {
+      '010신규': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: true },
+      'MNP': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: true },
+      '기변': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: true }
+    };
+    setPriceData(defaultPriceData);
+  }, [product?.id, propPriceData, onPriceCalculated]);
 
   return (
     <Card

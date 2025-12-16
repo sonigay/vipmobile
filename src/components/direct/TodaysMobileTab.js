@@ -168,14 +168,21 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
 
       const allPricing = [...skPricing, ...ktPricing, ...lgPricing];
 
-      // 가격 데이터 인덱싱: `${modelId}-${openingType}` -> priceObj
+      // 가격 데이터 인덱싱: 
+      // 1) `${modelId}-${openingType}` -> priceObj (기본 키)
+      // 2) `${modelId}-${planGroup}-${openingType}` -> priceObj (요금제군별 키)
       const pricingMap = {};
       allPricing.forEach(item => {
-        const key = `${item.modelId}-${item.openingType}`;
-        const carrierKey = `${item.modelId}-${item.openingType}-${item.carrier}`; // Carrier 포함 키도 지원?
-        // MobileListTab에서는 `${modelId}-${openingType}` 사용 (openingType별로 유니크하다고 가정?)
-        // 실제로는 carrier가 다르면 modelId도 다르므로 유니크함.
-        pricingMap[key] = item;
+        const basicKey = `${item.modelId}-${item.openingType}`;
+        const planGroupKey = `${item.modelId}-${item.planGroup}-${item.openingType}`;
+        
+        // 기본 키로 저장 (기존 호환성 유지)
+        if (!pricingMap[basicKey]) {
+          pricingMap[basicKey] = item;
+        }
+        
+        // 요금제군별 키로도 저장 (요금제군별 조회 가능)
+        pricingMap[planGroupKey] = item;
       });
 
       setMasterPricing(pricingMap);
@@ -255,17 +262,26 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
 
     const openingTypes = ['010신규', 'MNP', '기변'];
     const result = {};
-    let hasData = false;
 
-    // TODO: TodaysProductCard가 기대하는 구조 확인 필요
-    // 기대 구조: { '010신규': { publicSupport, storeSupport, purchasePrice, loading: false } }
+    // 기본 요금제군 결정 (프리미엄/중저가에 따라)
+    let defaultPlanGroup = '115군';
+    if (product.isBudget && !product.isPremium) {
+      defaultPlanGroup = '33군';
+    }
 
+    // 마스터 가격 데이터에서 요금제군별로 찾기
     openingTypes.forEach(type => {
-      const key = `${product.id}-${type}`;
-      const pricing = masterPricing[key];
+      // 1순위: 요금제군별 키로 찾기 `${modelId}-${planGroup}-${openingType}`
+      const planGroupKey = `${product.id}-${defaultPlanGroup}-${type}`;
+      let pricing = masterPricing[planGroupKey];
+
+      // 2순위: 기본 키로 찾기 `${modelId}-${openingType}` (요금제군별 키가 없을 때)
+      if (!pricing) {
+        const basicKey = `${product.id}-${type}`;
+        pricing = masterPricing[basicKey];
+      }
 
       if (pricing) {
-        hasData = true;
         result[type] = {
           publicSupport: pricing.publicSupport || 0,
           storeSupport: pricing.storeSupportWithAddon || 0, // 기본값으로 부가서비스 포함 지원금 사용
@@ -283,10 +299,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
       }
     });
 
-    // 하나라도 데이터가 있으면 결과 반환, 아니면 null?
-    // TodaysProductCard는 null이면 자체 로딩을 시도할 수 있음.
-    // 하지만 마스터 데이터를 사용하므로 자체 로딩을 피하고 싶음.
-    // 따라서 빈 데이터라도 반환하는 것이 좋음 (단, loading: false)
+    // 마스터 데이터를 사용하므로 항상 반환 (loading: false로 설정하여 API 호출 방지)
     return result;
   }, [masterPricing]);
 
