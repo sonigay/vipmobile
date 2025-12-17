@@ -4589,7 +4589,7 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
 
     const safeCarrier = normalizePart(carrier) || 'SK';
     const safeModelId = normalizePart(modelId) || 'unknown';
-    const safeManufacturerFinal = normalizePart(safeManufacturer) || '기타';
+    const safeManufacturerFinal = normalizePart(safeManufacturer) || 'Other';
 
     // 파일명 생성: 각 부분을 조합하고 최종적으로 이중 하이픈 제거
     // 🔥 개선: 파일 확장자를 올바르게 추출하고 이미지로 인식되도록 확장자 보장
