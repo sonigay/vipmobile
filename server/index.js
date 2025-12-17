@@ -4579,12 +4579,30 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
     const safeManufacturer = manufacturer && manufacturer.trim() ? manufacturer.trim() : '기타';
 
     // 🔥 개선: 각 부분을 정규화하여 이중 하이픈 방지
+    // 🔥 핵심 수정: 한글을 영문으로 변환하여 Discord 파일명 호환성 개선
     const normalizePart = (str) => {
       if (!str) return '';
-      return str.trim()
-        .replace(/-+/g, '-')  // 연속된 하이픈을 단일 하이픈로
-        .replace(/^-|-$/g, '')  // 앞뒤 하이픈 제거
-        .replace(/\s+/g, '-');  // 공백을 하이픈으로 변환
+      // 한글을 영문으로 변환 (제조사명)
+      const koreanToEnglish = {
+        '삼성': 'Samsung',
+        '애플': 'Apple',
+        'LG': 'LG',
+        '기타': 'Other'
+      };
+      let normalized = str.trim();
+      // 한글 제조사명 변환
+      for (const [korean, english] of Object.entries(koreanToEnglish)) {
+        if (normalized.includes(korean)) {
+          normalized = normalized.replace(korean, english);
+        }
+      }
+      // 한글 제거 및 영문/숫자만 허용 (Discord 파일명 호환성)
+      normalized = normalized
+        .replace(/[^a-zA-Z0-9\-_]/g, '') // 한글 및 특수문자 제거
+        .replace(/\s+/g, '') // 공백 제거
+        .replace(/-+/g, '-') // 이중 하이픈 제거
+        .replace(/^-|-$/g, ''); // 앞뒤 하이픈 제거
+      return normalized;
     };
 
     const safeCarrier = normalizePart(carrier) || 'SK';
