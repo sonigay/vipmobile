@@ -117,4 +117,5 @@ const ImageUploadButton = ({
 };
 
 export default ImageUploadButton;
+export { ImageUploadButton };
 
