@@ -467,6 +467,20 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                         position: relative !important;
                     }
 
+                    /* 인쇄 시에도 2컬럼 레이아웃 유지 */
+                    .print-area > .MuiGrid-container {
+                        display: flex !important;
+                        flex-wrap: wrap !important;
+                    }
+
+                    /* print-area 내부 최상위 Grid container의 직접 자식 Grid item을 50% 너비로 강제 */
+                    .print-area > .MuiGrid-container > .MuiGrid-item {
+                        flex-basis: 50% !important;
+                        max-width: 50% !important;
+                        width: 50% !important;
+                        flex: 0 0 50% !important;
+                    }
+
                     /* Paper 컴포넌트가 잘리지 않도록 */
                     .print-root .MuiPaper-root {
                         page-break-inside: avoid !important;
