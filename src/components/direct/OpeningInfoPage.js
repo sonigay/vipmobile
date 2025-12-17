@@ -70,23 +70,23 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
         customerContact: initialData?.customerContact || '',
         customerBirth: '',
         openingType: convertOpeningType(initialData?.openingType) || 'NEW', // NEW, MNP, CHANGE
-        prevCarrier: '',
-        contractType: 'standard', // standard | selected (선택약정)
-        installmentPeriod: 24,
-        plan: '', // 요금제명
-        paymentType: 'installment', // installment | cash
-        withAddon: true, // 부가유치 여부 (true: 부가유치, false: 미유치)
-        usePublicSupport: true, // 이통사지원금 사용 여부
-        lgPremier: false, // LG 프리미어 약정 적용 여부
-        cashPrice: 0, // 현금가
-        depositAccount: '', // 입금계좌
+        prevCarrier: initialData?.prevCarrier || '',
+        contractType: initialData?.contractType || 'standard', // standard | selected (선택약정)
+        installmentPeriod: initialData?.installmentPeriod || 24,
+        plan: initialData?.plan || '', // 요금제명
+        paymentType: initialData?.paymentType || 'installment', // installment | cash
+        withAddon: initialData?.withAddon !== undefined ? initialData.withAddon : true, // 부가유치 여부 (true: 부가유치, false: 미유치)
+        usePublicSupport: initialData?.usePublicSupport !== undefined ? initialData.usePublicSupport : true, // 이통사지원금 사용 여부
+        lgPremier: initialData?.lgPremier || false, // LG 프리미어 약정 적용 여부
+        cashPrice: initialData?.cashPrice || 0, // 현금가
+        depositAccount: initialData?.depositAccount || '', // 입금계좌
         // 단말기/유심 정보
-        deviceColor: '',
-        deviceSerial: '',
-        simModel: '',
-        simSerial: '',
+        deviceColor: initialData?.deviceColor || '',
+        deviceSerial: initialData?.deviceSerial || '',
+        simModel: initialData?.simModel || '',
+        simSerial: initialData?.simSerial || '',
         // POS코드
-        posCode: ''
+        posCode: initialData?.posCode || ''
     });
 
     // 요금제 그룹 로드 (마스터 데이터 사용)
@@ -110,7 +110,21 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
 
                     // 초기값 설정
                     let initialPlan = formattedPlans[0];
-                    if (initialData?.planGroup) {
+                    
+                    // 1순위: initialData.plan이 있으면 정확히 매칭
+                    if (initialData?.plan) {
+                        const foundPlan = formattedPlans.find(p => 
+                            p.name === initialData.plan || 
+                            p.planName === initialData.plan ||
+                            p.name.includes(initialData.plan)
+                        );
+                        if (foundPlan) {
+                            initialPlan = foundPlan;
+                        }
+                    }
+                    
+                    // 2순위: initialData.planGroup으로 찾기
+                    if (!initialPlan && initialData?.planGroup) {
                         const foundPlan = formattedPlans.find(p =>
                             p.group === initialData.planGroup ||
                             p.name.includes(initialData.planGroup)
@@ -135,7 +149,7 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
             }
         };
         loadPlanGroups();
-    }, [selectedCarrier, initialData?.planGroup]);
+    }, [selectedCarrier, initialData?.planGroup, initialData?.plan]);
 
     // 필수 부가서비스 및 보험상품 로드 (정책설정에서 가져오기)
     useEffect(() => {

@@ -119,6 +119,17 @@ const DirectSalesReportTab = ({ onRowClick, loggedInStore, isManagementMode = fa
 
     const handleRowClick = (row) => {
         if (onRowClick) {
+            // 요금제 정보에서 planGroup 추출 (예: "(AI 전화) 5G 시그니처(115군)" -> "115군")
+            const planText = row.plan || row.요금제 || '';
+            let planGroup = null;
+            if (planText) {
+                // 괄호 안의 요금제군 추출 (예: "(115군)" 또는 "115군")
+                const match = planText.match(/\(?(\d+군)\)?/);
+                if (match) {
+                    planGroup = match[1];
+                }
+            }
+
             // 데이터 포맷을 OpeningInfoPage가 기대하는 형식으로 변환
             const formattedData = {
                 ...row,
@@ -131,7 +142,18 @@ const DirectSalesReportTab = ({ onRowClick, loggedInStore, isManagementMode = fa
                 openingType: row.openingType || (row.개통유형 === '기변' ? 'CHANGE' : row.개통유형 === '신규' ? 'NEW' : 'MNP'),
                 customerName: row.customerName || row.고객명,
                 customerContact: row.customerContact || row.연락처,
-                carrier: row.carrier || row.통신사
+                carrier: row.carrier || row.통신사,
+                plan: planText, // 요금제명 (예: "(AI 전화) 5G 시그니처(115군)")
+                planGroup: planGroup || row.planGroup, // 요금제군 (예: "115군")
+                // 추가 필드들
+                deviceColor: row.color || row.deviceColor || row.색상,
+                deviceSerial: row.deviceSerial || row.단말일련번호,
+                simModel: row.usimModel || row.simModel || row.유심모델명,
+                simSerial: row.usimSerial || row.simSerial || row.유심일련번호,
+                contractType: row.contractType || (row.약정 === '선택약정' ? 'selected' : 'standard'),
+                installmentPeriod: row.installmentPeriod || row.할부개월 || 24,
+                paymentType: row.paymentType || (row.할부구분 === '현금' ? 'cash' : 'installment'),
+                prevCarrier: row.prevCarrier || row.전통신사
             };
             onRowClick(formattedData);
         }
