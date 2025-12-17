@@ -439,7 +439,7 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                 @media print {
                     @page {
                         size: A4;
-                        margin: 5mm;
+                        margin: 3mm;
                     }
 
                     /* HTML/Body 높이 제한 해제 */
@@ -465,13 +465,14 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                         height: auto !important;
                         overflow: visible !important;
                         position: relative !important;
-                        padding: 4px !important;
+                        padding: 2px !important;
                     }
 
                     /* 안내문구 박스 높이/간격 최소화 */
                     .agreement-box {
-                        margin-bottom: 4px !important;
-                        padding: 4px 8px !important;
+                        margin-bottom: 2px !important;
+                        padding: 2px 4px !important;
+                        page-break-after: avoid !important;
                     }
 
                     .agreement-box .MuiStack-root {
@@ -505,13 +506,28 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                         flex-wrap: wrap !important;
                         gap: 2px !important;
                         margin: 0 !important;
+                        width: 100% !important;
                     }
 
                     /* print-area 내부 최상위 Grid container의 직접 자식 Grid item을 50% 너비로 강제 */
-                    .print-area > .MuiGrid-container > .MuiGrid-item {
+                    /* MUI Grid는 복잡한 클래스 구조를 가지므로 모든 가능한 선택자 사용 */
+                    .print-area > .MuiGrid-container > [class*="MuiGrid-item"],
+                    .print-area > .MuiGrid-container > div[class*="MuiGrid"],
+                    .print-area > div[class*="MuiGrid-container"] > [class*="MuiGrid-item"],
+                    .print-area > div[class*="MuiGrid-container"] > div[class*="MuiGrid"] {
                         flex-basis: 50% !important;
                         max-width: 50% !important;
-                        width: 50% !important;
+                        width: calc(50% - 1px) !important;
+                        flex: 0 0 50% !important;
+                        box-sizing: border-box !important;
+                    }
+
+                    /* MUI Grid의 breakpoint 클래스 무시 - 인쇄 시 모든 Grid item을 50%로 */
+                    .print-area [class*="MuiGrid-grid-xs-12"],
+                    .print-area [class*="MuiGrid-grid-md-6"] {
+                        flex-basis: 50% !important;
+                        max-width: 50% !important;
+                        width: calc(50% - 1px) !important;
                         flex: 0 0 50% !important;
                     }
 
@@ -519,8 +535,8 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                     .print-root .MuiPaper-root {
                         page-break-inside: avoid !important;
                         break-inside: avoid !important;
-                        padding: 6px 8px !important;
-                        margin-bottom: 4px !important;
+                        padding: 4px 6px !important;
+                        margin-bottom: 2px !important;
                     }
 
                     /* Typography 간격 최소화 */
@@ -530,22 +546,29 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                     }
 
                     .print-root .MuiTypography-h6 {
+                        font-size: 11px !important;
+                        line-height: 1.1 !important;
+                        margin-bottom: 2px !important;
+                    }
+
+                    .print-root .MuiTypography-h4,
+                    .print-root .MuiTypography-h5 {
                         font-size: 12px !important;
-                        line-height: 1.2 !important;
-                        margin-bottom: 4px !important;
+                        line-height: 1.1 !important;
+                        margin-bottom: 2px !important;
                     }
 
                     /* TextField, Autocomplete 등 입력 필드 높이/간격 최소화 */
                     .print-root .MuiTextField-root,
                     .print-root .MuiAutocomplete-root {
-                        margin-bottom: 4px !important;
+                        margin-bottom: 2px !important;
                     }
 
                     .print-root .MuiInputBase-root {
-                        padding: 4px 8px !important;
-                        font-size: 11px !important;
-                        min-height: 28px !important;
-                        height: 28px !important;
+                        padding: 2px 6px !important;
+                        font-size: 10px !important;
+                        min-height: 24px !important;
+                        height: 24px !important;
                     }
 
                     .print-root .MuiInputLabel-root {
@@ -573,12 +596,46 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
 
                     /* Grid spacing 최소화 */
                     .print-root .MuiGrid-container {
-                        gap: 4px !important;
+                        gap: 2px !important;
+                    }
+
+                    /* 인쇄 시 내부 Grid item들을 가로 배치 (2줄 레이아웃) */
+                    /* 요금정보, 단말기유심 정보 등 내부 Grid item들 */
+                    /* xs={12} sm={6}인 경우 인쇄 시 50% */
+                    .print-root .MuiPaper-root .MuiGrid-container > .MuiGrid-item[class*="MuiGrid-grid-xs-12"][class*="MuiGrid-grid-sm-6"],
+                    .print-root .MuiPaper-root .MuiGrid-container > .MuiGrid-item[class*="MuiGrid-grid-xs-6"] {
+                        flex-basis: 50% !important;
+                        max-width: 50% !important;
+                        width: calc(50% - 1px) !important;
+                        flex: 0 0 50% !important;
+                    }
+
+                    /* 요금정보 섹션: 요금제군과 기본료를 가로 배치 */
+                    /* 첫 번째 Grid item(요금제 선택)은 전체 너비, 두 번째와 세 번째는 50%씩 */
+                    .plan-info-section .MuiGrid-container > .MuiGrid-item[class*="MuiGrid-grid-xs-12"]:nth-child(2),
+                    .plan-info-section .MuiGrid-container > .MuiGrid-item[class*="MuiGrid-grid-xs-12"]:nth-child(3) {
+                        flex-basis: 50% !important;
+                        max-width: 50% !important;
+                        width: calc(50% - 1px) !important;
+                        flex: 0 0 50% !important;
                     }
 
                     /* Stack spacing 최소화 */
                     .print-root .MuiStack-root {
-                        gap: 4px !important;
+                        gap: 2px !important;
+                    }
+
+                    /* Divider 간격 최소화 */
+                    .print-root .MuiDivider-root {
+                        margin: 2px 0 !important;
+                    }
+
+                    /* Select, MenuItem 간격 최소화 */
+                    .print-root .MuiSelect-root,
+                    .print-root .MuiMenuItem-root {
+                        font-size: 10px !important;
+                        padding: 2px 6px !important;
+                        min-height: 24px !important;
                     }
                 }
             `}</style>
@@ -693,7 +750,7 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                         />
 
                         {/* 요금정보 */}
-                        <Paper sx={{ p: 2, mb: 1.5, borderTop: `3px solid ${theme.primary}` }}>
+                        <Paper className="plan-info-section" sx={{ p: 2, mb: 1.5, borderTop: `3px solid ${theme.primary}` }}>
                             <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>요금정보</Typography>
                             <Grid container spacing={1.5}>
                                 <Grid item xs={12}>
@@ -792,7 +849,7 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                                 </Grid>
                                 {formData.plan && (
                                     <>
-                                        <Grid item xs={12}>
+                                        <Grid item xs={12} sm={6} sx={{ '@media print': { flexBasis: '50%', maxWidth: '50%' } }}>
                                             <TextField
                                                 label="요금제군"
                                                 fullWidth
@@ -803,7 +860,7 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                                                 InputProps={{ readOnly: true }}
                                             />
                                         </Grid>
-                                        <Grid item xs={12}>
+                                        <Grid item xs={12} sm={6} sx={{ '@media print': { flexBasis: '50%', maxWidth: '50%' } }}>
                                             <TextField
                                                 label="기본료"
                                                 fullWidth
