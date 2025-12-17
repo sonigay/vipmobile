@@ -134,15 +134,25 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
         directStoreApiClient.getMobilesMaster('LG')
       ]);
 
-      // 🔥 핵심 수정: API 응답의 imageUrl 필드를 image로 매핑
-      // getMobilesMaster는 imageUrl을 반환하지만 TodaysProductCard는 image를 기대
+      // 🔥 핵심 수정: API 응답의 imageUrl 필드를 image로 매핑하고,
+      // 기본 요금제군(defaultPlanGroup)을 미리 계산해둔다.
+      // - 프리미엄: 기본 115군
+      // - 중저가: 기본 33군
       // requiredAddons 필드도 제대로 전달되도록 확인
-      const allMobiles = [...skMobiles, ...ktMobiles, ...lgMobiles].map(m => ({
-        ...m,
-        image: m.imageUrl || m.image, // imageUrl을 image로 매핑
-        addons: m.requiredAddons || m.addons || '', // requiredAddons를 addons로도 매핑 (하위 호환성)
-        requiredAddons: m.requiredAddons || m.addons || '' // requiredAddons 필드 유지
-      }));
+      const allMobiles = [...skMobiles, ...ktMobiles, ...lgMobiles].map(m => {
+        let defaultPlanGroup = m.defaultPlanGroup || '115군';
+        if (m.isBudget && !m.isPremium) {
+          defaultPlanGroup = '33군';
+        }
+
+        return {
+          ...m,
+          image: m.imageUrl || m.image, // imageUrl을 image로 매핑
+          addons: m.requiredAddons || m.addons || '', // requiredAddons를 addons로도 매핑 (하위 호환성)
+          requiredAddons: m.requiredAddons || m.addons || '', // requiredAddons 필드 유지
+          defaultPlanGroup
+        };
+      });
 
       // 프리미엄/중저가/인기/추천 등으로 필터링
       /* 

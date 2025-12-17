@@ -124,7 +124,33 @@ function TodaysProductCard(props) {
           zIndex: 1
         }
       }}
-      onClick={() => product && onSelect && onSelect(product)}
+      onClick={() => {
+        if (!product || !onSelect) return;
+
+        // 개통정보입력 페이지에 전달할 기본값 구성
+        const defaultOpeningType = 'MNP';
+        const priceForDefaultType = finalPriceData[defaultOpeningType] || finalPriceData['MNP'] || {};
+
+        const selectedProduct = {
+          // 기본 단말 정보
+          ...product,
+          id: product.id || product.modelId, // OpeningInfoPage에서 modelId로 사용
+          // 기본 요금제군: 프리미엄/중저가 여부에 따라 결정 (TodaysMobileTab와 동일 로직)
+          planGroup: product.defaultPlanGroup || (product.isBudget && !product.isPremium ? '33군' : '115군'),
+          // 기본 개통유형: MNP 기준
+          openingType: defaultOpeningType,
+          // 지원금/구매가 정보 (MNP 기준)
+          publicSupport: priceForDefaultType.publicSupport || 0,
+          support: priceForDefaultType.publicSupport || 0, // 하위 호환 필드
+          storeSupport: priceForDefaultType.storeSupport || 0,
+          storeSupportWithAddon: priceForDefaultType.storeSupport || 0,
+          // 미유치 지원금은 Master에서 다시 계산되므로 0으로 초기화
+          storeSupportNoAddon: 0,
+          storeSupportWithoutAddon: 0
+        };
+
+        onSelect(selectedProduct);
+      }}
     >
       {/* 태그 칩들 */}
       {tagChips.length > 0 && (
@@ -357,7 +383,7 @@ function TodaysProductCard(props) {
       </CardContent>
 
       <CardActions sx={{ p: compact ? 1.5 : 2, pt: compact ? 0 : 0 }}>
-        <Button
+          <Button
           variant="contained"
           fullWidth
           startIcon={<ShoppingCartIcon />}
@@ -376,7 +402,25 @@ function TodaysProductCard(props) {
           }}
           onClick={(e) => {
             e.stopPropagation();
-            onSelect(product);
+            if (!product || !onSelect) return;
+
+            const defaultOpeningType = 'MNP';
+            const priceForDefaultType = finalPriceData[defaultOpeningType] || finalPriceData['MNP'] || {};
+
+            const selectedProduct = {
+              ...product,
+              id: product.id || product.modelId,
+              planGroup: product.defaultPlanGroup || (product.isBudget && !product.isPremium ? '33군' : '115군'),
+              openingType: defaultOpeningType,
+              publicSupport: priceForDefaultType.publicSupport || 0,
+              support: priceForDefaultType.publicSupport || 0,
+              storeSupport: priceForDefaultType.storeSupport || 0,
+              storeSupportWithAddon: priceForDefaultType.storeSupport || 0,
+              storeSupportNoAddon: 0,
+              storeSupportWithoutAddon: 0
+            };
+
+            onSelect(selectedProduct);
           }}
         >
           구매하기
