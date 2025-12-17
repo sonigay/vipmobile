@@ -650,7 +650,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
 
   // 렌더링
   return (
-    <Box sx={{ p: isFullScreen ? 0 : 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <Box sx={{ p: isFullScreen ? 0 : 3, height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
 
       {/* 헤더 (일반 모드) */}
       {!isFullScreen && (
@@ -740,7 +740,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
         </Box>
       ) : (
         // === 일반 그리드 모드 ===
-        <Box sx={{ flex: 1, overflow: 'auto' }}>
+        <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
           {/* 메인 헤더 문구 */}
           {mainHeaderText && (
             <Box sx={{ mb: 3, p: 2, borderRadius: 2, bgcolor: 'primary.main', color: 'white', textAlign: 'center' }}>
@@ -748,31 +748,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
             </Box>
           )}
 
-          {/* 상품 그리드 (Top Products) */}
-          <Box sx={{
-            display: 'grid',
-            gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' },
-            gap: 2
-          }}>
-            {allProducts.map(product => (
-              <TodaysProductCard
-                key={product.id}
-                product={product}
-                isPremium={product.isPremium}
-                priceData={getPriceDataForProduct(product)}
-                onSelect={onProductSelect}
-                theme={getCarrierTheme(product.carrier)}
-                compact={compact}
-              />
-            ))}
-            {allProducts.length === 0 && (
-              <Typography variant="body1" sx={{ gridColumn: '1/-1', textAlign: 'center', py: 4 }}>
-                표시할 상품이 없습니다.
-              </Typography>
-            )}
-          </Box>
-
-          {/* 수동 슬라이드쇼 프리뷰 (옵션) - 생략 가능 */}
+          {/* 모든 체크 상품 미리보기 */}
           {slideshowData.length > 0 && (
             <Box sx={{ mt: 4, pt: 2, borderTop: 1, borderColor: 'divider' }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
