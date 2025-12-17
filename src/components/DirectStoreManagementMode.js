@@ -160,7 +160,7 @@ const DirectStoreManagementMode = ({
       <CssBaseline />
       <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', display: 'flex', flexDirection: 'column' }}>
         {selectedReport ? (
-          <Box sx={{ flexGrow: 1, height: '100vh', overflow: 'auto' }}>
+          <Box className="opening-wrapper" sx={{ flexGrow: 1, height: '100vh', overflow: 'auto' }}>
             <ErrorBoundary name="OpeningInfoPage (Management)">
               <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}><CircularProgress /></Box>}>
                 <OpeningInfoPage

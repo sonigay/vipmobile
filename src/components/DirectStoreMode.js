@@ -312,7 +312,7 @@ const DirectStoreMode = ({
         {/* 개통정보 입력 페이지가 활성화된 경우 */}
         {selectedProduct ? (
           <Fade in={true}>
-            <Box sx={{ flexGrow: 1, height: '100vh', overflow: 'auto' }}>
+            <Box className="opening-wrapper" sx={{ flexGrow: 1, height: '100vh', overflow: 'auto' }}>
               <ErrorBoundary name="OpeningInfoPage">
                 <OpeningInfoPage
                   initialData={selectedProduct}

@@ -455,7 +455,12 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                         display: none !important;
                     }
 
-                    /* 스크롤 컨테이너 해제해서 전체 내용 출력 */
+                    /* 스크롤 컨테이너 해제해서 전체 내용 출력 (상위 래퍼 포함) */
+                    .opening-wrapper {
+                        height: auto !important;
+                        overflow: visible !important;
+                    }
+
                     .print-root {
                         height: auto !important;
                         overflow: visible !important;
