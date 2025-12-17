@@ -3172,13 +3172,16 @@ async function proxyDiscordImage(req, res) {
     const http = require('http');
     const url = require('url');
 
+    // 🔥 핵심 수정: 쿼리 파라미터 제거 (Discord CDN이 쿼리 파라미터를 제대로 처리하지 못할 수 있음)
+    const parsedUrl = new URL(imageUrl);
+    const cleanImageUrl = parsedUrl.origin + parsedUrl.pathname; // 쿼리 파라미터 제거
+
     let contentType = 'image/png'; // 기본값
 
     const imageBuffer = await new Promise((resolve, reject) => {
-      const parsedUrl = new URL(imageUrl);
       const protocol = parsedUrl.protocol === 'https:' ? https : http;
 
-      const request = protocol.get(imageUrl, {
+      const request = protocol.get(cleanImageUrl, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
