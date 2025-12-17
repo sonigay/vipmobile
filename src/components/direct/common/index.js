@@ -20,3 +20,6 @@ export { ErrorState, EmptyState } from './ErrorState';
 
 // 가격 표시 컴포넌트
 export { PriceDisplay, PriceComparison } from './PriceDisplay';
+
+// 이미지 업로드 컴포넌트
+export { default as ImageUploadButton } from './ImageUploadButton';

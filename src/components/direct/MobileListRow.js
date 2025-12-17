@@ -22,7 +22,6 @@ import {
 } from '@mui/material';
 import {
   PhotoCamera as PhotoCameraIcon,
-  Edit as EditIcon,
   Recommend as RecommendIcon,
   Star as StarIcon,
   Label as LabelIcon
@@ -31,6 +30,7 @@ import { Checkbox } from '@mui/material';
 import { HoverableTableRow } from './common/ModernTable';
 import { debugLog } from '../../utils/debugLogger';
 import { getProxyImageUrl } from '../../api';
+import { ImageUploadButton } from './common/ImageUploadButton';
 
 
 const MobileListRowComponent = ({
@@ -47,7 +47,7 @@ const MobileListRowComponent = ({
   onTagChange,
   onPlanGroupChange,
   onOpeningTypeChange,
-  onImageUploadClick,
+  onImageUploadSuccess,
   getSelectedTags,
   getDisplayValue
 }) => {
@@ -262,20 +262,28 @@ const MobileListRowComponent = ({
           >
             <PhotoCameraIcon />
           </Avatar>
-          <IconButton
-            size="small"
+          <Box
             sx={{
               position: 'absolute',
               bottom: -8,
-              right: -8,
-              bgcolor: 'background.paper',
-              boxShadow: 1,
-              '&:hover': { bgcolor: 'primary.main', color: 'black' }
+              right: -8
             }}
-            onClick={() => onImageUploadClick(row.id)}
           >
-            <EditIcon fontSize="small" />
-          </IconButton>
+            <ImageUploadButton
+              modelId={row.model || row.id}
+              carrier={row.carrier}
+              modelName={row.model}
+              petName={row.petName}
+              onUploadSuccess={onImageUploadSuccess}
+              size="small"
+              sx={{
+                bgcolor: 'background.paper',
+                boxShadow: 1,
+                '&:hover': { bgcolor: 'primary.main', color: 'black' }
+              }}
+              tooltip="이미지 업로드"
+            />
+          </Box>
         </Box>
       </TableCell>
       

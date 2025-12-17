@@ -268,11 +268,14 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
     loadMainHeaderText();
   }, [fetchData, loadMainHeaderText]);
 
-  // 이미지 업로드 이벤트 리스너
+  // 🔥 단방향 동기화: 휴대폰목록 페이지에서만 업로드 가능
+  // 오늘의휴대폰 페이지에서는 업로드 기능 제거, 휴대폰목록에서 업로드 시에만 자동 반영
+
+  // 이미지 업로드 이벤트 리스너 (다른 페이지에서 업로드 시)
   useEffect(() => {
     const handleImageUploaded = (event) => {
       console.log('🔄 [오늘의휴대폰] 이미지 업로드 이벤트 수신, 재로딩...');
-      setTimeout(() => fetchData(), 1000); // 1초 후 재로딩
+      setTimeout(() => fetchData(), 2000); // 2초 후 재로딩
     };
     window.addEventListener('imageUploaded', handleImageUploaded);
     return () => window.removeEventListener('imageUploaded', handleImageUploaded);

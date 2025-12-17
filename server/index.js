@@ -4757,6 +4757,67 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
         console.log(`✅ [이미지 업로드] Google Sheets 추가 성공`);
       }
 
+      // 🔥 핵심 개선: 직영점_단말마스터 시트에도 이미지 URL 업데이트 (재빌드 없이 즉시 반영)
+      if (sheetSaveSuccess) {
+        try {
+          console.log(`📝 [이미지 업로드] 직영점_단말마스터 시트 업데이트 시작: ${modelId}`);
+          
+          // 직영점_단말마스터 시트에서 해당 모델 찾기
+          const masterResponse = await rateLimitedSheetsCall(() =>
+            sheets.spreadsheets.values.get({
+              spreadsheetId: SPREADSHEET_ID,
+              range: '직영점_단말마스터!A:O'
+            })
+          );
+
+          const masterValues = masterResponse.data.values || [];
+          const masterRows = masterValues.slice(1); // 헤더 제외
+
+          // 기존 행 찾기: 통신사 + 모델ID 또는 모델명 조합으로 찾기
+          // normalizeModelCode 함수는 이미 전역으로 정의되어 있음 (라인 4250)
+          const normalizedModelId = normalizeModelCode(modelId);
+          const normalizedModelName = normalizeModelCode(modelName);
+
+          const existingMasterRowIndex = masterRows.findIndex(row => {
+            const rowCarrier = (row[0] || '').trim();
+            const rowModelId = (row[1] || '').trim(); // 모델ID
+            const rowModelName = (row[2] || '').trim(); // 모델명
+
+            // 통신사가 일치하는지 확인
+            if (rowCarrier !== carrier) return false;
+
+            // 정규화된 모델 코드로 매칭
+            const normalizedRowModelId = normalizeModelCode(rowModelId);
+            const normalizedRowModelName = normalizeModelCode(rowModelName);
+
+            // 모델ID 또는 모델명으로 매칭 (정규화된 값으로 비교)
+            return (normalizedRowModelId === normalizedModelId || normalizedRowModelId === normalizedModelName ||
+              normalizedRowModelName === normalizedModelId || normalizedRowModelName === normalizedModelName ||
+              rowModelId === modelId || rowModelName === modelName);
+          });
+
+          if (existingMasterRowIndex !== -1) {
+            // 이미지URL은 13번째 컬럼(M) → zero-based index 12
+            const targetRowNumber = existingMasterRowIndex + 2; // 데이터 시작이 2행
+            const targetCell = `직영점_단말마스터!M${targetRowNumber}`;
+            await rateLimitedSheetsCall(() =>
+              sheets.spreadsheets.values.update({
+                spreadsheetId: SPREADSHEET_ID,
+                range: targetCell,
+                valueInputOption: 'USER_ENTERED',
+                resource: { values: [[imageUrl]] }
+              })
+            );
+            console.log(`✅ [이미지 업로드] 직영점_단말마스터 시트 이미지URL 업데이트 성공: 행 ${targetRowNumber}`);
+          } else {
+            console.warn(`⚠️ [이미지 업로드] 직영점_단말마스터 시트에서 모델 ${modelId} (${carrier})을(를) 찾을 수 없어 이미지URL을 업데이트하지 못했습니다.`);
+          }
+        } catch (masterSheetError) {
+          console.error('❌ [이미지 업로드] 직영점_단말마스터 시트 업데이트 오류:', masterSheetError);
+          // 에러가 발생해도 이미지 업로드는 성공했으므로 계속 진행
+        }
+      }
+
       // 구글시트 저장 완료 확인 후 캐시 무효화 (직영점 모드 캐시)
       // 저장이 완료된 후에만 캐시를 무효화하여 최신 데이터가 반영되도록 함
       if (sheetSaveSuccess) {

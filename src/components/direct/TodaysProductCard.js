@@ -46,7 +46,7 @@ function TodaysProductCard(props) {
     compact, 
     theme, 
     priceData: propPriceData, 
-    onPriceCalculated 
+    onPriceCalculated
   } = props || {};
   
   // props로 받은 priceData가 있으면 사용 (초기화 순서 문제 방지 - useMemo 제거하고 직접 계산)
@@ -150,16 +150,18 @@ function TodaysProductCard(props) {
         </Stack>
       )}
 
-      <Box sx={{ 
-        position: 'relative', 
-        pt: compact ? '55%' : '70%',  // 컴팩트 모드에서 이미지 영역 비율 더 감소
-        minHeight: compact ? 180 : 240,  // 컴팩트 모드에서 최소 높이 더 감소
-        background: `linear-gradient(135deg, ${cardTheme.primary}10 0%, ${cardTheme.secondary}10 100%)`,
-        borderRadius: '16px 16px 0 0', 
-        overflow: 'hidden',
-        borderBottom: `2px solid ${cardTheme.primary}20`,
-        flexShrink: 0  // 이미지 영역이 축소되지 않도록
-      }}>
+      <Box 
+        sx={{ 
+          position: 'relative', 
+          pt: compact ? '55%' : '70%',  // 컴팩트 모드에서 이미지 영역 비율 더 감소
+          minHeight: compact ? 180 : 240,  // 컴팩트 모드에서 최소 높이 더 감소
+          background: `linear-gradient(135deg, ${cardTheme.primary}10 0%, ${cardTheme.secondary}10 100%)`,
+          borderRadius: '16px 16px 0 0', 
+          overflow: 'hidden',
+          borderBottom: `2px solid ${cardTheme.primary}20`,
+          flexShrink: 0  // 이미지 영역이 축소되지 않도록
+        }}
+      >
         <CardMedia
           component="img"
           image={product.image ? getProxyImageUrl(product.image) : ''}
@@ -224,7 +226,7 @@ function TodaysProductCard(props) {
             height: '100%',
             objectFit: 'cover',  // cover로 변경하여 섹션을 꽉 채움
             transition: 'transform 0.3s',
-            '&:hover': { transform: 'scale(1.05)' }
+            '&:hover': { transform: 'scale(1.05)'             }
           }}
         />
       </Box>

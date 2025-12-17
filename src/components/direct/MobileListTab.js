@@ -35,7 +35,6 @@ import {
   Refresh as RefreshIcon
 } from '@mui/icons-material';
 import { Checkbox } from '@mui/material';
-import { directStoreApi } from '../../api/directStoreApi';
 import { directStoreApiClient } from '../../api/directStoreApiClient';
 import { getCachedPrice, setCachedPrice, setCachedPricesBatch } from '../../utils/priceCache';
 import { LoadingState } from './common/LoadingState';
@@ -300,171 +299,63 @@ const MobileListTab = ({ onProductSelect }) => {
     }));
   }, [lookupPrice]);
 
-  const [uploadingModelId, setUploadingModelId] = useState(null);
-  const fileInputRef = React.useRef(null);
+  // 🔥 리팩토링: 이미지 업로드 성공 핸들러 (ImageUploadButton이 자동으로 처리)
+  const handleImageUploadSuccess = useCallback(async (imageUrl, modelId, carrier) => {
+    console.log('✅ [휴대폰목록] 이미지 업로드 성공 콜백:', { imageUrl, modelId, carrier });
+    
+    // 즉시 로컬 상태 업데이트 (UI 반영)
+    setMobileList(prevList => prevList.map(item => {
+      // 모델ID 또는 모델명으로 매칭
+      if (item.id === modelId || item.model === modelId) {
+        return { ...item, image: imageUrl };
+      }
+      return item;
+    }));
 
-  // ... (existing useEffect)
-
-  const handleImageUploadClick = useCallback((modelId) => {
-    setUploadingModelId(modelId);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ''; // Reset file input
-      fileInputRef.current.click();
+    // 서버에서 최신 데이터 재로딩 (선택적)
+    try {
+      const freshData = await directStoreApiClient.getMobileList(carrier);
+      setMobileList(freshData || []);
+      console.log('✅ [휴대폰목록] 최신 데이터 재로딩 완료');
+    } catch (reloadError) {
+      console.warn('⚠️ [휴대폰목록] 최신 데이터 재로딩 실패:', reloadError);
     }
   }, []);
 
-  const handleFileChange = async (event) => {
-    const file = event.target.files?.[0];
-    if (!file || !uploadingModelId) return;
-
-    try {
-      setLoading(true); // 전체 로딩 혹은 개별 로딩 처리 (여기서는 전체 로딩으로 단순화)
-
-      // 현재 모델 정보 가져오기
-      const currentModel = mobileList.find(m => m.id === uploadingModelId);
-      const carrier = getCurrentCarrier();
-      const modelName = currentModel?.model || uploadingModelId;
-      const petName = currentModel?.petName || modelName;
-
-      // 모델ID는 실제 모델 코드(모델명)로 사용 (동적 ID 대신)
-      // 서버에서도 modelId = modelName으로 처리하므로 일관성 유지
-      const actualModelId = modelName; // 실제 모델 코드를 modelId로 사용
-
-
-      console.log('📤 [이미지 업로드] 시작:', {
-        clientId: uploadingModelId, // 클라이언트 ID (참고용)
-        modelId: actualModelId,      // 실제 모델 코드 (서버에 전송)
-        carrier,
-        modelName,
-        petName,
-        fileName: file.name,
-        fileSize: file.size
-      });
-
-      // API 호출 (실제 모델 코드를 modelId로 전송)
-      const result = await directStoreApi.uploadImage(file, actualModelId, carrier, modelName, petName);
-
-
-      if (!result || !result.success) {
-        throw new Error(result?.error || '이미지 업로드에 실패했습니다.');
-      }
-
-      // imageUrl이 없으면 에러
-      if (!result.imageUrl) {
-        throw new Error('이미지 URL을 받지 못했습니다.');
-      }
-
-      // 경고가 있으면 함께 표시
-      if (result.warning) {
-        alert(`이미지가 업로드되었습니다.\n\n⚠️ 경고: ${result.warning}`);
-      } else {
-        alert('이미지가 성공적으로 업로드되었습니다.');
-      }
-
-      console.log('✅ [이미지 업로드] 성공:', result.imageUrl);
-
-      // 🔥 개선: 즉시 로컬 상태 업데이트 (UI 반영)
-      setMobileList(prevList => prevList.map(item =>
-        item.id === uploadingModelId
-          ? { ...item, image: result.imageUrl }
-          : item
-      ));
-
-
-      // 서버에서 최신 데이터를 다시 가져와서 UI에 반영
-      // 구글시트에 저장된 최신 이미지 URL을 포함한 전체 데이터를 가져옴
-      // Google Sheets 저장 완료를 기다리기 위해 지연 시간 추가
-      try {
-        console.log('🔄 [이미지 업로드] Google Sheets 저장 완료 대기 중... (3초)');
-        await new Promise(resolve => setTimeout(resolve, 3000)); // 2초 -> 3초로 증가
-
-        console.log('🔄 [이미지 업로드] 서버에서 최신 데이터 재로딩 중...');
-        const freshData = await directStoreApiClient.getMobileList(carrier);
-
-        // 🔥 핵심 수정: 모델명으로 정확히 매칭 (ID가 다를 수 있음)
-        // 1순위: 모델명으로 정확히 일치하는 모델 찾기
-        const uploadedModel = freshData?.find(m => {
-          // 모델명이 정확히 일치하는 경우
-          if (m.model === modelName) return true;
-          // ID에 모델명이 포함된 경우
-          if (m.id && m.id.includes(modelName)) return true;
-          // 클라이언트 ID와 일치하는 경우
-          if (m.id === uploadingModelId) return true;
-          return false;
-        });
-
-        console.log('🔍 [이미지 업로드] 모델 매칭 결과:', {
-          uploadingModelId,
-          modelName,
-          foundModel: uploadedModel ? {
-            id: uploadedModel.id,
-            model: uploadedModel.model,
-            image: uploadedModel.image
-          } : null,
-          freshDataCount: freshData?.length
-        });
-
-        // 🔥 핵심 수정: 이미지 업데이트 로직 개선
-        if (uploadedModel && uploadedModel.image) {
-          // 서버에서 이미지를 찾았으면 전체 데이터 업데이트
-          setMobileList(freshData || []);
-          console.log('✅ [이미지 업로드] 서버에서 이미지 찾음, 전체 데이터 업데이트');
-        } else {
-          // 🔥 핵심 수정: 서버에서 이미지를 찾지 못했거나 모델을 찾지 못한 경우
-          // 로컬 상태를 강제로 업데이트하여 이미지가 즉시 표시되도록 함
-          setMobileList(prevList => {
-            const updatedList = prevList.map(item => {
-              // 업로드한 모델과 일치하는 항목 찾기
-              if (item.id === uploadingModelId || item.model === modelName) {
-                // 이미지 URL을 강제로 업데이트
-                return { ...item, image: result.imageUrl };
-              }
-              // 다른 모델들도 freshData에서 업데이트
-              const matched = freshData?.find(m =>
-                (m.id && item.id && m.id === item.id) ||
-                (m.model && item.model && m.model === item.model)
-              );
-              if (matched) {
-                // freshData에 이미지가 있으면 사용, 없으면 기존 이미지 유지
-                return { ...matched, image: matched.image || item.image };
-              }
-              return item;
-            });
-
-            // 업로드한 모델이 리스트에 없으면 추가 (안전장치)
-            const hasUploadedModel = updatedList.some(item =>
-              item.id === uploadingModelId || item.model === modelName
-            );
-            if (!hasUploadedModel && currentModel) {
-              updatedList.push({ ...currentModel, image: result.imageUrl });
-            }
-
-            return updatedList;
-          });
-          console.log('✅ [이미지 업로드] 로컬 상태 강제 업데이트 완료');
-        }
-        console.log('✅ [이미지 업로드] 최신 데이터 재로딩 완료');
-
-        // 이미지 업로드 성공 이벤트 발생 (오늘의휴대폰 페이지 등 다른 컴포넌트에서 데이터 재로딩)
-        window.dispatchEvent(new CustomEvent('imageUploaded', {
-          detail: { carrier, modelId: actualModelId, imageUrl: result.imageUrl }
+  // 🔥 양방향 동기화: 다른 페이지(오늘의휴대폰)에서 이미지 업로드 시 자동 업데이트
+  useEffect(() => {
+    const handleImageUploaded = async (event) => {
+      const { carrier: eventCarrier, modelId, imageUrl } = event.detail || {};
+      const currentCarrier = getCurrentCarrier();
+      
+      // 현재 탭의 통신사와 일치하는 경우에만 업데이트
+      if (eventCarrier && eventCarrier === currentCarrier) {
+        console.log('🔄 [휴대폰목록] 다른 페이지에서 이미지 업로드 이벤트 수신:', { modelId, imageUrl });
+        
+        // 즉시 로컬 상태 업데이트
+        setMobileList(prevList => prevList.map(item => {
+          if (item.id === modelId || item.model === modelId) {
+            return { ...item, image: imageUrl };
+          }
+          return item;
         }));
-      } catch (reloadError) {
-        console.warn('⚠️ [이미지 업로드] 최신 데이터 재로딩 실패, 로컬 상태만 업데이트:', reloadError);
-        // 재로딩 실패해도 이벤트는 발생 (다른 컴포넌트에서 시도)
-        window.dispatchEvent(new CustomEvent('imageUploaded', {
-          detail: { carrier, modelId: actualModelId, imageUrl: result.imageUrl }
-        }));
+
+        // 서버에서 최신 데이터 재로딩 (2초 후)
+        setTimeout(async () => {
+          try {
+            const freshData = await directStoreApiClient.getMobileList(currentCarrier);
+            setMobileList(freshData || []);
+            console.log('✅ [휴대폰목록] 다른 페이지 업로드 후 최신 데이터 재로딩 완료');
+          } catch (reloadError) {
+            console.warn('⚠️ [휴대폰목록] 최신 데이터 재로딩 실패:', reloadError);
+          }
+        }, 2000);
       }
-    } catch (err) {
-      console.error('❌ [이미지 업로드] 실패:', err);
-      const errorMessage = err.message || err.toString() || '이미지 업로드에 실패했습니다.';
-      alert(`이미지 업로드에 실패했습니다.\n\n오류: ${errorMessage}`);
-    } finally {
-      setLoading(false);
-      setUploadingModelId(null);
-    }
-  };
+    };
+
+    window.addEventListener('imageUploaded', handleImageUploaded);
+    return () => window.removeEventListener('imageUploaded', handleImageUploaded);
+  }, [getCurrentCarrier]);
 
   const handleRowClick = useCallback((model) => {
     if (onProductSelect) {
@@ -685,13 +576,6 @@ const MobileListTab = ({ onProductSelect }) => {
 
   return (
     <Box sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <input
-        type="file"
-        ref={fileInputRef}
-        style={{ display: 'none' }}
-        accept="image/*"
-        onChange={handleFileChange}
-      />
 
       <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', color: 'text.primary' }}>
         휴대폰 목록
@@ -817,7 +701,7 @@ const MobileListTab = ({ onProductSelect }) => {
                       onTagChange={handleTagChange}
                       onPlanGroupChange={handlePlanGroupChange}
                       onOpeningTypeChange={handleOpeningTypeChange}
-                      onImageUploadClick={handleImageUploadClick}
+                      onImageUploadSuccess={handleImageUploadSuccess}
                       getSelectedTags={getSelectedTags}
                       getDisplayValue={getDisplayValue}
                     />
