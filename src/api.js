@@ -1257,13 +1257,23 @@ export default api;
 
 // 프론트엔드 캐싱 시스템
 // 이미지 프록시 URL 변환 (Discord CDN → 서버 프록시 경유)
+// 🔥 수정: Discord CDN URL은 프록시 없이 직접 사용 (서버에서 404 발생하므로)
 export function getProxyImageUrl(imageUrl) {
   try {
     if (!imageUrl) return imageUrl;
     const isDiscordCdn = imageUrl.includes('cdn.discordapp.com') || imageUrl.includes('media.discordapp.net');
+    // 🔥 핵심 수정: Discord CDN URL은 프록시 없이 직접 사용
+    // Discord attachment URL은 공개적으로 접근 가능하므로 프록시가 필요 없음
+    // 서버 프록시에서 404가 발생하는 문제를 해결하기 위해 직접 사용
     if (isDiscordCdn) {
-      const encoded = encodeURIComponent(imageUrl);
-      return `${API_BASE_URL}/api/meetings/proxy-image?url=${encoded}`;
+      // 쿼리 파라미터를 제거하여 안정적인 URL 사용
+      try {
+        const urlObj = new URL(imageUrl);
+        return urlObj.origin + urlObj.pathname;
+      } catch {
+        // URL 파싱 실패 시 원본 반환
+        return imageUrl;
+      }
     }
     return imageUrl;
   } catch {
