@@ -347,7 +347,11 @@ function TodaysProductCard(props) {
 
         <Box sx={{ mt: 2 }}>
           <Typography variant="caption" color="text.secondary" display="block">
-            * 필수부가: {product.addons || product.requiredAddons || '없음'} (93일 유지조건)
+            * 필수부가: {(() => {
+              const addons = product.requiredAddons || product.addons;
+              // 빈 문자열이나 '없음' 문자열이면 '없음' 표시
+              return (addons && addons.trim() && addons.trim() !== '없음') ? addons : '없음';
+            })()} (93일 유지조건)
           </Typography>
         </Box>
       </CardContent>

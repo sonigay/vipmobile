@@ -136,9 +136,12 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
 
       // 🔥 핵심 수정: API 응답의 imageUrl 필드를 image로 매핑
       // getMobilesMaster는 imageUrl을 반환하지만 TodaysProductCard는 image를 기대
+      // requiredAddons 필드도 제대로 전달되도록 확인
       const allMobiles = [...skMobiles, ...ktMobiles, ...lgMobiles].map(m => ({
         ...m,
-        image: m.imageUrl || m.image // imageUrl을 image로 매핑
+        image: m.imageUrl || m.image, // imageUrl을 image로 매핑
+        addons: m.requiredAddons || m.addons || '', // requiredAddons를 addons로도 매핑 (하위 호환성)
+        requiredAddons: m.requiredAddons || m.addons || '' // requiredAddons 필드 유지
       }));
 
       // 프리미엄/중저가/인기/추천 등으로 필터링
@@ -435,10 +438,26 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
       ]);
 
       // 🔥 핵심 수정: 슬라이드쇼 데이터 준비 시에도 imageUrl을 image로 매핑
+      // requiredAddons 필드도 제대로 전달되도록 확인
       const carrierMobiles = { 
-        'SK': skMobiles.map(m => ({ ...m, image: m.imageUrl || m.image })),
-        'KT': ktMobiles.map(m => ({ ...m, image: m.imageUrl || m.image })),
-        'LG': lgMobiles.map(m => ({ ...m, image: m.imageUrl || m.image }))
+        'SK': skMobiles.map(m => ({ 
+          ...m, 
+          image: m.imageUrl || m.image,
+          addons: m.requiredAddons || m.addons || '',
+          requiredAddons: m.requiredAddons || m.addons || ''
+        })),
+        'KT': ktMobiles.map(m => ({ 
+          ...m, 
+          image: m.imageUrl || m.image,
+          addons: m.requiredAddons || m.addons || '',
+          requiredAddons: m.requiredAddons || m.addons || ''
+        })),
+        'LG': lgMobiles.map(m => ({ 
+          ...m, 
+          image: m.imageUrl || m.image,
+          addons: m.requiredAddons || m.addons || '',
+          requiredAddons: m.requiredAddons || m.addons || ''
+        }))
       };
 
       for (const carrier of carriers) {
