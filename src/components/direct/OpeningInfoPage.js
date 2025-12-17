@@ -291,7 +291,7 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                     setPublicSupport(pricing.publicSupport || initialData?.publicSupport || 0);
                     setStoreSupportWithAddon(pricing.storeSupportWithAddon || 0);
                     setStoreSupportWithoutAddon(pricing.storeSupportWithoutAddon || 0);
-                    
+
                     // 일반약정이면 usePublicSupport를 true로 설정
                     if (formData.contractType === 'standard') {
                         setFormData(prev => ({ ...prev, usePublicSupport: true }));
@@ -439,203 +439,107 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                 @media print {
                     @page {
                         size: A4;
-                        margin: 3mm;
+                        margin: 5mm;
                     }
 
-                    /* HTML/Body 높이 제한 해제 */
+                    /* HTML/Body: 배경색 출력 강제 및 높이 제한 해제 */
                     html, body {
                         height: auto !important;
                         overflow: visible !important;
-                        -webkit-print-color-adjust: exact;
-                        print-color-adjust: exact;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
                     }
 
-                    /* 상단 헤더(뒤로가기/버튼 영역)만 숨기고 나머지는 화면 그대로 출력 */
+                    /* 상단 헤더 숨김 */
                     .no-print {
                         display: none !important;
                     }
 
-                    /* 스크롤 컨테이너 해제해서 전체 내용 출력 (상위 래퍼 포함) */
-                    .opening-wrapper {
-                        height: auto !important;
-                        overflow: visible !important;
-                    }
-
-                    .print-root {
+                    /* 전체 래퍼: 내용이 A4 한 장에 들어오도록 축소 (Zoom/Scale) */
+                    .opening-wrapper, .print-root {
                         height: auto !important;
                         overflow: visible !important;
                         position: relative !important;
-                        padding: 2px !important;
+                        padding: 0 !important;
+                        width: 100% !important;
+                        max-width: 100% !important;
+                        
+                        /* 핵심: 화면을 70%~75% 수준으로 축소하여 한 장에 맞춤 */
+                        zoom: 0.70; 
                     }
 
-                    /* 안내문구 박스 높이/간격 최소화 */
+                    /* 여백 미세 조정 (디자인 유지하되 불필요한 공백 제거) */
                     .agreement-box {
-                        margin-bottom: 2px !important;
-                        padding: 2px 4px !important;
+                        margin-bottom: 5px !important;
+                        padding: 5px !important;
                         page-break-after: avoid !important;
                     }
 
-                    .agreement-box .MuiStack-root {
-                        gap: 2px !important;
-                    }
-
-                    .agreement-box .MuiTypography-root {
-                        line-height: 1.2 !important;
-                        margin-bottom: 0 !important;
-                        font-size: 10px !important;
-                    }
-
-                    .agreement-box .MuiFormControlLabel-root {
-                        margin: 0 !important;
-                        margin-top: 2px !important;
-                    }
-
-                    /* 인쇄용 제목 간격 최소화 */
                     .print-only {
-                        margin-bottom: 2px !important;
+                        margin-bottom: 10px !important;
+                        display: block !important;
                     }
-
+                    
+                    /* 제목 폰트 크기 약간 조정 (너무 크면 공간 차지하므로) */
                     .print-only .MuiTypography-root {
-                        font-size: 14px !important;
-                        line-height: 1.2 !important;
+                        font-size: 24px !important; 
+                        font-weight: bold !important;
                     }
 
-                    /* 인쇄 시에도 2컬럼 레이아웃 유지 */
+                    /* Grid 레이아웃 강제 2단 (50:50) 유지 */
                     .print-area > .MuiGrid-container {
                         display: flex !important;
                         flex-wrap: wrap !important;
-                        gap: 2px !important;
-                        margin: 0 !important;
                         width: 100% !important;
+                        margin: 0 !important;
+                        gap: 10px !important;
                     }
 
-                    /* print-area 내부 최상위 Grid container의 직접 자식 Grid item을 50% 너비로 강제 */
-                    /* MUI Grid는 복잡한 클래스 구조를 가지므로 모든 가능한 선택자 사용 */
-                    .print-area > .MuiGrid-container > [class*="MuiGrid-item"],
-                    .print-area > .MuiGrid-container > div[class*="MuiGrid"],
-                    .print-area > div[class*="MuiGrid-container"] > [class*="MuiGrid-item"],
-                    .print-area > div[class*="MuiGrid-container"] > div[class*="MuiGrid"] {
-                        flex-basis: 50% !important;
-                        max-width: 50% !important;
-                        width: calc(50% - 1px) !important;
-                        flex: 0 0 50% !important;
+                    /* 메인 좌우 컬럼 강제 50% */
+                    .print-area > .MuiGrid-container > .MuiGrid-item {
+                        flex-basis: calc(50% - 5px) !important;
+                        max-width: calc(50% - 5px) !important;
+                        width: calc(50% - 5px) !important;
+                        padding: 0 !important;
                         box-sizing: border-box !important;
                     }
 
-                    /* MUI Grid의 breakpoint 클래스 무시 - 인쇄 시 모든 Grid item을 50%로 */
-                    .print-area [class*="MuiGrid-grid-xs-12"],
-                    .print-area [class*="MuiGrid-grid-md-6"] {
-                        flex-basis: 50% !important;
-                        max-width: 50% !important;
-                        width: calc(50% - 1px) !important;
-                        flex: 0 0 50% !important;
-                    }
-
-                    /* Paper 컴포넌트 간격 최소화 */
+                    /* Paper 컴포넌트: 그림자 제거, 테두리는 유지 */
                     .print-root .MuiPaper-root {
+                        box-shadow: none !important;
+                        border: 1px solid #e0e0e0 !important;
+                        padding: 10px !important;
+                        margin-bottom: 10px !important;
                         page-break-inside: avoid !important;
-                        break-inside: avoid !important;
-                        padding: 4px 6px !important;
-                        margin-bottom: 2px !important;
                     }
 
-                    /* Typography 간격 최소화 */
-                    .print-root .MuiTypography-root {
-                        line-height: 1.2 !important;
-                        margin-bottom: 2px !important;
+                    /* 내부 Grid item들도 2단 배치 필요한 경우 강제 */
+                    .print-root .MuiPaper-root .MuiGrid-container > .MuiGrid-item[class*="grid-xs-12"][class*="grid-sm-6"] {
+                        flex-basis: 50% !important;
+                        max-width: 50% !important;
+                    }
+                    
+                    /* 요금정보 섹션 내부 배치 */
+                    .plan-info-section .MuiGrid-container > .MuiGrid-item[class*="grid-xs-12"]:nth-child(2),
+                    .plan-info-section .MuiGrid-container > .MuiGrid-item[class*="grid-xs-12"]:nth-child(3) {
+                         flex-basis: 50% !important;
+                         max-width: 50% !important;
                     }
 
-                    .print-root .MuiTypography-h6 {
-                        font-size: 11px !important;
-                        line-height: 1.1 !important;
-                        margin-bottom: 2px !important;
-                    }
-
-                    .print-root .MuiTypography-h4,
-                    .print-root .MuiTypography-h5 {
-                        font-size: 12px !important;
-                        line-height: 1.1 !important;
-                        margin-bottom: 2px !important;
-                    }
-
-                    /* TextField, Autocomplete 등 입력 필드 높이/간격 최소화 */
-                    .print-root .MuiTextField-root,
-                    .print-root .MuiAutocomplete-root {
-                        margin-bottom: 2px !important;
-                    }
-
+                    /* 입력 필드 높이 약간 줄임 */
                     .print-root .MuiInputBase-root {
-                        padding: 2px 6px !important;
-                        font-size: 10px !important;
-                        min-height: 24px !important;
-                        height: 24px !important;
+                        min-height: 40px !important;
+                        height: 40px !important;
+                    }
+                    
+                    /* 계산 로직 상세 텍스트 등 불필요한 정보 숨김 */
+                    .calculation-details {
+                        display: none !important;
                     }
 
-                    .print-root .MuiInputLabel-root {
-                        font-size: 10px !important;
-                        transform: translate(8px, 14px) scale(1) !important;
-                    }
-
-                    .print-root .MuiInputLabel-shrink {
-                        transform: translate(8px, -6px) scale(0.75) !important;
-                    }
-
-                    /* FormControl 간격 최소화 */
-                    .print-root .MuiFormControl-root {
-                        margin-bottom: 4px !important;
-                    }
-
-                    /* RadioGroup, Checkbox 간격 최소화 */
-                    .print-root .MuiRadioGroup-root {
-                        gap: 4px !important;
-                    }
-
-                    .print-root .MuiFormControlLabel-root {
-                        margin: 0 8px 0 0 !important;
-                    }
-
-                    /* Grid spacing 최소화 */
-                    .print-root .MuiGrid-container {
-                        gap: 2px !important;
-                    }
-
-                    /* 인쇄 시 내부 Grid item들을 가로 배치 (2줄 레이아웃) */
-                    /* 요금정보, 단말기유심 정보 등 내부 Grid item들 */
-                    /* xs={12} sm={6}인 경우 인쇄 시 50% */
-                    .print-root .MuiPaper-root .MuiGrid-container > .MuiGrid-item[class*="MuiGrid-grid-xs-12"][class*="MuiGrid-grid-sm-6"],
-                    .print-root .MuiPaper-root .MuiGrid-container > .MuiGrid-item[class*="MuiGrid-grid-xs-6"] {
-                        flex-basis: 50% !important;
-                        max-width: 50% !important;
-                        width: calc(50% - 1px) !important;
-                        flex: 0 0 50% !important;
-                    }
-
-                    /* 요금정보 섹션: 요금제군과 기본료를 가로 배치 */
-                    /* 첫 번째 Grid item(요금제 선택)은 전체 너비, 두 번째와 세 번째는 50%씩 */
-                    .plan-info-section .MuiGrid-container > .MuiGrid-item[class*="MuiGrid-grid-xs-12"]:nth-child(2),
-                    .plan-info-section .MuiGrid-container > .MuiGrid-item[class*="MuiGrid-grid-xs-12"]:nth-child(3) {
-                        flex-basis: 50% !important;
-                        max-width: 50% !important;
-                        width: calc(50% - 1px) !important;
-                        flex: 0 0 50% !important;
-                    }
-
-                    /* Stack spacing 최소화 */
-                    .print-root .MuiStack-root {
-                        gap: 2px !important;
-                    }
-
-                    /* Divider 간격 최소화 */
-                    .print-root .MuiDivider-root {
-                        margin: 2px 0 !important;
-                    }
-
-                    /* Select, MenuItem 간격 최소화 */
-                    .print-root .MuiSelect-root,
-                    .print-root .MuiMenuItem-root {
-                        font-size: 10px !important;
-                        padding: 2px 6px !important;
-                        min-height: 24px !important;
+                    /* 스크롤바 숨김 */
+                    ::-webkit-scrollbar {
+                        display: none;
                     }
                 }
             `}</style>
@@ -993,8 +897,8 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                             <Stack direction="row" justifyContent="space-between" mb={1}>
                                 <Typography variant="body1">월 할부금</Typography>
                                 <Typography variant="body1">
-                                    {formData.paymentType === 'installment' 
-                                        ? installmentFeeResult.monthly.toLocaleString() 
+                                    {formData.paymentType === 'installment'
+                                        ? installmentFeeResult.monthly.toLocaleString()
                                         : '0'}원
                                 </Typography>
                             </Stack>
@@ -1177,8 +1081,8 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                                                 value={installmentPrincipal.toLocaleString()}
                                                 InputProps={{ readOnly: true }}
                                                 helperText={`부가${formData.withAddon ? '유치' : '미유치'} 기준`}
-                                                sx={{ 
-                                                    '& .MuiInputBase-input': { 
+                                                sx={{
+                                                    '& .MuiInputBase-input': {
                                                         fontWeight: 'bold',
                                                         color: theme.primary
                                                     }
@@ -1210,8 +1114,8 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                                                 value={installmentFeeResult.monthly.toLocaleString()}
                                                 InputProps={{ readOnly: true }}
                                                 helperText="월 납부할부금 + 월 할부수수료"
-                                                sx={{ 
-                                                    '& .MuiInputBase-input': { 
+                                                sx={{
+                                                    '& .MuiInputBase-input': {
                                                         fontWeight: 'bold',
                                                         color: 'primary.main'
                                                     }
@@ -1239,7 +1143,7 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                                         {installmentFeeResult.calculation && (
                                             <Grid item xs={12}>
                                                 <Paper sx={{ p: 2, mt: 1, bgcolor: 'grey.50', border: '1px solid', borderColor: 'divider' }}>
-                                                    <Typography variant="caption" component="pre" sx={{ 
+                                                    <Typography variant="caption" component="pre" sx={{
                                                         whiteSpace: 'pre-wrap',
                                                         fontFamily: 'monospace',
                                                         fontSize: '0.75rem',
