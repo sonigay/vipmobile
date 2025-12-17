@@ -164,7 +164,18 @@ function TodaysProductCard(props) {
       >
         <CardMedia
           component="img"
-          image={product.image ? getProxyImageUrl(product.image) : ''}
+          image={product.image ? (() => {
+            // 🔥 핵심 수정: MobileListRow와 동일하게 처리
+            let finalUrl = getProxyImageUrl(product.image);
+            const isDiscordCdn = finalUrl.includes('cdn.discordapp.com') || finalUrl.includes('media.discordapp.net');
+            if (isDiscordCdn && !finalUrl.includes('_t=')) {
+              // 쿼리 파라미터가 있으면 &로 추가, 없으면 ?로 추가
+              finalUrl = finalUrl.includes('?') 
+                ? `${finalUrl}&_t=${Date.now()}`
+                : `${finalUrl}?_t=${Date.now()}`;
+            }
+            return finalUrl;
+          })() : ''}
           alt={product.petName}
           onError={(e) => {
             // 🔥 핵심 수정: 이미지 로드 실패 처리 개선

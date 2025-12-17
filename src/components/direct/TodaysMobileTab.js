@@ -134,7 +134,12 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
         directStoreApiClient.getMobilesMaster('LG')
       ]);
 
-      const allMobiles = [...skMobiles, ...ktMobiles, ...lgMobiles];
+      // 🔥 핵심 수정: API 응답의 imageUrl 필드를 image로 매핑
+      // getMobilesMaster는 imageUrl을 반환하지만 TodaysProductCard는 image를 기대
+      const allMobiles = [...skMobiles, ...ktMobiles, ...lgMobiles].map(m => ({
+        ...m,
+        image: m.imageUrl || m.image // imageUrl을 image로 매핑
+      }));
 
       // 프리미엄/중저가/인기/추천 등으로 필터링
       /* 
@@ -429,7 +434,12 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
         directStoreApiClient.getMobilesMaster('LG')
       ]);
 
-      const carrierMobiles = { 'SK': skMobiles, 'KT': ktMobiles, 'LG': lgMobiles };
+      // 🔥 핵심 수정: 슬라이드쇼 데이터 준비 시에도 imageUrl을 image로 매핑
+      const carrierMobiles = { 
+        'SK': skMobiles.map(m => ({ ...m, image: m.imageUrl || m.image })),
+        'KT': ktMobiles.map(m => ({ ...m, image: m.imageUrl || m.image })),
+        'LG': lgMobiles.map(m => ({ ...m, image: m.imageUrl || m.image }))
+      };
 
       for (const carrier of carriers) {
         const list = carrierMobiles[carrier] || [];
@@ -759,7 +769,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                 </Box>
               </Box>
 
-              <Box sx={{ height: 400, border: 1, borderColor: 'divider', borderRadius: 2, overflow: 'hidden', position: 'relative' }}>
+              <Box sx={{ height: '70vh', minHeight: 600, border: 1, borderColor: 'divider', borderRadius: 2, overflow: 'auto', position: 'relative' }}>
                 {isManualTransitionPage && manualTransitionPageData ? (
                   <Box sx={{
                     height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
