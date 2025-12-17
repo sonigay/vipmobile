@@ -382,7 +382,7 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                 @media print {
                     @page {
                         size: A4;
-                        margin: 10mm;
+                        margin: 8mm;
                     }
                     
                     body * {
@@ -401,14 +401,20 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                         padding: 0 !important;
                         margin: 0 !important;
                         background: white !important;
-                        transform: scale(0.75);
+                        transform: scale(0.8);
                         transform-origin: top left;
-                        width: 133.33%;
+                        width: 125%;
                     }
                     
                     /* 헤더 숨기기 */
                     .no-print {
                         display: none !important;
+                    }
+                    
+                    /* 하단 공백 제거 */
+                    .print-area {
+                        padding-bottom: 0 !important;
+                        margin-bottom: 0 !important;
                     }
                     
                     /* Grid 컨테이너 - 2컬럼 레이아웃 유지 */
@@ -432,142 +438,172 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                         max-width: none !important;
                     }
                     
-                    /* Paper 컴포넌트 스타일 최적화 */
+                    /* Paper 컴포넌트 스타일 - 실제 페이지와 동일하게 */
                     .print-area .MuiPaper-root {
-                        margin-bottom: 6px !important;
-                        padding: 8px !important;
-                        box-shadow: none !important;
-                        border: 1px solid #ddd !important;
+                        margin-bottom: 12px !important;
+                        padding: 16px !important;
+                        box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+                        border: 1px solid #e0e0e0 !important;
+                        border-radius: 4px !important;
                         page-break-inside: avoid !important;
                         break-inside: avoid !important;
                     }
                     
-                    /* Typography 크기 조정 */
+                    /* 통신사 정보 박스 스타일 */
+                    .print-area .MuiPaper-root:has(.MuiTypography-h6:contains('통신사 정보')) {
+                        padding: 12px !important;
+                    }
+                    
+                    /* Typography 크기 - 실제 페이지와 유사하게 */
                     .print-area .MuiTypography-h4 {
-                        font-size: 1.1rem !important;
-                        margin-bottom: 4px !important;
+                        font-size: 1.25rem !important;
+                        margin-bottom: 8px !important;
                     }
                     
                     .print-area .MuiTypography-h6 {
-                        font-size: 0.9rem !important;
-                        margin-bottom: 4px !important;
+                        font-size: 1rem !important;
+                        margin-bottom: 8px !important;
                         font-weight: bold !important;
                     }
                     
                     .print-area .MuiTypography-h5 {
-                        font-size: 1rem !important;
+                        font-size: 1.1rem !important;
                     }
                     
                     .print-area .MuiTypography-body1 {
-                        font-size: 0.8rem !important;
+                        font-size: 0.875rem !important;
                     }
                     
                     .print-area .MuiTypography-body2 {
-                        font-size: 0.75rem !important;
-                    }
-                    
-                    .print-area .MuiTypography-subtitle2 {
                         font-size: 0.8rem !important;
                     }
                     
+                    .print-area .MuiTypography-subtitle2 {
+                        font-size: 0.875rem !important;
+                        font-weight: 500 !important;
+                        margin-bottom: 4px !important;
+                    }
+                    
                     .print-area .MuiTypography-caption {
-                        font-size: 0.7rem !important;
+                        font-size: 0.75rem !important;
                     }
                     
                     /* Grid spacing 조정 */
                     .print-area .MuiGrid-spacing-xs-1\.5 > .MuiGrid-item {
-                        padding: 3px !important;
+                        padding: 6px !important;
                     }
                     
                     .print-area .MuiGrid-spacing-xs-1 > .MuiGrid-item {
-                        padding: 3px !important;
+                        padding: 4px !important;
                     }
                     
-                    /* TextField 스타일 최적화 */
+                    /* TextField 스타일 - 실제 페이지와 유사하게 */
                     .print-area .MuiTextField-root {
-                        margin-bottom: 4px !important;
+                        margin-bottom: 8px !important;
                     }
                     
                     .print-area .MuiInputBase-root {
-                        font-size: 0.75rem !important;
-                        padding: 4px 8px !important;
-                        min-height: 28px !important;
-                        height: 28px !important;
+                        font-size: 0.875rem !important;
+                        padding: 8px 12px !important;
+                        min-height: 40px !important;
+                        height: auto !important;
                     }
                     
                     .print-area .MuiInputLabel-root {
-                        font-size: 0.75rem !important;
-                        transform: translate(8px, 8px) scale(1) !important;
+                        font-size: 0.875rem !important;
+                        transform: translate(12px, 14px) scale(1) !important;
                     }
                     
                     .print-area .MuiInputLabel-shrink {
-                        transform: translate(8px, -9px) scale(0.75) !important;
+                        transform: translate(12px, -9px) scale(0.75) !important;
                     }
                     
                     /* Divider 간격 조정 */
                     .print-area .MuiDivider-root {
-                        margin: 4px 0 !important;
+                        margin: 8px 0 !important;
                     }
                     
                     /* Stack 간격 조정 */
                     .print-area .MuiStack-root {
-                        margin-bottom: 4px !important;
+                        margin-bottom: 8px !important;
                     }
                     
                     /* Alert 스타일 최적화 */
                     .print-area .MuiAlert-root {
-                        padding: 4px 8px !important;
-                        margin-bottom: 4px !important;
-                        font-size: 0.75rem !important;
+                        padding: 8px 16px !important;
+                        margin-bottom: 8px !important;
+                        font-size: 0.875rem !important;
                     }
                     
                     /* RadioGroup, Checkbox 간격 조정 */
                     .print-area .MuiFormControl-root {
-                        margin-bottom: 4px !important;
+                        margin-bottom: 8px !important;
                     }
                     
                     .print-area .MuiFormControlLabel-root {
-                        margin-right: 8px !important;
+                        margin-right: 16px !important;
                         margin-bottom: 0 !important;
                     }
                     
+                    /* 인쇄 시 RadioGroup 세로 배치 */
+                    .print-area .MuiRadioGroup-root[aria-label*="가입유형"],
+                    .print-area .MuiRadioGroup-root[aria-label*="약정유형"] {
+                        flex-direction: column !important;
+                    }
+                    
+                    .print-area .MuiRadioGroup-root[aria-label*="가입유형"] .MuiFormControlLabel-root,
+                    .print-area .MuiRadioGroup-root[aria-label*="약정유형"] .MuiFormControlLabel-root {
+                        margin-right: 0 !important;
+                        margin-bottom: 4px !important;
+                    }
+                    
                     .print-area .MuiRadio-root {
-                        padding: 2px !important;
-                        font-size: 0.75rem !important;
+                        padding: 4px !important;
+                        font-size: 0.875rem !important;
                     }
                     
                     .print-area .MuiCheckbox-root {
-                        padding: 2px !important;
+                        padding: 4px !important;
                     }
                     
                     /* Select 스타일 최적화 */
                     .print-area .MuiSelect-root {
-                        font-size: 0.75rem !important;
-                        padding: 4px 8px !important;
-                        min-height: 28px !important;
-                        height: 28px !important;
+                        font-size: 0.875rem !important;
+                        padding: 8px 12px !important;
+                        min-height: 40px !important;
+                        height: auto !important;
                     }
                     
                     /* 금액종합안내 박스 최적화 */
                     .print-area .MuiPaper-root[style*="background-color: rgb(51, 51, 51)"] {
-                        padding: 8px !important;
+                        padding: 16px !important;
+                        background-color: #333 !important;
                     }
                     
                     .print-area .MuiPaper-root[style*="background-color: rgb(51, 51, 51)"] .MuiTypography-h6 {
-                        font-size: 0.85rem !important;
-                        margin-bottom: 4px !important;
+                        font-size: 1rem !important;
+                        margin-bottom: 8px !important;
                     }
                     
                     .print-area .MuiPaper-root[style*="background-color: rgb(51, 51, 51)"] .MuiTypography-h5 {
-                        font-size: 0.95rem !important;
+                        font-size: 1.1rem !important;
                     }
                     
                     .print-area .MuiPaper-root[style*="background-color: rgb(51, 51, 51)"] .MuiTypography-h4 {
-                        font-size: 1.05rem !important;
+                        font-size: 1.25rem !important;
+                    }
+                    
+                    /* 안내문구 박스 스타일 */
+                    .print-area .MuiBox-root:has(.MuiTypography-body2:contains('요금제는')) {
+                        padding: 16px !important;
+                        margin-bottom: 16px !important;
+                        background-color: rgba(0, 0, 0, 0.02) !important;
+                        border: 1px solid rgba(0, 0, 0, 0.1) !important;
+                        border-radius: 4px !important;
                     }
                     
                     /* 불필요한 여백 제거 */
-                    .print-area .MuiBox-root {
+                    .print-area .MuiBox-root:not(:has(.MuiTypography-body2:contains('요금제는'))) {
                         margin: 0 !important;
                         padding: 0 !important;
                     }
@@ -578,39 +614,22 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                         break-inside: avoid !important;
                     }
                     
-                    /* 통신사 정보, 가입유형, 약정유형, 부가서비스 유치 여부, 할부/현금 선택을 한 줄로 배치 */
-                    .print-area .MuiPaper-root:has(.print-inline-group) {
-                        display: flex !important;
-                        flex-wrap: wrap !important;
-                        align-items: center !important;
-                        gap: 8px !important;
-                    }
-                    
-                    .print-area .print-inline-group {
-                        display: inline-block !important;
-                        margin-right: 12px !important;
-                        margin-bottom: 0 !important;
-                    }
-                    
-                    .print-area .print-inline-group .MuiTypography-subtitle2 {
-                        display: inline !important;
-                        margin-right: 4px !important;
-                        margin-bottom: 0 !important;
-                    }
-                    
-                    .print-area .print-inline-group .MuiFormGroup-root {
-                        display: inline-flex !important;
-                    }
-                    
                     /* Autocomplete 스타일 */
                     .print-area .MuiAutocomplete-root {
-                        margin-bottom: 4px !important;
+                        margin-bottom: 8px !important;
                     }
                     
                     /* Helper text 스타일 */
                     .print-area .MuiFormHelperText-root {
-                        font-size: 0.65rem !important;
-                        margin-top: 2px !important;
+                        font-size: 0.75rem !important;
+                        margin-top: 4px !important;
+                    }
+                    
+                    /* 요금정보 필드 세로 배치 강제 */
+                    .print-area .MuiPaper-root:has(.MuiTypography-h6:contains('요금정보')) .MuiGrid-item {
+                        width: 100% !important;
+                        flex-basis: 100% !important;
+                        max-width: 100% !important;
                     }
                 }
             `}</style>
@@ -686,8 +705,18 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                     }
                 `}</style>
                 <Grid container spacing={1}>
-                    {/* 왼쪽: 가입 정보, 통신사 정보, 약정 및 할부 정보, 단말기유심 정보 */}
+                    {/* 왼쪽: 통신사 정보, 가입 정보, 약정 및 할부 정보, 요금정보, 금액종합안내 */}
                     <Grid item xs={12} md={6}>
+                        {/* 통신사 정보 박스 */}
+                        <Paper sx={{ p: 1.5, mb: 1.5, borderTop: `3px solid ${theme.primary}`, bgcolor: theme.bg }}>
+                            <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold', color: theme.primary, '@media print': { display: 'inline', mr: 2, mb: 0 } }}>
+                                통신사 정보 {selectedCarrier} {selectedCarrier === 'SK' ? 'T' : selectedCarrier === 'KT' ? 'U+' : 'U+'}
+                            </Typography>
+                            <Typography variant="body1" sx={{ fontWeight: 'bold', color: theme.primary, '@media print': { display: 'none' } }}>
+                                {selectedCarrier}
+                            </Typography>
+                        </Paper>
+
                         {/* 가입 정보 */}
                         <OpeningInfoFormSection
                             theme={theme}
@@ -701,16 +730,6 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                             setStoreSupportWithAddon={setStoreSupportWithAddon}
                             setStoreSupportWithoutAddon={setStoreSupportWithoutAddon}
                         />
-
-                        {/* 통신사 정보 박스 */}
-                        <Paper sx={{ p: 1.5, mb: 1.5, borderTop: `3px solid ${theme.primary}`, bgcolor: theme.bg }}>
-                            <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold', color: theme.primary, '@media print': { display: 'inline', mr: 2, mb: 0 } }}>
-                                통신사 정보 {selectedCarrier} {selectedCarrier === 'SK' ? 'T' : selectedCarrier === 'KT' ? 'U+' : 'U+'}
-                            </Typography>
-                            <Typography variant="body1" sx={{ fontWeight: 'bold', color: theme.primary, '@media print': { display: 'none' } }}>
-                                {selectedCarrier}
-                            </Typography>
-                        </Paper>
 
                         {/* 약정 및 할부 정보 */}
                         <ContractInfoFormSection

@@ -100,14 +100,15 @@ const ContractInfoFormSection = ({
             <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>약정 및 할부 정보</Typography>
             <Grid container spacing={1.5}>
                 <Grid item xs={12}>
-                    <FormControl component="fieldset" className="print-inline-group" sx={{ '@media print': { display: 'inline-block', mr: 2, verticalAlign: 'top' } }}>
-                        <Typography variant="subtitle2" gutterBottom sx={{ '@media print': { display: 'inline', mr: 1, mb: 0 } }}>약정유형</Typography>
+                    <FormControl component="fieldset" fullWidth>
+                        <Typography variant="subtitle2" gutterBottom>약정유형</Typography>
                         <RadioGroup
                             row
                             value={formData.contractType}
                             onChange={(e) => {
                                 handleContractTypeChange(e.target.value);
                             }}
+                            sx={{ '@media print': { flexDirection: 'column', '& .MuiFormControlLabel-root': { marginRight: 0, marginBottom: 1 } } }}
                         >
                             <FormControlLabel value="standard" control={<Radio />} label="일반약정" />
                             <FormControlLabel value="selected" control={<Radio />} label="선택약정" />

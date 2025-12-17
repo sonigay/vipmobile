@@ -116,12 +116,13 @@ const OpeningInfoFormSection = ({
                     />
                 </Grid>
                 <Grid item xs={12}>
-                    <FormControl component="fieldset" className="print-inline-group" sx={{ '@media print': { display: 'inline-block', mr: 2, verticalAlign: 'top' } }}>
-                        <Typography variant="subtitle2" gutterBottom sx={{ '@media print': { display: 'inline', mr: 1, mb: 0 } }}>가입유형</Typography>
+                    <FormControl component="fieldset" fullWidth>
+                        <Typography variant="subtitle2" gutterBottom>가입유형</Typography>
                         <RadioGroup
                             row
                             value={formData.openingType}
                             onChange={(e) => handleOpeningTypeChange(e.target.value)}
+                            sx={{ '@media print': { flexDirection: 'column', '& .MuiFormControlLabel-root': { marginRight: 0, marginBottom: 1 } } }}
                         >
                             <FormControlLabel value="NEW" control={<Radio />} label="신규가입" />
                             <FormControlLabel value="MNP" control={<Radio />} label="번호이동" />
