@@ -4646,11 +4646,11 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
         throw new Error('Discord 메시지에 첨부파일이 없습니다.');
       }
 
-      const attachment = message.attachments.first();
-      imageUrl = attachment.url;
+      const messageAttachment = message.attachments.first();
+      imageUrl = messageAttachment.url;
       
       // 🔥 핵심 수정: Discord가 반환한 실제 파일명 확인 및 로깅
-      const actualFilename = attachment.name;
+      const actualFilename = messageAttachment.name;
       console.log(`📤 [이미지 업로드] Discord 실제 파일명: ${actualFilename} (요청 파일명: ${filename})`);
       console.log(`📤 [이미지 업로드] Discord 원본 URL: ${imageUrl}`);
       
