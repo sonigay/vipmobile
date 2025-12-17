@@ -176,24 +176,18 @@ const MobileListRowComponent = ({
                 normalizedUrl = normalizedUrl.replace(/--+/g, '-');
               }
               
-              // 🔥 핵심 수정: Discord CDN URL인 경우 프록시를 통해 로드
+              // 🔥 핵심 수정: 회의모드와 동일하게 처리
+              // getProxyImageUrl은 원본 URL을 그대로 반환하므로 추가 처리 불필요
               let finalUrl = getProxyImageUrl(normalizedUrl);
               
-              // 캐시 무효화를 위한 타임스탬프 추가 (프록시 URL이 아닌 경우만)
-              if (!finalUrl.includes('/api/meetings/proxy-image')) {
-                if (finalUrl.includes('?')) {
-                  const urlEndsWithAmpersand = finalUrl.endsWith('&');
-                  const urlEndsWithQuestion = finalUrl.endsWith('?');
-                  if (urlEndsWithAmpersand) {
-                    finalUrl = `${finalUrl}_t=${Date.now()}`;
-                  } else if (urlEndsWithQuestion) {
-                    finalUrl = `${finalUrl}_t=${Date.now()}`;
-                  } else {
-                    finalUrl = `${finalUrl}&_t=${Date.now()}`;
-                  }
-                } else {
-                  finalUrl = `${finalUrl}?_t=${Date.now()}`;
-                }
+              // Discord CDN URL은 쿼리 파라미터를 포함해야 정상 작동
+              // 타임스탬프 추가는 쿼리 파라미터가 이미 있는 경우에만 추가
+              const isDiscordCdn = finalUrl.includes('cdn.discordapp.com') || finalUrl.includes('media.discordapp.net');
+              if (isDiscordCdn && !finalUrl.includes('_t=')) {
+                // 쿼리 파라미터가 있으면 &로 추가, 없으면 ?로 추가
+                finalUrl = finalUrl.includes('?') 
+                  ? `${finalUrl}&_t=${Date.now()}`
+                  : `${finalUrl}?_t=${Date.now()}`;
               }
               
               // 디버그 로그 (개발 환경에서만)

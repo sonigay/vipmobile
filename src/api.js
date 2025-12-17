@@ -1262,29 +1262,14 @@ export function getProxyImageUrl(imageUrl) {
   try {
     if (!imageUrl) return imageUrl;
     const isDiscordCdn = imageUrl.includes('cdn.discordapp.com') || imageUrl.includes('media.discordapp.net');
-    // 🔥 핵심 수정: Discord CDN URL은 프록시 없이 직접 사용
-    // Discord attachment URL은 공개적으로 접근 가능하므로 프록시가 필요 없음
-    // 서버 프록시에서 404가 발생하는 문제를 해결하기 위해 직접 사용
+    // 🔥 핵심 수정: 회의모드와 동일하게 Discord URL을 그대로 사용
+    // 회의모드에서는 원본 URL을 그대로 사용하여 정상 작동
+    // 쿼리 파라미터를 제거하면 Discord CDN에서 404 발생할 수 있음
     if (isDiscordCdn) {
-      // 🔥 핵심 수정: media.discordapp.net URL은 그대로 사용 (이미 서버에서 변환됨)
-      // 쿼리 파라미터는 제거하되, URL 전체 구조는 유지
-      try {
-        const urlObj = new URL(imageUrl);
-        // media.discordapp.net은 쿼리 파라미터 없이도 작동하지만,
-        // 브라우저 캐시 무효화를 위해 타임스탬프는 나중에 추가됨
-        // 여기서는 쿼리 파라미터만 제거하고 origin + pathname 반환
-        const cleanUrl = urlObj.origin + urlObj.pathname;
-        console.log('🖼️ [getProxyImageUrl] Discord URL 처리:', {
-          original: imageUrl.substring(0, 100),
-          cleaned: cleanUrl.substring(0, 100),
-          hostname: urlObj.hostname
-        });
-        return cleanUrl;
-      } catch (e) {
-        console.warn('⚠️ [getProxyImageUrl] URL 파싱 실패:', imageUrl, e);
-        // URL 파싱 실패 시 원본 반환
-        return imageUrl;
-      }
+      // 🔥 핵심: 원본 URL 그대로 반환 (회의모드와 동일)
+      // Discord attachment URL은 쿼리 파라미터를 포함해야 정상 작동
+      // 회의모드에서도 원본 URL을 그대로 사용하므로 동일하게 처리
+      return imageUrl;
     }
     return imageUrl;
   } catch (e) {

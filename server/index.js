@@ -4647,43 +4647,13 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
       }
 
       const messageAttachment = message.attachments.first();
+      // 🔥 핵심 수정: 회의모드와 완전히 동일하게 원본 URL을 그대로 사용
+      // 회의모드: message.attachments.first().url을 그대로 반환 (라인 1217)
+      // 직영점 모드: 동일하게 message.attachments.first().url을 그대로 사용
       imageUrl = messageAttachment.url;
       
-      // 🔥 핵심 수정: Discord가 반환한 실제 파일명 확인 및 로깅
-      const actualFilename = messageAttachment.name;
-      console.log(`📤 [이미지 업로드] Discord 실제 파일명: ${actualFilename} (요청 파일명: ${filename})`);
-      console.log(`📤 [이미지 업로드] Discord 원본 URL: ${imageUrl}`);
-      
-      // 🔥 핵심 수정: Discord가 반환하는 원본 URL을 그대로 사용
-      // cdn.discordapp.com은 브라우저에서 직접 접근 가능하며, media.discordapp.net으로 변환하면 404 발생
-      // 쿼리 파라미터는 유지 (Discord가 필요에 따라 추가한 파라미터일 수 있음)
-      try {
-        const urlObj = new URL(imageUrl);
-        const pathParts = urlObj.pathname.split('/');
-        let urlFilename = pathParts[pathParts.length - 1];
-        
-        // 쿼리 파라미터에서 파일명 추출 (있는 경우)
-        if (urlFilename.includes('?')) {
-          urlFilename = urlFilename.split('?')[0];
-        }
-        
-        // Discord가 파일명을 변경했을 수 있으므로, 실제 파일명으로 URL 업데이트
-        if (actualFilename && actualFilename !== urlFilename) {
-          console.log(`⚠️ [이미지 업로드] Discord 파일명 변경 감지: ${urlFilename} → ${actualFilename}`);
-          pathParts[pathParts.length - 1] = actualFilename;
-          urlObj.pathname = pathParts.join('/');
-          imageUrl = urlObj.toString();
-        }
-        
-        // 🔥 핵심: 원본 URL 그대로 사용 (도메인 변환하지 않음)
-        // cdn.discordapp.com은 브라우저에서 직접 접근 가능
-        console.log(`✅ [이미지 업로드] 최종 URL: ${imageUrl}`);
-      } catch (urlError) {
-        console.error('❌ [이미지 업로드] URL 파싱 오류:', urlError);
-        // URL 파싱 실패 시 원본 그대로 사용
-      }
-      discordUploadSuccess = true;
       console.log(`✅ [이미지 업로드] Discord 업로드 성공: ${imageUrl} (포스트: ${carrierPost.name}, 스레드: ${targetThread.name})`);
+      discordUploadSuccess = true;
     } catch (discordError) {
       console.error('❌ [이미지 업로드] Discord 업로드 실패:', discordError);
       return res.status(500).json({
