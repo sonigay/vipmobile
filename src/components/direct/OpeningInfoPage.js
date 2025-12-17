@@ -399,7 +399,7 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
     };
 
     return (
-        <Box sx={{ p: 3, height: '100%', overflow: 'auto', bgcolor: theme.bg }}>
+        <Box className="print-root" sx={{ p: 3, height: '100%', overflow: 'auto', bgcolor: theme.bg }}>
             {/* 인쇄용 스타일 (레이아웃 그대로 출력) */}
             <style>{`
                 @media print {
@@ -417,6 +417,21 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                     body {
                         -webkit-print-color-adjust: exact;
                         print-color-adjust: exact;
+                    }
+
+                    /* 스크롤 컨테이너 해제해서 전체 내용 출력 */
+                    .print-root {
+                        height: auto !important;
+                        overflow: visible !important;
+                    }
+
+                    /* 인쇄 시에는 좌우 2컬럼을 세로로 한 컬럼씩 출력 (잘리는 것 방지) */
+                    .print-area .MuiGrid-container {
+                        display: block !important;
+                    }
+                    .print-area .MuiGrid-item {
+                        max-width: 100% !important;
+                        flex-basis: 100% !important;
                     }
                 }
             `}</style>
