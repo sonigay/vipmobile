@@ -4629,13 +4629,25 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
       }
 
       imageUrl = message.attachments.first().url;
+      
+      // 🔥 핵심 수정: Discord가 반환한 실제 파일명 확인 및 로깅
+      const actualFilename = message.attachments.first().name;
+      console.log(`📤 [이미지 업로드] Discord 실제 파일명: ${actualFilename} (요청 파일명: ${filename})`);
+      
       // 🔥 개선: Discord URL에서 이중 하이픈 정규화
       try {
         const urlObj = new URL(imageUrl);
         const pathParts = urlObj.pathname.split('/');
-        const filename = pathParts[pathParts.length - 1];
-        if (filename.includes('--')) {
-          const normalizedFilename = filename.replace(/--+/g, '-');
+        const urlFilename = pathParts[pathParts.length - 1];
+        
+        // Discord가 파일명을 변경했을 수 있으므로, 실제 파일명으로 URL 업데이트
+        if (actualFilename && actualFilename !== urlFilename) {
+          console.log(`⚠️ [이미지 업로드] Discord 파일명 변경 감지: ${urlFilename} → ${actualFilename}`);
+          pathParts[pathParts.length - 1] = actualFilename;
+          urlObj.pathname = pathParts.join('/');
+          imageUrl = urlObj.toString();
+        } else if (urlFilename.includes('--')) {
+          const normalizedFilename = urlFilename.replace(/--+/g, '-');
           pathParts[pathParts.length - 1] = normalizedFilename;
           urlObj.pathname = pathParts.join('/');
           imageUrl = urlObj.toString();
