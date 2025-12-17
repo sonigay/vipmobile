@@ -108,7 +108,6 @@ const ContractInfoFormSection = ({
                             onChange={(e) => {
                                 handleContractTypeChange(e.target.value);
                             }}
-                            sx={{ '@media print': { flexDirection: 'column', '& .MuiFormControlLabel-root': { marginRight: 0, marginBottom: 1 } } }}
                         >
                             <FormControlLabel value="standard" control={<Radio />} label="일반약정" />
                             <FormControlLabel value="selected" control={<Radio />} label="선택약정" />

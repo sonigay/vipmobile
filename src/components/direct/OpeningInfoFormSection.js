@@ -122,7 +122,6 @@ const OpeningInfoFormSection = ({
                             row
                             value={formData.openingType}
                             onChange={(e) => handleOpeningTypeChange(e.target.value)}
-                            sx={{ '@media print': { flexDirection: 'column', '& .MuiFormControlLabel-root': { marginRight: 0, marginBottom: 1 } } }}
                         >
                             <FormControlLabel value="NEW" control={<Radio />} label="신규가입" />
                             <FormControlLabel value="MNP" control={<Radio />} label="번호이동" />

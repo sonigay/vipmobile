@@ -439,7 +439,7 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                 @media print {
                     @page {
                         size: A4;
-                        margin: 8mm;
+                        margin: 5mm;
                     }
 
                     /* HTML/Body 높이 제한 해제 */
@@ -465,12 +465,46 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                         height: auto !important;
                         overflow: visible !important;
                         position: relative !important;
+                        padding: 4px !important;
+                    }
+
+                    /* 안내문구 박스 높이/간격 최소화 */
+                    .agreement-box {
+                        margin-bottom: 4px !important;
+                        padding: 4px 8px !important;
+                    }
+
+                    .agreement-box .MuiStack-root {
+                        gap: 2px !important;
+                    }
+
+                    .agreement-box .MuiTypography-root {
+                        line-height: 1.2 !important;
+                        margin-bottom: 0 !important;
+                        font-size: 10px !important;
+                    }
+
+                    .agreement-box .MuiFormControlLabel-root {
+                        margin: 0 !important;
+                        margin-top: 2px !important;
+                    }
+
+                    /* 인쇄용 제목 간격 최소화 */
+                    .print-only {
+                        margin-bottom: 2px !important;
+                    }
+
+                    .print-only .MuiTypography-root {
+                        font-size: 14px !important;
+                        line-height: 1.2 !important;
                     }
 
                     /* 인쇄 시에도 2컬럼 레이아웃 유지 */
                     .print-area > .MuiGrid-container {
                         display: flex !important;
                         flex-wrap: wrap !important;
+                        gap: 2px !important;
+                        margin: 0 !important;
                     }
 
                     /* print-area 내부 최상위 Grid container의 직접 자식 Grid item을 50% 너비로 강제 */
@@ -481,10 +515,70 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                         flex: 0 0 50% !important;
                     }
 
-                    /* Paper 컴포넌트가 잘리지 않도록 */
+                    /* Paper 컴포넌트 간격 최소화 */
                     .print-root .MuiPaper-root {
                         page-break-inside: avoid !important;
                         break-inside: avoid !important;
+                        padding: 6px 8px !important;
+                        margin-bottom: 4px !important;
+                    }
+
+                    /* Typography 간격 최소화 */
+                    .print-root .MuiTypography-root {
+                        line-height: 1.2 !important;
+                        margin-bottom: 2px !important;
+                    }
+
+                    .print-root .MuiTypography-h6 {
+                        font-size: 12px !important;
+                        line-height: 1.2 !important;
+                        margin-bottom: 4px !important;
+                    }
+
+                    /* TextField, Autocomplete 등 입력 필드 높이/간격 최소화 */
+                    .print-root .MuiTextField-root,
+                    .print-root .MuiAutocomplete-root {
+                        margin-bottom: 4px !important;
+                    }
+
+                    .print-root .MuiInputBase-root {
+                        padding: 4px 8px !important;
+                        font-size: 11px !important;
+                        min-height: 28px !important;
+                        height: 28px !important;
+                    }
+
+                    .print-root .MuiInputLabel-root {
+                        font-size: 10px !important;
+                        transform: translate(8px, 14px) scale(1) !important;
+                    }
+
+                    .print-root .MuiInputLabel-shrink {
+                        transform: translate(8px, -6px) scale(0.75) !important;
+                    }
+
+                    /* FormControl 간격 최소화 */
+                    .print-root .MuiFormControl-root {
+                        margin-bottom: 4px !important;
+                    }
+
+                    /* RadioGroup, Checkbox 간격 최소화 */
+                    .print-root .MuiRadioGroup-root {
+                        gap: 4px !important;
+                    }
+
+                    .print-root .MuiFormControlLabel-root {
+                        margin: 0 8px 0 0 !important;
+                    }
+
+                    /* Grid spacing 최소화 */
+                    .print-root .MuiGrid-container {
+                        gap: 4px !important;
+                    }
+
+                    /* Stack spacing 최소화 */
+                    .print-root .MuiStack-root {
+                        gap: 4px !important;
                     }
                 }
             `}</style>
@@ -519,7 +613,7 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
             </Box>
 
             {/* 안내문구 및 동의 체크박스 */}
-            <Box className="print-area" sx={{ mb: 3, p: 2, bgcolor: 'rgba(0, 0, 0, 0.02)', borderRadius: 2, border: `1px solid ${theme.primary}20` }}>
+            <Box className="print-area agreement-box" sx={{ mb: 3, p: 2, bgcolor: 'rgba(0, 0, 0, 0.02)', borderRadius: 2, border: `1px solid ${theme.primary}20` }}>
                 <Stack spacing={1}>
                     <Typography variant="body2" color="text.secondary">
                         • 요금제는 183일 유지조건
