@@ -4076,6 +4076,13 @@ app.post('/api/direct/sales', async (req, res) => {
       ? data.addons.join(', ')
       : (typeof data.addons === 'string' ? data.addons : JSON.stringify(data.addons || {}));
 
+    // 약정 유형 한글 변환 (클라이언트에서 이미 변환했을 수도 있지만 안전하게 처리)
+    const contractTypeKor = data.contractType === 'selected' || data.contract === 'selected'
+      ? '선택약정'
+      : data.contractType === 'standard' || data.contract === 'standard'
+        ? '일반약정'
+        : (data.contractType || data.contract || '');
+
     const row = [
       id,                                       // 번호
       data.posCode || '',                       // POS코드
@@ -4094,7 +4101,7 @@ app.post('/api/direct/sales', async (req, res) => {
       data.prevCarrier || '',                   // 전통신사
       data.installmentType || '',               // 할부구분
       data.installmentPeriod || '',             // 할부개월
-      data.contractType || data.contract || '', // 약정
+      contractTypeKor,                         // 약정 (한글로 변환)
       data.plan || '',                          // 요금제
       addonsText || '',                         // 부가서비스
       data.factoryPrice || 0,                   // 출고가

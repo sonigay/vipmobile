@@ -326,8 +326,7 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                 storeId: loggedInStore?.id || '',
                 soldAt: new Date().toISOString(),
                 customerName: formData.customerName,
-                customerContact: formData.customerContact,
-                ctn: formData.ctn || '', // CTN
+                customerContact: formData.customerContact, // CTN (연락처)
                 carrier: selectedCarrier,
                 model: initialData?.model || '', // 단말기모델명
                 color: formData.deviceColor || '', // 색상
@@ -338,8 +337,8 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                 prevCarrier: formData.openingType === 'MNP' ? (formData.prevCarrier || '') : '', // 전통신사
                 installmentType: formData.paymentType === 'installment' ? '할부' : formData.paymentType === 'cash' ? '현금' : '', // 할부구분
                 installmentPeriod: formData.installmentPeriod || 24, // 할부개월
-                contractType: formData.contractType || 'standard', // 약정
-                contract: formData.contractType || 'standard', // 약정 (하위 호환)
+                contractType: formData.contractType === 'selected' ? '선택약정' : '일반약정', // 약정 (한글로 변환)
+                contract: formData.contractType === 'selected' ? '선택약정' : '일반약정', // 약정 (하위 호환, 한글로 변환)
                 plan: formData.plan || '', // 요금제
                 addons: requiredAddons.map(a => a.name).join(', ') || '', // 부가서비스
                 // 금액 정보
@@ -383,7 +382,7 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                 @media print {
                     @page {
                         size: A4;
-                        margin: 5mm;
+                        margin: 10mm;
                     }
                     
                     body * {
@@ -402,7 +401,9 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                         padding: 0 !important;
                         margin: 0 !important;
                         background: white !important;
-                        page-break-inside: avoid;
+                        transform: scale(0.75);
+                        transform-origin: top left;
+                        width: 133.33%;
                     }
                     
                     /* 헤더 숨기기 */
@@ -410,139 +411,159 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                         display: none !important;
                     }
                     
-                    /* Paper 컴포넌트 스타일 최적화 - 페이지 브레이크 제거 */
-                    .print-area .MuiPaper-root {
-                        margin-bottom: 4px !important;
-                        padding: 6px !important;
-                        box-shadow: none !important;
-                        page-break-inside: auto !important;
-                        break-inside: auto !important;
+                    /* Grid 컨테이너 - 2컬럼 레이아웃 유지 */
+                    .print-area > .MuiGrid-container {
+                        margin: 0 !important;
+                        width: 100% !important;
+                        display: flex !important;
+                        flex-wrap: wrap !important;
                     }
                     
-                    /* Typography 크기 축소 */
+                    /* 최상위 Grid item - 2컬럼 레이아웃 유지 */
+                    .print-area > .MuiGrid-container > .MuiGrid-item {
+                        flex-basis: 50% !important;
+                        max-width: 50% !important;
+                        padding: 4px !important;
+                    }
+                    
+                    /* 내부 Grid item은 원래 크기 유지 */
+                    .print-area .MuiPaper-root .MuiGrid-item {
+                        flex-basis: auto !important;
+                        max-width: none !important;
+                    }
+                    
+                    /* Paper 컴포넌트 스타일 최적화 */
+                    .print-area .MuiPaper-root {
+                        margin-bottom: 6px !important;
+                        padding: 8px !important;
+                        box-shadow: none !important;
+                        border: 1px solid #ddd !important;
+                        page-break-inside: avoid !important;
+                        break-inside: avoid !important;
+                    }
+                    
+                    /* Typography 크기 조정 */
                     .print-area .MuiTypography-h4 {
-                        font-size: 1.2rem !important;
+                        font-size: 1.1rem !important;
                         margin-bottom: 4px !important;
                     }
                     
                     .print-area .MuiTypography-h6 {
-                        font-size: 0.85rem !important;
-                        margin-bottom: 3px !important;
+                        font-size: 0.9rem !important;
+                        margin-bottom: 4px !important;
+                        font-weight: bold !important;
+                    }
+                    
+                    .print-area .MuiTypography-h5 {
+                        font-size: 1rem !important;
                     }
                     
                     .print-area .MuiTypography-body1 {
-                        font-size: 0.75rem !important;
+                        font-size: 0.8rem !important;
                     }
                     
                     .print-area .MuiTypography-body2 {
-                        font-size: 0.65rem !important;
+                        font-size: 0.75rem !important;
                     }
                     
-                    /* Grid 간격 축소 */
-                    .print-area .MuiGrid-container {
-                        margin: 0 !important;
-                        width: 100% !important;
+                    .print-area .MuiTypography-subtitle2 {
+                        font-size: 0.8rem !important;
                     }
                     
-                    .print-area .MuiGrid-item {
-                        padding: 1px 2px !important;
+                    .print-area .MuiTypography-caption {
+                        font-size: 0.7rem !important;
                     }
                     
-                    /* Grid spacing 최소화 */
+                    /* Grid spacing 조정 */
                     .print-area .MuiGrid-spacing-xs-1\.5 > .MuiGrid-item {
-                        padding: 1px !important;
+                        padding: 3px !important;
                     }
                     
                     .print-area .MuiGrid-spacing-xs-1 > .MuiGrid-item {
-                        padding: 1px !important;
+                        padding: 3px !important;
                     }
                     
                     /* TextField 스타일 최적화 */
                     .print-area .MuiTextField-root {
-                        margin-bottom: 1px !important;
+                        margin-bottom: 4px !important;
                     }
                     
                     .print-area .MuiInputBase-root {
-                        font-size: 0.65rem !important;
-                        padding: 2px 4px !important;
-                        min-height: 24px !important;
-                        height: 24px !important;
+                        font-size: 0.75rem !important;
+                        padding: 4px 8px !important;
+                        min-height: 28px !important;
+                        height: 28px !important;
                     }
                     
                     .print-area .MuiInputLabel-root {
-                        font-size: 0.65rem !important;
-                        transform: translate(4px, 6px) scale(1) !important;
+                        font-size: 0.75rem !important;
+                        transform: translate(8px, 8px) scale(1) !important;
                     }
                     
                     .print-area .MuiInputLabel-shrink {
-                        transform: translate(4px, -7px) scale(0.7) !important;
+                        transform: translate(8px, -9px) scale(0.75) !important;
                     }
                     
-                    /* Divider 간격 축소 */
+                    /* Divider 간격 조정 */
                     .print-area .MuiDivider-root {
-                        margin: 1px 0 !important;
+                        margin: 4px 0 !important;
                     }
                     
-                    /* Stack 간격 축소 */
+                    /* Stack 간격 조정 */
                     .print-area .MuiStack-root {
-                        margin-bottom: 0 !important;
-                    }
-                    
-                    /* Stack spacing 최소화 */
-                    .print-area .MuiStack-root > * {
-                        margin: 0 !important;
+                        margin-bottom: 4px !important;
                     }
                     
                     /* Alert 스타일 최적화 */
                     .print-area .MuiAlert-root {
-                        padding: 1px 4px !important;
-                        margin-bottom: 1px !important;
-                        font-size: 0.65rem !important;
+                        padding: 4px 8px !important;
+                        margin-bottom: 4px !important;
+                        font-size: 0.75rem !important;
                     }
                     
-                    /* RadioGroup, Checkbox 간격 축소 */
+                    /* RadioGroup, Checkbox 간격 조정 */
                     .print-area .MuiFormControl-root {
-                        margin-bottom: 1px !important;
+                        margin-bottom: 4px !important;
                     }
                     
                     .print-area .MuiFormControlLabel-root {
-                        margin-right: 4px !important;
+                        margin-right: 8px !important;
                         margin-bottom: 0 !important;
                     }
                     
                     .print-area .MuiRadio-root {
-                        padding: 1px !important;
-                        font-size: 0.65rem !important;
+                        padding: 2px !important;
+                        font-size: 0.75rem !important;
                     }
                     
                     .print-area .MuiCheckbox-root {
-                        padding: 1px !important;
+                        padding: 2px !important;
                     }
                     
                     /* Select 스타일 최적화 */
                     .print-area .MuiSelect-root {
-                        font-size: 0.65rem !important;
-                        padding: 2px 4px !important;
-                        min-height: 24px !important;
-                        height: 24px !important;
+                        font-size: 0.75rem !important;
+                        padding: 4px 8px !important;
+                        min-height: 28px !important;
+                        height: 28px !important;
                     }
                     
                     /* 금액종합안내 박스 최적화 */
                     .print-area .MuiPaper-root[style*="background-color: rgb(51, 51, 51)"] {
-                        padding: 4px !important;
+                        padding: 8px !important;
                     }
                     
                     .print-area .MuiPaper-root[style*="background-color: rgb(51, 51, 51)"] .MuiTypography-h6 {
-                        font-size: 0.75rem !important;
-                        margin-bottom: 2px !important;
+                        font-size: 0.85rem !important;
+                        margin-bottom: 4px !important;
                     }
                     
                     .print-area .MuiPaper-root[style*="background-color: rgb(51, 51, 51)"] .MuiTypography-h5 {
-                        font-size: 0.9rem !important;
+                        font-size: 0.95rem !important;
                     }
                     
                     .print-area .MuiPaper-root[style*="background-color: rgb(51, 51, 51)"] .MuiTypography-h4 {
-                        font-size: 1.1rem !important;
+                        font-size: 1.05rem !important;
                     }
                     
                     /* 불필요한 여백 제거 */
@@ -551,10 +572,10 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                         padding: 0 !important;
                     }
                     
-                    /* 페이지 브레이크 방지 제거 - 한 페이지에 모든 내용 표시 */
+                    /* 페이지 브레이크 방지 - 한 페이지에 모든 내용 표시 */
                     .print-area .MuiPaper-root {
-                        page-break-inside: auto !important;
-                        break-inside: auto !important;
+                        page-break-inside: avoid !important;
+                        break-inside: avoid !important;
                     }
                     
                     /* 통신사 정보, 가입유형, 약정유형, 부가서비스 유치 여부, 할부/현금 선택을 한 줄로 배치 */
@@ -579,6 +600,17 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                     
                     .print-area .print-inline-group .MuiFormGroup-root {
                         display: inline-flex !important;
+                    }
+                    
+                    /* Autocomplete 스타일 */
+                    .print-area .MuiAutocomplete-root {
+                        margin-bottom: 4px !important;
+                    }
+                    
+                    /* Helper text 스타일 */
+                    .print-area .MuiFormHelperText-root {
+                        font-size: 0.65rem !important;
+                        margin-top: 2px !important;
                     }
                 }
             `}</style>
@@ -692,270 +724,6 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                             setPublicSupport={setPublicSupport}
                         />
 
-                        {/* 단말기유심 정보 및 금액안내 */}
-                        <Paper sx={{ p: 2, borderTop: `3px solid ${theme.primary}` }}>
-                            <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>단말기유심 정보 및 금액안내</Typography>
-                            <Grid container spacing={1.5}>
-                                <Grid item xs={12}>
-                                    <TextField
-                                        label="모델명"
-                                        fullWidth
-                                        value={initialData?.model || ''}
-                                        InputProps={{ readOnly: true }}
-                                        variant="filled"
-                                    />
-                                </Grid>
-                                <Grid item xs={12} sm={6}>
-                                    <TextField
-                                        label="색상"
-                                        fullWidth
-                                        value={formData.deviceColor}
-                                        onChange={(e) => setFormData({ ...formData, deviceColor: e.target.value })}
-                                    />
-                                </Grid>
-                                <Grid item xs={12} sm={6}>
-                                    <TextField
-                                        label="단말일련번호"
-                                        fullWidth
-                                        value={formData.deviceSerial}
-                                        onChange={(e) => setFormData({ ...formData, deviceSerial: e.target.value })}
-                                    />
-                                </Grid>
-                                <Grid item xs={12} sm={6}>
-                                    <TextField
-                                        label="유심모델명"
-                                        fullWidth
-                                        value={formData.simModel}
-                                        onChange={(e) => setFormData({ ...formData, simModel: e.target.value })}
-                                    />
-                                </Grid>
-                                <Grid item xs={12} sm={6}>
-                                    <TextField
-                                        label="유심일련번호"
-                                        fullWidth
-                                        value={formData.simSerial}
-                                        onChange={(e) => setFormData({ ...formData, simSerial: e.target.value })}
-                                    />
-                                </Grid>
-                                <Grid item xs={12}>
-                                    <Divider sx={{ my: 2 }} />
-                                </Grid>
-                                <Grid item xs={6}>
-                                    <TextField
-                                        label="출고가"
-                                        fullWidth
-                                        value={factoryPrice.toLocaleString()}
-                                        InputProps={{ readOnly: true }}
-                                    />
-                                </Grid>
-                                <Grid item xs={6}>
-                                    <TextField
-                                        label="이통사 지원금"
-                                        fullWidth
-                                        value={formData.usePublicSupport ? publicSupport.toLocaleString() : '0'}
-                                        InputProps={{ readOnly: true }}
-                                    />
-                                </Grid>
-                                <Grid item xs={6}>
-                                    <TextField
-                                        label="대리점추가지원금 (부가유치)"
-                                        fullWidth
-                                        value={storeSupportWithAddon.toLocaleString()}
-                                        InputProps={{ readOnly: true }}
-                                    />
-                                </Grid>
-                                <Grid item xs={6}>
-                                    <TextField
-                                        label="대리점추가지원금 (부가미유치)"
-                                        fullWidth
-                                        value={storeSupportWithoutAddon.toLocaleString()}
-                                        InputProps={{ readOnly: true }}
-                                    />
-                                </Grid>
-                                <Grid item xs={6}>
-                                    <TextField
-                                        label="할부원금 (부가유치)"
-                                        fullWidth
-                                        value={(() => {
-                                            const support = formData.usePublicSupport ? publicSupport : 0;
-                                            const principal = calculateInstallmentPrincipalWithAddon(factoryPrice, support, storeSupportWithAddon, formData.usePublicSupport);
-                                            return isNaN(principal) ? 0 : principal;
-                                        })().toLocaleString()}
-                                        InputProps={{ readOnly: true }}
-                                        sx={{ input: { fontWeight: 'bold', color: theme.primary } }}
-                                    />
-                                </Grid>
-                                <Grid item xs={6}>
-                                    <TextField
-                                        label="할부원금 (부가미유치)"
-                                        fullWidth
-                                        value={(() => {
-                                            const support = formData.usePublicSupport ? publicSupport : 0;
-                                            const principal = calculateInstallmentPrincipalWithoutAddon(factoryPrice, support, storeSupportWithoutAddon, formData.usePublicSupport);
-                                            return isNaN(principal) ? 0 : principal;
-                                        })().toLocaleString()}
-                                        InputProps={{ readOnly: true }}
-                                        sx={{ input: { fontWeight: 'bold', color: theme.primary } }}
-                                    />
-                                </Grid>
-                                <Grid item xs={12}>
-                                    <FormControl component="fieldset" className="print-inline-group" sx={{ '@media print': { display: 'inline-block', mr: 2, verticalAlign: 'top' } }}>
-                                        <Typography variant="subtitle2" gutterBottom sx={{ '@media print': { display: 'inline', mr: 1, mb: 0 } }}>부가서비스 유치 여부</Typography>
-                                        <RadioGroup
-                                            row
-                                            value={formData.withAddon ? 'with' : 'without'}
-                                            onChange={(e) => setFormData({ ...formData, withAddon: e.target.value === 'with' })}
-                                        >
-                                            <FormControlLabel value="with" control={<Radio />} label="부가유치" />
-                                            <FormControlLabel value="without" control={<Radio />} label="부가미유치" />
-                                        </RadioGroup>
-                                        {/* 유치되는 부가서비스/보험상품 항목명 표기 */}
-                                        {formData.withAddon && (addonIncentiveList.length > 0 || insuranceIncentiveList.length > 0) && (
-                                            <Typography variant="caption" color="text.secondary" sx={{ ml: 2, fontSize: '0.75rem', '@media print': { ml: 1, display: 'inline' } }}>
-                                                ({[...addonIncentiveList, ...insuranceIncentiveList].join(', ')})
-                                            </Typography>
-                                        )}
-                                    </FormControl>
-                                </Grid>
-                                <Grid item xs={12}>
-                                    <FormControl component="fieldset" className="print-inline-group" sx={{ '@media print': { display: 'inline-block', mr: 2, verticalAlign: 'top' } }}>
-                                        <Typography variant="subtitle2" gutterBottom sx={{ '@media print': { display: 'inline', mr: 1, mb: 0 } }}>할부/현금 선택</Typography>
-                                        <RadioGroup
-                                            row
-                                            value={formData.paymentType}
-                                            onChange={(e) => setFormData({ ...formData, paymentType: e.target.value })}
-                                        >
-                                            <FormControlLabel value="installment" control={<Radio />} label="할부" />
-                                            <FormControlLabel value="cash" control={<Radio />} label="현금" />
-                                        </RadioGroup>
-                                    </FormControl>
-                                </Grid>
-                                {formData.paymentType === 'installment' && (
-                                    <>
-                                        <Grid item xs={12}>
-                                            <Divider sx={{ my: 1 }} />
-                                        </Grid>
-                                        <Grid item xs={12}>
-                                            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
-                                                할부 상세 내역
-                                            </Typography>
-                                        </Grid>
-                                        <Grid item xs={12}>
-                                            <TextField
-                                                label="총 할부원금"
-                                                fullWidth
-                                                value={installmentPrincipal.toLocaleString()}
-                                                InputProps={{ readOnly: true }}
-                                                helperText={`부가${formData.withAddon ? '유치' : '미유치'} 기준`}
-                                                sx={{ 
-                                                    '& .MuiInputBase-input': { 
-                                                        fontWeight: 'bold',
-                                                        color: theme.primary
-                                                    }
-                                                }}
-                                            />
-                                        </Grid>
-                                        <Grid item xs={6}>
-                                            <TextField
-                                                label="월 납부할부금"
-                                                fullWidth
-                                                value={installmentFeeResult.monthlyPrincipal?.toLocaleString() || '0'}
-                                                InputProps={{ readOnly: true }}
-                                                helperText="원금 부분 (평균값)"
-                                            />
-                                        </Grid>
-                                        <Grid item xs={6}>
-                                            <TextField
-                                                label="월 할부수수료"
-                                                fullWidth
-                                                value={installmentFeeResult.monthlyFee?.toLocaleString() || '0'}
-                                                InputProps={{ readOnly: true }}
-                                                helperText="이자 부분 (평균값)"
-                                            />
-                                        </Grid>
-                                        <Grid item xs={12}>
-                                            <TextField
-                                                label="월 납입금"
-                                                fullWidth
-                                                value={installmentFeeResult.monthly.toLocaleString()}
-                                                InputProps={{ readOnly: true }}
-                                                helperText="월 납부할부금 + 월 할부수수료"
-                                                sx={{ 
-                                                    '& .MuiInputBase-input': { 
-                                                        fontWeight: 'bold',
-                                                        color: 'primary.main'
-                                                    }
-                                                }}
-                                            />
-                                        </Grid>
-                                        <Grid item xs={6}>
-                                            <TextField
-                                                label="총 할부수수료"
-                                                fullWidth
-                                                value={installmentFeeResult.total.toLocaleString()}
-                                                InputProps={{ readOnly: true }}
-                                                helperText="전체 기간 이자 합계"
-                                            />
-                                        </Grid>
-                                        <Grid item xs={6}>
-                                            <TextField
-                                                label="총 납입금액"
-                                                fullWidth
-                                                value={(installmentPrincipal + installmentFeeResult.total).toLocaleString()}
-                                                InputProps={{ readOnly: true }}
-                                                helperText="할부원금 + 총 할부수수료"
-                                            />
-                                        </Grid>
-                                        {installmentFeeResult.calculation && (
-                                            <Grid item xs={12}>
-                                                <Paper sx={{ p: 2, mt: 1, bgcolor: 'grey.50', border: '1px solid', borderColor: 'divider' }}>
-                                                    <Typography variant="caption" component="pre" sx={{ 
-                                                        whiteSpace: 'pre-wrap',
-                                                        fontFamily: 'monospace',
-                                                        fontSize: '0.75rem',
-                                                        lineHeight: 1.6
-                                                    }}>
-                                                        {installmentFeeResult.calculation}
-                                                    </Typography>
-                                                </Paper>
-                                            </Grid>
-                                        )}
-                                    </>
-                                )}
-                                {formData.paymentType === 'cash' && (
-                                    <>
-                                        <Grid item xs={12}>
-                                            <Divider sx={{ my: 1 }} />
-                                        </Grid>
-                                        <Grid item xs={6}>
-                                            <TextField
-                                                label="현금가"
-                                                fullWidth
-                                                type="number"
-                                                value={getCashPrice()}
-                                                onChange={(e) => {
-                                                    const price = parseInt(e.target.value) || 0;
-                                                    setFormData({ ...formData, cashPrice: price });
-                                                }}
-                                                disabled={getCurrentInstallmentPrincipal() > 0}
-                                            />
-                                        </Grid>
-                                        <Grid item xs={6}>
-                                            <TextField
-                                                label="입금계좌"
-                                                fullWidth
-                                                value={formData.depositAccount}
-                                                onChange={(e) => setFormData({ ...formData, depositAccount: e.target.value })}
-                                            />
-                                        </Grid>
-                                    </>
-                                )}
-                            </Grid>
-                        </Paper>
-                    </Grid>
-
-                    {/* 오른쪽: 요금정보, 금액종합안내 */}
-                    <Grid item xs={12} md={6}>
                         {/* 요금정보 */}
                         <Paper sx={{ p: 2, mb: 1.5, borderTop: `3px solid ${theme.primary}` }}>
                             <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>요금정보</Typography>
@@ -1224,6 +992,270 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                                     {totalMonthlyFeeResult.toLocaleString()}원
                                 </Typography>
                             </Stack>
+                        </Paper>
+                    </Grid>
+
+                    {/* 오른쪽: 단말기유심 정보 및 금액안내 */}
+                    <Grid item xs={12} md={6}>
+                        {/* 단말기유심 정보 및 금액안내 */}
+                        <Paper sx={{ p: 2, borderTop: `3px solid ${theme.primary}` }}>
+                            <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>단말기유심 정보 및 금액안내</Typography>
+                            <Grid container spacing={1.5}>
+                                <Grid item xs={12}>
+                                    <TextField
+                                        label="모델명"
+                                        fullWidth
+                                        value={initialData?.model || ''}
+                                        InputProps={{ readOnly: true }}
+                                        variant="filled"
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        label="색상"
+                                        fullWidth
+                                        value={formData.deviceColor}
+                                        onChange={(e) => setFormData({ ...formData, deviceColor: e.target.value })}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        label="단말일련번호"
+                                        fullWidth
+                                        value={formData.deviceSerial}
+                                        onChange={(e) => setFormData({ ...formData, deviceSerial: e.target.value })}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        label="유심모델명"
+                                        fullWidth
+                                        value={formData.simModel}
+                                        onChange={(e) => setFormData({ ...formData, simModel: e.target.value })}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        label="유심일련번호"
+                                        fullWidth
+                                        value={formData.simSerial}
+                                        onChange={(e) => setFormData({ ...formData, simSerial: e.target.value })}
+                                    />
+                                </Grid>
+                                <Grid item xs={12}>
+                                    <Divider sx={{ my: 2 }} />
+                                </Grid>
+                                <Grid item xs={6}>
+                                    <TextField
+                                        label="출고가"
+                                        fullWidth
+                                        value={factoryPrice.toLocaleString()}
+                                        InputProps={{ readOnly: true }}
+                                    />
+                                </Grid>
+                                <Grid item xs={6}>
+                                    <TextField
+                                        label="이통사 지원금"
+                                        fullWidth
+                                        value={formData.usePublicSupport ? publicSupport.toLocaleString() : '0'}
+                                        InputProps={{ readOnly: true }}
+                                    />
+                                </Grid>
+                                <Grid item xs={6}>
+                                    <TextField
+                                        label="대리점추가지원금 (부가유치)"
+                                        fullWidth
+                                        value={storeSupportWithAddon.toLocaleString()}
+                                        InputProps={{ readOnly: true }}
+                                    />
+                                </Grid>
+                                <Grid item xs={6}>
+                                    <TextField
+                                        label="대리점추가지원금 (부가미유치)"
+                                        fullWidth
+                                        value={storeSupportWithoutAddon.toLocaleString()}
+                                        InputProps={{ readOnly: true }}
+                                    />
+                                </Grid>
+                                <Grid item xs={6}>
+                                    <TextField
+                                        label="할부원금 (부가유치)"
+                                        fullWidth
+                                        value={(() => {
+                                            const support = formData.usePublicSupport ? publicSupport : 0;
+                                            const principal = calculateInstallmentPrincipalWithAddon(factoryPrice, support, storeSupportWithAddon, formData.usePublicSupport);
+                                            return isNaN(principal) ? 0 : principal;
+                                        })().toLocaleString()}
+                                        InputProps={{ readOnly: true }}
+                                        sx={{ input: { fontWeight: 'bold', color: theme.primary } }}
+                                    />
+                                </Grid>
+                                <Grid item xs={6}>
+                                    <TextField
+                                        label="할부원금 (부가미유치)"
+                                        fullWidth
+                                        value={(() => {
+                                            const support = formData.usePublicSupport ? publicSupport : 0;
+                                            const principal = calculateInstallmentPrincipalWithoutAddon(factoryPrice, support, storeSupportWithoutAddon, formData.usePublicSupport);
+                                            return isNaN(principal) ? 0 : principal;
+                                        })().toLocaleString()}
+                                        InputProps={{ readOnly: true }}
+                                        sx={{ input: { fontWeight: 'bold', color: theme.primary } }}
+                                    />
+                                </Grid>
+                                <Grid item xs={12}>
+                                    <FormControl component="fieldset" className="print-inline-group" sx={{ '@media print': { display: 'inline-block', mr: 2, verticalAlign: 'top' } }}>
+                                        <Typography variant="subtitle2" gutterBottom sx={{ '@media print': { display: 'inline', mr: 1, mb: 0 } }}>부가서비스 유치 여부</Typography>
+                                        <RadioGroup
+                                            row
+                                            value={formData.withAddon ? 'with' : 'without'}
+                                            onChange={(e) => setFormData({ ...formData, withAddon: e.target.value === 'with' })}
+                                        >
+                                            <FormControlLabel value="with" control={<Radio />} label="부가유치" />
+                                            <FormControlLabel value="without" control={<Radio />} label="부가미유치" />
+                                        </RadioGroup>
+                                        {/* 유치되는 부가서비스/보험상품 항목명 표기 */}
+                                        {formData.withAddon && (addonIncentiveList.length > 0 || insuranceIncentiveList.length > 0) && (
+                                            <Typography variant="caption" color="text.secondary" sx={{ ml: 2, fontSize: '0.75rem', '@media print': { ml: 1, display: 'inline' } }}>
+                                                ({[...addonIncentiveList, ...insuranceIncentiveList].join(', ')})
+                                            </Typography>
+                                        )}
+                                    </FormControl>
+                                </Grid>
+                                <Grid item xs={12}>
+                                    <FormControl component="fieldset" className="print-inline-group" sx={{ '@media print': { display: 'inline-block', mr: 2, verticalAlign: 'top' } }}>
+                                        <Typography variant="subtitle2" gutterBottom sx={{ '@media print': { display: 'inline', mr: 1, mb: 0 } }}>할부/현금 선택</Typography>
+                                        <RadioGroup
+                                            row
+                                            value={formData.paymentType}
+                                            onChange={(e) => setFormData({ ...formData, paymentType: e.target.value })}
+                                        >
+                                            <FormControlLabel value="installment" control={<Radio />} label="할부" />
+                                            <FormControlLabel value="cash" control={<Radio />} label="현금" />
+                                        </RadioGroup>
+                                    </FormControl>
+                                </Grid>
+                                {formData.paymentType === 'installment' && (
+                                    <>
+                                        <Grid item xs={12}>
+                                            <Divider sx={{ my: 1 }} />
+                                        </Grid>
+                                        <Grid item xs={12}>
+                                            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
+                                                할부 상세 내역
+                                            </Typography>
+                                        </Grid>
+                                        <Grid item xs={12}>
+                                            <TextField
+                                                label="총 할부원금"
+                                                fullWidth
+                                                value={installmentPrincipal.toLocaleString()}
+                                                InputProps={{ readOnly: true }}
+                                                helperText={`부가${formData.withAddon ? '유치' : '미유치'} 기준`}
+                                                sx={{ 
+                                                    '& .MuiInputBase-input': { 
+                                                        fontWeight: 'bold',
+                                                        color: theme.primary
+                                                    }
+                                                }}
+                                            />
+                                        </Grid>
+                                        <Grid item xs={6}>
+                                            <TextField
+                                                label="월 납부할부금"
+                                                fullWidth
+                                                value={installmentFeeResult.monthlyPrincipal?.toLocaleString() || '0'}
+                                                InputProps={{ readOnly: true }}
+                                                helperText="원금 부분 (평균값)"
+                                            />
+                                        </Grid>
+                                        <Grid item xs={6}>
+                                            <TextField
+                                                label="월 할부수수료"
+                                                fullWidth
+                                                value={installmentFeeResult.monthlyFee?.toLocaleString() || '0'}
+                                                InputProps={{ readOnly: true }}
+                                                helperText="이자 부분 (평균값)"
+                                            />
+                                        </Grid>
+                                        <Grid item xs={12}>
+                                            <TextField
+                                                label="월 납입금"
+                                                fullWidth
+                                                value={installmentFeeResult.monthly.toLocaleString()}
+                                                InputProps={{ readOnly: true }}
+                                                helperText="월 납부할부금 + 월 할부수수료"
+                                                sx={{ 
+                                                    '& .MuiInputBase-input': { 
+                                                        fontWeight: 'bold',
+                                                        color: 'primary.main'
+                                                    }
+                                                }}
+                                            />
+                                        </Grid>
+                                        <Grid item xs={6}>
+                                            <TextField
+                                                label="총 할부수수료"
+                                                fullWidth
+                                                value={installmentFeeResult.total.toLocaleString()}
+                                                InputProps={{ readOnly: true }}
+                                                helperText="전체 기간 이자 합계"
+                                            />
+                                        </Grid>
+                                        <Grid item xs={6}>
+                                            <TextField
+                                                label="총 납입금액"
+                                                fullWidth
+                                                value={(installmentPrincipal + installmentFeeResult.total).toLocaleString()}
+                                                InputProps={{ readOnly: true }}
+                                                helperText="할부원금 + 총 할부수수료"
+                                            />
+                                        </Grid>
+                                        {installmentFeeResult.calculation && (
+                                            <Grid item xs={12}>
+                                                <Paper sx={{ p: 2, mt: 1, bgcolor: 'grey.50', border: '1px solid', borderColor: 'divider' }}>
+                                                    <Typography variant="caption" component="pre" sx={{ 
+                                                        whiteSpace: 'pre-wrap',
+                                                        fontFamily: 'monospace',
+                                                        fontSize: '0.75rem',
+                                                        lineHeight: 1.6
+                                                    }}>
+                                                        {installmentFeeResult.calculation}
+                                                    </Typography>
+                                                </Paper>
+                                            </Grid>
+                                        )}
+                                    </>
+                                )}
+                                {formData.paymentType === 'cash' && (
+                                    <>
+                                        <Grid item xs={12}>
+                                            <Divider sx={{ my: 1 }} />
+                                        </Grid>
+                                        <Grid item xs={6}>
+                                            <TextField
+                                                label="현금가"
+                                                fullWidth
+                                                type="number"
+                                                value={getCashPrice()}
+                                                onChange={(e) => {
+                                                    const price = parseInt(e.target.value) || 0;
+                                                    setFormData({ ...formData, cashPrice: price });
+                                                }}
+                                                disabled={getCurrentInstallmentPrincipal() > 0}
+                                            />
+                                        </Grid>
+                                        <Grid item xs={6}>
+                                            <TextField
+                                                label="입금계좌"
+                                                fullWidth
+                                                value={formData.depositAccount}
+                                                onChange={(e) => setFormData({ ...formData, depositAccount: e.target.value })}
+                                            />
+                                        </Grid>
+                                    </>
+                                )}
+                            </Grid>
                         </Paper>
                     </Grid>
                 </Grid>
