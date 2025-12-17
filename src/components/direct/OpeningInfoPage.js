@@ -467,23 +467,6 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                         position: relative !important;
                     }
 
-                    /* 모든 Grid 컨테이너를 세로 배치로 강제 변경 */
-                    .print-root .MuiGrid-container,
-                    .print-area .MuiGrid-container {
-                        display: block !important;
-                        flex-direction: column !important;
-                        width: 100% !important;
-                    }
-
-                    /* 모든 Grid item을 100% 너비로 강제 */
-                    .print-root .MuiGrid-item,
-                    .print-area .MuiGrid-item {
-                        max-width: 100% !important;
-                        flex-basis: 100% !important;
-                        width: 100% !important;
-                        flex: 0 0 100% !important;
-                    }
-
                     /* Paper 컴포넌트가 잘리지 않도록 */
                     .print-root .MuiPaper-root {
                         page-break-inside: avoid !important;
