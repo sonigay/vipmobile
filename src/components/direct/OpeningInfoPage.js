@@ -172,13 +172,47 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                     setAddonIncentiveList(incentiveAddons);
                 }
 
-                // 보험상품: 출고가에 맞는 보험상품 찾기
+                // 보험상품: 출고가 및 모델 유형(플립/폴드 여부)에 맞는 보험상품 찾기
                 if (policySettings.success && policySettings.insurance?.list && factoryPrice > 0) {
-                    const matchingInsurance = policySettings.insurance.list.find(insurance => {
-                        const minPrice = insurance.minPrice || 0;
-                        const maxPrice = insurance.maxPrice || 9999999;
-                        return factoryPrice >= minPrice && factoryPrice <= maxPrice;
+                    const insuranceList = policySettings.insurance.list || [];
+
+                    // 현재 단말이 플립/폴드 계열인지 여부 (펫네임/모델명 기준)
+                    const modelNameForCheck = (initialData?.petName || initialData?.model || '').toString();
+                    const lowerModelName = modelNameForCheck.toLowerCase();
+                    const flipFoldKeywords = ['플립', '폴드', 'flip', 'fold'];
+                    const isFlipFoldModel = flipFoldKeywords.some(keyword =>
+                        lowerModelName.includes(keyword.toLowerCase())
+                    );
+
+                    // 보험상품 중 이름에 플립/폴드 관련 키워드가 포함된 상품
+                    const flipFoldInsurances = insuranceList.filter(item => {
+                        const name = (item.name || '').toString().toLowerCase();
+                        return flipFoldKeywords.some(keyword =>
+                            name.includes(keyword.toLowerCase())
+                        );
                     });
+
+                    // 일반 보험상품 (플립/폴드 전용 상품 제외)
+                    const normalInsurances = insuranceList.filter(item => !flipFoldInsurances.includes(item));
+
+                    let matchingInsurance = null;
+
+                    if (selectedCarrier === 'LG' && isFlipFoldModel && flipFoldInsurances.length > 0) {
+                        // LG + 플립/폴드 단말인 경우 → "폰교체 패스 플립/폴드" 상품 우선 사용
+                        matchingInsurance = flipFoldInsurances.find(insurance => {
+                            const minPrice = insurance.minPrice || 0;
+                            const maxPrice = insurance.maxPrice || 9999999;
+                            return factoryPrice >= minPrice && factoryPrice <= maxPrice;
+                        }) || flipFoldInsurances[0];
+                    } else {
+                        // 그 외 모델들은 플립/폴드 전용 상품을 제외한 나머지 보험상품에서 출고가로 매칭
+                        const baseList = normalInsurances.length > 0 ? normalInsurances : insuranceList;
+                        matchingInsurance = baseList.find(insurance => {
+                            const minPrice = insurance.minPrice || 0;
+                            const maxPrice = insurance.maxPrice || 9999999;
+                            return factoryPrice >= minPrice && factoryPrice <= maxPrice;
+                        });
+                    }
 
                     if (matchingInsurance) {
                         required.push({

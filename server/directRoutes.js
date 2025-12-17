@@ -276,6 +276,11 @@ async function getPolicySettings(carrier) {
     const insuranceList = insuranceRows
       .filter(row => (row[0] || '').trim() === carrier)
       .map(row => ({
+        // 보험상품명 및 출고가 구간, 월요금까지 함께 보관 (모델별 선택 로직에 사용)
+        name: (row[1] || '').toString().trim(),
+        minPrice: Number(row[2] || 0),
+        maxPrice: Number(row[3] || 0),
+        fee: Number(row[4] || 0),
         incentive: Number(row[5] || 0), // 보험 유치 추가금액
         deduction: -Math.abs(Number(row[6] || 0))  // 보험 미유치 차감금액 (음수 처리)
       }));
@@ -1127,19 +1132,61 @@ async function rebuildPricingMaster(carriersParam) {
             }
           }
 
-          // 부가서비스/보험/별도정책 합산
-          const totalAddonIncentive = policySettings.addonList.reduce((acc, cur) => acc + (cur.incentive || 0), 0) +
-            policySettings.insuranceList.reduce((acc, cur) => acc + (cur.incentive || 0), 0);
-          const totalAddonDeduction = policySettings.addonList.reduce((acc, cur) => acc + (cur.deduction || 0), 0) +
-            policySettings.insuranceList.reduce((acc, cur) => acc + (cur.deduction || 0), 0);
+          // 부가서비스 인센티브/차감 합계 (보험은 모델별로 1개만 선택하므로 여기서는 제외)
+          const addonIncentiveSum = policySettings.addonList.reduce((acc, cur) => acc + (cur.incentive || 0), 0);
+          const addonDeductionSum = policySettings.addonList.reduce((acc, cur) => acc + (cur.deduction || 0), 0);
           const totalSpecialAddition = policySettings.specialPolicies.reduce((acc, cur) => acc + (cur.addition || 0), 0);
           const totalSpecialDeduction = policySettings.specialPolicies.reduce((acc, cur) => acc + (cur.deduction || 0), 0);
 
           // 기본 정책 마진 (기본마진 + 별도정책)
           const baseMargin = policySettings.baseMargin + totalSpecialAddition - totalSpecialDeduction;
 
+          // 보험상품: 출고가 및 모델명(플립/폴드 여부)에 맞는 보험 인센티브/차감 선택
+          const insuranceList = policySettings.insuranceList || [];
+
+          const modelNameForCheck = (modelName || '').toString();
+          const lowerModelName = modelNameForCheck.toLowerCase();
+          const flipFoldKeywords = ['플립', '폴드', 'flip', 'fold'];
+          const isFlipFoldModel = flipFoldKeywords.some(keyword =>
+            lowerModelName.includes(keyword.toLowerCase())
+          );
+
+          const flipFoldInsurances = insuranceList.filter(item => {
+            const name = (item.name || '').toString().toLowerCase();
+            return flipFoldKeywords.some(keyword =>
+              name.includes(keyword.toLowerCase())
+            );
+          });
+
+          const normalInsurances = insuranceList.filter(item => !flipFoldInsurances.includes(item));
+
+          let selectedInsurance = null;
+
+          if (carrier === 'LG' && isFlipFoldModel && flipFoldInsurances.length > 0) {
+            // LG + 플립/폴드 단말 → 플립/폴드 전용 보험상품 우선 적용
+            selectedInsurance = flipFoldInsurances.find(insurance => {
+              const minPrice = insurance.minPrice || 0;
+              const maxPrice = insurance.maxPrice || 9999999;
+              return factoryPrice >= minPrice && factoryPrice <= maxPrice;
+            }) || flipFoldInsurances[0];
+          } else {
+            // 그 외 모델 → 플립/폴드 전용 상품 제외 후 출고가 구간으로 매칭
+            const baseList = normalInsurances.length > 0 ? normalInsurances : insuranceList;
+            selectedInsurance = baseList.find(insurance => {
+              const minPrice = insurance.minPrice || 0;
+              const maxPrice = insurance.maxPrice || 9999999;
+              return factoryPrice >= minPrice && factoryPrice <= maxPrice;
+            });
+          }
+
+          const insuranceIncentive = selectedInsurance?.incentive || 0;
+          const insuranceDeduction = selectedInsurance?.deduction || 0;
+
+          const totalAddonIncentive = addonIncentiveSum + insuranceIncentive;
+          const totalAddonDeduction = addonDeductionSum + insuranceDeduction;
+
           // 대리점추가지원금 계산
-          // 부가유치: 정책표리베이트 - 마진 + 부가서비스추가금액 + 별도정책추가금액
+          // 부가유치: 정책표리베이트 - 마진 + (부가서비스/보험 인센티브) + 별도정책추가금액
           const storeSupportFull = Math.max(0,
             policyRebate
             - baseMargin
@@ -1147,7 +1194,7 @@ async function rebuildPricingMaster(carriersParam) {
             + totalSpecialAddition
           );
 
-          // 부가미유치: 정책표리베이트 - 마진 + 부가서비스차감금액 + 별도정책차감금액
+          // 부가미유치: 정책표리베이트 - 마진 + (부가서비스/보험 차감) + 별도정책차감금액
           const storeSupportNone = Math.max(0,
             policyRebate
             - baseMargin
@@ -4834,12 +4881,9 @@ function setupDirectRoutes(app) {
       const policySettings = await getPolicySettings(carrier);
       const { baseMargin, addonList, insuranceList, specialPolicies } = policySettings;
 
-      // 부가서비스 + 보험상품 추가금액 합계 (부가유치)
-      const totalAddonIncentive = addonList.reduce((sum, addon) => sum + (addon.incentive || 0), 0) +
-        insuranceList.reduce((sum, insurance) => sum + (insurance.incentive || 0), 0);
-      // 부가서비스 + 보험상품 차감금액 합계 (부가미유치)
-      const totalAddonDeduction = addonList.reduce((sum, addon) => sum + (addon.deduction || 0), 0) +
-        insuranceList.reduce((sum, insurance) => sum + (insurance.deduction || 0), 0);
+      // 부가서비스 인센티브/차감 합계 (보험은 모델별로 1개만 선택하므로 여기서는 제외)
+      const addonIncentiveSum = addonList.reduce((sum, addon) => sum + (addon.incentive || 0), 0);
+      const addonDeductionSum = addonList.reduce((sum, addon) => sum + (addon.deduction || 0), 0);
 
       const totalSpecialAddition = specialPolicies.reduce((sum, policy) => sum + (policy.addition || 0), 0);
       const totalSpecialDeduction = specialPolicies.reduce((sum, policy) => sum + (policy.deduction || 0), 0);
@@ -5670,6 +5714,49 @@ function setupDirectRoutes(app) {
           });
         }
       }
+
+      // 보험상품: 출고가 및 모델명(플립/폴드 여부)에 맞는 보험 인센티브/차감 선택
+      const insuranceListForCalc = insuranceList || [];
+      const modelNameForCheck = (modelName || '').toString();
+      const lowerModelName = modelNameForCheck.toLowerCase();
+      const flipFoldKeywords = ['플립', '폴드', 'flip', 'fold'];
+      const isFlipFoldModel = flipFoldKeywords.some(keyword =>
+        lowerModelName.includes(keyword.toLowerCase())
+      );
+
+      const flipFoldInsurances = insuranceListForCalc.filter(item => {
+        const name = (item.name || '').toString().toLowerCase();
+        return flipFoldKeywords.some(keyword =>
+          name.includes(keyword.toLowerCase())
+        );
+      });
+
+      const normalInsurances = insuranceListForCalc.filter(item => !flipFoldInsurances.includes(item));
+
+      let selectedInsurance = null;
+
+      if (carrier === 'LG' && isFlipFoldModel && flipFoldInsurances.length > 0) {
+        // LG + 플립/폴드 단말 → 플립/폴드 전용 보험상품 우선 적용
+        selectedInsurance = flipFoldInsurances.find(insurance => {
+          const minPrice = insurance.minPrice || 0;
+          const maxPrice = insurance.maxPrice || 9999999;
+          return factoryPrice >= minPrice && factoryPrice <= maxPrice;
+        }) || flipFoldInsurances[0];
+      } else {
+        // 그 외 모델 → 플립/폴드 전용 상품 제외 후 출고가 구간으로 매칭
+        const baseList = normalInsurances.length > 0 ? normalInsurances : insuranceListForCalc;
+        selectedInsurance = baseList.find(insurance => {
+          const minPrice = insurance.minPrice || 0;
+          const maxPrice = insurance.maxPrice || 9999999;
+          return factoryPrice >= minPrice && factoryPrice <= maxPrice;
+        });
+      }
+
+      const insuranceIncentive = selectedInsurance?.incentive || 0;
+      const insuranceDeduction = selectedInsurance?.deduction || 0;
+
+      const totalAddonIncentive = addonIncentiveSum + insuranceIncentive;
+      const totalAddonDeduction = addonDeductionSum + insuranceDeduction;
 
       // 대리점지원금 계산
       const storeSupportWithAddon = Math.max(0,
