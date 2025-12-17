@@ -3176,19 +3176,47 @@ async function proxyDiscordImage(req, res) {
     const parsedUrl = new URL(imageUrl);
     const cleanImageUrl = parsedUrl.origin + parsedUrl.pathname; // 쿼리 파라미터 제거
 
+    console.log(`[프록시] 원본 URL: ${imageUrl.substring(0, 150)}...`);
+    console.log(`[프록시] 정리된 URL: ${cleanImageUrl}`);
+
     let contentType = 'image/png'; // 기본값
 
     const imageBuffer = await new Promise((resolve, reject) => {
       const protocol = parsedUrl.protocol === 'https:' ? https : http;
 
+      // 먼저 쿼리 파라미터 없이 시도
       const request = protocol.get(cleanImageUrl, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Referer': 'https://discord.com/'
         }
       }, (response) => {
         // 🔥 개선: 404 에러를 포함한 모든 에러 상태 코드 처리
         if (response.statusCode === 404) {
-          reject(new Error(`이미지를 찾을 수 없습니다 (404): ${imageUrl.substring(0, 100)}...`));
+          // 쿼리 파라미터 없이 실패하면 원본 URL로 재시도
+          console.log(`[프록시] 쿼리 파라미터 없이 404 발생, 원본 URL로 재시도...`);
+          const retryRequest = protocol.get(imageUrl, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+              'Referer': 'https://discord.com/'
+            }
+          }, (retryResponse) => {
+            if (retryResponse.statusCode === 404) {
+              reject(new Error(`이미지를 찾을 수 없습니다 (404): ${imageUrl.substring(0, 100)}...`));
+              return;
+            }
+            if (retryResponse.statusCode !== 200) {
+              reject(new Error(`이미지 가져오기 실패: ${retryResponse.statusCode} ${retryResponse.statusMessage}`));
+              return;
+            }
+            // 재시도 성공 시 처리
+            contentType = retryResponse.headers['content-type'] || 'image/png';
+            const retryChunks = [];
+            retryResponse.on('data', chunk => retryChunks.push(chunk));
+            retryResponse.on('end', () => resolve(Buffer.concat(retryChunks)));
+          });
+          retryRequest.on('error', reject);
+          retryRequest.end();
           return;
         }
         if (response.statusCode !== 200) {
