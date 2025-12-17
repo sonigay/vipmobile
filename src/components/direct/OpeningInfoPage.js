@@ -408,30 +408,47 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                         margin: 8mm;
                     }
 
+                    /* HTML/Body 높이 제한 해제 */
+                    html, body {
+                        height: auto !important;
+                        overflow: visible !important;
+                        -webkit-print-color-adjust: exact;
+                        print-color-adjust: exact;
+                    }
+
                     /* 상단 헤더(뒤로가기/버튼 영역)만 숨기고 나머지는 화면 그대로 출력 */
                     .no-print {
                         display: none !important;
-                    }
-
-                    /* 배경색/그라데이션 유지 */
-                    body {
-                        -webkit-print-color-adjust: exact;
-                        print-color-adjust: exact;
                     }
 
                     /* 스크롤 컨테이너 해제해서 전체 내용 출력 */
                     .print-root {
                         height: auto !important;
                         overflow: visible !important;
+                        position: relative !important;
                     }
 
-                    /* 인쇄 시에는 좌우 2컬럼을 세로로 한 컬럼씩 출력 (잘리는 것 방지) */
+                    /* 모든 Grid 컨테이너를 세로 배치로 강제 변경 */
+                    .print-root .MuiGrid-container,
                     .print-area .MuiGrid-container {
                         display: block !important;
+                        flex-direction: column !important;
+                        width: 100% !important;
                     }
+
+                    /* 모든 Grid item을 100% 너비로 강제 */
+                    .print-root .MuiGrid-item,
                     .print-area .MuiGrid-item {
                         max-width: 100% !important;
                         flex-basis: 100% !important;
+                        width: 100% !important;
+                        flex: 0 0 100% !important;
+                    }
+
+                    /* Paper 컴포넌트가 잘리지 않도록 */
+                    .print-root .MuiPaper-root {
+                        page-break-inside: avoid !important;
+                        break-inside: avoid !important;
                     }
                 }
             `}</style>
