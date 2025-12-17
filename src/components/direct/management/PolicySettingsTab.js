@@ -282,8 +282,12 @@ const PolicySettingsTab = () => {
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                             기본 마진 금액 설정
                         </Typography>
-                        <Typography variant="h5" color="primary" sx={{ mt: 2, fontWeight: 'bold' }}>
-                            {margin.toLocaleString()}원
+                        <Typography
+                            variant="h5"
+                            color={margin > 0 ? 'primary' : 'text.secondary'}
+                            sx={{ mt: 2, fontWeight: 'bold' }}
+                        >
+                            {margin > 0 ? `${margin.toLocaleString()}원` : '설정된 마진 금액이 없습니다'}
                         </Typography>
                     </Paper>
                 </Grid>

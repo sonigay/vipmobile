@@ -239,7 +239,8 @@ async function getPolicySettings(carrier) {
     });
     const marginRows = (marginRes.data.values || []).slice(1);
     const marginRow = marginRows.find(row => (row[0] || '').trim() === carrier);
-    const baseMargin = marginRow ? Number(marginRow[1] || 0) : 50000;
+    // 설정된 마진이 없으면 기본값을 0원으로 처리
+    const baseMargin = marginRow ? Number(marginRow[1] || 0) : 0;
 
     // 부가서비스, 보험상품, 별도정책 병렬 읽기 (재시도 로직 포함)
     const [addonRes, insuranceRes, specialRes] = await Promise.all([

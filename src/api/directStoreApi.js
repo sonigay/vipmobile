@@ -217,9 +217,10 @@ export const directStoreApi = {
         } catch (err) {
             console.warn('정책 설정 API 호출 실패, Mock 데이터 사용:', err);
             // 백엔드 미구현 시 Mock Data 반환
+            // 기본 마진은 0원으로 간주 (미설정 상태)
             return {
                 success: true,
-                margin: { baseMargin: 50000 },
+                margin: { baseMargin: 0 },
                 addon: {
                     list: [
                         { id: 1, name: 'V컬러링', fee: 3300, incentive: 1000, deduction: 0 },

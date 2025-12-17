@@ -54,6 +54,7 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
     const [addonIncentiveList, setAddonIncentiveList] = useState([]); // 부가유치 시 유치되는 부가서비스 목록
     const [insuranceIncentiveList, setInsuranceIncentiveList] = useState([]); // 부가유치 시 유치되는 보험상품 목록
     const [agreementChecked, setAgreementChecked] = useState(false); // 동의 체크박스 상태
+    const [baseMargin, setBaseMargin] = useState(0); // 정책설정에서 가져온 기본 마진
 
     // 단말/지원금 기본값 정리 (휴대폰목록/오늘의휴대폰에서 전달된 데이터 사용)
     const factoryPrice = initialData?.factoryPrice || 0;
@@ -144,6 +145,14 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                 const required = [];
                 const addonIncentives = [];
                 const insuranceIncentives = [];
+
+                // 마진 설정 값 저장
+                if (policySettings.success && policySettings.margin?.baseMargin != null) {
+                    setBaseMargin(Number(policySettings.margin.baseMargin) || 0);
+                } else {
+                    // 설정된 마진 금액이 없으면 0원으로 처리
+                    setBaseMargin(0);
+                }
 
                 if (policySettings.success && policySettings.addon?.list) {
                     // 미유치차감금액이 있는 부가서비스를 필수 부가서비스로 간주
@@ -347,7 +356,21 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                 storeSupportWithAddon: formData.withAddon ? storeSupportWithAddon : 0, // 대리점추가지원금(부가유치)
                 storeSupportNoAddon: !formData.withAddon ? storeSupportWithoutAddon : 0, // 대리점추가지원금(부가미유치)
                 storeSupportWithoutAddon: !formData.withAddon ? storeSupportWithoutAddon : 0, // 하위 호환
-                margin: 0, // 마진 (정책설정에서 가져와야 함)
+                // 마진 계산
+                // 구매가 = 출고가 - 이통사지원금 - 대리점추가지원금
+                // - 구매가가 0원 이상이면 정책설정 마진(baseMargin)
+                // - 구매가가 0원 미만(마이너스)이면 그 절대값을 마진으로 사용
+                margin: (() => {
+                    const appliedPublicSupport = formData.usePublicSupport ? publicSupport : 0;
+                    const appliedStoreSupport = formData.withAddon ? storeSupportWithAddon : storeSupportWithoutAddon;
+                    const purchasePrice = factoryPrice - appliedPublicSupport - appliedStoreSupport;
+
+                    if (isNaN(purchasePrice)) return 0;
+                    if (purchasePrice >= 0) {
+                        return baseMargin || 0;
+                    }
+                    return Math.abs(purchasePrice);
+                })(),
                 // 계산된 값들 (참고용, 시트에는 저장 안 됨)
                 installmentPrincipalWithAddon: calculateInstallmentPrincipalWithAddon(factoryPrice, publicSupport, storeSupportWithAddon, formData.usePublicSupport),
                 installmentPrincipalWithoutAddon: calculateInstallmentPrincipalWithoutAddon(factoryPrice, publicSupport, storeSupportWithoutAddon, formData.usePublicSupport),

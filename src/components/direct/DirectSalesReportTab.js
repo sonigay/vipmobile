@@ -43,6 +43,12 @@ import { ModernTable, ModernTableCell, HoverableTableRow, EmptyTableRow } from '
 
 const DirectSalesReportTab = ({ onRowClick, loggedInStore, isManagementMode = false }) => {
     const [searchTerm, setSearchTerm] = useState('');
+    // YYYY-MM 형식의 월 필터 (기본값: 현재 달)
+    const [monthFilter, setMonthFilter] = useState(() => {
+        const now = new Date();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        return `${now.getFullYear()}-${month}`;
+    });
     const [salesData, setSalesData] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -172,15 +178,29 @@ const DirectSalesReportTab = ({ onRowClick, loggedInStore, isManagementMode = fa
         }
     };
 
-    // 검색 필터링
+    // 검색 + 월 필터링
     const filteredData = salesData.filter(row => {
         const searchLower = searchTerm.toLowerCase();
-        return (
+
+        // 검색어 필터
+        const matchesSearch =
             (row.customerName || row.고객명 || '').toLowerCase().includes(searchLower) ||
             (row.deviceModel || row.단말기모델명 || row.model || '').toLowerCase().includes(searchLower) ||
-            (row.customerContact || row.연락처 || row.contact || '').includes(searchTerm)
-        );
+            (row.customerContact || row.연락처 || row.contact || '').includes(searchTerm);
+
+        if (!matchesSearch) return false;
+
+        // 월 필터 (판매일시 기준으로 YYYY-MM 포함 여부 체크)
+        if (!monthFilter) return true;
+        const saleDateRaw = row.saleDateTime || row.판매일시 || row.date || '';
+        return typeof saleDateRaw === 'string' && saleDateRaw.includes(monthFilter);
     });
+
+    // 현재 필터된 데이터의 마진 합계
+    const totalMargin = filteredData.reduce((sum, row) => {
+        const margin = Number(row.margin ?? row.마진 ?? 0);
+        return sum + (isNaN(margin) ? 0 : margin);
+    }, 0);
 
     return (
         <Box sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -188,7 +208,7 @@ const DirectSalesReportTab = ({ onRowClick, loggedInStore, isManagementMode = fa
                 <Typography variant="h5" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
                     {isManagementMode ? '전체 판매일보' : '판매일보'}
                 </Typography>
-                <Box sx={{ display: 'flex', gap: 1 }}>
+                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                     <TextField
                         size="small"
                         placeholder="고객명, 모델명 검색"
@@ -203,11 +223,29 @@ const DirectSalesReportTab = ({ onRowClick, loggedInStore, isManagementMode = fa
                         }}
                         sx={{ bgcolor: 'background.paper', borderRadius: 1 }}
                     />
+                    <TextField
+                        size="small"
+                        type="month"
+                        label="월 선택"
+                        value={monthFilter}
+                        onChange={(e) => setMonthFilter(e.target.value)}
+                        InputLabelProps={{ shrink: true }}
+                        sx={{ bgcolor: 'background.paper', borderRadius: 1, minWidth: 150 }}
+                    />
                 </Box>
             </Box>
 
             {error && (
                 <ErrorState error={error} onRetry={() => window.location.reload()} />
+            )}
+
+            {/* 월 마진 합계 표시 */}
+            {!loading && (
+                <Box sx={{ mb: 1, textAlign: 'right' }}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                        총 마진: <strong>{totalMargin.toLocaleString()}원</strong>
+                    </Typography>
+                </Box>
             )}
 
             {loading ? (
@@ -229,14 +267,15 @@ const DirectSalesReportTab = ({ onRowClick, loggedInStore, isManagementMode = fa
                                 <ModernTableCell align="center" width="80">할부구분</ModernTableCell>
                                 <ModernTableCell align="center" width="80">할부개월</ModernTableCell>
                                 <ModernTableCell align="center" width="80">약정</ModernTableCell>
-                                <ModernTableCell width="100">요금제</ModernTableCell>
+                                <ModernTableCell width="120">요금제</ModernTableCell>
+                                <ModernTableCell align="right" width="100">마진</ModernTableCell>
                                 <ModernTableCell align="center" width="80">상태</ModernTableCell>
                                 <ModernTableCell align="center" width="100">관리</ModernTableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
                             {filteredData.length === 0 ? (
-                                <EmptyTableRow colSpan={isManagementMode ? 15 : 14} message="표시할 데이터가 없습니다." />
+                                <EmptyTableRow colSpan={isManagementMode ? 16 : 15} message="표시할 데이터가 없습니다." />
                             ) : (
                                 filteredData.map((row, idx) => {
                                     const rowNumber = row.번호 || row.id || (idx + 1);
@@ -265,6 +304,12 @@ const DirectSalesReportTab = ({ onRowClick, loggedInStore, isManagementMode = fa
                                             <TableCell align="center">{row.installmentPeriod || row.할부개월 || '-'}</TableCell>
                                             <TableCell align="center">{row.contractType || row.contract || row.약정 || '-'}</TableCell>
                                             <TableCell>{row.plan || row.요금제 || '-'}</TableCell>
+                                            <TableCell align="right">
+                                                {(() => {
+                                                    const margin = Number(row.margin ?? row.마진 ?? 0);
+                                                    return isNaN(margin) ? '-' : `${margin.toLocaleString()}원`;
+                                                })()}
+                                            </TableCell>
                                             <TableCell align="center">{getStatusChip(status)}</TableCell>
                                             <TableCell align="center" onClick={(e) => e.stopPropagation()}>
                                                 <Tooltip title="상태 변경">
