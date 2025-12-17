@@ -4646,33 +4646,49 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
         throw new Error('Discord 메시지에 첨부파일이 없습니다.');
       }
 
-      imageUrl = message.attachments.first().url;
+      const attachment = message.attachments.first();
+      imageUrl = attachment.url;
       
       // 🔥 핵심 수정: Discord가 반환한 실제 파일명 확인 및 로깅
-      const actualFilename = message.attachments.first().name;
+      const actualFilename = attachment.name;
       console.log(`📤 [이미지 업로드] Discord 실제 파일명: ${actualFilename} (요청 파일명: ${filename})`);
+      console.log(`📤 [이미지 업로드] Discord 원본 URL: ${imageUrl}`);
       
-      // 🔥 개선: Discord URL에서 이중 하이픈 정규화
+      // 🔥 핵심 수정: cdn.discordapp.com을 media.discordapp.net으로 변환
+      // Discord.js가 반환하는 cdn.discordapp.com URL은 때때로 접근이 안 되므로
+      // 실제 브라우저에서 접근 가능한 media.discordapp.net으로 변환
       try {
         const urlObj = new URL(imageUrl);
         const pathParts = urlObj.pathname.split('/');
-        const urlFilename = pathParts[pathParts.length - 1];
+        let urlFilename = pathParts[pathParts.length - 1];
+        
+        // 쿼리 파라미터에서 파일명 추출 (있는 경우)
+        if (urlFilename.includes('?')) {
+          urlFilename = urlFilename.split('?')[0];
+        }
         
         // Discord가 파일명을 변경했을 수 있으므로, 실제 파일명으로 URL 업데이트
         if (actualFilename && actualFilename !== urlFilename) {
           console.log(`⚠️ [이미지 업로드] Discord 파일명 변경 감지: ${urlFilename} → ${actualFilename}`);
           pathParts[pathParts.length - 1] = actualFilename;
           urlObj.pathname = pathParts.join('/');
-          imageUrl = urlObj.toString();
-        } else if (urlFilename.includes('--')) {
-          const normalizedFilename = urlFilename.replace(/--+/g, '-');
-          pathParts[pathParts.length - 1] = normalizedFilename;
-          urlObj.pathname = pathParts.join('/');
-          imageUrl = urlObj.toString();
         }
+        
+        // 🔥 핵심: cdn.discordapp.com을 media.discordapp.net으로 변환
+        if (urlObj.hostname === 'cdn.discordapp.com') {
+          urlObj.hostname = 'media.discordapp.net';
+          console.log(`🔄 [이미지 업로드] 도메인 변환: cdn.discordapp.com → media.discordapp.net`);
+        }
+        
+        // 쿼리 파라미터 제거 (필요시 format=webp&quality=lossless 추가 가능)
+        urlObj.search = '';
+        
+        imageUrl = urlObj.toString();
+        console.log(`✅ [이미지 업로드] 최종 URL: ${imageUrl}`);
       } catch (urlError) {
-        // URL 파싱 실패 시 문자열 치환으로 처리
-        imageUrl = imageUrl.replace(/--+/g, '-');
+        console.error('❌ [이미지 업로드] URL 변환 오류:', urlError);
+        // URL 파싱 실패 시 도메인만 변환
+        imageUrl = imageUrl.replace('cdn.discordapp.com', 'media.discordapp.net');
       }
       discordUploadSuccess = true;
       console.log(`✅ [이미지 업로드] Discord 업로드 성공: ${imageUrl} (포스트: ${carrierPost.name}, 스레드: ${targetThread.name})`);
