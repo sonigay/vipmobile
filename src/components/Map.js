@@ -999,9 +999,12 @@ ${loggedInStore.name}으로 이동 예정입니다.
                   eventHandlers={{
                     click: () => {
                       if (isCustomerMode) {
+                        // 고객모드일 때는 상세 정보만 로드하고, 선택은 버튼으로만 가능
                         loadCustomerDetails(store);
+                      } else {
+                        // 일반 모드일 때는 기존대로 바로 선택
+                        onStoreSelect(store);
                       }
-                      onStoreSelect(store);
                     }
                   }}
                 >
@@ -1304,7 +1307,15 @@ ${loggedInStore.name}으로 이동 예정입니다.
                   position={[parseFloat(store.latitude), parseFloat(store.longitude)]}
                   icon={createMarkerIcon(store)}
                   eventHandlers={{
-                    click: () => onStoreSelect(store)
+                    click: () => {
+                      if (isCustomerMode) {
+                        // 고객모드일 때는 상세 정보만 로드하고, 선택은 버튼으로만 가능
+                        loadCustomerDetails(store);
+                      } else {
+                        // 일반 모드일 때는 기존대로 바로 선택
+                        onStoreSelect(store);
+                      }
+                    }
                   }}
                 >
                   <Popup>
@@ -1567,10 +1578,18 @@ ${loggedInStore.name}으로 이동 예정입니다.
                   icon={createDuplicateMarkerIcon(representativeStore, isSelected, totalInventoryCount)}
                   eventHandlers={{
                     click: () => {
-                      // 선택되지 않은 상태면 아무것도 하지 않음 (말풍선만 표시)
-                      // 선택된 상태면 해당 매장을 다시 선택
-                      if (isSelected) {
-                        onStoreSelect(representativeStore);
+                      if (isCustomerMode) {
+                        // 고객모드일 때는 상세 정보만 로드하고, 선택은 버튼으로만 가능
+                        if (representativeStore) {
+                          loadCustomerDetails(representativeStore);
+                        }
+                      } else {
+                        // 일반 모드일 때는 기존 로직
+                        // 선택되지 않은 상태면 아무것도 하지 않음 (말풍선만 표시)
+                        // 선택된 상태면 해당 매장을 다시 선택
+                        if (isSelected) {
+                          onStoreSelect(representativeStore);
+                        }
                       }
                     }
                   }}
@@ -1647,7 +1666,15 @@ ${loggedInStore.name}으로 이동 예정입니다.
                                 cursor: 'pointer',
                                 backgroundColor: isSelected ? '#e3f2fd' : '#f9f9f9'
                               }}
-                              onClick={() => onStoreSelect(store)}
+                              onClick={() => {
+                                if (isCustomerMode) {
+                                  // 고객모드일 때는 상세 정보만 로드하고, 선택은 버튼으로만 가능
+                                  loadCustomerDetails(store);
+                                } else {
+                                  // 일반 모드일 때는 기존대로 바로 선택
+                                  onStoreSelect(store);
+                                }
+                              }}
                             >
                               <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
                                 {/* 마커 색상 표시 */}
@@ -1717,6 +1744,27 @@ ${loggedInStore.name}으로 이동 예정입니다.
                                   onQuickCostClick={onQuickCostClick}
                                   refreshKey={quickCostRefreshKey}
                                 />
+                              )}
+
+                              {/* 고객모드일 때 해당 매장 선택하기 버튼 */}
+                              {isCustomerMode && (
+                                <button
+                                  onClick={() => onStoreSelect(store)}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px',
+                                    backgroundColor: '#1976d2',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    fontSize: '12px',
+                                    fontWeight: 'bold',
+                                    cursor: 'pointer',
+                                    marginTop: '8px'
+                                  }}
+                                >
+                                  해당 매장 선택하기
+                                </button>
                               )}
                             </div>
                           );
