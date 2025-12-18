@@ -1322,8 +1322,101 @@ ${loggedInStore.name}으로 이동 예정입니다.
                     <div>
                       <h3>{store.name}</h3>
 
-                      {/* 관리자모드일 때는 출고일 기준 재고 표시, 일반모드일 때는 영업사원요청문구 버튼 표시 */}
-                      {isAgentMode ? (
+                      {/* 고객모드일 때는 매장 상세 정보 표시 */}
+                      {isCustomerMode ? (
+                        <div style={{ minWidth: '300px', maxWidth: '400px' }}>
+                          {/* 매장 기본 정보 */}
+                          <div style={{ marginBottom: '12px' }}>
+                            {store.phone && <p style={{ margin: '4px 0', fontSize: '14px' }}><strong>전화:</strong> {store.phone}</p>}
+                            {store.storePhone && <p style={{ margin: '4px 0', fontSize: '14px' }}><strong>휴대폰:</strong> {store.storePhone}</p>}
+                            {store.businessNumber && <p style={{ margin: '4px 0', fontSize: '14px' }}><strong>사업자번호:</strong> {store.businessNumber}</p>}
+                            {store.manager && <p style={{ margin: '4px 0', fontSize: '14px' }}><strong>점장명:</strong> {store.manager}</p>}
+                            {store.address && <p style={{ margin: '4px 0', fontSize: '14px' }}><strong>주소:</strong> {store.address}</p>}
+                          </div>
+
+                          {/* 사전승낙서마크 표시 */}
+                          {isDetailLoading && <p style={{ fontSize: '12px', color: '#666' }}>로딩 중...</p>}
+                          {!isDetailLoading && preApprovalMark && (
+                            <div style={{ marginBottom: '12px', padding: '8px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
+                              <p style={{ margin: '0 0 4px 0', fontSize: '12px', fontWeight: 'bold' }}>사전승낙서마크</p>
+                              <div dangerouslySetInnerHTML={{ __html: preApprovalMark }} />
+                            </div>
+                          )}
+
+                          {/* 매장 사진 표시 */}
+                          {!isDetailLoading && storePhotos && (
+                            <div style={{ marginBottom: '12px' }}>
+                              <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 'bold' }}>매장 사진</p>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                                {storePhotos.frontUrl && (
+                                  <img src={storePhotos.frontUrl} alt="전면" style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
+                                )}
+                                {storePhotos.insideUrl && (
+                                  <img src={storePhotos.insideUrl} alt="내부" style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
+                                )}
+                                {storePhotos.outsideUrl && (
+                                  <img src={storePhotos.outsideUrl} alt="외부" style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
+                                )}
+                                {storePhotos.outside2Url && (
+                                  <img src={storePhotos.outside2Url} alt="외부2" style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 점장 및 직원 사진 표시 */}
+                          {!isDetailLoading && storePhotos && (storePhotos.managerUrl || storePhotos.staff1Url || storePhotos.staff2Url || storePhotos.staff3Url) && (
+                            <div style={{ marginBottom: '12px' }}>
+                              <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 'bold' }}>점장 및 직원</p>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                                {storePhotos.managerUrl && (
+                                  <div>
+                                    <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#666' }}>점장</p>
+                                    <img src={storePhotos.managerUrl} alt="점장" style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
+                                  </div>
+                                )}
+                                {storePhotos.staff1Url && (
+                                  <div>
+                                    <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#666' }}>직원1</p>
+                                    <img src={storePhotos.staff1Url} alt="직원1" style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
+                                  </div>
+                                )}
+                                {storePhotos.staff2Url && (
+                                  <div>
+                                    <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#666' }}>직원2</p>
+                                    <img src={storePhotos.staff2Url} alt="직원2" style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
+                                  </div>
+                                )}
+                                {storePhotos.staff3Url && (
+                                  <div>
+                                    <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#666' }}>직원3</p>
+                                    <img src={storePhotos.staff3Url} alt="직원3" style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 해당매장선택하기 버튼 */}
+                          <button
+                            onClick={() => onStoreSelect(store)}
+                            style={{
+                              width: '100%',
+                              padding: '10px',
+                              backgroundColor: '#1976d2',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              fontSize: '14px',
+                              fontWeight: 'bold',
+                              cursor: 'pointer',
+                              marginTop: '12px'
+                            }}
+                          >
+                            해당매장선택하기
+                          </button>
+                        </div>
+                      ) : isAgentMode ? (
                         <div>
                           {/* 퀵비용 예상 정보 (관리자 모드에서 요청점이 있는 경우 - 매장명 아래, 모델명/색상 정보 위) */}
                           {requestedStore && requestedStore.id && store.id && (
