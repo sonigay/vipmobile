@@ -59,11 +59,25 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false 
             try {
                 const response = await fetchData(false); // excludeShipped = false
                 if (response.success) {
-                    // VIP직영 매장만 필터링
-                    const vipStores = response.data.filter(store =>
-                        store.vipStatus === 'VIP직영' ||
-                        (store.name && store.name.includes('직영'))
-                    );
+                    let vipStores;
+                    
+                    if (isManagementMode) {
+                        // 관리 모드: VIP직영인 모든 매장 표시
+                        vipStores = response.data.filter(store =>
+                            store.vipStatus === 'VIP직영'
+                        );
+                    } else {
+                        // 직영점 모드: 로그인한 본인 매장만 표시
+                        if (loggedInStore && (loggedInStore.id || loggedInStore.name)) {
+                            vipStores = response.data.filter(store =>
+                                store.vipStatus === 'VIP직영' &&
+                                (store.id === loggedInStore.id || store.name === loggedInStore.name)
+                            );
+                        } else {
+                            vipStores = [];
+                        }
+                    }
+                    
                     setStores(vipStores);
                 } else {
                     setError('매장 정보를 불러오는데 실패했습니다.');
@@ -77,7 +91,7 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false 
         };
 
         loadStores();
-    }, []);
+    }, [isManagementMode, loggedInStore]);
 
     // 매장 선택 핸들러 (편집 다이얼로그 열기)
     const handleStoreSelect = async (store) => {
@@ -262,12 +276,9 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false 
         return <Alert severity="error">{error}</Alert>;
     }
 
-    // VIP직영 매장만 필터링
+    // stores는 이미 필터링되어 있으므로 그대로 사용
     const filteredStores = useMemo(() => {
-        return stores.filter(store => 
-            store.vipStatus === 'VIP직영' || 
-            (store.name && store.name.includes('직영'))
-        );
+        return stores;
     }, [stores]);
 
     return (

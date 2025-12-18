@@ -34,10 +34,9 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
             try {
                 const response = await fetchData(false); // excludeShipped = false
                 if (response.success) {
-                    // Filter VIP stores based on the new vipStatus field
+                    // VIP직영 매장만 필터링 (name.includes('직영') 제거)
                     const vipStores = response.data.filter(store =>
-                        store.vipStatus === 'VIP직영' ||
-                        (store.name && store.name.includes('직영'))
+                        store.vipStatus === 'VIP직영'
                     );
                     setStores(vipStores);
                 } else {
@@ -54,13 +53,9 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
         loadStores();
     }, []);
 
-    // VIP직영 매장만 필터링 (18번 인덱스 = vipStatus)
-    // useMemo는 항상 hook 규칙에 따라 최상위에서 호출되어야 함
+    // stores는 이미 VIP직영으로 필터링되어 있으므로 그대로 사용
     const filteredStores = useMemo(() => {
-        return stores.filter(store => 
-            store.vipStatus === 'VIP직영' || 
-            (store.name && store.name.includes('직영'))
-        );
+        return stores;
     }, [stores]);
 
     const handleStoreSelect = async (store) => {
