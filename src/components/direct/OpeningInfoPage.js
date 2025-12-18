@@ -537,7 +537,7 @@ const OpeningInfoPage = ({
     };
 
     return (
-        <Box className="print-root" sx={{ p: 3, height: '100%', overflow: 'auto', bgcolor: theme.bg }}>
+        <Box className={`print-root mode-${mode}`} sx={{ p: 3, height: '100%', overflow: 'auto', bgcolor: theme.bg }}>
             {/* 인쇄용 스타일 (레이아웃 그대로 출력) */}
             <style>{`
                 @media print {
@@ -568,7 +568,12 @@ const OpeningInfoPage = ({
                         width: 100% !important;
                         max-width: 100% !important;
                         
-                        /* 핵심: 상세 로그 포함을 위해 화면을 60% 수준으로 더 축소하여 한 장에 맞춤 */
+                        /* 기본: 직영점/관리자 모드 등은 내용이 적어 85% 수준으로 출력 */
+                        zoom: 0.85; 
+                    }
+
+                    /* 핵심: 고객모드는 내용(안내문구 등)이 많으므로 60% 수준으로 더 축소 */
+                    .print-root.mode-customer {
                         zoom: 0.60; 
                     }
 
@@ -772,7 +777,7 @@ const OpeningInfoPage = ({
                                     {/* 오른쪽 컬럼: 사전승낙서 마크 */}
                                     <Grid item xs={12} md={6}>
                                         {preApprovalMark ? (
-                                            <Box sx={{ 
+                                            <Box sx={{
                                                 display: 'flex',
                                                 flexDirection: 'column',
                                                 alignItems: 'flex-end',
@@ -783,8 +788,8 @@ const OpeningInfoPage = ({
                                                     pageBreakInside: 'avoid'
                                                 }
                                             }}>
-                                                <Typography variant="body2" sx={{ 
-                                                    mb: 0.5, 
+                                                <Typography variant="body2" sx={{
+                                                    mb: 0.5,
                                                     fontWeight: 'bold',
                                                     '@media print': {
                                                         fontSize: '0.875rem',
@@ -793,7 +798,7 @@ const OpeningInfoPage = ({
                                                 }}>
                                                     사전승낙서 마크:
                                                 </Typography>
-                                                <Box 
+                                                <Box
                                                     dangerouslySetInnerHTML={{ __html: preApprovalMark }}
                                                     sx={{
                                                         display: 'flex',
@@ -809,14 +814,14 @@ const OpeningInfoPage = ({
                                                 />
                                             </Box>
                                         ) : (
-                                            <Box sx={{ 
+                                            <Box sx={{
                                                 display: 'flex',
                                                 flexDirection: 'column',
                                                 alignItems: 'flex-end',
                                                 justifyContent: 'flex-start',
                                                 textAlign: 'right'
                                             }}>
-                                                <Typography variant="body2" sx={{ 
+                                                <Typography variant="body2" sx={{
                                                     color: 'text.secondary',
                                                     fontStyle: 'italic'
                                                 }}>
