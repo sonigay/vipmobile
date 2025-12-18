@@ -301,14 +301,23 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false 
                 border: '1px solid #eee', 
                 mb: 3, 
                 flexShrink: 0,
+                '& .MuiPaper-root': {
+                    height: '500px !important',
+                    width: '100% !important',
+                    margin: '0 !important',
+                    padding: '0 !important'
+                },
                 '& .leaflet-container': {
                     height: '500px !important',
                     width: '100% !important',
-                    minHeight: '500px !important'
+                    minHeight: '500px !important',
+                    position: 'relative !important'
                 },
-                '& .MuiPaper-root': {
-                    height: '500px !important',
-                    width: '100% !important'
+                '& .leaflet-map-pane': {
+                    height: '500px !important'
+                },
+                '& .leaflet-tile-pane': {
+                    height: '500px !important'
                 }
             }}>
                 <Map
