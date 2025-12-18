@@ -749,54 +749,83 @@ const OpeningInfoPage = ({
                                 <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold', color: theme.primary }}>
                                     매장 정보
                                 </Typography>
-                                <Stack spacing={1}>
-                                    <Typography variant="body2">
-                                        <strong>업체명:</strong> {(mode === 'customer' ? selectedStore : loggedInStore)?.name || ''}
-                                    </Typography>
-                                    <Typography variant="body2">
-                                        <strong>연락처:</strong> {(mode === 'customer' ? selectedStore : loggedInStore)?.phone || (mode === 'customer' ? selectedStore : loggedInStore)?.storePhone || ''}
-                                    </Typography>
-                                    <Typography variant="body2">
-                                        <strong>주소:</strong> {(mode === 'customer' ? selectedStore : loggedInStore)?.address || ''}
-                                    </Typography>
-                                    {(mode === 'customer' ? selectedStore : loggedInStore)?.accountInfo && (
-                                        <Typography variant="body2">
-                                            <strong>계좌정보:</strong> {(mode === 'customer' ? selectedStore : loggedInStore)?.accountInfo}
-                                        </Typography>
-                                    )}
-                                    {preApprovalMark && (
-                                        <Box sx={{ 
-                                            mt: 1,
-                                            '@media print': {
-                                                display: 'block',
-                                                pageBreakInside: 'avoid'
-                                            }
-                                        }}>
-                                            <Typography variant="body2" sx={{ 
-                                                mb: 0.5, 
-                                                fontWeight: 'bold',
+                                <Grid container spacing={2}>
+                                    {/* 왼쪽 컬럼: 기본 정보 */}
+                                    <Grid item xs={12} md={6}>
+                                        <Stack spacing={1}>
+                                            <Typography variant="body2">
+                                                <strong>업체명:</strong> {(mode === 'customer' ? selectedStore : loggedInStore)?.name || ''}
+                                            </Typography>
+                                            <Typography variant="body2">
+                                                <strong>연락처:</strong> {(mode === 'customer' ? selectedStore : loggedInStore)?.phone || (mode === 'customer' ? selectedStore : loggedInStore)?.storePhone || ''}
+                                            </Typography>
+                                            <Typography variant="body2">
+                                                <strong>주소:</strong> {(mode === 'customer' ? selectedStore : loggedInStore)?.address || ''}
+                                            </Typography>
+                                            {(mode === 'customer' ? selectedStore : loggedInStore)?.accountInfo && (
+                                                <Typography variant="body2">
+                                                    <strong>계좌정보:</strong> {(mode === 'customer' ? selectedStore : loggedInStore)?.accountInfo}
+                                                </Typography>
+                                            )}
+                                        </Stack>
+                                    </Grid>
+                                    {/* 오른쪽 컬럼: 사전승낙서 마크 */}
+                                    <Grid item xs={12} md={6}>
+                                        {preApprovalMark ? (
+                                            <Box sx={{ 
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                alignItems: 'flex-end',
+                                                justifyContent: 'flex-start',
+                                                textAlign: 'right',
                                                 '@media print': {
-                                                    fontSize: '0.875rem',
-                                                    mb: 0.25
+                                                    display: 'block',
+                                                    pageBreakInside: 'avoid'
                                                 }
                                             }}>
-                                                사전승낙서 마크:
-                                            </Typography>
-                                            <Box 
-                                                dangerouslySetInnerHTML={{ __html: preApprovalMark }}
-                                                sx={{
+                                                <Typography variant="body2" sx={{ 
+                                                    mb: 0.5, 
+                                                    fontWeight: 'bold',
                                                     '@media print': {
-                                                        '& img': {
-                                                            maxWidth: '100%',
-                                                            height: 'auto',
-                                                            pageBreakInside: 'avoid'
-                                                        }
+                                                        fontSize: '0.875rem',
+                                                        mb: 0.25
                                                     }
-                                                }}
-                                            />
-                                        </Box>
-                                    )}
-                                </Stack>
+                                                }}>
+                                                    사전승낙서 마크:
+                                                </Typography>
+                                                <Box 
+                                                    dangerouslySetInnerHTML={{ __html: preApprovalMark }}
+                                                    sx={{
+                                                        display: 'flex',
+                                                        justifyContent: 'flex-end',
+                                                        '@media print': {
+                                                            '& img': {
+                                                                maxWidth: '100%',
+                                                                height: 'auto',
+                                                                pageBreakInside: 'avoid'
+                                                            }
+                                                        }
+                                                    }}
+                                                />
+                                            </Box>
+                                        ) : (
+                                            <Box sx={{ 
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                alignItems: 'flex-end',
+                                                justifyContent: 'flex-start',
+                                                textAlign: 'right'
+                                            }}>
+                                                <Typography variant="body2" sx={{ 
+                                                    color: 'text.secondary',
+                                                    fontStyle: 'italic'
+                                                }}>
+                                                    사전승낙서 마크 없음
+                                                </Typography>
+                                            </Box>
+                                        )}
+                                    </Grid>
+                                </Grid>
                             </Paper>
                         )}
 
