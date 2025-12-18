@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Container, Tabs, Tab, Paper, Button } from '@mui/material';
+import { Box, Typography, Container, Tabs, Tab, Paper, Button, ToggleButtonGroup, ToggleButton } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import MobileListTab from '../direct/MobileListTab';
 import CustomerPreferredStoreTab from './CustomerPreferredStoreTab';
@@ -145,8 +145,48 @@ const CustomerDashboard = () => {
         );
     }
 
+    const handleModeToggle = (e, newValue) => {
+        if (newValue !== null && newValue === '업체') {
+            // 업체 화면으로 이동 (루트 경로)
+            navigate('/');
+        }
+    };
+
     return (
         <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+            {/* 업체/맴버 토글 - 화면 맨 상단 왼쪽 */}
+            <Box sx={{ mb: 2 }}>
+                <ToggleButtonGroup
+                    value="맴버"
+                    exclusive
+                    onChange={handleModeToggle}
+                    aria-label="로그인 타입 선택"
+                    size="small"
+                    sx={{
+                        '& .MuiToggleButton-root': {
+                            px: 2,
+                            py: 0.5,
+                            fontWeight: 600,
+                            fontSize: '0.85rem',
+                            '&.Mui-selected': {
+                                bgcolor: 'primary.main',
+                                color: 'white',
+                                '&:hover': {
+                                    bgcolor: 'primary.dark',
+                                }
+                            }
+                        }
+                    }}
+                >
+                    <ToggleButton value="업체" aria-label="업체 화면">
+                        업체
+                    </ToggleButton>
+                    <ToggleButton value="맴버" aria-label="맴버 화면">
+                        맴버
+                    </ToggleButton>
+                </ToggleButtonGroup>
+            </Box>
+
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Box>
                     <Typography variant="h4" sx={{ fontWeight: 700 }}>{customerInfo.name}님, 안녕하세요!</Typography>
