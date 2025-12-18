@@ -284,7 +284,7 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false 
     }
 
     return (
-        <Box sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
+        <Box sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
             <Typography variant="h5" sx={{ mb: 2, fontWeight: 'bold' }}>
                 선호구입매장 관리
             </Typography>
@@ -292,7 +292,7 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false 
                 지도에서 매장을 클릭하여 사전승낙서마크와 매장 사진을 관리할 수 있습니다.
             </Typography>
 
-            <Box sx={{ height: '500px', width: '100%', position: 'relative', borderRadius: 2, overflow: 'hidden', border: '1px solid #eee', mb: 3 }}>
+            <Box sx={{ height: '500px', width: '100%', position: 'relative', borderRadius: 2, overflow: 'hidden', border: '1px solid #eee', mb: 3, flexShrink: 0 }}>
                 <Map
                     userLocation={userLocation}
                     filteredStores={filteredStores}
@@ -305,7 +305,7 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false 
             </Box>
 
             {/* 매장 정보 테이블 */}
-            <Box sx={{ mt: 3 }}>
+            <Box sx={{ flexShrink: 0 }}>
                 <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
                     <StoreIcon color="primary" />
                     매장 목록
