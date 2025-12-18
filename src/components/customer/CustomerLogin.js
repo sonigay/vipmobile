@@ -51,7 +51,47 @@ const CustomerLogin = () => {
     };
 
     return (
-        <Container maxWidth="xs" sx={{ mt: 8 }}>
+        <Container maxWidth="xs" sx={{ mt: 8, position: 'relative' }}>
+            {/* 업체/맴버 토글 - 왼쪽 상단 끝 */}
+            <Box sx={{ 
+                position: 'absolute', 
+                top: 0, 
+                left: 0, 
+                zIndex: 1000,
+                mt: 2,
+                ml: 2
+            }}>
+                <ToggleButtonGroup
+                    value="맴버"
+                    exclusive
+                    onChange={handleModeToggle}
+                    aria-label="로그인 타입 선택"
+                    size="small"
+                    sx={{
+                        '& .MuiToggleButton-root': {
+                            px: 2,
+                            py: 0.5,
+                            fontWeight: 600,
+                            fontSize: '0.85rem',
+                            '&.Mui-selected': {
+                                bgcolor: 'primary.main',
+                                color: 'white',
+                                '&:hover': {
+                                    bgcolor: 'primary.dark',
+                                }
+                            }
+                        }
+                    }}
+                >
+                    <ToggleButton value="업체" aria-label="업체 로그인">
+                        업체
+                    </ToggleButton>
+                    <ToggleButton value="맴버" aria-label="맴버 로그인">
+                        맴버
+                    </ToggleButton>
+                </ToggleButtonGroup>
+            </Box>
+
             <Paper elevation={3} sx={{ p: 4, textAlign: 'center' }}>
                 {/* 로고 */}
                 <Box sx={{ mb: 3 }}>
@@ -71,8 +111,6 @@ const CustomerLogin = () => {
                         (주)브이아이피플러스
                     </Typography>
                 </Box>
-
-                <Typography variant="h5" gutterBottom sx={{ fontWeight: 600, mb: 3 }}>고객 로그인</Typography>
 
                 {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
@@ -106,43 +144,10 @@ const CustomerLogin = () => {
                     >
                         {loading ? <CircularProgress size={24} sx={{ position: 'absolute' }} /> : '로그인'}
                     </Button>
-
-                    {/* 업체/맴버 토글 - 로그인 버튼 밑, 오른쪽 정렬 */}
-                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-                        <ToggleButtonGroup
-                            value="맴버"
-                            exclusive
-                            onChange={handleModeToggle}
-                            aria-label="로그인 타입 선택"
-                            size="small"
-                            sx={{
-                                '& .MuiToggleButton-root': {
-                                    px: 2,
-                                    py: 0.5,
-                                    fontWeight: 600,
-                                    fontSize: '0.85rem',
-                                    '&.Mui-selected': {
-                                        bgcolor: 'primary.main',
-                                        color: 'white',
-                                        '&:hover': {
-                                            bgcolor: 'primary.dark',
-                                        }
-                                    }
-                                }
-                            }}
-                        >
-                            <ToggleButton value="업체" aria-label="업체 로그인">
-                                업체
-                            </ToggleButton>
-                            <ToggleButton value="맴버" aria-label="맴버 로그인">
-                                맴버
-                            </ToggleButton>
-                        </ToggleButtonGroup>
-                    </Box>
                 </Box>
 
                 {/* 홍보문구 개선 */}
-                <Box sx={{ mt: 4, textAlign: 'center', p: 3, bgcolor: '#f8f9fa', borderRadius: 2 }}>
+                <Box sx={{ mt: 4, textAlign: 'left', p: 3, bgcolor: '#f8f9fa', borderRadius: 2 }}>
                     <Typography variant="h5" color="primary" sx={{ fontWeight: 700, mb: 1.5 }}>
                         투명한 정찰제 가격
                     </Typography>
@@ -155,18 +160,18 @@ const CustomerLogin = () => {
                         검증된 업체의 안정적인 서비스
                     </Typography>
                     <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid #e0e0e0' }}>
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5, textAlign: 'left' }}>
                             ✓ 임직원 30명 · 파트너점 480여 업체
                         </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5, textAlign: 'left' }}>
                             ✓ 16년 이상의 검증된 업력
                         </Typography>
-                        <Typography variant="body2" color="text.secondary">
+                        <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'left' }}>
                             ✓ 안정적인 재무 구조
                         </Typography>
                     </Box>
-                    <Typography variant="body1" color="primary" sx={{ fontWeight: 600, mt: 2 }}>
-                        휴대폰 구매, 브이아이피플러스와 함께하세요
+                    <Typography variant="body1" color="primary" sx={{ fontWeight: 600, mt: 2, textAlign: 'left' }}>
+                        휴대폰 구매! 앞으로는 브이아이피플러스와 함께하세요
                     </Typography>
                 </Box>
             </Paper>
