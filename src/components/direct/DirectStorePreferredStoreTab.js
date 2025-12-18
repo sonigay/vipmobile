@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
     Box, Typography, CircularProgress, Alert, Dialog, DialogTitle, DialogContent, 
-    DialogActions, TextField, Button, Grid, IconButton, Stack 
+    DialogActions, TextField, Button, Grid, IconButton, Stack, Paper, Table, 
+    TableBody, TableCell, TableContainer, TableHead, TableRow 
 } from '@mui/material';
-import { Close as CloseIcon, Save as SaveIcon, CloudUpload as CloudUploadIcon } from '@mui/icons-material';
+import { Close as CloseIcon, Save as SaveIcon, CloudUpload as CloudUploadIcon, Store as StoreIcon } from '@mui/icons-material';
 import Map from '../Map';
 import { fetchData, customerAPI } from '../../api';
 
@@ -264,6 +265,12 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false 
         }
     };
 
+    // stores는 이미 필터링되어 있으므로 그대로 사용
+    // Hook 규칙: useMemo는 early return 이전에 호출되어야 함
+    const filteredStores = useMemo(() => {
+        return stores;
+    }, [stores]);
+
     if (isLoading) {
         return (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
@@ -276,11 +283,6 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false 
         return <Alert severity="error">{error}</Alert>;
     }
 
-    // stores는 이미 필터링되어 있으므로 그대로 사용
-    const filteredStores = useMemo(() => {
-        return stores;
-    }, [stores]);
-
     return (
         <Box sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
             <Typography variant="h5" sx={{ mb: 2, fontWeight: 'bold' }}>
@@ -290,7 +292,7 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false 
                 지도에서 매장을 클릭하여 사전승낙서마크와 매장 사진을 관리할 수 있습니다.
             </Typography>
 
-            <Box sx={{ height: '500px', width: '100%', position: 'relative', borderRadius: 2, overflow: 'hidden', border: '1px solid #eee', flex: 1 }}>
+            <Box sx={{ height: '500px', width: '100%', position: 'relative', borderRadius: 2, overflow: 'hidden', border: '1px solid #eee', mb: 3 }}>
                 <Map
                     userLocation={userLocation}
                     filteredStores={filteredStores}
@@ -300,6 +302,64 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false 
                     isCustomerMode={false}
                     loggedInStore={loggedInStore}
                 />
+            </Box>
+
+            {/* 매장 정보 테이블 */}
+            <Box sx={{ mt: 3 }}>
+                <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <StoreIcon color="primary" />
+                    매장 목록
+                </Typography>
+                <TableContainer component={Paper} sx={{ boxShadow: 2 }}>
+                    <Table>
+                        <TableHead sx={{ bgcolor: '#f5f5f5' }}>
+                            <TableRow>
+                                <TableCell sx={{ fontWeight: 'bold' }}>업체명</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold' }}>전화</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold' }}>휴대폰</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold' }}>사업자번호</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold' }}>점장명</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold' }}>매장주소</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold' }} align="center">관리</TableCell>
+                            </TableRow>
+                        </TableHead>
+                        <TableBody>
+                            {filteredStores.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={7} align="center" sx={{ py: 3 }}>
+                                        <Typography variant="body2" color="text.secondary">
+                                            표시할 매장이 없습니다.
+                                        </Typography>
+                                    </TableCell>
+                                </TableRow>
+                            ) : (
+                                filteredStores.map((store) => (
+                                    <TableRow key={store.id || store.uniqueId} hover>
+                                        <TableCell sx={{ fontWeight: 'medium' }}>{store.name || '-'}</TableCell>
+                                        <TableCell>{store.phone || '-'}</TableCell>
+                                        <TableCell>{store.storePhone || '-'}</TableCell>
+                                        <TableCell>{store.businessNumber || '-'}</TableCell>
+                                        <TableCell>{store.managerName || store.manager || '-'}</TableCell>
+                                        <TableCell sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {store.address || '-'}
+                                        </TableCell>
+                                        <TableCell align="center">
+                                            <Button
+                                                variant="outlined"
+                                                color="primary"
+                                                size="small"
+                                                onClick={() => handleStoreSelect(store)}
+                                                sx={{ textTransform: 'none' }}
+                                            >
+                                                편집
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            )}
+                        </TableBody>
+                    </Table>
+                </TableContainer>
             </Box>
 
             {/* 편집 다이얼로그 */}
