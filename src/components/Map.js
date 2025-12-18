@@ -1015,13 +1015,21 @@ ${loggedInStore.name}으로 이동 예정입니다.
                       {/* 고객모드일 때는 매장 상세 정보 표시 */}
                       {isCustomerMode ? (
                         <div style={{ minWidth: '300px', maxWidth: '400px' }}>
-                          {/* 매장 기본 정보 */}
+                          {/* 매장 기본 정보 - 계획서에 따라 인덱스별 정보 표시 */}
                           <div style={{ marginBottom: '12px' }}>
+                            {/* 14번 인덱스: 업체명 */}
+                            <p style={{ margin: '0 0 8px 0', fontSize: '16px', fontWeight: 'bold', color: '#1976d2' }}><strong>업체명:</strong> {store.name}</p>
+                            {/* 19번 인덱스: 전화 */}
                             {store.phone && <p style={{ margin: '4px 0', fontSize: '14px' }}><strong>전화:</strong> {store.phone}</p>}
+                            {/* 22번 인덱스: 휴대폰 */}
                             {store.storePhone && <p style={{ margin: '4px 0', fontSize: '14px' }}><strong>휴대폰:</strong> {store.storePhone}</p>}
+                            {/* 28번 인덱스: 사업자번호 */}
                             {store.businessNumber && <p style={{ margin: '4px 0', fontSize: '14px' }}><strong>사업자번호:</strong> {store.businessNumber}</p>}
-                            {store.manager && <p style={{ margin: '4px 0', fontSize: '14px' }}><strong>점장명:</strong> {store.manager}</p>}
-                            {store.address && <p style={{ margin: '4px 0', fontSize: '14px' }}><strong>주소:</strong> {store.address}</p>}
+                            {/* 29번 인덱스: 점장명 */}
+                            {store.managerName && <p style={{ margin: '4px 0', fontSize: '14px' }}><strong>점장명:</strong> {store.managerName}</p>}
+                            {!store.managerName && store.manager && <p style={{ margin: '4px 0', fontSize: '14px' }}><strong>점장명:</strong> {store.manager}</p>}
+                            {/* 32번 인덱스: 매장주소 */}
+                            {store.address && <p style={{ margin: '4px 0', fontSize: '14px' }}><strong>매장주소:</strong> {store.address}</p>}
                           </div>
 
                           {/* 사전승낙서마크 표시 */}
@@ -1325,13 +1333,21 @@ ${loggedInStore.name}으로 이동 예정입니다.
                       {/* 고객모드일 때는 매장 상세 정보 표시 */}
                       {isCustomerMode ? (
                         <div style={{ minWidth: '300px', maxWidth: '400px' }}>
-                          {/* 매장 기본 정보 */}
+                          {/* 매장 기본 정보 - 계획서에 따라 인덱스별 정보 표시 */}
                           <div style={{ marginBottom: '12px' }}>
+                            {/* 14번 인덱스: 업체명 */}
+                            <p style={{ margin: '0 0 8px 0', fontSize: '16px', fontWeight: 'bold', color: '#1976d2' }}><strong>업체명:</strong> {store.name}</p>
+                            {/* 19번 인덱스: 전화 */}
                             {store.phone && <p style={{ margin: '4px 0', fontSize: '14px' }}><strong>전화:</strong> {store.phone}</p>}
+                            {/* 22번 인덱스: 휴대폰 */}
                             {store.storePhone && <p style={{ margin: '4px 0', fontSize: '14px' }}><strong>휴대폰:</strong> {store.storePhone}</p>}
+                            {/* 28번 인덱스: 사업자번호 */}
                             {store.businessNumber && <p style={{ margin: '4px 0', fontSize: '14px' }}><strong>사업자번호:</strong> {store.businessNumber}</p>}
-                            {store.manager && <p style={{ margin: '4px 0', fontSize: '14px' }}><strong>점장명:</strong> {store.manager}</p>}
-                            {store.address && <p style={{ margin: '4px 0', fontSize: '14px' }}><strong>주소:</strong> {store.address}</p>}
+                            {/* 29번 인덱스: 점장명 */}
+                            {store.managerName && <p style={{ margin: '4px 0', fontSize: '14px' }}><strong>점장명:</strong> {store.managerName}</p>}
+                            {!store.managerName && store.manager && <p style={{ margin: '4px 0', fontSize: '14px' }}><strong>점장명:</strong> {store.manager}</p>}
+                            {/* 32번 인덱스: 매장주소 */}
+                            {store.address && <p style={{ margin: '4px 0', fontSize: '14px' }}><strong>매장주소:</strong> {store.address}</p>}
                           </div>
 
                           {/* 사전승낙서마크 표시 */}

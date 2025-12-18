@@ -64,16 +64,16 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
     }, [stores]);
 
     const handleStoreSelect = async (store) => {
+        // 매장 정보를 localStorage에 저장 (계획서 요구사항)
+        localStorage.setItem('customer_selected_store', JSON.stringify(store));
         setSelectedStore(store);
 
+        // 계획서에 따라: 버튼 클릭 시 안내 페이지를 거쳐야 함
         if (!selectedProduct) {
-            alert('휴대폰시세표 탭을 통해 구입하실 휴대폰을 선택합니다.');
-            // Switch to model list tab logic should be handled by the parent
+            // 상품 미선택 상태: 안내 페이지 → 휴대폰시세표 탭으로 이동
             if (onStoreConfirm) onStoreConfirm('SELECT_PRODUCT', store);
-            return;
-        }
-
-        if (window.confirm(`[${store.name}] 매장을 선호매장으로 선택하시겠습니까?\n이제 개통정보 입력을 통해 구입을 예약해주세요.`)) {
+        } else {
+            // 상품 선택 완료 상태: 안내 페이지 → 개통정보 입력 페이지로 이동
             if (onStoreConfirm) onStoreConfirm('SELECT_ORDER_INFO', store);
         }
     };
