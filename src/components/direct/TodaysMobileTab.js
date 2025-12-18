@@ -22,6 +22,7 @@ import {
   ArrowBack as ArrowBackIcon
 } from '@mui/icons-material';
 import { directStoreApiClient } from '../../api/directStoreApiClient';
+import { directStoreApi } from '../../api/directStoreApi';
 import { LoadingState } from './common/LoadingState';
 import { ErrorState } from './common/ErrorState';
 import TodaysProductCard from './TodaysProductCard';
@@ -154,6 +155,46 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
         };
       });
 
+      // 필수 부가서비스 로드 (통신사별)
+      const requiredAddonsByCarrier = {};
+      const carriers = ['SK', 'KT', 'LG'];
+      
+      try {
+        const policyPromises = carriers.map(async (carrier) => {
+          try {
+            const policySettings = await directStoreApi.getPolicySettings(carrier);
+            if (policySettings.success && policySettings.addon?.list) {
+              // 미유치차감금액이 있는 부가서비스를 필수 부가서비스로 간주
+              const addonList = policySettings.addon.list
+                .filter(addon => addon.deduction > 0)
+                .map(addon => addon.name);
+              return { carrier, addons: addonList.join(', ') };
+            }
+            return { carrier, addons: '' };
+          } catch (err) {
+            console.warn(`[TodaysMobileTab] ${carrier} 정책 설정 로드 실패:`, err);
+            return { carrier, addons: '' };
+          }
+        });
+        
+        const policyResults = await Promise.all(policyPromises);
+        policyResults.forEach(({ carrier, addons }) => {
+          requiredAddonsByCarrier[carrier] = addons;
+        });
+      } catch (err) {
+        console.error('[TodaysMobileTab] 필수 부가서비스 로드 실패:', err);
+      }
+
+      // 각 상품에 필수 부가서비스 매핑
+      const allMobilesWithAddons = allMobiles.map(m => {
+        const carrierAddons = requiredAddonsByCarrier[m.carrier] || '';
+        return {
+          ...m,
+          addons: carrierAddons || m.requiredAddons || m.addons || '',
+          requiredAddons: carrierAddons || m.requiredAddons || m.addons || ''
+        };
+      });
+
       // 프리미엄/중저가/인기/추천 등으로 필터링
       /* 
          규칙: 
@@ -161,8 +202,8 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
          - Budget: isBudget === true
          (Note: API 응답에 isPremium, isBudget 필드가 포함되어 있어야 함)
       */
-      const premium = allMobiles.filter(m => m.isPremium);
-      const budget = allMobiles.filter(m => m.isBudget);
+      const premium = allMobilesWithAddons.filter(m => m.isPremium);
+      const budget = allMobilesWithAddons.filter(m => m.isBudget);
 
       setPremiumPhones(premium);
       setBudgetPhones(budget);
@@ -447,27 +488,64 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
         directStoreApiClient.getMobilesMaster('LG')
       ]);
 
+      // 필수 부가서비스 로드 (통신사별) - 슬라이드쇼용
+      const requiredAddonsByCarrier = {};
+      try {
+        const policyPromises = carriers.map(async (carrier) => {
+          try {
+            const policySettings = await directStoreApi.getPolicySettings(carrier);
+            if (policySettings.success && policySettings.addon?.list) {
+              // 미유치차감금액이 있는 부가서비스를 필수 부가서비스로 간주
+              const addonList = policySettings.addon.list
+                .filter(addon => addon.deduction > 0)
+                .map(addon => addon.name);
+              return { carrier, addons: addonList.join(', ') };
+            }
+            return { carrier, addons: '' };
+          } catch (err) {
+            console.warn(`[TodaysMobileTab] 슬라이드쇼 ${carrier} 정책 설정 로드 실패:`, err);
+            return { carrier, addons: '' };
+          }
+        });
+        
+        const policyResults = await Promise.all(policyPromises);
+        policyResults.forEach(({ carrier, addons }) => {
+          requiredAddonsByCarrier[carrier] = addons;
+        });
+      } catch (err) {
+        console.error('[TodaysMobileTab] 슬라이드쇼 필수 부가서비스 로드 실패:', err);
+      }
+
       // 🔥 핵심 수정: 슬라이드쇼 데이터 준비 시에도 imageUrl을 image로 매핑
-      // requiredAddons 필드도 제대로 전달되도록 확인
+      // requiredAddons 필드도 제대로 전달되도록 확인 (정책 설정에서 가져온 값 사용)
       const carrierMobiles = { 
-        'SK': skMobiles.map(m => ({ 
-          ...m, 
-          image: m.imageUrl || m.image,
-          addons: m.requiredAddons || m.addons || '',
-          requiredAddons: m.requiredAddons || m.addons || ''
-        })),
-        'KT': ktMobiles.map(m => ({ 
-          ...m, 
-          image: m.imageUrl || m.image,
-          addons: m.requiredAddons || m.addons || '',
-          requiredAddons: m.requiredAddons || m.addons || ''
-        })),
-        'LG': lgMobiles.map(m => ({ 
-          ...m, 
-          image: m.imageUrl || m.image,
-          addons: m.requiredAddons || m.addons || '',
-          requiredAddons: m.requiredAddons || m.addons || ''
-        }))
+        'SK': skMobiles.map(m => {
+          const carrierAddons = requiredAddonsByCarrier['SK'] || '';
+          return {
+            ...m, 
+            image: m.imageUrl || m.image,
+            addons: carrierAddons || m.requiredAddons || m.addons || '',
+            requiredAddons: carrierAddons || m.requiredAddons || m.addons || ''
+          };
+        }),
+        'KT': ktMobiles.map(m => {
+          const carrierAddons = requiredAddonsByCarrier['KT'] || '';
+          return {
+            ...m, 
+            image: m.imageUrl || m.image,
+            addons: carrierAddons || m.requiredAddons || m.addons || '',
+            requiredAddons: carrierAddons || m.requiredAddons || m.addons || ''
+          };
+        }),
+        'LG': lgMobiles.map(m => {
+          const carrierAddons = requiredAddonsByCarrier['LG'] || '';
+          return {
+            ...m, 
+            image: m.imageUrl || m.image,
+            addons: carrierAddons || m.requiredAddons || m.addons || '',
+            requiredAddons: carrierAddons || m.requiredAddons || m.addons || ''
+          };
+        })
       };
 
       for (const carrier of carriers) {
@@ -727,8 +805,18 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
           top: 0, left: 0, right: 0, bottom: 0,
           bgcolor: 'background.default',
           zIndex: 1300,
-          p: 2
+          p: 2,
+          display: 'flex',
+          flexDirection: 'column'
         }}>
+          {/* 메인 헤더 문구 (슬라이드쇼 모드에도 표시) */}
+          {mainHeaderText && (
+            <Box sx={{ mb: 2, p: 2, borderRadius: 2, bgcolor: 'primary.main', color: 'white', textAlign: 'center', flexShrink: 0 }}>
+              <Typography variant="h6" fontWeight="bold">{mainHeaderText}</Typography>
+            </Box>
+          )}
+          
+          <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
           {isTransitionPage && transitionPageData ? (
             // 연결 페이지
             <Box sx={{
@@ -776,6 +864,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
               슬라이드쇼 종료
             </Button>
           </Box>
+          </Box>
         </Box>
       ) : (
         // === 일반 그리드 모드 ===
@@ -790,6 +879,13 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
           {/* 모든 체크 상품 미리보기 */}
           {slideshowData.length > 0 && (
             <Box sx={{ mt: 4, pt: 2, borderTop: 1, borderColor: 'divider' }}>
+              {/* 메인 헤더 문구 (미리보기 섹션에도 표시) */}
+              {mainHeaderText && (
+                <Box sx={{ mb: 3, p: 2, borderRadius: 2, bgcolor: 'primary.main', color: 'white', textAlign: 'center' }}>
+                  <Typography variant="h6" fontWeight="bold">{mainHeaderText}</Typography>
+                </Box>
+              )}
+              
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                 <Typography variant="h6">모든 체크 상품 미리보기 ({slideshowData.length} 슬라이드)</Typography>
                 <Box>
