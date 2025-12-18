@@ -292,7 +292,21 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false 
                 지도에서 매장을 클릭하여 사전승낙서마크와 매장 사진을 관리할 수 있습니다.
             </Typography>
 
-            <Box sx={{ height: '500px', width: '100%', position: 'relative', borderRadius: 2, overflow: 'hidden', border: '1px solid #eee', mb: 3, flexShrink: 0 }}>
+            <Box sx={{ 
+                height: '500px', 
+                width: '100%', 
+                position: 'relative', 
+                borderRadius: 2, 
+                overflow: 'hidden', 
+                border: '1px solid #eee', 
+                mb: 3, 
+                flexShrink: 0,
+                '& .leaflet-container': {
+                    height: '100%',
+                    width: '100%',
+                    minHeight: '500px'
+                }
+            }}>
                 <Map
                     userLocation={userLocation}
                     filteredStores={filteredStores}
