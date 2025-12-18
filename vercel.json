@@ -1,9 +1,7 @@
 {
   "buildCommand": "npm run build:ultra-fast",
   "outputDirectory": "build",
-  "installCommand": "npm install --legacy-peer-deps",
   "framework": "create-react-app",
-  "nodeVersion": "18.x",
   "env": {
     "REACT_APP_API_URL": "https://vipmobile-backend.cloudtype.app",
     "REACT_APP_LOGGING_ENABLED": "true",
