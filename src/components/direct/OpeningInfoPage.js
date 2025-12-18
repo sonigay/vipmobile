@@ -43,7 +43,15 @@ import { debugLog } from '../../utils/debugLogger';
 import OpeningInfoFormSection from './OpeningInfoFormSection';
 import ContractInfoFormSection from './ContractInfoFormSection';
 
-const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
+const OpeningInfoPage = ({ 
+    initialData, 
+    onBack, 
+    loggedInStore,
+    mode = 'directStore', // 'customer' | 'directStore' | 'management'
+    customerInfo = null, // 고객모드일 때 로그인한 고객 정보
+    selectedStore = null, // 고객모드일 때 선택한 매장 정보
+    saveToSheet = 'salesReport' // 'purchaseQueue' | 'salesReport'
+}) => {
     const [selectedCarrier, setSelectedCarrier] = useState(initialData?.carrier || 'SK');
     const theme = CARRIER_THEMES[selectedCarrier] || CARRIER_THEMES['SK'];
     const [isSaving, setIsSaving] = useState(false);
@@ -55,6 +63,7 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
     const [insuranceIncentiveList, setInsuranceIncentiveList] = useState([]); // 부가유치 시 유치되는 보험상품 목록
     const [agreementChecked, setAgreementChecked] = useState(false); // 동의 체크박스 상태
     const [baseMargin, setBaseMargin] = useState(0); // 정책설정에서 가져온 기본 마진
+    const [preApprovalMark, setPreApprovalMark] = useState(null); // 사전승낙서 마크
 
     // 단말/지원금 기본값 정리 (휴대폰목록/오늘의휴대폰에서 전달된 데이터 사용)
     const factoryPrice = initialData?.factoryPrice || 0;
@@ -263,6 +272,27 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
         loadRequiredAddons();
     }, [selectedCarrier, factoryPrice]);
 
+    // 사전승낙서 마크 로드
+    useEffect(() => {
+        const loadPreApprovalMark = async () => {
+            const currentStore = mode === 'customer' ? selectedStore : loggedInStore;
+            if (!currentStore?.name) {
+                setPreApprovalMark(null);
+                return;
+            }
+
+            try {
+                const { customerAPI } = await import('../../api');
+                const mark = await customerAPI.getPreApprovalMark(currentStore.name);
+                setPreApprovalMark(mark?.url || null);
+            } catch (error) {
+                console.error('사전승낙서 마크 로드 실패:', error);
+                setPreApprovalMark(null);
+            }
+        };
+        loadPreApprovalMark();
+    }, [mode, selectedStore, loggedInStore]);
+
     // initialData에서 planGroup과 openingType이 전달된 경우 대리점지원금 자동 계산 (마스터 데이터 사용)
     useEffect(() => {
         const calculateInitialPrice = async () => {
@@ -374,13 +404,16 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                 return;
             }
 
-            // 판매일보 시트 구조에 맞는 데이터 구성
+            // 현재 매장 정보 결정 (고객모드 vs 직영점모드)
+            const currentStore = mode === 'customer' ? selectedStore : loggedInStore;
+
+            // 판매일보/구매대기 시트 구조에 맞는 데이터 구성
             const saveData = {
                 // 기본 정보
-                posCode: formData.posCode || '',
-                company: loggedInStore?.name || '',
-                storeName: loggedInStore?.name || '',
-                storeId: loggedInStore?.id || '',
+                posCode: formData.posCode || currentStore?.id || '',
+                company: currentStore?.name || '',
+                storeName: currentStore?.name || '',
+                storeId: currentStore?.id || '',
                 soldAt: new Date().toISOString(),
                 customerName: formData.customerName,
                 customerContact: formData.customerContact, // CTN (연락처)
@@ -433,10 +466,67 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
 
             console.log('저장할 데이터:', saveData);
 
-            // API 호출
-            await directStoreApiClient.createSalesReport(saveData);
-
-            alert('개통 정보가 저장되었습니다.');
+            // 저장 대상에 따라 다른 API 호출
+            if (saveToSheet === 'purchaseQueue') {
+                // 구매대기 시트에 저장 (고객모드)
+                // 개통유형 변환 (NEW/MNP/CHANGE -> 신규/번호이동/기기변경)
+                const openingTypeMap = {
+                    'NEW': '신규',
+                    'MNP': '번호이동',
+                    'CHANGE': '기기변경'
+                };
+                const activationType = openingTypeMap[formData.openingType] || '신규';
+                
+                const purchaseQueueData = {
+                    ctn: customerInfo?.ctn || formData.customerContact,
+                    name: customerInfo?.name || formData.customerName,
+                    carrier: selectedCarrier,
+                    model: initialData?.model || '',
+                    color: formData.deviceColor || '',
+                    deviceSerial: formData.deviceSerial || '',
+                    usimModel: formData.simModel || '',
+                    usimSerial: formData.simSerial || '',
+                    activationType: activationType,
+                    oldCarrier: formData.openingType === 'MNP' ? (formData.prevCarrier || '') : '',
+                    installmentType: formData.paymentType === 'installment' ? '할부' : formData.paymentType === 'cash' ? '현금' : '',
+                    installmentMonths: formData.installmentPeriod || 24,
+                    contractType: formData.contractType === 'selected' ? '선택약정' : '일반약정',
+                    plan: formData.plan || '',
+                    additionalServices: requiredAddons.map(a => a.name).join(', ') || '',
+                    factoryPrice: factoryPrice || 0,
+                    carrierSupport: formData.usePublicSupport ? publicSupport : 0,
+                    dealerSupportWithAdd: formData.withAddon ? storeSupportWithAddon : 0,
+                    dealerSupportWithoutAdd: !formData.withAddon ? storeSupportWithoutAddon : 0,
+                    // 선택매장 정보 추가
+                    storeName: currentStore?.name || '',
+                    storePhone: currentStore?.phone || currentStore?.storePhone || '',
+                    storeAddress: currentStore?.address || '',
+                    storeBankInfo: currentStore?.accountInfo || ''
+                };
+                
+                const { customerAPI } = await import('../../api');
+                
+                // 수정 모드인지 확인 (initialData에 id가 있으면 수정 모드)
+                if (initialData?.id) {
+                    await customerAPI.updatePurchaseQueue(initialData.id, purchaseQueueData);
+                    alert('구매 대기가 수정되었습니다.');
+                } else {
+                    await customerAPI.addToPurchaseQueue(purchaseQueueData);
+                    alert('구매 대기가 등록되었습니다.');
+                }
+            } else {
+                // 판매일보 시트에 저장 (직영점모드)
+                // 수정 모드인지 확인
+                if (initialData?.id || initialData?.번호) {
+                    const rowId = initialData.id || initialData.번호;
+                    await directStoreApiClient.updateSalesReport(rowId, saveData);
+                    alert('개통 정보가 수정되었습니다.');
+                } else {
+                    await directStoreApiClient.createSalesReport(saveData);
+                    alert('개통 정보가 저장되었습니다.');
+                }
+            }
+            
             if (onBack) onBack();
         } catch (error) {
             console.error('저장 실패:', error);
@@ -596,6 +686,17 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                     <Typography variant="body2" color="text.secondary">
                         • 부가서비스는 93일 유지조건
                     </Typography>
+                    {/* 고객모드 전용 안내문구 */}
+                    {mode === 'customer' && (
+                        <>
+                            <Typography variant="body2" color="error" sx={{ fontWeight: 600, mt: 1 }}>
+                                • 대기자가 많을수 있으니 빠른 개통업무를 위해 입력된정보를 인쇄해서 방문해주세요
+                            </Typography>
+                            <Typography variant="body2" color="error" sx={{ fontWeight: 600 }}>
+                                • 휴대폰정책상 매일 매시간 정책변동이 있을수 있어 개통방문시 개통순간 가격을 확인해주세요
+                            </Typography>
+                        </>
+                    )}
                     <FormControlLabel
                         control={
                             <Checkbox
@@ -631,6 +732,39 @@ const OpeningInfoPage = ({ initialData, onBack, loggedInStore }) => {
                 <Grid container spacing={1}>
                     {/* 왼쪽: 통신사 정보, 가입 정보, 약정 및 할부 정보, 요금정보, 금액종합안내 */}
                     <Grid item xs={12} md={6}>
+                        {/* 매장 정보 표시 (고객모드/직영점모드 공통) */}
+                        {(mode === 'customer' ? selectedStore : loggedInStore) && (
+                            <Paper sx={{ p: 1.5, mb: 1.5, borderTop: `3px solid ${theme.primary}`, bgcolor: theme.bg }}>
+                                <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold', color: theme.primary }}>
+                                    매장 정보
+                                </Typography>
+                                <Stack spacing={1}>
+                                    <Typography variant="body2">
+                                        <strong>업체명:</strong> {(mode === 'customer' ? selectedStore : loggedInStore)?.name || ''}
+                                    </Typography>
+                                    <Typography variant="body2">
+                                        <strong>연락처:</strong> {(mode === 'customer' ? selectedStore : loggedInStore)?.phone || (mode === 'customer' ? selectedStore : loggedInStore)?.storePhone || ''}
+                                    </Typography>
+                                    <Typography variant="body2">
+                                        <strong>주소:</strong> {(mode === 'customer' ? selectedStore : loggedInStore)?.address || ''}
+                                    </Typography>
+                                    {(mode === 'customer' ? selectedStore : loggedInStore)?.accountInfo && (
+                                        <Typography variant="body2">
+                                            <strong>계좌정보:</strong> {(mode === 'customer' ? selectedStore : loggedInStore)?.accountInfo}
+                                        </Typography>
+                                    )}
+                                    {preApprovalMark && (
+                                        <Box sx={{ mt: 1 }}>
+                                            <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 'bold' }}>
+                                                사전승낙서 마크:
+                                            </Typography>
+                                            <Box dangerouslySetInnerHTML={{ __html: preApprovalMark }} />
+                                        </Box>
+                                    )}
+                                </Stack>
+                            </Paper>
+                        )}
+
                         {/* 통신사 정보 박스 */}
                         <Paper sx={{ p: 1.5, mb: 1.5, borderTop: `3px solid ${theme.primary}`, bgcolor: theme.bg }}>
                             <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold', color: theme.primary, '@media print': { display: 'inline', mr: 2, mb: 0 } }}>

@@ -21,7 +21,9 @@ import {
   Link as LinkIcon,
   Assessment as AssessmentIcon,
   TextFields as TextFieldsIcon,
-  Build as BuildIcon
+  Build as BuildIcon,
+  Assignment as AssignmentIcon,
+  Store as StoreIcon
 } from '@mui/icons-material';
 
 import { getModeColor, getModeTitle } from '../config/modeConfig';
@@ -37,6 +39,8 @@ const LinkSettingsTab = lazy(() => import('./direct/management/LinkSettingsTab')
 const MainPageTextSettingsTab = lazy(() => import('./direct/management/MainPageTextSettingsTab'));
 const DirectSalesReportTab = lazy(() => import('./direct/DirectSalesReportTab'));
 const OpeningInfoPage = lazy(() => import('./direct/OpeningInfoPage'));
+const CustomerQueueManagementTab = lazy(() => import('./direct/management/CustomerQueueManagementTab'));
+const DirectStorePreferredStoreTab = lazy(() => import('./direct/DirectStorePreferredStoreTab'));
 
 const DirectStoreManagementMode = ({
   loggedInStore,
@@ -107,6 +111,12 @@ const DirectStoreManagementMode = ({
           loggedInStore: loggedInStore,
           isManagementMode: true
         }
+      });
+      tabs.push({
+        key: 'customerQueue',
+        label: '고객 구매 대기',
+        icon: <AssignmentIcon />,
+        componentName: 'CustomerQueueManagementTab'
       });
     }
     return tabs;
@@ -248,6 +258,10 @@ const DirectStoreManagementMode = ({
                   Component = MainPageTextSettingsTab;
                 } else if (tab.componentName === 'DirectSalesReportTab') {
                   Component = DirectSalesReportTab;
+                } else if (tab.componentName === 'CustomerQueueManagementTab') {
+                  Component = CustomerQueueManagementTab;
+                } else if (tab.componentName === 'DirectStorePreferredStoreTab') {
+                  Component = DirectStorePreferredStoreTab;
                 }
 
                 return (

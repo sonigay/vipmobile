@@ -2,6 +2,8 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
+const fs = require('fs');
+const path = require('path');
 const { google } = require('googleapis');
 const NodeGeocoder = require('node-geocoder');
 const webpush = require('web-push');
@@ -848,6 +850,15 @@ const SUBSCRIBER_INCREASE_SHEET_NAME = '가입자증감';  // 가입자증감 �
 // 월간시상 관련 시트 이름 추가
 const PHONEKL_HOME_DATA_SHEET_NAME = '폰클홈데이터';  // 폰클홈데이터 시트
 const MONTHLY_AWARD_SETTINGS_SHEET_NAME = '장표모드셋팅메뉴';  // 월간시상 셋팅 메뉴 시트
+const CUSTOMER_QUEUE_SHEET_NAME = '직영점_구매대기';
+const CUSTOMER_PRE_APPROVAL_SHEET_NAME = '직영점_사전승낙서마크';
+const CUSTOMER_STORE_PHOTO_SHEET_NAME = '직영점_매장사진';
+const CUSTOMER_QUEUE_HEADERS = [
+  '번호', '고객CTN', '고객명', '통신사', '단말기모델명', '색상', '단말일련번호', '유심모델명', '유심일련번호', '개통유형',
+  '전통신사', '할부구분', '할부개월', '약정', '요금제', '부가서비스', '출고가', '이통사지원금', '대리점추가지원금(부가유치)',
+  '대리점추가지원금(부가미유치)', '선택매장업체명', '선택매장전화', '선택매장주소', '선택매장계좌정보', '등록일시', '상태',
+  '처리매장업체명', '처리일시'
+];
 
 // 사용자 권한 조회 함수
 async function getUserRole(userId) {
@@ -957,7 +968,10 @@ const geocoder = {
 const auth = new google.auth.JWT({
   email: GOOGLE_SERVICE_ACCOUNT_EMAIL,
   key: GOOGLE_PRIVATE_KEY.includes('\\n') ? GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n') : GOOGLE_PRIVATE_KEY,
-  scopes: ['https://www.googleapis.com/auth/spreadsheets']
+  scopes: [
+    'https://www.googleapis.com/auth/spreadsheets',
+    'https://www.googleapis.com/auth/drive.file' // Google Drive 파일 업로드 권한
+  ]
 });
 
 // 원본 Google Sheets API 초기화 (타임아웃 설정 포함)
@@ -966,6 +980,9 @@ const originalSheets = google.sheets({
   auth,
   timeout: 60000 // 60초 타임아웃
 });
+
+// Google Drive API 클라이언트 생성
+const drive = google.drive({ version: 'v3', auth });
 
 // UserSheetManager 및 PhoneklDataManager 인스턴스 생성
 const userSheetManager = new UserSheetManager(originalSheets, SPREADSHEET_ID);
@@ -2029,16 +2046,23 @@ app.get('/api/stores', async (req, res) => {
           return null;
         }
 
-        // 모든 매장(사무실 포함)은 원래 이름 그대로 유지
         const inventory = inventoryMap[name] || {};
+        const vipStatus = (row[18] || '').toString().trim(); // S열: 구분 (18번째 컬럼)
+        const businessNumber = (row[28] || '').toString().trim(); // AC열: 사업자번호 (28번째 컬럼)
+        const managerName = (row[29] || '').toString().trim(); // AD열: 점장명 (29번째 컬럼)
+        const accountInfo = (row[35] || '').toString().trim(); // AJ열: 계좌정보 (35번째 컬럼)
 
         return {
           id: storeId.toString(),
-          name: name, // 원래 이름 그대로 사용
+          name: name,
           address,
           phone,
           storePhone,
-          manager,
+          manager, // 기존 담당자 필드 유지
+          managerName, // 점장명 추가
+          businessNumber,
+          accountInfo,
+          vipStatus,
           latitude,
           longitude,
           uniqueId: `${storeId}_${name}`,
@@ -3477,6 +3501,782 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
+// 고객 로그인 API 추가
+app.post('/api/member/login', async (req, res) => {
+  try {
+    const { ctn, password } = req.body;
+
+    if (!ctn || !password) {
+      return res.status(400).json({
+        success: false,
+        error: '전화번호와 비밀번호를 입력해주세요.'
+      });
+    }
+
+    // 하이픈 제거된 CTN
+    const cleanCtn = ctn.replace(/[^0-9]/g, '');
+
+    // 판매일보 데이터 조회
+    const response = await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '직영점_판매일보!A:Z'
+      })
+    );
+
+    const values = response.data.values || [];
+    if (values.length <= 1) {
+      return res.status(401).json({
+        success: false,
+        error: '일치하는 가입 정보를 찾을 수 없습니다.'
+      });
+    }
+
+    // 헤더 행 제외
+    const rows = values.slice(1);
+
+    // CTN 기준 검색 (가장 최근 데이터 우선)
+    // row[6]이 CTN 컬럼 (G열)
+    const recentRows = [...rows].reverse();
+    const customerRow = recentRows.find(row => {
+      const rowCtn = (row[6] || '').replace(/[^0-9]/g, '');
+      return rowCtn === cleanCtn;
+    });
+
+    if (!customerRow) {
+      return res.status(401).json({
+        success: false,
+        error: '일치하는 가입 정보를 찾을 수 없습니다.'
+      });
+    }
+
+    // 비밀번호 검증 (010 다음 4자리)
+    // 010-1234-5678 -> 1234
+    let expectedPassword = '';
+    if (cleanCtn.startsWith('010') && cleanCtn.length >= 7) {
+      expectedPassword = cleanCtn.substring(3, 7);
+    } else if (cleanCtn.length >= 4) {
+      // 010이 아닌 경우 첫 4자리를 사용
+      expectedPassword = cleanCtn.substring(0, 4);
+    }
+
+    if (password !== expectedPassword) {
+      return res.status(401).json({
+        success: false,
+        error: '비밀번호가 일치하지 않습니다.'
+      });
+    }
+
+    // 로그인 성공 - 최근 개통 정보 반환
+    const customerInfo = {
+      id: customerRow[0],       // 번호
+      posCode: customerRow[1],  // POS코드
+      storeName: customerRow[2] || customerRow[1], // 업체명
+      storeId: customerRow[3],  // 매장ID
+      soldAt: customerRow[4],   // 판매일시
+      name: customerRow[5],     // 고객명
+      ctn: customerRow[6],      // CTN
+      carrier: customerRow[7],  // 통신사
+      model: customerRow[8],    // 단말기모델명
+      status: customerRow[25] || '개통완료' // 상태
+    };
+
+    res.json({
+      success: true,
+      customer: customerInfo
+    });
+
+  } catch (error) {
+    console.error('고객 로그인 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: '로그인 도중 오류가 발생했습니다.'
+    });
+  }
+});
+
+// GET /api/member/queue/all: 모든 고객 구매 대기 목록 조회 (관리자용 또는 POS코드 필터링)
+app.get('/api/member/queue/all', async (req, res) => {
+  const { posCode } = req.query; // POS코드 필터링 (직영점모드용)
+  
+  try {
+    const response = await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${CUSTOMER_QUEUE_SHEET_NAME}!A:AB`
+      })
+    );
+
+    const values = response.data.values || [];
+    if (values.length <= 1) return res.json([]);
+
+    const rows = values.slice(1);
+    
+    // POS코드 필터링이 필요한 경우, 폰클출고처데이터에서 매장명->POS코드 매핑 생성
+    let storeNameToPosCodeMap = null;
+    if (posCode) {
+      try {
+        const storeDataResponse = await rateLimitedSheetsCall(() =>
+          sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: '폰클출고처데이터!A:AM'
+          })
+        );
+        const storeData = storeDataResponse.data.values || [];
+        storeNameToPosCodeMap = new Map();
+        if (storeData && storeData.length > 1) {
+          storeData.slice(1).forEach(row => {
+            if (row && row.length > 15) {
+              const storeName = (row[14] || '').toString().trim(); // 14번 인덱스: 업체명
+              const storePosCode = (row[15] || '').toString().trim(); // 15번 인덱스: POS코드
+              if (storeName && storePosCode) {
+                storeNameToPosCodeMap.set(storeName, storePosCode);
+              }
+            }
+          });
+        }
+      } catch (err) {
+        console.error('폰클출고처데이터 조회 오류:', err);
+      }
+    }
+    
+    let filteredRows = rows;
+    if (posCode && storeNameToPosCodeMap) {
+      // 선택매장업체명(storeName)으로 POS코드를 찾아서 필터링
+      filteredRows = rows.filter(row => {
+        const storeName = (row[20] || '').toString().trim(); // U열: 선택매장업체명
+        const itemPosCode = storeNameToPosCodeMap.get(storeName);
+        return itemPosCode === posCode;
+      });
+    }
+    
+    const queue = filteredRows.map(row => ({
+      id: row[0],
+      ctn: row[1],
+      name: row[2],
+      carrier: row[3],
+      model: row[4],
+      color: row[5],
+      deviceSerial: row[6],
+      usimModel: row[7],
+      usimSerial: row[8],
+      activationType: row[9],
+      oldCarrier: row[10],
+      installmentType: row[11],
+      installmentMonths: row[12],
+      contractType: row[13],
+      plan: row[14],
+      additionalServices: row[15],
+      factoryPrice: row[16],
+      carrierSupport: row[17],
+      dealerSupportWithAdd: row[18],
+      dealerSupportWithoutAdd: row[19],
+      storeName: row[20],
+      storePhone: row[21],
+      storeAddress: row[22],
+      storeBankInfo: row[23],
+      createdAt: row[24],
+      status: row[25],
+      processedBy: row[26],
+      processedAt: row[27]
+    }));
+
+    // 최신순 정렬
+    queue.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+    res.json(queue);
+  } catch (error) {
+    console.error('전체 구매 대기 목록 조회 오류:', error);
+    res.status(500).json({ error: '목록을 불러오는데 실패했습니다.' });
+  }
+});
+
+// GET /api/member/queue: 고객 구매 대기 목록 조회
+app.get('/api/member/queue', async (req, res) => {
+  const { ctn } = req.query;
+  if (!ctn) return res.status(400).json({ error: 'CTN이 필요합니다.' });
+
+  try {
+    // 하이픈 제거된 CTN
+    const cleanCtn = ctn.replace(/[^0-9]/g, '');
+
+    const response = await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${CUSTOMER_QUEUE_SHEET_NAME}!A:AB`
+      })
+    );
+
+    const values = response.data.values || [];
+    if (values.length <= 1) return res.json([]);
+
+    const rows = values.slice(1);
+    const queue = rows
+      .filter(row => {
+        const rowCtn = (row[1] || '').replace(/[^0-9]/g, '');
+        return rowCtn === cleanCtn;
+      })
+      .map(row => ({
+        id: row[0],
+        ctn: row[1],
+        name: row[2],
+        carrier: row[3],
+        model: row[4],
+        color: row[5],
+        deviceSerial: row[6],
+        usimModel: row[7],
+        usimSerial: row[8],
+        activationType: row[9],
+        oldCarrier: row[10],
+        installmentType: row[11],
+        installmentMonths: row[12],
+        contractType: row[13],
+        plan: row[14],
+        additionalServices: row[15],
+        factoryPrice: row[16],
+        carrierSupport: row[17],
+        dealerSupportWithAdd: row[18],
+        dealerSupportWithoutAdd: row[19],
+        storeName: row[20],
+        storePhone: row[21],
+        storeAddress: row[22],
+        storeBankInfo: row[23],
+        createdAt: row[24],
+        status: row[25],
+        processedBy: row[26],
+        processedAt: row[27]
+      }));
+
+    res.json(queue);
+  } catch (error) {
+    console.error('구매 대기 목록 조회 오류:', error);
+    res.status(500).json({ error: '목록을 불러오는데 실패했습니다.' });
+  }
+});
+
+// POST /api/member/queue: 구매 대기 등록
+app.post('/api/member/queue', async (req, res) => {
+  const data = req.body;
+
+  try {
+    // 시트 존재 및 헤더 확인
+    const checkResponse = await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${CUSTOMER_QUEUE_SHEET_NAME}!A1:AB1`
+      })
+    ).catch(() => null);
+
+    if (!checkResponse || !checkResponse.data.values) {
+      await rateLimitedSheetsCall(() =>
+        sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${CUSTOMER_QUEUE_SHEET_NAME}!A1:AB1`,
+          valueInputOption: 'RAW',
+          resource: { values: [CUSTOMER_QUEUE_HEADERS] }
+        })
+      );
+    }
+
+    const id = `pending-${Date.now()}`;
+    const createdAt = new Date().toISOString().replace('T', ' ').substring(0, 19);
+
+    // 헤더 순서에 맞춰 데이터 배열 생성
+    const newRow = new Array(28).fill('');
+    newRow[0] = id;
+    newRow[1] = data.ctn || '';
+    newRow[2] = data.name || '';
+    newRow[3] = data.carrier || '';
+    newRow[4] = data.model || '';
+    newRow[5] = data.color || '';
+    newRow[6] = data.deviceSerial || '';
+    newRow[7] = data.usimModel || '';
+    newRow[8] = data.usimSerial || '';
+    newRow[9] = data.activationType || '';
+    newRow[10] = data.oldCarrier || '';
+    newRow[11] = data.installmentType || '';
+    newRow[12] = data.installmentMonths || '';
+    newRow[13] = data.contractType || '';
+    newRow[14] = data.plan || '';
+    newRow[15] = data.additionalServices || '';
+    newRow[16] = data.factoryPrice || '';
+    newRow[17] = data.carrierSupport || '';
+    newRow[18] = data.dealerSupportWithAdd || '';
+    newRow[19] = data.dealerSupportWithoutAdd || '';
+    newRow[20] = data.storeName || '';
+    newRow[21] = data.storePhone || '';
+    newRow[22] = data.storeAddress || '';
+    newRow[23] = data.storeBankInfo || '';
+    newRow[24] = createdAt;
+    newRow[25] = '구매대기';
+
+    await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.append({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${CUSTOMER_QUEUE_SHEET_NAME}!A:AB`,
+        valueInputOption: 'USER_ENTERED',
+        resource: { values: [newRow] }
+      })
+    );
+
+    res.json({ success: true, id });
+  } catch (error) {
+    console.error('구매 대기 등록 오류:', error);
+    res.status(500).json({ error: '등록에 실패했습니다.' });
+  }
+});
+
+// PUT /api/member/queue/:id: 구매 대기 수정
+app.put('/api/member/queue/:id', async (req, res) => {
+  const { id } = req.params;
+  const data = req.body;
+
+  try {
+    const response = await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${CUSTOMER_QUEUE_SHEET_NAME}!A:AB`
+      })
+    );
+
+    const values = response.data.values || [];
+    const rowIndex = values.findIndex(row => row[0] === id);
+
+    if (rowIndex === -1) return res.status(404).json({ error: '대상을 찾을 수 없습니다.' });
+
+    const updatedRow = [...values[rowIndex]];
+    // 매핑된 필드 업데이트
+    if (data.name !== undefined) updatedRow[2] = data.name;
+    if (data.carrier !== undefined) updatedRow[3] = data.carrier;
+    if (data.model !== undefined) updatedRow[4] = data.model;
+    if (data.color !== undefined) updatedRow[5] = data.color;
+    if (data.deviceSerial !== undefined) updatedRow[6] = data.deviceSerial;
+    if (data.usimModel !== undefined) updatedRow[7] = data.usimModel;
+    if (data.usimSerial !== undefined) updatedRow[8] = data.usimSerial;
+    if (data.activationType !== undefined) updatedRow[9] = data.activationType;
+    if (data.oldCarrier !== undefined) updatedRow[10] = data.oldCarrier;
+    if (data.installmentType !== undefined) updatedRow[11] = data.installmentType;
+    if (data.installmentMonths !== undefined) updatedRow[12] = data.installmentMonths;
+    if (data.contractType !== undefined) updatedRow[13] = data.contractType;
+    if (data.plan !== undefined) updatedRow[14] = data.plan;
+    if (data.additionalServices !== undefined) updatedRow[15] = data.additionalServices;
+    if (data.factoryPrice !== undefined) updatedRow[16] = data.factoryPrice;
+    if (data.carrierSupport !== undefined) updatedRow[17] = data.carrierSupport;
+    if (data.dealerSupportWithAdd !== undefined) updatedRow[18] = data.dealerSupportWithAdd;
+    if (data.dealerSupportWithoutAdd !== undefined) updatedRow[19] = data.dealerSupportWithoutAdd;
+    if (data.storeName !== undefined) updatedRow[20] = data.storeName;
+    if (data.storePhone !== undefined) updatedRow[21] = data.storePhone;
+    if (data.storeAddress !== undefined) updatedRow[22] = data.storeAddress;
+    if (data.storeBankInfo !== undefined) updatedRow[23] = data.storeBankInfo;
+    if (data.status !== undefined) updatedRow[25] = data.status;
+    if (data.processedBy !== undefined) updatedRow[26] = data.processedBy;
+    if (data.processedAt !== undefined) updatedRow[27] = data.processedAt;
+
+    await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${CUSTOMER_QUEUE_SHEET_NAME}!A${rowIndex + 1}:AB${rowIndex + 1}`,
+        valueInputOption: 'USER_ENTERED',
+        resource: { values: [updatedRow] }
+      })
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('구매 대기 수정 오류:', error);
+    res.status(500).json({ error: '수정에 실패했습니다.' });
+  }
+});
+
+// DELETE /api/member/queue/:id: 구매 대기 삭제
+app.delete('/api/member/queue/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const response = await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${CUSTOMER_QUEUE_SHEET_NAME}!A:AB`
+      })
+    );
+
+    const values = response.data.values || [];
+    const rowIndex = values.findIndex(row => row[0] === id);
+
+    if (rowIndex === -1) return res.status(404).json({ error: '대상을 찾을 수 없습니다.' });
+
+    // 상태를 '삭제됨'으로 변경 (Z열 = 25번 인덱스 = 상태)
+    await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${CUSTOMER_QUEUE_SHEET_NAME}!Z${rowIndex + 1}`,
+        valueInputOption: 'RAW',
+        resource: { values: [['삭제됨']] }
+      })
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('구매 대기 삭제 오류:', error);
+    res.status(500).json({ error: '삭제에 실패했습니다.' });
+  }
+});
+// 중복 제거됨 - 위의 getAllQueue API 사용
+
+// GET /api/direct/pre-approval-mark/:storeName: 사전승낙서마크 조회
+app.get('/api/direct/pre-approval-mark/:storeName', async (req, res) => {
+  const { storeName } = req.params;
+  try {
+    const values = await getSheetValues(CUSTOMER_PRE_APPROVAL_SHEET_NAME);
+    if (!values || values.length <= 1) return res.json({ url: '' });
+
+    const rows = values.slice(1);
+    const mark = rows.find(row => row[0] === storeName);
+    res.json({ url: mark ? mark[1] : '' });
+  } catch (error) {
+    console.error('사전승낙서마크 조회 오류:', error);
+    res.status(500).json({ error: '조회에 실패했습니다.' });
+  }
+});
+
+// POST /api/direct/pre-approval-mark: 사전승낙서마크 저장
+app.post('/api/direct/pre-approval-mark', async (req, res) => {
+  const { storeName, url } = req.body;
+  try {
+    const values = await getSheetValues(CUSTOMER_PRE_APPROVAL_SHEET_NAME);
+    const updatedAt = new Date().toISOString().replace('T', ' ').substring(0, 19);
+
+    if (!values || values.length === 0) {
+      await rateLimitedSheetsCall(() =>
+        sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${CUSTOMER_PRE_APPROVAL_SHEET_NAME}!A1:C1`,
+          valueInputOption: 'RAW',
+          resource: { values: [['업체명', '사전승낙서마크URL', '수정일시']] }
+        })
+      );
+    }
+
+    const rowIndex = values ? values.findIndex(row => row[0] === storeName) : -1;
+
+    if (rowIndex === -1) {
+      await rateLimitedSheetsCall(() =>
+        sheets.spreadsheets.values.append({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${CUSTOMER_PRE_APPROVAL_SHEET_NAME}!A:C`,
+          valueInputOption: 'USER_ENTERED',
+          resource: { values: [[storeName, url, updatedAt]] }
+        })
+      );
+    } else {
+      await rateLimitedSheetsCall(() =>
+        sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${CUSTOMER_PRE_APPROVAL_SHEET_NAME}!A${rowIndex + 1}:C${rowIndex + 1}`,
+          valueInputOption: 'USER_ENTERED',
+          resource: { values: [[storeName, url, updatedAt]] }
+        })
+      );
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('사전승낙서마크 저장 오류:', error);
+    res.status(500).json({ error: '저장에 실패했습니다.' });
+  }
+});
+
+// GET /api/direct/store-image/:storeName: 매장 사진 조회
+app.get('/api/direct/store-image/:storeName', async (req, res) => {
+  const { storeName } = req.params;
+  try {
+    const values = await getSheetValues(CUSTOMER_STORE_PHOTO_SHEET_NAME);
+    if (!values || values.length <= 1) return res.json(null);
+
+    const rows = values.slice(1);
+    const photoRow = rows.find(row => row[0] === storeName);
+
+    if (!photoRow) return res.json(null);
+
+    res.json({
+      storeName: photoRow[0],
+      frontUrl: photoRow[1],
+      insideUrl: photoRow[2],
+      outsideUrl: photoRow[3],
+      outside2Url: photoRow[4],
+      managerUrl: photoRow[5],
+      staff1Url: photoRow[6],
+      staff2Url: photoRow[7],
+      staff3Url: photoRow[8],
+      updatedAt: photoRow[9]
+    });
+  } catch (error) {
+    console.error('매장 사진 조회 오류:', error);
+    res.status(500).json({ error: '조회에 실패했습니다.' });
+  }
+});
+
+// POST /api/direct/store-image: 매장 사진 정보 저장
+app.post('/api/direct/store-image', async (req, res) => {
+  const data = req.body;
+  const storeName = data.storeName;
+  try {
+    const values = await getSheetValues(CUSTOMER_STORE_PHOTO_SHEET_NAME);
+    const updatedAt = new Date().toISOString().replace('T', ' ').substring(0, 19);
+
+    if (!values || values.length === 0) {
+      await rateLimitedSheetsCall(() =>
+        sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${CUSTOMER_STORE_PHOTO_SHEET_NAME}!A1:J1`,
+          valueInputOption: 'RAW',
+          resource: { values: [['업체명', '전면사진URL', '내부사진URL', '외부사진URL', '외부2사진URL', '점장사진URL', '직원1사진URL', '직원2사진URL', '직원3사진URL', '수정일시']] }
+        })
+      );
+    }
+
+    const rowIndex = values ? values.findIndex(row => row[0] === storeName) : -1;
+    const newRow = [
+      storeName,
+      data.frontUrl || '',
+      data.insideUrl || '',
+      data.outsideUrl || '',
+      data.outside2Url || '',
+      data.managerUrl || '',
+      data.staff1Url || '',
+      data.staff2Url || '',
+      data.staff3Url || '',
+      updatedAt
+    ];
+
+    if (rowIndex === -1) {
+      await rateLimitedSheetsCall(() =>
+        sheets.spreadsheets.values.append({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${CUSTOMER_STORE_PHOTO_SHEET_NAME}!A:J`,
+          valueInputOption: 'USER_ENTERED',
+          resource: { values: [newRow] }
+        })
+      );
+    } else {
+      await rateLimitedSheetsCall(() =>
+        sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${CUSTOMER_STORE_PHOTO_SHEET_NAME}!A${rowIndex + 1}:J${rowIndex + 1}`,
+          valueInputOption: 'USER_ENTERED',
+          resource: { values: [newRow] }
+        })
+      );
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('매장 사진 저장 오류:', error);
+    res.status(500).json({ error: '저장에 실패했습니다.' });
+  }
+});
+
+// 매장 사진 파일 업로드를 위한 multer 설정 (디스크 저장)
+const storeImageUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      const uploadDir = path.join(__dirname, 'public', 'uploads', 'store-images');
+      // 디렉토리가 없으면 생성
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+      cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+      const storeName = req.body.storeName || 'unknown';
+      const photoType = req.body.photoType || 'unknown'; // front, inside, outside, outside2, manager, staff1, staff2, staff3
+      const timestamp = Date.now();
+      const ext = path.extname(file.originalname);
+      const safeStoreName = storeName.replace(/[^a-zA-Z0-9가-힣]/g, '_');
+      const filename = `${safeStoreName}_${photoType}_${timestamp}${ext}`;
+      cb(null, filename);
+    }
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB 제한
+  fileFilter: (req, file, cb) => {
+    // 이미지 파일만 허용
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('이미지 파일만 업로드 가능합니다.'), false);
+    }
+  }
+});
+
+// Google Drive 폴더 생성 또는 조회 헬퍼 함수
+async function getOrCreateFolder(folderName, parentFolderId = null) {
+  try {
+    // 기존 폴더 검색
+    let query = `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+    if (parentFolderId) {
+      query += ` and '${parentFolderId}' in parents`;
+    } else {
+      query += ` and 'root' in parents`;
+    }
+
+    const searchResponse = await drive.files.list({
+      q: query,
+      fields: 'files(id, name)',
+      spaces: 'drive'
+    });
+
+    if (searchResponse.data.files && searchResponse.data.files.length > 0) {
+      return searchResponse.data.files[0].id;
+    }
+
+    // 폴더 생성
+    const folderMetadata = {
+      name: folderName,
+      mimeType: 'application/vnd.google-apps.folder'
+    };
+
+    if (parentFolderId) {
+      folderMetadata.parents = [parentFolderId];
+    }
+
+    const folderResponse = await drive.files.create({
+      requestBody: folderMetadata,
+      fields: 'id, name'
+    });
+
+    // 폴더를 공개로 설정 (선택사항 - 필요시 주석 해제)
+    // await drive.permissions.create({
+    //   fileId: folderResponse.data.id,
+    //   requestBody: {
+    //     role: 'reader',
+    //     type: 'anyone'
+    //   }
+    // });
+
+    return folderResponse.data.id;
+  } catch (error) {
+    console.error(`폴더 생성/조회 오류 (${folderName}):`, error);
+    throw error;
+  }
+}
+
+// POST /api/direct/store-image/upload: 매장 사진 파일 업로드 (Google Drive)
+app.post('/api/direct/store-image/upload', storeImageUpload.single('image'), async (req, res) => {
+  let localFilePath = null;
+  
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: '이미지 파일이 없습니다.' });
+    }
+
+    const storeName = req.body.storeName;
+    const photoType = req.body.photoType; // front, inside, outside, outside2, manager, staff1, staff2, staff3
+
+    if (!storeName || !photoType) {
+      // 업로드된 파일 삭제
+      if (req.file && req.file.path) {
+        fs.unlinkSync(req.file.path);
+      }
+      return res.status(400).json({ error: '매장명과 사진 타입이 필요합니다.' });
+    }
+
+    localFilePath = req.file.path;
+    const safeStoreName = storeName.replace(/[^a-zA-Z0-9가-힣]/g, '_');
+    const timestamp = Date.now();
+    const ext = path.extname(req.file.originalname);
+    const fileName = `${safeStoreName}_${photoType}_${timestamp}${ext}`;
+
+    console.log(`📤 [매장 사진 업로드] Google Drive 업로드 시작: ${storeName} - ${photoType}`);
+
+    // 폴더 구조 생성: 어플자료 > 고객모드 > 매장명 > (매장사진 또는 직원사진)
+    // 1. 어플자료 폴더
+    const appDataFolderId = await getOrCreateFolder('어플자료');
+    console.log(`📁 [매장 사진 업로드] 어플자료 폴더 ID: ${appDataFolderId}`);
+
+    // 2. 고객모드 폴더 (어플자료 안에)
+    const customerModeFolderId = await getOrCreateFolder('고객모드', appDataFolderId);
+    console.log(`📁 [매장 사진 업로드] 고객모드 폴더 ID: ${customerModeFolderId}`);
+
+    // 3. 매장명 폴더 (고객모드 안에)
+    const storeFolderId = await getOrCreateFolder(storeName, customerModeFolderId);
+    console.log(`📁 [매장 사진 업로드] 매장명 폴더 ID: ${storeFolderId}`);
+
+    // 4. 매장사진 또는 직원사진 폴더 (매장명 안에)
+    const photoCategory = ['front', 'inside', 'outside', 'outside2'].includes(photoType) 
+      ? '매장사진' 
+      : '직원사진';
+    const photoCategoryFolderId = await getOrCreateFolder(photoCategory, storeFolderId);
+    console.log(`📁 [매장 사진 업로드] ${photoCategory} 폴더 ID: ${photoCategoryFolderId}`);
+
+    // Google Drive에 파일 업로드 (해당 폴더에)
+    const fileMetadata = {
+      name: fileName,
+      parents: [photoCategoryFolderId]
+    };
+
+    const media = {
+      mimeType: req.file.mimetype,
+      body: fs.createReadStream(localFilePath)
+    };
+
+    const driveResponse = await drive.files.create({
+      requestBody: fileMetadata,
+      media: media,
+      fields: 'id, name, webViewLink, webContentLink'
+    });
+
+    const fileId = driveResponse.data.id;
+
+    // 파일을 공개로 설정 (누구나 링크로 접근 가능)
+    await drive.permissions.create({
+      fileId: fileId,
+      requestBody: {
+        role: 'reader',
+        type: 'anyone'
+      }
+    });
+
+    // 공개 링크 생성 (직접 다운로드 링크)
+    const fileUrl = `https://drive.google.com/uc?export=view&id=${fileId}`;
+    // 또는 썸네일 링크: `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000`
+
+    console.log(`✅ [매장 사진 업로드] Google Drive 업로드 성공: ${storeName} - ${photoType} - ${fileUrl}`);
+    console.log(`📂 [매장 사진 업로드] 저장 경로: 어플자료 > 고객모드 > ${storeName} > ${photoCategory}`);
+
+    // 로컬 파일 삭제 (Google Drive에 저장되었으므로)
+    try {
+      fs.unlinkSync(localFilePath);
+      localFilePath = null;
+    } catch (unlinkError) {
+      console.warn('⚠️ 로컬 파일 삭제 실패 (무시 가능):', unlinkError);
+    }
+
+    res.json({
+      success: true,
+      url: fileUrl,
+      fileId: fileId,
+      filename: fileName,
+      folderPath: `어플자료 > 고객모드 > ${storeName} > ${photoCategory}`
+    });
+  } catch (error) {
+    console.error('❌ [매장 사진 업로드] Google Drive 업로드 오류:', error);
+    
+    // 로컬 파일 삭제
+    if (localFilePath && fs.existsSync(localFilePath)) {
+      try {
+        fs.unlinkSync(localFilePath);
+      } catch (unlinkError) {
+        console.error('파일 삭제 실패:', unlinkError);
+      }
+    }
+
+    res.status(500).json({ 
+      error: '업로드에 실패했습니다: ' + (error.message || '알 수 없는 오류'),
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
 // 패스워드 검증 API
 app.post('/api/verify-password', async (req, res) => {
   try {
@@ -4658,7 +5458,7 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
       // 회의모드: message.attachments.first().url을 그대로 반환 (라인 1217)
       // 직영점 모드: 동일하게 message.attachments.first().url을 그대로 사용
       imageUrl = messageAttachment.url;
-      
+
       console.log(`✅ [이미지 업로드] Discord 업로드 성공: ${imageUrl} (포스트: ${carrierPost.name}, 스레드: ${targetThread.name})`);
       discordUploadSuccess = true;
     } catch (discordError) {
@@ -4776,7 +5576,7 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
       if (sheetSaveSuccess) {
         try {
           console.log(`📝 [이미지 업로드] 직영점_단말마스터 시트 업데이트 시작: ${modelId}`);
-          
+
           // 직영점_단말마스터 시트에서 해당 모델 찾기
           const masterResponse = await rateLimitedSheetsCall(() =>
             sheets.spreadsheets.values.get({

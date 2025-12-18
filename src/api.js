@@ -2106,3 +2106,103 @@ export const inventoryRecoveryAPI = {
     }
   }
 }; 
+// 고객 모드 API
+export const customerAPI = {
+  // 구매 대기 목록 조회
+  getPurchaseQueue: async (ctn) => {
+    const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/member/queue?ctn=${ctn}`);
+    if (!response.ok) throw new Error('구매 대기 목록을 불러오는데 실패했습니다.');
+    return response.json();
+  },
+
+  // 전체 구매 대기 목록 조회 (관리자용 또는 POS코드 필터링)
+  getAllQueue: async (posCode = null) => {
+    const url = posCode 
+      ? `${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/member/queue/all?posCode=${encodeURIComponent(posCode)}`
+      : `${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/member/queue/all`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('전체 구매 대기 목록을 불러오는데 실패했습니다.');
+    return response.json();
+  },
+
+  // 구매 대기 등록
+  addToPurchaseQueue: async (data) => {
+    const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/member/queue`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error('구매 대기 등록에 실패했습니다.');
+    return response.json();
+  },
+
+  // 구매 대기 수정
+  updatePurchaseQueue: async (id, data) => {
+    const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/member/queue/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error('구매 대기 수정에 실패했습니다.');
+    return response.json();
+  },
+
+  // 구매 대기 삭제
+  deleteFromPurchaseQueue: async (id) => {
+    const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/member/queue/${id}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) throw new Error('구매 대기 삭제에 실패했습니다.');
+    return response.json();
+  },
+
+  // 사전승낙서마크 조회
+  getPreApprovalMark: async (storeName) => {
+    const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/direct/pre-approval-mark/${encodeURIComponent(storeName)}`);
+    if (!response.ok) return { url: '' };
+    return response.json();
+  },
+
+  // 사전승낙서마크 저장
+  savePreApprovalMark: async (storeName, url) => {
+    const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/direct/pre-approval-mark`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ storeName, url }),
+    });
+    if (!response.ok) throw new Error('저장에 실패했습니다.');
+    return response.json();
+  },
+
+  // 매장 사진 조회
+  getStorePhotos: async (storeName) => {
+    const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/direct/store-image/${encodeURIComponent(storeName)}`);
+    if (!response.ok) return null;
+    const data = await response.json();
+    // API 응답 필드명을 컴포넌트에서 사용하는 필드명으로 변환
+    if (data) {
+      return {
+        frontPhoto: data.frontUrl,
+        insidePhoto: data.insideUrl,
+        outsidePhoto: data.outsideUrl,
+        outside2Photo: data.outside2Url,
+        managerPhoto: data.managerUrl,
+        staff1Photo: data.staff1Url,
+        staff2Photo: data.staff2Url,
+        staff3Photo: data.staff3Url
+      };
+    }
+    return null;
+  },
+
+  // 매장 사진 저장
+  saveStorePhotos: async (data) => {
+    const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/direct/store-image`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error('저장에 실패했습니다.');
+    return response.json();
+  }
+};

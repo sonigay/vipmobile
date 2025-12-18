@@ -44,7 +44,7 @@ import { formatPrice } from '../../utils/directStoreUtils';
 import { MobileListRow } from './MobileListRow';
 import { debugLog } from '../../utils/debugLogger';
 
-const MobileListTab = ({ onProductSelect }) => {
+const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
   const [carrierTab, setCarrierTab] = useState(0); // 0: SK, 1: KT, 2: LG
   const [mobileList, setMobileList] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -268,7 +268,7 @@ const MobileListTab = ({ onProductSelect }) => {
         openingType: openingType
       };
     }
-    
+
     // 데이터를 찾지 못한 경우 디버깅 로그 (개발 환경에서만)
     if (process.env.NODE_ENV === 'development') {
       console.warn(`[MobileListTab] 가격 데이터를 찾지 못함: key=${key}, modelId=${modelId}, planGroup=${planGroup}, openingType=${openingType}`);
@@ -276,7 +276,7 @@ const MobileListTab = ({ onProductSelect }) => {
       const availableKeys = Array.from(pricingDataRef.current.keys()).slice(0, 5);
       console.log(`[MobileListTab] 사용 가능한 키 샘플:`, availableKeys);
     }
-    
+
     // 데이터 없으면 0 리턴
     return {
       storeSupportWithAddon: 0,
@@ -302,7 +302,7 @@ const MobileListTab = ({ onProductSelect }) => {
   // 🔥 리팩토링: 이미지 업로드 성공 핸들러 (ImageUploadButton이 자동으로 처리)
   const handleImageUploadSuccess = useCallback(async (imageUrl, modelId, carrier) => {
     console.log('✅ [휴대폰목록] 이미지 업로드 성공 콜백:', { imageUrl, modelId, carrier });
-    
+
     // 즉시 로컬 상태 업데이트 (UI 반영)
     setMobileList(prevList => prevList.map(item => {
       // 모델ID 또는 모델명으로 매칭
@@ -327,11 +327,11 @@ const MobileListTab = ({ onProductSelect }) => {
     const handleImageUploaded = async (event) => {
       const { carrier: eventCarrier, modelId, imageUrl } = event.detail || {};
       const currentCarrier = getCurrentCarrier();
-      
+
       // 현재 탭의 통신사와 일치하는 경우에만 업데이트
       if (eventCarrier && eventCarrier === currentCarrier) {
         console.log('🔄 [휴대폰목록] 다른 페이지에서 이미지 업로드 이벤트 수신:', { modelId, imageUrl });
-        
+
         // 즉시 로컬 상태 업데이트
         setMobileList(prevList => prevList.map(item => {
           if (item.id === modelId || item.model === modelId) {
@@ -578,38 +578,40 @@ const MobileListTab = ({ onProductSelect }) => {
     <Box sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
 
       <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', color: 'text.primary' }}>
-        휴대폰 목록
+        {isCustomerMode ? '실시간 휴대폰 시세표' : '휴대폰 목록'}
       </Typography>
 
-      {/* 로딩 단계 표시 (칩만 표시, 기능 없음) */}
-      <Box sx={{ mb: 2, display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
-        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-          {Object.entries(steps).map(([key, step]) => (
-            <Chip
-              key={key}
-              label={`${step.label}${step.message ? `: ${step.message}` : ''}`}
-              size="small"
-              color={
-                step.status === 'success' ? 'success' :
-                  step.status === 'loading' ? 'info' :
-                    step.status === 'empty' ? 'default' :
-                      step.status === 'error' ? 'error' : 'default'
-              }
-              variant={step.status === 'success' ? 'filled' : 'outlined'}
-            />
-          ))}
+      {/* 로딩 단계 표시 (관리자 모드에서만 표시) */}
+      {!isCustomerMode && (
+        <Box sx={{ mb: 2, display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+            {Object.entries(steps).map(([key, step]) => (
+              <Chip
+                key={key}
+                label={`${step.label}${step.message ? `: ${step.message}` : ''}`}
+                size="small"
+                color={
+                  step.status === 'success' ? 'success' :
+                    step.status === 'loading' ? 'info' :
+                      step.status === 'empty' ? 'default' :
+                        step.status === 'error' ? 'error' : 'default'
+                }
+                variant={step.status === 'success' ? 'filled' : 'outlined'}
+              />
+            ))}
+          </Box>
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={handleReload}
+            startIcon={<RefreshIcon />}
+            disabled={loading}
+            sx={{ ml: 'auto' }}
+          >
+            새로고침
+          </Button>
         </Box>
-        <Button
-          variant="outlined"
-          size="small"
-          onClick={handleReload}
-          startIcon={<RefreshIcon />}
-          disabled={loading}
-          sx={{ ml: 'auto' }}
-        >
-          새로고침
-        </Button>
-      </Box>
+      )}
 
       {/* 통신사 탭 */}
       <Paper sx={{ mb: 3, borderRadius: 2, overflow: 'hidden' }}>
@@ -652,7 +654,7 @@ const MobileListTab = ({ onProductSelect }) => {
           <Table stickyHeader>
             <TableHead>
               <TableRow>
-                <ModernTableCell align="center" width="120">구분</ModernTableCell>
+                {!isCustomerMode && <ModernTableCell align="center" width="120">구분</ModernTableCell>}
                 <ModernTableCell align="center" width="100">이미지</ModernTableCell>
                 <ModernTableCell align="center" width="220">모델명 / 펫네임</ModernTableCell>
                 <ModernTableCell align="center" width="120">요금제군</ModernTableCell>
@@ -704,6 +706,7 @@ const MobileListTab = ({ onProductSelect }) => {
                       onImageUploadSuccess={handleImageUploadSuccess}
                       getSelectedTags={getSelectedTags}
                       getDisplayValue={getDisplayValue}
+                      isCustomerMode={isCustomerMode}
                     />
                   );
                 })

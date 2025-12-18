@@ -40,6 +40,7 @@ import TodaysMobileTab from './direct/TodaysMobileTab';
 import MobileListTab from './direct/MobileListTab';
 import DirectSalesReportTab from './direct/DirectSalesReportTab';
 import OpeningInfoPage from './direct/OpeningInfoPage';
+import CustomerPurchaseQueueTab from './customer/CustomerPurchaseQueueTab';
 
 const DirectStoreMode = ({
   loggedInStore,
@@ -56,7 +57,7 @@ const DirectStoreMode = ({
   const [password, setPassword] = useState('');
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
 
-  // 탭 상태 (0: 휴대폰 목록, 1: 오늘의 휴대폰, 2: 판매일보)
+  // 탭 상태 (0: 휴대폰 목록, 1: 오늘의 휴대폰, 2: 판매일보, 3: 구매대기, 4: 선호구입매장)
   const [activeTab, setActiveTab] = useState(0);
 
   // 전체화면 모드 상태 (오늘의 휴대폰 탭에서만 유효)
@@ -368,6 +369,8 @@ const DirectStoreMode = ({
                   <Tab label="휴대폰 목록" />
                   <Tab label="오늘의 휴대폰" />
                   <Tab label="판매일보" />
+                  <Tab label="구매대기" />
+                  <Tab label="선호구입매장" />
                 </Tabs>
               </AppBar>
             )}
@@ -422,6 +425,34 @@ const DirectStoreMode = ({
                 <ErrorBoundary name="DirectSalesReportTab">
                   <DirectSalesReportTab 
                     onRowClick={handleProductSelect} 
+                    loggedInStore={loggedInStore}
+                    isManagementMode={false}
+                  />
+                </ErrorBoundary>
+              </Box>
+
+              {/* 구매대기 탭 */}
+              <Box
+                role="tabpanel"
+                hidden={activeTab !== 3}
+                sx={{ height: '100%', display: activeTab === 3 ? 'block' : 'none' }}
+              >
+                <ErrorBoundary name="CustomerPurchaseQueueTab">
+                  <CustomerPurchaseQueueTab 
+                    loggedInStore={loggedInStore}
+                    isManagementMode={false}
+                  />
+                </ErrorBoundary>
+              </Box>
+
+              {/* 선호구입매장 탭 */}
+              <Box
+                role="tabpanel"
+                hidden={activeTab !== 4}
+                sx={{ height: '100%', display: activeTab === 4 ? 'block' : 'none' }}
+              >
+                <ErrorBoundary name="DirectStorePreferredStoreTab">
+                  <DirectStorePreferredStoreTab 
                     loggedInStore={loggedInStore}
                     isManagementMode={false}
                   />

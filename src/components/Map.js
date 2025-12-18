@@ -42,28 +42,28 @@ const defaultCenter = {
 // 강제 확대를 위한 별도 컴포넌트
 function ForceZoomUpdater({ forceZoomToStore }) {
   const map = useMap();
-  
+
   useEffect(() => {
     if (forceZoomToStore && map) {
       const { lat, lng, zoom } = forceZoomToStore;
-      
+
       const attemptZoom = (attemptCount = 0) => {
         try {
           // 지도 상태 확인 (간소화된 검사)
-          const isMapReady = map && 
-            map._loaded && 
-            map._container && 
+          const isMapReady = map &&
+            map._loaded &&
+            map._container &&
             map.setView;
-          
+
           if (isMapReady) {
             console.log('지도 확대 실행:', { lat, lng, zoom: zoom || 14 });
-            
+
             // 즉시 확대 실행 (애니메이션 없이)
             map.setView([lat, lng], zoom || 14, {
               animate: false,
               duration: 0
             });
-            
+
             // 확대 후 애니메이션으로 부드럽게 이동
             setTimeout(() => {
               if (map && map.setView) {
@@ -73,17 +73,17 @@ function ForceZoomUpdater({ forceZoomToStore }) {
                 });
               }
             }, 100);
-            
+
             return;
           }
-          
+
           // 재시도 로직 (최대 5회, 200ms 간격으로 단축)
           if (attemptCount < 5) {
             console.log(`지도 확대 재시도 ${attemptCount + 1}/5`);
             setTimeout(() => attemptZoom(attemptCount + 1), 200);
           } else {
             console.warn('ForceZoomUpdater 최대 재시도 횟수 초과 - 강제 실행');
-            
+
             // 강제 실행 (지도 상태와 관계없이)
             try {
               if (map && map.setView) {
@@ -105,19 +105,19 @@ function ForceZoomUpdater({ forceZoomToStore }) {
           }
         }
       };
-      
+
       // 초기 시도 (지연 시간 단축)
       setTimeout(() => attemptZoom(), 300);
     }
   }, [forceZoomToStore, map]);
-  
+
   return null;
 }
 
 // 지도 뷰 업데이트를 위한 컴포넌트
 function MapUpdater({ center, bounds, zoom, isAgentMode, currentView, forceZoomToStore }) {
   const map = useMap();
-  
+
   // 각 모드별 줌 레벨 설정
   const getModeZoom = () => {
     if (isAgentMode) {
@@ -128,19 +128,19 @@ function MapUpdater({ center, bounds, zoom, isAgentMode, currentView, forceZoomT
     }
     return 12; // 일반 매장 모드
   };
-  
+
   useEffect(() => {
     // 강제 확대가 진행 중이면 MapUpdater 비활성화 (지도 위치 유지)
     if (forceZoomToStore) {
       return;
     }
-    
+
     const attemptUpdate = (attemptCount = 0) => {
       try {
         if (map && map._loaded && map._container && map._mapPane && map._leaflet_pos) {
           const container = map._container;
           const panelSize = map._size || { x: container.offsetWidth, y: container.offsetHeight };
-          
+
           if (panelSize.x > 0 && panelSize.y > 0 || container.offsetWidth > 0 && container.offsetHeight > 0) {
             if (bounds) {
               const modeZoom = getModeZoom();
@@ -158,7 +158,7 @@ function MapUpdater({ center, bounds, zoom, isAgentMode, currentView, forceZoomT
             return;
           }
         }
-        
+
         // 재시도 로직 (최대 3회, 400ms 간격으로 늘림)
         if (attemptCount < 3) {
           setTimeout(() => attemptUpdate(attemptCount + 1), 400);
@@ -170,16 +170,16 @@ function MapUpdater({ center, bounds, zoom, isAgentMode, currentView, forceZoomT
         }
       }
     };
-    
+
     attemptUpdate();
   }, [map, center, bounds, zoom, isAgentMode, currentView, forceZoomToStore]);
-  
+
   return null;
 }
 
-function Map({ 
-  userLocation, 
-  filteredStores, 
+function Map({
+  userLocation,
+  filteredStores,
   selectedStore,
   requestedStore,
   selectedRadius,
@@ -201,8 +201,47 @@ function Map({
   rememberedRequests, // 기억된 요청 목록
   setRememberedRequests, // 기억된 요청 목록 설정 함수
   onQuickCostClick, // 퀵비용 등록 버튼 클릭 핸들러
-  quickCostRefreshKey // 퀵비용 데이터 리프레시용 키
+  quickCostRefreshKey, // 퀵비용 데이터 리프레시용 키
+  isCustomerMode = false // 고객 모드 여부 추가
 }) {
+  const [preApprovalMark, setPreApprovalMark] = useState(null);
+  const [storePhotos, setStorePhotos] = useState(null);
+  const [isDetailLoading, setIsDetailLoading] = useState(false);
+
+  // 고객 모드일 때 매장 상세 정보(사진, 사전승낙서) 로드
+  const loadCustomerDetails = async (store) => {
+    if (!isCustomerMode) return;
+    setIsDetailLoading(true);
+    setPreApprovalMark(null);
+    setStorePhotos(null);
+    try {
+      const { customerAPI } = await import('../api');
+      const [mark, photos] = await Promise.all([
+        customerAPI.getPreApprovalMark(store.name),
+        customerAPI.getStorePhotos(store.name)
+      ]);
+      setPreApprovalMark(mark?.url || null);
+      // photos 필드명 변환 (frontPhoto -> frontUrl 등)
+      if (photos) {
+        setStorePhotos({
+          frontUrl: photos.frontPhoto,
+          insideUrl: photos.insidePhoto,
+          outsideUrl: photos.outsidePhoto,
+          outside2Url: photos.outside2Photo,
+          managerUrl: photos.managerPhoto,
+          staff1Url: photos.staff1Photo,
+          staff2Url: photos.staff2Photo,
+          staff3Url: photos.staff3Photo
+        });
+      } else {
+        setStorePhotos(null);
+      }
+    } catch (error) {
+      console.error('매장 상세 정보 로드 오류:', error);
+    } finally {
+      setIsDetailLoading(false);
+    }
+  };
   // 디버깅: onQuickCostClick prop 확인
   useEffect(() => {
     console.log('🔍 Map 컴포넌트: quickCostRefreshKey prop 확인', {
@@ -213,14 +252,14 @@ function Map({
       isNumber: typeof quickCostRefreshKey === 'number',
       value: quickCostRefreshKey
     });
-    
+
     if (typeof quickCostRefreshKey === 'undefined') {
       console.warn('⚠️ Map 컴포넌트: quickCostRefreshKey prop이 전달되지 않았습니다.');
     } else {
       console.log('✅ Map 컴포넌트: quickCostRefreshKey prop 전달 확인됨:', quickCostRefreshKey);
     }
   }, [quickCostRefreshKey]);
-  
+
   const [map, setMap] = useState(null);
   const [userInteracted, setUserInteracted] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
@@ -282,60 +321,61 @@ ${loggedInStore.name}으로 이동 예정입니다.
       alert('클립보드 복사에 실패했습니다.');
     });
   };
-  
+
+
   // 마커들의 경계를 계산하는 함수
   const calculateBounds = (stores) => {
     if (!stores || stores.length === 0) return null;
-    
+
     const validStores = stores.filter(store => {
       if (!store) return false;
-      
+
       const lat = store.latitude;
       const lng = store.longitude;
-      
+
       // null, undefined, 빈 문자열, 0, NaN 체크
-      if (!lat || !lng || 
-          lat === null || lng === null ||
-          lat === undefined || lng === undefined ||
-          lat === '' || lng === '' ||
-          isNaN(parseFloat(lat)) || isNaN(parseFloat(lng)) ||
-          parseFloat(lat) === 0 || parseFloat(lng) === 0) {
+      if (!lat || !lng ||
+        lat === null || lng === null ||
+        lat === undefined || lng === undefined ||
+        lat === '' || lng === '' ||
+        isNaN(parseFloat(lat)) || isNaN(parseFloat(lng)) ||
+        parseFloat(lat) === 0 || parseFloat(lng) === 0) {
         return false;
       }
-      
+
       return true;
     });
-    
+
     if (validStores.length === 0) {
       console.warn('No valid stores with coordinates found for bounds calculation');
       return null;
     }
-    
+
     let minLat = parseFloat(validStores[0].latitude);
     let maxLat = parseFloat(validStores[0].latitude);
     let minLng = parseFloat(validStores[0].longitude);
     let maxLng = parseFloat(validStores[0].longitude);
-    
+
     validStores.forEach(store => {
       const lat = parseFloat(store.latitude);
       const lng = parseFloat(store.longitude);
-      
+
       minLat = Math.min(minLat, lat);
       maxLat = Math.max(maxLat, lat);
       minLng = Math.min(minLng, lng);
       maxLng = Math.max(maxLng, lng);
     });
-    
+
     // 경계에 여백 추가 (10% 패딩)
     const latPadding = (maxLat - minLat) * 0.1;
     const lngPadding = (maxLng - minLng) * 0.1;
-    
+
     // Leaflet bounds 객체 생성
     const bounds = L.latLngBounds([
       [minLat - latPadding, minLng - lngPadding],
       [maxLat + latPadding, maxLng + lngPadding]
     ]);
-    
+
     return bounds;
   };
 
@@ -349,7 +389,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
     }
     return 12; // 일반 매장 모드
   };
-  
+
   const [mapZoom, setMapZoom] = useState(getInitialZoom());
   const [mapKey, setMapKey] = useState(0);
   const [isMapInitialized, setIsMapInitialized] = useState(false);
@@ -389,10 +429,10 @@ ${loggedInStore.name}으로 이동 예정입니다.
   // 재고 수량 계산 함수
   const calculateInventory = useCallback((store) => {
     if (!store.inventory) return 0;
-    
+
     // 새로운 데이터 구조: { phones: {}, sims: {}, wearables: {}, smartDevices: {} }
     let totalInventory = 0;
-    
+
     // 모든 카테고리의 재고를 합산
     Object.values(store.inventory).forEach(category => {
       if (typeof category === 'object' && category !== null) {
@@ -415,11 +455,11 @@ ${loggedInStore.name}으로 이동 예정입니다.
         });
       }
     });
-    
+
     // 모델과 색상이 선택된 경우 필터링
     if (selectedModel) {
       let filteredInventory = 0;
-      
+
       Object.values(store.inventory).forEach(category => {
         if (category[selectedModel]) {
           if (selectedColor) {
@@ -448,10 +488,10 @@ ${loggedInStore.name}으로 이동 예정입니다.
           }
         }
       });
-      
+
       return filteredInventory;
     }
-    
+
     return totalInventory;
   }, [selectedModel, selectedColor]);
 
@@ -473,16 +513,16 @@ ${loggedInStore.name}으로 이동 예정입니다.
       if (!category || typeof category !== 'object') return;
       Object.entries(category).forEach(([modelName, model]) => {
         if (!model || typeof model !== 'object') return;
-        
+
         // 검색 필터가 있고, 해당 모델이 선택되지 않은 경우 스킵
         if (hasSearchFilter && selectedModel && modelName !== selectedModel) return;
-        
+
         Object.values(model).forEach(status => {
           if (!status || typeof status !== 'object') return;
           Object.entries(status).forEach(([color, item]) => {
             // 검색 필터가 있고, 해당 색상이 선택되지 않은 경우 스킵
             if (hasSearchFilter && selectedColor && color !== selectedColor) return;
-            
+
             // 새로운 구조: { quantity: number, shippedDate: string }
             if (typeof item === 'object' && item && item.shippedDate && item.quantity) {
               const days = Math.floor((now - new Date(item.shippedDate)) / (1000 * 60 * 60 * 24));
@@ -518,13 +558,13 @@ ${loggedInStore.name}으로 이동 예정입니다.
 
     // 출고일 기준 긴급도 아이콘 결정 (비중 기준)
     const totalFilteredInventory = inventoryByAge.within30 + inventoryByAge.within60 + inventoryByAge.over60;
-    
+
     if (totalFilteredInventory > 0) {
       // 비중이 가장 높은 카테고리로 결정
       const within30Ratio = inventoryByAge.within30 / totalFilteredInventory;
       const within60Ratio = inventoryByAge.within60 / totalFilteredInventory;
       const over60Ratio = inventoryByAge.over60 / totalFilteredInventory;
-      
+
       if (over60Ratio >= within30Ratio && over60Ratio >= within60Ratio) {
         urgencyIcon = '⚠️';
       } else if (within60Ratio >= within30Ratio) {
@@ -565,13 +605,13 @@ ${loggedInStore.name}으로 이동 예정입니다.
     // 5. 일반 매장 - 출고일 기준 색상 조정 (비중 기준)
     else {
       const totalFilteredInventory = inventoryByAge.within30 + inventoryByAge.within60 + inventoryByAge.over60;
-      
+
       if (totalFilteredInventory > 0) {
         // 비중이 가장 높은 카테고리로 색상 결정
         const within30Ratio = inventoryByAge.within30 / totalFilteredInventory;
         const within60Ratio = inventoryByAge.within60 / totalFilteredInventory;
         const over60Ratio = inventoryByAge.over60 / totalFilteredInventory;
-        
+
         if (over60Ratio >= within30Ratio && over60Ratio >= within60Ratio) {
           // 60일 이상 비중이 높음: 주황색
           fillColor = hasInventory ? '#ff9800' : '#f44336';
@@ -615,7 +655,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
         ">
           ${inventoryCount > 0 ? inventoryCount : ''}
           ${urgencyIcon && (
-            `<div style="
+          `<div style="
               position: absolute;
               top: -8px;
               right: -8px;
@@ -629,7 +669,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
               font-size: 10px;
               color: white;
             ">${urgencyIcon}</div>`
-          )}
+        )}
         </div>
       `,
       iconSize: [radius * 2, radius * 2],
@@ -641,7 +681,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
   const onMapLoad = useCallback((mapInstance) => {
     setMap(mapInstance);
     mapRef.current = mapInstance; // ref 설정
-    
+
     // 지도가 완전히 로드될 때까지 대기 (더 긴 대기 시간)
     setTimeout(() => {
       // 추가 안전 검사
@@ -658,12 +698,12 @@ ${loggedInStore.name}으로 이동 예정입니다.
         }, 500);
       }
     }, 500); // 더 긴 대기 시간으로 조정
-    
+
     // 사용자 인터랙션 이벤트 리스너 추가
     mapInstance.on('dragstart', () => {
       setUserInteracted(true);
     });
-    
+
     mapInstance.on('zoomstart', () => {
       setUserInteracted(true);
     });
@@ -683,26 +723,26 @@ ${loggedInStore.name}으로 이동 예정입니다.
   // 선택된 매장으로 지도 이동 및 Popup 자동 열기 (개선된 버전)
   useEffect(() => {
     if (!selectedStore || !selectedStore.latitude || !selectedStore.longitude || !map) return;
-    
+
     // 이전에 선택된 매장과 다른 경우에만 처리
     if (previousSelectedStoreRef.current !== selectedStore.id) {
       const position = {
         lat: parseFloat(selectedStore.latitude),
         lng: parseFloat(selectedStore.longitude)
       };
-      
+
       safeMapOperation(() => {
         // 현재 지도 범위 확인
         const currentBounds = map.getBounds();
         const currentCenter = map.getCenter();
         const currentZoom = map.getZoom();
-        
+
         // 선택한 매장이 현재 화면에 보이는지 확인
         const isVisible = currentBounds.contains([position.lat, position.lng]);
-        
+
         // 선택한 매장과 현재 중심점의 거리 계산
         const distance = currentCenter.distanceTo([position.lat, position.lng]);
-        
+
         // 거리가 가까우면 (500m 이내) 이동하지 않음
         if (isVisible && distance < 500) {
           console.log('매장이 화면에 보이므로 지도 이동하지 않음');
@@ -713,7 +753,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
             duration: 0.8 // 애니메이션 시간 단축
           });
         }
-        
+
         // 선택된 매장의 마커 Popup 자동으로 열기
         setTimeout(() => {
           try {
@@ -724,13 +764,13 @@ ${loggedInStore.name}으로 이동 예정입니다.
                 const markerLat = layer.getLatLng().lat;
                 const markerLng = layer.getLatLng().lng;
                 // 좌표가 거의 일치하는지 확인 (0.0001도 이내, 약 11m)
-                if (Math.abs(markerLat - position.lat) < 0.0001 && 
-                    Math.abs(markerLng - position.lng) < 0.0001) {
+                if (Math.abs(markerLat - position.lat) < 0.0001 &&
+                  Math.abs(markerLng - position.lng) < 0.0001) {
                   foundMarker = layer;
                 }
               }
             });
-            
+
             if (foundMarker && foundMarker.getPopup) {
               const popup = foundMarker.getPopup();
               if (popup) {
@@ -742,7 +782,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
           }
         }, 300); // 지도 이동 후 약간의 지연을 두고 Popup 열기
       });
-      
+
       // 선택한 매장 ID 저장
       previousSelectedStoreRef.current = selectedStore.id;
     }
@@ -752,7 +792,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
   useEffect(() => {
     if (forceZoomToStore && mapRef.current && mapRef.current._mapPane && mapRef.current._leaflet_pos) {
       const { lat, lng } = forceZoomToStore;
-      
+
       try {
         const mapInstance = mapRef.current;
         if (mapInstance._loaded && mapInstance._mapPane && mapInstance._leaflet_pos) {
@@ -770,7 +810,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
   // 지도 범위 계산 (각 모드별 최적화)
   const mapBounds = useMemo(() => {
     if (!filteredStores.length && !userLocation) return null;
-    
+
     const bounds = L.latLngBounds();
 
     // 매장 위치 추가 (재고가 있는 매장만)
@@ -779,7 +819,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
         bounds.extend([parseFloat(store.latitude), parseFloat(store.longitude)]);
       }
     });
-    
+
     // 개통실적 마커가 있는 경우 해당 위치도 추가
     if (showActivationMarkers && activationData) {
       Object.entries(activationData).forEach(([storeName, data]) => {
@@ -789,20 +829,20 @@ ${loggedInStore.name}으로 이동 예정입니다.
         }
       });
     }
-    
+
     // 사용자 위치 추가 (일반 모드에서만)
     if (userLocation && !isAgentMode) {
       bounds.extend([userLocation.lat, userLocation.lng]);
     }
-    
+
     // 경계가 유효한지 확인
     if (bounds && typeof bounds.isEmpty === 'function' && bounds.isEmpty()) {
       return null;
     }
-    
+
     return bounds;
   }, [filteredStores, userLocation, isAgentMode, showActivationMarkers, activationData]);
-      
+
   // 초기 로드 시 지도 범위 설정 (각 모드별 최적화)
   useEffect(() => {
     if (mapBounds && (initialLoadRef.current || !userInteracted) && !forceZoomToStore) {
@@ -817,14 +857,14 @@ ${loggedInStore.name}으로 이동 예정입니다.
         } else {
           maxZoom = 12; // 일반 매장 모드: 중간 시야
         }
-        
+
         map.fitBounds(mapBounds, {
           animate: true,
           duration: 1.5,
           maxZoom: maxZoom, // 최대 줌 레벨 제한
           padding: [20, 20] // 경계에 여백 추가
         });
-        
+
         console.log(`지도 초기 뷰 설정: ${isAgentMode ? '관리자' : '일반'} 모드, ${currentView || '기본'} 뷰, 최대줌: ${maxZoom}`);
       });
       initialLoadRef.current = false;
@@ -834,17 +874,17 @@ ${loggedInStore.name}으로 이동 예정입니다.
   // 반경 변경 시 지도 범위 재설정
   useEffect(() => {
     if (!userLocation || !selectedRadius || isAgentMode) return;
-    
+
     if (initialLoadRef.current || !userInteracted) {
       const bounds = L.latLngBounds([
         [userLocation.lat - selectedRadius / 111000, userLocation.lng - selectedRadius / (111000 * Math.cos(userLocation.lat * Math.PI / 180))],
         [userLocation.lat + selectedRadius / 111000, userLocation.lng + selectedRadius / (111000 * Math.cos(userLocation.lat * Math.PI / 180))]
       ]);
-      
+
       safeMapOperation(() => {
         // 일반 매장 모드에서 반경 변경 시 최대 줌 레벨 제한
         const maxZoom = 13;
-        
+
         map.fitBounds(bounds, {
           animate: true,
           duration: 1.5,
@@ -855,7 +895,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
   }, [map, selectedRadius, userLocation, isAgentMode, userInteracted, safeMapOperation]);
 
   return (
-          <Paper sx={getMapContainerStyle(isMapExpanded)}>
+    <Paper sx={getMapContainerStyle(isMapExpanded)}>
       {/* 확대/축소 토글 버튼 */}
       <Box sx={{
         position: 'absolute',
@@ -882,7 +922,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
           {isMapExpanded ? '축소' : '확대'}
         </Button>
       </Box>
-      
+
       <MapContainer
         key={`map-${isAgentMode ? 'agent' : 'store'}-${currentView || 'default'}-${currentView === 'activation' ? 'activation' : mapKey}`}
         center={[mapCenter.lat, mapCenter.lng]}
@@ -897,33 +937,33 @@ ${loggedInStore.name}으로 이동 예정입니다.
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        
+
         {/* 지도 뷰 업데이트 */}
-        <MapUpdater 
-          center={mapCenter} 
-          bounds={mapBounds} 
+        <MapUpdater
+          center={mapCenter}
+          bounds={mapBounds}
           zoom={mapZoom}
           isAgentMode={isAgentMode}
           currentView={currentView}
           forceZoomToStore={forceZoomToStore}
         />
-        
+
         {/* 강제 확대 업데이트 */}
-        <ForceZoomUpdater 
+        <ForceZoomUpdater
           forceZoomToStore={forceZoomToStore}
         />
-        
+
         {/* 매장 마커들 (담당개통확인 모드에서는 재고 마커 숨김) */}
         {currentView !== 'activation' && (() => {
           // 좌표별로 매장들을 그룹화
           const coordinateGroups = {};
           filteredStores.forEach(store => {
             if (!store.latitude || !store.longitude) return;
-            
+
             const lat = parseFloat(store.latitude).toFixed(6);
             const lng = parseFloat(store.longitude).toFixed(6);
             const coordKey = `${lat},${lng}`;
-            
+
             if (!coordinateGroups[coordKey]) {
               coordinateGroups[coordKey] = [];
             }
@@ -936,230 +976,328 @@ ${loggedInStore.name}으로 이동 예정입니다.
             const selectedStoreInGroup = stores.find(store => selectedStore?.id === store.id);
             if (selectedStoreInGroup) {
               const store = selectedStoreInGroup;
-              
+
               // 강력한 좌표 검증
-              if (!store || !store.latitude || !store.longitude || 
-                  isNaN(parseFloat(store.latitude)) || isNaN(parseFloat(store.longitude)) ||
-                  parseFloat(store.latitude) === 0 || parseFloat(store.longitude) === 0 ||
-                  parseFloat(store.latitude) === null || parseFloat(store.longitude) === null) {
+              if (!store || !store.latitude || !store.longitude ||
+                isNaN(parseFloat(store.latitude)) || isNaN(parseFloat(store.longitude)) ||
+                parseFloat(store.latitude) === 0 || parseFloat(store.longitude) === 0 ||
+                parseFloat(store.latitude) === null || parseFloat(store.longitude) === null) {
                 console.warn('Invalid coordinates for store:', store?.storeName, store?.latitude, store?.longitude);
                 return null;
               }
-              
+
               const inventoryCount = calculateInventory(store);
               const inventoryByAge = getInventoryByAge(store);
               const isSelected = selectedStore?.id === store.id;
               const isLoggedInStore = loggedInStoreId === store.id;
-              
+
               return (
                 <Marker
                   key={store.id}
                   position={[parseFloat(store.latitude), parseFloat(store.longitude)]}
                   icon={createMarkerIcon(store)}
                   eventHandlers={{
-                    click: () => onStoreSelect(store)
+                    click: () => {
+                      if (isCustomerMode) {
+                        loadCustomerDetails(store);
+                      }
+                      onStoreSelect(store);
+                    }
                   }}
                 >
                   <Popup>
-                <div>
-                  <h3>{store.name}</h3>
-                  
-                  {/* 관리자모드일 때는 출고일 기준 재고 표시, 일반모드일 때는 영업사원요청문구 버튼 표시 */}
-                  {isAgentMode ? (
                     <div>
-                      {/* 퀵비용 예상 정보 (관리자 모드에서 요청점이 있는 경우 - 매장명 아래, 모델명/색상 정보 위) */}
-                      {requestedStore && requestedStore.id && store.id && (
-                        <QuickCostPreview
-                          key={`quickcost-${requestedStore.id}-${store.id}-${selectedStore?.id === store.id ? 'selected' : 'normal'}-${quickCostRefreshKey || 0}`}
-                          fromStoreId={requestedStore.id}
-                          toStoreId={store.id}
-                          fromStoreName={requestedStore.name}
-                          toStoreName={store.name}
-                          onQuickCostClick={onQuickCostClick}
-                          refreshKey={quickCostRefreshKey}
-                        />
-                      )}
-                      
-                      {store.inventory && (
+                      <h3>{store.name}</h3>
+
+                      {/* 고객모드일 때는 매장 상세 정보 표시 */}
+                      {isCustomerMode ? (
+                        <div style={{ minWidth: '300px', maxWidth: '400px' }}>
+                          {/* 매장 기본 정보 */}
+                          <div style={{ marginBottom: '12px' }}>
+                            {store.phone && <p style={{ margin: '4px 0', fontSize: '14px' }}><strong>전화:</strong> {store.phone}</p>}
+                            {store.storePhone && <p style={{ margin: '4px 0', fontSize: '14px' }}><strong>휴대폰:</strong> {store.storePhone}</p>}
+                            {store.businessNumber && <p style={{ margin: '4px 0', fontSize: '14px' }}><strong>사업자번호:</strong> {store.businessNumber}</p>}
+                            {store.manager && <p style={{ margin: '4px 0', fontSize: '14px' }}><strong>점장명:</strong> {store.manager}</p>}
+                            {store.address && <p style={{ margin: '4px 0', fontSize: '14px' }}><strong>주소:</strong> {store.address}</p>}
+                          </div>
+
+                          {/* 사전승낙서마크 표시 */}
+                          {isDetailLoading && <p style={{ fontSize: '12px', color: '#666' }}>로딩 중...</p>}
+                          {!isDetailLoading && preApprovalMark && (
+                            <div style={{ marginBottom: '12px', padding: '8px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
+                              <p style={{ margin: '0 0 4px 0', fontSize: '12px', fontWeight: 'bold' }}>사전승낙서마크</p>
+                              <div dangerouslySetInnerHTML={{ __html: preApprovalMark }} />
+                            </div>
+                          )}
+
+                          {/* 매장 사진 표시 */}
+                          {!isDetailLoading && storePhotos && (
+                            <div style={{ marginBottom: '12px' }}>
+                              <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 'bold' }}>매장 사진</p>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                                {storePhotos.frontUrl && (
+                                  <img src={storePhotos.frontUrl} alt="전면" style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
+                                )}
+                                {storePhotos.insideUrl && (
+                                  <img src={storePhotos.insideUrl} alt="내부" style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
+                                )}
+                                {storePhotos.outsideUrl && (
+                                  <img src={storePhotos.outsideUrl} alt="외부" style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
+                                )}
+                                {storePhotos.outside2Url && (
+                                  <img src={storePhotos.outside2Url} alt="외부2" style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 점장 및 직원 사진 표시 */}
+                          {!isDetailLoading && storePhotos && (storePhotos.managerUrl || storePhotos.staff1Url || storePhotos.staff2Url || storePhotos.staff3Url) && (
+                            <div style={{ marginBottom: '12px' }}>
+                              <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 'bold' }}>점장 및 직원</p>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                                {storePhotos.managerUrl && (
+                                  <div>
+                                    <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#666' }}>점장</p>
+                                    <img src={storePhotos.managerUrl} alt="점장" style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
+                                  </div>
+                                )}
+                                {storePhotos.staff1Url && (
+                                  <div>
+                                    <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#666' }}>직원1</p>
+                                    <img src={storePhotos.staff1Url} alt="직원1" style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
+                                  </div>
+                                )}
+                                {storePhotos.staff2Url && (
+                                  <div>
+                                    <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#666' }}>직원2</p>
+                                    <img src={storePhotos.staff2Url} alt="직원2" style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
+                                  </div>
+                                )}
+                                {storePhotos.staff3Url && (
+                                  <div>
+                                    <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#666' }}>직원3</p>
+                                    <img src={storePhotos.staff3Url} alt="직원3" style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 해당매장선택하기 버튼 */}
+                          <button
+                            onClick={() => onStoreSelect(store)}
+                            style={{
+                              width: '100%',
+                              padding: '10px',
+                              backgroundColor: '#1976d2',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              fontSize: '14px',
+                              fontWeight: 'bold',
+                              cursor: 'pointer',
+                              marginTop: '12px'
+                            }}
+                          >
+                            해당매장선택하기
+                          </button>
+                        </div>
+                      ) : isAgentMode ? (
                         <div>
-                          {Object.entries(store.inventory).map(([category, models]) => {
-                            if (!models || typeof models !== 'object') return null;
-                            
-                            return Object.entries(models).map(([model, statuses]) => {
-                              if (!statuses || typeof statuses !== 'object') return null;
-                              
-                              // 해당 모델의 총 재고 계산
-                              let modelTotal = 0;
-                              const colorDetails = [];
-                              
-                              Object.entries(statuses).forEach(([status, colors]) => {
-                                if (colors && typeof colors === 'object') {
-                                  Object.entries(colors).forEach(([color, item]) => {
-                                    let quantity = 0;
-                                    if (typeof item === 'object' && item && item.quantity) {
-                                      quantity = item.quantity;
-                                    } else if (typeof item === 'number') {
-                                      quantity = item;
-                                    }
-                                    if (quantity && quantity > 0) {
-                                      modelTotal += quantity;
-                                      colorDetails.push(`${color}: ${quantity}개`);
+                          {/* 퀵비용 예상 정보 (관리자 모드에서 요청점이 있는 경우 - 매장명 아래, 모델명/색상 정보 위) */}
+                          {requestedStore && requestedStore.id && store.id && (
+                            <QuickCostPreview
+                              key={`quickcost-${requestedStore.id}-${store.id}-${selectedStore?.id === store.id ? 'selected' : 'normal'}-${quickCostRefreshKey || 0}`}
+                              fromStoreId={requestedStore.id}
+                              toStoreId={store.id}
+                              fromStoreName={requestedStore.name}
+                              toStoreName={store.name}
+                              onQuickCostClick={onQuickCostClick}
+                              refreshKey={quickCostRefreshKey}
+                            />
+                          )}
+
+                          {store.inventory && (
+                            <div>
+                              {Object.entries(store.inventory).map(([category, models]) => {
+                                if (!models || typeof models !== 'object') return null;
+
+                                return Object.entries(models).map(([model, statuses]) => {
+                                  if (!statuses || typeof statuses !== 'object') return null;
+
+                                  // 해당 모델의 총 재고 계산
+                                  let modelTotal = 0;
+                                  const colorDetails = [];
+
+                                  Object.entries(statuses).forEach(([status, colors]) => {
+                                    if (colors && typeof colors === 'object') {
+                                      Object.entries(colors).forEach(([color, item]) => {
+                                        let quantity = 0;
+                                        if (typeof item === 'object' && item && item.quantity) {
+                                          quantity = item.quantity;
+                                        } else if (typeof item === 'number') {
+                                          quantity = item;
+                                        }
+                                        if (quantity && quantity > 0) {
+                                          modelTotal += quantity;
+                                          colorDetails.push(`${color}: ${quantity}개`);
+                                        }
+                                      });
                                     }
                                   });
-                                }
-                              });
-                              
-                              if (modelTotal > 0) {
-                                return (
-                                  <div key={model} style={{ marginBottom: '8px' }}>
-                                    <p style={{ fontWeight: 'bold', margin: '0 0 4px 0', color: '#2196f3' }}>
-                                      {model}: {modelTotal}개
-                                    </p>
-                                    <div style={{ fontSize: '0.9em', color: '#666', marginLeft: '8px' }}>
-                                      {colorDetails.join(', ')}
-                                    </div>
-                                  </div>
-                                );
-                              }
-                              return null;
-                            });
-                          })}
+
+                                  if (modelTotal > 0) {
+                                    return (
+                                      <div key={model} style={{ marginBottom: '8px' }}>
+                                        <p style={{ fontWeight: 'bold', margin: '0 0 4px 0', color: '#2196f3' }}>
+                                          {model}: {modelTotal}개
+                                        </p>
+                                        <div style={{ fontSize: '0.9em', color: '#666', marginLeft: '8px' }}>
+                                          {colorDetails.join(', ')}
+                                        </div>
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                });
+                              })}
+                            </div>
+                          )}
+
+                          {/* 출고일 기준 재고 정보 */}
+                          {(inventoryByAge.within30 > 0 || inventoryByAge.within60 > 0 || inventoryByAge.over60 > 0) && (
+                            <div style={{ marginTop: '12px', padding: '8px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
+                              <p style={{ fontWeight: 'bold', margin: '0 0 8px 0', fontSize: '0.9em' }}>출고일 기준 재고:</p>
+                              <div style={{ fontSize: '0.85em' }}>
+                                {inventoryByAge.over60 > 0 && (
+                                  <p style={{ margin: '2px 0', color: '#ff9800' }}>⚠️ 60일 이상: {inventoryByAge.over60}개</p>
+                                )}
+                                {inventoryByAge.within60 > 0 && (
+                                  <p style={{ margin: '2px 0', color: '#ffc107' }}>⚡ 30-60일: {inventoryByAge.within60}개</p>
+                                )}
+                                {inventoryByAge.within30 > 0 && (
+                                  <p style={{ margin: '2px 0', color: '#4caf50' }}>✅ 30일 이내: {inventoryByAge.within30}개</p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 선택됨/기억 버튼을 같은 줄에 배치 */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                            {isSelected && <span style={{ color: '#2196f3', fontWeight: 'bold', fontSize: '12px' }}>✓ 선택됨</span>}
+                            {isLoggedInStore && <span style={{ color: '#9c27b0', fontWeight: 'bold', fontSize: '12px' }}>내 매장</span>}
+
+                            <button
+                              onClick={() => handleRemember(store, selectedModel, selectedColor)}
+                              disabled={!selectedModel || !selectedColor}
+                              style={{
+                                padding: '6px 8px',
+                                backgroundColor: selectedModel && selectedColor ? '#4CAF50' : '#F5F5F5',
+                                color: selectedModel && selectedColor ? 'white' : '#999',
+                                border: 'none',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                fontWeight: 'bold',
+                                cursor: selectedModel && selectedColor ? 'pointer' : 'not-allowed',
+                                minWidth: '50px'
+                              }}
+                            >
+                              기억
+                            </button>
+                          </div>
                         </div>
-                      )}
-                      
-                      {/* 출고일 기준 재고 정보 */}
-                      {(inventoryByAge.within30 > 0 || inventoryByAge.within60 > 0 || inventoryByAge.over60 > 0) && (
-                        <div style={{ marginTop: '12px', padding: '8px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
-                          <p style={{ fontWeight: 'bold', margin: '0 0 8px 0', fontSize: '0.9em' }}>출고일 기준 재고:</p>
-                          <div style={{ fontSize: '0.85em' }}>
-                            {inventoryByAge.over60 > 0 && (
-                              <p style={{ margin: '2px 0', color: '#ff9800' }}>⚠️ 60일 이상: {inventoryByAge.over60}개</p>
-                            )}
-                            {inventoryByAge.within60 > 0 && (
-                              <p style={{ margin: '2px 0', color: '#ffc107' }}>⚡ 30-60일: {inventoryByAge.within60}개</p>
-                            )}
-                            {inventoryByAge.within30 > 0 && (
-                              <p style={{ margin: '2px 0', color: '#4caf50' }}>✅ 30일 이내: {inventoryByAge.within30}개</p>
-                            )}
+                      ) : (
+                        /* 일반모드일 때는 영업사원요청문구 버튼 표시 */
+                        <div>
+                          {store.address && <p>주소: {store.address}</p>}
+
+                          {/* 퀵비용 예상 정보 (주소 아래, 재고 위) */}
+                          {loggedInStore && loggedInStore.id && store.id && (
+                            <QuickCostPreview
+                              key={`quickcost-${loggedInStore.id}-${store.id}-${selectedStore?.id === store.id ? 'selected' : 'normal'}-${quickCostRefreshKey || 0}`}
+                              fromStoreId={loggedInStore.id}
+                              toStoreId={store.id}
+                              fromStoreName={loggedInStore.name}
+                              toStoreName={store.name}
+                              onQuickCostClick={onQuickCostClick}
+                              refreshKey={quickCostRefreshKey}
+                            />
+                          )}
+
+                          <p>재고: {inventoryCount}개</p>
+
+                          {/* 선택됨 표시 */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                            {isSelected && <span style={{ color: '#2196f3', fontWeight: 'bold', fontSize: '12px' }}>✓ 선택됨</span>}
+                            {isLoggedInStore && <span style={{ color: '#9c27b0', fontWeight: 'bold', fontSize: '12px' }}>내 매장</span>}
+                          </div>
+
+                          {/* 영업사원요청문구/기억 버튼을 아래로 이동 */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                            <button
+                              onClick={() => handleKakaoTalk(store, selectedModel, selectedColor, loggedInStore)}
+                              disabled={!selectedModel || !selectedColor}
+                              style={{
+                                flex: 1,
+                                padding: '6px 8px',
+                                backgroundColor: selectedModel && selectedColor ? '#FEE500' : '#F5F5F5',
+                                color: selectedModel && selectedColor ? '#3C1E1E' : '#999',
+                                border: 'none',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                fontWeight: 'bold',
+                                cursor: selectedModel && selectedColor ? 'pointer' : 'not-allowed',
+                                minWidth: '80px'
+                              }}
+                            >
+                              영업사원요청문구
+                            </button>
+
+                            <button
+                              onClick={() => handleRemember(store, selectedModel, selectedColor)}
+                              disabled={!selectedModel || !selectedColor}
+                              style={{
+                                padding: '6px 8px',
+                                backgroundColor: selectedModel && selectedColor ? '#4CAF50' : '#F5F5F5',
+                                color: selectedModel && selectedColor ? 'white' : '#999',
+                                border: 'none',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                fontWeight: 'bold',
+                                cursor: selectedModel && selectedColor ? 'pointer' : 'not-allowed',
+                                minWidth: '50px'
+                              }}
+                            >
+                              기억
+                            </button>
                           </div>
                         </div>
                       )}
-                      
-                        {/* 선택됨/기억 버튼을 같은 줄에 배치 */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
-                        {isSelected && <span style={{color: '#2196f3', fontWeight: 'bold', fontSize: '12px'}}>✓ 선택됨</span>}
-                        {isLoggedInStore && <span style={{color: '#9c27b0', fontWeight: 'bold', fontSize: '12px'}}>내 매장</span>}
-                        
-                        <button 
-                          onClick={() => handleRemember(store, selectedModel, selectedColor)}
-                          disabled={!selectedModel || !selectedColor}
-                          style={{
-                            padding: '6px 8px',
-                            backgroundColor: selectedModel && selectedColor ? '#4CAF50' : '#F5F5F5',
-                            color: selectedModel && selectedColor ? 'white' : '#999',
-                            border: 'none',
-                            borderRadius: '4px',
-                            fontSize: '11px',
-                            fontWeight: 'bold',
-                            cursor: selectedModel && selectedColor ? 'pointer' : 'not-allowed',
-                            minWidth: '50px'
-                          }}
-                        >
-                          기억
-                        </button>
-                      </div>
                     </div>
-                  ) : (
-                    /* 일반모드일 때는 영업사원요청문구 버튼 표시 */
-                    <div>
-                      {store.address && <p>주소: {store.address}</p>}
-                      
-                      {/* 퀵비용 예상 정보 (주소 아래, 재고 위) */}
-                      {loggedInStore && loggedInStore.id && store.id && (
-                        <QuickCostPreview
-                          key={`quickcost-${loggedInStore.id}-${store.id}-${selectedStore?.id === store.id ? 'selected' : 'normal'}-${quickCostRefreshKey || 0}`}
-                          fromStoreId={loggedInStore.id}
-                          toStoreId={store.id}
-                          fromStoreName={loggedInStore.name}
-                          toStoreName={store.name}
-                          onQuickCostClick={onQuickCostClick}
-                          refreshKey={quickCostRefreshKey}
-                        />
-                      )}
-                      
-                      <p>재고: {inventoryCount}개</p>
-                      
-                      {/* 선택됨 표시 */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
-                        {isSelected && <span style={{color: '#2196f3', fontWeight: 'bold', fontSize: '12px'}}>✓ 선택됨</span>}
-                        {isLoggedInStore && <span style={{color: '#9c27b0', fontWeight: 'bold', fontSize: '12px'}}>내 매장</span>}
-                      </div>
-                      
-                      {/* 영업사원요청문구/기억 버튼을 아래로 이동 */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
-                        <button 
-                          onClick={() => handleKakaoTalk(store, selectedModel, selectedColor, loggedInStore)}
-                          disabled={!selectedModel || !selectedColor}
-                          style={{
-                            flex: 1,
-                            padding: '6px 8px',
-                            backgroundColor: selectedModel && selectedColor ? '#FEE500' : '#F5F5F5',
-                            color: selectedModel && selectedColor ? '#3C1E1E' : '#999',
-                            border: 'none',
-                            borderRadius: '4px',
-                            fontSize: '11px',
-                            fontWeight: 'bold',
-                            cursor: selectedModel && selectedColor ? 'pointer' : 'not-allowed',
-                            minWidth: '80px'
-                          }}
-                        >
-                          영업사원요청문구
-                        </button>
-                        
-                        <button 
-                          onClick={() => handleRemember(store, selectedModel, selectedColor)}
-                          disabled={!selectedModel || !selectedColor}
-                          style={{
-                            padding: '6px 8px',
-                            backgroundColor: selectedModel && selectedColor ? '#4CAF50' : '#F5F5F5',
-                            color: selectedModel && selectedColor ? 'white' : '#999',
-                            border: 'none',
-                            borderRadius: '4px',
-                            fontSize: '11px',
-                            fontWeight: 'bold',
-                            cursor: selectedModel && selectedColor ? 'pointer' : 'not-allowed',
-                            minWidth: '50px'
-                          }}
-                        >
-                          기억
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </Popup>
-            </Marker>
-          );
+                  </Popup>
+                </Marker>
+              );
             }
-            
+
             if (stores.length === 1) {
               // 단일 매장인 경우 기존 로직
               const store = stores[0];
-              
+
               // 강력한 좌표 검증
-              if (!store || !store.latitude || !store.longitude || 
-                  isNaN(parseFloat(store.latitude)) || isNaN(parseFloat(store.longitude)) ||
-                  parseFloat(store.latitude) === 0 || parseFloat(store.longitude) === 0 ||
-                  parseFloat(store.latitude) === null || parseFloat(store.longitude) === null) {
+              if (!store || !store.latitude || !store.longitude ||
+                isNaN(parseFloat(store.latitude)) || isNaN(parseFloat(store.longitude)) ||
+                parseFloat(store.latitude) === 0 || parseFloat(store.longitude) === 0 ||
+                parseFloat(store.latitude) === null || parseFloat(store.longitude) === null) {
                 console.warn('Invalid coordinates for store:', store?.storeName, store?.latitude, store?.longitude);
                 return null;
               }
-              
+
               const inventoryCount = calculateInventory(store);
               const inventoryByAge = getInventoryByAge(store);
               const isSelected = selectedStore?.id === store.id;
               const isLoggedInStore = loggedInStoreId === store.id;
-              
+
               return (
                 <Marker
                   key={store.id}
@@ -1170,205 +1308,205 @@ ${loggedInStore.name}으로 이동 예정입니다.
                   }}
                 >
                   <Popup>
-                <div>
-                  <h3>{store.name}</h3>
-                  
-                  {/* 관리자모드일 때는 출고일 기준 재고 표시, 일반모드일 때는 영업사원요청문구 버튼 표시 */}
-                  {isAgentMode ? (
                     <div>
-                      {/* 퀵비용 예상 정보 (관리자 모드에서 요청점이 있는 경우 - 매장명 아래, 모델명/색상 정보 위) */}
-                      {requestedStore && requestedStore.id && store.id && (
-                        <QuickCostPreview
-                          key={`quickcost-${requestedStore.id}-${store.id}-${selectedStore?.id === store.id ? 'selected' : 'normal'}-${quickCostRefreshKey || 0}`}
-                          fromStoreId={requestedStore.id}
-                          toStoreId={store.id}
-                          fromStoreName={requestedStore.name}
-                          toStoreName={store.name}
-                          onQuickCostClick={onQuickCostClick}
-                          refreshKey={quickCostRefreshKey}
-                        />
-                      )}
-                      
-                      {store.inventory && (
+                      <h3>{store.name}</h3>
+
+                      {/* 관리자모드일 때는 출고일 기준 재고 표시, 일반모드일 때는 영업사원요청문구 버튼 표시 */}
+                      {isAgentMode ? (
                         <div>
-                          {Object.entries(store.inventory).map(([category, models]) => {
-                            if (!models || typeof models !== 'object') return null;
-                            
-                            return Object.entries(models).map(([model, statuses]) => {
-                              if (!statuses || typeof statuses !== 'object') return null;
-                              
-                              // 해당 모델의 총 재고 계산
-                              let modelTotal = 0;
-                              const colorDetails = [];
-                              
-                              Object.entries(statuses).forEach(([status, colors]) => {
-                                if (colors && typeof colors === 'object') {
-                                  Object.entries(colors).forEach(([color, item]) => {
-                                    let quantity = 0;
-                                    if (typeof item === 'object' && item && item.quantity) {
-                                      quantity = item.quantity;
-                                    } else if (typeof item === 'number') {
-                                      quantity = item;
-                                    }
-                                    if (quantity && quantity > 0) {
-                                      modelTotal += quantity;
-                                      colorDetails.push(`${color}: ${quantity}개`);
+                          {/* 퀵비용 예상 정보 (관리자 모드에서 요청점이 있는 경우 - 매장명 아래, 모델명/색상 정보 위) */}
+                          {requestedStore && requestedStore.id && store.id && (
+                            <QuickCostPreview
+                              key={`quickcost-${requestedStore.id}-${store.id}-${selectedStore?.id === store.id ? 'selected' : 'normal'}-${quickCostRefreshKey || 0}`}
+                              fromStoreId={requestedStore.id}
+                              toStoreId={store.id}
+                              fromStoreName={requestedStore.name}
+                              toStoreName={store.name}
+                              onQuickCostClick={onQuickCostClick}
+                              refreshKey={quickCostRefreshKey}
+                            />
+                          )}
+
+                          {store.inventory && (
+                            <div>
+                              {Object.entries(store.inventory).map(([category, models]) => {
+                                if (!models || typeof models !== 'object') return null;
+
+                                return Object.entries(models).map(([model, statuses]) => {
+                                  if (!statuses || typeof statuses !== 'object') return null;
+
+                                  // 해당 모델의 총 재고 계산
+                                  let modelTotal = 0;
+                                  const colorDetails = [];
+
+                                  Object.entries(statuses).forEach(([status, colors]) => {
+                                    if (colors && typeof colors === 'object') {
+                                      Object.entries(colors).forEach(([color, item]) => {
+                                        let quantity = 0;
+                                        if (typeof item === 'object' && item && item.quantity) {
+                                          quantity = item.quantity;
+                                        } else if (typeof item === 'number') {
+                                          quantity = item;
+                                        }
+                                        if (quantity && quantity > 0) {
+                                          modelTotal += quantity;
+                                          colorDetails.push(`${color}: ${quantity}개`);
+                                        }
+                                      });
                                     }
                                   });
-                                }
-                              });
-                              
-                              if (modelTotal > 0) {
-                                return (
-                                  <div key={model} style={{ marginBottom: '8px' }}>
-                                    <p style={{ fontWeight: 'bold', margin: '0 0 4px 0', color: '#2196f3' }}>
-                                      {model}: {modelTotal}개
-                                    </p>
-                                    <div style={{ fontSize: '0.9em', color: '#666', marginLeft: '8px' }}>
-                                      {colorDetails.join(', ')}
-                                    </div>
-                                  </div>
-                                );
-                              }
-                              return null;
-                            });
-                          })}
+
+                                  if (modelTotal > 0) {
+                                    return (
+                                      <div key={model} style={{ marginBottom: '8px' }}>
+                                        <p style={{ fontWeight: 'bold', margin: '0 0 4px 0', color: '#2196f3' }}>
+                                          {model}: {modelTotal}개
+                                        </p>
+                                        <div style={{ fontSize: '0.9em', color: '#666', marginLeft: '8px' }}>
+                                          {colorDetails.join(', ')}
+                                        </div>
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                });
+                              })}
+                            </div>
+                          )}
+
+                          {/* 출고일 기준 재고 정보 */}
+                          {(inventoryByAge.within30 > 0 || inventoryByAge.within60 > 0 || inventoryByAge.over60 > 0) && (
+                            <div style={{ marginTop: '12px', padding: '8px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
+                              <p style={{ fontWeight: 'bold', margin: '0 0 8px 0', fontSize: '0.9em' }}>출고일 기준 재고:</p>
+                              <div style={{ fontSize: '0.85em' }}>
+                                {inventoryByAge.over60 > 0 && (
+                                  <p style={{ margin: '2px 0', color: '#ff9800' }}>⚠️ 60일 이상: {inventoryByAge.over60}개</p>
+                                )}
+                                {inventoryByAge.within60 > 0 && (
+                                  <p style={{ margin: '2px 0', color: '#ffc107' }}>⚡ 30-60일: {inventoryByAge.within60}개</p>
+                                )}
+                                {inventoryByAge.within30 > 0 && (
+                                  <p style={{ margin: '2px 0', color: '#4caf50' }}>✅ 30일 이내: {inventoryByAge.within30}개</p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 선택됨/기억 버튼을 같은 줄에 배치 */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                            {isSelected && <span style={{ color: '#2196f3', fontWeight: 'bold', fontSize: '12px' }}>✓ 선택됨</span>}
+                            {isLoggedInStore && <span style={{ color: '#9c27b0', fontWeight: 'bold', fontSize: '12px' }}>내 매장</span>}
+
+                            <button
+                              onClick={() => handleRemember(store, selectedModel, selectedColor)}
+                              disabled={!selectedModel || !selectedColor}
+                              style={{
+                                padding: '6px 8px',
+                                backgroundColor: selectedModel && selectedColor ? '#4CAF50' : '#F5F5F5',
+                                color: selectedModel && selectedColor ? 'white' : '#999',
+                                border: 'none',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                fontWeight: 'bold',
+                                cursor: selectedModel && selectedColor ? 'pointer' : 'not-allowed',
+                                minWidth: '50px'
+                              }}
+                            >
+                              기억
+                            </button>
+                          </div>
                         </div>
-                      )}
-                      
-                      {/* 출고일 기준 재고 정보 */}
-                      {(inventoryByAge.within30 > 0 || inventoryByAge.within60 > 0 || inventoryByAge.over60 > 0) && (
-                        <div style={{ marginTop: '12px', padding: '8px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
-                          <p style={{ fontWeight: 'bold', margin: '0 0 8px 0', fontSize: '0.9em' }}>출고일 기준 재고:</p>
-                          <div style={{ fontSize: '0.85em' }}>
-                            {inventoryByAge.over60 > 0 && (
-                              <p style={{ margin: '2px 0', color: '#ff9800' }}>⚠️ 60일 이상: {inventoryByAge.over60}개</p>
-                            )}
-                            {inventoryByAge.within60 > 0 && (
-                              <p style={{ margin: '2px 0', color: '#ffc107' }}>⚡ 30-60일: {inventoryByAge.within60}개</p>
-                            )}
-                            {inventoryByAge.within30 > 0 && (
-                              <p style={{ margin: '2px 0', color: '#4caf50' }}>✅ 30일 이내: {inventoryByAge.within30}개</p>
-                            )}
+                      ) : (
+                        /* 일반모드일 때는 영업사원요청문구 버튼 표시 */
+                        <div>
+                          {store.address && <p>주소: {store.address}</p>}
+
+                          {/* 퀵비용 예상 정보 (주소 아래, 재고 위) */}
+                          {loggedInStore && loggedInStore.id && store.id && (
+                            <QuickCostPreview
+                              key={`quickcost-${loggedInStore.id}-${store.id}-${selectedStore?.id === store.id ? 'selected' : 'normal'}-${quickCostRefreshKey || 0}`}
+                              fromStoreId={loggedInStore.id}
+                              toStoreId={store.id}
+                              fromStoreName={loggedInStore.name}
+                              toStoreName={store.name}
+                              onQuickCostClick={onQuickCostClick}
+                              refreshKey={quickCostRefreshKey}
+                            />
+                          )}
+
+                          <p>재고: {inventoryCount}개</p>
+
+                          {/* 선택됨 표시 */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                            {isSelected && <span style={{ color: '#2196f3', fontWeight: 'bold', fontSize: '12px' }}>✓ 선택됨</span>}
+                            {isLoggedInStore && <span style={{ color: '#9c27b0', fontWeight: 'bold', fontSize: '12px' }}>내 매장</span>}
+                          </div>
+
+                          {/* 영업사원요청문구/기억 버튼을 아래로 이동 */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                            <button
+                              onClick={() => handleKakaoTalk(store, selectedModel, selectedColor, loggedInStore)}
+                              disabled={!selectedModel || !selectedColor}
+                              style={{
+                                flex: 1,
+                                padding: '6px 8px',
+                                backgroundColor: selectedModel && selectedColor ? '#FEE500' : '#F5F5F5',
+                                color: selectedModel && selectedColor ? '#3C1E1E' : '#999',
+                                border: 'none',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                fontWeight: 'bold',
+                                cursor: selectedModel && selectedColor ? 'pointer' : 'not-allowed',
+                                minWidth: '80px'
+                              }}
+                            >
+                              영업사원요청문구
+                            </button>
+
+                            <button
+                              onClick={() => handleRemember(store, selectedModel, selectedColor)}
+                              disabled={!selectedModel || !selectedColor}
+                              style={{
+                                padding: '6px 8px',
+                                backgroundColor: selectedModel && selectedColor ? '#4CAF50' : '#F5F5F5',
+                                color: selectedModel && selectedColor ? 'white' : '#999',
+                                border: 'none',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                fontWeight: 'bold',
+                                cursor: selectedModel && selectedColor ? 'pointer' : 'not-allowed',
+                                minWidth: '50px'
+                              }}
+                            >
+                              기억
+                            </button>
                           </div>
                         </div>
                       )}
-                      
-                        {/* 선택됨/기억 버튼을 같은 줄에 배치 */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
-                        {isSelected && <span style={{color: '#2196f3', fontWeight: 'bold', fontSize: '12px'}}>✓ 선택됨</span>}
-                        {isLoggedInStore && <span style={{color: '#9c27b0', fontWeight: 'bold', fontSize: '12px'}}>내 매장</span>}
-                        
-                        <button 
-                          onClick={() => handleRemember(store, selectedModel, selectedColor)}
-                          disabled={!selectedModel || !selectedColor}
-                          style={{
-                            padding: '6px 8px',
-                            backgroundColor: selectedModel && selectedColor ? '#4CAF50' : '#F5F5F5',
-                            color: selectedModel && selectedColor ? 'white' : '#999',
-                            border: 'none',
-                            borderRadius: '4px',
-                            fontSize: '11px',
-                            fontWeight: 'bold',
-                            cursor: selectedModel && selectedColor ? 'pointer' : 'not-allowed',
-                            minWidth: '50px'
-                          }}
-                        >
-                          기억
-                        </button>
-                      </div>
                     </div>
-                  ) : (
-                    /* 일반모드일 때는 영업사원요청문구 버튼 표시 */
-                    <div>
-                      {store.address && <p>주소: {store.address}</p>}
-                      
-                      {/* 퀵비용 예상 정보 (주소 아래, 재고 위) */}
-                      {loggedInStore && loggedInStore.id && store.id && (
-                        <QuickCostPreview
-                          key={`quickcost-${loggedInStore.id}-${store.id}-${selectedStore?.id === store.id ? 'selected' : 'normal'}-${quickCostRefreshKey || 0}`}
-                          fromStoreId={loggedInStore.id}
-                          toStoreId={store.id}
-                          fromStoreName={loggedInStore.name}
-                          toStoreName={store.name}
-                          onQuickCostClick={onQuickCostClick}
-                          refreshKey={quickCostRefreshKey}
-                        />
-                      )}
-                      
-                      <p>재고: {inventoryCount}개</p>
-                      
-                      {/* 선택됨 표시 */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
-                        {isSelected && <span style={{color: '#2196f3', fontWeight: 'bold', fontSize: '12px'}}>✓ 선택됨</span>}
-                        {isLoggedInStore && <span style={{color: '#9c27b0', fontWeight: 'bold', fontSize: '12px'}}>내 매장</span>}
-                      </div>
-                      
-                      {/* 영업사원요청문구/기억 버튼을 아래로 이동 */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
-                        <button 
-                          onClick={() => handleKakaoTalk(store, selectedModel, selectedColor, loggedInStore)}
-                          disabled={!selectedModel || !selectedColor}
-                          style={{
-                            flex: 1,
-                            padding: '6px 8px',
-                            backgroundColor: selectedModel && selectedColor ? '#FEE500' : '#F5F5F5',
-                            color: selectedModel && selectedColor ? '#3C1E1E' : '#999',
-                            border: 'none',
-                            borderRadius: '4px',
-                            fontSize: '11px',
-                            fontWeight: 'bold',
-                            cursor: selectedModel && selectedColor ? 'pointer' : 'not-allowed',
-                            minWidth: '80px'
-                          }}
-                        >
-                          영업사원요청문구
-                        </button>
-                        
-                        <button 
-                          onClick={() => handleRemember(store, selectedModel, selectedColor)}
-                          disabled={!selectedModel || !selectedColor}
-                          style={{
-                            padding: '6px 8px',
-                            backgroundColor: selectedModel && selectedColor ? '#4CAF50' : '#F5F5F5',
-                            color: selectedModel && selectedColor ? 'white' : '#999',
-                            border: 'none',
-                            borderRadius: '4px',
-                            fontSize: '11px',
-                            fontWeight: 'bold',
-                            cursor: selectedModel && selectedColor ? 'pointer' : 'not-allowed',
-                            minWidth: '50px'
-                          }}
-                        >
-                          기억
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </Popup>
-            </Marker>
-          );
+                  </Popup>
+                </Marker>
+              );
             } else {
               // 중복 좌표에 여러 매장이 있는 경우 하나의 마커로 표시하고 클릭 시 말풍선으로 선택
               const firstStore = stores[0];
-              
+
               // 강력한 좌표 검증
-              if (!firstStore || !firstStore.latitude || !firstStore.longitude || 
-                  isNaN(parseFloat(firstStore.latitude)) || isNaN(parseFloat(firstStore.longitude)) ||
-                  parseFloat(firstStore.latitude) === 0 || parseFloat(firstStore.longitude) === 0 ||
-                  parseFloat(firstStore.latitude) === null || parseFloat(firstStore.longitude) === null) {
+              if (!firstStore || !firstStore.latitude || !firstStore.longitude ||
+                isNaN(parseFloat(firstStore.latitude)) || isNaN(parseFloat(firstStore.longitude)) ||
+                parseFloat(firstStore.latitude) === 0 || parseFloat(firstStore.longitude) === 0 ||
+                parseFloat(firstStore.latitude) === null || parseFloat(firstStore.longitude) === null) {
                 console.warn('Invalid coordinates for duplicate group:', firstStore?.storeName, firstStore?.latitude, firstStore?.longitude);
                 return null;
               }
-              
+
               const baseLat = parseFloat(firstStore.latitude);
               const baseLng = parseFloat(firstStore.longitude);
-              
+
               // 대표 매장 선택 로직 개선
               let representativeStore;
               let isSelected = false;
-              
+
               // 1. 선택된 매장이 있으면 해당 매장을 대표로 사용
               const selectedStoreInGroup = stores.find(store => selectedStore?.id === store.id);
               if (selectedStoreInGroup) {
@@ -1379,7 +1517,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
               else {
                 representativeStore = stores.find(store => store.name && store.name.includes('사무실')) || stores[0];
               }
-              
+
               // 선택되지 않은 상태일 때는 총 합산 수량을 계산
               let totalInventoryCount = 0;
               if (!isSelected) {
@@ -1387,7 +1525,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
                   return total + calculateInventory(store);
                 }, 0);
               }
-              
+
               // 중복 좌표용 마커 아이콘 생성 함수
               const createDuplicateMarkerIcon = (store, isSelected, totalCount) => {
                 if (isSelected) {
@@ -1421,7 +1559,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
                   });
                 }
               };
-              
+
               return (
                 <Marker
                   key={`duplicate-${coordKey}`}
@@ -1449,10 +1587,10 @@ ${loggedInStore.name}으로 이동 예정입니다.
                           const inventoryCount = calculateInventory(store);
                           const inventoryByAge = getInventoryByAge(store);
                           const hasInventory = inventoryCount > 0;
-                          
+
                           // 마커와 동일한 색상 로직 적용
                           let fillColor, strokeColor;
-                          
+
                           // 1. 요청점 (최우선)
                           if (isRequestedStore) {
                             fillColor = '#ff9800';
@@ -1476,12 +1614,12 @@ ${loggedInStore.name}으로 이동 예정입니다.
                           // 5. 일반 매장 - 출고일 기준 색상 조정
                           else {
                             const totalFilteredInventory = inventoryByAge.within30 + inventoryByAge.within60 + inventoryByAge.over60;
-                            
+
                             if (totalFilteredInventory > 0) {
                               const within30Ratio = inventoryByAge.within30 / totalFilteredInventory;
                               const within60Ratio = inventoryByAge.within60 / totalFilteredInventory;
                               const over60Ratio = inventoryByAge.over60 / totalFilteredInventory;
-                              
+
                               if (over60Ratio >= within30Ratio && over60Ratio >= within60Ratio) {
                                 fillColor = hasInventory ? '#ff9800' : '#f44336';
                                 strokeColor = hasInventory ? '#f57c00' : '#d32f2f';
@@ -1497,14 +1635,14 @@ ${loggedInStore.name}으로 이동 예정입니다.
                               strokeColor = hasInventory ? '#388e3c' : '#d32f2f';
                             }
                           }
-                          
+
                           return (
-                            <div 
+                            <div
                               key={store.id}
-                              style={{ 
-                                padding: '8px', 
-                                border: '1px solid #e0e0e0', 
-                                borderRadius: '4px', 
+                              style={{
+                                padding: '8px',
+                                border: '1px solid #e0e0e0',
+                                borderRadius: '4px',
                                 marginBottom: '4px',
                                 cursor: 'pointer',
                                 backgroundColor: isSelected ? '#e3f2fd' : '#f9f9f9'
@@ -1513,7 +1651,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
                             >
                               <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
                                 {/* 마커 색상 표시 */}
-                                <div 
+                                <div
                                   style={{
                                     width: '12px',
                                     height: '12px',
@@ -1526,12 +1664,12 @@ ${loggedInStore.name}으로 이동 예정입니다.
                                 />
                                 <div style={{ fontWeight: 'bold', flex: 1 }}>
                                   {store.name}
-                                  {isSelected && <span style={{color: '#2196f3', marginLeft: '8px'}}>✓ 선택됨</span>}
-                                  {isLoggedInStore && <span style={{color: '#9c27b0', marginLeft: '8px'}}>내 매장</span>}
+                                  {isSelected && <span style={{ color: '#2196f3', marginLeft: '8px' }}>✓ 선택됨</span>}
+                                  {isLoggedInStore && <span style={{ color: '#9c27b0', marginLeft: '8px' }}>내 매장</span>}
                                 </div>
                                 {/* 재고 수량을 마커 색상 원 안에 표시 */}
                                 {inventoryCount > 0 && (
-                                  <div 
+                                  <div
                                     style={{
                                       width: '20px',
                                       height: '20px',
@@ -1551,23 +1689,23 @@ ${loggedInStore.name}으로 이동 예정입니다.
                                   </div>
                                 )}
                               </div>
-                              
+
                               {/* 관리자모드에서만 출고일 기준 재고 표시 */}
-                              {isAgentMode && currentView === 'assigned' && inventoryByAge && 
-                               (inventoryByAge.within30 > 0 || inventoryByAge.within60 > 0 || inventoryByAge.over60 > 0) && (
-                                <div style={{ fontSize: '0.8em', marginTop: '4px' }}>
-                                  {inventoryByAge.over60 > 0 && (
-                                    <span style={{ color: '#ff9800', marginRight: '8px' }}>⚠️ {inventoryByAge.over60}</span>
-                                  )}
-                                  {inventoryByAge.within60 > 0 && (
-                                    <span style={{ color: '#ffc107', marginRight: '8px' }}>⚡ {inventoryByAge.within60}</span>
-                                  )}
-                                  {inventoryByAge.within30 > 0 && (
-                                    <span style={{ color: '#4caf50', marginRight: '8px' }}>✅ {inventoryByAge.within30}</span>
-                                  )}
-                                </div>
-                              )}
-                              
+                              {isAgentMode && currentView === 'assigned' && inventoryByAge &&
+                                (inventoryByAge.within30 > 0 || inventoryByAge.within60 > 0 || inventoryByAge.over60 > 0) && (
+                                  <div style={{ fontSize: '0.8em', marginTop: '4px' }}>
+                                    {inventoryByAge.over60 > 0 && (
+                                      <span style={{ color: '#ff9800', marginRight: '8px' }}>⚠️ {inventoryByAge.over60}</span>
+                                    )}
+                                    {inventoryByAge.within60 > 0 && (
+                                      <span style={{ color: '#ffc107', marginRight: '8px' }}>⚡ {inventoryByAge.within60}</span>
+                                    )}
+                                    {inventoryByAge.within30 > 0 && (
+                                      <span style={{ color: '#4caf50', marginRight: '8px' }}>✅ {inventoryByAge.within30}</span>
+                                    )}
+                                  </div>
+                                )}
+
                               {/* 퀵비용 예상 정보 */}
                               {((isAgentMode && requestedStore && requestedStore.id) || (!isAgentMode && loggedInStore && loggedInStore.id)) && store.id && (
                                 <QuickCostPreview
@@ -1591,7 +1729,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
             }
           });
         })()}
-        
+
         {/* 개통실적 마커들 (담당개통확인 화면에서만 표시) */}
         {showActivationMarkers && activationData && Object.entries(activationData).map(([storeName, data]) => {
           // 담당자 필터링 (담당개통확인 모드에서만)
@@ -1600,30 +1738,30 @@ ${loggedInStore.name}으로 이동 예정입니다.
               return null; // 해당 담당자가 담당하지 않는 매장은 마커 표시 안함
             }
           }
-          
+
           // 해당 매장의 위치 정보 찾기
           const storeLocation = filteredStores.find(store => store.name === storeName);
           if (!storeLocation || !storeLocation.latitude || !storeLocation.longitude) return null;
-          
+
           const { currentMonth, previousMonth, models, agents, lastActivationDate } = data;
-          
+
           // 모델 검색이 있는 경우 해당 모델의 판매량만 계산
           let displayCurrent = currentMonth;
           let displayPrevious = previousMonth;
           let displayModels = models;
-          
+
           if (activationModelSearch) {
             displayCurrent = 0;
             displayPrevious = 0;
             displayModels = {};
-            
+
             Object.entries(models).forEach(([modelKey, count]) => {
               if (modelKey.startsWith(activationModelSearch + ' (')) {
                 displayCurrent += count;
                 displayModels[modelKey] = count;
               }
             });
-            
+
             // 전월 데이터도 비율로 계산
             if (currentMonth > 0 && previousMonth > 0) {
               displayPrevious = Math.round((displayCurrent / currentMonth) * previousMonth);
@@ -1632,10 +1770,10 @@ ${loggedInStore.name}으로 이동 예정입니다.
             // 날짜 검색이 있는 경우 - 이미 해당 날짜의 데이터만 필터링되어 있음
             // 추가 필터링 불필요 (백엔드에서 이미 처리됨)
           }
-          
+
           // 개통실적이 있는 경우에만 마커 표시
           if (displayCurrent === 0 && displayPrevious === 0) return null;
-          
+
           // 비교 결과에 따른 색상 결정
           let markerColor = '#FF9800'; // 동일 (주황색)
           if (displayCurrent > displayPrevious) {
@@ -1643,7 +1781,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
           } else if (displayCurrent < displayPrevious) {
             markerColor = '#F44336'; // 감소 (빨간색)
           }
-          
+
           // 개통실적 마커 아이콘 생성
           const activationIcon = L.divIcon({
             className: 'custom-div-icon',
@@ -1673,7 +1811,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
             iconAnchor: [20, 20],
             popupAnchor: [0, -20]
           });
-          
+
           return (
             <Marker
               key={`activation-${storeName}`}
@@ -1688,12 +1826,12 @@ ${loggedInStore.name}으로 이동 예정입니다.
               <Popup>
                 <div style={{ minWidth: '200px' }}>
                   <h3 style={{ margin: '0 0 8px 0', color: '#1e293b' }}>{storeName}</h3>
-                  
+
                   <div style={{ marginBottom: '12px' }}>
-                    <div style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '8px', 
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
                       marginBottom: '4px',
                       fontSize: '14px',
                       fontWeight: 'bold'
@@ -1701,7 +1839,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
                       <span style={{ color: '#0ea5e9' }}>
                         {activationModelSearch ? `${activationModelSearch}: ` : ''}당월: {displayCurrent}개
                       </span>
-                      <span style={{ 
+                      <span style={{
                         color: markerColor,
                         fontSize: '16px'
                       }}>
@@ -1710,13 +1848,13 @@ ${loggedInStore.name}으로 이동 예정입니다.
                       <span style={{ color: '#64748b' }}>전월: {displayPrevious}개</span>
                     </div>
                     <div style={{ fontSize: '12px', color: '#64748b' }}>
-                      기준일: {activationDateSearch ? 
-                        new Date(activationDateSearch).toLocaleDateString('ko-KR') : 
+                      기준일: {activationDateSearch ?
+                        new Date(activationDateSearch).toLocaleDateString('ko-KR') :
                         (lastActivationDate ? lastActivationDate.toLocaleDateString('ko-KR') : '날짜 정보 없음')
                       }
                     </div>
                   </div>
-                  
+
                   <div style={{ marginBottom: '8px' }}>
                     <h4 style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#374151' }}>담당자</h4>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
@@ -1734,7 +1872,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
                       ))}
                     </div>
                   </div>
-                  
+
                   <div>
                     <h4 style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#374151' }}>
                       {activationModelSearch ? `${activationModelSearch} 상세` : '모델별 실적'}
@@ -1757,7 +1895,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
             </Marker>
           );
         })}
-        
+
         {/* 검색 반경 원 (관리자 모드가 아닐 때만) */}
         {userLocation && selectedRadius && !isAgentMode && (
           <Circle

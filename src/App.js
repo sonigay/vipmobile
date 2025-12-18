@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { Container, Box, Typography, Button, CircularProgress, Chip, IconButton, Alert } from '@mui/material';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import CustomerMode from './components/customer/CustomerMode';
 import Map from './components/Map';
 import FilterPanel from './components/FilterPanel';
 import AgentFilterPanel from './components/AgentFilterPanel';
@@ -18,13 +20,13 @@ import Header from './components/Header';
 // 배정 관련 Screen import 제거 (재고 모드로 이동)
 import { fetchData, fetchModels, cacheManager } from './api';
 import { calculateDistance } from './utils/distanceUtils';
-import { 
-  fetchCurrentMonthData, 
-  fetchPreviousMonthData, 
+import {
+  fetchCurrentMonthData,
+  fetchPreviousMonthData,
   fetchActivationDataByDate,
   fetchActivationDateComparison,
-  generateStoreActivationComparison, 
-  filterActivationByAgent 
+  generateStoreActivationComparison,
+  filterActivationByAgent
 } from './utils/activationService';
 import './App.css';
 import StoreInfoTable from './components/StoreInfoTable';
@@ -57,15 +59,15 @@ import './mobile.css';
 import PersonIcon from '@mui/icons-material/Person';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import NotificationsIcon from '@mui/icons-material/Notifications';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableContainer, 
-  TableHead, 
-  TableRow, 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   Paper,
-  TextField 
+  TextField
 } from '@mui/material';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -80,14 +82,14 @@ const logActivity = async (activityData) => {
   try {
     const API_URL = process.env.REACT_APP_API_URL;
     const loggingEnabled = process.env.REACT_APP_LOGGING_ENABLED === 'true';
-    
+
     if (!loggingEnabled) {
       // console.log('활동 로깅이 비활성화되어 있습니다.');
       return;
     }
-    
+
     // console.log('활동 로깅 데이터:', activityData);
-    
+
     // 서버로 전송
     // console.log(`로그 전송 URL: ${API_URL}/api/log-activity`);
     const response = await fetch(`${API_URL}/api/log-activity`, {
@@ -97,15 +99,15 @@ const logActivity = async (activityData) => {
       },
       body: JSON.stringify(activityData),
     });
-    
+
     const data = await response.json();
-          // console.log('로그 전송 응답:', data);
-    
+    // console.log('로그 전송 응답:', data);
+
     if (!response.ok) {
       throw new Error(`서버 응답 오류: ${response.status} ${response.statusText}`);
     }
-    
-          // console.log('활동 로깅 성공!');
+
+    // console.log('활동 로깅 성공!');
   } catch (error) {
     console.error('활동 로깅 실패:', error);
     console.error('활동 데이터:', activityData);
@@ -191,9 +193,9 @@ function AppContent() {
   const [activationModelSearch, setActivationModelSearch] = useState('');
   // 개통실적 날짜 검색 상태
   const [activationDateSearch, setActivationDateSearch] = useState('');
-    // 알림 시스템 초기화
+  // 알림 시스템 초기화
   const [notificationInitialized, setNotificationInitialized] = useState(false);
-  
+
   // 토스트 알림 상태
   const [toastNotifications, setToastNotifications] = useState([]);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
@@ -206,7 +208,7 @@ function AppContent() {
   const [pendingLoginData, setPendingLoginData] = useState(null);
   const [pendingAvailableModes, setPendingAvailableModes] = useState([]); // 초기 로그인 시 계산된 모드 목록
   const [modeSelectionRequired, setModeSelectionRequired] = useState(false);
-  
+
   const [showAppUpdatePopup, setShowAppUpdatePopup] = useState(false);
   const [currentMode, setCurrentMode] = useState('');
   const [directStoreAuthenticated, setDirectStoreAuthenticated] = useState(false);
@@ -215,7 +217,7 @@ function AppContent() {
   const [directStorePasswordError, setDirectStorePasswordError] = useState('');
   const [pendingDirectStoreAction, setPendingDirectStoreAction] = useState(null);
   const [directStorePasswordLoading, setDirectStorePasswordLoading] = useState(false);
-  
+
   // 퀵비용 관련 상태
   const [showQuickCostModal, setShowQuickCostModal] = useState(false);
   const [quickCostFromStore, setQuickCostFromStore] = useState(null);
@@ -229,24 +231,24 @@ function AppContent() {
     setIsDirectStoreManagementMode(false);
     setIsDirectStoreMode(false);
   }, []);
-  
+
   // 맵 확대 토글 핸들러 (스크롤 자동 조정 포함)
   const handleMapExpandToggle = () => {
     setIsMapExpanded(!isMapExpanded);
-    
+
     // 맵 확대 시 스크롤을 맵 위치로 자동 조정
     setTimeout(() => {
-      const mapContainer = document.querySelector('.activation-map-container') || 
-                          document.querySelector('[style*="height"]');
+      const mapContainer = document.querySelector('.activation-map-container') ||
+        document.querySelector('[style*="height"]');
       if (mapContainer) {
-        mapContainer.scrollIntoView({ 
-          behavior: 'smooth', 
-          block: 'start' 
+        mapContainer.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start'
         });
       }
     }, 100);
   };
-  
+
   // 현재 사용자의 사용 가능한 모드 목록 가져오기 (모드 변경 시 사용)
   const getCurrentUserAvailableModes = () => {
     if (!loggedInStore) {
@@ -255,12 +257,12 @@ function AppContent() {
       }
       return [];
     }
-    
+
     if (process.env.NODE_ENV === 'development') {
       console.log('🔍 getCurrentUserAvailableModes: loggedInStore =', loggedInStore);
       console.log('🔍 getCurrentUserAvailableModes: modePermissions =', loggedInStore.modePermissions);
     }
-    
+
     if (loggedInStore.modePermissions) {
       // 서브 권한 제외 목록 (모드 선택에 표시하지 않을 권한들)
       const subPermissions = ['onSalePolicy', 'onSaleLink', 'bondChart', 'inspectionOverview'];
@@ -270,38 +272,38 @@ function AppContent() {
           if (subPermissions.includes(mode)) {
             return false;
           }
-          
+
           // 회의 모드의 경우 M 권한만 접속 가능
           if (mode === 'meeting') {
             // 문자열 "M" 또는 boolean true 모두 허용
             return hasPermission === 'M' || hasPermission === true || String(hasPermission).trim().toUpperCase() === 'M';
           }
-          
+
           // 직영점 관리 모드의 경우 M, S, O 모두 접속 가능
           if (mode === 'directStoreManagement') {
             const permission = String(hasPermission || '').trim().toUpperCase();
-            return hasPermission === 'M' || hasPermission === 'S' || hasPermission === 'O' || 
-                   permission === 'M' || permission === 'S' || permission === 'O' ||
-                   hasPermission === true;
+            return hasPermission === 'M' || hasPermission === 'S' || hasPermission === 'O' ||
+              permission === 'M' || permission === 'S' || permission === 'O' ||
+              hasPermission === true;
           }
-          
+
           // 다른 모드는 권한이 있으면 포함 (true 또는 'O')
           return hasPermission === true || hasPermission === 'O' || String(hasPermission).trim().toUpperCase() === 'O';
         })
         .map(([mode]) => mode);
-      
+
       if (process.env.NODE_ENV === 'development') {
         console.log('✅ getCurrentUserAvailableModes: 사용 가능한 모드 =', availableModes);
       }
       return availableModes;
     }
-    
+
     if (process.env.NODE_ENV === 'development') {
       console.log('⚠️ getCurrentUserAvailableModes: modePermissions가 없음');
     }
     return [];
   };
-  
+
   // 알림 시스템 및 모바일 최적화 초기화 제거 (재고 모드로 이동)
 
   // 배정 모드 핸들러 제거 (재고 모드로 이동)
@@ -329,22 +331,22 @@ function AppContent() {
   // 캐시 클릭 핸들러 (자동 캐시 정리 + 새로고침)
   const handleCacheClick = useCallback(() => {
     // console.log('캐시 정리 및 새로고침 시작');
-    
+
     // Service Worker에 캐시 정리 메시지 전송
     if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
       navigator.serviceWorker.controller.postMessage({
         type: 'CLEAR_CACHE'
       });
     }
-    
+
     // 클라이언트 캐시도 정리
     cacheManager.clearAll();
-    
+
     // API 캐시도 정리
     if (window.clientCacheUtils) {
       window.clientCacheUtils.cleanup();
     }
-    
+
     // 잠시 후 페이지 새로고침
     setTimeout(() => {
       window.location.reload();
@@ -355,7 +357,7 @@ function AppContent() {
   const loadActivationData = useCallback(async () => {
     try {
       // console.log('개통실적 데이터 로딩 시작...');
-      
+
       // 당월, 전월, 날짜별 데이터 병렬 로드
       const [currentData, previousData, dateData] = await Promise.all([
         fetchCurrentMonthData(),
@@ -365,18 +367,18 @@ function AppContent() {
 
       // 매장별 비교 데이터 생성
       const comparisonData = generateStoreActivationComparison(currentData, previousData);
-      
+
       // 담당자 필터링 적용
       let filteredData = comparisonData;
       if (isAgentMode && agentTarget) {
         filteredData = filterActivationByAgent(comparisonData, agentTarget);
       }
-      
+
       setActivationData(filteredData);
       setActivationDataByDate(dateData);
-              // console.log('개통실적 데이터 로딩 완료');
-        // console.log('날짜별 데이터:', dateData);
-        // console.log('날짜별 데이터 키들:', Object.keys(dateData || {}));
+      // console.log('개통실적 데이터 로딩 완료');
+      // console.log('날짜별 데이터:', dateData);
+      // console.log('날짜별 데이터 키들:', Object.keys(dateData || {}));
     } catch (error) {
       console.error('개통실적 데이터 로딩 실패:', error);
       setActivationData(null);
@@ -388,9 +390,9 @@ function AppContent() {
   const loadActivationDataForDate = useCallback(async (date) => {
     try {
       // console.log(`특정 날짜 개통실적 데이터 로딩 시작: ${date}`);
-      
+
       const dateComparisonData = await fetchActivationDateComparison(date);
-      
+
       // 담당자 필터링 적용
       let filteredData = dateComparisonData;
       if (isAgentMode && agentTarget) {
@@ -402,34 +404,34 @@ function AppContent() {
             const targetPrefix = agentTarget.toString().substring(0, 3);
             return agentPrefix === targetPrefix;
           });
-          
+
           if (hasMatchingAgent) {
             filteredData[storeName] = storeData;
           }
         });
       }
-      
+
       // lastActivationDate 필드 추가 (Map 컴포넌트 호환성을 위해)
       Object.keys(filteredData).forEach(storeName => {
         filteredData[storeName].lastActivationDate = new Date(date);
       });
-      
+
       setActivationData(filteredData);
-              // console.log(`특정 날짜 개통실적 데이터 로딩 완료: ${date}`);
-        // console.log('날짜 비교 데이터:', filteredData);
-      
+      // console.log(`특정 날짜 개통실적 데이터 로딩 완료: ${date}`);
+      // console.log('날짜 비교 데이터:', filteredData);
+
       // 전월 데이터 디버깅
       const storesWithPreviousData = Object.values(filteredData).filter(store => store.previousMonth > 0);
-              // console.log(`프론트엔드 - 전월 데이터가 있는 매장 수: ${storesWithPreviousData.length}`);
-              if (storesWithPreviousData.length > 0) {
-          // console.log('프론트엔드 - 전월 데이터가 있는 매장들:', storesWithPreviousData.map(store => ({
-          //   storeName: store.storeName,
-          //   previousMonth: store.previousMonth,
-          //   currentMonth: store.currentMonth
-          // })));
-        } else {
-          // console.log('프론트엔드 - 전월 데이터가 있는 매장이 없습니다.');
-        }
+      // console.log(`프론트엔드 - 전월 데이터가 있는 매장 수: ${storesWithPreviousData.length}`);
+      if (storesWithPreviousData.length > 0) {
+        // console.log('프론트엔드 - 전월 데이터가 있는 매장들:', storesWithPreviousData.map(store => ({
+        //   storeName: store.storeName,
+        //   previousMonth: store.previousMonth,
+        //   currentMonth: store.currentMonth
+        // })));
+      } else {
+        // console.log('프론트엔드 - 전월 데이터가 있는 매장이 없습니다.');
+      }
     } catch (error) {
       console.error(`특정 날짜 개통실적 데이터 로딩 실패: ${date}`, error);
       setActivationData(null);
@@ -439,25 +441,25 @@ function AppContent() {
   // 개통실적 모델별 통계 계산
   const getActivationModelStats = useCallback(() => {
     if (!activationData) return [];
-    
+
     const modelStats = {};
-    
+
     // 담당자별 필터링된 데이터 사용
-    const filteredData = isAgentMode && agentTarget 
+    const filteredData = isAgentMode && agentTarget
       ? Object.entries(activationData).filter(([storeName, storeData]) => {
-          return storeData.agents && storeData.agents.includes(agentTarget);
-        }).reduce((acc, [storeName, storeData]) => {
-          acc[storeName] = storeData;
-          return acc;
-        }, {})
+        return storeData.agents && storeData.agents.includes(agentTarget);
+      }).reduce((acc, [storeName, storeData]) => {
+        acc[storeName] = storeData;
+        return acc;
+      }, {})
       : activationData;
-    
+
     Object.values(filteredData).forEach(storeData => {
       const { currentMonth, models } = storeData;
-      
+
       Object.entries(models).forEach(([modelKey, count]) => {
         const modelName = modelKey.split(' (')[0]; // "iPhone 15 (블랙)" -> "iPhone 15"
-        
+
         if (!modelStats[modelName]) {
           modelStats[modelName] = {
             modelName,
@@ -466,19 +468,19 @@ function AppContent() {
             storeCount: new Set()
           };
         }
-        
+
         modelStats[modelName].currentMonth += count;
         modelStats[modelName].storeCount.add(storeData.storeName);
       });
     });
-    
+
     // 전월 데이터도 계산 (전체 개통량 기준으로 비율 계산)
     Object.values(filteredData).forEach(storeData => {
       const { currentMonth, previousMonth, models } = storeData;
-      
+
       Object.entries(models).forEach(([modelKey, count]) => {
         const modelName = modelKey.split(' (')[0];
-        
+
         if (modelStats[modelName] && currentMonth > 0 && previousMonth > 0) {
           // 해당 모델의 당월 비율을 계산하여 전월 데이터 추정
           const modelRatio = count / currentMonth;
@@ -487,13 +489,13 @@ function AppContent() {
         }
       });
     });
-    
+
     // 배열로 변환하고 판매량 내림차순 정렬
     return Object.values(modelStats)
       .map(stat => ({
         ...stat,
         storeCount: stat.storeCount.size,
-        changeRate: stat.previousMonth > 0 
+        changeRate: stat.previousMonth > 0
           ? ((stat.currentMonth - stat.previousMonth) / stat.previousMonth * 100).toFixed(1)
           : stat.currentMonth > 0 ? '100.0' : '0.0'
       }))
@@ -503,26 +505,26 @@ function AppContent() {
   // 개통실적 특정 모델의 매장별 통계
   const getActivationStoreStats = useCallback((modelName) => {
     if (!activationData || !modelName) return [];
-    
+
     const storeStats = [];
-    
+
     // 담당자별 필터링된 데이터 사용
-    const filteredData = isAgentMode && agentTarget 
+    const filteredData = isAgentMode && agentTarget
       ? Object.entries(activationData).filter(([storeName, storeData]) => {
-          return storeData.agents && storeData.agents.includes(agentTarget);
-        }).reduce((acc, [storeName, storeData]) => {
-          acc[storeName] = storeData;
-          return acc;
-        }, {})
+        return storeData.agents && storeData.agents.includes(agentTarget);
+      }).reduce((acc, [storeName, storeData]) => {
+        acc[storeName] = storeData;
+        return acc;
+      }, {})
       : activationData;
-    
+
     Object.values(filteredData).forEach(storeData => {
       const { storeName, currentMonth, previousMonth, models } = storeData;
-      
+
       let modelCurrent = 0;
       let modelPrevious = 0;
       const colorDetails = {};
-      
+
       Object.entries(models).forEach(([modelKey, count]) => {
         if (modelKey.startsWith(modelName + ' (')) {
           modelCurrent += count;
@@ -530,26 +532,26 @@ function AppContent() {
           colorDetails[color] = (colorDetails[color] || 0) + count;
         }
       });
-      
+
       // 전월 데이터도 계산 (전체 개통량 기준으로 비율 계산)
       if (currentMonth > 0 && previousMonth > 0) {
         const modelRatio = modelCurrent / currentMonth;
         modelPrevious = Math.round(modelRatio * previousMonth);
       }
-      
+
       if (modelCurrent > 0) {
         storeStats.push({
           storeName,
           currentMonth: modelCurrent,
           previousMonth: modelPrevious,
-          changeRate: modelPrevious > 0 
+          changeRate: modelPrevious > 0
             ? ((modelCurrent - modelPrevious) / modelPrevious * 100).toFixed(1)
             : '100.0',
           colorDetails
         });
       }
     });
-    
+
     // 판매량 내림차순 정렬
     return storeStats.sort((a, b) => b.currentMonth - a.currentMonth);
   }, [activationData, isAgentMode, agentTarget]);
@@ -557,7 +559,7 @@ function AppContent() {
   // 개통실적 전체 통계 계산 (전체 날짜 선택 시)
   const getActivationDateStats = useCallback(() => {
     if (!activationData) return [];
-    
+
     // 전체 데이터를 하나의 통계로 집계
     const totalStats = {
       date: '전체',
@@ -566,24 +568,24 @@ function AppContent() {
       storeCount: new Set(),
       models: {}
     };
-    
+
     // 담당자별 필터링된 데이터 사용
-    const filteredData = isAgentMode && agentTarget 
+    const filteredData = isAgentMode && agentTarget
       ? Object.entries(activationData).filter(([storeName, storeData]) => {
-          return storeData.agents && storeData.agents.includes(agentTarget);
-        }).reduce((acc, [storeName, storeData]) => {
-          acc[storeName] = storeData;
-          return acc;
-        }, {})
+        return storeData.agents && storeData.agents.includes(agentTarget);
+      }).reduce((acc, [storeName, storeData]) => {
+        acc[storeName] = storeData;
+        return acc;
+      }, {})
       : activationData;
-    
+
     Object.values(filteredData).forEach(storeData => {
       const { currentMonth, previousMonth, models } = storeData;
-      
+
       totalStats.currentMonth += currentMonth;
       totalStats.previousMonth += previousMonth;
       totalStats.storeCount.add(storeData.storeName);
-      
+
       // 모델별 집계
       Object.entries(models).forEach(([modelKey, count]) => {
         const modelName = modelKey.split(' (')[0];
@@ -593,12 +595,12 @@ function AppContent() {
         totalStats.models[modelName] += count;
       });
     });
-    
+
     // 배열로 변환
     return [{
       ...totalStats,
       storeCount: totalStats.storeCount.size,
-      changeRate: totalStats.previousMonth > 0 
+      changeRate: totalStats.previousMonth > 0
         ? ((totalStats.currentMonth - totalStats.previousMonth) / totalStats.previousMonth * 100).toFixed(1)
         : totalStats.currentMonth > 0 ? '100.0' : '0.0'
     }];
@@ -607,32 +609,32 @@ function AppContent() {
   // 개통실적 날짜 옵션 생성 (지난 날짜들 포함)
   const getActivationDateOptions = useCallback(() => {
     if (!activationDataByDate) return [];
-    
+
     // console.log('=== 날짜 옵션 생성 디버깅 ===');
     // console.log('activationDataByDate:', activationDataByDate);
     // console.log('사용 가능한 날짜들:', Object.keys(activationDataByDate));
-    
+
     const dateOptions = [];
     const today = new Date();
-    
+
     // 오늘부터 과거 30일까지의 날짜 옵션 생성
     for (let i = 0; i < 30; i++) {
       const date = new Date(today);
       date.setDate(today.getDate() - i);
       const dateKey = date.toISOString().split('T')[0]; // ISO 형식 (YYYY-MM-DD)
-      
+
       // 해당 날짜에 데이터가 있는지 확인
       const hasData = activationDataByDate[dateKey] && Object.keys(activationDataByDate[dateKey]).length > 0;
-      
-              // console.log(`날짜 ${dateKey}: 데이터 있음 = ${hasData}`);
-      
+
+      // console.log(`날짜 ${dateKey}: 데이터 있음 = ${hasData}`);
+
       // 데이터가 있거나 오늘 날짜인 경우 추가
       if (hasData || i === 0) {
         // 표시용 일자만 생성 (예: "25일")
         const displayDate = new Date(dateKey);
         const day = displayDate.getDate();
         const displayLabel = `${day}일`;
-        
+
         dateOptions.push({
           value: dateKey,
           label: displayLabel,
@@ -641,7 +643,7 @@ function AppContent() {
         });
       }
     }
-    
+
     // console.log('최종 날짜 옵션:', dateOptions);
     return dateOptions;
   }, [activationDataByDate]);
@@ -649,39 +651,39 @@ function AppContent() {
   // 담당자별 총 개통실적 계산 (카테고리별)
   const getAgentTotalActivation = useCallback(() => {
     if (!activationData || !isAgentMode || !agentTarget) return null;
-    
+
     const totalStats = {
       phones: 0,
       wearables: 0,
       tablets: 0
     };
-    
+
     // 담당자별 필터링된 데이터 사용
     const filteredData = Object.entries(activationData).filter(([storeName, storeData]) => {
       return storeData.agents && storeData.agents.includes(agentTarget);
     });
-    
+
     filteredData.forEach(([storeName, storeData]) => {
       const { models } = storeData;
-      
+
       Object.entries(models).forEach(([modelKey, count]) => {
         const modelName = modelKey.split(' (')[0];
-        
+
         // 모델명으로 카테고리 판단 (간단한 키워드 매칭)
-        if (modelName.toLowerCase().includes('iphone') || 
-            modelName.toLowerCase().includes('galaxy') ||
-            modelName.toLowerCase().includes('갤럭시') ||
-            modelName.toLowerCase().includes('아이폰')) {
+        if (modelName.toLowerCase().includes('iphone') ||
+          modelName.toLowerCase().includes('galaxy') ||
+          modelName.toLowerCase().includes('갤럭시') ||
+          modelName.toLowerCase().includes('아이폰')) {
           totalStats.phones += count;
-        } else if (modelName.toLowerCase().includes('watch') || 
-                   modelName.toLowerCase().includes('갤럭시워치') ||
-                   modelName.toLowerCase().includes('애플워치') ||
-                   modelName.toLowerCase().includes('버즈') ||
-                   modelName.toLowerCase().includes('buds')) {
+        } else if (modelName.toLowerCase().includes('watch') ||
+          modelName.toLowerCase().includes('갤럭시워치') ||
+          modelName.toLowerCase().includes('애플워치') ||
+          modelName.toLowerCase().includes('버즈') ||
+          modelName.toLowerCase().includes('buds')) {
           totalStats.wearables += count;
-        } else if (modelName.toLowerCase().includes('ipad') || 
-                   modelName.toLowerCase().includes('갤럭시탭') ||
-                   modelName.toLowerCase().includes('태블릿')) {
+        } else if (modelName.toLowerCase().includes('ipad') ||
+          modelName.toLowerCase().includes('갤럭시탭') ||
+          modelName.toLowerCase().includes('태블릿')) {
           totalStats.tablets += count;
         } else {
           // 기본적으로 휴대폰으로 분류
@@ -689,26 +691,26 @@ function AppContent() {
         }
       });
     });
-    
+
     return totalStats;
   }, [activationData, isAgentMode, agentTarget]);
 
   // 담당자별 총 재고 계산 (카테고리별)
   const getAgentTotalInventory = useCallback(() => {
     if (!data || !isAgentMode || !agentTarget) return null;
-    
+
     const totalStats = {
       phones: 0,
       wearables: 0,
       tablets: 0
     };
-    
+
     // 담당자별 필터링된 매장들
     const agentStores = filterStoresByAgent(data.stores, agentTarget);
-    
+
     agentStores.forEach(store => {
       if (!store.inventory) return;
-      
+
       // 새로운 데이터 구조: { phones: {}, sims: {}, wearables: {}, smartDevices: {} }
       Object.entries(store.inventory).forEach(([category, categoryData]) => {
         if (typeof categoryData === 'object' && categoryData !== null) {
@@ -723,7 +725,7 @@ function AppContent() {
                     } else if (typeof item === 'number') {
                       quantity = item || 0;
                     }
-                    
+
                     // 카테고리별 분류
                     if (category === 'phones') {
                       totalStats.phones += quantity;
@@ -731,9 +733,9 @@ function AppContent() {
                       totalStats.wearables += quantity;
                     } else if (category === 'smartDevices') {
                       // 태블릿은 smartDevices에 포함될 가능성이 높음
-                      if (modelName.toLowerCase().includes('ipad') || 
-                          modelName.toLowerCase().includes('갤럭시탭') ||
-                          modelName.toLowerCase().includes('태블릿')) {
+                      if (modelName.toLowerCase().includes('ipad') ||
+                        modelName.toLowerCase().includes('갤럭시탭') ||
+                        modelName.toLowerCase().includes('태블릿')) {
                         totalStats.tablets += quantity;
                       } else {
                         totalStats.wearables += quantity;
@@ -750,44 +752,44 @@ function AppContent() {
         }
       });
     });
-    
+
     return totalStats;
   }, [data, isAgentMode, agentTarget]);
 
   // 선택한 모델의 총 개통수 계산
   const getSelectedModelTotalActivation = useCallback(() => {
     if (!activationData || !activationModelSearch || !isAgentMode || !agentTarget) return 0;
-    
+
     let totalCount = 0;
-    
+
     // 담당자별 필터링된 데이터 사용
     const filteredData = Object.entries(activationData).filter(([storeName, storeData]) => {
       return storeData.agents && storeData.agents.includes(agentTarget);
     });
-    
+
     filteredData.forEach(([storeName, storeData]) => {
       const { models } = storeData;
-      
+
       Object.entries(models).forEach(([modelKey, count]) => {
         if (modelKey.startsWith(activationModelSearch + ' (')) {
           totalCount += count;
         }
       });
     });
-    
+
     return totalCount;
   }, [activationData, activationModelSearch, isAgentMode, agentTarget]);
 
   // 선택한 날짜의 총 개통수 계산
   const getSelectedDateTotalActivation = useCallback(() => {
     if (!activationDataByDate || !activationDateSearch || !isAgentMode || !agentTarget) return 0;
-    
+
     let totalCount = 0;
-    
+
     // 해당 날짜의 데이터 확인
     const dateData = activationDataByDate[activationDateSearch];
     if (!dateData) return 0;
-    
+
     // 담당자별 필터링
     Object.values(dateData).forEach(storeData => {
       const hasMatchingAgent = storeData.agents.some(agent => {
@@ -796,21 +798,21 @@ function AppContent() {
         const targetPrefix = agentTarget.toString().substring(0, 3);
         return agentPrefix === targetPrefix;
       });
-      
+
       if (hasMatchingAgent) {
         totalCount += storeData.totalCount;
       }
     });
-    
+
     return totalCount;
   }, [activationDataByDate, activationDateSearch, isAgentMode, agentTarget]);
 
   // 개통실적 특정 날짜의 매장별 통계
   const getActivationDateStoreStats = useCallback((dateKey) => {
     if (!activationData || !dateKey) return [];
-    
+
     const storeStats = [];
-    
+
     // activationData에서 해당 날짜의 데이터 사용 (전월 비교 데이터 포함)
     Object.entries(activationData).forEach(([storeName, storeData]) => {
       // 담당자 필터링
@@ -821,21 +823,21 @@ function AppContent() {
           const targetPrefix = agentTarget.toString().substring(0, 3);
           return agentPrefix === targetPrefix;
         });
-        
+
         if (!hasMatchingAgent) return;
       }
-      
+
       storeStats.push({
         storeName: storeData.storeName,
         currentMonth: storeData.currentMonth,
         previousMonth: storeData.previousMonth,
-        changeRate: storeData.previousMonth > 0 
+        changeRate: storeData.previousMonth > 0
           ? ((storeData.currentMonth - storeData.previousMonth) / storeData.previousMonth * 100).toFixed(1)
           : storeData.currentMonth > 0 ? '100.0' : '0.0',
         models: storeData.models
       });
     });
-    
+
     // 판매량 내림차순 정렬
     return storeStats.sort((a, b) => b.currentMonth - a.currentMonth);
   }, [activationData, isAgentMode, agentTarget]);
@@ -852,7 +854,7 @@ function AppContent() {
         const requiresDirectStorePassword = parsedState.store?.directStoreSecurity?.requiresPassword;
         const directStoreAuth = parsedState.store?.directStoreSecurity?.authenticated;
         setDirectStoreAuthenticated(directStoreAuth || !requiresDirectStorePassword);
-        
+
         // 관리자 모드 상태 복원
         if (parsedState.isAgent) {
           setIsAgentMode(true);
@@ -863,14 +865,14 @@ function AppContent() {
           setAgentQualification(parsedState.agentQualification || '');
           setAgentContactId(parsedState.agentContactId || '');
           setCurrentView(parsedState.currentView || 'all');
-          
+
           // 관리자 모드 위치 설정 (안산지역 중심)
           setUserLocation({
             lat: 37.3215,  // 안산지역 중심
             lng: 126.8309,
           });
           setSelectedRadius(80000);
-          
+
           // 관리자 모드일 때 개통실적 데이터 로드
           setTimeout(() => {
             loadActivationData();
@@ -885,7 +887,7 @@ function AppContent() {
           // 재고모드 상태 복원
           setIsInventoryMode(true);
           setInventoryUserName(parsedState.inventoryUserName || '재고관리자');
-          
+
           // 재고모드 위치 설정 (전체 지역 보기)
           setUserLocation({
             lat: 37.5665,
@@ -973,18 +975,18 @@ function AppContent() {
     }
 
     // console.log(`담당자별 재고 필터링 시작: ${agentTarget}`);
-    
+
     return stores.filter(store => {
       if (!store.manager) return false;
-      
+
       // 담당자명 앞 3글자 비교 (기존 로직과 동일)
       const managerPrefix = store.manager.toString().substring(0, 3);
       const agentPrefix = agentTarget.toString().substring(0, 3);
-      
-      const isMatch = managerPrefix === agentPrefix;
-      
 
-      
+      const isMatch = managerPrefix === agentPrefix;
+
+
+
       return isMatch;
     });
   }, []);
@@ -992,9 +994,9 @@ function AppContent() {
   // 재고 필터링 함수 (상태 변수들 뒤에 정의)
   const filterStores = useCallback((stores, selectedModel, selectedColor, userLocation, searchRadius) => {
     // console.log('재고 필터링 시작:', { selectedModel, selectedColor });
-    
+
     if (!stores || !Array.isArray(stores)) {
-              // console.log('매장 데이터가 없거나 유효하지 않음');
+      // console.log('매장 데이터가 없거나 유효하지 않음');
       return [];
     }
 
@@ -1002,7 +1004,7 @@ function AppContent() {
       // 1. 재고 확인
       let hasInventory = false;
       let totalQuantity = 0;
-      
+
       if (store.inventory) {
         // 새로운 데이터 구조: { phones: {}, sims: {}, wearables: {}, smartDevices: {} }
         if (selectedModel) {
@@ -1046,10 +1048,10 @@ function AppContent() {
             }
           });
           hasInventory = totalQuantity > 0;
-                      // console.log(`매장 [${store.name}] - 전체 재고: ${totalQuantity}`);
+          // console.log(`매장 [${store.name}] - 전체 재고: ${totalQuantity}`);
         }
       }
-      
+
       store.totalQuantity = totalQuantity;
       store.hasInventory = hasInventory;
 
@@ -1064,7 +1066,7 @@ function AppContent() {
         store.distance = distance;
         return distance <= searchRadius && hasInventory;
       }
-      
+
       return hasInventory;
     });
   }, []);
@@ -1074,7 +1076,7 @@ function AppContent() {
     // 디바이스 정보 가져오기
     const userAgent = navigator.userAgent;
     setDeviceInfo(userAgent);
-    
+
     // localStorage에서 IP 정보 가져오기
     const savedIpInfo = localStorage.getItem('userIpInfo');
     if (savedIpInfo) {
@@ -1085,14 +1087,14 @@ function AppContent() {
   // 데이터 로딩 함수
   const loadData = useCallback(async () => {
     if (!isLoggedIn) return;
-    
+
     setIsLoading(true);
     try {
       // console.log('데이터 로딩 시작');
-      
+
       // 전체재고확인에서는 3일 이내 출고재고 제외, 담당재고확인에서는 모든 재고 포함
       const includeShipped = isAgentMode && currentView === 'assigned' ? true : false;
-      
+
       // 캐시를 효과적으로 사용하기 위해 타임스탬프 제거
       const [storesResponse, modelsResponse] = await Promise.all([
         fetchData(includeShipped),
@@ -1105,7 +1107,7 @@ function AppContent() {
         //   storesCount: storesResponse.data?.length || 0,
         //   modelsCount: Object.keys(modelsResponse.data || {}).length
         // });
-        
+
         const models = Object.keys(modelsResponse.data || {}).sort();
 
         // 데이터 설정 전 최종 확인
@@ -1118,13 +1120,13 @@ function AppContent() {
         // 데이터 설정과 동시에 필터링된 매장 목록 초기화
         setData(finalData);
         setFilteredStores([]);
-        
+
         // 강제로 필터링 useEffect 트리거
         setTimeout(() => {
           // console.log('필터링 강제 실행');
         }, 0);
       } else {
-        console.error('데이터 로딩 실패 상세:', { 
+        console.error('데이터 로딩 실패 상세:', {
           storesSuccess: storesResponse.success,
           modelsSuccess: modelsResponse.success,
           storesError: storesResponse.error,
@@ -1154,16 +1156,16 @@ function AppContent() {
   useEffect(() => {
     if (isLoggedIn && data?.stores && loggedInStore) {
       // console.log('로그인 매장 재고 정보 업데이트 시작');
-      
+
       // 로그인한 매장의 최신 정보 찾기
       const updatedStore = data.stores.find(store => store.id === loggedInStore.id);
-      
+
       if (updatedStore) {
         // console.log('로그인 매장 최신 정보 발견:', {
         //   매장명: updatedStore.name,
         //   재고: updatedStore.inventory
         // });
-        
+
         // 로그인 매장 정보 업데이트 (modePermissions 보존!)
         setLoggedInStore({
           ...updatedStore,
@@ -1237,7 +1239,7 @@ function AppContent() {
 
           return { ...store, distance };
         });
-        
+
         // 관리자 모드가 아닌 경우에만 반경 필터링 적용
         if (!isAgentMode && selectedRadius) {
           filtered = filtered.filter(store => store.distance <= selectedRadius / 1000);
@@ -1266,13 +1268,13 @@ function AppContent() {
     console.log('🔍 store.userRole:', store.userRole);
     console.log('🔍 store.isAgent:', store.isAgent);
     console.log('🔍 store 전체:', JSON.stringify(store, null, 2));
-    
+
     setIsLoggedIn(true);
     setLoggedInStore(store);
-  setDirectStoreAuthenticated(
-    store?.directStoreSecurity?.authenticated || !store?.directStoreSecurity?.requiresPassword
-  );
-    
+    setDirectStoreAuthenticated(
+      store?.directStoreSecurity?.authenticated || !store?.directStoreSecurity?.requiresPassword
+    );
+
     // 대리점 관리자인 경우 별도 처리
     if (store.isAgent) {
       // 대리점 관리자는 modePermissions에 다른 모드 권한이 있으면 모달 표시
@@ -1286,47 +1288,47 @@ function AppContent() {
             if (subPermissions.includes(mode)) {
               return false;
             }
-            
+
             // 회의 모드의 경우 M 또는 O 권한 허용
             if (mode === 'meeting') {
               // 문자열 "M", "O" 또는 boolean true 모두 허용 (여러 조건 체크)
               const permission = String(hasPermission || '').trim().toUpperCase();
-              const hasAccess = hasPermission === 'M' || 
-                                hasPermission === 'O' ||
-                                hasPermission === true || 
-                                permission === 'M' ||
-                                permission === 'O' ||
-                                (typeof hasPermission === 'string' && (hasPermission.trim().toUpperCase() === 'M' || hasPermission.trim().toUpperCase() === 'O'));
+              const hasAccess = hasPermission === 'M' ||
+                hasPermission === 'O' ||
+                hasPermission === true ||
+                permission === 'M' ||
+                permission === 'O' ||
+                (typeof hasPermission === 'string' && (hasPermission.trim().toUpperCase() === 'M' || hasPermission.trim().toUpperCase() === 'O'));
               console.log(`🔍 [필터링] meeting 모드 체크: mode="${mode}", hasPermission="${hasPermission}", type=${typeof hasPermission}, hasAccess=${hasAccess}`);
               return hasAccess; // M 또는 O 권한 체크 완료
             }
-            
+
             // 직영점 관리 모드의 경우 M, S, O 모두 접속 가능
             if (mode === 'directStoreManagement') {
               const permission = String(hasPermission || '').trim().toUpperCase();
-              const hasAccess = hasPermission === 'M' || hasPermission === 'S' || hasPermission === 'O' || 
-                                permission === 'M' || permission === 'S' || permission === 'O' ||
-                                hasPermission === true;
+              const hasAccess = hasPermission === 'M' || hasPermission === 'S' || hasPermission === 'O' ||
+                permission === 'M' || permission === 'S' || permission === 'O' ||
+                hasPermission === true;
               console.log(`🔍 [필터링] directStoreManagement 모드 체크: mode="${mode}", hasPermission="${hasPermission}", type=${typeof hasPermission}, hasAccess=${hasAccess}`);
               return hasAccess;
             }
-            
+
             // 다른 모드는 권한이 있으면 포함 (true 또는 'O')
             return hasPermission === true || hasPermission === 'O' || String(hasPermission || '').trim().toUpperCase() === 'O';
           })
           .map(([mode]) => mode);
-        
+
         console.log('🔍 [필터링 결과] availableModes:', availableModes);
         console.log('🔍 [디버깅] meeting 포함 여부:', availableModes.includes('meeting'));
         console.log('🔍 [디버깅] store.modePermissions.meeting:', store.modePermissions?.meeting);
-        
+
         // 단일 권한인 경우 (agent만 있거나, 하나만 있는 경우)
         if (availableModes.length === 1) {
           console.log(`🔍 대리점 관리자 단일 권한 (${availableModes[0]}): 바로 진입`);
           processLogin(store);
           return;
         }
-        
+
         // 다중 권한이 있는 경우 모드 선택 팝업 표시
         if (availableModes.length > 1) {
           console.log('🔍 대리점 관리자 다중 권한: 모달 표시');
@@ -1339,13 +1341,13 @@ function AppContent() {
           return;
         }
       }
-      
+
       // 권한이 없거나 agent만 있는 경우 바로 관리자 모드로 진입
       console.log('🔍 대리점 관리자 - 권한 없음 또는 agent만: 바로 관리자 모드 진입');
       processLogin(store);
       return;
     }
-    
+
     // 일반 매장 로그인 처리
     // 권한이 있는 경우 모드 선택 팝업 표시 (다중 권한일 때만)
     if (store.modePermissions) {
@@ -1354,15 +1356,15 @@ function AppContent() {
       const availableModes = Object.entries(store.modePermissions)
         .filter(([mode, hasPermission]) => hasPermission && actualModes.includes(mode))
         .map(([mode]) => mode);
-      
+
       console.log('다중 권한 확인:', availableModes);
-      
+
       // 단일 권한인 경우 바로 해당 모드로 진입 (모달 없이)
       if (availableModes.length === 1) {
         const singleMode = availableModes[0];
         console.log(`${singleMode} 단일 권한: 바로 진입`);
         console.log('🔍 단일 권한 진입 시 store.modePermissions:', store.modePermissions);
-        
+
         if (singleMode === 'directStore' && store.directStoreSecurity?.requiresPassword) {
           console.log('직영점 모드 단일 권한이지만 비밀번호 검증 필요 - 모드 선택으로 전환');
           setAvailableModes(availableModes);
@@ -1375,7 +1377,7 @@ function AppContent() {
 
         // 단일 권한의 경우 자동으로 해당 모드로 설정
         // modePermissions와 userRole은 반드시 보존되어야 함 (onSalePolicy 같은 서브 권한 포함)
-        const modifiedStore = { 
+        const modifiedStore = {
           ...store,
           modePermissions: { ...store.modePermissions }, // modePermissions 깊은 복사로 보존
           userRole: store.userRole // userRole도 보존
@@ -1389,13 +1391,13 @@ function AppContent() {
         } else if (singleMode === 'directStore') {
           modifiedStore.isDirectStore = true;
         }
-        
+
         console.log('🔍 modifiedStore.modePermissions:', modifiedStore.modePermissions);
         console.log('🔍 modifiedStore.userRole:', modifiedStore.userRole);
         processLogin(modifiedStore);
         return;
       }
-      
+
       if (availableModes.length > 1) {
         // 다중 권한이 있는 경우 모드 선택 팝업 표시
         console.log('🔍 일반 매장 다중 권한: 모달 표시');
@@ -1408,7 +1410,7 @@ function AppContent() {
         return;
       }
     }
-    
+
     // 단일 권한이거나 일반 매장인 경우 바로 로그인 처리
     processLogin(store);
   };
@@ -1417,8 +1419,8 @@ function AppContent() {
   const processLogin = (store) => {
     resetNewModeFlags();
     // 회의모드인지 확인 (isMeeting 플래그 또는 modePermissions.meeting이 M 또는 O인 경우)
-    const hasMeetingPermission = store.isMeeting || 
-                                  (store.modePermissions?.meeting === 'M' || store.modePermissions?.meeting === 'O');
+    const hasMeetingPermission = store.isMeeting ||
+      (store.modePermissions?.meeting === 'M' || store.modePermissions?.meeting === 'O');
     if (hasMeetingPermission) {
       // console.log('로그인: 회의모드');
       setIsMeetingMode(true);
@@ -1430,7 +1432,7 @@ function AppContent() {
       setIsPolicyMode(false);
       setIsReservationMode(false);
       setCurrentMode('meeting');
-      
+
       // 로그인 상태 저장
       localStorage.setItem('loginState', JSON.stringify({
         isMeeting: true,
@@ -1456,7 +1458,7 @@ function AppContent() {
       setIsPolicyMode(false);
       setIsMeetingMode(false);
       setCurrentMode('reservation');
-      
+
       // 로그인 상태 저장
       localStorage.setItem('loginState', JSON.stringify({
         isReservation: true,
@@ -1482,7 +1484,7 @@ function AppContent() {
       setIsMeetingMode(false);
       setIsReservationMode(false);
       setCurrentMode('inspection');
-      
+
       // 로그인 상태 저장
       localStorage.setItem('loginState', JSON.stringify({
         isInspection: true,
@@ -1508,7 +1510,7 @@ function AppContent() {
       setIsMeetingMode(false);
       setIsReservationMode(false);
       setCurrentMode('chart');
-      
+
       // 로그인 상태 저장
       localStorage.setItem('loginState', JSON.stringify({
         isChart: true,
@@ -1534,7 +1536,7 @@ function AppContent() {
       setIsMeetingMode(false);
       setIsReservationMode(false);
       setCurrentMode('policy');
-      
+
       // 로그인 상태 저장
       localStorage.setItem('loginState', JSON.stringify({
         isPolicy: true,
@@ -1560,10 +1562,10 @@ function AppContent() {
       setIsMeetingMode(false);
       setIsReservationMode(false);
       setCurrentMode('settlement');
-      
+
       setSettlementUserName(store.manager || '정산관리자');
-              // console.log(`정산모드 접속자: ${store.manager || '정산관리자'}`);
-      
+      // console.log(`정산모드 접속자: ${store.manager || '정산관리자'}`);
+
       // 로그인 상태 저장
       localStorage.setItem('loginState', JSON.stringify({
         isSettlement: true,
@@ -1590,17 +1592,17 @@ function AppContent() {
       setIsMeetingMode(false);
       setIsReservationMode(false);
       setCurrentMode('inventory');
-      
+
       setInventoryUserName(store.manager || '재고관리자');
-              // console.log(`재고모드 접속자: ${store.manager || '재고관리자'}`);
-      
+      // console.log(`재고모드 접속자: ${store.manager || '재고관리자'}`);
+
       // 재고모드에서는 서울시청을 중심으로 전체 지역 보기
       setUserLocation({
         lat: 37.5665,
         lng: 126.9780,
       });
       setSelectedRadius(50000);
-      
+
       // 로그인 상태 저장
       localStorage.setItem('loginState', JSON.stringify({
         isInventory: true,
@@ -1615,7 +1617,7 @@ function AppContent() {
         inventoryUserName: store.manager || '재고관리자'
       }));
     }
-    
+
     // 영업 모드인지 확인
     console.log('영업 모드 조건 확인:', store.modePermissions && store.modePermissions.sales);
     if (store.modePermissions && store.modePermissions.sales) {
@@ -1635,14 +1637,14 @@ function AppContent() {
       setIsInventoryRecoveryMode(false);
       setIsDataCollectionMode(false);
       setCurrentMode('sales');
-      
+
       // 영업 모드에서는 서울시청을 중심으로 전체 지역 보기
       setUserLocation({
         lat: 37.5665,
         lng: 126.9780,
       });
       setSelectedRadius(50000);
-      
+
       // 로그인 상태 저장
       localStorage.setItem('loginState', JSON.stringify({
         isSales: true,
@@ -1676,14 +1678,14 @@ function AppContent() {
       setIsInventoryRecoveryMode(false);
       setIsDataCollectionMode(false);
       setCurrentMode('agent');
-      
+
       // agentTarget 설정 (store.target이 비어있으면 store.name에서 추출)
       const agentTarget = store.target || store.name || '';
 
       setAgentTarget(agentTarget);
       setAgentQualification(store.qualification);
       setAgentContactId(store.contactId);
-      
+
       // 관리자 모드에서는 안산지역을 중심으로 인천-평택 지역 보기
       setUserLocation({
         lat: 37.3215,  // 안산지역 중심
@@ -1691,7 +1693,7 @@ function AppContent() {
       });
       // 검색 반경을 더 넓게 설정 (인천-평택 지역까지 보이도록)
       setSelectedRadius(80000);
-      
+
       // 로그인 상태 저장
       localStorage.setItem('loginState', JSON.stringify({
         isAgent: true,
@@ -1731,7 +1733,7 @@ function AppContent() {
       setIsBudgetMode(false);
       setIsSalesMode(false);
       setCurrentMode('inventoryRecovery');
-      
+
       // 로그인 상태 저장
       localStorage.setItem('loginState', JSON.stringify({
         isInventoryRecovery: true,
@@ -1766,7 +1768,7 @@ function AppContent() {
       setIsSmsManagementMode(false);
       setIsObManagementMode(false);
       setCurrentMode('budget');
-      
+
       localStorage.setItem('loginState', JSON.stringify({
         isBudget: true,
         isAgent: false,
@@ -1800,7 +1802,7 @@ function AppContent() {
       setIsDataCollectionMode(false);
       setIsObManagementMode(false);
       setCurrentMode('smsManagement');
-      
+
       localStorage.setItem('loginState', JSON.stringify({
         isSmsManagement: true,
         isAgent: false,
@@ -1835,7 +1837,7 @@ function AppContent() {
       setIsDataCollectionMode(false);
       setIsSmsManagementMode(false);
       setCurrentMode('obManagement');
-      
+
       localStorage.setItem('loginState', JSON.stringify({
         isObManagement: true,
         isAgent: false,
@@ -1871,7 +1873,7 @@ function AppContent() {
       setIsSmsManagementMode(false);
       setIsObManagementMode(false);
       setCurrentMode('onSaleManagement');
-      
+
       localStorage.setItem('loginState', JSON.stringify({
         isOnSaleManagement: true,
         isAgent: false,
@@ -2051,7 +2053,7 @@ function AppContent() {
       setIsSmsManagementMode(false);
       setIsObManagementMode(false);
       setCurrentMode('dataCollection');
-      
+
       localStorage.setItem('loginState', JSON.stringify({
         isDataCollection: true,
         isAgent: false,
@@ -2071,12 +2073,12 @@ function AppContent() {
     // 직영점 모드인지 확인 (비밀번호가 필요 없는 경우에만 바로 진입)
     else if (store.isDirectStore) {
       console.log('로그인: 직영점 모드');
-      
+
       // 비밀번호가 필요하고 아직 인증되지 않은 경우, 컴포넌트에서 비밀번호 입력 화면을 보여주도록 함
       // (온세일 접수 모드와 동일한 방식)
       const requiresPassword = store.directStoreSecurity?.requiresPassword;
       const isAuthenticated = store.directStoreSecurity?.authenticated;
-      
+
       if (requiresPassword && !isAuthenticated) {
         // 비밀번호가 필요한 경우, 인증 없이 모드를 활성화하여 컴포넌트에서 비밀번호 입력 화면을 보여줌
         console.log('직영점 모드: 비밀번호 필요 - 컴포넌트에서 처리');
@@ -2125,10 +2127,10 @@ function AppContent() {
     // 온세일접수 모드인지 확인 (modePermissions.onSaleReception이 있으면 바로 진입)
     else if (store.modePermissions && store.modePermissions.onSaleReception) {
       console.log('로그인: 온세일접수 모드');
-      
+
       // loggedInStore 업데이트 (modePermissions 유지)
       setLoggedInStore(store);
-      
+
       setIsOnSaleReceptionMode(true);
       setIsAgentMode(false);
       setIsInventoryMode(false);
@@ -2145,7 +2147,7 @@ function AppContent() {
       setIsObManagementMode(false);
       setIsOnSaleManagementMode(false);
       setCurrentMode('onSaleReception');
-      
+
       localStorage.setItem('loginState', JSON.stringify({
         isOnSaleReception: true,
         isAgent: false,
@@ -2158,10 +2160,10 @@ function AppContent() {
     // 기본 모드인지 확인 (modePermissions.basicMode가 있으면 바로 진입)
     else if (store.modePermissions && store.modePermissions.basicMode) {
       console.log('로그인: 기본 모드 (일반 매장)');
-      
+
       // loggedInStore 업데이트 (modePermissions 유지)
       setLoggedInStore(store);
-      
+
       setIsAgentMode(false);
       setIsInventoryMode(false);
       setIsSettlementMode(false);
@@ -2178,7 +2180,7 @@ function AppContent() {
       setIsOnSaleManagementMode(false);
       setIsOnSaleReceptionMode(false);
       setCurrentMode('basicMode');
-      
+
       // 기본 모드인 경우 위치 설정
       if (store.latitude && store.longitude) {
         setUserLocation({
@@ -2186,7 +2188,7 @@ function AppContent() {
           lng: parseFloat(store.longitude)
         });
       }
-      
+
       // 로그인 상태 저장
       localStorage.setItem('loginState', JSON.stringify({
         isBasicMode: true,
@@ -2200,10 +2202,10 @@ function AppContent() {
     // 권한이 없는 일반 매장 (레거시 - 기본 모드로 처리)
     else {
       console.log('로그인: 레거시 일반 매장 모드');
-      
+
       // loggedInStore 업데이트 (modePermissions 유지)
       setLoggedInStore(store);
-      
+
       setIsAgentMode(false);
       setIsInventoryMode(false);
       setIsSettlementMode(false);
@@ -2220,7 +2222,7 @@ function AppContent() {
       setIsOnSaleManagementMode(false);
       setIsOnSaleReceptionMode(false);
       setCurrentMode('basicMode');
-      
+
       // 일반 매장인 경우 기존 로직 유지
       if (store.latitude && store.longitude) {
         setUserLocation({
@@ -2228,7 +2230,7 @@ function AppContent() {
           lng: parseFloat(store.longitude)
         });
       }
-      
+
       // 로그인 상태 저장
       localStorage.setItem('loginState', JSON.stringify({
         isBasicMode: true,
@@ -2248,7 +2250,7 @@ function AppContent() {
 
     // 선택된 모드에 따라 store 객체 수정
     const modifiedStore = { ...pendingLoginData };
-    
+
     // 모든 모드 플래그 초기화
     modifiedStore.isAgent = false;
     modifiedStore.isInventory = false;
@@ -2271,7 +2273,7 @@ function AppContent() {
     modifiedStore.isDirectStoreManagement = false;
     modifiedStore.isDirectStore = false;
     modifiedStore.isDataCollection = false;
-    
+
     // 선택된 모드만 true로 설정
     switch (normalizedMode) {
       case 'agent':
@@ -2344,20 +2346,20 @@ function AppContent() {
       default:
         break;
     }
-    
+
     // loggedInStore 업데이트 (modePermissions 유지)
     setLoggedInStore(modifiedStore);
-    
+
     // 수정된 store로 로그인 처리
     processLogin(modifiedStore);
-    
+
     // 모드 진입 시 업데이트 팝업 표시
     // 로그 최소화 (성능 최적화)
     setCurrentMode(normalizedMode);
     setShowAppUpdatePopup(true);
     // console.log('✅ [App] showAppUpdatePopup을 true로 설정');
     // console.log('🔍 [App] 현재 모드:', selectedMode, '팝업 상태:', true);
-    
+
     // 상태 초기화
     setPendingLoginData(null);
     setShowModeSelection(false);
@@ -2376,7 +2378,7 @@ function AppContent() {
     console.log('🔍 handleModeSwitch 호출됨:', selectedMode);
     console.log('🔍 현재 loggedInStore:', loggedInStore);
     console.log('🔍 loggedInStore.modePermissions:', loggedInStore?.modePermissions);
-    
+
     if (!loggedInStore) {
       console.log('⚠️ loggedInStore가 없어서 모드 전환 불가');
       return;
@@ -2386,7 +2388,7 @@ function AppContent() {
     const normalizedMode = resolveModeKey(selectedMode);
 
     // 비밀번호는 각 모드 컴포넌트에서 처리하므로 여기서는 바로 전환
-    
+
     // 모든 모드 상태 초기화
     setIsAgentMode(false);
     setIsInventoryMode(false);
@@ -2405,7 +2407,7 @@ function AppContent() {
     setIsOnSaleManagementMode(false);
     setIsOnSaleReceptionMode(false);
     resetNewModeFlags();
-    
+
     // 선택된 모드만 true로 설정
     switch (normalizedMode) {
       case 'agent':
@@ -2514,22 +2516,22 @@ function AppContent() {
         // console.log('알 수 없는 모드:', selectedMode);
         break;
     }
-    
+
     // 모드 전환 완료 - 팝업 닫기
     setShowModeSelection(false);
-    
+
     // 모드 진입 시 업데이트 팝업 표시 (검수모드 제외)
     console.log('🔍 [App] handleModeSwitch - 모드 전환 시 팝업 표시:', selectedMode);
     setCurrentMode(normalizedMode);
-    
+
     // 검수모드는 자체 업데이트 팝업을 사용하므로 App.js에서 표시하지 않음
     if (normalizedMode !== 'inspection') {
       setShowAppUpdatePopup(true);
       //       console.log('✅ [App] showAppUpdatePopup을 true로 설정');
     }
-    
+
     setModeSelectionRequired(false);
-    
+
     // console.log('모드 전환 완료');
   };
 
@@ -2669,7 +2671,7 @@ function AppContent() {
     setPendingDirectStoreAction(null);
     // 재고 확인 뷰 상태 초기화
     setCurrentView('all');
-    
+
     // 로그인 상태 삭제
     localStorage.removeItem('loginState');
   };
@@ -2679,7 +2681,7 @@ function AppContent() {
     setSelectedModel(model);
     setSelectedColor('');  // 색상 선택 초기화
     // setFilteredStores([]); // 검색 결과 초기화 제거 - 마커가 사라지는 문제 해결
-    
+
     // 모델 검색 로그 전송
     if (loggedInStore) {
       // console.log('모델 선택 로그 전송 시작:', model);
@@ -2694,7 +2696,7 @@ function AppContent() {
         model: model
       });
     }
-    
+
     // 데이터 로드는 로그 전송 후 실행 (캐시 사용으로 인해 불필요한 호출 제거)
     // loadData();
   }, [loggedInStore, isAgentMode, agentTarget, ipInfo, deviceInfo]);
@@ -2703,7 +2705,7 @@ function AppContent() {
     // console.log('선택된 색상 변경:', color);
     setSelectedColor(color);
     // setFilteredStores([]); // 검색 결과 초기화 제거 - 마커가 사라지는 문제 해결
-    
+
     // 색상 검색 로그 전송
     if (loggedInStore && selectedModel) {
       // console.log('색상 선택 로그 전송 시작:', color, '모델:', selectedModel);
@@ -2719,7 +2721,7 @@ function AppContent() {
         colorName: color
       });
     }
-    
+
     // 데이터 로드는 로그 전송 후 실행 (캐시 사용으로 인해 불필요한 호출 제거)
     // loadData();
   }, [loggedInStore, selectedModel, isAgentMode, agentTarget, ipInfo, deviceInfo]);
@@ -2727,7 +2729,7 @@ function AppContent() {
   const handleRadiusSelect = useCallback((radius) => {
     // console.log('선택된 반경 변경:', radius);
     setSelectedRadius(radius);
-    
+
     // 일반 모드에서 반경 변경 시 맵을 사용자 위치로 이동
     if (!isAgentMode && userLocation) {
       // 맵 이동을 위한 상태 업데이트
@@ -2736,7 +2738,7 @@ function AppContent() {
         lng: userLocation.lng,
         zoom: getZoomLevelForRadius(radius)
       });
-      
+
       // 반경 변경 로그 전송
       if (loggedInStore) {
         logActivity({
@@ -2772,24 +2774,24 @@ function AppContent() {
   // 재고요청점 검색 함수
   const handleStoreSearch = useCallback((query) => {
     setSearchQuery(query);
-    
+
     if (!query.trim() || !data?.stores) {
       setSearchResults([]);
       return;
     }
-    
+
     // 매장명 또는 담당자명으로 검색 (대소문자 구분 없이)
     const filtered = data.stores.filter(store => {
       const storeName = store.name?.toLowerCase() || '';
       const managerName = store.manager?.toLowerCase() || '';
       const searchTerm = query.toLowerCase();
-      
+
       return storeName.includes(searchTerm) || managerName.includes(searchTerm);
     });
-    
+
     // console.log(`검색어: "${query}" - 검색 결과: ${filtered.length}개`);
     // console.log('검색된 매장들:', filtered.map(s => ({ name: s.name, manager: s.manager })));
-    
+
     setSearchResults(filtered);
   }, [data?.stores]);
 
@@ -2800,17 +2802,17 @@ function AppContent() {
     setRequestedStore(store); // 요청점검색으로 선택된 매장 저장
     setSearchQuery('');
     setSearchResults([]);
-    
+
     // 선택된 매장으로 지도 이동 (강제 확대)
     if (store.latitude && store.longitude) {
       const lat = parseFloat(store.latitude);
       const lng = parseFloat(store.longitude);
-      
+
       console.log('지도 이동 좌표:', lat, lng);
-      
+
       // 먼저 userLocation 변경
       setUserLocation({ lat, lng });
-      
+
       // 강제 확대 실행 (지연 시간 단축)
       setTimeout(() => {
         console.log('강제 확대 상태 설정');
@@ -2865,7 +2867,7 @@ function AppContent() {
       alert('삭제할 기억된 요청이 없습니다.');
       return;
     }
-    
+
     if (window.confirm('모든 기억된 요청을 삭제하시겠습니까?')) {
       setRememberedRequests([]);
       alert('모든 기억된 요청이 삭제되었습니다.');
@@ -2881,7 +2883,7 @@ function AppContent() {
     // 관리자모드와 일반모드 구분
     if (isAgentMode) {
       // 관리자모드용 템플릿
-      const requestList = rememberedRequests.map((req, index) => 
+      const requestList = rememberedRequests.map((req, index) =>
         `${index + 1}. ${req.storeName} (담당자: ${req.manager || '미지정'}): ${req.model} / ${req.color}`
       ).join('\n');
 
@@ -2949,7 +2951,7 @@ ${requestList}
       });
     } else {
       // 일반모드용 템플릿 (기존)
-      const requestList = rememberedRequests.map((req, index) => 
+      const requestList = rememberedRequests.map((req, index) =>
         `${index + 1}. ${req.storeName}: ${req.model} / ${req.color}`
       ).join('\n');
 
@@ -2989,12 +2991,12 @@ ${requestList}
   const handleViewChange = useCallback((view) => {
     setCurrentView(view);
     // console.log(`재고 확인 뷰 변경: ${view}`);
-    
+
     // 뷰 변경 시 요청점 관련 상태 초기화
     setRequestedStore(null);
     setForceZoomToStore(null);
     setSelectedStore(null);
-    
+
     // 로컬 스토리지에 현재 뷰 상태 저장
     const savedLoginState = localStorage.getItem('loginState');
     if (savedLoginState) {
@@ -3006,7 +3008,7 @@ ${requestList}
         console.error('로그인 상태 업데이트 실패:', error);
       }
     }
-    
+
     // 관리자모드에서 뷰가 변경되면 데이터 다시 로드 (캐시 무효화 제거)
     // if (isAgentMode && isLoggedIn) {
     //   // console.log('관리자모드 뷰 변경으로 인한 데이터 재로드');
@@ -3026,10 +3028,10 @@ ${requestList}
   // 매장 재고 계산 함수 추가
   const getStoreInventory = useCallback((store) => {
     if (!store || !store.inventory) return 0;
-    
+
     // 새로운 데이터 구조: { phones: {}, sims: {}, wearables: {}, smartDevices: {} }
     let totalInventory = 0;
-    
+
     if (selectedModel && selectedColor) {
       // 특정 모델과 색상의 재고 확인
       Object.values(store.inventory).forEach(category => {
@@ -3076,7 +3078,7 @@ ${requestList}
         }
       });
     }
-    
+
     return totalInventory;
   }, [selectedModel, selectedColor]);
 
@@ -3109,7 +3111,7 @@ ${requestList}
     // console.log('새로운 배정 알림:', notification);
     playNotificationSound();
     setUnreadNotifications(prev => prev + 1);
-    
+
     // 알림 목록에 추가
     const newNotification = {
       id: Date.now(),
@@ -3119,9 +3121,9 @@ ${requestList}
       isRead: false,
       data: notification.data || {}
     };
-    
+
     setNotificationList(prev => [newNotification, ...prev]);
-    
+
     // 토스트 알림 추가
     const toastId = Date.now();
     const newToast = {
@@ -3130,9 +3132,9 @@ ${requestList}
       message: notification.message || '새로운 배정이 완료되었습니다.',
       timestamp: new Date()
     };
-    
+
     setToastNotifications(prev => [...prev, newToast]);
-    
+
     // 5초 후 자동 제거
     setTimeout(() => {
       setToastNotifications(prev => prev.filter(toast => toast.id !== toastId));
@@ -3147,22 +3149,22 @@ ${requestList}
       //   userName: loggedInStore.name,
       //   isAgentMode
       // });
-      
+
       const eventSource = new EventSource(`${process.env.REACT_APP_API_URL}/api/notifications/stream?user_id=${loggedInStore.id}`);
-      
+
       eventSource.onopen = () => {
         console.log('SSE 연결 성공');
       };
-      
+
       eventSource.onmessage = (event) => {
         try {
           const notification = JSON.parse(event.data);
-          
+
           // ping 메시지는 무시
           if (notification.type === 'ping') {
             return;
           }
-          
+
           if (notification.type === 'assignment_completed') {
             showNotificationToast(notification);
           }
@@ -3173,14 +3175,14 @@ ${requestList}
 
       eventSource.onerror = (error) => {
         console.error('실시간 알림 연결 오류:', error);
-        
+
         // 연결 상태 확인
         if (eventSource.readyState === EventSource.CLOSED) {
           console.log('SSE 연결이 종료됨');
         } else if (eventSource.readyState === EventSource.CONNECTING) {
           console.log('SSE 재연결 시도 중...');
         }
-        
+
         // 연결이 끊어진 경우 5초 후 재연결 시도
         setTimeout(() => {
           if (eventSource.readyState === EventSource.CLOSED) {
@@ -3188,7 +3190,7 @@ ${requestList}
             // 재연결 로직은 useEffect의 의존성 배열에 의해 자동으로 처리됨
           }
         }, 5000);
-        
+
         eventSource.close();
       };
 
@@ -3208,7 +3210,7 @@ ${requestList}
   // 개통정보 페이지 라우팅 (로그인 상태와 무관하게 URL 파라미터로 접근)
   const urlParams = new URLSearchParams(window.location.search);
   const showActivationPage = urlParams.get('activationSheetId');
-  
+
   if (showActivationPage) {
     return (
       <ThemeProvider theme={theme}>
@@ -3232,9 +3234,9 @@ ${requestList}
     return (
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <SettlementMode 
-          onLogout={handleLogout} 
-          loggedInStore={loggedInStore} 
+        <SettlementMode
+          onLogout={handleLogout}
+          loggedInStore={loggedInStore}
           settlementUserName={settlementUserName}
           onModeChange={() => {
             // console.log('App.js SettlementMode onModeChange 호출됨');
@@ -3260,9 +3262,9 @@ ${requestList}
     return (
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <SalesMode 
-          onLogout={handleLogout} 
-          loggedInStore={loggedInStore} 
+        <SalesMode
+          onLogout={handleLogout}
+          loggedInStore={loggedInStore}
           onModeChange={() => {
             // console.log('App.js SalesMode onModeChange 호출됨');
             const currentModes = getCurrentUserAvailableModes();
@@ -3284,9 +3286,9 @@ ${requestList}
     return (
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <InspectionMode 
-          onLogout={handleLogout} 
-          loggedInStore={loggedInStore} 
+        <InspectionMode
+          onLogout={handleLogout}
+          loggedInStore={loggedInStore}
           onModeChange={() => {
             // console.log('App.js InspectionMode onModeChange 호출됨');
             const currentModes = getCurrentUserAvailableModes();
@@ -3308,9 +3310,9 @@ ${requestList}
     return (
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <ChartMode 
-          onLogout={handleLogout} 
-          loggedInStore={loggedInStore} 
+        <ChartMode
+          onLogout={handleLogout}
+          loggedInStore={loggedInStore}
           onModeChange={() => {
             // console.log('App.js ChartMode onModeChange 호출됨');
             const currentModes = getCurrentUserAvailableModes();
@@ -3332,9 +3334,9 @@ ${requestList}
     return (
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <PolicyMode 
-          onLogout={handleLogout} 
-          loggedInStore={loggedInStore} 
+        <PolicyMode
+          onLogout={handleLogout}
+          loggedInStore={loggedInStore}
           onModeChange={() => {
             // console.log('App.js PolicyMode onModeChange 호출됨');
             const currentModes = getCurrentUserAvailableModes();
@@ -3356,9 +3358,9 @@ ${requestList}
     return (
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <MeetingMode 
-          onLogout={handleLogout} 
-          loggedInStore={loggedInStore} 
+        <MeetingMode
+          onLogout={handleLogout}
+          loggedInStore={loggedInStore}
           onModeChange={() => {
             // console.log('App.js MeetingMode onModeChange 호출됨');
             const currentModes = getCurrentUserAvailableModes();
@@ -3380,9 +3382,9 @@ ${requestList}
     return (
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <ReservationMode 
-          onLogout={handleLogout} 
-          loggedInStore={loggedInStore} 
+        <ReservationMode
+          onLogout={handleLogout}
+          loggedInStore={loggedInStore}
           onModeChange={() => {
             // console.log('App.js ReservationMode onModeChange 호출됨');
             const currentModes = getCurrentUserAvailableModes();
@@ -3404,9 +3406,9 @@ ${requestList}
     return (
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <BudgetMode 
-          onLogout={handleLogout} 
-          loggedInStore={loggedInStore} 
+        <BudgetMode
+          onLogout={handleLogout}
+          loggedInStore={loggedInStore}
           onModeChange={() => {
             // console.log('App.js BudgetMode onModeChange 호출됨');
             const currentModes = getCurrentUserAvailableModes();
@@ -3428,9 +3430,9 @@ ${requestList}
     return (
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <DataCollectionMode 
-          onLogout={handleLogout} 
-          loggedInStore={loggedInStore} 
+        <DataCollectionMode
+          onLogout={handleLogout}
+          loggedInStore={loggedInStore}
           onModeChange={() => {
             const currentModes = getCurrentUserAvailableModes();
             setAvailableModes(currentModes);
@@ -3449,9 +3451,9 @@ ${requestList}
     return (
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <SmsManagementMode 
-          onLogout={handleLogout} 
-          loggedInStore={loggedInStore} 
+        <SmsManagementMode
+          onLogout={handleLogout}
+          loggedInStore={loggedInStore}
           onModeChange={() => {
             const currentModes = getCurrentUserAvailableModes();
             setAvailableModes(currentModes);
@@ -3470,9 +3472,9 @@ ${requestList}
     return (
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <ObManagementMode 
-          onLogout={handleLogout} 
-          loggedInStore={loggedInStore} 
+        <ObManagementMode
+          onLogout={handleLogout}
+          loggedInStore={loggedInStore}
           onModeChange={() => {
             const currentModes = getCurrentUserAvailableModes();
             setAvailableModes(currentModes);
@@ -3491,9 +3493,9 @@ ${requestList}
     return (
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <OnSaleManagementMode 
-          onLogout={handleLogout} 
-          loggedInStore={loggedInStore} 
+        <OnSaleManagementMode
+          onLogout={handleLogout}
+          loggedInStore={loggedInStore}
           onModeChange={() => {
             const currentModes = getCurrentUserAvailableModes();
             console.log('🔍 OnSaleManagementMode 모드변경: currentModes =', currentModes);
@@ -3627,8 +3629,8 @@ ${requestList}
     return (
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <OnSaleReceptionMode 
-          onLogout={handleLogout} 
+        <OnSaleReceptionMode
+          onLogout={handleLogout}
           loggedInStore={loggedInStore}
           onModeChange={() => {
             const currentModes = getCurrentUserAvailableModes();
@@ -3649,9 +3651,9 @@ ${requestList}
     return (
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <InventoryRecoveryMode 
-          onLogout={handleLogout} 
-          loggedInStore={loggedInStore} 
+        <InventoryRecoveryMode
+          onLogout={handleLogout}
+          loggedInStore={loggedInStore}
           onModeChange={() => {
             // console.log('App.js InventoryRecoveryMode onModeChange 호출됨');
             const currentModes = getCurrentUserAvailableModes();
@@ -3673,9 +3675,9 @@ ${requestList}
     return (
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <InventoryMode 
-          onLogout={handleLogout} 
-          loggedInStore={loggedInStore} 
+        <InventoryMode
+          onLogout={handleLogout}
+          loggedInStore={loggedInStore}
           onModeChange={() => {
             // console.log('App.js InventoryMode onModeChange 호출됨');
             const currentModes = getCurrentUserAvailableModes();
@@ -3697,22 +3699,22 @@ ${requestList}
     return (
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <Container maxWidth="xl" sx={{ 
-          height: '100vh', 
+        <Container maxWidth="xl" sx={{
+          height: '100vh',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center'
         }}>
           {/* 헤더 영역 */}
-          <Box sx={{ 
-            position: 'absolute', 
-            top: 0, 
-            left: 0, 
-            right: 0, 
-            p: 2, 
-            display: 'flex', 
-            justifyContent: 'space-between', 
+          <Box sx={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            p: 2,
+            display: 'flex',
+            justifyContent: 'space-between',
             alignItems: 'center',
             backgroundColor: 'rgba(255, 255, 255, 0.9)',
             backdropFilter: 'blur(10px)',
@@ -3721,7 +3723,7 @@ ${requestList}
             <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
               모드 선택
             </Typography>
-            
+
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               {/* 모드 전환 버튼 - 2개 이상 권한이 있는 사용자에게만 표시 */}
               {availableModes && availableModes.length > 1 && (
@@ -3736,10 +3738,10 @@ ${requestList}
                     // console.log('모드 선택 팝업 열기 완료');
                   }}
                   startIcon={<SwapHorizIcon />}
-                  sx={{ 
+                  sx={{
                     borderColor: '#1976d2',
                     color: '#1976d2',
-                    '&:hover': { 
+                    '&:hover': {
                       borderColor: '#1565c0',
                       backgroundColor: 'rgba(25, 118, 210, 0.04)'
                     }
@@ -3748,14 +3750,14 @@ ${requestList}
                   모드 변경
                 </Button>
               )}
-              
-              <Button 
-                variant="outlined" 
+
+              <Button
+                variant="outlined"
                 onClick={handleLogout}
-                sx={{ 
+                sx={{
                   borderColor: '#d32f2f',
                   color: '#d32f2f',
-                  '&:hover': { 
+                  '&:hover': {
                     borderColor: '#c62828',
                     backgroundColor: 'rgba(211, 47, 47, 0.04)'
                   }
@@ -3765,9 +3767,9 @@ ${requestList}
               </Button>
             </Box>
           </Box>
-          
+
           {/* 메인 콘텐츠 */}
-          <Box sx={{ 
+          <Box sx={{
             textAlign: 'center',
             p: 4,
             borderRadius: 2,
@@ -3782,8 +3784,8 @@ ${requestList}
               사용할 모드를 선택해주세요.
             </Typography>
           </Box>
-        
-                  {/* 모드 선택 팝업 */}
+
+          {/* 모드 선택 팝업 */}
           <ModeSelectionPopup
             open={showModeSelection}
             onClose={() => {
@@ -3811,8 +3813,8 @@ ${requestList}
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Container maxWidth="xl" sx={{ 
-        minHeight: '100vh', 
+      <Container maxWidth="xl" sx={{
+        minHeight: '100vh',
         py: 2,
         '@media (max-width: 768px)': {
           maxWidth: '100%',
@@ -3821,7 +3823,7 @@ ${requestList}
         }
       }}>
         <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', gap: 2 }}>
-          <Header 
+          <Header
             inventoryUserName={inventoryUserName}
             isInventoryMode={isInventoryMode}
             currentUserId={loggedInStore?.id}
@@ -3853,8 +3855,8 @@ ${requestList}
                   {currentView === 'activation' ? (
                     // 담당개통확인 모드 - 지도를 위로, 테이블을 아래로
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <Box sx={{ 
-                        height: isMapExpanded ? '85vh' : { xs: '50vh', sm: '60vh', md: '70vh' }, 
+                      <Box sx={{
+                        height: isMapExpanded ? '85vh' : { xs: '50vh', sm: '60vh', md: '70vh' },
                         position: 'relative',
                         overflow: 'hidden',
                         borderRadius: 1,
@@ -3892,10 +3894,10 @@ ${requestList}
                           quickCostRefreshKey={quickCostRefreshKey}
                         />
                       </Box>
-                      
-                      <Box sx={{ 
-                        backgroundColor: 'white', 
-                        borderRadius: 1, 
+
+                      <Box sx={{
+                        backgroundColor: 'white',
+                        borderRadius: 1,
                         p: 2,
                         boxShadow: 1,
                         overflow: 'visible'
@@ -3970,16 +3972,16 @@ ${requestList}
                             </Box>
                           </Box>
                         </Box>
-                        
+
                         {activationModelSearch ? (
                           // 특정 모델의 매장별 통계
                           <Box>
-                            <Box sx={{ 
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              gap: 2, 
-                              p: 1, 
-                              backgroundColor: '#e3f2fd', 
+                            <Box sx={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 2,
+                              p: 1,
+                              backgroundColor: '#e3f2fd',
                               borderRadius: 1,
                               fontSize: '14px',
                               mb: 2
@@ -4011,9 +4013,9 @@ ${requestList}
                                     <td style={{ padding: '8px', textAlign: 'center', border: '1px solid #ddd' }}>
                                       {store.previousMonth}개
                                     </td>
-                                    <td style={{ 
-                                      padding: '8px', 
-                                      textAlign: 'center', 
+                                    <td style={{
+                                      padding: '8px',
+                                      textAlign: 'center',
                                       border: '1px solid #ddd',
                                       color: parseFloat(store.changeRate) > 0 ? '#4caf50' : parseFloat(store.changeRate) < 0 ? '#f44336' : '#ff9800',
                                       fontWeight: 'bold'
@@ -4035,12 +4037,12 @@ ${requestList}
                         ) : activationDateSearch ? (
                           // 특정 날짜의 매장별 통계
                           <Box>
-                            <Box sx={{ 
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              gap: 2, 
-                              p: 1, 
-                              backgroundColor: '#e8f5e8', 
+                            <Box sx={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 2,
+                              p: 1,
+                              backgroundColor: '#e8f5e8',
                               borderRadius: 1,
                               fontSize: '14px',
                               mb: 2
@@ -4072,9 +4074,9 @@ ${requestList}
                                     <td style={{ padding: '8px', textAlign: 'center', border: '1px solid #ddd' }}>
                                       {store.previousMonth}개
                                     </td>
-                                    <td style={{ 
-                                      padding: '8px', 
-                                      textAlign: 'center', 
+                                    <td style={{
+                                      padding: '8px',
+                                      textAlign: 'center',
                                       border: '1px solid #ddd',
                                       color: parseFloat(store.changeRate) > 0 ? '#4caf50' : parseFloat(store.changeRate) < 0 ? '#f44336' : '#ff9800',
                                       fontWeight: 'bold'
@@ -4120,9 +4122,9 @@ ${requestList}
                                     <td style={{ padding: '8px', textAlign: 'center', border: '1px solid #ddd' }}>
                                       {stat.previousMonth}개
                                     </td>
-                                    <td style={{ 
-                                      padding: '8px', 
-                                      textAlign: 'center', 
+                                    <td style={{
+                                      padding: '8px',
+                                      textAlign: 'center',
                                       border: '1px solid #ddd',
                                       color: parseFloat(stat.changeRate) > 0 ? '#4caf50' : parseFloat(stat.changeRate) < 0 ? '#f44336' : '#ff9800',
                                       fontWeight: 'bold'
@@ -4142,46 +4144,46 @@ ${requestList}
                     </Box>
                   ) : (
                     // 기존 재고확인 모드
-                <>
-                  <StoreInfoTable 
-                    selectedStore={selectedStore}
-                    requestedStore={requestedStore}
-                    agentTarget={agentTarget}
-                    agentContactId={agentContactId}
-                    onCallButtonClick={handleCallButtonClick}
-                    onKakaoTalkButtonClick={handleKakaoTalkButtonClick}
-                    selectedModel={selectedModel}
-                    selectedColor={selectedColor}
-                    currentView={currentView}
-                    agentTotalInventory={getAgentTotalInventory()}
-                    loggedInStore={loggedInStore}
-                    isAgentMode={isAgentMode}
-                    onQuickCostClick={(fromStore, toStore) => {
-                      setQuickCostFromStore(fromStore);
-                      setQuickCostToStore(toStore);
-                      setShowQuickCostModal(true);
-                    }}
-                    quickCostRefreshKey={quickCostRefreshKey}
-                  />
-                  <AgentFilterPanel
-                    models={data?.models}
-                    colorsByModel={data?.colorsByModel}
-                    selectedModel={selectedModel}
-                    selectedColor={selectedColor}
-                    onModelSelect={handleModelSelect}
-                    onColorSelect={handleColorSelect}
-                    searchQuery={searchQuery}
-                    searchResults={searchResults}
-                    onStoreSearch={handleStoreSearch}
-                    onSearchResultSelect={handleSearchResultSelect}
-                  />
+                    <>
+                      <StoreInfoTable
+                        selectedStore={selectedStore}
+                        requestedStore={requestedStore}
+                        agentTarget={agentTarget}
+                        agentContactId={agentContactId}
+                        onCallButtonClick={handleCallButtonClick}
+                        onKakaoTalkButtonClick={handleKakaoTalkButtonClick}
+                        selectedModel={selectedModel}
+                        selectedColor={selectedColor}
+                        currentView={currentView}
+                        agentTotalInventory={getAgentTotalInventory()}
+                        loggedInStore={loggedInStore}
+                        isAgentMode={isAgentMode}
+                        onQuickCostClick={(fromStore, toStore) => {
+                          setQuickCostFromStore(fromStore);
+                          setQuickCostToStore(toStore);
+                          setShowQuickCostModal(true);
+                        }}
+                        quickCostRefreshKey={quickCostRefreshKey}
+                      />
+                      <AgentFilterPanel
+                        models={data?.models}
+                        colorsByModel={data?.colorsByModel}
+                        selectedModel={selectedModel}
+                        selectedColor={selectedColor}
+                        onModelSelect={handleModelSelect}
+                        onColorSelect={handleColorSelect}
+                        searchQuery={searchQuery}
+                        searchResults={searchResults}
+                        onStoreSearch={handleStoreSearch}
+                        onSearchResultSelect={handleSearchResultSelect}
+                      />
                     </>
                   )}
                 </>
               ) : (
                 // 일반 매장 모드일 때 StoreInfoTable과 FilterPanel 표시
                 <>
-                  <StoreInfoTable 
+                  <StoreInfoTable
                     selectedStore={selectedStore}
                     requestedStore={requestedStore}
                     agentTarget={agentTarget}
@@ -4214,7 +4216,7 @@ ${requestList}
                   />
                 </>
               )}
-              
+
               {/* 기억된 요청 목록 테이블 */}
               {!isAgentMode ? (
                 <RememberedRequestsTable
@@ -4231,9 +4233,9 @@ ${requestList}
                   onBulkRequest={handleBulkRequest}
                 />
               )}
-              
+
               {currentView !== 'activation' && (
-                <Box sx={{ 
+                <Box sx={{
                   flex: 1,
                   height: isMapExpanded ? '85vh' : { xs: '50vh', sm: '60vh', md: '70vh' },
                   position: 'relative',
@@ -4278,7 +4280,7 @@ ${requestList}
           )}
         </Box>
       </Container>
-      
+
 
 
       {/* 알림 모달 */}
@@ -4309,9 +4311,9 @@ ${requestList}
             <NotificationsIcon color="primary" />
             <Typography variant="h6">알림</Typography>
             {unreadNotifications > 0 && (
-              <Chip 
-                label={unreadNotifications} 
-                color="error" 
+              <Chip
+                label={unreadNotifications}
+                color="error"
                 size="small"
                 sx={{ ml: 'auto' }}
               />
@@ -4327,11 +4329,11 @@ ${requestList}
             ) : (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 {notificationList.map((notification) => (
-                  <Box 
-                    key={notification.id} 
-                    sx={{ 
-                      p: 2, 
-                      border: '1px solid #e0e0e0', 
+                  <Box
+                    key={notification.id}
+                    sx={{
+                      p: 2,
+                      border: '1px solid #e0e0e0',
                       borderRadius: 1,
                       backgroundColor: notification.isRead ? '#fafafa' : '#fff3e0'
                     }}
@@ -4376,7 +4378,7 @@ ${requestList}
       ))}
 
       {/* 알림 시스템 */}
-                    {/* 알림 시스템 제거 (재고 모드로 이동) */}
+      {/* 알림 시스템 제거 (재고 모드로 이동) */}
 
       {/* 직영점 모드 비밀번호 확인 */}
       <Dialog
@@ -4427,7 +4429,7 @@ ${requestList}
           </Box>
         </DialogContent>
         <DialogActions sx={{ p: 3, gap: 1 }}>
-          <Button 
+          <Button
             onClick={handleDirectStorePasswordCancel}
             disabled={directStorePasswordLoading}
             sx={{ color: '#455A64' }}
@@ -4438,9 +4440,9 @@ ${requestList}
             onClick={handleDirectStorePasswordSubmit}
             variant="contained"
             disabled={directStorePasswordLoading}
-            sx={{ 
+            sx={{
               background: 'linear-gradient(135deg, #455A64 0%, #37474f 100%)',
-              '&:hover': { 
+              '&:hover': {
                 background: 'linear-gradient(135deg, #37474f 0%, #263238 100%)'
               },
               boxShadow: '0 4px 15px rgba(69, 90, 100, 0.3)',
@@ -4481,7 +4483,7 @@ ${requestList}
           // console.log('새 업데이트가 추가되었습니다.');
         }}
       />
-      
+
       {/* 퀵비용 등록 모달 */}
       <QuickCostModal
         open={showQuickCostModal}
@@ -4521,9 +4523,14 @@ ${requestList}
 
 function App() {
   return (
-    <ErrorBoundary>
-      <AppContent />
-    </ErrorBoundary>
+    <BrowserRouter>
+      <ErrorBoundary>
+        <Routes>
+          <Route path="/member/*" element={<CustomerMode />} />
+          <Route path="*" element={<AppContent />} />
+        </Routes>
+      </ErrorBoundary>
+    </BrowserRouter>
   );
 }
 
