@@ -1033,67 +1033,122 @@ ${loggedInStore.name}으로 이동 예정입니다.
                           </div>
 
                           {/* 사전승낙서마크 표시 */}
-                          {isDetailLoading && <p style={{ fontSize: '12px', color: '#666' }}>로딩 중...</p>}
-                          {!isDetailLoading && preApprovalMark && (
-                            <div style={{ marginBottom: '12px', padding: '8px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
-                              <p style={{ margin: '0 0 4px 0', fontSize: '12px', fontWeight: 'bold' }}>사전승낙서마크</p>
+                          <div style={{ marginBottom: '12px', padding: '8px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
+                            <p style={{ margin: '0 0 4px 0', fontSize: '12px', fontWeight: 'bold' }}>사전승낙서마크</p>
+                            {isDetailLoading ? (
+                              <p style={{ fontSize: '12px', color: '#666' }}>로딩 중...</p>
+                            ) : preApprovalMark ? (
                               <div dangerouslySetInnerHTML={{ __html: preApprovalMark }} />
-                            </div>
-                          )}
+                            ) : (
+                              <p style={{ fontSize: '12px', color: '#999', fontStyle: 'italic' }}>사전승낙서 마크 없음</p>
+                            )}
+                          </div>
 
                           {/* 매장 사진 표시 */}
-                          {!isDetailLoading && storePhotos && (
-                            <div style={{ marginBottom: '12px' }}>
-                              <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 'bold' }}>매장 사진</p>
+                          <div style={{ marginBottom: '12px' }}>
+                            <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 'bold' }}>매장 사진</p>
+                            {isDetailLoading ? (
+                              <p style={{ fontSize: '12px', color: '#666' }}>로딩 중...</p>
+                            ) : storePhotos && (storePhotos.frontUrl || storePhotos.insideUrl || storePhotos.outsideUrl || storePhotos.outside2Url) ? (
                               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
-                                {storePhotos.frontUrl && (
+                                {storePhotos.frontUrl ? (
                                   <img src={storePhotos.frontUrl} alt="전면" style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
+                                ) : (
+                                  <div style={{ width: '100%', height: '80px', backgroundColor: '#f0f0f0', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <p style={{ fontSize: '11px', color: '#999' }}>전면 사진 없음</p>
+                                  </div>
                                 )}
-                                {storePhotos.insideUrl && (
+                                {storePhotos.insideUrl ? (
                                   <img src={storePhotos.insideUrl} alt="내부" style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
+                                ) : (
+                                  <div style={{ width: '100%', height: '80px', backgroundColor: '#f0f0f0', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <p style={{ fontSize: '11px', color: '#999' }}>내부 사진 없음</p>
+                                  </div>
                                 )}
-                                {storePhotos.outsideUrl && (
+                                {storePhotos.outsideUrl ? (
                                   <img src={storePhotos.outsideUrl} alt="외부" style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
+                                ) : (
+                                  <div style={{ width: '100%', height: '80px', backgroundColor: '#f0f0f0', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <p style={{ fontSize: '11px', color: '#999' }}>외부 사진 없음</p>
+                                  </div>
                                 )}
-                                {storePhotos.outside2Url && (
+                                {storePhotos.outside2Url ? (
                                   <img src={storePhotos.outside2Url} alt="외부2" style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
+                                ) : (
+                                  <div style={{ width: '100%', height: '80px', backgroundColor: '#f0f0f0', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <p style={{ fontSize: '11px', color: '#999' }}>외부2 사진 없음</p>
+                                  </div>
                                 )}
                               </div>
-                            </div>
-                          )}
+                            ) : (
+                              <p style={{ fontSize: '12px', color: '#999', fontStyle: 'italic' }}>매장 사진 없음</p>
+                            )}
+                          </div>
 
                           {/* 점장 및 직원 사진 표시 */}
-                          {!isDetailLoading && storePhotos && (storePhotos.managerUrl || storePhotos.staff1Url || storePhotos.staff2Url || storePhotos.staff3Url) && (
-                            <div style={{ marginBottom: '12px' }}>
-                              <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 'bold' }}>점장 및 직원</p>
+                          <div style={{ marginBottom: '12px' }}>
+                            <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 'bold' }}>점장 및 직원</p>
+                            {isDetailLoading ? (
+                              <p style={{ fontSize: '12px', color: '#666' }}>로딩 중...</p>
+                            ) : storePhotos && (storePhotos.managerUrl || storePhotos.staff1Url || storePhotos.staff2Url || storePhotos.staff3Url) ? (
                               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
-                                {storePhotos.managerUrl && (
+                                {storePhotos.managerUrl ? (
                                   <div>
                                     <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#666' }}>점장</p>
                                     <img src={storePhotos.managerUrl} alt="점장" style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
                                   </div>
+                                ) : (
+                                  <div>
+                                    <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#666' }}>점장</p>
+                                    <div style={{ width: '100%', height: '80px', backgroundColor: '#f0f0f0', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                      <p style={{ fontSize: '11px', color: '#999' }}>사진 없음</p>
+                                    </div>
+                                  </div>
                                 )}
-                                {storePhotos.staff1Url && (
+                                {storePhotos.staff1Url ? (
                                   <div>
                                     <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#666' }}>직원1</p>
                                     <img src={storePhotos.staff1Url} alt="직원1" style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
                                   </div>
+                                ) : (
+                                  <div>
+                                    <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#666' }}>직원1</p>
+                                    <div style={{ width: '100%', height: '80px', backgroundColor: '#f0f0f0', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                      <p style={{ fontSize: '11px', color: '#999' }}>사진 없음</p>
+                                    </div>
+                                  </div>
                                 )}
-                                {storePhotos.staff2Url && (
+                                {storePhotos.staff2Url ? (
                                   <div>
                                     <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#666' }}>직원2</p>
                                     <img src={storePhotos.staff2Url} alt="직원2" style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
                                   </div>
+                                ) : (
+                                  <div>
+                                    <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#666' }}>직원2</p>
+                                    <div style={{ width: '100%', height: '80px', backgroundColor: '#f0f0f0', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                      <p style={{ fontSize: '11px', color: '#999' }}>사진 없음</p>
+                                    </div>
+                                  </div>
                                 )}
-                                {storePhotos.staff3Url && (
+                                {storePhotos.staff3Url ? (
                                   <div>
                                     <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#666' }}>직원3</p>
                                     <img src={storePhotos.staff3Url} alt="직원3" style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
                                   </div>
+                                ) : (
+                                  <div>
+                                    <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#666' }}>직원3</p>
+                                    <div style={{ width: '100%', height: '80px', backgroundColor: '#f0f0f0', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                      <p style={{ fontSize: '11px', color: '#999' }}>사진 없음</p>
+                                    </div>
+                                  </div>
                                 )}
                               </div>
-                            </div>
-                          )}
+                            ) : (
+                              <p style={{ fontSize: '12px', color: '#999', fontStyle: 'italic' }}>점장 및 직원 사진 없음</p>
+                            )}
+                          </div>
 
                           {/* 해당매장선택하기 버튼 */}
                           <button
@@ -1351,67 +1406,122 @@ ${loggedInStore.name}으로 이동 예정입니다.
                           </div>
 
                           {/* 사전승낙서마크 표시 */}
-                          {isDetailLoading && <p style={{ fontSize: '12px', color: '#666' }}>로딩 중...</p>}
-                          {!isDetailLoading && preApprovalMark && (
-                            <div style={{ marginBottom: '12px', padding: '8px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
-                              <p style={{ margin: '0 0 4px 0', fontSize: '12px', fontWeight: 'bold' }}>사전승낙서마크</p>
+                          <div style={{ marginBottom: '12px', padding: '8px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
+                            <p style={{ margin: '0 0 4px 0', fontSize: '12px', fontWeight: 'bold' }}>사전승낙서마크</p>
+                            {isDetailLoading ? (
+                              <p style={{ fontSize: '12px', color: '#666' }}>로딩 중...</p>
+                            ) : preApprovalMark ? (
                               <div dangerouslySetInnerHTML={{ __html: preApprovalMark }} />
-                            </div>
-                          )}
+                            ) : (
+                              <p style={{ fontSize: '12px', color: '#999', fontStyle: 'italic' }}>사전승낙서 마크 없음</p>
+                            )}
+                          </div>
 
                           {/* 매장 사진 표시 */}
-                          {!isDetailLoading && storePhotos && (
-                            <div style={{ marginBottom: '12px' }}>
-                              <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 'bold' }}>매장 사진</p>
+                          <div style={{ marginBottom: '12px' }}>
+                            <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 'bold' }}>매장 사진</p>
+                            {isDetailLoading ? (
+                              <p style={{ fontSize: '12px', color: '#666' }}>로딩 중...</p>
+                            ) : storePhotos && (storePhotos.frontUrl || storePhotos.insideUrl || storePhotos.outsideUrl || storePhotos.outside2Url) ? (
                               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
-                                {storePhotos.frontUrl && (
+                                {storePhotos.frontUrl ? (
                                   <img src={storePhotos.frontUrl} alt="전면" style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
+                                ) : (
+                                  <div style={{ width: '100%', height: '80px', backgroundColor: '#f0f0f0', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <p style={{ fontSize: '11px', color: '#999' }}>전면 사진 없음</p>
+                                  </div>
                                 )}
-                                {storePhotos.insideUrl && (
+                                {storePhotos.insideUrl ? (
                                   <img src={storePhotos.insideUrl} alt="내부" style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
+                                ) : (
+                                  <div style={{ width: '100%', height: '80px', backgroundColor: '#f0f0f0', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <p style={{ fontSize: '11px', color: '#999' }}>내부 사진 없음</p>
+                                  </div>
                                 )}
-                                {storePhotos.outsideUrl && (
+                                {storePhotos.outsideUrl ? (
                                   <img src={storePhotos.outsideUrl} alt="외부" style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
+                                ) : (
+                                  <div style={{ width: '100%', height: '80px', backgroundColor: '#f0f0f0', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <p style={{ fontSize: '11px', color: '#999' }}>외부 사진 없음</p>
+                                  </div>
                                 )}
-                                {storePhotos.outside2Url && (
+                                {storePhotos.outside2Url ? (
                                   <img src={storePhotos.outside2Url} alt="외부2" style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
+                                ) : (
+                                  <div style={{ width: '100%', height: '80px', backgroundColor: '#f0f0f0', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <p style={{ fontSize: '11px', color: '#999' }}>외부2 사진 없음</p>
+                                  </div>
                                 )}
                               </div>
-                            </div>
-                          )}
+                            ) : (
+                              <p style={{ fontSize: '12px', color: '#999', fontStyle: 'italic' }}>매장 사진 없음</p>
+                            )}
+                          </div>
 
                           {/* 점장 및 직원 사진 표시 */}
-                          {!isDetailLoading && storePhotos && (storePhotos.managerUrl || storePhotos.staff1Url || storePhotos.staff2Url || storePhotos.staff3Url) && (
-                            <div style={{ marginBottom: '12px' }}>
-                              <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 'bold' }}>점장 및 직원</p>
+                          <div style={{ marginBottom: '12px' }}>
+                            <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 'bold' }}>점장 및 직원</p>
+                            {isDetailLoading ? (
+                              <p style={{ fontSize: '12px', color: '#666' }}>로딩 중...</p>
+                            ) : storePhotos && (storePhotos.managerUrl || storePhotos.staff1Url || storePhotos.staff2Url || storePhotos.staff3Url) ? (
                               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
-                                {storePhotos.managerUrl && (
+                                {storePhotos.managerUrl ? (
                                   <div>
                                     <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#666' }}>점장</p>
                                     <img src={storePhotos.managerUrl} alt="점장" style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
                                   </div>
+                                ) : (
+                                  <div>
+                                    <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#666' }}>점장</p>
+                                    <div style={{ width: '100%', height: '80px', backgroundColor: '#f0f0f0', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                      <p style={{ fontSize: '11px', color: '#999' }}>사진 없음</p>
+                                    </div>
+                                  </div>
                                 )}
-                                {storePhotos.staff1Url && (
+                                {storePhotos.staff1Url ? (
                                   <div>
                                     <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#666' }}>직원1</p>
                                     <img src={storePhotos.staff1Url} alt="직원1" style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
                                   </div>
+                                ) : (
+                                  <div>
+                                    <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#666' }}>직원1</p>
+                                    <div style={{ width: '100%', height: '80px', backgroundColor: '#f0f0f0', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                      <p style={{ fontSize: '11px', color: '#999' }}>사진 없음</p>
+                                    </div>
+                                  </div>
                                 )}
-                                {storePhotos.staff2Url && (
+                                {storePhotos.staff2Url ? (
                                   <div>
                                     <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#666' }}>직원2</p>
                                     <img src={storePhotos.staff2Url} alt="직원2" style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
                                   </div>
+                                ) : (
+                                  <div>
+                                    <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#666' }}>직원2</p>
+                                    <div style={{ width: '100%', height: '80px', backgroundColor: '#f0f0f0', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                      <p style={{ fontSize: '11px', color: '#999' }}>사진 없음</p>
+                                    </div>
+                                  </div>
                                 )}
-                                {storePhotos.staff3Url && (
+                                {storePhotos.staff3Url ? (
                                   <div>
                                     <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#666' }}>직원3</p>
                                     <img src={storePhotos.staff3Url} alt="직원3" style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
                                   </div>
+                                ) : (
+                                  <div>
+                                    <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#666' }}>직원3</p>
+                                    <div style={{ width: '100%', height: '80px', backgroundColor: '#f0f0f0', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                      <p style={{ fontSize: '11px', color: '#999' }}>사진 없음</p>
+                                    </div>
+                                  </div>
                                 )}
                               </div>
-                            </div>
-                          )}
+                            ) : (
+                              <p style={{ fontSize: '12px', color: '#999', fontStyle: 'italic' }}>점장 및 직원 사진 없음</p>
+                            )}
+                          </div>
 
                           {/* 해당매장선택하기 버튼 */}
                           <button
