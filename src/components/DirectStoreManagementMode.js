@@ -42,6 +42,7 @@ const DirectSalesReportTab = lazy(() => import('./direct/DirectSalesReportTab'))
 const OpeningInfoPage = lazy(() => import('./direct/OpeningInfoPage'));
 const CustomerQueueManagementTab = lazy(() => import('./direct/management/CustomerQueueManagementTab'));
 const DirectStorePreferredStoreTab = lazy(() => import('./direct/DirectStorePreferredStoreTab'));
+const DriveMonitoringTab = lazy(() => import('./direct/management/DriveMonitoringTab'));
 
 const DirectStoreManagementMode = ({
   loggedInStore,
