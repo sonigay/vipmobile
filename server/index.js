@@ -984,6 +984,169 @@ const originalSheets = google.sheets({
 // Google Drive API 클라이언트 생성
 const drive = google.drive({ version: 'v3', auth });
 
+// ==================== Google Drive API 모니터링 시스템 ====================
+// 모니터링 데이터 저장 (메모리 기반, 서버 재시작 시 초기화됨)
+const driveMonitoring = {
+  // 일일 호출량 추적 (날짜별)
+  dailyCalls: new Map(), // key: YYYY-MM-DD, value: { count: number, errors: number }
+  // 최근 호출 기록 (최대 1000개)
+  recentCalls: [],
+  // 임계값 설정
+  threshold: {
+    dailyCalls: 10000, // 일일 10,000회 이상 시 경고
+    errorRate: 0.05 // 에러율 5% 이상 시 경고
+  }
+};
+
+// Google Drive API 호출 래퍼 함수 (모니터링 포함)
+async function monitoredDriveCall(operation, params) {
+  const timestamp = new Date();
+  const dateKey = timestamp.toISOString().split('T')[0]; // YYYY-MM-DD
+  const operationName = operation; // 'files.list', 'files.create', 'permissions.create' 등
+  
+  // 일일 호출량 초기화 (없으면)
+  if (!driveMonitoring.dailyCalls.has(dateKey)) {
+    driveMonitoring.dailyCalls.set(dateKey, { count: 0, errors: 0, operations: {} });
+  }
+  const dailyStats = driveMonitoring.dailyCalls.get(dateKey);
+  
+  // 호출 시작
+  dailyStats.count++;
+  if (!dailyStats.operations[operationName]) {
+    dailyStats.operations[operationName] = 0;
+  }
+  dailyStats.operations[operationName]++;
+  
+  const callRecord = {
+    timestamp: timestamp.toISOString(),
+    operation: operationName,
+    params: JSON.stringify(params).substring(0, 200), // 파라미터 일부만 저장 (너무 길면 잘림)
+    success: false,
+    error: null,
+    duration: null
+  };
+  
+  const startTime = Date.now();
+  
+  try {
+    let result;
+    
+    // 실제 Drive API 호출
+    switch (operation) {
+      case 'files.list':
+        result = await drive.files.list(params);
+        break;
+      case 'files.create':
+        result = await drive.files.create(params);
+        break;
+      case 'permissions.create':
+        result = await drive.permissions.create(params);
+        break;
+      default:
+        throw new Error(`Unknown operation: ${operation}`);
+    }
+    
+    const duration = Date.now() - startTime;
+    callRecord.success = true;
+    callRecord.duration = duration;
+    
+    // 최근 호출 기록에 추가 (최대 1000개 유지)
+    driveMonitoring.recentCalls.push(callRecord);
+    if (driveMonitoring.recentCalls.length > 1000) {
+      driveMonitoring.recentCalls.shift(); // 오래된 것 제거
+    }
+    
+    // 임계값 체크 및 경고
+    checkThresholds(dateKey, dailyStats);
+    
+    return result;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    callRecord.success = false;
+    callRecord.error = error.message || error.toString();
+    callRecord.duration = duration;
+    
+    // 에러 카운트 증가
+    dailyStats.errors++;
+    
+    // 최근 호출 기록에 추가
+    driveMonitoring.recentCalls.push(callRecord);
+    if (driveMonitoring.recentCalls.length > 1000) {
+      driveMonitoring.recentCalls.shift();
+    }
+    
+    // 임계값 체크 및 경고
+    checkThresholds(dateKey, dailyStats);
+    
+    throw error;
+  }
+}
+
+// 임계값 체크 및 경고 함수
+function checkThresholds(dateKey, dailyStats) {
+  const { threshold } = driveMonitoring;
+  const errorRate = dailyStats.count > 0 ? dailyStats.errors / dailyStats.count : 0;
+  
+  // 일일 호출량 경고
+  if (dailyStats.count >= threshold.dailyCalls) {
+    console.warn(`⚠️ [Google Drive 모니터링] 일일 호출량 임계값 초과: ${dailyStats.count}회 (임계값: ${threshold.dailyCalls}회)`);
+  }
+  
+  // 에러율 경고
+  if (errorRate >= threshold.errorRate) {
+    console.warn(`⚠️ [Google Drive 모니터링] 에러율 임계값 초과: ${(errorRate * 100).toFixed(2)}% (임계값: ${(threshold.errorRate * 100).toFixed(2)}%)`);
+  }
+}
+
+// 모니터링 데이터 조회 함수
+function getDriveMonitoringData(days = 7) {
+  const now = new Date();
+  const data = [];
+  
+  // 최근 N일 데이터 수집
+  for (let i = 0; i < days; i++) {
+    const date = new Date(now);
+    date.setDate(date.getDate() - i);
+    const dateKey = date.toISOString().split('T')[0];
+    
+    const dailyStats = driveMonitoring.dailyCalls.get(dateKey) || { count: 0, errors: 0, operations: {} };
+    const errorRate = dailyStats.count > 0 ? dailyStats.errors / dailyStats.count : 0;
+    
+    data.push({
+      date: dateKey,
+      totalCalls: dailyStats.count,
+      errors: dailyStats.errors,
+      errorRate: errorRate,
+      operations: dailyStats.operations,
+      thresholdExceeded: {
+        dailyCalls: dailyStats.count >= driveMonitoring.threshold.dailyCalls,
+        errorRate: errorRate >= driveMonitoring.threshold.errorRate
+      }
+    });
+  }
+  
+  // 최근 호출 기록 (최근 100개)
+  const recentCalls = driveMonitoring.recentCalls.slice(-100).reverse();
+  
+  // 전체 통계
+  const totalStats = {
+    today: {
+      date: now.toISOString().split('T')[0],
+      ...(driveMonitoring.dailyCalls.get(now.toISOString().split('T')[0]) || { count: 0, errors: 0, operations: {} })
+    },
+    threshold: driveMonitoring.threshold,
+    recentErrors: recentCalls.filter(call => !call.success).slice(0, 20)
+  };
+  
+  return {
+    dailyData: data.reverse(), // 오래된 것부터
+    recentCalls: recentCalls,
+    totalStats: totalStats
+  };
+}
+
+// ==================== 모니터링 시스템 끝 ====================
+
 // UserSheetManager 및 PhoneklDataManager 인스턴스 생성
 const userSheetManager = new UserSheetManager(originalSheets, SPREADSHEET_ID);
 const phoneklDataManager = new PhoneklDataManager(originalSheets, SPREADSHEET_ID);
@@ -3923,6 +4086,25 @@ app.delete('/api/member/queue/:id', async (req, res) => {
 });
 // 중복 제거됨 - 위의 getAllQueue API 사용
 
+// GET /api/direct/drive-monitoring: Google Drive API 모니터링 데이터 조회
+app.get('/api/direct/drive-monitoring', async (req, res) => {
+  try {
+    const days = parseInt(req.query.days) || 7; // 기본 7일
+    const data = getDriveMonitoringData(days);
+    
+    res.json({
+      success: true,
+      data: data
+    });
+  } catch (error) {
+    console.error('❌ [모니터링] 데이터 조회 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: '모니터링 데이터 조회에 실패했습니다: ' + error.message
+    });
+  }
+});
+
 // GET /api/direct/pre-approval-mark/:storeName: 사전승낙서마크 조회
 app.get('/api/direct/pre-approval-mark/:storeName', async (req, res) => {
   const { storeName } = req.params;
@@ -4119,7 +4301,7 @@ async function getOrCreateFolder(folderName, parentFolderId = null) {
       query += ` and 'root' in parents`;
     }
 
-    const searchResponse = await drive.files.list({
+    const searchResponse = await monitoredDriveCall('files.list', {
       q: query,
       fields: 'files(id, name)',
       spaces: 'drive'
@@ -4139,7 +4321,7 @@ async function getOrCreateFolder(folderName, parentFolderId = null) {
       folderMetadata.parents = [parentFolderId];
     }
 
-    const folderResponse = await drive.files.create({
+    const folderResponse = await monitoredDriveCall('files.create', {
       requestBody: folderMetadata,
       fields: 'id, name'
     });
@@ -4219,7 +4401,7 @@ app.post('/api/direct/store-image/upload', storeImageUpload.single('image'), asy
       body: fs.createReadStream(localFilePath)
     };
 
-    const driveResponse = await drive.files.create({
+    const driveResponse = await monitoredDriveCall('files.create', {
       requestBody: fileMetadata,
       media: media,
       fields: 'id, name, webViewLink, webContentLink'
@@ -4228,7 +4410,7 @@ app.post('/api/direct/store-image/upload', storeImageUpload.single('image'), asy
     const fileId = driveResponse.data.id;
 
     // 파일을 공개로 설정 (누구나 링크로 접근 가능)
-    await drive.permissions.create({
+    await monitoredDriveCall('permissions.create', {
       fileId: fileId,
       requestBody: {
         role: 'reader',
@@ -5255,17 +5437,17 @@ async function findOrCreateManufacturerThread(post, manufacturer) {
   }
 }
 
-// POST /api/direct/upload-image: 이미지 업로드 (Discord)
+// POST /api/direct/upload-image: 이미지 업로드 (Google Drive)
 app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (req, res) => {
   const startTime = Date.now();
   let imageUrl = null;
-  let discordUploadSuccess = false;
+  let localFilePath = null;
 
   try {
-    console.log('📤 [이미지 업로드] 요청 시작');
+    console.log('📤 [상품 이미지 업로드] 요청 시작');
 
     if (!req.file) {
-      console.error('❌ [이미지 업로드] 파일이 없습니다.');
+      console.error('❌ [상품 이미지 업로드] 파일이 없습니다.');
       return res.status(400).json({
         success: false,
         error: '이미지 파일이 없습니다.'
@@ -5282,196 +5464,84 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
     // 모델명이 실제 모델 코드이므로 이를 모델ID로 사용
     const modelId = modelName; // 모델ID는 실제 모델 코드와 동일하게 설정
 
-    console.log(`📤 [이미지 업로드] 클라이언트 ID: ${clientModelId}, 모델ID(모델명): ${modelId}, 통신사: ${carrier}, 펫네임: ${petName}, 파일명: ${file.originalname}, 크기: ${file.size} bytes`);
+    console.log(`📤 [상품 이미지 업로드] 클라이언트 ID: ${clientModelId}, 모델ID(모델명): ${modelId}, 통신사: ${carrier}, 펫네임: ${petName}, 파일명: ${file.originalname}, 크기: ${file.size} bytes`);
 
     // 제조사 추출 (모델명과 펫네임 모두 체크)
     const manufacturer = extractManufacturer(modelName, petName);
-    console.log(`📤 [이미지 업로드] 추출된 제조사: ${manufacturer} (모델명: ${modelName}, 펫네임: ${petName})`);
+    console.log(`📤 [상품 이미지 업로드] 추출된 제조사: ${manufacturer} (모델명: ${modelName}, 펫네임: ${petName})`);
 
     // 🔥 디버그: 제조사 추출 실패 시 상세 로그
     if (!manufacturer || manufacturer.trim() === '' || manufacturer === '기타') {
-      console.warn(`⚠️ [이미지 업로드] 제조사 추출 실패 또는 '기타': 모델명=${modelName}, 펫네임=${petName}, 추출된제조사=${manufacturer}`);
+      console.warn(`⚠️ [상품 이미지 업로드] 제조사 추출 실패 또는 '기타': 모델명=${modelName}, 펫네임=${petName}, 추출된제조사=${manufacturer}`);
     }
 
-    // Discord 봇 초기화 확인
-    if (!DISCORD_LOGGING_ENABLED || !discordBot) {
-      console.error('❌ [이미지 업로드] Discord 봇이 초기화되지 않았습니다.');
-      return res.status(500).json({
-        success: false,
-        error: 'Discord 봇이 초기화되지 않았습니다.'
-      });
-    }
+    localFilePath = req.file.path;
+    const safeModelId = modelId.replace(/[^a-zA-Z0-9가-힣]/g, '_');
+    const timestamp = Date.now();
+    const ext = path.extname(req.file.originalname);
+    const fileName = `${safeModelId}_${timestamp}${ext}`;
 
-    // Discord 봇이 준비될 때까지 대기
-    if (!discordBot.isReady()) {
-      console.log('⏳ [이미지 업로드] Discord 봇 준비 대기 중...');
-      for (let i = 0; i < 10; i++) {
-        if (discordBot.isReady()) break;
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-    }
+    console.log(`📤 [상품 이미지 업로드] Google Drive 업로드 시작: ${carrier} - ${modelId}`);
 
-    if (!discordBot.isReady()) {
-      console.error('❌ [이미지 업로드] Discord 봇이 준비되지 않았습니다.');
-      return res.status(500).json({
-        success: false,
-        error: 'Discord 봇이 준비되지 않았습니다.'
-      });
-    }
+    // 폴더 구조 생성: 어플자료 > 상품이미지 > 통신사명
+    // 1. 어플자료 폴더
+    const appDataFolderId = await getOrCreateFolder('어플자료');
+    console.log(`📁 [상품 이미지 업로드] 어플자료 폴더 ID: ${appDataFolderId}`);
 
-    // 포럼 채널 가져오기
-    const forumChannelId = DISCORD_STORE_FORUM_CHANNEL_ID;
+    // 2. 상품이미지 폴더 (어플자료 안에)
+    const productImageFolderId = await getOrCreateFolder('상품이미지', appDataFolderId);
+    console.log(`📁 [상품 이미지 업로드] 상품이미지 폴더 ID: ${productImageFolderId}`);
 
-    if (!forumChannelId) {
-      console.error('❌ [이미지 업로드] Discord 포럼 채널 ID가 설정되지 않았습니다.');
-      return res.status(500).json({
-        success: false,
-        error: 'Discord 포럼 채널 ID가 설정되지 않았습니다.'
-      });
-    }
+    // 3. 통신사명 폴더 (상품이미지 안에)
+    const carrierFolderId = await getOrCreateFolder(carrier, productImageFolderId);
+    console.log(`📁 [상품 이미지 업로드] 통신사명 폴더 ID: ${carrierFolderId}`);
 
-    console.log(`📤 [이미지 업로드] Discord 포럼 채널 ID: ${forumChannelId}`);
-
-    let forumChannel;
-    try {
-      forumChannel = await discordBot.channels.fetch(forumChannelId);
-    } catch (fetchError) {
-      console.error(`❌ [이미지 업로드] Discord 포럼 채널 가져오기 실패:`, fetchError);
-      return res.status(500).json({
-        success: false,
-        error: `Discord 포럼 채널을 가져올 수 없습니다: ${fetchError.message}`
-      });
-    }
-
-    if (!forumChannel) {
-      console.error(`❌ [이미지 업로드] Discord 포럼 채널을 찾을 수 없습니다: ${forumChannelId}`);
-      return res.status(500).json({
-        success: false,
-        error: `Discord 포럼 채널을 찾을 수 없습니다: ${forumChannelId}`
-      });
-    }
-
-    // 포럼 채널 타입 확인
-    if (forumChannel.type !== 15) { // ForumChannel = 15
-      console.warn(`⚠️ [이미지 업로드] 채널이 포럼 채널이 아닙니다. 타입: ${forumChannel.type}`);
-      // 포럼이 아니어도 계속 진행 (하위 호환성)
-    }
-
-    // 통신사별 포스트 찾기 또는 생성
-    let carrierPost;
-    try {
-      carrierPost = await findOrCreateCarrierPost(forumChannel, carrier);
-    } catch (postError) {
-      console.error('❌ [이미지 업로드] 통신사별 포스트 찾기/생성 실패:', postError);
-      return res.status(500).json({
-        success: false,
-        error: `통신사별 포스트 찾기/생성 실패: ${postError.message}`
-      });
-    }
-
-    // 제조사별 스레드 찾기 또는 생성 (현재는 포스트를 그대로 사용)
-    let targetThread;
-    try {
-      targetThread = await findOrCreateManufacturerThread(carrierPost, manufacturer);
-    } catch (threadError) {
-      console.error('❌ [이미지 업로드] 제조사별 스레드 찾기/생성 실패:', threadError);
-      return res.status(500).json({
-        success: false,
-        error: `제조사별 스레드 찾기/생성 실패: ${threadError.message}`
-      });
-    }
-
-    // 이미지 업로드
-    // 🔥 개선: manufacturer가 빈 문자열이면 기본값 사용 (하이픈 두 개 연속 방지)
-    const safeManufacturer = manufacturer && manufacturer.trim() ? manufacturer.trim() : '기타';
-
-    // 🔥 개선: 각 부분을 정규화하여 이중 하이픈 방지
-    // 🔥 핵심 수정: 한글을 영문으로 변환하여 Discord 파일명 호환성 개선
-    const normalizePart = (str) => {
-      if (!str) return '';
-      // 한글을 영문으로 변환 (제조사명)
-      const koreanToEnglish = {
-        '삼성': 'Samsung',
-        '애플': 'Apple',
-        'LG': 'LG',
-        '기타': 'Other'
-      };
-      let normalized = str.trim();
-      // 한글 제조사명 변환
-      for (const [korean, english] of Object.entries(koreanToEnglish)) {
-        if (normalized.includes(korean)) {
-          normalized = normalized.replace(korean, english);
-        }
-      }
-      // 한글 제거 및 영문/숫자만 허용 (Discord 파일명 호환성)
-      normalized = normalized
-        .replace(/[^a-zA-Z0-9\-_]/g, '') // 한글 및 특수문자 제거
-        .replace(/\s+/g, '') // 공백 제거
-        .replace(/-+/g, '-') // 이중 하이픈 제거
-        .replace(/^-|-$/g, ''); // 앞뒤 하이픈 제거
-      return normalized;
+    // Google Drive에 파일 업로드 (해당 폴더에)
+    const fileMetadata = {
+      name: fileName,
+      parents: [carrierFolderId]
     };
 
-    const safeCarrier = normalizePart(carrier) || 'SK';
-    const safeModelId = normalizePart(modelId) || 'unknown';
-    const safeManufacturerFinal = normalizePart(safeManufacturer) || 'Other';
+    const media = {
+      mimeType: req.file.mimetype,
+      body: fs.createReadStream(localFilePath)
+    };
 
-    // 파일명 생성: 각 부분을 조합하고 최종적으로 이중 하이픈 제거
-    // 🔥 개선: 파일 확장자를 올바르게 추출하고 이미지로 인식되도록 확장자 보장
-    const originalExtension = file.originalname.split('.').pop()?.toLowerCase() || '';
-    const validImageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
-    const fileExtension = validImageExtensions.includes(originalExtension) ? originalExtension : 'jpg';
+    const driveResponse = await monitoredDriveCall('files.create', {
+      requestBody: fileMetadata,
+      media: media,
+      fields: 'id, name, webViewLink, webContentLink'
+    });
 
-    const filenameParts = [
-      'direct-store',
-      safeCarrier,
-      safeManufacturerFinal,
-      safeModelId,
-      String(Date.now())
-    ].filter(Boolean); // 빈 문자열 제거
+    const fileId = driveResponse.data.id;
 
-    // 각 부분을 하이픈으로 연결하고 최종적으로 이중 하이픈 제거
-    // 🔥 개선: 확장자를 별도로 추가하여 확장자가 항상 포함되도록 보장
-    // 파일명 형식: direct-store-{carrier}-{manufacturer}-{modelId}-{timestamp}.{extension}
-    let baseFilename = filenameParts.join('-').replace(/-+/g, '-');
-    let filename = `${baseFilename}.${fileExtension}`;
-
-    // 🔥 디버그: 파일명 생성 확인
-    console.log(`📤 [이미지 업로드] 파일명 생성: ${filename} (원본확장자=${originalExtension}, 최종확장자=${fileExtension}, manufacturer=${manufacturer}, safeManufacturer=${safeManufacturerFinal}, carrier=${carrier}->${safeCarrier}, modelId=${modelId}->${safeModelId})`);
-    console.log(`📤 [이미지 업로드] Discord에 업로드 시작: ${filename} (포스트: ${carrierPost.name}, 스레드: ${targetThread.name})`);
-
-    try {
-      const { AttachmentBuilder } = require('discord.js');
-      // 🔥 개선: 이미지로 인식되도록 description 추가 및 파일명에 확장자 보장
-      const attachment = new AttachmentBuilder(file.buffer, {
-        name: filename,
-        description: `상품 이미지: ${modelName} (${petName})`
-      });
-      const message = await targetThread.send({ files: [attachment] });
-
-      if (!message || !message.attachments || !message.attachments.first()) {
-        throw new Error('Discord 메시지에 첨부파일이 없습니다.');
+    // 파일을 공개로 설정 (누구나 링크로 접근 가능)
+    await monitoredDriveCall('permissions.create', {
+      fileId: fileId,
+      requestBody: {
+        role: 'reader',
+        type: 'anyone'
       }
+    });
 
-      const messageAttachment = message.attachments.first();
-      // 🔥 핵심 수정: 회의모드와 완전히 동일하게 원본 URL을 그대로 사용
-      // 회의모드: message.attachments.first().url을 그대로 반환 (라인 1217)
-      // 직영점 모드: 동일하게 message.attachments.first().url을 그대로 사용
-      imageUrl = messageAttachment.url;
+    // 공개 링크 생성 (직접 다운로드 링크)
+    imageUrl = `https://drive.google.com/uc?export=view&id=${fileId}`;
+    // 또는 썸네일 링크: `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000`
 
-      console.log(`✅ [이미지 업로드] Discord 업로드 성공: ${imageUrl} (포스트: ${carrierPost.name}, 스레드: ${targetThread.name})`);
-      discordUploadSuccess = true;
-    } catch (discordError) {
-      console.error('❌ [이미지 업로드] Discord 업로드 실패:', discordError);
-      return res.status(500).json({
-        success: false,
-        error: `Discord에 이미지 업로드 실패: ${discordError.message}`
-      });
+    console.log(`✅ [상품 이미지 업로드] Google Drive 업로드 성공: ${carrier} - ${modelId} - ${imageUrl}`);
+    console.log(`📂 [상품 이미지 업로드] 저장 경로: 어플자료 > 상품이미지 > ${carrier}`);
+
+    // 로컬 파일 삭제 (Google Drive에 저장되었으므로)
+    try {
+      fs.unlinkSync(localFilePath);
+      localFilePath = null;
+    } catch (unlinkError) {
+      console.warn('⚠️ 로컬 파일 삭제 실패 (무시 가능):', unlinkError);
     }
 
     // imageUrl이 없으면 에러 반환
     if (!imageUrl) {
-      console.error('❌ [이미지 업로드] 이미지 URL을 가져올 수 없습니다.');
+      console.error('❌ [상품 이미지 업로드] 이미지 URL을 가져올 수 없습니다.');
       return res.status(500).json({
         success: false,
         error: '이미지 URL을 가져올 수 없습니다.'
@@ -5482,7 +5552,7 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
     // 컬럼 구조: 통신사(A) | 모델ID(B) | 모델명(C) | 펫네임(D) | 제조사(E) | 이미지URL(F) | 비고(G)
     let sheetSaveSuccess = false;
     try {
-      console.log(`📝 [이미지 업로드] Google Sheets에 저장 시작: ${modelId}`);
+      console.log(`📝 [상품 이미지 업로드] Google Sheets에 저장 시작: ${modelId}`);
 
       // 기존 데이터 조회 (A:G 범위로 변경)
       const imageResponse = await rateLimitedSheetsCall(() =>
@@ -5541,7 +5611,7 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
 
       if (existingRowIndex !== -1) {
         // 기존 행 업데이트
-        console.log(`📝 [이미지 업로드] 기존 행 업데이트: 행 ${existingRowIndex + 2}`);
+        console.log(`📝 [상품 이미지 업로드] 기존 행 업데이트: 행 ${existingRowIndex + 2}`);
         await rateLimitedSheetsCall(() =>
           sheets.spreadsheets.values.update({
             spreadsheetId: SPREADSHEET_ID,
@@ -5553,10 +5623,10 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
           })
         );
         sheetSaveSuccess = true;
-        console.log(`✅ [이미지 업로드] Google Sheets 업데이트 성공`);
+        console.log(`✅ [상품 이미지 업로드] Google Sheets 업데이트 성공`);
       } else {
         // 새 행 추가
-        console.log(`📝 [이미지 업로드] 새 행 추가`);
+        console.log(`📝 [상품 이미지 업로드] 새 행 추가`);
         await rateLimitedSheetsCall(() =>
           sheets.spreadsheets.values.append({
             spreadsheetId: SPREADSHEET_ID,
@@ -5569,13 +5639,13 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
           })
         );
         sheetSaveSuccess = true;
-        console.log(`✅ [이미지 업로드] Google Sheets 추가 성공`);
+        console.log(`✅ [상품 이미지 업로드] Google Sheets 추가 성공`);
       }
 
       // 🔥 핵심 개선: 직영점_단말마스터 시트에도 이미지 URL 업데이트 (재빌드 없이 즉시 반영)
       if (sheetSaveSuccess) {
         try {
-          console.log(`📝 [이미지 업로드] 직영점_단말마스터 시트 업데이트 시작: ${modelId}`);
+          console.log(`📝 [상품 이미지 업로드] 직영점_단말마스터 시트 업데이트 시작: ${modelId}`);
 
           // 직영점_단말마스터 시트에서 해당 모델 찾기
           const masterResponse = await rateLimitedSheetsCall(() =>
@@ -5623,12 +5693,12 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
                 resource: { values: [[imageUrl]] }
               })
             );
-            console.log(`✅ [이미지 업로드] 직영점_단말마스터 시트 이미지URL 업데이트 성공: 행 ${targetRowNumber}`);
+            console.log(`✅ [상품 이미지 업로드] 직영점_단말마스터 시트 이미지URL 업데이트 성공: 행 ${targetRowNumber}`);
           } else {
-            console.warn(`⚠️ [이미지 업로드] 직영점_단말마스터 시트에서 모델 ${modelId} (${carrier})을(를) 찾을 수 없어 이미지URL을 업데이트하지 못했습니다.`);
+            console.warn(`⚠️ [상품 이미지 업로드] 직영점_단말마스터 시트에서 모델 ${modelId} (${carrier})을(를) 찾을 수 없어 이미지URL을 업데이트하지 못했습니다.`);
           }
         } catch (masterSheetError) {
-          console.error('❌ [이미지 업로드] 직영점_단말마스터 시트 업데이트 오류:', masterSheetError);
+          console.error('❌ [상품 이미지 업로드] 직영점_단말마스터 시트 업데이트 오류:', masterSheetError);
           // 에러가 발생해도 이미지 업로드는 성공했으므로 계속 진행
         }
       }
@@ -5639,41 +5709,41 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
         try {
           const { invalidateDirectStoreCache } = require('./directRoutes');
           invalidateDirectStoreCache(carrier);
-          console.log(`🔄 [이미지 업로드] 캐시 무효화 완료: 통신사=${carrier} (구글시트 저장 완료 후)`);
+          console.log(`🔄 [상품 이미지 업로드] 캐시 무효화 완료: 통신사=${carrier} (구글시트 저장 완료 후)`);
         } catch (cacheError) {
-          console.warn('⚠️ [이미지 업로드] 캐시 무효화 실패 (무시):', cacheError.message);
+          console.warn('⚠️ [상품 이미지 업로드] 캐시 무효화 실패 (무시):', cacheError.message);
         }
       } else {
-        console.warn('⚠️ [이미지 업로드] 구글시트 저장 실패로 인해 캐시 무효화 건너뜀');
+        console.warn('⚠️ [상품 이미지 업로드] 구글시트 저장 실패로 인해 캐시 무효화 건너뜀');
       }
     } catch (sheetError) {
-      console.error('❌ [이미지 업로드] Google Sheets 저장 오류:', sheetError);
-      console.error('❌ [이미지 업로드] 스택 트레이스:', sheetError.stack);
+      console.error('❌ [상품 이미지 업로드] Google Sheets 저장 오류:', sheetError);
+      console.error('❌ [상품 이미지 업로드] 스택 트레이스:', sheetError.stack);
 
-      // Discord 업로드는 성공했지만 Google Sheets 저장 실패
+      // Google Drive 업로드는 성공했지만 Google Sheets 저장 실패
       // 최신 데이터 반영을 위해 캐시는 무효화 (다음 요청 시 구글시트에서 다시 읽음)
       try {
         const { invalidateDirectStoreCache } = require('./directRoutes');
         invalidateDirectStoreCache(carrier);
-        console.log(`🔄 [이미지 업로드] 캐시 무효화 완료: 통신사=${carrier} (구글시트 저장 실패 후에도 무효화)`);
+        console.log(`🔄 [상품 이미지 업로드] 캐시 무효화 완료: 통신사=${carrier} (구글시트 저장 실패 후에도 무효화)`);
       } catch (cacheError) {
-        console.warn('⚠️ [이미지 업로드] 캐시 무효화 실패 (무시):', cacheError.message);
+        console.warn('⚠️ [상품 이미지 업로드] 캐시 무효화 실패 (무시):', cacheError.message);
       }
 
       // 사용자에게 경고와 함께 성공 응답 반환 (이미지 URL은 사용 가능)
       const elapsedTime = Date.now() - startTime;
-      console.warn(`⚠️ [이미지 업로드] Discord 업로드는 성공했지만 Google Sheets 저장 실패 (${elapsedTime}ms)`);
+      console.warn(`⚠️ [상품 이미지 업로드] Google Drive 업로드는 성공했지만 Google Sheets 저장 실패 (${elapsedTime}ms)`);
 
       return res.status(200).json({
         success: true,
         imageUrl: imageUrl,
         modelId: modelId,
-        warning: 'Discord에는 업로드되었지만 Google Sheets 저장에 실패했습니다. 이미지 URL은 사용 가능합니다.'
+        warning: 'Google Drive에는 업로드되었지만 Google Sheets 저장에 실패했습니다. 이미지 URL은 사용 가능합니다.'
       });
     }
 
     const elapsedTime = Date.now() - startTime;
-    console.log(`✅ [이미지 업로드] 완료 (${elapsedTime}ms) - Discord: ${discordUploadSuccess}, Sheets: ${sheetSaveSuccess}`);
+    console.log(`✅ [상품 이미지 업로드] 완료 (${elapsedTime}ms) - Google Drive: 성공, Sheets: ${sheetSaveSuccess}`);
 
     return res.json({
       success: true,
@@ -5682,8 +5752,17 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
     });
   } catch (error) {
     const elapsedTime = Date.now() - startTime;
-    console.error(`❌ [이미지 업로드] 전체 프로세스 오류 (${elapsedTime}ms):`, error);
-    console.error('❌ [이미지 업로드] 스택 트레이스:', error.stack);
+    console.error(`❌ [상품 이미지 업로드] 전체 프로세스 오류 (${elapsedTime}ms):`, error);
+    console.error('❌ [상품 이미지 업로드] 스택 트레이스:', error.stack);
+
+    // 로컬 파일 삭제
+    if (localFilePath && fs.existsSync(localFilePath)) {
+      try {
+        fs.unlinkSync(localFilePath);
+      } catch (unlinkError) {
+        console.error('파일 삭제 실패:', unlinkError);
+      }
+    }
 
     return res.status(500).json({
       success: false,

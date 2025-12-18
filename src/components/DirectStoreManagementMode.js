@@ -23,7 +23,8 @@ import {
   TextFields as TextFieldsIcon,
   Build as BuildIcon,
   Assignment as AssignmentIcon,
-  Store as StoreIcon
+  Store as StoreIcon,
+  Monitor as MonitorIcon
 } from '@mui/icons-material';
 
 import { getModeColor, getModeTitle } from '../config/modeConfig';
@@ -127,6 +128,12 @@ const DirectStoreManagementMode = ({
           loggedInStore: loggedInStore,
           isManagementMode: true
         }
+      });
+      tabs.push({
+        key: 'driveMonitoring',
+        label: 'Google Drive 모니터링',
+        icon: <MonitorIcon />,
+        componentName: 'DriveMonitoringTab'
       });
     }
     return tabs;
@@ -272,6 +279,8 @@ const DirectStoreManagementMode = ({
                   Component = CustomerQueueManagementTab;
                 } else if (tab.componentName === 'DirectStorePreferredStoreTab') {
                   Component = DirectStorePreferredStoreTab;
+                } else if (tab.componentName === 'DriveMonitoringTab') {
+                  Component = DriveMonitoringTab;
                 }
 
                 return (
