@@ -292,34 +292,47 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false 
                 지도에서 매장을 클릭하여 사전승낙서마크와 매장 사진을 관리할 수 있습니다.
             </Typography>
 
-            <Box sx={{ 
-                height: '500px', 
-                width: '100%', 
-                position: 'relative', 
-                borderRadius: 2, 
-                overflow: 'hidden', 
-                border: '1px solid #eee', 
-                mb: 3, 
-                flexShrink: 0,
-                '& .MuiPaper-root': {
-                    height: '500px !important',
-                    width: '100% !important',
-                    margin: '0 !important',
-                    padding: '0 !important'
-                },
-                '& .leaflet-container': {
-                    height: '500px !important',
-                    width: '100% !important',
-                    minHeight: '500px !important',
-                    position: 'relative !important'
-                },
-                '& .leaflet-map-pane': {
-                    height: '500px !important'
-                },
-                '& .leaflet-tile-pane': {
-                    height: '500px !important'
-                }
-            }}>
+            <Box 
+                id="direct-store-map-container"
+                sx={{ 
+                    height: '500px', 
+                    width: '100%', 
+                    position: 'relative', 
+                    borderRadius: 2, 
+                    overflow: 'hidden', 
+                    border: '1px solid #eee', 
+                    mb: 3, 
+                    flexShrink: 0,
+                    '& .MuiPaper-root': {
+                        height: '500px !important',
+                        width: '100% !important',
+                        margin: '0 !important',
+                        padding: '0 !important',
+                        display: 'flex !important',
+                        flexDirection: 'column !important'
+                    },
+                    '& .leaflet-container': {
+                        height: '500px !important',
+                        width: '100% !important',
+                        minHeight: '500px !important',
+                        maxHeight: '500px !important',
+                        position: 'relative !important',
+                        zIndex: 0
+                    },
+                    '& .leaflet-map-pane': {
+                        height: '500px !important',
+                        width: '100% !important'
+                    },
+                    '& .leaflet-tile-pane': {
+                        height: '500px !important',
+                        width: '100% !important'
+                    },
+                    '& .leaflet-overlay-pane': {
+                        height: '500px !important',
+                        width: '100% !important'
+                    }
+                }}
+            >
                 <Map
                     userLocation={userLocation}
                     filteredStores={filteredStores}
