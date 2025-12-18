@@ -51,15 +51,13 @@ const CustomerLogin = () => {
     };
 
     return (
-        <Container maxWidth="xs" sx={{ mt: 8, position: 'relative' }}>
-            {/* 업체/맴버 토글 - 상단 오른쪽 (Paper 밖) */}
+        <>
+            {/* 업체/맴버 토글 - 전체 화면 기준 상단 오른쪽 (Container 밖) */}
             <Box sx={{ 
-                position: 'absolute', 
-                top: 0, 
-                right: 0, 
-                zIndex: 1000,
-                mt: 2,
-                mr: 2
+                position: 'fixed', 
+                top: 16, 
+                right: 16, 
+                zIndex: 1000
             }}>
                 <ToggleButtonGroup
                     value="맴버"
@@ -92,7 +90,8 @@ const CustomerLogin = () => {
                 </ToggleButtonGroup>
             </Box>
 
-            <Paper elevation={3} sx={{ p: 4, textAlign: 'center' }}>
+            <Container maxWidth="xs" sx={{ mt: 8 }}>
+                <Paper elevation={3} sx={{ p: 4, textAlign: 'center' }}>
                 {/* 로고 */}
                 <Box sx={{ mb: 3 }}>
                     <img 
@@ -174,8 +173,9 @@ const CustomerLogin = () => {
                         휴대폰 구매! 앞으로는 브이아이피플러스와 함께하세요
                     </Typography>
                 </Box>
-            </Paper>
-        </Container>
+                </Paper>
+            </Container>
+        </>
     );
 };
 

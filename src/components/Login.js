@@ -525,15 +525,13 @@ function Login({ onLogin }) {
   };
 
   return (
-    <Container maxWidth="sm" sx={{ position: 'relative' }}>
-      {/* 업체/맴버 토글 - 상단 오른쪽 (Paper 밖) */}
+    <>
+      {/* 업체/맴버 토글 - 전체 화면 기준 상단 오른쪽 (Container 밖) */}
       <Box sx={{ 
-        position: 'absolute', 
-        top: 0, 
-        right: 0, 
-        zIndex: 1000,
-        mt: 2,
-        mr: 2
+        position: 'fixed', 
+        top: 16, 
+        right: 16, 
+        zIndex: 1000
       }}>
         <ToggleButtonGroup
           value={loginType}
@@ -575,7 +573,8 @@ function Login({ onLogin }) {
         </ToggleButtonGroup>
       </Box>
 
-      <Box sx={{ 
+      <Container maxWidth="sm">
+        <Box sx={{ 
         minHeight: '100vh', 
         display: 'flex', 
         alignItems: 'center', 
@@ -1045,7 +1044,8 @@ function Login({ onLogin }) {
       
       {/* 업데이트 진행 팝업 */}
       
-    </Container>
+      </Container>
+    </>
   );
 }
 
