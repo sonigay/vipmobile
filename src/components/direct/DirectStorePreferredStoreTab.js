@@ -36,6 +36,12 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false 
     const [isSaving, setIsSaving] = useState(false);
     const [uploadingPhotoType, setUploadingPhotoType] = useState(null); // 현재 업로드 중인 사진 타입
 
+    // stores는 이미 필터링되어 있으므로 그대로 사용
+    // Hook 규칙: 모든 Hook은 최상위에서 호출되어야 함
+    const filteredStores = useMemo(() => {
+        return stores;
+    }, [stores]);
+
     useEffect(() => {
         // 사용자 위치 가져오기
         if (navigator.geolocation) {
@@ -264,12 +270,6 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false 
             setIsSaving(false);
         }
     };
-
-    // stores는 이미 필터링되어 있으므로 그대로 사용
-    // Hook 규칙: useMemo는 early return 이전에 호출되어야 함
-    const filteredStores = useMemo(() => {
-        return stores;
-    }, [stores]);
 
     if (isLoading) {
         return (
