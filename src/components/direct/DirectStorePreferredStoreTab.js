@@ -340,6 +340,7 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false 
                     currentView="all"
                     onStoreSelect={handleStoreSelect}
                     isCustomerMode={false}
+                    useCustomerStylePopup={true}
                     loggedInStore={loggedInStore}
                 />
             </Box>

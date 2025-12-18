@@ -202,7 +202,8 @@ function Map({
   setRememberedRequests, // 기억된 요청 목록 설정 함수
   onQuickCostClick, // 퀵비용 등록 버튼 클릭 핸들러
   quickCostRefreshKey, // 퀵비용 데이터 리프레시용 키
-  isCustomerMode = false // 고객 모드 여부 추가
+  isCustomerMode = false, // 고객 모드 여부 추가
+  useCustomerStylePopup = false // 고객모드 스타일 말풍선 사용 여부 (클릭 동작은 기존대로)
 }) {
   const [preApprovalMark, setPreApprovalMark] = useState(null);
   const [storePhotos, setStorePhotos] = useState(null);
@@ -1042,8 +1043,8 @@ ${loggedInStore.name}으로 이동 예정입니다.
                     <div>
                       <h3>{store.name}</h3>
 
-                      {/* 고객모드일 때는 매장 기본 정보만 표시 (사진과 사전승낙서 마크는 테이블에 표시) */}
-                      {isCustomerMode ? (
+                      {/* 고객모드 또는 고객모드 스타일 말풍선 사용 시 매장 기본 정보만 표시 */}
+                      {(isCustomerMode || useCustomerStylePopup) ? (
                         <div style={{ minWidth: '250px', maxWidth: '350px' }}>
                           {/* 매장 기본 정보 - 계획서에 따라 인덱스별 정보 표시 */}
                           <div style={{ marginBottom: '12px' }}>
@@ -1297,8 +1298,8 @@ ${loggedInStore.name}으로 이동 예정입니다.
                     <div>
                       <h3>{store.name}</h3>
 
-                      {/* 고객모드일 때는 매장 기본 정보만 표시 (사진과 사전승낙서 마크는 테이블에 표시) */}
-                      {isCustomerMode ? (
+                      {/* 고객모드 또는 고객모드 스타일 말풍선 사용 시 매장 기본 정보만 표시 */}
+                      {(isCustomerMode || useCustomerStylePopup) ? (
                         <div style={{ minWidth: '250px', maxWidth: '350px' }}>
                           {/* 매장 기본 정보 - 계획서에 따라 인덱스별 정보 표시 */}
                           <div style={{ marginBottom: '12px' }}>
@@ -1591,7 +1592,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
                   icon={createDuplicateMarkerIcon(representativeStore, isSelected, totalInventoryCount)}
                   eventHandlers={{
                     click: () => {
-                      if (isCustomerMode) {
+                      if (isCustomerMode && !useCustomerStylePopup) {
                         // 고객모드일 때는 상세 정보만 로드하고, 선택은 버튼으로만 가능
                         if (representativeStore) {
                           loadCustomerDetails(representativeStore);
