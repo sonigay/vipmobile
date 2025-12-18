@@ -43,9 +43,9 @@ import { debugLog } from '../../utils/debugLogger';
 import OpeningInfoFormSection from './OpeningInfoFormSection';
 import ContractInfoFormSection from './ContractInfoFormSection';
 
-const OpeningInfoPage = ({ 
-    initialData, 
-    onBack, 
+const OpeningInfoPage = ({
+    initialData,
+    onBack,
     loggedInStore,
     mode = 'directStore', // 'customer' | 'directStore' | 'management'
     customerInfo = null, // 고객모드일 때 로그인한 고객 정보
@@ -119,11 +119,11 @@ const OpeningInfoPage = ({
 
                     // 초기값 설정
                     let initialPlan = formattedPlans[0];
-                    
+
                     // 1순위: initialData.plan이 있으면 정확히 매칭
                     if (initialData?.plan) {
-                        const foundPlan = formattedPlans.find(p => 
-                            p.name === initialData.plan || 
+                        const foundPlan = formattedPlans.find(p =>
+                            p.name === initialData.plan ||
                             p.planName === initialData.plan ||
                             p.name.includes(initialData.plan)
                         );
@@ -131,7 +131,7 @@ const OpeningInfoPage = ({
                             initialPlan = foundPlan;
                         }
                     }
-                    
+
                     // 2순위: initialData.planGroup으로 찾기
                     if (!initialPlan && initialData?.planGroup) {
                         const foundPlan = formattedPlans.find(p =>
@@ -476,7 +476,7 @@ const OpeningInfoPage = ({
                     'CHANGE': '기기변경'
                 };
                 const activationType = openingTypeMap[formData.openingType] || '신규';
-                
+
                 const purchaseQueueData = {
                     ctn: customerInfo?.ctn || formData.customerContact,
                     name: customerInfo?.name || formData.customerName,
@@ -503,9 +503,9 @@ const OpeningInfoPage = ({
                     storeAddress: currentStore?.address || '',
                     storeBankInfo: currentStore?.accountInfo || ''
                 };
-                
+
                 const { customerAPI } = await import('../../api');
-                
+
                 // 수정 모드인지 확인 (initialData에 id가 있으면 수정 모드)
                 if (initialData?.id) {
                     await customerAPI.updatePurchaseQueue(initialData.id, purchaseQueueData);
@@ -526,7 +526,7 @@ const OpeningInfoPage = ({
                     alert('개통 정보가 저장되었습니다.');
                 }
             }
-            
+
             if (onBack) onBack();
         } catch (error) {
             console.error('저장 실패:', error);
@@ -568,25 +568,25 @@ const OpeningInfoPage = ({
                         width: 100% !important;
                         max-width: 100% !important;
                         
-                        /* 핵심: 화면을 70%~75% 수준으로 축소하여 한 장에 맞춤 */
-                        zoom: 0.70; 
+                        /* 핵심: 상세 로그 포함을 위해 화면을 60% 수준으로 더 축소하여 한 장에 맞춤 */
+                        zoom: 0.60; 
                     }
 
                     /* 여백 미세 조정 (디자인 유지하되 불필요한 공백 제거) */
                     .agreement-box {
-                        margin-bottom: 5px !important;
-                        padding: 5px !important;
+                        margin-bottom: 2px !important;
+                        padding: 3px !important;
                         page-break-after: avoid !important;
                     }
 
                     .print-only {
-                        margin-bottom: 10px !important;
+                        margin-bottom: 5px !important;
                         display: block !important;
                     }
                     
                     /* 제목 폰트 크기 약간 조정 (너무 크면 공간 차지하므로) */
                     .print-only .MuiTypography-root {
-                        font-size: 24px !important; 
+                        font-size: 20px !important; 
                         font-weight: bold !important;
                     }
 
@@ -612,8 +612,8 @@ const OpeningInfoPage = ({
                     .print-root .MuiPaper-root {
                         box-shadow: none !important;
                         border: 1px solid #e0e0e0 !important;
-                        padding: 10px !important;
-                        margin-bottom: 10px !important;
+                        padding: 8px !important;
+                        margin-bottom: 5px !important;
                         page-break-inside: avoid !important;
                     }
 
@@ -636,9 +636,20 @@ const OpeningInfoPage = ({
                         height: 40px !important;
                     }
                     
-                    /* 계산 로직 상세 텍스트 등 불필요한 정보 숨김 */
+                    /* 계산 로직 상세 텍스트: 인쇄 시에도 표시하되 매우 조밀하게 */
                     .calculation-details {
-                        display: none !important;
+                        display: block !important;
+                        margin-top: 5px !important;
+                    }
+                    
+                    .calculation-details .MuiPaper-root {
+                        padding: 5px !important;
+                        background-color: #f9f9f9 !important;
+                    }
+
+                    .calculation-details pre, .calculation-details .MuiTypography-caption {
+                        font-size: 0.65rem !important;
+                        line-height: 1.2 !important;
                     }
 
                     /* 스크롤바 숨김 */
@@ -649,7 +660,7 @@ const OpeningInfoPage = ({
             `}</style>
 
             {/* 헤더 */}
-            <Box className="no-print" sx={{ display: 'flex', alignItems: 'center', mb: 4 }}>
+            <Box className="no-print" sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                 <IconButton onClick={onBack} sx={{ mr: 2 }}>
                     <ArrowBackIcon />
                 </IconButton>
@@ -1289,7 +1300,7 @@ const OpeningInfoPage = ({
                                             />
                                         </Grid>
                                         {installmentFeeResult.calculation && (
-                                            <Grid item xs={12}>
+                                            <Grid item xs={12} className="calculation-details">
                                                 <Paper sx={{ p: 2, mt: 1, bgcolor: 'grey.50', border: '1px solid', borderColor: 'divider' }}>
                                                     <Typography variant="caption" component="pre" sx={{
                                                         whiteSpace: 'pre-wrap',
