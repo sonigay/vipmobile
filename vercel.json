@@ -3,6 +3,7 @@
   "outputDirectory": "build",
   "installCommand": "npm ci --prefer-offline --no-audit --no-fund --silent",
   "framework": "create-react-app",
+  "nodeVersion": "18.x",
   "env": {
     "REACT_APP_API_URL": "https://vipmobile-backend.cloudtype.app",
     "REACT_APP_LOGGING_ENABLED": "true",
