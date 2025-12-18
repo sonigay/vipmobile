@@ -118,6 +118,16 @@ const DirectStoreManagementMode = ({
         icon: <AssignmentIcon />,
         componentName: 'CustomerQueueManagementTab'
       });
+      tabs.push({
+        key: 'preferredStore',
+        label: '선호구입매장설정',
+        icon: <StoreIcon />,
+        componentName: 'DirectStorePreferredStoreTab',
+        props: {
+          loggedInStore: loggedInStore,
+          isManagementMode: true
+        }
+      });
     }
     return tabs;
   }, [hasPolicyPermission, hasLinkPermission, hasSalesReportPermission, handleReportSelect, loggedInStore]);

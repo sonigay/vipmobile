@@ -41,6 +41,7 @@ import MobileListTab from './direct/MobileListTab';
 import DirectSalesReportTab from './direct/DirectSalesReportTab';
 import OpeningInfoPage from './direct/OpeningInfoPage';
 import CustomerPurchaseQueueTab from './customer/CustomerPurchaseQueueTab';
+import DirectStorePreferredStoreTab from './direct/DirectStorePreferredStoreTab';
 
 const DirectStoreMode = ({
   loggedInStore,
