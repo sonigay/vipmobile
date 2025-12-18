@@ -765,11 +765,35 @@ const OpeningInfoPage = ({
                                         </Typography>
                                     )}
                                     {preApprovalMark && (
-                                        <Box sx={{ mt: 1 }}>
-                                            <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 'bold' }}>
+                                        <Box sx={{ 
+                                            mt: 1,
+                                            '@media print': {
+                                                display: 'block',
+                                                pageBreakInside: 'avoid'
+                                            }
+                                        }}>
+                                            <Typography variant="body2" sx={{ 
+                                                mb: 0.5, 
+                                                fontWeight: 'bold',
+                                                '@media print': {
+                                                    fontSize: '0.875rem',
+                                                    mb: 0.25
+                                                }
+                                            }}>
                                                 사전승낙서 마크:
                                             </Typography>
-                                            <Box dangerouslySetInnerHTML={{ __html: preApprovalMark }} />
+                                            <Box 
+                                                dangerouslySetInnerHTML={{ __html: preApprovalMark }}
+                                                sx={{
+                                                    '@media print': {
+                                                        '& img': {
+                                                            maxWidth: '100%',
+                                                            height: 'auto',
+                                                            pageBreakInside: 'avoid'
+                                                        }
+                                                    }
+                                                }}
+                                            />
                                         </Box>
                                     )}
                                 </Stack>
