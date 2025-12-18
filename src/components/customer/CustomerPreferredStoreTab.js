@@ -126,7 +126,7 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
         setSelectedStore(store);
     };
 
-    // 해당 매장 선택하기 버튼 클릭 시
+    // 매장 선택하기 버튼 클릭 시
     const handleStoreSelect = async (store) => {
         // 매장 정보를 localStorage에 저장 (계획서 요구사항)
         localStorage.setItem('customer_selected_store', JSON.stringify(store));
@@ -179,6 +179,7 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                     isAgentMode={false}
                     currentView="all"
                     onStoreSelect={handleStoreClick}
+                    onStoreConfirm={(store) => handleStoreSelect(store)}
                     isCustomerMode={true}
                 />
                 {selectedProduct && (
@@ -215,56 +216,87 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                                 {selectedStore.name || '-'}
                             </Typography>
                             
-                            <Box sx={{ mb: 3 }}>
-                                {selectedStore.phone && (
-                                    <Typography variant="body2" sx={{ mb: 0.5 }}>
-                                        <strong>전화:</strong> {selectedStore.phone}
-                                    </Typography>
-                                )}
-                                {selectedStore.storePhone && (
-                                    <Typography variant="body2" sx={{ mb: 0.5 }}>
-                                        <strong>휴대폰:</strong> {selectedStore.storePhone}
-                                    </Typography>
-                                )}
-                                {selectedStore.businessNumber && (
-                                    <Typography variant="body2" sx={{ mb: 0.5 }}>
-                                        <strong>사업자번호:</strong> {selectedStore.businessNumber}
-                                    </Typography>
-                                )}
-                                {(selectedStore.managerName || selectedStore.manager) && (
-                                    <Typography variant="body2" sx={{ mb: 0.5 }}>
-                                        <strong>점장명:</strong> {selectedStore.managerName || selectedStore.manager}
-                                    </Typography>
-                                )}
-                                {selectedStore.address && (
-                                    <Typography variant="body2" sx={{ mb: 0.5 }}>
-                                        <strong>매장주소:</strong> {selectedStore.address}
-                                    </Typography>
-                                )}
-                            </Box>
-
-                            {/* 사전승낙서 마크 */}
-                            {loadingDetails ? (
-                                <Box sx={{ mb: 3, p: 2, bgcolor: '#f5f5f5', borderRadius: 1, textAlign: 'center' }}>
-                                    <CircularProgress size={24} />
-                                </Box>
-                            ) : selectedStoreDetails?.preApprovalMark ? (
-                                <Box sx={{ mb: 3, p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
-                                    <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
-                                        사전승낙서 마크
-                                    </Typography>
-                                    <Box dangerouslySetInnerHTML={{ __html: selectedStoreDetails.preApprovalMark }} />
-                                </Box>
-                            ) : (
-                                <Box sx={{ mb: 3, p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
-                                    <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
-                                        사전승낙서 마크
-                                    </Typography>
-                                    <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                                        사전승낙서 마크 없음
-                                    </Typography>
-                                </Box>
-                            )}
+                            <Grid container spacing={2} sx={{ mb: 3 }}>
+                                {/* 왼쪽 컬럼: 기본 정보 */}
+                                <Grid item xs={12} md={6}>
+                                    <Box>
+                                        {selectedStore.phone && (
+                                            <Typography variant="body2" sx={{ mb: 0.5 }}>
+                                                <strong>전화:</strong> {selectedStore.phone}
+                                            </Typography>
+                                        )}
+                                        {selectedStore.storePhone && (
+                                            <Typography variant="body2" sx={{ mb: 0.5 }}>
+                                                <strong>휴대폰:</strong> {selectedStore.storePhone}
+                                            </Typography>
+                                        )}
+                                        {selectedStore.businessNumber && (
+                                            <Typography variant="body2" sx={{ mb: 0.5 }}>
+                                                <strong>사업자번호:</strong> {selectedStore.businessNumber}
+                                            </Typography>
+                                        )}
+                                        {(selectedStore.managerName || selectedStore.manager) && (
+                                            <Typography variant="body2" sx={{ mb: 0.5 }}>
+                                                <strong>점장명:</strong> {selectedStore.managerName || selectedStore.manager}
+                                            </Typography>
+                                        )}
+                                        {selectedStore.address && (
+                                            <Typography variant="body2" sx={{ mb: 0.5 }}>
+                                                <strong>매장주소:</strong> {selectedStore.address}
+                                            </Typography>
+                                        )}
+                                    </Box>
+                                </Grid>
+                                
+                                {/* 오른쪽 컬럼: 사전승낙서 마크 */}
+                                <Grid item xs={12} md={6}>
+                                    {loadingDetails ? (
+                                        <Box sx={{ p: 2, bgcolor: '#f5f5f5', borderRadius: 1, textAlign: 'center' }}>
+                                            <CircularProgress size={24} />
+                                        </Box>
+                                    ) : selectedStoreDetails?.preApprovalMark ? (
+                                        <Box sx={{
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            alignItems: 'flex-end',
+                                            justifyContent: 'flex-start',
+                                            textAlign: 'right',
+                                            p: 2,
+                                            bgcolor: '#f5f5f5',
+                                            borderRadius: 1
+                                        }}>
+                                            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
+                                                사전승낙서 마크
+                                            </Typography>
+                                            <Box 
+                                                dangerouslySetInnerHTML={{ __html: selectedStoreDetails.preApprovalMark }}
+                                                sx={{
+                                                    display: 'flex',
+                                                    justifyContent: 'flex-end'
+                                                }}
+                                            />
+                                        </Box>
+                                    ) : (
+                                        <Box sx={{
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            alignItems: 'flex-end',
+                                            justifyContent: 'flex-start',
+                                            textAlign: 'right',
+                                            p: 2,
+                                            bgcolor: '#f5f5f5',
+                                            borderRadius: 1
+                                        }}>
+                                            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
+                                                사전승낙서 마크
+                                            </Typography>
+                                            <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                                                사전승낙서 마크 없음
+                                            </Typography>
+                                        </Box>
+                                    )}
+                                </Grid>
+                            </Grid>
 
                             {/* 사진 갤러리 */}
                             {loadingDetails ? (
@@ -397,7 +429,7 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                                 </Box>
                             )}
 
-                            {/* 해당 매장 선택하기 버튼 */}
+                            {/* 매장 선택하기 버튼 */}
                             <Button
                                 fullWidth
                                 variant="contained"
@@ -406,7 +438,7 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                                 onClick={() => handleStoreSelect(selectedStore)}
                                 sx={{ mt: 3, py: 1.5 }}
                             >
-                                해당 매장 선택하기
+                                매장선택하기
                             </Button>
                         </CardContent>
                     </Card>

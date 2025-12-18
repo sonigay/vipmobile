@@ -203,7 +203,9 @@ function Map({
   onQuickCostClick, // 퀵비용 등록 버튼 클릭 핸들러
   quickCostRefreshKey, // 퀵비용 데이터 리프레시용 키
   isCustomerMode = false, // 고객 모드 여부 추가
-  useCustomerStylePopup = false // 고객모드 스타일 말풍선 사용 여부 (클릭 동작은 기존대로)
+  useCustomerStylePopup = false, // 고객모드 스타일 말풍선 사용 여부 (클릭 동작은 기존대로)
+  fixedHeight = null, // 고정 높이 (px 단위, DirectStorePreferredStoreTab 등에서 사용)
+  onStoreConfirm = null // 고객모드에서 매장 선택 확인 시 호출 (페이지 이동용)
 }) {
   const [preApprovalMark, setPreApprovalMark] = useState(null);
   const [storePhotos, setStorePhotos] = useState(null);
@@ -925,8 +927,23 @@ ${loggedInStore.name}으로 이동 예정입니다.
     }
   }, [map, selectedRadius, userLocation, isAgentMode, userInteracted, safeMapOperation]);
 
+  // 고정 높이가 지정된 경우 Paper 스타일 조정
+  const paperStyle = fixedHeight 
+    ? {
+        width: '100%',
+        height: `${fixedHeight}px`,
+        display: 'flex',
+        flexDirection: 'column',
+        margin: 0,
+        padding: 0,
+        borderRadius: '4px',
+        overflow: 'hidden',
+        position: 'relative'
+      }
+    : getMapContainerStyle(isMapExpanded);
+
   return (
-    <Paper sx={getMapContainerStyle(isMapExpanded)}>
+    <Paper sx={paperStyle}>
       {/* 확대/축소 토글 버튼 */}
       <Box sx={{
         position: 'absolute',
@@ -958,7 +975,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
         key={`map-${isAgentMode ? 'agent' : 'store'}-${currentView || 'default'}-${currentView === 'activation' ? 'activation' : mapKey}`}
         center={[mapCenter.lat, mapCenter.lng]}
         zoom={mapZoom}
-        style={getContainerStyle(isMapExpanded)}
+        style={getContainerStyle(isMapExpanded, fixedHeight)}
         whenCreated={onMapLoad}
         zoomControl={true}
         attributionControl={false}
@@ -1029,17 +1046,18 @@ ${loggedInStore.name}으로 이동 예정입니다.
                   icon={createMarkerIcon(store)}
                   eventHandlers={{
                     click: () => {
-                      if (isCustomerMode) {
-                        // 고객모드일 때는 상세 정보만 로드하고, 선택은 버튼으로만 가능
+                      if (isCustomerMode && !useCustomerStylePopup) {
+                        // 고객모드일 때는 상세 정보 로드 + 테이블에 매장 정보 표시
                         loadCustomerDetails(store);
+                        onStoreSelect(store); // 테이블에 매장 정보 표시
                       } else {
-                        // 일반 모드일 때는 기존대로 바로 선택
+                        // 일반 모드 또는 고객모드 스타일 말풍선 사용 시 기존대로 바로 선택
                         onStoreSelect(store);
                       }
                     }
                   }}
                 >
-                  <Popup>
+                  <Popup autoPan={false}>
                     <div>
                       <h3>{store.name}</h3>
 
@@ -1063,9 +1081,16 @@ ${loggedInStore.name}으로 이동 예정입니다.
                             {store.address && <p style={{ margin: '4px 0', fontSize: '14px' }}><strong>매장주소:</strong> {store.address}</p>}
                           </div>
 
-                          {/* 해당매장선택하기 버튼 */}
+                          {/* 매장선택하기 버튼 */}
                           <button
-                            onClick={() => onStoreSelect(store)}
+                            onClick={() => {
+                              // 고객모드에서 onStoreConfirm이 있으면 페이지 이동, 없으면 테이블에만 표시
+                              if (isCustomerMode && onStoreConfirm) {
+                                onStoreConfirm(store);
+                              } else {
+                                onStoreSelect(store);
+                              }
+                            }}
                             style={{
                               width: '100%',
                               padding: '10px',
@@ -1079,7 +1104,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
                               marginTop: '12px'
                             }}
                           >
-                            해당매장선택하기
+                            매장선택하기
                           </button>
                         </div>
                       ) : isAgentMode ? (
@@ -1284,17 +1309,18 @@ ${loggedInStore.name}으로 이동 예정입니다.
                   icon={createMarkerIcon(store)}
                   eventHandlers={{
                     click: () => {
-                      if (isCustomerMode) {
-                        // 고객모드일 때는 상세 정보만 로드하고, 선택은 버튼으로만 가능
+                      if (isCustomerMode && !useCustomerStylePopup) {
+                        // 고객모드일 때는 상세 정보 로드 + 테이블에 매장 정보 표시
                         loadCustomerDetails(store);
+                        onStoreSelect(store); // 테이블에 매장 정보 표시
                       } else {
-                        // 일반 모드일 때는 기존대로 바로 선택
+                        // 일반 모드 또는 고객모드 스타일 말풍선 사용 시 기존대로 바로 선택
                         onStoreSelect(store);
                       }
                     }
                   }}
                 >
-                  <Popup>
+                  <Popup autoPan={false}>
                     <div>
                       <h3>{store.name}</h3>
 
@@ -1318,9 +1344,16 @@ ${loggedInStore.name}으로 이동 예정입니다.
                             {store.address && <p style={{ margin: '4px 0', fontSize: '14px' }}><strong>매장주소:</strong> {store.address}</p>}
                           </div>
 
-                          {/* 해당매장선택하기 버튼 */}
+                          {/* 매장선택하기 버튼 */}
                           <button
-                            onClick={() => onStoreSelect(store)}
+                            onClick={() => {
+                              // 고객모드에서 onStoreConfirm이 있으면 페이지 이동, 없으면 테이블에만 표시
+                              if (isCustomerMode && onStoreConfirm) {
+                                onStoreConfirm(store);
+                              } else {
+                                onStoreSelect(store);
+                              }
+                            }}
                             style={{
                               width: '100%',
                               padding: '10px',
@@ -1334,7 +1367,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
                               marginTop: '12px'
                             }}
                           >
-                            해당매장선택하기
+                            매장선택하기
                           </button>
                         </div>
                       ) : isAgentMode ? (
@@ -1593,9 +1626,10 @@ ${loggedInStore.name}으로 이동 예정입니다.
                   eventHandlers={{
                     click: () => {
                       if (isCustomerMode && !useCustomerStylePopup) {
-                        // 고객모드일 때는 상세 정보만 로드하고, 선택은 버튼으로만 가능
+                        // 고객모드일 때는 상세 정보 로드 + 테이블에 매장 정보 표시
                         if (representativeStore) {
                           loadCustomerDetails(representativeStore);
+                          onStoreSelect(representativeStore); // 테이블에 매장 정보 표시
                         }
                       } else {
                         // 일반 모드일 때는 기존 로직
@@ -1682,8 +1716,9 @@ ${loggedInStore.name}으로 이동 예정입니다.
                               }}
                               onClick={() => {
                                 if (isCustomerMode) {
-                                  // 고객모드일 때는 상세 정보만 로드하고, 선택은 버튼으로만 가능
+                                  // 고객모드일 때는 상세 정보 로드 + 테이블에 매장 정보 표시
                                   loadCustomerDetails(store);
+                                  onStoreSelect(store); // 테이블에 매장 정보 표시
                                 } else {
                                   // 일반 모드일 때는 기존대로 바로 선택
                                   onStoreSelect(store);
@@ -1760,10 +1795,17 @@ ${loggedInStore.name}으로 이동 예정입니다.
                                 />
                               )}
 
-                              {/* 고객모드일 때 해당 매장 선택하기 버튼 */}
+                              {/* 고객모드일 때 매장 선택하기 버튼 */}
                               {isCustomerMode && (
                                 <button
-                                  onClick={() => onStoreSelect(store)}
+                                  onClick={() => {
+                                    // 고객모드에서 onStoreConfirm이 있으면 페이지 이동, 없으면 테이블에만 표시
+                                    if (onStoreConfirm) {
+                                      onStoreConfirm(store);
+                                    } else {
+                                      onStoreSelect(store);
+                                    }
+                                  }}
                                   style={{
                                     width: '100%',
                                     padding: '8px',
@@ -1777,7 +1819,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
                                     marginTop: '8px'
                                   }}
                                 >
-                                  해당 매장 선택하기
+                                  매장선택하기
                                 </button>
                               )}
                             </div>

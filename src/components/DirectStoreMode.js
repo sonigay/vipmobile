@@ -371,7 +371,7 @@ const DirectStoreMode = ({
                   <Tab label="오늘의 휴대폰" />
                   <Tab label="판매일보" />
                   <Tab label="구매대기" />
-                  <Tab label="선호구입매장" />
+                  <Tab label="선호구입매장설정" />
                 </Tabs>
               </AppBar>
             )}

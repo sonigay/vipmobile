@@ -303,33 +303,68 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false 
                     border: '1px solid #eee', 
                     mb: 3, 
                     flexShrink: 0,
-                    '& .MuiPaper-root': {
+                    display: 'flex',
+                    flexDirection: 'column',
+                    '& > .MuiPaper-root': {
                         height: '500px !important',
                         width: '100% !important',
                         margin: '0 !important',
                         padding: '0 !important',
                         display: 'flex !important',
-                        flexDirection: 'column !important'
+                        flexDirection: 'column !important',
+                        position: 'relative !important',
+                        overflow: 'hidden !important',
+                        flex: '1 1 auto !important'
                     },
                     '& .leaflet-container': {
                         height: '500px !important',
                         width: '100% !important',
                         minHeight: '500px !important',
                         maxHeight: '500px !important',
-                        position: 'relative !important',
+                        position: 'absolute !important',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
                         zIndex: 0
                     },
                     '& .leaflet-map-pane': {
                         height: '500px !important',
-                        width: '100% !important'
+                        width: '100% !important',
+                        position: 'absolute !important',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0
                     },
                     '& .leaflet-tile-pane': {
                         height: '500px !important',
-                        width: '100% !important'
+                        width: '100% !important',
+                        position: 'absolute !important',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0
                     },
                     '& .leaflet-overlay-pane': {
                         height: '500px !important',
-                        width: '100% !important'
+                        width: '100% !important',
+                        position: 'absolute !important',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0
+                    },
+                    '& .leaflet-pane': {
+                        position: 'absolute !important',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0
+                    },
+                    '& .leaflet-tile': {
+                        visibility: 'visible !important',
+                        opacity: 1 !important
                     }
                 }}
             >
@@ -342,6 +377,7 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false 
                     isCustomerMode={false}
                     useCustomerStylePopup={true}
                     loggedInStore={loggedInStore}
+                    fixedHeight={500}
                 />
             </Box>
 
