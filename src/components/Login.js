@@ -16,13 +16,17 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
+  DialogActions,
+  ToggleButtonGroup,
+  ToggleButton
 } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
 
 
 function Login({ onLogin }) {
+  const navigate = useNavigate();
   const [storeId, setStoreId] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -38,6 +42,7 @@ function Login({ onLogin }) {
   const [tempLoginData, setTempLoginData] = useState(null); // 임시 로그인 데이터 저장
   const [passwordAttempts, setPasswordAttempts] = useState(0);
   const MAX_PASSWORD_ATTEMPTS = 5;
+  const [loginType, setLoginType] = useState('업체'); // '업체' 또는 '맴버'
 
 
   // 사용자 기기 정보 수집
@@ -606,6 +611,47 @@ function Login({ onLogin }) {
             </Typography>
           </Alert>
 
+          {/* 업체/맴버 토글 */}
+          <Box sx={{ mb: 2, display: 'flex', justifyContent: 'center' }}>
+            <ToggleButtonGroup
+              value={loginType}
+              exclusive
+              onChange={(e, newValue) => {
+                if (newValue !== null) {
+                  setLoginType(newValue);
+                  setError(''); // 토글 변경 시 에러 초기화
+                  if (newValue === '맴버') {
+                    // 맴버 선택 시 고객모드로 이동
+                    navigate('/member');
+                  }
+                }
+              }}
+              aria-label="로그인 타입 선택"
+              sx={{
+                '& .MuiToggleButton-root': {
+                  px: 3,
+                  py: 1,
+                  fontWeight: 600,
+                  fontSize: '0.95rem',
+                  '&.Mui-selected': {
+                    bgcolor: 'primary.main',
+                    color: 'white',
+                    '&:hover': {
+                      bgcolor: 'primary.dark',
+                    }
+                  }
+                }
+              }}
+            >
+              <ToggleButton value="업체" aria-label="업체 로그인">
+                업체
+              </ToggleButton>
+              <ToggleButton value="맴버" aria-label="맴버 로그인">
+                맴버
+              </ToggleButton>
+            </ToggleButtonGroup>
+          </Box>
+
           <form onSubmit={handleSubmit}>
             <TextField
               fullWidth
@@ -616,14 +662,14 @@ function Login({ onLogin }) {
               margin="normal"
               error={!!error}
               helperText={error}
-              disabled={loading}
+              disabled={loading || loginType === '맴버'}
             />
             <Button
               type="submit"
               variant="contained"
               fullWidth
               sx={{ mt: 2 }}
-              disabled={loading || (showConsentForm && !userConsent)}
+              disabled={loading || (showConsentForm && !userConsent) || loginType === '맴버'}
             >
               {loading ? <CircularProgress size={24} /> : '로그인'}
             </Button>
