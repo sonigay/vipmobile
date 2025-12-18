@@ -54,6 +54,15 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
         loadStores();
     }, []);
 
+    // VIP직영 매장만 필터링 (18번 인덱스 = vipStatus)
+    // useMemo는 항상 hook 규칙에 따라 최상위에서 호출되어야 함
+    const filteredStores = useMemo(() => {
+        return stores.filter(store => 
+            store.vipStatus === 'VIP직영' || 
+            (store.name && store.name.includes('직영'))
+        );
+    }, [stores]);
+
     const handleStoreSelect = async (store) => {
         setSelectedStore(store);
 
@@ -80,14 +89,6 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
     if (error) {
         return <Alert severity="error">{error}</Alert>;
     }
-
-    // VIP직영 매장만 필터링 (18번 인덱스 = vipStatus)
-    const filteredStores = useMemo(() => {
-        return stores.filter(store => 
-            store.vipStatus === 'VIP직영' || 
-            (store.name && store.name.includes('직영'))
-        );
-    }, [stores]);
 
     return (
         <Box sx={{ height: '500px', width: '100%', position: 'relative', borderRadius: 2, overflow: 'hidden', border: '1px solid #eee' }}>
