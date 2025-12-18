@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, Container, TextField, Button, Typography, Paper, Alert, CircularProgress, Divider } from '@mui/material';
+import { Box, Container, TextField, Button, Typography, Paper, Alert, CircularProgress, Divider, ToggleButtonGroup, ToggleButton } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
@@ -43,25 +43,47 @@ const CustomerLogin = () => {
         }
     };
 
+    const handleModeToggle = (e, newValue) => {
+        if (newValue !== null && newValue === '업체') {
+            // 업체 화면으로 이동 (루트 경로)
+            navigate('/');
+        }
+    };
+
     return (
         <Container maxWidth="xs" sx={{ mt: 8 }}>
             <Paper elevation={3} sx={{ p: 4, textAlign: 'center' }}>
-                <img src="/logo.png" alt="VIP Plus" style={{ width: '200px', marginBottom: '20px' }}
-                    onError={(e) => { e.target.src = 'https://via.placeholder.com/200x50?text=VIP+PLUS'; }} />
+                {/* 로고 */}
+                <Box sx={{ mb: 3 }}>
+                    <img 
+                        src="/login.png" 
+                        alt="(주)브이아이피플러스"
+                        style={{ 
+                            maxWidth: '180px', 
+                            height: 'auto',
+                            marginBottom: '10px'
+                        }}
+                        onError={(e) => { 
+                            e.target.style.display = 'none';
+                        }} 
+                    />
+                    <Typography variant="h6" color="text.secondary" sx={{ fontSize: '1.1rem', fontWeight: 500 }}>
+                        (주)브이아이피플러스
+                    </Typography>
+                </Box>
 
-                <Typography variant="h5" gutterBottom sx={{ fontWeight: 600 }}>고객 로그인</Typography>
+                <Typography variant="h5" gutterBottom sx={{ fontWeight: 600, mb: 3 }}>고객 로그인</Typography>
 
                 {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
                 <Box component="form" onSubmit={handleLogin} sx={{ mt: 2 }}>
                     <TextField
                         fullWidth
-                        label="휴대폰 번호 (CTN)"
+                        label="아이디"
                         variant="outlined"
                         margin="normal"
                         value={ctn}
                         onChange={(e) => setCtn(e.target.value)}
-                        placeholder="01012345678"
                         disabled={loading}
                     />
                     <TextField
@@ -72,9 +94,7 @@ const CustomerLogin = () => {
                         margin="normal"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        placeholder="전화번호 가운데 4자리"
                         disabled={loading}
-                        helperText="010 다음 숫자 4자리를 입력하세요"
                     />
                     <Button
                         fullWidth
@@ -86,30 +106,67 @@ const CustomerLogin = () => {
                     >
                         {loading ? <CircularProgress size={24} sx={{ position: 'absolute' }} /> : '로그인'}
                     </Button>
+
+                    {/* 업체/맴버 토글 - 로그인 버튼 밑, 오른쪽 정렬 */}
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+                        <ToggleButtonGroup
+                            value="맴버"
+                            exclusive
+                            onChange={handleModeToggle}
+                            aria-label="로그인 타입 선택"
+                            size="small"
+                            sx={{
+                                '& .MuiToggleButton-root': {
+                                    px: 2,
+                                    py: 0.5,
+                                    fontWeight: 600,
+                                    fontSize: '0.85rem',
+                                    '&.Mui-selected': {
+                                        bgcolor: 'primary.main',
+                                        color: 'white',
+                                        '&:hover': {
+                                            bgcolor: 'primary.dark',
+                                        }
+                                    }
+                                }
+                            }}
+                        >
+                            <ToggleButton value="업체" aria-label="업체 로그인">
+                                업체
+                            </ToggleButton>
+                            <ToggleButton value="맴버" aria-label="맴버 로그인">
+                                맴버
+                            </ToggleButton>
+                        </ToggleButtonGroup>
+                    </Box>
                 </Box>
 
+                {/* 홍보문구 개선 */}
                 <Box sx={{ mt: 4, textAlign: 'center', p: 3, bgcolor: '#f8f9fa', borderRadius: 2 }}>
-                    <Typography variant="h6" color="primary" sx={{ fontWeight: 700, mb: 2 }}>
-                        호갱걱정 NO
+                    <Typography variant="h5" color="primary" sx={{ fontWeight: 700, mb: 1.5 }}>
+                        투명한 정찰제 가격
                     </Typography>
-                    <Typography variant="h6" color="primary" sx={{ fontWeight: 700, mb: 2 }}>
-                        사후관리걱정 NO
+                    <Typography variant="h6" color="primary" sx={{ fontWeight: 600, mb: 1 }}>
+                        호갱걱정 NO · 사후관리걱정 NO
                     </Typography>
                     <Divider sx={{ my: 2 }} />
-                    <Typography variant="body1" color="text.primary" sx={{ fontWeight: 600, mb: 1 }}>
-                        실시간으로 공개되는 투명한 정찰제 가격
+                    <Typography variant="body1" color="text.primary" sx={{ fontWeight: 600, mb: 2, lineHeight: 1.6 }}>
+                        실시간 공개되는 최신 시세와<br />
+                        검증된 업체의 안정적인 서비스
                     </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                        임직원 30명
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                        당사 거래 파트너점 25년12월기준 480여 업체
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                        16년 이상의 업력에서 나오는 안정적 재무 구조의 검증된 기업
-                    </Typography>
+                    <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid #e0e0e0' }}>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                            ✓ 임직원 30명 · 파트너점 480여 업체
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                            ✓ 16년 이상의 검증된 업력
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                            ✓ 안정적인 재무 구조
+                        </Typography>
+                    </Box>
                     <Typography variant="body1" color="primary" sx={{ fontWeight: 600, mt: 2 }}>
-                        휴대폰 구매! 앞으로 브이아이피플러스와 함께하세요
+                        휴대폰 구매, 브이아이피플러스와 함께하세요
                     </Typography>
                 </Box>
             </Paper>
