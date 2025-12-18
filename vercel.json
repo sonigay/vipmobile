@@ -1,7 +1,7 @@
 {
   "buildCommand": "npm run build:ultra-fast",
   "outputDirectory": "build",
-  "installCommand": "npm ci --prefer-offline --no-audit --no-fund --silent",
+  "installCommand": "npm install --legacy-peer-deps",
   "framework": "create-react-app",
   "nodeVersion": "18.x",
   "env": {
