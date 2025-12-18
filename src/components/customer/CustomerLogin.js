@@ -52,14 +52,14 @@ const CustomerLogin = () => {
 
     return (
         <Container maxWidth="xs" sx={{ mt: 8, position: 'relative' }}>
-            {/* 업체/맴버 토글 - 왼쪽 상단 끝 */}
+            {/* 업체/맴버 토글 - 상단 오른쪽 (Paper 밖) */}
             <Box sx={{ 
                 position: 'absolute', 
                 top: 0, 
-                left: 0, 
+                right: 0, 
                 zIndex: 1000,
                 mt: 2,
-                ml: 2
+                mr: 2
             }}>
                 <ToggleButtonGroup
                     value="맴버"

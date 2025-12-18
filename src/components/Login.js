@@ -525,7 +525,56 @@ function Login({ onLogin }) {
   };
 
   return (
-    <Container maxWidth="sm">
+    <Container maxWidth="sm" sx={{ position: 'relative' }}>
+      {/* 업체/맴버 토글 - 상단 오른쪽 (Paper 밖) */}
+      <Box sx={{ 
+        position: 'absolute', 
+        top: 0, 
+        right: 0, 
+        zIndex: 1000,
+        mt: 2,
+        mr: 2
+      }}>
+        <ToggleButtonGroup
+          value={loginType}
+          exclusive
+          onChange={(e, newValue) => {
+            if (newValue !== null) {
+              setLoginType(newValue);
+              setError(''); // 토글 변경 시 에러 초기화
+              if (newValue === '맴버') {
+                // 맴버 선택 시 고객모드로 이동
+                navigate('/member');
+              }
+            }
+          }}
+          aria-label="로그인 타입 선택"
+          size="small"
+          sx={{
+            '& .MuiToggleButton-root': {
+              px: 2,
+              py: 0.5,
+              fontWeight: 600,
+              fontSize: '0.85rem',
+              '&.Mui-selected': {
+                bgcolor: 'primary.main',
+                color: 'white',
+                '&:hover': {
+                  bgcolor: 'primary.dark',
+                }
+              }
+            }
+          }}
+        >
+          <ToggleButton value="업체" aria-label="업체 로그인">
+            업체
+          </ToggleButton>
+          <ToggleButton value="맴버" aria-label="맴버 로그인">
+            맴버
+          </ToggleButton>
+        </ToggleButtonGroup>
+      </Box>
+
       <Box sx={{ 
         minHeight: '100vh', 
         display: 'flex', 
@@ -610,47 +659,6 @@ function Login({ onLogin }) {
               6. 페이지 Ctrl+F5 (새로고침) 후 로그인
             </Typography>
           </Alert>
-
-          {/* 업체/맴버 토글 */}
-          <Box sx={{ mb: 2, display: 'flex', justifyContent: 'center' }}>
-            <ToggleButtonGroup
-              value={loginType}
-              exclusive
-              onChange={(e, newValue) => {
-                if (newValue !== null) {
-                  setLoginType(newValue);
-                  setError(''); // 토글 변경 시 에러 초기화
-                  if (newValue === '맴버') {
-                    // 맴버 선택 시 고객모드로 이동
-                    navigate('/member');
-                  }
-                }
-              }}
-              aria-label="로그인 타입 선택"
-              sx={{
-                '& .MuiToggleButton-root': {
-                  px: 3,
-                  py: 1,
-                  fontWeight: 600,
-                  fontSize: '0.95rem',
-                  '&.Mui-selected': {
-                    bgcolor: 'primary.main',
-                    color: 'white',
-                    '&:hover': {
-                      bgcolor: 'primary.dark',
-                    }
-                  }
-                }
-              }}
-            >
-              <ToggleButton value="업체" aria-label="업체 로그인">
-                업체
-              </ToggleButton>
-              <ToggleButton value="맴버" aria-label="맴버 로그인">
-                맴버
-              </ToggleButton>
-            </ToggleButtonGroup>
-          </Box>
 
           <form onSubmit={handleSubmit}>
             <TextField
