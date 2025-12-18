@@ -302,9 +302,13 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false 
                 mb: 3, 
                 flexShrink: 0,
                 '& .leaflet-container': {
-                    height: '100%',
-                    width: '100%',
-                    minHeight: '500px'
+                    height: '500px !important',
+                    width: '100% !important',
+                    minHeight: '500px !important'
+                },
+                '& .MuiPaper-root': {
+                    height: '500px !important',
+                    width: '100% !important'
                 }
             }}>
                 <Map
