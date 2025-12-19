@@ -869,13 +869,6 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
       ) : (
         // === 일반 그리드 모드 ===
         <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
-          {/* 메인 헤더 문구 */}
-          {mainHeaderText && (
-            <Box sx={{ mb: 3, p: 2, borderRadius: 2, bgcolor: 'primary.main', color: 'white', textAlign: 'center' }}>
-              <Typography variant="h6" fontWeight="bold">{mainHeaderText}</Typography>
-            </Box>
-          )}
-
           {/* 모든 체크 상품 미리보기 */}
           {slideshowData.length > 0 && (
             <Box sx={{ mt: 4, pt: 2, borderTop: 1, borderColor: 'divider' }}>
