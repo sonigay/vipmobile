@@ -108,21 +108,34 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false 
                 const mapContainer = document.getElementById('direct-store-map-container');
                 if (mapContainer) {
                     const leafletContainer = mapContainer.querySelector('.leaflet-container');
-                    if (leafletContainer && window.L) {
-                        // Leaflet 맵 인스턴스 찾기
-                        const mapId = leafletContainer._leaflet_id;
-                        if (mapId && window.L.map) {
-                            const map = window.L.map.get(mapId);
-                            if (map && map.invalidateSize) {
-                                // 지도 크기 강제 재계산
-                                map.invalidateSize();
+                    if (leafletContainer) {
+                        // 방법 1: DOM 요소에서 직접 맵 인스턴스 찾기
+                        // Leaflet은 DOM 요소에 _leaflet 속성으로 맵 인스턴스를 저장합니다
+                        if (leafletContainer._leaflet && typeof leafletContainer._leaflet.invalidateSize === 'function') {
+                            try {
+                                leafletContainer._leaflet.invalidateSize();
                                 // 약간의 지연 후 다시 한 번 재계산 (타일 렌더링 보장)
                                 setTimeout(() => {
-                                    if (map && map.invalidateSize) {
-                                        map.invalidateSize();
+                                    if (leafletContainer._leaflet && typeof leafletContainer._leaflet.invalidateSize === 'function') {
+                                        leafletContainer._leaflet.invalidateSize();
                                     }
                                 }, 100);
                                 return;
+                            } catch (error) {
+                                console.warn('지도 크기 재계산 오류:', error);
+                            }
+                        }
+                        
+                        // 방법 2: window resize 이벤트를 트리거하여 지도가 자동으로 크기 재계산하도록 함
+                        // Leaflet은 자동으로 window resize 이벤트를 감지하여 invalidateSize를 호출합니다
+                        if (window.dispatchEvent) {
+                            try {
+                                window.dispatchEvent(new Event('resize'));
+                            } catch (e) {
+                                // Event 생성자가 지원되지 않는 경우 (구형 브라우저)
+                                const resizeEvent = document.createEvent('Event');
+                                resizeEvent.initEvent('resize', true, true);
+                                window.dispatchEvent(resizeEvent);
                             }
                         }
                     }
