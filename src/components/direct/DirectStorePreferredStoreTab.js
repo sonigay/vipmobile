@@ -364,7 +364,7 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false 
                     },
                     '& .leaflet-tile': {
                         visibility: 'visible !important',
-                        opacity: 1 !important
+                        opacity: '1 !important'
                     }
                 }}
             >

@@ -245,23 +245,8 @@ function Map({
       setIsDetailLoading(false);
     }
   };
-  // 디버깅: onQuickCostClick prop 확인
-  useEffect(() => {
-    console.log('🔍 Map 컴포넌트: quickCostRefreshKey prop 확인', {
-      quickCostRefreshKey,
-      type: typeof quickCostRefreshKey,
-      isUndefined: typeof quickCostRefreshKey === 'undefined',
-      isNull: quickCostRefreshKey === null,
-      isNumber: typeof quickCostRefreshKey === 'number',
-      value: quickCostRefreshKey
-    });
-
-    if (typeof quickCostRefreshKey === 'undefined') {
-      console.warn('⚠️ Map 컴포넌트: quickCostRefreshKey prop이 전달되지 않았습니다.');
-    } else {
-      console.log('✅ Map 컴포넌트: quickCostRefreshKey prop 전달 확인됨:', quickCostRefreshKey);
-    }
-  }, [quickCostRefreshKey]);
+  // quickCostRefreshKey는 선택적 prop (퀵비용 기능이 있는 경우에만 필요)
+  // 고객모드나 직영점모드에서는 퀵비용 기능이 없으므로 전달되지 않을 수 있음
 
   const [map, setMap] = useState(null);
   const [userInteracted, setUserInteracted] = useState(false);
