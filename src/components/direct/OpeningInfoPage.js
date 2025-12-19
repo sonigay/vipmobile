@@ -572,11 +572,11 @@ const OpeningInfoPage = ({
                         width: 100% !important;
                         max-width: 100% !important;
                         
-                        /* 기본: 직영점/관리자 모드 등은 내용이 적어 85% 수준으로 출력 */
-                        zoom: 0.85; 
+                        /* 기본: 모든 모드에서 한 장에 맞도록 60% 수준으로 출력 */
+                        zoom: 0.60; 
                     }
 
-                    /* 핵심: 고객모드는 내용(안내문구 등)이 많으므로 60% 수준으로 더 축소 */
+                    /* 고객모드도 동일하게 60% 유지 (이미 기본값과 동일) */
                     .print-root.mode-customer {
                         zoom: 0.60; 
                     }
@@ -617,12 +617,12 @@ const OpeningInfoPage = ({
                         box-sizing: border-box !important;
                     }
 
-                    /* Paper 컴포넌트: 그림자 제거, 테두리는 유지 */
+                    /* Paper 컴포넌트: 그림자 제거, 테두리는 유지, 여백 최소화 */
                     .print-root .MuiPaper-root {
                         box-shadow: none !important;
                         border: 1px solid #e0e0e0 !important;
-                        padding: 8px !important;
-                        margin-bottom: 5px !important;
+                        padding: 6px !important;
+                        margin-bottom: 3px !important;
                         page-break-inside: avoid !important;
                     }
 
@@ -641,8 +641,8 @@ const OpeningInfoPage = ({
 
                     /* 입력 필드 높이 약간 줄임 */
                     .print-root .MuiInputBase-root {
-                        min-height: 40px !important;
-                        height: 40px !important;
+                        min-height: 36px !important;
+                        height: 36px !important;
                     }
                     
                     /* 계산 로직 상세 텍스트: 인쇄 시에도 표시하되 매우 조밀하게 */
