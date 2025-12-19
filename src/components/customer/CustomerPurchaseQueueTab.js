@@ -117,12 +117,14 @@ const CustomerPurchaseQueueTab = ({ customerInfo, isManagementMode = false, logg
 
     // handleEditSave는 더 이상 필요 없음 - OpeningInfoPage가 직접 저장 처리
 
-    const handleStoreModify = (e) => {
+    const handleStoreModify = (row, e) => {
         if (e) e.stopPropagation();
+        setSelectedRow(row); // 선택된 행 설정
         setShowStoreSelectDialog(true);
     };
 
     const handleStoreSelect = async (store) => {
+        if (!selectedRow) return;
         try {
             await customerAPI.updatePurchaseQueue(selectedRow.id, {
                 storeName: store.name,
@@ -132,6 +134,7 @@ const CustomerPurchaseQueueTab = ({ customerInfo, isManagementMode = false, logg
             });
             await loadQueue();
             setShowStoreSelectDialog(false);
+            setSelectedRow(null); // 다이얼로그 닫을 때 선택 해제
             alert('선호매장이 변경되었습니다.');
         } catch (err) {
             alert('매장 변경에 실패했습니다.');
@@ -343,14 +346,18 @@ const CustomerPurchaseQueueTab = ({ customerInfo, isManagementMode = false, logg
                             selectedProduct={null}
                             customerInfo={customerInfo}
                             onStoreConfirm={(action, store) => {
-                                if (action === 'SELECT_ORDER_INFO' && store) {
+                                // action과 관계없이 store가 있으면 매장 선택 처리
+                                if (store) {
                                     handleStoreSelect(store);
                                 }
                             }}
                         />
                     </DialogContent>
                     <DialogActions>
-                        <Button onClick={() => setShowStoreSelectDialog(false)}>취소</Button>
+                        <Button onClick={() => {
+                            setShowStoreSelectDialog(false);
+                            setSelectedRow(null); // 다이얼로그 닫을 때 선택 해제
+                        }}>취소</Button>
                     </DialogActions>
                 </Dialog>
             )}
