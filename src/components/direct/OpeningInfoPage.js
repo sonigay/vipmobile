@@ -506,11 +506,15 @@ const OpeningInfoPage = ({
 
                 const { customerAPI } = await import('../../api');
 
-                // 수정 모드인지 확인 (initialData에 id가 있으면 수정 모드)
-                if (initialData?.id) {
-                    await customerAPI.updatePurchaseQueue(initialData.id, purchaseQueueData);
+                // 수정 모드인지 확인 (purchaseQueueId가 있으면 수정 모드)
+                // initialData.id는 상품 ID일 수 있으므로 purchaseQueueId를 별도로 확인
+                const purchaseQueueId = initialData?.purchaseQueueId;
+                if (purchaseQueueId) {
+                    // purchaseQueueId가 명시적으로 전달된 경우에만 수정 모드
+                    await customerAPI.updatePurchaseQueue(purchaseQueueId, purchaseQueueData);
                     alert('구매 대기가 수정되었습니다.');
                 } else {
+                    // 새로 등록
                     await customerAPI.addToPurchaseQueue(purchaseQueueData);
                     alert('구매 대기가 등록되었습니다.');
                 }

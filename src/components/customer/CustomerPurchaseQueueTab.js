@@ -288,7 +288,7 @@ const CustomerPurchaseQueueTab = ({ customerInfo, isManagementMode = false, logg
                         <OpeningInfoPage
                             initialData={{
                                 ...selectedRow,
-                                id: selectedRow.id, // 수정 모드 구분용
+                                purchaseQueueId: selectedRow.id, // 구매대기 항목 ID (수정 모드 구분용)
                                 model: selectedRow.model,
                                 petName: selectedRow.model,
                                 factoryPrice: selectedRow.factoryPrice || 0,
