@@ -101,54 +101,68 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false 
     }, [isManagementMode, loggedInStore]);
 
     // 탭이 활성화될 때 지도 크기 재계산 (직영점모드와 관리모드 모두)
+    // 탭이 숨겨져 있을 때는 지도가 렌더링되지 않으므로, 탭이 보일 때만 실행
     useEffect(() => {
-        if (!isLoading) {
+        if (!isLoading && stores.length > 0) {
             // 지도가 마운트된 후 크기 재계산 (여러 번 시도)
             const attemptResize = (attemptCount = 0) => {
                 const mapContainer = document.getElementById('direct-store-map-container');
-                if (mapContainer) {
-                    const leafletContainer = mapContainer.querySelector('.leaflet-container');
-                    if (leafletContainer) {
-                        // 방법 1: DOM 요소에서 직접 맵 인스턴스 찾기
-                        // Leaflet은 DOM 요소에 _leaflet 속성으로 맵 인스턴스를 저장합니다
-                        if (leafletContainer._leaflet && typeof leafletContainer._leaflet.invalidateSize === 'function') {
-                            try {
-                                leafletContainer._leaflet.invalidateSize();
-                                // 약간의 지연 후 다시 한 번 재계산 (타일 렌더링 보장)
-                                setTimeout(() => {
-                                    if (leafletContainer._leaflet && typeof leafletContainer._leaflet.invalidateSize === 'function') {
-                                        leafletContainer._leaflet.invalidateSize();
-                                    }
-                                }, 100);
-                                return;
-                            } catch (error) {
-                                console.warn('지도 크기 재계산 오류:', error);
-                            }
-                        }
-                        
-                        // 방법 2: window resize 이벤트를 트리거하여 지도가 자동으로 크기 재계산하도록 함
-                        // Leaflet은 자동으로 window resize 이벤트를 감지하여 invalidateSize를 호출합니다
-                        if (window.dispatchEvent) {
-                            try {
-                                window.dispatchEvent(new Event('resize'));
-                            } catch (e) {
-                                // Event 생성자가 지원되지 않는 경우 (구형 브라우저)
-                                const resizeEvent = document.createEvent('Event');
-                                resizeEvent.initEvent('resize', true, true);
-                                window.dispatchEvent(resizeEvent);
-                            }
-                        }
+                if (!mapContainer) {
+                    // 컨테이너가 아직 없으면 재시도
+                    if (attemptCount < 10) {
+                        setTimeout(() => attemptResize(attemptCount + 1), 200);
                     }
+                    return;
                 }
                 
-                // 최대 5회까지 재시도 (500ms 간격)
-                if (attemptCount < 5) {
-                    setTimeout(() => attemptResize(attemptCount + 1), 500);
+                // 컨테이너가 보이는지 확인 (탭이 활성화되어 있는지)
+                const containerStyle = window.getComputedStyle(mapContainer);
+                if (containerStyle.display === 'none' || containerStyle.visibility === 'hidden') {
+                    // 탭이 숨겨져 있으면 재시도
+                    if (attemptCount < 10) {
+                        setTimeout(() => attemptResize(attemptCount + 1), 200);
+                    }
+                    return;
+                }
+                
+                const leafletContainer = mapContainer.querySelector('.leaflet-container');
+                if (leafletContainer) {
+                    // 방법 1: DOM 요소에서 직접 맵 인스턴스 찾기
+                    if (leafletContainer._leaflet && typeof leafletContainer._leaflet.invalidateSize === 'function') {
+                        try {
+                            leafletContainer._leaflet.invalidateSize();
+                            // 약간의 지연 후 다시 한 번 재계산 (타일 렌더링 보장)
+                            setTimeout(() => {
+                                if (leafletContainer._leaflet && typeof leafletContainer._leaflet.invalidateSize === 'function') {
+                                    leafletContainer._leaflet.invalidateSize();
+                                }
+                            }, 100);
+                            return;
+                        } catch (error) {
+                            console.warn('지도 크기 재계산 오류:', error);
+                        }
+                    }
+                    
+                    // 방법 2: window resize 이벤트를 트리거
+                    if (window.dispatchEvent) {
+                        try {
+                            window.dispatchEvent(new Event('resize'));
+                        } catch (e) {
+                            const resizeEvent = document.createEvent('Event');
+                            resizeEvent.initEvent('resize', true, true);
+                            window.dispatchEvent(resizeEvent);
+                        }
+                    }
+                } else {
+                    // leaflet-container가 아직 없으면 재시도
+                    if (attemptCount < 10) {
+                        setTimeout(() => attemptResize(attemptCount + 1), 200);
+                    }
                 }
             };
             
             // 초기 시도 (지도가 마운트될 시간을 줌)
-            const timer = setTimeout(() => attemptResize(), 300);
+            const timer = setTimeout(() => attemptResize(), 500);
             return () => clearTimeout(timer);
         }
     }, [isLoading, stores.length]); // stores가 로드되면 재계산
@@ -350,90 +364,16 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false 
                 sx={{ 
                     height: '500px', 
                     width: '100%', 
-                    minHeight: '500px',
-                    maxHeight: '500px',
                     position: 'relative', 
                     borderRadius: 2, 
                     overflow: 'hidden', 
                     border: '1px solid #eee', 
                     mb: 3, 
                     flexShrink: 0,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    '& > .MuiPaper-root': {
-                        height: '500px !important',
-                        width: '100% !important',
-                        minHeight: '500px !important',
-                        maxHeight: '500px !important',
-                        margin: '0 !important',
-                        padding: '0 !important',
-                        display: 'flex !important',
-                        flexDirection: 'column !important',
-                        position: 'relative !important',
-                        overflow: 'hidden !important',
-                        flex: '1 1 auto !important'
-                    },
                     '& .leaflet-container': {
-                        height: '500px !important',
-                        width: '100% !important',
-                        minHeight: '500px !important',
-                        maxHeight: '500px !important',
-                        position: 'absolute !important',
-                        top: '0 !important',
-                        left: '0 !important',
-                        right: '0 !important',
-                        bottom: '0 !important',
-                        zIndex: 0
-                    },
-                    '& .leaflet-map-pane': {
-                        height: '500px !important',
-                        width: '100% !important',
-                        minHeight: '500px !important',
-                        maxHeight: '500px !important',
-                        position: 'absolute !important',
-                        top: '0 !important',
-                        left: '0 !important',
-                        right: '0 !important',
-                        bottom: '0 !important'
-                    },
-                    '& .leaflet-tile-pane': {
-                        height: '500px !important',
-                        width: '100% !important',
-                        minHeight: '500px !important',
-                        maxHeight: '500px !important',
-                        position: 'absolute !important',
-                        top: '0 !important',
-                        left: '0 !important',
-                        right: '0 !important',
-                        bottom: '0 !important'
-                    },
-                    '& .leaflet-overlay-pane': {
-                        height: '500px !important',
-                        width: '100% !important',
-                        minHeight: '500px !important',
-                        maxHeight: '500px !important',
-                        position: 'absolute !important',
-                        top: '0 !important',
-                        left: '0 !important',
-                        right: '0 !important',
-                        bottom: '0 !important'
-                    },
-                    '& .leaflet-pane': {
-                        position: 'absolute !important',
-                        top: '0 !important',
-                        left: '0 !important',
-                        right: '0 !important',
-                        bottom: '0 !important'
-                    },
-                    '& .leaflet-tile': {
-                        visibility: 'visible !important',
-                        opacity: '1 !important',
-                        display: 'block !important'
-                    },
-                    '& .leaflet-tile-container': {
-                        position: 'absolute !important',
-                        left: '0 !important',
-                        top: '0 !important'
+                        height: '100%',
+                        width: '100%',
+                        minHeight: '500px'
                     }
                 }}
             >
