@@ -100,11 +100,11 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false 
         loadStores();
     }, [isManagementMode, loggedInStore]);
 
-    // 관리모드에서 탭이 활성화될 때 지도 크기 재계산
+    // 탭이 활성화될 때 지도 크기 재계산 (직영점모드와 관리모드 모두)
     useEffect(() => {
-        if (isManagementMode && !isLoading) {
-            // 지도가 마운트된 후 크기 재계산
-            const timer = setTimeout(() => {
+        if (!isLoading) {
+            // 지도가 마운트된 후 크기 재계산 (여러 번 시도)
+            const attemptResize = (attemptCount = 0) => {
                 const mapContainer = document.getElementById('direct-store-map-container');
                 if (mapContainer) {
                     const leafletContainer = mapContainer.querySelector('.leaflet-container');
@@ -114,15 +114,31 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false 
                         if (mapId && window.L.map) {
                             const map = window.L.map.get(mapId);
                             if (map && map.invalidateSize) {
+                                // 지도 크기 강제 재계산
                                 map.invalidateSize();
+                                // 약간의 지연 후 다시 한 번 재계산 (타일 렌더링 보장)
+                                setTimeout(() => {
+                                    if (map && map.invalidateSize) {
+                                        map.invalidateSize();
+                                    }
+                                }, 100);
+                                return;
                             }
                         }
                     }
                 }
-            }, 500);
+                
+                // 최대 5회까지 재시도 (500ms 간격)
+                if (attemptCount < 5) {
+                    setTimeout(() => attemptResize(attemptCount + 1), 500);
+                }
+            };
+            
+            // 초기 시도 (지도가 마운트될 시간을 줌)
+            const timer = setTimeout(() => attemptResize(), 300);
             return () => clearTimeout(timer);
         }
-    }, [isManagementMode, isLoading]);
+    }, [isLoading, stores.length]); // stores가 로드되면 재계산
 
     // 매장 선택 핸들러 (편집 다이얼로그 열기)
     const handleStoreSelect = async (store) => {
@@ -321,6 +337,8 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false 
                 sx={{ 
                     height: '500px', 
                     width: '100%', 
+                    minHeight: '500px',
+                    maxHeight: '500px',
                     position: 'relative', 
                     borderRadius: 2, 
                     overflow: 'hidden', 
@@ -332,6 +350,8 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false 
                     '& > .MuiPaper-root': {
                         height: '500px !important',
                         width: '100% !important',
+                        minHeight: '500px !important',
+                        maxHeight: '500px !important',
                         margin: '0 !important',
                         padding: '0 !important',
                         display: 'flex !important',
@@ -346,54 +366,66 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false 
                         minHeight: '500px !important',
                         maxHeight: '500px !important',
                         position: 'absolute !important',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
+                        top: '0 !important',
+                        left: '0 !important',
+                        right: '0 !important',
+                        bottom: '0 !important',
                         zIndex: 0
                     },
                     '& .leaflet-map-pane': {
                         height: '500px !important',
                         width: '100% !important',
+                        minHeight: '500px !important',
+                        maxHeight: '500px !important',
                         position: 'absolute !important',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0
+                        top: '0 !important',
+                        left: '0 !important',
+                        right: '0 !important',
+                        bottom: '0 !important'
                     },
                     '& .leaflet-tile-pane': {
                         height: '500px !important',
                         width: '100% !important',
+                        minHeight: '500px !important',
+                        maxHeight: '500px !important',
                         position: 'absolute !important',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0
+                        top: '0 !important',
+                        left: '0 !important',
+                        right: '0 !important',
+                        bottom: '0 !important'
                     },
                     '& .leaflet-overlay-pane': {
                         height: '500px !important',
                         width: '100% !important',
+                        minHeight: '500px !important',
+                        maxHeight: '500px !important',
                         position: 'absolute !important',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0
+                        top: '0 !important',
+                        left: '0 !important',
+                        right: '0 !important',
+                        bottom: '0 !important'
                     },
                     '& .leaflet-pane': {
                         position: 'absolute !important',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0
+                        top: '0 !important',
+                        left: '0 !important',
+                        right: '0 !important',
+                        bottom: '0 !important'
                     },
                     '& .leaflet-tile': {
                         visibility: 'visible !important',
-                        opacity: '1 !important'
+                        opacity: '1 !important',
+                        display: 'block !important'
+                    },
+                    '& .leaflet-tile-container': {
+                        position: 'absolute !important',
+                        left: '0 !important',
+                        top: '0 !important'
                     }
                 }}
             >
                 <Map
-                    key={isManagementMode ? `map-management-${isLoading}` : 'map-direct'}
+                    key={`map-${isManagementMode ? 'management' : 'direct'}-${isLoading ? 'loading' : 'ready'}-${stores.length}`}
                     userLocation={userLocation}
                     filteredStores={filteredStores}
                     isAgentMode={false}
