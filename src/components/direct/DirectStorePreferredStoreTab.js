@@ -100,6 +100,30 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false 
         loadStores();
     }, [isManagementMode, loggedInStore]);
 
+    // 관리모드에서 탭이 활성화될 때 지도 크기 재계산
+    useEffect(() => {
+        if (isManagementMode && !isLoading) {
+            // 지도가 마운트된 후 크기 재계산
+            const timer = setTimeout(() => {
+                const mapContainer = document.getElementById('direct-store-map-container');
+                if (mapContainer) {
+                    const leafletContainer = mapContainer.querySelector('.leaflet-container');
+                    if (leafletContainer && window.L) {
+                        // Leaflet 맵 인스턴스 찾기
+                        const mapId = leafletContainer._leaflet_id;
+                        if (mapId && window.L.map) {
+                            const map = window.L.map.get(mapId);
+                            if (map && map.invalidateSize) {
+                                map.invalidateSize();
+                            }
+                        }
+                    }
+                }
+            }, 500);
+            return () => clearTimeout(timer);
+        }
+    }, [isManagementMode, isLoading]);
+
     // 매장 선택 핸들러 (편집 다이얼로그 열기)
     const handleStoreSelect = async (store) => {
         setSelectedStore(store);
@@ -369,6 +393,7 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false 
                 }}
             >
                 <Map
+                    key={isManagementMode ? `map-management-${isLoading}` : 'map-direct'}
                     userLocation={userLocation}
                     filteredStores={filteredStores}
                     isAgentMode={false}
