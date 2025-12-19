@@ -453,10 +453,13 @@ const DirectStoreMode = ({
                 sx={{ height: '100%', display: activeTab === 4 ? 'block' : 'none' }}
               >
                 <ErrorBoundary name="DirectStorePreferredStoreTab">
-                  <DirectStorePreferredStoreTab 
-                    loggedInStore={loggedInStore}
-                    isManagementMode={false}
-                  />
+                  {activeTab === 4 && (
+                    <DirectStorePreferredStoreTab 
+                      loggedInStore={loggedInStore}
+                      isManagementMode={false}
+                      activeTab={activeTab}
+                    />
+                  )}
                 </ErrorBoundary>
               </Box>
             </Box>

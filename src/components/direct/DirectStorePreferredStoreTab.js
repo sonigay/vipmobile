@@ -12,7 +12,7 @@ import { fetchData, customerAPI } from '../../api';
  * 직영점모드/관리모드용 선호구입매장 탭
  * 매장 선택 및 사전승낙서마크, 매장 사진 관리 기능 제공
  */
-const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false }) => {
+const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false, activeTab = null }) => {
     const [stores, setStores] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -100,84 +100,35 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false 
         loadStores();
     }, [isManagementMode, loggedInStore]);
 
-    // 탭이 활성화될 때 지도 크기 재계산 (직영점모드와 관리모드 모두)
-    // 탭이 숨겨져 있을 때는 지도가 렌더링되지 않으므로, 탭이 보일 때만 실행
+    // 탭이 활성화될 때 지도 크기 재계산
+    // activeTab이 변경되면 지도가 다시 마운트되므로, 마운트 후 크기 재계산
     useEffect(() => {
-        if (!isLoading && stores.length > 0) {
-            // 지도가 마운트된 후 크기 재계산 (여러 번 시도)
-            const attemptResize = (attemptCount = 0) => {
+        if (!isLoading && stores.length > 0 && activeTab !== null) {
+            // 지도가 마운트된 후 크기 재계산
+            const timer = setTimeout(() => {
                 const mapContainer = document.getElementById('direct-store-map-container');
-                if (!mapContainer) {
-                    // 컨테이너가 아직 없으면 재시도
-                    if (attemptCount < 15) {
-                        setTimeout(() => attemptResize(attemptCount + 1), 300);
-                    }
-                    return;
-                }
-                
-                // 컨테이너가 보이는지 확인 (탭이 활성화되어 있는지)
-                const containerStyle = window.getComputedStyle(mapContainer);
-                if (containerStyle.display === 'none' || containerStyle.visibility === 'hidden') {
-                    // 탭이 숨겨져 있으면 재시도
-                    if (attemptCount < 15) {
-                        setTimeout(() => attemptResize(attemptCount + 1), 300);
-                    }
-                    return;
-                }
+                if (!mapContainer) return;
                 
                 const leafletContainer = mapContainer.querySelector('.leaflet-container');
-                if (leafletContainer) {
-                    // 방법 1: DOM 요소에서 직접 맵 인스턴스 찾기
-                    if (leafletContainer._leaflet && typeof leafletContainer._leaflet.invalidateSize === 'function') {
-                        try {
-                            // 여러 번 invalidateSize 호출하여 타일이 완전히 렌더링되도록 함
-                            leafletContainer._leaflet.invalidateSize();
-                            setTimeout(() => {
-                                if (leafletContainer._leaflet && typeof leafletContainer._leaflet.invalidateSize === 'function') {
-                                    leafletContainer._leaflet.invalidateSize();
-                                }
-                            }, 100);
-                            setTimeout(() => {
-                                if (leafletContainer._leaflet && typeof leafletContainer._leaflet.invalidateSize === 'function') {
-                                    leafletContainer._leaflet.invalidateSize();
-                                }
-                            }, 300);
-                            setTimeout(() => {
-                                if (leafletContainer._leaflet && typeof leafletContainer._leaflet.invalidateSize === 'function') {
-                                    leafletContainer._leaflet.invalidateSize();
-                                }
-                            }, 600);
-                            return;
-                        } catch (error) {
-                            console.warn('지도 크기 재계산 오류:', error);
-                        }
-                    }
-                    
-                    // 방법 2: window resize 이벤트를 트리거
-                    if (window.dispatchEvent) {
-                        try {
-                            window.dispatchEvent(new Event('resize'));
-                            setTimeout(() => window.dispatchEvent(new Event('resize')), 200);
-                            setTimeout(() => window.dispatchEvent(new Event('resize')), 500);
-                        } catch (e) {
-                            const resizeEvent = document.createEvent('Event');
-                            resizeEvent.initEvent('resize', true, true);
-                            window.dispatchEvent(resizeEvent);
-                        }
-                    }
-                } else {
-                    // leaflet-container가 아직 없으면 재시도
-                    if (attemptCount < 15) {
-                        setTimeout(() => attemptResize(attemptCount + 1), 300);
+                if (leafletContainer && leafletContainer._leaflet && typeof leafletContainer._leaflet.invalidateSize === 'function') {
+                    try {
+                        // 지도 크기 재계산
+                        leafletContainer._leaflet.invalidateSize();
+                        // 약간의 지연 후 다시 한 번 재계산 (타일 렌더링 보장)
+                        setTimeout(() => {
+                            if (leafletContainer._leaflet && typeof leafletContainer._leaflet.invalidateSize === 'function') {
+                                leafletContainer._leaflet.invalidateSize();
+                            }
+                        }, 200);
+                    } catch (error) {
+                        console.warn('지도 크기 재계산 오류:', error);
                     }
                 }
-            };
+            }, 500);
             
-            // 초기 시도 (지도가 마운트될 시간을 줌)
-            const timer = setTimeout(() => attemptResize(), 800);
             return () => clearTimeout(timer);
         }
-    }, [isLoading, stores.length]); // stores가 로드되면 재계산
+    }, [isLoading, stores.length, activeTab]); // activeTab이 변경되면 재계산
 
     // 매장 선택 핸들러 (편집 다이얼로그 열기)
     const handleStoreSelect = async (store) => {
@@ -390,7 +341,7 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false 
                 }}
             >
                 <Map
-                    key={`map-${isManagementMode ? 'management' : 'direct'}-${isLoading ? 'loading' : 'ready'}-${stores.length}-${filteredStores.length}`}
+                    key={`map-${isManagementMode ? 'management' : 'direct'}-${activeTab !== null ? `tab-${activeTab}` : 'default'}-${isLoading ? 'loading' : 'ready'}-${stores.length}`}
                     userLocation={userLocation}
                     filteredStores={filteredStores}
                     isAgentMode={false}

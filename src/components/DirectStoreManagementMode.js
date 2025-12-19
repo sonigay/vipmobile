@@ -293,7 +293,7 @@ const DirectStoreManagementMode = ({
                   >
                     <ErrorBoundary name={tab.componentName || tab.key}>
                       <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}><CircularProgress /></Box>}>
-                        {Component && <Component {...(tab.props || {})} />}
+                        {activeTab === index && Component && <Component {...(tab.props || {})} activeTab={activeTab} />}
                       </Suspense>
                     </ErrorBoundary>
                   </Box>
