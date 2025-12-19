@@ -14,25 +14,49 @@ L.Icon.Default.mergeOptions({
 });
 
 // 동적 스타일을 위한 함수들
-const getContainerStyle = (isExpanded) => ({
-  width: '100%',
-  height: isExpanded ? '85vh' : '100%',
-  borderRadius: '4px',
-  transition: 'height 0.3s ease-in-out'
-});
+const getContainerStyle = (isExpanded, fixedHeight = null) => {
+  if (fixedHeight) {
+    return {
+      width: '100%',
+      height: `${fixedHeight}px`,
+      borderRadius: '4px'
+    };
+  }
+  return {
+    width: '100%',
+    height: isExpanded ? '85vh' : '100%',
+    borderRadius: '4px',
+    transition: 'height 0.3s ease-in-out'
+  };
+};
 
-const getMapContainerStyle = (isExpanded) => ({
-  width: '100%',
-  height: isExpanded ? '85vh' : '100%',
-  display: 'flex',
-  flexDirection: 'column',
-  margin: 0,
-  padding: 0,
-  borderRadius: '4px',
-  overflow: 'hidden',
-  position: 'relative',
-  transition: 'height 0.3s ease-in-out'
-});
+const getMapContainerStyle = (isExpanded, fixedHeight = null) => {
+  if (fixedHeight) {
+    return {
+      width: '100%',
+      height: `${fixedHeight}px`,
+      display: 'flex',
+      flexDirection: 'column',
+      margin: 0,
+      padding: 0,
+      borderRadius: '4px',
+      overflow: 'hidden',
+      position: 'relative'
+    };
+  }
+  return {
+    width: '100%',
+    height: isExpanded ? '85vh' : '100%',
+    display: 'flex',
+    flexDirection: 'column',
+    margin: 0,
+    padding: 0,
+    borderRadius: '4px',
+    overflow: 'hidden',
+    position: 'relative',
+    transition: 'height 0.3s ease-in-out'
+  };
+};
 
 const defaultCenter = {
   lat: 37.5665,
@@ -713,7 +737,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
   useEffect(() => {
     if (map && isMapReady && map._loaded) {
       // 약간의 지연 후 invalidateSize 호출 (DOM이 완전히 렌더링된 후)
-      const timer = setTimeout(() => {
+      const timer1 = setTimeout(() => {
         try {
           if (map && map.invalidateSize) {
             map.invalidateSize();
@@ -723,9 +747,38 @@ ${loggedInStore.name}으로 이동 예정입니다.
         }
       }, 100);
       
-      return () => clearTimeout(timer);
+      // fixedHeight가 있을 때는 추가로 여러 번 호출하여 타일 렌더링 보장
+      if (fixedHeight) {
+        const timer2 = setTimeout(() => {
+          try {
+            if (map && map.invalidateSize) {
+              map.invalidateSize();
+            }
+          } catch (error) {
+            console.error('invalidateSize 오류:', error);
+          }
+        }, 300);
+        
+        const timer3 = setTimeout(() => {
+          try {
+            if (map && map.invalidateSize) {
+              map.invalidateSize();
+            }
+          } catch (error) {
+            console.error('invalidateSize 오류:', error);
+          }
+        }, 600);
+        
+        return () => {
+          clearTimeout(timer1);
+          clearTimeout(timer2);
+          clearTimeout(timer3);
+        };
+      }
+      
+      return () => clearTimeout(timer1);
     }
-  }, [map, isMapReady]);
+  }, [map, isMapReady, fixedHeight]);
 
   // 안전한 지도 조작 함수
   const safeMapOperation = useCallback((operation) => {
@@ -913,19 +966,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
   }, [map, selectedRadius, userLocation, isAgentMode, userInteracted, safeMapOperation]);
 
   // 고정 높이가 지정된 경우 Paper 스타일 조정
-  const paperStyle = fixedHeight 
-    ? {
-        width: '100%',
-        height: `${fixedHeight}px`,
-        display: 'flex',
-        flexDirection: 'column',
-        margin: 0,
-        padding: 0,
-        borderRadius: '4px',
-        overflow: 'hidden',
-        position: 'relative'
-      }
-    : getMapContainerStyle(isMapExpanded);
+  const paperStyle = getMapContainerStyle(isMapExpanded, fixedHeight);
 
   return (
     <Paper sx={paperStyle}>

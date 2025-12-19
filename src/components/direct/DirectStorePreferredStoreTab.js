@@ -109,8 +109,8 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false 
                 const mapContainer = document.getElementById('direct-store-map-container');
                 if (!mapContainer) {
                     // 컨테이너가 아직 없으면 재시도
-                    if (attemptCount < 10) {
-                        setTimeout(() => attemptResize(attemptCount + 1), 200);
+                    if (attemptCount < 15) {
+                        setTimeout(() => attemptResize(attemptCount + 1), 300);
                     }
                     return;
                 }
@@ -119,8 +119,8 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false 
                 const containerStyle = window.getComputedStyle(mapContainer);
                 if (containerStyle.display === 'none' || containerStyle.visibility === 'hidden') {
                     // 탭이 숨겨져 있으면 재시도
-                    if (attemptCount < 10) {
-                        setTimeout(() => attemptResize(attemptCount + 1), 200);
+                    if (attemptCount < 15) {
+                        setTimeout(() => attemptResize(attemptCount + 1), 300);
                     }
                     return;
                 }
@@ -130,13 +130,23 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false 
                     // 방법 1: DOM 요소에서 직접 맵 인스턴스 찾기
                     if (leafletContainer._leaflet && typeof leafletContainer._leaflet.invalidateSize === 'function') {
                         try {
+                            // 여러 번 invalidateSize 호출하여 타일이 완전히 렌더링되도록 함
                             leafletContainer._leaflet.invalidateSize();
-                            // 약간의 지연 후 다시 한 번 재계산 (타일 렌더링 보장)
                             setTimeout(() => {
                                 if (leafletContainer._leaflet && typeof leafletContainer._leaflet.invalidateSize === 'function') {
                                     leafletContainer._leaflet.invalidateSize();
                                 }
                             }, 100);
+                            setTimeout(() => {
+                                if (leafletContainer._leaflet && typeof leafletContainer._leaflet.invalidateSize === 'function') {
+                                    leafletContainer._leaflet.invalidateSize();
+                                }
+                            }, 300);
+                            setTimeout(() => {
+                                if (leafletContainer._leaflet && typeof leafletContainer._leaflet.invalidateSize === 'function') {
+                                    leafletContainer._leaflet.invalidateSize();
+                                }
+                            }, 600);
                             return;
                         } catch (error) {
                             console.warn('지도 크기 재계산 오류:', error);
@@ -147,6 +157,8 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false 
                     if (window.dispatchEvent) {
                         try {
                             window.dispatchEvent(new Event('resize'));
+                            setTimeout(() => window.dispatchEvent(new Event('resize')), 200);
+                            setTimeout(() => window.dispatchEvent(new Event('resize')), 500);
                         } catch (e) {
                             const resizeEvent = document.createEvent('Event');
                             resizeEvent.initEvent('resize', true, true);
@@ -155,14 +167,14 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false 
                     }
                 } else {
                     // leaflet-container가 아직 없으면 재시도
-                    if (attemptCount < 10) {
-                        setTimeout(() => attemptResize(attemptCount + 1), 200);
+                    if (attemptCount < 15) {
+                        setTimeout(() => attemptResize(attemptCount + 1), 300);
                     }
                 }
             };
             
             // 초기 시도 (지도가 마운트될 시간을 줌)
-            const timer = setTimeout(() => attemptResize(), 500);
+            const timer = setTimeout(() => attemptResize(), 800);
             return () => clearTimeout(timer);
         }
     }, [isLoading, stores.length]); // stores가 로드되면 재계산
@@ -378,7 +390,7 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false 
                 }}
             >
                 <Map
-                    key={`map-${isManagementMode ? 'management' : 'direct'}-${isLoading ? 'loading' : 'ready'}-${stores.length}`}
+                    key={`map-${isManagementMode ? 'management' : 'direct'}-${isLoading ? 'loading' : 'ready'}-${stores.length}-${filteredStores.length}`}
                     userLocation={userLocation}
                     filteredStores={filteredStores}
                     isAgentMode={false}
