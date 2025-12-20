@@ -524,9 +524,9 @@ const OpeningInfoPage = ({
                 // 금액 정보
                 factoryPrice: factoryPrice || 0, // 출고가
                 publicSupport: formData.usePublicSupport ? publicSupport : 0, // 이통사지원금
-                storeSupportWithAddon: formData.withAddon ? storeSupportWithAddon : 0, // 대리점추가지원금(부가유치)
-                storeSupportNoAddon: !formData.withAddon ? storeSupportWithoutAddon : 0, // 대리점추가지원금(부가미유치)
-                storeSupportWithoutAddon: !formData.withAddon ? storeSupportWithoutAddon : 0, // 하위 호환
+                storeSupportWithAddon: formData.withAddon ? calculateDynamicStoreSupport.withAddon : 0, // 대리점추가지원금(부가유치) - 동적 계산
+                storeSupportNoAddon: !formData.withAddon ? calculateDynamicStoreSupport.withoutAddon : 0, // 대리점추가지원금(부가미유치) - 동적 계산
+                storeSupportWithoutAddon: !formData.withAddon ? calculateDynamicStoreSupport.withoutAddon : 0, // 하위 호환
                 // 마진 계산
                 // 구매가 = 출고가 - 이통사지원금 - 대리점추가지원금
                 // - 구매가가 0원 이상이면 정책설정 마진(baseMargin)
