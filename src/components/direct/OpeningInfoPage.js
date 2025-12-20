@@ -585,8 +585,8 @@ const OpeningInfoPage = ({
                     additionalServices: requiredAddons.map(a => a.name).join(', ') || '',
                     factoryPrice: factoryPrice || 0,
                     carrierSupport: formData.usePublicSupport ? publicSupport : 0,
-                    dealerSupportWithAdd: formData.withAddon ? storeSupportWithAddon : 0,
-                    dealerSupportWithoutAdd: !formData.withAddon ? storeSupportWithoutAddon : 0,
+                    dealerSupportWithAdd: formData.withAddon ? calculateDynamicStoreSupport.withAddon : 0, // 동적 계산
+                    dealerSupportWithoutAdd: !formData.withAddon ? calculateDynamicStoreSupport.withoutAddon : 0, // 동적 계산
                     // 선택매장 정보 추가
                     storeName: currentStore?.name || '',
                     storePhone: currentStore?.phone || currentStore?.storePhone || '',
