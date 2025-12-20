@@ -155,43 +155,100 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
         };
       });
 
-      // 필수 부가서비스 로드 (통신사별)
-      const requiredAddonsByCarrier = {};
+      // 필수 부가서비스 및 보험상품 로드 (통신사별)
+      const policySettingsByCarrier = {};
       const carriers = ['SK', 'KT', 'LG'];
       
       try {
         const policyPromises = carriers.map(async (carrier) => {
           try {
             const policySettings = await directStoreApi.getPolicySettings(carrier);
-            if (policySettings.success && policySettings.addon?.list) {
-              // 미유치차감금액이 있는 부가서비스를 필수 부가서비스로 간주
-              const addonList = policySettings.addon.list
-                .filter(addon => addon.deduction > 0)
-                .map(addon => addon.name);
-              return { carrier, addons: addonList.join(', ') };
-            }
-            return { carrier, addons: '' };
+            return { carrier, policySettings };
           } catch (err) {
             console.warn(`[TodaysMobileTab] ${carrier} 정책 설정 로드 실패:`, err);
-            return { carrier, addons: '' };
+            return { carrier, policySettings: null };
           }
         });
         
         const policyResults = await Promise.all(policyPromises);
-        policyResults.forEach(({ carrier, addons }) => {
-          requiredAddonsByCarrier[carrier] = addons;
+        policyResults.forEach(({ carrier, policySettings }) => {
+          if (policySettings) {
+            policySettingsByCarrier[carrier] = policySettings;
+          }
         });
       } catch (err) {
         console.error('[TodaysMobileTab] 필수 부가서비스 로드 실패:', err);
       }
 
-      // 각 상품에 필수 부가서비스 매핑
+      // 각 상품에 필수 부가서비스 및 보험상품 매핑
       const allMobilesWithAddons = allMobiles.map(m => {
-        const carrierAddons = requiredAddonsByCarrier[m.carrier] || '';
+        const policySettings = policySettingsByCarrier[m.carrier];
+        const addonNames = [];
+        
+        // 1. 미유치차감금액이 있는 부가서비스 추가
+        if (policySettings?.success && policySettings.addon?.list) {
+          const addonList = policySettings.addon.list
+            .filter(addon => addon.deduction > 0)
+            .map(addon => addon.name);
+          addonNames.push(...addonList);
+        }
+        
+        // 2. 보험상품 매칭 (출고가 및 모델 유형 기준)
+        if (policySettings?.success && policySettings.insurance?.list && m.factoryPrice > 0) {
+          const insuranceList = policySettings.insurance.list || [];
+          
+          // 현재 단말이 플립/폴드 계열인지 여부 (펫네임/모델명 기준)
+          const modelNameForCheck = (m.petName || m.model || '').toString();
+          const lowerModelName = modelNameForCheck.toLowerCase();
+          const flipFoldKeywords = ['플립', '폴드', 'flip', 'fold'];
+          const isFlipFoldModel = flipFoldKeywords.some(keyword =>
+            lowerModelName.includes(keyword.toLowerCase())
+          );
+          
+          // 보험상품 중 이름에 플립/폴드 관련 키워드가 포함된 상품
+          const flipFoldInsurances = insuranceList.filter(item => {
+            const name = (item.name || '').toString().toLowerCase();
+            return flipFoldKeywords.some(keyword =>
+              name.includes(keyword.toLowerCase())
+            );
+          });
+          
+          // 일반 보험상품 (플립/폴드 전용 상품 제외)
+          const normalInsurances = insuranceList.filter(item => !flipFoldInsurances.includes(item));
+          
+          let matchingInsurance = null;
+          
+          if (m.carrier === 'LG' && isFlipFoldModel && flipFoldInsurances.length > 0) {
+            // LG + 플립/폴드 단말인 경우 → "폰교체 패스 플립/폴드" 상품 우선 사용
+            matchingInsurance = flipFoldInsurances.find(insurance => {
+              const minPrice = insurance.minPrice || 0;
+              const maxPrice = insurance.maxPrice || 9999999;
+              return m.factoryPrice >= minPrice && m.factoryPrice <= maxPrice;
+            }) || flipFoldInsurances[0];
+          } else {
+            // 그 외 모델들은 플립/폴드 전용 상품을 제외한 나머지 보험상품에서 출고가로 매칭
+            const baseList = normalInsurances.length > 0 ? normalInsurances : insuranceList;
+            matchingInsurance = baseList.find(insurance => {
+              const minPrice = insurance.minPrice || 0;
+              const maxPrice = insurance.maxPrice || 9999999;
+              return m.factoryPrice >= minPrice && m.factoryPrice <= maxPrice;
+            });
+          }
+          
+          if (matchingInsurance) {
+            addonNames.push(matchingInsurance.name);
+          }
+        }
+        
+        // 필수 부가서비스 목록을 문자열로 변환
+        const requiredAddonsStr = addonNames.length > 0 
+          ? addonNames.join(', ') 
+          : (m.requiredAddons || m.addons || '');
+        
         return {
           ...m,
-          addons: carrierAddons || m.requiredAddons || m.addons || '',
-          requiredAddons: carrierAddons || m.requiredAddons || m.addons || ''
+          addons: requiredAddonsStr,
+          requiredAddons: requiredAddonsStr
         };
       });
 
@@ -488,29 +545,24 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
         directStoreApiClient.getMobilesMaster('LG')
       ]);
 
-      // 필수 부가서비스 로드 (통신사별) - 슬라이드쇼용
-      const requiredAddonsByCarrier = {};
+      // 필수 부가서비스 및 보험상품 로드 (통신사별) - 슬라이드쇼용
+      const policySettingsByCarrier = {};
       try {
         const policyPromises = carriers.map(async (carrier) => {
           try {
             const policySettings = await directStoreApi.getPolicySettings(carrier);
-            if (policySettings.success && policySettings.addon?.list) {
-              // 미유치차감금액이 있는 부가서비스를 필수 부가서비스로 간주
-              const addonList = policySettings.addon.list
-                .filter(addon => addon.deduction > 0)
-                .map(addon => addon.name);
-              return { carrier, addons: addonList.join(', ') };
-            }
-            return { carrier, addons: '' };
+            return { carrier, policySettings };
           } catch (err) {
             console.warn(`[TodaysMobileTab] 슬라이드쇼 ${carrier} 정책 설정 로드 실패:`, err);
-            return { carrier, addons: '' };
+            return { carrier, policySettings: null };
           }
         });
         
         const policyResults = await Promise.all(policyPromises);
-        policyResults.forEach(({ carrier, addons }) => {
-          requiredAddonsByCarrier[carrier] = addons;
+        policyResults.forEach(({ carrier, policySettings }) => {
+          if (policySettings) {
+            policySettingsByCarrier[carrier] = policySettings;
+          }
         });
       } catch (err) {
         console.error('[TodaysMobileTab] 슬라이드쇼 필수 부가서비스 로드 실패:', err);
@@ -518,32 +570,216 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
 
       // 🔥 핵심 수정: 슬라이드쇼 데이터 준비 시에도 imageUrl을 image로 매핑
       // requiredAddons 필드도 제대로 전달되도록 확인 (정책 설정에서 가져온 값 사용)
+      // 보험상품도 포함하여 매핑
       const carrierMobiles = { 
         'SK': skMobiles.map(m => {
-          const carrierAddons = requiredAddonsByCarrier['SK'] || '';
+          const policySettings = policySettingsByCarrier['SK'];
+          const addonNames = [];
+          
+          // 1. 미유치차감금액이 있는 부가서비스 추가
+          if (policySettings?.success && policySettings.addon?.list) {
+            const addonList = policySettings.addon.list
+              .filter(addon => addon.deduction > 0)
+              .map(addon => addon.name);
+            addonNames.push(...addonList);
+          }
+          
+          // 2. 보험상품 매칭 (출고가 및 모델 유형 기준)
+          if (policySettings?.success && policySettings.insurance?.list && m.factoryPrice > 0) {
+            const insuranceList = policySettings.insurance.list || [];
+            
+            // 현재 단말이 플립/폴드 계열인지 여부 (펫네임/모델명 기준)
+            const modelNameForCheck = (m.petName || m.model || '').toString();
+            const lowerModelName = modelNameForCheck.toLowerCase();
+            const flipFoldKeywords = ['플립', '폴드', 'flip', 'fold'];
+            const isFlipFoldModel = flipFoldKeywords.some(keyword =>
+              lowerModelName.includes(keyword.toLowerCase())
+            );
+            
+            // 보험상품 중 이름에 플립/폴드 관련 키워드가 포함된 상품
+            const flipFoldInsurances = insuranceList.filter(item => {
+              const name = (item.name || '').toString().toLowerCase();
+              return flipFoldKeywords.some(keyword =>
+                name.includes(keyword.toLowerCase())
+              );
+            });
+            
+            // 일반 보험상품 (플립/폴드 전용 상품 제외)
+            const normalInsurances = insuranceList.filter(item => !flipFoldInsurances.includes(item));
+            
+            let matchingInsurance = null;
+            
+            if (m.carrier === 'LG' && isFlipFoldModel && flipFoldInsurances.length > 0) {
+              // LG + 플립/폴드 단말인 경우 → "폰교체 패스 플립/폴드" 상품 우선 사용
+              matchingInsurance = flipFoldInsurances.find(insurance => {
+                const minPrice = insurance.minPrice || 0;
+                const maxPrice = insurance.maxPrice || 9999999;
+                return m.factoryPrice >= minPrice && m.factoryPrice <= maxPrice;
+              }) || flipFoldInsurances[0];
+            } else {
+              // 그 외 모델들은 플립/폴드 전용 상품을 제외한 나머지 보험상품에서 출고가로 매칭
+              const baseList = normalInsurances.length > 0 ? normalInsurances : insuranceList;
+              matchingInsurance = baseList.find(insurance => {
+                const minPrice = insurance.minPrice || 0;
+                const maxPrice = insurance.maxPrice || 9999999;
+                return m.factoryPrice >= minPrice && m.factoryPrice <= maxPrice;
+              });
+            }
+            
+            if (matchingInsurance) {
+              addonNames.push(matchingInsurance.name);
+            }
+          }
+          
+          const requiredAddonsStr = addonNames.length > 0 
+            ? addonNames.join(', ') 
+            : (m.requiredAddons || m.addons || '');
+          
           return {
             ...m, 
             image: m.imageUrl || m.image,
-            addons: carrierAddons || m.requiredAddons || m.addons || '',
-            requiredAddons: carrierAddons || m.requiredAddons || m.addons || ''
+            addons: requiredAddonsStr,
+            requiredAddons: requiredAddonsStr
           };
         }),
         'KT': ktMobiles.map(m => {
-          const carrierAddons = requiredAddonsByCarrier['KT'] || '';
+          const policySettings = policySettingsByCarrier['KT'];
+          const addonNames = [];
+          
+          // 1. 미유치차감금액이 있는 부가서비스 추가
+          if (policySettings?.success && policySettings.addon?.list) {
+            const addonList = policySettings.addon.list
+              .filter(addon => addon.deduction > 0)
+              .map(addon => addon.name);
+            addonNames.push(...addonList);
+          }
+          
+          // 2. 보험상품 매칭 (출고가 및 모델 유형 기준)
+          if (policySettings?.success && policySettings.insurance?.list && m.factoryPrice > 0) {
+            const insuranceList = policySettings.insurance.list || [];
+            
+            // 현재 단말이 플립/폴드 계열인지 여부 (펫네임/모델명 기준)
+            const modelNameForCheck = (m.petName || m.model || '').toString();
+            const lowerModelName = modelNameForCheck.toLowerCase();
+            const flipFoldKeywords = ['플립', '폴드', 'flip', 'fold'];
+            const isFlipFoldModel = flipFoldKeywords.some(keyword =>
+              lowerModelName.includes(keyword.toLowerCase())
+            );
+            
+            // 보험상품 중 이름에 플립/폴드 관련 키워드가 포함된 상품
+            const flipFoldInsurances = insuranceList.filter(item => {
+              const name = (item.name || '').toString().toLowerCase();
+              return flipFoldKeywords.some(keyword =>
+                name.includes(keyword.toLowerCase())
+              );
+            });
+            
+            // 일반 보험상품 (플립/폴드 전용 상품 제외)
+            const normalInsurances = insuranceList.filter(item => !flipFoldInsurances.includes(item));
+            
+            let matchingInsurance = null;
+            
+            if (m.carrier === 'LG' && isFlipFoldModel && flipFoldInsurances.length > 0) {
+              // LG + 플립/폴드 단말인 경우 → "폰교체 패스 플립/폴드" 상품 우선 사용
+              matchingInsurance = flipFoldInsurances.find(insurance => {
+                const minPrice = insurance.minPrice || 0;
+                const maxPrice = insurance.maxPrice || 9999999;
+                return m.factoryPrice >= minPrice && m.factoryPrice <= maxPrice;
+              }) || flipFoldInsurances[0];
+            } else {
+              // 그 외 모델들은 플립/폴드 전용 상품을 제외한 나머지 보험상품에서 출고가로 매칭
+              const baseList = normalInsurances.length > 0 ? normalInsurances : insuranceList;
+              matchingInsurance = baseList.find(insurance => {
+                const minPrice = insurance.minPrice || 0;
+                const maxPrice = insurance.maxPrice || 9999999;
+                return m.factoryPrice >= minPrice && m.factoryPrice <= maxPrice;
+              });
+            }
+            
+            if (matchingInsurance) {
+              addonNames.push(matchingInsurance.name);
+            }
+          }
+          
+          const requiredAddonsStr = addonNames.length > 0 
+            ? addonNames.join(', ') 
+            : (m.requiredAddons || m.addons || '');
+          
           return {
             ...m, 
             image: m.imageUrl || m.image,
-            addons: carrierAddons || m.requiredAddons || m.addons || '',
-            requiredAddons: carrierAddons || m.requiredAddons || m.addons || ''
+            addons: requiredAddonsStr,
+            requiredAddons: requiredAddonsStr
           };
         }),
         'LG': lgMobiles.map(m => {
-          const carrierAddons = requiredAddonsByCarrier['LG'] || '';
+          const policySettings = policySettingsByCarrier['LG'];
+          const addonNames = [];
+          
+          // 1. 미유치차감금액이 있는 부가서비스 추가
+          if (policySettings?.success && policySettings.addon?.list) {
+            const addonList = policySettings.addon.list
+              .filter(addon => addon.deduction > 0)
+              .map(addon => addon.name);
+            addonNames.push(...addonList);
+          }
+          
+          // 2. 보험상품 매칭 (출고가 및 모델 유형 기준)
+          if (policySettings?.success && policySettings.insurance?.list && m.factoryPrice > 0) {
+            const insuranceList = policySettings.insurance.list || [];
+            
+            // 현재 단말이 플립/폴드 계열인지 여부 (펫네임/모델명 기준)
+            const modelNameForCheck = (m.petName || m.model || '').toString();
+            const lowerModelName = modelNameForCheck.toLowerCase();
+            const flipFoldKeywords = ['플립', '폴드', 'flip', 'fold'];
+            const isFlipFoldModel = flipFoldKeywords.some(keyword =>
+              lowerModelName.includes(keyword.toLowerCase())
+            );
+            
+            // 보험상품 중 이름에 플립/폴드 관련 키워드가 포함된 상품
+            const flipFoldInsurances = insuranceList.filter(item => {
+              const name = (item.name || '').toString().toLowerCase();
+              return flipFoldKeywords.some(keyword =>
+                name.includes(keyword.toLowerCase())
+              );
+            });
+            
+            // 일반 보험상품 (플립/폴드 전용 상품 제외)
+            const normalInsurances = insuranceList.filter(item => !flipFoldInsurances.includes(item));
+            
+            let matchingInsurance = null;
+            
+            if (m.carrier === 'LG' && isFlipFoldModel && flipFoldInsurances.length > 0) {
+              // LG + 플립/폴드 단말인 경우 → "폰교체 패스 플립/폴드" 상품 우선 사용
+              matchingInsurance = flipFoldInsurances.find(insurance => {
+                const minPrice = insurance.minPrice || 0;
+                const maxPrice = insurance.maxPrice || 9999999;
+                return m.factoryPrice >= minPrice && m.factoryPrice <= maxPrice;
+              }) || flipFoldInsurances[0];
+            } else {
+              // 그 외 모델들은 플립/폴드 전용 상품을 제외한 나머지 보험상품에서 출고가로 매칭
+              const baseList = normalInsurances.length > 0 ? normalInsurances : insuranceList;
+              matchingInsurance = baseList.find(insurance => {
+                const minPrice = insurance.minPrice || 0;
+                const maxPrice = insurance.maxPrice || 9999999;
+                return m.factoryPrice >= minPrice && m.factoryPrice <= maxPrice;
+              });
+            }
+            
+            if (matchingInsurance) {
+              addonNames.push(matchingInsurance.name);
+            }
+          }
+          
+          const requiredAddonsStr = addonNames.length > 0 
+            ? addonNames.join(', ') 
+            : (m.requiredAddons || m.addons || '');
+          
           return {
             ...m, 
             image: m.imageUrl || m.image,
-            addons: carrierAddons || m.requiredAddons || m.addons || '',
-            requiredAddons: carrierAddons || m.requiredAddons || m.addons || ''
+            addons: requiredAddonsStr,
+            requiredAddons: requiredAddonsStr
           };
         })
       };

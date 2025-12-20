@@ -209,3 +209,4 @@ async function getOrCreateStoreFolder(storeName) {
 
 **참고**: 서비스 계정의 Google Drive는 일반 Google 계정과는 별도의 공간입니다. 파일은 정상적으로 저장되며, URL을 통해 접근 가능합니다. 폴더 구조는 자동으로 생성되며, 이미 존재하는 폴더는 재사용됩니다.
 
+
