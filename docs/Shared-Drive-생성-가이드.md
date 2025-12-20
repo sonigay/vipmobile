@@ -118,3 +118,5 @@ A: 공유 폴더는 개인 드라이브 안에 있어서 Service Account가 저�
 
 **Q: Google Workspace 계정이 없으면?**
 A: OAuth Delegation을 사용하여 사용자 계정으로 인증하면 개인 드라이브에 저장할 수 있습니다.
+
+

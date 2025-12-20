@@ -194,3 +194,5 @@ async function loadImage(imageUrl, threadId, messageId) {
 ```
 
 **마치 "열쇠(메시지 ID)"로 "금고(메시지)"를 열어서 "새 열쇠(최신 URL)"를 꺼내는 것과 같습니다.**
+
+

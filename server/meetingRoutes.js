@@ -1171,6 +1171,7 @@ async function uploadVideoToDiscord(videoBuffer, filename, meetingId, meetingDat
 
     const result = {
       videoUrl: message.attachments.first().url,
+      messageId: message.id,  // Discord 메시지 ID 추가 (URL 갱신용)
       postId: post.id,
       threadId: thread.id
     };
@@ -2990,6 +2991,7 @@ async function uploadCustomSlideFile(req, res) {
         res.json({
           success: true,
           videoUrl: result.videoUrl,
+          messageId: result.messageId,  // Discord 메시지 ID 추가
           postId: result.postId,
           threadId: result.threadId,
           fileType: 'video'

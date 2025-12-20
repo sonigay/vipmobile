@@ -31,6 +31,7 @@ import { HoverableTableRow } from './common/ModernTable';
 import { debugLog } from '../../utils/debugLogger';
 import { getProxyImageUrl } from '../../api';
 import { ImageUploadButton } from './common/ImageUploadButton';
+import { attachDiscordImageRefreshHandler } from '../../utils/discordImageUtils';
 
 
 const MobileListRowComponent = ({
@@ -220,6 +221,21 @@ const MobileListRowComponent = ({
               if (!originalUrl) {
                 e.target.dataset.gaveUp = 'true';
                 e.target.onerror = null;
+                return;
+              }
+
+              // Discord 이미지이고 메시지 ID가 있으면 자동 갱신 시도
+              const isDiscordUrl = originalUrl.includes('cdn.discordapp.com') || originalUrl.includes('media.discordapp.net');
+              if (isDiscordUrl && row.discordThreadId && row.discordMessageId) {
+                attachDiscordImageRefreshHandler(
+                  e.target,
+                  row.discordThreadId,
+                  row.discordMessageId,
+                  (newUrl) => {
+                    // 갱신 성공 시 시트에 저장 (선택사항)
+                    console.log('✅ [MobileListRow] Discord 이미지 URL 갱신 성공');
+                  }
+                );
                 return;
               }
 

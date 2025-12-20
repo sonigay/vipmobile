@@ -247,3 +247,5 @@ const result = {
 5. `newRow` 배열에 `mergedDiscordMessageId` 추가
 6. `updateRange`를 A:W로 변경
 7. 테스트: 이미지 업로드 후 Google Sheets에 messageId 저장 확인
+
+

@@ -590,7 +590,10 @@ async function rebuildDeviceMaster(carriersParam) {
       };
 
       // 이미지 매칭: Carrier+ModelCode 우선, 없으면 Carrier+ModelName
-      let imageUrl = imageMap.get(`${carrier}:${normalizedCode}`) || imageMap.get(`${carrier}:${modelName}`) || '';
+      const imageInfo = imageMap.get(`${carrier}:${normalizedCode}`) || imageMap.get(`${carrier}:${modelName}`) || null;
+      let imageUrl = imageInfo && typeof imageInfo === 'object' ? imageInfo.imageUrl : (imageInfo || '');
+      const discordMessageId = imageInfo && typeof imageInfo === 'object' ? imageInfo.discordMessageId : null;
+      const discordThreadId = imageInfo && typeof imageInfo === 'object' ? imageInfo.discordThreadId : null;
 
       // 기본 요금제군 결정
       let defaultPlanGroup = '115군';
@@ -3504,11 +3507,13 @@ function setupDirectRoutes(app) {
       };
 
       imageRows.forEach(row => {
-        // 통신사(A열, 인덱스 0), 모델ID(B열, 인덱스 1), 모델명(C열, 인덱스 2), 이미지URL(F열, 인덱스 5) 매핑
+        // 통신사(A열, 인덱스 0), 모델ID(B열, 인덱스 1), 모델명(C열, 인덱스 2), 이미지URL(F열, 인덱스 5), Discord메시지ID(I열, 인덱스 8), Discord스레드ID(K열, 인덱스 10) 매핑
         const rowCarrier = (row[0] || '').trim();
         const modelId = (row[1] || '').trim(); // 모델ID (실제 모델 코드)
         const modelName = (row[2] || '').trim(); // 모델명 (모델ID와 동일)
         let imageUrl = (row[5] || '').trim();
+        const discordMessageId = (row[8] || '').trim(); // I: Discord메시지ID
+        const discordThreadId = (row[10] || '').trim(); // K: Discord스레드ID
 
         // 이미지 URL 정규화: 이중 하이픈 제거
         imageUrl = normalizeImageUrl(imageUrl);
@@ -3531,18 +3536,25 @@ function setupDirectRoutes(app) {
           const actualModelCode = modelId || modelName;
 
           if (actualModelCode) {
+            // 이미지 정보 객체 생성 (URL + Discord 정보)
+            const imageInfo = {
+              imageUrl,
+              discordMessageId: discordMessageId || null,
+              discordThreadId: discordThreadId || null
+            };
+
             // 원본 모델 코드로 키 생성 (정확한 매칭)
             const key = `${carrierParam}:${actualModelCode}`;
-            imageMap.set(key, imageUrl);
-            imageMap.set(actualModelCode, imageUrl);
+            imageMap.set(key, imageInfo);
+            imageMap.set(actualModelCode, imageInfo);
             imageMapCount++;
 
             // 정규화된 모델 코드로도 키 생성 (형식 차이 무시)
             const normalizedCode = normalizeModelCode(actualModelCode);
             if (normalizedCode && normalizedCode !== actualModelCode.toLowerCase()) {
               const normalizedKey = `${carrierParam}:${normalizedCode}`;
-              imageMap.set(normalizedKey, imageUrl);
-              imageMap.set(normalizedCode, imageUrl);
+              imageMap.set(normalizedKey, imageInfo);
+              imageMap.set(normalizedCode, imageInfo);
             }
           } else {
             // 로그 제거 (성능 최적화 - 모든 모델에 대해 반복 실행되는 불필요한 로그)
@@ -4222,32 +4234,32 @@ function setupDirectRoutes(app) {
           image: (() => {
             // 1. 통신사+모델명 조합으로 먼저 조회 (가장 정확)
             const key = `${carrierParam}:${model}`;
-            let imgUrl = imageMap.get(key);
-            let foundVia = imgUrl ? `key1:${key}` : null;
+            let imageInfo = imageMap.get(key);
+            let foundVia = imageInfo ? `key1:${key}` : null;
 
             // 2. 없으면 모델명만으로 조회 (하위 호환)
-            if (!imgUrl) {
-              imgUrl = imageMap.get(model);
-              if (imgUrl) foundVia = `key2:${model}`;
+            if (!imageInfo) {
+              imageInfo = imageMap.get(model);
+              if (imageInfo) foundVia = `key2:${model}`;
             }
 
             // 3. 정규화된 키로 조회 (형식 차이 무시)
-            if (!imgUrl) {
+            if (!imageInfo) {
               const normalizedModel = normalizeModelCode(model);
               if (normalizedModel) {
                 const normalizedKey = `${carrierParam}:${normalizedModel}`;
-                imgUrl = imageMap.get(normalizedKey);
-                if (imgUrl) {
+                imageInfo = imageMap.get(normalizedKey);
+                if (imageInfo) {
                   foundVia = `key3:${normalizedKey}`;
                 } else {
-                  imgUrl = imageMap.get(normalizedModel);
-                  if (imgUrl) foundVia = `key4:${normalizedModel}`;
+                  imageInfo = imageMap.get(normalizedModel);
+                  if (imageInfo) foundVia = `key4:${normalizedModel}`;
                 }
               }
             }
 
             // 4. 여전히 없으면 유사한 키 찾기 (공백, 하이픈 등 차이 무시)
-            if (!imgUrl && imageMap.size > 0) {
+            if (!imageInfo && imageMap.size > 0) {
               const modelNormalized = normalizeModelCode(model);
               const mapKeys = Array.from(imageMap.keys());
 
@@ -4259,8 +4271,8 @@ function setupDirectRoutes(app) {
                 if (keyNormalized === modelNormalized ||
                   keyNormalized.includes(modelNormalized) ||
                   modelNormalized.includes(keyNormalized)) {
-                  imgUrl = imageMap.get(mapKey);
-                  if (imgUrl) {
+                  imageInfo = imageMap.get(mapKey);
+                  if (imageInfo) {
                     foundVia = `key5:${mapKey}`;
                     // 로그 제거 (성능 최적화)
                   }
@@ -4269,9 +4281,39 @@ function setupDirectRoutes(app) {
               }
             }
 
+            // 이미지 정보에서 URL과 Discord 정보 추출
+            let imgUrl = '';
+            let discordMessageId = null;
+            let discordThreadId = null;
+            
+            if (imageInfo) {
+              if (typeof imageInfo === 'object' && imageInfo.imageUrl) {
+                imgUrl = imageInfo.imageUrl;
+                discordMessageId = imageInfo.discordMessageId || null;
+                discordThreadId = imageInfo.discordThreadId || null;
+              } else if (typeof imageInfo === 'string') {
+                // 하위 호환: 문자열인 경우 (기존 코드)
+                imgUrl = imageInfo;
+              }
+            }
+
             // 로그 제거 (성능 최적화 - 모든 모델에 대해 반복 실행되는 불필요한 로그)
 
             return imgUrl || '';
+          })(),
+          discordMessageId: (() => {
+            // 이미지 정보에서 Discord 메시지 ID 추출 (위의 imageInfo 사용)
+            if (imageInfo && typeof imageInfo === 'object' && imageInfo.discordMessageId) {
+              return imageInfo.discordMessageId;
+            }
+            return null;
+          })(),
+          discordThreadId: (() => {
+            // 이미지 정보에서 Discord 스레드 ID 추출 (위의 imageInfo 사용)
+            if (imageInfo && typeof imageInfo === 'object' && imageInfo.discordThreadId) {
+              return imageInfo.discordThreadId;
+            }
+            return null;
           })(),
           tags: tagsArray,
           requiredAddons: (requiredAddons.length > 0 ? requiredAddons.join(', ') : '') + (insuranceName ? (requiredAddons.length > 0 ? ', ' : '') + insuranceName : '') || '없음',

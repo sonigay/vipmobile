@@ -199,3 +199,5 @@ A: 편집은 기존 파일의 데이터만 변경하는 것이므로 저장 공�
 
 **Q: Shared Drive 없이 해결할 방법이 있나요?**  
 A: OAuth Delegation을 사용하면 가능하지만, Google Workspace 관리자 권한이 필요합니다.
+
+
