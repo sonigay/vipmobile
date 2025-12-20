@@ -7209,7 +7209,7 @@ app.post('/api/discord/batch-refresh-urls', express.json(), async (req, res) => 
           updatedRow[12] = refreshResult.postId || refreshResult.threadId || ''; // M: Discord포스트ID
           
           await rateLimitedSheetsCall(() =>
-            sheets.spreadsheets.values.update({
+            originalSheets.spreadsheets.values.update({
               spreadsheetId: SPREADSHEET_ID,
               range: `회의목록!A${rowIndex + 2}:W${rowIndex + 2}`,
               valueInputOption: 'USER_ENTERED',
