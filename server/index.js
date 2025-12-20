@@ -789,6 +789,8 @@ app._router.stack.forEach((middleware) => {
 const SPREADSHEET_ID = process.env.SHEET_ID;
 const GOOGLE_PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY;
 const GOOGLE_SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+// Google Drive "어플자료" 폴더 ID (환경변수로 설정 가능, 없으면 기본값 사용)
+const APP_DATA_FOLDER_ID = process.env.APP_DATA_FOLDER_ID || '1u2r9l7MHeWrU3mIeO74eGVuEjhTlzcC_';
 
 // 필수 환경 변수 검증
 if (!SPREADSHEET_ID) {
@@ -4702,11 +4704,16 @@ async function getSpreadsheetParentFolder() {
   try {
     const sheetFile = await monitoredDriveCall('files.get', {
       fileId: SPREADSHEET_ID,
-      fields: 'parents'
+      fields: 'parents, driveId',
+      supportsAllDrives: true
     });
+    
     // Google Sheets 파일은 항상 하나의 부모 폴더를 가짐
     if (sheetFile.data.parents && sheetFile.data.parents.length > 0) {
-      return sheetFile.data.parents[0];
+      return {
+        folderId: sheetFile.data.parents[0],
+        driveId: sheetFile.data.driveId || null
+      };
     }
     return null;
   } catch (error) {
@@ -4716,13 +4723,34 @@ async function getSpreadsheetParentFolder() {
 }
 
 // Google Drive 폴더 생성 또는 조회 헬퍼 함수
-async function getOrCreateFolder(folderName, parentFolderId = null) {
+async function getOrCreateFolder(folderName, parentFolderId = null, driveId = null) {
   try {
+    // "어플자료" 폴더인 경우 환경변수로 지정된 폴더 ID 직접 사용
+    if (!parentFolderId && folderName === '어플자료' && APP_DATA_FOLDER_ID) {
+      try {
+        // 폴더 존재 확인
+        const folderInfo = await monitoredDriveCall('files.get', {
+          fileId: APP_DATA_FOLDER_ID,
+          fields: 'id, name, driveId',
+          supportsAllDrives: true
+        });
+        console.log(`✅ [폴더 확인] "어플자료" 폴더 직접 사용: ${APP_DATA_FOLDER_ID}`);
+        return {
+          folderId: folderInfo.data.id,
+          driveId: folderInfo.data.driveId || null
+        };
+      } catch (error) {
+        console.warn(`⚠️ [폴더 확인] 지정된 "어플자료" 폴더 접근 실패, 검색으로 대체:`, error.message);
+        // 폴더 접근 실패 시 기존 로직으로 폴더 검색
+      }
+    }
+    
     // root 폴더인 경우 Google Sheets와 같은 폴더 사용
     if (!parentFolderId) {
       const spreadsheetParent = await getSpreadsheetParentFolder();
       if (spreadsheetParent) {
-        parentFolderId = spreadsheetParent;
+        parentFolderId = spreadsheetParent.folderId;
+        driveId = spreadsheetParent.driveId || driveId;
       }
     }
 
@@ -4736,14 +4764,18 @@ async function getOrCreateFolder(folderName, parentFolderId = null) {
 
     const searchResponse = await monitoredDriveCall('files.list', {
       q: query,
-      fields: 'files(id, name)',
+      fields: 'files(id, name, driveId)',
       corpora: parentFolderId ? 'allDrives' : 'user',
       includeItemsFromAllDrives: true,
       supportsAllDrives: true
     });
 
     if (searchResponse.data.files && searchResponse.data.files.length > 0) {
-      return searchResponse.data.files[0].id;
+      const foundFolder = searchResponse.data.files[0];
+      return {
+        folderId: foundFolder.id,
+        driveId: foundFolder.driveId || null
+      };
     }
 
     // 폴더 생성
@@ -4756,11 +4788,18 @@ async function getOrCreateFolder(folderName, parentFolderId = null) {
       folderMetadata.parents = [parentFolderId];
     }
 
-    const folderResponse = await monitoredDriveCall('files.create', {
+    const createParams = {
       requestBody: folderMetadata,
       fields: 'id, name',
       supportsAllDrives: true
-    });
+    };
+    
+    // Shared Drive에 있는 경우 driveId 지정
+    if (driveId) {
+      createParams.requestBody.driveId = driveId;
+    }
+    
+    const folderResponse = await monitoredDriveCall('files.create', createParams);
 
     // 폴더를 공개로 설정 (선택사항 - 필요시 주석 해제)
     // await drive.permissions.create({
@@ -4771,7 +4810,8 @@ async function getOrCreateFolder(folderName, parentFolderId = null) {
     //   }
     // });
 
-    return folderResponse.data.id;
+    const createdFolderId = folderResponse.data.id;
+    return { folderId: createdFolderId, driveId: driveId || null };
   } catch (error) {
     console.error(`폴더 생성/조회 오류 (${folderName}):`, error);
     throw error;
@@ -4808,29 +4848,42 @@ app.post('/api/direct/store-image/upload', storeImageUpload.single('image'), asy
 
     // 폴더 구조 생성: 어플자료 > 고객모드 > 매장명 > (매장사진 또는 직원사진)
     // 1. 어플자료 폴더
-    const appDataFolderId = await getOrCreateFolder('어플자료');
-    console.log(`📁 [매장 사진 업로드] 어플자료 폴더 ID: ${appDataFolderId}`);
+    const appDataFolder = await getOrCreateFolder('어플자료');
+    const appDataFolderId = appDataFolder.folderId || appDataFolder; // 하위 호환성
+    const appDataDriveId = appDataFolder.driveId || null;
+    console.log(`📁 [매장 사진 업로드] 어플자료 폴더 ID: ${appDataFolderId}${appDataDriveId ? `, Drive ID: ${appDataDriveId}` : ''}`);
 
     // 2. 고객모드 폴더 (어플자료 안에)
-    const customerModeFolderId = await getOrCreateFolder('고객모드', appDataFolderId);
-    console.log(`📁 [매장 사진 업로드] 고객모드 폴더 ID: ${customerModeFolderId}`);
+    const customerModeFolder = await getOrCreateFolder('고객모드', appDataFolderId, appDataDriveId);
+    const customerModeFolderId = customerModeFolder.folderId || customerModeFolder;
+    const customerModeDriveId = customerModeFolder.driveId || appDataDriveId;
+    console.log(`📁 [매장 사진 업로드] 고객모드 폴더 ID: ${customerModeFolderId}${customerModeDriveId ? `, Drive ID: ${customerModeDriveId}` : ''}`);
 
     // 3. 매장명 폴더 (고객모드 안에)
-    const storeFolderId = await getOrCreateFolder(storeName, customerModeFolderId);
-    console.log(`📁 [매장 사진 업로드] 매장명 폴더 ID: ${storeFolderId}`);
+    const storeFolder = await getOrCreateFolder(storeName, customerModeFolderId, customerModeDriveId);
+    const storeFolderId = storeFolder.folderId || storeFolder;
+    const storeDriveId = storeFolder.driveId || customerModeDriveId;
+    console.log(`📁 [매장 사진 업로드] 매장명 폴더 ID: ${storeFolderId}${storeDriveId ? `, Drive ID: ${storeDriveId}` : ''}`);
 
     // 4. 매장사진 또는 직원사진 폴더 (매장명 안에)
     const photoCategory = ['front', 'inside', 'outside', 'outside2'].includes(photoType) 
       ? '매장사진' 
       : '직원사진';
-    const photoCategoryFolderId = await getOrCreateFolder(photoCategory, storeFolderId);
-    console.log(`📁 [매장 사진 업로드] ${photoCategory} 폴더 ID: ${photoCategoryFolderId}`);
+    const photoCategoryFolder = await getOrCreateFolder(photoCategory, storeFolderId, storeDriveId);
+    const photoCategoryFolderId = photoCategoryFolder.folderId || photoCategoryFolder;
+    const photoCategoryDriveId = photoCategoryFolder.driveId || storeDriveId;
+    console.log(`📁 [매장 사진 업로드] ${photoCategory} 폴더 ID: ${photoCategoryFolderId}${photoCategoryDriveId ? `, Drive ID: ${photoCategoryDriveId}` : ''}`);
 
     // Google Drive에 파일 업로드 (해당 폴더에)
     const fileMetadata = {
       name: fileName,
       parents: [photoCategoryFolderId]
     };
+    
+    // Shared Drive에 있는 경우 driveId 지정
+    if (photoCategoryDriveId) {
+      fileMetadata.driveId = photoCategoryDriveId;
+    }
 
     const media = {
       mimeType: req.file.mimetype,
@@ -4840,7 +4893,8 @@ app.post('/api/direct/store-image/upload', storeImageUpload.single('image'), asy
     const driveResponse = await monitoredDriveCall('files.create', {
       requestBody: fileMetadata,
       media: media,
-      fields: 'id, name, webViewLink, webContentLink'
+      fields: 'id, name, webViewLink, webContentLink',
+      supportsAllDrives: true
     });
 
     const fileId = driveResponse.data.id;
@@ -5920,16 +5974,22 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
 
     // 폴더 구조 생성: 어플자료 > 상품이미지 > 통신사명
     // 1. 어플자료 폴더
-    const appDataFolderId = await getOrCreateFolder('어플자료');
-    console.log(`📁 [상품 이미지 업로드] 어플자료 폴더 ID: ${appDataFolderId}`);
+    const appDataFolder = await getOrCreateFolder('어플자료');
+    const appDataFolderId = appDataFolder.folderId || appDataFolder; // 하위 호환성
+    const appDataDriveId = appDataFolder.driveId || null;
+    console.log(`📁 [상품 이미지 업로드] 어플자료 폴더 ID: ${appDataFolderId}${appDataDriveId ? `, Drive ID: ${appDataDriveId}` : ''}`);
 
     // 2. 상품이미지 폴더 (어플자료 안에)
-    const productImageFolderId = await getOrCreateFolder('상품이미지', appDataFolderId);
-    console.log(`📁 [상품 이미지 업로드] 상품이미지 폴더 ID: ${productImageFolderId}`);
+    const productImageFolder = await getOrCreateFolder('상품이미지', appDataFolderId, appDataDriveId);
+    const productImageFolderId = productImageFolder.folderId || productImageFolder;
+    const productImageDriveId = productImageFolder.driveId || appDataDriveId;
+    console.log(`📁 [상품 이미지 업로드] 상품이미지 폴더 ID: ${productImageFolderId}${productImageDriveId ? `, Drive ID: ${productImageDriveId}` : ''}`);
 
     // 3. 통신사명 폴더 (상품이미지 안에)
-    const carrierFolderId = await getOrCreateFolder(carrier, productImageFolderId);
-    console.log(`📁 [상품 이미지 업로드] 통신사명 폴더 ID: ${carrierFolderId}`);
+    const carrierFolder = await getOrCreateFolder(carrier, productImageFolderId, productImageDriveId);
+    const carrierFolderId = carrierFolder.folderId || carrierFolder;
+    const carrierDriveId = carrierFolder.driveId || productImageDriveId;
+    console.log(`📁 [상품 이미지 업로드] 통신사명 폴더 ID: ${carrierFolderId}${carrierDriveId ? `, Drive ID: ${carrierDriveId}` : ''}`);
 
     // Google Drive에 파일 업로드 (해당 폴더에)
     // memoryStorage를 사용하므로 req.file.buffer를 스트림으로 변환
@@ -5947,6 +6007,11 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
       name: fileName,
       parents: [carrierFolderId]
     };
+    
+    // Shared Drive에 있는 경우 driveId 지정
+    if (carrierDriveId) {
+      fileMetadata.driveId = carrierDriveId;
+    }
 
     const media = {
       mimeType: req.file.mimetype,
