@@ -15,24 +15,36 @@ import {
   TableHead,
   TableRow,
   Chip,
-  LinearProgress
+  Button,
+  IconButton,
+  Tooltip,
+  Checkbox,
+  FormControlLabel,
+  Stack
 } from '@mui/material';
 import {
-  TrendingUp as TrendingUpIcon,
-  Error as ErrorIcon,
+  Refresh as RefreshIcon,
+  Image as ImageIcon,
   CheckCircle as CheckCircleIcon,
-  Warning as WarningIcon
+  Error as ErrorIcon,
+  Warning as WarningIcon,
+  Store as StoreIcon,
+  PhoneAndroid as PhoneIcon,
+  Slideshow as SlideshowIcon
 } from '@mui/icons-material';
 
-const DriveMonitoringTab = () => {
+const DiscordImageMonitoringTab = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [monitoringData, setMonitoringData] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [selectedItems, setSelectedItems] = useState(new Set());
+  const [refreshResults, setRefreshResults] = useState(null);
 
   useEffect(() => {
     loadMonitoringData();
-    // 30초마다 자동 새로고침
-    const interval = setInterval(loadMonitoringData, 30000);
+    // 60초마다 자동 새로고침
+    const interval = setInterval(loadMonitoringData, 60000);
     return () => clearInterval(interval);
   }, []);
 
@@ -40,7 +52,7 @@ const DriveMonitoringTab = () => {
     try {
       setLoading(true);
       const response = await fetch(
-        `${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/direct/drive-monitoring?days=7`
+        `${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/discord/image-monitoring?type=direct`
       );
       
       if (!response.ok) {
@@ -62,6 +74,67 @@ const DriveMonitoringTab = () => {
     }
   };
 
+  const handleSelectAll = (items) => {
+    if (selectedItems.size === items.length) {
+      setSelectedItems(new Set());
+    } else {
+      setSelectedItems(new Set(items.map((_, index) => index)));
+    }
+  };
+
+  const handleSelectItem = (index) => {
+    const newSelected = new Set(selectedItems);
+    if (newSelected.has(index)) {
+      newSelected.delete(index);
+    } else {
+      newSelected.add(index);
+    }
+    setSelectedItems(newSelected);
+  };
+
+  const handleRefreshSelected = async () => {
+    if (selectedItems.size === 0) {
+      alert('갱신할 항목을 선택해주세요.');
+      return;
+    }
+
+    try {
+      setRefreshing(true);
+      const allItems = [
+        ...monitoringData.direct.mobileImages.map(item => ({ type: 'mobile-image', ...item })),
+        ...monitoringData.direct.masterImages.map(item => ({ type: 'master-image', ...item })),
+        ...monitoringData.direct.storePhotos.map(item => ({ type: 'store-photo', ...item }))
+      ];
+
+      const itemsToRefresh = Array.from(selectedItems).map(index => allItems[index]);
+      
+      const response = await fetch(
+        `${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/discord/batch-refresh-urls`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: itemsToRefresh })
+        }
+      );
+
+      const result = await response.json();
+      if (result.success) {
+        setRefreshResults(result);
+        alert(`갱신 완료: 성공 ${result.successCount}개, 실패 ${result.failCount}개`);
+        // 데이터 다시 로드
+        await loadMonitoringData();
+        setSelectedItems(new Set());
+      } else {
+        throw new Error(result.error || '갱신에 실패했습니다.');
+      }
+    } catch (err) {
+      console.error('URL 갱신 오류:', err);
+      alert(`갱신 실패: ${err.message}`);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   if (loading && !monitoringData) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
@@ -74,6 +147,7 @@ const DriveMonitoringTab = () => {
     return (
       <Box sx={{ p: 3 }}>
         <Alert severity="error">{error}</Alert>
+        <Button onClick={loadMonitoringData} sx={{ mt: 2 }}>다시 시도</Button>
       </Box>
     );
   }
@@ -82,230 +156,289 @@ const DriveMonitoringTab = () => {
     return null;
   }
 
-  const { dailyData, recentCalls, totalStats } = monitoringData;
-  const today = totalStats.today;
-  const threshold = totalStats.threshold;
-  const todayErrorRate = today.count > 0 ? (today.errors / today.count) * 100 : 0;
-  const isDailyCallsExceeded = today.count >= threshold.dailyCalls;
-  const isErrorRateExceeded = todayErrorRate >= (threshold.errorRate * 100);
+      // 모드에 따라 데이터 구조가 다름
+      const isMeetingMode = window.location.pathname.includes('meeting') || 
+                            document.title.includes('회의');
+      
+      let totalCount = 0;
+      let allItems = [];
+      let statsData = null;
+      
+      if (isMeetingMode && monitoringData.meeting) {
+        // 회의모드
+        const { meeting } = monitoringData;
+        totalCount = meeting.slides.length;
+        allItems = meeting.slides.map((item, idx) => ({
+          ...item,
+          index: idx,
+          category: 'meeting-slide',
+          label: `${item.meetingId} - ${item.slideId} (${item.title || '제목 없음'})`
+        }));
+        statsData = {
+          slides: meeting.slides.length
+        };
+      } else if (monitoringData.direct) {
+        // 직영점 관리모드
+        const { direct } = monitoringData;
+        totalCount = direct.mobileImages.length + direct.masterImages.length + direct.storePhotos.length;
+        allItems = [
+          ...direct.mobileImages.map((item, idx) => ({ ...item, index: idx, category: 'mobile-image', label: `${item.carrier} - ${item.modelName || item.modelId}` })),
+          ...direct.masterImages.map((item, idx) => ({ ...item, index: direct.mobileImages.length + idx, category: 'master-image', label: `${item.carrier} - ${item.modelName || item.modelId}` })),
+          ...direct.storePhotos.map((item, idx) => ({ ...item, index: direct.mobileImages.length + direct.masterImages.length + idx, category: 'store-photo', label: `${item.storeName} - ${item.photoType}` }))
+        ];
+        statsData = {
+          mobileImages: direct.mobileImages.length,
+          masterImages: direct.masterImages.length,
+          storePhotos: direct.storePhotos.length
+        };
+      }
 
   return (
     <Box sx={{ p: 3 }}>
-      <Typography variant="h5" sx={{ mb: 3, fontWeight: 'bold' }}>
-        Google Drive API 모니터링
-      </Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
+          Discord 이미지 URL 모니터링
+        </Typography>
+        <Stack direction="row" spacing={2}>
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            onClick={loadMonitoringData}
+            disabled={loading}
+          >
+            새로고침
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<RefreshIcon />}
+            onClick={handleRefreshSelected}
+            disabled={refreshing || selectedItems.size === 0}
+          >
+            선택 항목 갱신 ({selectedItems.size})
+          </Button>
+        </Stack>
+      </Box>
 
-      {/* 오늘의 통계 카드 */}
-      <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid item xs={12} md={4}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                <TrendingUpIcon color="primary" sx={{ mr: 1 }} />
-                <Typography variant="h6">오늘의 호출량</Typography>
-              </Box>
-              <Typography variant="h4" sx={{ fontWeight: 'bold', mb: 1 }}>
-                {today.count.toLocaleString()}
-              </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Typography variant="body2" color="text.secondary">
-                  임계값: {threshold.dailyCalls.toLocaleString()}회
-                </Typography>
-                {isDailyCallsExceeded ? (
-                  <Chip
-                    icon={<WarningIcon />}
-                    label="임계값 초과"
-                    color="error"
-                    size="small"
-                  />
-                ) : (
-                  <Chip
-                    icon={<CheckCircleIcon />}
-                    label="정상"
-                    color="success"
-                    size="small"
-                  />
-                )}
-              </Box>
-              <LinearProgress
-                variant="determinate"
-                value={Math.min((today.count / threshold.dailyCalls) * 100, 100)}
-                sx={{ mt: 1 }}
-                color={isDailyCallsExceeded ? 'error' : 'primary'}
-              />
-            </CardContent>
-          </Card>
+      {/* 통계 카드 */}
+      {statsData && (
+        <Grid container spacing={3} sx={{ mb: 3 }}>
+          {isMeetingMode ? (
+            <Grid item xs={12} md={4}>
+              <Card>
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                    <SlideshowIcon color="primary" sx={{ mr: 1 }} />
+                    <Typography variant="h6">회의 슬라이드</Typography>
+                  </Box>
+                  <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+                    {statsData.slides}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    회의목록
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+          ) : (
+            <>
+              <Grid item xs={12} md={4}>
+                <Card>
+                  <CardContent>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                      <PhoneIcon color="primary" sx={{ mr: 1 }} />
+                      <Typography variant="h6">모델 이미지</Typography>
+                    </Box>
+                    <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+                      {statsData.mobileImages}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      직영점_모델이미지
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+
+              <Grid item xs={12} md={4}>
+                <Card>
+                  <CardContent>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                      <ImageIcon color="secondary" sx={{ mr: 1 }} />
+                      <Typography variant="h6">단말 마스터</Typography>
+                    </Box>
+                    <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+                      {statsData.masterImages}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      직영점_단말마스터
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+
+              <Grid item xs={12} md={4}>
+                <Card>
+                  <CardContent>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                      <StoreIcon color="success" sx={{ mr: 1 }} />
+                      <Typography variant="h6">매장 사진</Typography>
+                    </Box>
+                    <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+                      {statsData.storePhotos}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      직영점_매장사진
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+            </>
+          )}
         </Grid>
+      )}
 
-        <Grid item xs={12} md={4}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                <ErrorIcon color={isErrorRateExceeded ? 'error' : 'action'} sx={{ mr: 1 }} />
-                <Typography variant="h6">에러율</Typography>
-              </Box>
-              <Typography variant="h4" sx={{ fontWeight: 'bold', mb: 1 }}>
-                {todayErrorRate.toFixed(2)}%
-              </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Typography variant="body2" color="text.secondary">
-                  에러: {today.errors}회 / 총: {today.count}회
-                </Typography>
-                {isErrorRateExceeded ? (
-                  <Chip
-                    icon={<WarningIcon />}
-                    label="임계값 초과"
-                    color="error"
-                    size="small"
-                  />
-                ) : (
-                  <Chip
-                    icon={<CheckCircleIcon />}
-                    label="정상"
-                    color="success"
-                    size="small"
-                  />
-                )}
-              </Box>
-              <LinearProgress
-                variant="determinate"
-                value={Math.min((todayErrorRate / (threshold.errorRate * 100)) * 100, 100)}
-                sx={{ mt: 1 }}
-                color={isErrorRateExceeded ? 'error' : 'primary'}
-              />
-            </CardContent>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12} md={4}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" sx={{ mb: 1 }}>
-                최근 에러
-              </Typography>
-              <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-                {totalStats.recentErrors.length}
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                최근 20개 기록 중
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-
-      {/* 경고 알림 */}
-      {(isDailyCallsExceeded || isErrorRateExceeded) && (
-        <Alert severity="warning" sx={{ mb: 3 }}>
+      {/* 갱신 결과 */}
+      {refreshResults && (
+        <Alert 
+          severity={refreshResults.failCount === 0 ? 'success' : 'warning'} 
+          sx={{ mb: 3 }}
+          onClose={() => setRefreshResults(null)}
+        >
           <Typography variant="body1" sx={{ fontWeight: 'bold', mb: 1 }}>
-            ⚠️ 임계값 초과 경고
+            갱신 완료
           </Typography>
-          {isDailyCallsExceeded && (
-            <Typography variant="body2">
-              • 일일 호출량이 임계값({threshold.dailyCalls.toLocaleString()}회)을 초과했습니다. ({today.count.toLocaleString()}회)
-            </Typography>
-          )}
-          {isErrorRateExceeded && (
-            <Typography variant="body2">
-              • 에러율이 임계값({(threshold.errorRate * 100).toFixed(2)}%)을 초과했습니다. ({todayErrorRate.toFixed(2)}%)
-            </Typography>
-          )}
-          <Typography variant="body2" sx={{ mt: 1, fontStyle: 'italic' }}>
-            트래픽이 계속 증가하면 Cloudflare R2 또는 Google Cloud Storage로 마이그레이션을 고려해주세요.
+          <Typography variant="body2">
+            총 {refreshResults.total}개 중 성공: {refreshResults.successCount}개, 실패: {refreshResults.failCount}개
           </Typography>
         </Alert>
       )}
 
-      {/* 일일 통계 테이블 */}
-      <Paper sx={{ mb: 3 }}>
-        <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
-          <Typography variant="h6">최근 7일 통계</Typography>
-        </Box>
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>날짜</TableCell>
-                <TableCell align="right">총 호출</TableCell>
-                <TableCell align="right">에러</TableCell>
-                <TableCell align="right">에러율</TableCell>
-                <TableCell>상태</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {dailyData.map((day, index) => {
-                const dayErrorRate = day.totalCalls > 0 ? (day.errors / day.totalCalls) * 100 : 0;
-                const hasWarning = day.thresholdExceeded.dailyCalls || day.thresholdExceeded.errorRate;
-                
-                return (
-                  <TableRow key={index} sx={{ bgcolor: hasWarning ? 'error.lighter' : 'inherit' }}>
-                    <TableCell>{day.date}</TableCell>
-                    <TableCell align="right">{day.totalCalls.toLocaleString()}</TableCell>
-                    <TableCell align="right">{day.errors}</TableCell>
-                    <TableCell align="right">{dayErrorRate.toFixed(2)}%</TableCell>
-                    <TableCell>
-                      {hasWarning ? (
-                        <Chip label="경고" color="error" size="small" />
-                      ) : (
-                        <Chip label="정상" color="success" size="small" />
-                      )}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
-
-      {/* 최근 호출 기록 */}
-      <Paper>
-        <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
-          <Typography variant="h6">최근 호출 기록 (최근 20개)</Typography>
-        </Box>
-        <TableContainer>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>시간</TableCell>
-                <TableCell>작업</TableCell>
-                <TableCell>상태</TableCell>
-                <TableCell>소요시간</TableCell>
-                <TableCell>에러</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {recentCalls.slice(0, 20).map((call, index) => (
-                <TableRow key={index}>
-                  <TableCell>
-                    {new Date(call.timestamp).toLocaleString('ko-KR')}
-                  </TableCell>
-                  <TableCell>{call.operation}</TableCell>
-                  <TableCell>
-                    {call.success ? (
-                      <Chip label="성공" color="success" size="small" />
-                    ) : (
-                      <Chip label="실패" color="error" size="small" />
-                    )}
-                  </TableCell>
-                  <TableCell>{call.duration}ms</TableCell>
-                  <TableCell>
-                    {call.error ? (
-                      <Typography variant="caption" color="error" sx={{ maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {call.error}
-                      </Typography>
-                    ) : (
-                      '-'
-                    )}
-                  </TableCell>
+      {/* 이미지 목록 */}
+      {totalCount > 0 ? (
+        <Paper>
+          <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h6">Discord 이미지 목록 (총 {totalCount}개)</Typography>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={selectedItems.size === allItems.length && allItems.length > 0}
+                  indeterminate={selectedItems.size > 0 && selectedItems.size < allItems.length}
+                  onChange={() => handleSelectAll(allItems)}
+                />
+              }
+              label="전체 선택"
+            />
+          </Box>
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell padding="checkbox" width="50px"></TableCell>
+                  <TableCell>유형</TableCell>
+                  <TableCell>이름/모델</TableCell>
+                  <TableCell>통신사</TableCell>
+                  <TableCell>이미지 URL</TableCell>
+                  <TableCell>메시지 ID</TableCell>
+                  <TableCell>스레드 ID</TableCell>
+                  <TableCell>상태</TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
+              </TableHead>
+              <TableBody>
+                {allItems.map((item, index) => {
+                  const isSelected = selectedItems.has(index);
+                  const categoryIcon = item.category === 'mobile-image' ? <PhoneIcon /> :
+                                      item.category === 'master-image' ? <ImageIcon /> :
+                                      item.category === 'store-photo' ? <StoreIcon /> :
+                                      <SlideshowIcon />;
+                  const categoryLabel = item.category === 'mobile-image' ? '모델이미지' :
+                                       item.category === 'master-image' ? '단말마스터' :
+                                       item.category === 'store-photo' ? '매장사진' :
+                                       '회의슬라이드';
+                  
+                  return (
+                    <TableRow 
+                      key={index} 
+                      hover
+                      selected={isSelected}
+                      onClick={() => handleSelectItem(index)}
+                      sx={{ cursor: 'pointer' }}
+                    >
+                      <TableCell padding="checkbox">
+                        <Checkbox checked={isSelected} />
+                      </TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          {categoryIcon}
+                          <Typography variant="body2">{categoryLabel}</Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" fontWeight="bold">
+                          {item.label}
+                        </Typography>
+                        {item.petName && (
+                          <Typography variant="caption" color="text.secondary">
+                            {item.petName}
+                          </Typography>
+                        )}
+                        {item.photoType && (
+                          <Typography variant="caption" color="text.secondary">
+                            {item.photoType}
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell>{item.carrier || item.meetingId || '-'}</TableCell>
+                      <TableCell>
+                        <Tooltip title={item.imageUrl}>
+                          <Typography 
+                            variant="body2" 
+                            sx={{ 
+                              maxWidth: 200, 
+                              overflow: 'hidden', 
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap'
+                            }}
+                          >
+                            {item.imageUrl || '-'}
+                          </Typography>
+                        </Tooltip>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
+                          {item.messageId ? item.messageId.substring(0, 10) + '...' : '-'}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
+                          {item.threadId ? item.threadId.substring(0, 10) + '...' : '-'}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Chip 
+                          icon={<CheckCircleIcon />} 
+                          label="정상" 
+                          color="success" 
+                          size="small" 
+                        />
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
+      ) : (
+        <Paper sx={{ p: 4, textAlign: 'center' }}>
+          <Typography variant="h6" color="text.secondary">
+            Discord 이미지가 없습니다.
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            이미지를 업로드하면 여기에 표시됩니다.
+          </Typography>
+        </Paper>
+      )}
     </Box>
   );
 };
 
-export default DriveMonitoringTab;
+export default DiscordImageMonitoringTab;

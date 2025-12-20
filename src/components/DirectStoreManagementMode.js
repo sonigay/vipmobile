@@ -137,10 +137,10 @@ const DirectStoreManagementMode = ({
         }
       });
       tabs.push({
-        key: 'driveMonitoring',
-        label: 'Google Drive 모니터링',
+        key: 'discordImageMonitoring',
+        label: 'Discord 이미지 모니터링',
         icon: <MonitorIcon />,
-        componentName: 'DriveMonitoringTab'
+        componentName: 'DriveMonitoringTab' // 파일명은 유지하되 내용은 Discord 모니터링으로 변경됨
       });
       tabs.push({
         key: 'board',

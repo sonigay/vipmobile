@@ -12,12 +12,14 @@ import {
   SwapHoriz as SwapHorizIcon,
   Update as UpdateIcon,
   EventNote as EventNoteIcon,
-  PlayArrow as PlayArrowIcon
+  PlayArrow as PlayArrowIcon,
+  Monitor as MonitorIcon
 } from '@mui/icons-material';
 
 import AppUpdatePopup from './AppUpdatePopup';
 import MeetingPreparationTab from './meeting/MeetingPreparationTab';
 import MeetingPresentationTab from './meeting/MeetingPresentationTab';
+const DiscordImageMonitoringTab = React.lazy(() => import('./direct/management/DriveMonitoringTab'));
 
 function MeetingMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   // 업데이트 팝업 상태
@@ -47,7 +49,7 @@ function MeetingMode({ onLogout, loggedInStore, onModeChange, availableModes }) 
   // 접근 가능한 탭 확인
   const allowedTabs = useMemo(() => {
     if (meetingRole === 'M') {
-      return [0, 1]; // 회의준비, 회의진행 모두 가능
+      return [0, 1, 2]; // 회의준비, 회의진행, Discord 이미지 모니터링 모두 가능
     } else {
       return [1]; // 회의진행만 가능
     }
@@ -116,6 +118,14 @@ function MeetingMode({ onLogout, loggedInStore, onModeChange, availableModes }) 
                   icon={<PlayArrowIcon />} 
                   iconPosition="start"
                   label="회의진행" 
+                  sx={{ textTransform: 'none', fontWeight: 'bold' }}
+                />
+              )}
+              {allowedTabs.includes(2) && (
+                <Tab 
+                  icon={<MonitorIcon />} 
+                  iconPosition="start"
+                  label="Discord 이미지 모니터링" 
                   sx={{ textTransform: 'none', fontWeight: 'bold' }}
                 />
               )}
@@ -189,6 +199,11 @@ function MeetingMode({ onLogout, loggedInStore, onModeChange, availableModes }) 
               setSelectedMeetingForPresentation(null);
             }}
           />
+        )}
+        {activeTab === 2 && allowedTabs.includes(2) && (
+          <React.Suspense fallback={<Box sx={{ p: 3, textAlign: 'center' }}>로딩 중...</Box>}>
+            <DiscordImageMonitoringTab />
+          </React.Suspense>
         )}
       </Box>
       

@@ -6935,6 +6935,272 @@ app.post('/api/direct/refresh-store-photo-url', express.json(), async (req, res)
   }
 });
 
+// GET /api/discord/image-monitoring: Discord 이미지 URL 모니터링 데이터 조회
+app.get('/api/discord/image-monitoring', async (req, res) => {
+  try {
+    const { sheets, SPREADSHEET_ID } = createSheetsClient();
+    const { type } = req.query; // 'direct' 또는 'meeting'
+    
+    const monitoringData = {
+      direct: {
+        mobileImages: [],
+        masterImages: [],
+        storePhotos: []
+      },
+      meeting: {
+        slides: []
+      }
+    };
+    
+    if (!type || type === 'direct') {
+      // 직영점_모델이미지 조회
+      const { HEADERS_MOBILE_IMAGES } = require('./directRoutes');
+      const { ensureSheetHeaders } = require('./directRoutes');
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, '직영점_모델이미지', HEADERS_MOBILE_IMAGES);
+      
+      const imageResponse = await rateLimitedSheetsCall(() =>
+        sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: '직영점_모델이미지!A:K'
+        })
+      );
+      
+      const imageRows = (imageResponse.data.values || []).slice(1);
+      monitoringData.direct.mobileImages = imageRows
+        .filter(row => {
+          const messageId = (row[8] || '').trim(); // I: Discord메시지ID
+          const threadId = (row[10] || '').trim(); // K: Discord스레드ID
+          return messageId && threadId;
+        })
+        .map(row => ({
+          carrier: (row[0] || '').trim(),
+          modelId: (row[1] || '').trim(),
+          modelName: (row[2] || '').trim(),
+          petName: (row[3] || '').trim(),
+          imageUrl: (row[5] || '').trim(),
+          messageId: (row[8] || '').trim(),
+          postId: (row[9] || '').trim(),
+          threadId: (row[10] || '').trim()
+        }));
+      
+      // 직영점_단말마스터 조회
+      const { HEADERS_MOBILE_MASTER } = require('./directRoutes');
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, '직영점_단말마스터', HEADERS_MOBILE_MASTER);
+      
+      const masterResponse = await rateLimitedSheetsCall(() =>
+        sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: '직영점_단말마스터!A:R'
+        })
+      );
+      
+      const masterRows = (masterResponse.data.values || []).slice(1);
+      monitoringData.direct.masterImages = masterRows
+        .filter(row => {
+          const messageId = (row[15] || '').trim(); // P: Discord메시지ID
+          const threadId = (row[17] || '').trim(); // R: Discord스레드ID
+          return messageId && threadId;
+        })
+        .map(row => ({
+          carrier: (row[0] || '').trim(),
+          modelId: (row[1] || '').trim(),
+          modelName: (row[2] || '').trim(),
+          petName: (row[3] || '').trim(),
+          imageUrl: (row[12] || '').trim(),
+          messageId: (row[15] || '').trim(),
+          postId: (row[16] || '').trim(),
+          threadId: (row[17] || '').trim()
+        }));
+      
+      // 직영점_매장사진 조회
+      const { ensureSheetHeaders: ensureHeaders } = require('./directRoutes');
+      await ensureHeaders(sheets, SPREADSHEET_ID, CUSTOMER_STORE_PHOTO_SHEET_NAME, HEADERS_STORE_PHOTO);
+      
+      const storePhotoResponse = await rateLimitedSheetsCall(() =>
+        sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${CUSTOMER_STORE_PHOTO_SHEET_NAME}!A:AH`
+        })
+      );
+      
+      const storePhotoRows = (storePhotoResponse.data.values || []).slice(1);
+      const photoTypes = ['front', 'inside', 'outside', 'outside2', 'manager', 'staff1', 'staff2', 'staff3'];
+      const photoTypeMap = {
+        front: { url: 1, msgId: 2, postId: 3, threadId: 4 },
+        inside: { url: 5, msgId: 6, postId: 7, threadId: 8 },
+        outside: { url: 9, msgId: 10, postId: 11, threadId: 12 },
+        outside2: { url: 13, msgId: 14, postId: 15, threadId: 16 },
+        manager: { url: 17, msgId: 18, postId: 19, threadId: 20 },
+        staff1: { url: 21, msgId: 22, postId: 23, threadId: 24 },
+        staff2: { url: 25, msgId: 26, postId: 27, threadId: 28 },
+        staff3: { url: 29, msgId: 30, postId: 31, threadId: 32 }
+      };
+      
+      storePhotoRows.forEach(row => {
+        const storeName = (row[0] || '').trim();
+        photoTypes.forEach(photoType => {
+          const map = photoTypeMap[photoType];
+          const messageId = (row[map.msgId] || '').trim();
+          const threadId = (row[map.threadId] || '').trim();
+          if (messageId && threadId) {
+            monitoringData.direct.storePhotos.push({
+              storeName,
+              photoType,
+              imageUrl: (row[map.url] || '').trim(),
+              messageId,
+              postId: (row[map.postId] || '').trim(),
+              threadId
+            });
+          }
+        });
+      });
+    }
+    
+    if (!type || type === 'meeting') {
+      // 회의목록 조회
+      const meetingResponse = await rateLimitedSheetsCall(() =>
+        sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: '회의목록!A:W'
+        })
+      );
+      
+      const meetingRows = (meetingResponse.data.values || []).slice(1);
+      monitoringData.meeting.slides = meetingRows
+        .filter(row => {
+          const messageId = (row[14] || '').trim(); // O: Discord메시지ID
+          const threadId = (row[13] || '').trim(); // N: Discord스레드ID
+          return messageId && threadId && (row[9] || '').trim(); // 이미지URL이 있는 경우만
+        })
+        .map(row => ({
+          meetingId: (row[0] || '').trim(),
+          slideId: (row[1] || '').trim(),
+          title: (row[6] || '').trim(),
+          imageUrl: (row[9] || '').trim(),
+          messageId: (row[14] || '').trim(),
+          postId: (row[12] || '').trim(),
+          threadId: (row[13] || '').trim(),
+          meetingDate: (row[18] || '').trim(),
+          meetingNumber: (row[19] || '').trim()
+        }));
+    }
+    
+    return res.json({
+      success: true,
+      data: monitoringData
+    });
+  } catch (error) {
+    console.error('Discord 이미지 모니터링 데이터 조회 오류:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// POST /api/discord/batch-refresh-urls: 여러 이미지 URL 일괄 갱신
+app.post('/api/discord/batch-refresh-urls', express.json(), async (req, res) => {
+  try {
+    const { items } = req.body; // [{ type, ...params }]
+    
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'items 배열이 필요합니다.'
+      });
+    }
+    
+    const results = [];
+    
+    for (const item of items) {
+      try {
+        const { type, threadId, messageId } = item;
+        
+        if (!type || !threadId || !messageId) {
+          results.push({
+            success: false,
+            error: 'type, threadId, messageId가 필요합니다.',
+            item
+          });
+          continue;
+        }
+        
+        // Discord에서 최신 URL 가져오기
+        const refreshResult = await refreshDiscordImageUrl(threadId, messageId);
+        const newImageUrl = refreshResult.imageUrl;
+        
+        // 타입에 따라 적절한 API 호출
+        if (type === 'mobile-image') {
+          const { carrier, modelId, modelName } = item;
+          const refreshRes = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/direct/refresh-mobile-image-url`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ carrier, modelId, modelName, threadId, messageId })
+          });
+          const refreshData = await refreshRes.json();
+          results.push({ ...refreshData, type, item });
+        } else if (type === 'master-image') {
+          const { carrier, modelId, modelName } = item;
+          const refreshRes = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/direct/refresh-master-image-url`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ carrier, modelId, modelName, threadId, messageId })
+          });
+          const refreshData = await refreshRes.json();
+          results.push({ ...refreshData, type, item });
+        } else if (type === 'store-photo') {
+          const { storeName, photoType } = item;
+          const refreshRes = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/direct/refresh-store-photo-url`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ storeName, photoType, threadId, messageId })
+          });
+          const refreshData = await refreshRes.json();
+          results.push({ ...refreshData, type, item });
+        } else if (type === 'meeting-slide') {
+          // 회의 슬라이드 URL 갱신은 meetingRoutes에 구현 필요
+          results.push({
+            success: false,
+            error: '회의 슬라이드 URL 갱신은 아직 구현되지 않았습니다.',
+            type,
+            item
+          });
+        } else {
+          results.push({
+            success: false,
+            error: `알 수 없는 타입: ${type}`,
+            type,
+            item
+          });
+        }
+      } catch (error) {
+        results.push({
+          success: false,
+          error: error.message,
+          item
+        });
+      }
+    }
+    
+    const successCount = results.filter(r => r.success).length;
+    const failCount = results.length - successCount;
+    
+    return res.json({
+      success: true,
+      total: results.length,
+      successCount,
+      failCount,
+      results
+    });
+  } catch (error) {
+    console.error('일괄 URL 갱신 오류:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // POST /api/direct/upload-transition-page-image: 연결페이지 이미지 업로드 (Discord)
 app.post('/api/direct/upload-transition-page-image', directStoreUpload.single('image'), async (req, res) => {
   const startTime = Date.now();
