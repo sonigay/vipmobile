@@ -857,6 +857,42 @@ const CUSTOMER_QUEUE_SHEET_NAME = '직영점_구매대기';
 const CUSTOMER_PRE_APPROVAL_SHEET_NAME = '직영점_사전승낙서마크';
 const CUSTOMER_STORE_PHOTO_SHEET_NAME = '직영점_매장사진';
 const CUSTOMER_BOARD_SHEET_NAME = '직영점_게시판';
+const HEADERS_STORE_PHOTO = [
+  '업체명',                    // 0
+  '전면사진URL',               // 1
+  '전면사진Discord메시지ID',   // 2
+  '전면사진Discord포스트ID',   // 3
+  '전면사진Discord스레드ID',   // 4
+  '내부사진URL',               // 5
+  '내부사진Discord메시지ID',   // 6
+  '내부사진Discord포스트ID',   // 7
+  '내부사진Discord스레드ID',   // 8
+  '외부사진URL',               // 9
+  '외부사진Discord메시지ID',   // 10
+  '외부사진Discord포스트ID',   // 11
+  '외부사진Discord스레드ID',   // 12
+  '외부2사진URL',              // 13
+  '외부2사진Discord메시지ID',  // 14
+  '외부2사진Discord포스트ID',  // 15
+  '외부2사진Discord스레드ID',  // 16
+  '점장사진URL',               // 17
+  '점장사진Discord메시지ID',   // 18
+  '점장사진Discord포스트ID',   // 19
+  '점장사진Discord스레드ID',   // 20
+  '직원1사진URL',              // 21
+  '직원1사진Discord메시지ID',  // 22
+  '직원1사진Discord포스트ID',  // 23
+  '직원1사진Discord스레드ID',  // 24
+  '직원2사진URL',              // 25
+  '직원2사진Discord메시지ID',  // 26
+  '직원2사진Discord포스트ID',  // 27
+  '직원2사진Discord스레드ID',  // 28
+  '직원3사진URL',              // 29
+  '직원3사진Discord메시지ID',  // 30
+  '직원3사진Discord포스트ID',  // 31
+  '직원3사진Discord스레드ID',  // 32
+  '수정일시'                   // 33
+];
 const CUSTOMER_QUEUE_HEADERS = [
   '번호', '고객CTN', '고객명', '통신사', '단말기모델명', '색상', '단말일련번호', '유심모델명', '유심일련번호', '개통유형',
   '전통신사', '할부구분', '할부개월', '약정', '요금제', '부가서비스', '출고가', '이통사지원금', '대리점추가지원금(부가유치)',
@@ -4615,37 +4651,75 @@ app.post('/api/direct/store-image', async (req, res) => {
     const values = await getSheetValues(CUSTOMER_STORE_PHOTO_SHEET_NAME);
     const updatedAt = new Date().toISOString().replace('T', ' ').substring(0, 19);
 
-    if (!values || values.length === 0) {
-      await rateLimitedSheetsCall(() =>
-        sheets.spreadsheets.values.update({
-          spreadsheetId: SPREADSHEET_ID,
-          range: `${CUSTOMER_STORE_PHOTO_SHEET_NAME}!A1:J1`,
-          valueInputOption: 'RAW',
-          resource: { values: [['업체명', '전면사진URL', '내부사진URL', '외부사진URL', '외부2사진URL', '점장사진URL', '직원1사진URL', '직원2사진URL', '직원3사진URL', '수정일시']] }
-        })
-      );
-    }
+    // 헤더 확인 및 생성
+    const { ensureSheetHeaders } = require('./directRoutes');
+    await ensureSheetHeaders(sheets, SPREADSHEET_ID, CUSTOMER_STORE_PHOTO_SHEET_NAME, HEADERS_STORE_PHOTO);
 
     const rowIndex = values ? values.findIndex(row => row[0] === storeName) : -1;
+    
+    // 기존 행이 있으면 기존 Discord 정보 보존
+    const existingRow = rowIndex !== -1 && values ? values[rowIndex] : null;
+    
+    // 각 URL에 대응하는 Discord 정보 매핑 함수
+    const getDiscordInfo = (urlType, url) => {
+      if (!url) return ['', '', '']; // URL이 없으면 Discord 정보도 없음
+      
+      // 기존 행에서 해당 URL 타입의 Discord 정보 찾기
+      if (existingRow) {
+        const urlIndexMap = {
+          front: { url: 1, msgId: 2, postId: 3, threadId: 4 },
+          inside: { url: 5, msgId: 6, postId: 7, threadId: 8 },
+          outside: { url: 9, msgId: 10, postId: 11, threadId: 12 },
+          outside2: { url: 13, msgId: 14, postId: 15, threadId: 16 },
+          manager: { url: 17, msgId: 18, postId: 19, threadId: 20 },
+          staff1: { url: 21, msgId: 22, postId: 23, threadId: 24 },
+          staff2: { url: 25, msgId: 26, postId: 27, threadId: 28 },
+          staff3: { url: 29, msgId: 30, postId: 31, threadId: 32 }
+        };
+        
+        const map = urlIndexMap[urlType];
+        if (map && existingRow[map.url] === url) {
+          // 기존 URL과 동일하면 Discord 정보 보존
+          return [
+            existingRow[map.msgId] || '',
+            existingRow[map.postId] || '',
+            existingRow[map.threadId] || ''
+          ];
+        }
+      }
+      
+      // 새 URL이거나 기존 URL과 다르면 Discord 정보 없음 (나중에 업로드 시 채워짐)
+      return ['', '', ''];
+    };
+    
     const newRow = [
-      storeName,
-      data.frontUrl || '',
-      data.insideUrl || '',
-      data.outsideUrl || '',
-      data.outside2Url || '',
-      data.managerUrl || '',
-      data.staff1Url || '',
-      data.staff2Url || '',
-      data.staff3Url || '',
-      updatedAt
+      storeName,  // 0: 업체명
+      data.frontUrl || '',  // 1: 전면사진URL
+      ...getDiscordInfo('front', data.frontUrl),  // 2-4: 전면사진Discord정보
+      data.insideUrl || '',  // 5: 내부사진URL
+      ...getDiscordInfo('inside', data.insideUrl),  // 6-8: 내부사진Discord정보
+      data.outsideUrl || '',  // 9: 외부사진URL
+      ...getDiscordInfo('outside', data.outsideUrl),  // 10-12: 외부사진Discord정보
+      data.outside2Url || '',  // 13: 외부2사진URL
+      ...getDiscordInfo('outside2', data.outside2Url),  // 14-16: 외부2사진Discord정보
+      data.managerUrl || '',  // 17: 점장사진URL
+      ...getDiscordInfo('manager', data.managerUrl),  // 18-20: 점장사진Discord정보
+      data.staff1Url || '',  // 21: 직원1사진URL
+      ...getDiscordInfo('staff1', data.staff1Url),  // 22-24: 직원1사진Discord정보
+      data.staff2Url || '',  // 25: 직원2사진URL
+      ...getDiscordInfo('staff2', data.staff2Url),  // 26-28: 직원2사진Discord정보
+      data.staff3Url || '',  // 29: 직원3사진URL
+      ...getDiscordInfo('staff3', data.staff3Url),  // 30-32: 직원3사진Discord정보
+      updatedAt  // 33: 수정일시
     ];
 
     if (rowIndex === -1) {
       await rateLimitedSheetsCall(() =>
         sheets.spreadsheets.values.append({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${CUSTOMER_STORE_PHOTO_SHEET_NAME}!A:J`,
+          range: `${CUSTOMER_STORE_PHOTO_SHEET_NAME}!A:AH`,
           valueInputOption: 'USER_ENTERED',
+          insertDataOption: 'INSERT_ROWS',
           resource: { values: [newRow] }
         })
       );
@@ -4653,7 +4727,7 @@ app.post('/api/direct/store-image', async (req, res) => {
       await rateLimitedSheetsCall(() =>
         sheets.spreadsheets.values.update({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${CUSTOMER_STORE_PHOTO_SHEET_NAME}!A${rowIndex + 1}:J${rowIndex + 1}`,
+          range: `${CUSTOMER_STORE_PHOTO_SHEET_NAME}!A${rowIndex + 1}:AH${rowIndex + 1}`,
           valueInputOption: 'USER_ENTERED',
           resource: { values: [newRow] }
         })
@@ -4860,7 +4934,96 @@ async function getOrCreateFolder(folderName, parentFolderId = null, driveId = nu
   }
 }
 
-// POST /api/direct/store-image/upload: 매장 사진 파일 업로드 (Google Drive)
+// 매장 사진용 Discord 업로드 함수
+async function uploadStorePhotoToDiscord(imageBuffer, filename, storeName, photoType) {
+  if (!DISCORD_LOGGING_ENABLED || !discordBot) {
+    throw new Error('Discord 봇이 초기화되지 않았습니다.');
+  }
+
+  // 봇이 준비될 때까지 대기
+  if (!discordBot.isReady()) {
+    for (let i = 0; i < 10; i++) {
+      if (discordBot.isReady()) break;
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+
+  if (!discordBot.isReady()) {
+    throw new Error('Discord 봇이 준비되지 않았습니다.');
+  }
+
+  try {
+    // 포럼 채널 가져오기
+    const forumChannelId = DISCORD_STORE_FORUM_CHANNEL_ID;
+    if (!forumChannelId) {
+      throw new Error('Discord 포럼 채널 ID가 설정되지 않았습니다.');
+    }
+
+    const forumChannel = await discordBot.channels.fetch(forumChannelId);
+    if (!forumChannel) {
+      throw new Error(`Discord 포럼 채널을 찾을 수 없습니다: ${forumChannelId}`);
+    }
+
+    // 매장명 포스트 찾기 또는 생성
+    const postName = `${storeName} 매장`;
+    let storePost;
+
+    try {
+      // 활성 스레드에서 찾기
+      const activeThreads = await forumChannel.threads.fetchActive();
+      storePost = Array.from(activeThreads.threads.values()).find(
+        thread => thread.name === postName
+      );
+
+      if (!storePost) {
+        // 아카이브된 스레드에서 찾기
+        try {
+          const archivedThreads = await forumChannel.threads.fetchArchived({ limit: 100 });
+          storePost = Array.from(archivedThreads.threads.values()).find(
+            thread => thread.name === postName
+          );
+        } catch (archivedError) {
+          console.warn('아카이브된 스레드 조회 실패:', archivedError);
+        }
+      }
+
+      if (!storePost) {
+        // 포스트 생성
+        console.log(`📌 [매장 사진 업로드] 새 포스트 생성: ${postName}`);
+        storePost = await forumChannel.threads.create({
+          name: postName,
+          message: {
+            content: `${storeName} 매장 사진 저장`
+          },
+          appliedTags: []
+        });
+        console.log(`✅ [매장 사진 업로드] 새 포스트 생성 완료: ${postName} (ID: ${storePost.id})`);
+      }
+    } catch (postError) {
+      console.error('❌ [매장 사진 업로드] 매장 포스트 찾기/생성 실패:', postError);
+      throw postError;
+    }
+
+    // 이미지 업로드
+    const { AttachmentBuilder } = require('discord.js');
+    const attachment = new AttachmentBuilder(imageBuffer, { name: filename });
+    const message = await storePost.send({ files: [attachment] });
+
+    const result = {
+      imageUrl: message.attachments.first().url,
+      messageId: message.id,  // Discord 메시지 ID 추가 (URL 갱신용)
+      postId: storePost.id,
+      threadId: storePost.id  // 포럼에서는 포스트 = 스레드
+    };
+
+    return result;
+  } catch (error) {
+    console.error('Discord 이미지 업로드 오류:', error);
+    throw error;
+  }
+}
+
+// POST /api/direct/store-image/upload: 매장 사진 파일 업로드 (Discord)
 app.post('/api/direct/store-image/upload', storeImageUpload.single('image'), async (req, res) => {
   let localFilePath = null;
   
@@ -4886,86 +5049,18 @@ app.post('/api/direct/store-image/upload', storeImageUpload.single('image'), asy
     const ext = path.extname(req.file.originalname);
     const fileName = `${safeStoreName}_${photoType}_${timestamp}${ext}`;
 
-    console.log(`📤 [매장 사진 업로드] Google Drive 업로드 시작: ${storeName} - ${photoType}`);
+    console.log(`📤 [매장 사진 업로드] Discord 업로드 시작: ${storeName} - ${photoType}`);
 
-    // 폴더 구조 생성: 어플자료 > 고객모드 > 매장명 > (매장사진 또는 직원사진)
-    // 1. 어플자료 폴더
-    const appDataFolder = await getOrCreateFolder('어플자료');
-    const appDataFolderId = appDataFolder.folderId || appDataFolder; // 하위 호환성
-    const appDataDriveId = appDataFolder.driveId || null;
-    console.log(`📁 [매장 사진 업로드] 어플자료 폴더 ID: ${appDataFolderId}${appDataDriveId ? `, Drive ID: ${appDataDriveId}` : ''}`);
-
-    // 2. 고객모드 폴더 (어플자료 안에)
-    const customerModeFolder = await getOrCreateFolder('고객모드', appDataFolderId, appDataDriveId);
-    const customerModeFolderId = customerModeFolder.folderId || customerModeFolder;
-    const customerModeDriveId = customerModeFolder.driveId || appDataDriveId;
-    console.log(`📁 [매장 사진 업로드] 고객모드 폴더 ID: ${customerModeFolderId}${customerModeDriveId ? `, Drive ID: ${customerModeDriveId}` : ''}`);
-
-    // 3. 매장명 폴더 (고객모드 안에)
-    const storeFolder = await getOrCreateFolder(storeName, customerModeFolderId, customerModeDriveId);
-    const storeFolderId = storeFolder.folderId || storeFolder;
-    const storeDriveId = storeFolder.driveId || customerModeDriveId;
-    console.log(`📁 [매장 사진 업로드] 매장명 폴더 ID: ${storeFolderId}${storeDriveId ? `, Drive ID: ${storeDriveId}` : ''}`);
-
-    // 4. 매장사진 또는 직원사진 폴더 (매장명 안에)
-    const photoCategory = ['front', 'inside', 'outside', 'outside2'].includes(photoType) 
-      ? '매장사진' 
-      : '직원사진';
-    const photoCategoryFolder = await getOrCreateFolder(photoCategory, storeFolderId, storeDriveId);
-    const photoCategoryFolderId = photoCategoryFolder.folderId || photoCategoryFolder;
-    const photoCategoryDriveId = photoCategoryFolder.driveId || storeDriveId;
-    console.log(`📁 [매장 사진 업로드] ${photoCategory} 폴더 ID: ${photoCategoryFolderId}${photoCategoryDriveId ? `, Drive ID: ${photoCategoryDriveId}` : ''}`);
-
-    // Shared Drive 확인 및 공유 폴더 시도
-    if (!photoCategoryDriveId) {
-      console.warn('⚠️ [매장 사진 업로드] 폴더가 개인 드라이브에 있습니다. 공유 폴더로 저장을 시도합니다...');
-      console.warn('⚠️ [매장 사진 업로드] 참고: Service Account는 일반적으로 개인 드라이브에 저장할 수 없지만, 공유 폴더인 경우 시도해봅니다.');
-      // driveId 없이 시도 (공유 폴더인 경우 작동할 수 있음)
-    }
-
-    // Google Drive에 파일 업로드 (해당 폴더에)
-    const fileMetadata = {
-      name: fileName,
-      parents: [photoCategoryFolderId]
-    };
+    // 파일 읽기
+    const fileBuffer = fs.readFileSync(localFilePath);
     
-    // Shared Drive에 있는 경우 driveId 지정
-    if (photoCategoryDriveId) {
-      fileMetadata.driveId = photoCategoryDriveId;
-    }
+    // Discord에 이미지 업로드
+    const discordResult = await uploadStorePhotoToDiscord(fileBuffer, fileName, storeName, photoType);
+    const fileUrl = discordResult.imageUrl;
 
-    const media = {
-      mimeType: req.file.mimetype,
-      body: fs.createReadStream(localFilePath)
-    };
+    console.log(`✅ [매장 사진 업로드] Discord 업로드 성공: ${storeName} - ${photoType} - ${fileUrl}`);
 
-    const driveResponse = await monitoredDriveCall('files.create', {
-      requestBody: fileMetadata,
-      media: media,
-      fields: 'id, name, webViewLink, webContentLink',
-      supportsAllDrives: true
-    });
-
-    const fileId = driveResponse.data.id;
-
-    // 파일을 공개로 설정 (누구나 링크로 접근 가능)
-    await monitoredDriveCall('permissions.create', {
-      fileId: fileId,
-      requestBody: {
-        role: 'reader',
-        type: 'anyone'
-      },
-      supportsAllDrives: true
-    });
-
-    // 공개 링크 생성 (직접 다운로드 링크)
-    const fileUrl = `https://drive.google.com/uc?export=view&id=${fileId}`;
-    // 또는 썸네일 링크: `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000`
-
-    console.log(`✅ [매장 사진 업로드] Google Drive 업로드 성공: ${storeName} - ${photoType} - ${fileUrl}`);
-    console.log(`📂 [매장 사진 업로드] 저장 경로: 어플자료 > 고객모드 > ${storeName} > ${photoCategory}`);
-
-    // 로컬 파일 삭제 (Google Drive에 저장되었으므로)
+    // 로컬 파일 삭제
     try {
       fs.unlinkSync(localFilePath);
       localFilePath = null;
@@ -4973,15 +5068,93 @@ app.post('/api/direct/store-image/upload', storeImageUpload.single('image'), asy
       console.warn('⚠️ 로컬 파일 삭제 실패 (무시 가능):', unlinkError);
     }
 
+    // Google Sheets에 저장 (Discord 정보 포함)
+    try {
+      const values = await getSheetValues(CUSTOMER_STORE_PHOTO_SHEET_NAME);
+      const updatedAt = new Date().toISOString().replace('T', ' ').substring(0, 19);
+      
+      // 헤더 확인 및 생성
+      const { ensureSheetHeaders } = require('./directRoutes');
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, CUSTOMER_STORE_PHOTO_SHEET_NAME, HEADERS_STORE_PHOTO);
+
+      const rowIndex = values ? values.findIndex(row => row[0] === storeName) : -1;
+      const existingRow = rowIndex !== -1 && values ? values[rowIndex] : null;
+      
+      // photoType에 따른 컬럼 인덱스 매핑
+      const photoTypeMap = {
+        front: { url: 1, msgId: 2, postId: 3, threadId: 4 },
+        inside: { url: 5, msgId: 6, postId: 7, threadId: 8 },
+        outside: { url: 9, msgId: 10, postId: 11, threadId: 12 },
+        outside2: { url: 13, msgId: 14, postId: 15, threadId: 16 },
+        manager: { url: 17, msgId: 18, postId: 19, threadId: 20 },
+        staff1: { url: 21, msgId: 22, postId: 23, threadId: 24 },
+        staff2: { url: 25, msgId: 26, postId: 27, threadId: 28 },
+        staff3: { url: 29, msgId: 30, postId: 31, threadId: 32 }
+      };
+      
+      const photoMap = photoTypeMap[photoType];
+      if (!photoMap) {
+        console.warn(`⚠️ [매장 사진 업로드] 알 수 없는 photoType: ${photoType}`);
+      } else {
+        if (rowIndex === -1) {
+          // 새 행 생성 (모든 컬럼 초기화)
+          const newRow = new Array(34).fill('');
+          newRow[0] = storeName;
+          newRow[photoMap.url] = fileUrl;
+          newRow[photoMap.msgId] = discordResult.messageId || '';
+          newRow[photoMap.postId] = discordResult.postId || '';
+          newRow[photoMap.threadId] = discordResult.threadId || '';
+          newRow[33] = updatedAt;
+          
+          await rateLimitedSheetsCall(() =>
+            sheets.spreadsheets.values.append({
+              spreadsheetId: SPREADSHEET_ID,
+              range: `${CUSTOMER_STORE_PHOTO_SHEET_NAME}!A:AH`,
+              valueInputOption: 'USER_ENTERED',
+              insertDataOption: 'INSERT_ROWS',
+              resource: { values: [newRow] }
+            })
+          );
+          console.log(`✅ [매장 사진 업로드] Google Sheets 새 행 추가 성공`);
+        } else {
+          // 기존 행 업데이트 (해당 photoType의 URL과 Discord 정보만 업데이트)
+          const updatedRow = [...existingRow];
+          // 배열 길이가 부족하면 확장
+          while (updatedRow.length < 34) {
+            updatedRow.push('');
+          }
+          updatedRow[photoMap.url] = fileUrl;
+          updatedRow[photoMap.msgId] = discordResult.messageId || '';
+          updatedRow[photoMap.postId] = discordResult.postId || '';
+          updatedRow[photoMap.threadId] = discordResult.threadId || '';
+          updatedRow[33] = updatedAt;
+          
+          await rateLimitedSheetsCall(() =>
+            sheets.spreadsheets.values.update({
+              spreadsheetId: SPREADSHEET_ID,
+              range: `${CUSTOMER_STORE_PHOTO_SHEET_NAME}!A${rowIndex + 1}:AH${rowIndex + 1}`,
+              valueInputOption: 'USER_ENTERED',
+              resource: { values: [updatedRow] }
+            })
+          );
+          console.log(`✅ [매장 사진 업로드] Google Sheets 업데이트 성공`);
+        }
+      }
+    } catch (sheetError) {
+      console.error('❌ [매장 사진 업로드] Google Sheets 저장 오류:', sheetError);
+      // Discord 업로드는 성공했으므로 계속 진행
+    }
+
     res.json({
       success: true,
       url: fileUrl,
-      fileId: fileId,
-      filename: fileName,
-      folderPath: `어플자료 > 고객모드 > ${storeName} > ${photoCategory}`
+      messageId: discordResult.messageId,
+      postId: discordResult.postId,
+      threadId: discordResult.threadId,
+      filename: fileName
     });
   } catch (error) {
-    console.error('❌ [매장 사진 업로드] Google Drive 업로드 오류:', error);
+    console.error('❌ [매장 사진 업로드] Discord 업로드 오류:', error);
     
     // 로컬 파일 삭제
     if (localFilePath && fs.existsSync(localFilePath)) {
@@ -5311,7 +5484,7 @@ app.get('/api/direct/mobiles', async (req, res) => {
     const imageResponse = await rateLimitedSheetsCall(() =>
       sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
-        range: '직영점_모델이미지!A:G'
+        range: '직영점_모델이미지!A:K'
       })
     );
 
@@ -5977,11 +6150,66 @@ async function findOrCreateManufacturerThread(post, manufacturer) {
   }
 }
 
-// POST /api/direct/upload-image: 이미지 업로드 (Google Drive)
+// 직영점 모드용 Discord 이미지 업로드 함수
+async function uploadImageToDiscordForStore(imageBuffer, filename, carrier, manufacturer) {
+  if (!DISCORD_LOGGING_ENABLED || !discordBot) {
+    throw new Error('Discord 봇이 초기화되지 않았습니다.');
+  }
+
+  // 봇이 준비될 때까지 대기
+  if (!discordBot.isReady()) {
+    for (let i = 0; i < 10; i++) {
+      if (discordBot.isReady()) break;
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+
+  if (!discordBot.isReady()) {
+    throw new Error('Discord 봇이 준비되지 않았습니다.');
+  }
+
+  try {
+    // 포럼 채널 가져오기
+    const forumChannelId = DISCORD_STORE_FORUM_CHANNEL_ID;
+    if (!forumChannelId) {
+      throw new Error('Discord 포럼 채널 ID가 설정되지 않았습니다.');
+    }
+
+    const forumChannel = await discordBot.channels.fetch(forumChannelId);
+    if (!forumChannel) {
+      throw new Error(`Discord 포럼 채널을 찾을 수 없습니다: ${forumChannelId}`);
+    }
+
+    // 통신사별 포스트 찾기 또는 생성
+    const carrierPost = await findOrCreateCarrierPost(forumChannel, carrier);
+
+    // 제조사별 스레드 찾기 또는 생성 (현재는 포스트를 그대로 사용)
+    const thread = await findOrCreateManufacturerThread(carrierPost, manufacturer);
+
+    // 이미지 업로드
+    const { AttachmentBuilder } = require('discord.js');
+    const attachment = new AttachmentBuilder(imageBuffer, { name: filename });
+    const message = await thread.send({ files: [attachment] });
+
+    const result = {
+      imageUrl: message.attachments.first().url,
+      messageId: message.id,  // Discord 메시지 ID 추가 (URL 갱신용)
+      postId: carrierPost.id,
+      threadId: thread.id
+    };
+
+    return result;
+  } catch (error) {
+    console.error('Discord 이미지 업로드 오류:', error);
+    throw error;
+  }
+}
+
+// POST /api/direct/upload-image: 이미지 업로드 (Discord)
 app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (req, res) => {
   const startTime = Date.now();
   let imageUrl = null;
-  let localFilePath = null;
+  let discordResult = null;
 
   try {
     console.log('📤 [상품 이미지 업로드] 요청 시작');
@@ -6020,29 +6248,9 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
     const ext = path.extname(req.file.originalname);
     const fileName = `${safeModelId}_${timestamp}${ext}`;
 
-    console.log(`📤 [상품 이미지 업로드] Google Drive 업로드 시작: ${carrier} - ${modelId}`);
+    console.log(`📤 [상품 이미지 업로드] Discord 업로드 시작: ${carrier} - ${modelId}`);
 
-    // 폴더 구조 생성: 어플자료 > 상품이미지 > 통신사명
-    // 1. 어플자료 폴더
-    const appDataFolder = await getOrCreateFolder('어플자료');
-    const appDataFolderId = appDataFolder.folderId || appDataFolder; // 하위 호환성
-    const appDataDriveId = appDataFolder.driveId || null;
-    console.log(`📁 [상품 이미지 업로드] 어플자료 폴더 ID: ${appDataFolderId}${appDataDriveId ? `, Drive ID: ${appDataDriveId}` : ''}`);
-
-    // 2. 상품이미지 폴더 (어플자료 안에)
-    const productImageFolder = await getOrCreateFolder('상품이미지', appDataFolderId, appDataDriveId);
-    const productImageFolderId = productImageFolder.folderId || productImageFolder;
-    const productImageDriveId = productImageFolder.driveId || appDataDriveId;
-    console.log(`📁 [상품 이미지 업로드] 상품이미지 폴더 ID: ${productImageFolderId}${productImageDriveId ? `, Drive ID: ${productImageDriveId}` : ''}`);
-
-    // 3. 통신사명 폴더 (상품이미지 안에)
-    const carrierFolder = await getOrCreateFolder(carrier, productImageFolderId, productImageDriveId);
-    const carrierFolderId = carrierFolder.folderId || carrierFolder;
-    const carrierDriveId = carrierFolder.driveId || productImageDriveId;
-    console.log(`📁 [상품 이미지 업로드] 통신사명 폴더 ID: ${carrierFolderId}${carrierDriveId ? `, Drive ID: ${carrierDriveId}` : ''}`);
-
-    // Google Drive에 파일 업로드 (해당 폴더에)
-    // memoryStorage를 사용하므로 req.file.buffer를 스트림으로 변환
+    // Discord에 이미지 업로드
     const fileBuffer = req.file.buffer;
     
     if (!fileBuffer) {
@@ -6053,53 +6261,10 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
       });
     }
 
-    // Shared Drive 확인 및 공유 폴더 시도
-    if (!carrierDriveId) {
-      console.warn('⚠️ [상품 이미지 업로드] 폴더가 개인 드라이브에 있습니다. 공유 폴더로 저장을 시도합니다...');
-      console.warn('⚠️ [상품 이미지 업로드] 참고: Service Account는 일반적으로 개인 드라이브에 저장할 수 없지만, 공유 폴더인 경우 시도해봅니다.');
-      // driveId 없이 시도 (공유 폴더인 경우 작동할 수 있음)
-    }
+    discordResult = await uploadImageToDiscordForStore(fileBuffer, fileName, carrier, manufacturer);
+    imageUrl = discordResult.imageUrl;
 
-    const fileMetadata = {
-      name: fileName,
-      parents: [carrierFolderId]
-    };
-    
-    // Shared Drive에 있는 경우 driveId 지정
-    if (carrierDriveId) {
-      fileMetadata.driveId = carrierDriveId;
-    }
-
-    const media = {
-      mimeType: req.file.mimetype,
-      body: Readable.from(fileBuffer)
-    };
-
-    const driveResponse = await monitoredDriveCall('files.create', {
-      requestBody: fileMetadata,
-      media: media,
-      fields: 'id, name, webViewLink, webContentLink',
-      supportsAllDrives: true
-    });
-
-    const fileId = driveResponse.data.id;
-
-    // 파일을 공개로 설정 (누구나 링크로 접근 가능)
-    await monitoredDriveCall('permissions.create', {
-      fileId: fileId,
-      requestBody: {
-        role: 'reader',
-        type: 'anyone'
-      },
-      supportsAllDrives: true
-    });
-
-    // 공개 링크 생성 (직접 다운로드 링크)
-    imageUrl = `https://drive.google.com/uc?export=view&id=${fileId}`;
-    // 또는 썸네일 링크: `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000`
-
-    console.log(`✅ [상품 이미지 업로드] Google Drive 업로드 성공: ${carrier} - ${modelId} - ${imageUrl}`);
-    console.log(`📂 [상품 이미지 업로드] 저장 경로: 어플자료 > 상품이미지 > ${carrier}`);
+    console.log(`✅ [상품 이미지 업로드] Discord 업로드 성공: ${carrier} - ${modelId} - ${imageUrl}`);
 
     // memoryStorage를 사용하므로 로컬 파일 삭제 불필요
 
@@ -6113,16 +6278,22 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
     }
 
     // 직영점_모델이미지 시트에 저장/업데이트
-    // 컬럼 구조: 통신사(A) | 모델ID(B) | 모델명(C) | 펫네임(D) | 제조사(E) | 이미지URL(F) | 비고(G)
+    // 컬럼 구조: 통신사(A) | 모델ID(B) | 모델명(C) | 펫네임(D) | 제조사(E) | 이미지URL(F) | 비고(G) | 색상(H) | Discord메시지ID(I) | Discord포스트ID(J) | Discord스레드ID(K)
     let sheetSaveSuccess = false;
     try {
       console.log(`📝 [상품 이미지 업로드] Google Sheets에 저장 시작: ${modelId}`);
 
-      // 기존 데이터 조회 (A:G 범위로 변경)
+      // 헤더 확인 및 생성
+      const directRoutes = require('./directRoutes');
+      const { ensureSheetHeaders } = directRoutes;
+      const { HEADERS_MOBILE_IMAGES } = require('./directRoutes');
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, '직영점_모델이미지', HEADERS_MOBILE_IMAGES);
+
+      // 기존 데이터 조회 (A:K 범위)
       const imageResponse = await rateLimitedSheetsCall(() =>
         sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
-          range: '직영점_모델이미지!A:G'
+          range: '직영점_모델이미지!A:K'
         })
       );
 
@@ -6161,16 +6332,23 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
           rowModelId === modelId || rowModelName === modelName);
       });
 
-      // 7개 컬럼 데이터 구성: 통신사 | 모델ID | 모델명 | 펫네임 | 제조사 | 이미지URL | 비고
-      // 모델ID는 참고용으로 저장하되, 실제 조회는 통신사+모델명 조합으로 함
+      // 기존 행이 있으면 기존 색상 값 보존
+      const existingRow = existingRowIndex !== -1 ? rows[existingRowIndex] : null;
+      const existingColor = existingRow && existingRow[7] ? existingRow[7] : '';
+
+      // 11개 컬럼 데이터 구성: 통신사 | 모델ID | 모델명 | 펫네임 | 제조사 | 이미지URL | 비고 | 색상 | Discord메시지ID | Discord포스트ID | Discord스레드ID
       const newRow = [
-        carrier,           // A: 통신사
-        modelId,           // B: 모델ID (참고용, 동적으로 변할 수 있음)
-        modelName,         // C: 모델명 (실제 조회 키)
-        petName,           // D: 펫네임
-        manufacturer,      // E: 제조사
-        imageUrl,          // F: 이미지URL
-        ''                 // G: 비고 (빈 값)
+        carrier,                    // A: 통신사
+        modelId,                   // B: 모델ID (참고용, 동적으로 변할 수 있음)
+        modelName,                 // C: 모델명 (실제 조회 키)
+        petName,                   // D: 펫네임
+        manufacturer,              // E: 제조사
+        imageUrl,                  // F: 이미지URL
+        '',                        // G: 비고 (빈 값)
+        existingColor,             // H: 색상 (기존 값 보존)
+        discordResult.messageId || '',  // I: Discord메시지ID
+        discordResult.postId || '',     // J: Discord포스트ID
+        discordResult.threadId || ''    // K: Discord스레드ID
       ];
 
       if (existingRowIndex !== -1) {
@@ -6179,7 +6357,7 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
         await rateLimitedSheetsCall(() =>
           sheets.spreadsheets.values.update({
             spreadsheetId: SPREADSHEET_ID,
-            range: `직영점_모델이미지!A${existingRowIndex + 2}:G${existingRowIndex + 2}`,
+            range: `직영점_모델이미지!A${existingRowIndex + 2}:K${existingRowIndex + 2}`,
             valueInputOption: 'USER_ENTERED',
             resource: {
               values: [newRow]
@@ -6194,7 +6372,7 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
         await rateLimitedSheetsCall(() =>
           sheets.spreadsheets.values.append({
             spreadsheetId: SPREADSHEET_ID,
-            range: '직영점_모델이미지!A:G',
+            range: '직영점_모델이미지!A:K',
             valueInputOption: 'USER_ENTERED',
             insertDataOption: 'INSERT_ROWS',
             resource: {
@@ -6212,10 +6390,14 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
           console.log(`📝 [상품 이미지 업로드] 직영점_단말마스터 시트 업데이트 시작: ${modelId}`);
 
           // 직영점_단말마스터 시트에서 해당 모델 찾기
+          // 헤더 확인 및 생성
+          const { HEADERS_MOBILE_MASTER } = require('./directRoutes');
+          await ensureSheetHeaders(sheets, SPREADSHEET_ID, '직영점_단말마스터', HEADERS_MOBILE_MASTER);
+
           const masterResponse = await rateLimitedSheetsCall(() =>
             sheets.spreadsheets.values.get({
               spreadsheetId: SPREADSHEET_ID,
-              range: '직영점_단말마스터!A:O'
+              range: '직영점_단말마스터!A:R'
             })
           );
 
@@ -6247,17 +6429,26 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
 
           if (existingMasterRowIndex !== -1) {
             // 이미지URL은 13번째 컬럼(M) → zero-based index 12
+            // Discord 정보는 P, Q, R 컬럼 (인덱스 15, 16, 17)
             const targetRowNumber = existingMasterRowIndex + 2; // 데이터 시작이 2행
-            const targetCell = `직영점_단말마스터!M${targetRowNumber}`;
+            const existingMasterRow = masterRows[existingMasterRowIndex];
+            
+            // 기존 행 데이터 가져오기 (이미지URL과 Discord 정보만 업데이트)
+            const updatedRow = [...existingMasterRow];
+            updatedRow[12] = imageUrl;  // M: 이미지URL
+            updatedRow[15] = discordResult.messageId || '';  // P: Discord메시지ID
+            updatedRow[16] = discordResult.postId || '';     // Q: Discord포스트ID
+            updatedRow[17] = discordResult.threadId || '';   // R: Discord스레드ID
+            
             await rateLimitedSheetsCall(() =>
               sheets.spreadsheets.values.update({
                 spreadsheetId: SPREADSHEET_ID,
-                range: targetCell,
+                range: `직영점_단말마스터!A${targetRowNumber}:R${targetRowNumber}`,
                 valueInputOption: 'USER_ENTERED',
-                resource: { values: [[imageUrl]] }
+                resource: { values: [updatedRow] }
               })
             );
-            console.log(`✅ [상품 이미지 업로드] 직영점_단말마스터 시트 이미지URL 업데이트 성공: 행 ${targetRowNumber}`);
+            console.log(`✅ [상품 이미지 업로드] 직영점_단말마스터 시트 업데이트 성공: 행 ${targetRowNumber} (이미지URL + Discord 정보)`);
           } else {
             console.warn(`⚠️ [상품 이미지 업로드] 직영점_단말마스터 시트에서 모델 ${modelId} (${carrier})을(를) 찾을 수 없어 이미지URL을 업데이트하지 못했습니다.`);
           }
@@ -6284,7 +6475,7 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
       console.error('❌ [상품 이미지 업로드] Google Sheets 저장 오류:', sheetError);
       console.error('❌ [상품 이미지 업로드] 스택 트레이스:', sheetError.stack);
 
-      // Google Drive 업로드는 성공했지만 Google Sheets 저장 실패
+      // Discord 업로드는 성공했지만 Google Sheets 저장 실패
       // 최신 데이터 반영을 위해 캐시는 무효화 (다음 요청 시 구글시트에서 다시 읽음)
       try {
         const { invalidateDirectStoreCache } = require('./directRoutes');
@@ -6296,18 +6487,18 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
 
       // 사용자에게 경고와 함께 성공 응답 반환 (이미지 URL은 사용 가능)
       const elapsedTime = Date.now() - startTime;
-      console.warn(`⚠️ [상품 이미지 업로드] Google Drive 업로드는 성공했지만 Google Sheets 저장 실패 (${elapsedTime}ms)`);
+      console.warn(`⚠️ [상품 이미지 업로드] Discord 업로드는 성공했지만 Google Sheets 저장 실패 (${elapsedTime}ms)`);
 
       return res.status(200).json({
         success: true,
         imageUrl: imageUrl,
         modelId: modelId,
-        warning: 'Google Drive에는 업로드되었지만 Google Sheets 저장에 실패했습니다. 이미지 URL은 사용 가능합니다.'
+        warning: 'Discord에는 업로드되었지만 Google Sheets 저장에 실패했습니다. 이미지 URL은 사용 가능합니다.'
       });
     }
 
     const elapsedTime = Date.now() - startTime;
-    console.log(`✅ [상품 이미지 업로드] 완료 (${elapsedTime}ms) - Google Drive: 성공, Sheets: ${sheetSaveSuccess}`);
+    console.log(`✅ [상품 이미지 업로드] 완료 (${elapsedTime}ms) - Discord: 성공, Sheets: ${sheetSaveSuccess}`);
 
     return res.json({
       success: true,
@@ -6332,6 +6523,71 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
       success: false,
       error: `이미지 업로드에 실패했습니다: ${error.message}`,
       details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
+// GET /api/discord/refresh-image-url: Discord 이미지 URL 갱신 API
+app.get('/api/discord/refresh-image-url', async (req, res) => {
+  try {
+    const { threadId, messageId } = req.query;
+    
+    if (!threadId || !messageId) {
+      return res.status(400).json({
+        success: false,
+        error: 'threadId와 messageId가 필요합니다.'
+      });
+    }
+    
+    if (!DISCORD_LOGGING_ENABLED || !discordBot) {
+      return res.status(503).json({
+        success: false,
+        error: 'Discord 봇이 초기화되지 않았습니다.'
+      });
+    }
+    
+    if (!discordBot.isReady()) {
+      return res.status(503).json({
+        success: false,
+        error: 'Discord 봇이 준비되지 않았습니다.'
+      });
+    }
+    
+    const thread = await discordBot.channels.fetch(threadId);
+    if (!thread) {
+      return res.status(404).json({
+        success: false,
+        error: '해당 스레드를 찾을 수 없습니다.'
+      });
+    }
+    
+    const message = await thread.messages.fetch(messageId);
+    if (!message) {
+      return res.status(404).json({
+        success: false,
+        error: '해당 메시지를 찾을 수 없습니다.'
+      });
+    }
+    
+    const attachment = message.attachments.first();
+    if (!attachment) {
+      return res.status(404).json({
+        success: false,
+        error: '첨부파일을 찾을 수 없습니다.'
+      });
+    }
+    
+    return res.json({
+      success: true,
+      imageUrl: attachment.url,
+      messageId: message.id,
+      threadId: thread.id
+    });
+  } catch (error) {
+    console.error('Discord URL 갱신 오류:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message
     });
   }
 });

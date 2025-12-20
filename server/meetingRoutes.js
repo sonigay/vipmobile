@@ -463,7 +463,7 @@ async function getMeetingConfig(req, res) {
 
     // 시트 헤더 확인 (tabLabel, subTabLabel, 세부항목옵션, videoUrl 컬럼 추가)
     await ensureSheetHeaders(sheets, SPREADSHEET_ID, sheetName, [
-      '회의ID', '슬라이드ID', '순서', '타입', '모드', '탭', '제목', '내용', '배경색', '이미지URL', '동영상URL', '캡처시간', 'Discord포스트ID', 'Discord스레드ID', '탭라벨', '서브탭라벨', '세부항목옵션', '회의날짜', '회의차수', '회의장소', '참석자', '생성자'
+      '회의ID', '슬라이드ID', '순서', '타입', '모드', '탭', '제목', '내용', '배경색', '이미지URL', '동영상URL', '캡처시간', 'Discord포스트ID', 'Discord스레드ID', 'Discord메시지ID', '탭라벨', '서브탭라벨', '세부항목옵션', '회의날짜', '회의차수', '회의장소', '참석자', '생성자'
     ]);
 
     // 데이터 조회 (tabLabel, subTabLabel, 세부항목옵션, videoUrl 컬럼 포함)
@@ -589,11 +589,11 @@ async function saveMeetingConfig(req, res) {
 
     // 시트 헤더 확인 (tabLabel, subTabLabel, 세부항목옵션, videoUrl 컬럼 추가)
     await ensureSheetHeaders(sheets, SPREADSHEET_ID, sheetName, [
-      '회의ID', '슬라이드ID', '순서', '타입', '모드', '탭', '제목', '내용', '배경색', '이미지URL', '동영상URL', '캡처시간', 'Discord포스트ID', 'Discord스레드ID', '탭라벨', '서브탭라벨', '세부항목옵션', '회의날짜', '회의차수', '회의장소', '참석자', '생성자'
+      '회의ID', '슬라이드ID', '순서', '타입', '모드', '탭', '제목', '내용', '배경색', '이미지URL', '동영상URL', '캡처시간', 'Discord포스트ID', 'Discord스레드ID', 'Discord메시지ID', '탭라벨', '서브탭라벨', '세부항목옵션', '회의날짜', '회의차수', '회의장소', '참석자', '생성자'
     ]);
 
-    // 기존 데이터 조회 (메인 슬라이드 필드 및 tabLabel, subTabLabel, 세부항목옵션, videoUrl 포함, 재시도 포함)
-    const range = `${sheetName}!A3:V`;
+    // 기존 데이터 조회 (메인 슬라이드 필드 및 tabLabel, subTabLabel, 세부항목옵션, videoUrl, Discord메시지ID 포함, 재시도 포함)
+    const range = `${sheetName}!A3:W`;
     const response = await retrySheetsOperation(async () => {
       return await sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
@@ -696,12 +696,14 @@ async function saveMeetingConfig(req, res) {
       const existingCapturedAt = existingRow ? (existingRow[11] || '') : '';
       const existingDiscordPostId = existingRow ? (existingRow[12] || '') : '';
       const existingDiscordThreadId = existingRow ? (existingRow[13] || '') : '';
+      const existingDiscordMessageId = existingRow ? (existingRow[14] || '') : '';
 
       const incomingImageUrl = slide.imageUrl && slide.imageUrl !== '없음' ? slide.imageUrl : '';
       const incomingVideoUrl = slide.videoUrl && slide.videoUrl !== '없음' ? slide.videoUrl : '';
       const incomingCapturedAt = slide.capturedAt || '';
       const incomingDiscordPostId = slide.discordPostId && slide.discordPostId !== '없음' ? slide.discordPostId : '';
       const incomingDiscordThreadId = slide.discordThreadId && slide.discordThreadId !== '없음' ? slide.discordThreadId : '';
+      const incomingDiscordMessageId = slide.discordMessageId && slide.discordMessageId !== '없음' ? slide.discordMessageId : '';
 
       const mergedImageUrl =
         incomingImageUrl ||
@@ -716,6 +718,9 @@ async function saveMeetingConfig(req, res) {
       const mergedDiscordThreadId =
         incomingDiscordThreadId ||
         (existingDiscordThreadId && existingDiscordThreadId !== '없음' ? existingDiscordThreadId : '');
+      const mergedDiscordMessageId =
+        incomingDiscordMessageId ||
+        (existingDiscordMessageId && existingDiscordMessageId !== '없음' ? existingDiscordMessageId : '');
 
       const newRow = [
         meetingId,
@@ -732,6 +737,7 @@ async function saveMeetingConfig(req, res) {
         mergedCapturedAt,
         mergedDiscordPostId,
         mergedDiscordThreadId,
+        mergedDiscordMessageId, // Discord 메시지 ID
         slide.tabLabel || '', // 탭라벨
         slide.subTabLabel || '', // 서브탭라벨
         slide.detailLabel || '', // 세부항목옵션 (예: "코드별 실적", "사무실별 실적" 등)
@@ -743,8 +749,8 @@ async function saveMeetingConfig(req, res) {
       ];
 
       if (existingRowIndex !== -1) {
-        // 기존 슬라이드 업데이트 (메인 슬라이드 필드 및 tabLabel, subTabLabel, 세부항목옵션, videoUrl 포함, 재시도 포함)
-        const updateRange = `${sheetName}!A${existingRowIndex + 3}:V${existingRowIndex + 3}`;
+        // 기존 슬라이드 업데이트 (메인 슬라이드 필드 및 tabLabel, subTabLabel, 세부항목옵션, videoUrl, Discord메시지ID 포함, 재시도 포함)
+        const updateRange = `${sheetName}!A${existingRowIndex + 3}:W${existingRowIndex + 3}`;
         console.log(`📝 [saveMeetingConfig] 기존 슬라이드 업데이트 시작: 범위 ${updateRange}`);
         const updateResult = await retrySheetsOperation(async () => {
           return await sheets.spreadsheets.values.update({
@@ -1215,6 +1221,7 @@ async function uploadImageToDiscord(imageBuffer, filename, meetingId, meetingDat
 
     const result = {
       imageUrl: message.attachments.first().url,
+      messageId: message.id,  // Discord 메시지 ID 추가 (URL 갱신용)
       postId: post.id,
       threadId: thread.id
     };
@@ -1341,7 +1348,7 @@ async function uploadMeetingImage(req, res) {
         // 전체 슬라이드 수 확인 (엔딩 슬라이드 판별용)
         const { sheets, SPREADSHEET_ID } = createSheetsClient();
         const sheetName = '회의설정';
-        const range = `${sheetName}!A3:V`;
+        const range = `${sheetName}!A3:W`;
         const response = await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
           range
@@ -1432,7 +1439,7 @@ async function uploadMeetingImage(req, res) {
       if (!isTempMeeting && slideOrder !== undefined) {
         const { sheets, SPREADSHEET_ID } = createSheetsClient();
         const sheetName = '회의설정';
-        const range = `${sheetName}!A3:V`;
+        const range = `${sheetName}!A3:W`;
         const response = await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
           range

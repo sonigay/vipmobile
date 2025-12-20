@@ -59,7 +59,23 @@ const HEADERS_MOBILE_MASTER = [
   'isCheap',        // 11
   '이미지URL',        // 12
   '사용여부',         // 13
-  '비고'             // 14
+  '비고',            // 14
+  'Discord메시지ID',  // 15
+  'Discord포스트ID',  // 16
+  'Discord스레드ID'   // 17
+];
+const HEADERS_MOBILE_IMAGES = [
+  '통신사',          // 0
+  '모델ID',          // 1
+  '모델명',          // 2
+  '펫네임',          // 3
+  '제조사',          // 4
+  '이미지URL',        // 5
+  '비고',            // 6
+  '색상',            // 7
+  'Discord메시지ID',  // 8
+  'Discord포스트ID',  // 9
+  'Discord스레드ID'   // 10
 ];
 const HEADERS_MOBILE_PRICING = [
   '통신사',                     // 0
@@ -442,7 +458,7 @@ async function rebuildDeviceMaster(carriersParam) {
 
   try {
     const imagesRes = await withRetry(async () => {
-      return await sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: SHEET_MOBILE_IMAGES });
+      return await sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `${SHEET_MOBILE_IMAGES}!A:K` });
     });
     const imageRows = (imagesRes.data.values || []).slice(1);
     for (const row of imageRows) {
@@ -1804,7 +1820,7 @@ function setupDirectRoutes(app) {
       const response = await withRetry(async () => {
         return await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
-          range: SHEET_MOBILE_MASTER
+          range: `${SHEET_MOBILE_MASTER}!A:R`
         });
       });
 
@@ -3442,7 +3458,7 @@ function setupDirectRoutes(app) {
       const [imageRes, todaysRes] = await Promise.all([
         sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
-          range: '직영점_모델이미지!A:G'
+          range: '직영점_모델이미지!A:K'
         }).catch((err) => {
           console.error(`[Direct] ⚠️ 직영점_모델이미지 시트 읽기 실패:`, err.message);
           return { data: { values: [] } };
@@ -5940,3 +5956,6 @@ function setupDirectRoutes(app) {
 module.exports = setupDirectRoutes;
 module.exports.invalidateDirectStoreCache = invalidateDirectStoreCache;
 module.exports.deleteCache = deleteCache;
+module.exports.ensureSheetHeaders = ensureSheetHeaders;
+module.exports.HEADERS_MOBILE_IMAGES = HEADERS_MOBILE_IMAGES;
+module.exports.HEADERS_MOBILE_MASTER = HEADERS_MOBILE_MASTER;
