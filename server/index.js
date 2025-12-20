@@ -4905,7 +4905,8 @@ app.post('/api/direct/store-image/upload', storeImageUpload.single('image'), asy
       requestBody: {
         role: 'reader',
         type: 'anyone'
-      }
+      },
+      supportsAllDrives: true
     });
 
     // 공개 링크 생성 (직접 다운로드 링크)
@@ -6033,7 +6034,8 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
       requestBody: {
         role: 'reader',
         type: 'anyone'
-      }
+      },
+      supportsAllDrives: true
     });
 
     // 공개 링크 생성 (직접 다운로드 링크)
