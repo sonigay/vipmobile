@@ -590,26 +590,125 @@ ${loggedInStore.name}으로 이동 예정입니다.
     const inventoryByAge = getInventoryByAge(store);
     const hasInventory = inventoryCount > 0;
 
+    // 고객모드/직영점모드/직영점관리모드 여부 확인
+    const isCustomerOrDirectStoreMode = isCustomerMode || (!isAgentMode && !isOfficeStore);
+
     let fillColor, strokeColor, radius, iconStyle, urgencyIcon = '';
 
-    // 출고일 기준 긴급도 아이콘 결정 (비중 기준)
-    const totalFilteredInventory = inventoryByAge.within30 + inventoryByAge.within60 + inventoryByAge.over60;
+    // 출고일 기준 긴급도 아이콘 결정 (비중 기준) - 관리자모드/일반모드에서만 사용
+    if (!isCustomerOrDirectStoreMode) {
+      const totalFilteredInventory = inventoryByAge.within30 + inventoryByAge.within60 + inventoryByAge.over60;
 
-    if (totalFilteredInventory > 0) {
-      // 비중이 가장 높은 카테고리로 결정
-      const within30Ratio = inventoryByAge.within30 / totalFilteredInventory;
-      const within60Ratio = inventoryByAge.within60 / totalFilteredInventory;
-      const over60Ratio = inventoryByAge.over60 / totalFilteredInventory;
+      if (totalFilteredInventory > 0) {
+        // 비중이 가장 높은 카테고리로 결정
+        const within30Ratio = inventoryByAge.within30 / totalFilteredInventory;
+        const within60Ratio = inventoryByAge.within60 / totalFilteredInventory;
+        const over60Ratio = inventoryByAge.over60 / totalFilteredInventory;
 
-      if (over60Ratio >= within30Ratio && over60Ratio >= within60Ratio) {
-        urgencyIcon = '⚠️';
-      } else if (within60Ratio >= within30Ratio) {
-        urgencyIcon = '⚡';
-      } else {
-        urgencyIcon = '✅';
+        if (over60Ratio >= within30Ratio && over60Ratio >= within60Ratio) {
+          urgencyIcon = '⚠️';
+        } else if (within60Ratio >= within30Ratio) {
+          urgencyIcon = '⚡';
+        } else {
+          urgencyIcon = '✅';
+        }
       }
     }
 
+    // 고객모드/직영점모드/직영점관리모드: 대중교통 스타일 마커 (핀 모양)
+    if (isCustomerOrDirectStoreMode) {
+      // 선택된 매장
+      if (isSelected) {
+        fillColor = '#2196f3';
+        strokeColor = '#1976d2';
+      }
+      // 로그인한 매장
+      else if (isLoggedInStore) {
+        fillColor = '#9c27b0';
+        strokeColor = '#7b1fa2';
+      }
+      // 요청점
+      else if (isRequestedStore) {
+        fillColor = '#ff9800';
+        strokeColor = '#f57c00';
+      }
+      // 일반 매장 - 재고수량에 따라 색상 조정 (단순화)
+      else {
+        fillColor = hasInventory ? '#4caf50' : '#9e9e9e';
+        strokeColor = hasInventory ? '#388e3c' : '#757575';
+      }
+
+      // 대중교통 스타일 핀 마커 (역삼각형 + 원형)
+      const pinSize = isSelected || isLoggedInStore || isRequestedStore ? 32 : 28;
+      const circleRadius = pinSize * 0.4;
+      const triangleHeight = pinSize * 0.6;
+      const triangleWidth = pinSize * 0.7;
+
+      return L.divIcon({
+        className: 'custom-marker customer-mode-marker',
+        html: `
+          <div style="
+            position: relative;
+            width: ${pinSize}px;
+            height: ${pinSize}px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            filter: drop-shadow(0 3px 6px rgba(0,0,0,0.4));
+          ">
+            <!-- 원형 부분 -->
+            <div style="
+              width: ${circleRadius * 2}px;
+              height: ${circleRadius * 2}px;
+              background-color: ${fillColor};
+              border: 3px solid ${strokeColor};
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              color: white;
+              font-weight: bold;
+              font-size: ${hasInventory && inventoryCount > 0 ? '11px' : '0px'};
+              z-index: 2;
+              position: relative;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            ">
+              ${hasInventory && inventoryCount > 0 ? inventoryCount : ''}
+            </div>
+            <!-- 역삼각형 부분 (핀) -->
+            <div style="
+              position: absolute;
+              top: ${circleRadius * 2 - 2}px;
+              left: 50%;
+              transform: translateX(-50%);
+              width: 0;
+              height: 0;
+              border-left: ${triangleWidth / 2}px solid transparent;
+              border-right: ${triangleWidth / 2}px solid transparent;
+              border-top: ${triangleHeight}px solid ${fillColor};
+              z-index: 1;
+            "></div>
+            <!-- 역삼각형 테두리 -->
+            <div style="
+              position: absolute;
+              top: ${circleRadius * 2 - 2}px;
+              left: 50%;
+              transform: translateX(-50%);
+              width: 0;
+              height: 0;
+              border-left: ${triangleWidth / 2 + 2}px solid transparent;
+              border-right: ${triangleWidth / 2 + 2}px solid transparent;
+              border-top: ${triangleHeight + 2}px solid ${strokeColor};
+              z-index: 0;
+            "></div>
+          </div>
+        `,
+        iconSize: [pinSize, pinSize + triangleHeight],
+        iconAnchor: [pinSize / 2, pinSize + triangleHeight]
+      });
+    }
+
+    // 관리자모드/일반모드: 기존 원형 마커 (재고수량 기반 색상)
     // 1. 요청점 (최우선)
     if (isRequestedStore) {
       fillColor = '#ff9800';
@@ -711,7 +810,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
       iconSize: [radius * 2, radius * 2],
       iconAnchor: [radius, radius]
     });
-  }, [selectedStore, loggedInStoreId, calculateInventory, getInventoryByAge]);
+  }, [selectedStore, loggedInStoreId, calculateInventory, getInventoryByAge, isCustomerMode, isAgentMode]);
 
   // 지도 로드 핸들러
   const onMapLoad = useCallback((mapInstance) => {
