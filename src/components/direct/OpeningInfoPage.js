@@ -183,12 +183,14 @@ const OpeningInfoPage = ({
                 }
 
                 if (policySettings.success && policySettings.addon?.list) {
-                    // 🔥 개선: 모든 부가서비스 목록 저장 (incentive, deduction 정보 포함)
+                    // 🔥 개선: 모든 부가서비스 목록 저장 (incentive, deduction, description, url 정보 포함)
                     const allAddons = policySettings.addon.list.map(addon => ({
                         name: addon.name,
                         monthlyFee: addon.fee || 0,
                         incentive: addon.incentive || 0,
                         deduction: addon.deduction || 0,
+                        description: addon.description || '',
+                        url: addon.url || '',
                         type: 'addon'
                     }));
                     setAvailableAddons(allAddons);
@@ -254,7 +256,7 @@ const OpeningInfoPage = ({
                         });
                     }
 
-                    // 🔥 개선: 모든 보험상품 목록 저장 (incentive, deduction 정보 포함)
+                    // 🔥 개선: 모든 보험상품 목록 저장 (incentive, deduction, description, url 정보 포함)
                     const allInsurances = insuranceList
                         .filter(insurance => {
                             // 출고가 범위에 맞는 보험상품만 포함
@@ -267,6 +269,8 @@ const OpeningInfoPage = ({
                             monthlyFee: insurance.fee || 0,
                             incentive: insurance.incentive || 0,
                             deduction: insurance.deduction || 0,
+                            description: insurance.description || '',
+                            url: insurance.url || '',
                             type: 'insurance'
                         }));
                     setAvailableInsurances(allInsurances);
@@ -662,13 +666,13 @@ const OpeningInfoPage = ({
                         width: 100% !important;
                         max-width: 100% !important;
                         
-                        /* 기본: 모든 모드에서 한 장에 맞도록 60% 수준으로 출력 */
-                        zoom: 0.60; 
+                        /* 기본: 모든 모드에서 한 장에 맞도록 55% 수준으로 출력 (부가서비스 설명 추가로 인한 조정) */
+                        zoom: 0.55; 
                     }
 
-                    /* 고객모드도 동일하게 60% 유지 (이미 기본값과 동일) */
+                    /* 고객모드도 동일하게 55% 유지 */
                     .print-root.mode-customer {
-                        zoom: 0.60; 
+                        zoom: 0.55; 
                     }
 
                     /* 여백 미세 조정 (디자인 유지하되 불필요한 공백 제거) */
@@ -711,9 +715,21 @@ const OpeningInfoPage = ({
                     .print-root .MuiPaper-root {
                         box-shadow: none !important;
                         border: 1px solid #e0e0e0 !important;
-                        padding: 6px !important;
-                        margin-bottom: 3px !important;
+                        padding: 4px !important;
+                        margin-bottom: 2px !important;
                         page-break-inside: avoid !important;
+                    }
+                    
+                    /* 부가서비스/보험상품 선택 영역: 인쇄 시 더 컴팩트하게 */
+                    .print-root .MuiPaper-root[class*="MuiPaper-outlined"] {
+                        padding: 3px !important;
+                        margin-bottom: 2px !important;
+                    }
+                    
+                    /* 부가서비스/보험상품 설명 텍스트: 인쇄 시 작게 */
+                    .print-root .MuiTypography-body2 {
+                        font-size: 0.7rem !important;
+                        line-height: 1.2 !important;
                     }
 
                     /* 내부 Grid item들도 2단 배치 필요한 경우 강제 */
@@ -731,8 +747,25 @@ const OpeningInfoPage = ({
 
                     /* 입력 필드 높이 약간 줄임 */
                     .print-root .MuiInputBase-root {
-                        min-height: 36px !important;
-                        height: 36px !important;
+                        min-height: 32px !important;
+                        height: 32px !important;
+                    }
+                    
+                    /* 부가서비스/보험상품 선택 영역: 인쇄 시 더 컴팩트하게 */
+                    .print-root .MuiPaper-root[class*="MuiPaper-outlined"] {
+                        padding: 3px !important;
+                        margin-bottom: 2px !important;
+                    }
+                    
+                    /* 부가서비스/보험상품 설명 텍스트: 인쇄 시 작게 */
+                    .print-root .MuiTypography-body2 {
+                        font-size: 0.7rem !important;
+                        line-height: 1.2 !important;
+                    }
+                    
+                    /* 부가서비스/보험상품 버튼: 인쇄 시 숨김 */
+                    .print-root .MuiButton-root {
+                        display: none !important;
                     }
                     
                     /* 계산 로직 상세 텍스트: 인쇄 시에도 표시하되 매우 조밀하게 */
@@ -1357,34 +1390,55 @@ const OpeningInfoPage = ({
                                                 <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold', color: 'primary.main' }}>
                                                     부가서비스
                                                 </Typography>
-                                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                                                     {availableAddons.map((addon) => (
-                                                        <FormControlLabel
-                                                            key={addon.name}
-                                                            control={
-                                                                <Checkbox
-                                                                    checked={selectedAddons.has(addon.name)}
-                                                                    onChange={(e) => {
-                                                                        const newSelected = new Set(selectedAddons);
-                                                                        if (e.target.checked) {
-                                                                            newSelected.add(addon.name);
-                                                                        } else {
-                                                                            newSelected.delete(addon.name);
-                                                                        }
-                                                                        setSelectedAddons(newSelected);
-                                                                    }}
-                                                                />
-                                                            }
-                                                            label={
-                                                                <Box>
-                                                                    <Typography variant="body2">{addon.name}</Typography>
-                                                                    <Typography variant="caption" color="text.secondary">
-                                                                        {addon.incentive > 0 && `유치시 +${addon.incentive.toLocaleString()}원`}
-                                                                        {addon.deduction > 0 && `미유치시 -${addon.deduction.toLocaleString()}원`}
-                                                                    </Typography>
-                                                                </Box>
-                                                            }
-                                                        />
+                                                        <Paper key={addon.name} variant="outlined" sx={{ p: 2 }}>
+                                                            <FormControlLabel
+                                                                control={
+                                                                    <Checkbox
+                                                                        checked={selectedAddons.has(addon.name)}
+                                                                        onChange={(e) => {
+                                                                            const newSelected = new Set(selectedAddons);
+                                                                            if (e.target.checked) {
+                                                                                newSelected.add(addon.name);
+                                                                            } else {
+                                                                                newSelected.delete(addon.name);
+                                                                            }
+                                                                            setSelectedAddons(newSelected);
+                                                                        }}
+                                                                    />
+                                                                }
+                                                                label={
+                                                                    <Box sx={{ ml: 1 }}>
+                                                                        <Typography variant="body2" fontWeight="bold">{addon.name}</Typography>
+                                                                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                                                                            {addon.incentive > 0 && `유치시 +${addon.incentive.toLocaleString()}원`}
+                                                                            {addon.deduction > 0 && `미유치시 -${addon.deduction.toLocaleString()}원`}
+                                                                        </Typography>
+                                                                        {addon.description && (
+                                                                            <Typography variant="body2" color="text.secondary" sx={{ mt: 1, fontSize: '0.875rem' }}>
+                                                                                {addon.description}
+                                                                            </Typography>
+                                                                        )}
+                                                                        {addon.url && (
+                                                                            <Box sx={{ mt: 1 }}>
+                                                                                <Button
+                                                                                    size="small"
+                                                                                    variant="outlined"
+                                                                                    href={addon.url}
+                                                                                    target="_blank"
+                                                                                    rel="noopener noreferrer"
+                                                                                    sx={{ fontSize: '0.75rem', textTransform: 'none' }}
+                                                                                    onClick={(e) => e.stopPropagation()}
+                                                                                >
+                                                                                    공식사이트 확인
+                                                                                </Button>
+                                                                            </Box>
+                                                                        )}
+                                                                    </Box>
+                                                                }
+                                                            />
+                                                        </Paper>
                                                     ))}
                                                 </Box>
                                             </Box>
@@ -1396,34 +1450,55 @@ const OpeningInfoPage = ({
                                                 <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold', color: 'primary.main' }}>
                                                     보험상품
                                                 </Typography>
-                                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                                                     {availableInsurances.map((insurance) => (
-                                                        <FormControlLabel
-                                                            key={insurance.name}
-                                                            control={
-                                                                <Checkbox
-                                                                    checked={selectedInsurances.has(insurance.name)}
-                                                                    onChange={(e) => {
-                                                                        const newSelected = new Set(selectedInsurances);
-                                                                        if (e.target.checked) {
-                                                                            newSelected.add(insurance.name);
-                                                                        } else {
-                                                                            newSelected.delete(insurance.name);
-                                                                        }
-                                                                        setSelectedInsurances(newSelected);
-                                                                    }}
-                                                                />
-                                                            }
-                                                            label={
-                                                                <Box>
-                                                                    <Typography variant="body2">{insurance.name}</Typography>
-                                                                    <Typography variant="caption" color="text.secondary">
-                                                                        {insurance.incentive > 0 && `유치시 +${insurance.incentive.toLocaleString()}원`}
-                                                                        {insurance.deduction > 0 && `미유치시 -${insurance.deduction.toLocaleString()}원`}
-                                                                    </Typography>
-                                                                </Box>
-                                                            }
-                                                        />
+                                                        <Paper key={insurance.name} variant="outlined" sx={{ p: 2 }}>
+                                                            <FormControlLabel
+                                                                control={
+                                                                    <Checkbox
+                                                                        checked={selectedInsurances.has(insurance.name)}
+                                                                        onChange={(e) => {
+                                                                            const newSelected = new Set(selectedInsurances);
+                                                                            if (e.target.checked) {
+                                                                                newSelected.add(insurance.name);
+                                                                            } else {
+                                                                                newSelected.delete(insurance.name);
+                                                                            }
+                                                                            setSelectedInsurances(newSelected);
+                                                                        }}
+                                                                    />
+                                                                }
+                                                                label={
+                                                                    <Box sx={{ ml: 1 }}>
+                                                                        <Typography variant="body2" fontWeight="bold">{insurance.name}</Typography>
+                                                                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                                                                            {insurance.incentive > 0 && `유치시 +${insurance.incentive.toLocaleString()}원`}
+                                                                            {insurance.deduction > 0 && `미유치시 -${insurance.deduction.toLocaleString()}원`}
+                                                                        </Typography>
+                                                                        {insurance.description && (
+                                                                            <Typography variant="body2" color="text.secondary" sx={{ mt: 1, fontSize: '0.875rem' }}>
+                                                                                {insurance.description}
+                                                                            </Typography>
+                                                                        )}
+                                                                        {insurance.url && (
+                                                                            <Box sx={{ mt: 1 }}>
+                                                                                <Button
+                                                                                    size="small"
+                                                                                    variant="outlined"
+                                                                                    href={insurance.url}
+                                                                                    target="_blank"
+                                                                                    rel="noopener noreferrer"
+                                                                                    sx={{ fontSize: '0.75rem', textTransform: 'none' }}
+                                                                                    onClick={(e) => e.stopPropagation()}
+                                                                                >
+                                                                                    공식사이트 확인
+                                                                                </Button>
+                                                                            </Box>
+                                                                        )}
+                                                                    </Box>
+                                                                }
+                                                            />
+                                                        </Paper>
                                                     ))}
                                                 </Box>
                                             </Box>

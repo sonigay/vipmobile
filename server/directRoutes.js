@@ -38,8 +38,8 @@ const SHEET_TODAYS_MOBILES = '직영점_오늘의휴대폰';
 
 // 시트 헤더 정의
 const HEADERS_POLICY_MARGIN = ['통신사', '마진'];
-const HEADERS_POLICY_ADDON = ['통신사', '서비스명', '월요금', '유치추가금액', '미유치차감금액'];
-const HEADERS_POLICY_INSURANCE = ['통신사', '보험상품명', '출고가최소', '출고가최대', '월요금', '유치추가금액', '미유치차감금액'];
+const HEADERS_POLICY_ADDON = ['통신사', '서비스명', '월요금', '유치추가금액', '미유치차감금액', '상세설명', '공식사이트URL'];
+const HEADERS_POLICY_INSURANCE = ['통신사', '보험상품명', '출고가최소', '출고가최대', '월요금', '유치추가금액', '미유치차감금액', '상세설명', '공식사이트URL'];
 const HEADERS_POLICY_SPECIAL = ['통신사', '정책명', '추가금액', '차감금액', '적용여부'];
 const HEADERS_SETTINGS = ['통신사', '설정유형', '시트ID', '시트URL', '설정값JSON'];
 const HEADERS_MAIN_PAGE_TEXTS = ['통신사', '카테고리', '설정유형', '문구내용', '이미지URL', '수정일시'];
@@ -1987,7 +1987,9 @@ function setupDirectRoutes(app) {
           name: (row[1] || '').trim(),
           fee: Number(row[2] || 0),
           incentive: Number(row[3] || 0),
-          deduction: Number(row[4] || 0)
+          deduction: Number(row[4] || 0),
+          description: (row[5] || '').trim(),
+          url: (row[6] || '').trim()
         }));
 
       // 보험상품 설정 읽기
@@ -2006,7 +2008,9 @@ function setupDirectRoutes(app) {
           maxPrice: Number(row[3] || 0),
           fee: Number(row[4] || 0),
           incentive: Number(row[5] || 0),
-          deduction: Number(row[6] || 0)
+          deduction: Number(row[6] || 0),
+          description: (row[7] || '').trim(),
+          url: (row[8] || '').trim()
         }));
 
       // 별도 정책 설정 읽기
@@ -2117,7 +2121,9 @@ function setupDirectRoutes(app) {
           item.name || '',
           item.fee || 0,
           item.incentive || 0,
-          item.deduction || 0
+          item.deduction || 0,
+          item.description || '',
+          item.url || ''
         ]);
         if (newAddonRows.length > 0) {
           await sheets.spreadsheets.values.append({
@@ -2173,7 +2179,9 @@ function setupDirectRoutes(app) {
           item.maxPrice || 0,
           item.fee || 0,
           item.incentive || 0,
-          item.deduction || 0
+          item.deduction || 0,
+          item.description || '',
+          item.url || ''
         ]);
         if (newInsuranceRows.length > 0) {
           await sheets.spreadsheets.values.append({

@@ -63,12 +63,12 @@ const PolicySettingsTab = () => {
         { id: 2, name: '우주패스', fee: 9900, incentive: 5000, deduction: 2000 }
     ]);
     // 부가서비스 입력 폼 상태
-    const [newAddon, setNewAddon] = useState({ name: '', fee: '', incentive: '', deduction: '' });
+    const [newAddon, setNewAddon] = useState({ name: '', fee: '', incentive: '', deduction: '', description: '', url: '' });
 
     // 2-1. 보험상품 설정 리스트
     const [insurances, setInsurances] = useState([]);
     // 보험상품 입력 폼 상태
-    const [newInsurance, setNewInsurance] = useState({ name: '', minPrice: '', maxPrice: '', fee: '', incentive: '', deduction: '' });
+    const [newInsurance, setNewInsurance] = useState({ name: '', minPrice: '', maxPrice: '', fee: '', incentive: '', deduction: '', description: '', url: '' });
 
     // 3. 별도정책 설정 리스트
     const [specialPolicies, setSpecialPolicies] = useState([
@@ -141,9 +141,11 @@ const PolicySettingsTab = () => {
                 name: newAddon.name,
                 fee: Number(newAddon.fee) || 0,
                 incentive: Number(newAddon.incentive) || 0,
-                deduction: Number(newAddon.deduction) || 0
+                deduction: Number(newAddon.deduction) || 0,
+                description: newAddon.description || '',
+                url: newAddon.url || ''
             }]);
-            setNewAddon({ name: '', fee: '', incentive: '', deduction: '' });
+            setNewAddon({ name: '', fee: '', incentive: '', deduction: '', description: '', url: '' });
         }
     };
 
@@ -162,9 +164,11 @@ const PolicySettingsTab = () => {
                 maxPrice: Number(newInsurance.maxPrice) || 0,
                 fee: Number(newInsurance.fee) || 0,
                 incentive: Number(newInsurance.incentive) || 0,
-                deduction: Number(newInsurance.deduction) || 0
+                deduction: Number(newInsurance.deduction) || 0,
+                description: newInsurance.description || '',
+                url: newInsurance.url || ''
             }]);
-            setNewInsurance({ name: '', minPrice: '', maxPrice: '', fee: '', incentive: '', deduction: '' });
+            setNewInsurance({ name: '', minPrice: '', maxPrice: '', fee: '', incentive: '', deduction: '', description: '', url: '' });
         }
     };
 
@@ -376,7 +380,7 @@ const PolicySettingsTab = () => {
                             <Grid container spacing={2} alignItems="center">
                                 <Grid item xs={12} sm={3}>
                                     <TextField
-                                        label="이름" size="small" fullWidth
+                                        label="서비스명" size="small" fullWidth
                                         value={newAddon.name} onChange={(e) => setNewAddon({ ...newAddon, name: e.target.value })}
                                     />
                                 </Grid>
@@ -402,6 +406,21 @@ const PolicySettingsTab = () => {
                                     <Button variant="contained" fullWidth startIcon={<AddIcon />} onClick={handleAddAddon}>
                                         추가
                                     </Button>
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        label="상세설명" size="small" fullWidth multiline rows={2}
+                                        value={newAddon.description} onChange={(e) => setNewAddon({ ...newAddon, description: e.target.value })}
+                                        placeholder="부가서비스에 대한 상세 설명을 입력하세요"
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        label="공식사이트 URL" size="small" fullWidth
+                                        value={newAddon.url} onChange={(e) => setNewAddon({ ...newAddon, url: e.target.value })}
+                                        placeholder="https://..."
+                                        helperText="통신사 공식 부가서비스 안내 페이지 URL"
+                                    />
                                 </Grid>
                             </Grid>
                         </Paper>
@@ -487,8 +506,23 @@ const PolicySettingsTab = () => {
                                         value={newInsurance.deduction} onChange={(e) => setNewInsurance({ ...newInsurance, deduction: e.target.value })}
                                     />
                                 </Grid>
-                                <Grid item xs={12} sm={0.5}>
-                                    <Button variant="contained" fullWidth startIcon={<AddIcon />} onClick={handleAddInsurance}>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        label="상세설명" size="small" fullWidth multiline rows={2}
+                                        value={newInsurance.description} onChange={(e) => setNewInsurance({ ...newInsurance, description: e.target.value })}
+                                        placeholder="보험상품에 대한 상세 설명을 입력하세요"
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        label="공식사이트 URL" size="small" fullWidth
+                                        value={newInsurance.url} onChange={(e) => setNewInsurance({ ...newInsurance, url: e.target.value })}
+                                        placeholder="https://..."
+                                        helperText="통신사 공식 보험상품 안내 페이지 URL"
+                                    />
+                                </Grid>
+                                <Grid item xs={12}>
+                                    <Button variant="contained" startIcon={<AddIcon />} onClick={handleAddInsurance}>
                                         추가
                                     </Button>
                                 </Grid>
@@ -515,6 +549,18 @@ const PolicySettingsTab = () => {
                                                             <Typography variant="body2" color="text.secondary">
                                                                 월 {insurance.fee.toLocaleString()}원
                                                             </Typography>
+                                                            {insurance.description && (
+                                                                <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                                                                    {insurance.description}
+                                                                </Typography>
+                                                            )}
+                                                            {insurance.url && (
+                                                                <Typography variant="caption" color="primary" display="block" sx={{ mt: 0.5 }}>
+                                                                    <a href={insurance.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+                                                                        공식사이트: {insurance.url}
+                                                                    </a>
+                                                                </Typography>
+                                                            )}
                                                         </Box>
                                                     }
                                                 />
