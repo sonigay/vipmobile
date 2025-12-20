@@ -53,22 +53,38 @@ function createSheetsClient() {
   return { sheets, SPREADSHEET_ID };
 }
 
-// Google Sheets API 재시도 헬퍼 함수
-async function retrySheetsOperation(operation, maxRetries = 3, delay = 1000) {
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+// Google Sheets API 재시도 헬퍼 함수 (Rate Limit 강화)
+async function retrySheetsOperation(operation, maxRetries = 5, baseDelay = 3000) {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       return await operation();
     } catch (error) {
-      const isQuotaError = error.code === 429 ||
-        (error.message && error.message.includes('Quota exceeded')) ||
-        (error.response && error.response.status === 429);
+      // Rate Limit 오류 감지 (더 포괄적으로)
+      const isQuotaError =
+        error.code === 429 ||
+        (error.response && error.response.status === 429) ||
+        (error.response && error.response.data && error.response.data.error &&
+          (error.response.data.error.status === 'RESOURCE_EXHAUSTED' ||
+            (error.response.data.error.message && error.response.data.error.message.includes('Quota exceeded')))) ||
+        (error.message && (
+          error.message.includes('Quota exceeded') ||
+          error.message.includes('RESOURCE_EXHAUSTED') ||
+          error.message.includes('429') ||
+          error.message.includes('rateLimitExceeded')
+        ));
 
-      if (isQuotaError && attempt < maxRetries) {
-        const waitTime = delay * Math.pow(2, attempt - 1); // Exponential backoff
-        console.warn(`⚠️ [Sheets API] 할당량 초과, ${waitTime}ms 후 재시도 (${attempt}/${maxRetries})`);
+      if (isQuotaError && attempt < maxRetries - 1) {
+        // Exponential backoff with jitter (랜덤 지연 추가로 동시 요청 분산)
+        const jitter = Math.random() * 2000; // 0~2초 랜덤
+        const delay = baseDelay * Math.pow(2, attempt) + jitter;
+        const waitTime = Math.min(delay, 60000); // 최대 60초
+
+        console.warn(`⚠️ [Sheets API] Rate limit 오류 발생, ${Math.round(waitTime)}ms 후 재시도 (${attempt + 1}/${maxRetries})`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
         continue;
       }
+
+      // Rate Limit 오류가 아니거나 최대 재시도 횟수 초과
       throw error;
     }
   }
