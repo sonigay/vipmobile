@@ -7158,10 +7158,74 @@ app.post('/api/discord/batch-refresh-urls', express.json(), async (req, res) => 
           const refreshData = await refreshRes.json();
           results.push({ ...refreshData, type, item });
         } else if (type === 'meeting-slide') {
-          // 회의 슬라이드 URL 갱신은 meetingRoutes에 구현 필요
+          // 회의 슬라이드 URL 갱신
+          const { meetingId, slideId } = item;
+          if (!meetingId || !slideId) {
+            results.push({
+              success: false,
+              error: 'meetingId, slideId가 필요합니다.',
+              type,
+              item
+            });
+            continue;
+          }
+          
+          // 회의목록 시트에서 해당 슬라이드 찾기 및 업데이트
+          const { ensureSheetHeaders } = require('./directRoutes');
+          await ensureSheetHeaders(sheets, SPREADSHEET_ID, '회의목록', [
+            '회의ID', '슬라이드ID', '순서', '타입', '모드', '탭', '제목', '내용', '배경색', '이미지URL', '동영상URL', '캡처시간', 'Discord포스트ID', 'Discord스레드ID', 'Discord메시지ID', '탭라벨', '서브탭라벨', '세부항목옵션', '회의날짜', '회의차수', '회의장소', '참석자', '생성자'
+          ]);
+          
+          const meetingResponse = await rateLimitedSheetsCall(() =>
+            sheets.spreadsheets.values.get({
+              spreadsheetId: SPREADSHEET_ID,
+              range: '회의목록!A:W'
+            })
+          );
+          
+          const meetingRows = (meetingResponse.data.values || []).slice(1);
+          const rowIndex = meetingRows.findIndex(row => 
+            (row[0] || '').trim() === meetingId && 
+            (row[1] || '').trim() === slideId
+          );
+          
+          if (rowIndex === -1) {
+            results.push({
+              success: false,
+              error: '해당 슬라이드를 찾을 수 없습니다.',
+              type,
+              item
+            });
+            continue;
+          }
+          
+          // 기존 행 업데이트 (이미지 URL만 갱신)
+          const existingRow = meetingRows[rowIndex];
+          const updatedRow = [...existingRow];
+          while (updatedRow.length < 23) {
+            updatedRow.push('');
+          }
+          updatedRow[9] = newImageUrl; // J: 이미지URL
+          updatedRow[14] = refreshResult.messageId || ''; // O: Discord메시지ID
+          updatedRow[13] = refreshResult.threadId || ''; // N: Discord스레드ID
+          updatedRow[12] = refreshResult.postId || refreshResult.threadId || ''; // M: Discord포스트ID
+          
+          await rateLimitedSheetsCall(() =>
+            sheets.spreadsheets.values.update({
+              spreadsheetId: SPREADSHEET_ID,
+              range: `회의목록!A${rowIndex + 2}:W${rowIndex + 2}`,
+              valueInputOption: 'USER_ENTERED',
+              resource: { values: [updatedRow] }
+            })
+          );
+          
+          console.log(`✅ [URL 갱신] 회의 슬라이드 업데이트 완료: ${meetingId} - ${slideId}`);
+          
           results.push({
-            success: false,
-            error: '회의 슬라이드 URL 갱신은 아직 구현되지 않았습니다.',
+            success: true,
+            imageUrl: newImageUrl,
+            messageId: refreshResult.messageId,
+            threadId: refreshResult.threadId,
             type,
             item
           });
