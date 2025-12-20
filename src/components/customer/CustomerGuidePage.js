@@ -77,9 +77,14 @@ const CustomerGuidePage = ({ type, onNavigate, onBack }) => {
                     뒤로가기
                 </Button>
                 
-                <Typography variant="h5" sx={{ fontWeight: 600, mb: 3, color: 'primary.main' }}>
+                <Typography variant="h5" sx={{ fontWeight: 600, mb: 2, color: 'primary.main' }}>
                     {getMessage()}
                 </Typography>
+                {type === 'SELECT_STORE' && (
+                    <Typography variant="body2" sx={{ mb: 3, color: 'text.secondary', fontStyle: 'italic' }}>
+                        고객님의 위치에서 가장 가까운 매장을 안내합니다.
+                    </Typography>
+                )}
 
                 <Button
                     variant="contained"

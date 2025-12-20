@@ -63,6 +63,12 @@ const defaultCenter = {
   lng: 126.9780
 };
 
+// 수도권을 보기 위한 중심 좌표
+const seoulMetroCenter = {
+  lat: 37.5,
+  lng: 127.0
+};
+
 // 강제 확대를 위한 별도 컴포넌트
 function ForceZoomUpdater({ forceZoomToStore }) {
   const map = useMap();
@@ -139,7 +145,7 @@ function ForceZoomUpdater({ forceZoomToStore }) {
 }
 
 // 지도 뷰 업데이트를 위한 컴포넌트
-function MapUpdater({ center, bounds, zoom, isAgentMode, currentView, forceZoomToStore }) {
+function MapUpdater({ center, bounds, zoom, isAgentMode, currentView, forceZoomToStore, isCustomerMode }) {
   const map = useMap();
 
   // 각 모드별 줌 레벨 설정
@@ -149,6 +155,10 @@ function MapUpdater({ center, bounds, zoom, isAgentMode, currentView, forceZoomT
       if (currentView === 'assigned') return 11; // 담당재고확인
       if (currentView === 'activation') return 12; // 담당개통확인
       return 10; // 기본값
+    }
+    // 고객모드에서 위치 정보 실패 시 수도권 보기
+    if (isCustomerMode && center && center.isDefault) {
+      return 10; // 수도권이 잘 보이는 줌 레벨
     }
     return 12; // 일반 매장 모드
   };
@@ -399,6 +409,10 @@ ${loggedInStore.name}으로 이동 예정입니다.
       if (currentView === 'activation') return 10; // 담당개통확인: 중간 시야
       return 6; // 기본값: 전체재고확인과 동일
     }
+    // 고객모드에서 위치 정보 실패 시 수도권 보기
+    if (isCustomerMode && userLocation && userLocation.isDefault) {
+      return 10; // 수도권이 잘 보이는 줌 레벨
+    }
     return 12; // 일반 매장 모드
   };
 
@@ -409,7 +423,17 @@ ${loggedInStore.name}으로 이동 예정입니다.
   const previousSelectedStoreRef = useRef(null);
   const mapRef = useRef(null);
 
-  const center = useMemo(() => userLocation || defaultCenter, [userLocation]);
+  // 고객모드에서 위치 정보 실패 시 수도권 중심 좌표 사용
+  const center = useMemo(() => {
+    if (userLocation) {
+      return userLocation;
+    }
+    // 고객모드이고 userLocation이 없으면 수도권 중심 좌표 사용
+    if (isCustomerMode) {
+      return seoulMetroCenter;
+    }
+    return defaultCenter;
+  }, [userLocation, isCustomerMode]);
 
   // userLocation이 변경될 때 mapCenter 업데이트
   useEffect(() => {
@@ -1020,6 +1044,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
           isAgentMode={isAgentMode}
           currentView={currentView}
           forceZoomToStore={forceZoomToStore}
+          isCustomerMode={isCustomerMode}
         />
 
         {/* 강제 확대 업데이트 */}

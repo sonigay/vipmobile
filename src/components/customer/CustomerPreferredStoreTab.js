@@ -31,11 +31,13 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                 },
                 (error) => {
                     console.error('Geolocation error:', error);
-                    setUserLocation({ lat: 37.5665, lng: 126.9780 });
+                    // 위치 정보 실패 시 수도권이 보이도록 중심 좌표 설정
+                    setUserLocation({ lat: 37.5, lng: 127.0, isDefault: true });
                 }
             );
         } else {
-            setUserLocation({ lat: 37.5665, lng: 126.9780 });
+            // Geolocation 미지원 시 수도권이 보이도록 중심 좌표 설정
+            setUserLocation({ lat: 37.5, lng: 127.0, isDefault: true });
         }
 
         const loadStores = async () => {
@@ -171,6 +173,22 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                     minHeight: '500px'
                 }
             }}>
+                {/* 지도 설명 문구 */}
+                <Box sx={{
+                    position: 'absolute',
+                    top: 10,
+                    right: 10,
+                    zIndex: 1000,
+                    bgcolor: 'rgba(255,255,255,0.95)',
+                    p: 1.5,
+                    borderRadius: 1,
+                    boxShadow: 2,
+                    borderLeft: '4px solid #4caf50'
+                }}>
+                    <Typography variant="body2" sx={{ fontWeight: 'medium', color: 'text.primary' }}>
+                        고객님의 위치에서 가장 가까운 매장을 안내합니다.
+                    </Typography>
+                </Box>
                 <Map
                     userLocation={userLocation}
                     filteredStores={filteredStores}
