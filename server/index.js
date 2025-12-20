@@ -4753,17 +4753,29 @@ async function getOrCreateFolder(folderName, parentFolderId = null, driveId = nu
       } catch (error) {
         console.error(`❌ [폴더 확인] 지정된 "어플자료" 폴더 접근 실패:`, error.message);
         console.error(`❌ [폴더 확인] 폴더 ID: ${APP_DATA_FOLDER_ID}`);
-        console.error(`❌ [폴더 확인] 확인 사항:`);
-        console.error(`   1. 폴더 ID가 정확한지 확인`);
-        console.error(`   2. Service Account(${GOOGLE_SERVICE_ACCOUNT_EMAIL})가 폴더에 공유되어 있는지 확인`);
-        console.error(`   3. 폴더가 삭제되지 않았는지 확인`);
+        console.error(`❌ [폴더 확인] 에러 코드: ${error.code || 'N/A'}`);
+        
+        if (error.code === 404) {
+          console.error(`❌ [폴더 확인] 404 에러 - 폴더를 찾을 수 없습니다.`);
+          console.error(`❌ [폴더 확인] 확인 사항:`);
+          console.error(`   1. 폴더 ID가 정확한지 확인 (URL에서 /folders/ 뒤의 값)`);
+          console.error(`   2. Service Account(${GOOGLE_SERVICE_ACCOUNT_EMAIL})가 폴더에 공유되어 있는지 확인`);
+          console.error(`   3. 공유 권한: "편집자" 또는 "뷰어" 권한이 필요합니다`);
+          console.error(`   4. 폴더가 삭제되지 않았는지 확인`);
+          console.error(`❌ [폴더 확인] 중요: 공유 폴더라도 Service Account가 접근할 수 있도록 공유되어야 합니다!`);
+        } else if (error.code === 403) {
+          console.error(`❌ [폴더 확인] 403 에러 - 접근 권한이 없습니다.`);
+          console.error(`❌ [폴더 확인] Service Account(${GOOGLE_SERVICE_ACCOUNT_EMAIL})를 폴더에 공유해주세요.`);
+        }
+        
         console.warn(`⚠️ [폴더 확인] 검색으로 대체 시도...`);
         // 폴더 접근 실패 시 기존 로직으로 폴더 검색
       }
     }
     
     // root 폴더인 경우 Google Sheets와 같은 폴더 사용
-    if (!parentFolderId) {
+    // 단, "어플자료" 폴더는 이미 위에서 처리했으므로 스킵
+    if (!parentFolderId && folderName !== '어플자료') {
       const spreadsheetParent = await getSpreadsheetParentFolder();
       if (spreadsheetParent) {
         parentFolderId = spreadsheetParent.folderId;

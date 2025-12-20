@@ -117,11 +117,16 @@ const auth = new google.auth.JWT({
 ### 에러: "Service Accounts do not have storage quota"
 - **원인**: 개인 드라이브에 저장 시도
 - **해결**: Shared Drive 사용 필요
+- **참고**: `docs/Shared-Drive-생성-가이드.md` 파일 참조
 
 ### 에러: "File not found" (404)
 - **원인**: Service Account가 파일에 접근 권한 없음
-- **해결**: Shared Drive에 Service Account 추가
+- **해결**: Shared Drive에 Service Account 추가 또는 폴더 공유 확인
 
 ### 에러: "Drive API has not been used in project"
 - **원인**: Drive API 미활성화
 - **해결**: Google Cloud Console에서 Drive API 활성화
+
+## 📚 추가 문서
+
+- **Shared Drive 생성 방법**: `docs/Shared-Drive-생성-가이드.md` 참조
