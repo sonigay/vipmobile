@@ -4916,35 +4916,23 @@ app.post('/api/direct/store-image/upload', storeImageUpload.single('image'), asy
     const photoCategoryDriveId = photoCategoryFolder.driveId || storeDriveId;
     console.log(`📁 [매장 사진 업로드] ${photoCategory} 폴더 ID: ${photoCategoryFolderId}${photoCategoryDriveId ? `, Drive ID: ${photoCategoryDriveId}` : ''}`);
 
-    // Shared Drive 확인
+    // Shared Drive 확인 및 공유 폴더 시도
     if (!photoCategoryDriveId) {
-      console.error('❌ [매장 사진 업로드] 폴더가 개인 드라이브에 있습니다. Service Account는 개인 드라이브에 저장할 수 없습니다.');
-      console.error('❌ [매장 사진 업로드] 해결 방법:');
-      console.error('   1. "어플자료" 폴더를 Shared Drive로 이동');
-      console.error('   2. 또는 Shared Drive에 새 "어플자료" 폴더를 만들고 Service Account와 공유');
-      console.error(`   3. Service Account 이메일: ${GOOGLE_SERVICE_ACCOUNT_EMAIL}`);
-      
-      // 로컬 파일 삭제
-      if (localFilePath && fs.existsSync(localFilePath)) {
-        try {
-          fs.unlinkSync(localFilePath);
-        } catch (unlinkError) {
-          console.error('파일 삭제 실패:', unlinkError);
-        }
-      }
-      
-      return res.status(403).json({
-        error: '폴더가 개인 드라이브에 있어 저장할 수 없습니다. Shared Drive에 폴더를 만들어 Service Account와 공유해주세요.',
-        serviceAccountEmail: GOOGLE_SERVICE_ACCOUNT_EMAIL
-      });
+      console.warn('⚠️ [매장 사진 업로드] 폴더가 개인 드라이브에 있습니다. 공유 폴더로 저장을 시도합니다...');
+      console.warn('⚠️ [매장 사진 업로드] 참고: Service Account는 일반적으로 개인 드라이브에 저장할 수 없지만, 공유 폴더인 경우 시도해봅니다.');
+      // driveId 없이 시도 (공유 폴더인 경우 작동할 수 있음)
     }
 
     // Google Drive에 파일 업로드 (해당 폴더에)
     const fileMetadata = {
       name: fileName,
-      parents: [photoCategoryFolderId],
-      driveId: photoCategoryDriveId // Shared Drive에 저장
+      parents: [photoCategoryFolderId]
     };
+    
+    // Shared Drive에 있는 경우 driveId 지정
+    if (photoCategoryDriveId) {
+      fileMetadata.driveId = photoCategoryDriveId;
+    }
 
     const media = {
       mimeType: req.file.mimetype,
@@ -6065,25 +6053,22 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
       });
     }
 
-    // Shared Drive 확인
+    // Shared Drive 확인 및 공유 폴더 시도
     if (!carrierDriveId) {
-      console.error('❌ [상품 이미지 업로드] 폴더가 개인 드라이브에 있습니다. Service Account는 개인 드라이브에 저장할 수 없습니다.');
-      console.error('❌ [상품 이미지 업로드] 해결 방법:');
-      console.error('   1. "어플자료" 폴더를 Shared Drive로 이동');
-      console.error('   2. 또는 Shared Drive에 새 "어플자료" 폴더를 만들고 Service Account와 공유');
-      console.error(`   3. Service Account 이메일: ${GOOGLE_SERVICE_ACCOUNT_EMAIL}`);
-      return res.status(403).json({
-        success: false,
-        error: '폴더가 개인 드라이브에 있어 저장할 수 없습니다. Shared Drive에 폴더를 만들어 Service Account와 공유해주세요.',
-        serviceAccountEmail: GOOGLE_SERVICE_ACCOUNT_EMAIL
-      });
+      console.warn('⚠️ [상품 이미지 업로드] 폴더가 개인 드라이브에 있습니다. 공유 폴더로 저장을 시도합니다...');
+      console.warn('⚠️ [상품 이미지 업로드] 참고: Service Account는 일반적으로 개인 드라이브에 저장할 수 없지만, 공유 폴더인 경우 시도해봅니다.');
+      // driveId 없이 시도 (공유 폴더인 경우 작동할 수 있음)
     }
 
     const fileMetadata = {
       name: fileName,
-      parents: [carrierFolderId],
-      driveId: carrierDriveId // Shared Drive에 저장
+      parents: [carrierFolderId]
     };
+    
+    // Shared Drive에 있는 경우 driveId 지정
+    if (carrierDriveId) {
+      fileMetadata.driveId = carrierDriveId;
+    }
 
     const media = {
       mimeType: req.file.mimetype,
