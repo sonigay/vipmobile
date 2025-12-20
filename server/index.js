@@ -26,8 +26,9 @@ const port = process.env.PORT || 4000;
 let lastSheetsApiCall = 0;
 const SHEETS_API_COOLDOWN = 1000; // 1초 대기
 
-// Google Sheets API 호출 빈도 제한 함수
-const rateLimitedSheetsCall = async (apiCall) => {
+// Google Sheets API 호출 빈도 제한 함수 (Rate Limit 재시도 포함)
+const rateLimitedSheetsCall = async (apiCall, maxRetries = 5) => {
+  // 기본 Rate Limiting: 최소 간격 유지
   const now = Date.now();
   const timeSinceLastCall = now - lastSheetsApiCall;
 
@@ -38,7 +39,42 @@ const rateLimitedSheetsCall = async (apiCall) => {
   }
 
   lastSheetsApiCall = Date.now();
-  return await apiCall();
+
+  // Rate Limit 오류 재시도 로직
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await apiCall();
+    } catch (error) {
+      // Rate Limit 오류 감지
+      const isRateLimitError =
+        error.code === 429 ||
+        (error.response && error.response.status === 429) ||
+        (error.response && error.response.data && error.response.data.error &&
+          (error.response.data.error.status === 'RESOURCE_EXHAUSTED' ||
+            (error.response.data.error.message && error.response.data.error.message.includes('Quota exceeded')))) ||
+        (error.message && (
+          error.message.includes('Quota exceeded') ||
+          error.message.includes('RESOURCE_EXHAUSTED') ||
+          error.message.includes('429') ||
+          error.message.includes('rateLimitExceeded')
+        ));
+
+      if (isRateLimitError && attempt < maxRetries - 1) {
+        // Exponential backoff with jitter (랜덤 지연 추가로 동시 요청 분산)
+        const jitter = Math.random() * 2000; // 0~2초 랜덤
+        const baseDelay = 3000; // 3초 기본 지연
+        const delay = baseDelay * Math.pow(2, attempt) + jitter;
+        const waitTime = Math.min(delay, 60000); // 최대 60초
+
+        console.warn(`⚠️ [Sheets API] Rate limit 오류 발생, ${Math.round(waitTime)}ms 후 재시도 (${attempt + 1}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        continue;
+      }
+
+      // Rate Limit 오류가 아니거나 최대 재시도 횟수 초과
+      throw error;
+    }
+  }
 };
 
 // ===== SMS API 캐싱 시스템 (API 호출 최적화) =====
