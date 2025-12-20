@@ -434,7 +434,25 @@ const PolicySettingsTab = () => {
                                             primary={
                                                 <Typography fontWeight="bold">{addon.name}</Typography>
                                             }
-                                            secondary={`월 ${addon.fee.toLocaleString()}원`}
+                                            secondary={
+                                                <Box>
+                                                    <Typography variant="body2" color="text.secondary">
+                                                        월 {addon.fee.toLocaleString()}원
+                                                    </Typography>
+                                                    {addon.description && (
+                                                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                                                            {addon.description}
+                                                        </Typography>
+                                                    )}
+                                                    {addon.url && (
+                                                        <Typography variant="caption" color="primary" display="block" sx={{ mt: 0.5 }}>
+                                                            <a href={addon.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+                                                                공식사이트: {addon.url}
+                                                            </a>
+                                                        </Typography>
+                                                    )}
+                                                </Box>
+                                            }
                                         />
                                         <Stack direction="row" spacing={2} alignItems="center" sx={{ mr: 2 }}>
                                             <Typography variant="body2" color="primary">
