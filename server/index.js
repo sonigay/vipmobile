@@ -1041,6 +1041,9 @@ async function monitoredDriveCall(operation, params) {
       case 'files.list':
         result = await drive.files.list(params);
         break;
+      case 'files.get':
+        result = await drive.files.get(params);
+        break;
       case 'files.create':
         result = await drive.files.create(params);
         break;
@@ -4694,9 +4697,35 @@ const storeImageUpload = multer({
   }
 });
 
+// Google Sheets 파일의 부모 폴더 ID 가져오기
+async function getSpreadsheetParentFolder() {
+  try {
+    const sheetFile = await monitoredDriveCall('files.get', {
+      fileId: SPREADSHEET_ID,
+      fields: 'parents'
+    });
+    // Google Sheets 파일은 항상 하나의 부모 폴더를 가짐
+    if (sheetFile.data.parents && sheetFile.data.parents.length > 0) {
+      return sheetFile.data.parents[0];
+    }
+    return null;
+  } catch (error) {
+    console.error('스프레드시트 부모 폴더 조회 오류:', error);
+    return null;
+  }
+}
+
 // Google Drive 폴더 생성 또는 조회 헬퍼 함수
 async function getOrCreateFolder(folderName, parentFolderId = null) {
   try {
+    // root 폴더인 경우 Google Sheets와 같은 폴더 사용
+    if (!parentFolderId) {
+      const spreadsheetParent = await getSpreadsheetParentFolder();
+      if (spreadsheetParent) {
+        parentFolderId = spreadsheetParent;
+      }
+    }
+
     // 기존 폴더 검색
     let query = `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
     if (parentFolderId) {
@@ -4708,7 +4737,9 @@ async function getOrCreateFolder(folderName, parentFolderId = null) {
     const searchResponse = await monitoredDriveCall('files.list', {
       q: query,
       fields: 'files(id, name)',
-      spaces: 'drive'
+      corpora: parentFolderId ? 'allDrives' : 'user',
+      includeItemsFromAllDrives: true,
+      supportsAllDrives: true
     });
 
     if (searchResponse.data.files && searchResponse.data.files.length > 0) {
@@ -4727,7 +4758,8 @@ async function getOrCreateFolder(folderName, parentFolderId = null) {
 
     const folderResponse = await monitoredDriveCall('files.create', {
       requestBody: folderMetadata,
-      fields: 'id, name'
+      fields: 'id, name',
+      supportsAllDrives: true
     });
 
     // 폴더를 공개로 설정 (선택사항 - 필요시 주석 해제)
@@ -5924,7 +5956,8 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
     const driveResponse = await monitoredDriveCall('files.create', {
       requestBody: fileMetadata,
       media: media,
-      fields: 'id, name, webViewLink, webContentLink'
+      fields: 'id, name, webViewLink, webContentLink',
+      supportsAllDrives: true
     });
 
     const fileId = driveResponse.data.id;
