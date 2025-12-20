@@ -4734,13 +4734,30 @@ async function getOrCreateFolder(folderName, parentFolderId = null, driveId = nu
           fields: 'id, name, driveId',
           supportsAllDrives: true
         });
-        console.log(`✅ [폴더 확인] "어플자료" 폴더 직접 사용: ${APP_DATA_FOLDER_ID}`);
+        
+        const folderDriveId = folderInfo.data.driveId || null;
+        
+        // Shared Drive가 아닌 경우 경고
+        if (!folderDriveId) {
+          console.warn(`⚠️ [폴더 확인] "어플자료" 폴더가 개인 드라이브에 있습니다. Shared Drive에 있어야 Service Account가 저장할 수 있습니다.`);
+          console.warn(`⚠️ [폴더 확인] 폴더 ID: ${APP_DATA_FOLDER_ID}, Drive ID: null (개인 드라이브)`);
+          console.warn(`⚠️ [폴더 확인] 해결 방법: 이 폴더를 Shared Drive로 이동하거나, Shared Drive에 새 폴더를 만들어 공유하세요.`);
+        } else {
+          console.log(`✅ [폴더 확인] "어플자료" 폴더 직접 사용: ${APP_DATA_FOLDER_ID}, Drive ID: ${folderDriveId} (Shared Drive)`);
+        }
+        
         return {
           folderId: folderInfo.data.id,
-          driveId: folderInfo.data.driveId || null
+          driveId: folderDriveId
         };
       } catch (error) {
-        console.warn(`⚠️ [폴더 확인] 지정된 "어플자료" 폴더 접근 실패, 검색으로 대체:`, error.message);
+        console.error(`❌ [폴더 확인] 지정된 "어플자료" 폴더 접근 실패:`, error.message);
+        console.error(`❌ [폴더 확인] 폴더 ID: ${APP_DATA_FOLDER_ID}`);
+        console.error(`❌ [폴더 확인] 확인 사항:`);
+        console.error(`   1. 폴더 ID가 정확한지 확인`);
+        console.error(`   2. Service Account(${GOOGLE_SERVICE_ACCOUNT_EMAIL})가 폴더에 공유되어 있는지 확인`);
+        console.error(`   3. 폴더가 삭제되지 않았는지 확인`);
+        console.warn(`⚠️ [폴더 확인] 검색으로 대체 시도...`);
         // 폴더 접근 실패 시 기존 로직으로 폴더 검색
       }
     }
@@ -4772,9 +4789,22 @@ async function getOrCreateFolder(folderName, parentFolderId = null, driveId = nu
 
     if (searchResponse.data.files && searchResponse.data.files.length > 0) {
       const foundFolder = searchResponse.data.files[0];
+      const foundDriveId = foundFolder.driveId || null;
+      
+      // "어플자료" 폴더인 경우 Shared Drive 확인
+      if (folderName === '어플자료' && !foundDriveId) {
+        console.warn(`⚠️ [폴더 확인] 검색으로 찾은 "어플자료" 폴더가 개인 드라이브에 있습니다.`);
+        console.warn(`⚠️ [폴더 확인] 폴더 ID: ${foundFolder.id}, Drive ID: null (개인 드라이브)`);
+        console.warn(`⚠️ [폴더 확인] Service Account는 개인 드라이브에 저장할 수 없습니다.`);
+        console.warn(`⚠️ [폴더 확인] 해결 방법:`);
+        console.warn(`   1. 이 폴더를 Shared Drive로 이동`);
+        console.warn(`   2. 또는 Shared Drive에 새 "어플자료" 폴더를 만들고 Service Account와 공유`);
+        console.warn(`   3. Service Account 이메일: ${GOOGLE_SERVICE_ACCOUNT_EMAIL}`);
+      }
+      
       return {
         folderId: foundFolder.id,
-        driveId: foundFolder.driveId || null
+        driveId: foundDriveId
       };
     }
 
@@ -4874,16 +4904,35 @@ app.post('/api/direct/store-image/upload', storeImageUpload.single('image'), asy
     const photoCategoryDriveId = photoCategoryFolder.driveId || storeDriveId;
     console.log(`📁 [매장 사진 업로드] ${photoCategory} 폴더 ID: ${photoCategoryFolderId}${photoCategoryDriveId ? `, Drive ID: ${photoCategoryDriveId}` : ''}`);
 
+    // Shared Drive 확인
+    if (!photoCategoryDriveId) {
+      console.error('❌ [매장 사진 업로드] 폴더가 개인 드라이브에 있습니다. Service Account는 개인 드라이브에 저장할 수 없습니다.');
+      console.error('❌ [매장 사진 업로드] 해결 방법:');
+      console.error('   1. "어플자료" 폴더를 Shared Drive로 이동');
+      console.error('   2. 또는 Shared Drive에 새 "어플자료" 폴더를 만들고 Service Account와 공유');
+      console.error(`   3. Service Account 이메일: ${GOOGLE_SERVICE_ACCOUNT_EMAIL}`);
+      
+      // 로컬 파일 삭제
+      if (localFilePath && fs.existsSync(localFilePath)) {
+        try {
+          fs.unlinkSync(localFilePath);
+        } catch (unlinkError) {
+          console.error('파일 삭제 실패:', unlinkError);
+        }
+      }
+      
+      return res.status(403).json({
+        error: '폴더가 개인 드라이브에 있어 저장할 수 없습니다. Shared Drive에 폴더를 만들어 Service Account와 공유해주세요.',
+        serviceAccountEmail: GOOGLE_SERVICE_ACCOUNT_EMAIL
+      });
+    }
+
     // Google Drive에 파일 업로드 (해당 폴더에)
     const fileMetadata = {
       name: fileName,
-      parents: [photoCategoryFolderId]
+      parents: [photoCategoryFolderId],
+      driveId: photoCategoryDriveId // Shared Drive에 저장
     };
-    
-    // Shared Drive에 있는 경우 driveId 지정
-    if (photoCategoryDriveId) {
-      fileMetadata.driveId = photoCategoryDriveId;
-    }
 
     const media = {
       mimeType: req.file.mimetype,
@@ -6004,15 +6053,25 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
       });
     }
 
+    // Shared Drive 확인
+    if (!carrierDriveId) {
+      console.error('❌ [상품 이미지 업로드] 폴더가 개인 드라이브에 있습니다. Service Account는 개인 드라이브에 저장할 수 없습니다.');
+      console.error('❌ [상품 이미지 업로드] 해결 방법:');
+      console.error('   1. "어플자료" 폴더를 Shared Drive로 이동');
+      console.error('   2. 또는 Shared Drive에 새 "어플자료" 폴더를 만들고 Service Account와 공유');
+      console.error(`   3. Service Account 이메일: ${GOOGLE_SERVICE_ACCOUNT_EMAIL}`);
+      return res.status(403).json({
+        success: false,
+        error: '폴더가 개인 드라이브에 있어 저장할 수 없습니다. Shared Drive에 폴더를 만들어 Service Account와 공유해주세요.',
+        serviceAccountEmail: GOOGLE_SERVICE_ACCOUNT_EMAIL
+      });
+    }
+
     const fileMetadata = {
       name: fileName,
-      parents: [carrierFolderId]
+      parents: [carrierFolderId],
+      driveId: carrierDriveId // Shared Drive에 저장
     };
-    
-    // Shared Drive에 있는 경우 driveId 지정
-    if (carrierDriveId) {
-      fileMetadata.driveId = carrierDriveId;
-    }
 
     const media = {
       mimeType: req.file.mimetype,
