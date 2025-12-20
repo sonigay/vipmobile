@@ -4096,12 +4096,67 @@ app.get('/api/member/board', async (req, res) => {
   const { storeName, posCode } = req.query; // 매장명 필터링 (직영점모드용)
   
   try {
-    const response = await rateLimitedSheetsCall(() =>
-      sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: `${CUSTOMER_BOARD_SHEET_NAME}!A:L`
-      })
-    );
+    // 시트 존재 확인 및 생성
+    let response;
+    try {
+      response = await rateLimitedSheetsCall(() =>
+        sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${CUSTOMER_BOARD_SHEET_NAME}!A:L`
+        })
+      );
+    } catch (error) {
+      // 시트가 존재하지 않으면 헤더만 생성하고 빈 배열 반환
+      if (error.code === 400 || error.message?.includes('Unable to parse range')) {
+        console.log('게시판 시트가 존재하지 않아 헤더를 생성합니다.');
+        try {
+          await rateLimitedSheetsCall(() =>
+            sheets.spreadsheets.values.update({
+              spreadsheetId: SPREADSHEET_ID,
+              range: `${CUSTOMER_BOARD_SHEET_NAME}!A1:L1`,
+              valueInputOption: 'RAW',
+              resource: { values: [CUSTOMER_BOARD_HEADERS] }
+            })
+          );
+        } catch (createError) {
+          // 시트 자체가 없으면 시트 생성 시도
+          try {
+            await rateLimitedSheetsCall(() =>
+              sheets.spreadsheets.batchUpdate({
+                spreadsheetId: SPREADSHEET_ID,
+                resource: {
+                  requests: [{
+                    addSheet: {
+                      properties: {
+                        title: CUSTOMER_BOARD_SHEET_NAME,
+                        gridProperties: {
+                          rowCount: 1000,
+                          columnCount: 12
+                        }
+                      }
+                    }
+                  }]
+                }
+              })
+            );
+            // 시트 생성 후 헤더 추가
+            await rateLimitedSheetsCall(() =>
+              sheets.spreadsheets.values.update({
+                spreadsheetId: SPREADSHEET_ID,
+                range: `${CUSTOMER_BOARD_SHEET_NAME}!A1:L1`,
+                valueInputOption: 'RAW',
+                resource: { values: [CUSTOMER_BOARD_HEADERS] }
+              })
+            );
+          } catch (sheetCreateError) {
+            console.error('게시판 시트 생성 오류:', sheetCreateError);
+            // 시트 생성 실패해도 빈 배열 반환
+          }
+        }
+        return res.json([]);
+      }
+      throw error;
+    }
 
     const values = response.data.values || [];
     if (values.length <= 1) return res.json([]);
@@ -4187,12 +4242,21 @@ app.get('/api/member/board/:id', async (req, res) => {
   const { id } = req.params;
   
   try {
-    const response = await rateLimitedSheetsCall(() =>
-      sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: `${CUSTOMER_BOARD_SHEET_NAME}!A:L`
-      })
-    );
+    let response;
+    try {
+      response = await rateLimitedSheetsCall(() =>
+        sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${CUSTOMER_BOARD_SHEET_NAME}!A:L`
+        })
+      );
+    } catch (error) {
+      // 시트가 존재하지 않으면 404 반환
+      if (error.code === 400 || error.message?.includes('Unable to parse range')) {
+        return res.status(404).json({ error: '게시글을 찾을 수 없습니다.' });
+      }
+      throw error;
+    }
 
     const values = response.data.values || [];
     const row = values.find(r => r[0] === id);
@@ -4229,22 +4293,64 @@ app.post('/api/member/board', async (req, res) => {
 
   try {
     // 시트 존재 및 헤더 확인
-    const checkResponse = await rateLimitedSheetsCall(() =>
-      sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: `${CUSTOMER_BOARD_SHEET_NAME}!A1:L1`
-      })
-    ).catch(() => null);
-
-    if (!checkResponse || !checkResponse.data.values) {
-      await rateLimitedSheetsCall(() =>
-        sheets.spreadsheets.values.update({
+    let checkResponse;
+    try {
+      checkResponse = await rateLimitedSheetsCall(() =>
+        sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${CUSTOMER_BOARD_SHEET_NAME}!A1:L1`,
-          valueInputOption: 'RAW',
-          resource: { values: [CUSTOMER_BOARD_HEADERS] }
+          range: `${CUSTOMER_BOARD_SHEET_NAME}!A1:L1`
         })
       );
+    } catch (error) {
+      // 시트가 존재하지 않으면 시트 생성
+      if (error.code === 400 || error.message?.includes('Unable to parse range')) {
+        console.log('게시판 시트가 존재하지 않아 새로 생성합니다.');
+        try {
+          await rateLimitedSheetsCall(() =>
+            sheets.spreadsheets.batchUpdate({
+              spreadsheetId: SPREADSHEET_ID,
+              resource: {
+                requests: [{
+                  addSheet: {
+                    properties: {
+                      title: CUSTOMER_BOARD_SHEET_NAME,
+                      gridProperties: {
+                        rowCount: 1000,
+                        columnCount: 12
+                      }
+                    }
+                  }
+                }]
+              }
+            })
+          );
+        } catch (sheetCreateError) {
+          // 시트가 이미 존재하는 경우 무시
+          if (!sheetCreateError.message?.includes('already exists')) {
+            console.error('게시판 시트 생성 오류:', sheetCreateError);
+            throw sheetCreateError;
+          }
+        }
+      } else {
+        throw error;
+      }
+    }
+
+    // 헤더가 없으면 헤더 추가
+    if (!checkResponse || !checkResponse.data.values) {
+      try {
+        await rateLimitedSheetsCall(() =>
+          sheets.spreadsheets.values.update({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${CUSTOMER_BOARD_SHEET_NAME}!A1:L1`,
+            valueInputOption: 'RAW',
+            resource: { values: [CUSTOMER_BOARD_HEADERS] }
+          })
+        );
+      } catch (headerError) {
+        console.error('게시판 헤더 생성 오류:', headerError);
+        // 헤더 생성 실패해도 계속 진행 (이미 존재할 수 있음)
+      }
     }
 
     const id = `board-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -4289,12 +4395,21 @@ app.put('/api/member/board/:id', async (req, res) => {
   const data = req.body;
 
   try {
-    const response = await rateLimitedSheetsCall(() =>
-      sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: `${CUSTOMER_BOARD_SHEET_NAME}!A:L`
-      })
-    );
+    let response;
+    try {
+      response = await rateLimitedSheetsCall(() =>
+        sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${CUSTOMER_BOARD_SHEET_NAME}!A:L`
+        })
+      );
+    } catch (error) {
+      // 시트가 존재하지 않으면 404 반환
+      if (error.code === 400 || error.message?.includes('Unable to parse range')) {
+        return res.status(404).json({ error: '게시글을 찾을 수 없습니다.' });
+      }
+      throw error;
+    }
 
     const values = response.data.values || [];
     const rowIndex = values.findIndex(row => row[0] === id);
@@ -4334,12 +4449,21 @@ app.delete('/api/member/board/:id', async (req, res) => {
   const { id } = req.params;
 
   try {
-    const response = await rateLimitedSheetsCall(() =>
-      sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: `${CUSTOMER_BOARD_SHEET_NAME}!A:L`
-      })
-    );
+    let response;
+    try {
+      response = await rateLimitedSheetsCall(() =>
+        sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${CUSTOMER_BOARD_SHEET_NAME}!A:L`
+        })
+      );
+    } catch (error) {
+      // 시트가 존재하지 않으면 404 반환
+      if (error.code === 400 || error.message?.includes('Unable to parse range')) {
+        return res.status(404).json({ error: '게시글을 찾을 수 없습니다.' });
+      }
+      throw error;
+    }
 
     const values = response.data.values || [];
     const rowIndex = values.findIndex(row => row[0] === id);
