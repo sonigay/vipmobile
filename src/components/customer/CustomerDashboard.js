@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import MobileListTab from '../direct/MobileListTab';
 import CustomerPreferredStoreTab from './CustomerPreferredStoreTab';
 import CustomerPurchaseQueueTab from './CustomerPurchaseQueueTab';
+import CustomerBoardTab from './CustomerBoardTab';
 import CustomerGuidePage from './CustomerGuidePage';
 import OpeningInfoPage from '../direct/OpeningInfoPage';
 
@@ -168,6 +169,7 @@ const CustomerDashboard = () => {
                     <Tab label="휴대폰 시세표" />
                     <Tab label="선호 구입 매장" />
                     <Tab label="나의 구매 대기" />
+                    <Tab label="게시판" />
                 </Tabs>
             </Paper>
 
@@ -189,6 +191,11 @@ const CustomerDashboard = () => {
                 {tabValue === 2 && (
                     <Box sx={{ p: 3 }}>
                         <CustomerPurchaseQueueTab customerInfo={customerInfo} />
+                    </Box>
+                )}
+                {tabValue === 3 && (
+                    <Box sx={{ p: 3 }}>
+                        <CustomerBoardTab customerInfo={customerInfo} />
                     </Box>
                 )}
             </Box>

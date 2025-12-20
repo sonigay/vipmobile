@@ -24,7 +24,8 @@ import {
   Build as BuildIcon,
   Assignment as AssignmentIcon,
   Store as StoreIcon,
-  Monitor as MonitorIcon
+  Monitor as MonitorIcon,
+  Forum as ForumIcon
 } from '@mui/icons-material';
 
 import { getModeColor, getModeTitle } from '../config/modeConfig';
@@ -43,6 +44,7 @@ const OpeningInfoPage = lazy(() => import('./direct/OpeningInfoPage'));
 const CustomerQueueManagementTab = lazy(() => import('./direct/management/CustomerQueueManagementTab'));
 const DirectStorePreferredStoreTab = lazy(() => import('./direct/DirectStorePreferredStoreTab'));
 const DriveMonitoringTab = lazy(() => import('./direct/management/DriveMonitoringTab'));
+const DirectStoreBoardTab = lazy(() => import('./direct/DirectStoreBoardTab'));
 
 const DirectStoreManagementMode = ({
   loggedInStore,
@@ -135,6 +137,16 @@ const DirectStoreManagementMode = ({
         label: 'Google Drive 모니터링',
         icon: <MonitorIcon />,
         componentName: 'DriveMonitoringTab'
+      });
+      tabs.push({
+        key: 'board',
+        label: '게시판',
+        icon: <ForumIcon />,
+        componentName: 'DirectStoreBoardTab',
+        props: {
+          loggedInStore: loggedInStore,
+          isManagementMode: true
+        }
       });
     }
     return tabs;
@@ -282,6 +294,8 @@ const DirectStoreManagementMode = ({
                   Component = DirectStorePreferredStoreTab;
                 } else if (tab.componentName === 'DriveMonitoringTab') {
                   Component = DriveMonitoringTab;
+                } else if (tab.componentName === 'DirectStoreBoardTab') {
+                  Component = DirectStoreBoardTab;
                 }
 
                 return (

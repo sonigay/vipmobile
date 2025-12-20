@@ -2156,6 +2156,57 @@ export const customerAPI = {
     return response.json();
   },
 
+  // 게시판 목록 조회
+  getBoardList: async (storeName = null, posCode = null) => {
+    let url = `${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/member/board`;
+    const params = new URLSearchParams();
+    if (storeName) params.append('storeName', storeName);
+    if (posCode) params.append('posCode', posCode);
+    if (params.toString()) url += `?${params.toString()}`;
+    
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('게시판 목록을 불러오는데 실패했습니다.');
+    return response.json();
+  },
+
+  // 게시판 상세 조회
+  getBoardPost: async (id) => {
+    const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/member/board/${id}`);
+    if (!response.ok) throw new Error('게시글을 불러오는데 실패했습니다.');
+    return response.json();
+  },
+
+  // 게시판 글 작성
+  createBoardPost: async (data) => {
+    const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/member/board`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error('글 작성에 실패했습니다.');
+    return response.json();
+  },
+
+  // 게시판 글 수정
+  updateBoardPost: async (id, data) => {
+    const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/member/board/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error('글 수정에 실패했습니다.');
+    return response.json();
+  },
+
+  // 게시판 글 삭제
+  deleteBoardPost: async (id) => {
+    const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/member/board/${id}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) throw new Error('글 삭제에 실패했습니다.');
+    return response.json();
+  },
+
   // 사전승낙서마크 조회
   getPreApprovalMark: async (storeName) => {
     const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/direct/pre-approval-mark/${encodeURIComponent(storeName)}`);

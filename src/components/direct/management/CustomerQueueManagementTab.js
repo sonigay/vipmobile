@@ -71,7 +71,7 @@ const CustomerQueueManagementTab = ({ loggedInStore }) => {
         item.name.includes(searchTerm) ||
         item.ctn.includes(searchTerm) ||
         item.model.includes(searchTerm) ||
-        item.store.includes(searchTerm)
+        (item.storeName && item.storeName.includes(searchTerm))
     );
 
     if (isLoading) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 5 }}><CircularProgress /></Box>;
@@ -123,7 +123,7 @@ const CustomerQueueManagementTab = ({ loggedInStore }) => {
                                     <TableCell>{item.ctn}</TableCell>
                                     <TableCell>{item.model} / {item.color}</TableCell>
                                     <TableCell>
-                                        <Chip label={item.store || '미지정'} size="small" variant="outlined" />
+                                        <Chip label={item.storeName || '미지정'} size="small" variant="outlined" />
                                     </TableCell>
                                     <TableCell sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                         {item.memo}

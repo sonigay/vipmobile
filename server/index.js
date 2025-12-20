@@ -853,11 +853,15 @@ const MONTHLY_AWARD_SETTINGS_SHEET_NAME = '장표모드셋팅메뉴';  // 월간
 const CUSTOMER_QUEUE_SHEET_NAME = '직영점_구매대기';
 const CUSTOMER_PRE_APPROVAL_SHEET_NAME = '직영점_사전승낙서마크';
 const CUSTOMER_STORE_PHOTO_SHEET_NAME = '직영점_매장사진';
+const CUSTOMER_BOARD_SHEET_NAME = '직영점_게시판';
 const CUSTOMER_QUEUE_HEADERS = [
   '번호', '고객CTN', '고객명', '통신사', '단말기모델명', '색상', '단말일련번호', '유심모델명', '유심일련번호', '개통유형',
   '전통신사', '할부구분', '할부개월', '약정', '요금제', '부가서비스', '출고가', '이통사지원금', '대리점추가지원금(부가유치)',
   '대리점추가지원금(부가미유치)', '선택매장업체명', '선택매장전화', '선택매장주소', '선택매장계좌정보', '등록일시', '상태',
   '처리매장업체명', '처리일시'
+];
+const CUSTOMER_BOARD_HEADERS = [
+  '번호', '카테고리', '제목', '내용', '고객명', '고객CTN', '매장명', '매장전화', '매장주소', '등록일시', '수정일시', '상태'
 ];
 
 // 사용자 권한 조회 함수
@@ -4084,6 +4088,281 @@ app.delete('/api/member/queue/:id', async (req, res) => {
     res.status(500).json({ error: '삭제에 실패했습니다.' });
   }
 });
+
+// ========== 게시판 API ==========
+
+// GET /api/member/board: 게시판 목록 조회
+app.get('/api/member/board', async (req, res) => {
+  const { storeName, posCode } = req.query; // 매장명 필터링 (직영점모드용)
+  
+  try {
+    const response = await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${CUSTOMER_BOARD_SHEET_NAME}!A:L`
+      })
+    );
+
+    const values = response.data.values || [];
+    if (values.length <= 1) return res.json([]);
+
+    const rows = values.slice(1);
+    
+    // POS코드 필터링이 필요한 경우, 폰클출고처데이터에서 매장명->POS코드 매핑 생성
+    let storeNameToPosCodeMap = null;
+    if (posCode) {
+      try {
+        const storeDataResponse = await rateLimitedSheetsCall(() =>
+          sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: '폰클출고처데이터!A:AM'
+          })
+        );
+        const storeData = storeDataResponse.data.values || [];
+        storeNameToPosCodeMap = new Map();
+        if (storeData && storeData.length > 1) {
+          storeData.slice(1).forEach(row => {
+            if (row && row.length > 15) {
+              const storeNameFromData = (row[14] || '').toString().trim(); // 14번 인덱스: 업체명
+              const storePosCode = (row[15] || '').toString().trim(); // 15번 인덱스: POS코드
+              if (storeNameFromData && storePosCode) {
+                storeNameToPosCodeMap.set(storeNameFromData, storePosCode);
+              }
+            }
+          });
+        }
+      } catch (err) {
+        console.error('매장 데이터 조회 오류:', err);
+      }
+    }
+
+    let queue = rows
+      .filter(row => {
+        // 삭제된 항목 제외
+        const status = (row[11] || '').toString().trim();
+        if (status === '삭제됨') return false;
+        
+        // 매장명 필터링
+        if (storeName) {
+          const rowStoreName = (row[6] || '').toString().trim();
+          return rowStoreName === storeName;
+        }
+        
+        // POS코드 필터링
+        if (posCode && storeNameToPosCodeMap) {
+          const rowStoreName = (row[6] || '').toString().trim();
+          const itemPosCode = storeNameToPosCodeMap.get(rowStoreName);
+          return itemPosCode === posCode;
+        }
+        
+        return true;
+      })
+      .map(row => ({
+        id: row[0],
+        category: row[1] || '',
+        title: row[2] || '',
+        content: row[3] || '',
+        customerName: row[4] || '',
+        customerCtn: row[5] || '',
+        storeName: row[6] || '',
+        storePhone: row[7] || '',
+        storeAddress: row[8] || '',
+        createdAt: row[9] || '',
+        updatedAt: row[10] || '',
+        status: row[11] || '활성'
+      }));
+
+    // 최신순 정렬
+    queue.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+    res.json(queue);
+  } catch (error) {
+    console.error('게시판 목록 조회 오류:', error);
+    res.status(500).json({ error: '목록을 불러오는데 실패했습니다.' });
+  }
+});
+
+// GET /api/member/board/:id: 게시판 상세 조회
+app.get('/api/member/board/:id', async (req, res) => {
+  const { id } = req.params;
+  
+  try {
+    const response = await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${CUSTOMER_BOARD_SHEET_NAME}!A:L`
+      })
+    );
+
+    const values = response.data.values || [];
+    const row = values.find(r => r[0] === id);
+    
+    if (!row) {
+      return res.status(404).json({ error: '게시글을 찾을 수 없습니다.' });
+    }
+
+    const post = {
+      id: row[0],
+      category: row[1] || '',
+      title: row[2] || '',
+      content: row[3] || '',
+      customerName: row[4] || '',
+      customerCtn: row[5] || '',
+      storeName: row[6] || '',
+      storePhone: row[7] || '',
+      storeAddress: row[8] || '',
+      createdAt: row[9] || '',
+      updatedAt: row[10] || '',
+      status: row[11] || '활성'
+    };
+
+    res.json(post);
+  } catch (error) {
+    console.error('게시판 상세 조회 오류:', error);
+    res.status(500).json({ error: '게시글을 불러오는데 실패했습니다.' });
+  }
+});
+
+// POST /api/member/board: 게시판 글 작성
+app.post('/api/member/board', async (req, res) => {
+  const data = req.body;
+
+  try {
+    // 시트 존재 및 헤더 확인
+    const checkResponse = await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${CUSTOMER_BOARD_SHEET_NAME}!A1:L1`
+      })
+    ).catch(() => null);
+
+    if (!checkResponse || !checkResponse.data.values) {
+      await rateLimitedSheetsCall(() =>
+        sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${CUSTOMER_BOARD_SHEET_NAME}!A1:L1`,
+          valueInputOption: 'RAW',
+          resource: { values: [CUSTOMER_BOARD_HEADERS] }
+        })
+      );
+    }
+
+    const id = `board-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const createdAt = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    const updatedAt = createdAt;
+
+    // 헤더 순서에 맞춰 데이터 배열 생성
+    const newRow = [
+      id,
+      data.category || '사용후기',
+      data.title || '',
+      data.content || '',
+      data.customerName || '',
+      data.customerCtn || '',
+      data.storeName || '',
+      data.storePhone || '',
+      data.storeAddress || '',
+      createdAt,
+      updatedAt,
+      '활성'
+    ];
+
+    await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.append({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${CUSTOMER_BOARD_SHEET_NAME}!A:L`,
+        valueInputOption: 'RAW',
+        resource: { values: [newRow] }
+      })
+    );
+
+    res.json({ success: true, id });
+  } catch (error) {
+    console.error('게시판 글 작성 오류:', error);
+    res.status(500).json({ error: '글 작성에 실패했습니다.' });
+  }
+});
+
+// PUT /api/member/board/:id: 게시판 글 수정
+app.put('/api/member/board/:id', async (req, res) => {
+  const { id } = req.params;
+  const data = req.body;
+
+  try {
+    const response = await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${CUSTOMER_BOARD_SHEET_NAME}!A:L`
+      })
+    );
+
+    const values = response.data.values || [];
+    const rowIndex = values.findIndex(row => row[0] === id);
+
+    if (rowIndex === -1) return res.status(404).json({ error: '게시글을 찾을 수 없습니다.' });
+
+    const updatedRow = [...values[rowIndex]];
+    const updatedAt = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    
+    // 매핑된 필드 업데이트
+    if (data.category !== undefined) updatedRow[1] = data.category;
+    if (data.title !== undefined) updatedRow[2] = data.title;
+    if (data.content !== undefined) updatedRow[3] = data.content;
+    if (data.storeName !== undefined) updatedRow[6] = data.storeName;
+    if (data.storePhone !== undefined) updatedRow[7] = data.storePhone;
+    if (data.storeAddress !== undefined) updatedRow[8] = data.storeAddress;
+    updatedRow[10] = updatedAt; // 수정일시
+
+    await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${CUSTOMER_BOARD_SHEET_NAME}!A${rowIndex + 1}:L${rowIndex + 1}`,
+        valueInputOption: 'RAW',
+        resource: { values: [updatedRow] }
+      })
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('게시판 글 수정 오류:', error);
+    res.status(500).json({ error: '글 수정에 실패했습니다.' });
+  }
+});
+
+// DELETE /api/member/board/:id: 게시판 글 삭제
+app.delete('/api/member/board/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const response = await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${CUSTOMER_BOARD_SHEET_NAME}!A:L`
+      })
+    );
+
+    const values = response.data.values || [];
+    const rowIndex = values.findIndex(row => row[0] === id);
+
+    if (rowIndex === -1) return res.status(404).json({ error: '게시글을 찾을 수 없습니다.' });
+
+    // 상태를 '삭제됨'으로 변경 (L열 = 11번 인덱스 = 상태)
+    await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${CUSTOMER_BOARD_SHEET_NAME}!L${rowIndex + 1}`,
+        valueInputOption: 'RAW',
+        resource: { values: [['삭제됨']] }
+      })
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('게시판 글 삭제 오류:', error);
+    res.status(500).json({ error: '글 삭제에 실패했습니다.' });
+  }
+});
+
 // 중복 제거됨 - 위의 getAllQueue API 사용
 
 // GET /api/direct/drive-monitoring: Google Drive API 모니터링 데이터 조회

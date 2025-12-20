@@ -42,6 +42,7 @@ import DirectSalesReportTab from './direct/DirectSalesReportTab';
 import OpeningInfoPage from './direct/OpeningInfoPage';
 import CustomerPurchaseQueueTab from './customer/CustomerPurchaseQueueTab';
 import DirectStorePreferredStoreTab from './direct/DirectStorePreferredStoreTab';
+import DirectStoreBoardTab from './direct/DirectStoreBoardTab';
 
 const DirectStoreMode = ({
   loggedInStore,
@@ -372,6 +373,7 @@ const DirectStoreMode = ({
                   <Tab label="판매일보" />
                   <Tab label="구매대기" />
                   <Tab label="선호구입매장설정" />
+                  <Tab label="게시판" />
                 </Tabs>
               </AppBar>
             )}
@@ -460,6 +462,20 @@ const DirectStoreMode = ({
                       activeTab={activeTab}
                     />
                   )}
+                </ErrorBoundary>
+              </Box>
+
+              {/* 게시판 탭 */}
+              <Box
+                role="tabpanel"
+                hidden={activeTab !== 5}
+                sx={{ height: '100%', display: activeTab === 5 ? 'block' : 'none' }}
+              >
+                <ErrorBoundary name="DirectStoreBoardTab">
+                  <DirectStoreBoardTab 
+                    loggedInStore={loggedInStore}
+                    isManagementMode={false}
+                  />
                 </ErrorBoundary>
               </Box>
             </Box>
