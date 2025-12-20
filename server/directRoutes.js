@@ -4281,35 +4281,57 @@ function setupDirectRoutes(app) {
               }
             }
 
-            // 이미지 정보에서 URL과 Discord 정보 추출
-            let imgUrl = '';
-            let discordMessageId = null;
-            let discordThreadId = null;
-            
+            // 이미지 정보에서 URL 추출
             if (imageInfo) {
               if (typeof imageInfo === 'object' && imageInfo.imageUrl) {
-                imgUrl = imageInfo.imageUrl;
-                discordMessageId = imageInfo.discordMessageId || null;
-                discordThreadId = imageInfo.discordThreadId || null;
+                return imageInfo.imageUrl;
               } else if (typeof imageInfo === 'string') {
                 // 하위 호환: 문자열인 경우 (기존 코드)
-                imgUrl = imageInfo;
+                return imageInfo;
               }
             }
 
             // 로그 제거 (성능 최적화 - 모든 모델에 대해 반복 실행되는 불필요한 로그)
 
-            return imgUrl || '';
+            return '';
           })(),
           discordMessageId: (() => {
-            // 이미지 정보에서 Discord 메시지 ID 추출 (위의 imageInfo 사용)
+            // 이미지 정보 조회 (위의 image 로직과 동일)
+            const key = `${carrierParam}:${model}`;
+            let imageInfo = imageMap.get(key);
+
+            if (!imageInfo) {
+              imageInfo = imageMap.get(model);
+            }
+
+            if (!imageInfo) {
+              const normalizedModel = normalizeModelCode(model);
+              if (normalizedModel) {
+                imageInfo = imageMap.get(`${carrierParam}:${normalizedModel}`) || imageMap.get(normalizedModel);
+              }
+            }
+
             if (imageInfo && typeof imageInfo === 'object' && imageInfo.discordMessageId) {
               return imageInfo.discordMessageId;
             }
             return null;
           })(),
           discordThreadId: (() => {
-            // 이미지 정보에서 Discord 스레드 ID 추출 (위의 imageInfo 사용)
+            // 이미지 정보 조회 (위의 image 로직과 동일)
+            const key = `${carrierParam}:${model}`;
+            let imageInfo = imageMap.get(key);
+
+            if (!imageInfo) {
+              imageInfo = imageMap.get(model);
+            }
+
+            if (!imageInfo) {
+              const normalizedModel = normalizeModelCode(model);
+              if (normalizedModel) {
+                imageInfo = imageMap.get(`${carrierParam}:${normalizedModel}`) || imageMap.get(normalizedModel);
+              }
+            }
+
             if (imageInfo && typeof imageInfo === 'object' && imageInfo.discordThreadId) {
               return imageInfo.discordThreadId;
             }
