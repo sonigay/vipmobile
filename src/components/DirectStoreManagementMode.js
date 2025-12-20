@@ -120,7 +120,11 @@ const DirectStoreManagementMode = ({
         key: 'customerQueue',
         label: '고객 구매 대기',
         icon: <AssignmentIcon />,
-        componentName: 'CustomerQueueManagementTab'
+        componentName: 'CustomerQueueManagementTab',
+        props: {
+          onRowClick: handleReportSelect,
+          loggedInStore: loggedInStore
+        }
       });
       tabs.push({
         key: 'preferredStore',

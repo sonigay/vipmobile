@@ -9,7 +9,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import { customerAPI } from '../../../api';
 import CustomerPurchaseQueueTab from '../../customer/CustomerPurchaseQueueTab';
 
-const CustomerQueueManagementTab = ({ loggedInStore }) => {
+const CustomerQueueManagementTab = ({ loggedInStore, onRowClick }) => {
     const [queue, setQueue] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -117,7 +117,53 @@ const CustomerQueueManagementTab = ({ loggedInStore }) => {
                             </TableRow>
                         ) : (
                             filteredQueue.map((item) => (
-                                <TableRow key={item.id} hover sx={{ opacity: item.status === '삭제됨' ? 0.6 : 1 }}>
+                                <TableRow 
+                                    key={item.id} 
+                                    hover 
+                                    sx={{ 
+                                        opacity: item.status === '삭제됨' ? 0.6 : 1,
+                                        cursor: onRowClick ? 'pointer' : 'default'
+                                    }}
+                                    onClick={() => {
+                                        if (onRowClick) {
+                                            // 구매대기 데이터를 개통정보입력페이지 형식으로 변환
+                                            const openingTypeMap = {
+                                                '신규': 'NEW',
+                                                '번호이동': 'MNP',
+                                                '기기변경': 'CHANGE'
+                                            };
+                                            const openingType = openingTypeMap[item.activationType] || 'NEW';
+                                            
+                                            onRowClick({
+                                                id: item.id,
+                                                번호: item.id,
+                                                purchaseQueueId: item.id, // 수정 모드 구분용
+                                                customerName: item.name,
+                                                customerContact: item.ctn,
+                                                carrier: item.carrier,
+                                                model: item.model,
+                                                deviceColor: item.color || '',
+                                                deviceSerial: item.deviceSerial || '',
+                                                simModel: item.usimModel || '',
+                                                simSerial: item.usimSerial || '',
+                                                openingType: openingType,
+                                                prevCarrier: item.oldCarrier || '',
+                                                paymentType: item.installmentType === '할부' ? 'installment' : 'cash',
+                                                installmentPeriod: item.installmentMonths || 24,
+                                                contractType: item.contractType === '선택약정' ? 'selected' : 'standard',
+                                                plan: item.plan || '',
+                                                withAddon: true, // 기본값
+                                                usePublicSupport: true, // 기본값
+                                                factoryPrice: item.factoryPrice || 0,
+                                                publicSupport: item.carrierSupport || 0,
+                                                support: item.carrierSupport || 0, // 하위 호환
+                                                storeSupport: item.dealerSupportWithAdd || 0,
+                                                storeSupportNoAddon: item.dealerSupportWithoutAdd || 0,
+                                                soldAt: item.createdAt
+                                            });
+                                        }
+                                    }}
+                                >
                                     <TableCell>{new Date(item.createdAt).toLocaleString()}</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }}>{item.name}</TableCell>
                                     <TableCell>{item.ctn}</TableCell>
