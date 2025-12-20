@@ -100,11 +100,19 @@ const DiscordImageMonitoringTab = () => {
 
     try {
       setRefreshing(true);
-      const allItems = [
-        ...monitoringData.direct.mobileImages.map(item => ({ type: 'mobile-image', ...item })),
-        ...monitoringData.direct.masterImages.map(item => ({ type: 'master-image', ...item })),
-        ...monitoringData.direct.storePhotos.map(item => ({ type: 'store-photo', ...item }))
-      ];
+      const isMeetingMode = window.location.pathname.includes('meeting') || 
+                            document.title.includes('회의');
+      
+      let allItems = [];
+      if (isMeetingMode && monitoringData.meeting) {
+        allItems = monitoringData.meeting.slides.map(item => ({ type: 'meeting-slide', ...item }));
+      } else if (monitoringData.direct) {
+        allItems = [
+          ...monitoringData.direct.mobileImages.map(item => ({ type: 'mobile-image', ...item })),
+          ...monitoringData.direct.masterImages.map(item => ({ type: 'master-image', ...item })),
+          ...monitoringData.direct.storePhotos.map(item => ({ type: 'store-photo', ...item }))
+        ];
+      }
 
       const itemsToRefresh = Array.from(selectedItems).map(index => allItems[index]);
       
