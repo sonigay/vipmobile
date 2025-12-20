@@ -2,15 +2,21 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
     Box, Typography, Paper, Chip, Card, CardContent, Grid, IconButton,
     CircularProgress, Alert, Dialog, DialogTitle, DialogContent, DialogActions,
-    Button, Divider
+    Button, Divider, Table, TableBody, TableCell, TableContainer, TableHead,
+    TableRow, ToggleButton, ToggleButtonGroup, Tooltip, Select, MenuItem,
+    FormControl, InputLabel, TextField, InputAdornment
 } from '@mui/material';
 import {
     Store as StoreIcon,
     Star as StarIcon,
     Feedback as FeedbackIcon,
-    Build as BuildIcon
+    Build as BuildIcon,
+    ViewModule as ViewModuleIcon,
+    TableChart as TableChartIcon,
+    Search as SearchIcon,
+    Clear as ClearIcon
 } from '@mui/icons-material';
-import { customerAPI } from '../../api';
+import { customerAPI, api } from '../../api';
 
 const CATEGORY_OPTIONS = [
     { value: '사용후기', label: '사용후기', icon: <StarIcon />, color: '#ff9800' },
@@ -20,10 +26,15 @@ const CATEGORY_OPTIONS = [
 
 const DirectStoreBoardTab = ({ loggedInStore, isManagementMode = false }) => {
     const [posts, setPosts] = useState([]);
+    const [allPosts, setAllPosts] = useState([]); // 전체 게시글 (필터링 전)
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
     const [selectedPost, setSelectedPost] = useState(null);
     const [showDetailDialog, setShowDetailDialog] = useState(false);
+    const [viewMode, setViewMode] = useState('card'); // 'card' or 'table'
+    const [selectedStoreFilter, setSelectedStoreFilter] = useState('all'); // 'all' or storeName
+    const [stores, setStores] = useState([]); // 매장 목록
+    const [searchTerm, setSearchTerm] = useState(''); // 검색어
 
     const loadPosts = useCallback(async () => {
         setIsLoading(true);
@@ -38,19 +49,61 @@ const DirectStoreBoardTab = ({ loggedInStore, isManagementMode = false }) => {
                 const posCode = loggedInStore.id; // POS코드
                 data = await customerAPI.getBoardList(null, posCode);
             }
-            setPosts(data);
+            setAllPosts(data); // 전체 게시글 저장
+            setPosts(data); // 초기에는 전체 표시
         } catch (err) {
             console.error('Error loading posts:', err);
             setError('게시글을 불러오는데 실패했습니다.');
             setPosts([]);
+            setAllPosts([]);
         } finally {
             setIsLoading(false);
         }
     }, [isManagementMode, loggedInStore]);
 
+    // 매장 목록 로드 (관리 모드만)
+    const loadStores = useCallback(async () => {
+        if (!isManagementMode) return;
+        try {
+            const storeData = await api.getStores({ includeShipped: false });
+            // VIP직영 매장만 필터링
+            const vipStores = storeData.filter(store => store.vipStatus === 'VIP직영');
+            setStores(vipStores);
+        } catch (err) {
+            console.error('Error loading stores:', err);
+        }
+    }, [isManagementMode]);
+
+    // 매장 필터링 및 검색
+    useEffect(() => {
+        let filtered = [...allPosts];
+
+        // 매장 필터링 (관리 모드만)
+        if (isManagementMode && selectedStoreFilter !== 'all') {
+            filtered = filtered.filter(post => post.storeName === selectedStoreFilter);
+        }
+
+        // 검색 필터링
+        if (searchTerm.trim()) {
+            const searchLower = searchTerm.toLowerCase().trim();
+            filtered = filtered.filter(post => {
+                return (
+                    (post.title || '').toLowerCase().includes(searchLower) ||
+                    (post.content || '').toLowerCase().includes(searchLower) ||
+                    (post.customerName || '').toLowerCase().includes(searchLower) ||
+                    (post.storeName || '').toLowerCase().includes(searchLower) ||
+                    (post.category || '').toLowerCase().includes(searchLower)
+                );
+            });
+        }
+
+        setPosts(filtered);
+    }, [selectedStoreFilter, allPosts, isManagementMode, searchTerm]);
+
     useEffect(() => {
         loadPosts();
-    }, [loadPosts]);
+        loadStores();
+    }, [loadPosts, loadStores]);
 
     const handlePostClick = async (post) => {
         try {
@@ -84,22 +137,91 @@ const DirectStoreBoardTab = ({ loggedInStore, isManagementMode = false }) => {
 
     return (
         <Box sx={{ p: 3 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
-                    {isManagementMode ? '전체 게시판' : '게시판'}
-                </Typography>
-                {!isManagementMode && loggedInStore && (
-                    <Typography variant="body2" color="text.secondary">
-                        {loggedInStore.name} 매장의 게시글만 표시됩니다
-                    </Typography>
-                )}
+            <Box sx={{ mb: 3 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
+                    <Box>
+                        <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
+                            {isManagementMode ? '전체 게시판' : '게시판'}
+                        </Typography>
+                        {!isManagementMode && loggedInStore && (
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                                {loggedInStore.name} 매장의 게시글만 표시됩니다
+                            </Typography>
+                        )}
+                    </Box>
+                    <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+                        {isManagementMode && stores.length > 0 && (
+                            <FormControl size="small" sx={{ minWidth: 200 }}>
+                                <InputLabel>매장 필터</InputLabel>
+                                <Select
+                                    value={selectedStoreFilter}
+                                    label="매장 필터"
+                                    onChange={(e) => setSelectedStoreFilter(e.target.value)}
+                                >
+                                    <MenuItem value="all">전체 매장</MenuItem>
+                                    {stores.map(store => (
+                                        <MenuItem key={store.id || store.name} value={store.name}>
+                                            {store.name}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        )}
+                        <ToggleButtonGroup
+                            value={viewMode}
+                            exclusive
+                            onChange={(e, newMode) => {
+                                if (newMode !== null) setViewMode(newMode);
+                            }}
+                            size="small"
+                        >
+                            <ToggleButton value="card" aria-label="카드 뷰">
+                                <Tooltip title="카드 뷰">
+                                    <ViewModuleIcon />
+                                </Tooltip>
+                            </ToggleButton>
+                            <ToggleButton value="table" aria-label="테이블 뷰">
+                                <Tooltip title="테이블 뷰">
+                                    <TableChartIcon />
+                                </Tooltip>
+                            </ToggleButton>
+                        </ToggleButtonGroup>
+                    </Box>
+                </Box>
+                {/* 검색 바 */}
+                <TextField
+                    fullWidth
+                    size="small"
+                    placeholder="제목, 내용, 작성자, 매장명, 카테고리로 검색..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    InputProps={{
+                        startAdornment: (
+                            <InputAdornment position="start">
+                                <SearchIcon color="action" />
+                            </InputAdornment>
+                        ),
+                        endAdornment: searchTerm && (
+                            <InputAdornment position="end">
+                                <IconButton
+                                    size="small"
+                                    onClick={() => setSearchTerm('')}
+                                    edge="end"
+                                >
+                                    <ClearIcon fontSize="small" />
+                                </IconButton>
+                            </InputAdornment>
+                        )
+                    }}
+                    sx={{ bgcolor: 'background.paper', borderRadius: 1 }}
+                />
             </Box>
 
             {posts.length === 0 ? (
                 <Paper sx={{ p: 4, textAlign: 'center', bgcolor: '#f9f9f9' }}>
                     <Typography color="text.secondary">아직 작성된 글이 없습니다.</Typography>
                 </Paper>
-            ) : (
+            ) : viewMode === 'card' ? (
                 <Grid container spacing={3}>
                     {posts.map((post) => {
                         const categoryInfo = getCategoryInfo(post.category);
@@ -185,6 +307,90 @@ const DirectStoreBoardTab = ({ loggedInStore, isManagementMode = false }) => {
                         );
                     })}
                 </Grid>
+            ) : (
+                <TableContainer component={Paper} sx={{ boxShadow: 2 }}>
+                    <Table>
+                        <TableHead sx={{ bgcolor: '#f5f5f5' }}>
+                            <TableRow>
+                                <TableCell sx={{ fontWeight: 'bold', width: '80px' }}>카테고리</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold' }}>제목</TableCell>
+                                {isManagementMode && (
+                                    <TableCell sx={{ fontWeight: 'bold', width: '120px' }}>작성자</TableCell>
+                                )}
+                                <TableCell sx={{ fontWeight: 'bold', width: '150px' }}>매장</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold', width: '120px' }}>작성일</TableCell>
+                            </TableRow>
+                        </TableHead>
+                        <TableBody>
+                            {posts.map((post) => {
+                                const categoryInfo = getCategoryInfo(post.category);
+                                return (
+                                    <TableRow
+                                        key={post.id}
+                                        hover
+                                        sx={{ cursor: 'pointer' }}
+                                        onClick={() => handlePostClick(post)}
+                                    >
+                                        <TableCell>
+                                            <Chip
+                                                icon={categoryInfo.icon}
+                                                label={categoryInfo.label}
+                                                size="small"
+                                                sx={{
+                                                    bgcolor: categoryInfo.color,
+                                                    color: 'white',
+                                                    fontWeight: 'bold'
+                                                }}
+                                            />
+                                        </TableCell>
+                                        <TableCell>
+                                            <Typography
+                                                variant="body2"
+                                                sx={{
+                                                    fontWeight: 'medium',
+                                                    overflow: 'hidden',
+                                                    textOverflow: 'ellipsis',
+                                                    whiteSpace: 'nowrap',
+                                                    maxWidth: '400px'
+                                                }}
+                                            >
+                                                {post.title}
+                                            </Typography>
+                                            <Typography
+                                                variant="caption"
+                                                color="text.secondary"
+                                                sx={{
+                                                    display: 'block',
+                                                    overflow: 'hidden',
+                                                    textOverflow: 'ellipsis',
+                                                    whiteSpace: 'nowrap',
+                                                    maxWidth: '400px',
+                                                    mt: 0.5
+                                                }}
+                                            >
+                                                {post.content}
+                                            </Typography>
+                                        </TableCell>
+                                        {isManagementMode && (
+                                            <TableCell>{post.customerName || '-'}</TableCell>
+                                        )}
+                                        <TableCell>
+                                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                                <StoreIcon sx={{ fontSize: 14, mr: 0.5, color: 'text.secondary' }} />
+                                                <Typography variant="body2">
+                                                    {post.storeName || '미지정'}
+                                                </Typography>
+                                            </Box>
+                                        </TableCell>
+                                        <TableCell>
+                                            {post.createdAt ? new Date(post.createdAt).toLocaleDateString() : '-'}
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
+                        </TableBody>
+                    </Table>
+                </TableContainer>
             )}
 
             {/* 상세보기 다이얼로그 */}
