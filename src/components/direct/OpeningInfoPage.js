@@ -61,6 +61,11 @@ const OpeningInfoPage = ({
     const [requiredAddons, setRequiredAddons] = useState([]); // 필수 부가서비스 목록
     const [addonIncentiveList, setAddonIncentiveList] = useState([]); // 부가유치 시 유치되는 부가서비스 목록
     const [insuranceIncentiveList, setInsuranceIncentiveList] = useState([]); // 부가유치 시 유치되는 보험상품 목록
+    // 🔥 개선: 부가서비스/보험상품 개별 선택 기능
+    const [availableAddons, setAvailableAddons] = useState([]); // 선택 가능한 모든 부가서비스 목록 (incentive, deduction 정보 포함)
+    const [availableInsurances, setAvailableInsurances] = useState([]); // 선택 가능한 모든 보험상품 목록 (incentive, deduction 정보 포함)
+    const [selectedAddons, setSelectedAddons] = useState(new Set()); // 선택된 부가서비스 이름 Set
+    const [selectedInsurances, setSelectedInsurances] = useState(new Set()); // 선택된 보험상품 이름 Set
     const [agreementChecked, setAgreementChecked] = useState(false); // 동의 체크박스 상태
     const [baseMargin, setBaseMargin] = useState(0); // 정책설정에서 가져온 기본 마진
     const [preApprovalMark, setPreApprovalMark] = useState(null); // 사전승낙서 마크
@@ -178,21 +183,33 @@ const OpeningInfoPage = ({
                 }
 
                 if (policySettings.success && policySettings.addon?.list) {
+                    // 🔥 개선: 모든 부가서비스 목록 저장 (incentive, deduction 정보 포함)
+                    const allAddons = policySettings.addon.list.map(addon => ({
+                        name: addon.name,
+                        monthlyFee: addon.fee || 0,
+                        incentive: addon.incentive || 0,
+                        deduction: addon.deduction || 0,
+                        type: 'addon'
+                    }));
+                    setAvailableAddons(allAddons);
+
                     // 미유치차감금액이 있는 부가서비스를 필수 부가서비스로 간주
-                    const addonList = policySettings.addon.list
+                    const addonList = allAddons
                         .filter(addon => addon.deduction > 0)
                         .map(addon => ({
                             name: addon.name,
-                            monthlyFee: addon.fee || 0,
+                            monthlyFee: addon.monthlyFee,
                             type: 'addon'
                         }));
                     required.push(...addonList);
 
-                    // 부가유치 시 유치되는 부가서비스 (incentive가 있는 항목)
-                    const incentiveAddons = policySettings.addon.list
+                    // 부가유치 시 유치되는 부가서비스 (incentive가 있는 항목) - 초기값으로 모두 선택
+                    const incentiveAddons = allAddons
                         .filter(addon => addon.incentive > 0)
                         .map(addon => addon.name);
                     setAddonIncentiveList(incentiveAddons);
+                    // 초기값: incentive가 있는 부가서비스는 모두 선택
+                    setSelectedAddons(new Set(incentiveAddons));
                 }
 
                 // 보험상품: 출고가 및 모델 유형(플립/폴드 여부)에 맞는 보험상품 찾기
@@ -237,6 +254,23 @@ const OpeningInfoPage = ({
                         });
                     }
 
+                    // 🔥 개선: 모든 보험상품 목록 저장 (incentive, deduction 정보 포함)
+                    const allInsurances = insuranceList
+                        .filter(insurance => {
+                            // 출고가 범위에 맞는 보험상품만 포함
+                            const minPrice = insurance.minPrice || 0;
+                            const maxPrice = insurance.maxPrice || 9999999;
+                            return factoryPrice >= minPrice && factoryPrice <= maxPrice;
+                        })
+                        .map(insurance => ({
+                            name: insurance.name,
+                            monthlyFee: insurance.fee || 0,
+                            incentive: insurance.incentive || 0,
+                            deduction: insurance.deduction || 0,
+                            type: 'insurance'
+                        }));
+                    setAvailableInsurances(allInsurances);
+
                     if (matchingInsurance) {
                         required.push({
                             name: matchingInsurance.name,
@@ -244,9 +278,11 @@ const OpeningInfoPage = ({
                             type: 'insurance'
                         });
 
-                        // 부가유치 시 유치되는 보험상품 (incentive가 있는 경우)
+                        // 부가유치 시 유치되는 보험상품 (incentive가 있는 경우) - 초기값으로 선택
                         if (matchingInsurance.incentive > 0) {
                             setInsuranceIncentiveList([matchingInsurance.name]);
+                            // 초기값: incentive가 있는 보험상품은 선택
+                            setSelectedInsurances(new Set([matchingInsurance.name]));
                         }
                     }
                 }
@@ -349,12 +385,48 @@ const OpeningInfoPage = ({
         calculateInitialPrice();
     }, [initialData?.planGroup, initialData?.openingType, planGroups, selectedCarrier, initialData?.id, formData.contractType]);
 
+    // 🔥 개선: 선택된 부가서비스/보험상품에 따른 대리점지원금 계산
+    const calculateDynamicStoreSupport = useMemo(() => {
+        // 선택된 부가서비스/보험상품의 incentive 합계
+        const selectedIncentive = 
+            Array.from(selectedAddons).reduce((sum, name) => {
+                const addon = availableAddons.find(a => a.name === name);
+                return sum + (addon?.incentive || 0);
+            }, 0) +
+            Array.from(selectedInsurances).reduce((sum, name) => {
+                const insurance = availableInsurances.find(i => i.name === name);
+                return sum + (insurance?.incentive || 0);
+            }, 0);
+
+        // 선택되지 않은 부가서비스/보험상품의 deduction 합계
+        const unselectedDeduction = 
+            availableAddons
+                .filter(addon => !selectedAddons.has(addon.name))
+                .reduce((sum, addon) => sum + (addon.deduction || 0), 0) +
+            availableInsurances
+                .filter(insurance => !selectedInsurances.has(insurance.name))
+                .reduce((sum, insurance) => sum + (insurance.deduction || 0), 0);
+
+        // 동적 대리점지원금 = 기본 대리점지원금 + 선택된 상품들의 incentive - 선택되지 않은 상품들의 deduction
+        const dynamicStoreSupportWithAddon = storeSupportWithAddon + selectedIncentive - unselectedDeduction;
+        const dynamicStoreSupportWithoutAddon = storeSupportWithoutAddon - unselectedDeduction;
+
+        return {
+            withAddon: Math.max(0, dynamicStoreSupportWithAddon), // 음수 방지
+            withoutAddon: Math.max(0, dynamicStoreSupportWithoutAddon) // 음수 방지
+        };
+    }, [selectedAddons, selectedInsurances, availableAddons, availableInsurances, storeSupportWithAddon, storeSupportWithoutAddon]);
+
     // 계산 로직 (계산 엔진 사용)
     const getCurrentInstallmentPrincipal = () => {
         const support = formData.usePublicSupport ? publicSupport : 0;
+        const dynamicStoreSupport = formData.withAddon 
+            ? calculateDynamicStoreSupport.withAddon 
+            : calculateDynamicStoreSupport.withoutAddon;
+        
         return formData.withAddon
-            ? calculateInstallmentPrincipalWithAddon(factoryPrice, support, storeSupportWithAddon, formData.usePublicSupport)
-            : calculateInstallmentPrincipalWithoutAddon(factoryPrice, support, storeSupportWithoutAddon, formData.usePublicSupport);
+            ? calculateInstallmentPrincipalWithAddon(factoryPrice, support, dynamicStoreSupport, formData.usePublicSupport)
+            : calculateInstallmentPrincipalWithoutAddon(factoryPrice, support, dynamicStoreSupport, formData.usePublicSupport);
     };
 
     // 현금가 계산 함수
@@ -367,7 +439,7 @@ const OpeningInfoPage = ({
     // 🔥 개선: formData.withAddon 변경 시 할부원금 재계산되도록 useMemo 사용
     const installmentPrincipal = useMemo(() => {
         return getCurrentInstallmentPrincipal();
-    }, [formData.withAddon, formData.usePublicSupport, factoryPrice, publicSupport, storeSupportWithAddon, storeSupportWithoutAddon]);
+    }, [formData.withAddon, formData.usePublicSupport, factoryPrice, publicSupport, calculateDynamicStoreSupport]);
     
     const installmentFeeResult = useMemo(() => {
         return calculateInstallmentFee(installmentPrincipal, formData.installmentPeriod);
@@ -461,7 +533,7 @@ const OpeningInfoPage = ({
                 // - 구매가가 0원 미만(마이너스)이면 그 절대값을 마진으로 사용
                 margin: (() => {
                     const appliedPublicSupport = formData.usePublicSupport ? publicSupport : 0;
-                    const appliedStoreSupport = formData.withAddon ? storeSupportWithAddon : storeSupportWithoutAddon;
+                    const appliedStoreSupport = formData.withAddon ? calculateDynamicStoreSupport.withAddon : calculateDynamicStoreSupport.withoutAddon;
                     const purchasePrice = factoryPrice - appliedPublicSupport - appliedStoreSupport;
 
                     if (isNaN(purchasePrice)) return 0;
@@ -471,8 +543,8 @@ const OpeningInfoPage = ({
                     return Math.abs(purchasePrice);
                 })(),
                 // 계산된 값들 (참고용, 시트에는 저장 안 됨)
-                installmentPrincipalWithAddon: calculateInstallmentPrincipalWithAddon(factoryPrice, publicSupport, storeSupportWithAddon, formData.usePublicSupport),
-                installmentPrincipalWithoutAddon: calculateInstallmentPrincipalWithoutAddon(factoryPrice, publicSupport, storeSupportWithoutAddon, formData.usePublicSupport),
+                installmentPrincipalWithAddon: calculateInstallmentPrincipalWithAddon(factoryPrice, publicSupport, calculateDynamicStoreSupport.withAddon, formData.usePublicSupport),
+                installmentPrincipalWithoutAddon: calculateInstallmentPrincipalWithoutAddon(factoryPrice, publicSupport, calculateDynamicStoreSupport.withoutAddon, formData.usePublicSupport),
                 installmentFee: installmentFeeResult,
                 planFee: planFeeResult,
                 requiredAddonsFee: addonsFeeResult,
@@ -1079,7 +1151,7 @@ const OpeningInfoPage = ({
                                     대리점추가지원금 ({formData.withAddon ? '부가유치' : '부가미유치'})
                                 </Typography>
                                 <Typography variant="body2">
-                                    -{(formData.withAddon ? storeSupportWithAddon : storeSupportWithoutAddon).toLocaleString()}원
+                                    -{(formData.withAddon ? calculateDynamicStoreSupport.withAddon : calculateDynamicStoreSupport.withoutAddon).toLocaleString()}원
                                 </Typography>
                             </Stack>
                             {formData.paymentType === 'installment' && (
@@ -1233,16 +1305,18 @@ const OpeningInfoPage = ({
                                     <TextField
                                         label="대리점추가지원금 (부가유치)"
                                         fullWidth
-                                        value={storeSupportWithAddon.toLocaleString()}
+                                        value={calculateDynamicStoreSupport.withAddon.toLocaleString()}
                                         InputProps={{ readOnly: true }}
+                                        helperText="선택된 상품에 따라 자동 계산"
                                     />
                                 </Grid>
                                 <Grid item xs={6}>
                                     <TextField
                                         label="대리점추가지원금 (부가미유치)"
                                         fullWidth
-                                        value={storeSupportWithoutAddon.toLocaleString()}
+                                        value={calculateDynamicStoreSupport.withoutAddon.toLocaleString()}
                                         InputProps={{ readOnly: true }}
+                                        helperText="선택된 상품에 따라 자동 계산"
                                     />
                                 </Grid>
                                 <Grid item xs={6}>
@@ -1251,7 +1325,7 @@ const OpeningInfoPage = ({
                                         fullWidth
                                         value={(() => {
                                             const support = formData.usePublicSupport ? publicSupport : 0;
-                                            const principal = calculateInstallmentPrincipalWithAddon(factoryPrice, support, storeSupportWithAddon, formData.usePublicSupport);
+                                            const principal = calculateInstallmentPrincipalWithAddon(factoryPrice, support, calculateDynamicStoreSupport.withAddon, formData.usePublicSupport);
                                             return isNaN(principal) ? 0 : principal;
                                         })().toLocaleString()}
                                         InputProps={{ readOnly: true }}
@@ -1264,7 +1338,7 @@ const OpeningInfoPage = ({
                                         fullWidth
                                         value={(() => {
                                             const support = formData.usePublicSupport ? publicSupport : 0;
-                                            const principal = calculateInstallmentPrincipalWithoutAddon(factoryPrice, support, storeSupportWithoutAddon, formData.usePublicSupport);
+                                            const principal = calculateInstallmentPrincipalWithoutAddon(factoryPrice, support, calculateDynamicStoreSupport.withoutAddon, formData.usePublicSupport);
                                             return isNaN(principal) ? 0 : principal;
                                         })().toLocaleString()}
                                         InputProps={{ readOnly: true }}
@@ -1272,22 +1346,100 @@ const OpeningInfoPage = ({
                                     />
                                 </Grid>
                                 <Grid item xs={12}>
-                                    <FormControl component="fieldset" className="print-inline-group" sx={{ '@media print': { display: 'inline-block', mr: 2, verticalAlign: 'top' } }}>
-                                        <Typography variant="subtitle2" gutterBottom sx={{ '@media print': { display: 'inline', mr: 1, mb: 0 } }}>부가서비스 유치 여부</Typography>
-                                        <RadioGroup
-                                            row
-                                            value={formData.withAddon ? 'with' : 'without'}
-                                            onChange={(e) => setFormData({ ...formData, withAddon: e.target.value === 'with' })}
-                                        >
-                                            <FormControlLabel value="with" control={<Radio />} label="부가유치" />
-                                            <FormControlLabel value="without" control={<Radio />} label="부가미유치" />
-                                        </RadioGroup>
-                                        {/* 유치되는 부가서비스/보험상품 항목명 표기 */}
-                                        {formData.withAddon && (addonIncentiveList.length > 0 || insuranceIncentiveList.length > 0) && (
-                                            <Typography variant="caption" color="text.secondary" sx={{ ml: 2, fontSize: '0.75rem', '@media print': { ml: 1, display: 'inline' } }}>
-                                                ({[...addonIncentiveList, ...insuranceIncentiveList].join(', ')})
-                                            </Typography>
+                                    <FormControl component="fieldset" fullWidth>
+                                        <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold', mb: 2 }}>
+                                            부가서비스/보험상품 개별 선택
+                                        </Typography>
+                                        
+                                        {/* 부가서비스 선택 */}
+                                        {availableAddons.length > 0 && (
+                                            <Box sx={{ mb: 2 }}>
+                                                <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold', color: 'primary.main' }}>
+                                                    부가서비스
+                                                </Typography>
+                                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                                                    {availableAddons.map((addon) => (
+                                                        <FormControlLabel
+                                                            key={addon.name}
+                                                            control={
+                                                                <Checkbox
+                                                                    checked={selectedAddons.has(addon.name)}
+                                                                    onChange={(e) => {
+                                                                        const newSelected = new Set(selectedAddons);
+                                                                        if (e.target.checked) {
+                                                                            newSelected.add(addon.name);
+                                                                        } else {
+                                                                            newSelected.delete(addon.name);
+                                                                        }
+                                                                        setSelectedAddons(newSelected);
+                                                                    }}
+                                                                />
+                                                            }
+                                                            label={
+                                                                <Box>
+                                                                    <Typography variant="body2">{addon.name}</Typography>
+                                                                    <Typography variant="caption" color="text.secondary">
+                                                                        {addon.incentive > 0 && `유치시 +${addon.incentive.toLocaleString()}원`}
+                                                                        {addon.deduction > 0 && `미유치시 -${addon.deduction.toLocaleString()}원`}
+                                                                    </Typography>
+                                                                </Box>
+                                                            }
+                                                        />
+                                                    ))}
+                                                </Box>
+                                            </Box>
                                         )}
+
+                                        {/* 보험상품 선택 */}
+                                        {availableInsurances.length > 0 && (
+                                            <Box sx={{ mb: 2 }}>
+                                                <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold', color: 'primary.main' }}>
+                                                    보험상품
+                                                </Typography>
+                                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                                                    {availableInsurances.map((insurance) => (
+                                                        <FormControlLabel
+                                                            key={insurance.name}
+                                                            control={
+                                                                <Checkbox
+                                                                    checked={selectedInsurances.has(insurance.name)}
+                                                                    onChange={(e) => {
+                                                                        const newSelected = new Set(selectedInsurances);
+                                                                        if (e.target.checked) {
+                                                                            newSelected.add(insurance.name);
+                                                                        } else {
+                                                                            newSelected.delete(insurance.name);
+                                                                        }
+                                                                        setSelectedInsurances(newSelected);
+                                                                    }}
+                                                                />
+                                                            }
+                                                            label={
+                                                                <Box>
+                                                                    <Typography variant="body2">{insurance.name}</Typography>
+                                                                    <Typography variant="caption" color="text.secondary">
+                                                                        {insurance.incentive > 0 && `유치시 +${insurance.incentive.toLocaleString()}원`}
+                                                                        {insurance.deduction > 0 && `미유치시 -${insurance.deduction.toLocaleString()}원`}
+                                                                    </Typography>
+                                                                </Box>
+                                                            }
+                                                        />
+                                                    ))}
+                                                </Box>
+                                            </Box>
+                                        )}
+
+                                        {/* 동적 대리점지원금 표시 */}
+                                        <Box sx={{ mt: 2, p: 1, bgcolor: 'info.light', borderRadius: 1 }}>
+                                            <Typography variant="caption" sx={{ fontWeight: 'bold' }}>
+                                                계산된 대리점지원금:
+                                            </Typography>
+                                            <Typography variant="body2">
+                                                유치시: {calculateDynamicStoreSupport.withAddon.toLocaleString()}원
+                                                {' | '}
+                                                미유치시: {calculateDynamicStoreSupport.withoutAddon.toLocaleString()}원
+                                            </Typography>
+                                        </Box>
                                     </FormControl>
                                 </Grid>
                                 <Grid item xs={12}>

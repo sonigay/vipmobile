@@ -578,7 +578,7 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
     <Box sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
 
       <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', color: 'text.primary' }}>
-        {isCustomerMode ? '실시간 휴대폰 시세표' : '휴대폰 목록'}
+        {isCustomerMode ? '실시간 휴대폰 시세표' : '휴대폰시세표'}
       </Typography>
 
       {/* 로딩 단계 표시 (관리자 모드에서만 표시) */}

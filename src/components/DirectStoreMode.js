@@ -368,7 +368,7 @@ const DirectStoreMode = ({
                   centered
                   sx={{ borderBottom: 1, borderColor: 'divider' }}
                 >
-                  <Tab label="휴대폰 목록" />
+                  <Tab label="휴대폰시세표" />
                   <Tab label="오늘의 휴대폰" />
                   <Tab label="판매일보" />
                   <Tab label="구매대기" />
