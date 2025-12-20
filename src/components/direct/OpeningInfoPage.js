@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     Box,
     Paper,
@@ -364,18 +364,36 @@ const OpeningInfoPage = ({
     };
 
     // 계산된 값들을 메모이제이션하여 불필요한 재계산 방지
-    const installmentPrincipal = getCurrentInstallmentPrincipal();
-    const installmentFeeResult = calculateInstallmentFee(installmentPrincipal, formData.installmentPeriod);
-    const planFeeResult = calculatePlanFee(planBasicFee, formData.contractType, selectedCarrier, formData.lgPremier);
-    const addonsFeeResult = calculateRequiredAddonsFee(requiredAddons);
-    const totalMonthlyFeeResult = calculateTotalMonthlyFee(
-        formData.paymentType,
-        installmentPrincipal,
-        formData.installmentPeriod,
-        planFeeResult,
-        addonsFeeResult
-    );
-    const cashPriceResult = calculateCashPrice(installmentPrincipal, formData.cashPrice);
+    // 🔥 개선: formData.withAddon 변경 시 할부원금 재계산되도록 useMemo 사용
+    const installmentPrincipal = useMemo(() => {
+        return getCurrentInstallmentPrincipal();
+    }, [formData.withAddon, formData.usePublicSupport, factoryPrice, publicSupport, storeSupportWithAddon, storeSupportWithoutAddon]);
+    
+    const installmentFeeResult = useMemo(() => {
+        return calculateInstallmentFee(installmentPrincipal, formData.installmentPeriod);
+    }, [installmentPrincipal, formData.installmentPeriod]);
+    
+    const planFeeResult = useMemo(() => {
+        return calculatePlanFee(planBasicFee, formData.contractType, selectedCarrier, formData.lgPremier);
+    }, [planBasicFee, formData.contractType, selectedCarrier, formData.lgPremier]);
+    
+    const addonsFeeResult = useMemo(() => {
+        return calculateRequiredAddonsFee(requiredAddons);
+    }, [requiredAddons]);
+    
+    const totalMonthlyFeeResult = useMemo(() => {
+        return calculateTotalMonthlyFee(
+            formData.paymentType,
+            installmentPrincipal,
+            formData.installmentPeriod,
+            planFeeResult,
+            addonsFeeResult
+        );
+    }, [formData.paymentType, installmentPrincipal, formData.installmentPeriod, planFeeResult, addonsFeeResult]);
+    
+    const cashPriceResult = useMemo(() => {
+        return calculateCashPrice(installmentPrincipal, formData.cashPrice);
+    }, [installmentPrincipal, formData.cashPrice]);
 
     const handlePrint = () => {
         window.print();
