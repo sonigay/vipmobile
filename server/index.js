@@ -4,6 +4,7 @@ const cors = require('cors');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
+const { Readable } = require('stream');
 const { google } = require('googleapis');
 const NodeGeocoder = require('node-geocoder');
 const webpush = require('web-push');
@@ -5878,7 +5879,6 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
       console.warn(`⚠️ [상품 이미지 업로드] 제조사 추출 실패 또는 '기타': 모델명=${modelName}, 펫네임=${petName}, 추출된제조사=${manufacturer}`);
     }
 
-    localFilePath = req.file.path;
     const safeModelId = modelId.replace(/[^a-zA-Z0-9가-힣]/g, '_');
     const timestamp = Date.now();
     const ext = path.extname(req.file.originalname);
@@ -5900,6 +5900,17 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
     console.log(`📁 [상품 이미지 업로드] 통신사명 폴더 ID: ${carrierFolderId}`);
 
     // Google Drive에 파일 업로드 (해당 폴더에)
+    // memoryStorage를 사용하므로 req.file.buffer를 스트림으로 변환
+    const fileBuffer = req.file.buffer;
+    
+    if (!fileBuffer) {
+      console.error('❌ [상품 이미지 업로드] 파일 버퍼가 없습니다.');
+      return res.status(400).json({
+        success: false,
+        error: '파일 데이터를 읽을 수 없습니다.'
+      });
+    }
+
     const fileMetadata = {
       name: fileName,
       parents: [carrierFolderId]
@@ -5907,7 +5918,7 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
 
     const media = {
       mimeType: req.file.mimetype,
-      body: fs.createReadStream(localFilePath)
+      body: Readable.from(fileBuffer)
     };
 
     const driveResponse = await monitoredDriveCall('files.create', {
@@ -5934,13 +5945,7 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
     console.log(`✅ [상품 이미지 업로드] Google Drive 업로드 성공: ${carrier} - ${modelId} - ${imageUrl}`);
     console.log(`📂 [상품 이미지 업로드] 저장 경로: 어플자료 > 상품이미지 > ${carrier}`);
 
-    // 로컬 파일 삭제 (Google Drive에 저장되었으므로)
-    try {
-      fs.unlinkSync(localFilePath);
-      localFilePath = null;
-    } catch (unlinkError) {
-      console.warn('⚠️ 로컬 파일 삭제 실패 (무시 가능):', unlinkError);
-    }
+    // memoryStorage를 사용하므로 로컬 파일 삭제 불필요
 
     // imageUrl이 없으면 에러 반환
     if (!imageUrl) {
