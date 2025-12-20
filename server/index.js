@@ -6938,7 +6938,8 @@ app.post('/api/direct/refresh-store-photo-url', express.json(), async (req, res)
 // GET /api/discord/image-monitoring: Discord 이미지 URL 모니터링 데이터 조회
 app.get('/api/discord/image-monitoring', async (req, res) => {
   try {
-    const { sheets, SPREADSHEET_ID } = createSheetsClient();
+    // index.js에서 사용하는 전역 sheets와 SPREADSHEET_ID 사용
+    const sheets = originalSheets;
     const { type } = req.query; // 'direct' 또는 'meeting'
     
     const monitoringData = {
@@ -7171,13 +7172,10 @@ app.post('/api/discord/batch-refresh-urls', express.json(), async (req, res) => 
           }
           
           // 회의목록 시트에서 해당 슬라이드 찾기 및 업데이트
-          const { ensureSheetHeaders } = require('./directRoutes');
-          await ensureSheetHeaders(sheets, SPREADSHEET_ID, '회의목록', [
-            '회의ID', '슬라이드ID', '순서', '타입', '모드', '탭', '제목', '내용', '배경색', '이미지URL', '동영상URL', '캡처시간', 'Discord포스트ID', 'Discord스레드ID', 'Discord메시지ID', '탭라벨', '서브탭라벨', '세부항목옵션', '회의날짜', '회의차수', '회의장소', '참석자', '생성자'
-          ]);
-          
+          // ensureSheetHeaders는 directRoutes에 있지만, meetingRoutes에도 있을 수 있음
+          // 일단 직접 시트를 읽어서 확인
           const meetingResponse = await rateLimitedSheetsCall(() =>
-            sheets.spreadsheets.values.get({
+            originalSheets.spreadsheets.values.get({
               spreadsheetId: SPREADSHEET_ID,
               range: '회의목록!A:W'
             })
