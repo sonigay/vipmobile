@@ -526,6 +526,8 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
                     useCustomerStylePopup={true}
                     loggedInStore={loggedInStore}
                     fixedHeight={500}
+                    transitLocations={transitLocations}
+                    showTransitMarkers={true}
                 />
             </Box>
 
