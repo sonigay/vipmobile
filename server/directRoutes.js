@@ -4621,17 +4621,28 @@ function setupDirectRoutes(app) {
         image
       } = req.body || {};
 
-      // modelId에서 carrier와 index 추출 (형식: mobile-{carrier}-{index})
+      // modelId 형식 처리: mobile-{carrier}-{index} 또는 실제 모델 ID
+      let carrier = carrierFromBody;
+      let index = null;
+      let modelNameFromId = null;
+      
       const parts = modelId.split('-');
-      if (parts.length < 3) {
-        return res.status(400).json({ success: false, error: '잘못된 모델 ID 형식입니다.' });
-      }
-
-      const carrier = carrierFromBody || parts[1]; // SK, KT, LG
-      const index = parseInt(parts[2], 10);
-
-      if (isNaN(index)) {
-        return res.status(400).json({ success: false, error: '잘못된 모델 인덱스입니다.' });
+      if (parts.length >= 3 && parts[0] === 'mobile') {
+        // 형식: mobile-{carrier}-{index}
+        carrier = carrier || parts[1]; // SK, KT, LG
+        index = parseInt(parts[2], 10);
+        if (isNaN(index)) {
+          return res.status(400).json({ success: false, error: '잘못된 모델 인덱스입니다.' });
+        }
+      } else {
+        // 실제 모델 ID 형식 (예: SMS731N) - 모델명으로 직접 사용
+        modelNameFromId = modelId;
+        if (!carrier && carrierFromBody) {
+          carrier = carrierFromBody;
+        } else if (!carrier) {
+          // carrier가 없으면 body에서 가져오거나 기본값 사용
+          carrier = carrierFromBody || 'SK';
+        }
       }
 
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
@@ -4657,9 +4668,10 @@ function setupDirectRoutes(app) {
         return res.status(404).json({ success: false, error: `${carrier} 정책표 설정에서 모델명 범위가 누락되었습니다.` });
       }
 
-      // 정책표 시트에서 해당 인덱스의 모델명 읽기 (body 우선)
-      let modelName = (modelFromBody || '').toString().trim();
-      if (!modelName) {
+      // 모델명 결정 (우선순위: body > modelId에서 추출 > 인덱스로 조회)
+      let modelName = (modelFromBody || modelNameFromId || '').toString().trim();
+      if (!modelName && index !== null) {
+        // 인덱스가 있으면 정책표에서 조회
         try {
           const modelRes = await sheets.spreadsheets.values.get({
             spreadsheetId: policySheetId,
@@ -4675,6 +4687,11 @@ function setupDirectRoutes(app) {
           console.warn('[Direct] 모델명 읽기 실패:', err);
           return res.status(500).json({ success: false, error: '모델명을 읽을 수 없습니다.', message: err.message });
         }
+      }
+      
+      // 실제 모델 ID를 사용하는 경우, 정책표 조회 없이 바로 사용
+      if (!modelName && modelNameFromId) {
+        modelName = modelNameFromId;
       }
 
       if (!modelName) {
