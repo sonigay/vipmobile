@@ -348,29 +348,29 @@ const DirectStoreMode = ({
                   </Typography>
 
                   <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', width: { xs: '100%', sm: 'auto' }, justifyContent: { xs: 'flex-end', sm: 'flex-start' } }}>
-                    <Button
-                      color="inherit"
+                  <Button
+                    color="inherit"
                       size={isMobile ? 'small' : 'medium'}
-                      startIcon={<UpdateIcon />}
-                      onClick={() => setShowUpdatePopup(true)}
+                    startIcon={<UpdateIcon />}
+                    onClick={() => setShowUpdatePopup(true)}
                       sx={{ flex: { xs: '1 1 auto', sm: '0 0 auto' }, minWidth: { xs: 'auto', sm: '120px' } }}
-                    >
+                  >
                       <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>업데이트 확인</Box>
                       <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>업데이트</Box>
-                    </Button>
+                  </Button>
 
-                    {onModeChange && availableModes && availableModes.length > 1 && (
-                      <Button
-                        color="inherit"
+                  {onModeChange && availableModes && availableModes.length > 1 && (
+                    <Button
+                      color="inherit"
                         size={isMobile ? 'small' : 'medium'}
-                        startIcon={<RefreshIcon />}
-                        onClick={onModeChange}
+                      startIcon={<RefreshIcon />}
+                      onClick={onModeChange}
                         sx={{ flex: { xs: '1 1 auto', sm: '0 0 auto' }, minWidth: { xs: 'auto', sm: '100px' } }}
-                      >
+                    >
                         <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>모드 변경</Box>
                         <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>모드</Box>
-                      </Button>
-                    )}
+                    </Button>
+                  )}
 
                     <Button 
                       color="inherit" 
@@ -378,8 +378,8 @@ const DirectStoreMode = ({
                       size={isMobile ? 'small' : 'medium'}
                       sx={{ flex: { xs: '1 1 auto', sm: '0 0 auto' }, minWidth: { xs: 'auto', sm: '80px' } }}
                     >
-                      로그아웃
-                    </Button>
+                    로그아웃
+                  </Button>
                   </Box>
                 </Toolbar>
               </AppBar>
@@ -387,14 +387,14 @@ const DirectStoreMode = ({
 
             {/* 메인 컨텐츠 영역 */}
             <Container maxWidth="xl" sx={{ mt: { xs: 2, sm: 4 }, mb: { xs: 2, sm: 4 }, px: { xs: 1, sm: 2, md: 3 }, flexGrow: 1, position: 'relative', overflow: 'auto', maxHeight: { xs: 'calc(100vh - 200px)', sm: 'none' } }}>
-              {/* 탭 네비게이션 */}
+                {/* 탭 네비게이션 */}
               {!isFullScreen && (
                 <Paper sx={{ width: '100%', mb: 2, overflow: 'hidden' }}>
-                  <Tabs
-                    value={activeTab}
-                    onChange={handleTabChange}
+                <Tabs
+                  value={activeTab}
+                  onChange={handleTabChange}
                     indicatorColor="primary"
-                    textColor="primary"
+                  textColor="primary"
                     variant="scrollable"
                     scrollButtons="auto"
                     sx={{
@@ -404,16 +404,16 @@ const DirectStoreMode = ({
                         px: { xs: 1, sm: 2 }
                       }
                     }}
-                  >
-                    <Tab label="휴대폰시세표" />
-                    <Tab label="오늘의 휴대폰" />
-                    <Tab label="판매일보" />
-                    <Tab label="구매대기" />
-                    <Tab label="선호구입매장설정" />
-                    <Tab label="게시판" />
-                  </Tabs>
+                >
+                  <Tab label="휴대폰시세표" />
+                  <Tab label="오늘의 휴대폰" />
+                  <Tab label="판매일보" />
+                  <Tab label="구매대기" />
+                  <Tab label="선호구입매장설정" />
+                  <Tab label="게시판" />
+                </Tabs>
                 </Paper>
-              )}
+            )}
               {/* 휴대폰 목록 탭 */}
               <Paper sx={{ 
                 p: { xs: activeTab === 0 ? 0 : 2, sm: activeTab === 0 ? 0 : 3 }, 

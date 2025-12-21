@@ -206,7 +206,7 @@ const OpeningInfoPage = ({
                             .split(',')
                             .map(name => name.trim())
                             .filter(name => name);
-                        
+
                         // 저장된 부가서비스 이름과 매칭되는 항목만 선택
                         const savedAddons = allAddons.filter(addon => 
                             savedAddonNames.includes(addon.name)
@@ -276,12 +276,12 @@ const OpeningInfoPage = ({
                             );
                             
                             // 플립/폴드 모델일 때는 플립/폴드 보험상품만, 아닐 때는 일반 보험상품만
-                            if (isFlipFoldModel) {
+                    if (isFlipFoldModel) {
                                 // 플립/폴드 모델: 플립/폴드 보험상품만 포함
                                 if (!isFlipFoldInsurance) {
                                     return false; // 일반 보험상품 제외
                                 }
-                            } else {
+                    } else {
                                 // 일반 모델: 일반 보험상품만 포함
                                 if (isFlipFoldInsurance) {
                                     return false; // 플립/폴드 보험상품 제외
@@ -433,14 +433,14 @@ const OpeningInfoPage = ({
     const calculateDynamicStoreSupport = useMemo(() => {
         // 모든 가능한 항목 (부가서비스 + 보험상품)
         const allAvailableItems = [...availableAddons, ...availableInsurances];
-        
+
         // 서버에서 받은 값은 "모든 부가서비스 유치/미유치"를 가정한 값
         // 사용자가 선택한 항목과의 차이를 계산
         
         // 모든 항목의 incentive/deduction 합계 (서버 기본값 기준)
         const allItemsIncentive = allAvailableItems.reduce((sum, item) => sum + (item.incentive || 0), 0);
         const allItemsDeduction = allAvailableItems.reduce((sum, item) => sum + (item.deduction || 0), 0);
-        
+
         // 사용자가 선택한 항목들의 incentive/deduction 합계
         const selectedIncentive = selectedItems.reduce((sum, item) => sum + (item.incentive || 0), 0);
         const selectedDeduction = selectedItems.reduce((sum, item) => sum + (item.deduction || 0), 0);
@@ -561,7 +561,7 @@ const OpeningInfoPage = ({
                     
                     // 인쇄 실행
                     setTimeout(() => {
-                        window.print();
+        window.print();
                         
                         // 인쇄 후 원래 상태로 복원
                         setTimeout(() => {
@@ -1267,8 +1267,8 @@ const OpeningInfoPage = ({
                                             </Grid>
                                         )}
                                         {/* 부가서비스 및 보험 적용시 금액 변경 */}
-                                        <Grid item xs={12}>
-                                            <Divider sx={{ my: 1 }} />
+                                            <Grid item xs={12}>
+                                                <Divider sx={{ my: 1 }} />
                                             <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold' }}>
                                                 부가서비스 및 보험 적용시 금액 변경
                                             </Typography>
@@ -1278,8 +1278,8 @@ const OpeningInfoPage = ({
                                                     <CircularProgress size={24} />
                                                     <Typography variant="body2" sx={{ ml: 2, color: 'text.secondary' }}>
                                                         부가서비스 및 보험상품 목록을 불러오는 중...
-                                                    </Typography>
-                                                </Box>
+                                                        </Typography>
+                                                    </Box>
                                             ) : (
                                                 <>
                                                     {/* 선택 가능한 항목 목록 (부가서비스 + 보험상품) */}

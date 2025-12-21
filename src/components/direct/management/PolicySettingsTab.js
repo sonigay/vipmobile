@@ -499,9 +499,9 @@ const PolicySettingsTab = () => {
                                             </Button>
                                         </Stack>
                                     ) : (
-                                        <Button variant="contained" fullWidth startIcon={<AddIcon />} onClick={handleAddAddon}>
-                                            추가
-                                        </Button>
+                                    <Button variant="contained" fullWidth startIcon={<AddIcon />} onClick={handleAddAddon}>
+                                        추가
+                                    </Button>
                                     )}
                                 </Grid>
                                 <Grid item xs={12} sm={6}>
@@ -565,8 +565,8 @@ const PolicySettingsTab = () => {
                                                     <EditIcon />
                                                 </IconButton>
                                                 <IconButton edge="end" onClick={() => handleDeleteAddon(addon.id)} color="error">
-                                                    <DeleteIcon />
-                                                </IconButton>
+                                                <DeleteIcon />
+                                            </IconButton>
                                             </Stack>
                                         </ListItemSecondaryAction>
                                     </ListItem>
@@ -652,9 +652,9 @@ const PolicySettingsTab = () => {
                                             </Button>
                                         </Stack>
                                     ) : (
-                                        <Button variant="contained" startIcon={<AddIcon />} onClick={handleAddInsurance}>
-                                            추가
-                                        </Button>
+                                    <Button variant="contained" startIcon={<AddIcon />} onClick={handleAddInsurance}>
+                                        추가
+                                    </Button>
                                     )}
                                 </Grid>
                             </Grid>
@@ -709,8 +709,8 @@ const PolicySettingsTab = () => {
                                                             <EditIcon />
                                                         </IconButton>
                                                         <IconButton edge="end" onClick={() => handleDeleteInsurance(insurance.id)} color="error">
-                                                            <DeleteIcon />
-                                                        </IconButton>
+                                                        <DeleteIcon />
+                                                    </IconButton>
                                                     </Stack>
                                                 </ListItemSecondaryAction>
                                             </ListItem>

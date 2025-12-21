@@ -224,41 +224,41 @@ const DirectStoreManagementMode = ({
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: { xs: '100%', sm: 'auto' } }}>
                   <SettingsIcon sx={{ color: 'primary.main', fontSize: { xs: '1.5rem', sm: '2rem' } }} />
                   <Typography variant="h4" sx={{ flexGrow: 1, color: 'primary.main', fontWeight: 700, fontSize: { xs: '1.5rem', sm: '2rem' } }}>
-                    {modeTitle}
-                  </Typography>
+                  {modeTitle}
+                </Typography>
                 </Box>
 
                 <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', width: { xs: '100%', sm: 'auto' }, justifyContent: { xs: 'flex-end', sm: 'flex-end' } }}>
-                  {/* 업데이트 확인 버튼 */}
-                  <Button
-                    color="inherit"
+                {/* 업데이트 확인 버튼 */}
+                <Button
+                  color="inherit"
                     size={isMobile ? 'small' : 'medium'}
-                    startIcon={<UpdateIcon />}
-                    onClick={() => setShowUpdatePopup(true)}
+                  startIcon={<UpdateIcon />}
+                  onClick={() => setShowUpdatePopup(true)}
                     sx={{ flex: { xs: '1 1 auto', sm: '0 0 auto' }, minWidth: { xs: 'auto', sm: '120px' }, border: '1px solid rgba(255,255,255,0.3)' }}
-                  >
+                >
                     <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>업데이트 확인</Box>
                     <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>업데이트</Box>
-                  </Button>
+                </Button>
 
-                  {/* 데이터 재빌드 버튼 */}
-                  <Button
-                    color="inherit"
+                {/* 데이터 재빌드 버튼 */}
+                <Button
+                  color="inherit"
                     size={isMobile ? 'small' : 'medium'}
-                    startIcon={rebuilding ? <CircularProgress size={20} color="inherit" /> : <BuildIcon />}
-                    onClick={handleRebuildMaster}
-                    disabled={rebuilding}
+                  startIcon={rebuilding ? <CircularProgress size={20} color="inherit" /> : <BuildIcon />}
+                  onClick={handleRebuildMaster}
+                  disabled={rebuilding}
                     sx={{ flex: { xs: '1 1 auto', sm: '0 0 auto' }, minWidth: { xs: 'auto', sm: 'auto' }, border: '1px solid rgba(255,255,255,0.3)' }}
-                  >
+                >
                     <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
-                      {rebuilding ? '빌드 중...' : '데이터 재빌드'}
+                  {rebuilding ? '빌드 중...' : '데이터 재빌드'}
                     </Box>
                     <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>
                       {rebuilding ? '빌드 중' : '재빌드'}
                     </Box>
-                  </Button>
+                </Button>
 
-                  {onModeChange && availableModes && availableModes.length > 1 && (
+                {onModeChange && availableModes && availableModes.length > 1 && (
                     <Button 
                       color="inherit" 
                       size={isMobile ? 'small' : 'medium'}
