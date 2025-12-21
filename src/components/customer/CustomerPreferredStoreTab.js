@@ -31,13 +31,13 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                 },
                 (error) => {
                     console.error('Geolocation error:', error);
-                    // 위치 정보 실패 시 수도권이 보이도록 중심 좌표 설정
-                    setUserLocation({ lat: 37.5, lng: 127.0, isDefault: true });
+                    // 위치 정보 실패 시 평택 중심 좌표 설정 (인천과 청주지역까지 보이도록)
+                    setUserLocation({ lat: 36.9922, lng: 127.1128, isDefault: true });
                 }
             );
         } else {
-            // Geolocation 미지원 시 수도권이 보이도록 중심 좌표 설정
-            setUserLocation({ lat: 37.5, lng: 127.0, isDefault: true });
+            // Geolocation 미지원 시 평택 중심 좌표 설정 (인천과 청주지역까지 보이도록)
+            setUserLocation({ lat: 36.9922, lng: 127.1128, isDefault: true });
         }
 
         const loadStores = async () => {

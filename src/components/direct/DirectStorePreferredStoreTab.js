@@ -54,11 +54,39 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
                 },
                 (error) => {
                     console.error('Geolocation error:', error);
-                    setUserLocation({ lat: 37.5665, lng: 126.9780 });
+                    // 위치 정보 실패 시: 직영점모드는 접속 매장 중심, 관리모드는 평택 중심
+                    if (isManagementMode) {
+                        // 관리모드: 평택 중심 좌표 설정 (인천과 청주지역까지 보이도록)
+                        setUserLocation({ lat: 36.9922, lng: 127.1128, isDefault: true });
+                    } else if (loggedInStore?.coords?.lat && loggedInStore?.coords?.lng) {
+                        // 직영점모드: 접속 매장 중심 좌표 사용
+                        setUserLocation({ 
+                            lat: loggedInStore.coords.lat, 
+                            lng: loggedInStore.coords.lng,
+                            isDefault: true 
+                        });
+                    } else {
+                        // 매장 위치 정보가 없으면 평택 중심
+                        setUserLocation({ lat: 36.9922, lng: 127.1128, isDefault: true });
+                    }
                 }
             );
         } else {
-            setUserLocation({ lat: 37.5665, lng: 126.9780 });
+            // Geolocation 미지원 시: 직영점모드는 접속 매장 중심, 관리모드는 평택 중심
+            if (isManagementMode) {
+                // 관리모드: 평택 중심 좌표 설정 (인천과 청주지역까지 보이도록)
+                setUserLocation({ lat: 36.9922, lng: 127.1128, isDefault: true });
+            } else if (loggedInStore?.coords?.lat && loggedInStore?.coords?.lng) {
+                // 직영점모드: 접속 매장 중심 좌표 사용
+                setUserLocation({ 
+                    lat: loggedInStore.coords.lat, 
+                    lng: loggedInStore.coords.lng,
+                    isDefault: true 
+                });
+            } else {
+                // 매장 위치 정보가 없으면 평택 중심
+                setUserLocation({ lat: 36.9922, lng: 127.1128, isDefault: true });
+            }
         }
 
         const loadStores = async () => {

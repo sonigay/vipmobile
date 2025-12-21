@@ -69,6 +69,12 @@ const seoulMetroCenter = {
   lng: 127.0
 };
 
+// 평택 중심 좌표 (인천과 청주지역까지 한눈에 보이도록)
+const pyeongtaekCenter = {
+  lat: 36.9922,
+  lng: 127.1128
+};
+
 // 강제 확대를 위한 별도 컴포넌트
 function ForceZoomUpdater({ forceZoomToStore }) {
   const map = useMap();
@@ -156,9 +162,9 @@ function MapUpdater({ center, bounds, zoom, isAgentMode, currentView, forceZoomT
       if (currentView === 'activation') return 12; // 담당개통확인
       return 10; // 기본값
     }
-    // 고객모드에서 위치 정보 실패 시 수도권 보기
+    // 고객모드에서 위치 정보 실패 시 평택 중심 보기 (인천과 청주지역까지 보이도록)
     if (isCustomerMode && center && center.isDefault) {
-      return 10; // 수도권이 잘 보이는 줌 레벨
+      return 9; // 평택 중심으로 인천과 청주지역까지 보이는 줌 레벨
     }
     return 12; // 일반 매장 모드
   };
@@ -409,9 +415,9 @@ ${loggedInStore.name}으로 이동 예정입니다.
       if (currentView === 'activation') return 10; // 담당개통확인: 중간 시야
       return 6; // 기본값: 전체재고확인과 동일
     }
-    // 고객모드에서 위치 정보 실패 시 수도권 보기
+    // 고객모드에서 위치 정보 실패 시 평택 중심 보기 (인천과 청주지역까지 보이도록)
     if (isCustomerMode && userLocation && userLocation.isDefault) {
-      return 10; // 수도권이 잘 보이는 줌 레벨
+      return 9; // 평택 중심으로 인천과 청주지역까지 보이는 줌 레벨
     }
     return 12; // 일반 매장 모드
   };
@@ -423,14 +429,14 @@ ${loggedInStore.name}으로 이동 예정입니다.
   const previousSelectedStoreRef = useRef(null);
   const mapRef = useRef(null);
 
-  // 고객모드에서 위치 정보 실패 시 수도권 중심 좌표 사용
+  // 각 모드별 초기 중심 좌표 설정
   const center = useMemo(() => {
     if (userLocation) {
       return userLocation;
     }
-    // 고객모드이고 userLocation이 없으면 수도권 중심 좌표 사용
+    // 고객모드이고 userLocation이 없으면 평택 중심 좌표 사용 (인천과 청주지역까지 보이도록)
     if (isCustomerMode) {
-      return seoulMetroCenter;
+      return pyeongtaekCenter;
     }
     return defaultCenter;
   }, [userLocation, isCustomerMode]);
