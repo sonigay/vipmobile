@@ -179,8 +179,8 @@ function TodaysProductCard(props) {
       <Box 
         sx={{ 
           position: 'relative', 
-          pt: compact ? '55%' : '70%',  // 컴팩트 모드에서 이미지 영역 비율 더 감소
-          minHeight: compact ? 180 : 240,  // 컴팩트 모드에서 최소 높이 더 감소
+          pt: compact ? '50%' : '65%',  // 이미지 영역 비율 축소 (55%->50%, 70%->65%)
+          minHeight: compact ? 160 : 220,  // 최소 높이 축소 (180->160, 240->220)
           background: `linear-gradient(135deg, ${cardTheme.primary}10 0%, ${cardTheme.secondary}10 100%)`,
           borderRadius: '16px 16px 0 0', 
           overflow: 'hidden',
@@ -261,7 +261,9 @@ function TodaysProductCard(props) {
             left: 0,
             width: '100%',
             height: '100%',
-            objectFit: 'cover',  // cover로 변경하여 섹션을 꽉 채움
+            objectFit: 'contain',  // contain으로 변경하여 이미지가 잘리지 않도록
+            objectPosition: 'center',
+            padding: '8px'  // 여백 추가로 이미지 축소
             transition: 'transform 0.3s',
             '&:hover': { transform: 'scale(1.05)'             }
           }}
