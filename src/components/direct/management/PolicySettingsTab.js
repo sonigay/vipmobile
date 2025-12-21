@@ -64,11 +64,15 @@ const PolicySettingsTab = () => {
     ]);
     // 부가서비스 입력 폼 상태
     const [newAddon, setNewAddon] = useState({ name: '', fee: '', incentive: '', deduction: '', description: '', url: '' });
+    // 부가서비스 수정 중인 항목 ID
+    const [editingAddonId, setEditingAddonId] = useState(null);
 
     // 2-1. 보험상품 설정 리스트
     const [insurances, setInsurances] = useState([]);
     // 보험상품 입력 폼 상태
     const [newInsurance, setNewInsurance] = useState({ name: '', minPrice: '', maxPrice: '', fee: '', incentive: '', deduction: '', description: '', url: '' });
+    // 보험상품 수정 중인 항목 ID
+    const [editingInsuranceId, setEditingInsuranceId] = useState(null);
 
     // 3. 별도정책 설정 리스트
     const [specialPolicies, setSpecialPolicies] = useState([
@@ -149,6 +153,45 @@ const PolicySettingsTab = () => {
         }
     };
 
+    // 부가서비스 수정 시작
+    const handleEditAddon = (addon) => {
+        setEditingAddonId(addon.id);
+        setNewAddon({
+            name: addon.name,
+            fee: addon.fee,
+            incentive: addon.incentive,
+            deduction: addon.deduction,
+            description: addon.description || '',
+            url: addon.url || ''
+        });
+    };
+
+    // 부가서비스 수정 취소
+    const handleCancelEditAddon = () => {
+        setEditingAddonId(null);
+        setNewAddon({ name: '', fee: '', incentive: '', deduction: '', description: '', url: '' });
+    };
+
+    // 부가서비스 수정 저장
+    const handleSaveEditAddon = () => {
+        if (newAddon.name && editingAddonId) {
+            setAddons(addons.map(item => 
+                item.id === editingAddonId 
+                    ? {
+                        ...item,
+                        name: newAddon.name,
+                        fee: Number(newAddon.fee) || 0,
+                        incentive: Number(newAddon.incentive) || 0,
+                        deduction: Number(newAddon.deduction) || 0,
+                        description: newAddon.description || '',
+                        url: newAddon.url || ''
+                    }
+                    : item
+            ));
+            handleCancelEditAddon();
+        }
+    };
+
     // 부가서비스 삭제
     const handleDeleteAddon = (id) => {
         setAddons(addons.filter(item => item.id !== id));
@@ -169,6 +212,49 @@ const PolicySettingsTab = () => {
                 url: newInsurance.url || ''
             }]);
             setNewInsurance({ name: '', minPrice: '', maxPrice: '', fee: '', incentive: '', deduction: '', description: '', url: '' });
+        }
+    };
+
+    // 보험상품 수정 시작
+    const handleEditInsurance = (insurance) => {
+        setEditingInsuranceId(insurance.id);
+        setNewInsurance({
+            name: insurance.name,
+            minPrice: insurance.minPrice,
+            maxPrice: insurance.maxPrice,
+            fee: insurance.fee,
+            incentive: insurance.incentive,
+            deduction: insurance.deduction,
+            description: insurance.description || '',
+            url: insurance.url || ''
+        });
+    };
+
+    // 보험상품 수정 취소
+    const handleCancelEditInsurance = () => {
+        setEditingInsuranceId(null);
+        setNewInsurance({ name: '', minPrice: '', maxPrice: '', fee: '', incentive: '', deduction: '', description: '', url: '' });
+    };
+
+    // 보험상품 수정 저장
+    const handleSaveEditInsurance = () => {
+        if (newInsurance.name && editingInsuranceId) {
+            setInsurances(insurances.map(item => 
+                item.id === editingInsuranceId 
+                    ? {
+                        ...item,
+                        name: newInsurance.name,
+                        minPrice: Number(newInsurance.minPrice) || 0,
+                        maxPrice: Number(newInsurance.maxPrice) || 0,
+                        fee: Number(newInsurance.fee) || 0,
+                        incentive: Number(newInsurance.incentive) || 0,
+                        deduction: Number(newInsurance.deduction) || 0,
+                        description: newInsurance.description || '',
+                        url: newInsurance.url || ''
+                    }
+                    : item
+            ));
+            handleCancelEditInsurance();
         }
     };
 
@@ -403,9 +489,20 @@ const PolicySettingsTab = () => {
                                     />
                                 </Grid>
                                 <Grid item xs={12} sm={3}>
-                                    <Button variant="contained" fullWidth startIcon={<AddIcon />} onClick={handleAddAddon}>
-                                        추가
-                                    </Button>
+                                    {editingAddonId ? (
+                                        <Stack direction="row" spacing={1}>
+                                            <Button variant="contained" fullWidth startIcon={<SaveIcon />} onClick={handleSaveEditAddon} color="success">
+                                                저장
+                                            </Button>
+                                            <Button variant="outlined" fullWidth onClick={handleCancelEditAddon}>
+                                                취소
+                                            </Button>
+                                        </Stack>
+                                    ) : (
+                                        <Button variant="contained" fullWidth startIcon={<AddIcon />} onClick={handleAddAddon}>
+                                            추가
+                                        </Button>
+                                    )}
                                 </Grid>
                                 <Grid item xs={12} sm={6}>
                                     <TextField
@@ -463,9 +560,14 @@ const PolicySettingsTab = () => {
                                             </Typography>
                                         </Stack>
                                         <ListItemSecondaryAction>
-                                            <IconButton edge="end" onClick={() => handleDeleteAddon(addon.id)}>
-                                                <DeleteIcon />
-                                            </IconButton>
+                                            <Stack direction="row" spacing={1}>
+                                                <IconButton edge="end" onClick={() => handleEditAddon(addon)} color="primary">
+                                                    <EditIcon />
+                                                </IconButton>
+                                                <IconButton edge="end" onClick={() => handleDeleteAddon(addon.id)} color="error">
+                                                    <DeleteIcon />
+                                                </IconButton>
+                                            </Stack>
                                         </ListItemSecondaryAction>
                                     </ListItem>
                                     <Divider />
@@ -540,9 +642,20 @@ const PolicySettingsTab = () => {
                                     />
                                 </Grid>
                                 <Grid item xs={12}>
-                                    <Button variant="contained" startIcon={<AddIcon />} onClick={handleAddInsurance}>
-                                        추가
-                                    </Button>
+                                    {editingInsuranceId ? (
+                                        <Stack direction="row" spacing={1}>
+                                            <Button variant="contained" startIcon={<SaveIcon />} onClick={handleSaveEditInsurance} color="success">
+                                                저장
+                                            </Button>
+                                            <Button variant="outlined" onClick={handleCancelEditInsurance}>
+                                                취소
+                                            </Button>
+                                        </Stack>
+                                    ) : (
+                                        <Button variant="contained" startIcon={<AddIcon />} onClick={handleAddInsurance}>
+                                            추가
+                                        </Button>
+                                    )}
                                 </Grid>
                             </Grid>
                         </Paper>
@@ -591,9 +704,14 @@ const PolicySettingsTab = () => {
                                                     </Typography>
                                                 </Stack>
                                                 <ListItemSecondaryAction>
-                                                    <IconButton edge="end" onClick={() => handleDeleteInsurance(insurance.id)}>
-                                                        <DeleteIcon />
-                                                    </IconButton>
+                                                    <Stack direction="row" spacing={1}>
+                                                        <IconButton edge="end" onClick={() => handleEditInsurance(insurance)} color="primary">
+                                                            <EditIcon />
+                                                        </IconButton>
+                                                        <IconButton edge="end" onClick={() => handleDeleteInsurance(insurance.id)} color="error">
+                                                            <DeleteIcon />
+                                                        </IconButton>
+                                                    </Stack>
                                                 </ListItemSecondaryAction>
                                             </ListItem>
                                             <Divider />
