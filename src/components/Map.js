@@ -1091,7 +1091,11 @@ ${loggedInStore.name}으로 이동 예정입니다.
 
   // 초기 로드 시 지도 범위 설정 (각 모드별 최적화)
   useEffect(() => {
-    if (mapBounds && (initialLoadRef.current || !userInteracted) && !forceZoomToStore) {
+    // 고객모드 또는 직영점관리모드에서 위치 정보 실패 시 fitBounds 사용하지 않음
+    const shouldUseFitBounds = !((isCustomerMode || (!isCustomerMode && !isAgentMode && !loggedInStore?.coords)) && 
+                                  userLocation && userLocation.isDefault);
+    
+    if (mapBounds && shouldUseFitBounds && (initialLoadRef.current || !userInteracted) && !forceZoomToStore) {
       safeMapOperation(() => {
         // 각 모드별 최대 줌 레벨 설정
         let maxZoom;
@@ -1115,7 +1119,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
       });
       initialLoadRef.current = false;
     }
-  }, [map, mapBounds, userInteracted, safeMapOperation, isAgentMode, currentView, forceZoomToStore]);
+  }, [map, mapBounds, userInteracted, safeMapOperation, isAgentMode, currentView, forceZoomToStore, isCustomerMode, loggedInStore, userLocation]);
 
   // 반경 변경 시 지도 범위 재설정
   useEffect(() => {
