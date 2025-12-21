@@ -189,9 +189,23 @@ const OpeningInfoPage = ({
                     }));
                     setAvailableAddons(allAddons);
 
-                    // 🔥 초기값: deduction > 0인 부가서비스만 초기 선택 (필수 항목)
-                    const requiredAddons = allAddons.filter(addon => addon.deduction > 0);
-                    initialSelectedItems.push(...requiredAddons);
+                    // 🔥 초기값: 정책설정에 있는 모든 부가서비스를 초기 선택
+                    // initialData에 이미 선택된 부가서비스가 있으면 그것을 우선 사용
+                    if (initialData?.additionalServices || initialData?.addons) {
+                        const savedAddonNames = (initialData.additionalServices || initialData.addons || '')
+                            .split(',')
+                            .map(name => name.trim())
+                            .filter(name => name);
+                        
+                        // 저장된 부가서비스 이름과 매칭되는 항목만 선택
+                        const savedAddons = allAddons.filter(addon => 
+                            savedAddonNames.includes(addon.name)
+                        );
+                        initialSelectedItems.push(...savedAddons);
+                    } else {
+                        // 새로 입력하는 경우: 정책설정에 있는 모든 부가서비스를 초기 선택
+                        initialSelectedItems.push(...allAddons);
+                    }
                 }
 
                 // 보험상품: 출고가 및 모델 유형(플립/폴드 여부)에 맞는 보험상품 찾기
@@ -252,11 +266,33 @@ const OpeningInfoPage = ({
                         }));
                     setAvailableInsurances(allInsurances);
 
-                    // 🔥 초기값: deduction > 0인 보험상품만 초기 선택 (필수 항목)
-                    if (matchingInsurance && matchingInsurance.deduction > 0) {
-                        const requiredInsurance = allInsurances.find(ins => ins.name === matchingInsurance.name);
-                        if (requiredInsurance) {
-                            initialSelectedItems.push(requiredInsurance);
+                    // 🔥 초기값: 정책설정에 있는 보험상품 중 출고가에 맞는 항목을 초기 선택
+                    // initialData에 이미 선택된 보험상품이 있으면 그것을 우선 사용
+                    if (initialData?.additionalServices || initialData?.addons) {
+                        const savedItemNames = (initialData.additionalServices || initialData.addons || '')
+                            .split(',')
+                            .map(name => name.trim())
+                            .filter(name => name);
+                        
+                        // 저장된 보험상품 이름과 매칭되는 항목만 선택
+                        const savedInsurances = allInsurances.filter(insurance => 
+                            savedItemNames.includes(insurance.name)
+                        );
+                        initialSelectedItems.push(...savedInsurances);
+                    } else {
+                        // 새로 입력하는 경우: 기존 로직대로 플립/폴드는 해당 상품, 그 외는 일반 보험을 선택
+                        // matchingInsurance가 있으면 그것을 선택, 없으면 첫 번째 보험상품 선택
+                        if (matchingInsurance) {
+                            const matchedInsurance = allInsurances.find(ins => ins.name === matchingInsurance.name);
+                            if (matchedInsurance) {
+                                initialSelectedItems.push(matchedInsurance);
+                            } else if (allInsurances.length > 0) {
+                                // 매칭되는 보험상품이 없으면 첫 번째 보험상품 선택
+                                initialSelectedItems.push(allInsurances[0]);
+                            }
+                        } else if (allInsurances.length > 0) {
+                            // matchingInsurance가 없어도 보험상품이 있으면 첫 번째 보험상품 선택
+                            initialSelectedItems.push(allInsurances[0]);
                         }
                     }
                 }
