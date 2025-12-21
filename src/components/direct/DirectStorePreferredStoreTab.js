@@ -4,9 +4,11 @@ import {
     DialogActions, TextField, Button, Grid, IconButton, Stack, Paper, Table, 
     TableBody, TableCell, TableContainer, TableHead, TableRow 
 } from '@mui/material';
-import { Close as CloseIcon, Save as SaveIcon, CloudUpload as CloudUploadIcon, Store as StoreIcon } from '@mui/icons-material';
+import { Close as CloseIcon, Save as SaveIcon, CloudUpload as CloudUploadIcon, Store as StoreIcon, Add as AddIcon, Delete as DeleteIcon, Edit as EditIcon, Check as CheckIcon, Cancel as CancelIcon } from '@mui/icons-material';
+import { Autocomplete, Chip } from '@mui/material';
 import Map from '../Map';
 import { fetchData, customerAPI } from '../../api';
+import { directStoreApiClient } from '../../api/directStoreApiClient';
 
 /**
  * 직영점모드/관리모드용 선호구입매장 탭
@@ -35,6 +37,14 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
     });
     const [isSaving, setIsSaving] = useState(false);
     const [uploadingPhotoType, setUploadingPhotoType] = useState(null); // 현재 업로드 중인 사진 타입
+    
+    // 대중교통 위치 상태
+    const [editBusTerminalIds, setEditBusTerminalIds] = useState([]); // 선택된 버스터미널 ID 배열
+    const [editSubwayStationIds, setEditSubwayStationIds] = useState([]); // 선택된 지하철역 ID 배열
+    const [allTransitLocations, setAllTransitLocations] = useState([]); // 모든 대중교통 위치 목록
+    const [transitLocations, setTransitLocations] = useState([]); // 매장별 대중교통 위치 (지도 표시용)
+    const [isLoadingTransit, setIsLoadingTransit] = useState(false);
+    const [isAddingNewTransit, setIsAddingNewTransit] = useState({ type: null, name: '', address: '' }); // 새 위치 추가 상태
 
     // stores는 이미 필터링되어 있으므로 그대로 사용
     // Hook 규칙: 모든 Hook은 최상위에서 호출되어야 함
@@ -128,6 +138,41 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
         loadStores();
     }, [isManagementMode, loggedInStore]);
 
+    // 대중교통 위치 데이터 로드
+    const loadAllTransitLocations = async () => {
+        try {
+            const response = await directStoreApiClient.getAllTransitLocations();
+            if (response.success && response.data) {
+                setAllTransitLocations(response.data);
+            }
+        } catch (error) {
+            console.error('대중교통 위치 목록 로드 실패:', error);
+        }
+    };
+
+    const loadTransitLocations = async () => {
+        setIsLoadingTransit(true);
+        try {
+            const response = await directStoreApiClient.getTransitLocations();
+            if (response.success && response.data) {
+                setTransitLocations(response.data);
+            }
+        } catch (error) {
+            console.error('매장별 대중교통 위치 로드 실패:', error);
+        } finally {
+            setIsLoadingTransit(false);
+        }
+    };
+
+    // 컴포넌트 마운트 시 대중교통 위치 데이터 로드
+    useEffect(() => {
+        const loadData = async () => {
+            await loadAllTransitLocations();
+            await loadTransitLocations();
+        };
+        loadData();
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
     // 탭이 활성화될 때 지도 크기 재계산
     // activeTab이 변경되면 지도가 다시 마운트되므로, 마운트 후 크기 재계산
     useEffect(() => {
@@ -209,7 +254,31 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
                 staff2Url: '',
                 staff3Url: ''
             });
+            
         }
+        
+        // 대중교통 위치 로드 (ID 배열로)
+        try {
+            const response = await directStoreApiClient.getTransitLocations();
+            if (response.success && response.data) {
+                const transitData = response.data.find(t => t.storeName === store.name);
+                if (transitData) {
+                    setEditBusTerminalIds(transitData.busTerminals ? transitData.busTerminals.map(t => t.id).filter(Boolean) : []);
+                    setEditSubwayStationIds(transitData.subwayStations ? transitData.subwayStations.map(s => s.id).filter(Boolean) : []);
+                } else {
+                    setEditBusTerminalIds([]);
+                    setEditSubwayStationIds([]);
+                }
+            } else {
+                setEditBusTerminalIds([]);
+                setEditSubwayStationIds([]);
+            }
+        } catch (error) {
+            console.error('대중교통 위치 로드 실패:', error);
+            setEditBusTerminalIds([]);
+            setEditSubwayStationIds([]);
+        }
+        setIsAddingNewTransit({ type: null, name: '', address: '' });
     };
 
     // 편집 다이얼로그 닫기
@@ -227,6 +296,9 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
             staff2Url: '',
             staff3Url: ''
         });
+        setEditBusTerminalIds([]);
+        setEditSubwayStationIds([]);
+        setIsAddingNewTransit({ type: null, name: '', address: '' });
     };
 
     // 파일 업로드 핸들러
@@ -295,6 +367,65 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
         }
     };
 
+    // 버스터미널 선택 핸들러
+    const handleBusTerminalSelect = (event, newValue) => {
+        if (newValue && newValue.id) {
+            if (!editBusTerminalIds.includes(newValue.id)) {
+                setEditBusTerminalIds([...editBusTerminalIds, newValue.id]);
+            }
+        }
+    };
+    
+    // 버스터미널 삭제 핸들러
+    const handleBusTerminalRemove = (idToRemove) => {
+        setEditBusTerminalIds(editBusTerminalIds.filter(id => id !== idToRemove));
+    };
+    
+    // 지하철역 선택 핸들러
+    const handleSubwayStationSelect = (event, newValue) => {
+        if (newValue && newValue.id) {
+            if (!editSubwayStationIds.includes(newValue.id)) {
+                setEditSubwayStationIds([...editSubwayStationIds, newValue.id]);
+            }
+        }
+    };
+    
+    // 지하철역 삭제 핸들러
+    const handleSubwayStationRemove = (idToRemove) => {
+        setEditSubwayStationIds(editSubwayStationIds.filter(id => id !== idToRemove));
+    };
+    
+    // 새 대중교통 위치 추가 핸들러
+    const handleAddNewTransitLocation = async (type) => {
+        const { name, address } = isAddingNewTransit;
+        if (!name || !address) {
+            alert('이름과 주소를 모두 입력해주세요.');
+            return;
+        }
+        
+        try {
+            const response = await directStoreApiClient.createTransitLocation(type, name, address);
+            if (response.success && response.data) {
+                // 새로 생성된 위치를 선택 목록에 추가
+                if (type === '버스터미널') {
+                    setEditBusTerminalIds([...editBusTerminalIds, response.data.id]);
+                } else {
+                    setEditSubwayStationIds([...editSubwayStationIds, response.data.id]);
+                }
+                // 목록 새로고침
+                await loadAllTransitLocations();
+                // 입력 필드 초기화
+                setIsAddingNewTransit({ type: null, name: '', address: '' });
+                alert('대중교통 위치가 추가되었습니다.');
+            } else {
+                alert('대중교통 위치 추가에 실패했습니다: ' + (response.error || '알 수 없는 오류'));
+            }
+        } catch (error) {
+            console.error('대중교통 위치 추가 실패:', error);
+            alert('대중교통 위치 추가에 실패했습니다.');
+        }
+    };
+
     // 저장
     const handleSaveStoreInfo = async () => {
         if (!editingStore) return;
@@ -318,6 +449,22 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
                 staff2Url: editStorePhotos.staff2Url.trim(),
                 staff3Url: editStorePhotos.staff3Url.trim()
             });
+            
+            // 대중교통 위치 저장 (ID 배열로)
+            const transitResponse = await directStoreApiClient.saveTransitLocation(
+                editingStore.name,
+                editBusTerminalIds,
+                editSubwayStationIds
+            );
+            
+            if (!transitResponse.success) {
+                console.error('대중교통 위치 저장 실패:', transitResponse.error);
+                // 대중교통 위치 저장 실패는 경고만 표시하고 계속 진행
+            } else {
+                // 캐시 갱신을 위해 데이터 다시 로드
+                await loadTransitLocations();
+                await loadAllTransitLocations();
+            }
             
             alert('저장되었습니다.');
             handleCloseEditDialog();
@@ -714,6 +861,255 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
                                     </Stack>
                                 </Grid>
                             </Grid>
+                        </Grid>
+                        
+                        {/* 대중교통 위치 */}
+                        <Grid item xs={12}>
+                            <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>
+                                대중교통 위치
+                            </Typography>
+                            
+                            {/* 버스터미널 섹션 */}
+                            <Box sx={{ mb: 3 }}>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
+                                        버스터미널
+                                    </Typography>
+                                </Box>
+                                
+                                {/* 선택된 버스터미널 표시 */}
+                                <Box sx={{ mb: 2 }}>
+                                    {editBusTerminalIds.length > 0 ? (
+                                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                                            {editBusTerminalIds.map((id) => {
+                                                const location = allTransitLocations.find(loc => loc.id === id && loc.type === '버스터미널');
+                                                if (!location) return null;
+                                                return (
+                                                    <Chip
+                                                        key={id}
+                                                        label={`${location.name} (${location.address})`}
+                                                        onDelete={() => handleBusTerminalRemove(id)}
+                                                        color="primary"
+                                                        variant="outlined"
+                                                    />
+                                                );
+                                            })}
+                                        </Box>
+                                    ) : (
+                                        <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', mb: 2 }}>
+                                            선택된 버스터미널이 없습니다.
+                                        </Typography>
+                                    )}
+                                </Box>
+                                
+                                {/* 버스터미널 선택 드롭다운 */}
+                                <Box sx={{ mb: 2 }}>
+                                    <Autocomplete
+                                        options={allTransitLocations.filter(loc => loc.type === '버스터미널')}
+                                        getOptionLabel={(option) => `${option.name} - ${option.address}`}
+                                        value={null}
+                                        onChange={handleBusTerminalSelect}
+                                        renderInput={(params) => (
+                                            <TextField
+                                                {...params}
+                                                label="버스터미널 선택"
+                                                placeholder="버스터미널을 선택하세요"
+                                                size="small"
+                                            />
+                                        )}
+                                        renderOption={(props, option) => (
+                                            <li {...props} key={option.id}>
+                                                <Box>
+                                                    <Typography variant="body2" fontWeight="bold">
+                                                        {option.name}
+                                                    </Typography>
+                                                    <Typography variant="caption" color="text.secondary">
+                                                        {option.address}
+                                                    </Typography>
+                                                </Box>
+                                            </li>
+                                        )}
+                                    />
+                                </Box>
+                                
+                                {/* 새 버스터미널 추가 */}
+                                {isAddingNewTransit.type === '버스터미널' ? (
+                                    <Paper sx={{ p: 2, mb: 2, border: '1px solid #e0e0e0', bgcolor: '#f9f9f9' }}>
+                                        <Grid container spacing={2} alignItems="center">
+                                            <Grid item xs={12} sm={4}>
+                                                <TextField
+                                                    fullWidth
+                                                    size="small"
+                                                    label="이름"
+                                                    value={isAddingNewTransit.name}
+                                                    onChange={(e) => setIsAddingNewTransit({ ...isAddingNewTransit, name: e.target.value })}
+                                                    placeholder="예: 평택터미널"
+                                                />
+                                            </Grid>
+                                            <Grid item xs={12} sm={5}>
+                                                <TextField
+                                                    fullWidth
+                                                    size="small"
+                                                    label="주소"
+                                                    value={isAddingNewTransit.address}
+                                                    onChange={(e) => setIsAddingNewTransit({ ...isAddingNewTransit, address: e.target.value })}
+                                                    placeholder="경기도 평택시..."
+                                                />
+                                            </Grid>
+                                            <Grid item xs={12} sm={3}>
+                                                <Button
+                                                    fullWidth
+                                                    size="small"
+                                                    variant="contained"
+                                                    onClick={() => handleAddNewTransitLocation('버스터미널')}
+                                                    disabled={!isAddingNewTransit.name || !isAddingNewTransit.address}
+                                                >
+                                                    추가
+                                                </Button>
+                                                <Button
+                                                    fullWidth
+                                                    size="small"
+                                                    variant="outlined"
+                                                    onClick={() => setIsAddingNewTransit({ type: null, name: '', address: '' })}
+                                                    sx={{ mt: 1 }}
+                                                >
+                                                    취소
+                                                </Button>
+                                            </Grid>
+                                        </Grid>
+                                    </Paper>
+                                ) : (
+                                    <Button
+                                        size="small"
+                                        variant="outlined"
+                                        startIcon={<AddIcon />}
+                                        onClick={() => setIsAddingNewTransit({ type: '버스터미널', name: '', address: '' })}
+                                    >
+                                        새 버스터미널 추가
+                                    </Button>
+                                )}
+                            </Box>
+                            
+                            {/* 지하철역 섹션 */}
+                            <Box>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
+                                        지하철역
+                                    </Typography>
+                                </Box>
+                                
+                                {/* 선택된 지하철역 표시 */}
+                                <Box sx={{ mb: 2 }}>
+                                    {editSubwayStationIds.length > 0 ? (
+                                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                                            {editSubwayStationIds.map((id) => {
+                                                const location = allTransitLocations.find(loc => loc.id === id && loc.type === '지하철역');
+                                                if (!location) return null;
+                                                return (
+                                                    <Chip
+                                                        key={id}
+                                                        label={`${location.name} (${location.address})`}
+                                                        onDelete={() => handleSubwayStationRemove(id)}
+                                                        color="secondary"
+                                                        variant="outlined"
+                                                    />
+                                                );
+                                            })}
+                                        </Box>
+                                    ) : (
+                                        <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', mb: 2 }}>
+                                            선택된 지하철역이 없습니다.
+                                        </Typography>
+                                    )}
+                                </Box>
+                                
+                                {/* 지하철역 선택 드롭다운 */}
+                                <Box sx={{ mb: 2 }}>
+                                    <Autocomplete
+                                        options={allTransitLocations.filter(loc => loc.type === '지하철역')}
+                                        getOptionLabel={(option) => `${option.name} - ${option.address}`}
+                                        value={null}
+                                        onChange={handleSubwayStationSelect}
+                                        renderInput={(params) => (
+                                            <TextField
+                                                {...params}
+                                                label="지하철역 선택"
+                                                placeholder="지하철역을 선택하세요"
+                                                size="small"
+                                            />
+                                        )}
+                                        renderOption={(props, option) => (
+                                            <li {...props} key={option.id}>
+                                                <Box>
+                                                    <Typography variant="body2" fontWeight="bold">
+                                                        {option.name}
+                                                    </Typography>
+                                                    <Typography variant="caption" color="text.secondary">
+                                                        {option.address}
+                                                    </Typography>
+                                                </Box>
+                                            </li>
+                                        )}
+                                    />
+                                </Box>
+                                
+                                {/* 새 지하철역 추가 */}
+                                {isAddingNewTransit.type === '지하철역' ? (
+                                    <Paper sx={{ p: 2, mb: 2, border: '1px solid #e0e0e0', bgcolor: '#f9f9f9' }}>
+                                        <Grid container spacing={2} alignItems="center">
+                                            <Grid item xs={12} sm={4}>
+                                                <TextField
+                                                    fullWidth
+                                                    size="small"
+                                                    label="이름"
+                                                    value={isAddingNewTransit.name}
+                                                    onChange={(e) => setIsAddingNewTransit({ ...isAddingNewTransit, name: e.target.value })}
+                                                    placeholder="예: 무선역 1번출구"
+                                                />
+                                            </Grid>
+                                            <Grid item xs={12} sm={5}>
+                                                <TextField
+                                                    fullWidth
+                                                    size="small"
+                                                    label="주소"
+                                                    value={isAddingNewTransit.address}
+                                                    onChange={(e) => setIsAddingNewTransit({ ...isAddingNewTransit, address: e.target.value })}
+                                                    placeholder="경기도 평택시..."
+                                                />
+                                            </Grid>
+                                            <Grid item xs={12} sm={3}>
+                                                <Button
+                                                    fullWidth
+                                                    size="small"
+                                                    variant="contained"
+                                                    onClick={() => handleAddNewTransitLocation('지하철역')}
+                                                    disabled={!isAddingNewTransit.name || !isAddingNewTransit.address}
+                                                >
+                                                    추가
+                                                </Button>
+                                                <Button
+                                                    fullWidth
+                                                    size="small"
+                                                    variant="outlined"
+                                                    onClick={() => setIsAddingNewTransit({ type: null, name: '', address: '' })}
+                                                    sx={{ mt: 1 }}
+                                                >
+                                                    취소
+                                                </Button>
+                                            </Grid>
+                                        </Grid>
+                                    </Paper>
+                                ) : (
+                                    <Button
+                                        size="small"
+                                        variant="outlined"
+                                        startIcon={<AddIcon />}
+                                        onClick={() => setIsAddingNewTransit({ type: '지하철역', name: '', address: '' })}
+                                    >
+                                        새 지하철역 추가
+                                    </Button>
+                                )}
+                            </Box>
                         </Grid>
                     </Grid>
                 </DialogContent>
