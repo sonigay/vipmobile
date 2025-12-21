@@ -1850,6 +1850,22 @@ function setupDirectRoutes(app) {
       console.log(`[Direct] Rebuilding Pricing Master for ${carriers.join(',')}`);
       const step3 = await rebuildPricingMaster(carriers);
 
+      // 4. 재빌드 완료 후 모든 관련 캐시 무효화
+      console.log(`[Direct] Invalidating all related caches after rebuild`);
+      deleteCache('todays-mobiles');
+      // 모든 통신사 캐시 무효화 (모든 버전 및 해시 포함)
+      for (const carrier of ['SK', 'KT', 'LG']) {
+        // 기본 캐시 키
+        deleteCache(`mobiles-${carrier}`);
+        // 캐시 버전별 키 (v5, v6 등)
+        deleteCache(`mobiles-${carrier}-v5`);
+        deleteCache(`mobiles-${carrier}-v6`);
+      }
+      // invalidateDirectStoreCache 함수 사용 (모든 관련 캐시 무효화)
+      if (typeof invalidateDirectStoreCache === 'function') {
+        invalidateDirectStoreCache();
+      }
+
       return res.json({
         success: true,
         summary: {
