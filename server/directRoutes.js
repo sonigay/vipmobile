@@ -430,28 +430,72 @@ async function rebuildPlanMaster(carriersParam) {
     perCarrierStats[carrier] = { count: created };
   }
 
-  // 기존 데이터 제거 후 새 데이터 쓰기 (헤더 유지)
-  await withRetry(async () => {
-    return await sheets.spreadsheets.values.clear({
-      spreadsheetId: SPREADSHEET_ID,
-      range: `${SHEET_PLAN_MASTER}!A2:G`
+  // 기존 데이터 제거: 헤더를 제외한 모든 행 삭제
+  try {
+    // 먼저 기존 데이터 행 수 확인
+    const existingRes = await withRetry(async () => {
+      return await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${SHEET_PLAN_MASTER}!A:A`
+      });
     });
-  });
+    const existingRows = existingRes.data.values || [];
+    const existingDataRowCount = existingRows.length - 1; // 헤더 제외
+    
+    // 헤더를 제외한 모든 행 삭제 (행이 있는 경우만)
+    if (existingDataRowCount > 0) {
+      const sheetId = await getSheetId(sheets, SPREADSHEET_ID, SHEET_PLAN_MASTER);
+      if (sheetId !== null) {
+        await withRetry(async () => {
+          return await sheets.spreadsheets.batchUpdate({
+            spreadsheetId: SPREADSHEET_ID,
+            resource: {
+              requests: [{
+                deleteDimension: {
+                  range: {
+                    sheetId: sheetId,
+                    dimension: 'ROWS',
+                    startIndex: 1, // 헤더 다음 행부터 (0-based, 헤더가 0)
+                    endIndex: existingRows.length // 마지막 행까지
+                  }
+                }
+              }]
+            }
+          });
+        });
+      }
+    }
+  } catch (err) {
+    console.warn('[Direct][rebuildPlanMaster] 기존 데이터 삭제 실패 (계속 진행):', err.message);
+    // 삭제 실패해도 계속 진행 (clear로 대체 시도)
+    try {
+      await withRetry(async () => {
+        return await sheets.spreadsheets.values.clear({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_PLAN_MASTER}!A2:G1000` // 더 넓은 범위로 clear
+        });
+      });
+    } catch (clearErr) {
+      console.warn('[Direct][rebuildPlanMaster] clear도 실패:', clearErr.message);
+    }
+  }
 
-  if (allRows.length > 0) {
+  // 새 데이터 쓰기 (빈 행 필터링)
+  const filteredRows = allRows.filter(row => row && row.length > 0 && row[0]); // 첫 번째 컬럼(통신사)이 있는 행만
+  if (filteredRows.length > 0) {
     await withRetry(async () => {
       return await sheets.spreadsheets.values.append({
         spreadsheetId: SPREADSHEET_ID,
         range: SHEET_PLAN_MASTER,
         valueInputOption: 'USER_ENTERED',
         insertDataOption: 'INSERT_ROWS',
-        resource: { values: allRows }
+        resource: { values: filteredRows }
       });
     });
   }
 
   return {
-    totalCount: allRows.length,
+    totalCount: filteredRows.length,
     perCarrier: perCarrierStats
   };
 }
@@ -724,27 +768,71 @@ async function rebuildDeviceMaster(carriersParam) {
     perCarrierStats[carrier] = { count: uniqueCarrierRows.length };
   }
 
-  // 기존 데이터 제거 후 새 데이터 쓰기
-  await withRetry(async () => {
-    return await sheets.spreadsheets.values.clear({
-      spreadsheetId: SPREADSHEET_ID,
-      range: `${SHEET_MOBILE_MASTER}!A2:O`
+  // 기존 데이터 제거: 헤더를 제외한 모든 행 삭제
+  try {
+    // 먼저 기존 데이터 행 수 확인
+    const existingRes = await withRetry(async () => {
+      return await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${SHEET_MOBILE_MASTER}!A:A`
+      });
     });
-  });
+    const existingRows = existingRes.data.values || [];
+    const existingDataRowCount = existingRows.length - 1; // 헤더 제외
+    
+    // 헤더를 제외한 모든 행 삭제 (행이 있는 경우만)
+    if (existingDataRowCount > 0) {
+      const sheetId = await getSheetId(sheets, SPREADSHEET_ID, SHEET_MOBILE_MASTER);
+      if (sheetId !== null) {
+        await withRetry(async () => {
+          return await sheets.spreadsheets.batchUpdate({
+            spreadsheetId: SPREADSHEET_ID,
+            resource: {
+              requests: [{
+                deleteDimension: {
+                  range: {
+                    sheetId: sheetId,
+                    dimension: 'ROWS',
+                    startIndex: 1, // 헤더 다음 행부터 (0-based, 헤더가 0)
+                    endIndex: existingRows.length // 마지막 행까지
+                  }
+                }
+              }]
+            }
+          });
+        });
+      }
+    }
+  } catch (err) {
+    console.warn('[Direct][rebuildDeviceMaster] 기존 데이터 삭제 실패 (계속 진행):', err.message);
+    // 삭제 실패해도 계속 진행 (clear로 대체 시도)
+    try {
+      await withRetry(async () => {
+        return await sheets.spreadsheets.values.clear({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_MOBILE_MASTER}!A2:O1000` // 더 넓은 범위로 clear
+        });
+      });
+    } catch (clearErr) {
+      console.warn('[Direct][rebuildDeviceMaster] clear도 실패:', clearErr.message);
+    }
+  }
 
-  if (allRows.length > 0) {
+  // 새 데이터 쓰기 (빈 행 필터링)
+  const filteredRows = allRows.filter(row => row && row.length > 0 && row[0]); // 첫 번째 컬럼(통신사)이 있는 행만
+  if (filteredRows.length > 0) {
     await withRetry(async () => {
       return await sheets.spreadsheets.values.append({
         spreadsheetId: SPREADSHEET_ID,
         range: SHEET_MOBILE_MASTER,
         valueInputOption: 'USER_ENTERED',
         insertDataOption: 'INSERT_ROWS',
-        resource: { values: allRows }
+        resource: { values: filteredRows }
       });
     });
   }
 
-  return { totalCount: allRows.length, perCarrier: perCarrierStats };
+  return { totalCount: filteredRows.length, perCarrier: perCarrierStats };
 }
 
 // 단말요금정책(직영점_단말요금정책) 재빌드 헬퍼
