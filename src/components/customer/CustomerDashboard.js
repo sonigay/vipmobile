@@ -242,7 +242,7 @@ const CustomerDashboard = () => {
                                 아이디 부여 후 사용 가능한 기능입니다. 현재 공개아이디(아이디부여전) 상태로 접근할 수 없습니다.
                             </Alert>
                         ) : (
-                            <CustomerPurchaseQueueTab customerInfo={customerInfo} />
+                        <CustomerPurchaseQueueTab customerInfo={customerInfo} />
                         )}
                     </Box>
                 )}
@@ -253,7 +253,7 @@ const CustomerDashboard = () => {
                                 아이디 부여 후 사용 가능한 기능입니다. 현재 공개아이디(아이디부여전) 상태로 접근할 수 없습니다.
                             </Alert>
                         ) : (
-                            <CustomerBoardTab customerInfo={customerInfo} />
+                        <CustomerBoardTab customerInfo={customerInfo} />
                         )}
                     </Box>
                 )}

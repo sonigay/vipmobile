@@ -250,7 +250,9 @@ function Map({
   isCustomerMode = false, // 고객 모드 여부 추가
   useCustomerStylePopup = false, // 고객모드 스타일 말풍선 사용 여부 (클릭 동작은 기존대로)
   fixedHeight = null, // 고정 높이 (px 단위, DirectStorePreferredStoreTab 등에서 사용)
-  onStoreConfirm = null // 고객모드에서 매장 선택 확인 시 호출 (페이지 이동용)
+  onStoreConfirm = null, // 고객모드에서 매장 선택 확인 시 호출 (페이지 이동용)
+  transitLocations = [], // 대중교통 위치 데이터 배열
+  showTransitMarkers = true // 대중교통 마커 표시 여부
 }) {
   const [preApprovalMark, setPreApprovalMark] = useState(null);
   const [storePhotos, setStorePhotos] = useState(null);
@@ -2057,6 +2059,87 @@ ${loggedInStore.name}으로 이동 예정입니다.
         })()}
 
         {/* 개통실적 마커들 (담당개통확인 화면에서만 표시) */}
+        {/* 대중교통 마커 (고객모드, 직영점모드, 직영점관리모드에서만 표시, isAgentMode가 false일 때만) */}
+        {!isAgentMode && showTransitMarkersState && transitLocations && transitLocations.length > 0 && transitLocations.map((location) => {
+          const markers = [];
+          
+          // 버스터미널 마커
+          if (location.busTerminals && Array.isArray(location.busTerminals)) {
+            location.busTerminals.forEach((terminal, index) => {
+              if (terminal.lat && terminal.lng) {
+                const busIcon = L.icon({
+                  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
+                  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+                  iconSize: [25, 41],
+                  iconAnchor: [12, 41],
+                  popupAnchor: [1, -34],
+                  shadowSize: [41, 41]
+                });
+                
+                markers.push(
+                  <Marker
+                    key={`bus-${location.storeName}-${index}`}
+                    position={[terminal.lat, terminal.lng]}
+                    icon={busIcon}
+                  >
+                    <Popup>
+                      <div>
+                        <h4 style={{ margin: '0 0 8px 0', fontSize: '16px', fontWeight: 'bold', color: '#1976d2' }}>
+                          🚌 {terminal.name}
+                        </h4>
+                        {terminal.address && (
+                          <p style={{ margin: '4px 0', fontSize: '14px' }}>
+                            <strong>주소:</strong> {terminal.address}
+                          </p>
+                        )}
+                      </div>
+                    </Popup>
+                  </Marker>
+                );
+              }
+            });
+          }
+          
+          // 지하철역 마커
+          if (location.subwayStations && Array.isArray(location.subwayStations)) {
+            location.subwayStations.forEach((station, index) => {
+              if (station.lat && station.lng) {
+                const subwayIcon = L.icon({
+                  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
+                  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+                  iconSize: [25, 41],
+                  iconAnchor: [12, 41],
+                  popupAnchor: [1, -34],
+                  shadowSize: [41, 41]
+                });
+                
+                markers.push(
+                  <Marker
+                    key={`subway-${location.storeName}-${index}`}
+                    position={[station.lat, station.lng]}
+                    icon={subwayIcon}
+                  >
+                    <Popup>
+                      <div>
+                        <h4 style={{ margin: '0 0 8px 0', fontSize: '16px', fontWeight: 'bold', color: '#d32f2f' }}>
+                          🚇 {station.name}
+                        </h4>
+                        {station.address && (
+                          <p style={{ margin: '4px 0', fontSize: '14px' }}>
+                            <strong>주소:</strong> {station.address}
+                          </p>
+                        )}
+                      </div>
+                    </Popup>
+                  </Marker>
+                );
+              }
+            });
+          }
+          
+          return markers;
+        }).flat()}
+
         {showActivationMarkers && activationData && Object.entries(activationData).map(([storeName, data]) => {
           // 담당자 필터링 (담당개통확인 모드에서만)
           if (currentView === 'activation' && isAgentMode && agentTarget) {

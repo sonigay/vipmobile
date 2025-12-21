@@ -6,6 +6,7 @@ import {
 import { Store as StoreIcon } from '@mui/icons-material';
 import Map from '../Map';
 import { fetchData, customerAPI } from '../../api';
+import { directStoreApiClient } from '../../api/directStoreApiClient';
 
 const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfirm }) => {
     const [stores, setStores] = useState([]);
@@ -199,6 +200,7 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                     onStoreSelect={handleStoreClick}
                     onStoreConfirm={(store) => handleStoreSelect(store)}
                     isCustomerMode={true}
+                    transitLocations={transitLocations}
                 />
                 {selectedProduct && (
                     <Box sx={{
