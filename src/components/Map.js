@@ -1081,7 +1081,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
     }
 
     return bounds;
-  }, [filteredStores, userLocation, isAgentMode, showActivationMarkers, activationData]);
+  }, [filteredStores, userLocation, isAgentMode, showActivationMarkers, activationData, isCustomerMode, loggedInStore]);
 
   // 초기 로드 시 지도 범위 설정 (각 모드별 최적화)
   useEffect(() => {
