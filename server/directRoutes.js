@@ -4835,26 +4835,103 @@ function setupDirectRoutes(app) {
         isBudget ? 'Y' : ''                                   // N 중저가
       ];
 
+      // 모든 태그가 체크 해제되었는지 확인
+      const hasAnyTag = isPopular || isRecommended || isCheap || isPremium || isBudget;
+
       if (rowIndex === -1) {
-        // 행이 없으면 추가
-        await sheets.spreadsheets.values.append({
-          spreadsheetId: SPREADSHEET_ID,
-          range: '직영점_오늘의휴대폰',
-          valueInputOption: 'USER_ENTERED',
-          insertDataOption: 'INSERT_ROWS',
-          resource: { values: [newRowValues] }
-        });
+        // 행이 없으면 태그가 있을 때만 추가
+        if (hasAnyTag) {
+          await sheets.spreadsheets.values.append({
+            spreadsheetId: SPREADSHEET_ID,
+            range: '직영점_오늘의휴대폰',
+            valueInputOption: 'USER_ENTERED',
+            insertDataOption: 'INSERT_ROWS',
+            resource: { values: [newRowValues] }
+          });
+        }
       } else {
-        // 행이 있으면 전체 컬럼(A:N) 업데이트
-        const updateRange = `직영점_오늘의휴대폰!A${rowIndex + 2}:N${rowIndex + 2}`;
-        await sheets.spreadsheets.values.update({
-          spreadsheetId: SPREADSHEET_ID,
-          range: updateRange,
-          valueInputOption: 'USER_ENTERED',
-          resource: {
-            values: [newRowValues]
+        if (hasAnyTag) {
+          // 행이 있고 태그가 있으면 전체 컬럼(A:N) 업데이트
+          const updateRange = `직영점_오늘의휴대폰!A${rowIndex + 2}:N${rowIndex + 2}`;
+          await sheets.spreadsheets.values.update({
+            spreadsheetId: SPREADSHEET_ID,
+            range: updateRange,
+            valueInputOption: 'USER_ENTERED',
+            resource: {
+              values: [newRowValues]
+            }
+          });
+        } else {
+          // 모든 태그가 체크 해제되었으면 해당 행 삭제
+          const sheetId = await getSheetId(sheets, SPREADSHEET_ID, '직영점_오늘의휴대폰');
+          if (sheetId !== null) {
+            await withRetry(async () => {
+              return await sheets.spreadsheets.batchUpdate({
+                spreadsheetId: SPREADSHEET_ID,
+                resource: {
+                  requests: [{
+                    deleteDimension: {
+                      range: {
+                        sheetId: sheetId,
+                        dimension: 'ROWS',
+                        startIndex: rowIndex + 1, // 헤더 다음 행부터 (0-based, 헤더가 0)
+                        endIndex: rowIndex + 2 // 삭제할 행까지
+                      }
+                    }
+                  }]
+                }
+              });
+            });
           }
+        }
+      }
+
+      // 직영점_단말마스터 시트도 업데이트
+      try {
+        await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_MOBILE_MASTER, HEADERS_MOBILE_MASTER);
+        const masterRes = await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_MOBILE_MASTER}!A:R`
         });
+        const masterRows = (masterRes.data.values || []).slice(1);
+        
+        // 모델명과 통신사로 해당 행 찾기
+        const masterRowIndex = masterRows.findIndex(row => 
+          (row[2] || '').toString().trim() === modelName && 
+          (row[0] || '').toString().trim().toUpperCase() === carrier.toUpperCase()
+        );
+
+        if (masterRowIndex !== -1) {
+          // 기존 행 정보 가져오기
+          const existingMasterRow = masterRows[masterRowIndex];
+          
+          // 태그 컬럼 업데이트 (7: isPremium, 8: isBudget, 9: isPopular, 10: isRecommended, 11: isCheap)
+          const updatedMasterRow = [...existingMasterRow];
+          // 행이 18개 컬럼보다 짧으면 확장
+          while (updatedMasterRow.length < 18) {
+            updatedMasterRow.push('');
+          }
+          
+          updatedMasterRow[7] = isPremium ? 'Y' : 'N';  // isPremium
+          updatedMasterRow[8] = isBudget ? 'Y' : 'N';    // isBudget
+          updatedMasterRow[9] = isPopular ? 'Y' : 'N';  // isPopular
+          updatedMasterRow[10] = isRecommended ? 'Y' : 'N'; // isRecommended
+          updatedMasterRow[11] = isCheap ? 'Y' : 'N';    // isCheap
+
+          // 업데이트
+          const masterUpdateRange = `${SHEET_MOBILE_MASTER}!A${masterRowIndex + 2}:R${masterRowIndex + 2}`;
+          await sheets.spreadsheets.values.update({
+            spreadsheetId: SPREADSHEET_ID,
+            range: masterUpdateRange,
+            valueInputOption: 'USER_ENTERED',
+            resource: {
+              values: [updatedMasterRow]
+            }
+          });
+        }
+      } catch (masterErr) {
+        console.warn('[Direct] 직영점_단말마스터 업데이트 실패 (계속 진행):', masterErr.message);
+        // 마스터 업데이트 실패해도 계속 진행
       }
 
       // 태그/모바일 캐시 무효화
