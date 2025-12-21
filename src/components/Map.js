@@ -1049,6 +1049,12 @@ ${loggedInStore.name}으로 이동 예정입니다.
 
   // 지도 범위 계산 (각 모드별 최적화)
   const mapBounds = useMemo(() => {
+    // 고객모드 또는 직영점관리모드에서 위치 정보 실패 시 bounds 사용하지 않음 (center와 zoom 사용)
+    if ((isCustomerMode || (!isCustomerMode && !isAgentMode && !loggedInStore?.coords)) && 
+        userLocation && userLocation.isDefault) {
+      return null; // bounds를 사용하지 않고 center와 zoom을 사용
+    }
+    
     if (!filteredStores.length && !userLocation) return null;
 
     const bounds = L.latLngBounds();
