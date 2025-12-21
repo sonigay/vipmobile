@@ -1412,7 +1412,31 @@ async function ensureSheetHeaders(sheets, spreadsheetId, sheetName, headers) {
   }
 
   try {
-    // 시트 존재 여부 확인 및 헤더 확인 (재시도 로직 포함)
+    // 먼저 시트 존재 여부 확인
+    const spreadsheet = await withRetry(async () => {
+      return await sheets.spreadsheets.get({ spreadsheetId });
+    });
+    const sheetExists = spreadsheet.data.sheets.some(s => s.properties.title === sheetName);
+
+    // 시트가 없으면 생성
+    if (!sheetExists) {
+      await withRetry(async () => {
+        return await sheets.spreadsheets.batchUpdate({
+          spreadsheetId,
+          resource: {
+            requests: [{
+              addSheet: {
+                properties: {
+                  title: sheetName
+                }
+              }
+            }]
+          }
+        });
+      });
+    }
+
+    // 헤더 확인 및 업데이트 (재시도 로직 포함)
     const res = await withRetry(async () => {
       return await sheets.spreadsheets.values.get({
         spreadsheetId,
@@ -1438,46 +1462,42 @@ async function ensureSheetHeaders(sheets, spreadsheetId, sheetName, headers) {
     setCache(cacheKey, headers, CACHE_TTL);
     return headers;
   } catch (error) {
-    // 시트가 없으면 생성 (재시도 로직 포함)
-    if (error.code === 400) {
+    // 에러 메시지 확인: 시트가 이미 존재하는 경우
+    const errorMessage = error.message || (error.errors && error.errors[0] && error.errors[0].message) || '';
+    if (error.code === 400 && errorMessage.includes('already exists')) {
+      // 시트가 이미 존재하는 경우, 헤더만 업데이트 시도
       try {
-        await withRetry(async () => {
-          return await sheets.spreadsheets.batchUpdate({
+        const res = await withRetry(async () => {
+          return await sheets.spreadsheets.values.get({
             spreadsheetId,
-            resource: {
-              requests: [{
-                addSheet: {
-                  properties: {
-                    title: sheetName
-                  }
-                }
-              }]
-            }
+            range: `${sheetName}!1:1`
           });
         });
-        // 헤더 작성 (재시도 로직 포함)
-        await withRetry(async () => {
-          return await sheets.spreadsheets.values.update({
-            spreadsheetId,
-            range: `${sheetName}!A1:${String.fromCharCode(65 + headers.length - 1)}1`,
-            valueInputOption: 'USER_ENTERED',
-            resource: { values: [headers] }
+        const firstRow = res.data.values && res.data.values[0] ? res.data.values[0] : [];
+        const needsInit = firstRow.length === 0 || headers.some((h, i) => (firstRow[i] || '') !== h);
+        if (needsInit) {
+          await withRetry(async () => {
+            return await sheets.spreadsheets.values.update({
+              spreadsheetId,
+              range: `${sheetName}!A1:${String.fromCharCode(65 + headers.length - 1)}1`,
+              valueInputOption: 'USER_ENTERED',
+              resource: { values: [headers] }
+            });
           });
-        });
-        // 시트 생성 후 캐시에 저장
+        }
         setCache(cacheKey, headers, CACHE_TTL);
-      } catch (createError) {
-        console.error(`[Direct] Failed to create sheet ${sheetName}:`, createError);
-        // 에러 발생 시 캐시 삭제
+        return headers;
+      } catch (updateError) {
+        console.error(`[Direct] Failed to update headers for sheet ${sheetName}:`, updateError);
         cacheStore.delete(cacheKey);
-        throw createError;
+        throw updateError;
       }
     } else {
-      // 에러 발생 시 캐시 삭제
+      // 다른 에러인 경우
+      console.error(`[Direct] Failed to ensure sheet headers for ${sheetName}:`, error);
       cacheStore.delete(cacheKey);
       throw error;
     }
-    return headers;
   }
 }
 
