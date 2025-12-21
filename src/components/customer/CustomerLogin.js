@@ -130,7 +130,7 @@ const CustomerLogin = () => {
 
                 {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-                <Box component="form" onSubmit={handleLogin} sx={{ mt: 2 }}>
+                <Box component="form" onSubmit={handleLogin} sx={{ mt: 2 }} autoComplete="off">
                     <TextField
                         fullWidth
                         label="아이디"
@@ -139,6 +139,7 @@ const CustomerLogin = () => {
                         value={ctn}
                         onChange={(e) => setCtn(e.target.value)}
                         disabled={loading}
+                        autoComplete="off"
                     />
                     <TextField
                         fullWidth
@@ -149,6 +150,13 @@ const CustomerLogin = () => {
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         disabled={loading}
+                        autoComplete="new-password"
+                        inputProps={{
+                            autocomplete: "new-password",
+                            form: {
+                                autocomplete: "off"
+                            }
+                        }}
                     />
                     <Button
                         fullWidth
