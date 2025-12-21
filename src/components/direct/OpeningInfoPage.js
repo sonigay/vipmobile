@@ -402,26 +402,33 @@ const OpeningInfoPage = ({
     }, [initialData?.planGroup, initialData?.openingType, planGroups, selectedCarrier, initialData?.id, formData.contractType]);
 
     // 🔥 개선: 선택된 부가서비스/보험상품에 따른 대리점지원금 계산
+    // 서버에서 받은 storeSupportWithAddon/WithoutAddon은 이미 모든 부가서비스를 고려한 값
+    // 따라서 사용자가 선택한 부가서비스에 따라 차이만 계산해야 함
     const calculateDynamicStoreSupport = useMemo(() => {
-        // 선택된 항목들의 incentive 합계 (유치시 금액에 더해짐)
-        const selectedIncentive = selectedItems.reduce((sum, item) => {
-            return sum + (item.incentive || 0);
-        }, 0);
-
         // 모든 가능한 항목 (부가서비스 + 보험상품)
         const allAvailableItems = [...availableAddons, ...availableInsurances];
         
-        // 선택되지 않은 항목들의 deduction 합계 (미유치시 금액에서 차감)
-        const unselectedDeduction = allAvailableItems
-            .filter(item => !selectedItems.some(selected => selected.name === item.name))
-            .reduce((sum, item) => sum + (item.deduction || 0), 0);
+        // 서버에서 받은 값은 "모든 부가서비스 유치/미유치"를 가정한 값
+        // 사용자가 선택한 항목과의 차이를 계산
+        
+        // 모든 항목의 incentive/deduction 합계 (서버 기본값 기준)
+        const allItemsIncentive = allAvailableItems.reduce((sum, item) => sum + (item.incentive || 0), 0);
+        const allItemsDeduction = allAvailableItems.reduce((sum, item) => sum + (item.deduction || 0), 0);
+        
+        // 사용자가 선택한 항목들의 incentive/deduction 합계
+        const selectedIncentive = selectedItems.reduce((sum, item) => sum + (item.incentive || 0), 0);
+        const selectedDeduction = selectedItems.reduce((sum, item) => sum + (item.deduction || 0), 0);
 
         // 동적 대리점지원금 계산
-        // 유치시 = 기본값 + 선택된 항목들의 incentive
-        const dynamicStoreSupportWithAddon = storeSupportWithAddon + selectedIncentive;
+        // 서버의 storeSupportWithAddon = 모든 부가서비스 유치 시 값 (모든 incentive 포함)
+        // 사용자가 선택한 항목만큼만 적용하려면:
+        // 유치시 = 서버값 - (모든 항목의 incentive) + (선택한 항목의 incentive)
+        const dynamicStoreSupportWithAddon = storeSupportWithAddon - allItemsIncentive + selectedIncentive;
         
-        // 미유치시 = 기본값 - 선택되지 않은 항목들의 deduction
-        const dynamicStoreSupportWithoutAddon = storeSupportWithoutAddon - unselectedDeduction;
+        // 서버의 storeSupportWithoutAddon = 모든 부가서비스 미유치 시 값 (모든 deduction 포함)
+        // 사용자가 선택한 항목만큼만 적용하려면:
+        // 미유치시 = 서버값 - (모든 항목의 deduction) + (선택한 항목의 deduction)
+        const dynamicStoreSupportWithoutAddon = storeSupportWithoutAddon - allItemsDeduction + selectedDeduction;
 
         return {
             withAddon: Math.max(0, dynamicStoreSupportWithAddon), // 음수 방지

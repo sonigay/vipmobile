@@ -215,24 +215,15 @@ export const directStoreApi = {
             if (!response.ok) throw new Error('정책 설정 조회 실패');
             return response.json();
         } catch (err) {
-            console.warn('정책 설정 API 호출 실패, Mock 데이터 사용:', err);
-            // 백엔드 미구현 시 Mock Data 반환
-            // 기본 마진은 0원으로 간주 (미설정 상태)
+            console.error('정책 설정 API 호출 실패:', err);
+            // API 실패 시 빈 데이터 반환 (하드코딩된 Mock 데이터 제거)
             return {
-                success: true,
+                success: false,
+                error: err.message,
                 margin: { baseMargin: 0 },
-                addon: {
-                    list: [
-                        { id: 1, name: 'V컬러링', fee: 3300, incentive: 1000, deduction: 0 },
-                        { id: 2, name: '우주패스', fee: 9900, incentive: 5000, deduction: 2000 }
-                    ]
-                },
-                special: {
-                    list: [
-                        { id: 1, name: '기기반납', addition: 0, deduction: 100000, isActive: true },
-                        { id: 2, name: '제휴카드', addition: 50000, deduction: 0, isActive: false }
-                    ]
-                }
+                addon: { list: [] },
+                insurance: { list: [] },
+                special: { list: [] }
             };
         }
     },
