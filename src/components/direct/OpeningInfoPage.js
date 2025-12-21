@@ -25,14 +25,15 @@ import {
     ArrowBack as ArrowBackIcon,
     Print as PrintIcon,
     CheckCircle as CheckCircleIcon,
-    Calculate as CalculateIcon
+    Calculate as CalculateIcon,
+    Add as AddIcon,
+    Remove as RemoveIcon
 } from '@mui/icons-material';
 import { directStoreApi } from '../../api/directStoreApi';
 import { directStoreApiClient } from '../../api/directStoreApiClient';
 import {
     calculateInstallmentFee,
     calculatePlanFee,
-    calculateRequiredAddonsFee,
     calculateTotalMonthlyFee,
     calculateInstallmentPrincipalWithAddon,
     calculateInstallmentPrincipalWithoutAddon,
@@ -58,14 +59,10 @@ const OpeningInfoPage = ({
     const [planGroups, setPlanGroups] = useState([]); // 요금제 그룹 목록
     const [selectedPlanGroup, setSelectedPlanGroup] = useState('');
     const [planBasicFee, setPlanBasicFee] = useState(0);
-    const [requiredAddons, setRequiredAddons] = useState([]); // 필수 부가서비스 목록
-    const [addonIncentiveList, setAddonIncentiveList] = useState([]); // 부가유치 시 유치되는 부가서비스 목록
-    const [insuranceIncentiveList, setInsuranceIncentiveList] = useState([]); // 부가유치 시 유치되는 보험상품 목록
-    // 🔥 개선: 부가서비스/보험상품 개별 선택 기능
-    const [availableAddons, setAvailableAddons] = useState([]); // 선택 가능한 모든 부가서비스 목록 (incentive, deduction 정보 포함)
-    const [availableInsurances, setAvailableInsurances] = useState([]); // 선택 가능한 모든 보험상품 목록 (incentive, deduction 정보 포함)
-    const [selectedAddons, setSelectedAddons] = useState(new Set()); // 선택된 부가서비스 이름 Set
-    const [selectedInsurances, setSelectedInsurances] = useState(new Set()); // 선택된 보험상품 이름 Set
+    // 🔥 개선: 통합된 선택 항목 관리 (부가서비스 + 보험상품)
+    const [availableAddons, setAvailableAddons] = useState([]); // 선택 가능한 모든 부가서비스 목록 (incentive, deduction, description, url 정보 포함)
+    const [availableInsurances, setAvailableInsurances] = useState([]); // 선택 가능한 모든 보험상품 목록 (incentive, deduction, description, url 정보 포함)
+    const [selectedItems, setSelectedItems] = useState([]); // 사용자가 선택한 부가서비스/보험상품 배열 (통합 관리)
     const [agreementChecked, setAgreementChecked] = useState(false); // 동의 체크박스 상태
     const [baseMargin, setBaseMargin] = useState(0); // 정책설정에서 가져온 기본 마진
     const [preApprovalMark, setPreApprovalMark] = useState(null); // 사전승낙서 마크
@@ -167,23 +164,20 @@ const OpeningInfoPage = ({
 
     // 필수 부가서비스 및 보험상품 로드 (정책설정에서 가져오기)
     useEffect(() => {
-        const loadRequiredAddons = async () => {
+        const loadAvailableItems = async () => {
             try {
                 const policySettings = await directStoreApi.getPolicySettings(selectedCarrier);
-                const required = [];
-                const addonIncentives = [];
-                const insuranceIncentives = [];
+                const initialSelectedItems = [];
 
                 // 마진 설정 값 저장
                 if (policySettings.success && policySettings.margin?.baseMargin != null) {
                     setBaseMargin(Number(policySettings.margin.baseMargin) || 0);
                 } else {
-                    // 설정된 마진 금액이 없으면 0원으로 처리
                     setBaseMargin(0);
                 }
 
                 if (policySettings.success && policySettings.addon?.list) {
-                    // 🔥 개선: 모든 부가서비스 목록 저장 (incentive, deduction, description, url 정보 포함)
+                    // 모든 부가서비스 목록 저장 (incentive, deduction, description, url 정보 포함)
                     const allAddons = policySettings.addon.list.map(addon => ({
                         name: addon.name,
                         monthlyFee: addon.fee || 0,
@@ -195,23 +189,9 @@ const OpeningInfoPage = ({
                     }));
                     setAvailableAddons(allAddons);
 
-                    // 미유치차감금액이 있는 부가서비스를 필수 부가서비스로 간주
-                    const addonList = allAddons
-                        .filter(addon => addon.deduction > 0)
-                        .map(addon => ({
-                            name: addon.name,
-                            monthlyFee: addon.monthlyFee,
-                            type: 'addon'
-                        }));
-                    required.push(...addonList);
-
-                    // 부가유치 시 유치되는 부가서비스 (incentive가 있는 항목) - 초기값으로 모두 선택
-                    const incentiveAddons = allAddons
-                        .filter(addon => addon.incentive > 0)
-                        .map(addon => addon.name);
-                    setAddonIncentiveList(incentiveAddons);
-                    // 초기값: incentive가 있는 부가서비스는 모두 선택
-                    setSelectedAddons(new Set(incentiveAddons));
+                    // 🔥 초기값: deduction > 0인 부가서비스만 초기 선택 (필수 항목)
+                    const requiredAddons = allAddons.filter(addon => addon.deduction > 0);
+                    initialSelectedItems.push(...requiredAddons);
                 }
 
                 // 보험상품: 출고가 및 모델 유형(플립/폴드 여부)에 맞는 보험상품 찾기
@@ -240,14 +220,12 @@ const OpeningInfoPage = ({
                     let matchingInsurance = null;
 
                     if (selectedCarrier === 'LG' && isFlipFoldModel && flipFoldInsurances.length > 0) {
-                        // LG + 플립/폴드 단말인 경우 → "폰교체 패스 플립/폴드" 상품 우선 사용
                         matchingInsurance = flipFoldInsurances.find(insurance => {
                             const minPrice = insurance.minPrice || 0;
                             const maxPrice = insurance.maxPrice || 9999999;
                             return factoryPrice >= minPrice && factoryPrice <= maxPrice;
                         }) || flipFoldInsurances[0];
                     } else {
-                        // 그 외 모델들은 플립/폴드 전용 상품을 제외한 나머지 보험상품에서 출고가로 매칭
                         const baseList = normalInsurances.length > 0 ? normalInsurances : insuranceList;
                         matchingInsurance = baseList.find(insurance => {
                             const minPrice = insurance.minPrice || 0;
@@ -256,10 +234,9 @@ const OpeningInfoPage = ({
                         });
                     }
 
-                    // 🔥 개선: 모든 보험상품 목록 저장 (incentive, deduction, description, url 정보 포함)
+                    // 모든 보험상품 목록 저장 (incentive, deduction, description, url 정보 포함)
                     const allInsurances = insuranceList
                         .filter(insurance => {
-                            // 출고가 범위에 맞는 보험상품만 포함
                             const minPrice = insurance.minPrice || 0;
                             const maxPrice = insurance.maxPrice || 9999999;
                             return factoryPrice >= minPrice && factoryPrice <= maxPrice;
@@ -275,42 +252,24 @@ const OpeningInfoPage = ({
                         }));
                     setAvailableInsurances(allInsurances);
 
-                    if (matchingInsurance) {
-                        required.push({
-                            name: matchingInsurance.name,
-                            monthlyFee: matchingInsurance.fee || 0,
-                            type: 'insurance'
-                        });
-
-                        // 부가유치 시 유치되는 보험상품 (incentive가 있는 경우) - 초기값으로 선택
-                        if (matchingInsurance.incentive > 0) {
-                            setInsuranceIncentiveList([matchingInsurance.name]);
-                            // 초기값: incentive가 있는 보험상품은 선택
-                            setSelectedInsurances(new Set([matchingInsurance.name]));
+                    // 🔥 초기값: deduction > 0인 보험상품만 초기 선택 (필수 항목)
+                    if (matchingInsurance && matchingInsurance.deduction > 0) {
+                        const requiredInsurance = allInsurances.find(ins => ins.name === matchingInsurance.name);
+                        if (requiredInsurance) {
+                            initialSelectedItems.push(requiredInsurance);
                         }
                     }
                 }
 
-                if (required.length > 0) {
-                    setRequiredAddons(required);
-                } else {
-                    // 정책설정이 없으면 Mock 데이터 사용
-                    setRequiredAddons([
-                        { name: '우주패스', monthlyFee: 9900, type: 'addon' },
-                        { name: 'V컬러링', monthlyFee: 3300, type: 'addon' }
-                    ]);
-                }
+                // 초기 선택 항목 설정
+                setSelectedItems(initialSelectedItems);
             } catch (err) {
-                console.error('필수 부가서비스 로드 실패:', err);
-                // 에러 시 Mock 데이터 사용
-                setRequiredAddons([
-                    { name: '우주패스', monthlyFee: 9900, type: 'addon' },
-                    { name: 'V컬러링', monthlyFee: 3300, type: 'addon' }
-                ]);
+                console.error('부가서비스/보험상품 로드 실패:', err);
+                setSelectedItems([]);
             }
         };
-        loadRequiredAddons();
-    }, [selectedCarrier, factoryPrice]);
+        loadAvailableItems();
+    }, [selectedCarrier, factoryPrice, initialData?.petName, initialData?.model]);
 
     // 사전승낙서 마크 로드
     useEffect(() => {
@@ -391,35 +350,31 @@ const OpeningInfoPage = ({
 
     // 🔥 개선: 선택된 부가서비스/보험상품에 따른 대리점지원금 계산
     const calculateDynamicStoreSupport = useMemo(() => {
-        // 선택된 부가서비스/보험상품의 incentive 합계
-        const selectedIncentive = 
-            Array.from(selectedAddons).reduce((sum, name) => {
-                const addon = availableAddons.find(a => a.name === name);
-                return sum + (addon?.incentive || 0);
-            }, 0) +
-            Array.from(selectedInsurances).reduce((sum, name) => {
-                const insurance = availableInsurances.find(i => i.name === name);
-                return sum + (insurance?.incentive || 0);
-            }, 0);
+        // 선택된 항목들의 incentive 합계 (유치시 금액에 더해짐)
+        const selectedIncentive = selectedItems.reduce((sum, item) => {
+            return sum + (item.incentive || 0);
+        }, 0);
 
-        // 선택되지 않은 부가서비스/보험상품의 deduction 합계
-        const unselectedDeduction = 
-            availableAddons
-                .filter(addon => !selectedAddons.has(addon.name))
-                .reduce((sum, addon) => sum + (addon.deduction || 0), 0) +
-            availableInsurances
-                .filter(insurance => !selectedInsurances.has(insurance.name))
-                .reduce((sum, insurance) => sum + (insurance.deduction || 0), 0);
+        // 모든 가능한 항목 (부가서비스 + 보험상품)
+        const allAvailableItems = [...availableAddons, ...availableInsurances];
+        
+        // 선택되지 않은 항목들의 deduction 합계 (미유치시 금액에서 차감)
+        const unselectedDeduction = allAvailableItems
+            .filter(item => !selectedItems.some(selected => selected.name === item.name))
+            .reduce((sum, item) => sum + (item.deduction || 0), 0);
 
-        // 동적 대리점지원금 = 기본 대리점지원금 + 선택된 상품들의 incentive - 선택되지 않은 상품들의 deduction
-        const dynamicStoreSupportWithAddon = storeSupportWithAddon + selectedIncentive - unselectedDeduction;
+        // 동적 대리점지원금 계산
+        // 유치시 = 기본값 + 선택된 항목들의 incentive
+        const dynamicStoreSupportWithAddon = storeSupportWithAddon + selectedIncentive;
+        
+        // 미유치시 = 기본값 - 선택되지 않은 항목들의 deduction
         const dynamicStoreSupportWithoutAddon = storeSupportWithoutAddon - unselectedDeduction;
 
         return {
             withAddon: Math.max(0, dynamicStoreSupportWithAddon), // 음수 방지
             withoutAddon: Math.max(0, dynamicStoreSupportWithoutAddon) // 음수 방지
         };
-    }, [selectedAddons, selectedInsurances, availableAddons, availableInsurances, storeSupportWithAddon, storeSupportWithoutAddon]);
+    }, [selectedItems, availableAddons, availableInsurances, storeSupportWithAddon, storeSupportWithoutAddon]);
 
     // 계산 로직 (계산 엔진 사용)
     const getCurrentInstallmentPrincipal = () => {
@@ -439,6 +394,18 @@ const OpeningInfoPage = ({
         return calculateCashPrice(principal, formData.cashPrice);
     };
 
+    // 🔥 개선: 선택된 항목이 하나라도 있으면 withAddon을 true로 자동 설정
+    useEffect(() => {
+        const hasSelectedItems = selectedItems.length > 0;
+        // 현재 값과 다를 때만 업데이트 (무한 루프 방지)
+        setFormData(prev => {
+            if (prev.withAddon !== hasSelectedItems) {
+                return { ...prev, withAddon: hasSelectedItems };
+            }
+            return prev; // 동일하면 이전 객체 반환
+        });
+    }, [selectedItems.length]);
+
     // 계산된 값들을 메모이제이션하여 불필요한 재계산 방지
     // 🔥 개선: formData.withAddon 변경 시 할부원금 재계산되도록 useMemo 사용
     const installmentPrincipal = useMemo(() => {
@@ -453,9 +420,10 @@ const OpeningInfoPage = ({
         return calculatePlanFee(planBasicFee, formData.contractType, selectedCarrier, formData.lgPremier);
     }, [planBasicFee, formData.contractType, selectedCarrier, formData.lgPremier]);
     
+    // 🔥 개선: 선택된 항목들의 월 요금 합계
     const addonsFeeResult = useMemo(() => {
-        return calculateRequiredAddonsFee(requiredAddons);
-    }, [requiredAddons]);
+        return selectedItems.reduce((sum, item) => sum + (item.monthlyFee || 0), 0);
+    }, [selectedItems]);
     
     const totalMonthlyFeeResult = useMemo(() => {
         return calculateTotalMonthlyFee(
@@ -524,7 +492,7 @@ const OpeningInfoPage = ({
                 contractType: formData.contractType === 'selected' ? '선택약정' : '일반약정', // 약정 (한글로 변환)
                 contract: formData.contractType === 'selected' ? '선택약정' : '일반약정', // 약정 (하위 호환, 한글로 변환)
                 plan: formData.plan || '', // 요금제
-                addons: requiredAddons.map(a => a.name).join(', ') || '', // 부가서비스
+                addons: selectedItems.map(a => a.name).join(', ') || '', // 부가서비스
                 // 금액 정보
                 factoryPrice: factoryPrice || 0, // 출고가
                 publicSupport: formData.usePublicSupport ? publicSupport : 0, // 이통사지원금
@@ -586,7 +554,7 @@ const OpeningInfoPage = ({
                     installmentMonths: formData.installmentPeriod || 24,
                     contractType: formData.contractType === 'selected' ? '선택약정' : '일반약정',
                     plan: formData.plan || '',
-                    additionalServices: requiredAddons.map(a => a.name).join(', ') || '',
+                    additionalServices: selectedItems.map(a => a.name).join(', ') || '',
                     factoryPrice: factoryPrice || 0,
                     carrierSupport: formData.usePublicSupport ? publicSupport : 0,
                     dealerSupportWithAdd: formData.withAddon ? calculateDynamicStoreSupport.withAddon : 0, // 동적 계산
@@ -1141,20 +1109,90 @@ const OpeningInfoPage = ({
                                                 )}
                                             </Grid>
                                         )}
-                                        {requiredAddons.length > 0 && (
-                                            <Grid item xs={12}>
-                                                <Divider sx={{ my: 1 }} />
-                                                <Typography variant="subtitle2" gutterBottom>필수 부가서비스</Typography>
-                                                {requiredAddons.map((addon, idx) => (
-                                                    <Box key={idx} sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                                                        <Typography variant="body2">{addon.name}</Typography>
-                                                        <Typography variant="body2" color="primary">
-                                                            +{addon.monthlyFee.toLocaleString()}원
-                                                        </Typography>
-                                                    </Box>
-                                                ))}
-                                            </Grid>
-                                        )}
+                                        {/* 부가서비스 및 보험 적용시 금액 변경 */}
+                                        <Grid item xs={12}>
+                                            <Divider sx={{ my: 1 }} />
+                                            <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold' }}>
+                                                부가서비스 및 보험 적용시 금액 변경
+                                            </Typography>
+                                            
+                                            {/* 선택 가능한 항목 목록 (부가서비스 + 보험상품) */}
+                                            <Box sx={{ mb: 2 }}>
+                                                <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold', color: 'text.secondary' }}>
+                                                    선택 가능한 항목
+                                                </Typography>
+                                                <Stack spacing={1}>
+                                                    {[...availableAddons, ...availableInsurances]
+                                                        .filter(item => !selectedItems.some(selected => selected.name === item.name))
+                                                        .map((item) => (
+                                                            <Paper key={item.name} variant="outlined" sx={{ p: 1.5 }}>
+                                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                                    <Box sx={{ flex: 1 }}>
+                                                                        <Typography variant="body2" fontWeight="bold">
+                                                                            {item.name}
+                                                                        </Typography>
+                                                                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                                                                            월 요금: {item.monthlyFee.toLocaleString()}원
+                                                                            {item.incentive > 0 && ` | 유치시 +${item.incentive.toLocaleString()}원`}
+                                                                            {item.deduction > 0 && ` | 미유치시 -${item.deduction.toLocaleString()}원`}
+                                                                        </Typography>
+                                                                        {item.description && (
+                                                                            <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5, fontSize: '0.75rem' }}>
+                                                                                {item.description}
+                                                                            </Typography>
+                                                                        )}
+                                                                    </Box>
+                                                                    <IconButton
+                                                                        color="primary"
+                                                                        onClick={() => {
+                                                                            setSelectedItems(prev => [...prev, item]);
+                                                                        }}
+                                                                        sx={{ ml: 1 }}
+                                                                    >
+                                                                        <AddIcon />
+                                                                    </IconButton>
+                                                                </Box>
+                                                            </Paper>
+                                                        ))}
+                                                </Stack>
+                                            </Box>
+
+                                            {/* 선택된 항목 목록 */}
+                                            {selectedItems.length > 0 && (
+                                                <Box>
+                                                    <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold', color: 'primary.main' }}>
+                                                        선택된 항목
+                                                    </Typography>
+                                                    <Stack spacing={1}>
+                                                        {selectedItems.map((item) => (
+                                                            <Paper key={item.name} variant="outlined" sx={{ p: 1.5, bgcolor: 'action.selected' }}>
+                                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                                    <Box sx={{ flex: 1 }}>
+                                                                        <Typography variant="body2" fontWeight="bold">
+                                                                            {item.name}
+                                                                        </Typography>
+                                                                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                                                                            월 요금: {item.monthlyFee.toLocaleString()}원
+                                                                            {item.incentive > 0 && ` | 유치시 +${item.incentive.toLocaleString()}원`}
+                                                                            {item.deduction > 0 && ` | 미유치시 -${item.deduction.toLocaleString()}원`}
+                                                                        </Typography>
+                                                                    </Box>
+                                                                    <IconButton
+                                                                        color="error"
+                                                                        onClick={() => {
+                                                                            setSelectedItems(prev => prev.filter(selected => selected.name !== item.name));
+                                                                        }}
+                                                                        sx={{ ml: 1 }}
+                                                                    >
+                                                                        <RemoveIcon />
+                                                                    </IconButton>
+                                                                </Box>
+                                                            </Paper>
+                                                        ))}
+                                                    </Stack>
+                                                </Box>
+                                            )}
+                                        </Grid>
                                     </>
                                 )}
                             </Grid>
@@ -1226,9 +1264,9 @@ const OpeningInfoPage = ({
                                     <Typography variant="body2" color="error">-5,250원</Typography>
                                 </Stack>
                             )}
-                            {requiredAddons.length > 0 && (
+                            {selectedItems.length > 0 && (
                                 <Stack direction="row" justifyContent="space-between" mb={1}>
-                                    <Typography variant="body2">필수 부가서비스</Typography>
+                                    <Typography variant="body2">부가서비스 및 보험</Typography>
                                     <Typography variant="body2" color="primary">
                                         +{addonsFeeResult.toLocaleString()}원
                                     </Typography>
@@ -1250,7 +1288,7 @@ const OpeningInfoPage = ({
                                 <Typography variant="body1">월 기본료</Typography>
                                 <Typography variant="body1">{planFeeResult.toLocaleString()}원</Typography>
                             </Stack>
-                            {requiredAddons.length > 0 && (
+                            {selectedItems.length > 0 && (
                                 <Stack direction="row" justifyContent="space-between" mb={2}>
                                     <Typography variant="body1">월 부가서비스</Typography>
                                     <Typography variant="body1">{addonsFeeResult.toLocaleString()}원</Typography>
@@ -1377,145 +1415,6 @@ const OpeningInfoPage = ({
                                         InputProps={{ readOnly: true }}
                                         sx={{ input: { fontWeight: 'bold', color: theme.primary } }}
                                     />
-                                </Grid>
-                                <Grid item xs={12}>
-                                    <FormControl component="fieldset" fullWidth>
-                                        <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold', mb: 2 }}>
-                                            부가서비스/보험상품 개별 선택
-                                        </Typography>
-                                        
-                                        {/* 부가서비스 선택 */}
-                                        {availableAddons.length > 0 && (
-                                            <Box sx={{ mb: 2 }}>
-                                                <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold', color: 'primary.main' }}>
-                                                    부가서비스
-                                                </Typography>
-                                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                                    {availableAddons.map((addon) => (
-                                                        <Paper key={addon.name} variant="outlined" sx={{ p: 2 }}>
-                                                            <FormControlLabel
-                                                                control={
-                                                                    <Checkbox
-                                                                        checked={selectedAddons.has(addon.name)}
-                                                                        onChange={(e) => {
-                                                                            const newSelected = new Set(selectedAddons);
-                                                                            if (e.target.checked) {
-                                                                                newSelected.add(addon.name);
-                                                                            } else {
-                                                                                newSelected.delete(addon.name);
-                                                                            }
-                                                                            setSelectedAddons(newSelected);
-                                                                        }}
-                                                                    />
-                                                                }
-                                                                label={
-                                                                    <Box sx={{ ml: 1 }}>
-                                                                        <Typography variant="body2" fontWeight="bold">{addon.name}</Typography>
-                                                                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-                                                                            {addon.incentive > 0 && `유치시 +${addon.incentive.toLocaleString()}원`}
-                                                                            {addon.deduction > 0 && `미유치시 -${addon.deduction.toLocaleString()}원`}
-                                                                        </Typography>
-                                                                        {addon.description && (
-                                                                            <Typography variant="body2" color="text.secondary" sx={{ mt: 1, fontSize: '0.875rem' }}>
-                                                                                {addon.description}
-                                                                            </Typography>
-                                                                        )}
-                                                                        {addon.url && (
-                                                                            <Box sx={{ mt: 1 }}>
-                                                                                <Button
-                                                                                    size="small"
-                                                                                    variant="outlined"
-                                                                                    href={addon.url}
-                                                                                    target="_blank"
-                                                                                    rel="noopener noreferrer"
-                                                                                    sx={{ fontSize: '0.75rem', textTransform: 'none' }}
-                                                                                    onClick={(e) => e.stopPropagation()}
-                                                                                >
-                                                                                    공식사이트 확인
-                                                                                </Button>
-                                                                            </Box>
-                                                                        )}
-                                                                    </Box>
-                                                                }
-                                                            />
-                                                        </Paper>
-                                                    ))}
-                                                </Box>
-                                            </Box>
-                                        )}
-
-                                        {/* 보험상품 선택 */}
-                                        {availableInsurances.length > 0 && (
-                                            <Box sx={{ mb: 2 }}>
-                                                <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold', color: 'primary.main' }}>
-                                                    보험상품
-                                                </Typography>
-                                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                                    {availableInsurances.map((insurance) => (
-                                                        <Paper key={insurance.name} variant="outlined" sx={{ p: 2 }}>
-                                                            <FormControlLabel
-                                                                control={
-                                                                    <Checkbox
-                                                                        checked={selectedInsurances.has(insurance.name)}
-                                                                        onChange={(e) => {
-                                                                            const newSelected = new Set(selectedInsurances);
-                                                                            if (e.target.checked) {
-                                                                                newSelected.add(insurance.name);
-                                                                            } else {
-                                                                                newSelected.delete(insurance.name);
-                                                                            }
-                                                                            setSelectedInsurances(newSelected);
-                                                                        }}
-                                                                    />
-                                                                }
-                                                                label={
-                                                                    <Box sx={{ ml: 1 }}>
-                                                                        <Typography variant="body2" fontWeight="bold">{insurance.name}</Typography>
-                                                                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-                                                                            {insurance.incentive > 0 && `유치시 +${insurance.incentive.toLocaleString()}원`}
-                                                                            {insurance.deduction > 0 && `미유치시 -${insurance.deduction.toLocaleString()}원`}
-                                                                        </Typography>
-                                                                        {insurance.description && (
-                                                                            <Typography variant="body2" color="text.secondary" sx={{ mt: 1, fontSize: '0.875rem' }}>
-                                                                                {insurance.description}
-                                                                            </Typography>
-                                                                        )}
-                                                                        {insurance.url && (
-                                                                            <Box sx={{ mt: 1 }}>
-                                                                                <Button
-                                                                                    size="small"
-                                                                                    variant="outlined"
-                                                                                    href={insurance.url}
-                                                                                    target="_blank"
-                                                                                    rel="noopener noreferrer"
-                                                                                    sx={{ fontSize: '0.75rem', textTransform: 'none' }}
-                                                                                    onClick={(e) => e.stopPropagation()}
-                                                                                >
-                                                                                    공식사이트 확인
-                                                                                </Button>
-                                                                            </Box>
-                                                                        )}
-                                                                    </Box>
-                                                                }
-                                                            />
-                                                        </Paper>
-                                                    ))}
-                                                </Box>
-                                            </Box>
-                                        )}
-
-                                        {/* 동적 대리점지원금 표시 */}
-                                        <Box sx={{ mt: 2, p: 1, bgcolor: 'info.light', borderRadius: 1 }}>
-                                            <Typography variant="caption" sx={{ fontWeight: 'bold' }}>
-                                                계산된 대리점지원금:
-                                            </Typography>
-                                            <Typography variant="body2">
-                                                유치시: {calculateDynamicStoreSupport.withAddon.toLocaleString()}원
-                                                {' | '}
-                                                미유치시: {calculateDynamicStoreSupport.withoutAddon.toLocaleString()}원
-                                            </Typography>
-                                        </Box>
-                                    </FormControl>
                                 </Grid>
                                 <Grid item xs={12}>
                                     <FormControl component="fieldset" className="print-inline-group" sx={{ '@media print': { display: 'inline-block', mr: 2, verticalAlign: 'top' } }}>
