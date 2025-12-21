@@ -1400,7 +1400,8 @@ async function getSheetId(sheets, spreadsheetId, sheetName) {
   return sheet ? sheet.properties.sheetId : null;
 }
 
-// Excel 컬럼 인덱스를 컬럼 문자로 변환 (1 -> A, 27 -> AA, 36 -> AJ)
+// 스프레드시트 컬럼 번호를 컬럼 문자로 변환 (1 -> A, 27 -> AA, 36 -> AJ)
+// Google Sheets와 Excel 모두 동일한 컬럼 명명 규칙 사용 (A-Z, AA-AZ, BA-BZ, ...)
 function getColumnLetter(columnNumber) {
   let result = '';
   while (columnNumber > 0) {
