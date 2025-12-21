@@ -162,9 +162,14 @@ function MapUpdater({ center, bounds, zoom, isAgentMode, currentView, forceZoomT
       if (currentView === 'activation') return 12; // 담당개통확인
       return 10; // 기본값
     }
-    // 고객모드에서 위치 정보 실패 시 평택 중심 보기 (인천과 청주지역까지 보이도록)
-    if (isCustomerMode && center && center.isDefault) {
+    // 고객모드 또는 직영점관리모드에서 위치 정보 실패 시 평택 중심 보기 (인천과 청주지역까지 보이도록)
+    if ((isCustomerMode || (!isCustomerMode && !isAgentMode && !loggedInStore?.coords)) && 
+        center && center.isDefault) {
       return 9; // 평택 중심으로 인천과 청주지역까지 보이는 줌 레벨
+    }
+    // 직영점모드: 접속 매장 중심 (줌 레벨 14)
+    if (loggedInStore?.coords?.lat && loggedInStore?.coords?.lng) {
+      return 14;
     }
     return 12; // 일반 매장 모드
   };
@@ -291,7 +296,28 @@ function Map({
   const [map, setMap] = useState(null);
   const [userInteracted, setUserInteracted] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
-  const [mapCenter, setMapCenter] = useState(userLocation || defaultCenter);
+  // 초기 mapCenter 설정: userLocation이 있으면 사용, 없으면 center useMemo 결과 사용
+  const initialMapCenter = useMemo(() => {
+    if (userLocation) {
+      return userLocation;
+    }
+    // 고객모드이고 userLocation이 없으면 평택 중심 좌표 사용 (인천과 청주지역까지 보이도록)
+    if (isCustomerMode) {
+      return pyeongtaekCenter;
+    }
+    // 직영점모드: 접속 매장 중심 좌표 사용
+    if (loggedInStore?.coords?.lat && loggedInStore?.coords?.lng) {
+      return {
+        lat: loggedInStore.coords.lat,
+        lng: loggedInStore.coords.lng,
+        isDefault: true
+      };
+    }
+    // 직영점관리모드 또는 기타: 평택 중심 좌표 사용 (인천과 청주지역까지 보이도록)
+    return pyeongtaekCenter;
+  }, [userLocation, isCustomerMode, loggedInStore]);
+  
+  const [mapCenter, setMapCenter] = useState(initialMapCenter);
 
   // 기억 기능 함수
   const handleRemember = (store, model, color) => {
