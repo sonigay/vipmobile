@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
     Box, Typography, CircularProgress, Alert, Dialog, DialogTitle, DialogContent, 
     DialogActions, TextField, Button, Grid, IconButton, Stack, Paper, Table, 
-    TableBody, TableCell, TableContainer, TableHead, TableRow 
+    TableBody, TableCell, TableContainer, TableHead, TableRow, FormControlLabel, Switch
 } from '@mui/material';
 import { Close as CloseIcon, Save as SaveIcon, CloudUpload as CloudUploadIcon, Store as StoreIcon, Add as AddIcon, Delete as DeleteIcon, Edit as EditIcon, Check as CheckIcon, Cancel as CancelIcon } from '@mui/icons-material';
 import { Autocomplete, Chip } from '@mui/material';
@@ -45,6 +45,7 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
     const [transitLocations, setTransitLocations] = useState([]); // 매장별 대중교통 위치 (지도 표시용)
     const [isLoadingTransit, setIsLoadingTransit] = useState(false);
     const [isAddingNewTransit, setIsAddingNewTransit] = useState({ type: null, name: '', address: '' }); // 새 위치 추가 상태
+    const [showTransitMarkers, setShowTransitMarkers] = useState(true); // 대중교통 마커 표시 여부
 
     // stores는 이미 필터링되어 있으므로 그대로 사용
     // Hook 규칙: 모든 Hook은 최상위에서 호출되어야 함
@@ -515,6 +516,28 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
                     }
                 }}
             >
+                {/* 대중교통 마커 토글 */}
+                <Box sx={{
+                    position: 'absolute',
+                    top: 10,
+                    left: 10,
+                    zIndex: 1000,
+                    bgcolor: 'rgba(255,255,255,0.95)',
+                    p: 1,
+                    borderRadius: 1,
+                    boxShadow: 2
+                }}>
+                    <FormControlLabel
+                        control={
+                            <Switch
+                                checked={showTransitMarkers}
+                                onChange={(e) => setShowTransitMarkers(e.target.checked)}
+                                size="small"
+                            />
+                        }
+                        label={<Typography variant="body2" sx={{ fontSize: '0.875rem' }}>대중교통 마커</Typography>}
+                    />
+                </Box>
                 <Map
                     key={`map-${isManagementMode ? 'management' : 'direct'}-${activeTab !== null ? `tab-${activeTab}` : 'default'}-${isLoading ? 'loading' : 'ready'}-${stores.length}`}
                     userLocation={userLocation}
@@ -527,7 +550,7 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
                     loggedInStore={loggedInStore}
                     fixedHeight={500}
                     transitLocations={transitLocations}
-                    showTransitMarkers={true}
+                    showTransitMarkers={showTransitMarkers}
                 />
             </Box>
 

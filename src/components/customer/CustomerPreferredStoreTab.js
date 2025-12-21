@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
     Box, Typography, CircularProgress, Alert, Paper, Table, TableBody, 
-    TableCell, TableContainer, TableHead, TableRow, Button, Grid, Card, CardContent 
+    TableCell, TableContainer, TableHead, TableRow, Button, Grid, Card, CardContent,
+    FormControlLabel, Switch
 } from '@mui/material';
 import { Store as StoreIcon } from '@mui/icons-material';
 import Map from '../Map';
@@ -19,6 +20,9 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
     const [loadingDetails, setLoadingDetails] = useState(false);
     // 사진 갤러리: 메인 사진 (선택된 사진)
     const [mainPhoto, setMainPhoto] = useState(null);
+    // 대중교통 위치 데이터
+    const [transitLocations, setTransitLocations] = useState([]);
+    const [showTransitMarkers, setShowTransitMarkers] = useState(true);
 
     useEffect(() => {
         // Get user location
@@ -63,6 +67,19 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
         };
 
         loadStores();
+        
+        // 대중교통 위치 데이터 로드
+        const loadTransitLocations = async () => {
+            try {
+                const response = await directStoreApiClient.getTransitLocations();
+                if (response.success && response.data) {
+                    setTransitLocations(response.data);
+                }
+            } catch (error) {
+                console.error('대중교통 위치 로드 실패:', error);
+            }
+        };
+        loadTransitLocations();
     }, []);
 
     // 선택된 매장의 상세 정보 로드 (사전승낙서 마크, 사진)
@@ -190,6 +207,28 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                         고객님의 위치에서 가장 가까운 매장을 안내합니다.
                     </Typography>
                 </Box>
+                {/* 대중교통 마커 토글 */}
+                <Box sx={{
+                    position: 'absolute',
+                    top: 10,
+                    left: 10,
+                    zIndex: 1000,
+                    bgcolor: 'rgba(255,255,255,0.95)',
+                    p: 1,
+                    borderRadius: 1,
+                    boxShadow: 2
+                }}>
+                    <FormControlLabel
+                        control={
+                            <Switch
+                                checked={showTransitMarkers}
+                                onChange={(e) => setShowTransitMarkers(e.target.checked)}
+                                size="small"
+                            />
+                        }
+                        label={<Typography variant="body2" sx={{ fontSize: '0.875rem' }}>대중교통 마커</Typography>}
+                    />
+                </Box>
                 <Map
                     userLocation={userLocation}
                     filteredStores={filteredStores}
@@ -201,6 +240,7 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                     onStoreConfirm={(store) => handleStoreSelect(store)}
                     isCustomerMode={true}
                     transitLocations={transitLocations}
+                    showTransitMarkers={showTransitMarkers}
                 />
                 {selectedProduct && (
                     <Box sx={{
