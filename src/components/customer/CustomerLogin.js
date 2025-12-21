@@ -22,6 +22,23 @@ const CustomerLogin = () => {
         setError('');
 
         try {
+            // 첫구매 어드민 계정 체크 (하드코딩)
+            if (ctn === '1234' && password === '5678') {
+                // 첫구매 어드민 계정 정보 생성
+                const adminCustomer = {
+                    ctn: '1234',
+                    name: '첫구매 어드민',
+                    model: '',
+                    carrier: '',
+                    soldAt: null,
+                    isFirstPurchaseAdmin: true, // 첫구매 어드민 플래그
+                    publicIdStatus: 'before' // 공개아이디(아이디부여전)
+                };
+                localStorage.setItem('customer_info', JSON.stringify(adminCustomer));
+                navigate('/member/dashboard');
+                return;
+            }
+
             const API_URL = process.env.REACT_APP_API_URL || '';
             const response = await axios.post(`${API_URL}/api/member/login`, {
                 ctn,

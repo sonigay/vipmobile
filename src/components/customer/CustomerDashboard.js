@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Container, Tabs, Tab, Paper, Button } from '@mui/material';
+import { Box, Typography, Container, Tabs, Tab, Paper, Button, Alert } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import MobileListTab from '../direct/MobileListTab';
 import CustomerPreferredStoreTab from './CustomerPreferredStoreTab';
@@ -50,6 +50,13 @@ const CustomerDashboard = () => {
     }, [navigate]);
 
     const handleTabChange = (event, newValue) => {
+        // 첫구매 어드민 계정이고 공개아이디(아이디부여전) 상태인 경우, 나의구매대기(2)와 게시판(3) 탭 접근 제한
+        if (customerInfo?.isFirstPurchaseAdmin && customerInfo?.publicIdStatus === 'before') {
+            if (newValue === 2 || newValue === 3) {
+                // 탭 변경을 막고 경고 표시
+                return;
+            }
+        }
         setTabValue(newValue);
         setShowGuidePage(false);
     };
@@ -120,8 +127,8 @@ const CustomerDashboard = () => {
             <OpeningInfoPage
                 initialData={{
                     ...selectedProduct,
-                    customerName: customerInfo.name,
-                    customerContact: customerInfo.ctn,
+                    customerName: '', // 초기값 빈칸
+                    customerContact: '', // 초기값 빈칸
                     carrier: selectedProduct.carrier || customerInfo.carrier
                 }}
                 onBack={handleOpeningInfoBack}
@@ -187,10 +194,23 @@ const CustomerDashboard = () => {
                 >
                     <Tab label="휴대폰 시세표" />
                     <Tab label="선호 구입 매장" />
-                    <Tab label="나의 구매 대기" />
-                    <Tab label="게시판" />
+                    <Tab 
+                        label="나의 구매 대기" 
+                        disabled={customerInfo?.isFirstPurchaseAdmin && customerInfo?.publicIdStatus === 'before'}
+                    />
+                    <Tab 
+                        label="게시판" 
+                        disabled={customerInfo?.isFirstPurchaseAdmin && customerInfo?.publicIdStatus === 'before'}
+                    />
                 </Tabs>
             </Paper>
+
+            {/* 첫구매 어드민 계정 경고 문구 */}
+            {customerInfo?.isFirstPurchaseAdmin && customerInfo?.publicIdStatus === 'before' && (
+                <Alert severity="warning" sx={{ mb: 2 }}>
+                    아이디 부여 후 사용 가능한 기능입니다. 현재 공개아이디(아이디부여전) 상태로 "나의 구매 대기"와 "게시판" 탭에 접근할 수 없습니다.
+                </Alert>
+            )}
 
             <Box sx={{ 
                 p: { xs: tabValue === 0 ? 0 : 2, sm: tabValue === 0 ? 0 : 3 }, 
@@ -217,12 +237,24 @@ const CustomerDashboard = () => {
                 )}
                 {tabValue === 2 && (
                     <Box sx={{ p: 3 }}>
-                        <CustomerPurchaseQueueTab customerInfo={customerInfo} />
+                        {customerInfo?.isFirstPurchaseAdmin && customerInfo?.publicIdStatus === 'before' ? (
+                            <Alert severity="error">
+                                아이디 부여 후 사용 가능한 기능입니다. 현재 공개아이디(아이디부여전) 상태로 접근할 수 없습니다.
+                            </Alert>
+                        ) : (
+                            <CustomerPurchaseQueueTab customerInfo={customerInfo} />
+                        )}
                     </Box>
                 )}
                 {tabValue === 3 && (
                     <Box sx={{ p: 3 }}>
-                        <CustomerBoardTab customerInfo={customerInfo} />
+                        {customerInfo?.isFirstPurchaseAdmin && customerInfo?.publicIdStatus === 'before' ? (
+                            <Alert severity="error">
+                                아이디 부여 후 사용 가능한 기능입니다. 현재 공개아이디(아이디부여전) 상태로 접근할 수 없습니다.
+                            </Alert>
+                        ) : (
+                            <CustomerBoardTab customerInfo={customerInfo} />
+                        )}
                     </Box>
                 )}
             </Box>

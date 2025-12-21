@@ -223,7 +223,7 @@ const DirectStoreManagementMode = ({
               <Toolbar sx={{ flexDirection: { xs: 'column', sm: 'row' }, gap: { xs: 1, sm: 0 }, py: { xs: 1, sm: 0 } }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: { xs: '100%', sm: 'auto' } }}>
                   <SettingsIcon sx={{ color: 'primary.main', fontSize: { xs: '1.5rem', sm: '2rem' } }} />
-                  <Typography variant="h6" sx={{ flexGrow: 1, color: 'primary.main', fontWeight: 'bold', fontSize: { xs: '1.1rem', sm: '1.25rem' } }}>
+                  <Typography variant="h4" sx={{ flexGrow: 1, color: 'primary.main', fontWeight: 700, fontSize: { xs: '1.5rem', sm: '2rem' } }}>
                     {modeTitle}
                   </Typography>
                 </Box>
@@ -319,7 +319,7 @@ const DirectStoreManagementMode = ({
               loggedInStore={loggedInStore}
             />
 
-            <Box sx={{ flexGrow: 1, overflow: 'auto', maxHeight: { xs: 'calc(100vh - 200px)', sm: 'none' } }}>
+            <Container maxWidth="xl" sx={{ mt: { xs: 2, sm: 4 }, mb: { xs: 2, sm: 4 }, px: { xs: 1, sm: 2, md: 3 }, flexGrow: 1, overflow: 'auto', maxHeight: { xs: 'calc(100vh - 200px)', sm: 'none' } }}>
               {availableTabs.map((tab, index) => {
                 let Component = null;
                 if (tab.componentName === 'PolicySettingsTab') {
@@ -341,21 +341,31 @@ const DirectStoreManagementMode = ({
                 }
 
                 return (
-                  <Box
+                  <Paper
                     key={tab.key}
                     role="tabpanel"
                     hidden={activeTab !== index}
-                    sx={{ height: '100%', display: activeTab === index ? 'block' : 'none' }}
+                    sx={{ 
+                      p: { xs: activeTab === index ? 0 : 2, sm: activeTab === index ? 0 : 3 }, 
+                      bgcolor: '#fff', 
+                      borderRadius: 2, 
+                      boxShadow: 1, 
+                      minHeight: { xs: '300px', sm: '400px' }, 
+                      overflow: 'auto',
+                      maxHeight: { xs: 'calc(100vh - 300px)', sm: 'none' },
+                      height: '100%',
+                      display: activeTab === index ? 'block' : 'none'
+                    }}
                   >
                     <ErrorBoundary name={tab.componentName || tab.key}>
                       <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}><CircularProgress /></Box>}>
                         {activeTab === index && Component && <Component {...(tab.props || {})} activeTab={activeTab} />}
                       </Suspense>
                     </ErrorBoundary>
-                  </Box>
+                  </Paper>
                 );
               })}
-            </Box>
+            </Container>
           </>
         )}
       </Box>

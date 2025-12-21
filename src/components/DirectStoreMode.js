@@ -343,7 +343,7 @@ const DirectStoreMode = ({
             {!isFullScreen && (
               <AppBar position="static" enableColorOnDark>
                 <Toolbar sx={{ flexDirection: { xs: 'column', sm: 'row' }, gap: { xs: 1, sm: 0 }, py: { xs: 1, sm: 0 } }}>
-                  <Typography variant="h6" sx={{ flexGrow: 1, color: 'primary.main', fontWeight: 'bold', fontSize: { xs: '1.1rem', sm: '1.25rem' } }}>
+                  <Typography variant="h4" sx={{ flexGrow: 1, color: 'primary.main', fontWeight: 700, fontSize: { xs: '1.5rem', sm: '2rem' } }}>
                     {modeTitle}
                   </Typography>
 
@@ -412,24 +412,37 @@ const DirectStoreMode = ({
             )}
 
             {/* 메인 컨텐츠 영역 */}
-            <Box sx={{ flexGrow: 1, position: 'relative', overflow: 'auto', maxHeight: { xs: 'calc(100vh - 200px)', sm: 'none' } }}>
+            <Container maxWidth="xl" sx={{ mt: { xs: 2, sm: 4 }, mb: { xs: 2, sm: 4 }, px: { xs: 1, sm: 2, md: 3 }, flexGrow: 1, position: 'relative', overflow: 'auto', maxHeight: { xs: 'calc(100vh - 200px)', sm: 'none' } }}>
               {/* 휴대폰 목록 탭 */}
-              <Box
-                role="tabpanel"
-                hidden={activeTab !== 0}
-                sx={{ height: '100%', display: activeTab === 0 ? 'block' : 'none' }}
-              >
+              <Paper sx={{ 
+                p: { xs: activeTab === 0 ? 0 : 2, sm: activeTab === 0 ? 0 : 3 }, 
+                bgcolor: '#fff', 
+                borderRadius: 2, 
+                boxShadow: 1, 
+                minHeight: { xs: '300px', sm: '400px' }, 
+                overflow: 'auto',
+                maxHeight: { xs: 'calc(100vh - 300px)', sm: 'none' },
+                height: '100%',
+                display: activeTab === 0 ? 'block' : 'none'
+              }} role="tabpanel" hidden={activeTab !== 0}>
                 <ErrorBoundary name="MobileListTab">
                   <MobileListTab onProductSelect={handleProductSelect} />
                 </ErrorBoundary>
-              </Box>
+              </Paper>
 
               {/* 오늘의 휴대폰 탭 */}
-              <Box
-                role="tabpanel"
-                hidden={activeTab !== 1}
-                sx={{ height: '100%', display: activeTab === 1 ? 'block' : 'none' }}
-              >
+              <Paper sx={{ 
+                p: { xs: activeTab === 1 ? 0 : 2, sm: activeTab === 1 ? 0 : 3 }, 
+                bgcolor: '#fff', 
+                borderRadius: 2, 
+                boxShadow: 1, 
+                minHeight: { xs: '300px', sm: '400px' }, 
+                overflow: 'auto',
+                maxHeight: { xs: 'calc(100vh - 300px)', sm: 'none' },
+                height: '100%',
+                display: activeTab === 1 ? 'block' : 'none',
+                position: 'relative'
+              }} role="tabpanel" hidden={activeTab !== 1}>
                 {/* 전체화면 토글 버튼 (오늘의 휴대폰 탭에서만 표시) */}
                 <Box sx={{ position: 'absolute', top: 16, right: 16, zIndex: 1000 }}>
                   <IconButton
@@ -450,14 +463,20 @@ const DirectStoreMode = ({
                     onProductSelect={handleProductSelect}
                   />
                 </ErrorBoundary>
-              </Box>
+              </Paper>
 
               {/* 판매일보 탭 */}
-              <Box
-                role="tabpanel"
-                hidden={activeTab !== 2}
-                sx={{ height: '100%', display: activeTab === 2 ? 'block' : 'none' }}
-              >
+              <Paper sx={{ 
+                p: { xs: activeTab === 2 ? 0 : 2, sm: activeTab === 2 ? 0 : 3 }, 
+                bgcolor: '#fff', 
+                borderRadius: 2, 
+                boxShadow: 1, 
+                minHeight: { xs: '300px', sm: '400px' }, 
+                overflow: 'auto',
+                maxHeight: { xs: 'calc(100vh - 300px)', sm: 'none' },
+                height: '100%',
+                display: activeTab === 2 ? 'block' : 'none'
+              }} role="tabpanel" hidden={activeTab !== 2}>
                 <ErrorBoundary name="DirectSalesReportTab">
                   <DirectSalesReportTab 
                     onRowClick={handleProductSelect} 
@@ -465,28 +484,40 @@ const DirectStoreMode = ({
                     isManagementMode={false}
                   />
                 </ErrorBoundary>
-              </Box>
+              </Paper>
 
               {/* 구매대기 탭 */}
-              <Box
-                role="tabpanel"
-                hidden={activeTab !== 3}
-                sx={{ height: '100%', display: activeTab === 3 ? 'block' : 'none' }}
-              >
+              <Paper sx={{ 
+                p: { xs: activeTab === 3 ? 0 : 2, sm: activeTab === 3 ? 0 : 3 }, 
+                bgcolor: '#fff', 
+                borderRadius: 2, 
+                boxShadow: 1, 
+                minHeight: { xs: '300px', sm: '400px' }, 
+                overflow: 'auto',
+                maxHeight: { xs: 'calc(100vh - 300px)', sm: 'none' },
+                height: '100%',
+                display: activeTab === 3 ? 'block' : 'none'
+              }} role="tabpanel" hidden={activeTab !== 3}>
                 <ErrorBoundary name="CustomerPurchaseQueueTab">
                   <CustomerPurchaseQueueTab 
                     loggedInStore={loggedInStore}
                     isManagementMode={false}
                   />
                 </ErrorBoundary>
-              </Box>
+              </Paper>
 
               {/* 선호구입매장 탭 */}
-              <Box
-                role="tabpanel"
-                hidden={activeTab !== 4}
-                sx={{ height: '100%', display: activeTab === 4 ? 'block' : 'none' }}
-              >
+              <Paper sx={{ 
+                p: { xs: activeTab === 4 ? 0 : 2, sm: activeTab === 4 ? 0 : 3 }, 
+                bgcolor: '#fff', 
+                borderRadius: 2, 
+                boxShadow: 1, 
+                minHeight: { xs: '300px', sm: '400px' }, 
+                overflow: 'auto',
+                maxHeight: { xs: 'calc(100vh - 300px)', sm: 'none' },
+                height: '100%',
+                display: activeTab === 4 ? 'block' : 'none'
+              }} role="tabpanel" hidden={activeTab !== 4}>
                 <ErrorBoundary name="DirectStorePreferredStoreTab">
                   {activeTab === 4 && (
                     <DirectStorePreferredStoreTab 
@@ -496,22 +527,28 @@ const DirectStoreMode = ({
                     />
                   )}
                 </ErrorBoundary>
-              </Box>
+              </Paper>
 
               {/* 게시판 탭 */}
-              <Box
-                role="tabpanel"
-                hidden={activeTab !== 5}
-                sx={{ height: '100%', display: activeTab === 5 ? 'block' : 'none' }}
-              >
+              <Paper sx={{ 
+                p: { xs: activeTab === 5 ? 0 : 2, sm: activeTab === 5 ? 0 : 3 }, 
+                bgcolor: '#fff', 
+                borderRadius: 2, 
+                boxShadow: 1, 
+                minHeight: { xs: '300px', sm: '400px' }, 
+                overflow: 'auto',
+                maxHeight: { xs: 'calc(100vh - 300px)', sm: 'none' },
+                height: '100%',
+                display: activeTab === 5 ? 'block' : 'none'
+              }} role="tabpanel" hidden={activeTab !== 5}>
                 <ErrorBoundary name="DirectStoreBoardTab">
                   <DirectStoreBoardTab 
                     loggedInStore={loggedInStore}
                     isManagementMode={false}
                   />
                 </ErrorBoundary>
-              </Box>
-            </Box>
+              </Paper>
+            </Container>
           </>
         )}
 
