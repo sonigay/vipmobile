@@ -66,6 +66,11 @@ const OpeningInfoPage = ({
     const [agreementChecked, setAgreementChecked] = useState(false); // 동의 체크박스 상태
     const [baseMargin, setBaseMargin] = useState(0); // 정책설정에서 가져온 기본 마진
     const [preApprovalMark, setPreApprovalMark] = useState(null); // 사전승낙서 마크
+    
+    // 🔥 로딩 상태 관리 (항목별)
+    const [loadingPlanGroups, setLoadingPlanGroups] = useState(true); // 요금제 그룹 로딩
+    const [loadingAddonsAndInsurances, setLoadingAddonsAndInsurances] = useState(true); // 부가서비스/보험상품 로딩
+    const [loadingSupportAmounts, setLoadingSupportAmounts] = useState(true); // 이통사지원금/대리점추가지원금 로딩
 
     // 단말/지원금 기본값 정리 (휴대폰목록/오늘의휴대폰에서 전달된 데이터 사용)
     const factoryPrice = initialData?.factoryPrice || 0;
@@ -103,6 +108,7 @@ const OpeningInfoPage = ({
     // 요금제 그룹 로드 (마스터 데이터 사용)
     useEffect(() => {
         const loadPlanGroups = async () => {
+            setLoadingPlanGroups(true);
             try {
                 // 마스터 데이터 API 호출
                 const plans = await directStoreApiClient.getPlansMaster(selectedCarrier);
@@ -157,6 +163,9 @@ const OpeningInfoPage = ({
             } catch (err) {
                 console.error('요금제 그룹 로드 실패:', err);
                 // 에러 처리 (필요시 Mock 데이터 등으로 폴백)
+                setPlanGroups([]);
+            } finally {
+                setLoadingPlanGroups(false);
             }
         };
         loadPlanGroups();
@@ -165,6 +174,7 @@ const OpeningInfoPage = ({
     // 필수 부가서비스 및 보험상품 로드 (정책설정에서 가져오기)
     useEffect(() => {
         const loadAvailableItems = async () => {
+            setLoadingAddonsAndInsurances(true);
             try {
                 const policySettings = await directStoreApi.getPolicySettings(selectedCarrier);
                 const initialSelectedItems = [];
@@ -249,7 +259,7 @@ const OpeningInfoPage = ({
                     }
 
                     // 모든 보험상품 목록 저장 (incentive, deduction, description, url 정보 포함)
-                    // 플립/폴드 모델이 아닌 경우 플립/폴드 보험상품은 제외
+                    // 플립/폴드 모델일 때는 플립/폴드 보험상품만, 아닐 때는 일반 보험상품만 표시
                     const allInsurances = insuranceList
                         .filter(insurance => {
                             // 출고가 범위 체크
@@ -259,12 +269,20 @@ const OpeningInfoPage = ({
                             
                             if (!isPriceMatch) return false;
                             
-                            // 플립/폴드 모델이 아닌 경우 플립/폴드 보험상품 제외
-                            if (!isFlipFoldModel) {
-                                const insuranceName = (insurance.name || '').toString().toLowerCase();
-                                const isFlipFoldInsurance = flipFoldKeywords.some(keyword =>
-                                    insuranceName.includes(keyword.toLowerCase())
-                                );
+                            // 보험상품 이름 확인
+                            const insuranceName = (insurance.name || '').toString().toLowerCase();
+                            const isFlipFoldInsurance = flipFoldKeywords.some(keyword =>
+                                insuranceName.includes(keyword.toLowerCase())
+                            );
+                            
+                            // 플립/폴드 모델일 때는 플립/폴드 보험상품만, 아닐 때는 일반 보험상품만
+                            if (isFlipFoldModel) {
+                                // 플립/폴드 모델: 플립/폴드 보험상품만 포함
+                                if (!isFlipFoldInsurance) {
+                                    return false; // 일반 보험상품 제외
+                                }
+                            } else {
+                                // 일반 모델: 일반 보험상품만 포함
                                 if (isFlipFoldInsurance) {
                                     return false; // 플립/폴드 보험상품 제외
                                 }
@@ -319,6 +337,8 @@ const OpeningInfoPage = ({
             } catch (err) {
                 console.error('부가서비스/보험상품 로드 실패:', err);
                 setSelectedItems([]);
+            } finally {
+                setLoadingAddonsAndInsurances(false);
             }
         };
         loadAvailableItems();
@@ -349,8 +369,12 @@ const OpeningInfoPage = ({
     useEffect(() => {
         const calculateInitialPrice = async () => {
             if (!initialData?.planGroup || !initialData?.openingType || !planGroups.length || !initialData?.id) {
+                // 조건이 맞지 않으면 로딩 상태 해제 (초기값 사용)
+                setLoadingSupportAmounts(false);
                 return;
             }
+            
+            setLoadingSupportAmounts(true);
 
             // planGroup에 해당하는 plan 찾기
             const foundPlan = planGroups.find(p =>
@@ -395,6 +419,8 @@ const OpeningInfoPage = ({
                 }
             } catch (err) {
                 console.error('초기 대리점지원금 계산 실패:', err);
+            } finally {
+                setLoadingSupportAmounts(false);
             }
         };
 
@@ -1085,6 +1111,8 @@ const OpeningInfoPage = ({
                                         options={planGroups}
                                         getOptionLabel={(option) => typeof option === 'string' ? option : option.name}
                                         value={planGroups.find(p => p.name === formData.plan) || null}
+                                        loading={loadingPlanGroups}
+                                        disabled={loadingPlanGroups}
                                         onChange={async (event, newValue) => {
                                             if (newValue) {
                                                 setFormData({ ...formData, plan: newValue.name });
@@ -1094,6 +1122,7 @@ const OpeningInfoPage = ({
                                                 // 요금제군 추출하여 대리점추가지원금 자동 계산
                                                 const planGroup = newValue.group || newValue.name;
                                                 if (planGroup && (initialData?.id || initialData?.model)) {
+                                                    setLoadingSupportAmounts(true);
                                                     try {
                                                         const openingTypeMap = {
                                                             'NEW': '010신규',
@@ -1147,6 +1176,8 @@ const OpeningInfoPage = ({
                                                         }
                                                     } catch (err) {
                                                         console.error('대리점추가지원금 계산 실패:', err);
+                                                    } finally {
+                                                        setLoadingSupportAmounts(false);
                                                     }
                                                 }
                                             } else {
@@ -1163,7 +1194,16 @@ const OpeningInfoPage = ({
                                             <TextField
                                                 {...params}
                                                 label="요금제 선택"
-                                                placeholder="요금제명을 입력하세요"
+                                                placeholder={loadingPlanGroups ? "요금제 목록을 불러오는 중..." : "요금제명을 입력하세요"}
+                                                InputProps={{
+                                                    ...params.InputProps,
+                                                    endAdornment: (
+                                                        <>
+                                                            {loadingPlanGroups ? <CircularProgress color="inherit" size={20} /> : null}
+                                                            {params.InputProps.endAdornment}
+                                                        </>
+                                                    ),
+                                                }}
                                             />
                                         )}
                                         filterOptions={(options, { inputValue }) => {
@@ -1180,19 +1220,25 @@ const OpeningInfoPage = ({
                                             <TextField
                                                 label="요금제군"
                                                 fullWidth
-                                                value={(() => {
+                                                value={loadingPlanGroups ? '로딩 중...' : (() => {
                                                     const selectedPlan = planGroups.find(p => p.name === formData.plan);
                                                     return selectedPlan?.group || 'N/A';
                                                 })()}
-                                                InputProps={{ readOnly: true }}
+                                                InputProps={{ 
+                                                    readOnly: true,
+                                                    endAdornment: loadingPlanGroups ? <CircularProgress size={20} /> : null
+                                                }}
                                             />
                                         </Grid>
                                         <Grid item xs={12} sm={6} sx={{ '@media print': { flexBasis: '50%', maxWidth: '50%' } }}>
                                             <TextField
                                                 label="기본료"
                                                 fullWidth
-                                                value={planBasicFee.toLocaleString()}
-                                                InputProps={{ readOnly: true }}
+                                                value={loadingPlanGroups ? '로딩 중...' : planBasicFee.toLocaleString()}
+                                                InputProps={{ 
+                                                    readOnly: true,
+                                                    endAdornment: loadingPlanGroups ? <CircularProgress size={20} /> : null
+                                                }}
                                             />
                                         </Grid>
                                         {formData.contractType === 'selected' && (
@@ -1227,15 +1273,24 @@ const OpeningInfoPage = ({
                                                 부가서비스 및 보험 적용시 금액 변경
                                             </Typography>
                                             
-                                            {/* 선택 가능한 항목 목록 (부가서비스 + 보험상품) */}
-                                            <Box sx={{ mb: 2 }}>
-                                                <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold', color: 'text.secondary' }}>
-                                                    선택 가능한 항목
-                                                </Typography>
-                                                <Stack spacing={1}>
-                                                    {[...availableAddons, ...availableInsurances]
-                                                        .filter(item => !selectedItems.some(selected => selected.name === item.name))
-                                                        .map((item) => (
+                                            {loadingAddonsAndInsurances ? (
+                                                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 3 }}>
+                                                    <CircularProgress size={24} />
+                                                    <Typography variant="body2" sx={{ ml: 2, color: 'text.secondary' }}>
+                                                        부가서비스 및 보험상품 목록을 불러오는 중...
+                                                    </Typography>
+                                                </Box>
+                                            ) : (
+                                                <>
+                                                    {/* 선택 가능한 항목 목록 (부가서비스 + 보험상품) */}
+                                                    <Box sx={{ mb: 2 }}>
+                                                        <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold', color: 'text.secondary' }}>
+                                                            선택 가능한 항목
+                                                        </Typography>
+                                                        <Stack spacing={1}>
+                                                            {[...availableAddons, ...availableInsurances]
+                                                                .filter(item => !selectedItems.some(selected => selected.name === item.name))
+                                                                .map((item) => (
                                                             <Paper key={item.name} variant="outlined" sx={{ p: 1.5 }}>
                                                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                                     <Box sx={{ flex: 1 }}>
@@ -1325,7 +1380,16 @@ const OpeningInfoPage = ({
                             {formData.usePublicSupport && (
                                 <Stack direction="row" justifyContent="space-between" mb={1}>
                                     <Typography variant="body2">이통사 지원금</Typography>
-                                    <Typography variant="body2">-{publicSupport.toLocaleString()}원</Typography>
+                                    <Typography variant="body2">
+                                        {loadingSupportAmounts ? (
+                                            <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+                                                <CircularProgress size={14} />
+                                                <span>로딩 중...</span>
+                                            </Box>
+                                        ) : (
+                                            `-${publicSupport.toLocaleString()}원`
+                                        )}
+                                    </Typography>
                                 </Stack>
                             )}
                             <Stack direction="row" justifyContent="space-between" mb={1}>
@@ -1333,14 +1397,28 @@ const OpeningInfoPage = ({
                                     대리점추가지원금 ({formData.withAddon ? '부가유치' : '부가미유치'})
                                 </Typography>
                                 <Typography variant="body2">
-                                    -{(formData.withAddon ? calculateDynamicStoreSupport.withAddon : calculateDynamicStoreSupport.withoutAddon).toLocaleString()}원
+                                    {loadingSupportAmounts ? (
+                                        <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+                                            <CircularProgress size={14} />
+                                            <span>로딩 중...</span>
+                                        </Box>
+                                    ) : (
+                                        `-${(formData.withAddon ? calculateDynamicStoreSupport.withAddon : calculateDynamicStoreSupport.withoutAddon).toLocaleString()}원`
+                                    )}
                                 </Typography>
                             </Stack>
                             {formData.paymentType === 'installment' && (
                                 <Stack direction="row" justifyContent="space-between" mb={2}>
                                     <Typography variant="body2" fontWeight="bold">할부원금</Typography>
                                     <Typography variant="body2" fontWeight="bold" sx={{ color: '#ffd700' }}>
-                                        {getCurrentInstallmentPrincipal().toLocaleString()}원
+                                        {loadingSupportAmounts ? (
+                                            <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+                                                <CircularProgress size={14} />
+                                                <span>로딩 중...</span>
+                                            </Box>
+                                        ) : (
+                                            `${getCurrentInstallmentPrincipal().toLocaleString()}원`
+                                        )}
                                     </Typography>
                                 </Stack>
                             )}
@@ -1348,7 +1426,14 @@ const OpeningInfoPage = ({
                                 <Stack direction="row" justifyContent="space-between" mb={2}>
                                     <Typography variant="body2" fontWeight="bold">현금가</Typography>
                                     <Typography variant="body2" fontWeight="bold" sx={{ color: '#ffd700' }}>
-                                        {getCashPrice().toLocaleString()}원
+                                        {loadingSupportAmounts ? (
+                                            <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+                                                <CircularProgress size={14} />
+                                                <span>로딩 중...</span>
+                                            </Box>
+                                        ) : (
+                                            `${getCashPrice().toLocaleString()}원`
+                                        )}
                                     </Typography>
                                 </Stack>
                             )}
@@ -1359,7 +1444,16 @@ const OpeningInfoPage = ({
                             <Typography variant="subtitle2" sx={{ mb: 1, color: '#ffd700' }}>요금 금액</Typography>
                             <Stack direction="row" justifyContent="space-between" mb={1}>
                                 <Typography variant="body2">기본료</Typography>
-                                <Typography variant="body2">{planBasicFee.toLocaleString()}원</Typography>
+                                <Typography variant="body2">
+                                    {loadingPlanGroups ? (
+                                        <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+                                            <CircularProgress size={14} />
+                                            <span>로딩 중...</span>
+                                        </Box>
+                                    ) : (
+                                        `${planBasicFee.toLocaleString()}원`
+                                    )}
+                                </Typography>
                             </Stack>
                             {formData.contractType === 'selected' && (
                                 <Stack direction="row" justifyContent="space-between" mb={1}>
@@ -1465,6 +1559,13 @@ const OpeningInfoPage = ({
                                     />
                                 </Grid>
                                 <Grid item xs={12}>
+                                    <Alert severity="info" sx={{ mt: 1, mb: 1 }}>
+                                        <Typography variant="body2">
+                                            유심값 7,700원은 첫달 한달만 추가되어 청구됩니다
+                                        </Typography>
+                                    </Alert>
+                                </Grid>
+                                <Grid item xs={12}>
                                     <Divider sx={{ my: 2 }} />
                                 </Grid>
                                 <Grid item xs={6}>
@@ -1479,38 +1580,50 @@ const OpeningInfoPage = ({
                                     <TextField
                                         label="이통사 지원금"
                                         fullWidth
-                                        value={formData.usePublicSupport ? publicSupport.toLocaleString() : '0'}
-                                        InputProps={{ readOnly: true }}
+                                        value={loadingSupportAmounts ? '로딩 중...' : (formData.usePublicSupport ? publicSupport.toLocaleString() : '0')}
+                                        InputProps={{ 
+                                            readOnly: true,
+                                            endAdornment: loadingSupportAmounts ? <CircularProgress size={20} /> : null
+                                        }}
                                     />
                                 </Grid>
                                 <Grid item xs={6}>
                                     <TextField
                                         label="대리점추가지원금 (부가유치)"
                                         fullWidth
-                                        value={calculateDynamicStoreSupport.withAddon.toLocaleString()}
-                                        InputProps={{ readOnly: true }}
-                                        helperText="선택된 상품에 따라 자동 계산"
+                                        value={loadingSupportAmounts ? '로딩 중...' : calculateDynamicStoreSupport.withAddon.toLocaleString()}
+                                        InputProps={{ 
+                                            readOnly: true,
+                                            endAdornment: loadingSupportAmounts ? <CircularProgress size={20} /> : null
+                                        }}
+                                        helperText={loadingSupportAmounts ? "지원금 정보를 불러오는 중..." : "선택된 상품에 따라 자동 계산"}
                                     />
                                 </Grid>
                                 <Grid item xs={6}>
                                     <TextField
                                         label="대리점추가지원금 (부가미유치)"
                                         fullWidth
-                                        value={calculateDynamicStoreSupport.withoutAddon.toLocaleString()}
-                                        InputProps={{ readOnly: true }}
-                                        helperText="선택된 상품에 따라 자동 계산"
+                                        value={loadingSupportAmounts ? '로딩 중...' : calculateDynamicStoreSupport.withoutAddon.toLocaleString()}
+                                        InputProps={{ 
+                                            readOnly: true,
+                                            endAdornment: loadingSupportAmounts ? <CircularProgress size={20} /> : null
+                                        }}
+                                        helperText={loadingSupportAmounts ? "지원금 정보를 불러오는 중..." : "선택된 상품에 따라 자동 계산"}
                                     />
                                 </Grid>
                                 <Grid item xs={6}>
                                     <TextField
                                         label="할부원금 (부가유치)"
                                         fullWidth
-                                        value={(() => {
+                                        value={loadingSupportAmounts ? '로딩 중...' : (() => {
                                             const support = formData.usePublicSupport ? publicSupport : 0;
                                             const principal = calculateInstallmentPrincipalWithAddon(factoryPrice, support, calculateDynamicStoreSupport.withAddon, formData.usePublicSupport);
                                             return isNaN(principal) ? 0 : principal;
                                         })().toLocaleString()}
-                                        InputProps={{ readOnly: true }}
+                                        InputProps={{ 
+                                            readOnly: true,
+                                            endAdornment: loadingSupportAmounts ? <CircularProgress size={20} /> : null
+                                        }}
                                         sx={{ input: { fontWeight: 'bold', color: theme.primary } }}
                                     />
                                 </Grid>
@@ -1518,12 +1631,15 @@ const OpeningInfoPage = ({
                                     <TextField
                                         label="할부원금 (부가미유치)"
                                         fullWidth
-                                        value={(() => {
+                                        value={loadingSupportAmounts ? '로딩 중...' : (() => {
                                             const support = formData.usePublicSupport ? publicSupport : 0;
                                             const principal = calculateInstallmentPrincipalWithoutAddon(factoryPrice, support, calculateDynamicStoreSupport.withoutAddon, formData.usePublicSupport);
                                             return isNaN(principal) ? 0 : principal;
                                         })().toLocaleString()}
-                                        InputProps={{ readOnly: true }}
+                                        InputProps={{ 
+                                            readOnly: true,
+                                            endAdornment: loadingSupportAmounts ? <CircularProgress size={20} /> : null
+                                        }}
                                         sx={{ input: { fontWeight: 'bold', color: theme.primary } }}
                                     />
                                 </Grid>
