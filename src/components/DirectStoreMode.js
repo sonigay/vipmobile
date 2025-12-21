@@ -341,7 +341,7 @@ const DirectStoreMode = ({
           <>
             {/* 헤더 (전체화면 모드일 때는 숨김) */}
             {!isFullScreen && (
-              <AppBar position="static" enableColorOnDark>
+              <AppBar position="static" enableColorOnDark sx={{ backgroundColor: '#ffffff', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)' }}>
                 <Toolbar sx={{ flexDirection: { xs: 'column', sm: 'row' }, gap: { xs: 1, sm: 0 }, py: { xs: 1, sm: 0 } }}>
                   <Typography variant="h4" sx={{ flexGrow: 1, color: 'primary.main', fontWeight: 700, fontSize: { xs: '1.5rem', sm: '2rem' } }}>
                     {modeTitle}

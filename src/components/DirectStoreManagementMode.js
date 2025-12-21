@@ -219,7 +219,7 @@ const DirectStoreManagementMode = ({
           </Box>
         ) : (
           <>
-            <AppBar position="static" enableColorOnDark>
+            <AppBar position="static" enableColorOnDark sx={{ backgroundColor: '#ffffff', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)' }}>
               <Toolbar sx={{ flexDirection: { xs: 'column', sm: 'row' }, gap: { xs: 1, sm: 0 }, py: { xs: 1, sm: 0 }, justifyContent: { xs: 'flex-start', sm: 'space-between' } }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: { xs: '100%', sm: 'auto' } }}>
                   <SettingsIcon sx={{ color: 'primary.main', fontSize: { xs: '1.5rem', sm: '2rem' } }} />
