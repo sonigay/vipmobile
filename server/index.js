@@ -4707,7 +4707,7 @@ app.post('/api/direct/store-image', async (req, res) => {
 
     // 헤더 확인 및 생성
     const { ensureSheetHeaders } = require('./directRoutes');
-    await ensureSheetHeaders(originalSheets, SPREADSHEET_ID, CUSTOMER_STORE_PHOTO_SHEET_NAME, HEADERS_STORE_PHOTO);
+    await ensureSheetHeaders(sheets, SPREADSHEET_ID, CUSTOMER_STORE_PHOTO_SHEET_NAME, HEADERS_STORE_PHOTO);
 
     const rowIndex = values ? values.findIndex(row => row[0] === storeName) : -1;
     
@@ -4775,7 +4775,7 @@ app.post('/api/direct/store-image', async (req, res) => {
 
     if (rowIndex === -1) {
       await rateLimitedSheetsCall(() =>
-        originalSheets.spreadsheets.values.append({
+        sheets.spreadsheets.values.append({
           spreadsheetId: SPREADSHEET_ID,
           range: `${CUSTOMER_STORE_PHOTO_SHEET_NAME}!A:AJ`,
           valueInputOption: 'USER_ENTERED',
@@ -4785,7 +4785,7 @@ app.post('/api/direct/store-image', async (req, res) => {
       );
     } else {
       await rateLimitedSheetsCall(() =>
-        originalSheets.spreadsheets.values.update({
+        sheets.spreadsheets.values.update({
           spreadsheetId: SPREADSHEET_ID,
           range: `${CUSTOMER_STORE_PHOTO_SHEET_NAME}!A${rowIndex + 1}:AJ${rowIndex + 1}`,
           valueInputOption: 'USER_ENTERED',
