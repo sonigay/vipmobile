@@ -3755,7 +3755,34 @@ function setupDirectRoutes(app) {
         console.warn('[Direct] 직영점_오늘의휴대폰 시트 읽기 실패:', err);
       }
 
-      // 9. 데이터 조합 (모델명 기준으로 매칭)
+      // 9. 직영점_단말마스터 시트 읽기 (정렬 기준으로 사용)
+      let mobileMasterOrderMap = new Map(); // Key: 모델명 -> 순서 인덱스
+      try {
+        const masterRes = await withRetry(async () => {
+          return await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SHEET_MOBILE_MASTER}!A:R`
+          });
+        });
+        const masterRows = (masterRes.data.values || []).slice(1);
+        masterRows.forEach((row, idx) => {
+          const rowCarrier = (row[0] || '').toString().trim().toUpperCase();
+          const modelName = (row[2] || '').toString().trim(); // 모델명 (C열)
+          if (rowCarrier === carrierParam && modelName) {
+            // 통신사가 일치하고 모델명이 있으면 순서 맵에 추가
+            mobileMasterOrderMap.set(modelName, idx);
+            // 정규화된 모델명으로도 추가
+            const normalizedModel = normalizeModelCode(modelName);
+            if (normalizedModel && normalizedModel !== modelName) {
+              mobileMasterOrderMap.set(normalizedModel, idx);
+            }
+          }
+        });
+      } catch (err) {
+        console.warn(`[Direct] 직영점_단말마스터 시트 읽기 실패 (정렬 기준 없이 계속 진행):`, err.message);
+      }
+
+      // 10. 데이터 조합 (모델명 기준으로 매칭)
       const maxRows = Math.max(modelData.length, petNameData.length);
       const mobileList = [];
 
@@ -4507,6 +4534,31 @@ function setupDirectRoutes(app) {
         mobileList.push(mobile);
       }
 
+      // 11. 직영점_단말마스터 시트 순서대로 정렬
+      if (mobileMasterOrderMap.size > 0) {
+        mobileList.sort((a, b) => {
+          const modelA = (a.model || '').toString().trim();
+          const modelB = (b.model || '').toString().trim();
+          const normalizedA = normalizeModelCode(modelA);
+          const normalizedB = normalizeModelCode(modelB);
+
+          // 직영점_단말마스터에서 순서 찾기
+          const idxA = mobileMasterOrderMap.has(modelA)
+            ? mobileMasterOrderMap.get(modelA)
+            : (mobileMasterOrderMap.has(normalizedA) ? mobileMasterOrderMap.get(normalizedA) : Number.MAX_SAFE_INTEGER);
+          const idxB = mobileMasterOrderMap.has(modelB)
+            ? mobileMasterOrderMap.get(modelB)
+            : (mobileMasterOrderMap.has(normalizedB) ? mobileMasterOrderMap.get(normalizedB) : Number.MAX_SAFE_INTEGER);
+
+          // 둘 다 직영점_단말마스터에 없으면 원래 순서 유지
+          if (idxA === Number.MAX_SAFE_INTEGER && idxB === Number.MAX_SAFE_INTEGER) {
+            return 0;
+          }
+
+          return idxA - idxB;
+        });
+      }
+
       // ========== 간소화된 디버깅 요약 ==========
       // 115군의 SM-S926N256 값만 확인 (핵심 검증용)
       const testPlanGroup = '115군';
@@ -4552,9 +4604,49 @@ function setupDirectRoutes(app) {
     try {
       const carrier = req.query.carrier || 'SK';
       const includeMeta = req.query.meta === '1';
+      
+      // 정책표 모델 순서 해시 계산 (변경 감지용)
+      let policyOrderHash = '';
+      try {
+        const { sheets, SPREADSHEET_ID } = createSheetsClient();
+        await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_SETTINGS, HEADERS_SETTINGS);
+        const settingsRes = await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: SHEET_SETTINGS
+        });
+        const settingsRows = (settingsRes.data.values || []).slice(1);
+        const policyRow = settingsRows.find(row => (row[0] || '').trim() === carrier && (row[1] || '').trim() === 'policy');
+        if (policyRow && policyRow[2] && policyRow[4]) {
+          const policySheetId = policyRow[2].trim();
+          const policySettingsJson = JSON.parse(policyRow[4] || '{}');
+          const modelRange = policySettingsJson.modelRange || '';
+          if (modelRange) {
+            const modelRes = await sheets.spreadsheets.values.get({
+              spreadsheetId: policySheetId,
+              range: modelRange,
+              majorDimension: 'ROWS',
+              valueRenderOption: 'UNFORMATTED_VALUE'
+            });
+            const modelRows = (modelRes.data.values || []);
+            // 모델 순서를 문자열로 변환하여 해시 생성
+            const modelOrderStr = modelRows.map(row => (row[0] || '').toString().trim()).join('|');
+            // 간단한 해시 생성 (crypto 모듈 없이)
+            let hash = 0;
+            for (let i = 0; i < modelOrderStr.length; i++) {
+              const char = modelOrderStr.charCodeAt(i);
+              hash = ((hash << 5) - hash) + char;
+              hash = hash & hash; // 32bit 정수로 변환
+            }
+            policyOrderHash = Math.abs(hash).toString(36);
+          }
+        }
+      } catch (err) {
+        console.warn('[Direct] 정책표 순서 해시 계산 실패 (캐시 무효화 안됨):', err.message);
+      }
+      
       // 🔥 캐시 버전: 버그 수정 시 버전을 올려서 이전 캐시 무효화
-      const MOBILES_CACHE_VERSION = 'v5'; // v5: 33군 및 기변 캐시 문제 수정
-      const cacheKey = `mobiles-${carrier}-${MOBILES_CACHE_VERSION}`;
+      const MOBILES_CACHE_VERSION = 'v6'; // v6: 직영점_단말마스터 순서 기준 정렬 추가
+      const cacheKey = `mobiles-${carrier}-${MOBILES_CACHE_VERSION}-${policyOrderHash}`;
       const cached = getCache(cacheKey);
       if (cached) {
         if (includeMeta) {
