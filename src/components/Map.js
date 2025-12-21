@@ -151,7 +151,7 @@ function ForceZoomUpdater({ forceZoomToStore }) {
 }
 
 // 지도 뷰 업데이트를 위한 컴포넌트
-function MapUpdater({ center, bounds, zoom, isAgentMode, currentView, forceZoomToStore, isCustomerMode }) {
+function MapUpdater({ center, bounds, zoom, isAgentMode, currentView, forceZoomToStore, isCustomerMode, loggedInStore }) {
   const map = useMap();
 
   // 각 모드별 줌 레벨 설정
@@ -438,8 +438,17 @@ ${loggedInStore.name}으로 이동 예정입니다.
     if (isCustomerMode) {
       return pyeongtaekCenter;
     }
-    return defaultCenter;
-  }, [userLocation, isCustomerMode]);
+    // 직영점모드: 접속 매장 중심 좌표 사용
+    if (loggedInStore?.coords?.lat && loggedInStore?.coords?.lng) {
+      return {
+        lat: loggedInStore.coords.lat,
+        lng: loggedInStore.coords.lng,
+        isDefault: true
+      };
+    }
+    // 직영점관리모드 또는 기타: 평택 중심 좌표 사용 (인천과 청주지역까지 보이도록)
+    return pyeongtaekCenter;
+  }, [userLocation, isCustomerMode, loggedInStore]);
 
   // userLocation이 변경될 때 mapCenter 업데이트
   useEffect(() => {
