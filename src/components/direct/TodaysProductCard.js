@@ -263,7 +263,7 @@ function TodaysProductCard(props) {
             height: '100%',
             objectFit: 'contain',  // contain으로 변경하여 이미지가 잘리지 않도록
             objectPosition: 'center',
-            padding: '8px'  // 여백 추가로 이미지 축소
+            padding: '8px',  // 여백 추가로 이미지 축소
             transition: 'transform 0.3s',
             '&:hover': { transform: 'scale(1.05)'             }
           }}
