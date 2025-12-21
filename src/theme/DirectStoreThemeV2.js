@@ -342,7 +342,7 @@ const directStoreThemeV2 = createTheme({
         indicator: {
           height: '3px',
           borderRadius: '3px 3px 0 0',
-          background: `linear-gradient(90deg, ${colors.primary[500]}, ${colors.secondary[500]})`,
+          backgroundColor: colors.primary[500], // 그라데이션 제거, 단색으로 변경 (고객모드와 동일)
         },
       },
     },

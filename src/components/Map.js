@@ -165,7 +165,7 @@ function MapUpdater({ center, bounds, zoom, isAgentMode, currentView, forceZoomT
     // 고객모드 또는 직영점관리모드에서 위치 정보 실패 시 평택 중심 보기 (인천과 청주지역까지 보이도록)
     if ((isCustomerMode || (!isCustomerMode && !isAgentMode && !loggedInStore?.coords)) && 
         center && center.isDefault) {
-      return 7; // 평택 중심으로 인천과 청주지역까지 보이는 줌 레벨 (더 넓은 시야)
+      return 6; // 평택 중심으로 인천과 청주지역까지 보이는 줌 레벨
     }
     // 직영점모드: 접속 매장 중심 (줌 레벨 14)
     if (loggedInStore?.coords?.lat && loggedInStore?.coords?.lng) {
@@ -444,13 +444,13 @@ ${loggedInStore.name}으로 이동 예정입니다.
     // 고객모드: userLocation이 없거나 isDefault일 때 평택 중심 보기 (인천과 청주지역까지 보이도록)
     if (isCustomerMode) {
       if (!userLocation || (userLocation && userLocation.isDefault)) {
-        return 7; // 평택 중심으로 인천과 청주지역까지 보이는 줌 레벨 (더 넓은 시야)
+        return 6; // 평택 중심으로 인천과 청주지역까지 보이는 줌 레벨
       }
     }
     // 직영점관리모드: userLocation이 없거나 isDefault일 때 평택 중심 보기
     if (!isCustomerMode && !isAgentMode && !loggedInStore?.coords) {
       if (!userLocation || (userLocation && userLocation.isDefault)) {
-        return 7; // 평택 중심으로 인천과 청주지역까지 보이는 줌 레벨 (더 넓은 시야)
+        return 6; // 평택 중심으로 인천과 청주지역까지 보이는 줌 레벨
       }
     }
     // 직영점모드: 접속 매장 중심 (줌 레벨 14)
