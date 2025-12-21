@@ -535,7 +535,7 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
                                 size="small"
                             />
                         }
-                        label={<Typography variant="body2" sx={{ fontSize: '0.875rem' }}>대중교통 마커</Typography>}
+                        label={<Typography variant="body2" sx={{ fontSize: '0.875rem' }}>가까운대중교통 보기</Typography>}
                     />
                 </Box>
                 <Map
