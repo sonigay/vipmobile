@@ -516,11 +516,11 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
                     }
                 }}
             >
-                {/* 대중교통 마커 토글 */}
+                {/* 대중교통 마커 토글 (오른쪽 하단으로 이동) */}
                 <Box sx={{
                     position: 'absolute',
-                    top: 10,
-                    left: 10,
+                    bottom: 10,
+                    right: 10,
                     zIndex: 1000,
                     bgcolor: 'rgba(255,255,255,0.95)',
                     p: 1,

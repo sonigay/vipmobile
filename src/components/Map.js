@@ -701,8 +701,8 @@ ${loggedInStore.name}으로 이동 예정입니다.
         strokeColor = hasInventory ? '#388e3c' : '#757575';
       }
 
-      // 대중교통 스타일 핀 마커 (역삼각형 + 원형)
-      const pinSize = isSelected || isLoggedInStore || isRequestedStore ? 32 : 28;
+      // 대중교통 스타일 핀 마커 (역삼각형 + 원형) - 크기 증가
+      const pinSize = isSelected || isLoggedInStore || isRequestedStore ? 40 : 36;
       const circleRadius = pinSize * 0.4;
       const triangleHeight = pinSize * 0.6;
       const triangleWidth = pinSize * 0.7;
@@ -2063,17 +2063,38 @@ ${loggedInStore.name}으로 이동 예정입니다.
         {!isAgentMode && showTransitMarkers && transitLocations && transitLocations.length > 0 && transitLocations.map((location) => {
           const markers = [];
           
-          // 버스터미널 마커
+          // 버스터미널 마커 (크기 축소, 이름 표시)
           if (location.busTerminals && Array.isArray(location.busTerminals)) {
             location.busTerminals.forEach((terminal, index) => {
               if (terminal.lat && terminal.lng) {
-                const busIcon = L.icon({
-                  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
-                  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-                  iconSize: [25, 41],
-                  iconAnchor: [12, 41],
-                  popupAnchor: [1, -34],
-                  shadowSize: [41, 41]
+                // 이름이 표시된 커스텀 아이콘 생성
+                const busIcon = L.divIcon({
+                  html: `
+                    <div style="
+                      display: flex;
+                      flex-direction: column;
+                      align-items: center;
+                      transform: translateY(-10px);
+                    ">
+                      <div style="
+                        background-color: rgba(255, 255, 255, 0.95);
+                        border: 1px solid #1976d2;
+                        border-radius: 4px;
+                        padding: 2px 6px;
+                        font-size: 11px;
+                        font-weight: bold;
+                        color: #1976d2;
+                        white-space: nowrap;
+                        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                        margin-bottom: 2px;
+                      ">🚌 ${terminal.name || '버스터미널'}</div>
+                      <img src="https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png" 
+                           style="width: 18px; height: 30px;" />
+                    </div>`,
+                  iconSize: [18, 50], // 이름 공간 포함
+                  iconAnchor: [9, 50],
+                  popupAnchor: [1, -50],
+                  className: 'transit-marker-div'
                 });
                 
                 markers.push(
@@ -2100,17 +2121,38 @@ ${loggedInStore.name}으로 이동 예정입니다.
             });
           }
           
-          // 지하철역 마커
+          // 지하철역 마커 (크기 축소, 이름 표시)
           if (location.subwayStations && Array.isArray(location.subwayStations)) {
             location.subwayStations.forEach((station, index) => {
               if (station.lat && station.lng) {
-                const subwayIcon = L.icon({
-                  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
-                  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-                  iconSize: [25, 41],
-                  iconAnchor: [12, 41],
-                  popupAnchor: [1, -34],
-                  shadowSize: [41, 41]
+                // 이름이 표시된 커스텀 아이콘 생성
+                const subwayIcon = L.divIcon({
+                  html: `
+                    <div style="
+                      display: flex;
+                      flex-direction: column;
+                      align-items: center;
+                      transform: translateY(-10px);
+                    ">
+                      <div style="
+                        background-color: rgba(255, 255, 255, 0.95);
+                        border: 1px solid #d32f2f;
+                        border-radius: 4px;
+                        padding: 2px 6px;
+                        font-size: 11px;
+                        font-weight: bold;
+                        color: #d32f2f;
+                        white-space: nowrap;
+                        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                        margin-bottom: 2px;
+                      ">🚇 ${station.name || '지하철역'}</div>
+                      <img src="https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png" 
+                           style="width: 18px; height: 30px;" />
+                    </div>`,
+                  iconSize: [18, 50], // 이름 공간 포함
+                  iconAnchor: [9, 50],
+                  popupAnchor: [1, -50],
+                  className: 'transit-marker-div'
                 });
                 
                 markers.push(

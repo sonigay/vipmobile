@@ -207,10 +207,10 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                         고객님의 위치에서 가장 가까운 매장을 안내합니다.
                     </Typography>
                 </Box>
-                {/* 대중교통 마커 토글 */}
+                {/* 대중교통 마커 토글 (왼쪽 하단으로 이동) */}
                 <Box sx={{
                     position: 'absolute',
-                    top: 10,
+                    bottom: 10,
                     left: 10,
                     zIndex: 1000,
                     bgcolor: 'rgba(255,255,255,0.95)',
