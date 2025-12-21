@@ -1358,7 +1358,9 @@ const OpeningInfoPage = ({
                                                     </Stack>
                                                 </Box>
                                             )}
-                                        </Grid>
+                                            </>
+                                        )}
+                                    </Grid>
                                     </>
                                 )}
                             </Grid>
