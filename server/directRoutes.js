@@ -508,7 +508,7 @@ async function rebuildDeviceMaster(carriersParam) {
   await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_MOBILE_MASTER, HEADERS_MOBILE_MASTER);
 
   // 1. 이미지 및 태그 데이터 미리 로드 (전체)
-  let imageMap = new Map(); // Key: Carrier+ModelCode -> ImageURL
+  let imageMap = new Map(); // Key: Carrier+ModelCode -> { imageUrl, discordMessageId, discordPostId, discordThreadId }
   let tagMap = new Map();   // Key: ModelName -> { isPremium, isBudget, ... }
 
   try {
@@ -520,8 +520,16 @@ async function rebuildDeviceMaster(carriersParam) {
       const c = (row[0] || '').toString().trim().toUpperCase();
       const code = normalizeModelCode(row[1] || row[2]); // ModelID or ModelName
       const url = (row[5] || '').toString().trim();
+      const discordMessageId = (row[8] || '').toString().trim(); // I: Discord메시지ID
+      const discordPostId = (row[9] || '').toString().trim(); // J: Discord포스트ID
+      const discordThreadId = (row[10] || '').toString().trim(); // K: Discord스레드ID
       if (c && code && url) {
-        imageMap.set(`${c}:${code}`, url);
+        imageMap.set(`${c}:${code}`, {
+          imageUrl: url,
+          discordMessageId: discordMessageId || null,
+          discordPostId: discordPostId || null,
+          discordThreadId: discordThreadId || null
+        });
       }
     }
 
@@ -647,8 +655,9 @@ async function rebuildDeviceMaster(carriersParam) {
       // 이미지 매칭: Carrier+ModelCode 우선, 없으면 Carrier+ModelName
       const imageInfo = imageMap.get(`${carrier}:${normalizedCode}`) || imageMap.get(`${carrier}:${modelName}`) || null;
       let imageUrl = imageInfo && typeof imageInfo === 'object' ? imageInfo.imageUrl : (imageInfo || '');
-      const discordMessageId = imageInfo && typeof imageInfo === 'object' ? imageInfo.discordMessageId : null;
-      const discordThreadId = imageInfo && typeof imageInfo === 'object' ? imageInfo.discordThreadId : null;
+      const discordMessageId = imageInfo && typeof imageInfo === 'object' ? (imageInfo.discordMessageId || '') : '';
+      const discordPostId = imageInfo && typeof imageInfo === 'object' ? (imageInfo.discordPostId || '') : '';
+      const discordThreadId = imageInfo && typeof imageInfo === 'object' ? (imageInfo.discordThreadId || '') : '';
 
       // 기본 요금제군 결정
       let defaultPlanGroup = '115군';
@@ -656,21 +665,24 @@ async function rebuildDeviceMaster(carriersParam) {
       // 프리미엄/기타는 115군
 
       carrierRows.push([
-        carrier,
-        normalizedCode,   // 모델ID (정규화된 코드 사용)
-        modelName,        // 원본 모델명
-        petName,
-        maker,
-        factoryPrice,
-        defaultPlanGroup,
-        tags.isPremium ? 'Y' : 'N',
-        tags.isBudget ? 'Y' : 'N',
-        tags.isPopular ? 'Y' : 'N',
-        tags.isRecommended ? 'Y' : 'N',
-        tags.isCheap ? 'Y' : 'N',
-        imageUrl,
-        'Y',              // 사용여부 기본값 Y
-        ''                // 비고
+        carrier,           // 0: 통신사
+        normalizedCode,   // 1: 모델ID (정규화된 코드 사용)
+        modelName,        // 2: 원본 모델명
+        petName,          // 3: 펫네임
+        maker,            // 4: 제조사
+        factoryPrice,     // 5: 출고가
+        defaultPlanGroup, // 6: 기본요금제군
+        tags.isPremium ? 'Y' : 'N',    // 7: isPremium
+        tags.isBudget ? 'Y' : 'N',     // 8: isBudget
+        tags.isPopular ? 'Y' : 'N',    // 9: isPopular
+        tags.isRecommended ? 'Y' : 'N', // 10: isRecommended
+        tags.isCheap ? 'Y' : 'N',      // 11: isCheap
+        imageUrl,         // 12: 이미지URL
+        'Y',              // 13: 사용여부 기본값 Y
+        '',               // 14: 비고
+        discordMessageId, // 15: Discord메시지ID
+        discordPostId,    // 16: Discord포스트ID
+        discordThreadId  // 17: Discord스레드ID
       ]);
       created++;
     }
