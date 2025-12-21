@@ -1400,6 +1400,17 @@ async function getSheetId(sheets, spreadsheetId, sheetName) {
   return sheet ? sheet.properties.sheetId : null;
 }
 
+// Excel 컬럼 인덱스를 컬럼 문자로 변환 (1 -> A, 27 -> AA, 36 -> AJ)
+function getColumnLetter(columnNumber) {
+  let result = '';
+  while (columnNumber > 0) {
+    columnNumber--;
+    result = String.fromCharCode(65 + (columnNumber % 26)) + result;
+    columnNumber = Math.floor(columnNumber / 26);
+  }
+  return result;
+}
+
 async function ensureSheetHeaders(sheets, spreadsheetId, sheetName, headers) {
   // 캐시 키 생성
   const cacheKey = `headers-${sheetName}-${spreadsheetId}`;
@@ -1444,18 +1455,20 @@ async function ensureSheetHeaders(sheets, spreadsheetId, sheetName, headers) {
       });
     });
     const firstRow = res.data.values && res.data.values[0] ? res.data.values[0] : [];
-    const needsInit = firstRow.length === 0 || headers.some((h, i) => (firstRow[i] || '') !== h);
+    const needsInit = firstRow.length === 0 || headers.some((h, i) => (firstRow[i] || '') !== h) || firstRow.length < headers.length;
     if (needsInit) {
       await withRetry(async () => {
+        const lastColumn = getColumnLetter(headers.length);
+        // 범위를 명시적으로 지정하여 업데이트
         return await sheets.spreadsheets.values.update({
           spreadsheetId,
-          range: `${sheetName}!A1:${String.fromCharCode(65 + headers.length - 1)}1`,
+          range: `${sheetName}!A1:${lastColumn}1`,
           valueInputOption: 'USER_ENTERED',
           resource: { values: [headers] }
         });
       });
-      // 헤더 업데이트 후 캐시 무효화 (다음 호출에서 다시 확인)
-      // 캐시하지 않고 바로 반환
+      // 헤더 업데이트 후 캐시 무효화
+      cacheStore.delete(cacheKey);
       return headers;
     }
     // 헤더가 정상이면 캐시에 저장
@@ -1474,16 +1487,19 @@ async function ensureSheetHeaders(sheets, spreadsheetId, sheetName, headers) {
           });
         });
         const firstRow = res.data.values && res.data.values[0] ? res.data.values[0] : [];
-        const needsInit = firstRow.length === 0 || headers.some((h, i) => (firstRow[i] || '') !== h);
+        const needsInit = firstRow.length === 0 || headers.some((h, i) => (firstRow[i] || '') !== h) || firstRow.length < headers.length;
         if (needsInit) {
           await withRetry(async () => {
+            const lastColumn = getColumnLetter(headers.length);
             return await sheets.spreadsheets.values.update({
               spreadsheetId,
-              range: `${sheetName}!A1:${String.fromCharCode(65 + headers.length - 1)}1`,
+              range: `${sheetName}!A1:${lastColumn}1`,
               valueInputOption: 'USER_ENTERED',
               resource: { values: [headers] }
             });
           });
+          // 헤더 업데이트 후 캐시 무효화
+          cacheStore.delete(cacheKey);
         }
         setCache(cacheKey, headers, CACHE_TTL);
         return headers;
