@@ -494,6 +494,98 @@ export const directStoreApiClient = {
   },
 
   /**
+   * 대중교통 위치 목록 조회 (모든 위치)
+   */
+  getAllTransitLocations: async () => {
+    try {
+      const response = await fetchWithRetry(`${BASE_URL}/transit-location/all`);
+      return handleResponse(response, '대중교통 위치 목록 조회 실패');
+    } catch (error) {
+      console.error('대중교통 위치 목록 조회 실패:', error);
+      return { success: false, error: normalizeErrorMessage(error), data: [] };
+    }
+  },
+
+  /**
+   * 대중교통 위치 생성
+   */
+  createTransitLocation: async (type, name, address) => {
+    try {
+      const response = await fetchWithRetry(`${BASE_URL}/transit-location/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, name, address })
+      });
+      return handleResponse(response, '대중교통 위치 생성 실패');
+    } catch (error) {
+      console.error('대중교통 위치 생성 실패:', error);
+      return { success: false, error: normalizeErrorMessage(error) };
+    }
+  },
+
+  /**
+   * 대중교통 위치 수정
+   */
+  updateTransitLocation: async (id, type, name, address) => {
+    try {
+      const response = await fetchWithRetry(`${BASE_URL}/transit-location/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, name, address })
+      });
+      return handleResponse(response, '대중교통 위치 수정 실패');
+    } catch (error) {
+      console.error('대중교통 위치 수정 실패:', error);
+      return { success: false, error: normalizeErrorMessage(error) };
+    }
+  },
+
+  /**
+   * 대중교통 위치 삭제
+   */
+  deleteTransitLocation: async (id) => {
+    try {
+      const response = await fetchWithRetry(`${BASE_URL}/transit-location/${id}`, {
+        method: 'DELETE'
+      });
+      return handleResponse(response, '대중교통 위치 삭제 실패');
+    } catch (error) {
+      console.error('대중교통 위치 삭제 실패:', error);
+      return { success: false, error: normalizeErrorMessage(error) };
+    }
+  },
+
+  /**
+   * 대중교통 위치 저장 (매장별 ID 목록)
+   */
+  saveTransitLocation: async (storeName, busTerminalIds, subwayStationIds) => {
+    try {
+      const response = await fetchWithRetry(`${BASE_URL}/transit-location/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storeName, busTerminalIds, subwayStationIds })
+      });
+      return handleResponse(response, '대중교통 위치 저장 실패');
+    } catch (error) {
+      console.error('대중교통 위치 저장 실패:', error);
+      return { success: false, error: normalizeErrorMessage(error) };
+    }
+  },
+
+  /**
+   * 대중교통 위치 조회 (매장별)
+   */
+  getTransitLocations: async () => {
+    try {
+      const response = await fetchWithRetry(`${BASE_URL}/transit-location/list`);
+      return handleResponse(response, '대중교통 위치 조회 실패');
+    } catch (error) {
+      console.error('대중교통 위치 조회 실패:', error);
+      return { success: false, error: normalizeErrorMessage(error), data: [] };
+    }
+  },
+
+  /**
    * 연결페이지 이미지 업로드
    */
   uploadTransitionPageImage: async (file, carrier, category) => {

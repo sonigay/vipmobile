@@ -893,6 +893,7 @@ const CUSTOMER_QUEUE_SHEET_NAME = '직영점_구매대기';
 const CUSTOMER_PRE_APPROVAL_SHEET_NAME = '직영점_사전승낙서마크';
 const CUSTOMER_STORE_PHOTO_SHEET_NAME = '직영점_매장사진';
 const CUSTOMER_BOARD_SHEET_NAME = '직영점_게시판';
+const TRANSIT_LOCATION_SHEET_NAME = '직영점_대중교통위치';
 const HEADERS_STORE_PHOTO = [
   '업체명',                    // 0
   '전면사진URL',               // 1
@@ -927,7 +928,18 @@ const HEADERS_STORE_PHOTO = [
   '직원3사진Discord메시지ID',  // 30
   '직원3사진Discord포스트ID',  // 31
   '직원3사진Discord스레드ID',  // 32
-  '수정일시'                   // 33
+  '수정일시',                  // 33
+  '버스터미널ID목록',          // 34 - JSON 배열 ["ID1", "ID2"]
+  '지하철역ID목록'             // 35 - JSON 배열 ["ID1", "ID2"]
+];
+const HEADERS_TRANSIT_LOCATION = [
+  'ID',                        // 0 - 고유 ID (자동 생성)
+  '타입',                      // 1 - "버스터미널" 또는 "지하철역"
+  '이름',                      // 2
+  '주소',                      // 3
+  '위도',                      // 4
+  '경도',                      // 5
+  '수정일시'                   // 6
 ];
 const CUSTOMER_QUEUE_HEADERS = [
   '번호', '고객CTN', '고객명', '통신사', '단말기모델명', '색상', '단말일련번호', '유심모델명', '유심일련번호', '개통유형',
@@ -1331,7 +1343,7 @@ async function getSheetValuesWithoutCache(sheetName) {
     } else if (sheetName === '정책모드공지사항') {
       range = `${safeSheetName}!A:I`;
     } else if (sheetName === '직영점_매장사진') {
-      range = `${safeSheetName}!A:AH`;  // Discord 정보 컬럼 포함 (A:AH)
+      range = `${safeSheetName}!A:AJ`;  // Discord 정보 컬럼 + 대중교통 정보 컬럼 포함 (A:AJ)
     } else {
       range = `${safeSheetName}!A:AA`;
     }
@@ -1378,7 +1390,7 @@ async function fetchSheetValuesDirectly(sheetName, spreadsheetId = SPREADSHEET_I
   } else if (sheetName === '마당접수') {
     range = `${safeSheetName}!A:AI`;
   } else if (sheetName === '직영점_매장사진') {
-    range = `${safeSheetName}!A:AH`;  // Discord 정보 컬럼 포함 (A:AH)
+    range = `${safeSheetName}!A:AJ`;  // Discord 정보 컬럼 + 대중교통 정보 컬럼 포함 (A:AJ)
   } else {
     range = `${safeSheetName}!A:AA`;
   }
@@ -4734,6 +4746,10 @@ app.post('/api/direct/store-image', async (req, res) => {
       return ['', '', ''];
     };
     
+    // 기존 행에서 대중교통 정보 보존 (있는 경우)
+    const existingBusTerminals = existingRow && existingRow[34] ? existingRow[34] : '';
+    const existingSubwayStations = existingRow && existingRow[35] ? existingRow[35] : '';
+    
     const newRow = [
       storeName,  // 0: 업체명
       data.frontUrl || '',  // 1: 전면사진URL
@@ -4752,14 +4768,16 @@ app.post('/api/direct/store-image', async (req, res) => {
       ...getDiscordInfo('staff2', data.staff2Url),  // 26-28: 직원2사진Discord정보
       data.staff3Url || '',  // 29: 직원3사진URL
       ...getDiscordInfo('staff3', data.staff3Url),  // 30-32: 직원3사진Discord정보
-      updatedAt  // 33: 수정일시
+      updatedAt,  // 33: 수정일시
+      existingBusTerminals,  // 34: 버스터미널정보 (기존 값 보존)
+      existingSubwayStations  // 35: 지하철역정보 (기존 값 보존)
     ];
 
     if (rowIndex === -1) {
       await rateLimitedSheetsCall(() =>
         sheets.spreadsheets.values.append({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${CUSTOMER_STORE_PHOTO_SHEET_NAME}!A:AH`,
+          range: `${CUSTOMER_STORE_PHOTO_SHEET_NAME}!A:AJ`,
           valueInputOption: 'USER_ENTERED',
           insertDataOption: 'INSERT_ROWS',
           resource: { values: [newRow] }
@@ -4769,7 +4787,7 @@ app.post('/api/direct/store-image', async (req, res) => {
       await rateLimitedSheetsCall(() =>
         sheets.spreadsheets.values.update({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${CUSTOMER_STORE_PHOTO_SHEET_NAME}!A${rowIndex + 1}:AH${rowIndex + 1}`,
+          range: `${CUSTOMER_STORE_PHOTO_SHEET_NAME}!A${rowIndex + 1}:AJ${rowIndex + 1}`,
           valueInputOption: 'USER_ENTERED',
           resource: { values: [newRow] }
         })
@@ -5151,7 +5169,7 @@ app.post('/api/direct/store-image/upload', storeImageUpload.single('image'), asy
           await rateLimitedSheetsCall(() =>
             sheets.spreadsheets.values.append({
               spreadsheetId: SPREADSHEET_ID,
-              range: `${CUSTOMER_STORE_PHOTO_SHEET_NAME}!A:AH`,
+              range: `${CUSTOMER_STORE_PHOTO_SHEET_NAME}!A:AJ`,
               valueInputOption: 'USER_ENTERED',
               insertDataOption: 'INSERT_ROWS',
               resource: { values: [newRow] }
@@ -5161,8 +5179,8 @@ app.post('/api/direct/store-image/upload', storeImageUpload.single('image'), asy
         } else {
           // 기존 행 업데이트 (해당 photoType의 URL과 Discord 정보만 업데이트)
           const updatedRow = [...existingRow];
-          // 배열 길이가 부족하면 확장
-          while (updatedRow.length < 34) {
+          // 배열 길이가 부족하면 확장 (36개 컬럼: 기존 34개 + 대중교통 2개)
+          while (updatedRow.length < 36) {
             updatedRow.push('');
           }
           updatedRow[photoMap.url] = fileUrl;
@@ -5174,7 +5192,7 @@ app.post('/api/direct/store-image/upload', storeImageUpload.single('image'), asy
           await rateLimitedSheetsCall(() =>
             sheets.spreadsheets.values.update({
               spreadsheetId: SPREADSHEET_ID,
-              range: `${CUSTOMER_STORE_PHOTO_SHEET_NAME}!A${rowIndex + 1}:AH${rowIndex + 1}`,
+              range: `${CUSTOMER_STORE_PHOTO_SHEET_NAME}!A${rowIndex + 1}:AJ${rowIndex + 1}`,
               valueInputOption: 'USER_ENTERED',
               resource: { values: [updatedRow] }
             })
@@ -6912,7 +6930,7 @@ app.post('/api/direct/refresh-store-photo-url', express.json(), async (req, res)
     await rateLimitedSheetsCall(() =>
       sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
-        range: `${CUSTOMER_STORE_PHOTO_SHEET_NAME}!A${rowIndex + 1}:AH${rowIndex + 1}`,
+              range: `${CUSTOMER_STORE_PHOTO_SHEET_NAME}!A${rowIndex + 1}:AJ${rowIndex + 1}`,
         valueInputOption: 'USER_ENTERED',
         resource: { values: [updatedRow] }
       })
@@ -40502,6 +40520,331 @@ app.get('/api/quick-cost/quality', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || '데이터 품질 정보 조회에 실패했습니다.'
+    });
+  }
+});
+
+// 주소를 위도/경도로 변환하는 API (카카오 API 사용)
+app.get('/api/geocode-address', async (req, res) => {
+  setCORSHeaders(req, res);
+  
+  try {
+    const { address } = req.query;
+    
+    if (!address) {
+      return res.status(400).json({
+        success: false,
+        error: '주소가 필요합니다.'
+      });
+    }
+    
+    const coords = await geocodeAddressWithKakao(address);
+    
+    if (coords) {
+      res.json({
+        success: true,
+        latitude: coords.latitude,
+        longitude: coords.longitude
+      });
+    } else {
+      res.status(404).json({
+        success: false,
+        error: '주소를 찾을 수 없습니다.'
+      });
+    }
+  } catch (error) {
+    console.error('주소 변환 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || '주소 변환에 실패했습니다.'
+    });
+  }
+});
+
+// 대중교통 위치 조회 API (매장별, 캐싱 포함) - ID 기반으로 실제 위치 정보 조회
+const transitLocationCache = new Map();
+const TRANSIT_CACHE_TTL = 5 * 60 * 1000; // 5분
+
+app.get('/api/direct/transit-location/list', async (req, res) => {
+  setCORSHeaders(req, res);
+  
+  try {
+    // 캐시 확인
+    const cacheKey = 'transit_locations_by_store';
+    const cached = transitLocationCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp) < TRANSIT_CACHE_TTL) {
+      return res.json({
+        success: true,
+        data: cached.data,
+        fromCache: true
+      });
+    }
+    
+    // 모든 대중교통 위치 조회
+    await ensureTransitLocationSheetHeaders();
+    const transitValues = await getSheetValues(TRANSIT_LOCATION_SHEET_NAME);
+    const transitMap = new Map();
+    
+    if (transitValues && transitValues.length > 1) {
+      const transitRows = transitValues.slice(1);
+      for (const row of transitRows) {
+        if (!row[0]) continue;
+        transitMap.set(row[0], {
+          id: row[0],
+          type: row[1] || '',
+          name: row[2] || '',
+          address: row[3] || '',
+          lat: row[4] ? parseFloat(row[4]) : null,
+          lng: row[5] ? parseFloat(row[5]) : null,
+          updatedAt: row[6] || ''
+        });
+      }
+    }
+    
+    // 매장별 대중교통 위치 조회
+    const values = await getSheetValues(CUSTOMER_STORE_PHOTO_SHEET_NAME);
+    if (!values || values.length <= 1) {
+      return res.json({
+        success: true,
+        data: []
+      });
+    }
+    
+    const rows = values.slice(1);
+    const transitLocations = [];
+    
+    for (const row of rows) {
+      if (!row[0]) continue; // 매장명이 없으면 건너뛰기
+      
+      const storeName = row[0];
+      const busTerminals = [];
+      const subwayStations = [];
+      
+      // 버스터미널 ID 목록 파싱
+      if (row[34]) {
+        try {
+          const busIds = JSON.parse(row[34]);
+          if (Array.isArray(busIds)) {
+            for (const id of busIds) {
+              const location = transitMap.get(id);
+              if (location) {
+                busTerminals.push(location);
+              }
+            }
+          }
+        } catch (error) {
+          console.error(`버스터미널 ID 목록 JSON 파싱 실패 (${storeName}):`, error);
+        }
+      }
+      
+      // 지하철역 ID 목록 파싱
+      if (row[35]) {
+        try {
+          const subwayIds = JSON.parse(row[35]);
+          if (Array.isArray(subwayIds)) {
+            for (const id of subwayIds) {
+              const location = transitMap.get(id);
+              if (location) {
+                subwayStations.push(location);
+              }
+            }
+          }
+        } catch (error) {
+          console.error(`지하철역 ID 목록 JSON 파싱 실패 (${storeName}):`, error);
+        }
+      }
+      
+      if (busTerminals.length > 0 || subwayStations.length > 0) {
+        transitLocations.push({
+          storeName,
+          busTerminals,
+          subwayStations
+        });
+      }
+    }
+    
+    // 캐시 저장
+    transitLocationCache.set(cacheKey, {
+      data: transitLocations,
+      timestamp: Date.now()
+    });
+    
+    res.json({
+      success: true,
+      data: transitLocations,
+      fromCache: false
+    });
+  } catch (error) {
+    console.error('대중교통 위치 조회 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || '조회에 실패했습니다.'
+    });
+  }
+});
+
+// 대중교통 위치 저장 API
+app.post('/api/direct/transit-location/save', express.json(), async (req, res) => {
+  setCORSHeaders(req, res);
+  
+  try {
+    const { storeName, busTerminals, subwayStations } = req.body;
+    
+    if (!storeName) {
+      return res.status(400).json({
+        success: false,
+        error: '매장명이 필요합니다.'
+      });
+    }
+    
+    // 헤더 확인 및 생성
+    const { ensureSheetHeaders } = require('./directRoutes');
+    await ensureSheetHeaders(sheets, SPREADSHEET_ID, CUSTOMER_STORE_PHOTO_SHEET_NAME, HEADERS_STORE_PHOTO);
+    
+    const values = await getSheetValues(CUSTOMER_STORE_PHOTO_SHEET_NAME);
+    const rowIndex = values ? values.findIndex(row => row[0] === storeName) : -1;
+    const existingRow = rowIndex !== -1 && values ? values[rowIndex] : null;
+    
+    // 버스터미널 정보 처리
+    let busTerminalsJson = '[]';
+    if (busTerminals && Array.isArray(busTerminals) && busTerminals.length > 0) {
+      const processedBusTerminals = [];
+      for (const terminal of busTerminals) {
+        if (!terminal.name || !terminal.address) {
+          continue; // 이름이나 주소가 없으면 건너뛰기
+        }
+        
+        try {
+          const coords = await geocodeAddressWithKakao(terminal.address);
+          if (coords) {
+            processedBusTerminals.push({
+              name: terminal.name,
+              address: terminal.address,
+              lat: coords.latitude,
+              lng: coords.longitude
+            });
+          } else {
+            // 주소 변환 실패 시에도 저장 (위도/경도 없이)
+            processedBusTerminals.push({
+              name: terminal.name,
+              address: terminal.address,
+              lat: null,
+              lng: null
+            });
+          }
+        } catch (error) {
+          console.error(`버스터미널 주소 변환 실패: ${terminal.address}`, error);
+          // 주소 변환 실패 시에도 저장
+          processedBusTerminals.push({
+            name: terminal.name,
+            address: terminal.address,
+            lat: null,
+            lng: null
+          });
+        }
+      }
+      busTerminalsJson = JSON.stringify(processedBusTerminals);
+    }
+    
+    // 지하철역 정보 처리
+    let subwayStationsJson = '[]';
+    if (subwayStations && Array.isArray(subwayStations) && subwayStations.length > 0) {
+      const processedSubwayStations = [];
+      for (const station of subwayStations) {
+        if (!station.name || !station.address) {
+          continue; // 이름이나 주소가 없으면 건너뛰기
+        }
+        
+        try {
+          const coords = await geocodeAddressWithKakao(station.address);
+          if (coords) {
+            processedSubwayStations.push({
+              name: station.name,
+              address: station.address,
+              lat: coords.latitude,
+              lng: coords.longitude
+            });
+          } else {
+            // 주소 변환 실패 시에도 저장 (위도/경도 없이)
+            processedSubwayStations.push({
+              name: station.name,
+              address: station.address,
+              lat: null,
+              lng: null
+            });
+          }
+        } catch (error) {
+          console.error(`지하철역 주소 변환 실패: ${station.address}`, error);
+          // 주소 변환 실패 시에도 저장
+          processedSubwayStations.push({
+            name: station.name,
+            address: station.address,
+            lat: null,
+            lng: null
+          });
+        }
+      }
+      subwayStationsJson = JSON.stringify(processedSubwayStations);
+    }
+    
+    // 기존 행이 있으면 업데이트, 없으면 새로 추가
+    if (rowIndex === -1) {
+      // 새 행 생성 (기본값으로 채움)
+      const newRow = new Array(36).fill('');
+      newRow[0] = storeName;
+      newRow[34] = busTerminalsJson;
+      newRow[35] = subwayStationsJson;
+      
+      await rateLimitedSheetsCall(() =>
+        sheets.spreadsheets.values.append({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${CUSTOMER_STORE_PHOTO_SHEET_NAME}!A:AJ`,
+          valueInputOption: 'USER_ENTERED',
+          insertDataOption: 'INSERT_ROWS',
+          resource: { values: [newRow] }
+        })
+      );
+    } else {
+      // 기존 행 업데이트
+      const updatedRow = [...existingRow];
+      // 배열 길이가 부족하면 확장
+      while (updatedRow.length < 36) {
+        updatedRow.push('');
+      }
+      updatedRow[34] = busTerminalsJson;
+      updatedRow[35] = subwayStationsJson;
+      
+      await rateLimitedSheetsCall(() =>
+        sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${CUSTOMER_STORE_PHOTO_SHEET_NAME}!A${rowIndex + 1}:AJ${rowIndex + 1}`,
+          valueInputOption: 'USER_ENTERED',
+          resource: { values: [updatedRow] }
+        })
+      );
+    }
+    
+    // 캐시 무효화
+    const cacheKey = `sheet_${CUSTOMER_STORE_PHOTO_SHEET_NAME}_${SPREADSHEET_ID}`;
+    if (cacheManager && cacheManager.clear) {
+      cacheManager.clear(cacheKey);
+    }
+    // 대중교통 위치 캐시도 무효화
+    transitLocationCache.delete('transit_locations');
+    
+    res.json({
+      success: true,
+      data: {
+        storeName,
+        busTerminals: JSON.parse(busTerminalsJson),
+        subwayStations: JSON.parse(subwayStationsJson)
+      }
+    });
+  } catch (error) {
+    console.error('대중교통 위치 저장 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || '저장에 실패했습니다.'
     });
   }
 });
