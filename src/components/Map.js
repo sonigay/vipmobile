@@ -460,7 +460,15 @@ ${loggedInStore.name}으로 이동 예정입니다.
     return 12; // 일반 매장 모드
   };
 
-  const [mapZoom, setMapZoom] = useState(getInitialZoom());
+  // 초기 줌 레벨 계산 (userLocation이 변경될 때마다 재계산)
+  const initialZoom = useMemo(() => getInitialZoom(), [isAgentMode, currentView, isCustomerMode, loggedInStore, userLocation]);
+  const [mapZoom, setMapZoom] = useState(initialZoom);
+  
+  // userLocation이 변경될 때 줌 레벨 업데이트
+  useEffect(() => {
+    const newZoom = getInitialZoom();
+    setMapZoom(newZoom);
+  }, [userLocation, isCustomerMode, loggedInStore, isAgentMode, currentView]);
   const [mapKey, setMapKey] = useState(0);
   const [isMapInitialized, setIsMapInitialized] = useState(false);
   const initialLoadRef = useRef(true);
