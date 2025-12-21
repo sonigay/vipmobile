@@ -2060,7 +2060,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
 
         {/* 개통실적 마커들 (담당개통확인 화면에서만 표시) */}
         {/* 대중교통 마커 (고객모드, 직영점모드, 직영점관리모드에서만 표시, isAgentMode가 false일 때만) */}
-        {!isAgentMode && showTransitMarkersState && transitLocations && transitLocations.length > 0 && transitLocations.map((location) => {
+        {!isAgentMode && showTransitMarkers && transitLocations && transitLocations.length > 0 && transitLocations.map((location) => {
           const markers = [];
           
           // 버스터미널 마커
