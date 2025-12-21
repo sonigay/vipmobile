@@ -649,9 +649,10 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
           message={isInitializing ? '가격 정보를 계산하는 중...' : '데이터를 불러오는 중...'}
         />
       ) : (
-        /* 상품 테이블 */
-        <ModernTable sx={{ flexGrow: 1 }}>
-          <Table stickyHeader>
+        <>
+          {/* 상품 테이블 */}
+          <TableContainer component={Paper} sx={{ flexGrow: 1, overflowX: 'auto', maxWidth: '100%' }}>
+            <Table stickyHeader sx={{ minWidth: 1000 }}>
             <TableHead>
               <TableRow>
                 {!isCustomerMode && <ModernTableCell align="center" width="120">구분</ModernTableCell>}
@@ -713,7 +714,8 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
               )}
             </TableBody>
           </Table>
-        </ModernTable>
+        </TableContainer>
+        </>
       )}
     </Box>
   );

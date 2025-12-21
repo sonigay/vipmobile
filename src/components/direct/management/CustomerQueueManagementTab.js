@@ -94,8 +94,15 @@ const CustomerQueueManagementTab = ({ loggedInStore, onRowClick }) => {
 
             {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-            <TableContainer component={Paper} sx={{ boxShadow: 3 }}>
-                <Table>
+            <TableContainer 
+                component={Paper} 
+                sx={{ 
+                    boxShadow: 3,
+                    overflowX: 'auto',
+                    maxWidth: '100%'
+                }}
+            >
+                <Table sx={{ minWidth: 800 }}>
                     <TableHead sx={{ bgcolor: '#f5f5f5' }}>
                         <TableRow>
                             <TableCell sx={{ fontWeight: 'bold' }}>등록일시</TableCell>

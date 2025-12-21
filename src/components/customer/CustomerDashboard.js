@@ -147,24 +147,43 @@ const CustomerDashboard = () => {
     }
 
     return (
-        <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Container maxWidth="xl" sx={{ mt: { xs: 2, sm: 4 }, mb: { xs: 2, sm: 4 }, px: { xs: 1, sm: 2, md: 3 } }}>
+            <Box sx={{ 
+                display: 'flex', 
+                flexDirection: { xs: 'column', sm: 'row' },
+                justifyContent: 'space-between', 
+                alignItems: { xs: 'flex-start', sm: 'center' }, 
+                mb: 3,
+                gap: 2
+            }}>
                 <Box>
-                    <Typography variant="h4" sx={{ fontWeight: 700 }}>{customerInfo.name}님, 안녕하세요!</Typography>
-                    <Typography variant="body1" color="text.secondary">
+                    <Typography variant="h4" sx={{ fontWeight: 700, fontSize: { xs: '1.5rem', sm: '2rem' } }}>
+                        {customerInfo.name}님, 안녕하세요!
+                    </Typography>
+                    <Typography variant="body1" color="text.secondary" sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
                         가입 모델: {customerInfo.model} ({customerInfo.carrier}) | 개통일: {customerInfo.soldAt ? new Date(customerInfo.soldAt).toLocaleDateString() : '정보 없음'}
                     </Typography>
                 </Box>
-                <Button variant="outlined" color="inherit" onClick={handleLogout}>로그아웃</Button>
+                <Button variant="outlined" color="inherit" onClick={handleLogout} sx={{ minWidth: { xs: '100%', sm: 'auto' } }}>
+                    로그아웃
+                </Button>
             </Box>
 
-            <Paper sx={{ width: '100%', mb: 2 }}>
+            <Paper sx={{ width: '100%', mb: 2, overflow: 'hidden' }}>
                 <Tabs
                     value={tabValue}
                     onChange={handleTabChange}
                     indicatorColor="primary"
                     textColor="primary"
-                    variant="fullWidth"
+                    variant="scrollable"
+                    scrollButtons="auto"
+                    sx={{
+                      '& .MuiTab-root': {
+                        fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
+                        minWidth: { xs: 'auto', sm: 'auto' },
+                        px: { xs: 1, sm: 2 }
+                      }
+                    }}
                 >
                     <Tab label="휴대폰 시세표" />
                     <Tab label="선호 구입 매장" />
@@ -173,7 +192,15 @@ const CustomerDashboard = () => {
                 </Tabs>
             </Paper>
 
-            <Box sx={{ p: tabValue === 0 ? 0 : 3, bgcolor: '#fff', borderRadius: 2, boxShadow: 1, minHeight: '400px', overflow: 'hidden' }}>
+            <Box sx={{ 
+                p: { xs: tabValue === 0 ? 0 : 2, sm: tabValue === 0 ? 0 : 3 }, 
+                bgcolor: '#fff', 
+                borderRadius: 2, 
+                boxShadow: 1, 
+                minHeight: { xs: '300px', sm: '400px' }, 
+                overflow: 'auto',
+                maxHeight: { xs: 'calc(100vh - 300px)', sm: 'none' }
+            }}>
                 {tabValue === 0 && (
                     <Box>
                         <MobileListTab onProductSelect={handleProductSelect} isCustomerMode={true} />

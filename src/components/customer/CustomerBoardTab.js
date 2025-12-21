@@ -300,8 +300,15 @@ const CustomerBoardTab = ({ customerInfo }) => {
                     })}
                 </Grid>
             ) : (
-                <TableContainer component={Paper} sx={{ boxShadow: 2 }}>
-                    <Table>
+                <TableContainer 
+                    component={Paper} 
+                    sx={{ 
+                        boxShadow: 2,
+                        overflowX: 'auto',
+                        maxWidth: '100%'
+                    }}
+                >
+                    <Table sx={{ minWidth: 600 }}>
                         <TableHead sx={{ bgcolor: '#f5f5f5' }}>
                             <TableRow>
                                 <TableCell sx={{ fontWeight: 'bold', width: '80px' }}>카테고리</TableCell>

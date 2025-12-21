@@ -29,7 +29,9 @@ export const ModernTable = ({ children, sx, ...props }) => {
       sx={{
         borderRadius: 2,
         border: (theme) => `1px solid ${alpha(theme.palette.divider, 0.5)}`,
-        overflow: 'hidden',
+        overflowX: 'auto',
+        overflowY: 'auto',
+        maxWidth: '100%',
         ...sx,
       }}
       {...props}

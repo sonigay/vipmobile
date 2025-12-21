@@ -336,8 +336,8 @@ const DiscordImageMonitoringTab = () => {
               label="전체 선택"
             />
           </Box>
-          <TableContainer>
-            <Table size="small">
+          <TableContainer sx={{ overflowX: 'auto', maxWidth: '100%' }}>
+            <Table size="small" sx={{ minWidth: 800 }}>
               <TableHead>
                 <TableRow>
                   <TableCell padding="checkbox" width="50px"></TableCell>

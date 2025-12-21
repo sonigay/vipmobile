@@ -16,7 +16,10 @@ import {
   Tabs,
   Tab,
   IconButton,
-  Fade
+  Fade,
+  Container,
+  useMediaQuery,
+  useTheme
 } from '@mui/material';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
@@ -72,6 +75,8 @@ const DirectStoreMode = ({
   // 기존 모드 설정은 유지하되, 테마는 directStoreTheme로 덮어씌움
   const modeColor = getModeColor('directStore');
   const modeTitle = getModeTitle('directStore', '직영점 모드');
+  const theme = directStoreThemeV2;
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   // 비밀번호가 필요한지 확인
   const requiresPassword = loggedInStore?.directStoreSecurity?.requiresPassword;
@@ -240,12 +245,20 @@ const DirectStoreMode = ({
           <Dialog
             open={showPasswordDialog}
             onClose={() => setShowPasswordDialog(false)}
+            fullWidth
+            maxWidth="sm"
+            PaperProps={{
+              sx: {
+                m: { xs: 2, sm: 3 },
+                width: { xs: 'calc(100% - 32px)', sm: 'auto' }
+              }
+            }}
           >
-            <DialogTitle sx={{ color: 'primary.main', fontWeight: 'bold', textAlign: 'center' }}>
+            <DialogTitle sx={{ color: 'primary.main', fontWeight: 'bold', textAlign: 'center', fontSize: { xs: '1.1rem', sm: '1.25rem' } }}>
               🔐 비밀번호 입력
             </DialogTitle>
             <DialogContent>
-              <Box sx={{ pt: 1, minWidth: 300 }}>
+              <Box sx={{ pt: 1, minWidth: { xs: 'auto', sm: 300 } }}>
                 {error && (
                   <Alert severity="error" sx={{ mb: 2 }}>
                     {error}
@@ -300,8 +313,7 @@ const DirectStoreMode = ({
   }
 
   // 인증 완료 후 메인 화면
-  // 새로운 테마 사용 (V2)
-  const theme = directStoreThemeV2;
+  // 새로운 테마 사용 (V2) - 이미 위에서 선언됨
 
   return (
     <ThemeProvider theme={theme}>
@@ -330,33 +342,45 @@ const DirectStoreMode = ({
             {/* 헤더 (전체화면 모드일 때는 숨김) */}
             {!isFullScreen && (
               <AppBar position="static" enableColorOnDark>
-                <Toolbar>
-                  <Typography variant="h6" sx={{ flexGrow: 1, color: 'primary.main', fontWeight: 'bold' }}>
+                <Toolbar sx={{ flexDirection: { xs: 'column', sm: 'row' }, gap: { xs: 1, sm: 0 }, py: { xs: 1, sm: 0 } }}>
+                  <Typography variant="h6" sx={{ flexGrow: 1, color: 'primary.main', fontWeight: 'bold', fontSize: { xs: '1.1rem', sm: '1.25rem' } }}>
                     {modeTitle}
                   </Typography>
 
-                  <Button
-                    color="inherit"
-                    startIcon={<UpdateIcon />}
-                    onClick={() => setShowUpdatePopup(true)}
-                  >
-                    업데이트 확인
-                  </Button>
-
-                  {onModeChange && availableModes && availableModes.length > 1 && (
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', width: { xs: '100%', sm: 'auto' }, justifyContent: { xs: 'flex-end', sm: 'flex-start' } }}>
                     <Button
                       color="inherit"
-                      startIcon={<RefreshIcon />}
-                      onClick={onModeChange}
-                      sx={{ ml: 2 }}
+                      size={isMobile ? 'small' : 'medium'}
+                      startIcon={<UpdateIcon />}
+                      onClick={() => setShowUpdatePopup(true)}
+                      sx={{ flex: { xs: '1 1 auto', sm: '0 0 auto' }, minWidth: { xs: 'auto', sm: '120px' } }}
                     >
-                      모드 변경
+                      <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>업데이트 확인</Box>
+                      <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>업데이트</Box>
                     </Button>
-                  )}
 
-                  <Button color="inherit" onClick={onLogout} sx={{ ml: 2 }}>
-                    로그아웃
-                  </Button>
+                    {onModeChange && availableModes && availableModes.length > 1 && (
+                      <Button
+                        color="inherit"
+                        size={isMobile ? 'small' : 'medium'}
+                        startIcon={<RefreshIcon />}
+                        onClick={onModeChange}
+                        sx={{ flex: { xs: '1 1 auto', sm: '0 0 auto' }, minWidth: { xs: 'auto', sm: '100px' } }}
+                      >
+                        <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>모드 변경</Box>
+                        <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>모드</Box>
+                      </Button>
+                    )}
+
+                    <Button 
+                      color="inherit" 
+                      onClick={onLogout}
+                      size={isMobile ? 'small' : 'medium'}
+                      sx={{ flex: { xs: '1 1 auto', sm: '0 0 auto' }, minWidth: { xs: 'auto', sm: '80px' } }}
+                    >
+                      로그아웃
+                    </Button>
+                  </Box>
                 </Toolbar>
 
                 {/* 탭 네비게이션 */}
@@ -365,8 +389,17 @@ const DirectStoreMode = ({
                   onChange={handleTabChange}
                   textColor="primary"
                   indicatorColor="primary"
-                  centered
-                  sx={{ borderBottom: 1, borderColor: 'divider' }}
+                  variant="scrollable"
+                  scrollButtons="auto"
+                  sx={{
+                    borderBottom: 1,
+                    borderColor: 'divider',
+                    '& .MuiTab-root': {
+                      fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
+                      minWidth: { xs: 'auto', sm: 'auto' },
+                      px: { xs: 1, sm: 2 }
+                    }
+                  }}
                 >
                   <Tab label="휴대폰시세표" />
                   <Tab label="오늘의 휴대폰" />
@@ -379,7 +412,7 @@ const DirectStoreMode = ({
             )}
 
             {/* 메인 컨텐츠 영역 */}
-            <Box sx={{ flexGrow: 1, position: 'relative', overflow: 'hidden' }}>
+            <Box sx={{ flexGrow: 1, position: 'relative', overflow: 'auto', maxHeight: { xs: 'calc(100vh - 200px)', sm: 'none' } }}>
               {/* 휴대폰 목록 탭 */}
               <Box
                 role="tabpanel"

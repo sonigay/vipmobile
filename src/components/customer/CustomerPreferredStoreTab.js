@@ -157,10 +157,10 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
     }
 
     return (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, p: 2 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, p: { xs: 1, sm: 2 } }}>
             {/* 지도 */}
             <Box sx={{ 
-                height: '500px', 
+                height: { xs: '300px', sm: '400px', md: '500px' }, 
                 width: '100%', 
                 position: 'relative', 
                 borderRadius: 2, 
@@ -170,7 +170,7 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                 '& .leaflet-container': {
                     height: '100%',
                     width: '100%',
-                    minHeight: '500px'
+                    minHeight: { xs: '300px', sm: '400px', md: '500px' }
                 }
             }}>
                 {/* 지도 설명 문구 */}

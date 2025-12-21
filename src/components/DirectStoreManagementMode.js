@@ -12,7 +12,9 @@ import {
   IconButton,
   Paper,
   Alert,
-  CircularProgress
+  CircularProgress,
+  Container,
+  useMediaQuery
 } from '@mui/material';
 import {
   Update as UpdateIcon,
@@ -198,6 +200,7 @@ const DirectStoreManagementMode = ({
 
   // 새로운 테마 사용 (V2)
   const theme = directStoreThemeV2;
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   return (
     <ThemeProvider theme={theme}>
@@ -217,39 +220,65 @@ const DirectStoreManagementMode = ({
         ) : (
           <>
             <AppBar position="static" enableColorOnDark>
-              <Toolbar>
-                <SettingsIcon sx={{ mr: 2, color: 'primary.main' }} />
-                <Typography variant="h6" sx={{ flexGrow: 1, color: 'primary.main', fontWeight: 'bold' }}>
-                  {modeTitle}
-                </Typography>
+              <Toolbar sx={{ flexDirection: { xs: 'column', sm: 'row' }, gap: { xs: 1, sm: 0 }, py: { xs: 1, sm: 0 } }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: { xs: '100%', sm: 'auto' } }}>
+                  <SettingsIcon sx={{ color: 'primary.main', fontSize: { xs: '1.5rem', sm: '2rem' } }} />
+                  <Typography variant="h6" sx={{ flexGrow: 1, color: 'primary.main', fontWeight: 'bold', fontSize: { xs: '1.1rem', sm: '1.25rem' } }}>
+                    {modeTitle}
+                  </Typography>
+                </Box>
 
-                {/* 업데이트 확인 버튼 */}
-                <Button
-                  color="inherit"
-                  startIcon={<UpdateIcon />}
-                  onClick={() => setShowUpdatePopup(true)}
-                  sx={{ mr: 1, border: '1px solid rgba(255,255,255,0.3)' }}
-                >
-                  업데이트 확인
-                </Button>
-
-                {/* 데이터 재빌드 버튼 */}
-                <Button
-                  color="inherit"
-                  startIcon={rebuilding ? <CircularProgress size={20} color="inherit" /> : <BuildIcon />}
-                  onClick={handleRebuildMaster}
-                  disabled={rebuilding}
-                  sx={{ mr: 1, border: '1px solid rgba(255,255,255,0.3)' }}
-                >
-                  {rebuilding ? '빌드 중...' : '데이터 재빌드'}
-                </Button>
-
-                {onModeChange && availableModes && availableModes.length > 1 && (
-                  <Button color="inherit" startIcon={<RefreshIcon />} onClick={onModeChange} sx={{ mr: 2 }}>
-                    모드 변경
+                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', width: { xs: '100%', sm: 'auto' }, justifyContent: { xs: 'flex-end', sm: 'flex-start' } }}>
+                  {/* 업데이트 확인 버튼 */}
+                  <Button
+                    color="inherit"
+                    size={isMobile ? 'small' : 'medium'}
+                    startIcon={<UpdateIcon />}
+                    onClick={() => setShowUpdatePopup(true)}
+                    sx={{ flex: { xs: '1 1 auto', sm: '0 0 auto' }, minWidth: { xs: 'auto', sm: '120px' }, border: '1px solid rgba(255,255,255,0.3)' }}
+                  >
+                    <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>업데이트 확인</Box>
+                    <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>업데이트</Box>
                   </Button>
-                )}
-                <Button color="inherit" onClick={onLogout}>로그아웃</Button>
+
+                  {/* 데이터 재빌드 버튼 */}
+                  <Button
+                    color="inherit"
+                    size={isMobile ? 'small' : 'medium'}
+                    startIcon={rebuilding ? <CircularProgress size={20} color="inherit" /> : <BuildIcon />}
+                    onClick={handleRebuildMaster}
+                    disabled={rebuilding}
+                    sx={{ flex: { xs: '1 1 auto', sm: '0 0 auto' }, minWidth: { xs: 'auto', sm: 'auto' }, border: '1px solid rgba(255,255,255,0.3)' }}
+                  >
+                    <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
+                      {rebuilding ? '빌드 중...' : '데이터 재빌드'}
+                    </Box>
+                    <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>
+                      {rebuilding ? '빌드 중' : '재빌드'}
+                    </Box>
+                  </Button>
+
+                  {onModeChange && availableModes && availableModes.length > 1 && (
+                    <Button 
+                      color="inherit" 
+                      size={isMobile ? 'small' : 'medium'}
+                      startIcon={<RefreshIcon />} 
+                      onClick={onModeChange} 
+                      sx={{ flex: { xs: '1 1 auto', sm: '0 0 auto' }, minWidth: { xs: 'auto', sm: '100px' } }}
+                    >
+                      <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>모드 변경</Box>
+                      <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>모드</Box>
+                    </Button>
+                  )}
+                  <Button 
+                    color="inherit" 
+                    onClick={onLogout}
+                    size={isMobile ? 'small' : 'medium'}
+                    sx={{ flex: { xs: '1 1 auto', sm: '0 0 auto' }, minWidth: { xs: 'auto', sm: '80px' } }}
+                  >
+                    로그아웃
+                  </Button>
+                </Box>
               </Toolbar>
 
               {availableTabs.length > 0 && (
@@ -258,8 +287,17 @@ const DirectStoreManagementMode = ({
                   onChange={handleTabChange}
                   textColor="primary"
                   indicatorColor="primary"
-                  centered
-                  sx={{ borderBottom: 1, borderColor: 'divider' }}
+                  variant="scrollable"
+                  scrollButtons="auto"
+                  sx={{
+                    borderBottom: 1,
+                    borderColor: 'divider',
+                    '& .MuiTab-root': {
+                      fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
+                      minWidth: { xs: 'auto', sm: 'auto' },
+                      px: { xs: 1, sm: 2 }
+                    }
+                  }}
                 >
                   {availableTabs.map((tab, index) => (
                     <Tab
@@ -281,7 +319,7 @@ const DirectStoreManagementMode = ({
               loggedInStore={loggedInStore}
             />
 
-            <Box sx={{ flexGrow: 1, overflow: 'hidden' }}>
+            <Box sx={{ flexGrow: 1, overflow: 'auto', maxHeight: { xs: 'calc(100vh - 200px)', sm: 'none' } }}>
               {availableTabs.map((tab, index) => {
                 let Component = null;
                 if (tab.componentName === 'PolicySettingsTab') {
