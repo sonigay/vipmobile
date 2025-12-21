@@ -6546,6 +6546,11 @@ function setupDirectRoutes(app) {
       // 기존 행 데이터 가져오기
       const existingRow = rows[rowIndex];
       const updatedRow = [...existingRow];
+      
+      // 배열 길이가 부족하면 확장 (36개 컬럼 보장)
+      while (updatedRow.length < 36) {
+        updatedRow.push('');
+      }
 
       // AI 열 (인덱스 34): 버스터미널ID목록
       updatedRow[34] = JSON.stringify(Array.isArray(busTerminalIds) ? busTerminalIds : []);

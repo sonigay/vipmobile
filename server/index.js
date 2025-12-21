@@ -40562,6 +40562,10 @@ app.get('/api/geocode-address', async (req, res) => {
 });
 
 // 대중교통 위치 조회 API (매장별, 캐싱 포함) - ID 기반으로 실제 위치 정보 조회
+// 대중교통 위치 관련 엔드포인트는 server/directRoutes.js로 이동됨
+// 중복 방지를 위해 여기서는 제거 (directRoutes.js의 엔드포인트 사용)
+// 아래 코드는 주석 처리됨 - directRoutes.js의 엔드포인트를 사용하세요
+/*
 const transitLocationCache = new Map();
 const TRANSIT_CACHE_TTL = 5 * 60 * 1000; // 5분
 
@@ -40682,8 +40686,10 @@ app.get('/api/direct/transit-location/list', async (req, res) => {
     });
   }
 });
+*/
 
-// 대중교통 위치 저장 API
+// 대중교통 위치 저장 API (주석 처리됨 - directRoutes.js의 엔드포인트 사용)
+/*
 app.post('/api/direct/transit-location/save', express.json(), async (req, res) => {
   setCORSHeaders(req, res);
   
@@ -40848,6 +40854,7 @@ app.post('/api/direct/transit-location/save', express.json(), async (req, res) =
     });
   }
 });
+*/
 
 // 업체명 정규화 제안 API (관리자 전용)
 app.post('/api/quick-cost/normalize', async (req, res) => {
