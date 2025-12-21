@@ -382,37 +382,38 @@ const DirectStoreMode = ({
                     </Button>
                   </Box>
                 </Toolbar>
-
-                {/* 탭 네비게이션 */}
-                <Tabs
-                  value={activeTab}
-                  onChange={handleTabChange}
-                  textColor="primary"
-                  indicatorColor="primary"
-                  variant="scrollable"
-                  scrollButtons="auto"
-                  sx={{
-                    borderBottom: 1,
-                    borderColor: 'divider',
-                    '& .MuiTab-root': {
-                      fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
-                      minWidth: { xs: 'auto', sm: 'auto' },
-                      px: { xs: 1, sm: 2 }
-                    }
-                  }}
-                >
-                  <Tab label="휴대폰시세표" />
-                  <Tab label="오늘의 휴대폰" />
-                  <Tab label="판매일보" />
-                  <Tab label="구매대기" />
-                  <Tab label="선호구입매장설정" />
-                  <Tab label="게시판" />
-                </Tabs>
               </AppBar>
             )}
 
             {/* 메인 컨텐츠 영역 */}
             <Container maxWidth="xl" sx={{ mt: { xs: 2, sm: 4 }, mb: { xs: 2, sm: 4 }, px: { xs: 1, sm: 2, md: 3 }, flexGrow: 1, position: 'relative', overflow: 'auto', maxHeight: { xs: 'calc(100vh - 200px)', sm: 'none' } }}>
+              {/* 탭 네비게이션 */}
+              {!isFullScreen && (
+                <Paper sx={{ width: '100%', mb: 2, overflow: 'hidden' }}>
+                  <Tabs
+                    value={activeTab}
+                    onChange={handleTabChange}
+                    indicatorColor="primary"
+                    textColor="primary"
+                    variant="scrollable"
+                    scrollButtons="auto"
+                    sx={{
+                      '& .MuiTab-root': {
+                        fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
+                        minWidth: { xs: 'auto', sm: 'auto' },
+                        px: { xs: 1, sm: 2 }
+                      }
+                    }}
+                  >
+                    <Tab label="휴대폰시세표" />
+                    <Tab label="오늘의 휴대폰" />
+                    <Tab label="판매일보" />
+                    <Tab label="구매대기" />
+                    <Tab label="선호구입매장설정" />
+                    <Tab label="게시판" />
+                  </Tabs>
+                </Paper>
+              )}
               {/* 휴대폰 목록 탭 */}
               <Paper sx={{ 
                 p: { xs: activeTab === 0 ? 0 : 2, sm: activeTab === 0 ? 0 : 3 }, 

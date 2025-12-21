@@ -280,35 +280,6 @@ const DirectStoreManagementMode = ({
                   </Button>
                 </Box>
               </Toolbar>
-
-              {availableTabs.length > 0 && (
-                <Tabs
-                  value={Math.min(activeTab, availableTabs.length - 1)}
-                  onChange={handleTabChange}
-                  textColor="primary"
-                  indicatorColor="primary"
-                  variant="scrollable"
-                  scrollButtons="auto"
-                  sx={{
-                    borderBottom: 1,
-                    borderColor: 'divider',
-                    '& .MuiTab-root': {
-                      fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
-                      minWidth: { xs: 'auto', sm: 'auto' },
-                      px: { xs: 1, sm: 2 }
-                    }
-                  }}
-                >
-                  {availableTabs.map((tab, index) => (
-                    <Tab
-                      key={tab.key}
-                      icon={tab.icon}
-                      label={tab.label}
-                      iconPosition="start"
-                    />
-                  ))}
-                </Tabs>
-              )}
             </AppBar>
 
             {/* 업데이트 팝업 */}
@@ -320,6 +291,35 @@ const DirectStoreManagementMode = ({
             />
 
             <Container maxWidth="xl" sx={{ mt: { xs: 2, sm: 4 }, mb: { xs: 2, sm: 4 }, px: { xs: 1, sm: 2, md: 3 }, flexGrow: 1, overflow: 'auto', maxHeight: { xs: 'calc(100vh - 200px)', sm: 'none' } }}>
+              {/* 탭 네비게이션 */}
+              {availableTabs.length > 0 && (
+                <Paper sx={{ width: '100%', mb: 2, overflow: 'hidden' }}>
+                  <Tabs
+                    value={Math.min(activeTab, availableTabs.length - 1)}
+                    onChange={handleTabChange}
+                    indicatorColor="primary"
+                    textColor="primary"
+                    variant="scrollable"
+                    scrollButtons="auto"
+                    sx={{
+                      '& .MuiTab-root': {
+                        fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
+                        minWidth: { xs: 'auto', sm: 'auto' },
+                        px: { xs: 1, sm: 2 }
+                      }
+                    }}
+                  >
+                    {availableTabs.map((tab, index) => (
+                      <Tab
+                        key={tab.key}
+                        icon={tab.icon}
+                        label={tab.label}
+                        iconPosition="start"
+                      />
+                    ))}
+                  </Tabs>
+                </Paper>
+              )}
               {availableTabs.map((tab, index) => {
                 let Component = null;
                 if (tab.componentName === 'PolicySettingsTab') {
