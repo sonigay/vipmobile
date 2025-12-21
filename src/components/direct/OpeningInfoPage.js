@@ -249,11 +249,28 @@ const OpeningInfoPage = ({
                     }
 
                     // 모든 보험상품 목록 저장 (incentive, deduction, description, url 정보 포함)
+                    // 플립/폴드 모델이 아닌 경우 플립/폴드 보험상품은 제외
                     const allInsurances = insuranceList
                         .filter(insurance => {
+                            // 출고가 범위 체크
                             const minPrice = insurance.minPrice || 0;
                             const maxPrice = insurance.maxPrice || 9999999;
-                            return factoryPrice >= minPrice && factoryPrice <= maxPrice;
+                            const isPriceMatch = factoryPrice >= minPrice && factoryPrice <= maxPrice;
+                            
+                            if (!isPriceMatch) return false;
+                            
+                            // 플립/폴드 모델이 아닌 경우 플립/폴드 보험상품 제외
+                            if (!isFlipFoldModel) {
+                                const insuranceName = (insurance.name || '').toString().toLowerCase();
+                                const isFlipFoldInsurance = flipFoldKeywords.some(keyword =>
+                                    insuranceName.includes(keyword.toLowerCase())
+                                );
+                                if (isFlipFoldInsurance) {
+                                    return false; // 플립/폴드 보험상품 제외
+                                }
+                            }
+                            
+                            return true;
                         })
                         .map(insurance => ({
                             name: insurance.name,
@@ -476,7 +493,57 @@ const OpeningInfoPage = ({
     }, [installmentPrincipal, formData.cashPrice]);
 
     const handlePrint = () => {
-        window.print();
+        // 인쇄 전에 내용의 높이를 측정하여 A4 용지에 맞게 zoom 값 계산
+        const printArea = document.querySelector('.print-area');
+        if (printArea) {
+            // 인쇄 모드 전환 전 원본 크기 측정
+            const originalZoom = document.querySelector('.print-root')?.style.zoom || '1';
+            
+            // 임시로 zoom을 1로 설정하여 실제 높이 측정
+            const printRoot = document.querySelector('.print-root');
+            if (printRoot) {
+                printRoot.style.zoom = '1';
+                
+                // 리플로우를 위해 약간의 지연
+                setTimeout(() => {
+                    const contentHeight = printArea.scrollHeight;
+                    
+                    // A4 용지 크기 (마진 5mm 제외)
+                    // A4: 210mm x 297mm, 마진 5mm씩이면 실제 사용 가능: 200mm x 287mm
+                    // 96 DPI 기준: 1mm = 3.7795px
+                    // 실제 사용 가능 높이: 287mm * 3.7795 = 약 1084px
+                    // 하지만 브라우저마다 다를 수 있으므로 약간의 여유를 두고 1000px로 설정
+                    const a4Height = 1000; // A4 용지 사용 가능 높이 (px)
+                    
+                    // zoom 값 계산 (내용이 A4 한 장에 들어오도록)
+                    let calculatedZoom = a4Height / contentHeight;
+                    
+                    // 최소/최대 zoom 값 제한 (너무 작거나 크면 가독성 저하)
+                    calculatedZoom = Math.max(0.3, Math.min(0.8, calculatedZoom));
+                    
+                    // 계산된 zoom 값 적용
+                    if (printRoot) {
+                        printRoot.style.zoom = calculatedZoom.toString();
+                    }
+                    
+                    // 인쇄 실행
+                    setTimeout(() => {
+                        window.print();
+                        
+                        // 인쇄 후 원래 상태로 복원
+                        setTimeout(() => {
+                            if (printRoot) {
+                                printRoot.style.zoom = originalZoom;
+                            }
+                        }, 100);
+                    }, 100);
+                }, 50);
+            } else {
+                window.print();
+            }
+        } else {
+            window.print();
+        }
     };
 
     const handleComplete = async () => {
@@ -662,6 +729,7 @@ const OpeningInfoPage = ({
                     }
 
                     /* 전체 래퍼: 내용이 A4 한 장에 들어오도록 축소 (Zoom/Scale) */
+                    /* zoom 값은 handlePrint 함수에서 동적으로 계산되어 적용됨 */
                     .opening-wrapper, .print-root {
                         height: auto !important;
                         overflow: visible !important;
@@ -670,11 +738,11 @@ const OpeningInfoPage = ({
                         width: 100% !important;
                         max-width: 100% !important;
                         
-                        /* 기본: 모든 모드에서 한 장에 맞도록 55% 수준으로 출력 (부가서비스 설명 추가로 인한 조정) */
+                        /* 기본값: 동적 계산 전 기본 zoom (인쇄 시 handlePrint에서 재계산) */
                         zoom: 0.55; 
                     }
 
-                    /* 고객모드도 동일하게 55% 유지 */
+                    /* 고객모드도 동일하게 처리 */
                     .print-root.mode-customer {
                         zoom: 0.55; 
                     }
