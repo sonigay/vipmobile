@@ -162,16 +162,27 @@ function MapUpdater({ center, bounds, zoom, isAgentMode, currentView, forceZoomT
       if (currentView === 'activation') return 12; // 담당개통확인
       return 10; // 기본값
     }
-    // 고객모드 또는 직영점관리모드에서 위치 정보 실패 시 평택 중심 보기 (인천과 청주지역까지 보이도록)
-    if ((isCustomerMode || (!isCustomerMode && !isAgentMode && !loggedInStore?.coords)) && 
-        center && center.isDefault) {
-      return 6; // 평택 중심으로 인천과 청주지역까지 보이는 줌 레벨
+    // 고객모드: 위치 정보에 따라 줌 레벨 설정
+    if (isCustomerMode) {
+      if (center && center.isDefault) {
+        return 9; // 위치 정보 실패 시: 평택 중심으로 인천과 청주지역까지 보이는 줌 레벨
+      }
+      // 위치 정보 성공 시: 사용자 위치 중심으로 줌 레벨 14
+      return 14;
     }
     // 직영점모드: 접속 매장 중심 (줌 레벨 14)
     if (loggedInStore?.coords?.lat && loggedInStore?.coords?.lng) {
       return 14;
     }
-    return 12; // 일반 매장 모드
+    // 직영점관리모드: 위치 정보에 따라 줌 레벨 설정
+    if (!isCustomerMode && !isAgentMode) {
+      if (center && center.isDefault) {
+        return 9; // 위치 정보 실패 시: 평택 중심으로 인천과 청주지역까지 보이는 줌 레벨
+      }
+      // 위치 정보 성공 시: 사용자 위치 중심으로 줌 레벨 14
+      return 14;
+    }
+    return 12; // 기본값
   };
 
   useEffect(() => {
@@ -443,23 +454,27 @@ ${loggedInStore.name}으로 이동 예정입니다.
       if (currentView === 'activation') return 10; // 담당개통확인: 중간 시야
       return 6; // 기본값: 전체재고확인과 동일
     }
-    // 고객모드: userLocation이 없거나 isDefault일 때 평택 중심 보기 (인천과 청주지역까지 보이도록)
+    // 고객모드: 위치 정보에 따라 줌 레벨 설정
     if (isCustomerMode) {
       if (!userLocation || (userLocation && userLocation.isDefault)) {
-        return 6; // 평택 중심으로 인천과 청주지역까지 보이는 줌 레벨
+        return 9; // 위치 정보 실패 시: 평택 중심으로 인천과 청주지역까지 보이는 줌 레벨
       }
-    }
-    // 직영점관리모드: userLocation이 없거나 isDefault일 때 평택 중심 보기
-    if (!isCustomerMode && !isAgentMode && !loggedInStore?.coords) {
-      if (!userLocation || (userLocation && userLocation.isDefault)) {
-        return 6; // 평택 중심으로 인천과 청주지역까지 보이는 줌 레벨
-      }
+      // 위치 정보 성공 시: 사용자 위치 중심으로 줌 레벨 14
+      return 14;
     }
     // 직영점모드: 접속 매장 중심 (줌 레벨 14)
     if (loggedInStore?.coords?.lat && loggedInStore?.coords?.lng) {
       return 14;
     }
-    return 12; // 일반 매장 모드
+    // 직영점관리모드: 위치 정보에 따라 줌 레벨 설정
+    if (!isCustomerMode && !isAgentMode) {
+      if (!userLocation || (userLocation && userLocation.isDefault)) {
+        return 9; // 위치 정보 실패 시: 평택 중심으로 인천과 청주지역까지 보이는 줌 레벨
+      }
+      // 위치 정보 성공 시: 사용자 위치 중심으로 줌 레벨 14
+      return 14;
+    }
+    return 12; // 기본값
   };
 
   // 초기 줌 레벨 계산 (userLocation이 변경될 때마다 재계산)
