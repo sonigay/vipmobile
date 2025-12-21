@@ -1190,6 +1190,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
           currentView={currentView}
           forceZoomToStore={forceZoomToStore}
           isCustomerMode={isCustomerMode}
+          loggedInStore={loggedInStore}
         />
 
         {/* 강제 확대 업데이트 */}
