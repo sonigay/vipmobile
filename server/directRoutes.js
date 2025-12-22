@@ -152,7 +152,7 @@ function logWarningOnce(key, message, data = {}) {
 
 // Rate limiting을 위한 마지막 요청 시간 추적
 let lastApiCallTime = 0;
-const MIN_API_INTERVAL_MS = 100; // 최소 100ms 간격으로 API 호출
+const MIN_API_INTERVAL_MS = 250; // 최소 250ms 간격으로 API 호출 (Google Sheets API 분당 60회 제한 고려)
 
 function getCache(key) {
   const entry = cacheStore.get(key);
@@ -597,12 +597,11 @@ async function rebuildDeviceMaster(carriersParam) {
     }
 
     // 3. 실제 모델 데이터 읽기
-    const [models, petNames, makers, prices] = await Promise.all([
-      getSheetData(sheetId, modelRange),
-      petNameRange ? getSheetData(sheetId, petNameRange) : Promise.resolve([]),
-      makerRange ? getSheetData(sheetId, makerRange) : Promise.resolve([]), // 제조사 범위가 있다면
-      factoryPriceRange ? getSheetData(sheetId, factoryPriceRange) : Promise.resolve([])
-    ]);
+    // Rate Limit 방지를 위해 순차 처리로 변경 (Promise.all 대신)
+    const models = await getSheetData(sheetId, modelRange);
+    const petNames = petNameRange ? await getSheetData(sheetId, petNameRange) : [];
+    const makers = makerRange ? await getSheetData(sheetId, makerRange) : []; // 제조사 범위가 있다면
+    const prices = factoryPriceRange ? await getSheetData(sheetId, factoryPriceRange) : [];
 
     const flatModels = models.flat().map(v => (v || '').toString().trim());
     const flatPets = petNames.flat().map(v => (v || '').toString().trim());
@@ -2130,13 +2129,23 @@ function setupDirectRoutes(app) {
   router.get('/policy-settings', async (req, res) => {
     try {
       const carrier = req.query.carrier || 'SK';
+      
+      // 캐시 확인
+      const cacheKey = `policy-settings-${carrier}`;
+      const cached = getCache(cacheKey);
+      if (cached) {
+        return res.json(cached);
+      }
+
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
 
       // 마진 설정 읽기
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_MARGIN, HEADERS_POLICY_MARGIN);
-      const marginRes = await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: SHEET_POLICY_MARGIN
+      const marginRes = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: SHEET_POLICY_MARGIN
+        });
       });
       const marginRows = (marginRes.data.values || []).slice(1);
       const marginRow = marginRows.find(row => (row[0] || '').trim() === carrier);
@@ -2144,9 +2153,11 @@ function setupDirectRoutes(app) {
 
       // 부가서비스 설정 읽기
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_ADDON, HEADERS_POLICY_ADDON);
-      const addonRes = await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: SHEET_POLICY_ADDON
+      const addonRes = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: SHEET_POLICY_ADDON
+        });
       });
       const addonRows = (addonRes.data.values || []).slice(1);
       const addons = addonRows
@@ -2163,9 +2174,11 @@ function setupDirectRoutes(app) {
 
       // 보험상품 설정 읽기
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_INSURANCE, HEADERS_POLICY_INSURANCE);
-      const insuranceRes = await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: SHEET_POLICY_INSURANCE
+      const insuranceRes = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: SHEET_POLICY_INSURANCE
+        });
       });
       const insuranceRows = (insuranceRes.data.values || []).slice(1);
       const insurances = insuranceRows
@@ -2184,9 +2197,11 @@ function setupDirectRoutes(app) {
 
       // 별도 정책 설정 읽기
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_SPECIAL, HEADERS_POLICY_SPECIAL);
-      const specialRes = await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: SHEET_POLICY_SPECIAL
+      const specialRes = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: SHEET_POLICY_SPECIAL
+        });
       });
       const specialRows = (specialRes.data.values || []).slice(1);
       const specialPolicies = specialRows
@@ -2199,13 +2214,18 @@ function setupDirectRoutes(app) {
           isActive: (row[4] || '').toString().toLowerCase() === 'true' || (row[4] || '').toString() === '1'
         }));
 
-      res.json({
+      const result = {
         success: true,
         margin: { baseMargin: margin },
         addon: { list: addons },
         insurance: { list: insurances },
         special: { list: specialPolicies }
-      });
+      };
+      
+      // 캐시 저장 (5분)
+      setCache(cacheKey, result, 5 * 60 * 1000);
+      
+      res.json(result);
     } catch (error) {
       console.error('[Direct] policy-settings GET error:', error);
       res.status(500).json({ success: false, error: '정책 설정 조회 실패', message: error.message });
@@ -4626,47 +4646,68 @@ function setupDirectRoutes(app) {
       const carrier = req.query.carrier || 'SK';
       const includeMeta = req.query.meta === '1';
       
-      // 정책표 모델 순서 해시 계산 (변경 감지용)
-      let policyOrderHash = '';
-      try {
-        const { sheets, SPREADSHEET_ID } = createSheetsClient();
-        await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_SETTINGS, HEADERS_SETTINGS);
-        const settingsRes = await sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: SHEET_SETTINGS
-        });
-        const settingsRows = (settingsRes.data.values || []).slice(1);
-        const policyRow = settingsRows.find(row => (row[0] || '').trim() === carrier && (row[1] || '').trim() === 'policy');
-        if (policyRow && policyRow[2] && policyRow[4]) {
-          const policySheetId = policyRow[2].trim();
-          const policySettingsJson = JSON.parse(policyRow[4] || '{}');
-          const modelRange = policySettingsJson.modelRange || '';
-          if (modelRange) {
-            const modelRes = await sheets.spreadsheets.values.get({
-              spreadsheetId: policySheetId,
-              range: modelRange,
-              majorDimension: 'ROWS',
-              valueRenderOption: 'UNFORMATTED_VALUE'
-            });
-            const modelRows = (modelRes.data.values || []);
-            // 모델 순서를 문자열로 변환하여 해시 생성
-            const modelOrderStr = modelRows.map(row => (row[0] || '').toString().trim()).join('|');
-            // 간단한 해시 생성 (crypto 모듈 없이)
-            let hash = 0;
-            for (let i = 0; i < modelOrderStr.length; i++) {
-              const char = modelOrderStr.charCodeAt(i);
-              hash = ((hash << 5) - hash) + char;
-              hash = hash & hash; // 32bit 정수로 변환
-            }
-            policyOrderHash = Math.abs(hash).toString(36);
-          }
-        }
-      } catch (err) {
-        console.warn('[Direct] 정책표 순서 해시 계산 실패 (캐시 무효화 안됨):', err.message);
-      }
-      
       // 🔥 캐시 버전: 버그 수정 시 버전을 올려서 이전 캐시 무효화
       const MOBILES_CACHE_VERSION = 'v6'; // v6: 직영점_단말마스터 순서 기준 정렬 추가
+      
+      // 정책표 모델 순서 해시 계산 (변경 감지용) - 캐시 우선 확인
+      const policyHashCacheKey = `policy-hash-${carrier}`;
+      let policyOrderHash = getCache(policyHashCacheKey) || '';
+      
+      // 캐시에 없거나 Rate Limit 에러가 아닌 경우에만 계산
+      if (!policyOrderHash) {
+        try {
+          const { sheets, SPREADSHEET_ID } = createSheetsClient();
+          await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_SETTINGS, HEADERS_SETTINGS);
+          const settingsRes = await withRetry(async () => {
+            return await sheets.spreadsheets.values.get({
+              spreadsheetId: SPREADSHEET_ID,
+              range: SHEET_SETTINGS
+            });
+          });
+          const settingsRows = (settingsRes.data.values || []).slice(1);
+          const policyRow = settingsRows.find(row => (row[0] || '').trim() === carrier && (row[1] || '').trim() === 'policy');
+          if (policyRow && policyRow[2] && policyRow[4]) {
+            const policySheetId = policyRow[2].trim();
+            const policySettingsJson = JSON.parse(policyRow[4] || '{}');
+            const modelRange = policySettingsJson.modelRange || '';
+            if (modelRange) {
+              const modelRes = await withRetry(async () => {
+                return await sheets.spreadsheets.values.get({
+                  spreadsheetId: policySheetId,
+                  range: modelRange,
+                  majorDimension: 'ROWS',
+                  valueRenderOption: 'UNFORMATTED_VALUE'
+                });
+              });
+              const modelRows = (modelRes.data.values || []);
+              // 모델 순서를 문자열로 변환하여 해시 생성
+              const modelOrderStr = modelRows.map(row => (row[0] || '').toString().trim()).join('|');
+              // 간단한 해시 생성 (crypto 모듈 없이)
+              let hash = 0;
+              for (let i = 0; i < modelOrderStr.length; i++) {
+                const char = modelOrderStr.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash; // 32bit 정수로 변환
+              }
+              policyOrderHash = Math.abs(hash).toString(36);
+              // 해시 결과를 캐시에 저장 (5분)
+              setCache(policyHashCacheKey, policyOrderHash, 5 * 60 * 1000);
+            }
+          }
+        } catch (err) {
+          console.warn('[Direct] 정책표 순서 해시 계산 실패:', err.message);
+          // Rate Limit 에러가 아닌 경우에만 경고
+          const isRateLimitError = err.code === 429 || (err.response && err.response.status === 429) ||
+            (err.message && err.message.includes('Quota exceeded')) ||
+            (err.message && err.message.includes('rateLimitExceeded'));
+          if (!isRateLimitError) {
+            console.warn('[Direct] 정책표 순서 해시 계산 실패 (캐시 무효화 안됨):', err.message);
+          }
+          // 해시 계산 실패 시 기본값 사용 (빈 문자열)
+          policyOrderHash = '';
+        }
+      }
+      
       const cacheKey = `mobiles-${carrier}-${MOBILES_CACHE_VERSION}-${policyOrderHash}`;
       const cached = getCache(cacheKey);
       if (cached) {
@@ -4695,6 +4736,27 @@ function setupDirectRoutes(app) {
 
       // Rate limit 에러인 경우 처리
       if (mobileListResult && typeof mobileListResult === 'object' && mobileListResult.__rateLimitError) {
+        // Rate Limit 에러 발생 시 캐시된 데이터가 있으면 반환 (최신 데이터는 아니지만 사용자 경험 개선)
+        if (cached) {
+          console.warn(`[Direct] Rate Limit 에러 발생, 캐시된 데이터 반환 (통신사: ${carrier})`);
+          if (includeMeta) {
+            return res.json({
+              data: cached,
+              meta: {
+                carrier,
+                count: cached.length || 0,
+                empty: (cached.length || 0) === 0,
+                cached: true,
+                timestamp: Date.now(),
+                rateLimitError: true,
+                warning: 'Google Sheets API 할당량 초과로 캐시된 데이터를 반환합니다.'
+              }
+            });
+          }
+          return res.json(cached);
+        }
+        
+        // 캐시도 없으면 에러 메시지 반환
         const errorMsg = 'Google Sheets API 할당량 초과로 데이터를 가져올 수 없습니다. 잠시 후 다시 시도해주세요.';
         if (includeMeta) {
           return res.json({
