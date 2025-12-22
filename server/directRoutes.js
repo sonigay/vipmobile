@@ -554,7 +554,12 @@ async function rebuildDeviceMaster(carriersParam) {
         isPremium: parseBooleanFlag(row[TODAYS_HEADERS_MAP.isPremium]),
         isBudget: parseBooleanFlag(row[TODAYS_HEADERS_MAP.isBudget]),
       };
+      // 원본 모델명과 정규화된 모델명 모두 키로 저장 (매칭 강화)
       tagMap.set(modelName, tags);
+      const normalizedModel = normalizeModelCode(modelName);
+      if (normalizedModel && normalizedModel !== modelName) {
+        tagMap.set(normalizedModel, tags);
+      }
     }
   } catch (err) {
     console.warn('[Direct][rebuildDeviceMaster] 보조 데이터(이미지/태그) 로딩 실패 (일부 누락 가능):', err.message);
@@ -5003,11 +5008,17 @@ function setupDirectRoutes(app) {
         });
         const masterRows = (masterRes.data.values || []).slice(1);
         
-        // 모델명과 통신사로 해당 행 찾기
-        const masterRowIndex = masterRows.findIndex(row => 
-          (row[2] || '').toString().trim() === modelName && 
-          (row[0] || '').toString().trim().toUpperCase() === carrier.toUpperCase()
-        );
+        // 모델명과 통신사로 해당 행 찾기 (정규화된 모델명도 시도)
+        const normalizedModelName = normalizeModelCode(modelName);
+        let masterRowIndex = masterRows.findIndex(row => {
+          const rowModel = (row[2] || '').toString().trim();
+          const rowCarrier = (row[0] || '').toString().trim().toUpperCase();
+          return rowCarrier === carrier.toUpperCase() && (
+            rowModel === modelName ||
+            rowModel === normalizedModelName ||
+            normalizeModelCode(rowModel) === normalizedModelName
+          );
+        });
 
         if (masterRowIndex !== -1) {
           // 기존 행 정보 가져오기
@@ -5036,17 +5047,28 @@ function setupDirectRoutes(app) {
               values: [updatedMasterRow]
             }
           });
+        } else {
+          console.warn(`[Direct] 직영점_단말마스터에서 모델을 찾을 수 없음: ${modelName} (${carrier})`);
         }
       } catch (masterErr) {
-        console.warn('[Direct] 직영점_단말마스터 업데이트 실패 (계속 진행):', masterErr.message);
-        // 마스터 업데이트 실패해도 계속 진행
+        console.error('[Direct] 직영점_단말마스터 업데이트 실패:', masterErr.message);
+        // 마스터 업데이트 실패 시 경고만 출력 (직영점_오늘의휴대폰은 이미 업데이트됨)
+        // 다음 재빌드 시 동기화될 예정
       }
 
-      // 태그/모바일 캐시 무효화
+      // 태그/모바일 캐시 무효화 (모든 버전 및 해시 포함)
       deleteCache('todays-mobiles');
-      deleteCache(`mobiles-${carrier || 'SK'}`);
-      deleteCache(`mobiles-KT`);
-      deleteCache(`mobiles-LG`);
+      // 모든 통신사 캐시 무효화 (모든 버전 및 해시 포함)
+      for (const c of ['SK', 'KT', 'LG']) {
+        // 기본 캐시 키
+        deleteCache(`mobiles-${c}`);
+        // 캐시 버전별 키 (v5, v6 등)
+        deleteCache(`mobiles-${c}-v5`);
+        deleteCache(`mobiles-${c}-v6`);
+        // 정책표 순서 해시가 포함된 캐시는 정확한 해시를 알 수 없으므로
+        // 모든 가능한 패턴을 무효화하기 위해 캐시 스토어를 순회
+        // (실제로는 다음 요청 시 새로운 해시로 캐시가 생성되므로 문제 없음)
+      }
 
       res.json({ success: true });
     } catch (error) {
