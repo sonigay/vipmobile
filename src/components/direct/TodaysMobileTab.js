@@ -391,7 +391,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
   useEffect(() => {
     const handleImageUploaded = (event) => {
       console.log('🔄 [오늘의휴대폰] 이미지 업로드 이벤트 수신, 재로딩...');
-      setTimeout(() => fetchData(), 2000); // 2초 후 재로딩
+      setTimeout(() => fetchData(), 3000); // 3초 후 재로딩 (서버 처리 시간 확보)
     };
     window.addEventListener('imageUploaded', handleImageUploaded);
     return () => window.removeEventListener('imageUploaded', handleImageUploaded);
