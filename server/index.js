@@ -6692,10 +6692,10 @@ app.post('/api/direct/refresh-mobile-image-url', express.json(), async (req, res
     // 직영점_모델이미지 시트에서 해당 행 찾기 및 업데이트
     const { HEADERS_MOBILE_IMAGES } = require('./directRoutes');
     const { ensureSheetHeaders } = require('./directRoutes');
-    await ensureSheetHeaders(sheets, SPREADSHEET_ID, '직영점_모델이미지', HEADERS_MOBILE_IMAGES);
+    await ensureSheetHeaders(originalSheets, SPREADSHEET_ID, '직영점_모델이미지', HEADERS_MOBILE_IMAGES);
     
     const imageResponse = await rateLimitedSheetsCall(() =>
-      sheets.spreadsheets.values.get({
+      originalSheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
         range: '직영점_모델이미지!A:K'
       })
@@ -6744,7 +6744,7 @@ app.post('/api/direct/refresh-mobile-image-url', express.json(), async (req, res
     updatedRow[5] = newImageUrl; // F: 이미지URL
     
     await rateLimitedSheetsCall(() =>
-      sheets.spreadsheets.values.update({
+      originalSheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
         range: `직영점_모델이미지!A${existingRowIndex + 2}:K${existingRowIndex + 2}`,
         valueInputOption: 'USER_ENTERED',
@@ -6788,10 +6788,10 @@ app.post('/api/direct/refresh-master-image-url', express.json(), async (req, res
     // 직영점_단말마스터 시트에서 해당 행 찾기 및 업데이트
     const { HEADERS_MOBILE_MASTER } = require('./directRoutes');
     const { ensureSheetHeaders } = require('./directRoutes');
-    await ensureSheetHeaders(sheets, SPREADSHEET_ID, '직영점_단말마스터', HEADERS_MOBILE_MASTER);
+    await ensureSheetHeaders(originalSheets, SPREADSHEET_ID, '직영점_단말마스터', HEADERS_MOBILE_MASTER);
     
     const masterResponse = await rateLimitedSheetsCall(() =>
-      sheets.spreadsheets.values.get({
+      originalSheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
         range: '직영점_단말마스터!A:R'
       })
@@ -6840,7 +6840,7 @@ app.post('/api/direct/refresh-master-image-url', express.json(), async (req, res
     updatedRow[12] = newImageUrl; // M: 이미지URL
     
     await rateLimitedSheetsCall(() =>
-      sheets.spreadsheets.values.update({
+      originalSheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
         range: `직영점_단말마스터!A${existingRowIndex + 2}:R${existingRowIndex + 2}`,
         valueInputOption: 'USER_ENTERED',
@@ -6883,7 +6883,7 @@ app.post('/api/direct/refresh-store-photo-url', express.json(), async (req, res)
     
     // 직영점_매장사진 시트에서 해당 행 찾기 및 업데이트
     const { ensureSheetHeaders } = require('./directRoutes');
-    await ensureSheetHeaders(sheets, SPREADSHEET_ID, CUSTOMER_STORE_PHOTO_SHEET_NAME, HEADERS_STORE_PHOTO);
+    await ensureSheetHeaders(originalSheets, SPREADSHEET_ID, CUSTOMER_STORE_PHOTO_SHEET_NAME, HEADERS_STORE_PHOTO);
     
     const values = await getSheetValues(CUSTOMER_STORE_PHOTO_SHEET_NAME);
     const rowIndex = values ? values.findIndex(row => row[0] === storeName) : -1;
@@ -6928,9 +6928,9 @@ app.post('/api/direct/refresh-store-photo-url', express.json(), async (req, res)
     updatedRow[33] = new Date().toISOString().replace('T', ' ').substring(0, 19);
     
     await rateLimitedSheetsCall(() =>
-      sheets.spreadsheets.values.update({
+      originalSheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
-              range: `${CUSTOMER_STORE_PHOTO_SHEET_NAME}!A${rowIndex + 1}:AJ${rowIndex + 1}`,
+        range: `${CUSTOMER_STORE_PHOTO_SHEET_NAME}!A${rowIndex + 1}:AJ${rowIndex + 1}`,
         valueInputOption: 'USER_ENTERED',
         resource: { values: [updatedRow] }
       })
@@ -7148,34 +7148,254 @@ app.post('/api/discord/batch-refresh-urls', express.json(), async (req, res) => 
         const refreshResult = await refreshDiscordImageUrl(threadId, messageId);
         const newImageUrl = refreshResult.imageUrl;
         
-        // 타입에 따라 적절한 API 호출
+        // 타입에 따라 직접 로직 호출 (내부 fetch 대신)
         if (type === 'mobile-image') {
           const { carrier, modelId, modelName } = item;
-          const refreshRes = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/direct/refresh-mobile-image-url`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ carrier, modelId, modelName, threadId, messageId })
-          });
-          const refreshData = await refreshRes.json();
-          results.push({ ...refreshData, type, item });
+          try {
+            // Discord에서 최신 URL 가져오기
+            const refreshResult = await refreshDiscordImageUrl(threadId, messageId);
+            const newImageUrl = refreshResult.imageUrl;
+            
+            // 직영점_모델이미지 시트에서 해당 행 찾기 및 업데이트
+            const { HEADERS_MOBILE_IMAGES } = require('./directRoutes');
+            const { ensureSheetHeaders } = require('./directRoutes');
+            await ensureSheetHeaders(originalSheets, SPREADSHEET_ID, '직영점_모델이미지', HEADERS_MOBILE_IMAGES);
+            
+            const imageResponse = await rateLimitedSheetsCall(() =>
+              originalSheets.spreadsheets.values.get({
+                spreadsheetId: SPREADSHEET_ID,
+                range: '직영점_모델이미지!A:K'
+              })
+            );
+            
+            const imageValues = imageResponse.data.values || [];
+            const rows = imageValues.slice(1);
+            
+            // 모델명 정규화 함수
+            const normalizeModelCode = (code) => {
+              if (!code) return '';
+              return code.trim().replace(/\s+/g, '').replace(/-/g, '').toUpperCase();
+            };
+            
+            const normalizedModelId = normalizeModelCode(modelId);
+            const normalizedModelName = normalizeModelCode(modelName);
+            
+            const existingRowIndex = rows.findIndex(row => {
+              const rowCarrier = (row[0] || '').trim();
+              const rowModelId = (row[1] || '').trim();
+              const rowModelName = (row[2] || '').trim();
+              
+              if (rowCarrier !== carrier) return false;
+              
+              const normalizedRowModelId = normalizeModelCode(rowModelId);
+              const normalizedRowModelName = normalizeModelCode(rowModelName);
+              
+              return (normalizedRowModelId === normalizedModelId || normalizedRowModelId === normalizedModelName ||
+                normalizedRowModelName === normalizedModelId || normalizedRowModelName === normalizedModelName ||
+                rowModelId === modelId || rowModelName === modelName);
+            });
+            
+            if (existingRowIndex === -1) {
+              throw new Error('해당 모델을 찾을 수 없습니다.');
+            }
+            
+            // 기존 행 업데이트 (이미지 URL만 갱신)
+            const existingRow = rows[existingRowIndex];
+            const updatedRow = [...existingRow];
+            while (updatedRow.length < 11) {
+              updatedRow.push('');
+            }
+            updatedRow[5] = newImageUrl; // F: 이미지URL
+            
+            await rateLimitedSheetsCall(() =>
+              originalSheets.spreadsheets.values.update({
+                spreadsheetId: SPREADSHEET_ID,
+                range: `직영점_모델이미지!A${existingRowIndex + 2}:K${existingRowIndex + 2}`,
+                valueInputOption: 'USER_ENTERED',
+                resource: { values: [updatedRow] }
+              })
+            );
+            
+            console.log(`✅ [배치 갱신] 직영점_모델이미지 업데이트 완료: ${carrier} - ${modelId}`);
+            
+            results.push({
+              success: true,
+              imageUrl: newImageUrl,
+              messageId: refreshResult.messageId,
+              threadId: refreshResult.threadId,
+              type,
+              item
+            });
+          } catch (err) {
+            console.error(`❌ [배치 갱신] 직영점_모델이미지 갱신 오류: ${carrier} - ${modelId}`, err);
+            results.push({
+              success: false,
+              error: err.message,
+              type,
+              item
+            });
+          }
         } else if (type === 'master-image') {
           const { carrier, modelId, modelName } = item;
-          const refreshRes = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/direct/refresh-master-image-url`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ carrier, modelId, modelName, threadId, messageId })
-          });
-          const refreshData = await refreshRes.json();
-          results.push({ ...refreshData, type, item });
+          try {
+            // Discord에서 최신 URL 가져오기
+            const refreshResult = await refreshDiscordImageUrl(threadId, messageId);
+            const newImageUrl = refreshResult.imageUrl;
+            
+            // 직영점_단말마스터 시트에서 해당 행 찾기 및 업데이트
+            const { HEADERS_MOBILE_MASTER } = require('./directRoutes');
+            const { ensureSheetHeaders } = require('./directRoutes');
+            await ensureSheetHeaders(originalSheets, SPREADSHEET_ID, '직영점_단말마스터', HEADERS_MOBILE_MASTER);
+            
+            const masterResponse = await rateLimitedSheetsCall(() =>
+              originalSheets.spreadsheets.values.get({
+                spreadsheetId: SPREADSHEET_ID,
+                range: '직영점_단말마스터!A:R'
+              })
+            );
+            
+            const masterValues = masterResponse.data.values || [];
+            const masterRows = masterValues.slice(1);
+            
+            // 모델명 정규화 함수
+            const normalizeModelCode = (code) => {
+              if (!code) return '';
+              return code.trim().replace(/\s+/g, '').replace(/-/g, '').toUpperCase();
+            };
+            
+            const normalizedModelId = normalizeModelCode(modelId);
+            const normalizedModelName = normalizeModelCode(modelName);
+            
+            const existingRowIndex = masterRows.findIndex(row => {
+              const rowCarrier = (row[0] || '').trim();
+              const rowModelId = (row[1] || '').trim();
+              const rowModelName = (row[2] || '').trim();
+              
+              if (rowCarrier !== carrier) return false;
+              
+              const normalizedRowModelId = normalizeModelCode(rowModelId);
+              const normalizedRowModelName = normalizeModelCode(rowModelName);
+              
+              return (normalizedRowModelId === normalizedModelId || normalizedRowModelId === normalizedModelName ||
+                normalizedRowModelName === normalizedModelId || normalizedRowModelName === normalizedModelName ||
+                rowModelId === modelId || rowModelName === modelName);
+            });
+            
+            if (existingRowIndex === -1) {
+              throw new Error('해당 모델을 찾을 수 없습니다.');
+            }
+            
+            // 기존 행 업데이트 (이미지 URL만 갱신)
+            const existingRow = masterRows[existingRowIndex];
+            const updatedRow = [...existingRow];
+            while (updatedRow.length < 18) {
+              updatedRow.push('');
+            }
+            updatedRow[12] = newImageUrl; // M: 이미지URL
+            
+            await rateLimitedSheetsCall(() =>
+              originalSheets.spreadsheets.values.update({
+                spreadsheetId: SPREADSHEET_ID,
+                range: `직영점_단말마스터!A${existingRowIndex + 2}:R${existingRowIndex + 2}`,
+                valueInputOption: 'USER_ENTERED',
+                resource: { values: [updatedRow] }
+              })
+            );
+            
+            console.log(`✅ [배치 갱신] 직영점_단말마스터 업데이트 완료: ${carrier} - ${modelId}`);
+            
+            results.push({
+              success: true,
+              imageUrl: newImageUrl,
+              messageId: refreshResult.messageId,
+              threadId: refreshResult.threadId,
+              type,
+              item
+            });
+          } catch (err) {
+            console.error(`❌ [배치 갱신] 직영점_단말마스터 갱신 오류: ${carrier} - ${modelId}`, err);
+            results.push({
+              success: false,
+              error: err.message,
+              type,
+              item
+            });
+          }
         } else if (type === 'store-photo') {
           const { storeName, photoType } = item;
-          const refreshRes = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/direct/refresh-store-photo-url`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ storeName, photoType, threadId, messageId })
-          });
-          const refreshData = await refreshRes.json();
-          results.push({ ...refreshData, type, item });
+          try {
+            // Discord에서 최신 URL 가져오기
+            const refreshResult = await refreshDiscordImageUrl(threadId, messageId);
+            const newImageUrl = refreshResult.imageUrl;
+            
+            // 직영점_매장사진 시트에서 해당 행 찾기 및 업데이트
+            const { ensureSheetHeaders } = require('./directRoutes');
+            await ensureSheetHeaders(originalSheets, SPREADSHEET_ID, CUSTOMER_STORE_PHOTO_SHEET_NAME, HEADERS_STORE_PHOTO);
+            
+            const values = await getSheetValues(CUSTOMER_STORE_PHOTO_SHEET_NAME);
+            const rowIndex = values ? values.findIndex(row => row[0] === storeName) : -1;
+            
+            if (rowIndex === -1) {
+              throw new Error('해당 매장을 찾을 수 없습니다.');
+            }
+            
+            // photoType에 따른 컬럼 인덱스 매핑
+            const photoTypeMap = {
+              front: { url: 1, msgId: 2, postId: 3, threadId: 4 },
+              inside: { url: 5, msgId: 6, postId: 7, threadId: 8 },
+              outside: { url: 9, msgId: 10, postId: 11, threadId: 12 },
+              outside2: { url: 13, msgId: 14, postId: 15, threadId: 16 },
+              manager: { url: 17, msgId: 18, postId: 19, threadId: 20 },
+              staff1: { url: 21, msgId: 22, postId: 23, threadId: 24 },
+              staff2: { url: 25, msgId: 26, postId: 27, threadId: 28 },
+              staff3: { url: 29, msgId: 30, postId: 31, threadId: 32 }
+            };
+            
+            const photoMap = photoTypeMap[photoType];
+            if (!photoMap) {
+              throw new Error('알 수 없는 photoType입니다.');
+            }
+            
+            // 기존 행 업데이트
+            const existingRow = values[rowIndex];
+            const updatedRow = [...existingRow];
+            while (updatedRow.length < 34) {
+              updatedRow.push('');
+            }
+            updatedRow[photoMap.url] = newImageUrl;
+            updatedRow[photoMap.msgId] = refreshResult.messageId || '';
+            updatedRow[photoMap.postId] = refreshResult.postId || '';
+            updatedRow[photoMap.threadId] = refreshResult.threadId || '';
+            updatedRow[33] = new Date().toISOString().replace('T', ' ').substring(0, 19);
+            
+            await rateLimitedSheetsCall(() =>
+              originalSheets.spreadsheets.values.update({
+                spreadsheetId: SPREADSHEET_ID,
+                range: `${CUSTOMER_STORE_PHOTO_SHEET_NAME}!A${rowIndex + 1}:AJ${rowIndex + 1}`,
+                valueInputOption: 'USER_ENTERED',
+                resource: { values: [updatedRow] }
+              })
+            );
+            
+            console.log(`✅ [배치 갱신] 직영점_매장사진 업데이트 완료: ${storeName} - ${photoType}`);
+            
+            results.push({
+              success: true,
+              imageUrl: newImageUrl,
+              messageId: refreshResult.messageId,
+              threadId: refreshResult.threadId,
+              type,
+              item
+            });
+          } catch (err) {
+            console.error(`❌ [배치 갱신] 직영점_매장사진 갱신 오류: ${storeName} - ${photoType}`, err);
+            results.push({
+              success: false,
+              error: err.message,
+              type,
+              item
+            });
+          }
         } else if (type === 'meeting-slide') {
           // 회의 슬라이드 URL 갱신
           const { meetingId, slideId } = item;
