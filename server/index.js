@@ -15061,7 +15061,7 @@ const server = app.listen(port, '0.0.0.0', async () => {
         console.error('❌ [서버시작] 오류 상세:', error.message);
         console.error('❌ [서버시작] 오류 스택:', error.stack);
       }
-    }, 1000); // setTimeout 함수 닫기 (1초 후 실행)
+    }, 360000); // 6분 후 실행 (스케줄러 작업들과 충돌 방지, Rate Limit 고려)
 
   } catch (error) {
     console.error('서버 시작 중 오류:', error);
