@@ -14,12 +14,20 @@ import {
   Radio,
   FormControl,
   CircularProgress,
-  CardMedia
+  CardMedia,
+  TextField,
+  Select,
+  MenuItem,
+  InputLabel,
+  Paper,
+  Collapse
 } from '@mui/material';
 import {
   Refresh as RefreshIcon,
   ArrowForward as ArrowForwardIcon,
-  ArrowBack as ArrowBackIcon
+  ArrowBack as ArrowBackIcon,
+  Settings as SettingsIcon,
+  Save as SaveIcon
 } from '@mui/icons-material';
 import { directStoreApiClient } from '../../api/directStoreApiClient';
 import { directStoreApi } from '../../api/directStoreApi';
@@ -57,11 +65,16 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
   const [isSlideshowLooping, setIsSlideshowLooping] = useState(false);
   const [showRepeatDialog, setShowRepeatDialog] = useState(false);
   const [currentCarrier, setCurrentCarrier] = useState(null); // 테마 색상용
+  const [isTransitioning, setIsTransitioning] = useState(false); // 전환 애니메이션 중인지
 
   // 수동 슬라이드 탐색 상태 (일반 모드)
   const [manualSlideIndex, setManualSlideIndex] = useState(0);
   const [isManualTransitionPage, setIsManualTransitionPage] = useState(false);
   const [manualTransitionPageData, setManualTransitionPageData] = useState(null);
+  
+  // 슬라이드 설정 상태 (각 슬라이드별 시간 및 전환 효과)
+  const [slideSettings, setSlideSettings] = useState({}); // { index: { duration, transitionEffect } }
+  const [editingSlideIndex, setEditingSlideIndex] = useState(null); // 현재 편집 중인 슬라이드 인덱스
 
   // 로딩 단계 상태
   const [loadSteps, setLoadSteps] = useState({
@@ -241,9 +254,21 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
         }
         
         // 필수 부가서비스 목록을 문자열로 변환
+        // 정책 설정에서 가져온 부가서비스가 있으면 사용, 없으면 기존 값 사용
         const requiredAddonsStr = addonNames.length > 0 
           ? addonNames.join(', ') 
-          : (m.requiredAddons || m.addons || '');
+          : (m.requiredAddons || m.addons || '없음');
+        
+        // 디버깅: 필수부가 설정 확인
+        if (process.env.NODE_ENV === 'development' && m.modelId) {
+          console.log(`[필수부가] ${m.modelId} (${m.carrier}):`, {
+            addonNames,
+            requiredAddonsStr,
+            originalRequiredAddons: m.requiredAddons,
+            originalAddons: m.addons,
+            policySettingsSuccess: policySettings?.success
+          });
+        }
         
         return {
           ...m,
@@ -814,38 +839,18 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
         const premium = products.filter(p => p.isPremium);
         const budget = products.filter(p => p.isBudget);
 
-        // Premium Group
-        if (premium.length > 0) {
-          if (slideshowItems.length > 0) {
-            const transitionText = await directStoreApiClient.getTransitionPageText(carrier, 'premium');
-            slideshowItems.push({
-              type: 'transition',
-              carrier,
-              category: 'premium',
-              content: transitionText.data?.content || `이어서 ${carrier} 프리미엄 상품 안내입니다.`,
-              imageUrl: transitionText.data?.imageUrl || ''
-            });
-          }
-          for (let j = 0; j < premium.length; j += PRODUCTS_PER_SLIDE) {
-            slideshowItems.push({
-              type: 'productGroup',
-              products: premium.slice(j, j + PRODUCTS_PER_SLIDE),
-              carrier,
-              category: 'premium'
-            });
-          }
-        }
-
-        // Budget Group
+        // Budget Group (먼저 표시)
         if (budget.length > 0) {
-          if (premium.length > 0 || slideshowItems.length > 0) {
+          if (slideshowItems.length > 0) {
             const transitionText = await directStoreApiClient.getTransitionPageText(carrier, 'budget');
             slideshowItems.push({
               type: 'transition',
               carrier,
               category: 'budget',
               content: transitionText.data?.content || `이어서 ${carrier} 중저가 상품 안내입니다.`,
-              imageUrl: transitionText.data?.imageUrl || ''
+              imageUrl: transitionText.data?.imageUrl || '',
+              duration: 3000, // 기본값: 3초
+              transitionEffect: 'fade' // 기본값: fade
             });
           }
           for (let j = 0; j < budget.length; j += PRODUCTS_PER_SLIDE) {
@@ -853,7 +858,36 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
               type: 'productGroup',
               products: budget.slice(j, j + PRODUCTS_PER_SLIDE),
               carrier,
-              category: 'budget'
+              category: 'budget',
+              duration: 5000, // 기본값: 5초
+              transitionEffect: 'fade' // 기본값: fade
+            });
+          }
+        }
+
+        // Premium Group (Budget 이후 표시)
+        if (premium.length > 0) {
+          // Budget이 있었거나 이미 아이템이 있으면 연결 페이지 추가
+          if (budget.length > 0 || slideshowItems.length > 0) {
+            const transitionText = await directStoreApiClient.getTransitionPageText(carrier, 'premium');
+            slideshowItems.push({
+              type: 'transition',
+              carrier,
+              category: 'premium',
+              content: transitionText.data?.content || `이어서 ${carrier} 프리미엄 상품 안내입니다.`,
+              imageUrl: transitionText.data?.imageUrl || '',
+              duration: 3000, // 기본값: 3초
+              transitionEffect: 'fade' // 기본값: fade
+            });
+          }
+          for (let j = 0; j < premium.length; j += PRODUCTS_PER_SLIDE) {
+            slideshowItems.push({
+              type: 'productGroup',
+              products: premium.slice(j, j + PRODUCTS_PER_SLIDE),
+              carrier,
+              category: 'premium',
+              duration: 5000, // 기본값: 5초
+              transitionEffect: 'fade' // 기본값: fade
             });
           }
         }
@@ -872,7 +906,9 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
               carrier: nextCarrier,
               category: 'premium',
               content: tText.data?.content || `이어서 ${nextCarrier} 프리미엄 상품 안내입니다.`,
-              imageUrl: tText.data?.imageUrl || ''
+              imageUrl: tText.data?.imageUrl || '',
+              duration: 3000, // 기본값: 3초
+              transitionEffect: 'fade' // 기본값: fade
             });
           } else if (hasNextBudget) {
             const tText = await directStoreApiClient.getTransitionPageText(nextCarrier, 'budget');
@@ -881,7 +917,9 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
               carrier: nextCarrier,
               category: 'budget',
               content: tText.data?.content || `이어서 ${nextCarrier} 중저가 상품 안내입니다.`,
-              imageUrl: tText.data?.imageUrl || ''
+              imageUrl: tText.data?.imageUrl || '',
+              duration: 3000, // 기본값: 3초
+              transitionEffect: 'fade' // 기본값: fade
             });
           }
         }
@@ -950,40 +988,123 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
     setShowRepeatDialog(false);
   }, [slideshowData]);
 
+  // 전환 효과 스타일 생성 함수
+  const getTransitionStyle = useCallback((effect, isEntering) => {
+    const baseStyle = {
+      transition: 'all 0.8s cubic-bezier(0.4, 0, 0.2, 1)',
+      width: '100%',
+      height: '100%'
+    };
+
+    switch (effect) {
+      case 'fade':
+        return {
+          ...baseStyle,
+          opacity: isEntering ? 1 : 0
+        };
+      case 'slideLeft':
+        return {
+          ...baseStyle,
+          transform: isEntering ? 'translateX(0)' : 'translateX(100%)',
+          opacity: isEntering ? 1 : 0
+        };
+      case 'slideRight':
+        return {
+          ...baseStyle,
+          transform: isEntering ? 'translateX(0)' : 'translateX(-100%)',
+          opacity: isEntering ? 1 : 0
+        };
+      case 'slideUp':
+        return {
+          ...baseStyle,
+          transform: isEntering ? 'translateY(0)' : 'translateY(100%)',
+          opacity: isEntering ? 1 : 0
+        };
+      case 'slideDown':
+        return {
+          ...baseStyle,
+          transform: isEntering ? 'translateY(0)' : 'translateY(-100%)',
+          opacity: isEntering ? 1 : 0
+        };
+      case 'zoomIn':
+        return {
+          ...baseStyle,
+          transform: isEntering ? 'scale(1)' : 'scale(0.5)',
+          opacity: isEntering ? 1 : 0
+        };
+      case 'zoomOut':
+        return {
+          ...baseStyle,
+          transform: isEntering ? 'scale(1)' : 'scale(1.5)',
+          opacity: isEntering ? 1 : 0
+        };
+      case 'flipX':
+        return {
+          ...baseStyle,
+          transform: isEntering ? 'rotateY(0deg)' : 'rotateY(90deg)',
+          opacity: isEntering ? 1 : 0,
+          transformStyle: 'preserve-3d'
+        };
+      case 'flipY':
+        return {
+          ...baseStyle,
+          transform: isEntering ? 'rotateX(0deg)' : 'rotateX(90deg)',
+          opacity: isEntering ? 1 : 0,
+          transformStyle: 'preserve-3d'
+        };
+      case 'rotate':
+        return {
+          ...baseStyle,
+          transform: isEntering ? 'rotate(0deg) scale(1)' : 'rotate(180deg) scale(0.8)',
+          opacity: isEntering ? 1 : 0
+        };
+      default:
+        return baseStyle;
+    }
+  }, []);
+
   // 슬라이드쇼 타이머
   useEffect(() => {
     if (!isSlideshowActive || slideshowData.length === 0) return;
 
     const currentItem = slideshowData[currentSlideIndex];
-    const duration = currentItem?.type === 'transition' ? 3000 : 5000;
+    // 설정된 duration이 있으면 사용, 없으면 기본값
+    const duration = slideSettings[currentSlideIndex]?.duration || currentItem?.duration || (currentItem?.type === 'transition' ? 3000 : 5000);
 
     const timer = setTimeout(() => {
-      setCurrentSlideIndex(prev => {
-        const next = prev + 1;
-        if (next >= slideshowData.length) {
-          if (isSlideshowLooping) {
-            const first = slideshowData[0];
-            setIsTransitionPage(first?.type === 'transition');
-            setTransitionPageData(first?.type === 'transition' ? first : null);
-            if (first?.carrier) setCurrentCarrier(first.carrier);
-            return 0;
-          } else {
-            setIsSlideshowActive(false);
-            setCurrentSlideIndex(0);
-            return 0;
+      setIsTransitioning(true);
+      // 전환 애니메이션 시간 (0.8초)
+      setTimeout(() => {
+        setCurrentSlideIndex(prev => {
+          const next = prev + 1;
+          if (next >= slideshowData.length) {
+            if (isSlideshowLooping) {
+              const first = slideshowData[0];
+              setIsTransitionPage(first?.type === 'transition');
+              setTransitionPageData(first?.type === 'transition' ? first : null);
+              if (first?.carrier) setCurrentCarrier(first.carrier);
+              setIsTransitioning(false);
+              return 0;
+            } else {
+              setIsSlideshowActive(false);
+              setCurrentSlideIndex(0);
+              setIsTransitioning(false);
+              return 0;
+            }
           }
-        }
 
-        const nextItem = slideshowData[next];
-        setIsTransitionPage(nextItem.type === 'transition');
-        setTransitionPageData(nextItem.type === 'transition' ? nextItem : null);
-        if (nextItem.carrier) setCurrentCarrier(nextItem.carrier);
-        return next;
-      });
+          const nextItem = slideshowData[next];
+          setIsTransitionPage(nextItem.type === 'transition');
+          setTransitionPageData(nextItem.type === 'transition' ? nextItem : null);
+          if (nextItem.carrier) setCurrentCarrier(nextItem.carrier);
+          setIsTransitioning(false);
+          return next;
+        });
+      }, 800); // 전환 애니메이션 시간
     }, duration);
 
     return () => clearTimeout(timer);
-  }, [isSlideshowActive, slideshowData, currentSlideIndex, isSlideshowLooping]);
+  }, [isSlideshowActive, slideshowData, currentSlideIndex, isSlideshowLooping, slideSettings]);
 
   // 수동 탐색 핸들러
   const handleManualSlideChange = useCallback((direction) => {
@@ -1052,33 +1173,77 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
             </Box>
           )}
           
-          <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, position: 'relative', overflow: 'hidden' }}>
           {isTransitionPage && transitionPageData ? (
-            // 연결 페이지
+            // 연결 페이지 (전환 효과 적용)
             <Box sx={{
-              height: '100%', display: 'flex', flexDirection: 'column',
-              alignItems: 'center', justifyContent: 'center',
-              background: `linear-gradient(135deg, ${getCarrierTheme(transitionPageData.carrier).cardBg} 0%, ${getCarrierTheme(transitionPageData.carrier).primary}15 100%)`
+              height: '100%', 
+              width: '100%',
+              display: 'flex', 
+              flexDirection: 'column',
+              alignItems: 'center', 
+              justifyContent: 'center',
+              background: `linear-gradient(135deg, ${getCarrierTheme(transitionPageData.carrier).cardBg} 0%, ${getCarrierTheme(transitionPageData.carrier).primary}15 100%)`,
+              p: 4,
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              ...getTransitionStyle(
+                slideSettings[currentSlideIndex]?.transitionEffect || transitionPageData.transitionEffect || 'fade',
+                !isTransitioning
+              )
             }}>
               {transitionPageData.imageUrl ? (
                 <CardMedia
                   component="img"
                   image={transitionPageData.imageUrl}
-                  sx={{ maxHeight: '60%', maxWidth: '80%', objectFit: 'contain', mb: 4 }}
+                  sx={{ 
+                    maxHeight: '50%', 
+                    maxWidth: '70%', 
+                    objectFit: 'contain', 
+                    mb: 6,
+                    filter: 'drop-shadow(0 10px 30px rgba(0,0,0,0.3))'
+                  }}
                 />
               ) : null}
-              <Typography variant="h3" fontWeight="bold" color="primary.main" textAlign="center">
+              <Typography 
+                variant="h1" 
+                fontWeight="900" 
+                color="primary.main" 
+                textAlign="center"
+                sx={{
+                  fontSize: { xs: '3rem', sm: '4rem', md: '5rem', lg: '6rem' },
+                  lineHeight: 1.2,
+                  textShadow: '2px 2px 8px rgba(0,0,0,0.2)',
+                  letterSpacing: '0.05em',
+                  px: 4,
+                  py: 2,
+                  background: 'linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.7) 100%)',
+                  borderRadius: 4,
+                  boxShadow: '0 10px 40px rgba(0,0,0,0.2)',
+                  maxWidth: '90%',
+                  wordBreak: 'keep-all'
+                }}
+              >
                 {transitionPageData.content}
               </Typography>
             </Box>
           ) : (
-            // 상품 목록 페이지
+            // 상품 목록 페이지 (전환 효과 적용)
             <Box sx={{
               height: '100%',
               display: 'grid',
               gridTemplateColumns: 'repeat(3, 1fr)',
               gap: 2,
-              p: 4
+              p: 4,
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              ...getTransitionStyle(
+                slideSettings[currentSlideIndex]?.transitionEffect || slideshowData[currentSlideIndex]?.transitionEffect || 'fade',
+                !isTransitioning
+              )
             }}>
               {slideshowData[currentSlideIndex]?.products?.map(product => (
                 <TodaysProductCard
@@ -1117,11 +1282,80 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
               
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                 <Typography variant="h6">모든 체크 상품 미리보기 ({slideshowData.length} 슬라이드)</Typography>
-                <Box>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<SettingsIcon />}
+                    onClick={() => setEditingSlideIndex(editingSlideIndex === manualSlideIndex ? null : manualSlideIndex)}
+                  >
+                    {editingSlideIndex === manualSlideIndex ? '설정 닫기' : '슬라이드 설정'}
+                  </Button>
                   <IconButton onClick={() => handleManualSlideChange('prev')}><ArrowBackIcon /></IconButton>
                   <IconButton onClick={() => handleManualSlideChange('next')}><ArrowForwardIcon /></IconButton>
                 </Box>
               </Box>
+
+              {/* 슬라이드 설정 패널 */}
+              {editingSlideIndex === manualSlideIndex && slideshowData[manualSlideIndex] && (
+                <Paper sx={{ p: 2, mb: 2, bgcolor: 'background.paper' }}>
+                  <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                    슬라이드 {manualSlideIndex + 1} 설정
+                    {slideshowData[manualSlideIndex].type === 'transition' && ' (연결 페이지)'}
+                    {slideshowData[manualSlideIndex].type === 'productGroup' && ' (상품 페이지)'}
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 2 }}>
+                    <TextField
+                      label="표시 시간 (밀리초)"
+                      type="number"
+                      size="small"
+                      value={slideSettings[manualSlideIndex]?.duration || slideshowData[manualSlideIndex].duration || (slideshowData[manualSlideIndex].type === 'transition' ? 3000 : 5000)}
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value) || 1000;
+                        setSlideSettings(prev => ({
+                          ...prev,
+                          [manualSlideIndex]: {
+                            ...prev[manualSlideIndex],
+                            duration: value
+                          }
+                        }));
+                      }}
+                      inputProps={{ min: 1000, max: 30000, step: 500 }}
+                      sx={{ minWidth: 200 }}
+                    />
+                    <FormControl size="small" sx={{ minWidth: 200 }}>
+                      <InputLabel>전환 효과</InputLabel>
+                      <Select
+                        value={slideSettings[manualSlideIndex]?.transitionEffect || slideshowData[manualSlideIndex].transitionEffect || 'fade'}
+                        label="전환 효과"
+                        onChange={(e) => {
+                          setSlideSettings(prev => ({
+                            ...prev,
+                            [manualSlideIndex]: {
+                              ...prev[manualSlideIndex],
+                              transitionEffect: e.target.value
+                            }
+                          }));
+                        }}
+                      >
+                        <MenuItem value="fade">페이드 (Fade)</MenuItem>
+                        <MenuItem value="slideLeft">슬라이드 좌 (Slide Left)</MenuItem>
+                        <MenuItem value="slideRight">슬라이드 우 (Slide Right)</MenuItem>
+                        <MenuItem value="slideUp">슬라이드 상 (Slide Up)</MenuItem>
+                        <MenuItem value="slideDown">슬라이드 하 (Slide Down)</MenuItem>
+                        <MenuItem value="zoomIn">줌 인 (Zoom In)</MenuItem>
+                        <MenuItem value="zoomOut">줌 아웃 (Zoom Out)</MenuItem>
+                        <MenuItem value="flipX">플립 X (Flip X)</MenuItem>
+                        <MenuItem value="flipY">플립 Y (Flip Y)</MenuItem>
+                        <MenuItem value="rotate">회전 (Rotate)</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                    현재 슬라이드: {manualSlideIndex + 1} / {slideshowData.length}
+                  </Typography>
+                </Paper>
+              )}
 
               <Box sx={{ height: '70vh', minHeight: 600, border: 1, borderColor: 'divider', borderRadius: 2, overflow: 'auto', position: 'relative' }}>
                 {isManualTransitionPage && manualTransitionPageData ? (

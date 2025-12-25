@@ -5723,6 +5723,9 @@ app.get('/api/direct/sales', async (req, res) => {
       return res.json([]);
     }
 
+    // 쿼리 파라미터에서 storeId 필터 가져오기
+    const requestedStoreId = req.query.storeId;
+
     // 헤더 행 제외
     const rows = values.slice(1);
     const salesReports = rows
@@ -5792,7 +5795,16 @@ app.get('/api/direct/sales', async (req, res) => {
         status: row[25] || '',
         상태: row[25] || ''
       }))
-      .filter(report => report.id); // 빈 행 제외
+      .filter(report => {
+        // 빈 행 제외
+        if (!report.id) return false;
+        // storeId 필터가 있으면 해당 매장 데이터만 반환
+        if (requestedStoreId) {
+          return report.storeId === requestedStoreId || report.posCode === requestedStoreId;
+        }
+        // 필터가 없으면 모든 데이터 반환 (관리 모드)
+        return true;
+      });
 
     return res.json(salesReports);
   } catch (error) {

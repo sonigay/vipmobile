@@ -181,7 +181,7 @@ function TodaysProductCard(props) {
           position: 'relative', 
           pt: compact ? '50%' : '65%',  // 이미지 영역 비율 축소 (55%->50%, 70%->65%)
           minHeight: compact ? 160 : 220,  // 최소 높이 축소 (180->160, 240->220)
-          background: `linear-gradient(135deg, ${cardTheme.primary}10 0%, ${cardTheme.secondary}10 100%)`,
+          background: 'transparent', // 그라데이션 막대 제거
           borderRadius: '16px 16px 0 0', 
           overflow: 'hidden',
           borderBottom: `2px solid ${cardTheme.primary}20`,
@@ -377,8 +377,12 @@ function TodaysProductCard(props) {
           <Typography variant="caption" color="text.secondary" display="block">
             * 필수부가: {(() => {
               const addons = product.requiredAddons || product.addons;
-              // 빈 문자열이나 '없음' 문자열이면 '없음' 표시
-              return (addons && addons.trim() && addons.trim() !== '없음') ? addons : '없음';
+              // 값이 있으면 항상 표시 (동적 설정값 반영)
+              if (!addons || (typeof addons === 'string' && addons.trim() === '')) {
+                return '없음';
+              }
+              // '없음' 문자열이 아닌 경우 실제 값 표시
+              return addons.trim() === '없음' ? '없음' : addons;
             })()} (93일 유지조건)
           </Typography>
         </Box>
