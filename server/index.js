@@ -7144,10 +7144,6 @@ app.post('/api/discord/batch-refresh-urls', express.json(), async (req, res) => 
           continue;
         }
         
-        // Discord에서 최신 URL 가져오기
-        const refreshResult = await refreshDiscordImageUrl(threadId, messageId);
-        const newImageUrl = refreshResult.imageUrl;
-        
         // 타입에 따라 직접 로직 호출 (내부 fetch 대신)
         if (type === 'mobile-image') {
           const { carrier, modelId, modelName } = item;

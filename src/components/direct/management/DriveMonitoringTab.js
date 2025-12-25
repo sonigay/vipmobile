@@ -116,31 +116,66 @@ const DiscordImageMonitoringTab = () => {
 
       const itemsToRefresh = Array.from(selectedItems).map(index => allItems[index]);
       
-      const response = await fetch(
-        `${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/discord/batch-refresh-urls`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ items: itemsToRefresh })
-        }
-      );
+      console.log(`🔄 [배치 갱신] ${itemsToRefresh.length}개 항목 갱신 시작...`);
+      
+      // 타임아웃 설정 (5분)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000);
+      
+      try {
+        const response = await fetch(
+          `${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/discord/batch-refresh-urls`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items: itemsToRefresh }),
+            signal: controller.signal
+          }
+        );
 
-      const result = await response.json();
-      if (result.success) {
-        setRefreshResults(result);
-        alert(`갱신 완료: 성공 ${result.successCount}개, 실패 ${result.failCount}개`);
-        // 데이터 다시 로드
-        await loadMonitoringData();
-        setSelectedItems(new Set());
-      } else {
-        throw new Error(result.error || '갱신에 실패했습니다.');
+        clearTimeout(timeoutId);
+
+        // 응답 상태 확인
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status} 오류` }));
+          throw new Error(errorData.error || `서버 오류 (${response.status})`);
+        }
+
+        const result = await response.json();
+        
+        if (result.success) {
+          setRefreshResults(result);
+          const message = `갱신 완료: 성공 ${result.successCount}개, 실패 ${result.failCount}개`;
+          console.log(`✅ [배치 갱신] ${message}`);
+          alert(message);
+          // 데이터 다시 로드
+          await loadMonitoringData();
+          setSelectedItems(new Set());
+        } else {
+          throw new Error(result.error || '갱신에 실패했습니다.');
+        }
+      } catch (err) {
+        clearTimeout(timeoutId);
+        console.error('❌ [배치 갱신] URL 갱신 오류:', err);
+        
+        // 네트워크 오류인 경우에도 서버에서 처리가 완료되었을 수 있으므로 확인
+        if (err.name === 'AbortError' || err.message.includes('Failed to fetch') || err.message.includes('CORS')) {
+          // 네트워크 오류지만 서버에서 처리가 완료되었을 수 있음
+          // 사용자에게 확인 메시지 표시
+          const shouldReload = window.confirm(
+            '네트워크 오류가 발생했지만 서버에서 갱신이 완료되었을 수 있습니다.\n\n' +
+            '데이터를 새로고침하여 확인하시겠습니까?'
+          );
+          if (shouldReload) {
+            await loadMonitoringData();
+            setSelectedItems(new Set());
+          }
+        } else {
+          alert(`갱신 실패: ${err.message}`);
+        }
+      } finally {
+        setRefreshing(false);
       }
-    } catch (err) {
-      console.error('URL 갱신 오류:', err);
-      alert(`갱신 실패: ${err.message}`);
-    } finally {
-      setRefreshing(false);
-    }
   };
 
   if (loading && !monitoringData) {
