@@ -311,19 +311,28 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                                 {/* 오른쪽 컬럼: 사전승낙서 마크 */}
                                 <Grid item xs={12} md={6}>
                                     {loadingDetails ? (
-                                        <Box sx={{ p: 2, bgcolor: '#f5f5f5', borderRadius: 1, textAlign: 'center' }}>
+                                        <Box sx={{ 
+                                            p: 2, 
+                                            bgcolor: '#ffffff', 
+                                            borderRadius: 1, 
+                                            textAlign: 'center',
+                                            width: '50%',
+                                            mx: 'auto'
+                                        }}>
                                             <CircularProgress size={24} />
                                         </Box>
                                     ) : selectedStoreDetails?.preApprovalMark ? (
                                         <Box sx={{
                                             display: 'flex',
                                             flexDirection: 'column',
-                                            alignItems: 'flex-end',
-                                            justifyContent: 'flex-start',
-                                            textAlign: 'right',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            textAlign: 'center',
                                             p: 2,
-                                            bgcolor: '#f5f5f5',
-                                            borderRadius: 1
+                                            bgcolor: '#ffffff',
+                                            borderRadius: 1,
+                                            width: '50%',
+                                            mx: 'auto'
                                         }}>
                                             <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
                                                 사전승낙서 마크
@@ -332,7 +341,7 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                                                 dangerouslySetInnerHTML={{ __html: selectedStoreDetails.preApprovalMark }}
                                                 sx={{
                                                     display: 'flex',
-                                                    justifyContent: 'flex-end'
+                                                    justifyContent: 'center'
                                                 }}
                                             />
                                         </Box>
@@ -340,12 +349,14 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                                         <Box sx={{
                                             display: 'flex',
                                             flexDirection: 'column',
-                                            alignItems: 'flex-end',
-                                            justifyContent: 'flex-start',
-                                            textAlign: 'right',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            textAlign: 'center',
                                             p: 2,
-                                            bgcolor: '#f5f5f5',
-                                            borderRadius: 1
+                                            bgcolor: '#ffffff',
+                                            borderRadius: 1,
+                                            width: '50%',
+                                            mx: 'auto'
                                         }}>
                                             <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
                                                 사전승낙서 마크
