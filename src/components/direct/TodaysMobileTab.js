@@ -310,6 +310,15 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
 
       const allPricing = [...skPricing, ...ktPricing, ...lgPricing];
 
+      // 가격 데이터가 비어있는 경우 경고
+      if (allPricing.length === 0) {
+        console.warn('⚠️ [오늘의휴대폰] 가격 데이터가 비어있습니다. 서버가 아직 데이터를 준비하지 않았을 수 있습니다.');
+        setLoadSteps(prev => ({
+          ...prev,
+          pricing: { ...prev.pricing, status: 'error', message: '가격 데이터가 없습니다. 잠시 후 다시 시도해주세요.' }
+        }));
+      }
+
       // 가격 데이터 인덱싱: 
       // 1) `${modelId}-${openingType}` -> priceObj (기본 키)
       // 2) `${modelId}-${planGroup}-${openingType}` -> priceObj (요금제군별 키)

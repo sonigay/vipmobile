@@ -61,6 +61,7 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
   const [selectedPlanGroups, setSelectedPlanGroups] = useState({}); // { modelId: planGroup }
   const [selectedOpeningTypes, setSelectedOpeningTypes] = useState({}); // { modelId: openingType }
   const [calculatedPrices, setCalculatedPrices] = useState({}); // { modelId-openingType: PriceObj }
+  const [reloadTrigger, setReloadTrigger] = useState(0); // 새로고침 트리거
 
   const pricingDataRef = useRef(new Map()); // Key: modelId-planGroup-openingType -> PriceData
   const userSelectedOpeningTypesRef = useRef(new Set()); // 사용자가 수동으로 선택한 개통유형 추적
@@ -105,6 +106,11 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
           directStoreApiClient.getMobilesPricing(carrier),
           directStoreApiClient.getPlansMaster(carrier)
         ]);
+
+        // 가격 데이터가 비어있는 경우 경고
+        if (!pricing || pricing.length === 0) {
+          console.warn('⚠️ [휴대폰시세표] 가격 데이터가 비어있습니다. 서버가 아직 데이터를 준비하지 않았을 수 있습니다.');
+        }
 
         // 1. 요금제군 목록 추출 (plans-master 기반)
         const uniqueGroups = [...new Set(plans.map(p => p.planGroup))].filter(Boolean);
@@ -223,26 +229,14 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
     };
 
     fetchData();
-  }, [carrierTab, getCurrentCarrier]);
+  }, [carrierTab, getCurrentCarrier, reloadTrigger]);
 
   const handleReload = () => {
-    // CarrierTab을 다시 설정하여 useEffect 트리거 (실제 로직은 useEffect에 위임)
-    setCarrierTab(prev => prev);
-    // 강제 리렌더링을 위해 carrierTab 변경이 감지되도록 해야 함.
-    // 하지만 단순 setCarrierTab(prev)는 동일 값이라 효과 없음.
-    // fetchData를 별도 함수로 분리했으므로 직접 호출하지 않고, 
-    // initializedRef를 false로 하고 컴포넌트 키를 바꾸거나 해야 함.
-    // 여기서는 간단히 페이지 새로고침과 유사하게 처리하려면:
-    // useEffect의 의존성에 dummy state를 추가하거나, fetchData를 외부로 빼야함.
-    // 간단히:
-    window.location.reload(); // 가장 확실하지만 전체 앱 리로드임.
-    // 대안: carrierTab 변경 시 로직이 실행되므로, 잠시 다른 탭 갔다 오는 효과? 아니면 fetchData 로직을 함수로 분리?
-    // 위 useEffect 내부 로직을 handleReload에서도 호출 가능하게 분리하는 게 좋음.
-    // 하지만 이미 useEffect 내부에 있으니... 
-    // 임시로 initializedRef = false 설정하고 carrierTab을 다시 set
+    // reloadTrigger를 증가시켜 useEffect 재실행
+    setReloadTrigger(prev => prev + 1);
     initializedRef.current = false;
-    setCarrierTab(c => c); // 이건 효과 없음.
-    // useEffect 의존성에 timestamp 추가
+    setLoading(true);
+    setError(null);
   };
 
   // handleReload 재구현을 위해 useEffect 분리 대신 

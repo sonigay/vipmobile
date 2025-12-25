@@ -838,11 +838,11 @@ async function rebuildDeviceMaster(carriersParam) {
   const filteredRows = allRows.filter(row => row && row.length > 0 && row[0]); // 첫 번째 컬럼(통신사)이 있는 행만
   if (filteredRows.length > 0) {
     await withRetry(async () => {
-      return await sheets.spreadsheets.values.append({
+      // A2부터 시작하도록 명시 (헤더는 A1에 있음)
+      return await sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
-        range: SHEET_MOBILE_MASTER,
+        range: `${SHEET_MOBILE_MASTER}!A2:R${filteredRows.length + 1}`, // A2부터 R열까지
         valueInputOption: 'USER_ENTERED',
-        insertDataOption: 'INSERT_ROWS',
         resource: { values: filteredRows }
       });
     });
@@ -864,8 +864,28 @@ async function rebuildPricingMaster(carriersParam) {
     const res = await withRetry(() => sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: SHEET_MOBILE_MASTER }));
     const rows = (res.data.values || []).slice(1);
     mobileMasterRows = rows.filter(r => (r[13] || 'Y').toString().toUpperCase() !== 'N');
+    
+    if (mobileMasterRows.length === 0) {
+      console.warn('[Direct][rebuildPricingMaster] 단말 마스터에 활성화된 모델이 없습니다.');
+      return { 
+        totalCount: 0, 
+        perCarrier: { 
+          SK: { count: 0, warning: '단말 마스터에 활성화된 모델이 없습니다.' },
+          KT: { count: 0, warning: '단말 마스터에 활성화된 모델이 없습니다.' },
+          LG: { count: 0, warning: '단말 마스터에 활성화된 모델이 없습니다.' }
+        } 
+      };
+    }
   } catch (err) {
-    // 단말 마스터가 없으면 빈 배열
+    console.error('[Direct][rebuildPricingMaster] 단말 마스터 읽기 실패:', err);
+    return { 
+      totalCount: 0, 
+      perCarrier: { 
+        SK: { count: 0, error: '단말 마스터 읽기 실패' },
+        KT: { count: 0, error: '단말 마스터 읽기 실패' },
+        LG: { count: 0, error: '단말 마스터 읽기 실패' }
+      } 
+    };
   }
 
   const allRows = [];
@@ -1386,15 +1406,16 @@ async function rebuildPricingMaster(carriersParam) {
 
   if (allRows.length > 0) {
     await withRetry(async () => {
-      // Chunking if too large? 5000 rows is fine.
-      return await sheets.spreadsheets.values.append({
+      // A2부터 시작하도록 명시 (헤더는 A1에 있음)
+      return await sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
-        range: SHEET_MOBILE_PRICING,
+        range: `${SHEET_MOBILE_PRICING}!A2:N${allRows.length + 1}`, // A2부터 N열까지
         valueInputOption: 'USER_ENTERED',
-        insertDataOption: 'INSERT_ROWS',
         resource: { values: allRows }
       });
     });
+  } else {
+    console.warn('[Direct][rebuildPricingMaster] 생성할 데이터가 없습니다.');
   }
 
   return { totalCount: allRows.length, perCarrier: perCarrierStats };
