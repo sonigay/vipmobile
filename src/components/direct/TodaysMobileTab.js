@@ -35,7 +35,7 @@ import { LoadingState } from './common/LoadingState';
 import { ErrorState } from './common/ErrorState';
 import TodaysProductCard from './TodaysProductCard';
 
-const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
+const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
   const [premiumPhones, setPremiumPhones] = useState([]);
   const [budgetPhones, setBudgetPhones] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -72,9 +72,10 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
   const [isManualTransitionPage, setIsManualTransitionPage] = useState(false);
   const [manualTransitionPageData, setManualTransitionPageData] = useState(null);
   
-  // 슬라이드 설정 상태 (각 슬라이드별 시간 및 전환 효과)
-  const [slideSettings, setSlideSettings] = useState({}); // { index: { duration, transitionEffect } }
+  // 슬라이드 설정 상태 (각 슬라이드별 시간 및 전환 효과, 연결페이지 폰트/스타일)
+  const [slideSettings, setSlideSettings] = useState({}); // { index: { duration, transitionEffect, fontSize, fontWeight, color, backgroundColor } }
   const [editingSlideIndex, setEditingSlideIndex] = useState(null); // 현재 편집 중인 슬라이드 인덱스
+  const [savingSettings, setSavingSettings] = useState(false); // 설정 저장 중 상태
 
   // 로딩 단계 상태
   const [loadSteps, setLoadSteps] = useState({
@@ -368,13 +369,61 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
     }
   }, []);
 
-  // 메인헤더 문구 로드
-  const loadMainHeaderText = useCallback(async () => {
+  // 매장별 설정 로드
+  const loadStoreSettings = useCallback(async () => {
+    if (!loggedInStore?.id) {
+      // 매장 정보가 없으면 기본값만 로드
+      await loadMainHeaderText();
+      return;
+    }
+
     try {
       setLoadSteps(prev => ({
         ...prev,
         header: { ...prev.header, status: 'loading', message: '' }
       }));
+
+      // 매장별 메인페이지 문구 조회 (기본값 우선순위 처리)
+      const storeTextsResponse = await directStoreApiClient.getStoreMainPageTexts(loggedInStore.id);
+      if (storeTextsResponse.success && storeTextsResponse.data) {
+        const data = storeTextsResponse.data;
+        if (data.mainHeader?.content) {
+          setMainHeaderText(data.mainHeader.content);
+          try {
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('direct-main-header-text', data.mainHeader.content);
+            }
+          } catch { }
+        }
+      }
+
+      // 매장별 슬라이드쇼 설정 조회
+      const settingsResponse = await directStoreApiClient.getStoreSlideshowSettings(loggedInStore.id);
+      if (settingsResponse.success && settingsResponse.data) {
+        const storeSettings = settingsResponse.data;
+        if (storeSettings.slideSettings) {
+          setSlideSettings(storeSettings.slideSettings);
+        }
+      }
+
+      setLoadSteps(prev => ({
+        ...prev,
+        header: { ...prev.header, status: 'success', message: '' }
+      }));
+    } catch (err) {
+      console.error('매장별 설정 로드 실패:', err);
+      // 실패 시 기본값 로드
+      await loadMainHeaderText();
+      setLoadSteps(prev => ({
+        ...prev,
+        header: { ...prev.header, status: 'error', message: '설정 로드 실패' }
+      }));
+    }
+  }, [loggedInStore?.id]);
+
+  // 메인헤더 문구 로드 (기본값)
+  const loadMainHeaderText = useCallback(async () => {
+    try {
       const response = await directStoreApiClient.getMainHeaderText();
       if (response.success && response.data && response.data.content) {
         const content = response.data.content;
@@ -384,30 +433,58 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
             localStorage.setItem('direct-main-header-text', content);
           }
         } catch { }
-        setLoadSteps(prev => ({
-          ...prev,
-          header: { ...prev.header, status: 'success', message: '' }
-        }));
-      } else {
-        setLoadSteps(prev => ({
-          ...prev,
-          header: { ...prev.header, status: 'empty', message: '문구 없음' }
-        }));
       }
     } catch (err) {
       console.error('메인헤더 문구 로드 실패:', err);
-      setLoadSteps(prev => ({
-        ...prev,
-        header: { ...prev.header, status: 'error', message: '문구 로드 실패' }
-      }));
     }
   }, []);
+
+  // 슬라이드쇼 설정 저장
+  const saveSlideshowSettings = useCallback(async () => {
+    if (!loggedInStore?.id) {
+      alert('매장 정보가 없어 설정을 저장할 수 없습니다.');
+      return;
+    }
+
+    try {
+      setSavingSettings(true);
+
+      // 연결페이지 텍스트 수집 (슬라이드 데이터에서)
+      const transitionPageTexts = {};
+      slideshowData.forEach((slide, index) => {
+        if (slide.type === 'transition' && slide.carrier && slide.category) {
+          if (!transitionPageTexts[slide.carrier]) {
+            transitionPageTexts[slide.carrier] = {};
+          }
+          transitionPageTexts[slide.carrier][slide.category] = slide.content;
+        }
+      });
+
+      const response = await directStoreApiClient.saveStoreSlideshowSettings(
+        loggedInStore.id,
+        slideSettings,
+        mainHeaderText,
+        transitionPageTexts
+      );
+
+      if (response.success) {
+        alert('설정이 저장되었습니다.');
+      } else {
+        alert(`설정 저장 실패: ${response.error || '알 수 없는 오류'}`);
+      }
+    } catch (err) {
+      console.error('설정 저장 실패:', err);
+      alert(`설정 저장 실패: ${err.message || '알 수 없는 오류'}`);
+    } finally {
+      setSavingSettings(false);
+    }
+  }, [loggedInStore?.id, slideSettings, mainHeaderText, slideshowData]);
 
   // 초기 로드
   useEffect(() => {
     fetchData();
-    loadMainHeaderText();
-  }, [fetchData, loadMainHeaderText]);
+    loadStoreSettings();
+  }, [fetchData, loadStoreSettings]);
 
   // 🔥 단방향 동기화: 휴대폰목록 페이지에서만 업로드 가능
   // 오늘의휴대폰 페이지에서는 업로드 기능 제거, 휴대폰목록에서 업로드 시에만 자동 반영
@@ -555,6 +632,19 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
 
       const carriers = ['SK', 'KT', 'LG'];
       const allCheckedProducts = [];
+
+      // 매장별 연결페이지 텍스트 로드 (있으면 사용, 없으면 기본값)
+      let storeTransitionTexts = {};
+      if (loggedInStore?.id) {
+        try {
+          const storeTextsResponse = await directStoreApiClient.getStoreMainPageTexts(loggedInStore.id);
+          if (storeTextsResponse.success && storeTextsResponse.data?.transitionPages) {
+            storeTransitionTexts = storeTextsResponse.data.transitionPages;
+          }
+        } catch (err) {
+          console.warn('매장별 연결페이지 텍스트 로드 실패:', err);
+        }
+      }
 
       // API 호출하여 체크된 상품만 필터링? NO, 이미 allMobiles를 가져오는 것이 나을 수도 있지만
       // 여기서는 fetchData에서 저장하지 않은 전체 목록이 필요할 수 있음.
@@ -841,14 +931,21 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
 
         // Budget Group (먼저 표시)
         if (budget.length > 0) {
-          if (slideshowItems.length > 0) {
-            const transitionText = await directStoreApiClient.getTransitionPageText(carrier, 'budget');
+          // 첫 번째 통신사이고 첫 번째 그룹이 아닐 때, 또는 이미 아이템이 있을 때 연결 페이지 추가
+          // Premium Group과 동일한 로직 적용
+          if (i > 0 || slideshowItems.length > 0) {
+            // 매장별 설정이 있으면 우선 사용, 없으면 기본값
+            const storeText = storeTransitionTexts[carrier]?.['budget'];
+            const defaultText = await directStoreApiClient.getTransitionPageText(carrier, 'budget');
+            const content = storeText?.content || defaultText.data?.content || `이어서 ${carrier} 중저가 상품 안내입니다.`;
+            const imageUrl = storeText?.imageUrl || defaultText.data?.imageUrl || '';
+            
             slideshowItems.push({
               type: 'transition',
               carrier,
               category: 'budget',
-              content: transitionText.data?.content || `이어서 ${carrier} 중저가 상품 안내입니다.`,
-              imageUrl: transitionText.data?.imageUrl || '',
+              content,
+              imageUrl,
               duration: 3000, // 기본값: 3초
               transitionEffect: 'fade' // 기본값: fade
             });
@@ -869,13 +966,18 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
         if (premium.length > 0) {
           // Budget이 있었거나 이미 아이템이 있으면 연결 페이지 추가
           if (budget.length > 0 || slideshowItems.length > 0) {
-            const transitionText = await directStoreApiClient.getTransitionPageText(carrier, 'premium');
+            // 매장별 설정이 있으면 우선 사용, 없으면 기본값
+            const storeText = storeTransitionTexts[carrier]?.['premium'];
+            const defaultText = await directStoreApiClient.getTransitionPageText(carrier, 'premium');
+            const content = storeText?.content || defaultText.data?.content || `이어서 ${carrier} 프리미엄 상품 안내입니다.`;
+            const imageUrl = storeText?.imageUrl || defaultText.data?.imageUrl || '';
+            
             slideshowItems.push({
               type: 'transition',
               carrier,
               category: 'premium',
-              content: transitionText.data?.content || `이어서 ${carrier} 프리미엄 상품 안내입니다.`,
-              imageUrl: transitionText.data?.imageUrl || '',
+              content,
+              imageUrl,
               duration: 3000, // 기본값: 3초
               transitionEffect: 'fade' // 기본값: fade
             });
@@ -946,7 +1048,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
     } finally {
       setIsSlideshowDataLoading(false);
     }
-  }, []); // 의존성 없음 (API 호출)
+  }, [loggedInStore?.id]); // loggedInStore.id가 변경되면 재로드
 
   // 일반 모드에서도 슬라이드쇼 데이터 준비 (초기 로드 후)
   useEffect(() => {
@@ -1208,17 +1310,21 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
               ) : null}
               <Typography 
                 variant="h1" 
-                fontWeight="900" 
-                color="primary.main" 
+                fontWeight={slideSettings[currentSlideIndex]?.fontWeight || '900'}
+                color={slideSettings[currentSlideIndex]?.color || 'primary.main'}
                 textAlign="center"
                 sx={{
-                  fontSize: { xs: '3rem', sm: '4rem', md: '5rem', lg: '6rem' },
+                  fontSize: slideSettings[currentSlideIndex]?.fontSize 
+                    ? { xs: `${Math.max(1, slideSettings[currentSlideIndex].fontSize * 0.5)}rem`, sm: `${Math.max(2, slideSettings[currentSlideIndex].fontSize * 0.7)}rem`, md: `${slideSettings[currentSlideIndex].fontSize}rem`, lg: `${slideSettings[currentSlideIndex].fontSize * 1.2}rem` }
+                    : { xs: '3rem', sm: '4rem', md: '5rem', lg: '6rem' },
                   lineHeight: 1.2,
                   textShadow: '2px 2px 8px rgba(0,0,0,0.2)',
                   letterSpacing: '0.05em',
                   px: 4,
                   py: 2,
-                  background: 'linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.7) 100%)',
+                  background: slideSettings[currentSlideIndex]?.backgroundColor
+                    ? `linear-gradient(135deg, ${slideSettings[currentSlideIndex].backgroundColor}E6 0%, ${slideSettings[currentSlideIndex].backgroundColor}B3 100%)`
+                    : 'linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.7) 100%)',
                   borderRadius: 4,
                   boxShadow: '0 10px 40px rgba(0,0,0,0.2)',
                   maxWidth: '90%',
@@ -1277,6 +1383,21 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
               {mainHeaderText && (
                 <Box sx={{ mb: 3, p: 2, borderRadius: 2, bgcolor: 'primary.main', color: 'white', textAlign: 'center' }}>
                   <Typography variant="h6" fontWeight="bold">{mainHeaderText}</Typography>
+                  {loggedInStore?.id && (
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      sx={{ mt: 1, color: 'white', borderColor: 'white' }}
+                      onClick={() => {
+                        const newText = prompt('메인 헤더 문구를 입력하세요:', mainHeaderText);
+                        if (newText !== null && newText !== mainHeaderText) {
+                          setMainHeaderText(newText);
+                        }
+                      }}
+                    >
+                      문구 수정
+                    </Button>
+                  )}
                 </Box>
               )}
               
@@ -1291,6 +1412,17 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                   >
                     {editingSlideIndex === manualSlideIndex ? '설정 닫기' : '슬라이드 설정'}
                   </Button>
+                  {loggedInStore?.id && (
+                    <Button
+                      variant="contained"
+                      size="small"
+                      startIcon={<SaveIcon />}
+                      onClick={saveSlideshowSettings}
+                      disabled={savingSettings}
+                    >
+                      {savingSettings ? '저장 중...' : '설정 저장'}
+                    </Button>
+                  )}
                   <IconButton onClick={() => handleManualSlideChange('prev')}><ArrowBackIcon /></IconButton>
                   <IconButton onClick={() => handleManualSlideChange('next')}><ArrowForwardIcon /></IconButton>
                 </Box>
@@ -1351,6 +1483,125 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect }) => {
                       </Select>
                     </FormControl>
                   </Box>
+                  
+                  {/* 연결 페이지 전용 설정 (텍스트, 폰트 크기, 스타일, 색상) */}
+                  {slideshowData[manualSlideIndex]?.type === 'transition' && (
+                    <Box sx={{ mt: 3, pt: 2, borderTop: 1, borderColor: 'divider' }}>
+                      <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+                        연결 페이지 설정
+                      </Typography>
+                      <TextField
+                        label="연결 페이지 문구"
+                        fullWidth
+                        multiline
+                        rows={3}
+                        size="small"
+                        value={slideshowData[manualSlideIndex]?.content || ''}
+                        onChange={(e) => {
+                          const newContent = e.target.value;
+                          setSlideshowData(prev => {
+                            const updated = [...prev];
+                            if (updated[manualSlideIndex]) {
+                              updated[manualSlideIndex] = {
+                                ...updated[manualSlideIndex],
+                                content: newContent
+                              };
+                            }
+                            return updated;
+                          });
+                          // manualTransitionPageData도 업데이트
+                          if (isManualTransitionPage && manualTransitionPageData) {
+                            setManualTransitionPageData({
+                              ...manualTransitionPageData,
+                              content: newContent
+                            });
+                          }
+                        }}
+                        sx={{ mt: 2, mb: 2 }}
+                      />
+                      <Typography variant="subtitle2" fontWeight="bold" gutterBottom sx={{ mt: 2 }}>
+                        연결 페이지 스타일 설정
+                      </Typography>
+                      <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 2 }}>
+                        <TextField
+                          label="폰트 크기 (rem)"
+                          type="number"
+                          size="small"
+                          value={slideSettings[manualSlideIndex]?.fontSize || 5}
+                          onChange={(e) => {
+                            const value = parseFloat(e.target.value) || 3;
+                            setSlideSettings(prev => ({
+                              ...prev,
+                              [manualSlideIndex]: {
+                                ...prev[manualSlideIndex],
+                                fontSize: value
+                              }
+                            }));
+                          }}
+                          inputProps={{ min: 1, max: 10, step: 0.5 }}
+                          sx={{ minWidth: 150 }}
+                        />
+                        <FormControl size="small" sx={{ minWidth: 150 }}>
+                          <InputLabel>폰트 굵기</InputLabel>
+                          <Select
+                            value={slideSettings[manualSlideIndex]?.fontWeight || '900'}
+                            label="폰트 굵기"
+                            onChange={(e) => {
+                              setSlideSettings(prev => ({
+                                ...prev,
+                                [manualSlideIndex]: {
+                                  ...prev[manualSlideIndex],
+                                  fontWeight: e.target.value
+                                }
+                              }));
+                            }}
+                          >
+                            <MenuItem value="300">Light (300)</MenuItem>
+                            <MenuItem value="400">Regular (400)</MenuItem>
+                            <MenuItem value="500">Medium (500)</MenuItem>
+                            <MenuItem value="600">Semi Bold (600)</MenuItem>
+                            <MenuItem value="700">Bold (700)</MenuItem>
+                            <MenuItem value="800">Extra Bold (800)</MenuItem>
+                            <MenuItem value="900">Black (900)</MenuItem>
+                          </Select>
+                        </FormControl>
+                        <TextField
+                          label="텍스트 색상"
+                          type="color"
+                          size="small"
+                          value={slideSettings[manualSlideIndex]?.color || '#1976d2'}
+                          onChange={(e) => {
+                            setSlideSettings(prev => ({
+                              ...prev,
+                              [manualSlideIndex]: {
+                                ...prev[manualSlideIndex],
+                                color: e.target.value
+                              }
+                            }));
+                          }}
+                          sx={{ minWidth: 120 }}
+                          InputLabelProps={{ shrink: true }}
+                        />
+                        <TextField
+                          label="배경 색상"
+                          type="color"
+                          size="small"
+                          value={slideSettings[manualSlideIndex]?.backgroundColor || '#ffffff'}
+                          onChange={(e) => {
+                            setSlideSettings(prev => ({
+                              ...prev,
+                              [manualSlideIndex]: {
+                                ...prev[manualSlideIndex],
+                                backgroundColor: e.target.value
+                              }
+                            }));
+                          }}
+                          sx={{ minWidth: 120 }}
+                          InputLabelProps={{ shrink: true }}
+                        />
+                      </Box>
+                    </Box>
+                  )}
                   <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
                     현재 슬라이드: {manualSlideIndex + 1} / {slideshowData.length}
                   </Typography>

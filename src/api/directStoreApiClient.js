@@ -604,5 +604,55 @@ export const directStoreApiClient = {
       console.error('연결페이지 이미지 업로드 실패:', error);
       return { success: false, error: normalizeErrorMessage(error) };
     }
+  },
+
+  /**
+   * 매장별 슬라이드쇼 설정 조회
+   */
+  getStoreSlideshowSettings: async (storeId) => {
+    try {
+      const response = await fetchWithRetry(`${BASE_URL}/store-slideshow-settings?storeId=${encodeURIComponent(storeId)}`);
+      return handleResponse(response, '슬라이드쇼 설정 조회 실패');
+    } catch (error) {
+      console.error('슬라이드쇼 설정 조회 실패:', error);
+      return { success: false, error: normalizeErrorMessage(error) };
+    }
+  },
+
+  /**
+   * 매장별 슬라이드쇼 설정 저장
+   */
+  saveStoreSlideshowSettings: async (storeId, slideSettings, mainHeaderText, transitionPageTexts) => {
+    try {
+      const response = await fetchWithRetry(`${BASE_URL}/store-slideshow-settings`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          storeId,
+          slideSettings,
+          mainHeaderText,
+          transitionPageTexts
+        })
+      });
+      return handleResponse(response, '슬라이드쇼 설정 저장 실패');
+    } catch (error) {
+      console.error('슬라이드쇼 설정 저장 실패:', error);
+      return { success: false, error: normalizeErrorMessage(error) };
+    }
+  },
+
+  /**
+   * 매장별 메인페이지 문구 조회 (기본값 우선순위 처리)
+   */
+  getStoreMainPageTexts: async (storeId) => {
+    try {
+      const response = await fetchWithRetry(`${BASE_URL}/store-main-page-texts?storeId=${encodeURIComponent(storeId)}`);
+      return handleResponse(response, '매장별 메인페이지 문구 조회 실패');
+    } catch (error) {
+      console.error('매장별 메인페이지 문구 조회 실패:', error);
+      return { success: false, error: normalizeErrorMessage(error) };
+    }
   }
 };

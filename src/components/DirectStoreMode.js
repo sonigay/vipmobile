@@ -462,6 +462,7 @@ const DirectStoreMode = ({
                   <TodaysMobileTab
                     isFullScreen={isFullScreen}
                     onProductSelect={handleProductSelect}
+                    loggedInStore={loggedInStore}
                   />
                 </ErrorBoundary>
               </Paper>

@@ -6503,6 +6503,258 @@ function setupDirectRoutes(app) {
     }
   });
 
+  // === 매장별 슬라이드쇼 설정 관리 API ===
+  
+  // GET /api/direct/store-slideshow-settings?storeId=xxx: 매장별 슬라이드쇼 설정 조회
+  router.get('/store-slideshow-settings', async (req, res) => {
+    try {
+      const storeId = req.query.storeId;
+      if (!storeId) {
+        return res.status(400).json({ success: false, error: '매장ID가 필요합니다.' });
+      }
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      
+      // 시트 헤더 확인 및 생성
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_SETTINGS, HEADERS_SETTINGS);
+
+      // 매장별 설정 조회
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${SHEET_SETTINGS}!A:E`
+      });
+
+      const rows = (response.data.values || []).slice(1);
+      
+      // 매장별 슬라이드쇼 설정 찾기
+      const storeSetting = rows.find(row => {
+        const settingType = (row[1] || '').trim();
+        const settingJson = (row[4] || '').trim();
+        if (settingType === 'slideshowSettings') {
+          try {
+            const parsed = JSON.parse(settingJson);
+            return parsed.storeId === storeId;
+          } catch {
+            return false;
+          }
+        }
+        return false;
+      });
+
+      if (storeSetting) {
+        try {
+          const settings = JSON.parse(storeSetting[4] || '{}');
+          return res.json({ success: true, data: settings });
+        } catch {
+          return res.json({ success: true, data: null });
+        }
+      }
+
+      return res.json({ success: true, data: null });
+    } catch (error) {
+      console.error('[Direct] store-slideshow-settings GET error:', error);
+      res.status(500).json({ success: false, error: '설정 조회 실패', message: error.message });
+    }
+  });
+
+  // POST /api/direct/store-slideshow-settings: 매장별 슬라이드쇼 설정 저장
+  router.post('/store-slideshow-settings', async (req, res) => {
+    try {
+      const { storeId, slideSettings, mainHeaderText, transitionPageTexts } = req.body;
+      
+      if (!storeId) {
+        return res.status(400).json({ success: false, error: '매장ID가 필요합니다.' });
+      }
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      
+      // 시트 헤더 확인 및 생성
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_SETTINGS, HEADERS_SETTINGS);
+
+      // 기존 설정 조회
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${SHEET_SETTINGS}!A:E`
+      });
+
+      const rows = (response.data.values || []).slice(1);
+      
+      // 저장할 설정 객체 구성
+      const settingsData = {
+        storeId,
+        slideSettings: slideSettings || {},
+        mainHeaderText: mainHeaderText || null,
+        transitionPageTexts: transitionPageTexts || {},
+        updatedAt: new Date().toISOString()
+      };
+
+      // 기존 행 찾기
+      let existingRowIndex = -1;
+      for (let i = 0; i < rows.length; i++) {
+        const settingType = (rows[i][1] || '').trim();
+        const settingJson = (rows[i][4] || '').trim();
+        if (settingType === 'slideshowSettings') {
+          try {
+            const parsed = JSON.parse(settingJson);
+            if (parsed.storeId === storeId) {
+              existingRowIndex = i;
+              break;
+            }
+          } catch {
+            continue;
+          }
+        }
+      }
+
+      const newRow = [
+        '', // 통신사 (슬라이드쇼 설정은 통신사 무관)
+        'slideshowSettings',
+        '', // 시트ID
+        '', // 시트URL
+        JSON.stringify(settingsData)
+      ];
+
+      if (existingRowIndex !== -1) {
+        // 기존 행 업데이트
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_SETTINGS}!A${existingRowIndex + 2}:E${existingRowIndex + 2}`,
+          valueInputOption: 'USER_ENTERED',
+          resource: { values: [newRow] }
+        });
+      } else {
+        // 새 행 추가
+        await sheets.spreadsheets.values.append({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_SETTINGS}!A:E`,
+          valueInputOption: 'USER_ENTERED',
+          insertDataOption: 'INSERT_ROWS',
+          resource: { values: [newRow] }
+        });
+      }
+
+      res.json({ success: true, message: '슬라이드쇼 설정이 저장되었습니다.' });
+    } catch (error) {
+      console.error('[Direct] store-slideshow-settings POST error:', error);
+      res.status(500).json({ success: false, error: '설정 저장 실패', message: error.message });
+    }
+  });
+
+  // GET /api/direct/store-main-page-texts?storeId=xxx: 매장별 메인페이지 문구 조회 (기본값 우선순위 처리)
+  router.get('/store-main-page-texts', async (req, res) => {
+    try {
+      const storeId = req.query.storeId;
+      if (!storeId) {
+        return res.status(400).json({ success: false, error: '매장ID가 필요합니다.' });
+      }
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      
+      // 1. 매장별 설정 조회
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_SETTINGS, HEADERS_SETTINGS);
+      const settingsResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${SHEET_SETTINGS}!A:E`
+      });
+      const settingsRows = (settingsResponse.data.values || []).slice(1);
+      
+      let storeMainPageTexts = null;
+      const storeSetting = settingsRows.find(row => {
+        const settingType = (row[1] || '').trim();
+        const settingJson = (row[4] || '').trim();
+        if (settingType === 'slideshowSettings') {
+          try {
+            const parsed = JSON.parse(settingJson);
+            return parsed.storeId === storeId;
+          } catch {
+            return false;
+          }
+        }
+        return false;
+      });
+
+      if (storeSetting) {
+        try {
+          const settings = JSON.parse(storeSetting[4] || '{}');
+          storeMainPageTexts = {
+            mainHeaderText: settings.mainHeaderText,
+            transitionPageTexts: settings.transitionPageTexts || {}
+          };
+        } catch {
+          // JSON 파싱 실패 시 무시
+        }
+      }
+
+      // 2. 통신사별 기본값 조회
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_MAIN_PAGE_TEXTS, HEADERS_MAIN_PAGE_TEXTS);
+      const mainPageResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${SHEET_MAIN_PAGE_TEXTS}!A:F`
+      });
+      const mainPageRows = (mainPageResponse.data.values || []).slice(1);
+
+      const defaultTexts = {
+        mainHeader: null,
+        transitionPages: {}
+      };
+
+      mainPageRows.forEach(row => {
+        const carrier = (row[0] || '').trim();
+        const category = (row[1] || '').trim();
+        const textType = (row[2] || '').trim();
+        const content = (row[3] || '').trim();
+        const imageUrl = (row[4] || '').trim();
+        const updatedAt = (row[5] || '').trim();
+
+        if (textType === 'mainHeader') {
+          defaultTexts.mainHeader = {
+            content,
+            imageUrl,
+            updatedAt
+          };
+        } else if (textType === 'transitionPage' && carrier && category) {
+          if (!defaultTexts.transitionPages[carrier]) {
+            defaultTexts.transitionPages[carrier] = {};
+          }
+          defaultTexts.transitionPages[carrier][category] = {
+            content,
+            imageUrl,
+            updatedAt
+          };
+        }
+      });
+
+      // 3. 매장별 설정이 있으면 우선 사용, 없으면 기본값 사용
+      const result = {
+        mainHeader: storeMainPageTexts?.mainHeaderText 
+          ? { content: storeMainPageTexts.mainHeaderText, imageUrl: '', updatedAt: '' }
+          : defaultTexts.mainHeader,
+        transitionPages: {}
+      };
+
+      // 통신사별 연결페이지 텍스트 병합 (매장별 설정 우선)
+      const carriers = ['SK', 'KT', 'LG'];
+      const categories = ['budget', 'premium'];
+      
+      carriers.forEach(carrier => {
+        result.transitionPages[carrier] = {};
+        categories.forEach(category => {
+          const storeText = storeMainPageTexts?.transitionPageTexts?.[carrier]?.[category];
+          const defaultText = defaultTexts.transitionPages[carrier]?.[category];
+          
+          result.transitionPages[carrier][category] = storeText
+            ? { content: storeText, imageUrl: '', updatedAt: '' }
+            : defaultText || null;
+        });
+      });
+
+      res.json({ success: true, data: result });
+    } catch (error) {
+      console.error('[Direct] store-main-page-texts GET error:', error);
+      res.status(500).json({ success: false, error: '문구 조회 실패', message: error.message });
+    }
+  });
+
   // === 대중교통 위치 관리 API ===
 
   /**
