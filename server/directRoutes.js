@@ -7002,3 +7002,6 @@ module.exports.deleteCache = deleteCache;
 module.exports.ensureSheetHeaders = ensureSheetHeaders;
 module.exports.HEADERS_MOBILE_IMAGES = HEADERS_MOBILE_IMAGES;
 module.exports.HEADERS_MOBILE_MASTER = HEADERS_MOBILE_MASTER;
+module.exports.rebuildPlanMaster = rebuildPlanMaster;
+module.exports.rebuildDeviceMaster = rebuildDeviceMaster;
+module.exports.rebuildPricingMaster = rebuildPricingMaster;
