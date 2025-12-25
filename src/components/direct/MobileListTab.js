@@ -371,11 +371,17 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
         try {
           console.log(`🔄 [휴대폰목록] 최신 데이터 재로딩 시도 ${retryCount + 1}/${maxRetries + 1}...`);
           
-          // 🔥 핵심 수정: 가격 정책 데이터도 함께 로드하여 pricingDataRef 업데이트
-          const [freshData, pricing] = await Promise.all([
-            directStoreApiClient.getMobileList(carrier),
-            directStoreApiClient.getMobilesPricing(carrier)
+          // 🔥 핵심 수정: 초기 로드와 동일한 방식으로 데이터 가져오기
+          // getMobileList는 id 형식이 다르고 이미 계산된 가격이 포함되어 있어서
+          // 초기 로드와 동일하게 getMobilesMaster, getMobilesPricing, getPlansMaster를 사용
+          const [mobiles, pricing, plans] = await Promise.all([
+            directStoreApiClient.getMobilesMaster(carrier),
+            directStoreApiClient.getMobilesPricing(carrier),
+            directStoreApiClient.getPlansMaster(carrier)
           ]);
+          
+          // 요금제군 목록 추출
+          const uniqueGroups = [...new Set(plans.map(p => p.planGroup))].filter(Boolean);
           
           // 가격 정책 데이터 인덱싱 (Lookup Map 생성)
           const priceMap = new Map();
@@ -386,44 +392,91 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
           pricingDataRef.current = priceMap;
           console.log('🔄 [휴대폰목록] 가격 정책 데이터 업데이트 완료');
           
-          // 데이터 유효성 검사: 빈 배열이 아니고, 가격 정보가 있는지 확인
-          if (freshData && Array.isArray(freshData) && freshData.length > 0) {
-            // 첫 번째 항목에 가격 정보가 있는지 확인 (불완전한 데이터 감지)
-            const firstItem = freshData[0];
-            const hasValidData = firstItem.factoryPrice !== undefined || firstItem.purchasePriceWithAddon !== undefined;
+          // 초기 로드와 동일한 방식으로 mobileList 생성
+          const newSelectedPlans = {};
+          const newSelectedTypes = {};
+          const newCalculated = {};
+          
+          const modList = mobiles.map(m => {
+            // 기본값 결정
+            let defPlan = '115군';
+            if (m.isBudget && !m.isPremium) defPlan = '33군';
+            if (!uniqueGroups.includes(defPlan) && uniqueGroups.length > 0) defPlan = uniqueGroups[0];
             
-            // 업로드한 이미지가 포함되어 있는지 확인
-            const hasNewImage = freshData.some(item => 
-              (item.id === modelId || item.model === modelId) && item.image === imageUrl
-            );
+            const defType = 'MNP';
             
-            if (hasValidData && hasNewImage) {
-              setMobileList(freshData);
-              console.log('✅ [휴대폰목록] 최신 데이터 재로딩 완료 (새 이미지 포함, 가격 정책 업데이트)');
-              return; // 성공
-            } else if (hasValidData && !hasNewImage && retryCount < maxRetries) {
-              // 가격 정보는 있지만 새 이미지가 아직 반영되지 않음 - 재시도
-              console.log(`⚠️ [휴대폰목록] 새 이미지가 아직 반영되지 않음, 재시도... (${retryCount + 1}/${maxRetries})`);
-              reloadWithRetry(retryCount + 1, maxRetries);
-              return;
-            } else if (hasValidData) {
-              // 가격 정보는 있지만 새 이미지가 없음 (재시도 횟수 초과)
-              setMobileList(freshData);
-              console.log('✅ [휴대폰목록] 최신 데이터 재로딩 완료 (이미지는 로컬 상태로 이미 업데이트됨, 가격 정책 업데이트)');
-              return;
+            // 상태 저장
+            newSelectedPlans[m.modelId] = defPlan;
+            newSelectedTypes[m.modelId] = defType;
+            
+            // 초기 가격 Lookup
+            const priceKey = `${m.modelId}-${defPlan}-${defType}`;
+            const priceData = priceMap.get(priceKey);
+            
+            let publicSupport = 0;
+            
+            if (priceData) {
+              publicSupport = priceData.publicSupport || 0;
+              const storeSupportWith = priceData.storeSupportWithAddon || 0;
+              const storeSupportWithout = priceData.storeSupportWithoutAddon || 0;
+              
+              // calculatedPrices 초기화
+              newCalculated[`${m.modelId}-${defType}`] = {
+                storeSupportWithAddon: storeSupportWith,
+                storeSupportWithoutAddon: storeSupportWithout,
+                purchasePriceWithAddon: Math.max(0, m.factoryPrice - publicSupport - storeSupportWith),
+                purchasePriceWithoutAddon: Math.max(0, m.factoryPrice - publicSupport - storeSupportWithout),
+                publicSupport: publicSupport,
+                openingType: defType
+              };
             } else {
-              console.warn('⚠️ [휴대폰목록] 불완전한 데이터 감지');
-              if (retryCount < maxRetries) {
-                reloadWithRetry(retryCount + 1, maxRetries);
-                return;
-              }
+              // 가격 정보 없음 - 0 처리
+              newCalculated[`${m.modelId}-${defType}`] = {
+                storeSupportWithAddon: 0,
+                storeSupportWithoutAddon: 0,
+                purchasePriceWithAddon: m.factoryPrice,
+                purchasePriceWithoutAddon: m.factoryPrice,
+                publicSupport: 0,
+                openingType: defType
+              };
             }
+            
+            // Mobile object mapping (초기 로드와 동일한 구조)
+            return {
+              id: m.modelId, // ID 매핑 (초기 로드와 동일)
+              model: m.model,
+              petName: m.petName,
+              carrier: m.carrier,
+              factoryPrice: m.factoryPrice,
+              image: m.imageUrl,
+              isPremium: m.isPremium,
+              isBudget: m.isBudget,
+              isPopular: m.isPopular,
+              isRecommended: m.isRecommended,
+              isCheap: m.isCheap,
+              publicSupport: publicSupport,
+              support: publicSupport
+            };
+          });
+          
+          // 업로드한 이미지가 포함되어 있는지 확인
+          const hasNewImage = modList.some(item => 
+            (item.id === modelId || item.model === modelId) && item.image === imageUrl
+          );
+          
+          if (hasNewImage || retryCount >= maxRetries) {
+            // 상태 일괄 업데이트 (초기 로드와 동일)
+            setMobileList(modList);
+            setCalculatedPrices(newCalculated);
+            setSelectedPlanGroups(prev => ({ ...prev, ...newSelectedPlans }));
+            setSelectedOpeningTypes(prev => ({ ...prev, ...newSelectedTypes }));
+            console.log('✅ [휴대폰목록] 최신 데이터 재로딩 완료 (초기 로드 방식, 가격 정책 업데이트)');
+            return; // 성공
           } else {
-            console.warn('⚠️ [휴대폰목록] 빈 데이터 반환');
-            if (retryCount < maxRetries) {
-              reloadWithRetry(retryCount + 1, maxRetries);
-              return;
-            }
+            // 새 이미지가 아직 반영되지 않음 - 재시도
+            console.log(`⚠️ [휴대폰목록] 새 이미지가 아직 반영되지 않음, 재시도... (${retryCount + 1}/${maxRetries})`);
+            reloadWithRetry(retryCount + 1, maxRetries);
+            return;
           }
         } catch (reloadError) {
           console.warn(`⚠️ [휴대폰목록] 최신 데이터 재로딩 실패 (시도 ${retryCount + 1}/${maxRetries + 1}):`, reloadError);
@@ -466,11 +519,15 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
             try {
               console.log(`🔄 [휴대폰목록] 다른 페이지 업로드 후 최신 데이터 재로딩 시도 ${retryCount + 1}/${maxRetries + 1}...`);
               
-              // 🔥 핵심 수정: 가격 정책 데이터도 함께 로드하여 pricingDataRef 업데이트
-              const [freshData, pricing] = await Promise.all([
-                directStoreApiClient.getMobileList(currentCarrier),
-                directStoreApiClient.getMobilesPricing(currentCarrier)
+              // 🔥 핵심 수정: 초기 로드와 동일한 방식으로 데이터 가져오기
+              const [mobiles, pricing, plans] = await Promise.all([
+                directStoreApiClient.getMobilesMaster(currentCarrier),
+                directStoreApiClient.getMobilesPricing(currentCarrier),
+                directStoreApiClient.getPlansMaster(currentCarrier)
               ]);
+              
+              // 요금제군 목록 추출
+              const uniqueGroups = [...new Set(plans.map(p => p.planGroup))].filter(Boolean);
               
               // 가격 정책 데이터 인덱싱 (Lookup Map 생성)
               const priceMap = new Map();
@@ -481,44 +538,91 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
               pricingDataRef.current = priceMap;
               console.log('🔄 [휴대폰목록] 가격 정책 데이터 업데이트 완료');
               
-              // 데이터 유효성 검사: 빈 배열이 아니고, 가격 정보가 있는지 확인
-              if (freshData && Array.isArray(freshData) && freshData.length > 0) {
-                // 첫 번째 항목에 가격 정보가 있는지 확인 (불완전한 데이터 감지)
-                const firstItem = freshData[0];
-                const hasValidData = firstItem.factoryPrice !== undefined || firstItem.purchasePriceWithAddon !== undefined;
+              // 초기 로드와 동일한 방식으로 mobileList 생성
+              const newSelectedPlans = {};
+              const newSelectedTypes = {};
+              const newCalculated = {};
+              
+              const modList = mobiles.map(m => {
+                // 기본값 결정
+                let defPlan = '115군';
+                if (m.isBudget && !m.isPremium) defPlan = '33군';
+                if (!uniqueGroups.includes(defPlan) && uniqueGroups.length > 0) defPlan = uniqueGroups[0];
                 
-                // 업로드한 이미지가 포함되어 있는지 확인
-                const hasNewImage = freshData.some(item => 
-                  (item.id === modelId || item.model === modelId) && item.image === imageUrl
-                );
+                const defType = 'MNP';
                 
-                if (hasValidData && hasNewImage) {
-                  setMobileList(freshData);
-                  console.log('✅ [휴대폰목록] 다른 페이지 업로드 후 최신 데이터 재로딩 완료 (새 이미지 포함)');
-                  return; // 성공
-                } else if (hasValidData && !hasNewImage && retryCount < maxRetries) {
-                  // 가격 정보는 있지만 새 이미지가 아직 반영되지 않음 - 재시도
-                  console.log(`⚠️ [휴대폰목록] 새 이미지가 아직 반영되지 않음, 재시도... (${retryCount + 1}/${maxRetries})`);
-                  reloadWithRetry(retryCount + 1, maxRetries);
-                  return;
-                } else if (hasValidData) {
-                  // 가격 정보는 있지만 새 이미지가 없음 (재시도 횟수 초과)
-                  setMobileList(freshData);
-                  console.log('✅ [휴대폰목록] 다른 페이지 업로드 후 최신 데이터 재로딩 완료 (이미지는 로컬 상태로 이미 업데이트됨)');
-                  return;
+                // 상태 저장
+                newSelectedPlans[m.modelId] = defPlan;
+                newSelectedTypes[m.modelId] = defType;
+                
+                // 초기 가격 Lookup
+                const priceKey = `${m.modelId}-${defPlan}-${defType}`;
+                const priceData = priceMap.get(priceKey);
+                
+                let publicSupport = 0;
+                
+                if (priceData) {
+                  publicSupport = priceData.publicSupport || 0;
+                  const storeSupportWith = priceData.storeSupportWithAddon || 0;
+                  const storeSupportWithout = priceData.storeSupportWithoutAddon || 0;
+                  
+                  // calculatedPrices 초기화
+                  newCalculated[`${m.modelId}-${defType}`] = {
+                    storeSupportWithAddon: storeSupportWith,
+                    storeSupportWithoutAddon: storeSupportWithout,
+                    purchasePriceWithAddon: Math.max(0, m.factoryPrice - publicSupport - storeSupportWith),
+                    purchasePriceWithoutAddon: Math.max(0, m.factoryPrice - publicSupport - storeSupportWithout),
+                    publicSupport: publicSupport,
+                    openingType: defType
+                  };
                 } else {
-                  console.warn('⚠️ [휴대폰목록] 불완전한 데이터 감지');
-                  if (retryCount < maxRetries) {
-                    reloadWithRetry(retryCount + 1, maxRetries);
-                    return;
-                  }
+                  // 가격 정보 없음 - 0 처리
+                  newCalculated[`${m.modelId}-${defType}`] = {
+                    storeSupportWithAddon: 0,
+                    storeSupportWithoutAddon: 0,
+                    purchasePriceWithAddon: m.factoryPrice,
+                    purchasePriceWithoutAddon: m.factoryPrice,
+                    publicSupport: 0,
+                    openingType: defType
+                  };
                 }
+                
+                // Mobile object mapping (초기 로드와 동일한 구조)
+                return {
+                  id: m.modelId, // ID 매핑 (초기 로드와 동일)
+                  model: m.model,
+                  petName: m.petName,
+                  carrier: m.carrier,
+                  factoryPrice: m.factoryPrice,
+                  image: m.imageUrl,
+                  isPremium: m.isPremium,
+                  isBudget: m.isBudget,
+                  isPopular: m.isPopular,
+                  isRecommended: m.isRecommended,
+                  isCheap: m.isCheap,
+                  publicSupport: publicSupport,
+                  support: publicSupport
+                };
+              });
+              
+              // 업로드한 이미지가 포함되어 있는지 확인
+              const hasNewImage = modList.some(item => 
+                (item.id === modelId || item.model === modelId) && item.image === imageUrl
+              );
+              
+              if (hasNewImage || retryCount >= maxRetries) {
+                // 상태 일괄 업데이트 (초기 로드와 동일)
+                setMobileList(modList);
+                setCalculatedPrices(newCalculated);
+                setSelectedPlanGroups(prev => ({ ...prev, ...newSelectedPlans }));
+                setSelectedOpeningTypes(prev => ({ ...prev, ...newSelectedTypes }));
+                console.log('✅ [휴대폰목록] 다른 페이지 업로드 후 최신 데이터 재로딩 완료 (초기 로드 방식)');
+                return; // 성공
               } else {
-                console.warn('⚠️ [휴대폰목록] 빈 데이터 반환');
-                if (retryCount < maxRetries) {
-                  reloadWithRetry(retryCount + 1, maxRetries);
-                  return;
-                }
+                // 새 이미지가 아직 반영되지 않음 - 재시도
+                console.log(`⚠️ [휴대폰목록] 새 이미지가 아직 반영되지 않음, 재시도... (${retryCount + 1}/${maxRetries})`);
+                reloadWithRetry(retryCount + 1, maxRetries);
+                return;
               }
             } catch (reloadError) {
               console.warn(`⚠️ [휴대폰목록] 최신 데이터 재로딩 실패 (시도 ${retryCount + 1}/${maxRetries + 1}):`, reloadError);
