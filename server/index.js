@@ -7121,7 +7121,28 @@ app.get('/api/discord/image-monitoring', async (req, res) => {
 async function processBatchRefreshItems(items) {
   const results = [];
   
-  for (const item of items) {
+  // 배치 크기 제한: 한 번에 10개씩 처리
+  const BATCH_SIZE = 10;
+  const ITEM_DELAY_MS = 500; // 항목 간 지연 (500ms)
+  const BATCH_DELAY_MS = 1000; // 배치 간 지연 (1초)
+  
+  // 전체 항목을 배치로 나누기
+  for (let i = 0; i < items.length; i += BATCH_SIZE) {
+    const batch = items.slice(i, i + BATCH_SIZE);
+    const batchNumber = Math.floor(i / BATCH_SIZE) + 1;
+    const totalBatches = Math.ceil(items.length / BATCH_SIZE);
+    
+    console.log(`🔄 [배치 갱신] 배치 ${batchNumber}/${totalBatches} 처리 시작 (${batch.length}개 항목)`);
+    
+    // 배치 내 항목 처리
+    for (let j = 0; j < batch.length; j++) {
+      const item = batch[j];
+      
+      // 첫 번째 항목이 아니면 지연 추가
+      if (j > 0) {
+        await new Promise(resolve => setTimeout(resolve, ITEM_DELAY_MS));
+      }
+      
       try {
         const { type, threadId, messageId } = item;
         
@@ -7395,42 +7416,47 @@ async function processBatchRefreshItems(items) {
             continue;
           }
           
-          // 회의목록 시트에서 해당 슬라이드 찾기 및 업데이트
-          // ensureSheetHeaders는 directRoutes에 있지만, meetingRoutes에도 있을 수 있음
-          // 일단 직접 시트를 읽어서 확인
-          const meetingResponse = await rateLimitedSheetsCall(() =>
-            originalSheets.spreadsheets.values.get({
-              spreadsheetId: SPREADSHEET_ID,
-              range: '회의목록!A:W'
-            })
-          );
-          
-          const meetingRows = (meetingResponse.data.values || []).slice(1);
-          const rowIndex = meetingRows.findIndex(row => 
-            (row[0] || '').trim() === meetingId && 
-            (row[1] || '').trim() === slideId
-          );
-          
-          if (rowIndex === -1) {
-            results.push({
-              success: false,
-              error: '해당 슬라이드를 찾을 수 없습니다.',
-              type,
-              item
-            });
-            continue;
-          }
-          
-          // 기존 행 업데이트 (이미지 URL만 갱신)
-          const existingRow = meetingRows[rowIndex];
-          const updatedRow = [...existingRow];
-          while (updatedRow.length < 23) {
-            updatedRow.push('');
-          }
-          updatedRow[9] = newImageUrl; // J: 이미지URL
-          updatedRow[14] = refreshResult.messageId || ''; // O: Discord메시지ID
-          updatedRow[13] = refreshResult.threadId || ''; // N: Discord스레드ID
-          updatedRow[12] = refreshResult.postId || refreshResult.threadId || ''; // M: Discord포스트ID
+          try {
+            // Discord에서 최신 URL 가져오기
+            const refreshResult = await refreshDiscordImageUrl(threadId, messageId);
+            const newImageUrl = refreshResult.imageUrl;
+            
+            // 회의목록 시트에서 해당 슬라이드 찾기 및 업데이트
+            // ensureSheetHeaders는 directRoutes에 있지만, meetingRoutes에도 있을 수 있음
+            // 일단 직접 시트를 읽어서 확인
+            const meetingResponse = await rateLimitedSheetsCall(() =>
+              originalSheets.spreadsheets.values.get({
+                spreadsheetId: SPREADSHEET_ID,
+                range: '회의목록!A:W'
+              })
+            );
+            
+            const meetingRows = (meetingResponse.data.values || []).slice(1);
+            const rowIndex = meetingRows.findIndex(row => 
+              (row[0] || '').trim() === meetingId && 
+              (row[1] || '').trim() === slideId
+            );
+            
+            if (rowIndex === -1) {
+              results.push({
+                success: false,
+                error: '해당 슬라이드를 찾을 수 없습니다.',
+                type,
+                item
+              });
+              continue;
+            }
+            
+            // 기존 행 업데이트 (이미지 URL만 갱신)
+            const existingRow = meetingRows[rowIndex];
+            const updatedRow = [...existingRow];
+            while (updatedRow.length < 23) {
+              updatedRow.push('');
+            }
+            updatedRow[9] = newImageUrl; // J: 이미지URL
+            updatedRow[14] = refreshResult.messageId || ''; // O: Discord메시지ID
+            updatedRow[13] = refreshResult.threadId || ''; // N: Discord스레드ID
+            updatedRow[12] = refreshResult.postId || refreshResult.threadId || ''; // M: Discord포스트ID
           
           await rateLimitedSheetsCall(() =>
             originalSheets.spreadsheets.values.update({
@@ -7441,16 +7467,25 @@ async function processBatchRefreshItems(items) {
             })
           );
           
-          console.log(`✅ [URL 갱신] 회의 슬라이드 업데이트 완료: ${meetingId} - ${slideId}`);
-          
-          results.push({
-            success: true,
-            imageUrl: newImageUrl,
-            messageId: refreshResult.messageId,
-            threadId: refreshResult.threadId,
-            type,
-            item
-          });
+            console.log(`✅ [URL 갱신] 회의 슬라이드 업데이트 완료: ${meetingId} - ${slideId}`);
+            
+            results.push({
+              success: true,
+              imageUrl: newImageUrl,
+              messageId: refreshResult.messageId,
+              threadId: refreshResult.threadId,
+              type,
+              item
+            });
+          } catch (err) {
+            console.error(`❌ [배치 갱신] 회의 슬라이드 갱신 오류: ${meetingId} - ${slideId}`, err);
+            results.push({
+              success: false,
+              error: err.message,
+              type,
+              item
+            });
+          }
         } else {
           results.push({
             success: false,
@@ -7468,8 +7503,17 @@ async function processBatchRefreshItems(items) {
       }
     }
     
-    return results;
+    // 배치 간 지연 (마지막 배치가 아니면)
+    if (i + BATCH_SIZE < items.length) {
+      console.log(`⏳ [배치 갱신] 배치 ${batchNumber} 완료, ${BATCH_DELAY_MS}ms 대기 후 다음 배치 진행...`);
+      await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
+    } else {
+      console.log(`✅ [배치 갱신] 배치 ${batchNumber} 완료 (마지막 배치)`);
+    }
   }
+  
+  return results;
+}
 
 // POST /api/discord/batch-refresh-urls: 여러 이미지 URL 일괄 갱신
 app.post('/api/discord/batch-refresh-urls', express.json(), async (req, res) => {
