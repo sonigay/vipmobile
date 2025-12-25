@@ -1308,8 +1308,8 @@ async function rebuildPricingMaster(carriersParam) {
           const totalSpecialAddition = safePolicySettings.specialPolicies.reduce((acc, cur) => acc + (cur.addition || 0), 0);
           const totalSpecialDeduction = safePolicySettings.specialPolicies.reduce((acc, cur) => acc + (cur.deduction || 0), 0);
 
-          // 기본 정책 마진 (기본마진 + 별도정책)
-          const baseMargin = safePolicySettings.baseMargin + totalSpecialAddition - totalSpecialDeduction;
+          // 기본 정책 마진 (기본마진만 사용, 별도정책은 storeSupport 계산 시 별도로 처리)
+          const baseMargin = safePolicySettings.baseMargin || 0;
 
           // 보험상품: 출고가 및 모델명(플립/폴드 여부)에 맞는 보험 인센티브/차감 선택
           // 🔥 핵심 수정: safePolicySettings 사용
@@ -1366,11 +1366,12 @@ async function rebuildPricingMaster(carriersParam) {
           );
 
           // 부가미유치: 정책표리베이트 - 마진 + (부가서비스/보험 차감) + 별도정책차감금액
+          // 차감금액은 이미 음수로 저장되어 있으므로 더하면 자동으로 차감됨
           const storeSupportNone = Math.max(0,
             policyRebate
             - baseMargin
-            + totalAddonDeduction
-            + totalSpecialDeduction
+            + totalAddonDeduction  // 이미 음수이므로 더하면 차감됨
+            + totalSpecialDeduction  // 이미 음수이므로 더하면 차감됨
           );
 
           allRows.push([

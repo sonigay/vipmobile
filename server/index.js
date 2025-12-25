@@ -7158,10 +7158,29 @@ async function processBatchRefreshItems(items) {
       try {
         const { type, threadId, messageId } = item;
         
+        // Discord snowflake 형식 검증 함수
+        const isValidSnowflake = (value) => {
+          if (!value) return false;
+          const str = value.toString().trim();
+          return /^\d{17,19}$/.test(str);
+        };
+        
         if (!type || !threadId || !messageId) {
           results.push({
             success: false,
             error: 'type, threadId, messageId가 필요합니다.',
+            item
+          });
+          continue;
+        }
+        
+        // threadId와 messageId가 유효한 snowflake 형식인지 검증
+        if (!isValidSnowflake(threadId) || !isValidSnowflake(messageId)) {
+          console.warn(`⚠️ [배치 갱신] 잘못된 Discord ID 형식: threadId=${threadId}, messageId=${messageId}, type=${type}`);
+          results.push({
+            success: false,
+            error: `잘못된 Discord ID 형식: threadId나 messageId가 snowflake 형식이 아닙니다.`,
+            type,
             item
           });
           continue;
@@ -14361,11 +14380,13 @@ const server = app.listen(port, '0.0.0.0', async () => {
           );
           
           const imageRows = (imageResponse.data.values || []).slice(1);
+          
           monitoringData.direct.mobileImages = imageRows
             .filter(row => {
               const messageId = (row[8] || '').trim();
               const threadId = (row[10] || '').trim();
-              return messageId && threadId;
+              // Discord snowflake 형식 검증 추가
+              return messageId && threadId && isValidSnowflake(messageId) && isValidSnowflake(threadId);
             })
             .map(row => ({
               carrier: (row[0] || '').trim(),
@@ -14390,11 +14411,13 @@ const server = app.listen(port, '0.0.0.0', async () => {
           );
           
           const masterRows = (masterResponse.data.values || []).slice(1);
+          
           monitoringData.direct.masterImages = masterRows
             .filter(row => {
               const messageId = (row[15] || '').trim();
               const threadId = (row[17] || '').trim();
-              return messageId && threadId;
+              // Discord snowflake 형식 검증 추가
+              return messageId && threadId && isValidSnowflake(messageId) && isValidSnowflake(threadId);
             })
             .map(row => ({
               carrier: (row[0] || '').trim(),
@@ -14514,19 +14537,18 @@ const server = app.listen(port, '0.0.0.0', async () => {
     // 서버 시작 시 실행
     console.log('🚀 [스케줄러] 서버 시작 시 자동 실행 시작...');
     
-    // Discord 모니터링 자동 갱신 (서버 시작 시 1회)
-    // 서버 시작 후 충분한 시간 대기 (다른 초기화 작업 완료 대기)
-    setTimeout(async () => {
-      console.log('🔄 [스케줄러] 서버 시작 시 Discord 이미지 자동 갱신 실행');
-      await refreshAllDiscordImages();
-    }, 120000); // 2분 후 실행 (서버 초기화 및 다른 작업 완료 대기)
-    
-    // 데이터 재빌드 (서버 시작 시 1회)
-    // Discord 갱신 완료 후 충분한 시간 대기
+    // 데이터 재빌드 (서버 시작 시 1회) - 먼저 실행하여 데이터 준비
     setTimeout(async () => {
       console.log('🔄 [스케줄러] 서버 시작 시 데이터 재빌드 실행');
       await rebuildMasterData();
-    }, 300000); // 5분 후 실행 (Discord 갱신 완료 후 충분한 시간 대기)
+    }, 300000); // 5분 후 실행 (서버 초기화 및 다른 작업 완료 대기)
+    
+    // Discord 모니터링 자동 갱신 (서버 시작 시 1회)
+    // 데이터 재빌드 완료 후 실행하여 정상적인 Discord ID로 갱신
+    setTimeout(async () => {
+      console.log('🔄 [스케줄러] 서버 시작 시 Discord 이미지 자동 갱신 실행');
+      await refreshAllDiscordImages();
+    }, 600000); // 10분 후 실행 (데이터 재빌드 완료 후 충분한 시간 대기)
     
     // Discord 모니터링 자동 갱신 스케줄 등록
     // 매일 11:30, 17:30
