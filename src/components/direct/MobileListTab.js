@@ -299,6 +299,55 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
     }));
   }, [lookupPrice]);
 
+  // 🔥 핵심 수정: mobileList가 변경되면 calculatedPrices 자동 재계산
+  useEffect(() => {
+    // 초기화가 완료되지 않았거나 mobileList가 비어있으면 스킵
+    if (!initializedRef.current || mobileList.length === 0) {
+      return;
+    }
+
+    // 모든 모델의 calculatedPrices 재계산
+    const newCalculated = {};
+    
+    mobileList.forEach(mobile => {
+      const modelId = mobile.id;
+      const planGroup = selectedPlanGroups[modelId] || '115군';
+      const openingType = selectedOpeningTypes[modelId] || 'MNP';
+      
+      // lookupPrice로 최신 가격 계산
+      const priceObj = lookupPrice(modelId, planGroup, openingType);
+      const key = `${modelId}-${openingType}`;
+      
+      newCalculated[key] = priceObj;
+    });
+
+    // calculatedPrices 업데이트 (변경사항이 있을 때만)
+    setCalculatedPrices(prev => {
+      // 변경사항이 있는지 확인
+      const hasChanges = Object.keys(newCalculated).some(key => {
+        const oldValue = prev[key];
+        const newValue = newCalculated[key];
+        if (!oldValue) return true;
+        
+        // 주요 필드 비교
+        return (
+          oldValue.purchasePriceWithAddon !== newValue.purchasePriceWithAddon ||
+          oldValue.purchasePriceWithoutAddon !== newValue.purchasePriceWithoutAddon ||
+          oldValue.storeSupportWithAddon !== newValue.storeSupportWithAddon ||
+          oldValue.storeSupportWithoutAddon !== newValue.storeSupportWithoutAddon ||
+          oldValue.publicSupport !== newValue.publicSupport
+        );
+      });
+
+      if (hasChanges) {
+        console.log('🔄 [가격 재계산] mobileList 변경으로 인한 가격 자동 재계산');
+        return { ...prev, ...newCalculated };
+      }
+      
+      return prev;
+    });
+  }, [mobileList, selectedPlanGroups, selectedOpeningTypes, lookupPrice]);
+
   // 🔥 리팩토링: 이미지 업로드 성공 핸들러 (ImageUploadButton이 자동으로 처리)
   const handleImageUploadSuccess = useCallback(async (imageUrl, modelId, carrier) => {
     console.log('✅ [휴대폰목록] 이미지 업로드 성공 콜백:', { imageUrl, modelId, carrier });
@@ -643,15 +692,16 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
   // 가격 계산 요청 큐 처리 함수
 
   // 표시할 값 가져오기 (계산된 값이 있으면 사용, 없으면 원래 값) - 메모이제이션
+  // 🔥 핵심 수정: calculatedPrices 대신 lookupPrice를 직접 호출하여 항상 최신 factoryPrice 사용
   const getDisplayValue = useCallback((row, field, selectedOpeningType = null) => {
-    // 🔥 개선: openingType별로 저장된 값을 가져오도록 수정
-    // openingType이 null이면 기본값 'MNP' 사용 (초기 로드 시 selectedOpeningTypes가 빈 객체일 수 있음)
+    // openingType이 null이면 기본값 'MNP' 사용
     const openingType = selectedOpeningType || selectedOpeningTypes[row.id] || 'MNP';
-    const priceKey = `${row.id}-${openingType}`;
-    const calculated = calculatedPrices[priceKey] || null;
+    const planGroup = selectedPlanGroups[row.id] || '115군';
+    
+    // 🔥 핵심 수정: lookupPrice를 직접 호출하여 항상 최신 factoryPrice로 계산
+    // 이렇게 하면 mobileList가 변경되어도 항상 최신 가격이 표시됨
+    const calculated = lookupPrice(row.id, planGroup, openingType);
 
-    // 🔥 성능 최적화: 디버그 로그 제거 (불필요한 네트워크 요청 제거)
-    // 디버그 로그는 문제 발생 시에만 활성화
     // 계산된 값이 있고, 해당 필드가 존재하면 사용
     // 단, 대리점지원금의 경우 0이면 fallback 사용 (0은 유효하지 않은 값으로 간주)
     if (calculated && calculated[field] !== undefined) {
@@ -659,8 +709,7 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
       if ((field === 'storeSupportWithAddon' || field === 'storeSupportWithoutAddon') && calculated[field] === 0) {
         return row[field];
       }
-      // 🔥 개선: openingType이 일치하는지 확인
-      // '010신규'나 '기변'은 서버에서 '010신규/기변'으로 변환되므로, 이를 고려하여 비교
+      // openingType이 일치하는지 확인
       const normalizedCalculatedOpeningType = calculated.openingType === '010신규/기변'
         ? (openingType === '010신규' || openingType === '기변' ? '010신규/기변' : calculated.openingType)
         : calculated.openingType;
@@ -675,7 +724,7 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
       return calculated[field];
     }
     return row[field];
-  }, [calculatedPrices, selectedOpeningTypes]);
+  }, [selectedOpeningTypes, selectedPlanGroups, lookupPrice]);
 
   return (
     <Box sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
