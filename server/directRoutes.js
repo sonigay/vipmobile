@@ -152,7 +152,7 @@ function logWarningOnce(key, message, data = {}) {
 
 // Rate limiting을 위한 마지막 요청 시간 추적
 let lastApiCallTime = 0;
-const MIN_API_INTERVAL_MS = 250; // 최소 250ms 간격으로 API 호출 (Google Sheets API 분당 60회 제한 고려)
+const MIN_API_INTERVAL_MS = 2000; // 최소 2초 간격으로 API 호출 (Google Sheets API 분당 60회 제한 고려)
 
 function getCache(key) {
   const entry = cacheStore.get(key);

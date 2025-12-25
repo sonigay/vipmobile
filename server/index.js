@@ -24,7 +24,7 @@ const port = process.env.PORT || 4000;
 
 // Google Sheets API 호출 빈도 제한을 위한 변수
 let lastSheetsApiCall = 0;
-const SHEETS_API_COOLDOWN = 1000; // 1초 대기
+const SHEETS_API_COOLDOWN = 2000; // 2초 대기 (Google Sheets API 분당 60회 제한 고려)
 
 // Google Sheets API 호출 빈도 제한 함수 (Rate Limit 재시도 포함)
 const rateLimitedSheetsCall = async (apiCall, maxRetries = 5) => {
@@ -7121,10 +7121,10 @@ app.get('/api/discord/image-monitoring', async (req, res) => {
 async function processBatchRefreshItems(items) {
   const results = [];
   
-  // 배치 크기 제한: 한 번에 10개씩 처리
-  const BATCH_SIZE = 10;
-  const ITEM_DELAY_MS = 500; // 항목 간 지연 (500ms)
-  const BATCH_DELAY_MS = 1000; // 배치 간 지연 (1초)
+  // 배치 크기 제한: 한 번에 5개씩 처리 (Rate Limit 고려)
+  const BATCH_SIZE = 5;
+  const ITEM_DELAY_MS = 2000; // 항목 간 지연 (2초) - API 호출 간격 고려
+  const BATCH_DELAY_MS = 5000; // 배치 간 지연 (5초) - Rate Limit 회복 시간 고려
   
   // 전체 항목을 배치로 나누기
   for (let i = 0; i < items.length; i += BATCH_SIZE) {
@@ -14503,16 +14503,18 @@ const server = app.listen(port, '0.0.0.0', async () => {
     console.log('🚀 [스케줄러] 서버 시작 시 자동 실행 시작...');
     
     // Discord 모니터링 자동 갱신 (서버 시작 시 1회)
+    // 서버 시작 후 충분한 시간 대기 (다른 초기화 작업 완료 대기)
     setTimeout(async () => {
       console.log('🔄 [스케줄러] 서버 시작 시 Discord 이미지 자동 갱신 실행');
       await refreshAllDiscordImages();
-    }, 30000); // 30초 후 실행 (서버 초기화 완료 대기)
+    }, 120000); // 2분 후 실행 (서버 초기화 및 다른 작업 완료 대기)
     
     // 데이터 재빌드 (서버 시작 시 1회)
+    // Discord 갱신 완료 후 충분한 시간 대기
     setTimeout(async () => {
       console.log('🔄 [스케줄러] 서버 시작 시 데이터 재빌드 실행');
       await rebuildMasterData();
-    }, 60000); // 60초 후 실행 (Discord 갱신 후 실행)
+    }, 300000); // 5분 후 실행 (Discord 갱신 완료 후 충분한 시간 대기)
     
     // Discord 모니터링 자동 갱신 스케줄 등록
     // 매일 11:30, 17:30
@@ -14615,7 +14617,8 @@ const server = app.listen(port, '0.0.0.0', async () => {
     // 서버 시작 시 배정완료된 재고 자동 저장 및 중복 정리 (지연 로딩으로 성능 최적화)
     console.log('💾 [서버시작] 배정완료된 재고 자동 저장 및 중복 정리 시작 (백그라운드에서 실행)');
 
-    // 백그라운드에서 데이터 로드 (서버 시작 지연 방지)
+    // 백그라운드에서 데이터 로드 (서버 시작 지연 방지, Rate Limit 고려하여 충분한 지연)
+    // 스케줄러 작업들과 충돌하지 않도록 6분 후 실행
     setTimeout(async () => {
       try {
         console.log('🔍 [서버시작] 1단계: 시트 데이터 가져오기 시작 (백그라운드)');
