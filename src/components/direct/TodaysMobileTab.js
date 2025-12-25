@@ -935,10 +935,10 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
           // Premium Group과 동일한 로직 적용
           if (i > 0 || slideshowItems.length > 0) {
             // 매장별 설정이 있으면 우선 사용, 없으면 기본값
-            const storeText = storeTransitionTexts[carrier]?.['budget'];
-            const defaultText = await directStoreApiClient.getTransitionPageText(carrier, 'budget');
-            const content = storeText?.content || defaultText.data?.content || `이어서 ${carrier} 중저가 상품 안내입니다.`;
-            const imageUrl = storeText?.imageUrl || defaultText.data?.imageUrl || '';
+            // storeTransitionTexts는 이미 매장별 설정과 기본값이 병합된 상태
+            const transitionText = storeTransitionTexts[carrier]?.['budget'];
+            const content = transitionText?.content || `이어서 ${carrier} 중저가 상품 안내입니다.`;
+            const imageUrl = transitionText?.imageUrl || '';
             
             slideshowItems.push({
               type: 'transition',
@@ -967,10 +967,10 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
           // Budget이 있었거나 이미 아이템이 있으면 연결 페이지 추가
           if (budget.length > 0 || slideshowItems.length > 0) {
             // 매장별 설정이 있으면 우선 사용, 없으면 기본값
-            const storeText = storeTransitionTexts[carrier]?.['premium'];
-            const defaultText = await directStoreApiClient.getTransitionPageText(carrier, 'premium');
-            const content = storeText?.content || defaultText.data?.content || `이어서 ${carrier} 프리미엄 상품 안내입니다.`;
-            const imageUrl = storeText?.imageUrl || defaultText.data?.imageUrl || '';
+            // storeTransitionTexts는 이미 매장별 설정과 기본값이 병합된 상태
+            const transitionText = storeTransitionTexts[carrier]?.['premium'];
+            const content = transitionText?.content || `이어서 ${carrier} 프리미엄 상품 안내입니다.`;
+            const imageUrl = transitionText?.imageUrl || '';
             
             slideshowItems.push({
               type: 'transition',
@@ -989,6 +989,23 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
               carrier,
               category: 'premium',
               duration: 5000, // 기본값: 5초
+              transitionEffect: 'fade' // 기본값: fade
+            });
+          }
+          
+          // Premium 이후 Budget이 있으면 Budget 연결 페이지 추가
+          if (budget.length > 0) {
+            const transitionText = storeTransitionTexts[carrier]?.['budget'];
+            const content = transitionText?.content || `이어서 ${carrier} 중저가 상품 안내입니다.`;
+            const imageUrl = transitionText?.imageUrl || '';
+            
+            slideshowItems.push({
+              type: 'transition',
+              carrier,
+              category: 'budget',
+              content,
+              imageUrl,
+              duration: 3000, // 기본값: 3초
               transitionEffect: 'fade' // 기본값: fade
             });
           }
