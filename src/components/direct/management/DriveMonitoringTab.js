@@ -176,6 +176,12 @@ const DiscordImageMonitoringTab = () => {
       } finally {
         setRefreshing(false);
       }
+    } catch (err) {
+      // 바깥쪽 try 블록의 예외 처리 (예: setRefreshing(true) 이후의 예외)
+      console.error('❌ [배치 갱신] 예상치 못한 오류:', err);
+      setRefreshing(false);
+      alert(`갱신 중 오류가 발생했습니다: ${err.message}`);
+    }
   };
 
   if (loading && !monitoringData) {
