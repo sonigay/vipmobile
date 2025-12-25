@@ -361,6 +361,7 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
       return item;
     }));
 
+    // 🔥 핵심 수정: 가격 정책 데이터도 함께 재로딩하여 pricingDataRef 업데이트
     // 서버에서 최신 데이터 재로딩 (재시도 로직 포함)
     // 캐시 무효화 후 즉시 재로딩하면 Rate Limit이나 불완전한 데이터가 반환될 수 있음
     const reloadWithRetry = async (retryCount = 0, maxRetries = 3) => {
@@ -369,7 +370,21 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
       setTimeout(async () => {
         try {
           console.log(`🔄 [휴대폰목록] 최신 데이터 재로딩 시도 ${retryCount + 1}/${maxRetries + 1}...`);
-          const freshData = await directStoreApiClient.getMobileList(carrier);
+          
+          // 🔥 핵심 수정: 가격 정책 데이터도 함께 로드하여 pricingDataRef 업데이트
+          const [freshData, pricing] = await Promise.all([
+            directStoreApiClient.getMobileList(carrier),
+            directStoreApiClient.getMobilesPricing(carrier)
+          ]);
+          
+          // 가격 정책 데이터 인덱싱 (Lookup Map 생성)
+          const priceMap = new Map();
+          pricing.forEach(p => {
+            const key = `${p.modelId}-${p.planGroup}-${p.openingType}`;
+            priceMap.set(key, p);
+          });
+          pricingDataRef.current = priceMap;
+          console.log('🔄 [휴대폰목록] 가격 정책 데이터 업데이트 완료');
           
           // 데이터 유효성 검사: 빈 배열이 아니고, 가격 정보가 있는지 확인
           if (freshData && Array.isArray(freshData) && freshData.length > 0) {
@@ -384,7 +399,7 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
             
             if (hasValidData && hasNewImage) {
               setMobileList(freshData);
-              console.log('✅ [휴대폰목록] 최신 데이터 재로딩 완료 (새 이미지 포함)');
+              console.log('✅ [휴대폰목록] 최신 데이터 재로딩 완료 (새 이미지 포함, 가격 정책 업데이트)');
               return; // 성공
             } else if (hasValidData && !hasNewImage && retryCount < maxRetries) {
               // 가격 정보는 있지만 새 이미지가 아직 반영되지 않음 - 재시도
@@ -394,7 +409,7 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
             } else if (hasValidData) {
               // 가격 정보는 있지만 새 이미지가 없음 (재시도 횟수 초과)
               setMobileList(freshData);
-              console.log('✅ [휴대폰목록] 최신 데이터 재로딩 완료 (이미지는 로컬 상태로 이미 업데이트됨)');
+              console.log('✅ [휴대폰목록] 최신 데이터 재로딩 완료 (이미지는 로컬 상태로 이미 업데이트됨, 가격 정책 업데이트)');
               return;
             } else {
               console.warn('⚠️ [휴대폰목록] 불완전한 데이터 감지');
@@ -442,6 +457,7 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
           return item;
         }));
 
+        // 🔥 핵심 수정: 가격 정책 데이터도 함께 재로딩하여 pricingDataRef 업데이트
         // 서버에서 최신 데이터 재로딩 (재시도 로직 포함)
         const reloadWithRetry = async (retryCount = 0, maxRetries = 3) => {
           const delay = retryCount === 0 ? 1000 : 2000; // 첫 시도는 1초, 재시도는 2초
@@ -449,7 +465,21 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
           setTimeout(async () => {
             try {
               console.log(`🔄 [휴대폰목록] 다른 페이지 업로드 후 최신 데이터 재로딩 시도 ${retryCount + 1}/${maxRetries + 1}...`);
-              const freshData = await directStoreApiClient.getMobileList(currentCarrier);
+              
+              // 🔥 핵심 수정: 가격 정책 데이터도 함께 로드하여 pricingDataRef 업데이트
+              const [freshData, pricing] = await Promise.all([
+                directStoreApiClient.getMobileList(currentCarrier),
+                directStoreApiClient.getMobilesPricing(currentCarrier)
+              ]);
+              
+              // 가격 정책 데이터 인덱싱 (Lookup Map 생성)
+              const priceMap = new Map();
+              pricing.forEach(p => {
+                const key = `${p.modelId}-${p.planGroup}-${p.openingType}`;
+                priceMap.set(key, p);
+              });
+              pricingDataRef.current = priceMap;
+              console.log('🔄 [휴대폰목록] 가격 정책 데이터 업데이트 완료');
               
               // 데이터 유효성 검사: 빈 배열이 아니고, 가격 정보가 있는지 확인
               if (freshData && Array.isArray(freshData) && freshData.length > 0) {
