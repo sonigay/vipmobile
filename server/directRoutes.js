@@ -891,6 +891,20 @@ async function rebuildPricingMaster(carriersParam) {
       continue;
     }
 
+    // 🔥 핵심 수정: policySettings 유효성 검사 및 기본값 설정
+    if (!policySettings) {
+      perCarrierStats[carrier] = { count: 0, warning: '정책 설정을 불러올 수 없습니다.' };
+      continue;
+    }
+
+    // 각 속성이 배열인지 확인하고, 없으면 빈 배열로 설정
+    const safePolicySettings = {
+      baseMargin: policySettings.baseMargin || 0,
+      addonList: Array.isArray(policySettings.addonList) ? policySettings.addonList : [],
+      insuranceList: Array.isArray(policySettings.insuranceList) ? policySettings.insuranceList : [],
+      specialPolicies: Array.isArray(policySettings.specialPolicies) ? policySettings.specialPolicies : []
+    };
+
     let supportConfig = {};
     try { supportConfig = JSON.parse(supportRow[4] || '{}'); } catch (e) { }
 
@@ -1188,13 +1202,14 @@ async function rebuildPricingMaster(carriersParam) {
     //     StoreSupportWithoutAddon = StoreSupportWithAddon - (AddonDeductions)
 
     const targetProfit = 50000; // 목표 마진 (하드코딩 or 설정)
-    const totalAddonDeduction = policySettings.addonList.reduce((acc, cur) => acc + Math.abs(cur.deduction), 0) +
-      policySettings.insuranceList.reduce((acc, cur) => acc + Math.abs(cur.deduction), 0);
+    // 🔥 핵심 수정: safePolicySettings 사용
+    const totalAddonDeduction = safePolicySettings.addonList.reduce((acc, cur) => acc + Math.abs(cur.deduction || 0), 0) +
+      safePolicySettings.insuranceList.reduce((acc, cur) => acc + Math.abs(cur.deduction || 0), 0);
     // 별도 정책 합계
-    const specialPolicySum = policySettings.specialPolicies.reduce((acc, cur) => acc + cur.addition - cur.deduction, 0);
+    const specialPolicySum = safePolicySettings.specialPolicies.reduce((acc, cur) => acc + (cur.addition || 0) - (cur.deduction || 0), 0);
 
     // 기본 정책 마진
-    const baseMargin = policySettings.baseMargin + specialPolicySum;
+    const baseMargin = safePolicySettings.baseMargin + specialPolicySum;
 
     for (const mobileRow of carrierModels) {
       const modelName = mobileRow[2]; // Model Name
@@ -1267,16 +1282,18 @@ async function rebuildPricingMaster(carriersParam) {
           }
 
           // 부가서비스 인센티브/차감 합계 (보험은 모델별로 1개만 선택하므로 여기서는 제외)
-          const addonIncentiveSum = policySettings.addonList.reduce((acc, cur) => acc + (cur.incentive || 0), 0);
-          const addonDeductionSum = policySettings.addonList.reduce((acc, cur) => acc + (cur.deduction || 0), 0);
-          const totalSpecialAddition = policySettings.specialPolicies.reduce((acc, cur) => acc + (cur.addition || 0), 0);
-          const totalSpecialDeduction = policySettings.specialPolicies.reduce((acc, cur) => acc + (cur.deduction || 0), 0);
+          // 🔥 핵심 수정: safePolicySettings 사용
+          const addonIncentiveSum = safePolicySettings.addonList.reduce((acc, cur) => acc + (cur.incentive || 0), 0);
+          const addonDeductionSum = safePolicySettings.addonList.reduce((acc, cur) => acc + (cur.deduction || 0), 0);
+          const totalSpecialAddition = safePolicySettings.specialPolicies.reduce((acc, cur) => acc + (cur.addition || 0), 0);
+          const totalSpecialDeduction = safePolicySettings.specialPolicies.reduce((acc, cur) => acc + (cur.deduction || 0), 0);
 
           // 기본 정책 마진 (기본마진 + 별도정책)
-          const baseMargin = policySettings.baseMargin + totalSpecialAddition - totalSpecialDeduction;
+          const baseMargin = safePolicySettings.baseMargin + totalSpecialAddition - totalSpecialDeduction;
 
           // 보험상품: 출고가 및 모델명(플립/폴드 여부)에 맞는 보험 인센티브/차감 선택
-          const insuranceList = policySettings.insuranceList || [];
+          // 🔥 핵심 수정: safePolicySettings 사용
+          const insuranceList = safePolicySettings.insuranceList || [];
 
           const modelNameForCheck = (modelName || '').toString();
           const lowerModelName = modelNameForCheck.toLowerCase();
