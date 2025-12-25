@@ -122,6 +122,7 @@ function TodaysProductCard(props) {
           boxShadow: `0 8px 24px ${cardTheme.primary}40`,
           borderColor: cardTheme.primary,
           zIndex: 1
+          // 그라데이션 막대 제거됨
         }
       }}
       onClick={() => {
@@ -181,7 +182,7 @@ function TodaysProductCard(props) {
           position: 'relative', 
           pt: compact ? '50%' : '65%',  // 이미지 영역 비율 축소 (55%->50%, 70%->65%)
           minHeight: compact ? 160 : 220,  // 최소 높이 축소 (180->160, 240->220)
-          background: 'transparent', // 그라데이션 막대 제거
+          background: cardTheme.background || '#ffffff', // 통신사별 배경색 (SK: 파란색, KT: 녹색, LG: 분홍색)
           borderRadius: '16px 16px 0 0', 
           overflow: 'hidden',
           borderBottom: `2px solid ${cardTheme.primary}20`,
