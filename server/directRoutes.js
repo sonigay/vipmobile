@@ -6739,12 +6739,16 @@ function setupDirectRoutes(app) {
       carriers.forEach(carrier => {
         result.transitionPages[carrier] = {};
         categories.forEach(category => {
+          // 매장별 설정에서 가져온 값 (문자열)
           const storeText = storeMainPageTexts?.transitionPageTexts?.[carrier]?.[category];
+          // 기본값에서 가져온 값 (객체: { content, imageUrl, updatedAt })
           const defaultText = defaultTexts.transitionPages[carrier]?.[category];
           
+          // 매장별 설정이 있으면 우선 사용 (문자열을 객체로 변환)
+          // 없으면 기본값 사용
           result.transitionPages[carrier][category] = storeText
             ? { content: storeText, imageUrl: '', updatedAt: '' }
-            : defaultText || null;
+            : (defaultText || null);
         });
       });
 
