@@ -312,34 +312,67 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
       return item;
     }));
 
-    // 서버에서 최신 데이터 재로딩 (3초 후 - 서버 처리 시간 확보)
+    // 서버에서 최신 데이터 재로딩 (재시도 로직 포함)
     // 캐시 무효화 후 즉시 재로딩하면 Rate Limit이나 불완전한 데이터가 반환될 수 있음
-    setTimeout(async () => {
-      try {
-        const freshData = await directStoreApiClient.getMobileList(carrier);
-        
-        // 데이터 유효성 검사: 빈 배열이 아니고, 가격 정보가 있는지 확인
-        if (freshData && Array.isArray(freshData) && freshData.length > 0) {
-          // 첫 번째 항목에 가격 정보가 있는지 확인 (불완전한 데이터 감지)
-          const firstItem = freshData[0];
-          const hasValidData = firstItem.factoryPrice !== undefined || firstItem.purchasePriceWithAddon !== undefined;
+    const reloadWithRetry = async (retryCount = 0, maxRetries = 3) => {
+      const delay = retryCount === 0 ? 1000 : 2000; // 첫 시도는 1초, 재시도는 2초
+      
+      setTimeout(async () => {
+        try {
+          console.log(`🔄 [휴대폰목록] 최신 데이터 재로딩 시도 ${retryCount + 1}/${maxRetries + 1}...`);
+          const freshData = await directStoreApiClient.getMobileList(carrier);
           
-          if (hasValidData) {
-            setMobileList(freshData);
-            console.log('✅ [휴대폰목록] 최신 데이터 재로딩 완료');
+          // 데이터 유효성 검사: 빈 배열이 아니고, 가격 정보가 있는지 확인
+          if (freshData && Array.isArray(freshData) && freshData.length > 0) {
+            // 첫 번째 항목에 가격 정보가 있는지 확인 (불완전한 데이터 감지)
+            const firstItem = freshData[0];
+            const hasValidData = firstItem.factoryPrice !== undefined || firstItem.purchasePriceWithAddon !== undefined;
+            
+            // 업로드한 이미지가 포함되어 있는지 확인
+            const hasNewImage = freshData.some(item => 
+              (item.id === modelId || item.model === modelId) && item.image === imageUrl
+            );
+            
+            if (hasValidData && hasNewImage) {
+              setMobileList(freshData);
+              console.log('✅ [휴대폰목록] 최신 데이터 재로딩 완료 (새 이미지 포함)');
+              return; // 성공
+            } else if (hasValidData && !hasNewImage && retryCount < maxRetries) {
+              // 가격 정보는 있지만 새 이미지가 아직 반영되지 않음 - 재시도
+              console.log(`⚠️ [휴대폰목록] 새 이미지가 아직 반영되지 않음, 재시도... (${retryCount + 1}/${maxRetries})`);
+              reloadWithRetry(retryCount + 1, maxRetries);
+              return;
+            } else if (hasValidData) {
+              // 가격 정보는 있지만 새 이미지가 없음 (재시도 횟수 초과)
+              setMobileList(freshData);
+              console.log('✅ [휴대폰목록] 최신 데이터 재로딩 완료 (이미지는 로컬 상태로 이미 업데이트됨)');
+              return;
+            } else {
+              console.warn('⚠️ [휴대폰목록] 불완전한 데이터 감지');
+              if (retryCount < maxRetries) {
+                reloadWithRetry(retryCount + 1, maxRetries);
+                return;
+              }
+            }
           } else {
-            console.warn('⚠️ [휴대폰목록] 불완전한 데이터 감지, 이전 데이터 유지');
-            // 불완전한 데이터는 무시하고 이전 데이터 유지
+            console.warn('⚠️ [휴대폰목록] 빈 데이터 반환');
+            if (retryCount < maxRetries) {
+              reloadWithRetry(retryCount + 1, maxRetries);
+              return;
+            }
           }
-        } else {
-          console.warn('⚠️ [휴대폰목록] 빈 데이터 반환, 이전 데이터 유지');
-          // 빈 데이터는 무시하고 이전 데이터 유지
+        } catch (reloadError) {
+          console.warn(`⚠️ [휴대폰목록] 최신 데이터 재로딩 실패 (시도 ${retryCount + 1}/${maxRetries + 1}):`, reloadError);
+          if (retryCount < maxRetries) {
+            reloadWithRetry(retryCount + 1, maxRetries);
+            return;
+          }
+          // 재시도 횟수 초과 시에도 이전 데이터 유지 (이미 이미지는 업데이트됨)
         }
-      } catch (reloadError) {
-        console.warn('⚠️ [휴대폰목록] 최신 데이터 재로딩 실패, 이전 데이터 유지:', reloadError);
-        // 재로딩 실패 시에도 이전 데이터 유지 (이미 이미지는 업데이트됨)
-      }
-    }, 3000); // 3초 대기
+      }, delay);
+    };
+    
+    reloadWithRetry();
   }, []);
 
   // 🔥 양방향 동기화: 다른 페이지(오늘의휴대폰)에서 이미지 업로드 시 자동 업데이트
@@ -360,33 +393,66 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
           return item;
         }));
 
-        // 서버에서 최신 데이터 재로딩 (3초 후 - 서버 처리 시간 확보)
-        setTimeout(async () => {
-          try {
-            const freshData = await directStoreApiClient.getMobileList(currentCarrier);
-            
-            // 데이터 유효성 검사: 빈 배열이 아니고, 가격 정보가 있는지 확인
-            if (freshData && Array.isArray(freshData) && freshData.length > 0) {
-              // 첫 번째 항목에 가격 정보가 있는지 확인 (불완전한 데이터 감지)
-              const firstItem = freshData[0];
-              const hasValidData = firstItem.factoryPrice !== undefined || firstItem.purchasePriceWithAddon !== undefined;
+        // 서버에서 최신 데이터 재로딩 (재시도 로직 포함)
+        const reloadWithRetry = async (retryCount = 0, maxRetries = 3) => {
+          const delay = retryCount === 0 ? 1000 : 2000; // 첫 시도는 1초, 재시도는 2초
+          
+          setTimeout(async () => {
+            try {
+              console.log(`🔄 [휴대폰목록] 다른 페이지 업로드 후 최신 데이터 재로딩 시도 ${retryCount + 1}/${maxRetries + 1}...`);
+              const freshData = await directStoreApiClient.getMobileList(currentCarrier);
               
-              if (hasValidData) {
-                setMobileList(freshData);
-                console.log('✅ [휴대폰목록] 다른 페이지 업로드 후 최신 데이터 재로딩 완료');
+              // 데이터 유효성 검사: 빈 배열이 아니고, 가격 정보가 있는지 확인
+              if (freshData && Array.isArray(freshData) && freshData.length > 0) {
+                // 첫 번째 항목에 가격 정보가 있는지 확인 (불완전한 데이터 감지)
+                const firstItem = freshData[0];
+                const hasValidData = firstItem.factoryPrice !== undefined || firstItem.purchasePriceWithAddon !== undefined;
+                
+                // 업로드한 이미지가 포함되어 있는지 확인
+                const hasNewImage = freshData.some(item => 
+                  (item.id === modelId || item.model === modelId) && item.image === imageUrl
+                );
+                
+                if (hasValidData && hasNewImage) {
+                  setMobileList(freshData);
+                  console.log('✅ [휴대폰목록] 다른 페이지 업로드 후 최신 데이터 재로딩 완료 (새 이미지 포함)');
+                  return; // 성공
+                } else if (hasValidData && !hasNewImage && retryCount < maxRetries) {
+                  // 가격 정보는 있지만 새 이미지가 아직 반영되지 않음 - 재시도
+                  console.log(`⚠️ [휴대폰목록] 새 이미지가 아직 반영되지 않음, 재시도... (${retryCount + 1}/${maxRetries})`);
+                  reloadWithRetry(retryCount + 1, maxRetries);
+                  return;
+                } else if (hasValidData) {
+                  // 가격 정보는 있지만 새 이미지가 없음 (재시도 횟수 초과)
+                  setMobileList(freshData);
+                  console.log('✅ [휴대폰목록] 다른 페이지 업로드 후 최신 데이터 재로딩 완료 (이미지는 로컬 상태로 이미 업데이트됨)');
+                  return;
+                } else {
+                  console.warn('⚠️ [휴대폰목록] 불완전한 데이터 감지');
+                  if (retryCount < maxRetries) {
+                    reloadWithRetry(retryCount + 1, maxRetries);
+                    return;
+                  }
+                }
               } else {
-                console.warn('⚠️ [휴대폰목록] 불완전한 데이터 감지, 이전 데이터 유지');
-                // 불완전한 데이터는 무시하고 이전 데이터 유지
+                console.warn('⚠️ [휴대폰목록] 빈 데이터 반환');
+                if (retryCount < maxRetries) {
+                  reloadWithRetry(retryCount + 1, maxRetries);
+                  return;
+                }
               }
-            } else {
-              console.warn('⚠️ [휴대폰목록] 빈 데이터 반환, 이전 데이터 유지');
-              // 빈 데이터는 무시하고 이전 데이터 유지
+            } catch (reloadError) {
+              console.warn(`⚠️ [휴대폰목록] 최신 데이터 재로딩 실패 (시도 ${retryCount + 1}/${maxRetries + 1}):`, reloadError);
+              if (retryCount < maxRetries) {
+                reloadWithRetry(retryCount + 1, maxRetries);
+                return;
+              }
+              // 재시도 횟수 초과 시에도 이전 데이터 유지 (이미 이미지는 업데이트됨)
             }
-          } catch (reloadError) {
-            console.warn('⚠️ [휴대폰목록] 최신 데이터 재로딩 실패, 이전 데이터 유지:', reloadError);
-            // 재로딩 실패 시에도 이전 데이터 유지 (이미 이미지는 업데이트됨)
-          }
-        }, 3000); // 3초 대기
+          }, delay);
+        };
+        
+        reloadWithRetry();
       }
     };
 

@@ -1485,16 +1485,46 @@ function parseOpeningTypes(raw) {
 
 // 캐시 무효화 함수를 외부에서 사용할 수 있도록 export
 function invalidateDirectStoreCache(carrier = null) {
+  // 캐시 키가 mobiles-${carrier}-v6-${policyOrderHash} 형식이므로
+  // mobiles-${carrier}로 시작하는 모든 키를 삭제해야 함
+  const keysToDelete = [];
+  for (const key of cacheStore.keys()) {
+    if (carrier) {
+      // 특정 통신사의 모든 버전/해시 캐시 삭제
+      if (key.startsWith(`mobiles-${carrier}-`)) {
+        keysToDelete.push(key);
+      }
+    } else {
+      // 모든 통신사의 모든 버전/해시 캐시 삭제
+      if (key.startsWith('mobiles-SK-') || key.startsWith('mobiles-KT-') || key.startsWith('mobiles-LG-')) {
+        keysToDelete.push(key);
+      }
+    }
+  }
+  
+  // 레거시 캐시 키도 삭제 (하위 호환성)
   if (carrier) {
     deleteCache(`mobiles-${carrier}`);
+    deleteCache(`mobiles-${carrier}-v5`);
+    deleteCache(`mobiles-${carrier}-v6`);
   } else {
     // 모든 통신사 캐시 무효화
     deleteCache('mobiles-SK');
     deleteCache('mobiles-KT');
     deleteCache('mobiles-LG');
+    deleteCache('mobiles-SK-v5');
+    deleteCache('mobiles-KT-v5');
+    deleteCache('mobiles-LG-v5');
+    deleteCache('mobiles-SK-v6');
+    deleteCache('mobiles-KT-v6');
+    deleteCache('mobiles-LG-v6');
   }
+  
+  // 동적으로 생성된 캐시 키 삭제
+  keysToDelete.forEach(key => deleteCache(key));
+  
   deleteCache('todays-mobiles');
-  console.log(`[Direct] 모든 직영점 캐시 무효화 완료`);
+  console.log(`[Direct] 직영점 캐시 무효화 완료: ${carrier || '모든 통신사'} (${keysToDelete.length}개 동적 키 + 레거시 키)`);
 }
 
 // 시트 ID 조회 헬퍼 함수
