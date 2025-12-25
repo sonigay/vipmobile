@@ -9,7 +9,7 @@ const { google } = require('googleapis');
 const NodeGeocoder = require('node-geocoder');
 const webpush = require('web-push');
 const ExcelJS = require('exceljs');
-// const cron = require('node-cron'); // 클라우드타입에서 패키지 설치 문제로 임시 비활성화
+const cron = require('node-cron');
 const monthlyAwardAPI = require('./monthlyAwardAPI');
 const setupTeamRoutes = require('./teamRoutes');
 const UserSheetManager = require('./UserSheetManager');
@@ -7117,21 +7117,11 @@ app.get('/api/discord/image-monitoring', async (req, res) => {
   }
 });
 
-// POST /api/discord/batch-refresh-urls: 여러 이미지 URL 일괄 갱신
-app.post('/api/discord/batch-refresh-urls', express.json(), async (req, res) => {
-  try {
-    const { items } = req.body; // [{ type, ...params }]
-    
-    if (!Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'items 배열이 필요합니다.'
-      });
-    }
-    
-    const results = [];
-    
-    for (const item of items) {
+// 배치 갱신 로직을 재사용 가능한 함수로 분리
+async function processBatchRefreshItems(items) {
+  const results = [];
+  
+  for (const item of items) {
       try {
         const { type, threadId, messageId } = item;
         
@@ -7478,6 +7468,22 @@ app.post('/api/discord/batch-refresh-urls', express.json(), async (req, res) => 
       }
     }
     
+    return results;
+  }
+
+// POST /api/discord/batch-refresh-urls: 여러 이미지 URL 일괄 갱신
+app.post('/api/discord/batch-refresh-urls', express.json(), async (req, res) => {
+  try {
+    const { items } = req.body; // [{ type, ...params }]
+    
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'items 배열이 필요합니다.'
+      });
+    }
+    
+    const results = await processBatchRefreshItems(items);
     const successCount = results.filter(r => r.success).length;
     const failCount = results.length - successCount;
     
@@ -14266,6 +14272,238 @@ const server = app.listen(port, '0.0.0.0', async () => {
     } else {
       // console.log('Discord 봇 기능이 비활성화되었거나 설정이 완료되지 않았습니다.');
     }
+
+    // ===== 자동 스케줄 기능 초기화 =====
+    console.log('⏰ [스케줄러] 자동 스케줄 기능 초기화 시작...');
+    
+    // Discord 모니터링 자동 갱신 함수
+    async function refreshAllDiscordImages() {
+      try {
+        console.log('🔄 [스케줄러] Discord 이미지 자동 갱신 시작...');
+        
+        // 모니터링 데이터 직접 조회 (내부 함수 호출)
+        const sheets = originalSheets;
+        const monitoringData = {
+          direct: {
+            mobileImages: [],
+            masterImages: [],
+            storePhotos: []
+          }
+        };
+        
+        try {
+          // 직영점_모델이미지 조회
+          const { HEADERS_MOBILE_IMAGES } = require('./directRoutes');
+          const { ensureSheetHeaders } = require('./directRoutes');
+          await ensureSheetHeaders(sheets, SPREADSHEET_ID, '직영점_모델이미지', HEADERS_MOBILE_IMAGES);
+          
+          const imageResponse = await rateLimitedSheetsCall(() =>
+            sheets.spreadsheets.values.get({
+              spreadsheetId: SPREADSHEET_ID,
+              range: '직영점_모델이미지!A:K'
+            })
+          );
+          
+          const imageRows = (imageResponse.data.values || []).slice(1);
+          monitoringData.direct.mobileImages = imageRows
+            .filter(row => {
+              const messageId = (row[8] || '').trim();
+              const threadId = (row[10] || '').trim();
+              return messageId && threadId;
+            })
+            .map(row => ({
+              carrier: (row[0] || '').trim(),
+              modelId: (row[1] || '').trim(),
+              modelName: (row[2] || '').trim(),
+              petName: (row[3] || '').trim(),
+              imageUrl: (row[5] || '').trim(),
+              messageId: (row[8] || '').trim(),
+              postId: (row[9] || '').trim(),
+              threadId: (row[10] || '').trim()
+            }));
+          
+          // 직영점_단말마스터 조회
+          const { HEADERS_MOBILE_MASTER } = require('./directRoutes');
+          await ensureSheetHeaders(sheets, SPREADSHEET_ID, '직영점_단말마스터', HEADERS_MOBILE_MASTER);
+          
+          const masterResponse = await rateLimitedSheetsCall(() =>
+            sheets.spreadsheets.values.get({
+              spreadsheetId: SPREADSHEET_ID,
+              range: '직영점_단말마스터!A:R'
+            })
+          );
+          
+          const masterRows = (masterResponse.data.values || []).slice(1);
+          monitoringData.direct.masterImages = masterRows
+            .filter(row => {
+              const messageId = (row[15] || '').trim();
+              const threadId = (row[17] || '').trim();
+              return messageId && threadId;
+            })
+            .map(row => ({
+              carrier: (row[0] || '').trim(),
+              modelId: (row[1] || '').trim(),
+              modelName: (row[2] || '').trim(),
+              petName: (row[3] || '').trim(),
+              imageUrl: (row[12] || '').trim(),
+              messageId: (row[15] || '').trim(),
+              postId: (row[16] || '').trim(),
+              threadId: (row[17] || '').trim()
+            }));
+          
+          // 직영점_매장사진 조회
+          const { ensureSheetHeaders: ensureHeaders } = require('./directRoutes');
+          await ensureHeaders(sheets, SPREADSHEET_ID, CUSTOMER_STORE_PHOTO_SHEET_NAME, HEADERS_STORE_PHOTO);
+          
+          const storePhotoResponse = await rateLimitedSheetsCall(() =>
+            sheets.spreadsheets.values.get({
+              spreadsheetId: SPREADSHEET_ID,
+              range: `${CUSTOMER_STORE_PHOTO_SHEET_NAME}!A:AH`
+            })
+          );
+          
+          const storePhotoRows = (storePhotoResponse.data.values || []).slice(1);
+          const photoTypes = ['front', 'inside', 'outside', 'outside2', 'manager', 'staff1', 'staff2', 'staff3'];
+          const photoTypeMap = {
+            front: { url: 1, msgId: 2, postId: 3, threadId: 4 },
+            inside: { url: 5, msgId: 6, postId: 7, threadId: 8 },
+            outside: { url: 9, msgId: 10, postId: 11, threadId: 12 },
+            outside2: { url: 13, msgId: 14, postId: 15, threadId: 16 },
+            manager: { url: 17, msgId: 18, postId: 19, threadId: 20 },
+            staff1: { url: 21, msgId: 22, postId: 23, threadId: 24 },
+            staff2: { url: 25, msgId: 26, postId: 27, threadId: 28 },
+            staff3: { url: 29, msgId: 30, postId: 31, threadId: 32 }
+          };
+          
+          storePhotoRows.forEach(row => {
+            const storeName = (row[0] || '').trim();
+            photoTypes.forEach(photoType => {
+              const map = photoTypeMap[photoType];
+              const messageId = (row[map.msgId] || '').trim();
+              const threadId = (row[map.threadId] || '').trim();
+              if (messageId && threadId) {
+                monitoringData.direct.storePhotos.push({
+                  storeName,
+                  photoType,
+                  imageUrl: (row[map.url] || '').trim(),
+                  messageId,
+                  postId: (row[map.postId] || '').trim(),
+                  threadId
+                });
+              }
+            });
+          });
+        } catch (err) {
+          console.error('❌ [스케줄러] 모니터링 데이터 조회 오류:', err);
+          return;
+        }
+        
+        // 모든 이미지 항목 수집
+        const allItems = [
+          ...monitoringData.direct.mobileImages.map(item => ({ type: 'mobile-image', ...item })),
+          ...monitoringData.direct.masterImages.map(item => ({ type: 'master-image', ...item })),
+          ...monitoringData.direct.storePhotos.map(item => ({ type: 'store-photo', ...item }))
+        ];
+        
+        if (allItems.length === 0) {
+          console.log('ℹ️ [스케줄러] 갱신할 Discord 이미지가 없습니다.');
+          return;
+        }
+        
+        console.log(`🔄 [스케줄러] ${allItems.length}개 Discord 이미지 갱신 시작...`);
+        
+        // 배치 갱신 실행 (재사용 가능한 함수 호출)
+        const results = await processBatchRefreshItems(allItems);
+        
+        const successCount = results.filter(r => r.success).length;
+        const failCount = results.length - successCount;
+        console.log(`✅ [스케줄러] Discord 이미지 자동 갱신 완료: 성공 ${successCount}개, 실패 ${failCount}개`);
+      } catch (error) {
+        console.error('❌ [스케줄러] Discord 이미지 자동 갱신 오류:', error);
+      }
+    }
+    
+    // 데이터 재빌드 함수
+    async function rebuildMasterData() {
+      try {
+        console.log('🔄 [스케줄러] 데이터 재빌드 시작...');
+        
+        const { rebuildPlanMaster, rebuildDeviceMaster, rebuildPricingMaster, invalidateDirectStoreCache } = require('./directRoutes');
+        const carriers = ['SK', 'KT', 'LG'];
+        
+        // 1. 요금제 마스터 리빌드
+        console.log(`[스케줄러] Rebuilding Plan Master for ${carriers.join(',')}`);
+        await rebuildPlanMaster(carriers);
+        
+        // 2. 단말 마스터 리빌드
+        console.log(`[스케줄러] Rebuilding Device Master for ${carriers.join(',')}`);
+        await rebuildDeviceMaster(carriers);
+        
+        // 3. 단말 요금정책 리빌드
+        console.log(`[스케줄러] Rebuilding Pricing Master for ${carriers.join(',')}`);
+        await rebuildPricingMaster(carriers);
+        
+        // 4. 재빌드 완료 후 모든 관련 캐시 무효화
+        console.log(`[스케줄러] Invalidating all related caches after rebuild`);
+        if (typeof invalidateDirectStoreCache === 'function') {
+          invalidateDirectStoreCache();
+        }
+        
+        console.log('✅ [스케줄러] 데이터 재빌드 완료');
+      } catch (error) {
+        console.error('❌ [스케줄러] 데이터 재빌드 오류:', error);
+      }
+    }
+    
+    // 서버 시작 시 실행
+    console.log('🚀 [스케줄러] 서버 시작 시 자동 실행 시작...');
+    
+    // Discord 모니터링 자동 갱신 (서버 시작 시 1회)
+    setTimeout(async () => {
+      console.log('🔄 [스케줄러] 서버 시작 시 Discord 이미지 자동 갱신 실행');
+      await refreshAllDiscordImages();
+    }, 30000); // 30초 후 실행 (서버 초기화 완료 대기)
+    
+    // 데이터 재빌드 (서버 시작 시 1회)
+    setTimeout(async () => {
+      console.log('🔄 [스케줄러] 서버 시작 시 데이터 재빌드 실행');
+      await rebuildMasterData();
+    }, 60000); // 60초 후 실행 (Discord 갱신 후 실행)
+    
+    // Discord 모니터링 자동 갱신 스케줄 등록
+    // 매일 11:30, 17:30
+    cron.schedule('30 11 * * *', async () => {
+      console.log('⏰ [스케줄러] 정기 스케줄 실행: Discord 이미지 자동 갱신 (11:30)');
+      await refreshAllDiscordImages();
+    }, {
+      scheduled: true,
+      timezone: 'Asia/Seoul'
+    });
+    
+    cron.schedule('30 17 * * *', async () => {
+      console.log('⏰ [스케줄러] 정기 스케줄 실행: Discord 이미지 자동 갱신 (17:30)');
+      await refreshAllDiscordImages();
+    }, {
+      scheduled: true,
+      timezone: 'Asia/Seoul'
+    });
+    
+    // 데이터 재빌드 스케줄 등록
+    // 매일 11:00-19:00 매시간 10분 (11:10, 12:10, 13:10, ..., 19:10)
+    for (let hour = 11; hour <= 19; hour++) {
+      cron.schedule(`10 ${hour} * * *`, async () => {
+        console.log(`⏰ [스케줄러] 정기 스케줄 실행: 데이터 재빌드 (${hour}:10)`);
+        await rebuildMasterData();
+      }, {
+        scheduled: true,
+        timezone: 'Asia/Seoul'
+      });
+    }
+    
+    console.log('✅ [스케줄러] 자동 스케줄 기능 초기화 완료');
+    console.log('   - Discord 이미지 자동 갱신: 서버 시작 시, 매일 11:30, 17:30');
+    console.log('   - 데이터 재빌드: 서버 시작 시, 매일 11:10-19:10 매시간');
+    // ===== 자동 스케줄 기능 초기화 완료 =====
 
     // 주소 업데이트 함수 호출 (비동기로 처리하여 배정 로직을 방해하지 않도록)
     console.log('🔍 [서버시작] 주소 업데이트 함수 시작 (비동기 처리)');
