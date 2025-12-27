@@ -2211,26 +2211,47 @@ function setupDirectRoutes(app) {
 
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
 
-      // 마진 설정 읽기
-      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_MARGIN, HEADERS_POLICY_MARGIN);
-      const marginRes = await withRetry(async () => {
-        return await sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: SHEET_POLICY_MARGIN
-        });
-      });
+      // 🔥 성능 개선: 모든 시트 헤더 확인을 병렬로 처리
+      await Promise.all([
+        ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_MARGIN, HEADERS_POLICY_MARGIN),
+        ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_ADDON, HEADERS_POLICY_ADDON),
+        ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_INSURANCE, HEADERS_POLICY_INSURANCE),
+        ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_SPECIAL, HEADERS_POLICY_SPECIAL)
+      ]);
+
+      // 🔥 성능 개선: 모든 시트 읽기를 병렬로 처리
+      const [marginRes, addonRes, insuranceRes, specialRes] = await Promise.all([
+        withRetry(async () => {
+          return await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: SHEET_POLICY_MARGIN
+          });
+        }),
+        withRetry(async () => {
+          return await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: SHEET_POLICY_ADDON
+          });
+        }),
+        withRetry(async () => {
+          return await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: SHEET_POLICY_INSURANCE
+          });
+        }),
+        withRetry(async () => {
+          return await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: SHEET_POLICY_SPECIAL
+          });
+        })
+      ]);
+
+      // 데이터 처리
       const marginRows = (marginRes.data.values || []).slice(1);
       const marginRow = marginRows.find(row => (row[0] || '').trim() === carrier);
       const margin = marginRow ? Number(marginRow[1] || 0) : 50000; // 기본값 50000
 
-      // 부가서비스 설정 읽기
-      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_ADDON, HEADERS_POLICY_ADDON);
-      const addonRes = await withRetry(async () => {
-        return await sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: SHEET_POLICY_ADDON
-        });
-      });
       const addonRows = (addonRes.data.values || []).slice(1);
       const addons = addonRows
         .filter(row => (row[0] || '').trim() === carrier)
@@ -2244,14 +2265,6 @@ function setupDirectRoutes(app) {
           url: (row[6] || '').trim()
         }));
 
-      // 보험상품 설정 읽기
-      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_INSURANCE, HEADERS_POLICY_INSURANCE);
-      const insuranceRes = await withRetry(async () => {
-        return await sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: SHEET_POLICY_INSURANCE
-        });
-      });
       const insuranceRows = (insuranceRes.data.values || []).slice(1);
       const insurances = insuranceRows
         .filter(row => (row[0] || '').trim() === carrier)
@@ -2267,14 +2280,6 @@ function setupDirectRoutes(app) {
           url: (row[8] || '').trim()
         }));
 
-      // 별도 정책 설정 읽기
-      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_SPECIAL, HEADERS_POLICY_SPECIAL);
-      const specialRes = await withRetry(async () => {
-        return await sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: SHEET_POLICY_SPECIAL
-        });
-      });
       const specialRows = (specialRes.data.values || []).slice(1);
       const specialPolicies = specialRows
         .filter(row => (row[0] || '').trim() === carrier)
