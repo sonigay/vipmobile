@@ -40,20 +40,26 @@ const DiscordImageMonitoringTab = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedItems, setSelectedItems] = useState(new Set());
   const [refreshResults, setRefreshResults] = useState(null);
+  const [urlValidationCache, setUrlValidationCache] = useState(new Map()); // URL 검증 결과 캐시
 
   useEffect(() => {
     loadMonitoringData();
-    // 60초마다 자동 새로고침
-    const interval = setInterval(loadMonitoringData, 60000);
+    // 60초마다 자동 새로고침 (검증 없이)
+    const interval = setInterval(() => loadMonitoringData(false), 60000);
     return () => clearInterval(interval);
   }, []);
 
   const loadMonitoringData = async (validateUrls = false) => {
     try {
       setLoading(true);
-      const validateParam = validateUrls ? '&validate=true' : '';
+      // 검증 요청 시 캐시 무효화를 위해 타임스탬프 추가
+      const validateParam = validateUrls ? `&validate=true&_t=${Date.now()}` : '';
       const response = await fetch(
-        `${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/discord/image-monitoring?type=direct${validateParam}`
+        `${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/discord/image-monitoring?type=direct${validateParam}`,
+        {
+          // 검증 요청 시 캐시 무시
+          cache: validateUrls ? 'no-cache' : 'default'
+        }
       );
       
       if (!response.ok) {
@@ -62,7 +68,57 @@ const DiscordImageMonitoringTab = () => {
       
       const result = await response.json();
       if (result.success) {
-        setMonitoringData(result.data);
+        const data = result.data;
+        
+        // 검증 결과가 있으면 캐시에 저장
+        if (validateUrls) {
+          const newCache = new Map();
+          const updateCache = (items) => {
+            items.forEach(item => {
+              if (item.imageUrl && item.urlStatus && item.urlStatus !== 'unknown') {
+                newCache.set(item.imageUrl, {
+                  urlStatus: item.urlStatus,
+                  urlValid: item.urlValid,
+                  urlError: item.urlError
+                });
+              }
+            });
+          };
+          
+          if (data.direct) {
+            updateCache(data.direct.mobileImages || []);
+            updateCache(data.direct.masterImages || []);
+            updateCache(data.direct.storePhotos || []);
+          }
+          
+          setUrlValidationCache(newCache);
+        }
+        
+        // 검증 결과가 없는 경우 캐시에서 복원
+        if (!validateUrls && urlValidationCache.size > 0) {
+          const restoreValidation = (items) => {
+            return items.map(item => {
+              if (item.imageUrl && urlValidationCache.has(item.imageUrl)) {
+                const cached = urlValidationCache.get(item.imageUrl);
+                return {
+                  ...item,
+                  urlStatus: cached.urlStatus,
+                  urlValid: cached.urlValid,
+                  urlError: cached.urlError
+                };
+              }
+              return item;
+            });
+          };
+          
+          if (data.direct) {
+            data.direct.mobileImages = restoreValidation(data.direct.mobileImages || []);
+            data.direct.masterImages = restoreValidation(data.direct.masterImages || []);
+            data.direct.storePhotos = restoreValidation(data.direct.storePhotos || []);
+          }
+        }
+        
+        setMonitoringData(data);
         setError(null);
       } else {
         throw new Error(result.error || '알 수 없는 오류');
@@ -115,13 +171,58 @@ const DiscordImageMonitoringTab = () => {
         ];
       }
 
-      const itemsToRefresh = Array.from(selectedItems).map(index => allItems[index]);
+      let itemsToRefresh = Array.from(selectedItems).map(index => allItems[index]);
       
-      console.log(`🔄 [배치 갱신] ${itemsToRefresh.length}개 항목 갱신 시작...`);
+      // 스마트 갱신: 만료된 URL만 필터링
+      // 프론트엔드에 이미 있는 검증 결과(urlStatus)를 활용
+      const originalCount = itemsToRefresh.length;
       
-      // 타임아웃 설정 (5분)
+      // 만료되었거나 오류가 있는 항목만 필터링
+      // urlStatus가 없거나 'unknown'인 경우도 갱신 (안전을 위해)
+      const expiredItems = itemsToRefresh.filter(item => {
+        if (!item.imageUrl) return true; // URL이 없는 경우
+        if (item.urlStatus === 'valid' && item.urlValid === true) {
+          return false; // 정상 URL은 건너뛰기
+        }
+        // 만료, 오류, 타임아웃, 미확인 상태는 갱신
+        return true;
+      });
+      
+      if (expiredItems.length < originalCount) {
+        const skippedCount = originalCount - expiredItems.length;
+        console.log(`✅ [배치 갱신] ${skippedCount}개 정상 URL 건너뛰기, ${expiredItems.length}개 만료/오류/미확인 URL만 갱신`);
+      }
+      
+      itemsToRefresh = expiredItems;
+      
+      if (itemsToRefresh.length === 0) {
+        alert('갱신할 만료된 URL이 없습니다. 모든 선택한 항목이 정상입니다.\n\n상태 검증 버튼을 먼저 눌러 URL 상태를 확인해주세요.');
+        setRefreshing(false);
+        return;
+      }
+      
+      console.log(`🔄 [배치 갱신] ${itemsToRefresh.length}개 만료/오류/미확인 항목 갱신 시작 (전체 ${originalCount}개 중)...`);
+      
+      // 타임아웃 설정 (동적 계산)
+      // 배치 크기: 5개, 항목 간 지연: 2초, 배치 간 지연: 5초
+      // 각 항목당 예상 소요 시간: 약 3-4초 (Discord API + Google Sheets API)
+      const BATCH_SIZE = 5;
+      const ITEM_DELAY_MS = 2000;
+      const BATCH_DELAY_MS = 5000;
+      const ESTIMATED_TIME_PER_ITEM_MS = 4000; // 항목당 예상 소요 시간
+      
+      const totalBatches = Math.ceil(itemsToRefresh.length / BATCH_SIZE);
+      const estimatedTimeMs = 
+        (totalBatches * BATCH_DELAY_MS) + // 배치 간 지연
+        (itemsToRefresh.length * ITEM_DELAY_MS) + // 항목 간 지연
+        (itemsToRefresh.length * ESTIMATED_TIME_PER_ITEM_MS) + // 실제 처리 시간
+        (30000); // 여유 시간 30초
+      
+      const timeoutMinutes = Math.ceil(estimatedTimeMs / 60000);
+      console.log(`⏱️ [배치 갱신] 예상 소요 시간: ${Math.ceil(estimatedTimeMs / 1000)}초 (타임아웃: ${timeoutMinutes}분)`);
+      
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000);
+      const timeoutId = setTimeout(() => controller.abort(), estimatedTimeMs);
       
       try {
         const response = await fetch(
@@ -159,13 +260,14 @@ const DiscordImageMonitoringTab = () => {
         clearTimeout(timeoutId);
         console.error('❌ [배치 갱신] URL 갱신 오류:', err);
         
-        // 네트워크 오류인 경우에도 서버에서 처리가 완료되었을 수 있으므로 확인
-        if (err.name === 'AbortError' || err.message.includes('Failed to fetch') || err.message.includes('CORS')) {
-          // 네트워크 오류지만 서버에서 처리가 완료되었을 수 있음
+        // 타임아웃 또는 네트워크 오류인 경우에도 서버에서 처리가 완료되었을 수 있으므로 확인
+        if (err.name === 'AbortError' || err.message.includes('Failed to fetch') || err.message.includes('CORS') || err.message.includes('504')) {
+          // 타임아웃 또는 네트워크 오류지만 서버에서 처리가 완료되었을 수 있음
           // 사용자에게 확인 메시지 표시
           const shouldReload = window.confirm(
-            '네트워크 오류가 발생했지만 서버에서 갱신이 완료되었을 수 있습니다.\n\n' +
-            '데이터를 새로고침하여 확인하시겠습니까?'
+            `요청 시간이 초과되었지만 서버에서 갱신이 계속 진행 중일 수 있습니다.\n\n` +
+            `선택한 ${itemsToRefresh.length}개 항목 중 일부는 이미 갱신되었을 수 있습니다.\n\n` +
+            `데이터를 새로고침하여 확인하시겠습니까?`
           );
           if (shouldReload) {
             await loadMonitoringData();
