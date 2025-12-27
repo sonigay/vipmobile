@@ -2091,7 +2091,10 @@ function setupDirectRoutes(app) {
             isCheap: parseBooleanFlag(row[11]),
             imageUrl: (row[12] || '').toString().trim(),
             enabled,
-            note: (row[14] || '').toString().trim()
+            note: (row[14] || '').toString().trim(),
+            discordMessageId: (row[15] || '').toString().trim() || null, // P: Discord메시지ID
+            discordPostId: (row[16] || '').toString().trim() || null, // Q: Discord포스트ID
+            discordThreadId: (row[17] || '').toString().trim() || null // R: Discord스레드ID
           };
         })
         .filter(item => {

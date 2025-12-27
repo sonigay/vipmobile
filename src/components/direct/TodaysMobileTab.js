@@ -489,6 +489,57 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
     }
   }, [loggedInStore?.id, slideSettings, mainHeaderText, slideshowData]);
 
+  // 가격 데이터만 업데이트하는 함수 (슬라이드 리셋 방지)
+  const updatePricingDataOnly = useCallback(async () => {
+    try {
+      console.log('🔄 [오늘의휴대폰] 가격 데이터만 업데이트 중...');
+      
+      // 단말 요금정책 마스터 조회 (모든 통신사)
+      const [skPricing, ktPricing, lgPricing] = await Promise.all([
+        directStoreApiClient.getMobilesPricing('SK'),
+        directStoreApiClient.getMobilesPricing('KT'),
+        directStoreApiClient.getMobilesPricing('LG')
+      ]);
+
+      const allPricing = [...skPricing, ...ktPricing, ...lgPricing];
+
+      if (allPricing.length === 0) {
+        console.warn('⚠️ [오늘의휴대폰] 가격 데이터가 비어있습니다.');
+        return;
+      }
+
+      // 가격 데이터 인덱싱
+      const pricingMap = {};
+      allPricing.forEach(item => {
+        const purchasePriceWithAddon = Math.max(0, 
+          (item.factoryPrice || 0) - (item.publicSupport || 0) - (item.storeSupportWithAddon || 0)
+        );
+        const purchasePriceWithoutAddon = Math.max(0,
+          (item.factoryPrice || 0) - (item.publicSupport || 0) - (item.storeSupportWithoutAddon || 0)
+        );
+
+        const priceItem = {
+          ...item,
+          purchasePriceWithAddon,
+          purchasePriceWithoutAddon
+        };
+
+        const basicKey = `${item.modelId}-${item.openingType}`;
+        const planGroupKey = `${item.modelId}-${item.planGroup}-${item.openingType}`;
+        
+        if (!pricingMap[basicKey]) {
+          pricingMap[basicKey] = priceItem;
+        }
+        pricingMap[planGroupKey] = priceItem;
+      });
+
+      setMasterPricing(pricingMap);
+      console.log('✅ [오늘의휴대폰] 가격 데이터 업데이트 완료');
+    } catch (error) {
+      console.error('❌ [오늘의휴대폰] 가격 데이터 업데이트 오류:', error);
+    }
+  }, []);
+
   // 초기 로드
   useEffect(() => {
     fetchData();
@@ -507,6 +558,22 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
     window.addEventListener('imageUploaded', handleImageUploaded);
     return () => window.removeEventListener('imageUploaded', handleImageUploaded);
   }, [fetchData]);
+
+  // 주기적 가격 데이터 업데이트 (슬라이드 리셋 방지)
+  useEffect(() => {
+    // 슬라이드가 실행 중이면 가격 데이터만 업데이트, 아니면 전체 데이터 업데이트
+    const interval = setInterval(() => {
+      if (isSlideshowActive) {
+        // 슬라이드 실행 중: 가격 데이터만 업데이트 (슬라이드 리셋 방지)
+        updatePricingDataOnly();
+      } else {
+        // 슬라이드 미실행: 전체 데이터 업데이트 (이미지 URL 갱신 포함)
+        fetchData();
+      }
+    }, 60000); // 1분마다
+    
+    return () => clearInterval(interval);
+  }, [isSlideshowActive, updatePricingDataOnly, fetchData]);
 
   // 가격 데이터 Lookup 함수 (TodaysProductCard용 prop 생성)
   const getPriceDataForProduct = useCallback((product) => {
@@ -1077,11 +1144,12 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
   }, [loggedInStore?.id]); // loggedInStore.id가 변경되면 재로드
 
   // 일반 모드에서도 슬라이드쇼 데이터 준비 (초기 로드 후)
+  // 슬라이드가 실행 중이면 슬라이드 데이터는 업데이트하지 않음 (리셋 방지)
   useEffect(() => {
-    if (!loading) {
+    if (!loading && !isSlideshowActive) {
       prepareSlideshowData();
     }
-  }, [loading, prepareSlideshowData]);
+  }, [loading, isSlideshowActive, prepareSlideshowData]);
 
 
   // 슬라이드쇼 제어 (Start/Stop)

@@ -21,6 +21,7 @@ import {
 import { directStoreApiClient } from '../../api/directStoreApiClient';
 import { getCachedPrice, setCachedPrice, setCachedPricesBatch } from '../../utils/priceCache';
 import { getProxyImageUrl } from '../../api';
+import { attachDiscordImageRefreshHandler } from '../../utils/discordImageUtils';
 
 // 함수 선언으로 변경하여 hoisting으로 TDZ 문제 방지
 // React.lazy와의 호환성을 위해 함수를 즉시 평가 가능한 형태로 정의
@@ -229,6 +230,21 @@ function TodaysProductCard(props) {
               // 프록시 실패 → 원본 URL로 직접 시도
               e.target.src = originalUrl;
               e.target.dataset.retryCount = (retryCount + 1).toString();
+              return;
+            }
+            
+            // Discord 이미지이고 메시지 ID가 있으면 자동 갱신 시도
+            const isDiscordUrl = originalUrl.includes('cdn.discordapp.com') || originalUrl.includes('media.discordapp.net');
+            if (isDiscordUrl && product.discordThreadId && product.discordMessageId) {
+              attachDiscordImageRefreshHandler(
+                e.target,
+                product.discordThreadId,
+                product.discordMessageId,
+                (newUrl) => {
+                  // 갱신 성공 시 이미지 자동 복구
+                  console.log('✅ [TodaysProductCard] Discord 이미지 URL 갱신 성공');
+                }
+              );
               return;
             }
             
