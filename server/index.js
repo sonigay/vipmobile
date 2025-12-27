@@ -6630,6 +6630,65 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
   }
 });
 
+// Discord 이미지 URL 유효성 검증 함수
+async function validateImageUrl(imageUrl, timeoutMs = 5000) {
+  if (!imageUrl || !imageUrl.trim()) {
+    return { valid: false, status: 'empty', error: 'URL이 없습니다.' };
+  }
+
+  const https = require('https');
+  const http = require('http');
+  const url = require('url');
+
+  return new Promise((resolve) => {
+    try {
+      const parsedUrl = new URL(imageUrl);
+      const isHttps = parsedUrl.protocol === 'https:';
+      const client = isHttps ? https : http;
+
+      const options = {
+        method: 'HEAD',
+        timeout: timeoutMs,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; ImageValidator/1.0)'
+        }
+      };
+
+      const req = client.request(imageUrl, options, (res) => {
+        const statusCode = res.statusCode;
+        if (statusCode >= 200 && statusCode < 400) {
+          resolve({ valid: true, status: 'valid', statusCode });
+        } else if (statusCode === 404) {
+          resolve({ valid: false, status: 'expired', error: '이미지가 만료되었습니다 (404)', statusCode });
+        } else {
+          resolve({ valid: false, status: 'error', error: `HTTP ${statusCode}`, statusCode });
+        }
+        res.destroy();
+      });
+
+      req.on('error', (error) => {
+        if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+          resolve({ valid: false, status: 'error', error: '연결 실패', code: error.code });
+        } else if (error.code === 'ETIMEDOUT') {
+          resolve({ valid: false, status: 'timeout', error: '요청 시간 초과', code: error.code });
+        } else {
+          resolve({ valid: false, status: 'error', error: error.message, code: error.code });
+        }
+      });
+
+      req.on('timeout', () => {
+        req.destroy();
+        resolve({ valid: false, status: 'timeout', error: '요청 시간 초과' });
+      });
+
+      req.setTimeout(timeoutMs);
+      req.end();
+    } catch (error) {
+      resolve({ valid: false, status: 'error', error: error.message });
+    }
+  });
+}
+
 // Discord 이미지 URL 갱신 공통 함수
 async function refreshDiscordImageUrl(threadId, messageId) {
   if (!DISCORD_LOGGING_ENABLED || !discordBot) {
@@ -6970,7 +7029,8 @@ app.get('/api/discord/image-monitoring', async (req, res) => {
   try {
     // index.js에서 사용하는 전역 sheets와 SPREADSHEET_ID 사용
     const sheets = originalSheets;
-    const { type } = req.query; // 'direct' 또는 'meeting'
+    const { type, validate } = req.query; // 'direct' 또는 'meeting', validate: 'true'면 URL 유효성 검증 수행
+    const shouldValidate = validate === 'true';
     
     const monitoringData = {
       direct: {
@@ -6982,6 +7042,34 @@ app.get('/api/discord/image-monitoring', async (req, res) => {
         slides: []
       }
     };
+    
+    // URL 유효성 검증 헬퍼 함수 (병렬 처리)
+    async function validateImageUrls(items, maxConcurrent = 10) {
+      if (!shouldValidate || items.length === 0) {
+        return items.map(item => ({ ...item, urlStatus: 'unknown' }));
+      }
+
+      const results = [];
+      for (let i = 0; i < items.length; i += maxConcurrent) {
+        const batch = items.slice(i, i + maxConcurrent);
+        const batchResults = await Promise.all(
+          batch.map(async (item) => {
+            if (!item.imageUrl) {
+              return { ...item, urlStatus: 'empty', urlValid: false };
+            }
+            const validation = await validateImageUrl(item.imageUrl);
+            return {
+              ...item,
+              urlStatus: validation.status,
+              urlValid: validation.valid,
+              urlError: validation.error
+            };
+          })
+        );
+        results.push(...batchResults);
+      }
+      return results;
+    }
     
     if (!type || type === 'direct') {
       // 직영점_모델이미지 조회
@@ -6997,7 +7085,7 @@ app.get('/api/discord/image-monitoring', async (req, res) => {
       );
       
       const imageRows = (imageResponse.data.values || []).slice(1);
-      monitoringData.direct.mobileImages = imageRows
+      const mobileImages = imageRows
         .filter(row => {
           const messageId = (row[8] || '').trim(); // I: Discord메시지ID
           const threadId = (row[10] || '').trim(); // K: Discord스레드ID
@@ -7014,6 +7102,8 @@ app.get('/api/discord/image-monitoring', async (req, res) => {
           threadId: (row[10] || '').trim()
         }));
       
+      monitoringData.direct.mobileImages = await validateImageUrls(mobileImages);
+      
       // 직영점_단말마스터 조회
       const { HEADERS_MOBILE_MASTER } = require('./directRoutes');
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, '직영점_단말마스터', HEADERS_MOBILE_MASTER);
@@ -7026,7 +7116,7 @@ app.get('/api/discord/image-monitoring', async (req, res) => {
       );
       
       const masterRows = (masterResponse.data.values || []).slice(1);
-      monitoringData.direct.masterImages = masterRows
+      const masterImages = masterRows
         .filter(row => {
           const messageId = (row[15] || '').trim(); // P: Discord메시지ID
           const threadId = (row[17] || '').trim(); // R: Discord스레드ID
@@ -7042,6 +7132,8 @@ app.get('/api/discord/image-monitoring', async (req, res) => {
           postId: (row[16] || '').trim(),
           threadId: (row[17] || '').trim()
         }));
+      
+      monitoringData.direct.masterImages = await validateImageUrls(masterImages);
       
       // 직영점_매장사진 조회
       const { ensureSheetHeaders: ensureHeaders } = require('./directRoutes');
@@ -7067,6 +7159,7 @@ app.get('/api/discord/image-monitoring', async (req, res) => {
         staff3: { url: 29, msgId: 30, postId: 31, threadId: 32 }
       };
       
+      const storePhotos = [];
       storePhotoRows.forEach(row => {
         const storeName = (row[0] || '').trim();
         photoTypes.forEach(photoType => {
@@ -7074,7 +7167,7 @@ app.get('/api/discord/image-monitoring', async (req, res) => {
           const messageId = (row[map.msgId] || '').trim();
           const threadId = (row[map.threadId] || '').trim();
           if (messageId && threadId) {
-            monitoringData.direct.storePhotos.push({
+            storePhotos.push({
               storeName,
               photoType,
               imageUrl: (row[map.url] || '').trim(),
@@ -7085,6 +7178,8 @@ app.get('/api/discord/image-monitoring', async (req, res) => {
           }
         });
       });
+      
+      monitoringData.direct.storePhotos = await validateImageUrls(storePhotos);
     }
     
     if (!type || type === 'meeting') {
@@ -7097,7 +7192,7 @@ app.get('/api/discord/image-monitoring', async (req, res) => {
       );
       
       const meetingRows = (meetingResponse.data.values || []).slice(1);
-      monitoringData.meeting.slides = meetingRows
+      const slides = meetingRows
         .filter(row => {
           const messageId = (row[14] || '').trim(); // O: Discord메시지ID
           const threadId = (row[13] || '').trim(); // N: Discord스레드ID
@@ -7114,6 +7209,8 @@ app.get('/api/discord/image-monitoring', async (req, res) => {
           meetingDate: (row[18] || '').trim(),
           meetingNumber: (row[19] || '').trim()
         }));
+      
+      monitoringData.meeting.slides = await validateImageUrls(slides);
     }
     
     return res.json({
@@ -14489,10 +14586,30 @@ const server = app.listen(port, '0.0.0.0', async () => {
           return;
         }
         
-        console.log(`🔄 [스케줄러] ${allItems.length}개 Discord 이미지 갱신 시작...`);
+        // 스마트 갱신: 만료된 URL만 필터링
+        console.log(`🔍 [스케줄러] ${allItems.length}개 이미지 URL 유효성 검증 중...`);
+        const itemsToValidate = allItems.filter(item => item.imageUrl);
+        const validationResults = await Promise.all(
+          itemsToValidate.map(async (item) => {
+            const validation = await validateImageUrl(item.imageUrl);
+            return { ...item, urlValid: validation.valid, urlStatus: validation.status };
+          })
+        );
+        
+        // 만료되었거나 오류가 있는 항목만 갱신
+        const expiredItems = validationResults.filter(item => 
+          !item.urlValid || item.urlStatus === 'expired' || item.urlStatus === 'error' || item.urlStatus === 'timeout'
+        );
+        
+        if (expiredItems.length === 0) {
+          console.log('✅ [스케줄러] 모든 Discord 이미지 URL이 정상입니다. 갱신할 항목이 없습니다.');
+          return;
+        }
+        
+        console.log(`🔄 [스케줄러] ${expiredItems.length}개 만료/오류 이미지 갱신 시작 (전체 ${allItems.length}개 중)...`);
         
         // 배치 갱신 실행 (재사용 가능한 함수 호출)
-        const results = await processBatchRefreshItems(allItems);
+        const results = await processBatchRefreshItems(expiredItems);
         
         const successCount = results.filter(r => r.success).length;
         const failCount = results.length - successCount;
@@ -14502,25 +14619,80 @@ const server = app.listen(port, '0.0.0.0', async () => {
       }
     }
     
+    // 재시도 헬퍼 함수 (지수 백오프)
+    async function retryWithBackoff(fn, maxRetries = 3, baseDelayMs = 1000) {
+      let lastError;
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          return await fn();
+        } catch (error) {
+          lastError = error;
+          if (attempt < maxRetries - 1) {
+            const delayMs = baseDelayMs * Math.pow(2, attempt);
+            console.warn(`⚠️ [재시도] 시도 ${attempt + 1}/${maxRetries} 실패, ${delayMs}ms 후 재시도... (오류: ${error.message})`);
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+          }
+        }
+      }
+      throw lastError;
+    }
+    
+    // 데이터 재빌드 실행 상태 관리
+    let isRebuilding = false;
+    let rebuildStartTime = null;
+    const MAX_REBUILD_DURATION_MS = 30 * 60 * 1000; // 30분 최대 실행 시간
+    
     // 데이터 재빌드 함수
     async function rebuildMasterData() {
+      // 이미 재빌드가 진행 중이면 건너뛰기
+      if (isRebuilding) {
+        const elapsed = rebuildStartTime ? Date.now() - rebuildStartTime : 0;
+        if (elapsed > MAX_REBUILD_DURATION_MS) {
+          console.warn('⚠️ [스케줄러] 재빌드가 최대 실행 시간을 초과했습니다. 강제 종료합니다.');
+          isRebuilding = false;
+          rebuildStartTime = null;
+        } else {
+          console.log(`⚠️ [스케줄러] 이미 재빌드가 진행 중입니다. (경과 시간: ${Math.floor(elapsed / 1000)}초) 건너뜁니다.`);
+          return;
+        }
+      }
+      
+      isRebuilding = true;
+      rebuildStartTime = Date.now();
+      const startTime = Date.now();
+      
       try {
         console.log('🔄 [스케줄러] 데이터 재빌드 시작...');
         
         const { rebuildPlanMaster, rebuildDeviceMaster, rebuildPricingMaster, invalidateDirectStoreCache } = require('./directRoutes');
         const carriers = ['SK', 'KT', 'LG'];
         
-        // 1. 요금제 마스터 리빌드
+        // 1. 요금제 마스터 리빌드 (재시도 포함)
         console.log(`[스케줄러] Rebuilding Plan Master for ${carriers.join(',')}`);
-        await rebuildPlanMaster(carriers);
+        const planResult = await retryWithBackoff(
+          () => rebuildPlanMaster(carriers),
+          3,
+          2000
+        );
+        console.log(`[스케줄러] Plan Master 완료: ${planResult?.totalCount || 0}개`);
         
-        // 2. 단말 마스터 리빌드
+        // 2. 단말 마스터 리빌드 (재시도 포함)
         console.log(`[스케줄러] Rebuilding Device Master for ${carriers.join(',')}`);
-        await rebuildDeviceMaster(carriers);
+        const deviceResult = await retryWithBackoff(
+          () => rebuildDeviceMaster(carriers),
+          3,
+          2000
+        );
+        console.log(`[스케줄러] Device Master 완료: ${deviceResult?.totalCount || 0}개`);
         
-        // 3. 단말 요금정책 리빌드
+        // 3. 단말 요금정책 리빌드 (재시도 포함)
         console.log(`[스케줄러] Rebuilding Pricing Master for ${carriers.join(',')}`);
-        await rebuildPricingMaster(carriers);
+        const pricingResult = await retryWithBackoff(
+          () => rebuildPricingMaster(carriers),
+          3,
+          2000
+        );
+        console.log(`[스케줄러] Pricing Master 완료: ${pricingResult?.totalCount || 0}개`);
         
         // 4. 재빌드 완료 후 모든 관련 캐시 무효화
         console.log(`[스케줄러] Invalidating all related caches after rebuild`);
@@ -14528,9 +14700,16 @@ const server = app.listen(port, '0.0.0.0', async () => {
           invalidateDirectStoreCache();
         }
         
-        console.log('✅ [스케줄러] 데이터 재빌드 완료');
+        const elapsed = Date.now() - startTime;
+        console.log(`✅ [스케줄러] 데이터 재빌드 완료 (소요 시간: ${Math.floor(elapsed / 1000)}초)`);
       } catch (error) {
-        console.error('❌ [스케줄러] 데이터 재빌드 오류:', error);
+        const elapsed = Date.now() - startTime;
+        console.error(`❌ [스케줄러] 데이터 재빌드 오류 (소요 시간: ${Math.floor(elapsed / 1000)}초):`, error);
+        console.error(`❌ [스케줄러] 재시도 후에도 실패했습니다. 다음 스케줄에서 다시 시도합니다.`);
+        // 에러가 발생해도 다음 스케줄을 위해 플래그 해제
+      } finally {
+        isRebuilding = false;
+        rebuildStartTime = null;
       }
     }
     

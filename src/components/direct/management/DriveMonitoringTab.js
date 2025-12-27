@@ -48,11 +48,12 @@ const DiscordImageMonitoringTab = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const loadMonitoringData = async () => {
+  const loadMonitoringData = async (validateUrls = false) => {
     try {
       setLoading(true);
+      const validateParam = validateUrls ? '&validate=true' : '';
       const response = await fetch(
-        `${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/discord/image-monitoring?type=direct`
+        `${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/discord/image-monitoring?type=direct${validateParam}`
       );
       
       if (!response.ok) {
@@ -252,10 +253,19 @@ const DiscordImageMonitoringTab = () => {
           <Button
             variant="outlined"
             startIcon={<RefreshIcon />}
-            onClick={loadMonitoringData}
+            onClick={() => loadMonitoringData(false)}
             disabled={loading}
           >
             새로고침
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            onClick={() => loadMonitoringData(true)}
+            disabled={loading}
+            color="secondary"
+          >
+            상태 검증
           </Button>
           <Button
             variant="contained"
@@ -462,12 +472,48 @@ const DiscordImageMonitoringTab = () => {
                         </Typography>
                       </TableCell>
                       <TableCell>
-                        <Chip 
-                          icon={<CheckCircleIcon />} 
-                          label="정상" 
-                          color="success" 
-                          size="small" 
-                        />
+                        {(() => {
+                          const urlStatus = item.urlStatus || 'unknown';
+                          const urlValid = item.urlValid;
+                          
+                          if (urlStatus === 'unknown' || urlValid === undefined) {
+                            return (
+                              <Chip 
+                                icon={<WarningIcon />} 
+                                label="미확인" 
+                                color="default" 
+                                size="small" 
+                              />
+                            );
+                          } else if (urlValid === true && urlStatus === 'valid') {
+                            return (
+                              <Chip 
+                                icon={<CheckCircleIcon />} 
+                                label="정상" 
+                                color="success" 
+                                size="small" 
+                              />
+                            );
+                          } else if (urlStatus === 'expired') {
+                            return (
+                              <Chip 
+                                icon={<ErrorIcon />} 
+                                label="만료" 
+                                color="error" 
+                                size="small" 
+                              />
+                            );
+                          } else {
+                            return (
+                              <Chip 
+                                icon={<ErrorIcon />} 
+                                label={item.urlError || "오류"} 
+                                color="error" 
+                                size="small" 
+                              />
+                            );
+                          }
+                        })()}
                       </TableCell>
                     </TableRow>
                   );
