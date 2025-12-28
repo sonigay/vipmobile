@@ -427,11 +427,31 @@ async function processPolicyTableGeneration(jobId, params) {
     // PDF를 이미지로 변환 (pdfjs-dist 사용 - 순수 JavaScript, 시스템 의존성 없음)
     let cropped;
     try {
-      const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
+      // pdfjs-dist 동적 로드 (서버 시작 시 에러 방지)
+      let pdfjsLib;
+      try {
+        // 여러 경로 시도
+        try {
+          pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
+        } catch (e1) {
+          try {
+            pdfjsLib = require('pdfjs-dist/build/pdf.js');
+          } catch (e2) {
+            pdfjsLib = require('pdfjs-dist');
+          }
+        }
+      } catch (requireError) {
+        console.error('❌ [정책표] pdfjs-dist 모듈 로드 실패:', requireError.message);
+        throw new Error(`pdfjs-dist 모듈을 로드할 수 없습니다: ${requireError.message}`);
+      }
+
       const { createCanvas } = require('canvas');
 
       // PDF 문서 로드
-      const loadingTask = pdfjsLib.getDocument({ data: pdfBuffer });
+      const loadingTask = pdfjsLib.getDocument({ 
+        data: pdfBuffer,
+        verbosity: 0 // 로그 레벨 낮춤
+      });
       const pdfDocument = await loadingTask.promise;
 
       // 첫 번째 페이지만 렌더링 (정책표는 보통 한 페이지)
@@ -442,7 +462,7 @@ async function processPolicyTableGeneration(jobId, params) {
       const viewport = page.getViewport({ scale });
 
       // Canvas 생성
-      const canvas = createCanvas(viewport.width, viewport.height);
+      const canvas = createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height));
       const context = canvas.getContext('2d');
 
       // PDF 페이지를 Canvas에 렌더링
@@ -456,9 +476,10 @@ async function processPolicyTableGeneration(jobId, params) {
       // Canvas를 PNG 버퍼로 변환
       cropped = canvas.toBuffer('image/png');
       
-      console.log(`✅ [정책표] PDF를 이미지로 변환 완료 (크기: ${viewport.width}x${viewport.height})`);
+      console.log(`✅ [정책표] PDF를 이미지로 변환 완료 (크기: ${Math.ceil(viewport.width)}x${Math.ceil(viewport.height)})`);
     } catch (pdfError) {
       console.error('❌ [정책표] PDF를 이미지로 변환 실패:', pdfError.message);
+      console.error('❌ [정책표] 스택:', pdfError.stack);
       throw new Error(`PDF를 이미지로 변환할 수 없습니다: ${pdfError.message}`);
     }
 
