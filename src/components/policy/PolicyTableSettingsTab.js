@@ -39,6 +39,7 @@ const PolicyTableSettingsTab = ({ loggedInStore }) => {
   const [editingSetting, setEditingSetting] = useState(null);
   const [settingsFormData, setSettingsFormData] = useState({
     policyTableName: '',
+    policyTableDescription: '',
     policyTableLink: '',
     discordChannelId: '',
     creatorPermissions: []
@@ -107,6 +108,7 @@ const PolicyTableSettingsTab = ({ loggedInStore }) => {
       setEditingSetting(setting);
       setSettingsFormData({
         policyTableName: setting.policyTableName,
+        policyTableDescription: setting.policyTableDescription || '',
         policyTableLink: setting.policyTableLink,
         discordChannelId: setting.discordChannelId,
         creatorPermissions: setting.creatorPermissions || []
@@ -115,6 +117,7 @@ const PolicyTableSettingsTab = ({ loggedInStore }) => {
       setEditingSetting(null);
       setSettingsFormData({
         policyTableName: '',
+        policyTableDescription: '',
         policyTableLink: '',
         discordChannelId: '',
         creatorPermissions: []
@@ -128,6 +131,7 @@ const PolicyTableSettingsTab = ({ loggedInStore }) => {
     setEditingSetting(null);
     setSettingsFormData({
       policyTableName: '',
+      policyTableDescription: '',
       policyTableLink: '',
       discordChannelId: '',
       creatorPermissions: []
@@ -299,6 +303,17 @@ const PolicyTableSettingsTab = ({ loggedInStore }) => {
                 value={settingsFormData.policyTableName}
                 onChange={(e) => setSettingsFormData({ ...settingsFormData, policyTableName: e.target.value })}
                 required
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="정책표설명"
+                value={settingsFormData.policyTableDescription}
+                onChange={(e) => setSettingsFormData({ ...settingsFormData, policyTableDescription: e.target.value })}
+                multiline
+                rows={2}
+                placeholder="정책표에 대한 설명을 입력하세요"
               />
             </Grid>
             <Grid item xs={12}>

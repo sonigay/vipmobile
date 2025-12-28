@@ -68,6 +68,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
     userIds: []
   });
   const [regularUsers, setRegularUsers] = useState([]);
+  const [teamLeaders, setTeamLeaders] = useState([]);
 
   // 권한 체크
   const canAccess = ['SS', 'AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(loggedInStore?.userRole);
@@ -77,6 +78,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
       loadSettings();
       loadUserGroups();
       loadRegularUsers();
+      loadTeamLeaders();
     }
     return () => {
       if (pollingInterval) {
@@ -426,13 +428,29 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                       <Typography variant="h6" gutterBottom>
                         {setting.policyTableName}
                       </Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                        디스코드 채널: {setting.discordChannelId}
+                      {setting.policyTableDescription && (
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                          {setting.policyTableDescription}
+                        </Typography>
+                      )}
+                      <Typography variant="body2" sx={{ mb: 1 }}>
+                        <a 
+                          href={setting.policyTableLink} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          style={{ color: '#1976d2', textDecoration: 'none' }}
+                        >
+                          시트링크주소
+                        </a>
                       </Typography>
                       <Box sx={{ mt: 1 }}>
-                        {setting.creatorPermissions.map((perm) => (
-                          <Chip key={perm} label={perm} size="small" sx={{ mr: 0.5, mb: 0.5 }} />
-                        ))}
+                        {setting.creatorPermissions.map((perm) => {
+                          const leader = teamLeaders.find(l => l.code === perm);
+                          const displayLabel = leader ? leader.name : perm;
+                          return (
+                            <Chip key={perm} label={displayLabel} size="small" sx={{ mr: 0.5, mb: 0.5 }} />
+                          );
+                        })}
                       </Box>
                     </CardContent>
                     <CardActions>

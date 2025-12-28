@@ -57,6 +57,7 @@ const SHEET_USER_GROUPS = '정책모드_일반사용자그룹';
 const HEADERS_POLICY_TABLE_SETTINGS = [
   '정책표ID',
   '정책표이름',
+  '정책표설명',
   '정책표링크',
   '디스코드채널ID',
   '생성자적용권한',
@@ -591,7 +592,7 @@ function setupPolicyTableRoutes(app) {
       const response = await withRetry(async () => {
         return await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_POLICY_TABLE_SETTINGS}!A:G`
+          range: `${SHEET_POLICY_TABLE_SETTINGS}!A:H`
         });
       });
 
@@ -606,11 +607,12 @@ function setupPolicyTableRoutes(app) {
       const settings = dataRows.map(row => ({
         id: row[0] || '',
         policyTableName: row[1] || '',
-        policyTableLink: row[2] || '',
-        discordChannelId: row[3] || '',
-        creatorPermissions: row[4] ? JSON.parse(row[4]) : [],
-        registeredAt: row[5] || '',
-        registeredBy: row[6] || ''
+        policyTableDescription: row[2] || '',
+        policyTableLink: row[3] || '',
+        discordChannelId: row[4] || '',
+        creatorPermissions: row[5] ? JSON.parse(row[5]) : [],
+        registeredAt: row[6] || '',
+        registeredBy: row[7] || ''
       }));
 
       return res.json(settings);
@@ -629,7 +631,7 @@ function setupPolicyTableRoutes(app) {
         return res.status(403).json({ success: false, error: '권한이 없습니다.' });
       }
 
-      const { policyTableName, policyTableLink, discordChannelId, creatorPermissions } = req.body;
+      const { policyTableName, policyTableDescription, policyTableLink, discordChannelId, creatorPermissions } = req.body;
 
       if (!policyTableName || !policyTableLink || !discordChannelId || !creatorPermissions || !Array.isArray(creatorPermissions)) {
         return res.status(400).json({ success: false, error: '필수 필드가 누락되었습니다.' });
@@ -645,6 +647,7 @@ function setupPolicyTableRoutes(app) {
       const newRow = [
         newId,
         policyTableName,
+        policyTableDescription || '',
         policyTableLink,
         discordChannelId,
         JSON.stringify(creatorPermissions),
@@ -690,7 +693,7 @@ function setupPolicyTableRoutes(app) {
       const response = await withRetry(async () => {
         return await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_POLICY_TABLE_SETTINGS}!A:G`
+          range: `${SHEET_POLICY_TABLE_SETTINGS}!A:H`
         });
       });
 
@@ -702,20 +705,22 @@ function setupPolicyTableRoutes(app) {
       }
 
       const existingRow = rows[rowIndex];
+      const { policyTableName, policyTableDescription, policyTableLink, discordChannelId, creatorPermissions } = req.body;
       const updatedRow = [
         id, // 정책표ID는 변경 불가
         policyTableName !== undefined ? policyTableName : existingRow[1],
-        policyTableLink !== undefined ? policyTableLink : existingRow[2],
-        discordChannelId !== undefined ? discordChannelId : existingRow[3],
-        creatorPermissions !== undefined ? JSON.stringify(creatorPermissions) : existingRow[4],
-        existingRow[5], // 등록일시는 변경 불가
-        existingRow[6]  // 등록자는 변경 불가
+        policyTableDescription !== undefined ? policyTableDescription : (existingRow[2] || ''),
+        policyTableLink !== undefined ? policyTableLink : existingRow[3],
+        discordChannelId !== undefined ? discordChannelId : existingRow[4],
+        creatorPermissions !== undefined ? JSON.stringify(creatorPermissions) : existingRow[5],
+        existingRow[6], // 등록일시는 변경 불가
+        existingRow[7]  // 등록자는 변경 불가
       ];
 
       await withRetry(async () => {
         return await sheets.spreadsheets.values.update({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_POLICY_TABLE_SETTINGS}!A${rowIndex + 1}:G${rowIndex + 1}`,
+          range: `${SHEET_POLICY_TABLE_SETTINGS}!A${rowIndex + 2}:H${rowIndex + 2}`,
           valueInputOption: 'USER_ENTERED',
           resource: { values: [updatedRow] }
         });
@@ -748,7 +753,7 @@ function setupPolicyTableRoutes(app) {
       const response = await withRetry(async () => {
         return await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_POLICY_TABLE_SETTINGS}!A:G`
+          range: `${SHEET_POLICY_TABLE_SETTINGS}!A:H`
         });
       });
 
