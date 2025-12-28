@@ -124,10 +124,22 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
       });
       if (response.ok) {
         const data = await response.json();
-        setUserGroups(data);
+        // 응답이 배열인지 확인
+        if (Array.isArray(data)) {
+          setUserGroups(data);
+        } else if (data.success !== false && Array.isArray(data.data)) {
+          setUserGroups(data.data);
+        } else {
+          console.warn('정책영업그룹 응답 형식 오류:', data);
+          setUserGroups([]);
+        }
+      } else {
+        console.error('정책영업그룹 로드 실패:', response.status);
+        setUserGroups([]);
       }
     } catch (error) {
       console.error('정책영업그룹 로드 오류:', error);
+      setUserGroups([]);
     }
   };
 
@@ -564,10 +576,9 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
               <TextField
                 fullWidth
                 label="정책적용일시"
-                type="datetime-local"
                 value={creationFormData.applyDate}
                 onChange={(e) => setCreationFormData({ ...creationFormData, applyDate: e.target.value })}
-                InputLabelProps={{ shrink: true }}
+                placeholder="예: 2025-01-01 10:00"
                 required
               />
             </Grid>
@@ -584,8 +595,8 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
             </Grid>
             <Grid item xs={12}>
               <Autocomplete
-                options={userGroups}
-                getOptionLabel={(option) => option.groupName}
+                options={userGroups || []}
+                getOptionLabel={(option) => option?.groupName || ''}
                 value={userGroups.find(g => g.id === creationFormData.accessGroupId) || null}
                 onChange={(event, newValue) => {
                   setCreationFormData({
@@ -593,6 +604,8 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                     accessGroupId: newValue ? newValue.id : null
                   });
                 }}
+                isOptionEqualToValue={(option, value) => option?.id === value?.id}
+                noOptionsText="등록된 그룹이 없습니다."
                 renderInput={(params) => (
                   <TextField
                     {...params}
@@ -679,6 +692,67 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
               다시 생성
             </Button>
           ) : null}
+        </DialogActions>
+      </Dialog>
+
+      {/* 정책영업그룹 추가/수정 모달 */}
+      <Dialog open={groupModalOpen} onClose={handleCloseGroupModal} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          {editingGroup ? '정책영업그룹 수정' : '정책영업그룹 추가'}
+        </DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="그룹이름"
+                value={groupFormData.groupName}
+                onChange={(e) => setGroupFormData({ ...groupFormData, groupName: e.target.value })}
+                required
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <Autocomplete
+                multiple
+                options={regularUsers}
+                getOptionLabel={(option) => option?.name || option?.code || ''}
+                value={regularUsers.filter(user => groupFormData.userIds.includes(user.code))}
+                onChange={(event, newValue) => {
+                  setGroupFormData({
+                    ...groupFormData,
+                    userIds: newValue.map(user => user.code)
+                  });
+                }}
+                isOptionEqualToValue={(option, value) => option?.code === value?.code}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="일반사용자"
+                    placeholder="사용자를 선택하세요"
+                  />
+                )}
+                renderTags={(value, getTagProps) =>
+                  value.map((option, index) => (
+                    <Chip
+                      key={option.code}
+                      label={option.name || option.code}
+                      {...getTagProps({ index })}
+                    />
+                  ))
+                }
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseGroupModal}>취소</Button>
+          <Button
+            onClick={handleSaveGroup}
+            variant="contained"
+            disabled={loading || !groupFormData.groupName}
+          >
+            {loading ? <CircularProgress size={24} /> : '저장'}
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>
