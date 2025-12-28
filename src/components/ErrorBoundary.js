@@ -27,9 +27,14 @@ class ErrorBoundary extends React.Component {
     console.error('📍 Component Stack:', errorInfo?.componentStack);
     console.error('📋 Error Stack:', error?.stack);
     
-    // 서버로 에러 전송 (선택적)
-    try {
-      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {
+    // 서버로 에러 전송 (개발 환경에서만)
+    const isDevelopment = process.env.NODE_ENV === 'development' || 
+                          process.env.REACT_APP_ENV === 'development' ||
+                          !process.env.NODE_ENV;
+    
+    if (isDevelopment) {
+      try {
+        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -41,9 +46,12 @@ class ErrorBoundary extends React.Component {
           runId: 'error-catch',
           hypothesisId: 'ERROR-BOUNDARY'
         })
-      }).catch(() => {});
-    } catch (e) {
-      // 로깅 실패 무시
+      }).catch(() => {
+        // 네트워크 에러는 조용히 무시 (개발 환경에서만)
+      });
+      } catch (e) {
+        // 로깅 실패 무시
+      }
     }
     
     this.setState({

@@ -837,6 +837,52 @@ async function rebuildDeviceMaster(carriersParam) {
   // 새 데이터 쓰기 (빈 행 필터링)
   const filteredRows = allRows.filter(row => row && row.length > 0 && row[0]); // 첫 번째 컬럼(통신사)이 있는 행만
   if (filteredRows.length > 0) {
+    // 시트 크기 확인 및 확장
+    const requiredRows = filteredRows.length + 1; // 헤더 포함
+    const requiredCols = Math.max(...filteredRows.map(row => row.length), 18); // 최소 18열 (R열)
+    
+    try {
+      const sheetId = await getSheetId(sheets, SPREADSHEET_ID, SHEET_MOBILE_MASTER);
+      if (sheetId !== null) {
+        const spreadsheet = await withRetry(async () => {
+          return await sheets.spreadsheets.get({ 
+            spreadsheetId: SPREADSHEET_ID,
+            fields: 'sheets.properties'
+          });
+        });
+        const sheet = spreadsheet.data.sheets.find(s => s.properties.sheetId === sheetId);
+        if (sheet && sheet.properties.gridProperties) {
+          const currentRows = sheet.properties.gridProperties.rowCount || 1;
+          const currentCols = sheet.properties.gridProperties.columnCount || 26;
+          
+          if (currentRows < requiredRows || currentCols < requiredCols) {
+            console.log(`[Direct][rebuildDeviceMaster] 시트 크기 확장: ${currentRows}행/${currentCols}열 -> ${requiredRows}행/${requiredCols}열`);
+            await withRetry(async () => {
+              return await sheets.spreadsheets.batchUpdate({
+                spreadsheetId: SPREADSHEET_ID,
+                resource: {
+                  requests: [{
+                    updateSheetProperties: {
+                      properties: {
+                        sheetId: sheetId,
+                        gridProperties: {
+                          rowCount: Math.max(currentRows, requiredRows + 10), // 여유 공간 추가
+                          columnCount: Math.max(currentCols, requiredCols + 5) // 여유 공간 추가
+                        }
+                      },
+                      fields: 'gridProperties.rowCount,gridProperties.columnCount'
+                    }
+                  }]
+                }
+              });
+            });
+          }
+        }
+      }
+    } catch (expandErr) {
+      console.warn('[Direct][rebuildDeviceMaster] 시트 크기 확장 실패 (계속 진행):', expandErr.message);
+    }
+    
     await withRetry(async () => {
       // A2부터 시작하도록 명시 (헤더는 A1에 있음)
       return await sheets.spreadsheets.values.update({
