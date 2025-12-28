@@ -445,13 +445,23 @@ async function processPolicyTableGeneration(jobId, params) {
         throw new Error(`pdfjs-dist 모듈을 로드할 수 없습니다: ${requireError.message}`);
       }
 
-      const { createCanvas } = require('canvas');
+      const { createCanvas, Image } = require('canvas');
+
+      // pdfjs-dist를 Node.js 환경에서 사용하기 위한 설정
+      // Node.js Canvas를 브라우저 Canvas처럼 사용할 수 있도록 전역 설정
+      if (typeof global !== 'undefined') {
+        global.Canvas = createCanvas;
+        global.Image = Image;
+      }
 
       // PDF 문서 로드 (Buffer를 Uint8Array로 변환)
       const pdfData = new Uint8Array(pdfBuffer);
       const loadingTask = pdfjsLib.getDocument({ 
         data: pdfData,
-        verbosity: 0 // 로그 레벨 낮춤
+        verbosity: 0, // 로그 레벨 낮춤
+        // Node.js 환경에서 이미지 처리를 위한 설정
+        disableAutoFetch: false,
+        disableStream: false
       });
       const pdfDocument = await loadingTask.promise;
 
@@ -467,12 +477,17 @@ async function processPolicyTableGeneration(jobId, params) {
       const context = canvas.getContext('2d');
 
       // PDF 페이지를 Canvas에 렌더링
+      // pdfjs-dist가 Node.js Canvas를 인식할 수 있도록 설정
       const renderContext = {
         canvasContext: context,
-        viewport: viewport
+        viewport: viewport,
+        // Node.js 환경에서 이미지 처리를 위한 추가 설정
+        enableWebGL: false
       };
 
-      await page.render(renderContext).promise;
+      // render 메서드 호출
+      const renderTask = page.render(renderContext);
+      await renderTask.promise;
 
       // Canvas를 PNG 버퍼로 변환
       cropped = canvas.toBuffer('image/png');
