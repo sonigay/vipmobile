@@ -403,42 +403,52 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
         </Alert>
       )}
 
-      {loading && settings.length === 0 ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-          <CircularProgress />
-        </Box>
-      ) : (
-        <Grid container spacing={2}>
-          {settings.map((setting) => (
-            <Grid item xs={12} sm={6} md={4} key={setting.id}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom>
-                    {setting.policyTableName}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                    디스코드 채널: {setting.discordChannelId}
-                  </Typography>
-                  <Box sx={{ mt: 1 }}>
-                    {setting.creatorPermissions.map((perm) => (
-                      <Chip key={perm} label={perm} size="small" sx={{ mr: 0.5, mb: 0.5 }} />
-                    ))}
-                  </Box>
-                </CardContent>
-                <CardActions>
-                  <Button
-                    variant="contained"
-                    fullWidth
-                    onClick={() => handleOpenCreationModal(setting)}
-                  >
-                    생성
-                  </Button>
-                </CardActions>
-              </Card>
+      <Paper sx={{ mb: 3 }}>
+        <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)}>
+          <Tab label="정책표 생성" />
+          <Tab label="일반사용자 그룹" icon={<GroupIcon />} iconPosition="start" />
+        </Tabs>
+      </Paper>
+
+      {/* 정책표 생성 탭 */}
+      {activeTab === 0 && (
+        <>
+          {loading && settings.length === 0 ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+              <CircularProgress />
+            </Box>
+          ) : (
+            <Grid container spacing={2}>
+              {settings.map((setting) => (
+                <Grid item xs={12} sm={6} md={4} key={setting.id}>
+                  <Card>
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom>
+                        {setting.policyTableName}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                        디스코드 채널: {setting.discordChannelId}
+                      </Typography>
+                      <Box sx={{ mt: 1 }}>
+                        {setting.creatorPermissions.map((perm) => (
+                          <Chip key={perm} label={perm} size="small" sx={{ mr: 0.5, mb: 0.5 }} />
+                        ))}
+                      </Box>
+                    </CardContent>
+                    <CardActions>
+                      <Button
+                        variant="contained"
+                        fullWidth
+                        onClick={() => handleOpenCreationModal(setting)}
+                      >
+                        생성
+                      </Button>
+                    </CardActions>
+                  </Card>
+                </Grid>
+              ))}
             </Grid>
-          ))}
-        </Grid>
-      )}
+          )}
         </>
       )}
 
