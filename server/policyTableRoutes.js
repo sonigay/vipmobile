@@ -685,7 +685,6 @@ function setupPolicyTableRoutes(app) {
       }
 
       const { id } = req.params;
-      const { policyTableName, policyTableLink, discordChannelId, creatorPermissions } = req.body;
 
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_TABLE_SETTINGS, HEADERS_POLICY_TABLE_SETTINGS);
