@@ -105,6 +105,13 @@ const setCachedData = (cacheMap, key, data) => {
   console.log(`  💾 캐시 저장 (${key})`);
 };
 
+// Discord snowflake 형식 검증 함수 (모듈 스코프에서 정의하여 모든 함수에서 접근 가능)
+const isValidSnowflake = (value) => {
+  if (!value) return false;
+  const str = value.toString().trim();
+  return /^\d{17,19}$/.test(str);
+};
+
 // 서버 타임아웃 설정 (5분)
 app.use((req, res, next) => {
   req.setTimeout(300000); // 5분
@@ -7264,13 +7271,6 @@ async function processBatchRefreshItems(items) {
       
       try {
         const { type, threadId, messageId } = item;
-        
-        // Discord snowflake 형식 검증 함수
-        const isValidSnowflake = (value) => {
-          if (!value) return false;
-          const str = value.toString().trim();
-          return /^\d{17,19}$/.test(str);
-        };
         
         if (!type || !threadId || !messageId) {
           results.push({
@@ -14567,7 +14567,8 @@ const server = app.listen(port, '0.0.0.0', async () => {
               const map = photoTypeMap[photoType];
               const messageId = (row[map.msgId] || '').trim();
               const threadId = (row[map.threadId] || '').trim();
-              if (messageId && threadId) {
+              // Discord snowflake 형식 검증 추가
+              if (messageId && threadId && isValidSnowflake(messageId) && isValidSnowflake(threadId)) {
                 monitoringData.direct.storePhotos.push({
                   storeName,
                   photoType,
