@@ -466,15 +466,28 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                       )}
                       <Typography variant="body2" sx={{ mb: 1 }}>
                         <a 
-                          href={setting.policyTableLink} 
-                          target="_blank" 
+                          href={setting.policyTableLink}
+                          target="_blank"
                           rel="noopener noreferrer"
-                          style={{ color: '#1976d2', textDecoration: 'none' }}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            // 구글시트 링크를 웹 버전으로 강제 열기
+                            let url = setting.policyTableLink;
+                            // 이미 쿼리 파라미터가 있는지 확인
+                            const separator = url.includes('?') ? '&' : '?';
+                            // 웹 버전으로 강제 열기 (앱 실행 방지)
+                            url = `${url}${separator}usp=sharing`;
+                            window.open(url, '_blank', 'noopener,noreferrer');
+                          }}
+                          style={{ color: '#1976d2', textDecoration: 'none', cursor: 'pointer' }}
                         >
-                          시트링크주소
+                          구글시트 바로가기
                         </a>
                       </Typography>
                       <Box sx={{ mt: 1 }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
+                          정책생성가능자:
+                        </Typography>
                         {setting.creatorPermissions.map((perm) => {
                           const leader = teamLeaders.find(l => l.code === perm);
                           const displayLabel = leader ? leader.name : perm;
