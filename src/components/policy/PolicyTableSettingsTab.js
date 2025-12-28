@@ -41,6 +41,7 @@ const PolicyTableSettingsTab = ({ loggedInStore }) => {
     policyTableName: '',
     policyTableDescription: '',
     policyTableLink: '',
+    policyTablePublicLink: '',
     discordChannelId: '',
     creatorPermissions: []
   });

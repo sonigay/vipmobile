@@ -58,7 +58,8 @@ const HEADERS_POLICY_TABLE_SETTINGS = [
   '정책표ID',
   '정책표이름',
   '정책표설명',
-  '정책표링크',
+  '정책표링크',           // 편집 링크 (사용자가 클릭하는 링크)
+  '정책표공개링크',        // 공개 링크 (/pubhtml, Puppeteer 캡처용)
   '디스코드채널ID',
   '생성자적용권한',
   '등록일시',
@@ -88,6 +89,39 @@ const HEADERS_USER_GROUPS = [
   '등록일시',
   '등록자'
 ];
+
+// 구글시트 편집 링크 정규화 함수
+// 시트 ID만 넣어도, 전체 URL을 넣어도 편집 가능한 표준 URL로 변환
+function normalizeGoogleSheetEditLink(link) {
+  if (!link) return '';
+  
+  // 공백 제거
+  link = link.trim();
+  
+  // 시트 ID만 있는 경우 (예: "1Vy8Qhce3B6_41TxRfVUs883ioLxiGTUjkbD_nKebgrs")
+  if (/^[a-zA-Z0-9-_]+$/.test(link)) {
+    return `https://docs.google.com/spreadsheets/d/${link}/edit`;
+  }
+  
+  // 이미 전체 URL인 경우
+  if (link.startsWith('http://') || link.startsWith('https://')) {
+    // 시트 ID 추출
+    const sheetIdMatch = link.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+    if (sheetIdMatch) {
+      const sheetId = sheetIdMatch[1];
+      // gid 파라미터 추출 (있는 경우)
+      const gidMatch = link.match(/[?&#]gid=([0-9]+)/);
+      if (gidMatch) {
+        const gid = gidMatch[1];
+        return `https://docs.google.com/spreadsheets/d/${sheetId}/edit?gid=${gid}#gid=${gid}`;
+      }
+      return `https://docs.google.com/spreadsheets/d/${sheetId}/edit`;
+    }
+  }
+  
+  // 변환 실패 시 원본 반환
+  return link;
+}
 
 // 컬럼 인덱스 헬퍼 함수
 function getColumnLetter(columnNumber) {
@@ -719,7 +753,7 @@ function setupPolicyTableRoutes(app) {
       await withRetry(async () => {
         return await sheets.spreadsheets.values.update({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_POLICY_TABLE_SETTINGS}!A${rowIndex + 2}:H${rowIndex + 2}`,
+          range: `${SHEET_POLICY_TABLE_SETTINGS}!A${rowIndex + 2}:I${rowIndex + 2}`,
           valueInputOption: 'USER_ENTERED',
           resource: { values: [updatedRow] }
         });

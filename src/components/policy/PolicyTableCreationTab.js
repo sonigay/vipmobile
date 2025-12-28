@@ -474,16 +474,23 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                             // 구글시트 링크를 웹 버전으로 강제 열기
                             let url = setting.policyTableLink;
                             
+                            // 시트 ID만 있는 경우 전체 URL로 변환
+                            if (/^[a-zA-Z0-9-_]+$/.test(url)) {
+                              url = `https://docs.google.com/spreadsheets/d/${url}/edit`;
+                            }
+                            
                             // 구글시트 ID 추출
                             const sheetIdMatch = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
                             if (sheetIdMatch) {
                               const sheetId = sheetIdMatch[1];
+                              // gid 파라미터 추출 (있는 경우)
+                              const gidMatch = url.match(/[?&#]gid=([0-9]+)/);
+                              const gid = gidMatch ? gidMatch[1] : '0';
                               // 웹 버전으로 강제 열기 (앱 실행 방지)
                               // rm=minimal: 모바일 앱 리다이렉트 방지
                               // usp=sharing: 공유 링크 형식
-                              // gid=0: 첫 번째 시트로 이동
                               // chromeless=1: 크롬리스 모드 (앱 리다이렉트 방지)
-                              url = `https://docs.google.com/spreadsheets/d/${sheetId}/edit?usp=sharing&rm=minimal&gid=0&chromeless=1`;
+                              url = `https://docs.google.com/spreadsheets/d/${sheetId}/edit?usp=sharing&rm=minimal&gid=${gid}&chromeless=1#gid=${gid}`;
                             } else {
                               // ID를 찾을 수 없으면 원본 URL에 파라미터 추가
                               const separator = url.includes('?') ? '&' : '?';
