@@ -740,13 +740,21 @@ function setupPolicyTableRoutes(app) {
       });
 
       const rows = response.data.values || [];
-      const rowIndex = rows.findIndex(row => row[0] === id);
+      
+      // 헤더 행 제외 (첫 번째 행은 헤더)
+      if (rows.length < 2) {
+        return res.status(404).json({ success: false, error: '정책표 설정을 찾을 수 없습니다.' });
+      }
+      
+      // 헤더를 제외한 데이터 행에서 찾기
+      const dataRows = rows.slice(1);
+      const rowIndex = dataRows.findIndex(row => row[0] === id);
 
       if (rowIndex === -1) {
         return res.status(404).json({ success: false, error: '정책표 설정을 찾을 수 없습니다.' });
       }
 
-      const existingRow = rows[rowIndex];
+      const existingRow = dataRows[rowIndex];
       const { policyTableName, policyTableDescription, policyTableLink, policyTablePublicLink, discordChannelId, creatorPermissions } = req.body;
       
       // 편집 링크 정규화
