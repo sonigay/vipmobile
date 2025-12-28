@@ -59,8 +59,8 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
   const [pollingInterval, setPollingInterval] = useState(null);
   const [generatedResult, setGeneratedResult] = useState(null);
 
-  // 일반사용자 그룹 관리 상태
-  const [activeTab, setActiveTab] = useState(0); // 0: 정책표 생성, 1: 일반사용자 그룹
+  // 정책영업그룹 관리 상태
+  const [activeTab, setActiveTab] = useState(0); // 0: 정책표 생성, 1: 정책영업그룹
   const [groupModalOpen, setGroupModalOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState(null);
   const [groupFormData, setGroupFormData] = useState({
@@ -125,7 +125,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
         setUserGroups(data);
       }
     } catch (error) {
-      console.error('일반사용자 그룹 로드 오류:', error);
+      console.error('정책영업그룹 로드 오류:', error);
     }
   };
 
@@ -201,7 +201,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
         setError(errorData.error || '저장에 실패했습니다.');
       }
     } catch (error) {
-      console.error('일반사용자 그룹 저장 오류:', error);
+      console.error('정책영업그룹 저장 오류:', error);
       setError('저장 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
@@ -209,7 +209,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
   };
 
   const handleDeleteGroup = async (id) => {
-    if (!window.confirm('일반사용자 그룹을 삭제하시겠습니까?')) {
+    if (!window.confirm('정책영업그룹을 삭제하시겠습니까?')) {
       return;
     }
 
@@ -230,7 +230,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
         setError(errorData.error || '삭제에 실패했습니다.');
       }
     } catch (error) {
-      console.error('일반사용자 그룹 삭제 오류:', error);
+      console.error('정책영업그룹 삭제 오류:', error);
       setError('삭제 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
@@ -406,7 +406,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
       <Paper sx={{ mb: 3 }}>
         <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)}>
           <Tab label="정책표 생성" />
-          <Tab label="일반사용자 그룹" icon={<GroupIcon />} iconPosition="start" />
+          <Tab label="정책영업그룹" icon={<GroupIcon />} iconPosition="start" />
         </Tabs>
       </Paper>
 
@@ -452,11 +452,11 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
         </>
       )}
 
-      {/* 일반사용자 그룹 탭 */}
+      {/* 정책영업그룹 탭 */}
       {activeTab === 1 && (
         <Box>
           <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography variant="h6">일반사용자 그룹 목록</Typography>
+            <Typography variant="h6">정책영업그룹 목록</Typography>
             <Button
               variant="contained"
               startIcon={<AddIcon />}
@@ -559,7 +559,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                 renderInput={(params) => (
                   <TextField
                     {...params}
-                    label="접근권한 (일반사용자 그룹)"
+                    label="접근권한 (정책영업그룹)"
                     placeholder="그룹을 선택하세요 (선택사항)"
                   />
                 )}

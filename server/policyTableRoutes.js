@@ -790,7 +790,7 @@ function setupPolicyTableRoutes(app) {
     }
   });
 
-  // ========== 일반사용자 그룹 관련 API ==========
+  // ========== 정책영업그룹 관련 API ==========
 
   // GET /api/policy-table/user-groups
   router.get('/policy-table/user-groups', async (req, res) => {
@@ -875,7 +875,7 @@ function setupPolicyTableRoutes(app) {
       return res.json({
         success: true,
         id: newId,
-        message: '일반사용자 그룹이 추가되었습니다.'
+        message: '정책영업그룹이 추가되었습니다.'
       });
     } catch (error) {
       console.error('[정책표] 그룹 추가 오류:', error);
@@ -933,7 +933,7 @@ function setupPolicyTableRoutes(app) {
       return res.json({
         success: true,
         id: id,
-        message: '일반사용자 그룹이 수정되었습니다.'
+        message: '정책영업그룹이 수정되었습니다.'
       });
     } catch (error) {
       console.error('[정책표] 그룹 수정 오류:', error);
@@ -988,7 +988,7 @@ function setupPolicyTableRoutes(app) {
 
       return res.json({
         success: true,
-        message: '일반사용자 그룹이 삭제되었습니다.'
+        message: '정책영업그룹이 삭제되었습니다.'
       });
     } catch (error) {
       console.error('[정책표] 그룹 삭제 오류:', error);
@@ -1110,7 +1110,7 @@ function setupPolicyTableRoutes(app) {
         const policyRows = policyListResponse.data.values || [];
         const policyDataRows = policyRows.slice(1);
 
-        // 일반사용자 그룹 목록 조회
+        // 정책영업그룹 목록 조회
         const userGroupsResponse = await withRetry(async () => {
           return await sheets.spreadsheets.values.get({
             spreadsheetId: SPREADSHEET_ID,
@@ -1205,7 +1205,7 @@ function setupPolicyTableRoutes(app) {
         // 모든 정책표 표시
       } else if (['A', 'B', 'C', 'D', 'E', 'F'].includes(userRole)) {
         // 일반 사용자는 접근권한에 포함된 것만 표시
-        // 일반사용자 그룹 목록 조회
+        // 정책영업그룹 목록 조회
         await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_USER_GROUPS, HEADERS_USER_GROUPS);
         const userGroupsResponse = await withRetry(async () => {
           return await sheets.spreadsheets.values.get({
