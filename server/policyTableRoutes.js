@@ -747,16 +747,23 @@ function setupPolicyTableRoutes(app) {
       }
 
       const existingRow = rows[rowIndex];
-      const { policyTableName, policyTableDescription, policyTableLink, discordChannelId, creatorPermissions } = req.body;
+      const { policyTableName, policyTableDescription, policyTableLink, policyTablePublicLink, discordChannelId, creatorPermissions } = req.body;
+      
+      // 편집 링크 정규화
+      const normalizedEditLink = policyTableLink !== undefined 
+        ? normalizeGoogleSheetEditLink(policyTableLink)
+        : existingRow[3];
+      
       const updatedRow = [
         id, // 정책표ID는 변경 불가
         policyTableName !== undefined ? policyTableName : existingRow[1],
         policyTableDescription !== undefined ? policyTableDescription : (existingRow[2] || ''),
-        policyTableLink !== undefined ? policyTableLink : existingRow[3],
-        discordChannelId !== undefined ? discordChannelId : existingRow[4],
-        creatorPermissions !== undefined ? JSON.stringify(creatorPermissions) : existingRow[5],
-        existingRow[6], // 등록일시는 변경 불가
-        existingRow[7]  // 등록자는 변경 불가
+        normalizedEditLink,  // 정규화된 편집 링크
+        policyTablePublicLink !== undefined ? policyTablePublicLink : (existingRow[4] || ''),
+        discordChannelId !== undefined ? discordChannelId : existingRow[5],
+        creatorPermissions !== undefined ? JSON.stringify(creatorPermissions) : existingRow[6],
+        existingRow[7], // 등록일시는 변경 불가
+        existingRow[8]  // 등록자는 변경 불가
       ];
 
       await withRetry(async () => {
