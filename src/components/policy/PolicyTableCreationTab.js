@@ -131,6 +131,25 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
     }
   };
 
+  const loadTeamLeaders = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/agents`);
+      if (response.ok) {
+        const agents = await response.json();
+        // permissionLevel이 AA-FF인 사용자만 필터링 (팀장 권한자)
+        const leaders = agents
+          .filter(agent => agent.permissionLevel && ['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(agent.permissionLevel))
+          .map(agent => ({
+            code: agent.permissionLevel,
+            name: agent.target || agent.permissionLevel
+          }));
+        setTeamLeaders(leaders);
+      }
+    } catch (error) {
+      console.error('팀장 목록 로드 오류:', error);
+    }
+  };
+
   const loadRegularUsers = async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/agents`);
