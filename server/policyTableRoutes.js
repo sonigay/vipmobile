@@ -546,6 +546,12 @@ function setupPolicyTableRoutes(app) {
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-user-id, x-user-role');
   };
 
+  // OPTIONS 요청 처리 (CORS preflight)
+  router.options('*', (req, res) => {
+    setCORSHeaders(req, res);
+    res.sendStatus(200);
+  });
+
   // ========== 정책표생성설정 관련 API ==========
 
   // GET /api/policy-table-settings
