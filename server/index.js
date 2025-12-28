@@ -720,6 +720,14 @@ app.post('/api/client-logs', (req, res) => {
 // ==================== API 라우트들 ====================
 setupDirectRoutes(app);
 
+// 정책표 생성 라우트 설정
+try {
+  app.use('/api', setupPolicyTableRoutes(app));
+  console.log('✅ [정책표] Policy table routes mounted at /api');
+} catch (e) {
+  console.error('❌ [정책표] Failed to mount policy table routes:', e.message);
+}
+
 // 테스트 API
 app.get('/api/test', (req, res) => {
   console.log('🧪 [테스트] API 호출됨');

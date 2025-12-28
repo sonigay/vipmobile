@@ -58,6 +58,9 @@ import PolicyCancelModal from './PolicyCancelModal';
 import SettlementReflectModal from './SettlementReflectModal';
 import PolicyCopyModal from './PolicyCopyModal';
 import PolicyService from '../utils/policyService';
+import PolicyTableListTab from './policy/PolicyTableListTab';
+import PolicyTableCreationTab from './policy/PolicyTableCreationTab';
+import PolicyTableSettingsTab from './policy/PolicyTableSettingsTab';
 
 // 기본 정책 카테고리 데이터 (폴백용)
 const DEFAULT_POLICY_CATEGORIES = {
@@ -1933,6 +1936,40 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       </AppBar>
       
       <Container maxWidth={false} sx={{ flex: 1, py: 4, px: 2 }}>
+        {/* 메인 탭 */}
+        <Paper sx={{ mb: 3 }}>
+          <Tabs
+            value={mainTab}
+            onChange={(e, newValue) => setMainTab(newValue)}
+            variant="scrollable"
+            scrollButtons="auto"
+            sx={{ borderBottom: 1, borderColor: 'divider' }}
+          >
+            <Tab label="추가정책" />
+            <Tab label="정책표목록" />
+            <Tab label="정책표생성" />
+            <Tab label="정책표생성설정" />
+          </Tabs>
+        </Paper>
+
+        {/* 정책표목록 탭 */}
+        {mainTab === 1 && (
+          <PolicyTableListTab loggedInStore={loggedInStore} />
+        )}
+
+        {/* 정책표생성 탭 */}
+        {mainTab === 2 && (
+          <PolicyTableCreationTab loggedInStore={loggedInStore} />
+        )}
+
+        {/* 정책표생성설정 탭 */}
+        {mainTab === 3 && (
+          <PolicyTableSettingsTab loggedInStore={loggedInStore} />
+        )}
+
+        {/* 추가정책 탭 (기존 기능) */}
+        {mainTab === 0 && (
+          <>
         {/* 담당자 선택 탭 */}
         <Paper sx={{ mb: 2, p: 2 }}>
           <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
@@ -2884,6 +2921,8 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
               </TableContainer>
             )}
           </Box>
+        )}
+          </>
         )}
       </Container>
       
