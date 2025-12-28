@@ -142,6 +142,9 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const [selectedCategoryForList, setSelectedCategoryForList] = useState(null);
   const [policies, setPolicies] = useState([]); // 전체 정책 목록
   
+  // 메인 탭 상태 (추가정책, 정책표목록, 정책표생성, 정책표생성설정)
+  const [mainTab, setMainTab] = useState(0); // 0: 추가정책, 1: 정책표목록, 2: 정책표생성, 3: 정책표생성설정
+  
   // 승인 모달 상태
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [selectedPolicyForApproval, setSelectedPolicyForApproval] = useState(null);
