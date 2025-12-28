@@ -517,11 +517,16 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                               'noopener,noreferrer,width=1200,height=800'
                             );
                             
-                            // 새 창이 차단되었을 경우 대비
-                            if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
-                              // 팝업이 차단된 경우 사용자에게 알림
-                              alert('팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해주세요.');
-                            }
+                            // 팝업 차단 감지 (즉시 확인, 사용자가 창을 닫은 경우는 제외)
+                            // setTimeout을 사용하여 window.open 직후에만 확인
+                            setTimeout(() => {
+                              // newWindow가 null이거나 undefined인 경우만 팝업 차단으로 판단
+                              // closed 속성은 사용자가 창을 닫은 경우에도 true가 되므로 확인하지 않음
+                              if (!newWindow) {
+                                // 팝업이 차단된 경우 사용자에게 알림
+                                alert('팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해주세요.');
+                              }
+                            }, 100); // 100ms 후에 확인 (창이 열리는 시간 고려)
                           }}
                           style={{ color: '#1976d2', textDecoration: 'none', cursor: 'pointer' }}
                         >
