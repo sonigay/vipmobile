@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const { google } = require('googleapis');
 const { Client, GatewayIntentBits, AttachmentBuilder } = require('discord.js');
-const puppeteer = require('puppeteer');
+// Puppeteer 없이 Google Sheets API + Canvas 사용
 const sharp = require('sharp');
 
 // Discord 봇 설정 (server/index.js의 전역 discordBot 사용 또는 자체 초기화)
@@ -329,7 +329,6 @@ function getJobStatus(jobId) {
 // 정책표 생성 백그라운드 작업
 async function processPolicyTableGeneration(jobId, params) {
   const { policyTableId, applyDate, applyContent, accessGroupId, creatorName, creatorRole } = params;
-  let browser = null;
 
   try {
     updateJobStatus(jobId, {
@@ -371,88 +370,167 @@ async function processPolicyTableGeneration(jobId, params) {
     const policyTablePublicLink = settingsRow[4] || settingsRow[3];  // 공개 링크 (없으면 편집 링크 사용)
     const discordChannelId = settingsRow[5];
 
-    // 2. Puppeteer로 구글 시트 캡쳐
+    // 2. Google Sheets API로 데이터 가져와서 Canvas로 렌더링 (Puppeteer 없이)
     updateJobStatus(jobId, {
       status: 'processing',
       progress: 25,
-      message: '구글 시트 접근 중...'
+      message: '구글 시트 데이터 가져오는 중...'
     });
 
-    browser = await puppeteer.launch({
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--window-size=2560,10000',
-        '--hide-scrollbars'
-      ]
-    });
-
-    const page = await browser.newPage();
-    // 공개 링크가 있으면 사용, 없으면 편집 링크 사용
-    const captureUrl = policyTablePublicLink || policyTableLink;
-    await page.goto(captureUrl, { waitUntil: 'networkidle0', timeout: 30000 });
-
-    // iframe 찾기
-    let frame = null;
-    await page.waitForSelector('#pageswitcher-content', { timeout: 30000 });
-    const frameElement = await page.$('#pageswitcher-content');
-    if (frameElement) {
-      frame = await frameElement.contentFrame();
+    // Google Sheets 링크에서 스프레드시트 ID와 시트 ID 추출
+    const spreadsheetIdMatch = policyTableLink.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+    const sheetIdMatch = policyTableLink.match(/[#&]gid=(\d+)/);
+    
+    if (!spreadsheetIdMatch) {
+      throw new Error('구글 시트 ID를 찾을 수 없습니다.');
     }
-    if (!frame) {
-      frame = await page.frames().find(f =>
-        f.url().includes('pageswitcher') || f.name() === 'pageswitcher-content'
+
+    const targetSpreadsheetId = spreadsheetIdMatch[1];
+    const targetSheetId = sheetIdMatch ? sheetIdMatch[1] : null;
+
+    // 시트 목록 가져오기
+    const spreadsheetMetadata = await withRetry(async () => {
+      return await sheets.spreadsheets.get({
+        spreadsheetId: targetSpreadsheetId
+      });
+    });
+
+    // 시트 이름 찾기
+    let targetSheetName = null;
+    if (targetSheetId) {
+      const targetSheet = spreadsheetMetadata.data.sheets.find(
+        sheet => sheet.properties.sheetId.toString() === targetSheetId
       );
+      if (targetSheet) {
+        targetSheetName = targetSheet.properties.title;
+      }
     }
 
-    if (!frame) {
-      throw new Error('정책표 iframe을 찾을 수 없습니다.');
+    // 시트 이름이 없으면 첫 번째 시트 사용
+    if (!targetSheetName && spreadsheetMetadata.data.sheets.length > 0) {
+      targetSheetName = spreadsheetMetadata.data.sheets[0].properties.title;
+    }
+
+    if (!targetSheetName) {
+      throw new Error('시트를 찾을 수 없습니다.');
+    }
+
+    // 시트 데이터 가져오기
+    const dataResponse = await withRetry(async () => {
+      return await sheets.spreadsheets.values.get({
+        spreadsheetId: targetSpreadsheetId,
+        range: `${targetSheetName}!A:ZZ` // 충분히 넓은 범위
+      });
+    });
+
+    const rows = dataResponse.data.values || [];
+    if (rows.length === 0) {
+      throw new Error('시트 데이터가 비어있습니다.');
     }
 
     updateJobStatus(jobId, {
       status: 'processing',
       progress: 50,
-      message: '이미지 캡쳐 중...'
+      message: '이미지 생성 중...'
     });
 
-    // 테이블 찾기 및 스크린샷
-    await frame.waitForSelector('table', { timeout: 30000, visible: true });
-    const table = await frame.$('table');
-    await table.scrollIntoViewIfNeeded();
-    const boundingBox = await table.boundingBox();
-
-    if (!boundingBox) {
-      throw new Error('테이블 위치를 찾을 수 없습니다.');
+    // Canvas로 테이블 렌더링
+    const { createCanvas } = require('canvas');
+    
+    // 테이블 크기 계산
+    const cellPadding = 10;
+    const cellHeight = 40;
+    const headerHeight = 50;
+    const maxCellWidth = 200;
+    
+    // 열 너비 계산 (각 열의 최대 텍스트 길이 기반)
+    const columnWidths = [];
+    for (let col = 0; col < Math.max(...rows.map(row => row.length)); col++) {
+      let maxWidth = 100; // 최소 너비
+      for (const row of rows) {
+        if (row[col]) {
+          const text = String(row[col]);
+          const textWidth = text.length * 8; // 대략적인 텍스트 너비
+          maxWidth = Math.max(maxWidth, Math.min(textWidth + cellPadding * 2, maxCellWidth));
+        }
+      }
+      columnWidths.push(maxWidth);
     }
 
-    // 전체 페이지 스크린샷
-    const fullScreenshot = await page.screenshot({
-      type: 'png',
-      encoding: 'binary',
-      fullPage: true
-    });
+    const totalWidth = columnWidths.reduce((sum, w) => sum + w, 0);
+    const totalHeight = headerHeight + (rows.length - 1) * cellHeight;
 
-    // Sharp로 테이블 영역만 크롭
-    const x = Math.max(0, Math.floor(boundingBox.x * 0.95));
-    const y = Math.max(0, Math.floor(boundingBox.y * 0.95));
-    const width = Math.floor(boundingBox.width * 1.01);
-    const height = Math.floor(boundingBox.height * 1.01);
+    // Canvas 생성
+    const canvas = createCanvas(totalWidth, totalHeight);
+    const ctx = canvas.getContext('2d');
 
-    const cropped = await sharp(fullScreenshot)
-      .extract({
-        left: x,
-        top: y,
-        width: width,
-        height: height
-      })
-      .png()
-      .toBuffer();
+    // 배경색
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, totalWidth, totalHeight);
 
-    await browser.close();
-    browser = null;
+    // 폰트 설정
+    ctx.font = 'bold 14px Arial';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+
+    // 헤더 렌더링
+    let x = 0;
+    ctx.fillStyle = '#f0f0f0';
+    ctx.fillRect(0, 0, totalWidth, headerHeight);
+    
+    ctx.fillStyle = '#000000';
+    if (rows.length > 0) {
+      const headerRow = rows[0];
+      for (let col = 0; col < columnWidths.length; col++) {
+        ctx.fillRect(x, 0, columnWidths[col], headerHeight);
+        ctx.fillStyle = '#000000';
+        const text = headerRow[col] || '';
+        ctx.fillText(text, x + cellPadding, headerHeight / 2);
+        x += columnWidths[col];
+        ctx.fillStyle = '#f0f0f0';
+      }
+    }
+
+    // 데이터 행 렌더링
+    ctx.font = '12px Arial';
+    for (let rowIndex = 1; rowIndex < rows.length; rowIndex++) {
+      const row = rows[rowIndex];
+      const y = headerHeight + (rowIndex - 1) * cellHeight;
+      
+      x = 0;
+      for (let col = 0; col < columnWidths.length; col++) {
+        // 셀 배경
+        ctx.fillStyle = rowIndex % 2 === 0 ? '#ffffff' : '#fafafa';
+        ctx.fillRect(x, y, columnWidths[col], cellHeight);
+        
+        // 셀 테두리
+        ctx.strokeStyle = '#e0e0e0';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x, y, columnWidths[col], cellHeight);
+        
+        // 텍스트
+        ctx.fillStyle = '#000000';
+        const text = row[col] ? String(row[col]) : '';
+        // 텍스트가 너무 길면 잘라내기
+        const maxTextWidth = columnWidths[col] - cellPadding * 2;
+        let displayText = text;
+        const metrics = ctx.measureText(text);
+        if (metrics.width > maxTextWidth) {
+          // 텍스트를 잘라내고 "..." 추가
+          let truncated = text;
+          while (ctx.measureText(truncated + '...').width > maxTextWidth && truncated.length > 0) {
+            truncated = truncated.slice(0, -1);
+          }
+          displayText = truncated + '...';
+        }
+        ctx.fillText(displayText, x + cellPadding, y + cellHeight / 2);
+        
+        x += columnWidths[col];
+      }
+    }
+
+    // Canvas를 PNG 버퍼로 변환
+    const cropped = canvas.toBuffer('image/png');
 
     // 3. 디스코드 업로드
     updateJobStatus(jobId, {
@@ -569,9 +647,7 @@ async function processPolicyTableGeneration(jobId, params) {
       error: error.message
     });
   } finally {
-    if (browser) {
-      await browser.close();
-    }
+    // Puppeteer를 사용하지 않으므로 browser 정리 불필요
   }
 }
 
