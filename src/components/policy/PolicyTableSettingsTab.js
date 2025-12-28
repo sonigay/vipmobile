@@ -256,9 +256,16 @@ const PolicyTableSettingsTab = ({ loggedInStore }) => {
                         </TableCell>
                         <TableCell>{setting.discordChannelId}</TableCell>
                         <TableCell>
-                          {setting.creatorPermissions.map((perm) => (
-                            <Chip key={perm} label={perm} size="small" sx={{ mr: 0.5, mb: 0.5 }} />
-                          ))}
+                          {setting.creatorPermissions.map((perm) => {
+                            // 권한 코드로 이름 찾기
+                            const leader = teamLeaders.find(l => l.code === perm);
+                            const displayLabel = leader 
+                              ? `${leader.name} (${perm})` 
+                              : perm;
+                            return (
+                              <Chip key={perm} label={displayLabel} size="small" sx={{ mr: 0.5, mb: 0.5 }} />
+                            );
+                          })}
                         </TableCell>
                         <TableCell>{new Date(setting.registeredAt).toLocaleString('ko-KR')}</TableCell>
                         <TableCell>
