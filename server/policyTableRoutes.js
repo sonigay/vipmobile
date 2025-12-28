@@ -370,11 +370,11 @@ async function processPolicyTableGeneration(jobId, params) {
     const policyTablePublicLink = settingsRow[4] || settingsRow[3];  // 공개 링크 (없으면 편집 링크 사용)
     const discordChannelId = settingsRow[5];
 
-    // 2. Google Sheets API로 데이터 가져와서 Canvas로 렌더링 (Puppeteer 없이)
+    // 2. Google Sheets API export 기능으로 PDF 받아서 이미지로 변환 (실제 보이는 모습 그대로)
     updateJobStatus(jobId, {
       status: 'processing',
       progress: 25,
-      message: '구글 시트 데이터 가져오는 중...'
+      message: '구글 시트를 이미지로 변환 중...'
     });
 
     // Google Sheets 링크에서 스프레드시트 ID와 시트 ID 추출
@@ -388,149 +388,79 @@ async function processPolicyTableGeneration(jobId, params) {
     const targetSpreadsheetId = spreadsheetIdMatch[1];
     const targetSheetId = sheetIdMatch ? sheetIdMatch[1] : null;
 
-    // 시트 목록 가져오기
-    const spreadsheetMetadata = await withRetry(async () => {
-      return await sheets.spreadsheets.get({
-        spreadsheetId: targetSpreadsheetId
-      });
+    // Google Drive API를 사용하여 PDF로 export
+    const { google: googleDrive } = require('googleapis');
+    const auth = new googleDrive.auth.JWT({
+      email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+      key: process.env.GOOGLE_PRIVATE_KEY.includes('\\n') 
+        ? process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n') 
+        : process.env.GOOGLE_PRIVATE_KEY,
+      scopes: ['https://www.googleapis.com/auth/drive.readonly']
     });
 
-    // 시트 이름 찾기
-    let targetSheetName = null;
-    if (targetSheetId) {
-      const targetSheet = spreadsheetMetadata.data.sheets.find(
-        sheet => sheet.properties.sheetId.toString() === targetSheetId
+    const drive = googleDrive.drive({ version: 'v3', auth });
+
+    // PDF로 export (실제 보이는 모습 그대로)
+    let pdfBuffer;
+    try {
+      const exportResponse = await drive.files.export(
+        {
+          fileId: targetSpreadsheetId,
+          mimeType: 'application/pdf',
+          // 특정 시트만 export하려면 (선택사항)
+          // ...(targetSheetId ? { gid: targetSheetId } : {})
+        },
+        { responseType: 'arraybuffer' }
       );
-      if (targetSheet) {
-        targetSheetName = targetSheet.properties.title;
-      }
-    }
-
-    // 시트 이름이 없으면 첫 번째 시트 사용
-    if (!targetSheetName && spreadsheetMetadata.data.sheets.length > 0) {
-      targetSheetName = spreadsheetMetadata.data.sheets[0].properties.title;
-    }
-
-    if (!targetSheetName) {
-      throw new Error('시트를 찾을 수 없습니다.');
-    }
-
-    // 시트 데이터 가져오기
-    const dataResponse = await withRetry(async () => {
-      return await sheets.spreadsheets.values.get({
-        spreadsheetId: targetSpreadsheetId,
-        range: `${targetSheetName}!A:ZZ` // 충분히 넓은 범위
-      });
-    });
-
-    const rows = dataResponse.data.values || [];
-    if (rows.length === 0) {
-      throw new Error('시트 데이터가 비어있습니다.');
+      pdfBuffer = Buffer.from(exportResponse.data);
+    } catch (exportError) {
+      console.error('❌ [정책표] PDF export 실패:', exportError.message);
+      throw new Error(`구글 시트를 PDF로 변환할 수 없습니다: ${exportError.message}`);
     }
 
     updateJobStatus(jobId, {
       status: 'processing',
       progress: 50,
-      message: '이미지 생성 중...'
+      message: 'PDF를 이미지로 변환 중...'
     });
 
-    // Canvas로 테이블 렌더링
-    const { createCanvas } = require('canvas');
-    
-    // 테이블 크기 계산
-    const cellPadding = 10;
-    const cellHeight = 40;
-    const headerHeight = 50;
-    const maxCellWidth = 200;
-    
-    // 열 너비 계산 (각 열의 최대 텍스트 길이 기반)
-    const columnWidths = [];
-    for (let col = 0; col < Math.max(...rows.map(row => row.length)); col++) {
-      let maxWidth = 100; // 최소 너비
-      for (const row of rows) {
-        if (row[col]) {
-          const text = String(row[col]);
-          const textWidth = text.length * 8; // 대략적인 텍스트 너비
-          maxWidth = Math.max(maxWidth, Math.min(textWidth + cellPadding * 2, maxCellWidth));
-        }
-      }
-      columnWidths.push(maxWidth);
-    }
+    // PDF를 이미지로 변환 (pdfjs-dist 사용 - 순수 JavaScript, 시스템 의존성 없음)
+    let cropped;
+    try {
+      const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
+      const { createCanvas } = require('canvas');
 
-    const totalWidth = columnWidths.reduce((sum, w) => sum + w, 0);
-    const totalHeight = headerHeight + (rows.length - 1) * cellHeight;
+      // PDF 문서 로드
+      const loadingTask = pdfjsLib.getDocument({ data: pdfBuffer });
+      const pdfDocument = await loadingTask.promise;
 
-    // Canvas 생성
-    const canvas = createCanvas(totalWidth, totalHeight);
-    const ctx = canvas.getContext('2d');
-
-    // 배경색
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, totalWidth, totalHeight);
-
-    // 폰트 설정
-    ctx.font = 'bold 14px Arial';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-
-    // 헤더 렌더링
-    let x = 0;
-    ctx.fillStyle = '#f0f0f0';
-    ctx.fillRect(0, 0, totalWidth, headerHeight);
-    
-    ctx.fillStyle = '#000000';
-    if (rows.length > 0) {
-      const headerRow = rows[0];
-      for (let col = 0; col < columnWidths.length; col++) {
-        ctx.fillRect(x, 0, columnWidths[col], headerHeight);
-        ctx.fillStyle = '#000000';
-        const text = headerRow[col] || '';
-        ctx.fillText(text, x + cellPadding, headerHeight / 2);
-        x += columnWidths[col];
-        ctx.fillStyle = '#f0f0f0';
-      }
-    }
-
-    // 데이터 행 렌더링
-    ctx.font = '12px Arial';
-    for (let rowIndex = 1; rowIndex < rows.length; rowIndex++) {
-      const row = rows[rowIndex];
-      const y = headerHeight + (rowIndex - 1) * cellHeight;
+      // 첫 번째 페이지만 렌더링 (정책표는 보통 한 페이지)
+      const page = await pdfDocument.getPage(1);
       
-      x = 0;
-      for (let col = 0; col < columnWidths.length; col++) {
-        // 셀 배경
-        ctx.fillStyle = rowIndex % 2 === 0 ? '#ffffff' : '#fafafa';
-        ctx.fillRect(x, y, columnWidths[col], cellHeight);
-        
-        // 셀 테두리
-        ctx.strokeStyle = '#e0e0e0';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(x, y, columnWidths[col], cellHeight);
-        
-        // 텍스트
-        ctx.fillStyle = '#000000';
-        const text = row[col] ? String(row[col]) : '';
-        // 텍스트가 너무 길면 잘라내기
-        const maxTextWidth = columnWidths[col] - cellPadding * 2;
-        let displayText = text;
-        const metrics = ctx.measureText(text);
-        if (metrics.width > maxTextWidth) {
-          // 텍스트를 잘라내고 "..." 추가
-          let truncated = text;
-          while (ctx.measureText(truncated + '...').width > maxTextWidth && truncated.length > 0) {
-            truncated = truncated.slice(0, -1);
-          }
-          displayText = truncated + '...';
-        }
-        ctx.fillText(displayText, x + cellPadding, y + cellHeight / 2);
-        
-        x += columnWidths[col];
-      }
-    }
+      // 렌더링 옵션 (고해상도)
+      const scale = 2.0; // 2배 확대하여 고해상도
+      const viewport = page.getViewport({ scale });
 
-    // Canvas를 PNG 버퍼로 변환
-    const cropped = canvas.toBuffer('image/png');
+      // Canvas 생성
+      const canvas = createCanvas(viewport.width, viewport.height);
+      const context = canvas.getContext('2d');
+
+      // PDF 페이지를 Canvas에 렌더링
+      const renderContext = {
+        canvasContext: context,
+        viewport: viewport
+      };
+
+      await page.render(renderContext).promise;
+
+      // Canvas를 PNG 버퍼로 변환
+      cropped = canvas.toBuffer('image/png');
+      
+      console.log(`✅ [정책표] PDF를 이미지로 변환 완료 (크기: ${viewport.width}x${viewport.height})`);
+    } catch (pdfError) {
+      console.error('❌ [정책표] PDF를 이미지로 변환 실패:', pdfError.message);
+      throw new Error(`PDF를 이미지로 변환할 수 없습니다: ${pdfError.message}`);
+    }
 
     // 3. 디스코드 업로드
     updateJobStatus(jobId, {
