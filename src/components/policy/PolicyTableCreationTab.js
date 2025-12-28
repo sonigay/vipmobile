@@ -473,11 +473,30 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                             e.preventDefault();
                             // 구글시트 링크를 웹 버전으로 강제 열기
                             let url = setting.policyTableLink;
-                            // 이미 쿼리 파라미터가 있는지 확인
-                            const separator = url.includes('?') ? '&' : '?';
-                            // 웹 버전으로 강제 열기 (앱 실행 방지)
-                            url = `${url}${separator}usp=sharing`;
-                            window.open(url, '_blank', 'noopener,noreferrer');
+                            
+                            // 구글시트 ID 추출
+                            const sheetIdMatch = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+                            if (sheetIdMatch) {
+                              const sheetId = sheetIdMatch[1];
+                              // 웹 버전으로 강제 열기 (앱 실행 방지)
+                              // rm=minimal: 모바일 앱 리다이렉트 방지
+                              // usp=sharing: 공유 링크 형식
+                              // gid=0: 첫 번째 시트로 이동
+                              // chromeless=1: 크롬리스 모드 (앱 리다이렉트 방지)
+                              url = `https://docs.google.com/spreadsheets/d/${sheetId}/edit?usp=sharing&rm=minimal&gid=0&chromeless=1`;
+                            } else {
+                              // ID를 찾을 수 없으면 원본 URL에 파라미터 추가
+                              const separator = url.includes('?') ? '&' : '?';
+                              url = `${url}${separator}usp=sharing&rm=minimal&chromeless=1`;
+                            }
+                            
+                            // 새 창에서 열기 (앱 리다이렉트 방지)
+                            const newWindow = window.open(url, '_blank', 'noopener,noreferrer');
+                            // 새 창이 차단되었을 경우 대비
+                            if (!newWindow) {
+                              // 팝업이 차단된 경우 현재 창에서 열기
+                              window.location.href = url;
+                            }
                           }}
                           style={{ color: '#1976d2', textDecoration: 'none', cursor: 'pointer' }}
                         >
