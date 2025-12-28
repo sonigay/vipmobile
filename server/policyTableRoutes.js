@@ -541,15 +541,39 @@ function setupPolicyTableRoutes(app) {
 
   // CORS 헤더 설정
   const setCORSHeaders = (req, res) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-user-id, x-user-role');
+    // 환경 변수에서 허용할 도메인 목록 가져오기
+    const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
+    
+    // 기본 허용 도메인 (개발용 및 프로덕션)
+    const defaultOrigins = [
+      'https://vipmobile.vercel.app',
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://localhost:3002'
+    ];
+    
+    const allowedOrigins = [...defaultOrigins, ...corsOrigins];
+    const origin = req.headers.origin;
+    
+    if (origin && allowedOrigins.includes(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+    } else if (origin && process.env.CORS_ORIGIN?.includes(origin)) {
+      // 환경 변수에 있는 경우도 허용
+      res.setHeader('Access-Control-Allow-Origin', origin);
+    } else {
+      res.setHeader('Access-Control-Allow-Origin', 'https://vipmobile.vercel.app');
+    }
+    
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key, x-user-id, x-user-role');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Max-Age', '86400'); // 24시간 캐시
   };
 
   // OPTIONS 요청 처리 (CORS preflight)
   router.options('*', (req, res) => {
     setCORSHeaders(req, res);
-    res.sendStatus(200);
+    res.status(200).end();
   });
 
   // ========== 정책표생성설정 관련 API ==========
