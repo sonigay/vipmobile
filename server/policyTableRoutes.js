@@ -772,7 +772,7 @@ function setupPolicyTableRoutes(app) {
   router.get('/policy-table/user-groups', async (req, res) => {
     setCORSHeaders(req, res);
     try {
-      const permission = await checkPermission(req, ['SS']);
+      const permission = await checkPermission(req, ['SS', 'AA', 'BB', 'CC', 'DD', 'EE', 'FF']);
       if (!permission.hasPermission) {
         return res.status(403).json({ success: false, error: '권한이 없습니다.' });
       }
@@ -813,7 +813,7 @@ function setupPolicyTableRoutes(app) {
   router.post('/policy-table/user-groups', express.json(), async (req, res) => {
     setCORSHeaders(req, res);
     try {
-      const permission = await checkPermission(req, ['SS']);
+      const permission = await checkPermission(req, ['SS', 'AA', 'BB', 'CC', 'DD', 'EE', 'FF']);
       if (!permission.hasPermission) {
         return res.status(403).json({ success: false, error: '권한이 없습니다.' });
       }
@@ -863,7 +863,7 @@ function setupPolicyTableRoutes(app) {
   router.put('/policy-table/user-groups/:id', express.json(), async (req, res) => {
     setCORSHeaders(req, res);
     try {
-      const permission = await checkPermission(req, ['SS']);
+      const permission = await checkPermission(req, ['SS', 'AA', 'BB', 'CC', 'DD', 'EE', 'FF']);
       if (!permission.hasPermission) {
         return res.status(403).json({ success: false, error: '권한이 없습니다.' });
       }
@@ -921,7 +921,7 @@ function setupPolicyTableRoutes(app) {
   router.delete('/policy-table/user-groups/:id', async (req, res) => {
     setCORSHeaders(req, res);
     try {
-      const permission = await checkPermission(req, ['SS']);
+      const permission = await checkPermission(req, ['SS', 'AA', 'BB', 'CC', 'DD', 'EE', 'FF']);
       if (!permission.hasPermission) {
         return res.status(403).json({ success: false, error: '권한이 없습니다.' });
       }
@@ -978,7 +978,7 @@ function setupPolicyTableRoutes(app) {
   router.post('/policy-table/generate', express.json(), async (req, res) => {
     setCORSHeaders(req, res);
     try {
-      const permission = await checkPermission(req, ['S', 'AA', 'BB', 'CC', 'DD', 'EE', 'FF']);
+      const permission = await checkPermission(req, ['SS', 'AA', 'BB', 'CC', 'DD', 'EE', 'FF']);
       if (!permission.hasPermission) {
         return res.status(403).json({ success: false, error: '권한이 없습니다.' });
       }

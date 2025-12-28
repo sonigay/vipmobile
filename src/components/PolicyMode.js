@@ -145,6 +145,45 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   // 메인 탭 상태 (추가정책, 정책표목록, 정책표생성, 정책표생성설정)
   const [mainTab, setMainTab] = useState(0); // 0: 추가정책, 1: 정책표목록, 2: 정책표생성, 3: 정책표생성설정
   
+  // 탭 접근 권한 체크
+  const canAccessCreation = ['SS', 'AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(loggedInStore?.userRole);
+  const canAccessSettings = loggedInStore?.userRole === 'SS';
+  
+  // 실제 탭 인덱스 계산 (조건부 렌더링된 탭의 실제 인덱스)
+  const getActualTabIndex = () => {
+    let actualIndex = 0;
+    if (mainTab === 0) return actualIndex; // 추가정책
+    actualIndex++;
+    if (mainTab === 1) return actualIndex; // 정책표목록
+    actualIndex++;
+    if (mainTab === 2) {
+      if (canAccessCreation) return actualIndex; // 정책표생성
+      // 정책표생성이 없으면 정책표목록으로
+      return actualIndex - 1;
+    }
+    actualIndex++;
+    if (mainTab === 3) {
+      if (canAccessSettings) return actualIndex; // 정책표생성설정
+      // 정책표생성설정이 없으면 정책표생성으로
+      return canAccessCreation ? actualIndex - 1 : actualIndex - 2;
+    }
+    return 0;
+  };
+  
+  // 탭 클릭 시 mainTab 업데이트
+  const handleTabChange = (event, actualIndex) => {
+    let currentIndex = 0;
+    if (actualIndex === currentIndex++) {
+      setMainTab(0); // 추가정책
+    } else if (actualIndex === currentIndex++) {
+      setMainTab(1); // 정책표목록
+    } else if (canAccessCreation && actualIndex === currentIndex++) {
+      setMainTab(2); // 정책표생성
+    } else if (canAccessSettings && actualIndex === currentIndex++) {
+      setMainTab(3); // 정책표생성설정
+    }
+  };
+  
   // 승인 모달 상태
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [selectedPolicyForApproval, setSelectedPolicyForApproval] = useState(null);
@@ -1942,16 +1981,20 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         {/* 메인 탭 */}
         <Paper sx={{ mb: 3 }}>
           <Tabs
-            value={mainTab}
-            onChange={(e, newValue) => setMainTab(newValue)}
+            value={getActualTabIndex()}
+            onChange={handleTabChange}
             variant="scrollable"
             scrollButtons="auto"
             sx={{ borderBottom: 1, borderColor: 'divider' }}
           >
             <Tab label="추가정책" />
             <Tab label="정책표목록" />
-            <Tab label="정책표생성" />
-            <Tab label="정책표생성설정" />
+            {canAccessCreation && (
+              <Tab label="정책표생성" />
+            )}
+            {canAccessSettings && (
+              <Tab label="정책표생성설정" />
+            )}
           </Tabs>
         </Paper>
 
@@ -1961,12 +2004,12 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         )}
 
         {/* 정책표생성 탭 */}
-        {mainTab === 2 && (
+        {canAccessCreation && mainTab === 2 && (
           <PolicyTableCreationTab loggedInStore={loggedInStore} />
         )}
 
         {/* 정책표생성설정 탭 */}
-        {mainTab === 3 && (
+        {canAccessSettings && mainTab === 3 && (
           <PolicyTableSettingsTab loggedInStore={loggedInStore} />
         )}
 

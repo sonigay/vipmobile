@@ -20,21 +20,17 @@ import {
   Chip,
   IconButton,
   Alert,
-  CircularProgress,
-  Tabs,
-  Tab
+  CircularProgress
 } from '@mui/material';
 import {
   Add as AddIcon,
   Edit as EditIcon,
-  Delete as DeleteIcon,
-  Group as GroupIcon
+  Delete as DeleteIcon
 } from '@mui/icons-material';
 import { API_BASE_URL } from '../../api';
 
 const PolicyTableSettingsTab = ({ loggedInStore }) => {
   const [settings, setSettings] = useState([]);
-  const [userGroups, setUserGroups] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   
@@ -48,22 +44,8 @@ const PolicyTableSettingsTab = ({ loggedInStore }) => {
     creatorPermissions: []
   });
 
-  // 일반사용자 그룹 모달 상태
-  const [groupModalOpen, setGroupModalOpen] = useState(false);
-  const [editingGroup, setEditingGroup] = useState(null);
-  const [groupFormData, setGroupFormData] = useState({
-    groupName: '',
-    userIds: []
-  });
-
-  // 탭 상태 (정책표 설정 / 일반사용자 그룹)
-  const [activeTab, setActiveTab] = useState(0);
-
   // 팀장 권한자 목록 (대리점아이디관리 시트에서 가져옴)
   const [teamLeaders, setTeamLeaders] = useState([]);
-  
-  // 일반 사용자 목록 (A-F)
-  const [regularUsers, setRegularUsers] = useState([]);
 
   // 권한 체크
   const canAccess = loggedInStore?.userRole === 'SS';
@@ -71,9 +53,7 @@ const PolicyTableSettingsTab = ({ loggedInStore }) => {
   useEffect(() => {
     if (canAccess) {
       loadSettings();
-      loadUserGroups();
       loadTeamLeaders();
-      loadRegularUsers();
     }
   }, [canAccess]);
 
@@ -100,23 +80,6 @@ const PolicyTableSettingsTab = ({ loggedInStore }) => {
     }
   };
 
-  const loadUserGroups = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/policy-table/user-groups`, {
-        headers: {
-          'x-user-role': loggedInStore?.userRole || '',
-          'x-user-id': loggedInStore?.id || ''
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setUserGroups(data);
-      }
-    } catch (error) {
-      console.error('일반사용자 그룹 로드 오류:', error);
-    }
-  };
-
   const loadTeamLeaders = async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/agents`);
@@ -133,25 +96,6 @@ const PolicyTableSettingsTab = ({ loggedInStore }) => {
       }
     } catch (error) {
       console.error('팀장 목록 로드 오류:', error);
-    }
-  };
-
-  const loadRegularUsers = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/agents`);
-      if (response.ok) {
-        const agents = await response.json();
-        // R열(17번 인덱스)이 A-F인 사용자만 필터링
-        const users = agents
-          .filter(agent => ['A', 'B', 'C', 'D', 'E', 'F'].includes(agent[17]))
-          .map(agent => ({
-            code: agent[17],
-            name: agent[1] || agent[17] // 이름 또는 코드
-          }));
-        setRegularUsers(users);
-      }
-    } catch (error) {
-      console.error('일반 사용자 목록 로드 오류:', error);
     }
   };
 
@@ -250,103 +194,6 @@ const PolicyTableSettingsTab = ({ loggedInStore }) => {
     }
   };
 
-  const handleOpenGroupModal = (group = null) => {
-    if (group) {
-      setEditingGroup(group);
-      setGroupFormData({
-        groupName: group.groupName,
-        userIds: group.userIds || []
-      });
-    } else {
-      setEditingGroup(null);
-      setGroupFormData({
-        groupName: '',
-        userIds: []
-      });
-    }
-    setGroupModalOpen(true);
-  };
-
-  const handleCloseGroupModal = () => {
-    setGroupModalOpen(false);
-    setEditingGroup(null);
-    setGroupFormData({
-      groupName: '',
-      userIds: []
-    });
-  };
-
-  const handleSaveGroup = async () => {
-    try {
-      setLoading(true);
-      const url = editingGroup
-        ? `${API_BASE_URL}/api/policy-table/user-groups/${editingGroup.id}`
-        : `${API_BASE_URL}/api/policy-table/user-groups`;
-      
-      const method = editingGroup ? 'PUT' : 'POST';
-      
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-role': loggedInStore?.userRole || '',
-          'x-user-id': loggedInStore?.id || ''
-        },
-        body: JSON.stringify(groupFormData)
-      });
-
-      if (response.ok) {
-        await loadUserGroups();
-        handleCloseGroupModal();
-      } else {
-        const errorData = await response.json();
-        setError(errorData.error || '저장에 실패했습니다.');
-      }
-    } catch (error) {
-      console.error('일반사용자 그룹 저장 오류:', error);
-      setError('저장 중 오류가 발생했습니다.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDeleteGroup = async (id) => {
-    if (!window.confirm('일반사용자 그룹을 삭제하시겠습니까?')) {
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/api/policy-table/user-groups/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'x-user-role': loggedInStore?.userRole || '',
-          'x-user-id': loggedInStore?.id || ''
-        }
-      });
-
-      if (response.ok) {
-        await loadUserGroups();
-      } else {
-        const errorData = await response.json();
-        setError(errorData.error || '삭제에 실패했습니다.');
-      }
-    } catch (error) {
-      console.error('일반사용자 그룹 삭제 오류:', error);
-      setError('삭제 중 오류가 발생했습니다.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (!canAccess) {
-    return (
-      <Box sx={{ p: 3, textAlign: 'center' }}>
-        <Alert severity="warning">이 탭에 접근할 권한이 없습니다.</Alert>
-      </Box>
-    );
-  }
-
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h5" gutterBottom sx={{ mb: 3, fontWeight: 'bold' }}>
@@ -359,16 +206,7 @@ const PolicyTableSettingsTab = ({ loggedInStore }) => {
         </Alert>
       )}
 
-      <Paper sx={{ mb: 3 }}>
-        <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)}>
-          <Tab label="정책표 설정" />
-          <Tab label="일반사용자 그룹" icon={<GroupIcon />} iconPosition="start" />
-        </Tabs>
-      </Paper>
-
-      {/* 정책표 설정 탭 */}
-      {activeTab === 0 && (
-        <Box>
+      <Box>
           <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Typography variant="h6">정책표 설정 목록</Typography>
             <Button
@@ -435,72 +273,7 @@ const PolicyTableSettingsTab = ({ loggedInStore }) => {
               </Table>
             </TableContainer>
           )}
-        </Box>
-      )}
-
-      {/* 일반사용자 그룹 탭 */}
-      {activeTab === 1 && (
-        <Box>
-          <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography variant="h6">일반사용자 그룹 목록</Typography>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => handleOpenGroupModal()}
-            >
-              그룹 추가
-            </Button>
-          </Box>
-
-          {loading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-              <CircularProgress />
-            </Box>
-          ) : (
-            <TableContainer component={Paper}>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>그룹이름</TableCell>
-                    <TableCell>일반사용자</TableCell>
-                    <TableCell>등록일시</TableCell>
-                    <TableCell>작업</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {userGroups.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={4} align="center">
-                        등록된 그룹이 없습니다.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    userGroups.map((group) => (
-                      <TableRow key={group.id}>
-                        <TableCell>{group.groupName}</TableCell>
-                        <TableCell>
-                          {group.userIds.map((userId) => (
-                            <Chip key={userId} label={userId} size="small" sx={{ mr: 0.5, mb: 0.5 }} />
-                          ))}
-                        </TableCell>
-                        <TableCell>{new Date(group.registeredAt).toLocaleString('ko-KR')}</TableCell>
-                        <TableCell>
-                          <IconButton size="small" onClick={() => handleOpenGroupModal(group)}>
-                            <EditIcon />
-                          </IconButton>
-                          <IconButton size="small" onClick={() => handleDeleteGroup(group.id)}>
-                            <DeleteIcon />
-                          </IconButton>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )}
-        </Box>
-      )}
+      </Box>
 
       {/* 정책표 설정 모달 */}
       <Dialog open={settingsModalOpen} onClose={handleCloseSettingsModal} maxWidth="md" fullWidth>
@@ -581,72 +354,6 @@ const PolicyTableSettingsTab = ({ loggedInStore }) => {
         <DialogActions>
           <Button onClick={handleCloseSettingsModal}>취소</Button>
           <Button onClick={handleSaveSettings} variant="contained" disabled={loading}>
-            {loading ? <CircularProgress size={24} /> : '저장'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* 일반사용자 그룹 모달 */}
-      <Dialog open={groupModalOpen} onClose={handleCloseGroupModal} maxWidth="md" fullWidth>
-        <DialogTitle>
-          {editingGroup ? '일반사용자 그룹 수정' : '일반사용자 그룹 추가'}
-        </DialogTitle>
-        <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="그룹이름"
-                value={groupFormData.groupName}
-                onChange={(e) => setGroupFormData({ ...groupFormData, groupName: e.target.value })}
-                required
-                placeholder="예: 서울지역, 부산지역"
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <Autocomplete
-                multiple
-                options={regularUsers}
-                getOptionLabel={(option) => `${option.name} (${option.code})`}
-                value={regularUsers.filter(user => 
-                  groupFormData.userIds.includes(user.code)
-                )}
-                onChange={(event, newValue) => {
-                  setGroupFormData({
-                    ...groupFormData,
-                    userIds: newValue.map(v => v.code)
-                  });
-                }}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="일반사용자 선택"
-                    placeholder="일반사용자를 선택하세요"
-                    required
-                  />
-                )}
-                renderTags={(value, getTagProps) =>
-                  value.map((option, index) => (
-                    <Chip
-                      label={`${option.name} (${option.code})`}
-                      {...getTagProps({ index })}
-                      key={option.code}
-                    />
-                  ))
-                }
-                filterOptions={(options, { inputValue }) => {
-                  return options.filter((option) =>
-                    option.name.toLowerCase().includes(inputValue.toLowerCase()) ||
-                    option.code.toLowerCase().includes(inputValue.toLowerCase())
-                  );
-                }}
-              />
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseGroupModal}>취소</Button>
-          <Button onClick={handleSaveGroup} variant="contained" disabled={loading}>
             {loading ? <CircularProgress size={24} /> : '저장'}
           </Button>
         </DialogActions>
