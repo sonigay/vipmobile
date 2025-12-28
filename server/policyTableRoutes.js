@@ -320,7 +320,7 @@ async function checkPermission(req, allowedRoles) {
     hasPermission, 
     userRole: finalUserRole, 
     userId: finalUserId, 
-    userName: finalUserName || userInfo?.name 
+    userName: finalUserName || userInfo?.name || finalUserId
   };
 }
 
@@ -1208,7 +1208,7 @@ function setupPolicyTableRoutes(app) {
         applyDate,
         applyContent,
         accessGroupId,
-        creatorName: permission.userId || 'Unknown',
+        creatorName: permission.userName || permission.userId || 'Unknown',
         creatorRole: permission.userRole
       }).catch(error => {
         console.error('[정책표] 백그라운드 작업 오류:', error);
@@ -1340,7 +1340,7 @@ function setupPolicyTableRoutes(app) {
   router.get('/policy-tables', async (req, res) => {
     setCORSHeaders(req, res);
     try {
-      const { policyTableName, applyDateFrom, applyDateTo, creator, createDateFrom, createDateTo } = req.query;
+      const { policyTableName, applyDateSearch, creator, createDateFrom, createDateTo } = req.query;
       const userRole = req.headers['x-user-role'] || req.query.userRole;
 
       if (!policyTableName) {
@@ -1419,11 +1419,13 @@ function setupPolicyTableRoutes(app) {
       }
 
       // 추가 필터링
-      if (applyDateFrom) {
-        policies = policies.filter(p => p.applyDate >= applyDateFrom);
-      }
-      if (applyDateTo) {
-        policies = policies.filter(p => p.applyDate <= applyDateTo);
+      // 적용일시 텍스트 검색
+      if (applyDateSearch) {
+        const searchTerm = applyDateSearch.toLowerCase();
+        policies = policies.filter(p => {
+          const applyDate = (p.applyDate || '').toLowerCase();
+          return applyDate.includes(searchTerm);
+        });
       }
       if (creator) {
         policies = policies.filter(p => p.creator === creator);

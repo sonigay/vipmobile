@@ -32,6 +32,28 @@ import {
 } from '@mui/icons-material';
 import { API_BASE_URL } from '../../api';
 
+// 날짜 포맷팅 함수 (생성일시, 등록일시용)
+const formatDate = (dateValue) => {
+  if (!dateValue) return '-';
+  
+  try {
+    const date = new Date(dateValue);
+    if (isNaN(date.getTime())) {
+      return dateValue || '-';
+    }
+    return date.toLocaleString('ko-KR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch (error) {
+    console.warn('날짜 포맷팅 오류:', dateValue, error);
+    return dateValue || '-';
+  }
+};
+
 const PolicyTableListTab = ({ loggedInStore }) => {
   const [tabs, setTabs] = useState([]);
   const [activeTabIndex, setActiveTabIndex] = useState(0);
@@ -45,7 +67,6 @@ const PolicyTableListTab = ({ loggedInStore }) => {
   // 검색/필터링
   const [searchCreator, setSearchCreator] = useState('');
   const [filterApplyDateFrom, setFilterApplyDateFrom] = useState('');
-  const [filterApplyDateTo, setFilterApplyDateTo] = useState('');
 
   // 권한 체크
   const canAccess = ['A', 'B', 'C', 'D', 'E', 'F', 'AA', 'BB', 'CC', 'DD', 'EE', 'FF', 'S', 'SS'].includes(loggedInStore?.userRole);
@@ -94,8 +115,7 @@ const PolicyTableListTab = ({ loggedInStore }) => {
       const params = new URLSearchParams({
         policyTableName: policyTableName,
         ...(searchCreator && { creator: searchCreator }),
-        ...(filterApplyDateFrom && { applyDateFrom: filterApplyDateFrom }),
-        ...(filterApplyDateTo && { applyDateTo: filterApplyDateTo })
+        ...(filterApplyDateFrom && { applyDateSearch: filterApplyDateFrom })
       });
 
       const response = await fetch(`${API_BASE_URL}/api/policy-tables?${params}`, {
@@ -121,7 +141,6 @@ const PolicyTableListTab = ({ loggedInStore }) => {
     setPolicies([]);
     setSearchCreator('');
     setFilterApplyDateFrom('');
-    setFilterApplyDateTo('');
   };
 
   const handlePolicyClick = async (policy) => {
@@ -293,26 +312,21 @@ const PolicyTableListTab = ({ loggedInStore }) => {
                 }}
               />
             </Grid>
-            <Grid item xs={12} sm={3}>
+            <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
                 size="small"
-                label="적용일시 시작"
-                type="date"
+                label="적용일시 검색"
                 value={filterApplyDateFrom}
                 onChange={(e) => setFilterApplyDateFrom(e.target.value)}
-                InputLabelProps={{ shrink: true }}
-              />
-            </Grid>
-            <Grid item xs={12} sm={3}>
-              <TextField
-                fullWidth
-                size="small"
-                label="적용일시 종료"
-                type="date"
-                value={filterApplyDateTo}
-                onChange={(e) => setFilterApplyDateTo(e.target.value)}
-                InputLabelProps={{ shrink: true }}
+                placeholder="텍스트로 검색"
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <SearchIcon />
+                    </InputAdornment>
+                  )
+                }}
               />
             </Grid>
             <Grid item xs={12} sm={2}>
@@ -356,10 +370,10 @@ const PolicyTableListTab = ({ loggedInStore }) => {
                     onClick={() => handlePolicyClick(policy)}
                     sx={{ cursor: 'pointer' }}
                   >
-                    <TableCell>{new Date(policy.applyDate).toLocaleString('ko-KR')}</TableCell>
+                    <TableCell>{policy.applyDate || '-'}</TableCell>
                     <TableCell>{policy.creator}</TableCell>
-                    <TableCell>{new Date(policy.createdAt).toLocaleString('ko-KR')}</TableCell>
-                    <TableCell>{policy.registeredAt ? new Date(policy.registeredAt).toLocaleString('ko-KR') : '-'}</TableCell>
+                    <TableCell>{formatDate(policy.createdAt)}</TableCell>
+                    <TableCell>{formatDate(policy.registeredAt)}</TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       {canDelete && (
                         <IconButton
@@ -398,7 +412,7 @@ const PolicyTableListTab = ({ loggedInStore }) => {
                   정책적용일시
                 </Typography>
                 <Typography variant="body1" sx={{ mb: 2 }}>
-                  {new Date(selectedPolicy.applyDate).toLocaleString('ko-KR')}
+                  {selectedPolicy.applyDate || '-'}
                 </Typography>
                 <Typography variant="subtitle2" gutterBottom>
                   정책적용내용
