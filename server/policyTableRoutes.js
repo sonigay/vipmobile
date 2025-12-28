@@ -351,7 +351,7 @@ async function processPolicyTableGeneration(jobId, params) {
     const settingsResponse = await withRetry(async () => {
       return await sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
-        range: `${SHEET_POLICY_TABLE_SETTINGS}!A:G`
+        range: `${SHEET_POLICY_TABLE_SETTINGS}!A:I`
       });
     });
 
@@ -630,7 +630,7 @@ function setupPolicyTableRoutes(app) {
       const response = await withRetry(async () => {
         return await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_POLICY_TABLE_SETTINGS}!A:H`
+          range: `${SHEET_POLICY_TABLE_SETTINGS}!A:I`
         });
       });
 
@@ -701,7 +701,7 @@ function setupPolicyTableRoutes(app) {
       await withRetry(async () => {
         return await sheets.spreadsheets.values.append({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_POLICY_TABLE_SETTINGS}!A:G`,
+          range: `${SHEET_POLICY_TABLE_SETTINGS}!A:I`,
           valueInputOption: 'USER_ENTERED',
           resource: { values: [newRow] }
         });
@@ -735,7 +735,7 @@ function setupPolicyTableRoutes(app) {
       const response = await withRetry(async () => {
         return await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_POLICY_TABLE_SETTINGS}!A:H`
+          range: `${SHEET_POLICY_TABLE_SETTINGS}!A:I`
         });
       });
 
@@ -802,7 +802,7 @@ function setupPolicyTableRoutes(app) {
       const response = await withRetry(async () => {
         return await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_POLICY_TABLE_SETTINGS}!A:H`
+          range: `${SHEET_POLICY_TABLE_SETTINGS}!A:I`
         });
       });
 
