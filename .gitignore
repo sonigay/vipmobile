@@ -36,3 +36,8 @@ yarn-error.log*
 *_플랜*.md
 *_구현_플랜*.md
 *_가이드.md
+
+# Local Discord bot (로컬 PC 전용)
+/local-discord-bot/.env
+/local-discord-bot/logs/
+/local-discord-bot/node_modules/

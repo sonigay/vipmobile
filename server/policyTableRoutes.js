@@ -29,6 +29,124 @@ if (DISCORD_LOGGING_ENABLED && DISCORD_BOT_TOKEN) {
     .catch(error => console.error('❌ [정책표] Discord 봇 로그인 실패:', error));
 }
 
+// ===== 로컬 PC 디스코드 봇 명령어 전송용 클라이언트 =====
+// 클라우드 서버의 기존 봇(discordBot)과 별도로 명령어 전송 전용 봇 클라이언트를 사용
+let discordBotForCommands = null;
+
+/**
+ * 로컬 PC 디스코드 봇에 명령어를 전송하기 위한 별도 봇 클라이언트 초기화
+ * 기존 discordBot과는 별도로 동작하여 충돌 방지
+ */
+async function initDiscordBotForCommands() {
+  // 이미 초기화되어 있고 준비 상태라면 재사용
+  if (discordBotForCommands && discordBotForCommands.isReady()) {
+    return discordBotForCommands;
+  }
+
+  // 기존 봇 토큰 사용 (로컬 PC 봇이 아닌 클라우드 서버 봇)
+  // 로컬 PC 봇은 별도로 실행되므로, 클라우드 서버 봇이 명령어를 전송
+  if (!DISCORD_BOT_TOKEN) {
+    throw new Error('DISCORD_BOT_TOKEN 환경 변수가 설정되지 않았습니다.');
+  }
+
+  // 새 클라이언트 생성 (기존 discordBot과 별도)
+  discordBotForCommands = new Client({
+    intents: [
+      GatewayIntentBits.Guilds,
+      GatewayIntentBits.GuildMessages,
+      GatewayIntentBits.MessageContent
+    ]
+  });
+
+  // 봇이 준비될 때까지 대기
+  await new Promise((resolve, reject) => {
+    discordBotForCommands.once('ready', () => {
+      console.log('✅ 디스코드 봇 (명령어 전송용) 준비 완료');
+      resolve(discordBotForCommands);
+    });
+
+    // 30초 타임아웃
+    setTimeout(() => {
+      reject(new Error('디스코드 봇 준비 시간 초과'));
+    }, 30000);
+  });
+
+  // 로그인
+  await discordBotForCommands.login(DISCORD_BOT_TOKEN)
+    .then(() => console.log('✅ [정책표] Discord 봇 (명령어 전송용) 로그인 성공'))
+    .catch(error => {
+      console.error('❌ [정책표] Discord 봇 (명령어 전송용) 로그인 실패:', error);
+      throw error;
+    });
+
+  return discordBotForCommands;
+}
+
+/**
+ * 로컬 PC 디스코드 봇에 스크린샷 명령어를 전송하고 이미지 URL과 메시지 ID를 받아옴
+ * @param {string} sheetUrl - Google Sheets URL
+ * @param {string} policyTableName - 정책표 이름
+ * @param {string} userName - 생성자 이름
+ * @param {string} channelId - 디스코드 채널 ID
+ * @returns {Promise<{imageUrl: string, messageId: string}>} 이미지 URL과 메시지 ID
+ */
+async function captureSheetViaDiscordBot(sheetUrl, policyTableName, userName, channelId) {
+  try {
+    // 명령어 전송용 봇 초기화
+    const bot = await initDiscordBotForCommands();
+    const channel = await bot.channels.fetch(channelId);
+    if (!channel) {
+      throw new Error(`디스코드 채널을 찾을 수 없습니다: ${channelId}`);
+    }
+
+    // 명령어 생성
+    // 형식: !screenshot <URL> policyTableName=<이름> userName=<사용자>
+    const command = `!screenshot ${sheetUrl} policyTableName=${encodeURIComponent(policyTableName)} userName=${encodeURIComponent(userName)}`;
+    console.log(`📤 디스코드 명령어 전송: ${command.substring(0, 100)}...`);
+    
+    // 명령어 메시지 전송
+    const commandMessage = await channel.send(command);
+
+    // 봇이 업로드한 이미지 메시지 대기
+    const filter = (msg) => {
+      return msg.channel.id === channelId &&
+             msg.author.bot &&
+             msg.attachments.size > 0 &&
+             msg.createdTimestamp > commandMessage.createdTimestamp;
+    };
+
+    const collector = channel.createMessageCollector({
+      filter,
+      time: 60000, // 60초 대기
+      max: 1
+    });
+
+    return new Promise((resolve, reject) => {
+      collector.on('collect', (msg) => {
+        const attachment = msg.attachments.first();
+        if (attachment && attachment.contentType?.startsWith('image/')) {
+          const imageUrl = attachment.url;
+          const messageId = msg.id;
+          console.log(`✅ 스크린샷 생성 완료: ${imageUrl} (메시지 ID: ${messageId})`);
+          resolve({ imageUrl, messageId });
+        } else {
+          reject(new Error('이미지가 포함된 메시지를 찾을 수 없습니다.'));
+        }
+      });
+
+      collector.on('end', (collected) => {
+        if (collected.size === 0) {
+          reject(new Error('디스코드 봇 응답 시간 초과 (60초)'));
+        }
+      });
+    });
+
+  } catch (error) {
+    console.error('❌ 디스코드 봇 명령어 실행 오류:', error);
+    throw error;
+  }
+}
+
 // Google Sheets 클라이언트 생성
 function createSheetsClient() {
   const GOOGLE_SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
@@ -402,211 +520,28 @@ async function processPolicyTableGeneration(jobId, params) {
     const policyTablePublicLink = settingsRow[4] || settingsRow[3];  // 공개 링크 (없으면 편집 링크 사용)
     const discordChannelId = settingsRow[5];
 
-    // 2. Google Sheets API로 데이터 가져와서 Canvas로 렌더링 (스타일 정보 포함)
-    updateJobStatus(jobId, {
-      status: 'processing',
-      progress: 25,
-      message: '구글 시트 데이터 가져오는 중...'
-    });
-
-    // Google Sheets 링크에서 스프레드시트 ID와 시트 ID 추출
-    const spreadsheetIdMatch = policyTableLink.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-    const sheetIdMatch = policyTableLink.match(/[#&]gid=(\d+)/);
-    
-    if (!spreadsheetIdMatch) {
-      throw new Error('구글 시트 ID를 찾을 수 없습니다.');
-    }
-
-    const targetSpreadsheetId = spreadsheetIdMatch[1];
-    const targetSheetId = sheetIdMatch ? sheetIdMatch[1] : null;
-
-    // 시트 목록 가져오기
-    const spreadsheetMetadata = await withRetry(async () => {
-      return await sheets.spreadsheets.get({
-        spreadsheetId: targetSpreadsheetId
-      });
-    });
-
-    // 시트 이름 찾기
-    let targetSheetName = null;
-    if (targetSheetId) {
-      const targetSheet = spreadsheetMetadata.data.sheets.find(
-        sheet => sheet.properties.sheetId.toString() === targetSheetId
-      );
-      if (targetSheet) {
-        targetSheetName = targetSheet.properties.title;
-      }
-    }
-
-    // 시트 이름이 없으면 첫 번째 시트 사용
-    if (!targetSheetName && spreadsheetMetadata.data.sheets.length > 0) {
-      targetSheetName = spreadsheetMetadata.data.sheets[0].properties.title;
-    }
-
-    if (!targetSheetName) {
-      throw new Error('시트를 찾을 수 없습니다.');
-    }
-
-    // 시트 데이터 가져오기 (값과 포맷 정보 포함)
-    const dataResponse = await withRetry(async () => {
-      return await sheets.spreadsheets.values.get({
-        spreadsheetId: targetSpreadsheetId,
-        range: `${targetSheetName}!A:ZZ`, // 충분히 넓은 범위
-        valueRenderOption: 'FORMATTED_VALUE' // 포맷된 값 가져오기
-      });
-    });
-
-    // 셀 포맷 정보 가져오기 (색상, 폰트 등)
-    let cellFormats = null;
-    try {
-      const formatResponse = await withRetry(async () => {
-        return await sheets.spreadsheets.get({
-          spreadsheetId: targetSpreadsheetId,
-          ranges: [`${targetSheetName}!A:ZZ`],
-          includeGridData: true
-        });
-      });
-      
-      if (formatResponse.data.sheets && formatResponse.data.sheets[0] && 
-          formatResponse.data.sheets[0].data && formatResponse.data.sheets[0].data[0]) {
-        cellFormats = formatResponse.data.sheets[0].data[0].rowData;
-      }
-    } catch (formatError) {
-      console.warn('⚠️ [정책표] 셀 포맷 정보 가져오기 실패 (기본 스타일 사용):', formatError.message);
-    }
-
-    const rows = dataResponse.data.values || [];
-    if (rows.length === 0) {
-      throw new Error('시트 데이터가 비어있습니다.');
-    }
-
+    // 2. 디스코드 봇을 통한 스크린샷 생성 (Canvas 렌더링 대체)
     updateJobStatus(jobId, {
       status: 'processing',
       progress: 50,
-      message: '이미지 생성 중...'
+      message: '디스코드 봇으로 스크린샷 생성 중...'
     });
 
-    // Canvas로 테이블 렌더링 (스타일 정보 반영)
-    const { createCanvas } = require('canvas');
-    
-    // 테이블 크기 계산
-    const cellPadding = 12;
-    const cellHeight = 45;
-    const headerHeight = 55;
-    const maxCellWidth = 250;
-    const minCellWidth = 80;
-    
-    // 열 너비 계산 (각 열의 최대 텍스트 길이 기반)
-    const columnWidths = [];
-    for (let col = 0; col < Math.max(...rows.map(row => row.length)); col++) {
-      let maxWidth = minCellWidth;
-      for (const row of rows) {
-        if (row[col]) {
-          const text = String(row[col]);
-          const textWidth = text.length * 9; // 대략적인 텍스트 너비
-          maxWidth = Math.max(maxWidth, Math.min(textWidth + cellPadding * 2, maxCellWidth));
-        }
-      }
-      columnWidths.push(maxWidth);
-    }
+    const sheetUrl = policyTablePublicLink || policyTableLink;
 
-    const totalWidth = columnWidths.reduce((sum, w) => sum + w, 0);
-    const totalHeight = headerHeight + (rows.length - 1) * cellHeight;
+    // 로컬 PC 디스코드 봇에 명령어 전송 및 이미지 URL, 메시지 ID 받기
+    const { imageUrl, messageId: discordMessageId } = await captureSheetViaDiscordBot(
+      sheetUrl,
+      policyTableName,
+      creatorName, // 생성자 이름 전달
+      discordChannelId
+    );
 
-    // Canvas 생성
-    const canvas = createCanvas(totalWidth, totalHeight);
-    const ctx = canvas.getContext('2d');
-
-    // 배경색
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, totalWidth, totalHeight);
-
-    // 헤더 렌더링
-    let x = 0;
-    ctx.fillStyle = '#4285f4'; // Google Sheets 헤더 색상
-    ctx.fillRect(0, 0, totalWidth, headerHeight);
-    
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 15px Arial';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    
-    if (rows.length > 0) {
-      const headerRow = rows[0];
-      for (let col = 0; col < columnWidths.length; col++) {
-        const text = headerRow[col] || '';
-        ctx.fillText(text, x + cellPadding, headerHeight / 2);
-        x += columnWidths[col];
-      }
-    }
-
-    // 데이터 행 렌더링
-    ctx.font = '13px Arial';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    
-    for (let rowIndex = 1; rowIndex < rows.length; rowIndex++) {
-      const row = rows[rowIndex];
-      const y = headerHeight + (rowIndex - 1) * cellHeight;
-      
-      // 행 포맷 정보 가져오기
-      const rowFormat = cellFormats && cellFormats[rowIndex] ? cellFormats[rowIndex].values : null;
-      
-      x = 0;
-      for (let col = 0; col < columnWidths.length; col++) {
-        // 셀 배경색 (조건부 서식 반영)
-        const cellFormat = rowFormat && rowFormat[col] ? rowFormat[col] : null;
-        const bgColor = cellFormat && cellFormat.effectiveFormat && cellFormat.effectiveFormat.backgroundColor
-          ? `rgb(${Math.round(cellFormat.effectiveFormat.backgroundColor.red * 255)},${Math.round(cellFormat.effectiveFormat.backgroundColor.green * 255)},${Math.round(cellFormat.effectiveFormat.backgroundColor.blue * 255)})`
-          : (rowIndex % 2 === 0 ? '#ffffff' : '#f8f9fa');
-        ctx.fillStyle = bgColor;
-        ctx.fillRect(x, y, columnWidths[col], cellHeight);
-        
-        // 셀 테두리
-        ctx.strokeStyle = '#e0e0e0';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(x, y, columnWidths[col], cellHeight);
-        
-        // 텍스트 색상 및 스타일
-        const textColor = cellFormat && cellFormat.effectiveFormat && cellFormat.effectiveFormat.textFormat
-          ? (cellFormat.effectiveFormat.textFormat.foregroundColor 
-              ? `rgb(${Math.round(cellFormat.effectiveFormat.textFormat.foregroundColor.red * 255)},${Math.round(cellFormat.effectiveFormat.textFormat.foregroundColor.green * 255)},${Math.round(cellFormat.effectiveFormat.textFormat.foregroundColor.blue * 255)})`
-              : '#000000')
-          : '#000000';
-        ctx.fillStyle = textColor;
-        
-        // 폰트 스타일 (볼드, 이탤릭 등)
-        const isBold = cellFormat && cellFormat.effectiveFormat && cellFormat.effectiveFormat.textFormat
-          ? cellFormat.effectiveFormat.textFormat.bold
-          : false;
-        ctx.font = isBold ? 'bold 13px Arial' : '13px Arial';
-        
-        // 텍스트
-        const text = row[col] ? String(row[col]) : '';
-        const maxTextWidth = columnWidths[col] - cellPadding * 2;
-        let displayText = text;
-        const metrics = ctx.measureText(text);
-        if (metrics.width > maxTextWidth) {
-          let truncated = text;
-          while (ctx.measureText(truncated + '...').width > maxTextWidth && truncated.length > 0) {
-            truncated = truncated.slice(0, -1);
-          }
-          displayText = truncated + '...';
-        }
-        ctx.fillText(displayText, x + cellPadding, y + cellHeight / 2);
-        
-        x += columnWidths[col];
-      }
-    }
-
-    // Canvas를 PNG 버퍼로 변환
-    const cropped = canvas.toBuffer('image/png');
-
-    // 3. 디스코드 업로드
+    // 3. 디스코드 스레드 정보 가져오기 (이미지 URL은 captureSheetViaDiscordBot에서 받음)
     updateJobStatus(jobId, {
       status: 'processing',
       progress: 75,
-      message: '디스코드 업로드 중...'
+      message: '디스코드 스레드 정보 가져오는 중...'
     });
 
     if (!DISCORD_LOGGING_ENABLED || !discordBot) {
@@ -648,12 +583,9 @@ async function processPolicyTableGeneration(jobId, params) {
       });
     }
 
-    // 이미지 업로드
-    const attachment = new AttachmentBuilder(cropped, { name: `정책표_${Date.now()}.png` });
-    const message = await thread.send({ files: [attachment] });
-
-    const imageUrl = message.attachments.first().url;
-    const messageId = message.id;
+    // 이미지 URL과 메시지 ID는 이미 captureSheetViaDiscordBot에서 받았으므로
+    // 스레드 정보만 가져오기
+    const messageId = discordMessageId; // 디스코드 봇이 업로드한 메시지 ID
     const threadId = thread.id;
 
     // 4. 구글시트에 저장

@@ -1,0 +1,29 @@
+{
+  "name": "local-discord-screenshot-bot",
+  "version": "1.0.0",
+  "description": "Google Sheets 스크린샷 생성 디스코드 봇 (로컬 PC용)",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:stop": "pm2 stop discord-screenshot-bot",
+    "pm2:restart": "pm2 restart discord-screenshot-bot",
+    "pm2:logs": "pm2 logs discord-screenshot-bot",
+    "pm2:status": "pm2 status"
+  },
+  "keywords": [
+    "discord",
+    "bot",
+    "screenshot",
+    "puppeteer",
+    "google-sheets"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "discord.js": "^14.14.1",
+    "puppeteer": "^21.6.1",
+    "dotenv": "^16.3.1"
+  }
+}
+
