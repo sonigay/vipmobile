@@ -136,12 +136,12 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
       const response = await fetch(`${API_BASE_URL}/api/agents`);
       if (response.ok) {
         const agents = await response.json();
-        // R열(17번 인덱스)이 A-F인 사용자만 필터링
+        // permissionLevel이 A-F인 사용자만 필터링
         const users = agents
-          .filter(agent => ['A', 'B', 'C', 'D', 'E', 'F'].includes(agent[17]))
+          .filter(agent => agent.permissionLevel && ['A', 'B', 'C', 'D', 'E', 'F'].includes(agent.permissionLevel))
           .map(agent => ({
-            code: agent[17],
-            name: agent[1] || agent[17] // 이름 또는 코드
+            code: agent.permissionLevel,
+            name: agent.target || agent.permissionLevel
           }));
         setRegularUsers(users);
       }
