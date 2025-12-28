@@ -2871,7 +2871,8 @@ app.get('/api/agents', async (req, res) => {
         qualification: row[1] || '', // B열: 자격
         contactId: row[2] || '',     // C열: 연락처(아이디)
         office: office,
-        department: department
+        department: department,
+        permissionLevel: row[17] || '' // R열: 정책모드권한레벨
       };
 
       // 디버깅: 처음 10개 행 모두 상세 로그 출력

@@ -85,14 +85,17 @@ const PolicyTableSettingsTab = ({ loggedInStore }) => {
       const response = await fetch(`${API_BASE_URL}/api/agents`);
       if (response.ok) {
         const agents = await response.json();
-        // R열(17번 인덱스)이 AA-FF인 사용자만 필터링
+        // permissionLevel이 AA-FF인 사용자만 필터링 (팀장 권한자)
         const leaders = agents
-          .filter(agent => ['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(agent[17]))
+          .filter(agent => agent.permissionLevel && ['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(agent.permissionLevel))
           .map(agent => ({
-            code: agent[17],
-            name: agent[1] || agent[17] // 이름 또는 코드
+            code: agent.permissionLevel,
+            name: agent.target || agent.permissionLevel // A열(대상/이름) 또는 권한 코드
           }));
+        console.log('팀장 목록 로드 완료:', leaders);
         setTeamLeaders(leaders);
+      } else {
+        console.error('팀장 목록 로드 실패:', response.status);
       }
     } catch (error) {
       console.error('팀장 목록 로드 오류:', error);
