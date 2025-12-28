@@ -570,14 +570,9 @@ function setupPolicyTableRoutes(app) {
     res.setHeader('Access-Control-Max-Age', '86400'); // 24시간 캐시
   };
 
-  // OPTIONS 요청 처리 (CORS preflight) - 모든 경로에 대해 미들웨어로 처리
-  router.use((req, res, next) => {
-    if (req.method === 'OPTIONS') {
-      setCORSHeaders(req, res);
-      return res.status(200).end();
-    }
-    next();
-  });
+  // CORS 헤더는 전역 핸들러(app.options('*'))에서 처리되므로
+  // 라우터에서는 각 라우트 핸들러에서만 setCORSHeaders 호출
+  // OPTIONS 요청은 전역 핸들러가 처리
 
   // ========== 정책표생성설정 관련 API ==========
 
