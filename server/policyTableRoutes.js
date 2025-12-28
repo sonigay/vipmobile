@@ -447,9 +447,10 @@ async function processPolicyTableGeneration(jobId, params) {
 
       const { createCanvas } = require('canvas');
 
-      // PDF 문서 로드
+      // PDF 문서 로드 (Buffer를 Uint8Array로 변환)
+      const pdfData = new Uint8Array(pdfBuffer);
       const loadingTask = pdfjsLib.getDocument({ 
-        data: pdfBuffer,
+        data: pdfData,
         verbosity: 0 // 로그 레벨 낮춤
       });
       const pdfDocument = await loadingTask.promise;
