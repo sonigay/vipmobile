@@ -111,6 +111,7 @@ const PolicyTableSettingsTab = ({ loggedInStore }) => {
         policyTableName: setting.policyTableName,
         policyTableDescription: setting.policyTableDescription || '',
         policyTableLink: setting.policyTableLink,
+        policyTablePublicLink: setting.policyTablePublicLink || '',
         discordChannelId: setting.discordChannelId,
         creatorPermissions: setting.creatorPermissions || []
       });
@@ -120,6 +121,7 @@ const PolicyTableSettingsTab = ({ loggedInStore }) => {
         policyTableName: '',
         policyTableDescription: '',
         policyTableLink: '',
+        policyTablePublicLink: '',
         discordChannelId: '',
         creatorPermissions: []
       });
@@ -134,6 +136,7 @@ const PolicyTableSettingsTab = ({ loggedInStore }) => {
       policyTableName: '',
       policyTableDescription: '',
       policyTableLink: '',
+      policyTablePublicLink: '',
       discordChannelId: '',
       creatorPermissions: []
     });
@@ -320,11 +323,22 @@ const PolicyTableSettingsTab = ({ loggedInStore }) => {
             <Grid item xs={12}>
               <TextField
                 fullWidth
-                label="정책표링크"
+                label="정책표링크 (편집 링크)"
                 value={settingsFormData.policyTableLink}
                 onChange={(e) => setSettingsFormData({ ...settingsFormData, policyTableLink: e.target.value })}
                 required
-                placeholder="https://docs.google.com/spreadsheets/d/..."
+                placeholder="시트 ID 또는 전체 URL (예: 1Vy8Qhce3B6_41TxRfVUs883ioLxiGTUjkbD_nKebgrs)"
+                helperText="시트 ID만 입력하거나 전체 편집 URL을 입력하세요"
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="정책표공개링크 (캡처용)"
+                value={settingsFormData.policyTablePublicLink}
+                onChange={(e) => setSettingsFormData({ ...settingsFormData, policyTablePublicLink: e.target.value })}
+                placeholder="https://docs.google.com/spreadsheets/d/e/.../pubhtml (선택사항)"
+                helperText="웹에 게시된 공개 링크(/pubhtml). 없으면 편집 링크를 사용합니다."
               />
             </Grid>
             <Grid item xs={12}>

@@ -366,8 +366,10 @@ async function processPolicyTableGeneration(jobId, params) {
     }
 
     const policyTableName = settingsRow[1];
-    const policyTableLink = settingsRow[2];
-    const discordChannelId = settingsRow[3];
+    const policyTableDescription = settingsRow[2] || '';
+    const policyTableLink = settingsRow[3];  // 편집 링크
+    const policyTablePublicLink = settingsRow[4] || settingsRow[3];  // 공개 링크 (없으면 편집 링크 사용)
+    const discordChannelId = settingsRow[5];
 
     // 2. Puppeteer로 구글 시트 캡쳐
     updateJobStatus(jobId, {
@@ -389,7 +391,9 @@ async function processPolicyTableGeneration(jobId, params) {
     });
 
     const page = await browser.newPage();
-    await page.goto(policyTableLink, { waitUntil: 'networkidle0', timeout: 30000 });
+    // 공개 링크가 있으면 사용, 없으면 편집 링크 사용
+    const captureUrl = policyTablePublicLink || policyTableLink;
+    await page.goto(captureUrl, { waitUntil: 'networkidle0', timeout: 30000 });
 
     // iframe 찾기
     let frame = null;
@@ -643,10 +647,11 @@ function setupPolicyTableRoutes(app) {
         policyTableName: row[1] || '',
         policyTableDescription: row[2] || '',
         policyTableLink: row[3] || '',
-        discordChannelId: row[4] || '',
-        creatorPermissions: row[5] ? JSON.parse(row[5]) : [],
-        registeredAt: row[6] || '',
-        registeredBy: row[7] || ''
+        policyTablePublicLink: row[4] || '',  // 공개 링크
+        discordChannelId: row[5] || '',
+        creatorPermissions: row[6] ? JSON.parse(row[6]) : [],
+        registeredAt: row[7] || '',
+        registeredBy: row[8] || ''
       }));
 
       return res.json(settings);
@@ -665,7 +670,7 @@ function setupPolicyTableRoutes(app) {
         return res.status(403).json({ success: false, error: '권한이 없습니다.' });
       }
 
-      const { policyTableName, policyTableDescription, policyTableLink, discordChannelId, creatorPermissions } = req.body;
+      const { policyTableName, policyTableDescription, policyTableLink, policyTablePublicLink, discordChannelId, creatorPermissions } = req.body;
 
       if (!policyTableName || !policyTableLink || !discordChannelId || !creatorPermissions || !Array.isArray(creatorPermissions)) {
         return res.status(400).json({ success: false, error: '필수 필드가 누락되었습니다.' });
@@ -674,6 +679,9 @@ function setupPolicyTableRoutes(app) {
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_TABLE_SETTINGS, HEADERS_POLICY_TABLE_SETTINGS);
 
+      // 편집 링크 정규화 (시트 ID만 넣어도 전체 URL로 변환)
+      const normalizedEditLink = normalizeGoogleSheetEditLink(policyTableLink);
+      
       const newId = `PT_${Date.now()}`;
       const registeredAt = new Date().toISOString();
       const registeredBy = permission.userId || 'Unknown';
@@ -682,7 +690,8 @@ function setupPolicyTableRoutes(app) {
         newId,
         policyTableName,
         policyTableDescription || '',
-        policyTableLink,
+        normalizedEditLink,  // 정규화된 편집 링크
+        policyTablePublicLink || '',  // 공개 링크 (선택)
         discordChannelId,
         JSON.stringify(creatorPermissions),
         registeredAt,
