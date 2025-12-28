@@ -297,13 +297,16 @@ async function checkPermission(req, allowedRoles) {
   // userRole이 없으면 userInfo에서 가져오기
   const finalUserRole = userRole || userInfo?.role;
   const finalUserId = userId || userInfo?.id;
-  const finalUserName = userInfo?.name;
+  // 이름은 반드시 userInfo에서 가져오기 (아이디가 아닌 이름)
+  const finalUserName = userInfo?.name || null;
 
   // 디버깅 로그
   console.log('[정책표] 권한 체크:', {
     userId: userId,
     userRole: userRole,
     finalUserRole: finalUserRole,
+    finalUserId: finalUserId,
+    finalUserName: finalUserName,
     userInfo: userInfo ? { id: userInfo.id, name: userInfo.name, role: userInfo.role } : null,
     allowedRoles: allowedRoles
   });
@@ -314,13 +317,30 @@ async function checkPermission(req, allowedRoles) {
   }
 
   const hasPermission = allowedRoles.includes(finalUserRole);
-  console.log('[정책표] 권한 체크 결과:', { hasPermission, finalUserRole, allowedRoles });
+  console.log('[정책표] 권한 체크 결과:', { 
+    hasPermission, 
+    finalUserRole, 
+    allowedRoles,
+    userName: finalUserName,
+    userId: finalUserId
+  });
+  
+  // userName이 없으면 에러 (이름은 필수)
+  if (!finalUserName) {
+    console.error('[정책표] 사용자 이름을 찾을 수 없습니다:', { userId, userInfo });
+    return { 
+      hasPermission, 
+      userRole: finalUserRole, 
+      userId: finalUserId, 
+      userName: finalUserId // 폴백: 아이디라도 반환
+    };
+  }
   
   return { 
     hasPermission, 
     userRole: finalUserRole, 
     userId: finalUserId, 
-    userName: finalUserName || userInfo?.name || finalUserId
+    userName: finalUserName
   };
 }
 
@@ -655,7 +675,7 @@ async function processPolicyTableGeneration(jobId, params) {
         applyDate,                   // 3: 정책적용일시
         applyContent,                // 4: 정책적용내용
         accessGroupId || '',         // 5: 접근권한 (그룹ID)
-        creatorName || creatorRole,  // 6: 생성자 (이름 또는 역할)
+        creatorName || 'Unknown',  // 6: 생성자 (이름만 사용)
         createdAt,                   // 7: 생성일시
         messageId,                   // 8: 디스코드메시지ID
         threadId,                    // 9: 디스코드스레드ID
@@ -1208,7 +1228,7 @@ function setupPolicyTableRoutes(app) {
         applyDate,
         applyContent,
         accessGroupId,
-        creatorName: permission.userName || permission.userId || 'Unknown',
+        creatorName: permission.userName || 'Unknown',
         creatorRole: permission.userRole
       }).catch(error => {
         console.error('[정책표] 백그라운드 작업 오류:', error);
