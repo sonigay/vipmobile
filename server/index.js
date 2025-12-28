@@ -17,6 +17,7 @@ const PhoneklDataManager = require('./PhoneklDataManager');
 const setupObRoutes = require('./obRoutes');
 const meetingRoutes = require('./meetingRoutes');
 const setupDirectRoutes = require('./directRoutes');
+const setupPolicyTableRoutes = require('./policyTableRoutes');
 
 // 기본 설정
 const app = express();
