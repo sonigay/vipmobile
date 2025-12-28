@@ -510,23 +510,21 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                             }
                             
                             // 새 창에서 열기 (앱 리다이렉트 방지)
-                            // window.open의 세 번째 인자로 팝업 차단 방지 옵션 추가
                             const newWindow = window.open(
                               url, 
                               '_blank', 
                               'noopener,noreferrer,width=1200,height=800'
                             );
                             
-                            // 팝업 차단 감지 (즉시 확인, 사용자가 창을 닫은 경우는 제외)
-                            // setTimeout을 사용하여 window.open 직후에만 확인
-                            setTimeout(() => {
-                              // newWindow가 null이거나 undefined인 경우만 팝업 차단으로 판단
-                              // closed 속성은 사용자가 창을 닫은 경우에도 true가 되므로 확인하지 않음
-                              if (!newWindow) {
-                                // 팝업이 차단된 경우 사용자에게 알림
-                                alert('팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해주세요.');
-                              }
-                            }, 100); // 100ms 후에 확인 (창이 열리는 시간 고려)
+                            // 팝업 차단 감지 (즉시 확인, setTimeout 제거)
+                            // window.open 직후 즉시 확인하여 사용자가 창을 닫은 경우와 구분
+                            // newWindow가 null인 경우만 팝업 차단으로 판단
+                            if (!newWindow || newWindow === null) {
+                              // 팝업이 차단된 경우 사용자에게 알림
+                              alert('팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해주세요.');
+                            }
+                            // newWindow가 존재하면 정상적으로 열린 것이므로 아무것도 하지 않음
+                            // 사용자가 나중에 창을 닫아도 감지하지 않음
                           }}
                           style={{ color: '#1976d2', textDecoration: 'none', cursor: 'pointer' }}
                         >
