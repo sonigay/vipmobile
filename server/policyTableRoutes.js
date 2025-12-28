@@ -570,10 +570,13 @@ function setupPolicyTableRoutes(app) {
     res.setHeader('Access-Control-Max-Age', '86400'); // 24시간 캐시
   };
 
-  // OPTIONS 요청 처리 (CORS preflight)
-  router.options('*', (req, res) => {
-    setCORSHeaders(req, res);
-    res.status(200).end();
+  // OPTIONS 요청 처리 (CORS preflight) - 모든 경로에 대해 미들웨어로 처리
+  router.use((req, res, next) => {
+    if (req.method === 'OPTIONS') {
+      setCORSHeaders(req, res);
+      return res.status(200).end();
+    }
+    next();
   });
 
   // ========== 정책표생성설정 관련 API ==========
