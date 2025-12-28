@@ -299,11 +299,23 @@ async function checkPermission(req, allowedRoles) {
   const finalUserId = userId || userInfo?.id;
   const finalUserName = userInfo?.name;
 
+  // 디버깅 로그
+  console.log('[정책표] 권한 체크:', {
+    userId: userId,
+    userRole: userRole,
+    finalUserRole: finalUserRole,
+    userInfo: userInfo ? { id: userInfo.id, name: userInfo.name, role: userInfo.role } : null,
+    allowedRoles: allowedRoles
+  });
+
   if (!finalUserRole) {
+    console.error('[정책표] 권한 정보 없음:', { userId, userRole, userInfo });
     return { hasPermission: false, error: '사용자 권한 정보가 없습니다.' };
   }
 
   const hasPermission = allowedRoles.includes(finalUserRole);
+  console.log('[정책표] 권한 체크 결과:', { hasPermission, finalUserRole, allowedRoles });
+  
   return { 
     hasPermission, 
     userRole: finalUserRole, 
@@ -1434,9 +1446,18 @@ function setupPolicyTableRoutes(app) {
   router.post('/policy-tables/:id/register', express.json(), async (req, res) => {
     setCORSHeaders(req, res);
     try {
-      const permission = await checkPermission(req, ['S', 'AA', 'BB', 'CC', 'DD', 'EE', 'FF']);
+      // 권한 체크 (S와 SS 모두 허용)
+      const permission = await checkPermission(req, ['S', 'SS', 'AA', 'BB', 'CC', 'DD', 'EE', 'FF']);
       if (!permission.hasPermission) {
-        return res.status(403).json({ success: false, error: '권한이 없습니다.' });
+        console.error('[정책표] 등록 권한 없음:', {
+          userId: req.headers['x-user-id'],
+          userRole: req.headers['x-user-role'],
+          permission: permission
+        });
+        return res.status(403).json({ 
+          success: false, 
+          error: `권한이 없습니다. (사용자 역할: ${permission.userRole || '없음'})` 
+        });
       }
 
       const { id } = req.params;

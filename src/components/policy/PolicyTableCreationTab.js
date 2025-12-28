@@ -405,7 +405,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
         headers: {
           'Content-Type': 'application/json',
           'x-user-role': loggedInStore?.userRole || '',
-          'x-user-id': loggedInStore?.id || ''
+          'x-user-id': loggedInStore?.contactId || loggedInStore?.id || ''
         }
       });
 
