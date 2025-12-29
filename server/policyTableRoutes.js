@@ -915,6 +915,17 @@ function setupPolicyTableRoutes(app) {
         registeredBy: row[8] || ''
       }));
 
+      console.log('🔍 [정책표] 설정 목록 조회:', {
+        totalSettings: settings.length,
+        settings: settings.map(s => ({
+          id: s.id,
+          policyTableName: s.policyTableName,
+          creatorPermissions: s.creatorPermissions,
+          creatorPermissionsType: typeof s.creatorPermissions,
+          isArray: Array.isArray(s.creatorPermissions)
+        }))
+      });
+
       return res.json(settings);
     } catch (error) {
       console.error('[정책표] 설정 목록 조회 오류:', error);

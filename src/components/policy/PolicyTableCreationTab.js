@@ -100,10 +100,46 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
         const data = await response.json();
         // 현재 사용자의 권한에 맞는 정책표만 필터링
         const userRole = loggedInStore?.userRole;
+        console.log('🔍 [정책표생성] 정책표 설정 로드:', {
+          userRole,
+          totalSettings: data.length,
+          settings: data.map(s => ({
+            id: s.id,
+            policyTableName: s.policyTableName,
+            creatorPermissions: s.creatorPermissions,
+            creatorPermissionsType: typeof s.creatorPermissions,
+            isArray: Array.isArray(s.creatorPermissions),
+            includesUserRole: Array.isArray(s.creatorPermissions) ? s.creatorPermissions.includes(userRole) : false
+          }))
+        });
+        
         const filtered = data.filter(setting => {
           if (userRole === 'SS') return true; // 총괄은 모든 정책표 접근 가능
-          return setting.creatorPermissions.includes(userRole);
+          
+          // creatorPermissions가 배열인지 확인
+          if (!Array.isArray(setting.creatorPermissions)) {
+            console.warn('⚠️ [정책표생성] creatorPermissions가 배열이 아닙니다:', {
+              setting: setting.policyTableName,
+              creatorPermissions: setting.creatorPermissions,
+              type: typeof setting.creatorPermissions
+            });
+            return false;
+          }
+          
+          const includes = setting.creatorPermissions.includes(userRole);
+          console.log(`🔍 [정책표생성] 필터링 체크: ${setting.policyTableName}`, {
+            userRole,
+            creatorPermissions: setting.creatorPermissions,
+            includes
+          });
+          return includes;
         });
+        
+        console.log('✅ [정책표생성] 필터링 결과:', {
+          filteredCount: filtered.length,
+          filtered: filtered.map(s => s.policyTableName)
+        });
+        
         setSettings(filtered);
       }
     } catch (error) {
