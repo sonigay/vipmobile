@@ -97,13 +97,33 @@ const PolicyTableSettingsTab = ({ loggedInStore }) => {
             code: agent.permissionLevel,
             name: agent.target || agent.permissionLevel // A열(대상/이름) 또는 권한 코드
           }));
+        
+        // SS가 목록에 없으면 수동으로 추가
+        const hasSS = leaders.some(leader => leader.code === 'SS');
+        if (!hasSS) {
+          leaders.unshift({
+            code: 'SS',
+            name: '총괄 (SS)'
+          });
+        }
+        
         console.log('팀장 목록 로드 완료:', leaders);
         setTeamLeaders(leaders);
       } else {
         console.error('팀장 목록 로드 실패:', response.status);
+        // API 실패 시에도 SS를 기본으로 추가
+        setTeamLeaders([{
+          code: 'SS',
+          name: '총괄 (SS)'
+        }]);
       }
     } catch (error) {
       console.error('팀장 목록 로드 오류:', error);
+      // 오류 발생 시에도 SS를 기본으로 추가
+      setTeamLeaders([{
+        code: 'SS',
+        name: '총괄 (SS)'
+      }]);
     }
   };
 
