@@ -291,7 +291,20 @@ function AppContent() {
           }
 
           // 다른 모드는 권한이 있으면 포함 (true 또는 'O')
-          return hasPermission === true || hasPermission === 'O' || String(hasPermission).trim().toUpperCase() === 'O';
+          const hasAccess = hasPermission === true || hasPermission === 'O' || String(hasPermission).trim().toUpperCase() === 'O';
+          
+          // 일반정책모드 디버깅
+          if (mode === 'generalPolicy') {
+            console.log('🔍 [일반정책모드] 권한 체크:', {
+              mode,
+              hasPermission,
+              hasAccess,
+              type: typeof hasPermission,
+              stringValue: String(hasPermission).trim().toUpperCase()
+            });
+          }
+          
+          return hasAccess;
         })
         .map(([mode]) => mode);
 

@@ -3667,7 +3667,11 @@ app.post('/api/login', async (req, res) => {
           basicMode: hasBasicMode,
           onSaleMode: hasOnSaleMode,
           directStoreMode: hasDirectStoreMode,
-          generalPolicyMode: hasGeneralPolicyMode
+          generalPolicyMode: hasGeneralPolicyMode,
+          generalPolicyColumnValue: generalPolicyColumnValue,
+          generalPolicyRawValue: foundGeneralUser[8],
+          userId: foundGeneralUser[0],
+          rowLength: foundGeneralUser.length
         });
 
         // 권한이 하나도 없으면 로그인 거부
