@@ -58,8 +58,24 @@ async function initDiscordBotForCommands() {
     ]
   });
 
-  // 봇이 준비될 때까지 대기
+  // 로그인 먼저 실행
+  await discordBotForCommands.login(DISCORD_BOT_TOKEN)
+    .then(() => console.log('✅ [정책표] Discord 봇 (명령어 전송용) 로그인 성공'))
+    .catch(error => {
+      console.error('❌ [정책표] Discord 봇 (명령어 전송용) 로그인 실패:', error);
+      throw error;
+    });
+
+  // 봇이 준비될 때까지 대기 (로그인 후 ready 이벤트 대기)
   await new Promise((resolve, reject) => {
+    // 이미 ready 상태라면 즉시 resolve
+    if (discordBotForCommands.isReady()) {
+      console.log('✅ 디스코드 봇 (명령어 전송용) 준비 완료');
+      resolve(discordBotForCommands);
+      return;
+    }
+
+    // ready 이벤트 리스너 등록
     discordBotForCommands.once('ready', () => {
       console.log('✅ 디스코드 봇 (명령어 전송용) 준비 완료');
       resolve(discordBotForCommands);
@@ -70,14 +86,6 @@ async function initDiscordBotForCommands() {
       reject(new Error('디스코드 봇 준비 시간 초과'));
     }, 30000);
   });
-
-  // 로그인
-  await discordBotForCommands.login(DISCORD_BOT_TOKEN)
-    .then(() => console.log('✅ [정책표] Discord 봇 (명령어 전송용) 로그인 성공'))
-    .catch(error => {
-      console.error('❌ [정책표] Discord 봇 (명령어 전송용) 로그인 실패:', error);
-      throw error;
-    });
 
   return discordBotForCommands;
 }
@@ -107,17 +115,28 @@ async function captureSheetViaDiscordBot(sheetUrl, policyTableName, userName, ch
     // 명령어 메시지 전송
     const commandMessage = await channel.send(command);
 
+    // 로컬 PC 봇 ID 확인 (환경변수에서 가져오기, 선택사항)
+    const LOCAL_BOT_ID = process.env.DISCORD_LOCAL_BOT_ID;
+
     // 봇이 업로드한 이미지 메시지 대기
     const filter = (msg) => {
-      return msg.channel.id === channelId &&
-             msg.author.bot &&
-             msg.attachments.size > 0 &&
-             msg.createdTimestamp > commandMessage.createdTimestamp;
+      // 기본 필터: 같은 채널, 봇 메시지, 이미지 첨부, 명령어 이후
+      let matches = msg.channel.id === channelId &&
+                    msg.author.bot &&
+                    msg.attachments.size > 0 &&
+                    msg.createdTimestamp > commandMessage.createdTimestamp;
+
+      // 로컬 PC 봇 ID가 설정되어 있으면 추가 확인
+      if (LOCAL_BOT_ID && matches) {
+        matches = matches && msg.author.id === LOCAL_BOT_ID;
+      }
+
+      return matches;
     };
 
     const collector = channel.createMessageCollector({
       filter,
-      time: 60000, // 60초 대기
+      time: 90000, // 90초 대기 (Selenium 스크린샷 생성 시간 고려)
       max: 1
     });
 
@@ -136,7 +155,7 @@ async function captureSheetViaDiscordBot(sheetUrl, policyTableName, userName, ch
 
       collector.on('end', (collected) => {
         if (collected.size === 0) {
-          reject(new Error('디스코드 봇 응답 시간 초과 (60초)'));
+          reject(new Error('디스코드 봇 응답 시간 초과 (90초)'));
         }
       });
     });
