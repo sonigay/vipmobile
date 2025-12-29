@@ -150,8 +150,8 @@ pm2 save
 ### 스크린샷이 생성되지 않을 때
 
 1. Chrome이 설치되어 있는지 확인
-2. Puppeteer가 정상 작동하는지 확인
-3. Google Sheets URL이 공개 링크인지 확인
+2. ChromeDriver가 설치되어 있는지 확인 (Selenium이 자동으로 다운로드)
+3. Google Sheets URL이 공개 링크인지 확인 (`/pubhtml` 포함)
 4. 로그 확인: `pm2 logs discord-screenshot-bot`
 
 ## 로그 확인
