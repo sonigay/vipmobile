@@ -704,7 +704,7 @@ function getJobStatus(jobId) {
 
 // 정책표 생성 백그라운드 작업
 async function processPolicyTableGeneration(jobId, params) {
-  const { policyTableId, applyDate, applyContent, accessGroupId, creatorName, creatorRole } = params;
+  const { policyTableId, applyDate, applyContent, accessGroupId, creatorName, creatorRole, creatorId } = params;
 
   try {
     updateJobStatus(jobId, {
@@ -790,13 +790,14 @@ async function processPolicyTableGeneration(jobId, params) {
         applyDate,                   // 3: 정책적용일시
         applyContent,                // 4: 정책적용내용
         accessGroupId || '',         // 5: 접근권한 (그룹ID)
-        creatorName || 'Unknown',  // 6: 생성자 (이름만 사용)
+        creatorName || 'Unknown',  // 6: 생성자 (이름)
         createdAt,                   // 7: 생성일시
         messageId,                   // 8: 디스코드메시지ID
         threadId,                    // 9: 디스코드스레드ID
         imageUrl,                    // 10: 이미지URL
         'N',                         // 11: 등록여부
-        ''                           // 12: 등록일시
+        '',                          // 12: 등록일시
+        creatorId || ''              // 13: 생성자ID (새로 추가)
       ];
 
       await withRetry(async () => {
@@ -1507,7 +1508,8 @@ function setupPolicyTableRoutes(app) {
         applyContent,
         accessGroupId,
         creatorName: permission.userName || 'Unknown',
-        creatorRole: permission.userRole
+        creatorRole: permission.userRole,
+        creatorId: permission.userId || ''
       }).catch(error => {
         console.error('[정책표] 백그라운드 작업 오류:', error);
       });
@@ -1657,15 +1659,35 @@ function setupPolicyTableRoutes(app) {
 
         // 접근 가능한 탭만 필터링
         tabs = tabs.filter(tab => accessiblePolicyTableIds.has(tab.policyTableId));
-      } else if (['SS', 'S'].includes(userRole) || ['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(userRole)) {
-        // 모든 탭 표시
-      } else if (['A', 'B', 'C', 'D', 'E', 'F'].includes(userRole)) {
-        // 일반 사용자는 접근권한에 포함된 탭만 표시
+      } else if (['SS', 'S'].includes(userRole)) {
+        // SS(총괄), S(정산) 레벨은 모든 탭 표시
+      } else if (['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(userRole)) {
+        // 팀장 레벨은 본인이 생성한 정책표의 탭만 표시
+        const currentUserId = req.headers['x-user-id'] || userId;
+        const policyListResponse = await withRetry(async () => {
+          return await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SHEET_POLICY_TABLE_LIST}!A:N`
+          });
+        });
+
+        const policyRows = policyListResponse.data.values || [];
+        const policyDataRows = policyRows.slice(1);
+        const accessiblePolicyTableIds = new Set();
+        policyDataRows.forEach(row => {
+          const creatorId = row[13] || ''; // 생성자ID
+          if (creatorId === currentUserId) {
+            accessiblePolicyTableIds.add(row[1]); // 정책표ID_설정
+          }
+        });
+        tabs = tabs.filter(tab => accessiblePolicyTableIds.has(tab.policyTableId));
+      } else {
+        // 그 외 사용자(A-F)는 그룹의 담당자(managerIds)에 포함된 경우만 해당 그룹의 탭 표시
         // 정책표목록에서 접근권한 확인
         const policyListResponse = await withRetry(async () => {
           return await sheets.spreadsheets.values.get({
             spreadsheetId: SPREADSHEET_ID,
-            range: `${SHEET_POLICY_TABLE_LIST}!A:M`
+            range: `${SHEET_POLICY_TABLE_LIST}!A:N`
           });
         });
 
@@ -1737,7 +1759,7 @@ function setupPolicyTableRoutes(app) {
       const response = await withRetry(async () => {
         return await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_POLICY_TABLE_LIST}!A:M`
+          range: `${SHEET_POLICY_TABLE_LIST}!A:N`
         });
       });
 
@@ -1763,6 +1785,7 @@ function setupPolicyTableRoutes(app) {
           applyContent: row[4] || '',
           accessGroupId: row[5] || '',
           creator: row[6] || '',
+          creatorId: row[13] || '', // 생성자ID (새로 추가)
           createdAt: row[7] || '',
           messageId: row[8] || '',
           threadId: row[9] || '',
@@ -1854,10 +1877,24 @@ function setupPolicyTableRoutes(app) {
         console.log('✅ [일반정책모드] 필터링 완료:', {
           filteredCount: policies.length
         });
-      } else if (['SS', 'S'].includes(userRole) || ['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(userRole)) {
-        // 모든 정책표 표시 (정책모드)
-      } else if (['A', 'B', 'C', 'D', 'E', 'F'].includes(userRole)) {
-        // 일반 사용자는 접근권한에 포함된 것만 표시
+      } else if (['SS', 'S'].includes(userRole)) {
+        // SS(총괄), S(정산) 레벨은 모든 정책표 표시
+      } else if (['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(userRole)) {
+        // 팀장 레벨은 본인이 생성한 정책표만 확인 가능
+        const currentUserId = req.headers['x-user-id'] || req.query.userId;
+        policies = policies.filter(policy => {
+          // 생성자ID가 있으면 ID로 비교, 없으면 생성자 이름으로 비교 (하위 호환성)
+          if (policy.creatorId) {
+            return policy.creatorId === currentUserId;
+          } else {
+            // 기존 데이터 호환: 생성자 이름과 현재 사용자 이름 비교
+            // checkPermission에서 가져온 사용자 이름과 비교
+            // 하지만 정확하지 않을 수 있으므로, 가능하면 creatorId 사용 권장
+            return false; // creatorId가 없으면 접근 불가 (안전한 기본값)
+          }
+        });
+      } else {
+        // 그 외 사용자(A-F)는 그룹의 담당자(managerIds)에 포함된 경우만 해당 그룹의 정책표 표시
         // 정책영업그룹 목록 조회
         await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_USER_GROUPS, HEADERS_USER_GROUPS);
         const userGroupsResponse = await withRetry(async () => {
@@ -1877,19 +1914,46 @@ function setupPolicyTableRoutes(app) {
         });
 
         // 현재 사용자 아이디 확인
-        const currentUserId = req.headers['x-user-id'] || permission.userId;
+        const currentUserId = req.headers['x-user-id'] || req.query.userId;
+
+        console.log('🔍 [정책모드] 필터링 시작:', {
+          userRole,
+          currentUserId,
+          totalPolicies: policies.length,
+          userGroupsMapSize: userGroupsMap.size
+        });
 
         // 접근권한에 포함된 정책표만 필터링
         policies = policies.filter(policy => {
           const accessGroupId = policy.accessGroupId;
-          if (!accessGroupId) return false; // 접근권한이 없으면 접근 불가
+          if (!accessGroupId) {
+            console.log('❌ [정책모드] 접근권한 없음:', policy.id);
+            return false; // 접근권한이 없으면 접근 불가
+          }
           
           const groupData = userGroupsMap.get(accessGroupId);
-          if (!groupData) return false;
+          if (!groupData) {
+            console.log('❌ [정책모드] 그룹 데이터 없음:', { accessGroupId, policyId: policy.id });
+            return false;
+          }
 
           // managerIds에 현재 사용자 아이디가 포함되어 있는지 확인
           const managerIds = groupData.managerIds || [];
-          return managerIds.includes(currentUserId);
+          const hasAccess = managerIds.includes(currentUserId);
+          
+          console.log('🔍 [정책모드] 정책표 필터링:', {
+            policyId: policy.id,
+            accessGroupId,
+            managerIds,
+            currentUserId,
+            hasAccess
+          });
+          
+          return hasAccess;
+        });
+        
+        console.log('✅ [정책모드] 필터링 완료:', {
+          filteredCount: policies.length
         });
       }
 
@@ -1944,7 +2008,7 @@ function setupPolicyTableRoutes(app) {
       const response = await withRetry(async () => {
         return await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_POLICY_TABLE_LIST}!A:M`
+          range: `${SHEET_POLICY_TABLE_LIST}!A:N`
         });
       });
 
@@ -1992,7 +2056,7 @@ function setupPolicyTableRoutes(app) {
       const response = await withRetry(async () => {
         return await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_POLICY_TABLE_LIST}!A:M`
+          range: `${SHEET_POLICY_TABLE_LIST}!A:N`
         });
       });
 
@@ -2004,10 +2068,21 @@ function setupPolicyTableRoutes(app) {
       }
 
       // 권한 체크
-      if (['SS', 'S'].includes(userRole) || ['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(userRole)) {
-        // 모든 정책표 접근 가능
-      } else if (['A', 'B', 'C', 'D', 'E', 'F'].includes(userRole)) {
-        // 일반 사용자는 접근권한 확인 필요
+      if (['SS', 'S'].includes(userRole)) {
+        // SS(총괄), S(정산) 레벨은 모든 정책표 접근 가능
+      } else if (['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(userRole)) {
+        // 팀장 레벨은 본인이 생성한 정책표만 접근 가능
+        const currentUserId = req.headers['x-user-id'];
+        const creatorId = row[13] || ''; // 생성자ID
+        if (creatorId && creatorId !== currentUserId) {
+          return res.status(403).json({ success: false, error: '이 정책표에 접근할 권한이 없습니다.' });
+        }
+        // creatorId가 없으면 기존 데이터이므로 접근 불가 (안전한 기본값)
+        if (!creatorId) {
+          return res.status(403).json({ success: false, error: '이 정책표에 접근할 권한이 없습니다.' });
+        }
+      } else {
+        // 그 외 사용자(A-F)는 그룹의 담당자(managerIds)에 포함된 경우만 접근 가능
         const accessGroupId = row[5]; // 접근권한 (그룹ID)
         if (accessGroupId) {
           await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_USER_GROUPS, HEADERS_USER_GROUPS);
@@ -2070,7 +2145,7 @@ function setupPolicyTableRoutes(app) {
       const response = await withRetry(async () => {
         return await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_POLICY_TABLE_LIST}!A:M`
+          range: `${SHEET_POLICY_TABLE_LIST}!A:N`
         });
       });
 
@@ -2150,7 +2225,7 @@ function setupPolicyTableRoutes(app) {
       const response = await withRetry(async () => {
         return await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_POLICY_TABLE_LIST}!A:M`
+          range: `${SHEET_POLICY_TABLE_LIST}!A:N`
         });
       });
 
