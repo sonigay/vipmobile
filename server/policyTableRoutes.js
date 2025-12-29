@@ -1,7 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const { google } = require('googleapis');
-const { Client, GatewayIntentBits, AttachmentBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, AttachmentBuilder, ChannelType } = require('discord.js');
 // Puppeteer 없이 Google Sheets API + Canvas 사용
 const sharp = require('sharp');
 
@@ -96,7 +96,7 @@ async function initDiscordBotForCommands() {
  * @param {string} policyTableName - 정책표 이름
  * @param {string} userName - 생성자 이름
  * @param {string} channelId - 디스코드 채널 ID
- * @returns {Promise<{imageUrl: string, messageId: string}>} 이미지 URL과 메시지 ID
+ * @returns {Promise<{imageUrl: string, messageId: string, threadId: string}>} 이미지 URL, 메시지 ID, 스레드/포스트 ID
  */
 async function captureSheetViaDiscordBot(sheetUrl, policyTableName, userName, channelId) {
   try {
@@ -107,21 +107,80 @@ async function captureSheetViaDiscordBot(sheetUrl, policyTableName, userName, ch
       throw new Error(`디스코드 채널을 찾을 수 없습니다: ${channelId}`);
     }
 
+    // 포스트 이름 생성 (포럼 채널용)
+    const postName = `${userName}-${policyTableName}`;
+    let targetChannel = channel; // 실제로 메시지를 보낼 채널/포스트
+
+    // 포럼 채널인지 확인
+    if (channel.type === ChannelType.GuildForum) {
+      console.log(`📋 포럼 채널 감지: ${channelId}, 포스트 찾기/생성: ${postName}`);
+      
+      // 활성 포스트 가져오기
+      const activeThreads = await channel.threads.fetchActive();
+      
+      // 기존 포스트 찾기
+      let post = Array.from(activeThreads.threads.values()).find(
+        thread => thread.name === postName
+      );
+
+      if (!post) {
+        // 아카이브된 포스트도 확인
+        try {
+          const archivedThreads = await channel.threads.fetchArchived({ limit: 100 });
+          post = Array.from(archivedThreads.threads.values()).find(
+            thread => thread.name === postName
+          );
+          
+          if (post) {
+            // 아카이브된 포스트를 활성화
+            await post.setArchived(false);
+            console.log(`✅ 아카이브된 포스트 활성화: ${postName}`);
+          }
+        } catch (error) {
+          console.warn('⚠️ 아카이브된 포스트 확인 실패:', error.message);
+        }
+      }
+
+      if (!post) {
+        // 새 포스트 생성
+        console.log(`📌 새 포스트 생성: ${postName}`);
+        post = await channel.threads.create({
+          name: postName,
+          message: {
+            content: `${postName} 이미지 저장`
+          }
+        });
+        console.log(`✅ 새 포스트 생성 완료: ${postName} (ID: ${post.id})`);
+      } else {
+        console.log(`✅ 기존 포스트 찾음: ${postName} (ID: ${post.id})`);
+      }
+
+      // 포스트를 타겟 채널로 설정
+      targetChannel = post;
+    } else {
+      // 일반 텍스트 채널인지 확인
+      if (!channel.isTextBased() || channel.isDMBased()) {
+        throw new Error(`채널이 텍스트 채널이 아닙니다: ${channelId} (타입: ${channel.type})`);
+      }
+      // 일반 채널은 그대로 사용
+      targetChannel = channel;
+    }
+
     // 명령어 생성
     // 형식: !screenshot <URL> policyTableName=<이름> userName=<사용자>
     const command = `!screenshot ${sheetUrl} policyTableName=${encodeURIComponent(policyTableName)} userName=${encodeURIComponent(userName)}`;
     console.log(`📤 디스코드 명령어 전송: ${command.substring(0, 100)}...`);
     
-    // 명령어 메시지 전송
-    const commandMessage = await channel.send(command);
+    // 명령어 메시지 전송 (포스트 또는 일반 채널)
+    const commandMessage = await targetChannel.send(command);
 
     // 로컬 PC 봇 ID 확인 (환경변수에서 가져오기, 선택사항)
     const LOCAL_BOT_ID = process.env.DISCORD_LOCAL_BOT_ID;
 
     // 봇이 업로드한 이미지 메시지 대기
     const filter = (msg) => {
-      // 기본 필터: 같은 채널, 봇 메시지, 이미지 첨부, 명령어 이후
-      let matches = msg.channel.id === channelId &&
+      // 기본 필터: 같은 채널/포스트, 봇 메시지, 이미지 첨부, 명령어 이후
+      let matches = msg.channel.id === targetChannel.id &&
                     msg.author.bot &&
                     msg.attachments.size > 0 &&
                     msg.createdTimestamp > commandMessage.createdTimestamp;
@@ -134,7 +193,7 @@ async function captureSheetViaDiscordBot(sheetUrl, policyTableName, userName, ch
       return matches;
     };
 
-    const collector = channel.createMessageCollector({
+    const collector = targetChannel.createMessageCollector({
       filter,
       time: 90000, // 90초 대기 (Selenium 스크린샷 생성 시간 고려)
       max: 1
@@ -146,8 +205,9 @@ async function captureSheetViaDiscordBot(sheetUrl, policyTableName, userName, ch
         if (attachment && attachment.contentType?.startsWith('image/')) {
           const imageUrl = attachment.url;
           const messageId = msg.id;
-          console.log(`✅ 스크린샷 생성 완료: ${imageUrl} (메시지 ID: ${messageId})`);
-          resolve({ imageUrl, messageId });
+          const threadId = targetChannel.id; // 포스트/스레드 ID
+          console.log(`✅ 스크린샷 생성 완료: ${imageUrl} (메시지 ID: ${messageId}, 스레드 ID: ${threadId})`);
+          resolve({ imageUrl, messageId, threadId });
         } else {
           reject(new Error('이미지가 포함된 메시지를 찾을 수 없습니다.'));
         }
@@ -548,64 +608,19 @@ async function processPolicyTableGeneration(jobId, params) {
 
     const sheetUrl = policyTablePublicLink || policyTableLink;
 
-    // 로컬 PC 디스코드 봇에 명령어 전송 및 이미지 URL, 메시지 ID 받기
-    const { imageUrl, messageId: discordMessageId } = await captureSheetViaDiscordBot(
+    // 로컬 PC 디스코드 봇에 명령어 전송 및 이미지 URL, 메시지 ID, 스레드 ID 받기
+    // captureSheetViaDiscordBot에서 포스트/스레드를 찾거나 생성하고 명령어를 전송함
+    const { imageUrl, messageId: discordMessageId, threadId } = await captureSheetViaDiscordBot(
       sheetUrl,
       policyTableName,
       creatorName, // 생성자 이름 전달
       discordChannelId
     );
 
-    // 3. 디스코드 스레드 정보 가져오기 (이미지 URL은 captureSheetViaDiscordBot에서 받음)
-    updateJobStatus(jobId, {
-      status: 'processing',
-      progress: 75,
-      message: '디스코드 스레드 정보 가져오는 중...'
-    });
-
-    if (!DISCORD_LOGGING_ENABLED || !discordBot) {
-      throw new Error('Discord 봇이 초기화되지 않았습니다.');
-    }
-
-    // 봇이 준비될 때까지 대기
-    if (!discordBot.isReady()) {
-      for (let i = 0; i < 10; i++) {
-        if (discordBot.isReady()) break;
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-    }
-
-    if (!discordBot.isReady()) {
-      throw new Error('Discord 봇이 준비되지 않았습니다.');
-    }
-
-    const channel = await discordBot.channels.fetch(discordChannelId);
-    if (!channel) {
-      throw new Error(`디스코드 채널을 찾을 수 없습니다: ${discordChannelId}`);
-    }
-
-    // 스레드 찾기 또는 생성
-    const threadName = `${creatorName}-${policyTableName}`;
-    let thread = null;
-
-    // 기존 스레드 찾기
-    const threads = await channel.threads.fetchActive();
-    thread = threads.threads.find(t => t.name === threadName);
-
-    if (!thread) {
-      // 새 스레드 생성
-      thread = await channel.threads.create({
-        name: threadName,
-        message: {
-          content: `${threadName} 이미지 저장`
-        }
-      });
-    }
-
-    // 이미지 URL과 메시지 ID는 이미 captureSheetViaDiscordBot에서 받았으므로
-    // 스레드 정보만 가져오기
+    // 이미지 URL, 메시지 ID, 스레드 ID는 모두 captureSheetViaDiscordBot에서 받았으므로
+    // 추가 처리 없이 바로 사용
     const messageId = discordMessageId; // 디스코드 봇이 업로드한 메시지 ID
-    const threadId = thread.id;
+    // threadId는 captureSheetViaDiscordBot에서 반환한 포스트/스레드 ID
 
     // 4. 구글시트에 저장
     updateJobStatus(jobId, {
