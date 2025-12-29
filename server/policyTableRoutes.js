@@ -880,7 +880,8 @@ function setupPolicyTableRoutes(app) {
   router.get('/policy-table-settings', async (req, res) => {
     setCORSHeaders(req, res);
     try {
-      const permission = await checkPermission(req, ['SS']);
+      // 정책표생성 탭 접근 권한: SS, AA, BB, CC, DD, EE, FF
+      const permission = await checkPermission(req, ['SS', 'AA', 'BB', 'CC', 'DD', 'EE', 'FF']);
       if (!permission.hasPermission) {
         return res.status(403).json({ success: false, error: '권한이 없습니다.' });
       }
