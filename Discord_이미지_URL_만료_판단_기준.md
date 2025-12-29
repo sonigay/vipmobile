@@ -186,3 +186,4 @@ const results = await processBatchRefreshItems(expiredItems);
 
 **결론**: 스케줄은 각 Discord 이미지 URL에 대해 **HTTP HEAD 요청**을 보내서 실제 접근 가능 여부를 확인하고, **404 응답을 받으면 만료로 판단**하여 갱신 대상으로 분류합니다.
 
+

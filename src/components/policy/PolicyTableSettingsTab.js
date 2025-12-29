@@ -87,9 +87,12 @@ const PolicyTableSettingsTab = ({ loggedInStore }) => {
       const response = await fetch(`${API_BASE_URL}/api/agents`);
       if (response.ok) {
         const agents = await response.json();
-        // permissionLevel이 AA-FF인 사용자만 필터링 (팀장 권한자)
+        // SS 총괄과 팀장 권한자(AA-FF) 필터링
         const leaders = agents
-          .filter(agent => agent.permissionLevel && ['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(agent.permissionLevel))
+          .filter(agent => {
+            const permissionLevel = agent.permissionLevel;
+            return permissionLevel && (permissionLevel === 'SS' || ['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(permissionLevel));
+          })
           .map(agent => ({
             code: agent.permissionLevel,
             name: agent.target || agent.permissionLevel // A열(대상/이름) 또는 권한 코드

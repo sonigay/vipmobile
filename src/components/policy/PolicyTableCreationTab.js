@@ -69,6 +69,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
     managerIds: []
   });
   const [companies, setCompanies] = useState([]);
+  const [teamLeaders, setTeamLeaders] = useState([]);
 
   // 권한 체크
   const canAccess = ['SS', 'AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(loggedInStore?.userRole);
@@ -78,6 +79,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
       loadSettings();
       loadUserGroups();
       loadCompanies();
+      loadTeamLeaders();
     }
     return () => {
       if (pollingInterval) {
@@ -215,6 +217,31 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
       }
     } catch (error) {
       console.error('업체명 목록 로드 오류:', error);
+    }
+  };
+
+  const loadTeamLeaders = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/agents`);
+      if (response.ok) {
+        const agents = await response.json();
+        // SS 총괄과 팀장 권한자(AA-FF) 필터링
+        const leaders = agents
+          .filter(agent => {
+            const permissionLevel = agent.permissionLevel;
+            return permissionLevel && (permissionLevel === 'SS' || ['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(permissionLevel));
+          })
+          .map(agent => ({
+            code: agent.permissionLevel,
+            name: agent.target || agent.permissionLevel // A열(대상/이름) 또는 권한 코드
+          }));
+        console.log('팀장 목록 로드 완료:', leaders);
+        setTeamLeaders(leaders);
+      } else {
+        console.error('팀장 목록 로드 실패:', response.status);
+      }
+    } catch (error) {
+      console.error('팀장 목록 로드 오류:', error);
     }
   };
 

@@ -202,3 +202,4 @@ pm2 logs discord-screenshot-bot --err
 2. Google Sheets URL이 공개 링크인지 확인
 3. `npm run pm2:logs`로 에러 확인
 
+
