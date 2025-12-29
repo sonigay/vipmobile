@@ -204,17 +204,19 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
       if (response.ok) {
         const agents = await response.json();
         // permissionLevel이 A-F(일반사용자) 또는 AA-FF(팀장)인 사용자 필터링
+        // contactId를 고유 ID로 사용하여 개별 사용자 구분
         const users = agents
           .filter(agent => {
             const permissionLevel = agent.permissionLevel;
-            return permissionLevel && (
+            return permissionLevel && agent.contactId && (
               ['A', 'B', 'C', 'D', 'E', 'F'].includes(permissionLevel) || // 일반사용자
               ['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(permissionLevel) // 팀장 권한자
             );
           })
           .map(agent => ({
-            code: agent.permissionLevel,
-            name: agent.target || agent.permissionLevel
+            code: agent.contactId, // 고유 ID로 사용 (개별 사용자 구분)
+            name: agent.target || agent.contactId, // 사용자 이름
+            permissionLevel: agent.permissionLevel // 권한 레벨 (표시용)
           }));
         setRegularUsers(users);
       }
@@ -823,12 +825,17 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
               <Autocomplete
                 multiple
                 options={regularUsers}
-                getOptionLabel={(option) => option?.name || option?.code || ''}
+                getOptionLabel={(option) => {
+                  // 사용자 이름과 권한 레벨 표시 (예: "홍길동 (A)")
+                  const name = option?.name || option?.code || '';
+                  const permissionLevel = option?.permissionLevel || '';
+                  return permissionLevel ? `${name} (${permissionLevel})` : name;
+                }}
                 value={regularUsers.filter(user => groupFormData.userIds.includes(user.code))}
                 onChange={(event, newValue) => {
                   setGroupFormData({
                     ...groupFormData,
-                    userIds: newValue.map(user => user.code)
+                    userIds: newValue.map(user => user.code) // contactId 저장
                   });
                 }}
                 isOptionEqualToValue={(option, value) => option?.code === value?.code}
@@ -842,10 +849,13 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                 renderTags={(value, getTagProps) =>
                   value.map((option, index) => {
                     const { key, ...tagProps } = getTagProps({ index });
+                    const label = option?.permissionLevel 
+                      ? `${option.name || option.code} (${option.permissionLevel})`
+                      : (option.name || option.code);
                     return (
                       <Chip
                         key={option.code || key}
-                        label={option.name || option.code}
+                        label={label}
                         onDelete={tagProps.onDelete}
                         {...tagProps}
                       />
