@@ -69,7 +69,11 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
   const [filterApplyDateFrom, setFilterApplyDateFrom] = useState('');
 
   // 권한 체크
-  const canAccess = ['A', 'B', 'C', 'D', 'E', 'F', 'AA', 'BB', 'CC', 'DD', 'EE', 'FF', 'S', 'SS'].includes(loggedInStore?.userRole);
+  // 일반정책모드인 경우 modePermissions.generalPolicy로 체크
+  // 정책모드인 경우 userRole로 체크
+  const canAccess = mode === 'generalPolicy' 
+    ? loggedInStore?.modePermissions?.generalPolicy === true
+    : ['A', 'B', 'C', 'D', 'E', 'F', 'AA', 'BB', 'CC', 'DD', 'EE', 'FF', 'S', 'SS'].includes(loggedInStore?.userRole);
   const canDelete = loggedInStore?.userRole === 'SS' || ['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(loggedInStore?.userRole);
 
   useEffect(() => {
@@ -87,7 +91,12 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
   const loadTabs = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/api/policy-tables/tabs`, {
+      const params = new URLSearchParams();
+      if (mode) {
+        params.append('mode', mode);
+      }
+      
+      const response = await fetch(`${API_BASE_URL}/api/policy-tables/tabs?${params}`, {
         headers: {
           'x-user-role': loggedInStore?.userRole || '',
           'x-user-id': loggedInStore?.contactId || loggedInStore?.id || ''
