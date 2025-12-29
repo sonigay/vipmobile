@@ -203,9 +203,15 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
       const response = await fetch(`${API_BASE_URL}/api/agents`);
       if (response.ok) {
         const agents = await response.json();
-        // permissionLevel이 A-F인 사용자만 필터링
+        // permissionLevel이 A-F(일반사용자) 또는 AA-FF(팀장)인 사용자 필터링
         const users = agents
-          .filter(agent => agent.permissionLevel && ['A', 'B', 'C', 'D', 'E', 'F'].includes(agent.permissionLevel))
+          .filter(agent => {
+            const permissionLevel = agent.permissionLevel;
+            return permissionLevel && (
+              ['A', 'B', 'C', 'D', 'E', 'F'].includes(permissionLevel) || // 일반사용자
+              ['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(permissionLevel) // 팀장 권한자
+            );
+          })
           .map(agent => ({
             code: agent.permissionLevel,
             name: agent.target || agent.permissionLevel
@@ -834,14 +840,19 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                   />
                 )}
                 renderTags={(value, getTagProps) =>
-                  value.map((option, index) => (
-                    <Chip
-                      key={option.code}
-                      label={option.name || option.code}
-                      {...getTagProps({ index })}
-                    />
-                  ))
+                  value.map((option, index) => {
+                    const { key, ...tagProps } = getTagProps({ index });
+                    return (
+                      <Chip
+                        key={option.code || key}
+                        label={option.name || option.code}
+                        onDelete={tagProps.onDelete}
+                        {...tagProps}
+                      />
+                    );
+                  })
                 }
+                filterSelectedOptions
               />
             </Grid>
           </Grid>
