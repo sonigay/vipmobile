@@ -440,6 +440,23 @@ export const MODE_CONFIG = {
       updates: '어플업데이트!X열'
     }
   },
+  generalPolicy: {
+    key: 'generalPolicy',
+    title: '일반정책모드',
+    description: '정책표를 확인하고 조회합니다.',
+    features: [
+      '정책표 목록 조회',
+      '정책표 상세 보기',
+      '검색 및 필터링'
+    ],
+    color: '#FF9800',
+    icon: PolicyIcon,
+    category: 'general',
+    sheetRefs: {
+      general: '일반모드권한관리!I열',
+      updates: '어플업데이트!Z열'
+    }
+  },
   quickServiceManagement: {
     key: 'quickServiceManagement',
     title: '퀵서비스 관리 모드',
@@ -483,7 +500,8 @@ export const MODE_ORDER = [
   'quickServiceManagement',
   'basicMode',
   'directStore',
-  'onSaleReception'
+  'onSaleReception',
+  'generalPolicy'
 ];
 
 export const resolveModeKey = (mode) => {

@@ -50,6 +50,7 @@ import RiskManagementMode from './components/RiskManagementMode';
 import DirectStoreManagementMode from './components/DirectStoreManagementMode';
 import QuickServiceManagementMode from './components/QuickServiceManagementMode';
 import DirectStoreMode from './components/DirectStoreMode';
+import GeneralPolicyMode from './components/GeneralPolicyMode';
 import AppUpdatePopup from './components/AppUpdatePopup';
 import ErrorBoundary from './components/ErrorBoundary';
 // 알림 시스템 관련 import 제거 (재고 모드로 이동)
@@ -167,6 +168,7 @@ function AppContent() {
   const [isQuickServiceManagementMode, setIsQuickServiceManagementMode] = useState(false);
   const [isDirectStoreManagementMode, setIsDirectStoreManagementMode] = useState(false);
   const [isDirectStoreMode, setIsDirectStoreMode] = useState(false);
+  const [isGeneralPolicyMode, setIsGeneralPolicyMode] = useState(false);
   // 재고배정 모드 관련 상태 추가
   // 배정 모드 관련 상태 제거 (재고 모드로 이동)
   // 실시간 대시보드 모드 관련 상태 제거 (재고 모드로 이동)
@@ -230,6 +232,7 @@ function AppContent() {
     setIsQuickServiceManagementMode(false);
     setIsDirectStoreManagementMode(false);
     setIsDirectStoreMode(false);
+    setIsGeneralPolicyMode(false);
   }, []);
 
   // 맵 확대 토글 핸들러 (스크롤 자동 조정 포함)
@@ -2146,10 +2149,45 @@ function AppContent() {
       setIsSmsManagementMode(false);
       setIsObManagementMode(false);
       setIsOnSaleManagementMode(false);
+      setIsGeneralPolicyMode(false);
       setCurrentMode('onSaleReception');
 
       localStorage.setItem('loginState', JSON.stringify({
         isOnSaleReception: true,
+        isAgent: false,
+        store: {
+          ...store,
+          modePermissions: store.modePermissions // modePermissions 보존
+        }
+      }));
+    }
+    // 일반정책모드인지 확인 (modePermissions.generalPolicy가 있으면 바로 진입)
+    else if (store.modePermissions && store.modePermissions.generalPolicy) {
+      console.log('로그인: 일반정책모드');
+
+      // loggedInStore 업데이트 (modePermissions 유지)
+      setLoggedInStore(store);
+
+      setIsGeneralPolicyMode(true);
+      setIsAgentMode(false);
+      setIsInventoryMode(false);
+      setIsSettlementMode(false);
+      setIsInspectionMode(false);
+      setIsChartMode(false);
+      setIsPolicyMode(false);
+      setIsMeetingMode(false);
+      setIsReservationMode(false);
+      setIsBudgetMode(false);
+      setIsInventoryRecoveryMode(false);
+      setIsDataCollectionMode(false);
+      setIsSmsManagementMode(false);
+      setIsObManagementMode(false);
+      setIsOnSaleManagementMode(false);
+      setIsOnSaleReceptionMode(false);
+      setCurrentMode('generalPolicy');
+
+      localStorage.setItem('loginState', JSON.stringify({
+        isGeneralPolicy: true,
         isAgent: false,
         store: {
           ...store,
@@ -2272,6 +2310,7 @@ function AppContent() {
     modifiedStore.isQuickServiceManagement = false;
     modifiedStore.isDirectStoreManagement = false;
     modifiedStore.isDirectStore = false;
+    modifiedStore.isGeneralPolicy = false;
     modifiedStore.isDataCollection = false;
 
     // 선택된 모드만 true로 설정
@@ -2339,6 +2378,10 @@ function AppContent() {
       case 'directStore':
         modifiedStore.isDirectStore = true;
         // 비밀번호는 DirectStoreMode 컴포넌트에서 처리하므로 여기서는 설정하지 않음
+        break;
+      case 'generalPolicy':
+        modifiedStore.isGeneralPolicy = true;
+        // 비밀번호는 GeneralPolicyMode 컴포넌트에서 처리하므로 여기서는 설정하지 않음
         break;
       case 'dataCollection':
         modifiedStore.isDataCollection = true;
@@ -2512,6 +2555,9 @@ function AppContent() {
         setIsDirectStoreMode(true);
         setDirectStoreAuthenticated(true);
         break;
+      case 'generalPolicy':
+        setIsGeneralPolicyMode(true);
+        break;
       default:
         // console.log('알 수 없는 모드:', selectedMode);
         break;
@@ -2663,6 +2709,8 @@ function AppContent() {
     setIsOnSaleManagementMode(false);
     // 온세일 접수모드 상태 초기화
     setIsOnSaleReceptionMode(false);
+    // 일반정책모드 상태 초기화
+    setIsGeneralPolicyMode(false);
     resetNewModeFlags();
     setDirectStoreAuthenticated(false);
     setShowDirectStorePasswordModal(false);
@@ -3616,6 +3664,26 @@ ${requestList}
             const currentModes = getCurrentUserAvailableModes();
             setAvailableModes(currentModes);
             setIsDirectStoreMode(false);
+            setShowModeSelection(true);
+          }}
+          availableModes={availableModes}
+        />
+      </ThemeProvider>
+    );
+  }
+
+  // 일반정책모드일 때는 별도 화면 렌더링
+  if (isGeneralPolicyMode) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <GeneralPolicyMode
+          onLogout={handleLogout}
+          loggedInStore={loggedInStore}
+          onModeChange={() => {
+            const currentModes = getCurrentUserAvailableModes();
+            setAvailableModes(currentModes);
+            setIsGeneralPolicyMode(false);
             setShowModeSelection(true);
           }}
           availableModes={availableModes}

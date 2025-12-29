@@ -65,10 +65,10 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
   const [editingGroup, setEditingGroup] = useState(null);
   const [groupFormData, setGroupFormData] = useState({
     groupName: '',
-    userIds: []
+    companyNames: [],
+    managerIds: []
   });
-  const [regularUsers, setRegularUsers] = useState([]);
-  const [teamLeaders, setTeamLeaders] = useState([]);
+  const [companies, setCompanies] = useState([]);
 
   // 권한 체크
   const canAccess = ['SS', 'AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(loggedInStore?.userRole);
@@ -77,8 +77,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
     if (canAccess) {
       loadSettings();
       loadUserGroups();
-      loadRegularUsers();
-      loadTeamLeaders();
+      loadCompanies();
     }
     return () => {
       if (pollingInterval) {
@@ -179,49 +178,43 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
     }
   };
 
-  const loadTeamLeaders = async () => {
+  const loadCompanies = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/agents`);
+      const response = await fetch(`${API_BASE_URL}/api/policy-table/companies`, {
+        headers: {
+          'x-user-role': loggedInStore?.userRole || '',
+          'x-user-id': loggedInStore?.contactId || loggedInStore?.id || ''
+        }
+      });
       if (response.ok) {
-        const agents = await response.json();
-        // permissionLevel이 AA-FF인 사용자만 필터링 (팀장 권한자)
-        const leaders = agents
-          .filter(agent => agent.permissionLevel && ['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(agent.permissionLevel))
-          .map(agent => ({
-            code: agent.permissionLevel,
-            name: agent.target || agent.permissionLevel
+        const data = await response.json();
+        if (data.success) {
+          // 업체명을 code로 사용, managerIds도 함께 저장
+          const companyOptions = data.companies.map(company => ({
+            code: company.companyName, // 업체명을 고유 ID로 사용
+            name: company.companyName,
+            managerIds: company.managerIds || (company.managerId ? [company.managerId] : [])
           }));
-        setTeamLeaders(leaders);
-      }
-    } catch (error) {
-      console.error('팀장 목록 로드 오류:', error);
-    }
-  };
+          setCompanies(companyOptions);
 
-  const loadRegularUsers = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/agents`);
-      if (response.ok) {
-        const agents = await response.json();
-        // permissionLevel이 A-F(일반사용자) 또는 AA-FF(팀장)인 사용자 필터링
-        // contactId를 고유 ID로 사용하여 개별 사용자 구분
-        const users = agents
-          .filter(agent => {
-            const permissionLevel = agent.permissionLevel;
-            return permissionLevel && agent.contactId && (
-              ['A', 'B', 'C', 'D', 'E', 'F'].includes(permissionLevel) || // 일반사용자
-              ['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(permissionLevel) // 팀장 권한자
+          // 현재 로그인한 사용자의 아이디로 업체명 자동 선택
+          const currentUserId = loggedInStore?.contactId || loggedInStore?.id;
+          if (currentUserId) {
+            const userCompany = companyOptions.find(company => 
+              company.managerIds.includes(currentUserId)
             );
-          })
-          .map(agent => ({
-            code: agent.contactId, // 고유 ID로 사용 (개별 사용자 구분)
-            name: agent.target || agent.contactId, // 사용자 이름
-            permissionLevel: agent.permissionLevel // 권한 레벨 (표시용)
-          }));
-        setRegularUsers(users);
+            if (userCompany) {
+              setGroupFormData(prev => ({
+                ...prev,
+                companyNames: [userCompany.code],
+                managerIds: userCompany.managerIds
+              }));
+            }
+          }
+        }
       }
     } catch (error) {
-      console.error('일반 사용자 목록 로드 오류:', error);
+      console.error('업체명 목록 로드 오류:', error);
     }
   };
 
@@ -230,14 +223,30 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
       setEditingGroup(group);
       setGroupFormData({
         groupName: group.groupName,
-        userIds: group.userIds || []
+        companyNames: group.companyNames || [],
+        managerIds: group.managerIds || []
       });
     } else {
       setEditingGroup(null);
       setGroupFormData({
         groupName: '',
-        userIds: []
+        companyNames: [],
+        managerIds: []
       });
+      // 새 그룹 생성 시 현재 사용자의 업체명 자동 선택
+      const currentUserId = loggedInStore?.contactId || loggedInStore?.id;
+      if (currentUserId) {
+        const userCompany = companies.find(company => 
+          company.managerIds.includes(currentUserId)
+        );
+        if (userCompany) {
+          setGroupFormData(prev => ({
+            ...prev,
+            companyNames: [userCompany.code],
+            managerIds: userCompany.managerIds
+          }));
+        }
+      }
     }
     setGroupModalOpen(true);
   };
@@ -247,7 +256,8 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
     setEditingGroup(null);
     setGroupFormData({
       groupName: '',
-      userIds: []
+      companyNames: [],
+      managerIds: []
     });
   };
 
@@ -652,9 +662,33 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                       <TableRow key={group.id}>
                         <TableCell>{group.groupName}</TableCell>
                         <TableCell>
-                          {group.userIds.map((userId) => (
-                            <Chip key={userId} label={userId} size="small" sx={{ mr: 0.5, mb: 0.5 }} />
-                          ))}
+                          {group.companyNames && group.companyNames.length > 0 && (
+                            <Box sx={{ mb: 1 }}>
+                              <Typography variant="caption" color="text.secondary">업체명:</Typography>
+                              {group.companyNames.map((companyName) => (
+                                <Chip key={companyName} label={companyName} size="small" sx={{ mr: 0.5, mb: 0.5 }} />
+                              ))}
+                            </Box>
+                          )}
+                          {group.managerIds && group.managerIds.length > 0 && (
+                            <Box>
+                              <Typography variant="caption" color="text.secondary">담당자:</Typography>
+                              {group.managerIds.map((managerId) => (
+                                <Chip key={managerId} label={managerId} size="small" sx={{ mr: 0.5, mb: 0.5 }} />
+                              ))}
+                            </Box>
+                          )}
+                          {/* 하위 호환성: userIds가 있으면 표시 (기존 데이터) */}
+                          {(!group.companyNames || group.companyNames.length === 0) && 
+                           (!group.managerIds || group.managerIds.length === 0) &&
+                           group.userIds && group.userIds.length > 0 && (
+                            <Box>
+                              <Typography variant="caption" color="text.secondary">기존 데이터 (수정 필요):</Typography>
+                              {group.userIds.map((userId) => (
+                                <Chip key={userId} label={userId} size="small" sx={{ mr: 0.5, mb: 0.5 }} />
+                              ))}
+                            </Box>
+                          )}
                         </TableCell>
                         <TableCell>{new Date(group.registeredAt).toLocaleString('ko-KR')}</TableCell>
                         <TableCell>
@@ -824,38 +858,42 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
             <Grid item xs={12}>
               <Autocomplete
                 multiple
-                options={regularUsers}
-                getOptionLabel={(option) => {
-                  // 사용자 이름과 권한 레벨 표시 (예: "홍길동 (A)")
-                  const name = option?.name || option?.code || '';
-                  const permissionLevel = option?.permissionLevel || '';
-                  return permissionLevel ? `${name} (${permissionLevel})` : name;
-                }}
-                value={regularUsers.filter(user => groupFormData.userIds.includes(user.code))}
+                options={companies}
+                getOptionLabel={(option) => option?.name || option?.code || ''}
+                value={companies.filter(company => groupFormData.companyNames.includes(company.code))}
                 onChange={(event, newValue) => {
+                  // 선택된 업체명들
+                  const selectedCompanyNames = newValue.map(company => company.code);
+                  
+                  // 선택된 업체들의 담당자 아이디를 모두 수집
+                  const allManagerIds = new Set();
+                  newValue.forEach(company => {
+                    if (company.managerIds && Array.isArray(company.managerIds)) {
+                      company.managerIds.forEach(id => allManagerIds.add(id));
+                    }
+                  });
+
                   setGroupFormData({
                     ...groupFormData,
-                    userIds: newValue.map(user => user.code) // contactId 저장
+                    companyNames: selectedCompanyNames,
+                    managerIds: Array.from(allManagerIds)
                   });
                 }}
                 isOptionEqualToValue={(option, value) => option?.code === value?.code}
                 renderInput={(params) => (
                   <TextField
                     {...params}
-                    label="일반사용자"
-                    placeholder="사용자를 선택하세요"
+                    label="업체명"
+                    placeholder="업체명을 선택하세요"
                   />
                 )}
                 renderTags={(value, getTagProps) =>
                   value.map((option, index) => {
                     const { key, ...tagProps } = getTagProps({ index });
-                    const label = option?.permissionLevel 
-                      ? `${option.name || option.code} (${option.permissionLevel})`
-                      : (option.name || option.code);
                     return (
                       <Chip
                         key={option.code || key}
-                        label={label}
+                        label={option.name || option.code}
                         onDelete={tagProps.onDelete}
                         {...tagProps}
                       />

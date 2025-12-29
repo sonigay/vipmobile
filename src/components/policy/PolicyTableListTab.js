@@ -54,7 +54,7 @@ const formatDate = (dateValue) => {
   }
 };
 
-const PolicyTableListTab = ({ loggedInStore }) => {
+const PolicyTableListTab = ({ loggedInStore, mode }) => {
   const [tabs, setTabs] = useState([]);
   const [activeTabIndex, setActiveTabIndex] = useState(0);
   const [policies, setPolicies] = useState([]);
@@ -115,7 +115,8 @@ const PolicyTableListTab = ({ loggedInStore }) => {
       const params = new URLSearchParams({
         policyTableName: policyTableName,
         ...(searchCreator && { creator: searchCreator }),
-        ...(filterApplyDateFrom && { applyDateSearch: filterApplyDateFrom })
+        ...(filterApplyDateFrom && { applyDateSearch: filterApplyDateFrom }),
+        ...(mode && { mode: mode })
       });
 
       const response = await fetch(`${API_BASE_URL}/api/policy-tables?${params}`, {

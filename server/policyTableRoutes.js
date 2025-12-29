@@ -1125,6 +1125,36 @@ function setupPolicyTableRoutes(app) {
 
   // ========== 정책영업그룹 관련 API ==========
 
+  // 정책영업그룹 데이터 파싱 헬퍼 함수
+  function parseUserGroupData(dataString) {
+    if (!dataString) {
+      return { companyNames: [], managerIds: [] };
+    }
+
+    try {
+      const parsed = JSON.parse(dataString);
+      
+      // 새로운 형식: {"companyNames": [...], "managerIds": [...]}
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return {
+          companyNames: Array.isArray(parsed.companyNames) ? parsed.companyNames : [],
+          managerIds: Array.isArray(parsed.managerIds) ? parsed.managerIds : []
+        };
+      }
+      
+      // 기존 형식: ["A", "B", "C"] (권한 레벨 배열) - 무시하고 빈 배열 반환
+      if (Array.isArray(parsed)) {
+        console.log('[정책표] 기존 형식 감지 (권한 레벨 배열), 새로운 형식으로 초기화');
+        return { companyNames: [], managerIds: [] };
+      }
+      
+      return { companyNames: [], managerIds: [] };
+    } catch (error) {
+      console.error('[정책표] 그룹 데이터 파싱 오류:', error);
+      return { companyNames: [], managerIds: [] };
+    }
+  }
+
   // GET /api/policy-table/user-groups
   router.get('/policy-table/user-groups', async (req, res) => {
     setCORSHeaders(req, res);
@@ -1151,13 +1181,19 @@ function setupPolicyTableRoutes(app) {
 
       const dataRows = rows.slice(1);
 
-      const groups = dataRows.map(row => ({
-        id: row[0] || '',
-        groupName: row[1] || '',
-        userIds: row[2] ? JSON.parse(row[2]) : [],
-        registeredAt: row[3] || '',
-        registeredBy: row[4] || ''
-      }));
+      const groups = dataRows.map(row => {
+        const groupData = parseUserGroupData(row[2]);
+        return {
+          id: row[0] || '',
+          groupName: row[1] || '',
+          companyNames: groupData.companyNames,
+          managerIds: groupData.managerIds,
+          // 하위 호환성을 위해 userIds도 반환 (기존 코드 호환)
+          userIds: groupData.managerIds, // managerIds를 userIds로도 반환
+          registeredAt: row[3] || '',
+          registeredBy: row[4] || ''
+        };
+      });
 
       return res.json(groups);
     } catch (error) {
@@ -1175,10 +1211,19 @@ function setupPolicyTableRoutes(app) {
         return res.status(403).json({ success: false, error: '권한이 없습니다.' });
       }
 
-      const { groupName, userIds } = req.body;
+      const { groupName, companyNames, managerIds } = req.body;
 
-      if (!groupName || !userIds || !Array.isArray(userIds) || userIds.length === 0) {
+      // 하위 호환성: userIds도 받을 수 있음 (기존 코드 호환)
+      const finalCompanyNames = companyNames || [];
+      const finalManagerIds = managerIds || req.body.userIds || [];
+
+      if (!groupName || (!Array.isArray(finalCompanyNames) && !Array.isArray(finalManagerIds))) {
         return res.status(400).json({ success: false, error: '필수 필드가 누락되었습니다.' });
+      }
+
+      // companyNames와 managerIds가 모두 비어있으면 에러
+      if (finalCompanyNames.length === 0 && finalManagerIds.length === 0) {
+        return res.status(400).json({ success: false, error: '업체명 또는 담당자를 최소 1개 이상 선택해야 합니다.' });
       }
 
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
@@ -1188,10 +1233,19 @@ function setupPolicyTableRoutes(app) {
       const registeredAt = new Date().toISOString();
       const registeredBy = permission.userId || 'Unknown';
 
+      // 중복 제거
+      const uniqueCompanyNames = [...new Set(finalCompanyNames)];
+      const uniqueManagerIds = [...new Set(finalManagerIds)];
+
+      const groupData = {
+        companyNames: uniqueCompanyNames,
+        managerIds: uniqueManagerIds
+      };
+
       const newRow = [
         newId,
         groupName,
-        JSON.stringify(userIds),
+        JSON.stringify(groupData),
         registeredAt,
         registeredBy
       ];
@@ -1226,7 +1280,7 @@ function setupPolicyTableRoutes(app) {
       }
 
       const { id } = req.params;
-      const { groupName, userIds } = req.body;
+      const { groupName, companyNames, managerIds } = req.body;
 
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_USER_GROUPS, HEADERS_USER_GROUPS);
@@ -1246,10 +1300,35 @@ function setupPolicyTableRoutes(app) {
       }
 
       const existingRow = rows[rowIndex];
+      const existingData = parseUserGroupData(existingRow[2]);
+
+      // 새로운 데이터가 제공되면 사용, 없으면 기존 데이터 유지
+      let finalCompanyNames = companyNames !== undefined ? companyNames : existingData.companyNames;
+      let finalManagerIds = managerIds !== undefined ? managerIds : existingData.managerIds;
+
+      // 하위 호환성: userIds도 받을 수 있음
+      if (req.body.userIds && managerIds === undefined) {
+        finalManagerIds = req.body.userIds;
+      }
+
+      // companyNames와 managerIds가 모두 비어있으면 에러
+      if (finalCompanyNames.length === 0 && finalManagerIds.length === 0) {
+        return res.status(400).json({ success: false, error: '업체명 또는 담당자를 최소 1개 이상 선택해야 합니다.' });
+      }
+
+      // 중복 제거
+      const uniqueCompanyNames = [...new Set(finalCompanyNames)];
+      const uniqueManagerIds = [...new Set(finalManagerIds)];
+
+      const groupData = {
+        companyNames: uniqueCompanyNames,
+        managerIds: uniqueManagerIds
+      };
+
       const updatedRow = [
         id,
         groupName !== undefined ? groupName : existingRow[1],
-        userIds !== undefined ? JSON.stringify(userIds) : existingRow[2],
+        JSON.stringify(groupData),
         existingRow[3],
         existingRow[4]
       ];
@@ -1460,14 +1539,20 @@ function setupPolicyTableRoutes(app) {
           userGroupsMap.set(groupId, userIds);
         });
 
+        // 현재 사용자 아이디 확인
+        const currentUserId = req.headers['x-user-id'] || permission.userId;
+
         // 접근 가능한 정책표ID 목록 생성
         const accessiblePolicyTableIds = new Set();
         policyDataRows.forEach(row => {
           const accessGroupId = row[5]; // 접근권한 (그룹ID)
           if (accessGroupId) {
-            const userIds = userGroupsMap.get(accessGroupId) || [];
-            if (userIds.includes(userRole)) {
-              accessiblePolicyTableIds.add(row[1]); // 정책표ID_설정
+            const groupData = userGroupsMap.get(accessGroupId);
+            if (groupData) {
+              const managerIds = groupData.managerIds || [];
+              if (managerIds.includes(currentUserId)) {
+                accessiblePolicyTableIds.add(row[1]); // 정책표ID_설정
+              }
             }
           }
         });
@@ -1487,8 +1572,10 @@ function setupPolicyTableRoutes(app) {
   router.get('/policy-tables', async (req, res) => {
     setCORSHeaders(req, res);
     try {
-      const { policyTableName, applyDateSearch, creator, createDateFrom, createDateTo } = req.query;
+      const { policyTableName, applyDateSearch, creator, createDateFrom, createDateTo, mode } = req.query;
       const userRole = req.headers['x-user-role'] || req.query.userRole;
+      const currentUserId = req.headers['x-user-id'] || req.query.userId;
+      const isGeneralPolicyMode = mode === 'generalPolicy' || mode === 'general-policy';
 
       if (!policyTableName) {
         return res.status(400).json({ success: false, error: 'policyTableName이 필요합니다.' });
@@ -1534,8 +1621,65 @@ function setupPolicyTableRoutes(app) {
         }));
 
       // 권한 필터링
-      if (['SS', 'S'].includes(userRole) || ['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(userRole)) {
-        // 모든 정책표 표시
+      if (isGeneralPolicyMode) {
+        // 일반정책모드 필터링: companyNames 기반
+        await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_USER_GROUPS, HEADERS_USER_GROUPS);
+        const userGroupsResponse = await withRetry(async () => {
+          return await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SHEET_USER_GROUPS}!A:E`
+          });
+        });
+
+        const userGroupsRows = userGroupsResponse.data.values || [];
+        const userGroupsDataRows = userGroupsRows.slice(1);
+        const userGroupsMap = new Map();
+        userGroupsDataRows.forEach(row => {
+          const groupId = row[0];
+          const groupData = parseUserGroupData(row[2]);
+          userGroupsMap.set(groupId, groupData);
+        });
+
+        // 현재 사용자의 업체명 확인
+        const generalModeSheetName = '일반모드권한관리';
+        const generalModeResponse = await withRetry(async () => {
+          return await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${generalModeSheetName}!A:K`
+          });
+        });
+
+        const generalModeRows = generalModeResponse.data.values || [];
+        let userCompanyName = null;
+        if (generalModeRows.length > 3) {
+          const generalModeDataRows = generalModeRows.slice(3);
+          const userRow = generalModeDataRows.find(row => 
+            row[0] === currentUserId || row[10] === currentUserId // A열 또는 K열
+          );
+          if (userRow) {
+            userCompanyName = (userRow[1] || '').trim(); // B열 업체명
+          }
+        }
+
+        if (!userCompanyName) {
+          // 업체명을 찾을 수 없으면 빈 배열 반환
+          return res.json([]);
+        }
+
+        // 접근권한에 포함된 정책표만 필터링
+        policies = policies.filter(policy => {
+          const accessGroupId = policy.accessGroupId;
+          if (!accessGroupId) return false; // 접근권한이 없으면 접근 불가
+          
+          const groupData = userGroupsMap.get(accessGroupId);
+          if (!groupData) return false;
+
+          // companyNames에 현재 사용자의 업체명이 포함되어 있는지 확인
+          const companyNames = groupData.companyNames || [];
+          return companyNames.includes(userCompanyName);
+        });
+      } else if (['SS', 'S'].includes(userRole) || ['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(userRole)) {
+        // 모든 정책표 표시 (정책모드)
       } else if (['A', 'B', 'C', 'D', 'E', 'F'].includes(userRole)) {
         // 일반 사용자는 접근권한에 포함된 것만 표시
         // 정책영업그룹 목록 조회
@@ -1552,16 +1696,24 @@ function setupPolicyTableRoutes(app) {
         const userGroupsMap = new Map();
         userGroupsDataRows.forEach(row => {
           const groupId = row[0];
-          const userIds = row[2] ? JSON.parse(row[2]) : [];
-          userGroupsMap.set(groupId, userIds);
+          const groupData = parseUserGroupData(row[2]);
+          userGroupsMap.set(groupId, groupData);
         });
+
+        // 현재 사용자 아이디 확인
+        const currentUserId = req.headers['x-user-id'] || permission.userId;
 
         // 접근권한에 포함된 정책표만 필터링
         policies = policies.filter(policy => {
           const accessGroupId = policy.accessGroupId;
           if (!accessGroupId) return false; // 접근권한이 없으면 접근 불가
-          const userIds = userGroupsMap.get(accessGroupId) || [];
-          return userIds.includes(userRole);
+          
+          const groupData = userGroupsMap.get(accessGroupId);
+          if (!groupData) return false;
+
+          // managerIds에 현재 사용자 아이디가 포함되어 있는지 확인
+          const managerIds = groupData.managerIds || [];
+          return managerIds.includes(currentUserId);
         });
       }
 
@@ -1695,8 +1847,10 @@ function setupPolicyTableRoutes(app) {
           const userGroup = userGroupsDataRows.find(r => r[0] === accessGroupId);
           
           if (userGroup) {
-            const userIds = userGroup[2] ? JSON.parse(userGroup[2]) : [];
-            if (!userIds.includes(userRole)) {
+            const groupData = parseUserGroupData(userGroup[2]);
+            const currentUserId = req.headers['x-user-id'];
+            const managerIds = groupData.managerIds || [];
+            if (!managerIds.includes(currentUserId)) {
               return res.status(403).json({ success: false, error: '이 정책표에 접근할 권한이 없습니다.' });
             }
           } else {

@@ -26,7 +26,8 @@ const UPDATE_SHEET_COLUMNS = {
   RISK_MANAGEMENT: 21,     // V열: 리스크 관리 모드 업데이트내용
   DIRECT_STORE_MANAGEMENT: 22, // W열: 직영점 관리 모드 업데이트내용
   DIRECT_STORE: 23,         // X열: 직영점 모드 업데이트내용
-  QUICK_SERVICE_MANAGEMENT: 24 // Y열: 퀵서비스 관리 모드 업데이트내용
+  QUICK_SERVICE_MANAGEMENT: 24, // Y열: 퀵서비스 관리 모드 업데이트내용
+  GENERAL_POLICY: 25        // Z열: 일반정책모드 업데이트내용
 };
 
 // 모드별 컬럼 매핑
@@ -60,6 +61,8 @@ const MODE_COLUMN_MAP = {
   'directStoreManagement': UPDATE_SHEET_COLUMNS.DIRECT_STORE_MANAGEMENT,
   'directStore': UPDATE_SHEET_COLUMNS.DIRECT_STORE,
   'quickServiceManagement': UPDATE_SHEET_COLUMNS.QUICK_SERVICE_MANAGEMENT,
+  'generalPolicy': UPDATE_SHEET_COLUMNS.GENERAL_POLICY,
+  'general-policy': UPDATE_SHEET_COLUMNS.GENERAL_POLICY, // 별칭
   'basic': UPDATE_SHEET_COLUMNS.GENERAL,  // 기본모드는 일반모드와 동일
   'basicMode': UPDATE_SHEET_COLUMNS.GENERAL  // 별칭
 };

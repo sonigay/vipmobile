@@ -3624,7 +3624,7 @@ app.post('/api/login', async (req, res) => {
     console.log('Step 3: 일반모드권한관리 시트에서 검색 시작');
 
     const generalModeSheetName = '일반모드권한관리';
-    const generalModeRange = 'A:H'; // A~H열
+    const generalModeRange = 'A:K'; // A~K열 (I열: 일반정책모드 권한, J열: 일반정책모드 비밀번호, K열: 담당자 아이디)
 
     const generalModeResponse = await rateLimitedSheetsCall(() =>
       sheets.spreadsheets.values.get({
@@ -3657,15 +3657,21 @@ app.post('/api/login', async (req, res) => {
         const hasDirectStoreMode = directStoreColumnValue === 'O';
         const directStorePassword = (foundGeneralUser[7] || '').toString().trim(); // H열: 직영점 모드 비밀번호
         const requiresDirectStorePassword = hasDirectStoreMode && directStorePassword !== '';
+        // I열: 일반정책모드 권한
+        const generalPolicyColumnValue = (foundGeneralUser[8] || '').toString().trim().toUpperCase();
+        const hasGeneralPolicyMode = generalPolicyColumnValue === 'O';
+        const generalPolicyPassword = (foundGeneralUser[9] || '').toString().trim(); // J열: 일반정책모드 비밀번호
+        const requiresGeneralPolicyPassword = hasGeneralPolicyMode && generalPolicyPassword !== '';
 
         console.log('권한 확인:', {
           basicMode: hasBasicMode,
           onSaleMode: hasOnSaleMode,
-          directStoreMode: hasDirectStoreMode
+          directStoreMode: hasDirectStoreMode,
+          generalPolicyMode: hasGeneralPolicyMode
         });
 
         // 권한이 하나도 없으면 로그인 거부
-        if (!hasBasicMode && !hasOnSaleMode && !hasDirectStoreMode) {
+        if (!hasBasicMode && !hasOnSaleMode && !hasDirectStoreMode && !hasGeneralPolicyMode) {
           console.log('권한 없음: 로그인 거부');
           return res.status(403).json({
             success: false,
@@ -3710,10 +3716,14 @@ app.post('/api/login', async (req, res) => {
             basicMode: hasBasicMode,         // D열: 기본 모드
             onSaleReception: hasOnSaleMode,  // E열: 온세일접수 모드
             onSalePolicy: eColumnValue === 'M', // E열이 'M'인 경우 정책게시판 권한
-            directStore: hasDirectStoreMode     // G열: 직영점 모드
+            directStore: hasDirectStoreMode,    // G열: 직영점 모드
+            generalPolicy: hasGeneralPolicyMode // I열: 일반정책모드
           },
           directStoreSecurity: {
             requiresPassword: requiresDirectStorePassword
+          },
+          generalPolicySecurity: {
+            requiresPassword: requiresGeneralPolicyPassword
           }
         };
 
@@ -13437,6 +13447,74 @@ app.post('/api/onsale/uplus-submission', async (req, res) => {
 // ==================== 일반모드 온세일접수 API ====================
 
 // 일반모드 온세일 권한 확인
+app.post('/api/check-general-policy-permission', async (req, res) => {
+  try {
+    const { userId, password } = req.body;
+
+    console.log(`🔐 [일반정책모드] 권한 확인 시작: ${userId}`);
+
+    if (!userId || !password) {
+      return res.status(400).json({
+        success: false,
+        hasPermission: false,
+        error: '사용자 ID와 비밀번호를 입력해주세요.'
+      });
+    }
+
+    const sheetName = '일반모드권한관리';
+    const range = 'A:K'; // A~K열: 사용자ID, 업체명, 그룹, 기본모드, 온세일접수모드, 온세일접수비밀번호, 직영점모드, 직영점비밀번호, 일반정책모드, 일반정책모드비밀번호, 담당자아이디
+
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${sheetName}!${range}`,
+    });
+
+    const rows = response.data.values || [];
+
+    // 헤더는 3행(인덱스 2), 데이터는 4행(인덱스 3)부터
+    if (rows.length <= 3) {
+      console.log('⚠️ [일반정책모드] 일반모드권한관리 시트에 데이터가 없습니다.');
+      return res.json({ success: true, hasPermission: false });
+    }
+
+    // 4행부터 데이터
+    const dataRows = rows.slice(3);
+    const userRow = dataRows.find(row => row[0] === userId);
+
+    if (!userRow) {
+      console.log(`⚠️ [일반정책모드] 사용자를 찾을 수 없습니다: ${userId}`);
+      return res.json({ success: true, hasPermission: false });
+    }
+
+    // I열 (인덱스 8): 일반정책모드 권한
+    const generalPolicyPermission = (userRow[8] || '').toString().trim().toUpperCase();
+    const hasPermission = generalPolicyPermission === 'O';
+
+    if (!hasPermission) {
+      console.log(`⚠️ [일반정책모드] 권한이 없습니다: ${userId}`);
+      return res.json({ success: true, hasPermission: false });
+    }
+
+    // J열 (인덱스 9): 일반정책모드 비밀번호
+    const storedPassword = (userRow[9] || '').toString().trim();
+
+    if (storedPassword && password !== storedPassword) {
+      console.log(`⚠️ [일반정책모드] 비밀번호가 일치하지 않습니다: ${userId}`);
+      return res.json({ success: true, hasPermission: false, error: '비밀번호가 일치하지 않습니다.' });
+    }
+
+    console.log(`✅ [일반정책모드] 권한 확인 성공: ${userId}`);
+    return res.json({ success: true, hasPermission: true });
+  } catch (error) {
+    console.error('❌ [일반정책모드] 권한 확인 오류:', error);
+    return res.status(500).json({
+      success: false,
+      hasPermission: false,
+      error: '권한 확인 중 오류가 발생했습니다.'
+    });
+  }
+});
+
 app.post('/api/check-onsale-permission', async (req, res) => {
   try {
     const { userId, password } = req.body;
