@@ -546,21 +546,27 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                             }
                             
                             // 새 창에서 열기 (앱 리다이렉트 방지)
-                            const newWindow = window.open(
-                              url, 
-                              '_blank', 
-                              'noopener,noreferrer,width=1200,height=800'
-                            );
-                            
-                            // 팝업 차단 감지 (즉시 확인, setTimeout 제거)
-                            // window.open 직후 즉시 확인하여 사용자가 창을 닫은 경우와 구분
-                            // newWindow가 null인 경우만 팝업 차단으로 판단
-                            if (!newWindow || newWindow === null) {
-                              // 팝업이 차단된 경우 사용자에게 알림
-                              alert('팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해주세요.');
+                            try {
+                              const newWindow = window.open(
+                                url, 
+                                '_blank', 
+                                'noopener,noreferrer,width=1200,height=800'
+                              );
+                              
+                              // 팝업 차단 감지 (window.open 직후 즉시 확인)
+                              // newWindow가 null이거나 undefined인 경우만 팝업 차단으로 판단
+                              // 사용자가 창을 닫은 경우는 newWindow.closed로 확인 가능하므로 여기서는 확인하지 않음
+                              if (newWindow === null || newWindow === undefined) {
+                                // 팝업이 차단된 경우 사용자에게 알림
+                                alert('팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해주세요.');
+                              }
+                              // newWindow가 존재하면 정상적으로 열린 것이므로 아무것도 하지 않음
+                              // 사용자가 나중에 창을 닫아도 감지하지 않음
+                            } catch (error) {
+                              // window.open이 예외를 발생시킨 경우 (일부 브라우저에서 발생 가능)
+                              console.error('구글시트 열기 오류:', error);
+                              alert('구글시트를 열 수 없습니다. 브라우저 설정에서 팝업을 허용해주세요.');
                             }
-                            // newWindow가 존재하면 정상적으로 열린 것이므로 아무것도 하지 않음
-                            // 사용자가 나중에 창을 닫아도 감지하지 않음
                           }}
                           style={{ color: '#1976d2', textDecoration: 'none', cursor: 'pointer' }}
                         >
