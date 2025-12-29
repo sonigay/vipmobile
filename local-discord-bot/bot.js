@@ -116,7 +116,7 @@ client.on('messageCreate', async (message) => {
         .setColor(0x00FF00)
         .setTimestamp();
       
-      await loadingMsg.edit({
+      const imageMessage = await loadingMsg.edit({
         content: '',
         embeds: [embed],
         files: [{
@@ -125,7 +125,15 @@ client.on('messageCreate', async (message) => {
         }]
       });
       
-      console.log(`📤 [로컬PC봇] 이미지 디스코드 업로드 완료`);
+      console.log(`📤 [로컬PC봇] 이미지 디스코드 업로드 완료 (메시지 ID: ${imageMessage.id})`);
+      
+      // ===== 5단계: 클라우드 서버에 완료 신호 전송 =====
+      // 클라우드 서버 봇이 이 신호를 감지하고 이미지 URL을 추출
+      const commandMessageId = message.id; // 원본 명령어 메시지 ID
+      const completeSignal = `!screenshot-complete commandId=${commandMessageId} imageId=${imageMessage.id}`;
+      await message.channel.send(completeSignal);
+      console.log(`📡 [로컬PC봇] 완료 신호 전송: ${completeSignal}`);
+      
       console.log(`✅ [로컬PC봇] 전체 작업 완료: ${policyTableName} (${userName})`);
       
     } catch (error) {

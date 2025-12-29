@@ -222,21 +222,75 @@ async function captureSheetViaDiscordBot(sheetUrl, policyTableName, userName, ch
     
     // 명령어 메시지 전송 (포스트 또는 일반 채널)
     const commandMessage = await targetChannel.send(command);
+    const commandMessageId = commandMessage.id;
 
     // 로컬 PC 봇 ID 확인 (환경변수에서 가져오기, 선택사항)
     const LOCAL_BOT_ID = process.env.DISCORD_LOCAL_BOT_ID;
+    // 클라우드 서버 봇 ID (명령어를 보낸 봇)
+    const CLOUD_BOT_ID = bot.user.id;
 
-    // 봇이 업로드한 이미지 메시지 대기
+    console.log(`🔍 [정책표] 완료 신호 대기 설정:`);
+    console.log(`   타겟 채널/포스트 ID: ${targetChannel.id}`);
+    console.log(`   타겟 채널/포스트 이름: ${targetChannel.name || 'N/A'}`);
+    console.log(`   명령어 메시지 ID: ${commandMessageId}`);
+    console.log(`   클라우드 서버 봇 ID: ${CLOUD_BOT_ID}`);
+    console.log(`   로컬 PC 봇 ID: ${LOCAL_BOT_ID || '(설정되지 않음)'}`);
+
+    // 포스트(thread)인 경우 명시적으로 fetch
+    if (targetChannel.isThread()) {
+      try {
+        await targetChannel.fetch(); // 포스트 최신 상태로 갱신
+        console.log(`✅ [정책표] 포스트 fetch 완료: ${targetChannel.id} (${targetChannel.name})`);
+      } catch (error) {
+        console.warn(`⚠️ [정책표] 포스트 fetch 실패:`, error.message);
+      }
+    }
+
+    // 로컬 PC 봇이 보낸 완료 신호 메시지 대기
+    // 형식: !screenshot-complete commandId=<commandMessageId> imageId=<imageMessageId>
     const filter = (msg) => {
-      // 기본 필터: 같은 채널/포스트, 봇 메시지, 이미지 첨부, 명령어 이후
-      let matches = msg.channel.id === targetChannel.id &&
-                    msg.author.bot &&
-                    msg.attachments.size > 0 &&
-                    msg.createdTimestamp > commandMessage.createdTimestamp;
+      const isTargetChannel = msg.channel.id === targetChannel.id;
+      const isNotCloudBot = msg.author.id !== CLOUD_BOT_ID; // 클라우드 서버 봇이 아닌 메시지만
+      const isCompleteSignal = msg.content && msg.content.startsWith('!screenshot-complete');
+      
+      // 완료 신호 파싱
+      let commandIdMatch = null;
+      let imageIdMatch = null;
+      if (isCompleteSignal) {
+        commandIdMatch = msg.content.match(/commandId=(\d+)/);
+        imageIdMatch = msg.content.match(/imageId=(\d+)/);
+      }
 
-      // 로컬 PC 봇 ID가 설정되어 있으면 추가 확인
-      if (LOCAL_BOT_ID && matches) {
-        matches = matches && msg.author.id === LOCAL_BOT_ID;
+      // 명령어 ID를 문자열로 명시적 변환하여 정확한 매칭 보장
+      // Discord 메시지 ID는 숫자 문자열이지만, 타입 안전성을 위해 String() 사용
+      const receivedCommandId = commandIdMatch ? String(commandIdMatch[1]) : null;
+      const expectedCommandId = String(commandMessageId);
+      const isMatchingCommand = receivedCommandId === expectedCommandId;
+      const hasImageId = imageIdMatch && imageIdMatch[1];
+
+      // 로컬 PC 봇 ID 확인
+      const isLocalBot = LOCAL_BOT_ID ? msg.author.id === LOCAL_BOT_ID : true;
+
+      const matches = isTargetChannel &&
+                     isNotCloudBot &&
+                     isCompleteSignal &&
+                     isMatchingCommand &&
+                     hasImageId &&
+                     isLocalBot;
+
+      if (isTargetChannel && isCompleteSignal) {
+        console.log(`🔍 [정책표] 완료 신호 필터링:`, {
+          messageId: msg.id,
+          authorId: msg.author.id,
+          authorName: msg.author.username,
+          content: msg.content,
+          receivedCommandId,
+          expectedCommandId,
+          isMatchingCommand,
+          hasImageId,
+          isLocalBot,
+          matches
+        });
       }
 
       return matches;
@@ -249,21 +303,65 @@ async function captureSheetViaDiscordBot(sheetUrl, policyTableName, userName, ch
     });
 
     return new Promise((resolve, reject) => {
-      collector.on('collect', (msg) => {
-        const attachment = msg.attachments.first();
-        if (attachment && attachment.contentType?.startsWith('image/')) {
+      collector.on('collect', async (completeSignalMsg) => {
+        try {
+          console.log(`📥 [정책표] 완료 신호 수신:`, {
+            messageId: completeSignalMsg.id,
+            content: completeSignalMsg.content
+          });
+
+          // 완료 신호에서 이미지 메시지 ID 추출
+          const imageIdMatch = completeSignalMsg.content.match(/imageId=(\d+)/);
+          if (!imageIdMatch) {
+            reject(new Error('완료 신호에 이미지 메시지 ID가 없습니다.'));
+            return;
+          }
+
+          const imageMessageId = imageIdMatch[1];
+          console.log(`🔍 [정책표] 이미지 메시지 ID 추출: ${imageMessageId}`);
+
+          // 이미지 메시지 가져오기
+          const imageMessage = await targetChannel.messages.fetch(imageMessageId);
+          if (!imageMessage) {
+            reject(new Error(`이미지 메시지를 찾을 수 없습니다: ${imageMessageId}`));
+            return;
+          }
+
+          const attachment = imageMessage.attachments.first();
+          if (!attachment || !attachment.contentType?.startsWith('image/')) {
+            reject(new Error('이미지가 포함된 메시지를 찾을 수 없습니다.'));
+            return;
+          }
+
           const imageUrl = attachment.url;
-          const messageId = msg.id;
+          const messageId = imageMessage.id;
           const threadId = targetChannel.id; // 포스트/스레드 ID
-          console.log(`✅ 스크린샷 생성 완료: ${imageUrl} (메시지 ID: ${messageId}, 스레드 ID: ${threadId})`);
+
+          console.log(`✅ [정책표] 스크린샷 생성 완료: ${imageUrl} (메시지 ID: ${messageId}, 스레드 ID: ${threadId})`);
           resolve({ imageUrl, messageId, threadId });
-        } else {
-          reject(new Error('이미지가 포함된 메시지를 찾을 수 없습니다.'));
+
+        } catch (error) {
+          console.error(`❌ [정책표] 완료 신호 처리 오류:`, error);
+          reject(error);
         }
       });
 
       collector.on('end', (collected) => {
+        console.log(`🔚 [정책표] 완료 신호 수집 종료:`, {
+          collectedCount: collected.size,
+          collectedMessages: Array.from(collected.values()).map(msg => ({
+            id: msg.id,
+            authorId: msg.author.id,
+            authorName: msg.author.username,
+            content: msg.content,
+            timestamp: msg.createdTimestamp
+          }))
+        });
+        
         if (collected.size === 0) {
+          console.error(`❌ [정책표] 완료 신호 수집 실패: 90초 동안 완료 신호를 받지 못했습니다.`);
+          console.error(`   타겟 채널/포스트 ID: ${targetChannel.id}`);
+          console.error(`   명령어 메시지 ID: ${commandMessageId}`);
           reject(new Error('디스코드 봇 응답 시간 초과 (90초)'));
         }
       });
@@ -574,10 +672,10 @@ async function checkPermission(req, allowedRoles) {
   // userName이 없으면 에러 (이름은 필수)
   if (!finalUserName) {
     console.error('[정책표] 사용자 이름을 찾을 수 없습니다:', { userId, userInfo });
-    return { 
-      hasPermission, 
-      userRole: finalUserRole, 
-      userId: finalUserId, 
+  return { 
+    hasPermission, 
+    userRole: finalUserRole, 
+    userId: finalUserId, 
       userName: finalUserId // 폴백: 아이디라도 반환
     };
   }
