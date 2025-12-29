@@ -1408,6 +1408,78 @@ function setupPolicyTableRoutes(app) {
     }
   });
 
+  // GET /api/policy-table/companies
+  router.get('/policy-table/companies', async (req, res) => {
+    setCORSHeaders(req, res);
+    try {
+      const permission = await checkPermission(req, ['SS', 'AA', 'BB', 'CC', 'DD', 'EE', 'FF']);
+      if (!permission.hasPermission) {
+        return res.status(403).json({ success: false, error: '권한이 없습니다.' });
+      }
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      const generalModeSheetName = '일반모드권한관리';
+      
+      // A~K열 범위로 읽기 (B열=업체명, I열=일반정책모드 권한, K열=담당자 아이디)
+      const response = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${generalModeSheetName}!A:K`
+        });
+      });
+
+      const rows = response.data.values || [];
+      if (rows.length < 4) {
+        return res.json({ success: true, companies: [] });
+      }
+
+      // 헤더 3행 제외하고 4행부터 데이터
+      const dataRows = rows.slice(3);
+      
+      // 업체명별로 그룹화 (같은 업체명에 여러 담당자가 있을 수 있음)
+      const companyMap = new Map();
+      
+      dataRows.forEach(row => {
+        const companyName = (row[1] || '').trim(); // B열: 업체명
+        const generalPolicyPermission = (row[8] || '').trim(); // I열: 일반정책모드 권한
+        const managerId = (row[10] || '').trim(); // K열: 담당자 아이디
+        
+        // I열에 "O" 권한이 있는 경우만 포함
+        if (companyName && generalPolicyPermission === 'O' && managerId) {
+          if (!companyMap.has(companyName)) {
+            companyMap.set(companyName, {
+              companyName: companyName,
+              managerIds: []
+            });
+          }
+          
+          const company = companyMap.get(companyName);
+          if (!company.managerIds.includes(managerId)) {
+            company.managerIds.push(managerId);
+          }
+        }
+      });
+
+      const companies = Array.from(companyMap.values());
+      
+      console.log('✅ [정책표] 업체명 목록 로드:', {
+        totalCompanies: companies.length,
+        companies: companies.map(c => ({
+          companyName: c.companyName,
+          managerCount: c.managerIds.length
+        }))
+      });
+
+      return res.json({
+        success: true,
+        companies: companies
+      });
+    } catch (error) {
+      console.error('[정책표] 업체명 목록 로드 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // ========== 정책표 생성 관련 API ==========
 
   // POST /api/policy-table/generate
