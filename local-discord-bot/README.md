@@ -22,6 +22,7 @@ cp .env.example .env
 ```env
 DISCORD_BOT_TOKEN_LOCAL=your_local_bot_token_here
 DISCORD_CHANNEL_ID=your_channel_id_here  # 선택사항
+DISCORD_CLOUD_BOT_ID=your_cloud_bot_id_here  # 필수: 클라우드 서버 봇 ID
 ```
 
 ### 3. 디스코드 봇 토큰 발급
@@ -72,6 +73,20 @@ DISCORD_CHANNEL_ID=your_channel_id_here  # 선택사항
    ```env
    DISCORD_BOT_TOKEN_LOCAL=여기에_실제_토큰_붙여넣기
    ```
+
+8. **클라우드 서버 봇 ID 확인 및 설정**
+   - 클라우드 서버에서 사용하는 Discord 봇의 ID를 확인해야 합니다.
+   - **방법 1: Discord Developer Portal에서 확인**
+     1. https://discord.com/developers/applications 접속
+     2. 클라우드 서버 봇 애플리케이션 선택
+     3. "Bot" 탭에서 "User ID" 확인 (봇 ID)
+   - **방법 2: Discord에서 직접 확인 (개발자 모드 필요)**
+     1. Discord 설정 > 고급 > 개발자 모드 활성화
+     2. 클라우드 서버 봇 우클릭 > "ID 복사"
+   - **`.env` 파일에 추가**
+     ```env
+     DISCORD_CLOUD_BOT_ID=여기에_클라우드_서버_봇_ID_붙여넣기
+     ```
 
 #### 🔐 보안 주의사항
 

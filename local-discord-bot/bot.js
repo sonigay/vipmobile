@@ -4,6 +4,7 @@ const { initBrowser, captureSheetAsImage, closeBrowser } = require('./screenshot
 
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN_LOCAL;
 const DISCORD_CHANNEL_ID = process.env.DISCORD_CHANNEL_ID;
+const DISCORD_CLOUD_BOT_ID = process.env.DISCORD_CLOUD_BOT_ID; // 클라우드 서버 봇 ID
 
 if (!DISCORD_BOT_TOKEN) {
   console.error('❌ DISCORD_BOT_TOKEN_LOCAL이 설정되지 않았습니다.');
@@ -31,8 +32,18 @@ client.once('ready', async () => {
 // ===== 메시지 명령어 처리 =====
 // 클라우드 서버가 보낸 명령어를 감지하고 처리
 client.on('messageCreate', async (message) => {
-  // 봇 메시지 무시 (자신이 보낸 메시지는 처리하지 않음)
-  if (message.author.bot) return;
+  // 자신이 보낸 메시지는 처리하지 않음
+  if (message.author.id === client.user.id) return;
+  
+  // 클라우드 서버 봇의 메시지만 처리
+  if (message.author.bot) {
+    if (DISCORD_CLOUD_BOT_ID && message.author.id !== DISCORD_CLOUD_BOT_ID) {
+      return; // 클라우드 서버 봇이 아니면 무시
+    } else if (!DISCORD_CLOUD_BOT_ID) {
+      // 환경변수가 설정되지 않았으면 모든 봇 메시지 무시 (기존 동작)
+      return;
+    }
+  }
   
   // 특정 채널만 처리 (설정된 경우)
   if (DISCORD_CHANNEL_ID && message.channel.id !== DISCORD_CHANNEL_ID) {

@@ -91,14 +91,60 @@ async function initDiscordBotForCommands() {
 }
 
 /**
+ * 생성자적용권한 이름 가져오기 (대리점아이디관리 시트에서)
+ * @param {Array<string>} creatorPermissions - 역할 코드 배열 (예: ["AA", "BB"])
+ * @returns {Promise<string>} 첫 번째 역할 코드에 해당하는 이름
+ */
+async function getCreatorPermissionName(creatorPermissions) {
+  if (!creatorPermissions || creatorPermissions.length === 0) {
+    return 'Unknown';
+  }
+
+  try {
+    const { sheets, SPREADSHEET_ID } = createSheetsClient();
+    const agentSheetName = '대리점아이디관리';
+    
+    const response = await withRetry(async () => {
+      return await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${agentSheetName}!A:Z`
+      });
+    });
+
+    const rows = response.data.values || [];
+    if (rows.length < 2) {
+      return creatorPermissions[0]; // 시트에 데이터가 없으면 역할 코드 반환
+    }
+
+    // 첫 번째 역할 코드로 이름 찾기
+    const firstRoleCode = creatorPermissions[0];
+    const userRow = rows.find(row => {
+      // R열(17번 인덱스): 권한레벨
+      return row[17] === firstRoleCode;
+    });
+
+    if (userRow) {
+      // A열(0번 인덱스): 대상(이름)
+      return userRow[0] || firstRoleCode;
+    }
+
+    return firstRoleCode; // 찾지 못하면 역할 코드 반환
+  } catch (error) {
+    console.warn('⚠️ 생성자적용권한 이름 가져오기 실패:', error.message);
+    return creatorPermissions[0]; // 에러 시 역할 코드 반환
+  }
+}
+
+/**
  * 로컬 PC 디스코드 봇에 스크린샷 명령어를 전송하고 이미지 URL과 메시지 ID를 받아옴
  * @param {string} sheetUrl - Google Sheets URL
  * @param {string} policyTableName - 정책표 이름
- * @param {string} userName - 생성자 이름
+ * @param {string} userName - 실행한 사람 이름
  * @param {string} channelId - 디스코드 채널 ID
+ * @param {Array<string>} creatorPermissions - 생성자적용권한 역할 코드 배열
  * @returns {Promise<{imageUrl: string, messageId: string, threadId: string}>} 이미지 URL, 메시지 ID, 스레드/포스트 ID
  */
-async function captureSheetViaDiscordBot(sheetUrl, policyTableName, userName, channelId) {
+async function captureSheetViaDiscordBot(sheetUrl, policyTableName, userName, channelId, creatorPermissions = []) {
   try {
     // 명령어 전송용 봇 초기화
     const bot = await initDiscordBotForCommands();
@@ -107,8 +153,11 @@ async function captureSheetViaDiscordBot(sheetUrl, policyTableName, userName, ch
       throw new Error(`디스코드 채널을 찾을 수 없습니다: ${channelId}`);
     }
 
-    // 포스트 이름 생성 (포럼 채널용)
-    const postName = `${userName}-${policyTableName}`;
+    // 생성자적용권한 이름 가져오기
+    const creatorPermissionName = await getCreatorPermissionName(creatorPermissions);
+    
+    // 포스트 이름 생성 (포럼 채널용): 정책표이름-생성자적용권한사람이름-실행한사람이름
+    const postName = `${policyTableName}-${creatorPermissionName}-${userName}`;
     let targetChannel = channel; // 실제로 메시지를 보낼 채널/포스트
 
     // 포럼 채널인지 확인
@@ -598,6 +647,7 @@ async function processPolicyTableGeneration(jobId, params) {
     const policyTableLink = settingsRow[3];  // 편집 링크
     const policyTablePublicLink = settingsRow[4] || settingsRow[3];  // 공개 링크 (없으면 편집 링크 사용)
     const discordChannelId = settingsRow[5];
+    const creatorPermissions = settingsRow[6] ? JSON.parse(settingsRow[6]) : []; // 생성자적용권한
 
     // 2. 디스코드 봇을 통한 스크린샷 생성 (Canvas 렌더링 대체)
     updateJobStatus(jobId, {
@@ -613,8 +663,9 @@ async function processPolicyTableGeneration(jobId, params) {
     const { imageUrl, messageId: discordMessageId, threadId } = await captureSheetViaDiscordBot(
       sheetUrl,
       policyTableName,
-      creatorName, // 생성자 이름 전달
-      discordChannelId
+      creatorName, // 실행한 사람 이름 전달
+      discordChannelId,
+      creatorPermissions // 생성자적용권한 전달
     );
 
     // 이미지 URL, 메시지 ID, 스레드 ID는 모두 captureSheetViaDiscordBot에서 받았으므로
