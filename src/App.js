@@ -1368,7 +1368,7 @@ function AppContent() {
     // 권한이 있는 경우 모드 선택 팝업 표시 (다중 권한일 때만)
     if (store.modePermissions) {
       // 실제 모드 권한만 필터링 (onSalePolicy는 서브 권한이므로 제외)
-      const actualModes = ['basicMode', 'onSaleReception', 'onSaleManagement', 'directStore'];
+      const actualModes = ['basicMode', 'onSaleReception', 'onSaleManagement', 'directStore', 'generalPolicy'];
       const availableModes = Object.entries(store.modePermissions)
         .filter(([mode, hasPermission]) => hasPermission && actualModes.includes(mode))
         .map(([mode]) => mode);
@@ -1383,6 +1383,16 @@ function AppContent() {
 
         if (singleMode === 'directStore' && store.directStoreSecurity?.requiresPassword) {
           console.log('직영점 모드 단일 권한이지만 비밀번호 검증 필요 - 모드 선택으로 전환');
+          setAvailableModes(availableModes);
+          setPendingAvailableModes(availableModes);
+          setPendingLoginData(store);
+          setShowModeSelection(true);
+          setModeSelectionRequired(true);
+          return;
+        }
+
+        if (singleMode === 'generalPolicy' && store.generalPolicySecurity?.requiresPassword) {
+          console.log('일반정책모드 단일 권한이지만 비밀번호 검증 필요 - 모드 선택으로 전환');
           setAvailableModes(availableModes);
           setPendingAvailableModes(availableModes);
           setPendingLoginData(store);
