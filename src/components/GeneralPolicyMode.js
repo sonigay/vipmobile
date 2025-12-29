@@ -38,12 +38,32 @@ const GeneralPolicyMode = ({
   const API_URL = process.env.REACT_APP_API_URL;
 
   useEffect(() => {
-    // 권한이 있으면 비밀번호 다이얼로그 표시
+    // 권한 확인
     const hasPermission = loggedInStore?.modePermissions?.generalPolicy;
-    if (hasPermission) {
-      setShowPasswordDialog(true);
-    } else {
+    if (!hasPermission) {
       setError('일반정책모드 접근 권한이 없습니다.');
+      return;
+    }
+
+    // 비밀번호 필요 여부 확인
+    const requiresPassword = loggedInStore?.generalPolicySecurity?.requiresPassword;
+    const alreadyAuthenticated = loggedInStore?.generalPolicySecurity?.authenticated;
+
+    // 비밀번호가 필요 없으면 바로 인증 완료
+    if (!requiresPassword) {
+      setIsAuthenticated(true);
+      return;
+    }
+
+    // 이미 인증된 경우 바로 인증 상태로 설정
+    if (alreadyAuthenticated) {
+      setIsAuthenticated(true);
+      return;
+    }
+
+    // 비밀번호가 필요한 경우에만 다이얼로그 표시
+    if (requiresPassword && !alreadyAuthenticated) {
+      setShowPasswordDialog(true);
     }
   }, [loggedInStore]);
 
