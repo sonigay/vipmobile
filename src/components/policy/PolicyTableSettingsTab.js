@@ -87,25 +87,60 @@ const PolicyTableSettingsTab = ({ loggedInStore }) => {
       const response = await fetch(`${API_BASE_URL}/api/agents`);
       if (response.ok) {
         const agents = await response.json();
-        // SS 총괄과 팀장 권한자(AA-FF) 필터링
+        
+        // 동적으로 두 글자 대문자 권한 레벨 필터링 (팀장: AA, BB, CC, DD, EE, FF 등)
+        // 정규식: /^[A-Z]{2}$/ - 정확히 두 글자 대문자
+        const twoLetterPattern = /^[A-Z]{2}$/;
+        
         const leaders = agents
           .filter(agent => {
             const permissionLevel = agent.permissionLevel;
-            return permissionLevel && (permissionLevel === 'SS' || ['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(permissionLevel));
+            // SS(총괄) 또는 두 글자 대문자 패턴(팀장)인 경우
+            return permissionLevel && (permissionLevel === 'SS' || twoLetterPattern.test(permissionLevel));
           })
-          .map(agent => ({
-            code: agent.permissionLevel,
-            name: agent.target || agent.permissionLevel // A열(대상/이름) 또는 권한 코드
-          }));
+          .map(agent => {
+            const permissionLevel = agent.permissionLevel;
+            const name = agent.target || permissionLevel; // A열: 이름
+            const qualification = agent.qualification || ''; // B열: 직함
+            
+            // 이름 (직함) 형식으로 표시, 직함이 없으면 이름만 표시
+            const displayName = qualification 
+              ? `${name} (${qualification})`
+              : name;
+            
+            return {
+              code: permissionLevel,
+              name: displayName
+            };
+          });
         
-        // SS가 목록에 없으면 수동으로 추가
+        // SS가 목록에 없으면 동적으로 추가 (agents에서 SS 권한을 가진 사용자 찾기)
         const hasSS = leaders.some(leader => leader.code === 'SS');
         if (!hasSS) {
-          leaders.unshift({
-            code: 'SS',
-            name: '총괄 (SS)'
-          });
+          // agents에서 SS 권한을 가진 사용자 찾기
+          const ssAgent = agents.find(agent => agent.permissionLevel === 'SS');
+          if (ssAgent) {
+            const name = ssAgent.target || '총괄';
+            const qualification = ssAgent.qualification || '총괄';
+            leaders.unshift({
+              code: 'SS',
+              name: qualification ? `${name} (${qualification})` : name
+            });
+          } else {
+            // SS 권한 사용자가 없으면 기본값으로 추가
+            leaders.unshift({
+              code: 'SS',
+              name: '총괄 (총괄)'
+            });
+          }
         }
+        
+        // SS를 맨 앞에, 나머지는 정렬
+        leaders.sort((a, b) => {
+          if (a.code === 'SS') return -1;
+          if (b.code === 'SS') return 1;
+          return a.code.localeCompare(b.code);
+        });
         
         console.log('팀장 목록 로드 완료:', leaders);
         setTeamLeaders(leaders);
