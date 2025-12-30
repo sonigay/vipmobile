@@ -423,7 +423,8 @@ const HEADERS_POLICY_TABLE_LIST = [
   '디스코드스레드ID',   // 9
   '이미지URL',          // 10
   '등록여부',           // 11
-  '등록일시'            // 12
+  '등록일시',           // 12
+  '생성자ID'            // 13: 생성자ID (N열)
 ];
 
 const HEADERS_USER_GROUPS = [
@@ -2033,13 +2034,19 @@ function setupPolicyTableRoutes(app) {
 
       const existingRow = rows[rowIndex];
       const updatedRow = [...existingRow];
+      // 배열 길이를 최소 14로 보장 (생성자ID 포함, N열까지)
+      while (updatedRow.length < 14) {
+        updatedRow.push('');
+      }
       updatedRow[11] = 'Y'; // 등록여부
       updatedRow[12] = new Date().toISOString(); // 등록일시
+      // updatedRow[13]은 이미 creatorId가 있거나 빈 문자열
 
+      // N열까지 포함하여 저장 (HEADERS_POLICY_TABLE_LIST에 생성자ID 추가됨)
       await withRetry(async () => {
         return await sheets.spreadsheets.values.update({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_POLICY_TABLE_LIST}!A${rowIndex + 1}:M${rowIndex + 1}`,
+          range: `${SHEET_POLICY_TABLE_LIST}!A${rowIndex + 2}:N${rowIndex + 2}`,
           valueInputOption: 'USER_ENTERED',
           resource: { values: [updatedRow] }
         });
