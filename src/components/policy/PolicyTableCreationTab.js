@@ -232,6 +232,9 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
         // 정규식: /^[A-Z]{2}$/ - 정확히 두 글자 대문자
         const twoLetterPattern = /^[A-Z]{2}$/;
         
+        // SS 권한 사용자를 먼저 찾기 (필터링 전에)
+        const ssAgent = agents.find(agent => agent.permissionLevel === 'SS');
+        
         const leaders = agents
           .filter(agent => {
             const permissionLevel = agent.permissionLevel;
@@ -257,21 +260,28 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
         // SS가 목록에 없으면 동적으로 추가 (agents에서 SS 권한을 가진 사용자 찾기)
         const hasSS = leaders.some(leader => leader.code === 'SS');
         if (!hasSS) {
-          // agents에서 SS 권한을 가진 사용자 찾기
-          const ssAgent = agents.find(agent => agent.permissionLevel === 'SS');
-          if (ssAgent) {
-            const name = ssAgent.target || '총괄';
-            const qualification = ssAgent.qualification || '총괄';
+          if (ssAgent && ssAgent.target) {
+            // SS 권한 사용자가 있고 이름이 있으면 실제 이름과 직함 사용
+            const name = ssAgent.target; // A열: 실제 이름
+            const qualification = ssAgent.qualification || ''; // B열: 직함
             leaders.unshift({
               code: 'SS',
               name: qualification ? `${name} (${qualification})` : name
             });
           } else {
-            // SS 권한 사용자가 없으면 기본값으로 추가
+            // SS 권한 사용자가 없거나 이름이 없으면 기본값으로 추가
             leaders.unshift({
               code: 'SS',
               name: '총괄 (총괄)'
             });
+          }
+        } else {
+          // SS가 이미 목록에 있지만, 이름이 비어있거나 '총괄'인 경우 실제 데이터로 업데이트
+          const ssLeader = leaders.find(leader => leader.code === 'SS');
+          if (ssLeader && ssAgent && ssAgent.target && ssLeader.name.includes('총괄')) {
+            const name = ssAgent.target;
+            const qualification = ssAgent.qualification || '';
+            ssLeader.name = qualification ? `${name} (${qualification})` : name;
           }
         }
         
