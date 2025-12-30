@@ -717,7 +717,10 @@ function getJobStatus(jobId) {
 
 // 정책표 생성 백그라운드 작업
 async function processPolicyTableGeneration(jobId, params) {
-  const { policyTableId, applyDate, applyContent, accessGroupId, creatorName, creatorRole, creatorId } = params;
+  const { policyTableId, applyDate, applyContent, accessGroupId, accessGroupIds, creatorName, creatorRole, creatorId } = params;
+  
+  // accessGroupIds 배열 처리 (하위 호환성을 위해 accessGroupId도 지원)
+  const groupIds = accessGroupIds || (accessGroupId ? [accessGroupId] : []);
 
   try {
     updateJobStatus(jobId, {
@@ -793,16 +796,24 @@ async function processPolicyTableGeneration(jobId, params) {
 
     await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_TABLE_LIST, HEADERS_POLICY_TABLE_LIST);
 
-    const newRowId = `POL_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const createdAt = new Date().toISOString();
+    const createdRowIds = [];
 
+    // 여러 그룹을 선택한 경우, 각 그룹마다 정책표 행 생성
+    // 그룹이 없으면 빈 문자열로 하나의 행만 생성
+    const groupsToProcess = groupIds.length > 0 ? groupIds : [''];
+    
+    for (let i = 0; i < groupsToProcess.length; i++) {
+      const currentGroupId = groupsToProcess[i];
+      const newRowId = `POL_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
       const newRow = [
         newRowId,                    // 0: 정책표ID (고유 ID)
         policyTableId,               // 1: 정책표ID (설정과 연결)
         policyTableName,             // 2: 정책표이름
         applyDate,                   // 3: 정책적용일시
         applyContent,                // 4: 정책적용내용
-        accessGroupId || '',         // 5: 접근권한 (그룹ID)
+        currentGroupId || '',        // 5: 접근권한 (그룹ID)
         creatorName || 'Unknown',  // 6: 생성자 (이름)
         createdAt,                   // 7: 생성일시
         messageId,                   // 8: 디스코드메시지ID
@@ -816,24 +827,35 @@ async function processPolicyTableGeneration(jobId, params) {
       await withRetry(async () => {
         return await sheets.spreadsheets.values.append({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_POLICY_TABLE_LIST}!A:M`,
+          range: `${SHEET_POLICY_TABLE_LIST}!A:N`,
           valueInputOption: 'USER_ENTERED',
           resource: { values: [newRow] }
         });
       });
+      
+      createdRowIds.push(newRowId);
+      
+      // 여러 행을 생성할 때 약간의 지연 추가 (시트 쓰기 속도 제한 방지)
+      if (i < groupsToProcess.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
 
     // 완료
     updateJobStatus(jobId, {
       status: 'completed',
       progress: 100,
-      message: '정책표 생성이 완료되었습니다.',
+      message: groupIds.length > 1 
+        ? `${groupIds.length}개 그룹에 대한 정책표 생성이 완료되었습니다.`
+        : '정책표 생성이 완료되었습니다.',
       result: {
-        id: newRowId,
+        ids: createdRowIds,
         policyTableId,
         policyTableName,
         imageUrl,
         messageId,
-        threadId
+        threadId,
+        groupCount: groupIds.length
       }
     });
 
@@ -1505,11 +1527,14 @@ function setupPolicyTableRoutes(app) {
         return res.status(403).json({ success: false, error: '권한이 없습니다.' });
       }
 
-      const { policyTableId, applyDate, applyContent, accessGroupId } = req.body;
+      const { policyTableId, applyDate, applyContent, accessGroupId, accessGroupIds } = req.body;
 
       if (!policyTableId || !applyDate || !applyContent) {
         return res.status(400).json({ success: false, error: '필수 필드가 누락되었습니다.' });
       }
+
+      // accessGroupIds 배열 처리 (하위 호환성을 위해 accessGroupId도 지원)
+      const groupIds = accessGroupIds || (accessGroupId ? [accessGroupId] : []);
 
       // 작업 ID 생성
       const jobId = `JOB_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -1519,7 +1544,7 @@ function setupPolicyTableRoutes(app) {
         policyTableId,
         applyDate,
         applyContent,
-        accessGroupId,
+        accessGroupIds: groupIds,
         creatorName: permission.userName || 'Unknown',
         creatorRole: permission.userRole,
         creatorId: permission.userId || ''

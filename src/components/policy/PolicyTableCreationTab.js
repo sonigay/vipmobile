@@ -51,7 +51,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
   const [creationFormData, setCreationFormData] = useState({
     applyDate: '',
     applyContent: '',
-    accessGroupId: null
+    accessGroupIds: []
   });
 
   // 생성 진행 상태
@@ -464,7 +464,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
     setCreationFormData({
       applyDate: '',
       applyContent: '',
-      accessGroupId: null
+      accessGroupIds: []
     });
     setGenerationStatus(null);
     setGeneratedResult(null);
@@ -477,7 +477,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
     setCreationFormData({
       applyDate: '',
       applyContent: '',
-      accessGroupId: null
+      accessGroupIds: []
     });
     setGenerationStatus(null);
     setGeneratedResult(null);
@@ -506,7 +506,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
           policyTableId: selectedPolicyTable.id,
           applyDate: creationFormData.applyDate,
           applyContent: creationFormData.applyContent,
-          accessGroupId: creationFormData.accessGroupId
+          accessGroupIds: creationFormData.accessGroupIds
         })
       });
 
@@ -878,24 +878,39 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
             </Grid>
             <Grid item xs={12}>
               <Autocomplete
+                multiple
                 options={userGroups || []}
                 getOptionLabel={(option) => option?.groupName || ''}
-                value={userGroups.find(g => g.id === creationFormData.accessGroupId) || null}
+                value={userGroups.filter(g => creationFormData.accessGroupIds.includes(g.id)) || []}
                 onChange={(event, newValue) => {
                   setCreationFormData({
                     ...creationFormData,
-                    accessGroupId: newValue ? newValue.id : null
+                    accessGroupIds: newValue.map(g => g.id)
                   });
                 }}
                 isOptionEqualToValue={(option, value) => option?.id === value?.id}
                 noOptionsText="등록된 그룹이 없습니다."
+                filterSelectedOptions
                 renderInput={(params) => (
                   <TextField
                     {...params}
                     label="접근권한 (정책영업그룹)"
-                    placeholder="그룹을 선택하세요 (선택사항)"
+                    placeholder="그룹을 선택하세요 (다중 선택 가능)"
                   />
                 )}
+                renderTags={(value, getTagProps) =>
+                  value.map((option, index) => {
+                    const { key, ...tagProps } = getTagProps({ index });
+                    return (
+                      <Chip
+                        key={option.id || key}
+                        label={option.groupName || ''}
+                        onDelete={tagProps.onDelete}
+                        {...tagProps}
+                      />
+                    );
+                  })
+                }
               />
             </Grid>
 
