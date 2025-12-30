@@ -797,49 +797,36 @@ async function processPolicyTableGeneration(jobId, params) {
     await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_TABLE_LIST, HEADERS_POLICY_TABLE_LIST);
 
     const createdAt = new Date().toISOString();
-    const createdRowIds = [];
-
-    // 여러 그룹을 선택한 경우, 각 그룹마다 정책표 행 생성
-    // 그룹이 없으면 빈 문자열로 하나의 행만 생성
-    const groupsToProcess = groupIds.length > 0 ? groupIds : [''];
+    const newRowId = `POL_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
-    for (let i = 0; i < groupsToProcess.length; i++) {
-      const currentGroupId = groupsToProcess[i];
-      const newRowId = `POL_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
-      const newRow = [
-        newRowId,                    // 0: 정책표ID (고유 ID)
-        policyTableId,               // 1: 정책표ID (설정과 연결)
-        policyTableName,             // 2: 정책표이름
-        applyDate,                   // 3: 정책적용일시
-        applyContent,                // 4: 정책적용내용
-        currentGroupId || '',        // 5: 접근권한 (그룹ID)
-        creatorName || 'Unknown',  // 6: 생성자 (이름)
-        createdAt,                   // 7: 생성일시
-        messageId,                   // 8: 디스코드메시지ID
-        threadId,                    // 9: 디스코드스레드ID
-        imageUrl,                    // 10: 이미지URL
-        'N',                         // 11: 등록여부
-        '',                          // 12: 등록일시
-        creatorId || ''              // 13: 생성자ID (새로 추가)
-      ];
+    // 여러 그룹 ID를 JSON 배열 형식으로 저장
+    const accessGroupIdsJson = groupIds.length > 0 ? JSON.stringify(groupIds) : '';
 
-      await withRetry(async () => {
-        return await sheets.spreadsheets.values.append({
-          spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_POLICY_TABLE_LIST}!A:N`,
-          valueInputOption: 'USER_ENTERED',
-          resource: { values: [newRow] }
-        });
+    const newRow = [
+      newRowId,                    // 0: 정책표ID (고유 ID)
+      policyTableId,               // 1: 정책표ID (설정과 연결)
+      policyTableName,             // 2: 정책표이름
+      applyDate,                   // 3: 정책적용일시
+      applyContent,                // 4: 정책적용내용
+      accessGroupIdsJson,          // 5: 접근권한 (그룹ID 배열 JSON)
+      creatorName || 'Unknown',  // 6: 생성자 (이름)
+      createdAt,                   // 7: 생성일시
+      messageId,                   // 8: 디스코드메시지ID
+      threadId,                    // 9: 디스코드스레드ID
+      imageUrl,                    // 10: 이미지URL
+      'N',                         // 11: 등록여부
+      '',                          // 12: 등록일시
+      creatorId || ''              // 13: 생성자ID (새로 추가)
+    ];
+
+    await withRetry(async () => {
+      return await sheets.spreadsheets.values.append({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${SHEET_POLICY_TABLE_LIST}!A:N`,
+        valueInputOption: 'USER_ENTERED',
+        resource: { values: [newRow] }
       });
-      
-      createdRowIds.push(newRowId);
-      
-      // 여러 행을 생성할 때 약간의 지연 추가 (시트 쓰기 속도 제한 방지)
-      if (i < groupsToProcess.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-    }
+    });
 
     // 완료
     updateJobStatus(jobId, {
@@ -849,7 +836,7 @@ async function processPolicyTableGeneration(jobId, params) {
         ? `${groupIds.length}개 그룹에 대한 정책표 생성이 완료되었습니다.`
         : '정책표 생성이 완료되었습니다.',
       result: {
-        ids: createdRowIds,
+        id: newRowId,
         policyTableId,
         policyTableName,
         imageUrl,
@@ -1188,6 +1175,26 @@ function setupPolicyTableRoutes(app) {
     } catch (error) {
       console.error('[정책표] 그룹 데이터 파싱 오류:', error);
       return { companyNames: [], managerIds: [] };
+    }
+  }
+
+  // 접근권한 그룹 ID 배열 파싱 (하위 호환성 지원)
+  function parseAccessGroupIds(accessGroupIdString) {
+    if (!accessGroupIdString) {
+      return [];
+    }
+
+    try {
+      // JSON 배열 형식: ["UG_1", "UG_2"]
+      const parsed = JSON.parse(accessGroupIdString);
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+      // 단일 값도 배열로 반환
+      return [parsed];
+    } catch (error) {
+      // JSON 파싱 실패 시 단일 값으로 처리 (하위 호환성)
+      return accessGroupIdString ? [accessGroupIdString] : [];
     }
   }
 
@@ -1682,14 +1689,17 @@ function setupPolicyTableRoutes(app) {
         // 접근 가능한 정책표ID 목록 생성
         const accessiblePolicyTableIds = new Set();
         policyDataRows.forEach(row => {
-          const accessGroupId = row[5]; // 접근권한 (그룹ID)
-          if (accessGroupId) {
-            const groupData = userGroupsMap.get(accessGroupId);
-            if (groupData) {
-              // companyNames에 현재 사용자의 업체명이 포함되어 있는지 확인
-              const companyNames = groupData.companyNames || [];
-              if (companyNames.includes(userCompanyName)) {
-                accessiblePolicyTableIds.add(row[1]); // 정책표ID_설정
+          const accessGroupIds = parseAccessGroupIds(row[5]); // 접근권한 (그룹ID 배열)
+          for (const accessGroupId of accessGroupIds) {
+            if (accessGroupId) {
+              const groupData = userGroupsMap.get(accessGroupId);
+              if (groupData) {
+                // companyNames에 현재 사용자의 업체명이 포함되어 있는지 확인
+                const companyNames = groupData.companyNames || [];
+                if (companyNames.includes(userCompanyName)) {
+                  accessiblePolicyTableIds.add(row[1]); // 정책표ID_설정
+                  break; // 하나라도 매칭되면 추가하고 다음 정책표로
+                }
               }
             }
           }
@@ -1732,7 +1742,7 @@ function setupPolicyTableRoutes(app) {
         const accessiblePolicyTableIds = new Set();
         policyDataRows.forEach(row => {
           const creatorId = row[13] || ''; // 생성자ID
-          const accessGroupId = row[5]; // 접근권한 (그룹ID)
+          const accessGroupIds = parseAccessGroupIds(row[5]); // 접근권한 (그룹ID 배열)
           
           // 1. 본인이 생성한 정책표인지 확인
           if (creatorId === currentUserId) {
@@ -1740,12 +1750,15 @@ function setupPolicyTableRoutes(app) {
           }
           
           // 2. 본인이 담당자인 그룹의 정책표인지 확인
-          if (accessGroupId) {
-            const groupData = userGroupsMap.get(accessGroupId);
-            if (groupData) {
-              const managerIds = groupData.managerIds || [];
-              if (managerIds.includes(currentUserId)) {
-                accessiblePolicyTableIds.add(row[1]); // 정책표ID_설정
+          for (const accessGroupId of accessGroupIds) {
+            if (accessGroupId) {
+              const groupData = userGroupsMap.get(accessGroupId);
+              if (groupData) {
+                const managerIds = groupData.managerIds || [];
+                if (managerIds.includes(currentUserId)) {
+                  accessiblePolicyTableIds.add(row[1]); // 정책표ID_설정
+                  break; // 하나라도 매칭되면 추가하고 다음 정책표로
+                }
               }
             }
           }
@@ -1787,13 +1800,16 @@ function setupPolicyTableRoutes(app) {
         // 접근 가능한 정책표ID 목록 생성
         const accessiblePolicyTableIds = new Set();
         policyDataRows.forEach(row => {
-          const accessGroupId = row[5]; // 접근권한 (그룹ID)
-          if (accessGroupId) {
-            const groupData = userGroupsMap.get(accessGroupId);
-            if (groupData) {
-              const managerIds = groupData.managerIds || [];
-              if (managerIds.includes(currentUserId)) {
-                accessiblePolicyTableIds.add(row[1]); // 정책표ID_설정
+          const accessGroupIds = parseAccessGroupIds(row[5]); // 접근권한 (그룹ID 배열)
+          for (const accessGroupId of accessGroupIds) {
+            if (accessGroupId) {
+              const groupData = userGroupsMap.get(accessGroupId);
+              if (groupData) {
+                const managerIds = groupData.managerIds || [];
+                if (managerIds.includes(currentUserId)) {
+                  accessiblePolicyTableIds.add(row[1]); // 정책표ID_설정
+                  break; // 하나라도 매칭되면 추가하고 다음 정책표로
+                }
               }
             }
           }
@@ -1917,31 +1933,35 @@ function setupPolicyTableRoutes(app) {
         });
         
         policies = policies.filter(policy => {
-          const accessGroupId = policy.accessGroupId;
-          if (!accessGroupId) {
+          const accessGroupIds = parseAccessGroupIds(policy.accessGroupId);
+          if (accessGroupIds.length === 0) {
             console.log('❌ [일반정책모드] 접근권한 없음:', policy.id);
             return false; // 접근권한이 없으면 접근 불가
           }
           
-          const groupData = userGroupsMap.get(accessGroupId);
-          if (!groupData) {
-            console.log('❌ [일반정책모드] 그룹 데이터 없음:', { accessGroupId, policyId: policy.id });
-            return false;
+          // 여러 그룹 중 하나라도 매칭되면 접근 가능
+          for (const accessGroupId of accessGroupIds) {
+            const groupData = userGroupsMap.get(accessGroupId);
+            if (groupData) {
+              // companyNames에 현재 사용자의 업체명이 포함되어 있는지 확인
+              const companyNames = groupData.companyNames || [];
+              if (companyNames.includes(userCompanyName)) {
+                console.log('✅ [일반정책모드] 정책표 필터링 - 접근 허용:', {
+                  policyId: policy.id,
+                  accessGroupId,
+                  companyNames,
+                  userCompanyName
+                });
+                return true;
+              }
+            }
           }
-
-          // companyNames에 현재 사용자의 업체명이 포함되어 있는지 확인
-          const companyNames = groupData.companyNames || [];
-          const hasAccess = companyNames.includes(userCompanyName);
           
-          console.log('🔍 [일반정책모드] 정책표 필터링:', {
+          console.log('❌ [일반정책모드] 정책표 필터링 - 접근 거부:', {
             policyId: policy.id,
-            accessGroupId,
-            companyNames,
-            userCompanyName,
-            hasAccess
+            accessGroupIds
           });
-          
-          return hasAccess;
+          return false;
         });
         
         console.log('✅ [일반정책모드] 필터링 완료:', {
@@ -1987,12 +2007,17 @@ function setupPolicyTableRoutes(app) {
           
           // 2. 본인이 담당자인 그룹의 정책표인지 확인
           let isManager = false;
-          const accessGroupId = policy.accessGroupId;
-          if (accessGroupId) {
-            const groupData = userGroupsMap.get(accessGroupId);
-            if (groupData) {
-              const managerIds = groupData.managerIds || [];
-              isManager = managerIds.includes(currentUserId);
+          const accessGroupIds = parseAccessGroupIds(policy.accessGroupId);
+          for (const accessGroupId of accessGroupIds) {
+            if (accessGroupId) {
+              const groupData = userGroupsMap.get(accessGroupId);
+              if (groupData) {
+                const managerIds = groupData.managerIds || [];
+                if (managerIds.includes(currentUserId)) {
+                  isManager = true;
+                  break; // 하나라도 매칭되면 true
+                }
+              }
             }
           }
           
@@ -2004,7 +2029,7 @@ function setupPolicyTableRoutes(app) {
             currentUserId,
             isCreator,
             isManager,
-            accessGroupId,
+            accessGroupIds,
             hasAccess
           });
           
@@ -2047,31 +2072,35 @@ function setupPolicyTableRoutes(app) {
 
         // 접근권한에 포함된 정책표만 필터링
         policies = policies.filter(policy => {
-          const accessGroupId = policy.accessGroupId;
-          if (!accessGroupId) {
+          const accessGroupIds = parseAccessGroupIds(policy.accessGroupId);
+          if (accessGroupIds.length === 0) {
             console.log('❌ [정책모드] 접근권한 없음:', policy.id);
             return false; // 접근권한이 없으면 접근 불가
           }
           
-          const groupData = userGroupsMap.get(accessGroupId);
-          if (!groupData) {
-            console.log('❌ [정책모드] 그룹 데이터 없음:', { accessGroupId, policyId: policy.id });
-            return false;
+          // 여러 그룹 중 하나라도 매칭되면 접근 가능
+          for (const accessGroupId of accessGroupIds) {
+            const groupData = userGroupsMap.get(accessGroupId);
+            if (groupData) {
+              // managerIds에 현재 사용자 아이디가 포함되어 있는지 확인
+              const managerIds = groupData.managerIds || [];
+              if (managerIds.includes(currentUserId)) {
+                console.log('✅ [정책모드] 정책표 필터링 - 접근 허용:', {
+                  policyId: policy.id,
+                  accessGroupId,
+                  managerIds,
+                  currentUserId
+                });
+                return true;
+              }
+            }
           }
-
-          // managerIds에 현재 사용자 아이디가 포함되어 있는지 확인
-          const managerIds = groupData.managerIds || [];
-          const hasAccess = managerIds.includes(currentUserId);
           
-          console.log('🔍 [정책모드] 정책표 필터링:', {
+          console.log('❌ [정책모드] 정책표 필터링 - 접근 거부:', {
             policyId: policy.id,
-            accessGroupId,
-            managerIds,
-            currentUserId,
-            hasAccess
+            accessGroupIds
           });
-          
-          return hasAccess;
+          return false;
         });
         
         console.log('✅ [정책모드] 필터링 완료:', {
@@ -2201,9 +2230,9 @@ function setupPolicyTableRoutes(app) {
       if (isGeneralPolicyMode) {
         // 일반정책모드 필터링: companyNames 기반
         const currentUserId = req.headers['x-user-id'] || req.query.userId;
-        const accessGroupId = row[5]; // 접근권한 (그룹ID)
+        const accessGroupIds = parseAccessGroupIds(row[5]); // 접근권한 (그룹ID 배열)
         
-        if (!accessGroupId) {
+        if (accessGroupIds.length === 0) {
           return res.status(403).json({ success: false, error: '이 정책표에 접근할 권한이 없습니다.' });
         }
 
@@ -2218,13 +2247,6 @@ function setupPolicyTableRoutes(app) {
 
         const userGroupsRows = userGroupsResponse.data.values || [];
         const userGroupsDataRows = userGroupsRows.slice(1);
-        const userGroup = userGroupsDataRows.find(r => r[0] === accessGroupId);
-        
-        if (!userGroup) {
-          return res.status(403).json({ success: false, error: '이 정책표에 접근할 권한이 없습니다.' });
-        }
-
-        const groupData = parseUserGroupData(userGroup[2]);
         
         // 현재 사용자의 업체명 확인
         const generalModeSheetName = '일반모드권한관리';
@@ -2251,9 +2273,21 @@ function setupPolicyTableRoutes(app) {
           return res.status(403).json({ success: false, error: '이 정책표에 접근할 권한이 없습니다.' });
         }
 
-        // companyNames에 현재 사용자의 업체명이 포함되어 있는지 확인
-        const companyNames = groupData.companyNames || [];
-        if (!companyNames.includes(userCompanyName)) {
+        // 여러 그룹 중 하나라도 매칭되면 접근 가능
+        let hasAccess = false;
+        for (const accessGroupId of accessGroupIds) {
+          const userGroup = userGroupsDataRows.find(r => r[0] === accessGroupId);
+          if (userGroup) {
+            const groupData = parseUserGroupData(userGroup[2]);
+            const companyNames = groupData.companyNames || [];
+            if (companyNames.includes(userCompanyName)) {
+              hasAccess = true;
+              break;
+            }
+          }
+        }
+
+        if (!hasAccess) {
           return res.status(403).json({ success: false, error: '이 정책표에 접근할 권한이 없습니다.' });
         }
       } else if (['SS', 'S'].includes(userRole)) {
@@ -2262,14 +2296,14 @@ function setupPolicyTableRoutes(app) {
         // 팀장 레벨(두 글자 대문자 패턴)은 본인이 생성한 정책표 + 담당자인 그룹의 정책표 접근 가능
         const currentUserId = req.headers['x-user-id'];
         const creatorId = row[13] || ''; // 생성자ID
-        const accessGroupId = row[5]; // 접근권한 (그룹ID)
+        const accessGroupIds = parseAccessGroupIds(row[5]); // 접근권한 (그룹ID 배열)
         
         // 1. 본인이 생성한 정책표인지 확인
         const isCreator = creatorId && creatorId === currentUserId;
         
         // 2. 본인이 담당자인 그룹의 정책표인지 확인
         let isManager = false;
-        if (accessGroupId) {
+        if (accessGroupIds.length > 0) {
           await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_USER_GROUPS, HEADERS_USER_GROUPS);
           const userGroupsResponse = await withRetry(async () => {
             return await sheets.spreadsheets.values.get({
@@ -2280,12 +2314,17 @@ function setupPolicyTableRoutes(app) {
 
           const userGroupsRows = userGroupsResponse.data.values || [];
           const userGroupsDataRows = userGroupsRows.slice(1);
-          const userGroup = userGroupsDataRows.find(r => r[0] === accessGroupId);
           
-          if (userGroup) {
-            const groupData = parseUserGroupData(userGroup[2]);
-            const managerIds = groupData.managerIds || [];
-            isManager = managerIds.includes(currentUserId);
+          for (const accessGroupId of accessGroupIds) {
+            const userGroup = userGroupsDataRows.find(r => r[0] === accessGroupId);
+            if (userGroup) {
+              const groupData = parseUserGroupData(userGroup[2]);
+              const managerIds = groupData.managerIds || [];
+              if (managerIds.includes(currentUserId)) {
+                isManager = true;
+                break;
+              }
+            }
           }
         }
         
@@ -2295,31 +2334,38 @@ function setupPolicyTableRoutes(app) {
         }
       } else {
         // 그 외 사용자(A-F)는 그룹의 담당자(managerIds)에 포함된 경우만 접근 가능
-        const accessGroupId = row[5]; // 접근권한 (그룹ID)
-        if (accessGroupId) {
-          await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_USER_GROUPS, HEADERS_USER_GROUPS);
-          const userGroupsResponse = await withRetry(async () => {
-            return await sheets.spreadsheets.values.get({
-              spreadsheetId: SPREADSHEET_ID,
-              range: `${SHEET_USER_GROUPS}!A:E`
-            });
+        const accessGroupIds = parseAccessGroupIds(row[5]); // 접근권한 (그룹ID 배열)
+        if (accessGroupIds.length === 0) {
+          return res.status(403).json({ success: false, error: '이 정책표에 접근할 권한이 없습니다.' });
+        }
+        
+        await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_USER_GROUPS, HEADERS_USER_GROUPS);
+        const userGroupsResponse = await withRetry(async () => {
+          return await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SHEET_USER_GROUPS}!A:E`
           });
+        });
 
-          const userGroupsRows = userGroupsResponse.data.values || [];
-          const userGroupsDataRows = userGroupsRows.slice(1);
+        const userGroupsRows = userGroupsResponse.data.values || [];
+        const userGroupsDataRows = userGroupsRows.slice(1);
+        const currentUserId = req.headers['x-user-id'];
+        
+        // 여러 그룹 중 하나라도 매칭되면 접근 가능
+        let hasAccess = false;
+        for (const accessGroupId of accessGroupIds) {
           const userGroup = userGroupsDataRows.find(r => r[0] === accessGroupId);
-          
           if (userGroup) {
             const groupData = parseUserGroupData(userGroup[2]);
-            const currentUserId = req.headers['x-user-id'];
             const managerIds = groupData.managerIds || [];
-            if (!managerIds.includes(currentUserId)) {
-              return res.status(403).json({ success: false, error: '이 정책표에 접근할 권한이 없습니다.' });
+            if (managerIds.includes(currentUserId)) {
+              hasAccess = true;
+              break;
             }
-          } else {
-            return res.status(403).json({ success: false, error: '이 정책표에 접근할 권한이 없습니다.' });
           }
-        } else {
+        }
+        
+        if (!hasAccess) {
           return res.status(403).json({ success: false, error: '이 정책표에 접근할 권한이 없습니다.' });
         }
       }
