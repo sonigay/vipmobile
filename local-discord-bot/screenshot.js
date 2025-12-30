@@ -4,17 +4,43 @@ const Jimp = require('jimp');
 
 let driver = null;
 
+// 브라우저 상태 확인
+async function isBrowserAlive() {
+  if (!driver) {
+    return false;
+  }
+  
+  try {
+    // 간단한 명령어로 브라우저가 살아있는지 확인
+    await driver.getCurrentUrl();
+    return true;
+  } catch (error) {
+    // 브라우저가 종료되었거나 연결이 끊어진 경우
+    console.warn('⚠️ 브라우저 상태 확인 실패:', error.message);
+    driver = null; // 드라이버 초기화
+    return false;
+  }
+}
+
 // 브라우저 초기화 (한 번만 실행)
 async function initBrowser() {
+  // 브라우저가 이미 있고 살아있는지 확인
   if (driver) {
-    return driver;
+    const isAlive = await isBrowserAlive();
+    if (isAlive) {
+      return driver;
+    }
+    // 브라우저가 죽었으면 재초기화
+    console.log('🔄 브라우저가 종료되었습니다. 재초기화 중...');
+    driver = null;
   }
 
   const options = new chrome.Options();
   
-  // 환경변수에서 headless 설정 확인
+  // 환경변수에서 headless 설정 확인 (기본값: headless 모드)
+  // PM2에서 실행할 때는 반드시 headless 모드로 실행해야 콘솔창이 열리지 않음
   if (process.env.PUPPETEER_HEADLESS !== 'false') {
-    options.addArguments('--headless');
+    options.addArguments('--headless=new'); // 새로운 headless 모드 사용
   }
   
   // Chrome 옵션 설정 (기존 Selenium 코드에서 가져옴)
@@ -35,6 +61,11 @@ async function initBrowser() {
   options.addArguments('--disable-backgrounding-occluded-windows');
   options.addArguments('--disable-renderer-backgrounding');
   
+  // PM2 환경에서 콘솔창이 열리지 않도록 추가 옵션
+  options.addArguments('--disable-infobars'); // 정보 바 비활성화
+  options.addArguments('--disable-dev-shm-usage'); // /dev/shm 사용 비활성화
+  options.addArguments('--remote-debugging-port=0'); // 디버깅 포트 자동 할당
+  
   // 환경변수에서 추가 인수 가져오기
   if (process.env.PUPPETEER_ARGS) {
     const additionalArgs = process.env.PUPPETEER_ARGS.split(',');
@@ -48,13 +79,23 @@ async function initBrowser() {
   options.excludeSwitches(['enable-logging', 'enable-automation']);
   options.setLoggingPrefs({ 'browser': 'OFF', 'driver': 'OFF' });
 
-  driver = await new Builder()
-    .forBrowser('chrome')
-    .setChromeOptions(options)
-    .build();
+  try {
+    driver = await new Builder()
+      .forBrowser('chrome')
+      .setChromeOptions(options)
+      .build();
 
-  console.log('✅ 브라우저가 준비되었습니다.');
-  return driver;
+    console.log('✅ 브라우저가 준비되었습니다.');
+    return driver;
+  } catch (error) {
+    console.error('❌ 브라우저 초기화 실패:', error);
+    if (error.message && error.message.includes('ECONNREFUSED')) {
+      console.error('   → Chrome DevTools Protocol 연결 실패');
+      console.error('   → Chrome이 실행 중인지 확인하세요');
+      console.error('   → 포트가 이미 사용 중일 수 있습니다');
+    }
+    throw error;
+  }
 }
 
 // Google Sheets 스크린샷 생성
@@ -63,8 +104,16 @@ async function captureSheetAsImage(sheetUrl, options = {}) {
     waitTime = 3000  // 페이지 로딩 대기 시간 (ms)
   } = options;
 
+  // 브라우저 초기화 및 상태 확인
   if (!driver) {
     await initBrowser();
+  } else {
+    // 브라우저가 살아있는지 확인
+    const isAlive = await isBrowserAlive();
+    if (!isAlive) {
+      console.log('🔄 브라우저 재초기화 중...');
+      await initBrowser();
+    }
   }
 
   try {
@@ -129,10 +178,42 @@ async function captureSheetAsImage(sheetUrl, options = {}) {
 
   } catch (error) {
     console.error('❌ 스크린샷 생성 오류:', error);
+    console.error('   에러 타입:', error.name);
+    console.error('   에러 메시지:', error.message);
+    
+    // ECONNREFUSED 에러인 경우 브라우저 재초기화 시도
+    if (error.message && error.message.includes('ECONNREFUSED')) {
+      console.error('   → Chrome DevTools Protocol 연결 실패');
+      console.log('   → 브라우저 재초기화 시도 중...');
+      
+      // 드라이버 초기화
+      try {
+        if (driver) {
+          await driver.quit().catch(() => {}); // 종료 시도 (에러 무시)
+        }
+      } catch (e) {
+        // 종료 실패 무시
+      }
+      driver = null;
+      
+      // 브라우저 재초기화
+      try {
+        await initBrowser();
+        console.log('   → 브라우저 재초기화 완료');
+      } catch (initError) {
+        console.error('   → 브라우저 재초기화 실패:', initError.message);
+        throw error; // 원래 에러를 다시 throw
+      }
+      
+      // 재초기화 후 에러를 다시 throw하여 상위에서 재시도하도록 함
+      throw new Error(`브라우저 연결 실패 (재초기화 완료, 재시도 필요): ${error.message}`);
+    }
     
     // 에러 발생 시에도 메인 페이지로 전환
     try {
-      await driver.switchTo().defaultContent();
+      if (driver) {
+        await driver.switchTo().defaultContent();
+      }
     } catch (e) {
       // 전환 실패 무시
     }
@@ -144,9 +225,29 @@ async function captureSheetAsImage(sheetUrl, options = {}) {
 // 브라우저 종료
 async function closeBrowser() {
   if (driver) {
-    await driver.quit();
-    driver = null;
-    console.log('🔒 브라우저가 종료되었습니다.');
+    try {
+      await driver.quit();
+      console.log('🔒 브라우저가 종료되었습니다.');
+    } catch (error) {
+      console.warn('⚠️ 브라우저 종료 중 오류 (무시):', error.message);
+    } finally {
+      driver = null;
+    }
+  }
+  
+  // 추가: Chrome 프로세스가 남아있을 수 있으므로 강제 종료 시도 (Windows)
+  if (process.platform === 'win32') {
+    try {
+      const { exec } = require('child_process');
+      // Chrome 프로세스 중 selenium 관련 프로세스만 종료
+      exec('taskkill /F /IM chrome.exe /FI "WINDOWTITLE eq *chrome*" 2>nul', (error) => {
+        if (!error) {
+          console.log('🧹 남아있는 Chrome 프로세스 정리 완료');
+        }
+      });
+    } catch (e) {
+      // 무시
+    }
   }
 }
 

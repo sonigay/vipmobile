@@ -99,11 +99,32 @@ client.on('messageCreate', async (message) => {
       // Puppeteer를 사용하여 Google Sheets를 열고 스크린샷 생성
       console.log(`🖼️ [로컬PC봇] Puppeteer로 스크린샷 생성 시작...`);
       
-      const imageBuffer = await captureSheetAsImage(sheetUrl, {
-        waitTime: waitTime,
-        viewportWidth: viewportWidth,
-        viewportHeight: viewportHeight
-      });
+      let imageBuffer;
+      let retryCount = 0;
+      const maxRetries = 2; // 최대 2번 재시도 (초기 시도 + 1번 재시도)
+      
+      while (retryCount < maxRetries) {
+        try {
+          imageBuffer = await captureSheetAsImage(sheetUrl, {
+            waitTime: waitTime,
+            viewportWidth: viewportWidth,
+            viewportHeight: viewportHeight
+          });
+          break; // 성공하면 루프 종료
+        } catch (error) {
+          retryCount++;
+          
+          // ECONNREFUSED 에러이고 재시도 가능한 경우
+          if (error.message && error.message.includes('ECONNREFUSED') && retryCount < maxRetries) {
+            console.log(`🔄 [로컬PC봇] 브라우저 연결 실패, 재시도 ${retryCount}/${maxRetries - 1}...`);
+            await new Promise(resolve => setTimeout(resolve, 2000)); // 2초 대기 후 재시도
+            continue;
+          }
+          
+          // 재시도 불가능하거나 다른 에러인 경우 throw
+          throw error;
+        }
+      }
       
       console.log(`✅ [로컬PC봇] 스크린샷 생성 완료 (크기: ${imageBuffer.length} bytes)`);
       
@@ -179,6 +200,19 @@ process.on('SIGINT', async () => {
   await closeBrowser();
   client.destroy();
   process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+  console.log('\n🛑 봇 종료 중 (SIGTERM)...');
+  await closeBrowser();
+  client.destroy();
+  process.exit(0);
+});
+
+// PM2 재시작 시 브라우저 정리
+process.on('beforeExit', async () => {
+  console.log('🔄 프로세스 종료 전 브라우저 정리...');
+  await closeBrowser();
 });
 
 // 봇 로그인
