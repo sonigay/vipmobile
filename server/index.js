@@ -14827,21 +14827,24 @@ const server = app.listen(port, '0.0.0.0', async () => {
     }, 600000); // 10분 후 실행 (데이터 재빌드 완료 후 충분한 시간 대기)
     
     // Discord 모니터링 자동 갱신 스케줄 등록
-    // 매일 11:30, 17:30
-    cron.schedule('30 11 * * *', async () => {
-      console.log('⏰ [스케줄러] 정기 스케줄 실행: Discord 이미지 자동 갱신 (11:30)');
-      await refreshAllDiscordImages();
-    }, {
-      scheduled: true,
-      timezone: 'Asia/Seoul'
-    });
+    // 매일 03:30, 07:30, 11:30, 17:30, 20:30, 23:30
+    const imageRefreshSchedules = [
+      { time: '03:30', cron: '30 3 * * *' },
+      { time: '07:30', cron: '30 7 * * *' },
+      { time: '11:30', cron: '30 11 * * *' },
+      { time: '17:30', cron: '30 17 * * *' },
+      { time: '20:30', cron: '30 20 * * *' },
+      { time: '23:30', cron: '30 23 * * *' }
+    ];
     
-    cron.schedule('30 17 * * *', async () => {
-      console.log('⏰ [스케줄러] 정기 스케줄 실행: Discord 이미지 자동 갱신 (17:30)');
-      await refreshAllDiscordImages();
-    }, {
-      scheduled: true,
-      timezone: 'Asia/Seoul'
+    imageRefreshSchedules.forEach(({ time, cron: cronExpr }) => {
+      cron.schedule(cronExpr, async () => {
+        console.log(`⏰ [스케줄러] 정기 스케줄 실행: Discord 이미지 자동 갱신 (${time})`);
+        await refreshAllDiscordImages();
+      }, {
+        scheduled: true,
+        timezone: 'Asia/Seoul'
+      });
     });
     
     // 데이터 재빌드 스케줄 등록
@@ -14857,7 +14860,7 @@ const server = app.listen(port, '0.0.0.0', async () => {
     }
     
     console.log('✅ [스케줄러] 자동 스케줄 기능 초기화 완료');
-    console.log('   - Discord 이미지 자동 갱신: 서버 시작 시, 매일 11:30, 17:30');
+    console.log('   - Discord 이미지 자동 갱신: 서버 시작 시, 매일 03:30, 07:30, 11:30, 17:30, 20:30, 23:30');
     console.log('   - 데이터 재빌드: 서버 시작 시, 매일 11:10-19:10 매시간');
     // ===== 자동 스케줄 기능 초기화 완료 =====
 
