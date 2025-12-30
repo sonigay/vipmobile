@@ -145,8 +145,10 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   // 메인 탭 상태 (추가정책, 정책표목록, 정책표생성, 정책표생성설정)
   const [mainTab, setMainTab] = useState(0); // 0: 추가정책, 1: 정책표목록, 2: 정책표생성, 3: 정책표생성설정
   
-  // 탭 접근 권한 체크
-  const canAccessCreation = ['SS', 'AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(loggedInStore?.userRole);
+  // 탭 접근 권한 체크 - 동적으로 두 글자 대문자 패턴(팀장) 또는 SS(총괄) 인식
+  const userRole = loggedInStore?.userRole;
+  const twoLetterPattern = /^[A-Z]{2}$/;
+  const canAccessCreation = userRole && (userRole === 'SS' || twoLetterPattern.test(userRole));
   const canAccessSettings = loggedInStore?.userRole === 'SS';
   
   // 실제 탭 인덱스 계산 (조건부 렌더링된 탭의 실제 인덱스)
