@@ -71,8 +71,10 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
   const [companies, setCompanies] = useState([]);
   const [teamLeaders, setTeamLeaders] = useState([]);
 
-  // 권한 체크
-  const canAccess = ['SS', 'AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(loggedInStore?.userRole);
+  // 권한 체크 - 동적으로 두 글자 대문자 패턴(팀장) 또는 SS(총괄) 인식
+  const userRole = loggedInStore?.userRole;
+  const twoLetterPattern = /^[A-Z]{2}$/;
+  const canAccess = userRole && (userRole === 'SS' || twoLetterPattern.test(userRole));
 
   useEffect(() => {
     if (canAccess) {

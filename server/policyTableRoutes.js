@@ -660,13 +660,25 @@ async function checkPermission(req, allowedRoles) {
     return { hasPermission: false, error: '사용자 권한 정보가 없습니다.' };
   }
 
-  const hasPermission = allowedRoles.includes(finalUserRole);
+  // 동적 권한 체크: 두 글자 대문자 패턴(팀장) 자동 인식
+  const twoLetterPattern = /^[A-Z]{2}$/;
+  let hasPermission = false;
+  
+  // allowedRoles에 'TEAM_LEADER'가 있으면 두 글자 대문자 패턴 체크
+  if (allowedRoles.includes('TEAM_LEADER')) {
+    hasPermission = finalUserRole === 'SS' || twoLetterPattern.test(finalUserRole);
+  } else {
+    // 기존 로직: 직접 권한 레벨 비교
+    hasPermission = allowedRoles.includes(finalUserRole);
+  }
+  
   console.log('[정책표] 권한 체크 결과:', { 
     hasPermission, 
     finalUserRole, 
     allowedRoles,
     userName: finalUserName,
-    userId: finalUserId
+    userId: finalUserId,
+    isTeamLeaderCheck: allowedRoles.includes('TEAM_LEADER')
   });
   
   // userName이 없으면 에러 (이름은 필수)
@@ -881,8 +893,8 @@ function setupPolicyTableRoutes(app) {
   router.get('/policy-table-settings', async (req, res) => {
     setCORSHeaders(req, res);
     try {
-      // 정책표생성 탭 접근 권한: SS, AA, BB, CC, DD, EE, FF
-      const permission = await checkPermission(req, ['SS', 'AA', 'BB', 'CC', 'DD', 'EE', 'FF']);
+      // 정책표생성 탭 접근 권한: SS(총괄) 또는 두 글자 대문자 패턴(팀장)
+      const permission = await checkPermission(req, ['SS', 'TEAM_LEADER']);
       if (!permission.hasPermission) {
         return res.status(403).json({ success: false, error: '권한이 없습니다.' });
       }
@@ -1160,7 +1172,7 @@ function setupPolicyTableRoutes(app) {
   router.get('/policy-table/user-groups', async (req, res) => {
     setCORSHeaders(req, res);
     try {
-      const permission = await checkPermission(req, ['SS', 'AA', 'BB', 'CC', 'DD', 'EE', 'FF']);
+      const permission = await checkPermission(req, ['SS', 'TEAM_LEADER']);
       if (!permission.hasPermission) {
         return res.status(403).json({ success: false, error: '권한이 없습니다.' });
       }
@@ -1207,7 +1219,7 @@ function setupPolicyTableRoutes(app) {
   router.post('/policy-table/user-groups', express.json(), async (req, res) => {
     setCORSHeaders(req, res);
     try {
-      const permission = await checkPermission(req, ['SS', 'AA', 'BB', 'CC', 'DD', 'EE', 'FF']);
+      const permission = await checkPermission(req, ['SS', 'TEAM_LEADER']);
       if (!permission.hasPermission) {
         return res.status(403).json({ success: false, error: '권한이 없습니다.' });
       }
@@ -1275,7 +1287,7 @@ function setupPolicyTableRoutes(app) {
   router.put('/policy-table/user-groups/:id', express.json(), async (req, res) => {
     setCORSHeaders(req, res);
     try {
-      const permission = await checkPermission(req, ['SS', 'AA', 'BB', 'CC', 'DD', 'EE', 'FF']);
+      const permission = await checkPermission(req, ['SS', 'TEAM_LEADER']);
       if (!permission.hasPermission) {
         return res.status(403).json({ success: false, error: '권한이 없습니다.' });
       }
@@ -1358,7 +1370,7 @@ function setupPolicyTableRoutes(app) {
   router.delete('/policy-table/user-groups/:id', async (req, res) => {
     setCORSHeaders(req, res);
     try {
-      const permission = await checkPermission(req, ['SS', 'AA', 'BB', 'CC', 'DD', 'EE', 'FF']);
+      const permission = await checkPermission(req, ['SS', 'TEAM_LEADER']);
       if (!permission.hasPermission) {
         return res.status(403).json({ success: false, error: '권한이 없습니다.' });
       }
@@ -1413,7 +1425,7 @@ function setupPolicyTableRoutes(app) {
   router.get('/policy-table/companies', async (req, res) => {
     setCORSHeaders(req, res);
     try {
-      const permission = await checkPermission(req, ['SS', 'AA', 'BB', 'CC', 'DD', 'EE', 'FF']);
+      const permission = await checkPermission(req, ['SS', 'TEAM_LEADER']);
       if (!permission.hasPermission) {
         return res.status(403).json({ success: false, error: '권한이 없습니다.' });
       }
@@ -1487,7 +1499,7 @@ function setupPolicyTableRoutes(app) {
   router.post('/policy-table/generate', express.json(), async (req, res) => {
     setCORSHeaders(req, res);
     try {
-      const permission = await checkPermission(req, ['SS', 'AA', 'BB', 'CC', 'DD', 'EE', 'FF']);
+      const permission = await checkPermission(req, ['SS', 'TEAM_LEADER']);
       if (!permission.hasPermission) {
         return res.status(403).json({ success: false, error: '권한이 없습니다.' });
       }
@@ -1661,8 +1673,8 @@ function setupPolicyTableRoutes(app) {
         tabs = tabs.filter(tab => accessiblePolicyTableIds.has(tab.policyTableId));
       } else if (['SS', 'S'].includes(userRole)) {
         // SS(총괄), S(정산) 레벨은 모든 탭 표시
-      } else if (['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(userRole)) {
-        // 팀장 레벨은 본인이 생성한 정책표의 탭만 표시
+      } else if (userRole && /^[A-Z]{2}$/.test(userRole)) {
+        // 팀장 레벨(두 글자 대문자 패턴)은 본인이 생성한 정책표의 탭만 표시
         const currentUserId = req.headers['x-user-id'] || userId;
         const policyListResponse = await withRetry(async () => {
           return await sheets.spreadsheets.values.get({
@@ -1879,8 +1891,8 @@ function setupPolicyTableRoutes(app) {
         });
       } else if (['SS', 'S'].includes(userRole)) {
         // SS(총괄), S(정산) 레벨은 모든 정책표 표시
-      } else if (['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(userRole)) {
-        // 팀장 레벨은 본인이 생성한 정책표만 확인 가능
+      } else if (userRole && /^[A-Z]{2}$/.test(userRole)) {
+        // 팀장 레벨(두 글자 대문자 패턴)은 본인이 생성한 정책표만 확인 가능
         const currentUserId = req.headers['x-user-id'] || req.query.userId;
         policies = policies.filter(policy => {
           // 생성자ID가 있으면 ID로 비교, 없으면 생성자 이름으로 비교 (하위 호환성)
@@ -1988,7 +2000,7 @@ function setupPolicyTableRoutes(app) {
     setCORSHeaders(req, res);
     try {
       // 권한 체크 (S와 SS 모두 허용)
-      const permission = await checkPermission(req, ['S', 'SS', 'AA', 'BB', 'CC', 'DD', 'EE', 'FF']);
+      const permission = await checkPermission(req, ['S', 'SS', 'TEAM_LEADER']);
       if (!permission.hasPermission) {
         console.error('[정책표] 등록 권한 없음:', {
           userId: req.headers['x-user-id'],
@@ -2130,8 +2142,8 @@ function setupPolicyTableRoutes(app) {
         }
       } else if (['SS', 'S'].includes(userRole)) {
         // SS(총괄), S(정산) 레벨은 모든 정책표 접근 가능
-      } else if (['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(userRole)) {
-        // 팀장 레벨은 본인이 생성한 정책표만 접근 가능
+      } else if (userRole && /^[A-Z]{2}$/.test(userRole)) {
+        // 팀장 레벨(두 글자 대문자 패턴)은 본인이 생성한 정책표만 접근 가능
         const currentUserId = req.headers['x-user-id'];
         const creatorId = row[13] || ''; // 생성자ID
         if (creatorId && creatorId !== currentUserId) {
@@ -2273,7 +2285,7 @@ function setupPolicyTableRoutes(app) {
   router.delete('/policy-tables/:id', async (req, res) => {
     setCORSHeaders(req, res);
     try {
-      const permission = await checkPermission(req, ['SS', 'AA', 'BB', 'CC', 'DD', 'EE', 'FF']);
+      const permission = await checkPermission(req, ['SS', 'TEAM_LEADER']);
       if (!permission.hasPermission) {
         return res.status(403).json({ success: false, error: '권한이 없습니다.' });
       }

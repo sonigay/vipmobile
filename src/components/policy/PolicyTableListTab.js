@@ -71,10 +71,12 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
   // 권한 체크
   // 일반정책모드인 경우 modePermissions.generalPolicy로 체크
   // 정책모드인 경우 userRole로 체크
+  const userRole = loggedInStore?.userRole;
+  const twoLetterPattern = /^[A-Z]{2}$/;
   const canAccess = mode === 'generalPolicy' 
     ? loggedInStore?.modePermissions?.generalPolicy === true
-    : ['A', 'B', 'C', 'D', 'E', 'F', 'AA', 'BB', 'CC', 'DD', 'EE', 'FF', 'S', 'SS'].includes(loggedInStore?.userRole);
-  const canDelete = loggedInStore?.userRole === 'SS' || ['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(loggedInStore?.userRole);
+    : userRole && (['A', 'B', 'C', 'D', 'E', 'F', 'S', 'SS'].includes(userRole) || twoLetterPattern.test(userRole));
+  const canDelete = userRole === 'SS' || (userRole && twoLetterPattern.test(userRole));
 
   useEffect(() => {
     if (canAccess) {
