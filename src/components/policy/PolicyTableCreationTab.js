@@ -655,11 +655,10 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                       )}
                       <Typography variant="body2" sx={{ mb: 1 }}>
                         <a 
-                          href={setting.policyTableLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                          href="#"
                           onClick={(e) => {
                             e.preventDefault();
+                            e.stopPropagation();
                             // 구글시트 링크를 웹 버전으로 강제 열기 (PC/모바일 모두)
                             let url = setting.policyTableLink;
                             
@@ -699,22 +698,27 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                             }
                             
                             // 새 창에서 열기 (앱 리다이렉트 방지)
+                            let newWindow = null;
                             try {
-                              const newWindow = window.open(
+                              newWindow = window.open(
                                 url, 
                                 '_blank', 
                                 'noopener,noreferrer,width=1200,height=800'
                               );
                               
-                              // 팝업 차단 감지 (window.open 직후 즉시 확인)
+                              // 팝업 차단 감지: window.open 직후 즉시 확인
                               // newWindow가 null이거나 undefined인 경우만 팝업 차단으로 판단
-                              // 사용자가 창을 닫은 경우는 newWindow.closed로 확인 가능하므로 여기서는 확인하지 않음
-                              if (newWindow === null || newWindow === undefined) {
+                              if (!newWindow) {
                                 // 팝업이 차단된 경우 사용자에게 알림
                                 alert('팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해주세요.');
+                                return;
                               }
-                              // newWindow가 존재하면 정상적으로 열린 것이므로 아무것도 하지 않음
-                              // 사용자가 나중에 창을 닫아도 감지하지 않음
+                              
+                              // newWindow가 존재하면 정상적으로 열린 것
+                              // 사용자가 창을 닫은 경우는 newWindow.closed가 true가 되지만,
+                              // 이는 정상적인 동작이므로 알림을 표시하지 않음
+                              // 팝업 차단 감지는 window.open 직후에만 수행하며,
+                              // 이후 창이 닫히는 것은 감지하지 않음
                             } catch (error) {
                               // window.open이 예외를 발생시킨 경우 (일부 브라우저에서 발생 가능)
                               console.error('구글시트 열기 오류:', error);
