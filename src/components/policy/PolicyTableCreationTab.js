@@ -76,6 +76,20 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
   const twoLetterPattern = /^[A-Z]{2}$/;
   const canAccess = userRole && (userRole === 'SS' || twoLetterPattern.test(userRole));
 
+  // 디버깅: 권한 체크 로그
+  useEffect(() => {
+    console.log('🔍 [정책표생성] 권한 체크:', {
+      userRole,
+      canAccess,
+      twoLetterPatternTest: userRole ? twoLetterPattern.test(userRole) : false,
+      loggedInStore: loggedInStore ? {
+        userRole: loggedInStore.userRole,
+        contactId: loggedInStore.contactId,
+        id: loggedInStore.id
+      } : null
+    });
+  }, [userRole, canAccess]);
+
   useEffect(() => {
     if (canAccess) {
       loadSettings();
@@ -129,11 +143,23 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
             return false;
           }
           
-          const includes = setting.creatorPermissions.includes(userRole);
+          // 정확한 문자열 비교를 위해 trim() 및 대소문자 일치 확인
+          const normalizedUserRole = (userRole || '').trim();
+          const includes = setting.creatorPermissions.some(perm => {
+            const normalizedPerm = (perm || '').trim();
+            return normalizedPerm === normalizedUserRole;
+          });
+          
           console.log(`🔍 [정책표생성] 필터링 체크: ${setting.policyTableName}`, {
-            userRole,
+            userRole: normalizedUserRole,
             creatorPermissions: setting.creatorPermissions,
-            includes
+            normalizedPermissions: setting.creatorPermissions.map(p => (p || '').trim()),
+            includes,
+            matchDetails: setting.creatorPermissions.map(perm => ({
+              original: perm,
+              normalized: (perm || '').trim(),
+              matches: (perm || '').trim() === normalizedUserRole
+            }))
           });
           return includes;
         });
