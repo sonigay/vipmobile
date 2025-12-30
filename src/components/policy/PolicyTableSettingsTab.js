@@ -103,12 +103,24 @@ const PolicyTableSettingsTab = ({ loggedInStore }) => {
           })
           .map(agent => {
             const permissionLevel = agent.permissionLevel;
-            const name = agent.target || permissionLevel; // A열: 이름
+            // SS 권한 사용자인 경우 ssAgent의 target을 우선 사용
+            let name = agent.target;
+            if (permissionLevel === 'SS' && ssAgent && ssAgent.target) {
+              name = ssAgent.target; // A열: 실제 이름
+            } else if (!name || name.trim() === '') {
+              name = permissionLevel; // 이름이 없으면 권한레벨 사용
+            }
             const qualification = agent.qualification || ''; // B열: 직함
             
+            // SS 권한 사용자인 경우 ssAgent의 qualification을 우선 사용
+            let finalQualification = qualification;
+            if (permissionLevel === 'SS' && ssAgent && ssAgent.qualification) {
+              finalQualification = ssAgent.qualification;
+            }
+            
             // 이름 (직함) 형식으로 표시, 직함이 없으면 이름만 표시
-            const displayName = qualification 
-              ? `${name} (${qualification})`
+            const displayName = finalQualification 
+              ? `${name} (${finalQualification})`
               : name;
             
             return {
@@ -138,10 +150,13 @@ const PolicyTableSettingsTab = ({ loggedInStore }) => {
         } else {
           // SS가 이미 목록에 있지만, 이름이 비어있거나 '총괄'인 경우 실제 데이터로 업데이트
           const ssLeader = leaders.find(leader => leader.code === 'SS');
-          if (ssLeader && ssAgent && ssAgent.target && ssLeader.name.includes('총괄')) {
-            const name = ssAgent.target;
-            const qualification = ssAgent.qualification || '';
-            ssLeader.name = qualification ? `${name} (${qualification})` : name;
+          if (ssLeader && ssAgent && ssAgent.target) {
+            const name = ssAgent.target; // A열: 실제 이름
+            const qualification = ssAgent.qualification || ''; // B열: 직함
+            // 이름이 비어있거나 '총괄'이 포함되어 있으면 업데이트
+            if (!ssLeader.name || ssLeader.name.includes('총괄') || ssLeader.name === 'SS') {
+              ssLeader.name = qualification ? `${name} (${qualification})` : name;
+            }
           }
         }
         

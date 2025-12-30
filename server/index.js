@@ -2905,7 +2905,11 @@ app.get('/api/agents', async (req, res) => {
 
       return agent;
     }).filter(agent => {
-      // 아이디가 있고, office와 department가 모두 유효한 항목만 반환
+      // SS 권한 사용자는 office/department 필터링을 우회
+      if (agent.permissionLevel === 'SS') {
+        return agent.contactId && agent.target && agent.target.trim() !== '';
+      }
+      // 일반 사용자는 아이디가 있고, office와 department가 모두 유효한 항목만 반환
       return agent.contactId &&
         agent.office && agent.office.trim() !== '' &&
         agent.department && agent.department.trim() !== '';
