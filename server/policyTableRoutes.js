@@ -1895,16 +1895,48 @@ function setupPolicyTableRoutes(app) {
       } else if (userRole && /^[A-Z]{2}$/.test(userRole)) {
         // 팀장 레벨(두 글자 대문자 패턴)은 본인이 생성한 정책표만 확인 가능
         const currentUserId = req.headers['x-user-id'] || req.query.userId;
+        
+        console.log('🔍 [정책모드] 팀장 필터링 시작:', {
+          userRole,
+          currentUserId,
+          totalPolicies: policies.length,
+          policies: policies.map(p => ({
+            id: p.id,
+            policyTableName: p.policyTableName,
+            creatorId: p.creatorId,
+            creator: p.creator,
+            creatorIdMatch: p.creatorId === currentUserId
+          }))
+        });
+        
         policies = policies.filter(policy => {
           // 생성자ID가 있으면 ID로 비교, 없으면 생성자 이름으로 비교 (하위 호환성)
           if (policy.creatorId) {
-            return policy.creatorId === currentUserId;
+            const matches = policy.creatorId === currentUserId;
+            console.log(`🔍 [정책모드] 팀장 필터링 체크: ${policy.policyTableName}`, {
+              policyId: policy.id,
+              creatorId: policy.creatorId,
+              currentUserId,
+              matches,
+              creatorIdType: typeof policy.creatorId,
+              currentUserIdType: typeof currentUserId
+            });
+            return matches;
           } else {
             // 기존 데이터 호환: 생성자 이름과 현재 사용자 이름 비교
             // checkPermission에서 가져온 사용자 이름과 비교
             // 하지만 정확하지 않을 수 있으므로, 가능하면 creatorId 사용 권장
+            console.log(`⚠️ [정책모드] 팀장 필터링: creatorId 없음 - ${policy.policyTableName}`, {
+              policyId: policy.id,
+              creator: policy.creator
+            });
             return false; // creatorId가 없으면 접근 불가 (안전한 기본값)
           }
+        });
+        
+        console.log('✅ [정책모드] 팀장 필터링 완료:', {
+          filteredCount: policies.length,
+          filtered: policies.map(p => p.policyTableName)
         });
       } else {
         // 그 외 사용자(A-F)는 그룹의 담당자(managerIds)에 포함된 경우만 해당 그룹의 정책표 표시
