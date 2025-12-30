@@ -1675,7 +1675,7 @@ function setupPolicyTableRoutes(app) {
       } else if (['SS', 'S'].includes(userRole)) {
         // SS(총괄), S(정산) 레벨은 모든 탭 표시
       } else if (userRole && /^[A-Z]{2}$/.test(userRole)) {
-        // 팀장 레벨(두 글자 대문자 패턴)은 본인이 생성한 정책표의 탭만 표시
+        // 팀장 레벨(두 글자 대문자 패턴)은 본인이 생성한 정책표 + 담당자인 그룹의 정책표 탭 표시
         const currentUserId = req.headers['x-user-id'] || userId;
         const policyListResponse = await withRetry(async () => {
           return await sheets.spreadsheets.values.get({
@@ -1686,11 +1686,43 @@ function setupPolicyTableRoutes(app) {
 
         const policyRows = policyListResponse.data.values || [];
         const policyDataRows = policyRows.slice(1);
+        
+        // 정책영업그룹 목록 조회 (담당자 필터링용)
+        const userGroupsResponse = await withRetry(async () => {
+          return await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SHEET_USER_GROUPS}!A:E`
+          });
+        });
+
+        const userGroupsRows = userGroupsResponse.data.values || [];
+        const userGroupsDataRows = userGroupsRows.slice(1);
+        const userGroupsMap = new Map();
+        userGroupsDataRows.forEach(row => {
+          const groupId = row[0];
+          const groupData = parseUserGroupData(row[2]);
+          userGroupsMap.set(groupId, groupData);
+        });
+        
         const accessiblePolicyTableIds = new Set();
         policyDataRows.forEach(row => {
           const creatorId = row[13] || ''; // 생성자ID
+          const accessGroupId = row[5]; // 접근권한 (그룹ID)
+          
+          // 1. 본인이 생성한 정책표인지 확인
           if (creatorId === currentUserId) {
             accessiblePolicyTableIds.add(row[1]); // 정책표ID_설정
+          }
+          
+          // 2. 본인이 담당자인 그룹의 정책표인지 확인
+          if (accessGroupId) {
+            const groupData = userGroupsMap.get(accessGroupId);
+            if (groupData) {
+              const managerIds = groupData.managerIds || [];
+              if (managerIds.includes(currentUserId)) {
+                accessiblePolicyTableIds.add(row[1]); // 정책표ID_설정
+              }
+            }
           }
         });
         tabs = tabs.filter(tab => accessiblePolicyTableIds.has(tab.policyTableId));
@@ -1893,45 +1925,65 @@ function setupPolicyTableRoutes(app) {
       } else if (['SS', 'S'].includes(userRole)) {
         // SS(총괄), S(정산) 레벨은 모든 정책표 표시
       } else if (userRole && /^[A-Z]{2}$/.test(userRole)) {
-        // 팀장 레벨(두 글자 대문자 패턴)은 본인이 생성한 정책표만 확인 가능
+        // 팀장 레벨(두 글자 대문자 패턴)은 본인이 생성한 정책표 + 담당자인 그룹의 정책표 확인 가능
         const currentUserId = req.headers['x-user-id'] || req.query.userId;
+        
+        // 정책영업그룹 목록 조회 (담당자 필터링용)
+        await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_USER_GROUPS, HEADERS_USER_GROUPS);
+        const userGroupsResponse = await withRetry(async () => {
+          return await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SHEET_USER_GROUPS}!A:E`
+          });
+        });
+
+        const userGroupsRows = userGroupsResponse.data.values || [];
+        const userGroupsDataRows = userGroupsRows.slice(1);
+        const userGroupsMap = new Map();
+        userGroupsDataRows.forEach(row => {
+          const groupId = row[0];
+          const groupData = parseUserGroupData(row[2]);
+          userGroupsMap.set(groupId, groupData);
+        });
         
         console.log('🔍 [정책모드] 팀장 필터링 시작:', {
           userRole,
           currentUserId,
           totalPolicies: policies.length,
-          policies: policies.map(p => ({
-            id: p.id,
-            policyTableName: p.policyTableName,
-            creatorId: p.creatorId,
-            creator: p.creator,
-            creatorIdMatch: p.creatorId === currentUserId
-          }))
+          userGroupsMapSize: userGroupsMap.size
         });
         
         policies = policies.filter(policy => {
-          // 생성자ID가 있으면 ID로 비교, 없으면 생성자 이름으로 비교 (하위 호환성)
+          // 1. 본인이 생성한 정책표인지 확인
+          let isCreator = false;
           if (policy.creatorId) {
-            const matches = policy.creatorId === currentUserId;
-            console.log(`🔍 [정책모드] 팀장 필터링 체크: ${policy.policyTableName}`, {
-              policyId: policy.id,
-              creatorId: policy.creatorId,
-              currentUserId,
-              matches,
-              creatorIdType: typeof policy.creatorId,
-              currentUserIdType: typeof currentUserId
-            });
-            return matches;
-          } else {
-            // 기존 데이터 호환: 생성자 이름과 현재 사용자 이름 비교
-            // checkPermission에서 가져온 사용자 이름과 비교
-            // 하지만 정확하지 않을 수 있으므로, 가능하면 creatorId 사용 권장
-            console.log(`⚠️ [정책모드] 팀장 필터링: creatorId 없음 - ${policy.policyTableName}`, {
-              policyId: policy.id,
-              creator: policy.creator
-            });
-            return false; // creatorId가 없으면 접근 불가 (안전한 기본값)
+            isCreator = policy.creatorId === currentUserId;
           }
+          
+          // 2. 본인이 담당자인 그룹의 정책표인지 확인
+          let isManager = false;
+          const accessGroupId = policy.accessGroupId;
+          if (accessGroupId) {
+            const groupData = userGroupsMap.get(accessGroupId);
+            if (groupData) {
+              const managerIds = groupData.managerIds || [];
+              isManager = managerIds.includes(currentUserId);
+            }
+          }
+          
+          const hasAccess = isCreator || isManager;
+          
+          console.log(`🔍 [정책모드] 팀장 필터링 체크: ${policy.policyTableName}`, {
+            policyId: policy.id,
+            creatorId: policy.creatorId,
+            currentUserId,
+            isCreator,
+            isManager,
+            accessGroupId,
+            hasAccess
+          });
+          
+          return hasAccess;
         });
         
         console.log('✅ [정책모드] 팀장 필터링 완료:', {
@@ -2182,14 +2234,38 @@ function setupPolicyTableRoutes(app) {
       } else if (['SS', 'S'].includes(userRole)) {
         // SS(총괄), S(정산) 레벨은 모든 정책표 접근 가능
       } else if (userRole && /^[A-Z]{2}$/.test(userRole)) {
-        // 팀장 레벨(두 글자 대문자 패턴)은 본인이 생성한 정책표만 접근 가능
+        // 팀장 레벨(두 글자 대문자 패턴)은 본인이 생성한 정책표 + 담당자인 그룹의 정책표 접근 가능
         const currentUserId = req.headers['x-user-id'];
         const creatorId = row[13] || ''; // 생성자ID
-        if (creatorId && creatorId !== currentUserId) {
-          return res.status(403).json({ success: false, error: '이 정책표에 접근할 권한이 없습니다.' });
+        const accessGroupId = row[5]; // 접근권한 (그룹ID)
+        
+        // 1. 본인이 생성한 정책표인지 확인
+        const isCreator = creatorId && creatorId === currentUserId;
+        
+        // 2. 본인이 담당자인 그룹의 정책표인지 확인
+        let isManager = false;
+        if (accessGroupId) {
+          await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_USER_GROUPS, HEADERS_USER_GROUPS);
+          const userGroupsResponse = await withRetry(async () => {
+            return await sheets.spreadsheets.values.get({
+              spreadsheetId: SPREADSHEET_ID,
+              range: `${SHEET_USER_GROUPS}!A:E`
+            });
+          });
+
+          const userGroupsRows = userGroupsResponse.data.values || [];
+          const userGroupsDataRows = userGroupsRows.slice(1);
+          const userGroup = userGroupsDataRows.find(r => r[0] === accessGroupId);
+          
+          if (userGroup) {
+            const groupData = parseUserGroupData(userGroup[2]);
+            const managerIds = groupData.managerIds || [];
+            isManager = managerIds.includes(currentUserId);
+          }
         }
-        // creatorId가 없으면 기존 데이터이므로 접근 불가 (안전한 기본값)
-        if (!creatorId) {
+        
+        // 둘 다 아니면 접근 불가
+        if (!isCreator && !isManager) {
           return res.status(403).json({ success: false, error: '이 정책표에 접근할 권한이 없습니다.' });
         }
       } else {
