@@ -2049,6 +2049,8 @@ function setupPolicyTableRoutes(app) {
     try {
       const { id } = req.params;
       const userRole = req.headers['x-user-role'] || req.query.userRole;
+      const mode = req.query.mode;
+      const isGeneralPolicyMode = mode === 'generalPolicy' || mode === 'general-policy';
 
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_TABLE_LIST, HEADERS_POLICY_TABLE_LIST);
@@ -2068,7 +2070,65 @@ function setupPolicyTableRoutes(app) {
       }
 
       // 권한 체크
-      if (['SS', 'S'].includes(userRole)) {
+      if (isGeneralPolicyMode) {
+        // 일반정책모드 필터링: companyNames 기반
+        const currentUserId = req.headers['x-user-id'] || req.query.userId;
+        const accessGroupId = row[5]; // 접근권한 (그룹ID)
+        
+        if (!accessGroupId) {
+          return res.status(403).json({ success: false, error: '이 정책표에 접근할 권한이 없습니다.' });
+        }
+
+        // 정책영업그룹 조회
+        await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_USER_GROUPS, HEADERS_USER_GROUPS);
+        const userGroupsResponse = await withRetry(async () => {
+          return await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SHEET_USER_GROUPS}!A:E`
+          });
+        });
+
+        const userGroupsRows = userGroupsResponse.data.values || [];
+        const userGroupsDataRows = userGroupsRows.slice(1);
+        const userGroup = userGroupsDataRows.find(r => r[0] === accessGroupId);
+        
+        if (!userGroup) {
+          return res.status(403).json({ success: false, error: '이 정책표에 접근할 권한이 없습니다.' });
+        }
+
+        const groupData = parseUserGroupData(userGroup[2]);
+        
+        // 현재 사용자의 업체명 확인
+        const generalModeSheetName = '일반모드권한관리';
+        const generalModeResponse = await withRetry(async () => {
+          return await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${generalModeSheetName}!A:K`
+          });
+        });
+
+        const generalModeRows = generalModeResponse.data.values || [];
+        let userCompanyName = null;
+        if (generalModeRows.length > 3) {
+          const generalModeDataRows = generalModeRows.slice(3);
+          const userRow = generalModeDataRows.find(row => 
+            row[0] === currentUserId || row[10] === currentUserId // A열 또는 K열
+          );
+          if (userRow) {
+            userCompanyName = (userRow[1] || '').trim(); // B열 업체명
+          }
+        }
+
+        if (!userCompanyName) {
+          return res.status(403).json({ success: false, error: '이 정책표에 접근할 권한이 없습니다.' });
+        }
+
+        // companyNames에 현재 사용자의 업체명이 포함되어 있는지 확인
+        const companyNames = groupData.companyNames || [];
+        if (!companyNames.includes(userCompanyName)) {
+          return res.status(403).json({ success: false, error: '이 정책표에 접근할 권한이 없습니다.' });
+        }
+      } else if (['SS', 'S'].includes(userRole)) {
         // SS(총괄), S(정산) 레벨은 모든 정책표 접근 가능
       } else if (['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(userRole)) {
         // 팀장 레벨은 본인이 생성한 정책표만 접근 가능

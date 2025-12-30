@@ -155,7 +155,12 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
 
   const handlePolicyClick = async (policy) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/policy-tables/${policy.id}`, {
+      const params = new URLSearchParams();
+      if (mode) {
+        params.append('mode', mode);
+      }
+      
+      const response = await fetch(`${API_BASE_URL}/api/policy-tables/${policy.id}?${params}`, {
         headers: {
           'x-user-role': loggedInStore?.userRole || '',
           'x-user-id': loggedInStore?.contactId || loggedInStore?.id || ''
