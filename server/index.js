@@ -27202,6 +27202,176 @@ app.get('/api/policies', async (req, res) => {
   }
 });
 
+// 구두정책 카운팅 API
+app.get('/api/policies/shoe-counting', async (req, res) => {
+  try {
+    const { yearMonth, policyType, manager } = req.query;
+    
+    if (!yearMonth || !policyType) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'yearMonth와 policyType이 필요합니다.' 
+      });
+    }
+
+    // 정책_기본정보 시트에서 데이터 가져오기
+    const values = await getSheetValuesWithoutCache('정책_기본정보 ');
+
+    if (!values || values.length === 0) {
+      return res.json({ success: true, counting: {} });
+    }
+
+    const dataRows = values.length > 1 ? values.slice(1) : values;
+
+    // 정책유형 필터링 (무선/유선)
+    const policyTypeLabel = policyType === 'wireless' ? '무선' : '유선';
+    
+    // 구두정책만 필터링 (wireless_shoe 또는 wired_shoe)
+    const shoeCategory = policyType === 'wireless' ? 'wireless_shoe' : 'wired_shoe';
+    
+    // 필터링된 구두정책들
+    const shoePolicies = dataRows.filter(row => {
+      if (row.length < 29) return false; // 최소 컬럼 수 확인
+      
+      const policyYearMonth = row[23] || ''; // X열: 대상년월
+      const policyTypeData = row[6]; // G열: 정책유형
+      const subCategory = row[8]; // I열: 하위카테고리
+      const managerName = row[49] || ''; // AX열: 담당자명
+      
+      // 년월 필터
+      if (policyYearMonth !== yearMonth) return false;
+      
+      // 정책유형 필터
+      if (policyTypeData !== policyTypeLabel) return false;
+      
+      // 구두정책 카테고리 필터
+      if (subCategory !== shoeCategory) return false;
+      
+      // 담당자 필터 (manager가 제공된 경우)
+      if (manager && manager !== '전체' && managerName !== manager) return false;
+      
+      // 취소되지 않은 정책만
+      const policyStatus = row[15] || '활성'; // P열: 정책상태
+      if (policyStatus === '취소됨') return false;
+      
+      return true;
+    });
+
+    // 담당자별로 그룹화
+    const managerGroups = new Map();
+    
+    shoePolicies.forEach(row => {
+      const managerName = row[49] || '미지정'; // AX열: 담당자명
+      const storeName = row[25] || ''; // Z열: 업체명
+      const amount95Above = row[27] || ''; // AB열: 95군이상금액
+      const amount95Below = row[28] || ''; // AC열: 95군미만금액
+      
+      // 업체명이 없으면 스킵
+      if (!storeName || !storeName.trim()) return;
+      
+      if (!managerGroups.has(managerName)) {
+        managerGroups.set(managerName, new Map());
+      }
+      
+      const managerMap = managerGroups.get(managerName);
+      
+      // 금액 조합 키 생성 (95군이상:값/95군미만:값) - 만원 단위로 변환
+      const aboveValue = amount95Above ? Number(amount95Above) : null;
+      const belowValue = amount95Below ? Number(amount95Below) : null;
+      
+      // 만원 단위로 변환 (30000원 → 3만원, 20000원 → 2만원)
+      const aboveValueManwon = aboveValue !== null ? Math.round(aboveValue / 10000) : null;
+      const belowValueManwon = belowValue !== null ? Math.round(belowValue / 10000) : null;
+      
+      // 키 생성: (95군이상:3만원/95군미만:2만원) 형식
+      const key = `(95군이상:${aboveValueManwon !== null ? aboveValueManwon + '만원' : ''}/95군미만:${belowValueManwon !== null ? belowValueManwon + '만원' : ''})`;
+      
+      if (!managerMap.has(key)) {
+        managerMap.set(key, {
+          key: key,
+          aboveAmount: aboveValue,
+          belowAmount: belowValue,
+          aboveAmountManwon: aboveValueManwon,
+          belowAmountManwon: belowValueManwon,
+          companies: new Set()
+        });
+      }
+      
+      managerMap.get(key).companies.add(storeName.trim());
+    });
+
+    // 결과 변환
+    const result = {};
+    
+    managerGroups.forEach((managerMap, managerName) => {
+      result[managerName] = Array.from(managerMap.values()).map(item => ({
+        key: item.key,
+        aboveAmount: item.aboveAmount,
+        belowAmount: item.belowAmount,
+        aboveAmountManwon: item.aboveAmountManwon,
+        belowAmountManwon: item.belowAmountManwon,
+        companyCount: item.companies.size,
+        companies: Array.from(item.companies) // 업체 목록도 포함
+      })).sort((a, b) => {
+        // 정렬: 95군이상 금액 오름차순, 그 다음 95군미만 금액 오름차순
+        if (a.aboveAmountManwon !== b.aboveAmountManwon) {
+          return (a.aboveAmountManwon || 0) - (b.aboveAmountManwon || 0);
+        }
+        return (a.belowAmountManwon || 0) - (b.belowAmountManwon || 0);
+      });
+    });
+
+  // 전체 담당자도 추가 (manager 필터가 없을 때)
+  if (!manager || manager === '전체') {
+    const allManagerMap = new Map();
+    
+    managerGroups.forEach((managerMap) => {
+      managerMap.forEach((item, key) => {
+        if (!allManagerMap.has(key)) {
+          allManagerMap.set(key, {
+            key: key,
+            aboveAmount: item.aboveAmount,
+            belowAmount: item.belowAmount,
+            companies: new Set()
+          });
+        }
+        item.companies.forEach(company => {
+          allManagerMap.get(key).companies.add(company);
+        });
+      });
+    });
+    
+    result['전체'] = Array.from(allManagerMap.values()).map(item => ({
+      key: item.key,
+      aboveAmount: item.aboveAmount,
+      belowAmount: item.belowAmount,
+      aboveAmountManwon: item.aboveAmountManwon,
+      belowAmountManwon: item.belowAmountManwon,
+      companyCount: item.companies.size,
+      companies: Array.from(item.companies)
+    })).sort((a, b) => {
+      if (a.aboveAmountManwon !== b.aboveAmountManwon) {
+        return (a.aboveAmountManwon || 0) - (b.aboveAmountManwon || 0);
+      }
+      return (a.belowAmountManwon || 0) - (b.belowAmountManwon || 0);
+    });
+  }
+
+  console.log(`✅ [구두정책카운팅] 조회 완료:`, {
+    yearMonth,
+    policyType,
+    manager,
+    totalManagers: Object.keys(result).length
+  });
+
+  res.json({ success: true, counting: result });
+
+  } catch (error) {
+    console.error('구두정책 카운팅 조회 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 app.post('/api/policies', async (req, res) => {
   try {
     console.log('📡 [2025-12-04T' + new Date().toISOString().split('T')[1] + '] POST /api/policies - IP: ' + (req.ip || req.connection.remoteAddress) + ' - UA: ' + (req.get('user-agent') || 'Unknown'));

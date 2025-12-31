@@ -125,6 +125,12 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const [selectedManager, setSelectedManager] = useState('전체'); // 선택된 담당자 (기본값: 전체)
   const [managerPolicyCounts, setManagerPolicyCounts] = useState({}); // 담당자별 정책 개수
   
+  // 구두정책 카운팅 상태
+  const [shoeCounting, setShoeCounting] = useState({}); // 구두정책 카운팅 데이터
+  const [shoeCountingLoading, setShoeCountingLoading] = useState(false);
+  const [showCompanyModal, setShowCompanyModal] = useState(false);
+  const [selectedCountingData, setSelectedCountingData] = useState(null); // 선택된 카운팅 데이터 (업체 목록 표시용)
+  
   // 필터링 상태 추가
   const [selectedTeamFilter, setSelectedTeamFilter] = useState('all');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState('all');
@@ -258,6 +264,13 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       setNotices([]);
     }
   }, [selectedCategoryForList, selectedYearMonth]);
+
+  // 구두정책 카운팅 데이터 자동 로드
+  useEffect(() => {
+    if ((selectedCategoryForList === 'wireless_shoe' || selectedCategoryForList === 'wired_shoe') && currentView === 'policies') {
+      loadShoeCounting();
+    }
+  }, [selectedCategoryForList, selectedYearMonth, policyType, selectedManager, currentView]);
 
   const loadStores = async () => {
     try {
@@ -638,6 +651,39 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     // 해당 카테고리의 정책 목록 화면으로 이동
     setSelectedCategoryForList(categoryId);
     setCurrentView('policies');
+    
+    // 구두정책인 경우 카운팅 데이터 로드
+    if (categoryId === 'wireless_shoe' || categoryId === 'wired_shoe') {
+      loadShoeCounting();
+    }
+  };
+
+  // 구두정책 카운팅 데이터 로드
+  const loadShoeCounting = async () => {
+    setShoeCountingLoading(true);
+    try {
+      const policyTypeLabel = policyType === 'wireless' ? 'wireless' : 'wired';
+      const counting = await PolicyService.getShoeCounting({
+        yearMonth: selectedYearMonth,
+        policyType: policyTypeLabel,
+        manager: selectedManager === '전체' ? undefined : selectedManager
+      });
+      setShoeCounting(counting);
+    } catch (error) {
+      console.error('구두정책 카운팅 로드 실패:', error);
+      setShoeCounting({});
+    } finally {
+      setShoeCountingLoading(false);
+    }
+  };
+
+  // 카운팅 값 클릭 핸들러
+  const handleCountingClick = (countingItem, managerName) => {
+    setSelectedCountingData({
+      ...countingItem,
+      managerName: managerName
+    });
+    setShowCompanyModal(true);
   };
 
   const handleBackToCategories = () => {
@@ -2184,6 +2230,79 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                {categories[policyType]?.find(cat => cat.id === selectedCategoryForList)?.name} 정책 목록
              </Typography>
             
+            {/* 구두정책 카운팅 UI */}
+            {(selectedCategoryForList === 'wireless_shoe' || selectedCategoryForList === 'wired_shoe') && (
+              <Paper sx={{ mb: 3, p: 2 }}>
+                <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
+                  📊 구두정책 업체 카운팅
+                </Typography>
+                {shoeCountingLoading ? (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+                    <CircularProgress size={24} />
+                  </Box>
+                ) : (
+                  <Box>
+                    {Object.keys(shoeCounting).length === 0 ? (
+                      <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
+                        카운팅 데이터가 없습니다.
+                      </Typography>
+                    ) : (() => {
+                      // selectedManager에 따라 필터링
+                      const filteredCounting = selectedManager === '전체' 
+                        ? shoeCounting 
+                        : { [selectedManager]: shoeCounting[selectedManager] || [] };
+                      
+                      // 필터링된 결과가 없으면 메시지 표시
+                      const hasData = Object.values(filteredCounting).some(items => items.length > 0);
+                      
+                      if (!hasData) {
+                        return (
+                          <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
+                            {selectedManager === '전체' 
+                              ? '카운팅 데이터가 없습니다.' 
+                              : `${selectedManager} 담당자의 카운팅 데이터가 없습니다.`}
+                          </Typography>
+                        );
+                      }
+                      
+                      return Object.entries(filteredCounting).map(([managerName, countingItems]) => {
+                        // 빈 배열이면 표시하지 않음
+                        if (!countingItems || countingItems.length === 0) {
+                          return null;
+                        }
+                        
+                        return (
+                          <Box key={managerName} sx={{ mb: 3 }}>
+                            <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold', color: 'primary.main' }}>
+                              {managerName}
+                            </Typography>
+                            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                              {countingItems.map((item, index) => (
+                                <Chip
+                                  key={index}
+                                  label={`${item.key} 업체수:${item.companyCount}`}
+                                  onClick={() => handleCountingClick(item, managerName)}
+                                  sx={{
+                                    cursor: 'pointer',
+                                    '&:hover': {
+                                      backgroundColor: 'primary.light',
+                                      color: 'white'
+                                    }
+                                  }}
+                                  color="primary"
+                                  variant="outlined"
+                                />
+                              ))}
+                            </Box>
+                          </Box>
+                        );
+                      });
+                    })()}
+                  </Box>
+                )}
+              </Paper>
+            )}
+            
             {/* 필터링 UI */}
             <Box sx={{ mb: 2, display: 'flex', gap: 2, alignItems: 'center' }}>
               {/* 소속정책팀 필터 */}
@@ -3121,6 +3240,57 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                 {bulkProcessingMessage || '처리 중...'}
               </Typography>
             </Backdrop>
+
+            {/* 구두정책 카운팅 업체 목록 모달 */}
+            <Dialog
+              open={showCompanyModal}
+              onClose={() => {
+                setShowCompanyModal(false);
+                setSelectedCountingData(null);
+              }}
+              maxWidth="sm"
+              fullWidth
+            >
+              <DialogTitle>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography variant="h6">
+                    업체 목록
+                  </Typography>
+                  <IconButton
+                    onClick={() => {
+                      setShowCompanyModal(false);
+                      setSelectedCountingData(null);
+                    }}
+                  >
+                    <CancelIcon />
+                  </IconButton>
+                </Box>
+              </DialogTitle>
+              <DialogContent>
+                {selectedCountingData && (
+                  <Box>
+                    <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>
+                      담당자: {selectedCountingData.managerName}
+                    </Typography>
+                    <Typography variant="body2" sx={{ mb: 2, color: 'text.secondary' }}>
+                      {selectedCountingData.key} - 총 {selectedCountingData.companyCount}개 업체
+                    </Typography>
+                    <Box sx={{ maxHeight: 400, overflow: 'auto' }}>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                        {selectedCountingData.companies.map((company, index) => (
+                          <Chip
+                            key={index}
+                            label={company}
+                            sx={{ width: '100%', justifyContent: 'flex-start' }}
+                            variant="outlined"
+                          />
+                        ))}
+                      </Box>
+                    </Box>
+                  </Box>
+                )}
+              </DialogContent>
+            </Dialog>
                     </Box>
   );
 }

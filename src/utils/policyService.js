@@ -368,6 +368,29 @@ export class PolicyService {
     
     return categoryNames[categoryId] || '기타';
   }
+
+  // 구두정책 카운팅 조회
+  static async getShoeCounting(filters = {}) {
+    try {
+      const queryParams = new URLSearchParams();
+      
+      if (filters.yearMonth) queryParams.append('yearMonth', filters.yearMonth);
+      if (filters.policyType) queryParams.append('policyType', filters.policyType);
+      if (filters.manager) queryParams.append('manager', filters.manager);
+      
+      const response = await fetch(`${API_URL}/api/policies/shoe-counting?${queryParams}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      return data.counting || {};
+    } catch (error) {
+      console.error('구두정책 카운팅 조회 실패:', error);
+      throw error;
+    }
+  }
 }
 
 export default PolicyService; 
