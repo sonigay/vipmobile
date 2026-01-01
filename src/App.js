@@ -1174,23 +1174,45 @@ function AppContent() {
     try {
       const currentMode = isAgentMode ? '관리자모드' : '일반모드';
       const userId = loggedInStore.id || loggedInStore.contactId || '';
-      
       const API_URL = process.env.REACT_APP_API_URL || '';
-      const response = await fetch(`${API_URL}/api/map-display-option?userId=${encodeURIComponent(userId)}&mode=${encodeURIComponent(currentMode)}`, {
-        headers: {
-          'x-user-role': loggedInStore.userRole || loggedInStore.agentInfo?.agentModePermission || '',
-          'x-user-id': userId
-        }
-      });
+      
+      if (isAgentMode) {
+        // 관리자모드: 자신의 userId로 옵션 조회
+        const response = await fetch(`${API_URL}/api/map-display-option?userId=${encodeURIComponent(userId)}&mode=${encodeURIComponent(currentMode)}`, {
+          headers: {
+            'x-user-role': loggedInStore.userRole || loggedInStore.agentInfo?.agentModePermission || '',
+            'x-user-id': userId
+          }
+        });
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          setMapDisplayOption({
-            option: data.option || '전체',
-            value: data.value || '',
-            mode: data.mode || currentMode
-          });
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success) {
+            setMapDisplayOption({
+              option: data.option || '전체',
+              value: data.value || '',
+              mode: data.mode || currentMode
+            });
+          }
+        }
+      } else {
+        // 일반모드: "GENERAL_MODE"로 저장된 옵션 조회
+        const response = await fetch(`${API_URL}/api/map-display-option?userId=GENERAL_MODE&mode=${encodeURIComponent(currentMode)}`, {
+          headers: {
+            'x-user-role': loggedInStore.userRole || '',
+            'x-user-id': userId
+          }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success) {
+            setMapDisplayOption({
+              option: data.option || '전체',
+              value: '', // 일반모드는 값이 없음 (자동으로 사용자 속성값 사용)
+              mode: data.mode || currentMode
+            });
+          }
         }
       }
     } catch (error) {
@@ -1308,7 +1330,8 @@ function AppContent() {
               case '소속별':
                 return store.department === userDepartment;
               case '담당자별':
-                return store.manager === userManager;
+                // F열(5인덱스) 담당자 필드 사용 (managerForFilter)
+                return (store.managerForFilter || store.manager) === userManager;
               default:
                 return true;
             }
@@ -1326,7 +1349,8 @@ function AppContent() {
                 case '소속별':
                   return store.department === optionValue;
                 case '담당자별':
-                  return store.manager === optionValue;
+                  // F열(5인덱스) 담당자 필드 사용 (managerForFilter)
+                  return (store.managerForFilter || store.manager) === optionValue;
                 default:
                   return true;
               }

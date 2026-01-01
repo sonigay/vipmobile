@@ -2329,10 +2329,11 @@ app.get('/api/stores', async (req, res) => {
         const managerName = (row[29] || '').toString().trim(); // AD열: 점장명 (29번째 컬럼)
         const accountInfo = (row[35] || '').toString().trim(); // AJ열: 계좌정보 (35번째 컬럼)
         
-        // 코드/사무실/소속 정보 추가 (필터링용)
+        // 코드/사무실/소속/담당자 정보 추가 (필터링용)
         const code = (row[7] || '').toString().trim();        // H열(7인덱스): 코드
         const office = (row[3] || '').toString().trim();      // D열(3인덱스): 사무실
         const department = (row[4] || '').toString().trim();  // E열(4인덱스): 소속
+        const managerForFilter = (row[5] || '').toString().trim(); // F열(5인덱스): 담당자 (필터링용)
 
         return {
           id: storeId.toString(),
@@ -2341,6 +2342,7 @@ app.get('/api/stores', async (req, res) => {
           phone,
           storePhone,
           manager, // 기존 담당자 필드 유지 (V열, 21인덱스)
+          managerForFilter, // F열(5인덱스): 담당자 (필터링용)
           managerName, // 점장명 추가
           businessNumber,
           accountInfo,
@@ -2581,13 +2583,6 @@ app.get('/api/map-display-option/users', async (req, res) => {
         isAgent: true
       }));
 
-    const allUsers = [...users, ...agentUsers];
-    console.log('🔍 [지도옵션] 사용자 목록 조회 결과:', {
-      일반모드사용자수: users.length,
-      관리자모드사용자수: agentUsers.length,
-      전체사용자수: allUsers.length
-    });
-
     // 모든 사용자의 옵션 설정을 한 번에 조회
     const sheetName = '지도재고노출옵션';
     const optionResponse = await rateLimitedSheetsCall(() =>
@@ -2614,13 +2609,29 @@ app.get('/api/map-display-option/users', async (req, res) => {
       };
     });
 
-    // 각 사용자에 옵션 설정 추가
-    const usersWithOptions = allUsers.map(user => {
+    // 관리자모드 사용자에 옵션 설정 추가
+    const agentUsersWithOptions = agentUsers.map(user => {
       const adminKey = `${user.userId}_관리자모드`;
       const generalKey = `${user.userId}_일반모드`;
       
       return {
         ...user,
+        type: 'agent',
+        options: {
+          관리자모드: optionsMap[adminKey] || { option: '전체', value: '', updatedAt: '', updatedBy: '' },
+          일반모드: optionsMap[generalKey] || { option: '전체', value: '', updatedAt: '', updatedBy: '' }
+        }
+      };
+    });
+
+    // 일반모드 사용자에 옵션 설정 추가
+    const generalUsersWithOptions = users.map(user => {
+      const adminKey = `${user.userId}_관리자모드`;
+      const generalKey = `${user.userId}_일반모드`;
+      
+      return {
+        ...user,
+        type: 'general',
         options: {
           관리자모드: optionsMap[adminKey] || { option: '전체', value: '', updatedAt: '', updatedBy: '' },
           일반모드: optionsMap[generalKey] || { option: '전체', value: '', updatedAt: '', updatedBy: '' }
@@ -2629,15 +2640,15 @@ app.get('/api/map-display-option/users', async (req, res) => {
     });
 
     console.log('🔍 [지도옵션] 사용자 목록 조회 결과:', {
-      일반모드사용자수: users.length,
-      관리자모드사용자수: agentUsers.length,
-      전체사용자수: allUsers.length,
+      일반모드사용자수: generalUsersWithOptions.length,
+      관리자모드사용자수: agentUsersWithOptions.length,
       옵션설정수: optionRows.length
     });
 
     return res.json({
       success: true,
-      users: usersWithOptions
+      agentUsers: agentUsersWithOptions,  // 관리자모드 사용자
+      generalUsers: generalUsersWithOptions  // 일반모드 사용자
     });
   } catch (error) {
     console.error('사용자 목록 조회 오류:', error);
