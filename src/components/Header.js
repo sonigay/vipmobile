@@ -613,7 +613,26 @@ function Header({ inventoryUserName, isInventoryMode, currentUserId, onLogout, l
           )}
           
           {/* 지도 재고 노출 옵션 설정 버튼 (M 권한자만) */}
-          {loggedInStore && (loggedInStore.userRole === 'M' || loggedInStore.agentInfo?.agentModePermission === 'M') && (
+          {(() => {
+            if (!loggedInStore) return false;
+            const userRole = loggedInStore.userRole;
+            const agentModePermission = loggedInStore.agentInfo?.agentModePermission;
+            const isMPermission = userRole === 'M' || 
+                                 agentModePermission === 'M' ||
+                                 (agentModePermission && agentModePermission.toString().toUpperCase() === 'M');
+            
+            // 디버깅 로그
+            if (isAgentMode) {
+              console.log('🔍 [지도옵션] 권한 체크:', {
+                userRole,
+                agentModePermission,
+                agentInfo: loggedInStore.agentInfo,
+                isMPermission
+              });
+            }
+            
+            return isMPermission;
+          })() && (
             <Tooltip title="지도 재고 노출 옵션 설정">
               <IconButton
                 color="inherit"

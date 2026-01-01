@@ -310,7 +310,8 @@ function Login({ onLogin }) {
         userRole: data.agentInfo.userRole,
         obManagementRole: data.agentInfo.obManagementRole,
         meetingRole: data.agentInfo.meetingRole, // 회의 모드 권한 추가
-        modePermissions: data.modePermissions
+        modePermissions: data.modePermissions,
+        agentInfo: data.agentInfo // agentInfo 전체 전달 (agentModePermission 포함)
       });
     } else if (data.isInventory) {
       // 재고 관리자 로그인
