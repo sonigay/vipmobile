@@ -2328,6 +2328,11 @@ app.get('/api/stores', async (req, res) => {
         const businessNumber = (row[28] || '').toString().trim(); // AC열: 사업자번호 (28번째 컬럼)
         const managerName = (row[29] || '').toString().trim(); // AD열: 점장명 (29번째 컬럼)
         const accountInfo = (row[35] || '').toString().trim(); // AJ열: 계좌정보 (35번째 컬럼)
+        
+        // 코드/사무실/소속 정보 추가 (필터링용)
+        const code = (row[7] || '').toString().trim();        // H열(7인덱스): 코드
+        const office = (row[3] || '').toString().trim();      // D열(3인덱스): 사무실
+        const department = (row[4] || '').toString().trim();  // E열(4인덱스): 소속
 
         return {
           id: storeId.toString(),
@@ -2335,7 +2340,7 @@ app.get('/api/stores', async (req, res) => {
           address,
           phone,
           storePhone,
-          manager, // 기존 담당자 필드 유지
+          manager, // 기존 담당자 필드 유지 (V열, 21인덱스)
           managerName, // 점장명 추가
           businessNumber,
           accountInfo,
@@ -2343,7 +2348,10 @@ app.get('/api/stores', async (req, res) => {
           latitude,
           longitude,
           uniqueId: `${storeId}_${name}`,
-          inventory: inventory
+          inventory: inventory,
+          code,        // H열: 코드 (필터링용)
+          office,      // D열: 사무실 (필터링용)
+          department   // E열: 소속 (필터링용)
         };
       })
       .filter(store => store !== null); // null 값 제거
@@ -2356,6 +2364,229 @@ app.get('/api/stores', async (req, res) => {
     console.error('Error fetching store data:', error);
     res.status(500).json({
       error: 'Failed to fetch store data',
+      message: error.message
+    });
+  }
+});
+
+// 지도 재고 노출 옵션 조회 API
+app.get('/api/map-display-option', async (req, res) => {
+  try {
+    const { userId, mode } = req.query; // mode: '관리자모드' 또는 '일반모드'
+
+    const sheetName = '지도재고노출옵션';
+    const response = await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${sheetName}!A:F`,
+      })
+    );
+
+    const values = response.data.values || [];
+    if (values.length <= 1) {
+      // 헤더만 있거나 데이터가 없으면 기본값 반환
+      return res.json({
+        success: true,
+        option: '전체',
+        value: '',
+        mode: mode || '관리자모드'
+      });
+    }
+
+    // 헤더 제외하고 데이터 검색
+    const rows = values.slice(1);
+    const foundRow = rows.find(row => {
+      const rowUserId = (row[0] || '').toString().trim();
+      const rowMode = (row[1] || '').toString().trim();
+      return rowUserId === userId && rowMode === mode;
+    });
+
+    if (foundRow) {
+      return res.json({
+        success: true,
+        option: foundRow[2] || '전체', // C열: 노출옵션
+        value: foundRow[3] || '',      // D열: 선택값
+        mode: foundRow[1] || mode,     // B열: 모드구분
+        updatedAt: foundRow[4] || '',  // E열: 수정일시
+        updatedBy: foundRow[5] || ''   // F열: 수정자
+      });
+    }
+
+    // 옵션이 없으면 기본값 반환
+    return res.json({
+      success: true,
+      option: '전체',
+      value: '',
+      mode: mode || '관리자모드'
+    });
+  } catch (error) {
+    console.error('지도 재고 노출 옵션 조회 오류:', error);
+    return res.status(500).json({
+      success: false,
+      error: '옵션 조회에 실패했습니다.',
+      message: error.message
+    });
+  }
+});
+
+// 지도 재고 노출 옵션 저장 API
+app.post('/api/map-display-option', async (req, res) => {
+  try {
+    const { userId, mode, option, value, updatedBy } = req.body;
+
+    // 권한 체크: "M" 권한자만 저장 가능
+    const userRole = req.headers['x-user-role'];
+    if (userRole !== 'M') {
+      return res.status(403).json({
+        success: false,
+        error: '권한이 없습니다. "M" 권한자만 옵션을 설정할 수 있습니다.'
+      });
+    }
+
+    if (!userId || !mode || !option) {
+      return res.status(400).json({
+        success: false,
+        error: '필수 파라미터가 누락되었습니다.'
+      });
+    }
+
+    const sheetName = '지도재고노출옵션';
+    const now = new Date().toLocaleString('ko-KR');
+
+    // 기존 데이터 조회
+    const response = await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${sheetName}!A:F`,
+      })
+    );
+
+    const values = response.data.values || [];
+    const rows = values.length > 1 ? values.slice(1) : [];
+
+    // 기존 행 찾기
+    const existingRowIndex = rows.findIndex(row => {
+      const rowUserId = (row[0] || '').toString().trim();
+      const rowMode = (row[1] || '').toString().trim();
+      return rowUserId === userId && rowMode === mode;
+    });
+
+    const newRow = [
+      userId,           // A열: 사용자ID
+      mode,             // B열: 모드구분
+      option,           // C열: 노출옵션
+      value || '',      // D열: 선택값
+      now,              // E열: 수정일시
+      updatedBy || ''   // F열: 수정자
+    ];
+
+    if (existingRowIndex !== -1) {
+      // 기존 행 업데이트 (헤더 + 인덱스 + 1)
+      await rateLimitedSheetsCall(() =>
+        sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${sheetName}!A${existingRowIndex + 2}:F${existingRowIndex + 2}`,
+          valueInputOption: 'RAW',
+          resource: {
+            values: [newRow]
+          }
+        })
+      );
+    } else {
+      // 새 행 추가
+      await rateLimitedSheetsCall(() =>
+        sheets.spreadsheets.values.append({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${sheetName}!A:F`,
+          valueInputOption: 'RAW',
+          insertDataOption: 'INSERT_ROWS',
+          resource: {
+            values: [newRow]
+          }
+        })
+      );
+    }
+
+    return res.json({
+      success: true,
+      message: '옵션이 저장되었습니다.'
+    });
+  } catch (error) {
+    console.error('지도 재고 노출 옵션 저장 오류:', error);
+    return res.status(500).json({
+      success: false,
+      error: '옵션 저장에 실패했습니다.',
+      message: error.message
+    });
+  }
+});
+
+// "O" 사용자 목록 조회 API (M 권한자용)
+app.get('/api/map-display-option/users', async (req, res) => {
+  try {
+    // 권한 체크: "M" 권한자만 조회 가능
+    const userRole = req.headers['x-user-role'];
+    if (userRole !== 'M') {
+      return res.status(403).json({
+        success: false,
+        error: '권한이 없습니다.'
+      });
+    }
+
+    // 일반모드권한관리 시트에서 "O" 사용자 목록 가져오기
+    const generalModeSheetName = '일반모드권한관리';
+    const generalModeResponse = await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${generalModeSheetName}!A:K`,
+      })
+    );
+
+    const generalModeValues = generalModeResponse.data.values || [];
+    const generalModeRows = generalModeValues.length > 3 ? generalModeValues.slice(3) : [];
+
+    // 기본모드 권한이 있는 사용자만 필터링 (D열이 'O')
+    const users = generalModeRows
+      .filter(row => row[3] === 'O') // D열: 기본 모드 권한
+      .map(row => ({
+        userId: row[0] || '',      // A열: 사용자ID
+        name: row[1] || '',        // B열: 업체명
+        group: row[2] || ''        // C열: 그룹
+      }));
+
+    // 관리자모드 사용자도 추가 (대리점아이디관리 시트에서 Z열이 'O' 또는 'M'인 사용자)
+    const agentSheetName = '대리점아이디관리';
+    const agentResponse = await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${agentSheetName}!A:AF`,
+      })
+    );
+
+    const agentValues = agentResponse.data.values || [];
+    const agentRows = agentValues.length > 1 ? agentValues.slice(1) : [];
+
+    const agentUsers = agentRows
+      .filter(row => {
+        const agentModePermission = (row[25] || '').toString().trim().toUpperCase();
+        return agentModePermission === 'O' || agentModePermission === 'M';
+      })
+      .map(row => ({
+        userId: row[2] || '',      // C열: 연락처(아이디)
+        name: `${row[0] || ''} (${row[1] || ''})`, // A열: 대상, B열: 자격
+        group: row[5] || '',       // F열: 사무실
+        isAgent: true
+      }));
+
+    return res.json({
+      success: true,
+      users: [...users, ...agentUsers]
+    });
+  } catch (error) {
+    console.error('사용자 목록 조회 오류:', error);
+    return res.status(500).json({
+      success: false,
+      error: '사용자 목록 조회에 실패했습니다.',
       message: error.message
     });
   }
@@ -3507,7 +3738,8 @@ app.post('/api/login', async (req, res) => {
         const hasSmsManagementPermission = agent[23] === 'O'; // X열: SMS 관리모드 권한 (기존 V열)
         const obManagementPermissionRaw = (agent[24] || '').toString().trim().toUpperCase();
         const hasObManagementPermission = ['O', 'M', 'S'].includes(obManagementPermissionRaw); // Y열: OB 관리모드 권한 (기존 W열)
-        const hasAgentModePermission = agent[25] === 'O'; // Z열: 관리자모드 권한 (기존 X열)
+        const agentModePermissionRaw = (agent[25] || '').toString().trim().toUpperCase();
+        const hasAgentModePermission = agentModePermissionRaw === 'O' || agentModePermissionRaw === 'M'; // Z열: 관리자모드 권한 (O 또는 M)
         // AA열: 온세일관리모드 접속 권한 (O, S, M 모두 접속 가능)
         const hasOnSaleManagementPermission = agent[26] === 'O' || agent[26] === 'S' || agent[26] === 'M';
         const hasOnSaleLinkPermission = agent[26] === 'S'; // AA열: 온세일 링크관리 권한
@@ -3610,7 +3842,8 @@ app.post('/api/login', async (req, res) => {
             obManagementRole: obManagementPermissionRaw || '',
             meetingRole: meetingPermissionRaw || '', // 회의 모드 권한 추가
             onSaleLink: hasOnSaleLinkPermission || hasOnSalePolicyPermission, // AA열: 온세일 링크관리 권한 (S 또는 M)
-            onSalePolicy: hasOnSalePolicyPermission // AA열: 온세일 정책게시판 권한 (M 권한만)
+            onSalePolicy: hasOnSalePolicyPermission, // AA열: 온세일 정책게시판 권한 (M 권한만)
+            agentModePermission: agentModePermissionRaw || '' // Z열: 관리자모드 권한 (O 또는 M)
           }
         };
 
@@ -3687,12 +3920,16 @@ app.post('/api/login', async (req, res) => {
           });
         }
 
-        // 폰클출고처데이터에서 추가 정보 가져오기 (위도, 경도 등)
+        // 폰클출고처데이터에서 추가 정보 가져오기 (위도, 경도, 코드, 사무실, 소속, 담당자 등)
         let storeDetails = {
           latitude: 0,
           longitude: 0,
           address: '',
-          phone: ''
+          phone: '',
+          code: '',        // H열(7인덱스): 코드
+          office: '',      // D열(3인덱스): 사무실
+          department: '',  // E열(4인덱스): 소속
+          manager: ''       // F열(5인덱스): 담당자
         };
 
         if (storeValues) {
@@ -3704,7 +3941,11 @@ app.post('/api/login', async (req, res) => {
               address: foundStoreRow[11] || '',
               latitude: parseFloat(foundStoreRow[8] || '0'),
               longitude: parseFloat(foundStoreRow[9] || '0'),
-              phone: foundStoreRow[19] || ''
+              phone: foundStoreRow[19] || '',
+              code: (foundStoreRow[7] || '').toString().trim(),        // H열(7인덱스): 코드
+              office: (foundStoreRow[3] || '').toString().trim(),      // D열(3인덱스): 사무실
+              department: (foundStoreRow[4] || '').toString().trim(),  // E열(4인덱스): 소속
+              manager: (foundStoreRow[5] || '').toString().trim()       // F열(5인덱스): 담당자
             };
           }
         }

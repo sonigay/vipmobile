@@ -169,6 +169,9 @@ function AppContent() {
   const [isDirectStoreManagementMode, setIsDirectStoreManagementMode] = useState(false);
   const [isDirectStoreMode, setIsDirectStoreMode] = useState(false);
   const [isGeneralPolicyMode, setIsGeneralPolicyMode] = useState(false);
+  // 지도 재고 노출 옵션 관련 상태 추가
+  const [mapDisplayOption, setMapDisplayOption] = useState({ option: '전체', value: '', mode: '관리자모드' });
+  const [mapDisplayOptionLoading, setMapDisplayOptionLoading] = useState(false);
   // 재고배정 모드 관련 상태 추가
   // 배정 모드 관련 상태 제거 (재고 모드로 이동)
   // 실시간 대시보드 모드 관련 상태 제거 (재고 모드로 이동)
@@ -1156,10 +1159,57 @@ function AppContent() {
     }
   }, [isLoggedIn, isAgentMode, currentView]);
 
+  // 노출 옵션 로드 함수
+  const loadMapDisplayOption = useCallback(async () => {
+    if (!isLoggedIn || !loggedInStore) return;
+
+    // 고객모드는 옵션 로드 안 함
+    const isCustomerMode = loggedInStore.modePermissions?.customerMode;
+    if (isCustomerMode) {
+      setMapDisplayOption({ option: '전체', value: '', mode: '관리자모드' });
+      return;
+    }
+
+    setMapDisplayOptionLoading(true);
+    try {
+      const currentMode = isAgentMode ? '관리자모드' : '일반모드';
+      const userId = loggedInStore.id || loggedInStore.contactId || '';
+      
+      const API_URL = process.env.REACT_APP_API_URL || '';
+      const response = await fetch(`${API_URL}/api/map-display-option?userId=${encodeURIComponent(userId)}&mode=${encodeURIComponent(currentMode)}`, {
+        headers: {
+          'x-user-role': loggedInStore.userRole || loggedInStore.agentInfo?.agentModePermission || '',
+          'x-user-id': userId
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setMapDisplayOption({
+            option: data.option || '전체',
+            value: data.value || '',
+            mode: data.mode || currentMode
+          });
+        }
+      }
+    } catch (error) {
+      console.error('노출 옵션 로드 오류:', error);
+      setMapDisplayOption({ option: '전체', value: '', mode: isAgentMode ? '관리자모드' : '일반모드' });
+    } finally {
+      setMapDisplayOptionLoading(false);
+    }
+  }, [isLoggedIn, loggedInStore, isAgentMode]);
+
   // 초기 데이터 로딩
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // 노출 옵션 로드
+  useEffect(() => {
+    loadMapDisplayOption();
+  }, [loadMapDisplayOption]);
 
   // 캐시 상태 주기적 업데이트
   useEffect(() => {
@@ -1239,6 +1289,52 @@ function AppContent() {
         // console.log(`담당자별 필터링 결과: ${filtered.length}개 매장`);
       }
 
+      // 2-1. 지도 재고 노출 옵션 필터링 적용 (고객모드 제외)
+      const isCustomerMode = loggedInStore?.modePermissions?.customerMode;
+      if (!isCustomerMode && mapDisplayOption.option && mapDisplayOption.option !== '전체') {
+        if (!isAgentMode) {
+          // 일반모드: 본인 속성값과 동일한 것만 표시
+          const userCode = loggedInStore?.code || '';
+          const userOffice = loggedInStore?.office || '';
+          const userDepartment = loggedInStore?.department || '';
+          const userManager = loggedInStore?.manager || loggedInStore?.group || '';
+
+          filtered = filtered.filter(store => {
+            switch (mapDisplayOption.option) {
+              case '코드별':
+                return store.code === userCode;
+              case '사무실별':
+                return store.office === userOffice;
+              case '소속별':
+                return store.department === userDepartment;
+              case '담당자별':
+                return store.manager === userManager;
+              default:
+                return true;
+            }
+          });
+        } else {
+          // 관리자모드: 저장된 옵션값에 따라 필터링
+          const optionValue = mapDisplayOption.value || '';
+          if (optionValue) {
+            filtered = filtered.filter(store => {
+              switch (mapDisplayOption.option) {
+                case '코드별':
+                  return store.code === optionValue;
+                case '사무실별':
+                  return store.office === optionValue;
+                case '소속별':
+                  return store.department === optionValue;
+                case '담당자별':
+                  return store.manager === optionValue;
+                default:
+                  return true;
+              }
+            });
+          }
+        }
+      }
+
       // 3. 거리 계산
       if (userLocation) {
         filtered = filtered.map(store => {
@@ -1276,7 +1372,7 @@ function AppContent() {
       console.error('필터링 중 오류 발생:', error);
       setFilteredStores([]);
     }
-  }, [data, selectedRadius, userLocation, isAgentMode, currentView, agentTarget]);
+  }, [data, selectedRadius, userLocation, isAgentMode, currentView, agentTarget, loggedInStore, mapDisplayOption]);
 
   const handleLogin = (store) => {
     console.log('🔍 handleLogin 호출됨:', store);
@@ -3933,6 +4029,8 @@ ${requestList}
             }}
             availableModes={availableModes}
             onCheckUpdate={() => setShowAppUpdatePopup(true)}
+            mapDisplayOption={mapDisplayOption}
+            onMapDisplayOptionChange={loadMapDisplayOption}
           />
           {isLoading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1 }}>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { AppBar, Toolbar, Typography, Button, Box, Chip, IconButton, Tooltip, Dialog, DialogTitle, DialogContent, DialogActions, Switch, FormControlLabel, Alert, Menu, MenuItem } from '@mui/material';
+import { AppBar, Toolbar, Typography, Button, Box, Chip, IconButton, Tooltip, Dialog, DialogTitle, DialogContent, DialogActions, Switch, FormControlLabel, Alert, Menu, MenuItem, Select, FormControl, InputLabel, TextField, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Tabs, Tab, CircularProgress } from '@mui/material';
 import { 
   Update as UpdateIcon, 
   Person as PersonIcon, 
@@ -10,7 +10,9 @@ import {
   Assignment as AssignmentIcon,
   Business as BusinessIcon,
   MoreVert as MoreVertIcon,
-  SwapHoriz as SwapHorizIcon
+  SwapHoriz as SwapHorizIcon,
+  Map as MapIcon,
+  Settings as SettingsIcon
 } from '@mui/icons-material';
 import { 
   subscribeToPushNotifications, 
@@ -23,7 +25,7 @@ import {
 } from '../utils/pushNotificationUtils';
 import { getModeColor, getModeTitle, resolveModeKey } from '../config/modeConfig';
 
-function Header({ inventoryUserName, isInventoryMode, currentUserId, onLogout, loggedInStore, isAgentMode, currentView, onViewChange, activationData, agentTarget, data, onModeChange, availableModes, onCheckUpdate = null, currentMode }) {
+function Header({ inventoryUserName, isInventoryMode, currentUserId, onLogout, loggedInStore, isAgentMode, currentView, onViewChange, activationData, agentTarget, data, onModeChange, availableModes, onCheckUpdate = null, currentMode, mapDisplayOption, onMapDisplayOptionChange }) {
   const [pushDialogOpen, setPushDialogOpen] = useState(false);
   const [pushPermission, setPushPermission] = useState('default');
   const [pushSubscribed, setPushSubscribed] = useState(false);
@@ -31,6 +33,11 @@ function Header({ inventoryUserName, isInventoryMode, currentUserId, onLogout, l
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [menuAnchorEl, setMenuAnchorEl] = useState(null);
+  const [mapDisplayOptionDialogOpen, setMapDisplayOptionDialogOpen] = useState(false);
+  const [mapDisplayOptionUsers, setMapDisplayOptionUsers] = useState([]);
+  const [mapDisplayOptionLoading, setMapDisplayOptionLoading] = useState(false);
+  const [mapDisplayOptionTab, setMapDisplayOptionTab] = useState(0); // 0: 관리자모드, 1: 일반모드
+  const [mapDisplayOptionSettings, setMapDisplayOptionSettings] = useState({}); // { userId: { option, value } }
 
   // 매장 재고 계산 함수 (일반모드용)
   const getStoreInventory = (store) => {
@@ -323,6 +330,105 @@ function Header({ inventoryUserName, isInventoryMode, currentUserId, onLogout, l
     setMenuAnchorEl(null);
   };
 
+  // 지도 재고 노출 옵션 사용자 목록 로드
+  const loadMapDisplayOptionUsers = async () => {
+    setMapDisplayOptionLoading(true);
+    try {
+      const API_URL = process.env.REACT_APP_API_URL || '';
+      const response = await fetch(`${API_URL}/api/map-display-option/users`, {
+        headers: {
+          'x-user-role': loggedInStore?.userRole || loggedInStore?.agentInfo?.agentModePermission || '',
+          'x-user-id': loggedInStore?.id || loggedInStore?.contactId || ''
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setMapDisplayOptionUsers(data.users || []);
+          
+          // 각 사용자의 옵션 설정 로드
+          const settings = {};
+          for (const user of data.users) {
+            for (const mode of ['관리자모드', '일반모드']) {
+              const optionResponse = await fetch(`${API_URL}/api/map-display-option?userId=${encodeURIComponent(user.userId)}&mode=${encodeURIComponent(mode)}`, {
+                headers: {
+                  'x-user-role': loggedInStore?.userRole || loggedInStore?.agentInfo?.agentModePermission || '',
+                  'x-user-id': loggedInStore?.id || loggedInStore?.contactId || ''
+                }
+              });
+              
+              if (optionResponse.ok) {
+                const optionData = await optionResponse.json();
+                if (optionData.success) {
+                  settings[`${user.userId}_${mode}`] = {
+                    option: optionData.option || '전체',
+                    value: optionData.value || '',
+                    updatedAt: optionData.updatedAt || '',
+                    updatedBy: optionData.updatedBy || ''
+                  };
+                }
+              }
+            }
+          }
+          setMapDisplayOptionSettings(settings);
+        }
+      }
+    } catch (error) {
+      console.error('사용자 목록 로드 오류:', error);
+      setError('사용자 목록을 불러오는 중 오류가 발생했습니다.');
+    } finally {
+      setMapDisplayOptionLoading(false);
+    }
+  };
+
+  // 지도 재고 노출 옵션 저장
+  const handleSaveMapDisplayOptions = async () => {
+    setMapDisplayOptionLoading(true);
+    try {
+      const API_URL = process.env.REACT_APP_API_URL || '';
+      const currentMode = mapDisplayOptionTab === 0 ? '관리자모드' : '일반모드';
+      
+      for (const user of mapDisplayOptionUsers) {
+        const key = `${user.userId}_${currentMode}`;
+        const setting = mapDisplayOptionSettings[key];
+        
+        if (setting) {
+          const response = await fetch(`${API_URL}/api/map-display-option`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-user-role': loggedInStore?.userRole || loggedInStore?.agentInfo?.agentModePermission || '',
+              'x-user-id': loggedInStore?.id || loggedInStore?.contactId || ''
+            },
+            body: JSON.stringify({
+              userId: user.userId,
+              mode: currentMode,
+              option: setting.option,
+              value: setting.value || '',
+              updatedBy: loggedInStore?.name || loggedInStore?.agentInfo?.target || ''
+            })
+          });
+
+          if (!response.ok) {
+            throw new Error(`옵션 저장 실패: ${user.userId}`);
+          }
+        }
+      }
+
+      alert('옵션이 저장되었습니다.');
+      if (onMapDisplayOptionChange) {
+        onMapDisplayOptionChange();
+      }
+      setMapDisplayOptionDialogOpen(false);
+    } catch (error) {
+      console.error('옵션 저장 오류:', error);
+      setError('옵션 저장 중 오류가 발생했습니다.');
+    } finally {
+      setMapDisplayOptionLoading(false);
+    }
+  };
+
   const handleViewChange = (view) => {
     if (onViewChange) {
       onViewChange(view);
@@ -506,6 +612,25 @@ function Header({ inventoryUserName, isInventoryMode, currentUserId, onLogout, l
             </Button>
           )}
           
+          {/* 지도 재고 노출 옵션 설정 버튼 (M 권한자만) */}
+          {loggedInStore && (loggedInStore.userRole === 'M' || loggedInStore.agentInfo?.agentModePermission === 'M') && (
+            <Tooltip title="지도 재고 노출 옵션 설정">
+              <IconButton
+                color="inherit"
+                onClick={() => {
+                  setMapDisplayOptionDialogOpen(true);
+                  loadMapDisplayOptionUsers();
+                }}
+                sx={{ 
+                  border: '1px solid rgba(255,255,255,0.3)',
+                  borderRadius: 1
+                }}
+              >
+                <MapIcon />
+              </IconButton>
+            </Tooltip>
+          )}
+
           {/* 관리자모드 메뉴 */}
           {isAgentMode && (
             <IconButton
@@ -640,6 +765,105 @@ function Header({ inventoryUserName, isInventoryMode, currentUserId, onLogout, l
           담당개통확인
         </MenuItem>
       </Menu>
+
+      {/* 지도 재고 노출 옵션 설정 다이얼로그 */}
+      <Dialog 
+        open={mapDisplayOptionDialogOpen} 
+        onClose={() => setMapDisplayOptionDialogOpen(false)} 
+        maxWidth="lg" 
+        fullWidth
+      >
+        <DialogTitle>
+          지도 재고 노출 옵션 설정
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 2 }}>
+            <Tabs value={mapDisplayOptionTab} onChange={(e, newValue) => setMapDisplayOptionTab(newValue)}>
+              <Tab label="관리자모드" />
+              <Tab label="일반모드" />
+            </Tabs>
+
+            {mapDisplayOptionLoading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+                <CircularProgress />
+              </Box>
+            ) : (
+              <TableContainer component={Paper} sx={{ mt: 2, maxHeight: 400 }}>
+                <Table stickyHeader>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>사용자ID</TableCell>
+                      <TableCell>이름</TableCell>
+                      <TableCell>노출옵션</TableCell>
+                      <TableCell>선택값</TableCell>
+                      <TableCell>수정일시</TableCell>
+                      <TableCell>수정자</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {mapDisplayOptionUsers.map((user) => {
+                      const currentMode = mapDisplayOptionTab === 0 ? '관리자모드' : '일반모드';
+                      const setting = mapDisplayOptionSettings[`${user.userId}_${currentMode}`] || { option: '전체', value: '' };
+                      
+                      return (
+                        <TableRow key={user.userId}>
+                          <TableCell>{user.userId}</TableCell>
+                          <TableCell>{user.name}</TableCell>
+                          <TableCell>
+                            <FormControl size="small" sx={{ minWidth: 120 }}>
+                              <Select
+                                value={setting.option}
+                                onChange={(e) => {
+                                  const newSettings = { ...mapDisplayOptionSettings };
+                                  const key = `${user.userId}_${currentMode}`;
+                                  newSettings[key] = { ...setting, option: e.target.value };
+                                  setMapDisplayOptionSettings(newSettings);
+                                }}
+                              >
+                                <MenuItem value="전체">전체</MenuItem>
+                                <MenuItem value="코드별">코드별</MenuItem>
+                                <MenuItem value="사무실별">사무실별</MenuItem>
+                                <MenuItem value="소속별">소속별</MenuItem>
+                                <MenuItem value="담당자별">담당자별</MenuItem>
+                              </Select>
+                            </FormControl>
+                          </TableCell>
+                          <TableCell>
+                            <TextField
+                              size="small"
+                              value={setting.value}
+                              onChange={(e) => {
+                                const newSettings = { ...mapDisplayOptionSettings };
+                                const key = `${user.userId}_${currentMode}`;
+                                newSettings[key] = { ...setting, value: e.target.value };
+                                setMapDisplayOptionSettings(newSettings);
+                              }}
+                              placeholder="선택값 (일반모드는 자동)"
+                              disabled={!isAgentMode && mapDisplayOptionTab === 1}
+                            />
+                          </TableCell>
+                          <TableCell>{setting.updatedAt || '-'}</TableCell>
+                          <TableCell>{setting.updatedBy || '-'}</TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setMapDisplayOptionDialogOpen(false)}>취소</Button>
+          <Button 
+            onClick={handleSaveMapDisplayOptions} 
+            variant="contained"
+            disabled={mapDisplayOptionLoading}
+          >
+            저장
+          </Button>
+        </DialogActions>
+      </Dialog>
     </AppBar>
   );
 }

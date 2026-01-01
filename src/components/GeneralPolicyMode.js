@@ -15,7 +15,9 @@ import {
   DialogActions
 } from '@mui/material';
 import {
-  Lock as LockIcon
+  Lock as LockIcon,
+  Update as UpdateIcon,
+  SwapHoriz as SwapHorizIcon
 } from '@mui/icons-material';
 import AppUpdatePopup from './AppUpdatePopup';
 import PolicyTableListTab from './policy/PolicyTableListTab';
@@ -172,16 +174,44 @@ const GeneralPolicyMode = ({
     <Box sx={{ flexGrow: 1 }}>
       <AppBar position="static" sx={{ bgcolor: '#FF9800' }}>
         <Toolbar>
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+          <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: 600 }}>
             일반정책모드
           </Typography>
+          
+          {/* 업데이트 확인 버튼 */}
           <Button
             color="inherit"
+            startIcon={<UpdateIcon />}
             onClick={() => setShowUpdatePopup(true)}
-            sx={{ mr: 2 }}
+            sx={{ 
+              mr: 2,
+              backgroundColor: 'rgba(255,255,255,0.1)',
+              '&:hover': {
+                backgroundColor: 'rgba(255,255,255,0.2)'
+              }
+            }}
           >
-            업데이트
+            업데이트 확인
           </Button>
+          
+          {/* 모드 전환 버튼 - 2개 이상 권한이 있는 사용자에게만 표시 */}
+          {onModeChange && availableModes && availableModes.length > 1 && (
+            <Button
+              color="inherit"
+              startIcon={<SwapHorizIcon />}
+              onClick={onModeChange}
+              sx={{ 
+                mr: 2,
+                backgroundColor: 'rgba(255,255,255,0.1)',
+                '&:hover': {
+                  backgroundColor: 'rgba(255,255,255,0.2)'
+                }
+              }}
+            >
+              모드 변경
+            </Button>
+          )}
+          
           <Button color="inherit" onClick={onLogout}>
             로그아웃
           </Button>
