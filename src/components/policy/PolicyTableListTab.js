@@ -138,7 +138,13 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
       });
       if (response.ok) {
         const data = await response.json();
-        setPolicies(data);
+        // 생성일시 기준으로 내림차순 정렬 (가장 최근 정책이 위로)
+        const sortedData = data.sort((a, b) => {
+          const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return dateB - dateA; // 내림차순
+        });
+        setPolicies(sortedData);
       }
     } catch (error) {
       console.error('정책표 목록 로드 오류:', error);
