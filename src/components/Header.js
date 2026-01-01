@@ -41,6 +41,7 @@ function Header({ inventoryUserName, isInventoryMode, currentUserId, onLogout, l
   const [mapDisplayOptionLoading, setMapDisplayOptionLoading] = useState(false);
   const [mapDisplayOptionTab, setMapDisplayOptionTab] = useState(0); // 0: 관리자모드, 1: 일반모드
   const [mapDisplayOptionSettings, setMapDisplayOptionSettings] = useState({}); // { userId: { option, value } }
+  const [optionValueLists, setOptionValueLists] = useState({}); // { '코드별': [...], '사무실별': [...], ... }
 
   // 매장 재고 계산 함수 (일반모드용)
   const getStoreInventory = (store) => {
@@ -331,6 +332,35 @@ function Header({ inventoryUserName, isInventoryMode, currentUserId, onLogout, l
 
   const handleMenuClose = () => {
     setMenuAnchorEl(null);
+  };
+
+  // 지도 재고 노출 옵션 선택값 목록 로드
+  const loadOptionValueLists = async () => {
+    try {
+      const API_URL = process.env.REACT_APP_API_URL || '';
+      const options = ['코드별', '사무실별', '소속별', '담당자별'];
+      const lists = {};
+
+      for (const option of options) {
+        const response = await fetch(`${API_URL}/api/map-display-option/values?option=${encodeURIComponent(option)}`, {
+          headers: {
+            'x-user-role': loggedInStore?.agentInfo?.agentModePermission || loggedInStore?.userRole || '',
+            'x-user-id': loggedInStore?.id || loggedInStore?.contactId || ''
+          }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success) {
+            lists[option] = data.values || [];
+          }
+        }
+      }
+
+      setOptionValueLists(lists);
+    } catch (error) {
+      console.error('선택값 목록 로드 오류:', error);
+    }
   };
 
   // 지도 재고 노출 옵션 사용자 목록 로드
@@ -710,6 +740,7 @@ function Header({ inventoryUserName, isInventoryMode, currentUserId, onLogout, l
                 onClick={() => {
                   setMapDisplayOptionDialogOpen(true);
                   loadMapDisplayOptionUsers();
+                  loadOptionValueLists();
                 }}
                 sx={{ 
                   border: '1px solid rgba(255,255,255,0.3)',
@@ -935,17 +966,48 @@ function Header({ inventoryUserName, isInventoryMode, currentUserId, onLogout, l
                               </FormControl>
                             </TableCell>
                             <TableCell>
-                              <TextField
-                                size="small"
-                                value={setting.value}
-                                onChange={(e) => {
-                                  const newSettings = { ...mapDisplayOptionSettings };
-                                  const key = `${user.userId}_${currentMode}`;
-                                  newSettings[key] = { ...setting, value: e.target.value };
-                                  setMapDisplayOptionSettings(newSettings);
-                                }}
-                                placeholder="선택값"
-                              />
+                              {setting.option === '전체' ? (
+                                <TextField
+                                  size="small"
+                                  value=""
+                                  disabled
+                                  placeholder="전체는 선택값 없음"
+                                />
+                              ) : setting.option && ['코드별', '사무실별', '소속별', '담당자별'].includes(setting.option) ? (
+                                <FormControl size="small" sx={{ minWidth: 150 }}>
+                                  <Select
+                                    value={setting.value || ''}
+                                    onChange={(e) => {
+                                      const newSettings = { ...mapDisplayOptionSettings };
+                                      const key = `${user.userId}_${currentMode}`;
+                                      newSettings[key] = { ...setting, value: e.target.value };
+                                      setMapDisplayOptionSettings(newSettings);
+                                    }}
+                                    displayEmpty
+                                  >
+                                    <MenuItem value="">
+                                      <em>선택하세요</em>
+                                    </MenuItem>
+                                    {(optionValueLists[setting.option] || []).map((value) => (
+                                      <MenuItem key={value} value={value}>
+                                        {value}
+                                      </MenuItem>
+                                    ))}
+                                  </Select>
+                                </FormControl>
+                              ) : (
+                                <TextField
+                                  size="small"
+                                  value={setting.value}
+                                  onChange={(e) => {
+                                    const newSettings = { ...mapDisplayOptionSettings };
+                                    const key = `${user.userId}_${currentMode}`;
+                                    newSettings[key] = { ...setting, value: e.target.value };
+                                    setMapDisplayOptionSettings(newSettings);
+                                  }}
+                                  placeholder="선택값"
+                                />
+                              )}
                             </TableCell>
                             <TableCell>{setting.updatedAt || '-'}</TableCell>
                             <TableCell>{setting.updatedBy || '-'}</TableCell>

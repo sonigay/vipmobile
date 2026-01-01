@@ -2523,6 +2523,75 @@ app.post('/api/map-display-option', async (req, res) => {
   }
 });
 
+// 지도 재고 노출 옵션 선택값 목록 조회 API
+app.get('/api/map-display-option/values', async (req, res) => {
+  try {
+    const { option } = req.query; // option: '코드별', '사무실별', '소속별', '담당자별'
+
+    if (!option || !['코드별', '사무실별', '소속별', '담당자별'].includes(option)) {
+      return res.status(400).json({
+        success: false,
+        error: '올바른 옵션을 선택해주세요.'
+      });
+    }
+
+    const sheetName = '폰클출고처데이터';
+    const response = await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${sheetName}!A:AF`,
+      })
+    );
+
+    const values = response.data.values || [];
+    if (values.length <= 1) {
+      return res.json({
+        success: true,
+        values: []
+      });
+    }
+
+    const rows = values.slice(1); // 헤더 제외
+    const uniqueValues = new Set();
+
+    rows.forEach(row => {
+      let value = '';
+      switch (option) {
+        case '코드별':
+          value = (row[7] || '').toString().trim(); // H열(7인덱스): 코드
+          break;
+        case '사무실별':
+          value = (row[3] || '').toString().trim(); // D열(3인덱스): 사무실
+          break;
+        case '소속별':
+          value = (row[4] || '').toString().trim(); // E열(4인덱스): 소속
+          break;
+        case '담당자별':
+          value = (row[5] || '').toString().trim(); // F열(5인덱스): 담당자
+          break;
+      }
+      
+      if (value) {
+        uniqueValues.add(value);
+      }
+    });
+
+    const sortedValues = Array.from(uniqueValues).sort();
+
+    return res.json({
+      success: true,
+      values: sortedValues
+    });
+  } catch (error) {
+    console.error('선택값 목록 조회 오류:', error);
+    return res.status(500).json({
+      success: false,
+      error: '선택값 목록 조회에 실패했습니다.',
+      message: error.message
+    });
+  }
+});
+
 // "O" 사용자 목록 조회 API (M 권한자용)
 app.get('/api/map-display-option/users', async (req, res) => {
   try {
