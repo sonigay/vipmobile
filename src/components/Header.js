@@ -373,37 +373,20 @@ function Header({ inventoryUserName, isInventoryMode, currentUserId, onLogout, l
         console.log('🔍 [지도옵션] 사용자 수:', users.length);
         setMapDisplayOptionUsers(users);
         
-        // 각 사용자의 옵션 설정 로드
+        // 백엔드에서 이미 옵션 설정을 포함해서 보내주므로 바로 설정
         const settings = {};
-        for (const user of users) {
-            for (const mode of ['관리자모드', '일반모드']) {
-              try {
-                // agentModePermission을 우선적으로 사용
-                const optionUserRole = loggedInStore?.agentInfo?.agentModePermission || loggedInStore?.userRole || '';
-                const optionResponse = await fetch(`${API_URL}/api/map-display-option?userId=${encodeURIComponent(user.userId)}&mode=${encodeURIComponent(mode)}`, {
-                  headers: {
-                    'x-user-role': optionUserRole,
-                    'x-user-id': userId
-                  }
-                });
-              
-              if (optionResponse.ok) {
-                const optionData = await optionResponse.json();
-                if (optionData.success) {
-                  settings[`${user.userId}_${mode}`] = {
-                    option: optionData.option || '전체',
-                    value: optionData.value || '',
-                    updatedAt: optionData.updatedAt || '',
-                    updatedBy: optionData.updatedBy || ''
-                  };
-                }
-              }
-            } catch (err) {
-              console.warn(`🔍 [지도옵션] 사용자 ${user.userId}의 ${mode} 옵션 로드 실패:`, err);
-            }
+        users.forEach(user => {
+          if (user.options) {
+            settings[`${user.userId}_관리자모드`] = user.options.관리자모드 || { option: '전체', value: '', updatedAt: '', updatedBy: '' };
+            settings[`${user.userId}_일반모드`] = user.options.일반모드 || { option: '전체', value: '', updatedAt: '', updatedBy: '' };
+          } else {
+            // 옵션이 없는 경우 기본값 설정
+            settings[`${user.userId}_관리자모드`] = { option: '전체', value: '', updatedAt: '', updatedBy: '' };
+            settings[`${user.userId}_일반모드`] = { option: '전체', value: '', updatedAt: '', updatedBy: '' };
           }
-        }
+        });
         setMapDisplayOptionSettings(settings);
+        console.log('🔍 [지도옵션] 옵션 설정 로드 완료:', Object.keys(settings).length);
       } else {
         setError(data.error || '사용자 목록을 불러올 수 없습니다.');
         setMapDisplayOptionUsers([]);

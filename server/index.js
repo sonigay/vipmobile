@@ -2588,9 +2588,56 @@ app.get('/api/map-display-option/users', async (req, res) => {
       전체사용자수: allUsers.length
     });
 
+    // 모든 사용자의 옵션 설정을 한 번에 조회
+    const sheetName = '지도재고노출옵션';
+    const optionResponse = await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${sheetName}!A:F`,
+      })
+    );
+
+    const optionValues = optionResponse.data.values || [];
+    const optionRows = optionValues.length > 1 ? optionValues.slice(1) : [];
+
+    // 옵션 설정을 맵으로 변환 { userId_mode: { option, value, ... } }
+    const optionsMap = {};
+    optionRows.forEach(row => {
+      const rowUserId = (row[0] || '').toString().trim();
+      const rowMode = (row[1] || '').toString().trim();
+      const key = `${rowUserId}_${rowMode}`;
+      optionsMap[key] = {
+        option: row[2] || '전체',
+        value: row[3] || '',
+        updatedAt: row[4] || '',
+        updatedBy: row[5] || ''
+      };
+    });
+
+    // 각 사용자에 옵션 설정 추가
+    const usersWithOptions = allUsers.map(user => {
+      const adminKey = `${user.userId}_관리자모드`;
+      const generalKey = `${user.userId}_일반모드`;
+      
+      return {
+        ...user,
+        options: {
+          관리자모드: optionsMap[adminKey] || { option: '전체', value: '', updatedAt: '', updatedBy: '' },
+          일반모드: optionsMap[generalKey] || { option: '전체', value: '', updatedAt: '', updatedBy: '' }
+        }
+      };
+    });
+
+    console.log('🔍 [지도옵션] 사용자 목록 조회 결과:', {
+      일반모드사용자수: users.length,
+      관리자모드사용자수: agentUsers.length,
+      전체사용자수: allUsers.length,
+      옵션설정수: optionRows.length
+    });
+
     return res.json({
       success: true,
-      users: allUsers
+      users: usersWithOptions
     });
   } catch (error) {
     console.error('사용자 목록 조회 오류:', error);
