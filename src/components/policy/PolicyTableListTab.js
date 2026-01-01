@@ -434,7 +434,7 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
                 <Typography variant="subtitle2" gutterBottom>
                   정책적용내용
                 </Typography>
-                <Typography variant="body1">
+                <Typography variant="body1" sx={{ whiteSpace: 'pre-line' }}>
                   {selectedPolicy.applyContent}
                 </Typography>
               </Paper>
