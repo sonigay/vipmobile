@@ -333,28 +333,48 @@ function Header({ inventoryUserName, isInventoryMode, currentUserId, onLogout, l
   // 지도 재고 노출 옵션 사용자 목록 로드
   const loadMapDisplayOptionUsers = async () => {
     setMapDisplayOptionLoading(true);
+    setError('');
     try {
       const API_URL = process.env.REACT_APP_API_URL || '';
+      const userRole = loggedInStore?.userRole || loggedInStore?.agentInfo?.agentModePermission || '';
+      const userId = loggedInStore?.id || loggedInStore?.contactId || '';
+      
+      console.log('🔍 [지도옵션] 사용자 목록 로드 시작:', { userRole, userId, API_URL });
+      
       const response = await fetch(`${API_URL}/api/map-display-option/users`, {
         headers: {
-          'x-user-role': loggedInStore?.userRole || loggedInStore?.agentInfo?.agentModePermission || '',
-          'x-user-id': loggedInStore?.id || loggedInStore?.contactId || ''
+          'x-user-role': userRole,
+          'x-user-id': userId
         }
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          setMapDisplayOptionUsers(data.users || []);
-          
-          // 각 사용자의 옵션 설정 로드
-          const settings = {};
-          for (const user of data.users) {
-            for (const mode of ['관리자모드', '일반모드']) {
+      console.log('🔍 [지도옵션] 사용자 목록 응답:', response.status, response.statusText);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('🔍 [지도옵션] 사용자 목록 로드 실패:', errorData);
+        setError(errorData.error || `사용자 목록을 불러올 수 없습니다. (${response.status})`);
+        setMapDisplayOptionUsers([]);
+        return;
+      }
+
+      const data = await response.json();
+      console.log('🔍 [지도옵션] 사용자 목록 데이터:', data);
+      
+      if (data.success) {
+        const users = data.users || [];
+        console.log('🔍 [지도옵션] 사용자 수:', users.length);
+        setMapDisplayOptionUsers(users);
+        
+        // 각 사용자의 옵션 설정 로드
+        const settings = {};
+        for (const user of users) {
+          for (const mode of ['관리자모드', '일반모드']) {
+            try {
               const optionResponse = await fetch(`${API_URL}/api/map-display-option?userId=${encodeURIComponent(user.userId)}&mode=${encodeURIComponent(mode)}`, {
                 headers: {
-                  'x-user-role': loggedInStore?.userRole || loggedInStore?.agentInfo?.agentModePermission || '',
-                  'x-user-id': loggedInStore?.id || loggedInStore?.contactId || ''
+                  'x-user-role': userRole,
+                  'x-user-id': userId
                 }
               });
               
@@ -369,14 +389,20 @@ function Header({ inventoryUserName, isInventoryMode, currentUserId, onLogout, l
                   };
                 }
               }
+            } catch (err) {
+              console.warn(`🔍 [지도옵션] 사용자 ${user.userId}의 ${mode} 옵션 로드 실패:`, err);
             }
           }
-          setMapDisplayOptionSettings(settings);
         }
+        setMapDisplayOptionSettings(settings);
+      } else {
+        setError(data.error || '사용자 목록을 불러올 수 없습니다.');
+        setMapDisplayOptionUsers([]);
       }
     } catch (error) {
-      console.error('사용자 목록 로드 오류:', error);
-      setError('사용자 목록을 불러오는 중 오류가 발생했습니다.');
+      console.error('🔍 [지도옵션] 사용자 목록 로드 오류:', error);
+      setError(`사용자 목록을 불러오는 중 오류가 발생했습니다: ${error.message}`);
+      setMapDisplayOptionUsers([]);
     } finally {
       setMapDisplayOptionLoading(false);
     }
@@ -802,9 +828,21 @@ function Header({ inventoryUserName, isInventoryMode, currentUserId, onLogout, l
               <Tab label="일반모드" />
             </Tabs>
 
+            {error && (
+              <Alert severity="error" sx={{ mt: 2 }}>
+                {error}
+              </Alert>
+            )}
+            
             {mapDisplayOptionLoading ? (
               <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
                 <CircularProgress />
+              </Box>
+            ) : mapDisplayOptionUsers.length === 0 ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+                <Typography color="text.secondary">
+                  사용자 목록이 없습니다.
+                </Typography>
               </Box>
             ) : (
               <TableContainer component={Paper} sx={{ mt: 2, maxHeight: 400 }}>

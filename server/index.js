@@ -2525,11 +2525,14 @@ app.post('/api/map-display-option', async (req, res) => {
 app.get('/api/map-display-option/users', async (req, res) => {
   try {
     // 권한 체크: "M" 권한자만 조회 가능
-    const userRole = req.headers['x-user-role'];
+    const userRole = (req.headers['x-user-role'] || '').toString().trim().toUpperCase();
+    console.log('🔍 [지도옵션] 사용자 목록 조회 요청:', { userRole, userId: req.headers['x-user-id'] });
+    
     if (userRole !== 'M') {
+      console.log('🔍 [지도옵션] 권한 없음:', userRole);
       return res.status(403).json({
         success: false,
-        error: '권한이 없습니다.'
+        error: '권한이 없습니다. "M" 권한자만 조회 가능합니다.'
       });
     }
 
@@ -2578,9 +2581,16 @@ app.get('/api/map-display-option/users', async (req, res) => {
         isAgent: true
       }));
 
+    const allUsers = [...users, ...agentUsers];
+    console.log('🔍 [지도옵션] 사용자 목록 조회 결과:', {
+      일반모드사용자수: users.length,
+      관리자모드사용자수: agentUsers.length,
+      전체사용자수: allUsers.length
+    });
+
     return res.json({
       success: true,
-      users: [...users, ...agentUsers]
+      users: allUsers
     });
   } catch (error) {
     console.error('사용자 목록 조회 오류:', error);
