@@ -2464,6 +2464,24 @@ app.post('/api/map-display-option', async (req, res) => {
     );
 
     const values = response.data.values || [];
+    
+    // 헤더 확인 및 추가
+    if (values.length === 0 || !values[0] || values[0].length === 0 || values[0][0] !== '사용자ID') {
+      // 헤더가 없으면 추가
+      const headerRow = ['사용자ID', '모드구분', '노출옵션', '선택값', '수정일시', '수정자'];
+      await rateLimitedSheetsCall(() =>
+        sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${sheetName}!A1:F1`,
+          valueInputOption: 'RAW',
+          resource: {
+            values: [headerRow]
+          }
+        })
+      );
+    }
+
+    // 헤더 제외하고 데이터만
     const rows = values.length > 1 ? values.slice(1) : [];
 
     // 기존 행 찾기
@@ -2495,7 +2513,7 @@ app.post('/api/map-display-option', async (req, res) => {
         })
       );
     } else {
-      // 새 행 추가
+      // 새 행 추가 (A열부터)
       await rateLimitedSheetsCall(() =>
         sheets.spreadsheets.values.append({
           spreadsheetId: SPREADSHEET_ID,
@@ -2515,6 +2533,138 @@ app.post('/api/map-display-option', async (req, res) => {
     });
   } catch (error) {
     console.error('지도 재고 노출 옵션 저장 오류:', error);
+    return res.status(500).json({
+      success: false,
+      error: '옵션 저장에 실패했습니다.',
+      message: error.message
+    });
+  }
+});
+
+// 지도 재고 노출 옵션 배치 저장 API (M 권한자용)
+app.post('/api/map-display-option/batch', async (req, res) => {
+  try {
+    const { settings, updatedBy } = req.body; // settings: [{ userId, mode, option, value }, ...]
+
+    // 권한 체크: "M" 권한자만 저장 가능
+    const userRole = req.headers['x-user-role'];
+    if (userRole !== 'M') {
+      return res.status(403).json({
+        success: false,
+        error: '권한이 없습니다. "M" 권한자만 옵션을 설정할 수 있습니다.'
+      });
+    }
+
+    if (!settings || !Array.isArray(settings) || settings.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: '저장할 설정이 없습니다.'
+      });
+    }
+
+    const sheetName = '지도재고노출옵션';
+    const now = new Date().toLocaleString('ko-KR');
+
+    // 기존 데이터 조회
+    const response = await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${sheetName}!A:F`,
+      })
+    );
+
+    const values = response.data.values || [];
+    
+    // 헤더 확인 및 추가
+    if (values.length === 0 || !values[0] || values[0].length === 0 || values[0][0] !== '사용자ID') {
+      // 헤더가 없으면 추가
+      const headerRow = ['사용자ID', '모드구분', '노출옵션', '선택값', '수정일시', '수정자'];
+      await rateLimitedSheetsCall(() =>
+        sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${sheetName}!A1:F1`,
+          valueInputOption: 'RAW',
+          resource: {
+            values: [headerRow]
+          }
+        })
+      );
+    }
+
+    // 헤더 제외하고 데이터만
+    const rows = values.length > 1 ? values.slice(1) : [];
+
+    // 업데이트할 행과 추가할 행 분리
+    const updates = [];
+    const inserts = [];
+
+    settings.forEach(setting => {
+      const { userId, mode, option, value } = setting;
+      
+      if (!userId || !mode || !option) {
+        return; // 필수 파라미터 누락 시 스킵
+      }
+
+      const existingRowIndex = rows.findIndex(row => {
+        const rowUserId = (row[0] || '').toString().trim();
+        const rowMode = (row[1] || '').toString().trim();
+        return rowUserId === userId && rowMode === mode;
+      });
+
+      const newRow = [
+        userId,
+        mode,
+        option,
+        value || '',
+        now,
+        updatedBy || ''
+      ];
+
+      if (existingRowIndex !== -1) {
+        updates.push({
+          range: `${sheetName}!A${existingRowIndex + 2}:F${existingRowIndex + 2}`,
+          values: [newRow]
+        });
+      } else {
+        inserts.push(newRow);
+      }
+    });
+
+    // 업데이트 작업 수행
+    for (const update of updates) {
+      await rateLimitedSheetsCall(() =>
+        sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: update.range,
+          valueInputOption: 'RAW',
+          resource: {
+            values: update.values
+          }
+        })
+      );
+    }
+
+    // 추가 작업 수행 (배치로 한 번에)
+    if (inserts.length > 0) {
+      await rateLimitedSheetsCall(() =>
+        sheets.spreadsheets.values.append({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${sheetName}!A:F`,
+          valueInputOption: 'RAW',
+          insertDataOption: 'INSERT_ROWS',
+          resource: {
+            values: inserts
+          }
+        })
+      );
+    }
+
+    return res.json({
+      success: true,
+      message: `${updates.length}개 업데이트, ${inserts.length}개 추가 완료`
+    });
+  } catch (error) {
+    console.error('지도 재고 노출 옵션 배치 저장 오류:', error);
     return res.status(500).json({
       success: false,
       error: '옵션 저장에 실패했습니다.',

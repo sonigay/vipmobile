@@ -467,31 +467,40 @@ function Header({ inventoryUserName, isInventoryMode, currentUserId, onLogout, l
       const saveUserName = loggedInStore?.name || loggedInStore?.agentInfo?.target || '';
       
       if (mapDisplayOptionTab === 0) {
-        // 관리자모드: 사용자별로 저장
-        for (const user of mapDisplayOptionUsers) {
-          const key = `${user.userId}_관리자모드`;
-          const setting = mapDisplayOptionSettings[key];
-          
-          if (setting) {
-            const response = await fetch(`${API_URL}/api/map-display-option`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'x-user-role': saveUserRole,
-                'x-user-id': saveUserId
-              },
-              body: JSON.stringify({
+        // 관리자모드: 배치 저장
+        const settings = mapDisplayOptionUsers
+          .map(user => {
+            const key = `${user.userId}_관리자모드`;
+            const setting = mapDisplayOptionSettings[key];
+            if (setting) {
+              return {
                 userId: user.userId,
                 mode: '관리자모드',
                 option: setting.option,
-                value: setting.value || '',
-                updatedBy: saveUserName
-              })
-            });
-
-            if (!response.ok) {
-              throw new Error(`옵션 저장 실패: ${user.userId}`);
+                value: setting.value || ''
+              };
             }
+            return null;
+          })
+          .filter(s => s !== null);
+
+        if (settings.length > 0) {
+          const response = await fetch(`${API_URL}/api/map-display-option/batch`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-user-role': saveUserRole,
+              'x-user-id': saveUserId
+            },
+            body: JSON.stringify({
+              settings: settings,
+              updatedBy: saveUserName
+            })
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || '옵션 저장 실패');
           }
         }
       } else {
