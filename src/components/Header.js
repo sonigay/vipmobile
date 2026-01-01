@@ -336,10 +336,17 @@ function Header({ inventoryUserName, isInventoryMode, currentUserId, onLogout, l
     setError('');
     try {
       const API_URL = process.env.REACT_APP_API_URL || '';
-      const userRole = loggedInStore?.userRole || loggedInStore?.agentInfo?.agentModePermission || '';
+      // agentModePermission을 우선적으로 사용, 없으면 userRole 사용
+      const userRole = loggedInStore?.agentInfo?.agentModePermission || loggedInStore?.userRole || '';
       const userId = loggedInStore?.id || loggedInStore?.contactId || '';
       
-      console.log('🔍 [지도옵션] 사용자 목록 로드 시작:', { userRole, userId, API_URL });
+      console.log('🔍 [지도옵션] 사용자 목록 로드 시작:', { 
+        userRole, 
+        userId, 
+        API_URL,
+        agentModePermission: loggedInStore?.agentInfo?.agentModePermission,
+        originalUserRole: loggedInStore?.userRole
+      });
       
       const response = await fetch(`${API_URL}/api/map-display-option/users`, {
         headers: {
@@ -369,14 +376,16 @@ function Header({ inventoryUserName, isInventoryMode, currentUserId, onLogout, l
         // 각 사용자의 옵션 설정 로드
         const settings = {};
         for (const user of users) {
-          for (const mode of ['관리자모드', '일반모드']) {
-            try {
-              const optionResponse = await fetch(`${API_URL}/api/map-display-option?userId=${encodeURIComponent(user.userId)}&mode=${encodeURIComponent(mode)}`, {
-                headers: {
-                  'x-user-role': userRole,
-                  'x-user-id': userId
-                }
-              });
+            for (const mode of ['관리자모드', '일반모드']) {
+              try {
+                // agentModePermission을 우선적으로 사용
+                const optionUserRole = loggedInStore?.agentInfo?.agentModePermission || loggedInStore?.userRole || '';
+                const optionResponse = await fetch(`${API_URL}/api/map-display-option?userId=${encodeURIComponent(user.userId)}&mode=${encodeURIComponent(mode)}`, {
+                  headers: {
+                    'x-user-role': optionUserRole,
+                    'x-user-id': userId
+                  }
+                });
               
               if (optionResponse.ok) {
                 const optionData = await optionResponse.json();
@@ -420,11 +429,13 @@ function Header({ inventoryUserName, isInventoryMode, currentUserId, onLogout, l
         const setting = mapDisplayOptionSettings[key];
         
         if (setting) {
+          // agentModePermission을 우선적으로 사용
+          const saveUserRole = loggedInStore?.agentInfo?.agentModePermission || loggedInStore?.userRole || '';
           const response = await fetch(`${API_URL}/api/map-display-option`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'x-user-role': loggedInStore?.userRole || loggedInStore?.agentInfo?.agentModePermission || '',
+              'x-user-role': saveUserRole,
               'x-user-id': loggedInStore?.id || loggedInStore?.contactId || ''
             },
             body: JSON.stringify({
