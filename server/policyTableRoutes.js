@@ -2651,7 +2651,13 @@ function setupPolicyTableRoutes(app) {
     try {
       const userId = req.headers['x-user-id'] || req.body.userId;
       const { order, cardOrder } = req.body; // order는 탭 순서, cardOrder는 생성카드 순서
-      const updatedBy = req.headers['x-user-name'] || req.body.updatedBy || 'Unknown';
+      let updatedBy = req.headers['x-user-name'] || req.body.updatedBy || 'Unknown';
+      // URL 인코딩된 경우 디코딩
+      try {
+        updatedBy = decodeURIComponent(updatedBy);
+      } catch (e) {
+        // 디코딩 실패 시 원본 값 사용
+      }
 
       if (!userId) {
         return res.status(400).json({ success: false, error: '사용자 ID가 필요합니다.' });

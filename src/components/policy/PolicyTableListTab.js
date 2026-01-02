@@ -246,12 +246,16 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
       setSavingOrder(true);
       const order = newTabs.map(tab => tab.policyTableId);
       
+      // 헤더 값 안전하게 처리 (한글 등 특수문자 인코딩)
+      const userName = loggedInStore?.name || loggedInStore?.target || 'Unknown';
+      const safeUserName = typeof userName === 'string' ? encodeURIComponent(userName) : 'Unknown';
+      
       const response = await fetch(`${API_BASE_URL}/api/policy-tables/tabs/order`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'x-user-id': loggedInStore?.contactId || loggedInStore?.id || '',
-          'x-user-name': String(loggedInStore?.name || loggedInStore?.target || 'Unknown')
+          'x-user-name': safeUserName
         },
         body: JSON.stringify({ order })
       });
@@ -260,12 +264,20 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
         const data = await response.json();
         if (data.success) {
           console.log('탭 순서 저장 완료');
+          // 성공 메시지 표시 (선택사항)
+          // alert('탭 순서가 저장되었습니다.');
+        } else {
+          console.error('탭 순서 저장 실패:', data.error);
+          setError('탭 순서 저장에 실패했습니다.');
         }
       } else {
-        console.error('탭 순서 저장 실패:', response.status);
+        const errorData = await response.json().catch(() => ({}));
+        console.error('탭 순서 저장 실패:', response.status, errorData);
+        setError('탭 순서 저장에 실패했습니다.');
       }
     } catch (error) {
       console.error('탭 순서 저장 오류:', error);
+      setError('탭 순서 저장 중 오류가 발생했습니다.');
     } finally {
       setSavingOrder(false);
     }

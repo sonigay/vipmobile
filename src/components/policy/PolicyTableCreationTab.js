@@ -694,12 +694,16 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
       setSavingCardOrder(true);
       const cardOrder = newSettings.map(setting => setting.id);
       
+      // 헤더 값 안전하게 처리 (한글 등 특수문자 인코딩)
+      const userName = loggedInStore?.name || loggedInStore?.target || 'Unknown';
+      const safeUserName = typeof userName === 'string' ? encodeURIComponent(userName) : 'Unknown';
+      
       const response = await fetch(`${API_BASE_URL}/api/policy-tables/tabs/order`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'x-user-id': loggedInStore?.contactId || loggedInStore?.id || '',
-          'x-user-name': String(loggedInStore?.name || loggedInStore?.target || 'Unknown')
+          'x-user-name': safeUserName
         },
         body: JSON.stringify({ cardOrder })
       });
@@ -783,13 +787,17 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
           [setting.id]: { status: 'queued', jobId: null, result: null, error: null }
         }));
 
+        // 헤더 값 안전하게 처리 (한글 등 특수문자 인코딩)
+        const userName = loggedInStore?.name || loggedInStore?.target || 'Unknown';
+        const safeUserName = typeof userName === 'string' ? encodeURIComponent(userName) : 'Unknown';
+        
         const response = await fetch(`${API_BASE_URL}/api/policy-table/generate`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'x-user-role': loggedInStore?.userRole || '',
             'x-user-id': loggedInStore?.contactId || loggedInStore?.id || '',
-            'x-user-name': String(loggedInStore?.name || loggedInStore?.target || 'Unknown')
+            'x-user-name': safeUserName
           },
           body: JSON.stringify({
             policyTableId: setting.id,
