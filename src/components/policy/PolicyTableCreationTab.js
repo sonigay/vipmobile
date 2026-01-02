@@ -35,15 +35,95 @@ import {
   Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
-  Group as GroupIcon
+  Group as GroupIcon,
+  DragIndicator as DragIndicatorIcon,
+  CheckBox as CheckBoxIcon,
+  CheckBoxOutlineBlank as CheckBoxOutlineBlankIcon
 } from '@mui/icons-material';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  rectSortingStrategy
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { API_BASE_URL } from '../../api';
+
+// 드래그 가능한 카드 컴포넌트
+const SortableCard = ({ setting, children }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id: setting.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    cursor: 'grab',
+    position: 'relative'
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      <Box
+        sx={{
+          position: 'absolute',
+          top: 8,
+          right: 8,
+          zIndex: 1,
+          cursor: 'grab',
+          color: 'text.secondary',
+          '&:active': {
+            cursor: 'grabbing'
+          }
+        }}
+      >
+        <DragIndicatorIcon />
+      </Box>
+      {children}
+    </div>
+  );
+};
 
 const PolicyTableCreationTab = ({ loggedInStore }) => {
   const [settings, setSettings] = useState([]);
   const [userGroups, setUserGroups] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [savingCardOrder, setSavingCardOrder] = useState(false);
+  
+  // 여러 정책표 생성 관련 상태
+  const [selectedSettings, setSelectedSettings] = useState([]); // 체크된 카드 ID 배열
+  const [batchCreationModalOpen, setBatchCreationModalOpen] = useState(false);
+  const [batchCreationFormData, setBatchCreationFormData] = useState({
+    applyDate: '',
+    applyContent: '',
+    policyTableGroups: {} // { settingId: [groupIds] }
+  });
+  const [batchGenerationStatus, setBatchGenerationStatus] = useState({}); // { settingId: { status, jobId, result } }
+  const [batchPollingIntervals, setBatchPollingIntervals] = useState({}); // { settingId: intervalId }
+
+  // 드래그 앤 드롭 센서 설정
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   // 생성 모달 상태
   const [creationModalOpen, setCreationModalOpen] = useState(false);
@@ -134,6 +214,8 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
       });
       if (response.ok) {
         const data = await response.json();
+        // 백엔드에서 이미 사용자별 순서가 적용되어 있음
+        setSettings(data);
         // 현재 사용자의 권한에 맞는 정책표만 필터링
         const userRole = loggedInStore?.userRole;
         console.log('🔍 [정책표생성] 정책표 설정 로드:', {
@@ -671,10 +753,63 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
               <CircularProgress />
             </Box>
           ) : (
-            <Grid container spacing={2}>
-              {settings.map((setting) => (
-                <Grid item xs={12} sm={6} md={4} key={setting.id}>
-                  <Card>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleCardDragEnd}
+            >
+              <SortableContext
+                items={settings.map(s => s.id)}
+                strategy={rectSortingStrategy}
+              >
+                <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography variant="body2" color="text.secondary">
+                    {selectedSettings.length > 0 ? `${selectedSettings.length}개 선택됨` : '카드를 선택하세요'}
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    disabled={selectedSettings.length === 0}
+                    onClick={() => {
+                      const selected = settings.filter(s => selectedSettings.includes(s.id));
+                      setBatchCreationFormData({
+                        applyDate: '',
+                        applyContent: '',
+                        policyTableGroups: {}
+                      });
+                      setBatchGenerationStatus({});
+                      setBatchCreationModalOpen(true);
+                    }}
+                    startIcon={<AddIcon />}
+                  >
+                    모두생성
+                  </Button>
+                </Box>
+                <Grid container spacing={2}>
+                  {settings.map((setting) => (
+                    <Grid item xs={12} sm={6} md={4} key={setting.id}>
+                      <SortableCard setting={setting}>
+                        <Card sx={{ position: 'relative' }}>
+                          <Box sx={{ position: 'absolute', top: 8, left: 8, zIndex: 2 }}>
+                            <IconButton
+                              size="small"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedSettings(prev => {
+                                  if (prev.includes(setting.id)) {
+                                    return prev.filter(id => id !== setting.id);
+                                  } else {
+                                    return [...prev, setting.id];
+                                  }
+                                });
+                              }}
+                            >
+                              {selectedSettings.includes(setting.id) ? (
+                                <CheckBoxIcon color="primary" />
+                              ) : (
+                                <CheckBoxOutlineBlankIcon />
+                              )}
+                            </IconButton>
+                          </Box>
                     <CardContent>
                       <Typography variant="h6" gutterBottom>
                         {setting.policyTableName}
@@ -784,9 +919,20 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                       </Button>
                     </CardActions>
                   </Card>
+                        </SortableCard>
+                    </Grid>
+                  ))}
                 </Grid>
-              ))}
-            </Grid>
+              </SortableContext>
+            </DndContext>
+          )}
+          {savingCardOrder && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 1, mt: 2 }}>
+              <CircularProgress size={16} />
+              <Typography variant="caption" sx={{ ml: 1 }}>
+                순서 저장 중...
+              </Typography>
+            </Box>
           )}
         </>
       )}
@@ -1021,6 +1167,159 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
               다시 생성
             </Button>
           ) : null}
+        </DialogActions>
+      </Dialog>
+
+      {/* 모두정책생성 모달 */}
+      <Dialog open={batchCreationModalOpen} onClose={handleCloseBatchCreationModal} maxWidth="md" fullWidth>
+        <DialogTitle>
+          모두정책생성 ({selectedSettings.length}개)
+        </DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            {/* 공통 필드 */}
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="정책적용일시"
+                value={batchCreationFormData.applyDate}
+                onChange={(e) => setBatchCreationFormData({ 
+                  ...batchCreationFormData, 
+                  applyDate: e.target.value 
+                })}
+                placeholder="예: 2025-01-01 10:00"
+                required
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="정책적용내용"
+                value={batchCreationFormData.applyContent}
+                onChange={(e) => setBatchCreationFormData({ 
+                  ...batchCreationFormData, 
+                  applyContent: e.target.value 
+                })}
+                multiline
+                rows={4}
+                required
+              />
+            </Grid>
+
+            {/* 정책표별 정책영업그룹 선택 */}
+            <Grid item xs={12}>
+              <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 'bold' }}>
+                정책표별 정책영업그룹 선택
+              </Typography>
+              {settings
+                .filter(s => selectedSettings.includes(s.id))
+                .map((setting) => (
+                  <Box key={setting.id} sx={{ mb: 3, p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                    <Grid container spacing={2} alignItems="center">
+                      <Grid item xs={12} sm={4}>
+                        <Typography variant="body1" fontWeight="medium">
+                          {setting.policyTableName}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={12} sm={8}>
+                        <Autocomplete
+                          multiple
+                          options={userGroups || []}
+                          getOptionLabel={(option) => option.groupName || ''}
+                          value={
+                            (userGroups || []).filter(group => 
+                              batchCreationFormData.policyTableGroups[setting.id]?.includes(group.id)
+                            )
+                          }
+                          onChange={(event, newValue) => {
+                            setBatchCreationFormData(prev => ({
+                              ...prev,
+                              policyTableGroups: {
+                                ...prev.policyTableGroups,
+                                [setting.id]: newValue.map(g => g.id)
+                              }
+                            }));
+                          }}
+                          renderInput={(params) => (
+                            <TextField
+                              {...params}
+                              label="정책영업그룹"
+                              placeholder="그룹 선택"
+                              required
+                            />
+                          )}
+                          renderTags={(value, getTagProps) =>
+                            value.map((option, index) => (
+                              <Chip
+                                key={option.id}
+                                label={option.groupName}
+                                {...getTagProps({ index })}
+                                size="small"
+                              />
+                            ))
+                          }
+                        />
+                      </Grid>
+                      {/* 생성 상태 표시 */}
+                      {batchGenerationStatus[setting.id] && (
+                        <Grid item xs={12}>
+                          <Box sx={{ mt: 1 }}>
+                            {batchGenerationStatus[setting.id].status === 'queued' && (
+                              <Alert severity="info">대기 중...</Alert>
+                            )}
+                            {batchGenerationStatus[setting.id].status === 'processing' && (
+                              <Box>
+                                <LinearProgress />
+                                <Typography variant="caption" sx={{ mt: 0.5, display: 'block' }}>
+                                  생성 중... ({batchGenerationStatus[setting.id].progress || 0}%)
+                                </Typography>
+                                {batchGenerationStatus[setting.id].message && (
+                                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                    {batchGenerationStatus[setting.id].message}
+                                  </Typography>
+                                )}
+                              </Box>
+                            )}
+                            {batchGenerationStatus[setting.id].status === 'completed' && (
+                              <Alert severity="success">
+                                생성 완료!
+                                {batchGenerationStatus[setting.id].result && (
+                                  <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>
+                                    정책표 ID: {batchGenerationStatus[setting.id].result.id}
+                                  </Typography>
+                                )}
+                              </Alert>
+                            )}
+                            {batchGenerationStatus[setting.id].status === 'failed' && (
+                              <Alert severity="error">
+                                생성 실패: {batchGenerationStatus[setting.id].error || '알 수 없는 오류'}
+                              </Alert>
+                            )}
+                          </Box>
+                        </Grid>
+                      )}
+                    </Grid>
+                  </Box>
+                ))}
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseBatchCreationModal}>취소</Button>
+          <Button
+            onClick={handleStartBatchGeneration}
+            variant="contained"
+            disabled={
+              !batchCreationFormData.applyDate ||
+              !batchCreationFormData.applyContent ||
+              Object.keys(batchGenerationStatus).some(settingId => 
+                batchGenerationStatus[settingId]?.status === 'processing' ||
+                batchGenerationStatus[settingId]?.status === 'queued'
+              )
+            }
+          >
+            정책표생성
+          </Button>
         </DialogActions>
       </Dialog>
 

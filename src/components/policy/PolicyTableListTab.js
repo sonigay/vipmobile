@@ -28,9 +28,68 @@ import {
   Refresh as RefreshIcon,
   ContentCopy as ContentCopyIcon,
   Delete as DeleteIcon,
-  Search as SearchIcon
+  Search as SearchIcon,
+  DragIndicator as DragIndicatorIcon
 } from '@mui/icons-material';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  horizontalListSortingStrategy
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { API_BASE_URL } from '../../api';
+
+// 드래그 가능한 탭 컴포넌트
+const SortableTab = ({ tab, index, activeTabIndex, onTabClick }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id: tab.policyTableId });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    cursor: 'grab',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '4px'
+  };
+
+  return (
+    <Tab
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      label={
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          <DragIndicatorIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+          {tab.policyTableName}
+        </Box>
+      }
+      value={index}
+      onClick={(e) => {
+        e.stopPropagation();
+        onTabClick(e, index);
+      }}
+    />
+  );
+};
 
 // 날짜 포맷팅 함수 (생성일시, 등록일시용)
 const formatDate = (dateValue) => {
@@ -63,10 +122,19 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
   const [selectedPolicy, setSelectedPolicy] = useState(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [savingOrder, setSavingOrder] = useState(false);
 
   // 검색/필터링
   const [searchCreator, setSearchCreator] = useState('');
   const [filterApplyDateFrom, setFilterApplyDateFrom] = useState('');
+
+  // 드래그 앤 드롭 센서 설정
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   // 권한 체크
   // 일반정책모드인 경우 modePermissions.generalPolicy로 체크
@@ -159,6 +227,65 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
     setPolicies([]);
     setSearchCreator('');
     setFilterApplyDateFrom('');
+  };
+
+  // 탭 순서 저장
+  const saveTabOrder = async (newTabs) => {
+    try {
+      setSavingOrder(true);
+      const order = newTabs.map(tab => tab.policyTableId);
+      
+      const response = await fetch(`${API_BASE_URL}/api/policy-tables/tabs/order`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': loggedInStore?.contactId || loggedInStore?.id || '',
+          'x-user-name': loggedInStore?.name || loggedInStore?.target || 'Unknown'
+        },
+        body: JSON.stringify({ order })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          console.log('탭 순서 저장 완료');
+        }
+      } else {
+        console.error('탭 순서 저장 실패:', response.status);
+      }
+    } catch (error) {
+      console.error('탭 순서 저장 오류:', error);
+    } finally {
+      setSavingOrder(false);
+    }
+  };
+
+  // 드래그 종료 핸들러
+  const handleDragEnd = (event) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      setTabs((items) => {
+        const oldIndex = items.findIndex(item => item.policyTableId === active.id);
+        const newIndex = items.findIndex(item => item.policyTableId === over.id);
+        
+        const newTabs = arrayMove(items, oldIndex, newIndex);
+        
+        // 순서 저장
+        saveTabOrder(newTabs);
+        
+        // 활성 탭 인덱스 업데이트
+        const currentTabId = items[activeTabIndex]?.policyTableId;
+        if (currentTabId) {
+          const newActiveIndex = newTabs.findIndex(tab => tab.policyTableId === currentTabId);
+          if (newActiveIndex !== -1) {
+            setActiveTabIndex(newActiveIndex);
+          }
+        }
+        
+        return newTabs;
+      });
+    }
   };
 
   const handlePolicyClick = async (policy) => {
@@ -302,16 +429,41 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
       {/* 탭 */}
       {tabs.length > 0 && (
         <Paper sx={{ mb: 3 }}>
-          <Tabs
-            value={activeTabIndex}
-            onChange={handleTabChange}
-            variant="scrollable"
-            scrollButtons="auto"
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
           >
-            {tabs.map((tab, index) => (
-              <Tab key={tab.policyTableId} label={tab.policyTableName} />
-            ))}
-          </Tabs>
+            <SortableContext
+              items={tabs.map(tab => tab.policyTableId)}
+              strategy={horizontalListSortingStrategy}
+            >
+              <Tabs
+                value={activeTabIndex}
+                onChange={handleTabChange}
+                variant="scrollable"
+                scrollButtons="auto"
+              >
+                {tabs.map((tab, index) => (
+                  <SortableTab
+                    key={tab.policyTableId}
+                    tab={tab}
+                    index={index}
+                    activeTabIndex={activeTabIndex}
+                    onTabClick={handleTabChange}
+                  />
+                ))}
+              </Tabs>
+            </SortableContext>
+          </DndContext>
+          {savingOrder && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 1 }}>
+              <CircularProgress size={16} />
+              <Typography variant="caption" sx={{ ml: 1 }}>
+                순서 저장 중...
+              </Typography>
+            </Box>
+          )}
         </Paper>
       )}
 

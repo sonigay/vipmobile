@@ -396,6 +396,7 @@ function createSheetsClient() {
 const SHEET_POLICY_TABLE_SETTINGS = '정책모드_정책표설정';
 const SHEET_POLICY_TABLE_LIST = '정책모드_정책표목록';
 const SHEET_USER_GROUPS = '정책모드_일반사용자그룹';
+const SHEET_TAB_ORDER = '정책표목록_탭순서';
 
 // 시트 헤더 정의
 const HEADERS_POLICY_TABLE_SETTINGS = [
@@ -433,6 +434,14 @@ const HEADERS_USER_GROUPS = [
   '일반사용자목록',
   '등록일시',
   '등록자'
+];
+
+const HEADERS_TAB_ORDER = [
+  '사용자ID',
+  '탭순서',
+  '생성카드순서',
+  '수정일시',
+  '수정자'
 ];
 
 // 구글시트 편집 링크 정규화 함수
@@ -1616,6 +1625,7 @@ function setupPolicyTableRoutes(app) {
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_TABLE_SETTINGS, HEADERS_POLICY_TABLE_SETTINGS);
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_TABLE_LIST, HEADERS_POLICY_TABLE_LIST);
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_USER_GROUPS, HEADERS_USER_GROUPS);
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_TAB_ORDER, HEADERS_TAB_ORDER);
 
       const response = await withRetry(async () => {
         return await sheets.spreadsheets.values.get({
@@ -1825,6 +1835,62 @@ function setupPolicyTableRoutes(app) {
 
         // 접근 가능한 탭만 필터링
         tabs = tabs.filter(tab => accessiblePolicyTableIds.has(tab.policyTableId));
+      }
+
+      // 사용자별 탭 순서 적용
+      const currentUserId = req.headers['x-user-id'] || userId;
+      if (currentUserId) {
+        try {
+          await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_TAB_ORDER, HEADERS_TAB_ORDER);
+          const orderResponse = await withRetry(async () => {
+            return await sheets.spreadsheets.values.get({
+              spreadsheetId: SPREADSHEET_ID,
+              range: `${SHEET_TAB_ORDER}!A:D`
+            });
+          });
+          
+          const orderRows = orderResponse.data.values || [];
+          if (orderRows.length > 1) {
+            const orderDataRows = orderRows.slice(1);
+            const userOrderRow = orderDataRows.find(row => row[0] === currentUserId);
+            
+            if (userOrderRow && userOrderRow[1]) {
+              try {
+                const orderArray = JSON.parse(userOrderRow[1]);
+                if (Array.isArray(orderArray) && orderArray.length > 0) {
+                  // 순서 배열을 기준으로 탭 정렬
+                  const orderMap = new Map();
+                  orderArray.forEach((policyTableId, index) => {
+                    orderMap.set(policyTableId, index);
+                  });
+                  
+                  // 순서 배열에 있는 탭과 없는 탭 분리
+                  const orderedTabs = [];
+                  const unorderedTabs = [];
+                  
+                  tabs.forEach(tab => {
+                    if (orderMap.has(tab.policyTableId)) {
+                      orderedTabs.push({ tab, order: orderMap.get(tab.policyTableId) });
+                    } else {
+                      unorderedTabs.push(tab);
+                    }
+                  });
+                  
+                  // 순서대로 정렬
+                  orderedTabs.sort((a, b) => a.order - b.order);
+                  
+                  // 순서가 있는 탭 먼저, 그 다음 순서가 없는 탭
+                  tabs = [...orderedTabs.map(item => item.tab), ...unorderedTabs];
+                }
+              } catch (parseError) {
+                console.warn('[정책표] 탭 순서 JSON 파싱 오류:', parseError);
+              }
+            }
+          }
+        } catch (orderError) {
+          console.warn('[정책표] 탭 순서 조회 오류:', orderError);
+          // 순서 조회 실패 시 기본 순서 사용
+        }
       }
 
       return res.json(tabs);
@@ -2509,6 +2575,149 @@ function setupPolicyTableRoutes(app) {
       });
     } catch (error) {
       console.error('[정책표] 이미지 갱신 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // GET /api/policy-tables/tabs/order
+  router.get('/policy-tables/tabs/order', async (req, res) => {
+    setCORSHeaders(req, res);
+    try {
+      const userId = req.headers['x-user-id'] || req.query.userId;
+      
+      if (!userId) {
+        return res.status(400).json({ success: false, error: '사용자 ID가 필요합니다.' });
+      }
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_TAB_ORDER, HEADERS_TAB_ORDER);
+
+      const response = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_TAB_ORDER}!A:E`
+        });
+      });
+
+      const rows = response.data.values || [];
+      if (rows.length < 2) {
+        return res.json({ success: true, tabOrder: null, cardOrder: null });
+      }
+
+      const dataRows = rows.slice(1);
+      const userOrderRow = dataRows.find(row => row[0] === userId);
+
+      if (!userOrderRow) {
+        return res.json({ success: true, tabOrder: null, cardOrder: null });
+      }
+
+      let tabOrder = null;
+      let cardOrder = null;
+
+      try {
+        if (userOrderRow[1]) {
+          const tabOrderArray = JSON.parse(userOrderRow[1]);
+          tabOrder = Array.isArray(tabOrderArray) ? tabOrderArray : null;
+        }
+      } catch (parseError) {
+        console.error('[정책표] 탭 순서 JSON 파싱 오류:', parseError);
+      }
+
+      try {
+        if (userOrderRow[2]) {
+          const cardOrderArray = JSON.parse(userOrderRow[2]);
+          cardOrder = Array.isArray(cardOrderArray) ? cardOrderArray : null;
+        }
+      } catch (parseError) {
+        console.error('[정책표] 생성카드 순서 JSON 파싱 오류:', parseError);
+      }
+
+      return res.json({
+        success: true,
+        tabOrder: tabOrder,
+        cardOrder: cardOrder,
+        updatedAt: userOrderRow[3] || null,
+        updatedBy: userOrderRow[4] || null
+      });
+    } catch (error) {
+      console.error('[정책표] 탭 순서 조회 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // PUT /api/policy-tables/tabs/order
+  router.put('/policy-tables/tabs/order', express.json(), async (req, res) => {
+    setCORSHeaders(req, res);
+    try {
+      const userId = req.headers['x-user-id'] || req.body.userId;
+      const { order, cardOrder } = req.body; // order는 탭 순서, cardOrder는 생성카드 순서
+      const updatedBy = req.headers['x-user-name'] || req.body.updatedBy || 'Unknown';
+
+      if (!userId) {
+        return res.status(400).json({ success: false, error: '사용자 ID가 필요합니다.' });
+      }
+
+      if (order !== undefined && (!Array.isArray(order))) {
+        return res.status(400).json({ success: false, error: '탭 순서는 배열이어야 합니다.' });
+      }
+
+      if (cardOrder !== undefined && (!Array.isArray(cardOrder))) {
+        return res.status(400).json({ success: false, error: '생성카드 순서는 배열이어야 합니다.' });
+      }
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_TAB_ORDER, HEADERS_TAB_ORDER);
+
+      // 기존 데이터 조회
+      const response = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_TAB_ORDER}!A:E`
+        });
+      });
+
+      const rows = response.data.values || [];
+      const dataRows = rows.length > 1 ? rows.slice(1) : [];
+      const userOrderRowIndex = dataRows.findIndex(row => row[0] === userId);
+
+      const now = new Date().toLocaleString('ko-KR');
+      const existingRow = userOrderRowIndex !== -1 ? dataRows[userOrderRowIndex] : [];
+      
+      // 기존 값 유지하면서 업데이트
+      const tabOrderJson = order !== undefined ? JSON.stringify(order) : (existingRow[1] || '');
+      const cardOrderJson = cardOrder !== undefined ? JSON.stringify(cardOrder) : (existingRow[2] || '');
+      
+      const newRow = [userId, tabOrderJson, cardOrderJson, now, updatedBy];
+
+      if (userOrderRowIndex !== -1) {
+        // 기존 행 업데이트
+        await withRetry(async () => {
+          return await sheets.spreadsheets.values.update({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SHEET_TAB_ORDER}!A${userOrderRowIndex + 2}:E${userOrderRowIndex + 2}`,
+            valueInputOption: 'RAW',
+            resource: { values: [newRow] }
+          });
+        });
+      } else {
+        // 새 행 추가
+        await withRetry(async () => {
+          return await sheets.spreadsheets.values.append({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SHEET_TAB_ORDER}!A:E`,
+            valueInputOption: 'RAW',
+            insertDataOption: 'INSERT_ROWS',
+            resource: { values: [newRow] }
+          });
+        });
+      }
+
+      return res.json({
+        success: true,
+        message: '순서가 저장되었습니다.'
+      });
+    } catch (error) {
+      console.error('[정책표] 순서 저장 오류:', error);
       return res.status(500).json({ success: false, error: error.message });
     }
   });
