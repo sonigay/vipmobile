@@ -2490,11 +2490,13 @@ function setupPolicyTableRoutes(app) {
       const rowIndex = rows.findIndex(r => r[0] === id);
       const updatedRow = [...row];
       updatedRow[10] = newImageUrl; // 이미지URL
-
+      
+      // updatedRow가 14개 요소(A~N열)를 가지므로 N열까지 포함하여 업데이트
+      // rowIndex는 헤더를 포함한 배열 인덱스이므로, 실제 시트 행 번호는 rowIndex + 1
       await withRetry(async () => {
         return await sheets.spreadsheets.values.update({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_POLICY_TABLE_LIST}!A${rowIndex + 1}:M${rowIndex + 1}`,
+          range: `${SHEET_POLICY_TABLE_LIST}!A${rowIndex + 1}:N${rowIndex + 1}`,
           valueInputOption: 'USER_ENTERED',
           resource: { values: [updatedRow] }
         });
