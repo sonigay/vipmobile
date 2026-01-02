@@ -240,7 +240,7 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
         headers: {
           'Content-Type': 'application/json',
           'x-user-id': loggedInStore?.contactId || loggedInStore?.id || '',
-          'x-user-name': loggedInStore?.name || loggedInStore?.target || 'Unknown'
+          'x-user-name': String(loggedInStore?.name || loggedInStore?.target || 'Unknown')
         },
         body: JSON.stringify({ order })
       });

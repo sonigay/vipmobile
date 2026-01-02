@@ -508,11 +508,12 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
       
       const response = await fetch(url, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-role': loggedInStore?.userRole || '',
-          'x-user-id': loggedInStore?.contactId || loggedInStore?.id || ''
-        },
+          headers: {
+            'Content-Type': 'application/json',
+            'x-user-role': loggedInStore?.userRole || '',
+            'x-user-id': loggedInStore?.contactId || loggedInStore?.id || '',
+            'x-user-name': String(loggedInStore?.name || loggedInStore?.target || 'Unknown')
+          },
         body: JSON.stringify(groupFormData)
       });
 
@@ -683,6 +684,205 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
     // 주기적으로 실행
     const interval = setInterval(poll, pollInterval);
     setPollingInterval(interval);
+  };
+
+  // 카드 순서 저장
+  const saveCardOrder = async (newSettings) => {
+    try {
+      setSavingCardOrder(true);
+      const cardOrder = newSettings.map(setting => setting.id);
+      
+      const response = await fetch(`${API_BASE_URL}/api/policy-tables/tabs/order`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': loggedInStore?.contactId || loggedInStore?.id || '',
+          'x-user-name': String(loggedInStore?.name || loggedInStore?.target || 'Unknown')
+        },
+        body: JSON.stringify({ cardOrder })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          console.log('생성카드 순서 저장 완료');
+        }
+      } else {
+        console.error('생성카드 순서 저장 실패:', response.status);
+      }
+    } catch (error) {
+      console.error('생성카드 순서 저장 오류:', error);
+    } finally {
+      setSavingCardOrder(false);
+    }
+  };
+
+  // 드래그 종료 핸들러
+  const handleCardDragEnd = (event) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      setSettings((items) => {
+        const oldIndex = items.findIndex(item => item.id === active.id);
+        const newIndex = items.findIndex(item => item.id === over.id);
+        
+        const newSettings = arrayMove(items, oldIndex, newIndex);
+        
+        // 순서 저장
+        saveCardOrder(newSettings);
+        
+        return newSettings;
+      });
+    }
+  };
+
+  // 모두정책생성 모달 닫기
+  const handleCloseBatchCreationModal = () => {
+    setBatchCreationModalOpen(false);
+    setBatchCreationFormData({
+      applyDate: '',
+      applyContent: '',
+      policyTableGroups: {}
+    });
+    setBatchGenerationStatus({});
+    // 모든 폴링 인터벌 정리
+    Object.values(batchPollingIntervals).forEach(interval => {
+      if (interval) clearInterval(interval);
+    });
+    setBatchPollingIntervals({});
+    setSelectedSettings([]);
+  };
+
+  // 여러 정책표 병렬 생성 시작
+  const handleStartBatchGeneration = async () => {
+    const selected = settings.filter(s => selectedSettings.includes(s.id));
+    
+    // 유효성 검사
+    if (!batchCreationFormData.applyDate || !batchCreationFormData.applyContent) {
+      setError('정책적용일시와 정책적용내용을 입력해주세요.');
+      return;
+    }
+
+    for (const setting of selected) {
+      if (!batchCreationFormData.policyTableGroups[setting.id] || 
+          batchCreationFormData.policyTableGroups[setting.id].length === 0) {
+        setError(`${setting.policyTableName}의 정책영업그룹을 선택해주세요.`);
+        return;
+      }
+    }
+
+    setError(null);
+    
+    // 각 정책표별로 생성 작업 시작 (병렬 처리)
+    const generationPromises = selected.map(async (setting) => {
+      try {
+        setBatchGenerationStatus(prev => ({
+          ...prev,
+          [setting.id]: { status: 'queued', jobId: null, result: null, error: null }
+        }));
+
+        const response = await fetch(`${API_BASE_URL}/api/policy-table/generate`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-user-role': loggedInStore?.userRole || '',
+            'x-user-id': loggedInStore?.contactId || loggedInStore?.id || '',
+            'x-user-name': String(loggedInStore?.name || loggedInStore?.target || 'Unknown')
+          },
+          body: JSON.stringify({
+            policyTableId: setting.id,
+            applyDate: batchCreationFormData.applyDate,
+            applyContent: batchCreationFormData.applyContent,
+            accessGroupIds: batchCreationFormData.policyTableGroups[setting.id]
+          })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || '정책표 생성 요청에 실패했습니다.');
+        }
+
+        const data = await response.json();
+        const jobId = data.jobId;
+
+        setBatchGenerationStatus(prev => ({
+          ...prev,
+          [setting.id]: { status: 'processing', jobId, result: null, error: null }
+        }));
+
+        // 폴링 시작
+        startBatchPolling(setting.id, jobId);
+
+        return { settingId: setting.id, jobId, success: true };
+      } catch (error) {
+        console.error(`[정책표] ${setting.policyTableName} 생성 오류:`, error);
+        setBatchGenerationStatus(prev => ({
+          ...prev,
+          [setting.id]: { 
+            status: 'failed', 
+            jobId: null, 
+            result: null, 
+            error: error.message 
+          }
+        }));
+        return { settingId: setting.id, jobId: null, success: false, error: error.message };
+      }
+    });
+
+    // 모든 생성 작업 시작 (병렬)
+    await Promise.allSettled(generationPromises);
+  };
+
+  // 배치 생성 폴링 시작
+  const startBatchPolling = (settingId, jobId) => {
+    const interval = setInterval(async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/policy-table/generate/${jobId}/status`, {
+          headers: {
+            'x-user-role': loggedInStore?.userRole || '',
+            'x-user-id': loggedInStore?.contactId || loggedInStore?.id || ''
+          }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          
+          setBatchGenerationStatus(prev => ({
+            ...prev,
+            [settingId]: {
+              status: data.status,
+              jobId: jobId,
+              result: data.result || null,
+              error: data.error || null,
+              progress: data.progress || 0,
+              message: data.message || ''
+            }
+          }));
+
+          if (data.status === 'completed' || data.status === 'failed') {
+            clearInterval(interval);
+            setBatchPollingIntervals(prev => {
+              const newIntervals = { ...prev };
+              delete newIntervals[settingId];
+              return newIntervals;
+            });
+          }
+        }
+      } catch (error) {
+        console.error(`[정책표] 폴링 오류 (${settingId}):`, error);
+        clearInterval(interval);
+        setBatchPollingIntervals(prev => {
+          const newIntervals = { ...prev };
+          delete newIntervals[settingId];
+          return newIntervals;
+        });
+      }
+    }, 2000); // 2초마다 폴링
+
+    setBatchPollingIntervals(prev => ({
+      ...prev,
+      [settingId]: interval
+    }));
   };
 
   const handleRegister = async () => {
