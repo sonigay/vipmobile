@@ -1202,8 +1202,12 @@ function setupPolicyTableRoutes(app) {
   router.get('/policy-table/user-groups', async (req, res) => {
     setCORSHeaders(req, res);
     try {
-      const permission = await checkPermission(req, ['SS', 'TEAM_LEADER']);
-      if (!permission.hasPermission) {
+      // S 권한자도 정책영업그룹 조회 가능하도록 권한 체크 수정
+      const userRole = req.headers['x-user-role'] || req.query?.userRole;
+      const twoLetterPattern = /^[A-Z]{2}$/;
+      const hasPermission = userRole === 'SS' || userRole === 'S' || twoLetterPattern.test(userRole);
+      
+      if (!hasPermission) {
         return res.status(403).json({ success: false, error: '권한이 없습니다.' });
       }
 
@@ -1455,8 +1459,12 @@ function setupPolicyTableRoutes(app) {
   router.get('/policy-table/companies', async (req, res) => {
     setCORSHeaders(req, res);
     try {
-      const permission = await checkPermission(req, ['SS', 'TEAM_LEADER']);
-      if (!permission.hasPermission) {
+      // S 권한자도 업체명 목록 조회 가능하도록 권한 체크 수정
+      const userRole = req.headers['x-user-role'] || req.query?.userRole;
+      const twoLetterPattern = /^[A-Z]{2}$/;
+      const hasPermission = userRole === 'SS' || userRole === 'S' || twoLetterPattern.test(userRole);
+      
+      if (!hasPermission) {
         return res.status(403).json({ success: false, error: '권한이 없습니다.' });
       }
 
