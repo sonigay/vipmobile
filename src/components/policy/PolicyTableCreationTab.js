@@ -712,12 +712,20 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
         const data = await response.json();
         if (data.success) {
           console.log('생성카드 순서 저장 완료');
+          // 성공 메시지 표시 (선택사항)
+          // alert('카드 순서가 저장되었습니다.');
+        } else {
+          console.error('생성카드 순서 저장 실패:', data.error);
+          setError('카드 순서 저장에 실패했습니다.');
         }
       } else {
-        console.error('생성카드 순서 저장 실패:', response.status);
+        const errorData = await response.json().catch(() => ({}));
+        console.error('생성카드 순서 저장 실패:', response.status, errorData);
+        setError('카드 순서 저장에 실패했습니다.');
       }
     } catch (error) {
       console.error('생성카드 순서 저장 오류:', error);
+      setError('카드 순서 저장 중 오류가 발생했습니다.');
     } finally {
       setSavingCardOrder(false);
     }
