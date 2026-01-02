@@ -920,6 +920,7 @@ function setupPolicyTableRoutes(app) {
 
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_TABLE_SETTINGS, HEADERS_POLICY_TABLE_SETTINGS);
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_TAB_ORDER, HEADERS_TAB_ORDER);
 
       const response = await withRetry(async () => {
         return await sheets.spreadsheets.values.get({
@@ -936,7 +937,7 @@ function setupPolicyTableRoutes(app) {
       const headers = rows[0];
       const dataRows = rows.slice(1);
 
-      const settings = dataRows.map(row => ({
+      let settings = dataRows.map(row => ({
         id: row[0] || '',
         policyTableName: row[1] || '',
         policyTableDescription: row[2] || '',
@@ -947,6 +948,68 @@ function setupPolicyTableRoutes(app) {
         registeredAt: row[7] || '',
         registeredBy: row[8] || ''
       }));
+
+      // 사용자별 생성카드 순서 적용
+      const userId = req.headers['x-user-id'] || req.query.userId;
+      if (userId) {
+        try {
+          const orderResponse = await withRetry(async () => {
+            return await sheets.spreadsheets.values.get({
+              spreadsheetId: SPREADSHEET_ID,
+              range: `${SHEET_TAB_ORDER}!A:E`
+            });
+          });
+          
+          const orderRows = orderResponse.data.values || [];
+          if (orderRows.length > 1) {
+            const orderDataRows = orderRows.slice(1);
+            const userOrderRow = orderDataRows.find(row => row[0] === userId);
+            
+            if (userOrderRow && userOrderRow[2]) {
+              try {
+                const cardOrderArray = JSON.parse(userOrderRow[2]);
+                if (Array.isArray(cardOrderArray) && cardOrderArray.length > 0) {
+                  // 순서 배열을 기준으로 카드 정렬
+                  const orderMap = new Map();
+                  cardOrderArray.forEach((settingId, index) => {
+                    orderMap.set(settingId, index);
+                  });
+                  
+                  // 순서 배열에 있는 카드와 없는 카드 분리
+                  const orderedSettings = [];
+                  const unorderedSettings = [];
+                  
+                  settings.forEach(setting => {
+                    if (orderMap.has(setting.id)) {
+                      orderedSettings.push({ setting, order: orderMap.get(setting.id) });
+                    } else {
+                      unorderedSettings.push(setting);
+                    }
+                  });
+                  
+                  // 순서대로 정렬
+                  orderedSettings.sort((a, b) => a.order - b.order);
+                  
+                  // 순서가 있는 카드 먼저, 그 다음 순서가 없는 카드
+                  settings = [...orderedSettings.map(item => item.setting), ...unorderedSettings];
+                  
+                  console.log('✅ [정책표] 생성카드 순서 적용:', {
+                    userId,
+                    cardOrderArray,
+                    orderedCount: orderedSettings.length,
+                    unorderedCount: unorderedSettings.length
+                  });
+                }
+              } catch (parseError) {
+                console.warn('[정책표] 생성카드 순서 JSON 파싱 오류:', parseError);
+              }
+            }
+          }
+        } catch (orderError) {
+          console.warn('[정책표] 생성카드 순서 조회 오류:', orderError);
+          // 순서 조회 실패 시 기본 순서 사용
+        }
+      }
 
       console.log('🔍 [정책표] 설정 목록 조회:', {
         totalSettings: settings.length,
