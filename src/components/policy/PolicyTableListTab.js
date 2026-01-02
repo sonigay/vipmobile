@@ -373,6 +373,9 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
               <TableRow>
                 <TableCell>정책적용일시</TableCell>
                 <TableCell>생성자</TableCell>
+                {mode !== 'generalPolicy' && (
+                  <TableCell>정액영업그룹</TableCell>
+                )}
                 <TableCell>생성일시</TableCell>
                 <TableCell>등록일시</TableCell>
                 <TableCell>작업</TableCell>
@@ -381,7 +384,7 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
             <TableBody>
               {policies.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} align="center">
+                  <TableCell colSpan={mode !== 'generalPolicy' ? 6 : 5} align="center">
                     등록된 정책표가 없습니다.
                   </TableCell>
                 </TableRow>
@@ -395,6 +398,13 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
                   >
                     <TableCell>{policy.applyDate || '-'}</TableCell>
                     <TableCell>{policy.creator}</TableCell>
+                    {mode !== 'generalPolicy' && (
+                      <TableCell>
+                        {policy.accessGroupNames && policy.accessGroupNames.length > 0
+                          ? policy.accessGroupNames.join(', ')
+                          : '-'}
+                      </TableCell>
+                    )}
                     <TableCell>{formatDate(policy.createdAt)}</TableCell>
                     <TableCell>{formatDate(policy.registeredAt)}</TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>

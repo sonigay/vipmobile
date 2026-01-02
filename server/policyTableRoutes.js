@@ -1855,6 +1855,29 @@ function setupPolicyTableRoutes(app) {
       }
 
       const dataRows = rows.slice(1);
+      
+      // 정책영업그룹 목록 조회 (정액영업그룹 이름 표시용 - 정책모드에서만)
+      let userGroupsNameMap = new Map();
+      if (!isGeneralPolicyMode) {
+        await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_USER_GROUPS, HEADERS_USER_GROUPS);
+        const userGroupsResponse = await withRetry(async () => {
+          return await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SHEET_USER_GROUPS}!A:E`
+          });
+        });
+        
+        const userGroupsRows = userGroupsResponse.data.values || [];
+        const userGroupsDataRows = userGroupsRows.slice(1);
+        userGroupsDataRows.forEach(row => {
+          const groupId = row[0] || '';
+          const groupName = row[1] || '';
+          if (groupId && groupName) {
+            userGroupsNameMap.set(groupId, groupName);
+          }
+        });
+      }
+      
       let policies = dataRows
         .filter(row => {
           // 정책표이름 필터
@@ -1863,21 +1886,34 @@ function setupPolicyTableRoutes(app) {
           if (row[11] !== 'Y') return false;
           return true;
         })
-        .map(row => ({
-          id: row[0] || '',
-          policyTableId: row[1] || '',
-          policyTableName: row[2] || '',
-          applyDate: row[3] || '',
-          applyContent: row[4] || '',
-          accessGroupId: row[5] || '',
-          creator: row[6] || '',
-          creatorId: row[13] || '', // 생성자ID (새로 추가)
-          createdAt: row[7] || '',
-          messageId: row[8] || '',
-          threadId: row[9] || '',
-          imageUrl: row[10] || '',
-          registeredAt: row[12] || ''
-        }));
+        .map(row => {
+          const accessGroupId = row[5] || '';
+          const accessGroupIds = parseAccessGroupIds(accessGroupId);
+          
+          // 정액영업그룹 이름 배열 생성 (정책모드에서만)
+          const accessGroupNames = !isGeneralPolicyMode && accessGroupIds.length > 0
+            ? accessGroupIds
+                .map(groupId => userGroupsNameMap.get(groupId))
+                .filter(name => name) // undefined 제거
+            : [];
+          
+          return {
+            id: row[0] || '',
+            policyTableId: row[1] || '',
+            policyTableName: row[2] || '',
+            applyDate: row[3] || '',
+            applyContent: row[4] || '',
+            accessGroupId: accessGroupId,
+            accessGroupNames: accessGroupNames, // 정액영업그룹 이름 배열 추가
+            creator: row[6] || '',
+            creatorId: row[13] || '', // 생성자ID (새로 추가)
+            createdAt: row[7] || '',
+            messageId: row[8] || '',
+            threadId: row[9] || '',
+            imageUrl: row[10] || '',
+            registeredAt: row[12] || ''
+          };
+        });
 
       // 권한 필터링
       if (isGeneralPolicyMode) {

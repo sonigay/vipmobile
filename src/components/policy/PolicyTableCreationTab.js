@@ -60,7 +60,16 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
   const [generatedResult, setGeneratedResult] = useState(null);
 
   // 정책영업그룹 관리 상태
-  const [activeTab, setActiveTab] = useState(0); // 0: 정책표 생성, 1: 정책영업그룹
+  // S 권한자는 정책영업그룹 탭만 보이므로 초기값을 1로 설정
+  const [activeTab, setActiveTab] = useState(() => {
+    const userRole = loggedInStore?.userRole;
+    const twoLetterPattern = /^[A-Z]{2}$/;
+    // S 권한자는 정책영업그룹 탭만 보이므로 1로 설정, 그 외는 0
+    if (userRole === 'S') {
+      return 1;
+    }
+    return 0;
+  });
   const [groupModalOpen, setGroupModalOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState(null);
   const [groupFormData, setGroupFormData] = useState({
@@ -71,10 +80,13 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
   const [companies, setCompanies] = useState([]);
   const [teamLeaders, setTeamLeaders] = useState([]);
 
-  // 권한 체크 - 동적으로 두 글자 대문자 패턴(팀장) 또는 SS(총괄) 인식
+  // 권한 체크 - 동적으로 두 글자 대문자 패턴(팀장) 또는 SS(총괄), S(정산팀) 인식
   const userRole = loggedInStore?.userRole;
   const twoLetterPattern = /^[A-Z]{2}$/;
-  const canAccess = userRole && (userRole === 'SS' || twoLetterPattern.test(userRole));
+  const canAccess = userRole && (userRole === 'SS' || userRole === 'S' || twoLetterPattern.test(userRole));
+  // S 권한자는 정책영업그룹 탭만 접근 가능
+  const canAccessPolicyTableCreation = userRole && (userRole === 'SS' || twoLetterPattern.test(userRole));
+  const canAccessUserGroups = canAccess; // S 권한자도 정책영업그룹 접근 가능
 
   // 디버깅: 권한 체크 로그
   useEffect(() => {
@@ -92,17 +104,24 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
 
   useEffect(() => {
     if (canAccess) {
-      loadSettings();
+      // S 권한자는 정책영업그룹 탭만 보이도록 activeTab을 1로 설정
+      if (userRole === 'S') {
+        setActiveTab(1);
+      }
       loadUserGroups();
       loadCompanies();
       loadTeamLeaders();
+      // 정책표 생성 기능은 SS 또는 팀장만 사용 가능
+      if (canAccessPolicyTableCreation) {
+        loadSettings();
+      }
     }
     return () => {
       if (pollingInterval) {
         clearInterval(pollingInterval);
       }
     };
-  }, [canAccess]);
+  }, [canAccess, userRole, canAccessPolicyTableCreation]);
 
   const loadSettings = async () => {
     try {
@@ -626,14 +645,26 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
       )}
 
       <Paper sx={{ mb: 3 }}>
-        <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)}>
-          <Tab label="정책표 생성" />
+        <Tabs 
+          value={canAccessPolicyTableCreation ? activeTab : 0} 
+          onChange={(e, newValue) => {
+            // S 권한자는 정책영업그룹 탭만 접근 가능하므로 항상 0으로 설정 (정책표 생성 탭이 없으므로)
+            if (userRole === 'S') {
+              setActiveTab(1); // 내부적으로는 1로 유지하되, 탭 인덱스는 0으로 표시
+            } else {
+              setActiveTab(newValue);
+            }
+          }}
+        >
+          {canAccessPolicyTableCreation && (
+            <Tab label="정책표 생성" />
+          )}
           <Tab label="정책영업그룹" icon={<GroupIcon />} iconPosition="start" />
         </Tabs>
       </Paper>
 
       {/* 정책표 생성 탭 */}
-      {activeTab === 0 && (
+      {canAccessPolicyTableCreation && activeTab === 0 && (
         <>
           {loading && settings.length === 0 ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
