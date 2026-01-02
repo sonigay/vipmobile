@@ -73,20 +73,22 @@ const SortableCard = ({ setting, children }) => {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
-    cursor: 'grab',
     position: 'relative'
   };
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+    <div ref={setNodeRef} style={style} {...attributes}>
       <Box
+        {...listeners}
         sx={{
           position: 'absolute',
           top: 8,
           right: 8,
-          zIndex: 1,
+          zIndex: 2,
           cursor: 'grab',
           color: 'text.secondary',
+          display: 'flex',
+          alignItems: 'center',
           '&:active': {
             cursor: 'grabbing'
           }
@@ -989,7 +991,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                     <Grid item xs={12} sm={6} md={4} key={setting.id}>
                       <SortableCard setting={setting}>
                         <Card sx={{ position: 'relative' }}>
-                          <Box sx={{ position: 'absolute', top: 8, left: 8, zIndex: 2 }}>
+                          <Box sx={{ position: 'absolute', top: 8, left: 8, zIndex: 3 }}>
                             <IconButton
                               size="small"
                               onClick={(e) => {
@@ -1002,6 +1004,12 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                                   }
                                 });
                               }}
+                              sx={{ 
+                                backgroundColor: 'background.paper',
+                                '&:hover': {
+                                  backgroundColor: 'action.hover'
+                                }
+                              }}
                             >
                               {selectedSettings.includes(setting.id) ? (
                                 <CheckBoxIcon color="primary" />
@@ -1010,7 +1018,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                               )}
                             </IconButton>
                           </Box>
-                    <CardContent>
+                    <CardContent sx={{ pl: 6, pt: 2 }}>
                       <Typography variant="h6" gutterBottom>
                         {setting.policyTableName}
                       </Typography>

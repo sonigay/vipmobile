@@ -63,11 +63,7 @@ const SortableTab = ({ tab, index, activeTabIndex, onTabClick }) => {
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
-    cursor: 'grab',
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '4px'
+    opacity: isDragging ? 0.5 : 1
   };
 
   return (
@@ -75,18 +71,33 @@ const SortableTab = ({ tab, index, activeTabIndex, onTabClick }) => {
       ref={setNodeRef}
       style={style}
       {...attributes}
-      {...listeners}
       label={
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-          <DragIndicatorIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-          {tab.policyTableName}
+          <Box
+            {...listeners}
+            sx={{
+              cursor: 'grab',
+              display: 'inline-flex',
+              alignItems: 'center',
+              '&:active': {
+                cursor: 'grabbing'
+              }
+            }}
+          >
+            <DragIndicatorIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+          </Box>
+          <Box
+            onClick={(e) => {
+              e.stopPropagation();
+              onTabClick(e, index);
+            }}
+            sx={{ cursor: 'pointer', flex: 1 }}
+          >
+            {tab.policyTableName}
+          </Box>
         </Box>
       }
       value={index}
-      onClick={(e) => {
-        e.stopPropagation();
-        onTabClick(e, index);
-      }}
     />
   );
 };
