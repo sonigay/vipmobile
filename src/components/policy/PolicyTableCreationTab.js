@@ -1048,6 +1048,57 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
     }
   };
 
+  // 배치 생성된 모든 정책표 등록
+  const handleBatchRegister = async () => {
+    // 완료된 정책표만 필터링
+    const completedResults = Object.entries(batchGenerationStatus)
+      .filter(([settingId, status]) => status.status === 'completed' && status.result)
+      .map(([settingId, status]) => ({
+        settingId,
+        result: status.result,
+        setting: settings.find(s => s.id === settingId)
+      }));
+
+    if (completedResults.length === 0) {
+      setError('등록할 정책표가 없습니다.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      // 모든 정책표를 병렬로 등록
+      const registerPromises = completedResults.map(({ result }) =>
+        fetch(`${API_BASE_URL}/api/policy-tables/${result.id}/register`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-user-role': loggedInStore?.userRole || '',
+            'x-user-id': loggedInStore?.contactId || loggedInStore?.id || ''
+          }
+        })
+      );
+
+      const responses = await Promise.allSettled(registerPromises);
+      
+      const successCount = responses.filter(r => r.status === 'fulfilled' && r.value.ok).length;
+      const failCount = responses.length - successCount;
+
+      if (failCount === 0) {
+        alert(`모든 정책표(${successCount}개)가 등록되었습니다.`);
+        handleCloseBatchCreationModal();
+      } else {
+        setError(`${successCount}개 등록 성공, ${failCount}개 등록 실패했습니다.`);
+      }
+    } catch (error) {
+      console.error('배치 정책표 등록 오류:', error);
+      setError('정책표 등록 중 오류가 발생했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h5" gutterBottom sx={{ mb: 3, fontWeight: 'bold' }}>
@@ -1626,14 +1677,28 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                               </Box>
                             )}
                             {batchGenerationStatus[setting.id].status === 'completed' && (
-                              <Alert severity="success">
-                                생성 완료!
-                                {batchGenerationStatus[setting.id].result && (
-                                  <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>
-                                    정책표 ID: {batchGenerationStatus[setting.id].result.id}
-                                  </Typography>
+                              <Box>
+                                <Alert severity="success" sx={{ mb: 1 }}>
+                                  생성 완료!
+                                  {batchGenerationStatus[setting.id].result && (
+                                    <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>
+                                      정책표 ID: {batchGenerationStatus[setting.id].result.id}
+                                    </Typography>
+                                  )}
+                                </Alert>
+                                {batchGenerationStatus[setting.id].result?.imageUrl && (
+                                  <Box sx={{ mt: 1, textAlign: 'center' }}>
+                                    <img
+                                      src={batchGenerationStatus[setting.id].result.imageUrl}
+                                      alt={`${setting.policyTableName} 정책표`}
+                                      style={{ maxWidth: '100%', height: 'auto', border: '1px solid #ddd', borderRadius: 4 }}
+                                      onError={(e) => {
+                                        e.target.style.display = 'none';
+                                      }}
+                                    />
+                                  </Box>
                                 )}
-                              </Alert>
+                              </Box>
                             )}
                             {batchGenerationStatus[setting.id].status === 'failed' && (
                               <Box>
@@ -1667,6 +1732,20 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseBatchCreationModal}>취소</Button>
+          {/* 완료된 정책표가 있을 때만 정책표등록 버튼 표시 */}
+          {Object.values(batchGenerationStatus).some(status => 
+            status.status === 'completed' && status.result
+          ) && (
+            <Button
+              onClick={handleBatchRegister}
+              variant="contained"
+              color="success"
+              disabled={loading}
+              startIcon={<CheckCircleIcon />}
+            >
+              정책표등록
+            </Button>
+          )}
           <Button
             onClick={handleStartBatchGeneration}
             variant="contained"
