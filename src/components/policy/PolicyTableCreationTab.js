@@ -767,7 +767,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
     setSelectedSettings([]);
   };
 
-  // 여러 정책표 병렬 생성 시작
+  // 여러 정책표 제한된 병렬 생성 시작 (동시에 최대 2개만 처리)
   const handleStartBatchGeneration = async () => {
     const selected = settings.filter(s => selectedSettings.includes(s.id));
     
@@ -787,18 +787,30 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
 
     setError(null);
     
-    // 각 정책표별로 생성 작업 시작 (병렬 처리)
-    const generationPromises = selected.map(async (setting) => {
+    // 제한된 병렬 처리: 동시에 최대 2개만 처리 (디스코드 봇 부하 감소)
+    const MAX_CONCURRENT = 2;
+    const queue = [...selected];
+    
+    // 초기 상태 설정
+    selected.forEach(setting => {
+      setBatchGenerationStatus(prev => ({
+        ...prev,
+        [setting.id]: { status: 'queued', jobId: null, result: null, error: null }
+      }));
+    });
+    
+    // 헤더 값 안전하게 처리
+    const userName = loggedInStore?.name || loggedInStore?.target || 'Unknown';
+    const safeUserName = typeof userName === 'string' ? encodeURIComponent(userName) : 'Unknown';
+    
+    // 제한된 병렬 처리 함수
+    const processSetting = async (setting) => {
       try {
         setBatchGenerationStatus(prev => ({
           ...prev,
           [setting.id]: { status: 'queued', jobId: null, result: null, error: null }
         }));
 
-        // 헤더 값 안전하게 처리 (한글 등 특수문자 인코딩)
-        const userName = loggedInStore?.name || loggedInStore?.target || 'Unknown';
-        const safeUserName = typeof userName === 'string' ? encodeURIComponent(userName) : 'Unknown';
-        
         const response = await fetch(`${API_BASE_URL}/api/policy-table/generate`, {
           method: 'POST',
           headers: {
@@ -845,10 +857,92 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
         }));
         return { settingId: setting.id, jobId: null, success: false, error: error.message };
       }
-    });
+    };
+    
+    // 제한된 병렬 처리 실행
+    while (queue.length > 0) {
+      const batch = queue.splice(0, MAX_CONCURRENT);
+      const batchPromises = batch.map(setting => processSetting(setting));
+      await Promise.allSettled(batchPromises);
+      
+      // 배치 간 약간의 지연 (디스코드 봇 부하 감소)
+      if (queue.length > 0) {
+        await new Promise(resolve => setTimeout(resolve, 2000)); // 2초 대기
+      }
+    }
+  };
 
-    // 모든 생성 작업 시작 (병렬)
-    await Promise.allSettled(generationPromises);
+  // 개별 정책표 재생성
+  const handleRetryGeneration = async (settingId) => {
+    const setting = settings.find(s => s.id === settingId);
+    if (!setting) return;
+    
+    // 유효성 검사
+    if (!batchCreationFormData.applyDate || !batchCreationFormData.applyContent) {
+      setError('정책적용일시와 정책적용내용을 입력해주세요.');
+      return;
+    }
+
+    if (!batchCreationFormData.policyTableGroups[settingId] || 
+        batchCreationFormData.policyTableGroups[settingId].length === 0) {
+      setError(`${setting.policyTableName}의 정책영업그룹을 선택해주세요.`);
+      return;
+    }
+
+    setError(null);
+    
+    try {
+      setBatchGenerationStatus(prev => ({
+        ...prev,
+        [settingId]: { status: 'queued', jobId: null, result: null, error: null }
+      }));
+
+      const userName = loggedInStore?.name || loggedInStore?.target || 'Unknown';
+      const safeUserName = typeof userName === 'string' ? encodeURIComponent(userName) : 'Unknown';
+
+      const response = await fetch(`${API_BASE_URL}/api/policy-table/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-role': loggedInStore?.userRole || '',
+          'x-user-id': loggedInStore?.contactId || loggedInStore?.id || '',
+          'x-user-name': safeUserName
+        },
+        body: JSON.stringify({
+          policyTableId: settingId,
+          applyDate: batchCreationFormData.applyDate,
+          applyContent: batchCreationFormData.applyContent,
+          accessGroupIds: batchCreationFormData.policyTableGroups[settingId]
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || '정책표 생성 요청에 실패했습니다.');
+      }
+
+      const data = await response.json();
+      const jobId = data.jobId;
+
+      setBatchGenerationStatus(prev => ({
+        ...prev,
+        [settingId]: { status: 'processing', jobId, result: null, error: null }
+      }));
+
+      // 폴링 시작
+      startBatchPolling(settingId, jobId);
+    } catch (error) {
+      console.error(`[정책표] ${setting.policyTableName} 재생성 오류:`, error);
+      setBatchGenerationStatus(prev => ({
+        ...prev,
+        [settingId]: { 
+          status: 'failed', 
+          jobId: null, 
+          result: null, 
+          error: error.message 
+        }
+      }));
+    }
   };
 
   // 배치 생성 폴링 시작
@@ -1515,9 +1609,25 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                               </Alert>
                             )}
                             {batchGenerationStatus[setting.id].status === 'failed' && (
-                              <Alert severity="error">
-                                생성 실패: {batchGenerationStatus[setting.id].error || '알 수 없는 오류'}
-                              </Alert>
+                              <Box>
+                                <Alert severity="error" sx={{ mb: 1 }}>
+                                  생성 실패: {batchGenerationStatus[setting.id].error || '알 수 없는 오류'}
+                                </Alert>
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  startIcon={<RefreshIcon />}
+                                  onClick={() => handleRetryGeneration(setting.id)}
+                                  disabled={
+                                    !batchCreationFormData.applyDate ||
+                                    !batchCreationFormData.applyContent ||
+                                    !batchCreationFormData.policyTableGroups[setting.id] ||
+                                    batchCreationFormData.policyTableGroups[setting.id].length === 0
+                                  }
+                                >
+                                  재생성
+                                </Button>
+                              </Box>
                             )}
                           </Box>
                         </Grid>
