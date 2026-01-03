@@ -75,15 +75,16 @@ client.on('messageCreate', async (message) => {
     
     const policyTableName = options.policyTableName || '정책표';
     const userName = options.userName || 'Unknown';
+    const requestId = options.requestId || `LOCAL_${Date.now()}`;
     const waitTime = parseInt(options.waitTime) || 3000;
     const viewportWidth = parseInt(options.viewportWidth) || 1920;
     const viewportHeight = parseInt(options.viewportHeight) || 1080;
     
-    console.log(`📋 [로컬PC봇] 파싱된 정보:`);
-    console.log(`   URL: ${sheetUrl.substring(0, 50)}...`);
-    console.log(`   정책표: ${policyTableName}`);
-    console.log(`   사용자: ${userName}`);
-    console.log(`   대기시간: ${waitTime}ms`);
+    console.log(`📋 [로컬PC봇] [${requestId}] 파싱된 정보:`);
+    console.log(`   [${requestId}] URL: ${sheetUrl.substring(0, 50)}...`);
+    console.log(`   [${requestId}] 정책표: ${policyTableName}`);
+    console.log(`   [${requestId}] 사용자: ${userName}`);
+    console.log(`   [${requestId}] 대기시간: ${waitTime}ms`);
     
     // ===== 2단계: 로딩 메시지 전송 =====
     // 클라우드 서버에 작업 시작을 알림
@@ -97,7 +98,8 @@ client.on('messageCreate', async (message) => {
     try {
       // ===== 3단계: 스크린샷 생성 =====
       // Puppeteer를 사용하여 Google Sheets를 열고 스크린샷 생성
-      console.log(`🖼️ [로컬PC봇] Puppeteer로 스크린샷 생성 시작...`);
+      console.log(`🖼️ [로컬PC봇] [${requestId}] Puppeteer로 스크린샷 생성 시작...`);
+      console.log(`🖼️ [로컬PC봇] [${requestId}] 정책표: ${policyTableName}, URL: ${sheetUrl.substring(0, 50)}...`);
       
       let imageBuffer;
       let retryCount = 0;
@@ -116,7 +118,7 @@ client.on('messageCreate', async (message) => {
           
           // ECONNREFUSED 에러이고 재시도 가능한 경우
           if (error.message && error.message.includes('ECONNREFUSED') && retryCount < maxRetries) {
-            console.log(`🔄 [로컬PC봇] 브라우저 연결 실패, 재시도 ${retryCount}/${maxRetries - 1}...`);
+            console.log(`🔄 [로컬PC봇] [${requestId}] 브라우저 연결 실패, 재시도 ${retryCount}/${maxRetries - 1}...`);
             await new Promise(resolve => setTimeout(resolve, 2000)); // 2초 대기 후 재시도
             continue;
           }
@@ -126,7 +128,8 @@ client.on('messageCreate', async (message) => {
         }
       }
       
-      console.log(`✅ [로컬PC봇] 스크린샷 생성 완료 (크기: ${imageBuffer.length} bytes)`);
+      console.log(`✅ [로컬PC봇] [${requestId}] 스크린샷 생성 완료 (크기: ${imageBuffer.length} bytes)`);
+      console.log(`✅ [로컬PC봇] [${requestId}] 정책표: ${policyTableName}`);
       
       // ===== 4단계: 이미지를 디스코드에 업로드 =====
       // 생성한 이미지를 디스코드 채널에 업로드

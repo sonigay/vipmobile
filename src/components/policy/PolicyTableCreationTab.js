@@ -872,30 +872,33 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
       });
     };
     
-    // 병렬 처리 실행 (모든 요청을 동시에 시작하되, 각각 완료될 때까지 기다림)
-    // 디스코드 봇 부하를 고려하여 약간의 지연을 두고 시작
-    const promises = queue.map((setting, index) => {
-      return new Promise(async (resolve) => {
-        // 각 요청을 약간의 시간차를 두고 시작 (디스코드 봇 부하 분산)
-        if (index > 0) {
-          await new Promise(resolve => setTimeout(resolve, index * 1000)); // 1초씩 지연
-        }
-        
-        console.log(`[정책표 생성] ${index + 1}/${queue.length} 처리 시작: ${setting.policyTableName}`);
-        
-        try {
-          const result = await processSetting(setting);
-          console.log(`[정책표 생성] ${index + 1}/${queue.length} 처리 완료: ${setting.policyTableName}`);
-          resolve(result);
-        } catch (error) {
-          console.error(`[정책표 생성] ${index + 1}/${queue.length} 처리 실패: ${setting.policyTableName}`, error);
-          resolve({ settingId: setting.id, success: false, error: error.message });
-        }
-      });
-    });
-    
-    // 모든 요청이 완료될 때까지 기다림
-    await Promise.allSettled(promises);
+    // 순차 처리 실행 (각 요청이 완료될 때까지 기다린 후 다음 요청 시작)
+    // 병렬 처리에서 이미지가 뒤바뀌는 문제가 발생하여 순차 처리로 변경
+    for (let i = 0; i < queue.length; i++) {
+      const setting = queue[i];
+      
+      // setting 객체를 명시적으로 복사하여 클로저 문제 방지
+      const settingCopy = {
+        id: setting.id,
+        policyTableName: setting.policyTableName,
+        policyTableDescription: setting.policyTableDescription,
+        policyTableLink: setting.policyTableLink,
+        policyTablePublicLink: setting.policyTablePublicLink,
+        discordChannelId: setting.discordChannelId,
+        creatorPermissions: setting.creatorPermissions
+      };
+      
+      console.log(`[정책표 생성] ${i + 1}/${queue.length} 처리 시작: ${settingCopy.policyTableName} (ID: ${settingCopy.id})`);
+      
+      // 첫 번째 요청이 아니면 이전 요청 완료 후 약간의 지연
+      if (i > 0) {
+        await new Promise(resolve => setTimeout(resolve, 2000)); // 2초 대기
+      }
+      
+      await processSetting(settingCopy);
+      
+      console.log(`[정책표 생성] ${i + 1}/${queue.length} 처리 완료: ${settingCopy.policyTableName} (ID: ${settingCopy.id})`);
+    }
     
     console.log(`[정책표 생성] 모든 요청 처리 완료 (${queue.length}개)`);
   };

@@ -216,9 +216,12 @@ async function captureSheetViaDiscordBot(sheetUrl, policyTableName, userName, ch
     }
 
     // 명령어 생성
-    // 형식: !screenshot <URL> policyTableName=<이름> userName=<사용자>
-    const command = `!screenshot ${sheetUrl} policyTableName=${encodeURIComponent(policyTableName)} userName=${encodeURIComponent(userName)}`;
-    console.log(`📤 디스코드 명령어 전송: ${command.substring(0, 100)}...`);
+    // 형식: !screenshot <URL> policyTableName=<이름> userName=<사용자> requestId=<고유ID>
+    // requestId를 추가하여 여러 요청을 구분할 수 있도록 함
+    const requestId = `REQ_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const command = `!screenshot ${sheetUrl} policyTableName=${encodeURIComponent(policyTableName)} userName=${encodeURIComponent(userName)} requestId=${requestId}`;
+    console.log(`📤 [${requestId}] 디스코드 명령어 전송: ${command.substring(0, 100)}...`);
+    console.log(`📤 [${requestId}] 정책표: ${policyTableName}, URL: ${sheetUrl.substring(0, 50)}...`);
     
     // 명령어 메시지 전송 (포스트 또는 일반 채널)
     const commandMessage = await targetChannel.send(command);

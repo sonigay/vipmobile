@@ -121,7 +121,10 @@ async function captureSheetAsImage(sheetUrl, options = {}) {
   let newTabHandle = null;
 
   try {
-    console.log(`📸 스크린샷 생성 중: ${sheetUrl}`);
+    // URL에서 정책표 이름 추출 (디버깅용)
+    const urlMatch = sheetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
+    const sheetId = urlMatch ? urlMatch[1] : 'unknown';
+    console.log(`📸 스크린샷 생성 중: ${sheetUrl.substring(0, 50)}... (시트 ID: ${sheetId.substring(0, 10)}...)`);
     
     // 1. 현재 창 핸들 저장
     originalWindowHandle = await driver.getWindowHandle();
