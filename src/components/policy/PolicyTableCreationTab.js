@@ -515,7 +515,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
             'Content-Type': 'application/json',
             'x-user-role': loggedInStore?.userRole || '',
             'x-user-id': loggedInStore?.contactId || loggedInStore?.id || '',
-            'x-user-name': String(loggedInStore?.name || loggedInStore?.target || 'Unknown')
+            'x-user-name': encodeURIComponent(String(loggedInStore?.name || loggedInStore?.target || 'Unknown'))
           },
         body: JSON.stringify(groupFormData)
       });
