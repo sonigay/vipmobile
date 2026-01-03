@@ -107,6 +107,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [savingCardOrder, setSavingCardOrder] = useState(false);
+  const [successMessage, setSuccessMessage] = useState(null);
   
   // 여러 정책표 생성 관련 상태
   const [selectedSettings, setSelectedSettings] = useState([]); // 체크된 카드 ID 배열
@@ -859,10 +860,22 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
       }
     };
     
-    // 제한된 병렬 처리 실행
+    // 제한된 병렬 처리 실행 (배치 내에서도 약간의 지연을 두어 디스코드 봇 부하 감소)
     while (queue.length > 0) {
       const batch = queue.splice(0, MAX_CONCURRENT);
-      const batchPromises = batch.map(setting => processSetting(setting));
+      
+      // 배치 내 각 요청을 약간의 시간차를 두고 시작 (디스코드 봇 부하 분산)
+      const batchPromises = batch.map((setting, index) => {
+        return new Promise(async (resolve) => {
+          // 첫 번째는 즉시, 두 번째는 800ms 지연
+          if (index > 0) {
+            await new Promise(resolve => setTimeout(resolve, 800));
+          }
+          const result = await processSetting(setting);
+          resolve(result);
+        });
+      });
+      
       await Promise.allSettled(batchPromises);
       
       // 배치 간 약간의 지연 (디스코드 봇 부하 감소)
@@ -890,11 +903,12 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
     }
 
     setError(null);
+    setSuccessMessage(`${setting.policyTableName} 재생성을 시작했습니다...`);
     
     try {
       setBatchGenerationStatus(prev => ({
         ...prev,
-        [settingId]: { status: 'queued', jobId: null, result: null, error: null }
+        [settingId]: { status: 'queued', jobId: null, result: null, error: null, message: '재생성 요청 중...' }
       }));
 
       const userName = loggedInStore?.name || loggedInStore?.target || 'Unknown';
@@ -926,13 +940,21 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
 
       setBatchGenerationStatus(prev => ({
         ...prev,
-        [settingId]: { status: 'processing', jobId, result: null, error: null }
+        [settingId]: { status: 'processing', jobId, result: null, error: null, message: '재생성 처리 중...' }
       }));
+
+      // 성공 메시지 업데이트
+      setSuccessMessage(`${setting.policyTableName} 재생성이 시작되었습니다. 진행 상황을 확인하세요.`);
+      
+      // 3초 후 성공 메시지 자동 제거
+      setTimeout(() => setSuccessMessage(null), 3000);
 
       // 폴링 시작
       startBatchPolling(settingId, jobId);
     } catch (error) {
       console.error(`[정책표] ${setting.policyTableName} 재생성 오류:`, error);
+      setError(`${setting.policyTableName} 재생성 실패: ${error.message}`);
+      setSuccessMessage(null);
       setBatchGenerationStatus(prev => ({
         ...prev,
         [settingId]: { 
@@ -1035,6 +1057,11 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
           {error}
+        </Alert>
+      )}
+      {successMessage && (
+        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccessMessage(null)}>
+          {successMessage}
         </Alert>
       )}
 
