@@ -243,23 +243,71 @@ async function captureSheetAsImage(sheetUrl, options = {}) {
     console.log('✅ 스크린샷 생성 완료');
 
     // 작업이 끝나면 메인 페이지로 다시 포커스 전환
-    await driver.switchTo().defaultContent();
+    try {
+      await driver.switchTo().defaultContent();
+    } catch (e) {
+      console.warn('   → defaultContent 전환 실패 (무시):', e.message);
+    }
 
-    // 새 탭 닫기
+    // 새 탭 닫기 (안전하게)
     if (newTabHandle) {
       try {
-        await driver.close();
+        // 현재 탭이 여전히 유효한지 확인
+        const currentHandle = await driver.getWindowHandle();
+        if (currentHandle === newTabHandle) {
+          // 새 탭이 현재 탭이면 닫기
+          await driver.close();
+          console.log('   → 새 탭 닫기 완료');
+        } else {
+          // 이미 다른 탭으로 전환된 경우 새 탭으로 전환 후 닫기
+          try {
+            await driver.switchTo().window(newTabHandle);
+            await driver.close();
+            console.log('   → 새 탭으로 전환 후 닫기 완료');
+          } catch (e) {
+            console.warn('   → 새 탭 전환/닫기 실패 (이미 닫혔을 수 있음):', e.message);
+          }
+        }
+        
         // 원래 탭으로 전환
         if (originalWindowHandle) {
-          await driver.switchTo().window(originalWindowHandle);
+          try {
+            // 원래 탭이 여전히 존재하는지 확인
+            const allHandles = await driver.getAllWindowHandles();
+            if (allHandles.includes(originalWindowHandle)) {
+              await driver.switchTo().window(originalWindowHandle);
+              console.log('   → 원래 탭으로 복귀 완료');
+            } else {
+              // 원래 탭이 없으면 첫 번째 탭으로 전환
+              if (allHandles.length > 0) {
+                await driver.switchTo().window(allHandles[0]);
+                console.log('   → 첫 번째 탭으로 전환 완료');
+              }
+            }
+          } catch (e) {
+            console.warn('   → 원래 탭으로 전환 실패:', e.message);
+            // 첫 번째 탭으로 전환 시도
+            try {
+              const allHandles = await driver.getAllWindowHandles();
+              if (allHandles.length > 0) {
+                await driver.switchTo().window(allHandles[0]);
+              }
+            } catch (e2) {
+              // 전환 실패 무시
+            }
+          }
         }
-        console.log('   → 새 탭 닫기 완료');
       } catch (e) {
         console.warn('   → 탭 닫기 실패 (무시):', e.message);
         // 원래 탭으로 전환 시도
         try {
           if (originalWindowHandle) {
-            await driver.switchTo().window(originalWindowHandle);
+            const allHandles = await driver.getAllWindowHandles();
+            if (allHandles.includes(originalWindowHandle)) {
+              await driver.switchTo().window(originalWindowHandle);
+            } else if (allHandles.length > 0) {
+              await driver.switchTo().window(allHandles[0]);
+            }
           }
         } catch (e2) {
           // 전환 실패 무시
@@ -302,23 +350,53 @@ async function captureSheetAsImage(sheetUrl, options = {}) {
       throw new Error(`브라우저 연결 실패 (재초기화 완료, 재시도 필요): ${error.message}`);
     }
     
-    // 에러 발생 시에도 새 탭 닫기 및 원래 탭으로 전환
+    // 에러 발생 시에도 새 탭 닫기 및 원래 탭으로 전환 (안전하게)
     try {
       if (newTabHandle && driver) {
         try {
-          await driver.close();
+          // 현재 탭이 새 탭인지 확인
+          const currentHandle = await driver.getWindowHandle();
+          if (currentHandle === newTabHandle) {
+            await driver.close();
+          } else {
+            // 새 탭으로 전환 후 닫기 시도
+            try {
+              await driver.switchTo().window(newTabHandle);
+              await driver.close();
+            } catch (e) {
+              // 탭이 이미 닫혔을 수 있음
+              console.warn('   → 새 탭이 이미 닫혔거나 접근 불가:', e.message);
+            }
+          }
         } catch (e) {
           // 탭 닫기 실패 무시
+          console.warn('   → 탭 닫기 실패 (무시):', e.message);
         }
+        
         // 원래 탭으로 전환
         if (originalWindowHandle) {
-          await driver.switchTo().window(originalWindowHandle);
+          try {
+            const allHandles = await driver.getAllWindowHandles();
+            if (allHandles.includes(originalWindowHandle)) {
+              await driver.switchTo().window(originalWindowHandle);
+            } else if (allHandles.length > 0) {
+              // 원래 탭이 없으면 첫 번째 탭으로
+              await driver.switchTo().window(allHandles[0]);
+            }
+          } catch (e) {
+            console.warn('   → 원래 탭으로 전환 실패:', e.message);
+          }
         }
       } else if (driver) {
-        await driver.switchTo().defaultContent();
+        try {
+          await driver.switchTo().defaultContent();
+        } catch (e) {
+          // defaultContent 전환 실패 무시
+        }
       }
     } catch (e) {
       // 전환 실패 무시
+      console.warn('   → 탭 정리 중 오류 (무시):', e.message);
     }
     
     throw error;

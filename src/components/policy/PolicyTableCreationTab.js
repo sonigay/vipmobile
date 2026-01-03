@@ -803,83 +803,89 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
     const userName = loggedInStore?.name || loggedInStore?.target || 'Unknown';
     const safeUserName = typeof userName === 'string' ? encodeURIComponent(userName) : 'Unknown';
     
-    // 순차 처리 함수
+    // 순차 처리 함수 (완료될 때까지 기다림)
     const processSetting = async (setting) => {
-      try {
-        // 디버깅: 요청 보내는 데이터 로그
-        console.log(`[정책표 생성 프론트엔드] 요청 보냄:`);
-        console.log(`  - setting.id: ${setting.id}`);
-        console.log(`  - setting.policyTableName: ${setting.policyTableName}`);
-        console.log(`  - policyTableId: ${setting.id}`);
-        console.log(`  - accessGroupIds: ${JSON.stringify(batchCreationFormData.policyTableGroups[setting.id])}`);
+      return new Promise(async (resolve) => {
+        try {
+          // 디버깅: 요청 보내는 데이터 로그
+          console.log(`[정책표 생성 프론트엔드] 요청 보냄:`);
+          console.log(`  - setting.id: ${setting.id}`);
+          console.log(`  - setting.policyTableName: ${setting.policyTableName}`);
+          console.log(`  - policyTableId: ${setting.id}`);
+          console.log(`  - accessGroupIds: ${JSON.stringify(batchCreationFormData.policyTableGroups[setting.id])}`);
 
-        setBatchGenerationStatus(prev => ({
-          ...prev,
-          [setting.id]: { status: 'queued', jobId: null, result: null, error: null }
-        }));
+          setBatchGenerationStatus(prev => ({
+            ...prev,
+            [setting.id]: { status: 'queued', jobId: null, result: null, error: null }
+          }));
 
-        const requestBody = {
-          policyTableId: setting.id,
-          applyDate: batchCreationFormData.applyDate,
-          applyContent: batchCreationFormData.applyContent,
-          accessGroupIds: batchCreationFormData.policyTableGroups[setting.id]
-        };
+          const requestBody = {
+            policyTableId: setting.id,
+            applyDate: batchCreationFormData.applyDate,
+            applyContent: batchCreationFormData.applyContent,
+            accessGroupIds: batchCreationFormData.policyTableGroups[setting.id]
+          };
 
-        console.log(`[정책표 생성 프론트엔드] 요청 본문:`, JSON.stringify(requestBody, null, 2));
+          console.log(`[정책표 생성 프론트엔드] 요청 본문:`, JSON.stringify(requestBody, null, 2));
 
-        const response = await fetch(`${API_BASE_URL}/api/policy-table/generate`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-user-role': loggedInStore?.userRole || '',
-            'x-user-id': loggedInStore?.contactId || loggedInStore?.id || '',
-            'x-user-name': safeUserName
-          },
-          body: JSON.stringify(requestBody)
-        });
+          const response = await fetch(`${API_BASE_URL}/api/policy-table/generate`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-user-role': loggedInStore?.userRole || '',
+              'x-user-id': loggedInStore?.contactId || loggedInStore?.id || '',
+              'x-user-name': safeUserName
+            },
+            body: JSON.stringify(requestBody)
+          });
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || '정책표 생성 요청에 실패했습니다.');
-        }
-
-        const data = await response.json();
-        const jobId = data.jobId;
-
-        setBatchGenerationStatus(prev => ({
-          ...prev,
-          [setting.id]: { status: 'processing', jobId, result: null, error: null }
-        }));
-
-        // 폴링 시작
-        startBatchPolling(setting.id, jobId);
-
-        return { settingId: setting.id, jobId, success: true };
-      } catch (error) {
-        console.error(`[정책표] ${setting.policyTableName} 생성 오류:`, error);
-        setBatchGenerationStatus(prev => ({
-          ...prev,
-          [setting.id]: { 
-            status: 'failed', 
-            jobId: null, 
-            result: null, 
-            error: error.message 
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || '정책표 생성 요청에 실패했습니다.');
           }
-        }));
-        return { settingId: setting.id, jobId: null, success: false, error: error.message };
-      }
+
+          const data = await response.json();
+          const jobId = data.jobId;
+
+          setBatchGenerationStatus(prev => ({
+            ...prev,
+            [setting.id]: { status: 'processing', jobId, result: null, error: null }
+          }));
+
+          // 폴링 시작 및 완료될 때까지 기다림
+          await startBatchPollingUntilComplete(setting.id, jobId);
+
+          resolve({ settingId: setting.id, jobId, success: true });
+        } catch (error) {
+          console.error(`[정책표] ${setting.policyTableName} 생성 오류:`, error);
+          setBatchGenerationStatus(prev => ({
+            ...prev,
+            [setting.id]: { 
+              status: 'failed', 
+              jobId: null, 
+              result: null, 
+              error: error.message 
+            }
+          }));
+          resolve({ settingId: setting.id, jobId: null, success: false, error: error.message });
+        }
+      });
     };
     
-    // 순차 처리 실행 (각 요청이 완료된 후 다음 요청 시작)
+    // 순차 처리 실행 (각 요청이 완료될 때까지 기다린 후 다음 요청 시작)
     for (let i = 0; i < queue.length; i++) {
       const setting = queue[i];
       
-      // 첫 번째 요청이 아니면 이전 요청이 시작된 후 약간의 지연
+      console.log(`[정책표 생성] ${i + 1}/${queue.length} 처리 시작: ${setting.policyTableName}`);
+      
+      // 첫 번째 요청이 아니면 이전 요청 완료 후 약간의 지연
       if (i > 0) {
-        await new Promise(resolve => setTimeout(resolve, 3000)); // 3초 대기
+        await new Promise(resolve => setTimeout(resolve, 2000)); // 2초 대기
       }
       
       await processSetting(setting);
+      
+      console.log(`[정책표 생성] ${i + 1}/${queue.length} 처리 완료: ${setting.policyTableName}`);
     }
   };
 
@@ -965,7 +971,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
     }
   };
 
-  // 배치 생성 폴링 시작
+  // 배치 생성 폴링 시작 (기존 - UI 업데이트용)
   const startBatchPolling = (settingId, jobId) => {
     const interval = setInterval(async () => {
       try {
@@ -1015,6 +1021,60 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
       ...prev,
       [settingId]: interval
     }));
+  };
+
+  // 배치 생성 폴링 (완료될 때까지 기다림)
+  const startBatchPollingUntilComplete = (settingId, jobId) => {
+    return new Promise((resolve, reject) => {
+      const poll = async () => {
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/policy-table/generate/${jobId}/status`, {
+            headers: {
+              'x-user-role': loggedInStore?.userRole || '',
+              'x-user-id': loggedInStore?.contactId || loggedInStore?.id || ''
+            }
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            
+            // UI 업데이트
+            setBatchGenerationStatus(prev => ({
+              ...prev,
+              [settingId]: {
+                status: data.status,
+                jobId: jobId,
+                result: data.result || null,
+                error: data.error || null,
+                progress: data.progress || 0,
+                message: data.message || ''
+              }
+            }));
+
+            if (data.status === 'completed') {
+              console.log(`[정책표 생성] ${settingId} 완료`);
+              resolve(data.result);
+            } else if (data.status === 'failed') {
+              console.error(`[정책표 생성] ${settingId} 실패:`, data.error);
+              reject(new Error(data.error || '정책표 생성에 실패했습니다.'));
+            } else {
+              // 계속 폴링
+              setTimeout(poll, 2000); // 2초 후 다시 폴링
+            }
+          } else {
+            // 응답 오류 시 재시도
+            setTimeout(poll, 2000);
+          }
+        } catch (error) {
+          console.error(`[정책표] 폴링 오류 (${settingId}):`, error);
+          // 네트워크 오류 시 재시도
+          setTimeout(poll, 2000);
+        }
+      };
+
+      // 즉시 시작
+      poll();
+    });
   };
 
   const handleRegister = async () => {
