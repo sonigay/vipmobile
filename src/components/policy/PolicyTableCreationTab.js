@@ -788,8 +788,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
 
     setError(null);
     
-    // 제한된 병렬 처리: 동시에 최대 2개만 처리 (디스코드 봇 부하 감소)
-    const MAX_CONCURRENT = 2;
+    // 순차 처리로 변경 (디스코드 봇이 동시 요청을 처리하지 못하는 문제 해결)
     const queue = [...selected];
     
     // 초기 상태 설정
@@ -804,7 +803,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
     const userName = loggedInStore?.name || loggedInStore?.target || 'Unknown';
     const safeUserName = typeof userName === 'string' ? encodeURIComponent(userName) : 'Unknown';
     
-    // 제한된 병렬 처리 함수
+    // 순차 처리 함수
     const processSetting = async (setting) => {
       try {
         setBatchGenerationStatus(prev => ({
@@ -860,28 +859,16 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
       }
     };
     
-    // 제한된 병렬 처리 실행 (배치 내에서도 약간의 지연을 두어 디스코드 봇 부하 감소)
-    while (queue.length > 0) {
-      const batch = queue.splice(0, MAX_CONCURRENT);
+    // 순차 처리 실행 (각 요청이 완료된 후 다음 요청 시작)
+    for (let i = 0; i < queue.length; i++) {
+      const setting = queue[i];
       
-      // 배치 내 각 요청을 약간의 시간차를 두고 시작 (디스코드 봇 부하 분산)
-      const batchPromises = batch.map((setting, index) => {
-        return new Promise(async (resolve) => {
-          // 첫 번째는 즉시, 두 번째는 800ms 지연
-          if (index > 0) {
-            await new Promise(resolve => setTimeout(resolve, 800));
-          }
-          const result = await processSetting(setting);
-          resolve(result);
-        });
-      });
-      
-      await Promise.allSettled(batchPromises);
-      
-      // 배치 간 약간의 지연 (디스코드 봇 부하 감소)
-      if (queue.length > 0) {
-        await new Promise(resolve => setTimeout(resolve, 2000)); // 2초 대기
+      // 첫 번째 요청이 아니면 이전 요청이 시작된 후 약간의 지연
+      if (i > 0) {
+        await new Promise(resolve => setTimeout(resolve, 3000)); // 3초 대기
       }
+      
+      await processSetting(setting);
     }
   };
 
