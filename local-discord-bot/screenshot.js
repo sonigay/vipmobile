@@ -116,14 +116,44 @@ async function captureSheetAsImage(sheetUrl, options = {}) {
     }
   }
 
+  // 각 요청마다 새로운 탭을 열어서 처리 (동시 요청 충돌 방지)
+  let originalWindowHandle = null;
+  let newTabHandle = null;
+
   try {
     console.log(`📸 스크린샷 생성 중: ${sheetUrl}`);
     
-    // Google Sheets URL로 이동
+    // 1. 현재 창 핸들 저장
+    originalWindowHandle = await driver.getWindowHandle();
+    const originalHandles = await driver.getAllWindowHandles();
+    
+    // 2. 새 탭 열기
+    await driver.executeScript("window.open('about:blank', '_blank');");
+    
+    // 3. 새 탭 핸들 찾기
+    await new Promise(resolve => setTimeout(resolve, 500)); // 탭 생성 대기
+    const allHandles = await driver.getAllWindowHandles();
+    newTabHandle = allHandles.find(handle => !originalHandles.includes(handle));
+    
+    if (!newTabHandle) {
+      throw new Error('새 탭을 생성할 수 없습니다.');
+    }
+    
+    // 4. 새 탭으로 전환
+    await driver.switchTo().window(newTabHandle);
+    console.log('   → 새 탭으로 전환 완료');
+    
+    // 5. Google Sheets URL로 이동
     await driver.get(sheetUrl);
     console.log('🌐 시트 로드 완료');
+    
+    // 4. 페이지가 완전히 로드될 때까지 대기
+    await driver.wait(async () => {
+      const readyState = await driver.executeScript('return document.readyState');
+      return readyState === 'complete';
+    }, 10000);
 
-    // 페이지가 완전히 로드될 때까지 대기 (Google Sheets는 동적 로딩이 많음)
+    // 5. Google Sheets 동적 로딩 완료 대기 (추가 대기 시간)
     await new Promise(resolve => setTimeout(resolve, 2000)); // 2초 추가 대기
 
     // iframe을 찾아 그 안으로 포커스 전환 (재시도 로직 추가)
@@ -215,6 +245,28 @@ async function captureSheetAsImage(sheetUrl, options = {}) {
     // 작업이 끝나면 메인 페이지로 다시 포커스 전환
     await driver.switchTo().defaultContent();
 
+    // 새 탭 닫기
+    if (newTabHandle) {
+      try {
+        await driver.close();
+        // 원래 탭으로 전환
+        if (originalWindowHandle) {
+          await driver.switchTo().window(originalWindowHandle);
+        }
+        console.log('   → 새 탭 닫기 완료');
+      } catch (e) {
+        console.warn('   → 탭 닫기 실패 (무시):', e.message);
+        // 원래 탭으로 전환 시도
+        try {
+          if (originalWindowHandle) {
+            await driver.switchTo().window(originalWindowHandle);
+          }
+        } catch (e2) {
+          // 전환 실패 무시
+        }
+      }
+    }
+
     return buffer;
 
   } catch (error) {
@@ -250,9 +302,19 @@ async function captureSheetAsImage(sheetUrl, options = {}) {
       throw new Error(`브라우저 연결 실패 (재초기화 완료, 재시도 필요): ${error.message}`);
     }
     
-    // 에러 발생 시에도 메인 페이지로 전환
+    // 에러 발생 시에도 새 탭 닫기 및 원래 탭으로 전환
     try {
-      if (driver) {
+      if (newTabHandle && driver) {
+        try {
+          await driver.close();
+        } catch (e) {
+          // 탭 닫기 실패 무시
+        }
+        // 원래 탭으로 전환
+        if (originalWindowHandle) {
+          await driver.switchTo().window(originalWindowHandle);
+        }
+      } else if (driver) {
         await driver.switchTo().defaultContent();
       }
     } catch (e) {
