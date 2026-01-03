@@ -549,7 +549,7 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
                 <TableCell>정책적용일시</TableCell>
                 <TableCell>생성자</TableCell>
                 {mode !== 'generalPolicy' && (
-                  <TableCell>정액영업그룹</TableCell>
+                  <TableCell>정책영업그룹</TableCell>
                 )}
                 <TableCell>생성일시</TableCell>
                 <TableCell>등록일시</TableCell>
