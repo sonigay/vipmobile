@@ -123,30 +123,71 @@ async function captureSheetAsImage(sheetUrl, options = {}) {
     await driver.get(sheetUrl);
     console.log('🌐 시트 로드 완료');
 
-    // iframe을 찾아 그 안으로 포커스 전환
-    const iframe = await driver.wait(
-      until.elementLocated(By.css('#pageswitcher-content')),
-      30000
-    );
+    // 페이지가 완전히 로드될 때까지 대기 (Google Sheets는 동적 로딩이 많음)
+    await new Promise(resolve => setTimeout(resolve, 2000)); // 2초 추가 대기
+
+    // iframe을 찾아 그 안으로 포커스 전환 (재시도 로직 추가)
+    let iframe = null;
+    let retryCount = 0;
+    const maxRetries = 3;
+    
+    while (retryCount < maxRetries && !iframe) {
+      try {
+        iframe = await driver.wait(
+          until.elementLocated(By.css('#pageswitcher-content')),
+          20000 // 타임아웃을 20초로 줄이고 재시도로 보완
+        );
+        break; // 성공하면 루프 종료
+      } catch (error) {
+        retryCount++;
+        if (retryCount < maxRetries) {
+          console.log(`⚠️ iframe 찾기 실패, 재시도 ${retryCount}/${maxRetries}...`);
+          await new Promise(resolve => setTimeout(resolve, 2000)); // 2초 대기 후 재시도
+        } else {
+          throw new Error(`iframe을 찾을 수 없습니다 (#pageswitcher-content). 재시도 ${maxRetries}회 실패: ${error.message}`);
+        }
+      }
+    }
+    
     await driver.switchTo().frame(iframe);
     console.log('🔍 iframe 내부로 포커스 전환 완료.');
 
-    // iframe 안에서 테이블 요소 탐색
-    const table = await driver.wait(
-      until.elementLocated(By.css('table')),
-      30000
-    );
-    await driver.wait(
-      until.elementIsVisible(table),
-      30000
-    );
+    // iframe 안에서 테이블 요소 탐색 (재시도 로직 추가)
+    let table = null;
+    retryCount = 0;
+    
+    while (retryCount < maxRetries && !table) {
+      try {
+        table = await driver.wait(
+          until.elementLocated(By.css('table')),
+          20000 // 타임아웃을 20초로 줄이고 재시도로 보완
+        );
+        await driver.wait(
+          until.elementIsVisible(table),
+          10000
+        );
+        break; // 성공하면 루프 종료
+      } catch (error) {
+        retryCount++;
+        if (retryCount < maxRetries) {
+          console.log(`⚠️ 테이블 요소 찾기 실패, 재시도 ${retryCount}/${maxRetries}...`);
+          await new Promise(resolve => setTimeout(resolve, 2000)); // 2초 대기 후 재시도
+        } else {
+          // iframe에서 나와서 다시 시도
+          await driver.switchTo().defaultContent();
+          throw new Error(`테이블 요소를 찾을 수 없습니다. 재시도 ${maxRetries}회 실패: ${error.message}`);
+        }
+      }
+    }
+    
     console.log('✅ 테이블 요소 찾음');
 
     // 테이블이 보이도록 스크롤
     await driver.executeScript("arguments[0].scrollIntoView(true);", table);
     
     // 추가 대기 시간 (시트 로딩 완료 대기)
-    await new Promise(resolve => setTimeout(resolve, waitTime));
+    // Google Sheets는 동적 로딩이 많으므로 충분한 대기 시간 필요
+    await new Promise(resolve => setTimeout(resolve, Math.max(waitTime, 3000))); // 최소 3초 대기
 
     // 테이블 위치 정보 가져오기
     const rect = await table.getRect();
