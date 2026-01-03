@@ -760,8 +760,14 @@ async function processPolicyTableGeneration(jobId, params) {
       throw new Error('정책표 설정을 찾을 수 없습니다.');
     }
 
+    // 디버깅: 전달받은 policyTableId 로그
+    console.log(`[정책표 생성] 요청된 policyTableId: ${policyTableId}`);
+    console.log(`[정책표 생성] 사용 가능한 정책표 ID 목록:`, settingsRows.slice(1).map(row => row[0]));
+
     const settingsRow = settingsRows.find(row => row[0] === policyTableId);
     if (!settingsRow) {
+      console.error(`[정책표 생성] ❌ 정책표 ID ${policyTableId}를 찾을 수 없습니다.`);
+      console.error(`[정책표 생성] 사용 가능한 ID:`, settingsRows.slice(1).map(row => ({ id: row[0], name: row[1] })));
       throw new Error(`정책표 ID ${policyTableId}를 찾을 수 없습니다.`);
     }
 
@@ -772,6 +778,11 @@ async function processPolicyTableGeneration(jobId, params) {
     const discordChannelId = settingsRow[5];
     const creatorPermissions = settingsRow[6] ? JSON.parse(settingsRow[6]) : []; // 생성자적용권한
 
+    // 디버깅: 찾은 정책표 정보 로그
+    console.log(`[정책표 생성] ✅ 정책표 찾음: ${policyTableName} (ID: ${policyTableId})`);
+    console.log(`[정책표 생성] 편집 링크: ${policyTableLink}`);
+    console.log(`[정책표 생성] 공개 링크: ${policyTablePublicLink}`);
+
     // 2. 디스코드 봇을 통한 스크린샷 생성 (Canvas 렌더링 대체)
     updateJobStatus(jobId, {
       status: 'processing',
@@ -780,6 +791,7 @@ async function processPolicyTableGeneration(jobId, params) {
     });
 
     const sheetUrl = policyTablePublicLink || policyTableLink;
+    console.log(`[정책표 생성] 📸 사용할 시트 URL: ${sheetUrl}`);
 
     // 로컬 PC 디스코드 봇에 명령어 전송 및 이미지 URL, 메시지 ID, 스레드 ID 받기
     // captureSheetViaDiscordBot에서 포스트/스레드를 찾거나 생성하고 명령어를 전송함
@@ -1619,6 +1631,13 @@ function setupPolicyTableRoutes(app) {
       if (!policyTableId || !applyDate || !applyContent) {
         return res.status(400).json({ success: false, error: '필수 필드가 누락되었습니다.' });
       }
+
+      // 디버깅: 요청 받은 데이터 로그
+      console.log(`[정책표 생성 API] 요청 받음:`);
+      console.log(`  - policyTableId: ${policyTableId}`);
+      console.log(`  - applyDate: ${applyDate}`);
+      console.log(`  - applyContent: ${applyContent}`);
+      console.log(`  - accessGroupIds: ${JSON.stringify(accessGroupIds || accessGroupId)}`);
 
       // accessGroupIds 배열 처리 (하위 호환성을 위해 accessGroupId도 지원)
       const groupIds = accessGroupIds || (accessGroupId ? [accessGroupId] : []);

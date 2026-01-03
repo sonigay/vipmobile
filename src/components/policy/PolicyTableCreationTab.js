@@ -806,10 +806,26 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
     // 순차 처리 함수
     const processSetting = async (setting) => {
       try {
+        // 디버깅: 요청 보내는 데이터 로그
+        console.log(`[정책표 생성 프론트엔드] 요청 보냄:`);
+        console.log(`  - setting.id: ${setting.id}`);
+        console.log(`  - setting.policyTableName: ${setting.policyTableName}`);
+        console.log(`  - policyTableId: ${setting.id}`);
+        console.log(`  - accessGroupIds: ${JSON.stringify(batchCreationFormData.policyTableGroups[setting.id])}`);
+
         setBatchGenerationStatus(prev => ({
           ...prev,
           [setting.id]: { status: 'queued', jobId: null, result: null, error: null }
         }));
+
+        const requestBody = {
+          policyTableId: setting.id,
+          applyDate: batchCreationFormData.applyDate,
+          applyContent: batchCreationFormData.applyContent,
+          accessGroupIds: batchCreationFormData.policyTableGroups[setting.id]
+        };
+
+        console.log(`[정책표 생성 프론트엔드] 요청 본문:`, JSON.stringify(requestBody, null, 2));
 
         const response = await fetch(`${API_BASE_URL}/api/policy-table/generate`, {
           method: 'POST',
@@ -819,12 +835,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
             'x-user-id': loggedInStore?.contactId || loggedInStore?.id || '',
             'x-user-name': safeUserName
           },
-          body: JSON.stringify({
-            policyTableId: setting.id,
-            applyDate: batchCreationFormData.applyDate,
-            applyContent: batchCreationFormData.applyContent,
-            accessGroupIds: batchCreationFormData.policyTableGroups[setting.id]
-          })
+          body: JSON.stringify(requestBody)
         });
 
         if (!response.ok) {
