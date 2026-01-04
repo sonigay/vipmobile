@@ -150,7 +150,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Origin', 'Accept', 'X-API-Key', 'x-user-id', 'x-user-role', 'x-user-name'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Origin', 'Accept', 'X-API-Key', 'x-user-id', 'x-user-role', 'x-user-name', 'x-mode'],
   optionsSuccessStatus: 200,
   preflightContinue: false
 }));
