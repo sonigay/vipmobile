@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Box,
   Paper,
@@ -204,13 +204,24 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
       if (userRole === 'S') {
         setActiveTab(1);
       }
-      loadUserGroups();
-      loadCompanies();
-      loadTeamLeaders();
-      // 정책표 생성 기능은 SS 또는 팀장만 사용 가능
-      if (canAccessPolicyTableCreation) {
-        loadSettings();
-      }
+      
+      // 병렬 로딩으로 성능 개선
+      const loadInitialData = async () => {
+        const promises = [
+          loadUserGroups(),
+          loadCompanies(),
+          loadTeamLeaders()
+        ];
+        
+        // 정책표 생성 기능은 SS 또는 팀장만 사용 가능
+        if (canAccessPolicyTableCreation) {
+          promises.push(loadSettings());
+        }
+        
+        await Promise.all(promises);
+      };
+      
+      loadInitialData();
     }
     return () => {
       if (pollingInterval) {
@@ -317,12 +328,8 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
           groups = [];
         }
         setUserGroups(groups);
-        // 그룹 목록 로드 후 각 그룹의 변경이력도 로드
-        groups.forEach(group => {
-          if (group.id) {
-            loadChangeHistory(group.id);
-          }
-        });
+        // 변경이력은 지연 로딩: 사용자가 클릭하거나 필요할 때만 로드
+        // 초기 로딩 시에는 변경이력을 로드하지 않음 (성능 개선)
       } else {
         console.error('정책영업그룹 로드 실패:', response.status);
         setUserGroups([]);
@@ -625,9 +632,10 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
   };
 
   // 변경이력 기반으로 항목의 상태 결정 (추가/수정/삭제/폰클적용)
-  const getItemStatus = (groupId, itemName, itemType) => {
+  // useMemo로 최적화: 변경이력이 로드되지 않은 경우 null 반환 (지연 로딩)
+  const getItemStatus = useCallback((groupId, itemName, itemType) => {
     const history = changeHistory[groupId] || [];
-    if (history.length === 0) return null; // 변경이력이 없으면 기본 상태
+    if (history.length === 0) return null; // 변경이력이 없으면 기본 상태 (지연 로딩)
 
     // 해당 항목(그룹이름 또는 업체명)의 최신 변경이력 찾기
     const relevantHistory = history
@@ -716,10 +724,15 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
     }
 
     return null;
-  };
+  }, [changeHistory]);
 
-  // Popover 열기
-  const handleOpenPopover = (event, groupId, itemName, itemType) => {
+  // Popover 열기 (지연 로딩: 변경이력이 없으면 로드)
+  const handleOpenPopover = async (event, groupId, itemName, itemType) => {
+    // 변경이력이 없으면 먼저 로드
+    if (!changeHistory[groupId] || changeHistory[groupId].length === 0) {
+      await loadChangeHistory(groupId);
+    }
+    
     const history = changeHistory[groupId] || [];
     const relevantHistory = history
       .filter(h => {

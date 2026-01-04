@@ -163,11 +163,23 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
     }
   }, [canAccess]);
 
+  // 정책 목록 캐싱을 위한 상태
+  const [policiesCache, setPoliciesCache] = useState({});
+
   useEffect(() => {
     if (tabs.length > 0 && activeTabIndex < tabs.length) {
-      loadPolicies(tabs[activeTabIndex].policyTableName);
+      const tabName = tabs[activeTabIndex].policyTableName;
+      // 캐시에 있으면 캐시에서 가져오고, 없으면 로드
+      if (policiesCache[tabName]) {
+        setPolicies(policiesCache[tabName]);
+      } else {
+        loadPolicies(tabName);
+      }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabs, activeTabIndex]);
+
+  // loadPolicies 함수 수정하여 캐시에 저장
 
   const loadTabs = async () => {
     try {
@@ -224,6 +236,8 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
           return dateB - dateA; // 내림차순
         });
         setPolicies(sortedData);
+        // 캐시에 저장 (탭 전환 시 재로딩 방지)
+        setPoliciesCache(prev => ({ ...prev, [policyTableName]: sortedData }));
       }
     } catch (error) {
       console.error('정책표 목록 로드 오류:', error);
@@ -235,7 +249,8 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
 
   const handleTabChange = (event, newValue) => {
     setActiveTabIndex(newValue);
-    setPolicies([]);
+    // 캐시에서 로드하므로 빈 배열로 초기화하지 않음 (성능 개선)
+    // setPolicies([]);
     setSearchCreator('');
     setFilterApplyDateFrom('');
   };
