@@ -646,9 +646,17 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
 
     try {
       // 일반정책모드이고 워터마크 이미지가 있으면 워터마크 이미지 사용, 아니면 원본 사용
-      const imageUrlToCopy = (mode === 'generalPolicy' && watermarkedImageUrl) 
+      let imageUrlToCopy = (mode === 'generalPolicy' && watermarkedImageUrl) 
         ? watermarkedImageUrl 
         : selectedPolicy.imageUrl;
+
+      // Discord CDN 이미지인 경우 프록시를 통해 가져오기 (CORS 문제 해결)
+      const isDiscordCdn = imageUrlToCopy.includes('cdn.discordapp.com') || imageUrlToCopy.includes('media.discordapp.net');
+      if (isDiscordCdn && !imageUrlToCopy.startsWith('blob:')) {
+        // blob URL이 아닌 경우에만 프록시 사용
+        const proxyUrl = `${API_BASE_URL}/api/meetings/proxy-image?url=${encodeURIComponent(imageUrlToCopy)}`;
+        imageUrlToCopy = proxyUrl;
+      }
 
       // CORS 문제 해결을 위해 mode: 'cors' 추가
       // 그리고 이미지를 canvas로 변환하여 처리 (모바일 호환성 향상)
@@ -708,7 +716,14 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
       img.src = blobUrl;
 
       const convertedBlob = await imageLoadPromise;
+      
+      // Blob URL 정리
       URL.revokeObjectURL(blobUrl);
+      
+      // 모바일에서 안정성을 위해 blob을 다시 확인
+      if (!convertedBlob || convertedBlob.size === 0) {
+        throw new Error('이미지 변환 실패: 빈 blob');
+      }
 
       // ClipboardItem 생성 시 명시적으로 타입 지정
       const clipboardItem = new ClipboardItem({ 
