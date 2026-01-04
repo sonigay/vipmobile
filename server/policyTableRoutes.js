@@ -3330,6 +3330,12 @@ function setupPolicyTableRoutes(app) {
     }
   });
 
+  // OPTIONS /api/policy-tables/:id/view - CORS preflight 처리
+  router.options('/policy-tables/:id/view', (req, res) => {
+    setCORSHeaders(req, res);
+    res.status(200).end();
+  });
+
   // POST /api/policy-tables/:id/view - 정책표 확인이력 기록
   router.post('/policy-tables/:id/view', express.json(), async (req, res) => {
     setCORSHeaders(req, res);
