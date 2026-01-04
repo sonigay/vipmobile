@@ -437,7 +437,8 @@ const HEADERS_USER_GROUPS = [
   '그룹이름',
   '일반사용자목록',
   '등록일시',
-  '등록자'
+  '등록자',
+  '폰클등록여부'  // Y/N
 ];
 
 const HEADERS_TAB_ORDER = [
@@ -1359,7 +1360,7 @@ function setupPolicyTableRoutes(app) {
       const response = await withRetry(async () => {
         return await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_USER_GROUPS}!A:E`
+          range: `${SHEET_USER_GROUPS}!A:F`
         });
       });
 
@@ -1380,7 +1381,8 @@ function setupPolicyTableRoutes(app) {
           // 하위 호환성을 위해 userIds도 반환 (기존 코드 호환)
           userIds: groupData.managerIds, // managerIds를 userIds로도 반환
           registeredAt: row[3] || '',
-          registeredBy: row[4] || ''
+          registeredBy: row[4] || '',
+          phoneRegistered: row[5] === 'Y' || row[5] === 'y' || false  // 폰클등록여부
         };
       });
 
@@ -1436,13 +1438,14 @@ function setupPolicyTableRoutes(app) {
         groupName,
         JSON.stringify(groupData),
         registeredAt,
-        registeredBy
+        registeredBy,
+        'N'  // 폰클등록여부 (기본값: N)
       ];
 
       await withRetry(async () => {
         return await sheets.spreadsheets.values.append({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_USER_GROUPS}!A:E`,
+          range: `${SHEET_USER_GROUPS}!A:F`,
           valueInputOption: 'USER_ENTERED',
           resource: { values: [newRow] }
         });
@@ -1503,7 +1506,7 @@ function setupPolicyTableRoutes(app) {
       const response = await withRetry(async () => {
         return await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_USER_GROUPS}!A:E`
+          range: `${SHEET_USER_GROUPS}!A:F`
         });
       });
 
@@ -1517,6 +1520,7 @@ function setupPolicyTableRoutes(app) {
       const existingRow = rows[rowIndex];
       const existingData = parseUserGroupData(existingRow[2]);
       const existingGroupName = existingRow[1];
+      const existingPhoneRegistered = existingRow[5] || 'N';
 
       // 새로운 데이터가 제공되면 사용, 없으면 기존 데이터 유지
       let finalCompanyNames = companyNames !== undefined ? companyNames : existingData.companyNames;
@@ -1547,13 +1551,14 @@ function setupPolicyTableRoutes(app) {
         finalGroupName,
         JSON.stringify(groupData),
         existingRow[3],
-        existingRow[4]
+        existingRow[4],
+        existingPhoneRegistered  // 폰클등록여부 유지
       ];
 
       await withRetry(async () => {
         return await sheets.spreadsheets.values.update({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_USER_GROUPS}!A${rowIndex + 1}:E${rowIndex + 1}`,
+          range: `${SHEET_USER_GROUPS}!A${rowIndex + 1}:F${rowIndex + 1}`,
           valueInputOption: 'USER_ENTERED',
           resource: { values: [updatedRow] }
         });

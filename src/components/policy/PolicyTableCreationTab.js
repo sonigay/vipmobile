@@ -28,7 +28,8 @@ import {
   Tabs,
   Tab,
   Tooltip,
-  Popover
+  Popover,
+  Switch
 } from '@mui/material';
 import {
   Refresh as RefreshIcon,
@@ -1618,6 +1619,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
               <Table>
                 <TableHead>
                   <TableRow>
+                    <TableCell>폰클등록</TableCell>
                     <TableCell>그룹이름</TableCell>
                     <TableCell>업체명</TableCell>
                     <TableCell>작업</TableCell>
@@ -1626,7 +1628,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                 <TableBody>
                   {userGroups.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={3} align="center">
+                      <TableCell colSpan={4} align="center">
                         등록된 그룹이 없습니다.
                       </TableCell>
                     </TableRow>
@@ -1635,7 +1637,44 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                       const groupNameStatus = getItemStatus(group.id, group.groupName, '그룹이름');
                       
                       return (
-                        <TableRow key={group.id}>
+                        <TableRow 
+                          key={group.id}
+                          sx={{
+                            backgroundColor: group.phoneRegistered ? '#f5f5f5' : 'inherit'
+                          }}
+                        >
+                          <TableCell>
+                            <Switch
+                              checked={group.phoneRegistered || false}
+                              onChange={async (e) => {
+                                const newValue = e.target.checked;
+                                try {
+                                  const response = await fetch(`${API_BASE_URL}/api/policy-table/user-groups/${group.id}/phone-register`, {
+                                    method: 'PUT',
+                                    headers: {
+                                      'Content-Type': 'application/json',
+                                      'x-user-role': loggedInStore?.userRole || '',
+                                      'x-user-id': loggedInStore?.contactId || loggedInStore?.id || '',
+                                      'x-user-name': encodeURIComponent(loggedInStore?.userName || loggedInStore?.name || '')
+                                    },
+                                    body: JSON.stringify({ phoneRegistered: newValue })
+                                  });
+
+                                  if (response.ok) {
+                                    // 그룹 목록 다시 로드
+                                    await loadUserGroups();
+                                  } else {
+                                    const errorData = await response.json();
+                                    setError(errorData.error || '폰클 등록 여부 업데이트에 실패했습니다.');
+                                  }
+                                } catch (error) {
+                                  console.error('폰클 등록 여부 업데이트 오류:', error);
+                                  setError('폰클 등록 여부 업데이트 중 오류가 발생했습니다.');
+                                }
+                              }}
+                              size="small"
+                            />
+                          </TableCell>
                           <TableCell>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                               <Typography
