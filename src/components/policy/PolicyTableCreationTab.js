@@ -646,13 +646,40 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
 
     if (relevantHistory.length === 0) return null;
 
-    // 폰클 적용 여부 확인 (가장 최신의 폰클 적용된 이력 찾기)
-    const phoneAppliedHistory = relevantHistory.find(h => h.phoneApplied === 'Y');
-    if (phoneAppliedHistory) {
-      return {
-        status: 'phoneApplied',
-        history: phoneAppliedHistory
-      };
+    // 폰클 적용 여부 확인 (특정 업체명에 대해 폰클 적용된 이력 찾기)
+    // 업체명의 경우, 해당 업체명이 실제로 포함된 변경이력에서만 확인
+    if (itemType === '업체명') {
+      const phoneAppliedHistory = relevantHistory.find(h => {
+        if (h.phoneApplied !== 'Y') return false;
+        // 해당 업체명이 실제로 이 변경이력에 포함되어 있는지 확인
+        const beforeValue = Array.isArray(h.beforeValue) ? h.beforeValue : (h.beforeValue ? [h.beforeValue] : []);
+        const afterValue = Array.isArray(h.afterValue) ? h.afterValue : (h.afterValue ? [h.afterValue] : []);
+        // 추가/수정의 경우 afterValue에 포함되어야 함
+        if (h.changeAction === '추가' || h.changeAction === '수정') {
+          return afterValue.includes(itemName);
+        }
+        // 삭제의 경우 beforeValue에 포함되어야 함
+        if (h.changeAction === '삭제') {
+          return beforeValue.includes(itemName);
+        }
+        return false;
+      });
+      
+      if (phoneAppliedHistory) {
+        return {
+          status: 'phoneApplied',
+          history: phoneAppliedHistory
+        };
+      }
+    } else {
+      // 그룹이름의 경우 기존 로직 유지
+      const phoneAppliedHistory = relevantHistory.find(h => h.phoneApplied === 'Y');
+      if (phoneAppliedHistory) {
+        return {
+          status: 'phoneApplied',
+          history: phoneAppliedHistory
+        };
+      }
     }
 
     // 최신 변경이력 확인
@@ -1664,8 +1691,21 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                                     // 그룹 목록 다시 로드
                                     await loadUserGroups();
                                   } else {
-                                    const errorData = await response.json();
-                                    setError(errorData.error || '폰클 등록 여부 업데이트에 실패했습니다.');
+                                    // Content-Type 확인 후 JSON 파싱
+                                    const contentType = response.headers.get('content-type');
+                                    if (contentType && contentType.includes('application/json')) {
+                                      const errorData = await response.json();
+                                      setError(errorData.error || '폰클 등록 여부 업데이트에 실패했습니다.');
+                                    } else {
+                                      // HTML 에러 페이지인 경우
+                                      const errorText = await response.text();
+                                      console.error('폰클 등록 여부 업데이트 실패:', {
+                                        status: response.status,
+                                        statusText: response.statusText,
+                                        url: response.url
+                                      });
+                                      setError(`폰클 등록 여부 업데이트에 실패했습니다. (${response.status} ${response.statusText})`);
+                                    }
                                   }
                                 } catch (error) {
                                   console.error('폰클 등록 여부 업데이트 오류:', error);

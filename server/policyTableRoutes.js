@@ -1870,6 +1870,70 @@ function setupPolicyTableRoutes(app) {
     }
   });
 
+  // PUT /api/policy-table/user-groups/:id/phone-register
+  router.put('/policy-table/user-groups/:id/phone-register', express.json(), async (req, res) => {
+    setCORSHeaders(req, res);
+    try {
+      // S 권한자도 폰클 등록 가능하도록 권한 체크
+      const userRole = req.headers['x-user-role'] || req.query?.userRole;
+      const twoLetterPattern = /^[A-Z]{2}$/;
+      const hasPermission = userRole === 'SS' || userRole === 'S' || twoLetterPattern.test(userRole);
+      
+      if (!hasPermission) {
+        return res.status(403).json({ success: false, error: '권한이 없습니다.' });
+      }
+
+      const { id } = req.params;
+      const { phoneRegistered } = req.body; // true/false
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_USER_GROUPS, HEADERS_USER_GROUPS);
+
+      const response = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_USER_GROUPS}!A:F`
+        });
+      });
+
+      const rows = response.data.values || [];
+      const rowIndex = rows.findIndex(row => row[0] === id);
+
+      if (rowIndex === -1) {
+        return res.status(404).json({ success: false, error: '그룹을 찾을 수 없습니다.' });
+      }
+
+      const existingRow = rows[rowIndex];
+      const updatedRow = [...existingRow];
+      
+      // 배열 길이를 최소 6으로 보장
+      while (updatedRow.length < 6) {
+        updatedRow.push('');
+      }
+      
+      // 폰클 등록 여부 업데이트
+      updatedRow[5] = phoneRegistered ? 'Y' : 'N';
+
+      await withRetry(async () => {
+        return await sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_USER_GROUPS}!A${rowIndex + 1}:F${rowIndex + 1}`,
+          valueInputOption: 'USER_ENTERED',
+          resource: { values: [updatedRow] }
+        });
+      });
+
+      return res.json({
+        success: true,
+        message: '폰클 등록 여부가 업데이트되었습니다.',
+        phoneRegistered: phoneRegistered
+      });
+    } catch (error) {
+      console.error('[정책표] 폰클 등록 여부 업데이트 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // GET /api/policy-table/companies
   router.get('/policy-table/companies', async (req, res) => {
     setCORSHeaders(req, res);
