@@ -230,6 +230,20 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
     };
   }, [canAccess, userRole, canAccessPolicyTableCreation]);
 
+  // 정책영업그룹 탭이 활성화될 때 변경이력 다시 로드
+  useEffect(() => {
+    if (activeTab === 1 && userGroups.length > 0) {
+      console.log('🔍 [정책영업그룹] 탭 활성화, 변경이력 다시 로드:', userGroups.length, '개 그룹');
+      const changeHistoryPromises = userGroups.map(group => loadChangeHistory(group.id));
+      Promise.all(changeHistoryPromises).then(() => {
+        console.log('✅ [정책영업그룹] 변경이력 로드 완료');
+      }).catch(error => {
+        console.error('❌ [정책영업그룹] 변경이력 로드 실패:', error);
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
   const loadSettings = async () => {
     try {
       setLoading(true);
@@ -327,9 +341,16 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
           console.warn('정책영업그룹 응답 형식 오류:', data);
           groups = [];
         }
+        
+        // 모든 그룹의 변경이력을 병렬로 로드 (색상 표시를 위해 필수)
+        if (groups.length > 0) {
+          console.log('🔍 [정책영업그룹] 변경이력 로드 시작:', groups.length, '개 그룹');
+          const changeHistoryPromises = groups.map(group => loadChangeHistory(group.id));
+          await Promise.all(changeHistoryPromises);
+          console.log('✅ [정책영업그룹] 변경이력 로드 완료');
+        }
+        
         setUserGroups(groups);
-        // 변경이력은 지연 로딩: 사용자가 클릭하거나 필요할 때만 로드
-        // 초기 로딩 시에는 변경이력을 로드하지 않음 (성능 개선)
       } else {
         console.error('정책영업그룹 로드 실패:', response.status);
         setUserGroups([]);
