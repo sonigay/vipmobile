@@ -3049,6 +3049,19 @@ function setupPolicyTableRoutes(app) {
         }
       }
 
+      // 확인이력 파싱
+      let viewHistory = [];
+      try {
+        const viewHistoryStr = row[14] || '[]';
+        viewHistory = JSON.parse(viewHistoryStr);
+        if (!Array.isArray(viewHistory)) {
+          viewHistory = [];
+        }
+      } catch (e) {
+        console.warn('[정책표] 확인이력 파싱 오류:', e);
+        viewHistory = [];
+      }
+
       const policy = {
         id: row[0] || '',
         policyTableId: row[1] || '',
@@ -3061,7 +3074,8 @@ function setupPolicyTableRoutes(app) {
         messageId: row[8] || '',
         threadId: row[9] || '',
         imageUrl: row[10] || '',
-        registeredAt: row[12] || ''
+        registeredAt: row[12] || '',
+        viewHistory: viewHistory // 확인이력 추가
       };
 
       return res.json(policy);

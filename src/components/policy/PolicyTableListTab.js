@@ -362,7 +362,11 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
 
         // 확인이력 기록 (일반정책모드와 정책모드 모두 기록)
         // 확인이력 표시는 정책모드에서만 (아래 UI 코드에서 처리)
-        if (loggedInStore?.contactId && loggedInStore?.name) {
+        // 일반정책모드: contactId 또는 id 사용, name 또는 userName 사용
+        // 정책모드: contactId 또는 id 사용, name 또는 userName 사용
+        const companyId = loggedInStore?.contactId || loggedInStore?.id;
+        const companyName = loggedInStore?.name || loggedInStore?.userName;
+        if (companyId && companyName) {
           try {
             const viewUrl = `${API_BASE_URL}/api/policy-tables/${policy.id}/view`;
             const requestHeaders = {
@@ -376,8 +380,8 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
               requestHeaders['x-mode'] = mode;
             }
             const requestBody = {
-              companyId: loggedInStore.contactId || loggedInStore.id,
-              companyName: loggedInStore.name || loggedInStore.userName
+              companyId: companyId,
+              companyName: companyName
             };
             
             console.log('🔍 [확인이력] 요청 시작:', {
