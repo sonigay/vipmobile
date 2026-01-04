@@ -655,20 +655,22 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
     if (relevantHistory.length === 0) return null;
 
     // 폰클 적용 여부 확인 (특정 업체명에 대해 폰클 적용된 이력 찾기)
-    // 업체명의 경우, 해당 업체명이 실제로 포함된 변경이력에서만 확인
+    // 업체명의 경우, phoneAppliedCompanies 배열에서 해당 업체명이 포함되어 있는지 확인
     if (itemType === '업체명') {
       const phoneAppliedHistory = relevantHistory.find(h => {
-        if (h.phoneApplied !== 'Y') return false;
-        // 해당 업체명이 실제로 이 변경이력에 포함되어 있는지 확인
-        const beforeValue = Array.isArray(h.beforeValue) ? h.beforeValue : (h.beforeValue ? [h.beforeValue] : []);
-        const afterValue = Array.isArray(h.afterValue) ? h.afterValue : (h.afterValue ? [h.afterValue] : []);
-        // 추가/수정의 경우 afterValue에 포함되어야 함
-        if (h.changeAction === '추가' || h.changeAction === '수정') {
-          return afterValue.includes(itemName);
+        // phoneAppliedCompanies 배열에서 해당 업체명 확인
+        const phoneAppliedCompanies = h.phoneAppliedCompanies || [];
+        if (phoneAppliedCompanies.includes(itemName)) {
+          return true;
         }
-        // 삭제의 경우 beforeValue에 포함되어야 함
-        if (h.changeAction === '삭제') {
-          return beforeValue.includes(itemName);
+        // 하위 호환성: phoneAppliedCompanies가 없고 phoneApplied가 Y인 경우
+        // (기존 데이터)
+        if (!h.phoneAppliedCompanies && h.phoneApplied === 'Y') {
+          const afterValue = Array.isArray(h.afterValue) ? h.afterValue : (h.afterValue ? [h.afterValue] : []);
+          // 단일 업체명인 경우에만 적용 (하위 호환성)
+          if (afterValue.length === 1 && afterValue[0] === itemName) {
+            return true;
+          }
         }
         return false;
       });
@@ -766,7 +768,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
   };
 
   // 폰클 적용 완료 핸들러
-  const handleApplyPhone = async (groupId, changeId) => {
+  const handleApplyPhone = async (groupId, changeId, companyName = null) => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/policy-table/user-groups/${groupId}/change-history/${changeId}/apply-phone`, {
         method: 'PUT',
@@ -775,7 +777,8 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
           'x-user-role': loggedInStore?.userRole || '',
           'x-user-id': loggedInStore?.contactId || loggedInStore?.id || '',
           'x-user-name': encodeURIComponent(loggedInStore?.userName || loggedInStore?.name || '')
-        }
+        },
+        body: JSON.stringify({ companyName }) // 특정 업체명 전달
       });
 
       if (response.ok) {
@@ -2269,16 +2272,29 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                   <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                     변경자: {item.changedByName || item.changedBy}
                   </Typography>
-                  {item.phoneApplied === 'Y' && (
-                    <Box sx={{ mt: 0.5 }}>
-                      <Typography variant="caption" color="purple" sx={{ display: 'block', fontWeight: 'bold' }}>
-                        폰클 적용일시: {new Date(item.phoneAppliedAt).toLocaleString('ko-KR')}
-                      </Typography>
-                      <Typography variant="caption" color="purple" sx={{ display: 'block' }}>
-                        적용한 사용자: {item.phoneAppliedBy}
-                      </Typography>
-                    </Box>
-                  )}
+                  {(() => {
+                    // 업체명인 경우, 해당 업체명이 폰클 적용되었는지 확인
+                    const isCompanyName = popoverContent.itemType === '업체명';
+                    let isApplied = false;
+                    
+                    if (isCompanyName) {
+                      const phoneAppliedCompanies = item.phoneAppliedCompanies || [];
+                      isApplied = phoneAppliedCompanies.includes(popoverContent.itemName);
+                    } else {
+                      isApplied = item.phoneApplied === 'Y';
+                    }
+                    
+                    return isApplied && (
+                      <Box sx={{ mt: 0.5 }}>
+                        <Typography variant="caption" color="purple" sx={{ display: 'block', fontWeight: 'bold' }}>
+                          폰클 적용일시: {new Date(item.phoneAppliedAt).toLocaleString('ko-KR')}
+                        </Typography>
+                        <Typography variant="caption" color="purple" sx={{ display: 'block' }}>
+                          적용한 사용자: {item.phoneAppliedBy}
+                        </Typography>
+                      </Box>
+                    );
+                  })()}
                   {item.changeAction === '수정' && (
                     <Box sx={{ mt: 0.5 }}>
                       <Typography variant="caption" color="text.secondary">
@@ -2290,20 +2306,35 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                       </Typography>
                     </Box>
                   )}
-                  {item.phoneApplied !== 'Y' && (
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      startIcon={<PhoneAndroidIcon />}
-                      onClick={() => {
-                        handleApplyPhone(popoverContent.groupId, item.changeId);
-                        handleClosePopover();
-                      }}
-                      sx={{ mt: 1, color: 'purple', borderColor: 'purple' }}
-                    >
-                      폰클에 적용완료
-                    </Button>
-                  )}
+                  {(() => {
+                    // 업체명인 경우, 해당 업체명이 이미 폰클 적용되었는지 확인
+                    const isCompanyName = popoverContent.itemType === '업체명';
+                    let isAlreadyApplied = false;
+                    
+                    if (isCompanyName) {
+                      const phoneAppliedCompanies = item.phoneAppliedCompanies || [];
+                      isAlreadyApplied = phoneAppliedCompanies.includes(popoverContent.itemName);
+                    } else {
+                      // 그룹이름인 경우 기존 로직
+                      isAlreadyApplied = item.phoneApplied === 'Y';
+                    }
+                    
+                    return !isAlreadyApplied && (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<PhoneAndroidIcon />}
+                        onClick={() => {
+                          const companyName = isCompanyName ? popoverContent.itemName : null;
+                          handleApplyPhone(popoverContent.groupId, item.changeId, companyName);
+                          handleClosePopover();
+                        }}
+                        sx={{ mt: 1, color: 'purple', borderColor: 'purple' }}
+                      >
+                        폰클에 적용완료
+                      </Button>
+                    );
+                  })()}
                 </Box>
               ))}
             </Box>

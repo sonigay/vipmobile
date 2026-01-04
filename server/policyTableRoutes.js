@@ -460,9 +460,10 @@ const HEADERS_GROUP_CHANGE_HISTORY = [
   '변경일시',
   '변경자ID',
   '변경자이름',
-  '폰클적용여부',    // Y/N
+  '폰클적용여부',    // Y/N (하위 호환성 유지)
   '폰클적용일시',
-  '폰클적용자'
+  '폰클적용자',
+  '폰클적용업체명'   // JSON 배열: ["업체A", "업체B"] (업체명별 개별 적용)
 ];
 
 // 구글시트 편집 링크 정규화 함수
@@ -1326,15 +1327,16 @@ function setupPolicyTableRoutes(app) {
       new Date().toISOString(),
       historyData.changedBy,
       historyData.changedByName,
-      'N',                // 폰클적용여부 (기본값: N)
+      'N',                // 폰클적용여부 (기본값: N, 하위 호환성)
       '',                 // 폰클적용일시
-      ''                  // 폰클적용자
+      '',                 // 폰클적용자
+      '[]'                // 폰클적용업체명 (JSON 배열, 기본값: 빈 배열)
     ];
 
     await withRetry(async () => {
       return await sheets.spreadsheets.values.append({
         spreadsheetId: spreadsheetId,
-        range: `${SHEET_GROUP_CHANGE_HISTORY}!A:M`,
+        range: `${SHEET_GROUP_CHANGE_HISTORY}!A:N`,
         valueInputOption: 'USER_ENTERED',
         resource: { values: [historyRow] }
       });
@@ -1738,7 +1740,7 @@ function setupPolicyTableRoutes(app) {
       const response = await withRetry(async () => {
         return await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_GROUP_CHANGE_HISTORY}!A:M`
+          range: `${SHEET_GROUP_CHANGE_HISTORY}!A:N`
         });
       });
 
@@ -1771,6 +1773,17 @@ function setupPolicyTableRoutes(app) {
             // JSON이 아니면 문자열 그대로 사용
           }
 
+          // 폰클적용업체명 파싱 (JSON 배열)
+          let phoneAppliedCompanies = [];
+          try {
+            const phoneAppliedCompaniesStr = row[13] || '[]';
+            const parsed = JSON.parse(phoneAppliedCompaniesStr);
+            phoneAppliedCompanies = Array.isArray(parsed) ? parsed : [];
+          } catch (e) {
+            // JSON 파싱 실패 시 빈 배열
+            phoneAppliedCompanies = [];
+          }
+
           return {
             changeId: row[0] || '',
             groupId: row[1] || '',
@@ -1782,9 +1795,10 @@ function setupPolicyTableRoutes(app) {
             changedAt: row[7] || '',
             changedBy: row[8] || '',
             changedByName: row[9] || '',
-            phoneApplied: row[10] || 'N',  // 폰클적용여부
+            phoneApplied: row[10] || 'N',  // 폰클적용여부 (하위 호환성)
             phoneAppliedAt: row[11] || '',  // 폰클적용일시
-            phoneAppliedBy: row[12] || ''   // 폰클적용자
+            phoneAppliedBy: row[12] || '',  // 폰클적용자
+            phoneAppliedCompanies: phoneAppliedCompanies  // 폰클적용업체명 배열
           };
         })
         .sort((a, b) => new Date(b.changedAt) - new Date(a.changedAt)); // 최신순 정렬
@@ -1820,7 +1834,7 @@ function setupPolicyTableRoutes(app) {
       const response = await withRetry(async () => {
         return await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_GROUP_CHANGE_HISTORY}!A:M`
+          range: `${SHEET_GROUP_CHANGE_HISTORY}!A:N`
         });
       });
 
@@ -1839,20 +1853,61 @@ function setupPolicyTableRoutes(app) {
       const existingRow = dataRows[rowIndex];
       const updatedRow = [...existingRow];
       
-      // 배열 길이를 최소 13으로 보장
-      while (updatedRow.length < 13) {
+      // 배열 길이를 최소 14로 보장
+      while (updatedRow.length < 14) {
         updatedRow.push('');
       }
       
-      // 폰클 적용 정보 업데이트
-      updatedRow[10] = 'Y'; // 폰클적용여부
+      // 변경이력 데이터 파싱
+      let afterValue = [];
+      try {
+        const afterValueStr = existingRow[6] || '[]';
+        const parsed = JSON.parse(afterValueStr);
+        afterValue = Array.isArray(parsed) ? parsed : (parsed ? [parsed] : []);
+      } catch (e) {
+        afterValue = existingRow[6] ? [existingRow[6]] : [];
+      }
+      
+      // 기존 폰클적용업체명 파싱
+      let phoneAppliedCompanies = [];
+      try {
+        const phoneAppliedCompaniesStr = existingRow[13] || '[]';
+        const parsed = JSON.parse(phoneAppliedCompaniesStr);
+        phoneAppliedCompanies = Array.isArray(parsed) ? parsed : [];
+      } catch (e) {
+        phoneAppliedCompanies = [];
+      }
+      
+      // 요청에서 특정 업체명이 있는지 확인 (프론트엔드에서 전달)
+      const { companyName } = req.body; // 선택적: 특정 업체명
+      
+      // 업체명별 개별 적용
+      if (existingRow[3] === '업체명' && companyName) {
+        // 특정 업체명에만 폰클 적용
+        if (!phoneAppliedCompanies.includes(companyName)) {
+          phoneAppliedCompanies.push(companyName);
+        }
+        // 폰클적용업체명 업데이트
+        updatedRow[13] = JSON.stringify(phoneAppliedCompanies);
+        // 폰클적용여부는 적용된 업체명이 있으면 Y
+        updatedRow[10] = phoneAppliedCompanies.length > 0 ? 'Y' : 'N';
+      } else {
+        // 그룹이름이거나 업체명이 지정되지 않은 경우: 전체 적용 (기존 로직)
+        updatedRow[10] = 'Y'; // 폰클적용여부
+        // 모든 업체명을 적용 목록에 추가
+        if (existingRow[3] === '업체명' && Array.isArray(afterValue)) {
+          phoneAppliedCompanies = [...new Set([...phoneAppliedCompanies, ...afterValue])];
+          updatedRow[13] = JSON.stringify(phoneAppliedCompanies);
+        }
+      }
+      
       updatedRow[11] = new Date().toISOString(); // 폰클적용일시
       updatedRow[12] = permission.userName || permission.userId || 'Unknown'; // 폰클적용자
 
       await withRetry(async () => {
         return await sheets.spreadsheets.values.update({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_GROUP_CHANGE_HISTORY}!A${rowIndex + 2}:M${rowIndex + 2}`,
+          range: `${SHEET_GROUP_CHANGE_HISTORY}!A${rowIndex + 2}:N${rowIndex + 2}`,
           valueInputOption: 'USER_ENTERED',
           resource: { values: [updatedRow] }
         });
