@@ -922,6 +922,19 @@ function setupPolicyTableRoutes(app) {
     const allowedOrigins = [...defaultOrigins, ...corsOrigins];
     const origin = req.headers.origin;
     
+    // 디버깅 로그 (정책표 관련 요청만)
+    const isPolicyTableRequest = req.url && req.url.includes('/api/policy-tables');
+    
+    if (isPolicyTableRequest) {
+      console.log('🔍 [setCORSHeaders] 호출:', {
+        url: req.url,
+        method: req.method,
+        origin: origin,
+        allowedOrigins: allowedOrigins,
+        originInAllowed: origin && allowedOrigins.includes(origin)
+      });
+    }
+    
     if (origin && allowedOrigins.includes(origin)) {
       res.setHeader('Access-Control-Allow-Origin', origin);
     } else if (origin && process.env.CORS_ORIGIN?.includes(origin)) {
@@ -935,6 +948,15 @@ function setupPolicyTableRoutes(app) {
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key, x-user-id, x-user-role, x-user-name, x-mode');
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Max-Age', '86400'); // 24시간 캐시
+    
+    if (isPolicyTableRequest) {
+      console.log('✅ [setCORSHeaders] CORS 헤더 설정 완료:', {
+        'Access-Control-Allow-Origin': res.getHeader('Access-Control-Allow-Origin'),
+        'Access-Control-Allow-Methods': res.getHeader('Access-Control-Allow-Methods'),
+        'Access-Control-Allow-Headers': res.getHeader('Access-Control-Allow-Headers'),
+        'Access-Control-Allow-Credentials': res.getHeader('Access-Control-Allow-Credentials')
+      });
+    }
   };
 
   // CORS 헤더는 전역 핸들러(app.options('*'))에서 처리되므로
@@ -3332,13 +3354,52 @@ function setupPolicyTableRoutes(app) {
 
   // OPTIONS /api/policy-tables/:id/view - CORS preflight 처리
   router.options('/policy-tables/:id/view', (req, res) => {
+    console.log('🔍 [OPTIONS] /api/policy-tables/:id/view 요청 수신:', {
+      method: req.method,
+      url: req.url,
+      path: req.path,
+      origin: req.headers.origin,
+      'access-control-request-method': req.headers['access-control-request-method'],
+      'access-control-request-headers': req.headers['access-control-request-headers'],
+      'x-mode': req.headers['x-mode'],
+      allHeaders: req.headers
+    });
+    
     setCORSHeaders(req, res);
+    
+    console.log('✅ [OPTIONS] CORS 헤더 설정 완료:', {
+      'Access-Control-Allow-Origin': res.getHeader('Access-Control-Allow-Origin'),
+      'Access-Control-Allow-Methods': res.getHeader('Access-Control-Allow-Methods'),
+      'Access-Control-Allow-Headers': res.getHeader('Access-Control-Allow-Headers'),
+      'Access-Control-Allow-Credentials': res.getHeader('Access-Control-Allow-Credentials')
+    });
+    
     res.status(200).end();
   });
 
   // POST /api/policy-tables/:id/view - 정책표 확인이력 기록
   router.post('/policy-tables/:id/view', express.json(), async (req, res) => {
+    console.log('🔍 [POST] /api/policy-tables/:id/view 요청 수신:', {
+      method: req.method,
+      url: req.url,
+      path: req.path,
+      params: req.params,
+      origin: req.headers.origin,
+      'x-user-id': req.headers['x-user-id'],
+      'x-user-role': req.headers['x-user-role'],
+      'x-user-name': req.headers['x-user-name'],
+      'x-mode': req.headers['x-mode'],
+      body: req.body,
+      allHeaders: Object.keys(req.headers).reduce((acc, key) => {
+        if (key.toLowerCase().startsWith('x-') || key.toLowerCase() === 'origin') {
+          acc[key] = req.headers[key];
+        }
+        return acc;
+      }, {})
+    });
+    
     setCORSHeaders(req, res);
+    
     try {
       const { id } = req.params;
       const { companyId, companyName } = req.body;
@@ -3346,6 +3407,16 @@ function setupPolicyTableRoutes(app) {
       const userName = req.headers['x-user-name'] ? decodeURIComponent(req.headers['x-user-name']) : (req.query.userName || '');
       const userRole = req.headers['x-user-role'] || req.query.userRole;
       const mode = req.headers['x-mode'] || req.query.mode; // 일반정책모드/정책모드 구분
+      
+      console.log('🔍 [POST] 파싱된 값:', {
+        id,
+        companyId,
+        companyName,
+        userId,
+        userName,
+        userRole,
+        mode
+      });
 
       if (!companyId || !companyName) {
         return res.status(400).json({

@@ -364,22 +364,58 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
         // 확인이력 표시는 정책모드에서만 (아래 UI 코드에서 처리)
         if (loggedInStore?.contactId && loggedInStore?.name) {
           try {
-            await fetch(`${API_BASE_URL}/api/policy-tables/${policy.id}/view`, {
+            const viewUrl = `${API_BASE_URL}/api/policy-tables/${policy.id}/view`;
+            const requestHeaders = {
+              'Content-Type': 'application/json',
+              'x-user-role': loggedInStore?.userRole || '',
+              'x-user-id': loggedInStore?.contactId || loggedInStore?.id || '',
+              'x-user-name': encodeURIComponent(loggedInStore?.userName || loggedInStore?.name || ''),
+              'x-mode': mode || '' // 모드 정보 전달 (일반정책모드/정책모드 구분용)
+            };
+            const requestBody = {
+              companyId: loggedInStore.contactId || loggedInStore.id,
+              companyName: loggedInStore.name || loggedInStore.userName
+            };
+            
+            console.log('🔍 [확인이력] 요청 시작:', {
+              url: viewUrl,
               method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'x-user-role': loggedInStore?.userRole || '',
-                'x-user-id': loggedInStore?.contactId || loggedInStore?.id || '',
-                'x-user-name': encodeURIComponent(loggedInStore?.userName || loggedInStore?.name || ''),
-                'x-mode': mode || '' // 모드 정보 전달 (일반정책모드/정책모드 구분용)
-              },
-              body: JSON.stringify({
-                companyId: loggedInStore.contactId || loggedInStore.id,
-                companyName: loggedInStore.name || loggedInStore.userName
-              })
+              headers: requestHeaders,
+              body: requestBody,
+              mode: mode || 'undefined'
             });
+            
+            const viewResponse = await fetch(viewUrl, {
+              method: 'POST',
+              headers: requestHeaders,
+              body: JSON.stringify(requestBody)
+            });
+            
+            console.log('🔍 [확인이력] 응답 수신:', {
+              status: viewResponse.status,
+              statusText: viewResponse.statusText,
+              ok: viewResponse.ok,
+              headers: Object.fromEntries(viewResponse.headers.entries())
+            });
+            
+            if (!viewResponse.ok) {
+              const errorText = await viewResponse.text();
+              console.error('❌ [확인이력] 응답 오류:', {
+                status: viewResponse.status,
+                statusText: viewResponse.statusText,
+                body: errorText
+              });
+            } else {
+              const responseData = await viewResponse.json();
+              console.log('✅ [확인이력] 기록 성공:', responseData);
+            }
           } catch (viewError) {
-            console.error('확인이력 기록 실패:', viewError);
+            console.error('❌ [확인이력] 기록 실패:', {
+              error: viewError,
+              message: viewError.message,
+              stack: viewError.stack,
+              name: viewError.name
+            });
             // 확인이력 기록 실패는 무시 (사용자에게 오류 표시하지 않음)
           }
         }

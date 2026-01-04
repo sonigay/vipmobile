@@ -172,6 +172,21 @@ app.options('*', (req, res) => {
   const allowedOrigins = [...corsOrigins, ...defaultOrigins];
 
   const origin = req.headers.origin;
+  
+  // 디버깅 로그 (정책표 관련 요청만)
+  if (req.url && req.url.includes('/api/policy-tables')) {
+    console.log('🔍 [전역 OPTIONS] 요청 수신:', {
+      method: req.method,
+      url: req.url,
+      path: req.path,
+      origin: origin,
+      'access-control-request-method': req.headers['access-control-request-method'],
+      'access-control-request-headers': req.headers['access-control-request-headers'],
+      allowedOrigins: allowedOrigins,
+      originInAllowed: origin && allowedOrigins.includes(origin)
+    });
+  }
+  
   if (origin && allowedOrigins.includes(origin)) {
     res.header('Access-Control-Allow-Origin', origin);
   } else if (origin) {
@@ -183,6 +198,17 @@ app.options('*', (req, res) => {
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key, x-user-id, x-user-role, x-user-name, x-mode');
   res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Max-Age', '86400'); // 24시간 캐시
+  
+  // 디버깅 로그 (정책표 관련 요청만)
+  if (req.url && req.url.includes('/api/policy-tables')) {
+    console.log('✅ [전역 OPTIONS] CORS 헤더 설정 완료:', {
+      'Access-Control-Allow-Origin': res.getHeader('Access-Control-Allow-Origin'),
+      'Access-Control-Allow-Methods': res.getHeader('Access-Control-Allow-Methods'),
+      'Access-Control-Allow-Headers': res.getHeader('Access-Control-Allow-Headers'),
+      'Access-Control-Allow-Credentials': res.getHeader('Access-Control-Allow-Credentials')
+    });
+  }
+  
   res.status(200).end();
 });
 
