@@ -375,9 +375,16 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
               'x-user-id': loggedInStore?.contactId || loggedInStore?.id || '',
               'x-user-name': encodeURIComponent(loggedInStore?.userName || loggedInStore?.name || '')
             };
-            // x-mode 헤더는 값이 있을 때만 추가 (빈 문자열은 CORS 문제를 일으킬 수 있음)
-            if (mode) {
-              requestHeaders['x-mode'] = mode;
+            // x-mode 헤더 추가
+            // 일반정책모드: 'generalPolicy', 정책모드: 'policy' 또는 빈 문자열이 아닌 경우
+            if (mode === 'generalPolicy') {
+              requestHeaders['x-mode'] = 'generalPolicy';
+            } else if (mode && mode !== 'generalPolicy') {
+              // 정책모드인 경우 (mode가 있고 generalPolicy가 아닌 경우)
+              requestHeaders['x-mode'] = 'policy';
+            } else {
+              // mode가 없는 경우 기본값으로 'policy' 사용
+              requestHeaders['x-mode'] = 'policy';
             }
             const requestBody = {
               companyId: companyId,
@@ -1011,7 +1018,7 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
                 )}
               </Paper>
 
-              {/* 확인 이력 (정책모드만) */}
+              {/* 확인 이력 (정책모드에서만 표시, 일반정책모드는 기록만 함) */}
               {mode !== 'generalPolicy' && selectedPolicy && (
                 <>
                   <Divider sx={{ my: 2 }} />
@@ -1074,15 +1081,40 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
                               </TableRow>
                             </TableHead>
                             <TableBody>
-                              {uniqueViewHistory.map((view, index) => (
-                                <TableRow key={view.companyId || index}>
-                                  <TableCell>{index + 1}</TableCell>
-                                  <TableCell>
-                                    {view.firstViewDate || view.viewDate || '-'}
-                                  </TableCell>
-                                  <TableCell>{view.companyName || '-'}</TableCell>
-                                </TableRow>
-                              ))}
+                              {uniqueViewHistory.map((view, index) => {
+                                // 날짜 포맷팅 (한국 시간으로 표시)
+                                let formattedDate = '-';
+                                const dateStr = view.firstViewDate || view.viewDate;
+                                if (dateStr) {
+                                  try {
+                                    // ISO 형식 (YYYY-MM-DD HH:mm:ss)을 한국 시간으로 파싱
+                                    const date = new Date(dateStr.replace(' ', 'T') + '+09:00');
+                                    if (!isNaN(date.getTime())) {
+                                      formattedDate = date.toLocaleString('ko-KR', {
+                                        year: 'numeric',
+                                        month: '2-digit',
+                                        day: '2-digit',
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                        second: '2-digit',
+                                        hour12: false
+                                      });
+                                    } else {
+                                      formattedDate = dateStr;
+                                    }
+                                  } catch (e) {
+                                    formattedDate = dateStr;
+                                  }
+                                }
+                                
+                                return (
+                                  <TableRow key={view.companyId || index}>
+                                    <TableCell>{index + 1}</TableCell>
+                                    <TableCell>{formattedDate}</TableCell>
+                                    <TableCell>{view.companyName || '-'}</TableCell>
+                                  </TableRow>
+                                );
+                              })}
                             </TableBody>
                           </Table>
                         </TableContainer>
