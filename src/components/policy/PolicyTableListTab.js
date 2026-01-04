@@ -687,61 +687,12 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
 
       let finalBlob = blob;
 
-      // 모바일에서는 Canvas 변환을 최소화하여 품질 손실 방지
-      // 워터마크 이미지(blob URL)가 아닌 경우에만 Canvas 변환 수행
-      if (!imageUrlToCopy.startsWith('blob:') && isMobile) {
-        // 모바일: 원본 Blob을 직접 사용 (Canvas 변환 없이)
-        // 단, CORS 문제가 있는 경우에만 Canvas 변환
-        try {
-          // 원본 Blob을 직접 사용 시도
-          finalBlob = blob;
-        } catch (directError) {
-          // 직접 사용 실패 시에만 Canvas 변환
-          console.warn('원본 Blob 직접 사용 실패, Canvas 변환 시도:', directError);
-          const img = new Image();
-          img.crossOrigin = 'anonymous';
-          
-          const imageLoadPromise = new Promise((resolve, reject) => {
-            img.onload = () => {
-              try {
-                const canvas = document.createElement('canvas');
-                canvas.width = img.width;
-                canvas.height = img.height;
-                const ctx = canvas.getContext('2d');
-                
-                // 이미지 품질 향상을 위한 설정
-                ctx.imageSmoothingEnabled = true;
-                ctx.imageSmoothingQuality = 'high';
-                
-                ctx.drawImage(img, 0, 0);
-                
-                // PNG는 quality 파라미터가 무시되므로 항상 PNG 사용
-                // JPEG인 경우에만 quality 적용
-                const outputType = imageType.includes('jpeg') || imageType.includes('jpg') ? 'image/jpeg' : 'image/png';
-                const quality = outputType === 'image/jpeg' ? 1.0 : undefined; // JPEG만 quality 적용
-                
-                canvas.toBlob((convertedBlob) => {
-                  if (convertedBlob) {
-                    resolve(convertedBlob);
-                  } else {
-                    reject(new Error('Canvas to blob conversion failed'));
-                  }
-                }, outputType, quality);
-              } catch (err) {
-                reject(err);
-              }
-            };
-            img.onerror = () => reject(new Error('Image load failed'));
-          });
-
-          const blobUrl = URL.createObjectURL(blob);
-          img.src = blobUrl;
-
-          finalBlob = await imageLoadPromise;
-          
-          URL.revokeObjectURL(blobUrl);
-          imageType = imageType.includes('jpeg') || imageType.includes('jpg') ? 'image/jpeg' : 'image/png';
-        }
+      // 모바일에서는 Canvas 변환을 완전히 피하고 원본 Blob을 직접 사용
+      // Canvas 변환은 항상 품질 손실을 일으키므로 모바일에서는 원본 그대로 사용
+      if (isMobile) {
+        // 모바일: 원본 Blob을 직접 사용 (Canvas 변환 완전히 제거)
+        finalBlob = blob;
+        console.log('📱 [모바일] 원본 Blob 직접 사용 (Canvas 변환 없음)');
       } else if (!imageUrlToCopy.startsWith('blob:')) {
         // PC: 기존 로직 유지 (Canvas 변환)
         const img = new Image();
@@ -792,6 +743,12 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
         // blob URL에서 직접 Blob 가져오기
         const blobResponse = await fetch(imageUrlToCopy);
         finalBlob = await blobResponse.blob();
+        // blob URL의 경우 이미지 타입 확인
+        if (!finalBlob.type || !finalBlob.type.startsWith('image/')) {
+          imageType = 'image/png';
+        } else {
+          imageType = finalBlob.type;
+        }
       }
       
       // 모바일에서 안정성을 위해 blob을 다시 확인
@@ -799,9 +756,21 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
         throw new Error('이미지 변환 실패: 빈 blob');
       }
 
+      // 모바일에서 품질 유지를 위해 이미지 타입을 명확히 지정
+      // PNG는 무손실 압축이므로 품질 손실이 없음
+      let clipboardImageType = imageType;
+      if (isMobile) {
+        // 모바일에서는 가능하면 PNG 사용 (무손실)
+        // JPEG인 경우에만 JPEG 유지
+        if (!imageType.includes('jpeg') && !imageType.includes('jpg')) {
+          clipboardImageType = 'image/png';
+        }
+        console.log(`📱 [모바일] ClipboardItem 타입: ${clipboardImageType}, 크기: ${(finalBlob.size / 1024).toFixed(2)}KB`);
+      }
+
       // ClipboardItem 생성 시 명시적으로 타입 지정
       const clipboardItem = new ClipboardItem({ 
-        [imageType]: finalBlob 
+        [clipboardImageType]: finalBlob 
       });
 
       await navigator.clipboard.write([clipboardItem]);
