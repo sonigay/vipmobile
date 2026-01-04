@@ -1757,42 +1757,112 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                             </Box>
                           </TableCell>
                           <TableCell>
-                            {group.companyNames && group.companyNames.length > 0 ? (
-                              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                                {group.companyNames.map((companyName) => {
-                                  const companyStatus = getItemStatus(group.id, companyName, '업체명');
-                                  return (
-                                    <Chip
-                                      key={companyName}
-                                      label={
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                          <span>{companyName}</span>
-                                          {companyStatus?.status === 'phoneApplied' && <PhoneAndroidIcon sx={{ fontSize: 14 }} />}
-                                          {companyStatus?.status === 'added' && <AddCircleIcon sx={{ fontSize: 14 }} />}
-                                          {companyStatus?.status === 'modified' && <EditOutlinedIcon sx={{ fontSize: 14 }} />}
-                                          {companyStatus?.status === 'deleted' && <RemoveCircleIcon sx={{ fontSize: 14 }} />}
-                                        </Box>
+                            {(() => {
+                              // 현재 업체명 목록
+                              const currentCompanyNames = group.companyNames || [];
+                              
+                              // 변경이력에서 삭제된 업체명 찾기
+                              const history = changeHistory[group.id] || [];
+                              const deletedCompaniesMap = new Map(); // 중복 방지를 위한 Map
+                              
+                              // 변경이력을 시간순으로 정렬하여 최신 상태 확인
+                              const sortedHistory = [...history].sort((a, b) => new Date(a.changedAt) - new Date(b.changedAt));
+                              
+                              // 각 업체명의 최종 상태 추적
+                              const companyStatusMap = new Map();
+                              
+                              sortedHistory.forEach(h => {
+                                if (h.changeType === '업체명') {
+                                  const beforeValue = Array.isArray(h.beforeValue) ? h.beforeValue : (h.beforeValue ? [h.beforeValue] : []);
+                                  const afterValue = Array.isArray(h.afterValue) ? h.afterValue : (h.afterValue ? [h.afterValue] : []);
+                                  
+                                  if (h.changeAction === '추가') {
+                                    // 추가된 업체명들
+                                    afterValue.forEach(companyName => {
+                                      if (!beforeValue.includes(companyName)) {
+                                        companyStatusMap.set(companyName, { status: 'exists', history: h });
                                       }
-                                      size="small"
-                                      onClick={(e) => companyStatus && handleOpenPopover(e, group.id, companyName, '업체명')}
-                                      sx={{
-                                        color: companyStatus?.status === 'phoneApplied' ? 'purple' :
-                                               companyStatus?.status === 'added' ? 'primary.main' :
-                                               companyStatus?.status === 'modified' ? 'success.main' :
-                                               companyStatus?.status === 'deleted' ? 'error.main' : 'inherit',
-                                        textDecoration: companyStatus?.status === 'deleted' ? 'line-through' : 'none',
-                                        cursor: companyStatus ? 'pointer' : 'default',
-                                        '&:hover': companyStatus ? { opacity: 0.8 } : {}
-                                      }}
-                                    />
-                                  );
-                                })}
-                              </Box>
-                            ) : (
-                              <Typography variant="body2" color="text.secondary">
-                                업체명 없음
-                              </Typography>
-                            )}
+                                    });
+                                  } else if (h.changeAction === '삭제') {
+                                    // 삭제된 업체명들
+                                    beforeValue.forEach(companyName => {
+                                      if (!afterValue.includes(companyName)) {
+                                        // 현재 그룹에 없는 경우에만 삭제된 것으로 표시
+                                        if (!currentCompanyNames.includes(companyName)) {
+                                          companyStatusMap.set(companyName, { status: 'deleted', history: h });
+                                        } else {
+                                          // 현재 그룹에 있으면 존재하는 것으로 표시 (재추가됨)
+                                          companyStatusMap.set(companyName, { status: 'exists', history: h });
+                                        }
+                                      }
+                                    });
+                                  }
+                                }
+                              });
+                              
+                              // 삭제된 업체명만 별도로 수집
+                              const deletedCompanies = [];
+                              companyStatusMap.forEach((statusInfo, companyName) => {
+                                if (statusInfo.status === 'deleted' && !currentCompanyNames.includes(companyName)) {
+                                  deletedCompanies.push({
+                                    name: companyName,
+                                    deletedAt: statusInfo.history.changedAt,
+                                    changeId: statusInfo.history.changeId,
+                                    history: statusInfo.history
+                                  });
+                                }
+                              });
+                              
+                              // 현재 업체명과 삭제된 업체명 합치기
+                              const allCompanyNames = [
+                                ...currentCompanyNames.map(name => ({ name, isDeleted: false })),
+                                ...deletedCompanies.map(dc => ({ name: dc.name, isDeleted: true, deletedInfo: dc }))
+                              ];
+                              
+                              if (allCompanyNames.length === 0) {
+                                return (
+                                  <Typography variant="body2" color="text.secondary">
+                                    업체명 없음
+                                  </Typography>
+                                );
+                              }
+                              
+                              return (
+                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                                  {allCompanyNames.map(({ name, isDeleted, deletedInfo }) => {
+                                    const companyStatus = getItemStatus(group.id, name, '업체명');
+                                    // 삭제된 업체명인 경우 deleted 상태로 표시
+                                    const finalStatus = isDeleted ? { status: 'deleted', history: deletedInfo?.history } : companyStatus;
+                                    
+                                    return (
+                                      <Chip
+                                        key={`${name}-${isDeleted ? 'deleted' : 'current'}`}
+                                        label={
+                                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                            <span>{name}</span>
+                                            {finalStatus?.status === 'phoneApplied' && <PhoneAndroidIcon sx={{ fontSize: 14 }} />}
+                                            {finalStatus?.status === 'added' && <AddCircleIcon sx={{ fontSize: 14 }} />}
+                                            {finalStatus?.status === 'modified' && <EditOutlinedIcon sx={{ fontSize: 14 }} />}
+                                            {finalStatus?.status === 'deleted' && <RemoveCircleIcon sx={{ fontSize: 14 }} />}
+                                          </Box>
+                                        }
+                                        size="small"
+                                        onClick={(e) => finalStatus && handleOpenPopover(e, group.id, name, '업체명')}
+                                        sx={{
+                                          color: finalStatus?.status === 'phoneApplied' ? 'purple' :
+                                                 finalStatus?.status === 'added' ? 'primary.main' :
+                                                 finalStatus?.status === 'modified' ? 'success.main' :
+                                                 finalStatus?.status === 'deleted' ? 'error.main' : 'inherit',
+                                          textDecoration: finalStatus?.status === 'deleted' ? 'line-through' : 'none',
+                                          cursor: finalStatus ? 'pointer' : 'default',
+                                          '&:hover': finalStatus ? { opacity: 0.8 } : {}
+                                        }}
+                                      />
+                                    );
+                                  })}
+                                </Box>
+                              );
+                            })()}
                           </TableCell>
                           <TableCell>
                             <IconButton size="small" onClick={() => handleOpenGroupModal(group)}>
