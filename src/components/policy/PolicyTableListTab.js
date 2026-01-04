@@ -453,7 +453,17 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
       const watermarkText = loggedInStore?.name || loggedInStore?.userName || '';
       if (!watermarkText) return imageUrl;
 
-      const response = await fetch(imageUrl, {
+      // Discord CDN 이미지인 경우 프록시를 통해 가져오기 (CORS 문제 해결)
+      const isDiscordCdn = imageUrl.includes('cdn.discordapp.com') || imageUrl.includes('media.discordapp.net');
+      let fetchUrl = imageUrl;
+      
+      if (isDiscordCdn) {
+        // 프록시 URL 생성
+        const proxyUrl = `${API_BASE_URL}/api/meetings/proxy-image?url=${encodeURIComponent(imageUrl)}`;
+        fetchUrl = proxyUrl;
+      }
+
+      const response = await fetch(fetchUrl, {
         mode: 'cors',
         credentials: 'omit'
       });
