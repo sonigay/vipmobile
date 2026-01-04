@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Paper,
@@ -136,6 +136,7 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
   const [imageError, setImageError] = useState(false);
   const [savingOrder, setSavingOrder] = useState(false);
   const [watermarkedImageUrl, setWatermarkedImageUrl] = useState(null); // 워터마크가 포함된 이미지 URL
+  const previousWatermarkedUrlRef = useRef(null); // 이전 워터마크 URL 추적용
 
   // 검색/필터링
   const [searchCreator, setSearchCreator] = useState('');
@@ -165,21 +166,26 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
     }
   }, [canAccess]);
 
-  // 정책 목록 캐싱을 위한 상태
+  // 정책 목록 캐싱을 위한 상태 (모드별로 분리)
   const [policiesCache, setPoliciesCache] = useState({});
 
   useEffect(() => {
     if (tabs.length > 0 && activeTabIndex < tabs.length) {
       const tabName = tabs[activeTabIndex].policyTableName;
-      // 캐시에 있으면 캐시에서 가져오고, 없으면 로드
-      if (policiesCache[tabName]) {
-        setPolicies(policiesCache[tabName]);
+      // 캐시 키: 모드 + 탭이름 (모드별로 캐시 분리)
+      const cacheKey = `${mode || 'default'}_${tabName}`;
+      
+      // 검색/필터링이 없을 때만 캐시 사용
+      const hasFilters = searchCreator || filterApplyDateFrom;
+      
+      if (!hasFilters && policiesCache[cacheKey]) {
+        setPolicies(policiesCache[cacheKey]);
       } else {
         loadPolicies(tabName);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tabs, activeTabIndex]);
+  }, [tabs, activeTabIndex, mode]);
 
   // loadPolicies 함수 수정하여 캐시에 저장
 
@@ -238,8 +244,14 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
           return dateB - dateA; // 내림차순
         });
         setPolicies(sortedData);
-        // 캐시에 저장 (탭 전환 시 재로딩 방지)
-        setPoliciesCache(prev => ({ ...prev, [policyTableName]: sortedData }));
+        
+        // 검색/필터링이 없을 때만 캐시에 저장
+        const hasFilters = searchCreator || filterApplyDateFrom;
+        if (!hasFilters) {
+          // 캐시 키: 모드 + 탭이름 (모드별로 캐시 분리)
+          const cacheKey = `${mode || 'default'}_${policyTableName}`;
+          setPoliciesCache(prev => ({ ...prev, [cacheKey]: sortedData }));
+        }
       }
     } catch (error) {
       console.error('정책표 목록 로드 오류:', error);
@@ -381,6 +393,14 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
 
     try {
       setLoading(true);
+      
+      // 이전 워터마크 URL 정리
+      if (previousWatermarkedUrlRef.current && previousWatermarkedUrlRef.current.startsWith('blob:')) {
+        URL.revokeObjectURL(previousWatermarkedUrlRef.current);
+        previousWatermarkedUrlRef.current = null;
+      }
+      setWatermarkedImageUrl(null);
+      
       const response = await fetch(`${API_BASE_URL}/api/policy-tables/${selectedPolicy.id}/refresh-image`, {
         method: 'POST',
         headers: {
@@ -394,6 +414,20 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
         const data = await response.json();
         setSelectedPolicy({ ...selectedPolicy, imageUrl: data.imageUrl });
         setImageError(false);
+        
+        // 일반정책모드인 경우 워터마크 이미지 재생성
+        if (mode === 'generalPolicy' && data.imageUrl) {
+          createWatermarkedImage(data.imageUrl)
+            .then(url => {
+              previousWatermarkedUrlRef.current = url;
+              setWatermarkedImageUrl(url);
+            })
+            .catch(error => {
+              console.error('워터마크 이미지 생성 실패:', error);
+              setWatermarkedImageUrl(data.imageUrl);
+            });
+        }
+        
         alert('이미지가 갱신되었습니다.');
       } else {
         const errorData = await response.json();
@@ -445,17 +479,35 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
             
             // 워터마크 설정
             ctx.fillStyle = 'rgba(0, 0, 0, 0.03)'; // 매우 투명한 검은색
-            ctx.font = 'bold 40px Arial';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             
-            // 워터마크를 여러 개 그리기 (랜덤 위치, 회전)
-            const watermarkCount = 12;
+            // 워터마크를 여러 개 그리기 (랜덤 위치, 회전) - 더 많이, 더 크게
+            const watermarkCount = 30; // 12개에서 30개로 증가
+            const minFontSize = 40; // 최소 폰트 크기 증가
+            const maxFontSize = 120; // 최대 폰트 크기 증가
+            
+            // 격자 기반 배치로 분포 개선
+            const gridCols = 6; // 6열
+            const gridRows = 5; // 5행
+            const cellWidth = canvas.width / gridCols;
+            const cellHeight = canvas.height / gridRows;
+            
             for (let i = 0; i < watermarkCount; i++) {
-              const x = Math.random() * canvas.width;
-              const y = Math.random() * canvas.height;
+              // 격자 기반 위치 계산
+              const col = i % gridCols;
+              const row = Math.floor(i / gridCols);
+              
+              // 각 셀 내에서 랜덤 위치
+              const baseX = col * cellWidth + cellWidth / 2;
+              const baseY = row * cellHeight + cellHeight / 2;
+              const offsetX = (Math.random() - 0.5) * cellWidth * 0.8; // 셀의 80% 범위 내
+              const offsetY = (Math.random() - 0.5) * cellHeight * 0.8;
+              
+              const x = Math.max(0, Math.min(canvas.width, baseX + offsetX));
+              const y = Math.max(0, Math.min(canvas.height, baseY + offsetY));
               const rotation = (Math.random() - 0.5) * 60; // -30도 ~ +30도
-              const fontSize = 20 + Math.random() * 30; // 20px ~ 50px
+              const fontSize = minFontSize + Math.random() * (maxFontSize - minFontSize);
               
               ctx.save();
               ctx.translate(x, y);
@@ -496,12 +548,17 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
 
   // 정책 선택 시 워터마크 이미지 생성
   useEffect(() => {
-    let currentWatermarkedUrl = null;
+    // 이전 워터마크 URL 정리
+    if (previousWatermarkedUrlRef.current && previousWatermarkedUrlRef.current.startsWith('blob:')) {
+      URL.revokeObjectURL(previousWatermarkedUrlRef.current);
+      previousWatermarkedUrlRef.current = null;
+    }
 
     if (selectedPolicy && selectedPolicy.imageUrl && mode === 'generalPolicy') {
       createWatermarkedImage(selectedPolicy.imageUrl)
         .then(url => {
-          currentWatermarkedUrl = url;
+          // 이전 URL 저장
+          previousWatermarkedUrlRef.current = url;
           setWatermarkedImageUrl(url);
         })
         .catch(error => {
@@ -510,15 +567,17 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
         });
     } else {
       setWatermarkedImageUrl(null);
+      previousWatermarkedUrlRef.current = null;
     }
 
     // 정리 함수: 컴포넌트 언마운트 시 URL 해제
     return () => {
-      if (currentWatermarkedUrl && currentWatermarkedUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(currentWatermarkedUrl);
+      if (previousWatermarkedUrlRef.current && previousWatermarkedUrlRef.current.startsWith('blob:')) {
+        URL.revokeObjectURL(previousWatermarkedUrlRef.current);
+        previousWatermarkedUrlRef.current = null;
       }
     };
-  }, [selectedPolicy, mode, loggedInStore?.name, loggedInStore?.userName]);
+  }, [selectedPolicy?.id, selectedPolicy?.imageUrl, mode, loggedInStore?.name, loggedInStore?.userName]);
 
   const handleCopyImage = async () => {
     if (!selectedPolicy || !selectedPolicy.imageUrl) return;
