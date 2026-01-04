@@ -2461,7 +2461,8 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                     );
                   })()}
                 </Box>
-              ))}
+                );
+              })}
             </Box>
           </Box>
         )}
