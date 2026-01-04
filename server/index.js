@@ -1352,10 +1352,21 @@ async function getSheetValues(sheetName, spreadsheetId = SPREADSHEET_ID) {
   // 캐시에서 먼저 확인
   const cachedData = cacheUtils.get(cacheKey);
   if (cachedData) {
+    console.log(`✅ [캐시 히트] ${sheetName}`);
     return cachedData;
   }
 
-  return await fetchSheetValuesDirectly(sheetName, spreadsheetId);
+  const data = await fetchSheetValuesDirectly(sheetName, spreadsheetId);
+  
+  // 로그인에 자주 사용되는 시트는 더 긴 TTL 적용 (1분)
+  // 이 시트들은 자주 변경되지 않으므로 긴 TTL로 API 호출 감소
+  const loginFrequentSheets = ['폰클출고처데이터', '대리점아이디관리', '일반모드권한관리'];
+  const ttl = loginFrequentSheets.includes(sheetName) ? 60 * 1000 : CACHE_TTL;
+  
+  cacheUtils.set(cacheKey, data, ttl);
+  console.log(`💾 [캐시 저장] ${sheetName} (TTL: ${ttl / 1000}초)`);
+  
+  return data;
 }
 
 // 폰클개통데이터 캐시 무효화 함수
