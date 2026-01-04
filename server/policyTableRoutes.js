@@ -400,6 +400,7 @@ const SHEET_POLICY_TABLE_SETTINGS = '정책모드_정책표설정';
 const SHEET_POLICY_TABLE_LIST = '정책모드_정책표목록';
 const SHEET_USER_GROUPS = '정책모드_일반사용자그룹';
 const SHEET_TAB_ORDER = '정책표목록_탭순서';
+const SHEET_GROUP_CHANGE_HISTORY = '정책모드_정책영업그룹_변경이력';
 
 // 시트 헤더 정의
 const HEADERS_POLICY_TABLE_SETTINGS = [
@@ -445,6 +446,22 @@ const HEADERS_TAB_ORDER = [
   '생성카드순서',
   '수정일시',
   '수정자'
+];
+
+const HEADERS_GROUP_CHANGE_HISTORY = [
+  '변경ID',
+  '그룹ID',
+  '그룹이름',
+  '변경타입',        // 그룹이름/업체명
+  '변경항목',        // 추가/수정/삭제
+  '변경전값',
+  '변경후값',
+  '변경일시',
+  '변경자ID',
+  '변경자이름',
+  '폰클적용여부',    // Y/N
+  '폰클적용일시',
+  '폰클적용자'
 ];
 
 // 구글시트 편집 링크 정규화 함수
@@ -1285,6 +1302,44 @@ function setupPolicyTableRoutes(app) {
     }
   }
 
+  // 변경이력 저장 함수
+  async function saveGroupChangeHistory(sheets, spreadsheetId, historyData) {
+    await ensureSheetHeaders(sheets, spreadsheetId, SHEET_GROUP_CHANGE_HISTORY, HEADERS_GROUP_CHANGE_HISTORY);
+    
+    const changeId = `HIST_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+    const beforeValueStr = typeof historyData.beforeValue === 'string' 
+      ? historyData.beforeValue 
+      : JSON.stringify(historyData.beforeValue || '');
+    const afterValueStr = typeof historyData.afterValue === 'string' 
+      ? historyData.afterValue 
+      : JSON.stringify(historyData.afterValue || '');
+    
+    const historyRow = [
+      changeId,           // 변경ID
+      historyData.groupId,
+      historyData.groupName,
+      historyData.changeType,
+      historyData.changeAction,
+      beforeValueStr,
+      afterValueStr,
+      new Date().toISOString(),
+      historyData.changedBy,
+      historyData.changedByName,
+      'N',                // 폰클적용여부 (기본값: N)
+      '',                 // 폰클적용일시
+      ''                  // 폰클적용자
+    ];
+
+    await withRetry(async () => {
+      return await sheets.spreadsheets.values.append({
+        spreadsheetId: spreadsheetId,
+        range: `${SHEET_GROUP_CHANGE_HISTORY}!A:M`,
+        valueInputOption: 'USER_ENTERED',
+        resource: { values: [historyRow] }
+      });
+    });
+  }
+
   // GET /api/policy-table/user-groups
   router.get('/policy-table/user-groups', async (req, res) => {
     setCORSHeaders(req, res);
@@ -1393,6 +1448,32 @@ function setupPolicyTableRoutes(app) {
         });
       });
 
+      // 변경이력 저장: 그룹 추가
+      await saveGroupChangeHistory(sheets, SPREADSHEET_ID, {
+        groupId: newId,
+        groupName: groupName,
+        changeType: '그룹이름',
+        changeAction: '추가',
+        beforeValue: '',
+        afterValue: groupName,
+        changedBy: permission.userId || 'Unknown',
+        changedByName: permission.userName || 'Unknown'
+      });
+
+      // 변경이력 저장: 업체명 추가
+      if (uniqueCompanyNames.length > 0) {
+        await saveGroupChangeHistory(sheets, SPREADSHEET_ID, {
+          groupId: newId,
+          groupName: groupName,
+          changeType: '업체명',
+          changeAction: '추가',
+          beforeValue: [],
+          afterValue: uniqueCompanyNames,
+          changedBy: permission.userId || 'Unknown',
+          changedByName: permission.userName || 'Unknown'
+        });
+      }
+
       return res.json({
         success: true,
         id: newId,
@@ -1435,10 +1516,12 @@ function setupPolicyTableRoutes(app) {
 
       const existingRow = rows[rowIndex];
       const existingData = parseUserGroupData(existingRow[2]);
+      const existingGroupName = existingRow[1];
 
       // 새로운 데이터가 제공되면 사용, 없으면 기존 데이터 유지
       let finalCompanyNames = companyNames !== undefined ? companyNames : existingData.companyNames;
       let finalManagerIds = managerIds !== undefined ? managerIds : existingData.managerIds;
+      const finalGroupName = groupName !== undefined ? groupName : existingGroupName;
 
       // 하위 호환성: userIds도 받을 수 있음
       if (req.body.userIds && managerIds === undefined) {
@@ -1461,7 +1544,7 @@ function setupPolicyTableRoutes(app) {
 
       const updatedRow = [
         id,
-        groupName !== undefined ? groupName : existingRow[1],
+        finalGroupName,
         JSON.stringify(groupData),
         existingRow[3],
         existingRow[4]
@@ -1475,6 +1558,61 @@ function setupPolicyTableRoutes(app) {
           resource: { values: [updatedRow] }
         });
       });
+
+      // 변경이력 저장: 그룹이름 변경
+      if (groupName !== undefined && groupName !== existingGroupName) {
+        await saveGroupChangeHistory(sheets, SPREADSHEET_ID, {
+          groupId: id,
+          groupName: finalGroupName,
+          changeType: '그룹이름',
+          changeAction: '수정',
+          beforeValue: existingGroupName,
+          afterValue: groupName,
+          changedBy: permission.userId || 'Unknown',
+          changedByName: permission.userName || 'Unknown'
+        });
+      }
+
+      // 변경이력 저장: 업체명 변경
+      if (companyNames !== undefined) {
+        const existingCompanyNames = existingData.companyNames || [];
+        const newCompanyNames = uniqueCompanyNames;
+
+        // 추가된 업체명
+        const added = newCompanyNames.filter(c => !existingCompanyNames.includes(c));
+        // 삭제된 업체명
+        const removed = existingCompanyNames.filter(c => !newCompanyNames.includes(c));
+
+        // 추가된 업체명 이력 저장
+        if (added.length > 0) {
+          await saveGroupChangeHistory(sheets, SPREADSHEET_ID, {
+            groupId: id,
+            groupName: finalGroupName,
+            changeType: '업체명',
+            changeAction: '추가',
+            beforeValue: existingCompanyNames,
+            afterValue: newCompanyNames,
+            changedBy: permission.userId || 'Unknown',
+            changedByName: permission.userName || 'Unknown'
+          });
+        }
+
+        // 삭제된 업체명 이력 저장 (각각 개별로 저장)
+        if (removed.length > 0) {
+          for (const removedCompany of removed) {
+            await saveGroupChangeHistory(sheets, SPREADSHEET_ID, {
+              groupId: id,
+              groupName: finalGroupName,
+              changeType: '업체명',
+              changeAction: '삭제',
+              beforeValue: existingCompanyNames,
+              afterValue: newCompanyNames,
+              changedBy: permission.userId || 'Unknown',
+              changedByName: permission.userName || 'Unknown'
+            });
+          }
+        }
+      }
 
       return res.json({
         success: true,
@@ -1514,6 +1652,11 @@ function setupPolicyTableRoutes(app) {
         return res.status(404).json({ success: false, error: '그룹을 찾을 수 없습니다.' });
       }
 
+      const deletedRow = rows[rowIndex];
+      const deletedGroupName = deletedRow[1] || '';
+      const deletedData = parseUserGroupData(deletedRow[2]);
+      const deletedCompanyNames = deletedData.companyNames || [];
+
       await withRetry(async () => {
         return await sheets.spreadsheets.batchUpdate({
           spreadsheetId: SPREADSHEET_ID,
@@ -1532,12 +1675,192 @@ function setupPolicyTableRoutes(app) {
         });
       });
 
+      // 변경이력 저장: 그룹 삭제
+      await saveGroupChangeHistory(sheets, SPREADSHEET_ID, {
+        groupId: id,
+        groupName: deletedGroupName,
+        changeType: '그룹이름',
+        changeAction: '삭제',
+        beforeValue: deletedGroupName,
+        afterValue: '',
+        changedBy: permission.userId || 'Unknown',
+        changedByName: permission.userName || 'Unknown'
+      });
+
+      // 변경이력 저장: 업체명 삭제 (그룹 삭제 시 모든 업체명도 삭제된 것으로 기록)
+      if (deletedCompanyNames.length > 0) {
+        for (const deletedCompany of deletedCompanyNames) {
+          await saveGroupChangeHistory(sheets, SPREADSHEET_ID, {
+            groupId: id,
+            groupName: deletedGroupName,
+            changeType: '업체명',
+            changeAction: '삭제',
+            beforeValue: deletedCompanyNames,
+            afterValue: [],
+            changedBy: permission.userId || 'Unknown',
+            changedByName: permission.userName || 'Unknown'
+          });
+        }
+      }
+
       return res.json({
         success: true,
         message: '정책영업그룹이 삭제되었습니다.'
       });
     } catch (error) {
       console.error('[정책표] 그룹 삭제 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // GET /api/policy-table/user-groups/:id/change-history
+  router.get('/policy-table/user-groups/:id/change-history', async (req, res) => {
+    setCORSHeaders(req, res);
+    try {
+      // S 권한자도 변경이력 조회 가능하도록 권한 체크
+      const userRole = req.headers['x-user-role'] || req.query?.userRole;
+      const twoLetterPattern = /^[A-Z]{2}$/;
+      const hasPermission = userRole === 'SS' || userRole === 'S' || twoLetterPattern.test(userRole);
+      
+      if (!hasPermission) {
+        return res.status(403).json({ success: false, error: '권한이 없습니다.' });
+      }
+
+      const { id } = req.params;
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_GROUP_CHANGE_HISTORY, HEADERS_GROUP_CHANGE_HISTORY);
+
+      const response = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_GROUP_CHANGE_HISTORY}!A:M`
+        });
+      });
+
+      const rows = response.data.values || [];
+      if (rows.length < 2) {
+        return res.json([]);
+      }
+
+      const dataRows = rows.slice(1);
+      
+      // 해당 그룹ID의 변경이력만 필터링
+      const history = dataRows
+        .filter(row => row[1] === id) // 그룹ID로 필터링
+        .map(row => {
+          // 변경전값과 변경후값 파싱 (JSON 배열일 수 있음)
+          let beforeValue = row[5] || '';
+          let afterValue = row[6] || '';
+          
+          try {
+            const beforeParsed = JSON.parse(beforeValue);
+            beforeValue = Array.isArray(beforeParsed) ? beforeParsed : beforeValue;
+          } catch (e) {
+            // JSON이 아니면 문자열 그대로 사용
+          }
+          
+          try {
+            const afterParsed = JSON.parse(afterValue);
+            afterValue = Array.isArray(afterParsed) ? afterParsed : afterValue;
+          } catch (e) {
+            // JSON이 아니면 문자열 그대로 사용
+          }
+
+          return {
+            changeId: row[0] || '',
+            groupId: row[1] || '',
+            groupName: row[2] || '',
+            changeType: row[3] || '',      // 그룹이름/업체명
+            changeAction: row[4] || '',   // 추가/수정/삭제
+            beforeValue: beforeValue,
+            afterValue: afterValue,
+            changedAt: row[7] || '',
+            changedBy: row[8] || '',
+            changedByName: row[9] || '',
+            phoneApplied: row[10] || 'N',  // 폰클적용여부
+            phoneAppliedAt: row[11] || '',  // 폰클적용일시
+            phoneAppliedBy: row[12] || ''   // 폰클적용자
+          };
+        })
+        .sort((a, b) => new Date(b.changedAt) - new Date(a.changedAt)); // 최신순 정렬
+
+      return res.json(history);
+    } catch (error) {
+      console.error('[정책표] 변경이력 조회 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // PUT /api/policy-table/user-groups/:id/change-history/:changeId/apply-phone
+  router.put('/policy-table/user-groups/:id/change-history/:changeId/apply-phone', express.json(), async (req, res) => {
+    setCORSHeaders(req, res);
+    try {
+      // S 권한자도 폰클 적용 가능하도록 권한 체크
+      const userRole = req.headers['x-user-role'] || req.query?.userRole;
+      const twoLetterPattern = /^[A-Z]{2}$/;
+      const hasPermission = userRole === 'SS' || userRole === 'S' || twoLetterPattern.test(userRole);
+      
+      if (!hasPermission) {
+        return res.status(403).json({ success: false, error: '권한이 없습니다.' });
+      }
+
+      const { id: groupId } = req.params;
+      const { changeId } = req.params;
+      const permission = await checkPermission(req, ['SS', 'TEAM_LEADER', 'S']);
+      
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_GROUP_CHANGE_HISTORY, HEADERS_GROUP_CHANGE_HISTORY);
+
+      // 변경이력 조회
+      const response = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_GROUP_CHANGE_HISTORY}!A:M`
+        });
+      });
+
+      const rows = response.data.values || [];
+      if (rows.length < 2) {
+        return res.status(404).json({ success: false, error: '변경이력을 찾을 수 없습니다.' });
+      }
+
+      const dataRows = rows.slice(1);
+      const rowIndex = dataRows.findIndex(row => row[0] === changeId && row[1] === groupId);
+
+      if (rowIndex === -1) {
+        return res.status(404).json({ success: false, error: '변경이력을 찾을 수 없습니다.' });
+      }
+
+      const existingRow = dataRows[rowIndex];
+      const updatedRow = [...existingRow];
+      
+      // 배열 길이를 최소 13으로 보장
+      while (updatedRow.length < 13) {
+        updatedRow.push('');
+      }
+      
+      // 폰클 적용 정보 업데이트
+      updatedRow[10] = 'Y'; // 폰클적용여부
+      updatedRow[11] = new Date().toISOString(); // 폰클적용일시
+      updatedRow[12] = permission.userName || permission.userId || 'Unknown'; // 폰클적용자
+
+      await withRetry(async () => {
+        return await sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_GROUP_CHANGE_HISTORY}!A${rowIndex + 2}:M${rowIndex + 2}`,
+          valueInputOption: 'USER_ENTERED',
+          resource: { values: [updatedRow] }
+        });
+      });
+
+      return res.json({
+        success: true,
+        message: '폰클 적용이 완료되었습니다.',
+        phoneAppliedAt: updatedRow[11],
+        phoneAppliedBy: updatedRow[12]
+      });
+    } catch (error) {
+      console.error('[정책표] 폰클 적용 오류:', error);
       return res.status(500).json({ success: false, error: error.message });
     }
   });

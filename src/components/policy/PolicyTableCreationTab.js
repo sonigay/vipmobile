@@ -26,7 +26,9 @@ import {
   TableHead,
   TableRow,
   Tabs,
-  Tab
+  Tab,
+  Tooltip,
+  Popover
 } from '@mui/material';
 import {
   Refresh as RefreshIcon,
@@ -38,7 +40,11 @@ import {
   Group as GroupIcon,
   DragIndicator as DragIndicatorIcon,
   CheckBox as CheckBoxIcon,
-  CheckBoxOutlineBlank as CheckBoxOutlineBlankIcon
+  CheckBoxOutlineBlank as CheckBoxOutlineBlankIcon,
+  AddCircle as AddCircleIcon,
+  EditOutlined as EditOutlinedIcon,
+  RemoveCircle as RemoveCircleIcon,
+  PhoneAndroid as PhoneAndroidIcon
 } from '@mui/icons-material';
 import {
   DndContext,
@@ -162,6 +168,12 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
   });
   const [companies, setCompanies] = useState([]);
   const [teamLeaders, setTeamLeaders] = useState([]);
+  
+  // 변경이력 관련 상태
+  const [changeHistory, setChangeHistory] = useState({}); // { groupId: [historyItems] }
+  const [historyLoading, setHistoryLoading] = useState({}); // { groupId: boolean }
+  const [popoverAnchor, setPopoverAnchor] = useState(null); // Popover 앵커
+  const [popoverContent, setPopoverContent] = useState(null); // Popover 내용
 
   // 권한 체크 - 동적으로 두 글자 대문자 패턴(팀장) 또는 SS(총괄), S(정산팀) 인식
   const userRole = loggedInStore?.userRole;
@@ -294,14 +306,22 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
       if (response.ok) {
         const data = await response.json();
         // 응답이 배열인지 확인
+        let groups = [];
         if (Array.isArray(data)) {
-          setUserGroups(data);
+          groups = data;
         } else if (data.success !== false && Array.isArray(data.data)) {
-          setUserGroups(data.data);
+          groups = data.data;
         } else {
           console.warn('정책영업그룹 응답 형식 오류:', data);
-          setUserGroups([]);
+          groups = [];
         }
+        setUserGroups(groups);
+        // 그룹 목록 로드 후 각 그룹의 변경이력도 로드
+        groups.forEach(group => {
+          if (group.id) {
+            loadChangeHistory(group.id);
+          }
+        });
       } else {
         console.error('정책영업그룹 로드 실패:', response.status);
         setUserGroups([]);
@@ -309,6 +329,33 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
     } catch (error) {
       console.error('정책영업그룹 로드 오류:', error);
       setUserGroups([]);
+    }
+  };
+
+  // 변경이력 로드 함수
+  const loadChangeHistory = async (groupId) => {
+    if (!groupId) return;
+    
+    try {
+      setHistoryLoading(prev => ({ ...prev, [groupId]: true }));
+      const response = await fetch(`${API_BASE_URL}/api/policy-table/user-groups/${groupId}/change-history`, {
+        headers: {
+          'x-user-role': loggedInStore?.userRole || '',
+          'x-user-id': loggedInStore?.contactId || loggedInStore?.id || ''
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setChangeHistory(prev => ({ ...prev, [groupId]: data || [] }));
+      } else {
+        console.error(`그룹 ${groupId} 변경이력 로드 실패:`, response.status);
+        setChangeHistory(prev => ({ ...prev, [groupId]: [] }));
+      }
+    } catch (error) {
+      console.error(`그룹 ${groupId} 변경이력 로드 오류:`, error);
+      setChangeHistory(prev => ({ ...prev, [groupId]: [] }));
+    } finally {
+      setHistoryLoading(prev => ({ ...prev, [groupId]: false }));
     }
   };
 
@@ -521,7 +568,13 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
       });
 
       if (response.ok) {
+        const responseData = await response.json();
+        const savedGroupId = editingGroup?.id || responseData.id;
         await loadUserGroups();
+        // 수정된 그룹의 변경이력 다시 로드
+        if (savedGroupId) {
+          await loadChangeHistory(savedGroupId);
+        }
         handleCloseGroupModal();
       } else {
         const errorData = await response.json();
@@ -551,6 +604,12 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
       });
 
       if (response.ok) {
+        // 삭제된 그룹의 변경이력 제거
+        setChangeHistory(prev => {
+          const newHistory = { ...prev };
+          delete newHistory[id];
+          return newHistory;
+        });
         await loadUserGroups();
       } else {
         const errorData = await response.json();
@@ -561,6 +620,137 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
       setError('삭제 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // 변경이력 기반으로 항목의 상태 결정 (추가/수정/삭제/폰클적용)
+  const getItemStatus = (groupId, itemName, itemType) => {
+    const history = changeHistory[groupId] || [];
+    if (history.length === 0) return null; // 변경이력이 없으면 기본 상태
+
+    // 해당 항목(그룹이름 또는 업체명)의 최신 변경이력 찾기
+    const relevantHistory = history
+      .filter(h => {
+        if (itemType === '그룹이름') {
+          return h.changeType === '그룹이름' && 
+                 (h.beforeValue === itemName || h.afterValue === itemName);
+        } else {
+          const beforeValue = Array.isArray(h.beforeValue) ? h.beforeValue : (h.beforeValue ? [h.beforeValue] : []);
+          const afterValue = Array.isArray(h.afterValue) ? h.afterValue : (h.afterValue ? [h.afterValue] : []);
+          return h.changeType === '업체명' && 
+                 (beforeValue.includes(itemName) || afterValue.includes(itemName));
+        }
+      })
+      .sort((a, b) => new Date(b.changedAt) - new Date(a.changedAt)); // 최신순
+
+    if (relevantHistory.length === 0) return null;
+
+    // 폰클 적용 여부 확인 (가장 최신의 폰클 적용된 이력 찾기)
+    const phoneAppliedHistory = relevantHistory.find(h => h.phoneApplied === 'Y');
+    if (phoneAppliedHistory) {
+      return {
+        status: 'phoneApplied',
+        history: phoneAppliedHistory
+      };
+    }
+
+    // 최신 변경이력 확인
+    const latest = relevantHistory[0];
+    
+    // 현재 항목이 변경이력에 포함되어 있는지 확인
+    if (itemType === '그룹이름') {
+      // 그룹이름의 경우 직접 비교
+      if (latest.changeAction === '추가' && latest.afterValue === itemName) {
+        return { status: 'added', history: latest };
+      } else if (latest.changeAction === '수정' && latest.afterValue === itemName) {
+        return { status: 'modified', history: latest };
+      } else if (latest.changeAction === '삭제' && latest.beforeValue === itemName) {
+        return { status: 'deleted', history: latest };
+      }
+    } else if (itemType === '업체명') {
+      // 업체명의 경우 배열에서 확인
+      const afterValue = Array.isArray(latest.afterValue) ? latest.afterValue : (latest.afterValue ? [latest.afterValue] : []);
+      const beforeValue = Array.isArray(latest.beforeValue) ? latest.beforeValue : (latest.beforeValue ? [latest.beforeValue] : []);
+      
+      // 현재 업체명이 추가되었는지 확인
+      if (latest.changeAction === '추가' && afterValue.includes(itemName) && !beforeValue.includes(itemName)) {
+        return { status: 'added', history: latest };
+      } 
+      // 현재 업체명이 수정되었는지 확인 (이전에도 있었고 지금도 있지만 값이 변경됨)
+      else if (latest.changeAction === '수정' && afterValue.includes(itemName)) {
+        // 수정의 경우: 이전 값과 현재 값이 다르면 수정된 것으로 간주
+        return { status: 'modified', history: latest };
+      } 
+      // 현재 업체명이 삭제되었는지 확인
+      else if (latest.changeAction === '삭제' && beforeValue.includes(itemName) && !afterValue.includes(itemName)) {
+        return { status: 'deleted', history: latest };
+      }
+    }
+
+    return null;
+  };
+
+  // Popover 열기
+  const handleOpenPopover = (event, groupId, itemName, itemType) => {
+    const history = changeHistory[groupId] || [];
+    const relevantHistory = history
+      .filter(h => {
+        if (itemType === '그룹이름') {
+          return h.changeType === '그룹이름' && 
+                 (h.beforeValue === itemName || h.afterValue === itemName);
+        } else {
+          const beforeValue = Array.isArray(h.beforeValue) ? h.beforeValue : (h.beforeValue ? [h.beforeValue] : []);
+          const afterValue = Array.isArray(h.afterValue) ? h.afterValue : (h.afterValue ? [h.afterValue] : []);
+          return h.changeType === '업체명' && 
+                 (beforeValue.includes(itemName) || afterValue.includes(itemName));
+        }
+      })
+      .sort((a, b) => new Date(b.changedAt) - new Date(a.changedAt));
+
+    if (relevantHistory.length > 0) {
+      setPopoverContent({
+        groupId,
+        itemName,
+        itemType,
+        history: relevantHistory
+      });
+      setPopoverAnchor(event.currentTarget);
+    }
+  };
+
+  // Popover 닫기
+  const handleClosePopover = () => {
+    setPopoverAnchor(null);
+    setPopoverContent(null);
+  };
+
+  // 폰클 적용 완료 핸들러
+  const handleApplyPhone = async (groupId, changeId) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/policy-table/user-groups/${groupId}/change-history/${changeId}/apply-phone`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-role': loggedInStore?.userRole || '',
+          'x-user-id': loggedInStore?.contactId || loggedInStore?.id || '',
+          'x-user-name': encodeURIComponent(loggedInStore?.userName || loggedInStore?.name || '')
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // 변경이력 다시 로드
+        await loadChangeHistory(groupId);
+        // 성공 메시지 표시 (선택사항)
+        console.log('폰클 적용 완료:', data);
+      } else {
+        const errorData = await response.json();
+        console.error('폰클 적용 실패:', errorData.error);
+        setError(errorData.error || '폰클 적용에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('폰클 적용 오류:', error);
+      setError('폰클 적용 중 오류가 발생했습니다.');
     }
   };
 
@@ -1429,62 +1619,97 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                 <TableHead>
                   <TableRow>
                     <TableCell>그룹이름</TableCell>
-                    <TableCell>일반사용자</TableCell>
-                    <TableCell>등록일시</TableCell>
+                    <TableCell>업체명</TableCell>
                     <TableCell>작업</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {userGroups.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} align="center">
+                      <TableCell colSpan={3} align="center">
                         등록된 그룹이 없습니다.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    userGroups.map((group) => (
-                      <TableRow key={group.id}>
-                        <TableCell>{group.groupName}</TableCell>
-                        <TableCell>
-                          {group.companyNames && group.companyNames.length > 0 && (
-                            <Box sx={{ mb: 1 }}>
-                              <Typography variant="caption" color="text.secondary">업체명:</Typography>
-                              {group.companyNames.map((companyName) => (
-                                <Chip key={companyName} label={companyName} size="small" sx={{ mr: 0.5, mb: 0.5 }} />
-                              ))}
+                    userGroups.map((group) => {
+                      const groupNameStatus = getItemStatus(group.id, group.groupName, '그룹이름');
+                      
+                      return (
+                        <TableRow key={group.id}>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <Typography
+                                component="span"
+                                onClick={(e) => groupNameStatus && handleOpenPopover(e, group.id, group.groupName, '그룹이름')}
+                                sx={{
+                                  color: groupNameStatus?.status === 'phoneApplied' ? 'purple' :
+                                         groupNameStatus?.status === 'added' ? 'primary.main' :
+                                         groupNameStatus?.status === 'modified' ? 'success.main' :
+                                         groupNameStatus?.status === 'deleted' ? 'error.main' : 'inherit',
+                                  textDecoration: groupNameStatus?.status === 'deleted' ? 'line-through' : 'none',
+                                  cursor: groupNameStatus ? 'pointer' : 'default',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 0.5
+                                }}
+                              >
+                                {group.groupName}
+                                {groupNameStatus?.status === 'phoneApplied' && <PhoneAndroidIcon sx={{ fontSize: 16 }} />}
+                                {groupNameStatus?.status === 'added' && <AddCircleIcon sx={{ fontSize: 16 }} />}
+                                {groupNameStatus?.status === 'modified' && <EditOutlinedIcon sx={{ fontSize: 16 }} />}
+                                {groupNameStatus?.status === 'deleted' && <RemoveCircleIcon sx={{ fontSize: 16 }} />}
+                              </Typography>
                             </Box>
-                          )}
-                          {group.managerIds && group.managerIds.length > 0 && (
-                            <Box>
-                              <Typography variant="caption" color="text.secondary">담당자:</Typography>
-                              {group.managerIds.map((managerId) => (
-                                <Chip key={managerId} label={managerId} size="small" sx={{ mr: 0.5, mb: 0.5 }} />
-                              ))}
-                            </Box>
-                          )}
-                          {/* 하위 호환성: userIds가 있으면 표시 (기존 데이터) */}
-                          {(!group.companyNames || group.companyNames.length === 0) && 
-                           (!group.managerIds || group.managerIds.length === 0) &&
-                           group.userIds && group.userIds.length > 0 && (
-                            <Box>
-                              <Typography variant="caption" color="text.secondary">기존 데이터 (수정 필요):</Typography>
-                              {group.userIds.map((userId) => (
-                                <Chip key={userId} label={userId} size="small" sx={{ mr: 0.5, mb: 0.5 }} />
-                              ))}
-                            </Box>
-                          )}
-                        </TableCell>
-                        <TableCell>{new Date(group.registeredAt).toLocaleString('ko-KR')}</TableCell>
-                        <TableCell>
-                          <IconButton size="small" onClick={() => handleOpenGroupModal(group)}>
-                            <EditIcon />
-                          </IconButton>
-                          <IconButton size="small" onClick={() => handleDeleteGroup(group.id)}>
-                            <DeleteIcon />
-                          </IconButton>
-                        </TableCell>
-                      </TableRow>
-                    ))
+                          </TableCell>
+                          <TableCell>
+                            {group.companyNames && group.companyNames.length > 0 ? (
+                              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                                {group.companyNames.map((companyName) => {
+                                  const companyStatus = getItemStatus(group.id, companyName, '업체명');
+                                  return (
+                                    <Chip
+                                      key={companyName}
+                                      label={
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                          <span>{companyName}</span>
+                                          {companyStatus?.status === 'phoneApplied' && <PhoneAndroidIcon sx={{ fontSize: 14 }} />}
+                                          {companyStatus?.status === 'added' && <AddCircleIcon sx={{ fontSize: 14 }} />}
+                                          {companyStatus?.status === 'modified' && <EditOutlinedIcon sx={{ fontSize: 14 }} />}
+                                          {companyStatus?.status === 'deleted' && <RemoveCircleIcon sx={{ fontSize: 14 }} />}
+                                        </Box>
+                                      }
+                                      size="small"
+                                      onClick={(e) => companyStatus && handleOpenPopover(e, group.id, companyName, '업체명')}
+                                      sx={{
+                                        color: companyStatus?.status === 'phoneApplied' ? 'purple' :
+                                               companyStatus?.status === 'added' ? 'primary.main' :
+                                               companyStatus?.status === 'modified' ? 'success.main' :
+                                               companyStatus?.status === 'deleted' ? 'error.main' : 'inherit',
+                                        textDecoration: companyStatus?.status === 'deleted' ? 'line-through' : 'none',
+                                        cursor: companyStatus ? 'pointer' : 'default',
+                                        '&:hover': companyStatus ? { opacity: 0.8 } : {}
+                                      }}
+                                    />
+                                  );
+                                })}
+                              </Box>
+                            ) : (
+                              <Typography variant="body2" color="text.secondary">
+                                업체명 없음
+                              </Typography>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <IconButton size="small" onClick={() => handleOpenGroupModal(group)}>
+                              <EditIcon />
+                            </IconButton>
+                            <IconButton size="small" onClick={() => handleDeleteGroup(group.id)}>
+                              <DeleteIcon />
+                            </IconButton>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
                   )}
                 </TableBody>
               </Table>
@@ -1912,6 +2137,87 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* 변경이력 Popover */}
+      <Popover
+        open={Boolean(popoverAnchor)}
+        anchorEl={popoverAnchor}
+        onClose={handleClosePopover}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'left',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'left',
+        }}
+      >
+        {popoverContent && (
+          <Box sx={{ p: 2, minWidth: 300, maxWidth: 400 }}>
+            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
+              {popoverContent.itemType === '그룹이름' ? '그룹이름' : '업체명'}: {popoverContent.itemName}
+            </Typography>
+            <Box sx={{ maxHeight: 300, overflowY: 'auto' }}>
+              {popoverContent.history.map((item, index) => (
+                <Box key={index} sx={{ mb: 1.5, pb: 1.5, borderBottom: index < popoverContent.history.length - 1 ? '1px solid #e0e0e0' : 'none' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
+                    <Typography variant="caption" sx={{ 
+                      color: item.phoneApplied === 'Y' ? 'purple' :
+                             item.changeAction === '추가' ? 'primary.main' :
+                             item.changeAction === '수정' ? 'success.main' :
+                             'error.main',
+                      fontWeight: 'bold'
+                    }}>
+                      {item.phoneApplied === 'Y' ? '폰클 적용 완료' : item.changeAction}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {new Date(item.changedAt).toLocaleString('ko-KR')}
+                    </Typography>
+                  </Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                    변경자: {item.changedByName || item.changedBy}
+                  </Typography>
+                  {item.phoneApplied === 'Y' && (
+                    <Box sx={{ mt: 0.5 }}>
+                      <Typography variant="caption" color="purple" sx={{ display: 'block', fontWeight: 'bold' }}>
+                        폰클 적용일시: {new Date(item.phoneAppliedAt).toLocaleString('ko-KR')}
+                      </Typography>
+                      <Typography variant="caption" color="purple" sx={{ display: 'block' }}>
+                        적용한 사용자: {item.phoneAppliedBy}
+                      </Typography>
+                    </Box>
+                  )}
+                  {item.changeAction === '수정' && (
+                    <Box sx={{ mt: 0.5 }}>
+                      <Typography variant="caption" color="text.secondary">
+                        변경 전: {Array.isArray(item.beforeValue) ? item.beforeValue.join(', ') : item.beforeValue}
+                      </Typography>
+                      <br />
+                      <Typography variant="caption" color="text.secondary">
+                        변경 후: {Array.isArray(item.afterValue) ? item.afterValue.join(', ') : item.afterValue}
+                      </Typography>
+                    </Box>
+                  )}
+                  {item.phoneApplied !== 'Y' && (
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={<PhoneAndroidIcon />}
+                      onClick={() => {
+                        handleApplyPhone(popoverContent.groupId, item.changeId);
+                        handleClosePopover();
+                      }}
+                      sx={{ mt: 1, color: 'purple', borderColor: 'purple' }}
+                    >
+                      폰클에 적용완료
+                    </Button>
+                  )}
+                </Box>
+              ))}
+            </Box>
+          </Box>
+        )}
+      </Popover>
     </Box>
   );
 };
