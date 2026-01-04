@@ -3352,9 +3352,13 @@ function setupPolicyTableRoutes(app) {
     }
   });
 
-  // OPTIONS /api/policy-tables/:id/view - CORS preflight 처리
+  // OPTIONS 요청은 전역 핸들러(app.options('*'))에서 처리되므로
+  // 라우터 레벨 OPTIONS 핸들러는 제거 (전역 핸들러가 먼저 실행됨)
+  // 만약 라우터 핸들러가 필요하다면, 전역 핸들러가 실행되지 않을 때를 대비해 남겨둠
+  // 하지만 현재는 전역 핸들러가 모든 OPTIONS 요청을 처리하므로 주석 처리
+  /*
   router.options('/policy-tables/:id/view', (req, res) => {
-    console.log('🔍 [OPTIONS] /api/policy-tables/:id/view 요청 수신:', {
+    console.log('🔍 [라우터 OPTIONS] /api/policy-tables/:id/view 요청 수신:', {
       method: req.method,
       url: req.url,
       path: req.path,
@@ -3367,7 +3371,7 @@ function setupPolicyTableRoutes(app) {
     
     setCORSHeaders(req, res);
     
-    console.log('✅ [OPTIONS] CORS 헤더 설정 완료:', {
+    console.log('✅ [라우터 OPTIONS] CORS 헤더 설정 완료:', {
       'Access-Control-Allow-Origin': res.getHeader('Access-Control-Allow-Origin'),
       'Access-Control-Allow-Methods': res.getHeader('Access-Control-Allow-Methods'),
       'Access-Control-Allow-Headers': res.getHeader('Access-Control-Allow-Headers'),
@@ -3376,6 +3380,7 @@ function setupPolicyTableRoutes(app) {
     
     res.status(200).end();
   });
+  */
 
   // POST /api/policy-tables/:id/view - 정책표 확인이력 기록
   router.post('/policy-tables/:id/view', express.json(), async (req, res) => {

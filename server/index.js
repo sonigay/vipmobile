@@ -173,19 +173,22 @@ app.options('*', (req, res) => {
 
   const origin = req.headers.origin;
   
-  // 디버깅 로그 (정책표 관련 요청만)
-  if (req.url && req.url.includes('/api/policy-tables')) {
-    console.log('🔍 [전역 OPTIONS] 요청 수신:', {
-      method: req.method,
-      url: req.url,
-      path: req.path,
-      origin: origin,
-      'access-control-request-method': req.headers['access-control-request-method'],
-      'access-control-request-headers': req.headers['access-control-request-headers'],
-      allowedOrigins: allowedOrigins,
-      originInAllowed: origin && allowedOrigins.includes(origin)
-    });
-  }
+  // 디버깅 로그 (모든 OPTIONS 요청 로깅)
+  console.log('🔍 [전역 OPTIONS] 요청 수신:', {
+    method: req.method,
+    url: req.url,
+    path: req.path,
+    origin: origin,
+    'access-control-request-method': req.headers['access-control-request-method'],
+    'access-control-request-headers': req.headers['access-control-request-headers'],
+    allHeaders: Object.keys(req.headers).filter(k => k.toLowerCase().startsWith('access-control-') || k.toLowerCase() === 'origin').reduce((acc, k) => {
+      acc[k] = req.headers[k];
+      return acc;
+    }, {}),
+    allowedOrigins: allowedOrigins,
+    originInAllowed: origin && allowedOrigins.includes(origin),
+    isPolicyTableRequest: req.url && req.url.includes('/api/policy-tables')
+  });
   
   if (origin && allowedOrigins.includes(origin)) {
     res.header('Access-Control-Allow-Origin', origin);

@@ -369,9 +369,12 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
               'Content-Type': 'application/json',
               'x-user-role': loggedInStore?.userRole || '',
               'x-user-id': loggedInStore?.contactId || loggedInStore?.id || '',
-              'x-user-name': encodeURIComponent(loggedInStore?.userName || loggedInStore?.name || ''),
-              'x-mode': mode || '' // 모드 정보 전달 (일반정책모드/정책모드 구분용)
+              'x-user-name': encodeURIComponent(loggedInStore?.userName || loggedInStore?.name || '')
             };
+            // x-mode 헤더는 값이 있을 때만 추가 (빈 문자열은 CORS 문제를 일으킬 수 있음)
+            if (mode) {
+              requestHeaders['x-mode'] = mode;
+            }
             const requestBody = {
               companyId: loggedInStore.contactId || loggedInStore.id,
               companyName: loggedInStore.name || loggedInStore.userName
