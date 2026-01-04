@@ -429,7 +429,8 @@ const HEADERS_POLICY_TABLE_LIST = [
   '이미지URL',          // 10
   '등록여부',           // 11
   '등록일시',           // 12
-  '생성자ID'            // 13: 생성자ID (N열)
+  '생성자ID',           // 13: 생성자ID (N열)
+  '확인이력'            // 14: 확인이력 (JSON 배열 형식) (O열)
 ];
 
 const HEADERS_USER_GROUPS = [
@@ -2265,7 +2266,7 @@ function setupPolicyTableRoutes(app) {
         const policyListResponse = await withRetry(async () => {
           return await sheets.spreadsheets.values.get({
             spreadsheetId: SPREADSHEET_ID,
-            range: `${SHEET_POLICY_TABLE_LIST}!A:N`
+            range: `${SHEET_POLICY_TABLE_LIST}!A:O`
           });
         });
 
@@ -2320,7 +2321,7 @@ function setupPolicyTableRoutes(app) {
         const policyListResponse = await withRetry(async () => {
           return await sheets.spreadsheets.values.get({
             spreadsheetId: SPREADSHEET_ID,
-            range: `${SHEET_POLICY_TABLE_LIST}!A:N`
+            range: `${SHEET_POLICY_TABLE_LIST}!A:O`
           });
         });
 
@@ -2451,7 +2452,7 @@ function setupPolicyTableRoutes(app) {
       const response = await withRetry(async () => {
         return await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_POLICY_TABLE_LIST}!A:N`
+          range: `${SHEET_POLICY_TABLE_LIST}!A:O`
         });
       });
 
@@ -2503,6 +2504,19 @@ function setupPolicyTableRoutes(app) {
                 .filter(name => name) // undefined 제거
             : [];
           
+          // 확인이력 파싱
+          let viewHistory = [];
+          try {
+            const viewHistoryStr = row[14] || '[]';
+            viewHistory = JSON.parse(viewHistoryStr);
+            if (!Array.isArray(viewHistory)) {
+              viewHistory = [];
+            }
+          } catch (e) {
+            console.warn('[정책표] 확인이력 파싱 오류:', e);
+            viewHistory = [];
+          }
+          
           return {
             id: row[0] || '',
             policyTableId: row[1] || '',
@@ -2517,7 +2531,8 @@ function setupPolicyTableRoutes(app) {
             messageId: row[8] || '',
             threadId: row[9] || '',
             imageUrl: row[10] || '',
-            registeredAt: row[12] || ''
+            registeredAt: row[12] || '',
+            viewHistory: viewHistory // 확인이력 추가
           };
         });
 
@@ -2801,7 +2816,7 @@ function setupPolicyTableRoutes(app) {
       const response = await withRetry(async () => {
         return await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_POLICY_TABLE_LIST}!A:N`
+          range: `${SHEET_POLICY_TABLE_LIST}!A:O`
         });
       });
 
@@ -2857,7 +2872,7 @@ function setupPolicyTableRoutes(app) {
       const response = await withRetry(async () => {
         return await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_POLICY_TABLE_LIST}!A:N`
+          range: `${SHEET_POLICY_TABLE_LIST}!A:O`
         });
       });
 
@@ -3045,7 +3060,7 @@ function setupPolicyTableRoutes(app) {
       const response = await withRetry(async () => {
         return await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_POLICY_TABLE_LIST}!A:N`
+          range: `${SHEET_POLICY_TABLE_LIST}!A:O`
         });
       });
 
@@ -3276,7 +3291,7 @@ function setupPolicyTableRoutes(app) {
       const response = await withRetry(async () => {
         return await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_POLICY_TABLE_LIST}!A:N`
+          range: `${SHEET_POLICY_TABLE_LIST}!A:O`
         });
       });
 
@@ -3312,6 +3327,114 @@ function setupPolicyTableRoutes(app) {
     } catch (error) {
       console.error('[정책표] 삭제 오류:', error);
       return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // POST /api/policy-tables/:id/view - 정책표 확인이력 기록
+  router.post('/policy-tables/:id/view', express.json(), async (req, res) => {
+    setCORSHeaders(req, res);
+    try {
+      const { id } = req.params;
+      const { companyId, companyName } = req.body;
+      const userId = req.headers['x-user-id'] || req.query.userId;
+      const userName = req.headers['x-user-name'] ? decodeURIComponent(req.headers['x-user-name']) : (req.query.userName || '');
+
+      if (!companyId || !companyName) {
+        return res.status(400).json({
+          success: false,
+          error: '업체 ID와 업체명은 필수입니다.'
+        });
+      }
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_TABLE_LIST, HEADERS_POLICY_TABLE_LIST);
+
+      // 기존 데이터 읽기
+      const response = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_POLICY_TABLE_LIST}!A:O`
+        });
+      });
+
+      const rows = response.data.values || [];
+      if (rows.length < 2) {
+        return res.status(404).json({
+          success: false,
+          error: '정책표를 찾을 수 없습니다.'
+        });
+      }
+
+      const dataRows = rows.slice(1);
+      const rowIndex = dataRows.findIndex(row => row[0] === id);
+
+      if (rowIndex === -1) {
+        return res.status(404).json({
+          success: false,
+          error: '정책표를 찾을 수 없습니다.'
+        });
+      }
+
+      const existingRow = dataRows[rowIndex];
+      const updatedRow = [...existingRow];
+
+      // 배열 길이를 최소 15로 보장 (O열까지)
+      while (updatedRow.length < 15) {
+        updatedRow.push('');
+      }
+
+      // 기존 확인 이력 파싱
+      let viewHistory = [];
+      try {
+        const viewHistoryStr = updatedRow[14] || '[]';
+        viewHistory = JSON.parse(viewHistoryStr);
+        if (!Array.isArray(viewHistory)) {
+          viewHistory = [];
+        }
+      } catch (error) {
+        console.warn('[정책표] 확인이력 파싱 오류, 빈 배열로 초기화:', error);
+        viewHistory = [];
+      }
+
+      // 같은 업체의 기존 확인 이력 찾기
+      const existingView = viewHistory.find(v => v.companyId === companyId);
+      const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+
+      if (existingView) {
+        // 기존 확인 이력이 있으면 조회일시만 업데이트
+        existingView.viewDate = now;
+      } else {
+        // 새로운 확인 이력 추가
+        viewHistory.push({
+          companyId: companyId,
+          companyName: companyName,
+          viewDate: now,
+          firstViewDate: now
+        });
+      }
+
+      // 확인 이력 업데이트
+      updatedRow[14] = JSON.stringify(viewHistory);
+
+      await withRetry(async () => {
+        return await sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_POLICY_TABLE_LIST}!A${rowIndex + 2}:O${rowIndex + 2}`,
+          valueInputOption: 'RAW',
+          resource: { values: [updatedRow] }
+        });
+      });
+
+      console.log(`✅ [정책표] 확인이력 기록 완료: 업체 ${companyName}`);
+      return res.json({ success: true, message: '확인 이력이 기록되었습니다.' });
+
+    } catch (error) {
+      console.error('❌ [정책표] 확인이력 기록 실패:', error);
+      return res.status(500).json({
+        success: false,
+        error: '확인 이력 기록에 실패했습니다.',
+        message: error.message
+      });
     }
   });
 

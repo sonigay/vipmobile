@@ -22,7 +22,8 @@ import {
   Alert,
   CircularProgress,
   Chip,
-  InputAdornment
+  InputAdornment,
+  Divider
 } from '@mui/material';
 import {
   Refresh as RefreshIcon,
@@ -134,6 +135,7 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [savingOrder, setSavingOrder] = useState(false);
+  const [watermarkedImageUrl, setWatermarkedImageUrl] = useState(null); // 워터마크가 포함된 이미지 URL
 
   // 검색/필터링
   const [searchCreator, setSearchCreator] = useState('');
@@ -336,7 +338,8 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
       const response = await fetch(`${API_BASE_URL}/api/policy-tables/${policy.id}?${params}`, {
         headers: {
           'x-user-role': loggedInStore?.userRole || '',
-          'x-user-id': loggedInStore?.contactId || loggedInStore?.id || ''
+          'x-user-id': loggedInStore?.contactId || loggedInStore?.id || '',
+          'x-user-name': encodeURIComponent(loggedInStore?.userName || loggedInStore?.name || '')
         }
       });
       if (response.ok) {
@@ -344,6 +347,28 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
         setSelectedPolicy(data);
         setImageError(false);
         setDetailModalOpen(true);
+
+        // 정책모드일 때만 확인이력 기록 (일반정책모드에서는 기록하지 않음)
+        if (mode !== 'generalPolicy' && loggedInStore?.contactId && loggedInStore?.name) {
+          try {
+            await fetch(`${API_BASE_URL}/api/policy-tables/${policy.id}/view`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-user-role': loggedInStore?.userRole || '',
+                'x-user-id': loggedInStore?.contactId || loggedInStore?.id || '',
+                'x-user-name': encodeURIComponent(loggedInStore?.userName || loggedInStore?.name || '')
+              },
+              body: JSON.stringify({
+                companyId: loggedInStore.contactId || loggedInStore.id,
+                companyName: loggedInStore.name || loggedInStore.userName
+              })
+            });
+          } catch (viewError) {
+            console.error('확인이력 기록 실패:', viewError);
+            // 확인이력 기록 실패는 무시 (사용자에게 오류 표시하지 않음)
+          }
+        }
       }
     } catch (error) {
       console.error('정책표 상세 조회 오류:', error);
@@ -382,13 +407,131 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
     }
   };
 
+  // 워터마크가 포함된 이미지 생성 함수 (일반정책모드용)
+  const createWatermarkedImage = async (imageUrl) => {
+    if (mode !== 'generalPolicy' || !loggedInStore?.name && !loggedInStore?.userName) {
+      return imageUrl; // 일반정책모드가 아니거나 사용자 정보가 없으면 원본 반환
+    }
+
+    try {
+      const watermarkText = loggedInStore?.name || loggedInStore?.userName || '';
+      if (!watermarkText) return imageUrl;
+
+      const response = await fetch(imageUrl, {
+        mode: 'cors',
+        credentials: 'omit'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        
+        img.onload = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            
+            // 원본 이미지 그리기
+            ctx.drawImage(img, 0, 0);
+            
+            // 워터마크 설정
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.03)'; // 매우 투명한 검은색
+            ctx.font = 'bold 40px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            // 워터마크를 여러 개 그리기 (랜덤 위치, 회전)
+            const watermarkCount = 12;
+            for (let i = 0; i < watermarkCount; i++) {
+              const x = Math.random() * canvas.width;
+              const y = Math.random() * canvas.height;
+              const rotation = (Math.random() - 0.5) * 60; // -30도 ~ +30도
+              const fontSize = 20 + Math.random() * 30; // 20px ~ 50px
+              
+              ctx.save();
+              ctx.translate(x, y);
+              ctx.rotate((rotation * Math.PI) / 180);
+              ctx.font = `bold ${fontSize}px Arial`;
+              ctx.fillText(watermarkText, 0, 0);
+              ctx.restore();
+            }
+            
+            // Canvas를 Blob URL로 변환
+            canvas.toBlob((blob) => {
+              URL.revokeObjectURL(blobUrl);
+              if (blob) {
+                const watermarkedUrl = URL.createObjectURL(blob);
+                resolve(watermarkedUrl);
+              } else {
+                reject(new Error('Canvas to blob conversion failed'));
+              }
+            }, 'image/png', 1.0);
+          } catch (err) {
+            URL.revokeObjectURL(blobUrl);
+            reject(err);
+          }
+        };
+        
+        img.onerror = () => {
+          URL.revokeObjectURL(blobUrl);
+          reject(new Error('Image load failed'));
+        };
+        
+        img.src = blobUrl;
+      });
+    } catch (error) {
+      console.error('워터마크 이미지 생성 오류:', error);
+      return imageUrl; // 오류 시 원본 반환
+    }
+  };
+
+  // 정책 선택 시 워터마크 이미지 생성
+  useEffect(() => {
+    let currentWatermarkedUrl = null;
+
+    if (selectedPolicy && selectedPolicy.imageUrl && mode === 'generalPolicy') {
+      createWatermarkedImage(selectedPolicy.imageUrl)
+        .then(url => {
+          currentWatermarkedUrl = url;
+          setWatermarkedImageUrl(url);
+        })
+        .catch(error => {
+          console.error('워터마크 이미지 생성 실패:', error);
+          setWatermarkedImageUrl(selectedPolicy.imageUrl);
+        });
+    } else {
+      setWatermarkedImageUrl(null);
+    }
+
+    // 정리 함수: 컴포넌트 언마운트 시 URL 해제
+    return () => {
+      if (currentWatermarkedUrl && currentWatermarkedUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(currentWatermarkedUrl);
+      }
+    };
+  }, [selectedPolicy, mode, loggedInStore?.name, loggedInStore?.userName]);
+
   const handleCopyImage = async () => {
     if (!selectedPolicy || !selectedPolicy.imageUrl) return;
 
     try {
+      // 일반정책모드이고 워터마크 이미지가 있으면 워터마크 이미지 사용, 아니면 원본 사용
+      const imageUrlToCopy = (mode === 'generalPolicy' && watermarkedImageUrl) 
+        ? watermarkedImageUrl 
+        : selectedPolicy.imageUrl;
+
       // CORS 문제 해결을 위해 mode: 'cors' 추가
       // 그리고 이미지를 canvas로 변환하여 처리 (모바일 호환성 향상)
-      const response = await fetch(selectedPolicy.imageUrl, {
+      const response = await fetch(imageUrlToCopy, {
         mode: 'cors',
         credentials: 'omit'
       });
@@ -743,7 +886,7 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
                 ) : (
                   <Box sx={{ textAlign: 'center' }}>
                     <img
-                      src={selectedPolicy.imageUrl}
+                      src={(mode === 'generalPolicy' && watermarkedImageUrl) ? watermarkedImageUrl : selectedPolicy.imageUrl}
                       alt="정책표"
                       style={{ maxWidth: '100%', height: 'auto', border: '1px solid #ddd', borderRadius: 4 }}
                       onError={() => {
@@ -753,6 +896,87 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
                   </Box>
                 )}
               </Paper>
+
+              {/* 확인 이력 (정책모드만) */}
+              {mode !== 'generalPolicy' && selectedPolicy && (
+                <>
+                  <Divider sx={{ my: 2 }} />
+                  <Paper sx={{ p: 2 }}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      확인 이력 ({(() => {
+                        if (!selectedPolicy.viewHistory || !Array.isArray(selectedPolicy.viewHistory)) {
+                          return 0;
+                        }
+                        // 중복 제거 (같은 업체의 첫 조회일시만 표시)
+                        const uniqueViews = new Map();
+                        selectedPolicy.viewHistory.forEach(view => {
+                          if (view.companyId && !uniqueViews.has(view.companyId)) {
+                            uniqueViews.set(view.companyId, view);
+                          }
+                        });
+                        return uniqueViews.size;
+                      })()}개 업체)
+                    </Typography>
+                    {(() => {
+                      if (!selectedPolicy.viewHistory || !Array.isArray(selectedPolicy.viewHistory) || selectedPolicy.viewHistory.length === 0) {
+                        return (
+                          <Typography variant="body2" color="text.secondary">
+                            아직 확인한 업체가 없습니다.
+                          </Typography>
+                        );
+                      }
+
+                      // 중복 제거 (같은 업체의 첫 조회일시만 표시)
+                      const uniqueViews = new Map();
+                      selectedPolicy.viewHistory.forEach(view => {
+                        if (view.companyId && !uniqueViews.has(view.companyId)) {
+                          uniqueViews.set(view.companyId, view);
+                        } else if (view.companyId && uniqueViews.has(view.companyId)) {
+                          // 이미 있는 경우, firstViewDate가 더 이전이면 업데이트
+                          const existing = uniqueViews.get(view.companyId);
+                          if (view.firstViewDate && existing.firstViewDate) {
+                            if (new Date(view.firstViewDate) < new Date(existing.firstViewDate)) {
+                              uniqueViews.set(view.companyId, view);
+                            }
+                          }
+                        }
+                      });
+
+                      const uniqueViewHistory = Array.from(uniqueViews.values())
+                        .sort((a, b) => {
+                          const dateA = a.firstViewDate || a.viewDate || '';
+                          const dateB = b.firstViewDate || b.viewDate || '';
+                          return new Date(dateB) - new Date(dateA);
+                        });
+
+                      return (
+                        <TableContainer component={Paper} sx={{ maxHeight: 300, mt: 1 }}>
+                          <Table stickyHeader size="small">
+                            <TableHead>
+                              <TableRow>
+                                <TableCell>번호</TableCell>
+                                <TableCell>조회일시</TableCell>
+                                <TableCell>업체명</TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {uniqueViewHistory.map((view, index) => (
+                                <TableRow key={view.companyId || index}>
+                                  <TableCell>{index + 1}</TableCell>
+                                  <TableCell>
+                                    {view.firstViewDate || view.viewDate || '-'}
+                                  </TableCell>
+                                  <TableCell>{view.companyName || '-'}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
+                      );
+                    })()}
+                  </Paper>
+                </>
+              )}
             </Box>
           )}
         </DialogContent>
