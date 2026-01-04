@@ -371,17 +371,89 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
     if (!selectedPolicy || !selectedPolicy.imageUrl) return;
 
     try {
-      const response = await fetch(selectedPolicy.imageUrl);
-      const blob = await response.blob();
+      // CORS 문제 해결을 위해 mode: 'cors' 추가
+      // 그리고 이미지를 canvas로 변환하여 처리 (모바일 호환성 향상)
+      const response = await fetch(selectedPolicy.imageUrl, {
+        mode: 'cors',
+        credentials: 'omit'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
-      await navigator.clipboard.write([
-        new ClipboardItem({ [blob.type]: blob })
-      ]);
+      const blob = await response.blob();
+      
+      // blob.type이 없거나 잘못된 경우 명시적으로 설정
+      let imageType = blob.type;
+      if (!imageType || !imageType.startsWith('image/')) {
+        // Content-Type 헤더 확인
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.startsWith('image/')) {
+          imageType = contentType;
+        } else {
+          // 기본값으로 image/png 사용
+          imageType = 'image/png';
+        }
+      }
+
+      // 모바일 브라우저 호환성을 위해 이미지를 canvas로 변환
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      
+      const imageLoadPromise = new Promise((resolve, reject) => {
+        img.onload = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            
+            canvas.toBlob((convertedBlob) => {
+              if (convertedBlob) {
+                resolve(convertedBlob);
+              } else {
+                reject(new Error('Canvas to blob conversion failed'));
+              }
+            }, imageType, 1.0);
+          } catch (err) {
+            reject(err);
+          }
+        };
+        img.onerror = () => reject(new Error('Image load failed'));
+      });
+
+      // Blob URL 생성하여 이미지 로드
+      const blobUrl = URL.createObjectURL(blob);
+      img.src = blobUrl;
+
+      const convertedBlob = await imageLoadPromise;
+      URL.revokeObjectURL(blobUrl);
+
+      // ClipboardItem 생성 시 명시적으로 타입 지정
+      const clipboardItem = new ClipboardItem({ 
+        [imageType]: convertedBlob 
+      });
+
+      await navigator.clipboard.write([clipboardItem]);
 
       alert('이미지가 클립보드에 복사되었습니다.');
     } catch (error) {
       console.error('이미지 복사 오류:', error);
-      alert('이미지 복사에 실패했습니다. 브라우저 권한을 확인해주세요.');
+      console.error('오류 상세:', {
+        message: error.message,
+        stack: error.stack,
+        imageUrl: selectedPolicy.imageUrl
+      });
+      
+      // 모바일에서 실패할 경우 대안 제시
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      if (isMobile) {
+        alert('모바일에서 이미지 복사에 실패했습니다.\n이미지를 길게 눌러 저장하거나, 이미지 URL을 복사해주세요.');
+      } else {
+        alert('이미지 복사에 실패했습니다. 브라우저 권한을 확인해주세요.');
+      }
     }
   };
 
