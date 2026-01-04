@@ -3533,7 +3533,9 @@ function setupPolicyTableRoutes(app) {
       // 같은 업체의 기존 확인 이력 찾기
       const existingView = viewHistory.find(v => v.companyId === companyId);
       // 한국 시간(KST, UTC+9)으로 변환
-      const now = new Date(new Date().getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
+      const now = new Date().toLocaleString('sv-SE', {
+        timeZone: 'Asia/Seoul'
+      }).replace('T', ' ');
 
       if (existingView) {
         // 기존 확인 이력이 있으면 조회일시만 업데이트
