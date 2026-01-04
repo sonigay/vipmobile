@@ -2323,25 +2323,80 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
               {popoverContent.itemType === '그룹이름' ? '그룹이름' : '업체명'}: {popoverContent.itemName}
             </Typography>
             <Box sx={{ maxHeight: 300, overflowY: 'auto' }}>
-              {popoverContent.history.map((item, index) => (
-                <Box key={index} sx={{ mb: 1.5, pb: 1.5, borderBottom: index < popoverContent.history.length - 1 ? '1px solid #e0e0e0' : 'none' }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
-                    <Typography variant="caption" sx={{ 
-                      color: item.phoneApplied === 'Y' ? 'purple' :
-                             item.changeAction === '추가' ? 'primary.main' :
-                             item.changeAction === '수정' ? 'success.main' :
-                             'error.main',
-                      fontWeight: 'bold'
-                    }}>
-                      {item.phoneApplied === 'Y' ? '폰클 적용 완료' : item.changeAction}
+              {popoverContent.history.map((item, index) => {
+                // 해당 itemName과 관련된 정보만 필터링
+                let filteredBeforeValue = item.beforeValue;
+                let filteredAfterValue = item.afterValue;
+                
+                if (popoverContent.itemType === '업체명') {
+                  const beforeValue = Array.isArray(item.beforeValue) ? item.beforeValue : (item.beforeValue ? [item.beforeValue] : []);
+                  const afterValue = Array.isArray(item.afterValue) ? item.afterValue : (item.afterValue ? [item.afterValue] : []);
+                  
+                  // 해당 itemName만 필터링
+                  filteredBeforeValue = beforeValue.filter(name => name === popoverContent.itemName);
+                  filteredAfterValue = afterValue.filter(name => name === popoverContent.itemName);
+                  
+                  // 단일 값으로 변환 (배열이 1개 요소만 있으면 단일 값으로)
+                  if (filteredBeforeValue.length === 1) {
+                    filteredBeforeValue = filteredBeforeValue[0];
+                  } else if (filteredBeforeValue.length === 0) {
+                    filteredBeforeValue = null;
+                  }
+                  
+                  if (filteredAfterValue.length === 1) {
+                    filteredAfterValue = filteredAfterValue[0];
+                  } else if (filteredAfterValue.length === 0) {
+                    filteredAfterValue = null;
+                  }
+                }
+                
+                return (
+                  <Box key={index} sx={{ mb: 1.5, pb: 1.5, borderBottom: index < popoverContent.history.length - 1 ? '1px solid #e0e0e0' : 'none' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
+                      <Typography variant="caption" sx={{ 
+                        color: item.phoneApplied === 'Y' ? 'purple' :
+                               item.changeAction === '추가' ? 'primary.main' :
+                               item.changeAction === '수정' ? 'success.main' :
+                               'error.main',
+                        fontWeight: 'bold'
+                      }}>
+                        {item.phoneApplied === 'Y' ? '폰클 적용 완료' : item.changeAction}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {new Date(item.changedAt).toLocaleString('ko-KR')}
+                      </Typography>
+                    </Box>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                      변경자: {item.changedByName || item.changedBy}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {new Date(item.changedAt).toLocaleString('ko-KR')}
-                    </Typography>
-                  </Box>
-                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                    변경자: {item.changedByName || item.changedBy}
-                  </Typography>
+                    {popoverContent.itemType === '업체명' && (
+                      <>
+                        {item.changeAction === '삭제' && filteredBeforeValue && (
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                            변경전: {Array.isArray(filteredBeforeValue) ? filteredBeforeValue.join(', ') : filteredBeforeValue}
+                          </Typography>
+                        )}
+                        {item.changeAction === '추가' && filteredAfterValue && (
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                            변경후: {Array.isArray(filteredAfterValue) ? filteredAfterValue.join(', ') : filteredAfterValue}
+                          </Typography>
+                        )}
+                        {item.changeAction === '수정' && (
+                          <>
+                            {filteredBeforeValue && (
+                              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                변경전: {Array.isArray(filteredBeforeValue) ? filteredBeforeValue.join(', ') : filteredBeforeValue}
+                              </Typography>
+                            )}
+                            {filteredAfterValue && (
+                              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                변경후: {Array.isArray(filteredAfterValue) ? filteredAfterValue.join(', ') : filteredAfterValue}
+                              </Typography>
+                            )}
+                          </>
+                        )}
+                      </>
+                    )}
                   {(() => {
                     // 업체명인 경우, 해당 업체명이 폰클 적용되었는지 확인
                     const isCompanyName = popoverContent.itemType === '업체명';
@@ -2365,14 +2420,14 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                       </Box>
                     );
                   })()}
-                  {item.changeAction === '수정' && (
+                  {item.changeAction === '수정' && popoverContent.itemType === '그룹이름' && (
                     <Box sx={{ mt: 0.5 }}>
                       <Typography variant="caption" color="text.secondary">
-                        변경 전: {Array.isArray(item.beforeValue) ? item.beforeValue.join(', ') : item.beforeValue}
+                        변경 전: {item.beforeValue}
                       </Typography>
                       <br />
                       <Typography variant="caption" color="text.secondary">
-                        변경 후: {Array.isArray(item.afterValue) ? item.afterValue.join(', ') : item.afterValue}
+                        변경 후: {item.afterValue}
                       </Typography>
                     </Box>
                   )}
