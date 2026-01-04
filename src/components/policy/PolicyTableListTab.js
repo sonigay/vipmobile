@@ -30,7 +30,8 @@ import {
   ContentCopy as ContentCopyIcon,
   Delete as DeleteIcon,
   Search as SearchIcon,
-  DragIndicator as DragIndicatorIcon
+  DragIndicator as DragIndicatorIcon,
+  Download as DownloadIcon
 } from '@mui/icons-material';
 import {
   DndContext,
@@ -756,16 +757,33 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
         throw new Error('이미지 변환 실패: 빈 blob');
       }
 
+      // 모바일 브라우저는 ClipboardItem에 이미지를 넣을 때 자동으로 압축하는 경우가 많음
+      // 모바일에서는 클립보드 복사 없이 바로 원본 이미지 다운로드
+      if (isMobile) {
+        // 모바일: 원본 이미지 다운로드
+        const blobUrl = URL.createObjectURL(finalBlob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = `policy-${selectedPolicy.id || 'image'}.${imageType.includes('jpeg') || imageType.includes('jpg') ? 'jpg' : 'png'}`;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Blob URL 정리 (약간의 지연 후)
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+        
+        alert('이미지가 다운로드되었습니다. 다운로드한 이미지를 카카오톡 등에서 사용하세요.');
+        return;
+      }
+
+      // PC: 클립보드 복사 (기존 로직)
       // 모바일에서 품질 유지를 위해 이미지 타입을 명확히 지정
       // PNG는 무손실 압축이므로 품질 손실이 없음
       let clipboardImageType = imageType;
-      if (isMobile) {
-        // 모바일에서는 가능하면 PNG 사용 (무손실)
-        // JPEG인 경우에만 JPEG 유지
-        if (!imageType.includes('jpeg') && !imageType.includes('jpg')) {
-          clipboardImageType = 'image/png';
-        }
-        console.log(`📱 [모바일] ClipboardItem 타입: ${clipboardImageType}, 크기: ${(finalBlob.size / 1024).toFixed(2)}KB`);
+      // PC에서는 가능하면 PNG 사용 (무손실)
+      if (!imageType.includes('jpeg') && !imageType.includes('jpg')) {
+        clipboardImageType = 'image/png';
       }
 
       // ClipboardItem 생성 시 명시적으로 타입 지정
@@ -1052,10 +1070,10 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
                   </Button>
                   <Button
                     variant="outlined"
-                    startIcon={<ContentCopyIcon />}
+                    startIcon={/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ? <DownloadIcon /> : <ContentCopyIcon />}
                     onClick={handleCopyImage}
                   >
-                    이미지복사하기
+                    {/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ? '이미지 다운로드' : '이미지복사하기'}
                   </Button>
                 </Box>
                 {imageError ? (
