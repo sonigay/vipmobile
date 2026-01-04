@@ -3338,12 +3338,50 @@ function setupPolicyTableRoutes(app) {
       const { companyId, companyName } = req.body;
       const userId = req.headers['x-user-id'] || req.query.userId;
       const userName = req.headers['x-user-name'] ? decodeURIComponent(req.headers['x-user-name']) : (req.query.userName || '');
+      const userRole = req.headers['x-user-role'] || req.query.userRole;
+      const mode = req.headers['x-mode'] || req.query.mode; // 일반정책모드/정책모드 구분
 
       if (!companyId || !companyName) {
         return res.status(400).json({
           success: false,
           error: '업체 ID와 업체명은 필수입니다.'
         });
+      }
+
+      // 정책모드인 경우 대리점아이디관리에서 이름과 직함 정보 가져오기
+      let displayName = companyName;
+      let qualification = '';
+      
+      // 정책모드 사용자인 경우 (일반정책모드가 아닌 경우) 대리점아이디관리에서 정보 조회
+      // 일반정책모드는 업체명만 사용, 정책모드는 이름+직함 사용
+      if (mode !== 'generalPolicy' && userRole) { // 일반정책모드가 아닌 경우
+        try {
+          const { sheets, SPREADSHEET_ID } = createSheetsClient();
+          const agentSheetName = '대리점아이디관리';
+          const agentResponse = await withRetry(async () => {
+            return await sheets.spreadsheets.values.get({
+              spreadsheetId: SPREADSHEET_ID,
+              range: `${agentSheetName}!A:Z`
+            });
+          });
+
+          const agentRows = agentResponse.data.values || [];
+          if (agentRows.length >= 2) {
+            const agentRow = agentRows.find(row => row[2] === companyId); // C열(2번 인덱스): 연락처(아이디)
+            if (agentRow) {
+              const name = agentRow[0] || ''; // A열: 대상(이름)
+              qualification = agentRow[1] || ''; // B열: 자격(직함)
+              if (name && qualification) {
+                displayName = `${name} (${qualification})`;
+              } else if (name) {
+                displayName = name;
+              }
+            }
+          }
+        } catch (agentError) {
+          console.warn('[정책표] 대리점아이디관리 조회 실패, 기본값 사용:', agentError);
+          // 조회 실패 시 기본값 사용
+        }
       }
 
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
@@ -3407,7 +3445,7 @@ function setupPolicyTableRoutes(app) {
         // 새로운 확인 이력 추가
         viewHistory.push({
           companyId: companyId,
-          companyName: companyName,
+          companyName: displayName, // 이름과 직함이 포함된 표시명
           viewDate: now,
           firstViewDate: now
         });

@@ -360,8 +360,9 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
         setImageError(false);
         setDetailModalOpen(true);
 
-        // 정책모드일 때만 확인이력 기록 (일반정책모드에서는 기록하지 않음)
-        if (mode !== 'generalPolicy' && loggedInStore?.contactId && loggedInStore?.name) {
+        // 확인이력 기록 (일반정책모드와 정책모드 모두 기록)
+        // 확인이력 표시는 정책모드에서만 (아래 UI 코드에서 처리)
+        if (loggedInStore?.contactId && loggedInStore?.name) {
           try {
             await fetch(`${API_BASE_URL}/api/policy-tables/${policy.id}/view`, {
               method: 'POST',
@@ -369,7 +370,8 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
                 'Content-Type': 'application/json',
                 'x-user-role': loggedInStore?.userRole || '',
                 'x-user-id': loggedInStore?.contactId || loggedInStore?.id || '',
-                'x-user-name': encodeURIComponent(loggedInStore?.userName || loggedInStore?.name || '')
+                'x-user-name': encodeURIComponent(loggedInStore?.userName || loggedInStore?.name || ''),
+                'x-mode': mode || '' // 모드 정보 전달 (일반정책모드/정책모드 구분용)
               },
               body: JSON.stringify({
                 companyId: loggedInStore.contactId || loggedInStore.id,
