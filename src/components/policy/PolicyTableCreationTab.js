@@ -215,19 +215,19 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
         setActiveTab(1);
       }
       
-      // 병렬 로딩으로 성능 개선
+      // 성능 최적화: 필수 데이터만 먼저 로드
       const loadInitialData = async () => {
-        const promises = [
-          loadUserGroups(),
-          loadCompanies(),
-          loadTeamLeaders()
-        ];
+        const promises = [];
         
         // 정책표 생성 기능은 SS 또는 팀장만 사용 가능
         if (canAccessPolicyTableCreation) {
+          // 정책표 설정만 먼저 로드 (화면 표시에 필수)
           promises.push(loadSettings());
-          promises.push(loadDefaultGroups());
         }
+        
+        // 정책영업그룹은 정책영업그룹 탭에서만 필요하므로 지연 로드
+        // companies, teamLeaders는 정책영업그룹 추가/수정 시에만 필요하므로 지연 로드
+        // defaultGroups는 정책표 생성 모달 열 때 로드됨
         
         await Promise.all(promises);
       };
@@ -241,19 +241,32 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
     };
   }, [canAccess, userRole, canAccessPolicyTableCreation]);
 
-  // 정책영업그룹 탭이 활성화될 때 변경이력 다시 로드
+  // 정책영업그룹 탭이 활성화될 때 정책영업그룹 목록 로드 (지연 로드)
   useEffect(() => {
-    if (activeTab === 1 && userGroups.length > 0) {
-      console.log('🔍 [정책영업그룹] 탭 활성화, 변경이력 다시 로드:', userGroups.length, '개 그룹');
-      const changeHistoryPromises = userGroups.map(group => loadChangeHistory(group.id));
-      Promise.all(changeHistoryPromises).then(() => {
-        console.log('✅ [정책영업그룹] 변경이력 로드 완료');
-      }).catch(error => {
-        console.error('❌ [정책영업그룹] 변경이력 로드 실패:', error);
-      });
+    if (activeTab === 1 && userGroups.length === 0) {
+      // 정책영업그룹 목록 로드 (변경이력은 제외하여 빠르게 로드)
+      loadUserGroupsWithoutHistory();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
+
+  // 정책영업그룹 탭이 활성화되고 그룹이 로드된 후 변경이력 로드
+  useEffect(() => {
+    if (activeTab === 1 && userGroups.length > 0) {
+      // 변경이력이 없는 그룹만 로드
+      const groupsWithoutHistory = userGroups.filter(group => !changeHistory[group.id]);
+      if (groupsWithoutHistory.length > 0) {
+        console.log('🔍 [정책영업그룹] 변경이력 로드:', groupsWithoutHistory.length, '개 그룹');
+        const changeHistoryPromises = groupsWithoutHistory.map(group => loadChangeHistory(group.id));
+        Promise.all(changeHistoryPromises).then(() => {
+          console.log('✅ [정책영업그룹] 변경이력 로드 완료');
+        }).catch(error => {
+          console.error('❌ [정책영업그룹] 변경이력 로드 실패:', error);
+        });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, userGroups.length]);
 
   const loadSettings = async () => {
     try {
@@ -332,7 +345,8 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
     }
   };
 
-  const loadUserGroups = async () => {
+  // 정책영업그룹 목록만 로드 (변경이력 제외 - 성능 최적화)
+  const loadUserGroupsWithoutHistory = async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/policy-table/user-groups`, {
         headers: {
@@ -353,15 +367,18 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
           groups = [];
         }
         
-        // 모든 그룹의 변경이력을 병렬로 로드 (색상 표시를 위해 필수)
-        if (groups.length > 0) {
-          console.log('🔍 [정책영업그룹] 변경이력 로드 시작:', groups.length, '개 그룹');
-          const changeHistoryPromises = groups.map(group => loadChangeHistory(group.id));
-          await Promise.all(changeHistoryPromises);
-          console.log('✅ [정책영업그룹] 변경이력 로드 완료');
-        }
-        
         setUserGroups(groups);
+        
+        // 변경이력은 백그라운드에서 지연 로드
+        if (groups.length > 0) {
+          console.log('🔍 [정책영업그룹] 변경이력 백그라운드 로드 시작:', groups.length, '개 그룹');
+          const changeHistoryPromises = groups.map(group => loadChangeHistory(group.id));
+          Promise.all(changeHistoryPromises).then(() => {
+            console.log('✅ [정책영업그룹] 변경이력 로드 완료');
+          }).catch(error => {
+            console.error('❌ [정책영업그룹] 변경이력 로드 실패:', error);
+          });
+        }
       } else {
         console.error('정책영업그룹 로드 실패:', response.status);
         setUserGroups([]);
@@ -370,6 +387,11 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
       console.error('정책영업그룹 로드 오류:', error);
       setUserGroups([]);
     }
+  };
+
+  const loadUserGroups = async () => {
+    // loadUserGroupsWithoutHistory를 사용하여 변경이력 제외하고 빠르게 로드
+    await loadUserGroupsWithoutHistory();
   };
 
   // 변경이력 로드 함수
@@ -544,7 +566,14 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
     }
   };
 
-  const handleOpenGroupModal = (group = null) => {
+  const handleOpenGroupModal = async (group = null) => {
+    // companies와 teamLeaders가 없으면 지연 로드
+    if (companies.length === 0) {
+      await loadCompanies();
+    }
+    if (teamLeaders.length === 0) {
+      await loadTeamLeaders();
+    }
     if (group) {
       setEditingGroup(group);
       setGroupFormData({
