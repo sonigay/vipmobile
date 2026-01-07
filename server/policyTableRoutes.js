@@ -1687,9 +1687,11 @@ function setupPolicyTableRoutes(app) {
 
       const groups = dataRows.map(row => {
         const groupData = parseUserGroupData(row[2]);
+        const groupName = row[1] || '';
         return {
           id: row[0] || '',
-          groupName: row[1] || '',
+          name: groupName,  // name 필드 추가 (하위 호환성)
+          groupName: groupName,
           companyNames: groupData.companyNames,
           managerIds: groupData.managerIds,
           // 하위 호환성을 위해 userIds도 반환 (기존 코드 호환)
@@ -2652,9 +2654,15 @@ function setupPolicyTableRoutes(app) {
             const userGroupsRows = userGroupsResponse.data.values || [];
             const userGroupsDataRows = userGroupsRows.slice(1);
             const groups = userGroupsDataRows.map(row => {
-              const groupId = row[0];
+              const groupId = row[0] || '';
+              const groupName = row[1] || '';
               const groupData = parseUserGroupData(row[2]);
-              return { id: groupId, ...groupData };
+              return { 
+                id: groupId, 
+                name: groupName,  // name 필드 추가 (하위 호환성)
+                groupName: groupName,  // groupName 필드도 유지
+                ...groupData 
+              };
             });
             setCache(userGroupsCacheKey, groups, CACHE_TTL.USER_GROUPS);
             return groups;
@@ -2790,9 +2798,15 @@ function setupPolicyTableRoutes(app) {
             const userGroupsRows = userGroupsResponse.data.values || [];
             const userGroupsDataRows = userGroupsRows.slice(1);
             const groups = userGroupsDataRows.map(row => {
-              const groupId = row[0];
+              const groupId = row[0] || '';
+              const groupName = row[1] || '';
               const groupData = parseUserGroupData(row[2]);
-              return { id: groupId, ...groupData };
+              return { 
+                id: groupId, 
+                name: groupName,  // name 필드 추가 (하위 호환성)
+                groupName: groupName,  // groupName 필드도 유지
+                ...groupData 
+              };
             });
             setCache(userGroupsCacheKey, groups, CACHE_TTL.USER_GROUPS);
             return groups;
@@ -2806,7 +2820,10 @@ function setupPolicyTableRoutes(app) {
         if (Array.isArray(userGroupsData)) {
           userGroupsData.forEach(group => {
             if (group.id) {
+              // name 또는 groupName 필드 모두 지원
+              const groupName = group.name || group.groupName;
               userGroupsMap.set(group.id, {
+                name: groupName,
                 companyNames: group.companyNames || [],
                 managerIds: group.managerIds || []
               });
@@ -3014,9 +3031,12 @@ function setupPolicyTableRoutes(app) {
         
         if (cachedUserGroups && Array.isArray(cachedUserGroups)) {
           // 캐시에서 가져온 데이터를 Map으로 변환
+          // 캐시 데이터 구조: { id, groupName, companyNames, managerIds, ... }
           cachedUserGroups.forEach(group => {
-            if (group.id && group.name) {
-              userGroupsNameMap.set(group.id, group.name);
+            // groupName 또는 name 필드 모두 지원 (하위 호환성)
+            const groupName = group.groupName || group.name;
+            if (group.id && groupName) {
+              userGroupsNameMap.set(group.id, groupName);
             }
           });
         } else {
@@ -3118,9 +3138,15 @@ function setupPolicyTableRoutes(app) {
             const userGroupsRows = userGroupsResponse.data.values || [];
             const userGroupsDataRows = userGroupsRows.slice(1);
             const groups = userGroupsDataRows.map(row => {
-              const groupId = row[0];
+              const groupId = row[0] || '';
+              const groupName = row[1] || '';
               const groupData = parseUserGroupData(row[2]);
-              return { id: groupId, ...groupData };
+              return { 
+                id: groupId, 
+                name: groupName,  // name 필드 추가 (하위 호환성)
+                groupName: groupName,  // groupName 필드도 유지
+                ...groupData 
+              };
             });
             setCache(userGroupsCacheKey, groups, CACHE_TTL.USER_GROUPS);
             return groups;
@@ -3148,8 +3174,10 @@ function setupPolicyTableRoutes(app) {
         if (Array.isArray(userGroupsData)) {
           userGroupsData.forEach(group => {
             if (group.id) {
+              // name 또는 groupName 필드 모두 지원
+              const groupName = group.name || group.groupName;
               userGroupsMap.set(group.id, {
-                name: group.name,
+                name: groupName,
                 companyNames: group.companyNames || [],
                 managerIds: group.managerIds || []
               });
