@@ -873,10 +873,15 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
   };
 
   const handleDelete = async (id, e) => {
-    // 이벤트 전파 방지
+    // 이벤트 전파 방지 (즉시 실행)
     if (e) {
       e.stopPropagation();
       e.preventDefault();
+    }
+
+    // confirm 다이얼로그를 열기 전에 이벤트 전파를 완전히 차단
+    if (e && e.nativeEvent) {
+      e.nativeEvent.stopImmediatePropagation();
     }
 
     if (!window.confirm('정책표를 삭제하시겠습니까?')) {
@@ -1155,7 +1160,11 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
                       {canDelete && (
                         <IconButton
                           size="small"
-                          onClick={(e) => handleDelete(policy.id, e)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            handleDelete(policy.id, e);
+                          }}
                           color="error"
                         >
                           <DeleteIcon />
