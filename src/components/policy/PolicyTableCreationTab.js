@@ -29,7 +29,8 @@ import {
   Tab,
   Tooltip,
   Popover,
-  Switch
+  Switch,
+  Snackbar
 } from '@mui/material';
 import {
   Refresh as RefreshIcon,
@@ -115,6 +116,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
   const [error, setError] = useState(null);
   const [savingCardOrder, setSavingCardOrder] = useState(false);
   const [successMessage, setSuccessMessage] = useState(null);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   
   // 여러 정책표 생성 관련 상태
   const [selectedSettings, setSelectedSettings] = useState([]); // 체크된 카드 ID 배열
@@ -1449,15 +1451,21 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
       });
 
       if (response.ok) {
-        alert('정책표가 등록되었습니다.');
+        setSnackbar({ open: true, message: '정책표가 등록되었습니다.', severity: 'success' });
         handleCloseCreationModal();
+        // 정책표 목록 새로고침
+        await loadSettings();
       } else {
         const errorData = await response.json();
-        setError(errorData.error || '정책표 등록에 실패했습니다.');
+        const errorMessage = errorData.error || '정책표 등록에 실패했습니다.';
+        setError(errorMessage);
+        setSnackbar({ open: true, message: errorMessage, severity: 'error' });
       }
     } catch (error) {
       console.error('정책표 등록 오류:', error);
-      setError('정책표 등록 중 오류가 발생했습니다.');
+      const errorMessage = '정책표 등록 중 오류가 발생했습니다.';
+      setError(errorMessage);
+      setSnackbar({ open: true, message: errorMessage, severity: 'error' });
     } finally {
       setLoading(false);
     }
@@ -1501,14 +1509,24 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
       const failCount = responses.length - successCount;
 
       if (failCount === 0) {
-        alert(`모든 정책표(${successCount}개)가 등록되었습니다.`);
+        setSnackbar({ 
+          open: true, 
+          message: `모든 정책표(${successCount}개)가 등록되었습니다.`, 
+          severity: 'success' 
+        });
+        // 정책표 목록 새로고침
+        await loadSettings();
         handleCloseBatchCreationModal();
       } else {
-        setError(`${successCount}개 등록 성공, ${failCount}개 등록 실패했습니다.`);
+        const errorMessage = `${successCount}개 등록 성공, ${failCount}개 등록 실패했습니다.`;
+        setError(errorMessage);
+        setSnackbar({ open: true, message: errorMessage, severity: 'warning' });
       }
     } catch (error) {
       console.error('배치 정책표 등록 오류:', error);
-      setError('정책표 등록 중 오류가 발생했습니다.');
+      const errorMessage = '정책표 등록 중 오류가 발생했습니다.';
+      setError(errorMessage);
+      setSnackbar({ open: true, message: errorMessage, severity: 'error' });
     } finally {
       setLoading(false);
     }
@@ -2617,6 +2635,22 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
           </Box>
         )}
       </Popover>
+
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={() => setSnackbar({ ...snackbar, open: false })} 
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };
