@@ -385,11 +385,35 @@ function PolicyInputModal({
       }
       
       if (supportItems.length > 0) {
-        // 모든 금액이 동일한 경우 하나의 금액으로 표시
+        // 금액을 만원 단위로 변환하는 함수
+        const formatAmount = (amount) => {
+          if (amount >= 10000 && amount % 10000 === 0) {
+            return `[+${amount / 10000}만원]`;
+          }
+          return `[+${amount.toLocaleString()}원]`;
+        };
+        
+        // 모든 금액이 동일한 경우
         const uniqueAmounts = [...new Set(supportAmounts)];
-        const amountText = uniqueAmounts.length === 1 
-          ? `${uniqueAmounts[0].toLocaleString()}원`
-          : supportAmounts.map(amount => `${amount.toLocaleString()}원`).join('/');
+        let amountText;
+        
+        if (uniqueAmounts.length === 1) {
+          // 단일 금액인 경우
+          const singleAmount = uniqueAmounts[0];
+          const totalAmount = supportAmounts.reduce((sum, amount) => sum + amount, 0);
+          if (supportItems.length > 1) {
+            // 여러 상품이지만 금액이 모두 같은 경우: "각각 [+1만원], 모두 유치시 총[+3만원]"
+            amountText = `각각 ${formatAmount(singleAmount)}, 모두 유치시 총${formatAmount(totalAmount)}`;
+          } else {
+            // 단일 상품인 경우
+            amountText = formatAmount(singleAmount);
+          }
+        } else {
+          // 여러 금액인 경우: "각각 [+1만원], 모두 유치시 총[+3만원]" 형식
+          const individualAmounts = uniqueAmounts.map(formatAmount).join(', ');
+          const totalAmount = supportAmounts.reduce((sum, amount) => sum + amount, 0);
+          amountText = `각각 ${individualAmounts}, 모두 유치시 총${formatAmount(totalAmount)}`;
+        }
         
         // 대체상품 문구 생성
         const replacementTexts = [];
