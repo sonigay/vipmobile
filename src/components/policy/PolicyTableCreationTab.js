@@ -30,7 +30,13 @@ import {
   Tooltip,
   Popover,
   Switch,
-  Snackbar
+  Snackbar,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Checkbox,
+  FormControlLabel
 } from '@mui/material';
 import {
   Refresh as RefreshIcon,
