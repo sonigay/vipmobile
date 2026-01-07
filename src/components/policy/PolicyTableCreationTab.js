@@ -874,6 +874,17 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
         const data = await response.json();
         const jobId = data.jobId;
 
+        // 큐 정보 포함하여 상태 설정
+        setGenerationStatus({
+          status: 'queued',
+          progress: 0,
+          message: data.message || '대기 중...',
+          queuePosition: data.queuePosition,
+          queueLength: data.queueLength,
+          estimatedWaitTime: data.estimatedWaitTime,
+          discordBotStatus: data.discordBotStatus
+        });
+
         // 상태 폴링 시작 (하이브리드 폴링)
         startPolling(jobId);
       } else {
@@ -905,7 +916,16 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
 
         if (response.ok) {
           const status = await response.json();
-          setGenerationStatus(status);
+          
+          // 큐 정보 포함하여 상태 업데이트
+          setGenerationStatus({
+            ...status,
+            queuePosition: status.queueInfo?.queuePosition,
+            queueLength: status.queueInfo?.queueLength,
+            estimatedWaitTime: status.queueInfo?.estimatedWaitTime,
+            isProcessing: status.queueInfo?.isProcessing,
+            discordBotStatus: status.discordBotStatus
+          });
 
           if (status.status === 'completed') {
             setGeneratedResult(status.result);
@@ -1262,7 +1282,13 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
               result: data.result || null,
               error: data.error || null,
               progress: data.progress || 0,
-              message: data.message || ''
+              message: data.message || '',
+              queuePosition: data.queueInfo?.queuePosition,
+              queueLength: data.queueInfo?.queueLength,
+              estimatedWaitTime: data.queueInfo?.estimatedWaitTime,
+              isProcessing: data.queueInfo?.isProcessing,
+              discordBotStatus: data.discordBotStatus,
+              failureReason: data.failureReason
             }
           }));
 
@@ -1978,6 +2004,62 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                     <Typography variant="subtitle2" gutterBottom>
                       {generationStatus.message || '처리 중...'}
                     </Typography>
+                    
+                    {/* 대기순번 표시 */}
+                    {generationStatus.queuePosition !== undefined && generationStatus.queuePosition > 0 && (
+                      <Alert severity="info" sx={{ mt: 1, mb: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <Box>
+                            <Typography variant="body2" fontWeight="bold">
+                              대기순번: {generationStatus.queuePosition}번
+                            </Typography>
+                            {generationStatus.queueLength !== undefined && (
+                              <Typography variant="caption" color="text.secondary">
+                                전체 대기: {generationStatus.queueLength}개
+                              </Typography>
+                            )}
+                            {generationStatus.estimatedWaitTime !== undefined && generationStatus.estimatedWaitTime > 0 && (
+                              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                                예상 대기 시간: 약 {Math.ceil(generationStatus.estimatedWaitTime / 60)}분
+                              </Typography>
+                            )}
+                          </Box>
+                          <CircularProgress size={24} />
+                        </Box>
+                      </Alert>
+                    )}
+
+                    {/* 디스코드 봇 상태 표시 */}
+                    {generationStatus.discordBotStatus && (
+                      <Box sx={{ mt: 1, mb: 1 }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                          디스코드 봇 상태:
+                        </Typography>
+                        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                          <Chip
+                            size="small"
+                            label={generationStatus.discordBotStatus.isAvailable ? '✅ 사용 가능' : '❌ 사용 불가'}
+                            color={generationStatus.discordBotStatus.isAvailable ? 'success' : 'error'}
+                          />
+                          {generationStatus.discordBotStatus.lastResponseTime !== null && (
+                            <Chip
+                              size="small"
+                              label={`응답 시간: ${(generationStatus.discordBotStatus.lastResponseTime / 1000).toFixed(1)}초`}
+                              variant="outlined"
+                            />
+                          )}
+                          {generationStatus.discordBotStatus.lastError && (
+                            <Chip
+                              size="small"
+                              label={`오류: ${generationStatus.discordBotStatus.lastError.substring(0, 20)}...`}
+                              color="error"
+                              variant="outlined"
+                            />
+                          )}
+                        </Box>
+                      </Box>
+                    )}
+
                     {generationStatus.progress !== undefined && (
                       <LinearProgress
                         variant="determinate"
@@ -2019,7 +2101,19 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
 
                   {generationStatus.status === 'failed' && (
                     <Alert severity="error">
-                      {generationStatus.error || '정책표 생성에 실패했습니다.'}
+                      <Typography variant="body2" fontWeight="bold">
+                        {generationStatus.error || '정책표 생성에 실패했습니다.'}
+                      </Typography>
+                      {generationStatus.failureReason && (
+                        <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>
+                          원인: {generationStatus.failureReason}
+                        </Typography>
+                      )}
+                      {generationStatus.discordBotStatus?.lastError && (
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                          디스코드 봇 오류: {generationStatus.discordBotStatus.lastError.substring(0, 50)}...
+                        </Typography>
+                      )}
                     </Alert>
                   )}
                 </Paper>
@@ -2144,7 +2238,28 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                         <Grid item xs={12}>
                           <Box sx={{ mt: 1 }}>
                             {batchGenerationStatus[setting.id].status === 'queued' && (
-                              <Alert severity="info">대기 중...</Alert>
+                              <Alert severity="info">
+                                <Box>
+                                  <Typography variant="body2" fontWeight="bold">
+                                    대기 중...
+                                  </Typography>
+                                  {batchGenerationStatus[setting.id].queuePosition !== undefined && batchGenerationStatus[setting.id].queuePosition > 0 && (
+                                    <Box sx={{ mt: 0.5 }}>
+                                      <Typography variant="caption" color="text.secondary">
+                                        대기순번: {batchGenerationStatus[setting.id].queuePosition}번
+                                        {batchGenerationStatus[setting.id].queueLength !== undefined && (
+                                          <> (전체 대기: {batchGenerationStatus[setting.id].queueLength}개)</>
+                                        )}
+                                      </Typography>
+                                      {batchGenerationStatus[setting.id].estimatedWaitTime !== undefined && batchGenerationStatus[setting.id].estimatedWaitTime > 0 && (
+                                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                                          예상 대기 시간: 약 {Math.ceil(batchGenerationStatus[setting.id].estimatedWaitTime / 60)}분
+                                        </Typography>
+                                      )}
+                                    </Box>
+                                  )}
+                                </Box>
+                              </Alert>
                             )}
                             {batchGenerationStatus[setting.id].status === 'processing' && (
                               <Box>
@@ -2156,6 +2271,23 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                                   <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                                     {batchGenerationStatus[setting.id].message}
                                   </Typography>
+                                )}
+                                {/* 디스코드 봇 상태 표시 */}
+                                {batchGenerationStatus[setting.id].discordBotStatus && (
+                                  <Box sx={{ mt: 1, display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                                    <Chip
+                                      size="small"
+                                      label={batchGenerationStatus[setting.id].discordBotStatus.isAvailable ? '✅ 봇 사용 가능' : '❌ 봇 사용 불가'}
+                                      color={batchGenerationStatus[setting.id].discordBotStatus.isAvailable ? 'success' : 'error'}
+                                    />
+                                    {batchGenerationStatus[setting.id].discordBotStatus.lastResponseTime !== null && (
+                                      <Chip
+                                        size="small"
+                                        label={`응답: ${(batchGenerationStatus[setting.id].discordBotStatus.lastResponseTime / 1000).toFixed(1)}초`}
+                                        variant="outlined"
+                                      />
+                                    )}
+                                  </Box>
                                 )}
                               </Box>
                             )}
@@ -2186,7 +2318,19 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                             {batchGenerationStatus[setting.id].status === 'failed' && (
                               <Box>
                                 <Alert severity="error" sx={{ mb: 1 }}>
-                                  생성 실패: {batchGenerationStatus[setting.id].error || '알 수 없는 오류'}
+                                  <Typography variant="body2" fontWeight="bold">
+                                    생성 실패: {batchGenerationStatus[setting.id].error || '알 수 없는 오류'}
+                                  </Typography>
+                                  {batchGenerationStatus[setting.id].failureReason && (
+                                    <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>
+                                      원인: {batchGenerationStatus[setting.id].failureReason}
+                                    </Typography>
+                                  )}
+                                  {batchGenerationStatus[setting.id].discordBotStatus?.lastError && (
+                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                                      디스코드 봇 오류: {batchGenerationStatus[setting.id].discordBotStatus.lastError.substring(0, 50)}...
+                                    </Typography>
+                                  )}
                                 </Alert>
                                 <Button
                                   size="small"

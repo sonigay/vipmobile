@@ -798,12 +798,200 @@ function getJobStatus(jobId) {
   return jobStatusStore.get(jobId) || null;
 }
 
+// ===== 큐 시스템 =====
+// 대기순번 관리 및 디스코드 봇 상태 추적
+const generationQueue = {
+  queue: [], // 대기 중인 작업 목록 { jobId, userId, userName, policyTableName, createdAt, queuePosition }
+  processing: [], // 처리 중인 작업 목록 { jobId, userId, userName, policyTableName, startedAt, discordRequestId }
+  maxConcurrent: 1, // 동시에 처리할 수 있는 최대 작업 수 (디스코드 봇이 한 번에 하나만 처리)
+  discordBotStatus: {
+    isAvailable: true, // 디스코드 봇 사용 가능 여부
+    lastResponseTime: null, // 마지막 응답 시간 (ms)
+    lastError: null, // 마지막 오류 메시지
+    lastErrorTime: null, // 마지막 오류 발생 시간
+    activeRequests: 0 // 현재 활성 요청 수
+  }
+};
+
+// 큐에 작업 추가
+function addToQueue(jobId, userId, userName, policyTableName) {
+  const queuePosition = generationQueue.queue.length + 1;
+  const queueItem = {
+    jobId,
+    userId,
+    userName,
+    policyTableName,
+    createdAt: new Date().toISOString(),
+    queuePosition
+  };
+  generationQueue.queue.push(queueItem);
+  console.log(`📋 [큐] 작업 추가: ${jobId} (${policyTableName}, ${userName}), 대기순번: ${queuePosition}`);
+  return queueItem;
+}
+
+// 큐에서 작업 제거
+function removeFromQueue(jobId) {
+  const index = generationQueue.queue.findIndex(item => item.jobId === jobId);
+  if (index !== -1) {
+    generationQueue.queue.splice(index, 1);
+    // 대기순번 재계산
+    generationQueue.queue.forEach((item, idx) => {
+      item.queuePosition = idx + 1;
+    });
+    console.log(`📋 [큐] 작업 제거: ${jobId}, 남은 대기: ${generationQueue.queue.length}`);
+  }
+}
+
+// 처리 중인 작업 추가
+function addToProcessing(jobId, userId, userName, policyTableName, discordRequestId) {
+  const processingItem = {
+    jobId,
+    userId,
+    userName,
+    policyTableName,
+    startedAt: new Date().toISOString(),
+    discordRequestId
+  };
+  generationQueue.processing.push(processingItem);
+  generationQueue.discordBotStatus.activeRequests++;
+  console.log(`⚙️ [큐] 처리 시작: ${jobId} (${policyTableName}, ${userName}), 처리 중: ${generationQueue.processing.length}`);
+}
+
+// 처리 중인 작업 제거
+function removeFromProcessing(jobId) {
+  const index = generationQueue.processing.findIndex(item => item.jobId === jobId);
+  if (index !== -1) {
+    generationQueue.processing.splice(index, 1);
+    generationQueue.discordBotStatus.activeRequests = Math.max(0, generationQueue.discordBotStatus.activeRequests - 1);
+    console.log(`⚙️ [큐] 처리 완료: ${jobId}, 처리 중: ${generationQueue.processing.length}`);
+  }
+}
+
+// 큐 상태 조회
+function getQueueStatus() {
+  return {
+    queueLength: generationQueue.queue.length,
+    processingLength: generationQueue.processing.length,
+    maxConcurrent: generationQueue.maxConcurrent,
+    queue: generationQueue.queue.map(item => ({
+      jobId: item.jobId,
+      userName: item.userName,
+      policyTableName: item.policyTableName,
+      queuePosition: item.queuePosition,
+      createdAt: item.createdAt
+    })),
+    processing: generationQueue.processing.map(item => ({
+      jobId: item.jobId,
+      userName: item.userName,
+      policyTableName: item.policyTableName,
+      startedAt: item.startedAt
+    })),
+    discordBotStatus: { ...generationQueue.discordBotStatus }
+  };
+}
+
+// 특정 사용자의 대기순번 조회
+function getUserQueuePosition(userId, jobId) {
+  const queueItem = generationQueue.queue.find(item => item.jobId === jobId && item.userId === userId);
+  if (queueItem) {
+    return queueItem.queuePosition;
+  }
+  // 처리 중인 경우
+  const processingItem = generationQueue.processing.find(item => item.jobId === jobId && item.userId === userId);
+  if (processingItem) {
+    return 0; // 처리 중
+  }
+  return null; // 큐에 없음
+}
+
+// 디스코드 봇 상태 업데이트
+function updateDiscordBotStatus(status) {
+  if (status.responseTime !== undefined) {
+    generationQueue.discordBotStatus.lastResponseTime = status.responseTime;
+  }
+  if (status.error !== undefined) {
+    generationQueue.discordBotStatus.lastError = status.error;
+    generationQueue.discordBotStatus.lastErrorTime = new Date().toISOString();
+    generationQueue.discordBotStatus.isAvailable = false;
+  } else if (status.isAvailable !== undefined) {
+    generationQueue.discordBotStatus.isAvailable = status.isAvailable;
+  }
+}
+
+// 큐 처리 함수 (대기 중인 작업을 순차적으로 처리)
+let isProcessingQueue = false;
+async function processQueue() {
+  // 이미 처리 중이면 중복 실행 방지
+  if (isProcessingQueue) {
+    return;
+  }
+
+  isProcessingQueue = true;
+
+  try {
+    while (generationQueue.queue.length > 0 && generationQueue.processing.length < generationQueue.maxConcurrent) {
+      const queueItem = generationQueue.queue[0]; // 첫 번째 항목 가져오기
+      const { jobId, userId, userName, policyTableName } = queueItem;
+
+      // 큐에서 제거하고 처리 중으로 이동
+      removeFromQueue(jobId);
+      
+      // 작업 상태에서 실제 파라미터 가져오기
+      const jobStatus = getJobStatus(jobId);
+      if (!jobStatus || !jobStatus.params) {
+        console.error(`[큐] 작업 파라미터를 찾을 수 없습니다: ${jobId}`);
+        continue;
+      }
+
+      const params = jobStatus.params;
+      const discordRequestId = `REQ_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // 처리 중으로 이동
+      addToProcessing(jobId, userId, userName, policyTableName, discordRequestId);
+      
+      // 상태 업데이트
+      updateJobStatus(jobId, {
+        ...jobStatus,
+        status: 'processing',
+        progress: 0,
+        message: '처리 중...',
+        queuePosition: 0
+      });
+
+      // 실제 작업 실행 (비동기, 완료를 기다리지 않음)
+      processPolicyTableGeneration(jobId, params, discordRequestId)
+        .then(() => {
+          removeFromProcessing(jobId);
+          // 다음 작업 처리
+          processQueue();
+        })
+        .catch(error => {
+          console.error(`[큐] 작업 실패: ${jobId}`, error);
+          removeFromProcessing(jobId);
+          updateJobStatus(jobId, {
+            status: 'failed',
+            progress: 0,
+            message: `처리 실패: ${error.message}`,
+            error: error.message
+          });
+          // 다음 작업 처리
+          processQueue();
+        });
+    }
+  } finally {
+    isProcessingQueue = false;
+  }
+}
+
 // 정책표 생성 백그라운드 작업
-async function processPolicyTableGeneration(jobId, params) {
+async function processPolicyTableGeneration(jobId, params, discordRequestId = null) {
   const { policyTableId, applyDate, applyContent, accessGroupId, accessGroupIds, creatorName, creatorRole, creatorId } = params;
   
   // accessGroupIds 배열 처리 (하위 호환성을 위해 accessGroupId도 지원)
   const groupIds = accessGroupIds || (accessGroupId ? [accessGroupId] : []);
+
+  const startTime = Date.now();
+  let discordResponseTime = null;
 
   try {
     updateJobStatus(jobId, {
@@ -869,85 +1057,119 @@ async function processPolicyTableGeneration(jobId, params) {
 
     // 로컬 PC 디스코드 봇에 명령어 전송 및 이미지 URL, 메시지 ID, 스레드 ID 받기
     // captureSheetViaDiscordBot에서 포스트/스레드를 찾거나 생성하고 명령어를 전송함
-    const { imageUrl, messageId: discordMessageId, threadId } = await captureSheetViaDiscordBot(
-      sheetUrl,
-      policyTableName,
-      creatorName, // 실행한 사람 이름 전달
-      discordChannelId,
-      creatorPermissions // 생성자적용권한 전달
-    );
-
-    // 이미지 URL, 메시지 ID, 스레드 ID는 모두 captureSheetViaDiscordBot에서 받았으므로
-    // 추가 처리 없이 바로 사용
-    const messageId = discordMessageId; // 디스코드 봇이 업로드한 메시지 ID
-    // threadId는 captureSheetViaDiscordBot에서 반환한 포스트/스레드 ID
-
-    // 4. 구글시트에 저장
-    updateJobStatus(jobId, {
-      status: 'processing',
-      progress: 90,
-      message: '데이터 저장 중...'
-    });
-
-    await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_TABLE_LIST, HEADERS_POLICY_TABLE_LIST);
-
-    const createdAt = new Date().toISOString();
-    const newRowId = `POL_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
-    // 여러 그룹 ID를 JSON 배열 형식으로 저장
-    const accessGroupIdsJson = groupIds.length > 0 ? JSON.stringify(groupIds) : '';
-
-    const newRow = [
-      newRowId,                    // 0: 정책표ID (고유 ID)
-      policyTableId,               // 1: 정책표ID (설정과 연결)
-      policyTableName,             // 2: 정책표이름
-      applyDate,                   // 3: 정책적용일시
-      applyContent,                // 4: 정책적용내용
-      accessGroupIdsJson,          // 5: 접근권한 (그룹ID 배열 JSON)
-      creatorName || 'Unknown',  // 6: 생성자 (이름)
-      createdAt,                   // 7: 생성일시
-      messageId,                   // 8: 디스코드메시지ID
-      threadId,                    // 9: 디스코드스레드ID
-      imageUrl,                    // 10: 이미지URL
-      'N',                         // 11: 등록여부
-      '',                          // 12: 등록일시
-      creatorId || ''              // 13: 생성자ID (새로 추가)
-    ];
-
-    await withRetry(async () => {
-      return await sheets.spreadsheets.values.append({
-        spreadsheetId: SPREADSHEET_ID,
-        range: `${SHEET_POLICY_TABLE_LIST}!A:N`,
-        valueInputOption: 'USER_ENTERED',
-        resource: { values: [newRow] }
-      });
-    });
-
-    // 완료
-    updateJobStatus(jobId, {
-      status: 'completed',
-      progress: 100,
-      message: groupIds.length > 1 
-        ? `${groupIds.length}개 그룹에 대한 정책표 생성이 완료되었습니다.`
-        : '정책표 생성이 완료되었습니다.',
-      result: {
-        id: newRowId,
-        policyTableId,
+    const discordStartTime = Date.now();
+    let discordResponseTime = null;
+    try {
+      const { imageUrl, messageId: discordMessageId, threadId } = await captureSheetViaDiscordBot(
+        sheetUrl,
         policyTableName,
-        imageUrl,
-        messageId,
-        threadId,
-        groupCount: groupIds.length
-      }
-    });
+        creatorName, // 실행한 사람 이름 전달
+        discordChannelId,
+        creatorPermissions // 생성자적용권한 전달
+      );
+      
+      discordResponseTime = Date.now() - discordStartTime;
+      updateDiscordBotStatus({ 
+        responseTime: discordResponseTime,
+        isAvailable: true 
+      });
+      
+      // 이미지 URL, 메시지 ID, 스레드 ID는 모두 captureSheetViaDiscordBot에서 받았으므로
+      // 추가 처리 없이 바로 사용
+      const messageId = discordMessageId; // 디스코드 봇이 업로드한 메시지 ID
+      // threadId는 captureSheetViaDiscordBot에서 반환한 포스트/스레드 ID
 
+      // 4. 구글시트에 저장
+      updateJobStatus(jobId, {
+        status: 'processing',
+        progress: 90,
+        message: '데이터 저장 중...'
+      });
+
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_TABLE_LIST, HEADERS_POLICY_TABLE_LIST);
+
+      const createdAt = new Date().toISOString();
+      const newRowId = `POL_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // 여러 그룹 ID를 JSON 배열 형식으로 저장
+      const accessGroupIdsJson = groupIds.length > 0 ? JSON.stringify(groupIds) : '';
+
+      const newRow = [
+        newRowId,                    // 0: 정책표ID (고유 ID)
+        policyTableId,               // 1: 정책표ID (설정과 연결)
+        policyTableName,             // 2: 정책표이름
+        applyDate,                   // 3: 정책적용일시
+        applyContent,                // 4: 정책적용내용
+        accessGroupIdsJson,          // 5: 접근권한 (그룹ID 배열 JSON)
+        creatorName || 'Unknown',  // 6: 생성자 (이름)
+        createdAt,                   // 7: 생성일시
+        messageId,                   // 8: 디스코드메시지ID
+        threadId,                    // 9: 디스코드스레드ID
+        imageUrl,                    // 10: 이미지URL
+        'N',                         // 11: 등록여부
+        '',                          // 12: 등록일시
+        creatorId || ''              // 13: 생성자ID (새로 추가)
+      ];
+
+      await withRetry(async () => {
+        return await sheets.spreadsheets.values.append({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_POLICY_TABLE_LIST}!A:N`,
+          valueInputOption: 'USER_ENTERED',
+          resource: { values: [newRow] }
+        });
+      });
+
+      // 완료
+      updateJobStatus(jobId, {
+        status: 'completed',
+        progress: 100,
+        message: groupIds.length > 1 
+          ? `${groupIds.length}개 그룹에 대한 정책표 생성이 완료되었습니다.`
+          : '정책표 생성이 완료되었습니다.',
+        result: {
+          id: newRowId,
+          policyTableId,
+          policyTableName,
+          imageUrl,
+          messageId,
+          threadId,
+          groupCount: groupIds.length,
+          discordResponseTime: discordResponseTime
+        }
+      });
+
+    } catch (discordError) {
+      // 디스코드 봇 관련 오류
+      discordResponseTime = Date.now() - discordStartTime;
+      const errorMessage = discordError.message || '알 수 없는 오류';
+      updateDiscordBotStatus({ 
+        error: errorMessage,
+        responseTime: discordResponseTime,
+        isAvailable: false
+      });
+      
+      // 오류 원인 분석
+      let failureReason = '알 수 없음';
+      if (errorMessage.includes('ECONNREFUSED') || errorMessage.includes('브라우저')) {
+        failureReason = '로컬 PC 브라우저 연결 실패';
+      } else if (errorMessage.includes('디스코드') || errorMessage.includes('Discord')) {
+        failureReason = '디스코드 봇 응답 실패';
+      } else if (errorMessage.includes('타임아웃') || errorMessage.includes('timeout')) {
+        failureReason = '디스코드 봇 응답 시간 초과';
+      }
+      
+      throw new Error(`${failureReason}: ${errorMessage}`);
+    }
   } catch (error) {
     console.error('[정책표] 생성 오류:', error);
     updateJobStatus(jobId, {
       status: 'failed',
       progress: 0,
       message: '정책표 생성에 실패했습니다.',
-      error: error.message
+      error: error.message,
+      failureReason: error.message.includes('로컬 PC') ? '브라우저 문제' : 
+                     error.message.includes('디스코드') ? '디스코드 봇 문제' : '알 수 없음'
     });
   } finally {
     // Puppeteer를 사용하지 않으므로 browser 정리 불필요
@@ -2218,8 +2440,30 @@ function setupPolicyTableRoutes(app) {
       // 작업 ID 생성
       const jobId = `JOB_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-      // 백그라운드 작업 시작
-      processPolicyTableGeneration(jobId, {
+      // 정책표 이름 가져오기 (큐 표시용)
+      let policyTableName = '정책표';
+      try {
+        const { sheets, SPREADSHEET_ID } = createSheetsClient();
+        await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_TABLE_SETTINGS, HEADERS_POLICY_TABLE_SETTINGS);
+        const settingsResponse = await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_POLICY_TABLE_SETTINGS}!A:B`
+        });
+        const settingsRows = settingsResponse.data.values || [];
+        const settingsRow = settingsRows.find(row => row[0] === policyTableId);
+        if (settingsRow && settingsRow[1]) {
+          policyTableName = settingsRow[1];
+        }
+      } catch (error) {
+        console.warn('정책표 이름 조회 실패:', error.message);
+      }
+
+      // 큐에 작업 추가
+      const queueItem = addToQueue(jobId, permission.userId || '', permission.userName || 'Unknown', policyTableName);
+      const queuePosition = queueItem.queuePosition;
+
+      // 작업 파라미터 저장
+      const jobParams = {
         policyTableId,
         applyDate,
         applyContent,
@@ -2227,18 +2471,53 @@ function setupPolicyTableRoutes(app) {
         creatorName: permission.userName || 'Unknown',
         creatorRole: permission.userRole,
         creatorId: permission.userId || ''
-      }).catch(error => {
-        console.error('[정책표] 백그라운드 작업 오류:', error);
+      };
+
+      // 초기 상태 설정 (파라미터 포함)
+      updateJobStatus(jobId, {
+        status: 'queued',
+        progress: 0,
+        message: `대기 중... (대기순번: ${queuePosition})`,
+        queuePosition: queuePosition,
+        queueLength: generationQueue.queue.length,
+        params: jobParams // 큐 처리 시 사용할 파라미터 저장
       });
 
+      // 큐 처리 시작 (비동기)
+      processQueue().catch(error => {
+        console.error('[정책표] 큐 처리 오류:', error);
+      });
+
+      // 큐 상태 반환
+      const queueStatus = getQueueStatus();
       return res.json({
         success: true,
         jobId: jobId,
         status: 'queued',
-        message: '정책표 생성이 시작되었습니다.'
+        message: `대기 중... (대기순번: ${queuePosition})`,
+        queuePosition: queuePosition,
+        queueLength: queueStatus.queueLength,
+        estimatedWaitTime: queuePosition * 30, // 대략적인 대기 시간 (초) - 작업당 약 30초 가정
+        discordBotStatus: queueStatus.discordBotStatus
       });
     } catch (error) {
       console.error('[정책표] 생성 요청 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // GET /api/policy-table/queue-status
+  // 큐 상태 조회 API
+  router.get('/policy-table/queue-status', async (req, res) => {
+    setCORSHeaders(req, res);
+    try {
+      const queueStatus = getQueueStatus();
+      return res.json({
+        success: true,
+        ...queueStatus
+      });
+    } catch (error) {
+      console.error('[정책표] 큐 상태 조회 오류:', error);
       return res.status(500).json({ success: false, error: error.message });
     }
   });
@@ -2254,7 +2533,24 @@ function setupPolicyTableRoutes(app) {
         return res.status(404).json({ success: false, error: '작업을 찾을 수 없습니다.' });
       }
 
-      return res.json(status);
+      // 큐 정보 추가
+      const queueStatus = getQueueStatus();
+      const queueItem = generationQueue.queue.find(item => item.jobId === jobId);
+      const processingItem = generationQueue.processing.find(item => item.jobId === jobId);
+      
+      const response = {
+        ...status,
+        queueInfo: {
+          queuePosition: queueItem ? queueItem.queuePosition : (processingItem ? 0 : null),
+          queueLength: queueStatus.queueLength,
+          processingLength: queueStatus.processingLength,
+          isProcessing: !!processingItem,
+          estimatedWaitTime: queueItem ? queueItem.queuePosition * 30 : 0 // 대략적인 대기 시간 (초)
+        },
+        discordBotStatus: queueStatus.discordBotStatus
+      };
+
+      return res.json(response);
     } catch (error) {
       console.error('[정책표] 상태 조회 오류:', error);
       return res.status(500).json({ success: false, error: error.message });
