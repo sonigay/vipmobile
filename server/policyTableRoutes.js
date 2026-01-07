@@ -4182,8 +4182,19 @@ function setupPolicyTableRoutes(app) {
   router.put('/policy-table/default-groups/:userId', express.json(), async (req, res) => {
     setCORSHeaders(req, res);
     try {
+      console.log('[정책표] 기본 그룹 설정 저장 요청:', {
+        userId: req.params.userId,
+        body: req.body,
+        userRole: req.headers['x-user-role'],
+        userIdHeader: req.headers['x-user-id']
+      });
+
       const permission = await checkPermission(req, ['SS', 'TEAM_LEADER']);
       if (!permission.hasPermission) {
+        console.log('[정책표] 기본 그룹 설정 저장 권한 없음:', {
+          userRole: req.headers['x-user-role'],
+          requiredRoles: ['SS', 'TEAM_LEADER']
+        });
         return res.status(403).json({ success: false, error: '권한이 없습니다.' });
       }
 

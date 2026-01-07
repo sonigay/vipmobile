@@ -2808,8 +2808,25 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                     severity: 'success'
                   });
                 } else {
-                  const errorData = await response.json();
-                  setError(errorData.error || '기본 그룹 설정 저장에 실패했습니다.');
+                  // 응답이 JSON인지 확인
+                  const contentType = response.headers.get('content-type');
+                  let errorMessage = '기본 그룹 설정 저장에 실패했습니다.';
+                  
+                  if (contentType && contentType.includes('application/json')) {
+                    try {
+                      const errorData = await response.json();
+                      errorMessage = errorData.error || errorMessage;
+                    } catch (e) {
+                      console.error('JSON 파싱 오류:', e);
+                    }
+                  } else {
+                    // HTML 응답인 경우
+                    const text = await response.text();
+                    console.error('서버 응답 (HTML):', text.substring(0, 200));
+                    errorMessage = `서버 오류 (${response.status}): ${response.statusText}`;
+                  }
+                  
+                  setError(errorMessage);
                 }
               } catch (error) {
                 console.error('기본 그룹 설정 저장 오류:', error);
