@@ -1265,12 +1265,6 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
                     <Typography variant="body1" sx={{ mb: 2 }}>
                       {selectedPolicy.applyDate || '-'}
                     </Typography>
-                    <Typography variant="subtitle2" gutterBottom>
-                      정책적용내용
-                    </Typography>
-                    <Typography variant="body1" sx={{ whiteSpace: 'pre-line', mb: 2 }}>
-                      {selectedPolicy.applyContent}
-                    </Typography>
                     {mode !== 'generalPolicy' && (
                       <>
                         <Typography variant="subtitle2" gutterBottom>

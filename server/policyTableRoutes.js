@@ -3744,14 +3744,61 @@ function setupPolicyTableRoutes(app) {
         viewHistory = [];
       }
 
+      // 정책영업그룹 이름 매핑 (정책모드에서만)
+      const accessGroupId = row[5] || '';
+      const accessGroupIds = parseAccessGroupIds(accessGroupId);
+      let accessGroupNames = [];
+      
+      if (!isGeneralPolicyMode && accessGroupIds.length > 0) {
+        // 정책영업그룹 조회 (캐시 활용)
+        const userGroupsCacheKey = `user-groups-${SPREADSHEET_ID}`;
+        let userGroupsNameMap = new Map();
+        const cachedUserGroups = getCache(userGroupsCacheKey);
+        
+        if (cachedUserGroups) {
+          // 캐시에서 가져온 데이터 사용
+          cachedUserGroups.forEach(group => {
+            if (group.id && group.name) {
+              userGroupsNameMap.set(group.id, group.name);
+            }
+          });
+        } else {
+          // 캐시에 없으면 직접 조회
+          await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_USER_GROUPS, HEADERS_USER_GROUPS);
+          const userGroupsResponse = await withRetry(async () => {
+            return await sheets.spreadsheets.values.get({
+              spreadsheetId: SPREADSHEET_ID,
+              range: `${SHEET_USER_GROUPS}!A:E`
+            });
+          });
+          
+          const userGroupsRows = userGroupsResponse.data.values || [];
+          const userGroupsDataRows = userGroupsRows.slice(1);
+          userGroupsDataRows.forEach(groupRow => {
+            const groupId = groupRow[0] || '';
+            const groupName = groupRow[1] || '';
+            if (groupId && groupName) {
+              userGroupsNameMap.set(groupId, groupName);
+            }
+          });
+        }
+        
+        // 정책영업그룹 이름 배열 생성
+        accessGroupNames = accessGroupIds
+          .map(groupId => userGroupsNameMap.get(groupId))
+          .filter(name => name); // undefined 제거
+      }
+
       const policy = {
         id: row[0] || '',
         policyTableId: row[1] || '',
         policyTableName: row[2] || '',
         applyDate: row[3] || '',
         applyContent: row[4] || '',
-        accessGroupId: row[5] || '',
+        accessGroupId: accessGroupId,
+        accessGroupNames: accessGroupNames, // 정책영업그룹 이름 배열 추가
         creator: row[6] || '',
+        creatorId: row[13] || '', // 생성자ID
         createdAt: row[7] || '',
         messageId: row[8] || '',
         threadId: row[9] || '',
