@@ -401,6 +401,7 @@ const SHEET_POLICY_TABLE_LIST = '정책모드_정책표목록';
 const SHEET_USER_GROUPS = '정책모드_일반사용자그룹';
 const SHEET_TAB_ORDER = '정책표목록_탭순서';
 const SHEET_GROUP_CHANGE_HISTORY = '정책모드_정책영업그룹_변경이력';
+const SHEET_DEFAULT_GROUPS = '정책모드_기본정책영업그룹';
 
 // 시트 헤더 정의
 const HEADERS_POLICY_TABLE_SETTINGS = [
@@ -446,6 +447,14 @@ const HEADERS_TAB_ORDER = [
   '사용자ID',
   '탭순서',
   '생성카드순서',
+  '수정일시',
+  '수정자'
+];
+
+const HEADERS_DEFAULT_GROUPS = [
+  '사용자ID',
+  '정책표ID',
+  '기본그룹ID목록',  // JSON 배열 형식
   '수정일시',
   '수정자'
 ];
@@ -4119,6 +4128,127 @@ function setupPolicyTableRoutes(app) {
       });
     } catch (error) {
       console.error('[정책표] 삭제 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // ========== 기본 정책영업그룹 설정 관련 API ==========
+
+  // GET /api/policy-table/default-groups/:userId - 사용자의 기본 그룹 설정 조회
+  router.get('/policy-table/default-groups/:userId', async (req, res) => {
+    setCORSHeaders(req, res);
+    try {
+      const { userId } = req.params;
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_DEFAULT_GROUPS, HEADERS_DEFAULT_GROUPS);
+
+      const response = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_DEFAULT_GROUPS}!A:E`
+        });
+      });
+
+      const rows = response.data.values || [];
+      const dataRows = rows.length > 1 ? rows.slice(1) : [];
+      
+      // 해당 사용자의 설정만 필터링
+      const userSettings = dataRows
+        .filter(row => row[0] === userId)
+        .map(row => ({
+          policyTableId: row[1] || '',
+          defaultGroupIds: row[2] ? (row[2].startsWith('[') ? JSON.parse(row[2]) : [row[2]]) : []
+        }));
+
+      // 정책표ID별로 매핑
+      const defaultGroups = {};
+      userSettings.forEach(setting => {
+        if (setting.policyTableId) {
+          defaultGroups[setting.policyTableId] = setting.defaultGroupIds;
+        }
+      });
+
+      return res.json({
+        success: true,
+        defaultGroups: defaultGroups
+      });
+    } catch (error) {
+      console.error('[정책표] 기본 그룹 설정 조회 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // PUT /api/policy-table/default-groups/:userId - 사용자의 기본 그룹 설정 저장
+  router.put('/policy-table/default-groups/:userId', express.json(), async (req, res) => {
+    setCORSHeaders(req, res);
+    try {
+      const permission = await checkPermission(req, ['SS', 'TEAM_LEADER']);
+      if (!permission.hasPermission) {
+        return res.status(403).json({ success: false, error: '권한이 없습니다.' });
+      }
+
+      const { userId } = req.params;
+      const { policyTableId, defaultGroupIds } = req.body;
+
+      if (!policyTableId) {
+        return res.status(400).json({ success: false, error: '정책표ID가 필요합니다.' });
+      }
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_DEFAULT_GROUPS, HEADERS_DEFAULT_GROUPS);
+
+      const response = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_DEFAULT_GROUPS}!A:E`
+        });
+      });
+
+      const rows = response.data.values || [];
+      const dataRows = rows.length > 1 ? rows.slice(1) : [];
+      
+      // 해당 사용자와 정책표ID에 해당하는 행 찾기
+      const rowIndex = dataRows.findIndex(row => row[0] === userId && row[1] === policyTableId);
+
+      const now = new Date().toLocaleString('ko-KR');
+      const updatedBy = permission.userName || 'Unknown';
+      const defaultGroupIdsJson = Array.isArray(defaultGroupIds) && defaultGroupIds.length > 0
+        ? JSON.stringify(defaultGroupIds)
+        : '';
+
+      if (rowIndex !== -1) {
+        // 기존 행 업데이트
+        await withRetry(async () => {
+          return await sheets.spreadsheets.values.update({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SHEET_DEFAULT_GROUPS}!A${rowIndex + 2}:E${rowIndex + 2}`,
+            valueInputOption: 'RAW',
+            resource: {
+              values: [[userId, policyTableId, defaultGroupIdsJson, now, updatedBy]]
+            }
+          });
+        });
+      } else {
+        // 새 행 추가
+        await withRetry(async () => {
+          return await sheets.spreadsheets.values.append({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SHEET_DEFAULT_GROUPS}!A:E`,
+            valueInputOption: 'RAW',
+            insertDataOption: 'INSERT_ROWS',
+            resource: {
+              values: [[userId, policyTableId, defaultGroupIdsJson, now, updatedBy]]
+            }
+          });
+        });
+      }
+
+      return res.json({
+        success: true,
+        message: '기본 그룹 설정이 저장되었습니다.'
+      });
+    } catch (error) {
+      console.error('[정책표] 기본 그룹 설정 저장 오류:', error);
       return res.status(500).json({ success: false, error: error.message });
     }
   });

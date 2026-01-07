@@ -146,6 +146,14 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
     accessGroupIds: []
   });
 
+  // 기본 그룹 설정 관련 상태
+  const [defaultGroups, setDefaultGroups] = useState({}); // { policyTableId: [groupIds] }
+  const [defaultGroupModalOpen, setDefaultGroupModalOpen] = useState(false);
+  const [defaultGroupFormData, setDefaultGroupFormData] = useState({
+    policyTableId: '',
+    defaultGroupIds: []
+  });
+
   // 생성 진행 상태
   const [generationStatus, setGenerationStatus] = useState(null);
   const [pollingInterval, setPollingInterval] = useState(null);
@@ -218,6 +226,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
         // 정책표 생성 기능은 SS 또는 팀장만 사용 가능
         if (canAccessPolicyTableCreation) {
           promises.push(loadSettings());
+          promises.push(loadDefaultGroups());
         }
         
         await Promise.all(promises);
@@ -821,12 +830,46 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
     }
   };
 
-  const handleOpenCreationModal = (policyTable) => {
+  // 기본 그룹 설정 로드
+  const loadDefaultGroups = async () => {
+    try {
+      const userId = loggedInStore?.contactId || loggedInStore?.id;
+      if (!userId) return;
+
+      const response = await fetch(`${API_BASE_URL}/api/policy-table/default-groups/${userId}`, {
+        headers: {
+          'x-user-role': loggedInStore?.userRole || '',
+          'x-user-id': userId
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.defaultGroups) {
+          setDefaultGroups(data.defaultGroups);
+          return data.defaultGroups; // 반환값 추가
+        }
+      }
+      return {};
+    } catch (error) {
+      console.error('기본 그룹 설정 로드 오류:', error);
+      return {};
+    }
+  };
+
+  const handleOpenCreationModal = async (policyTable) => {
     setSelectedPolicyTable(policyTable);
+    
+    // 기본 그룹 설정 로드
+    const loadedDefaultGroups = await loadDefaultGroups();
+    
+    // 해당 정책표의 기본 그룹이 있으면 자동 선택
+    const defaultGroupIds = loadedDefaultGroups[policyTable.id] || [];
+    
     setCreationFormData({
       applyDate: '',
       applyContent: '',
-      accessGroupIds: []
+      accessGroupIds: defaultGroupIds
     });
     setGenerationStatus(null);
     setGeneratedResult(null);
@@ -1592,12 +1635,25 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                   <Button
                     variant="contained"
                     disabled={selectedSettings.length === 0}
-                    onClick={() => {
+                    onClick={async () => {
                       const selected = settings.filter(s => selectedSettings.includes(s.id));
+                      
+                      // 기본 그룹 설정 로드
+                      const loadedDefaultGroups = await loadDefaultGroups();
+                      
+                      // 각 정책표별 기본 그룹 자동 선택
+                      const policyTableGroups = {};
+                      selected.forEach(setting => {
+                        const defaultGroupIds = loadedDefaultGroups[setting.id] || [];
+                        if (defaultGroupIds.length > 0) {
+                          policyTableGroups[setting.id] = defaultGroupIds;
+                        }
+                      });
+                      
                       setBatchCreationFormData({
                         applyDate: '',
                         applyContent: '',
-                        policyTableGroups: {}
+                        policyTableGroups: policyTableGroups
                       });
                       setBatchGenerationStatus({});
                       setBatchCreationModalOpen(true);
@@ -2039,41 +2095,58 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
               />
             </Grid>
             <Grid item xs={12}>
-              <Autocomplete
-                multiple
-                options={userGroups || []}
-                getOptionLabel={(option) => option?.groupName || ''}
-                value={userGroups.filter(g => creationFormData.accessGroupIds.includes(g.id)) || []}
-                onChange={(event, newValue) => {
-                  setCreationFormData({
-                    ...creationFormData,
-                    accessGroupIds: newValue.map(g => g.id)
-                  });
-                }}
-                isOptionEqualToValue={(option, value) => option?.id === value?.id}
-                noOptionsText="등록된 그룹이 없습니다."
-                filterSelectedOptions
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="접근권한 (정책영업그룹)"
-                    placeholder="그룹을 선택하세요 (다중 선택 가능)"
-                  />
-                )}
-                renderTags={(value, getTagProps) =>
-                  value.map((option, index) => {
-                    const { key, ...tagProps } = getTagProps({ index });
-                    return (
-                      <Chip
-                        key={option.id || key}
-                        label={option.groupName || ''}
-                        onDelete={tagProps.onDelete}
-                        {...tagProps}
-                      />
-                    );
-                  })
-                }
-              />
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                <Autocomplete
+                  multiple
+                  options={userGroups || []}
+                  getOptionLabel={(option) => option?.groupName || ''}
+                  value={userGroups.filter(g => creationFormData.accessGroupIds.includes(g.id)) || []}
+                  onChange={(event, newValue) => {
+                    setCreationFormData({
+                      ...creationFormData,
+                      accessGroupIds: newValue.map(g => g.id)
+                    });
+                  }}
+                  isOptionEqualToValue={(option, value) => option?.id === value?.id}
+                  noOptionsText="등록된 그룹이 없습니다."
+                  filterSelectedOptions
+                  sx={{ flex: 1 }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="접근권한 (정책영업그룹)"
+                      placeholder="그룹을 선택하세요 (다중 선택 가능)"
+                    />
+                  )}
+                  renderTags={(value, getTagProps) =>
+                    value.map((option, index) => {
+                      const { key, ...tagProps } = getTagProps({ index });
+                      return (
+                        <Chip
+                          key={option.id || key}
+                          label={option.groupName || ''}
+                          onDelete={tagProps.onDelete}
+                          {...tagProps}
+                        />
+                      );
+                    })
+                  }
+                />
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => {
+                    setDefaultGroupFormData({
+                      policyTableId: selectedPolicyTable?.id || '',
+                      defaultGroupIds: creationFormData.accessGroupIds
+                    });
+                    setDefaultGroupModalOpen(true);
+                  }}
+                  sx={{ minWidth: 100 }}
+                >
+                  기본설정
+                </Button>
+              </Box>
             </Grid>
 
             {/* 생성 진행 상황 */}
@@ -2231,7 +2304,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                           {setting.policyTableName}
                         </Typography>
                       </Grid>
-                      <Grid item xs={12} sm={8}>
+                      <Grid item xs={12} sm={7}>
                         <Autocomplete
                           multiple
                           options={userGroups || []}
@@ -2269,6 +2342,22 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                             ))
                           }
                         />
+                      </Grid>
+                      <Grid item xs={12} sm={1}>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => {
+                            setDefaultGroupFormData({
+                              policyTableId: setting.id,
+                              defaultGroupIds: batchCreationFormData.policyTableGroups[setting.id] || []
+                            });
+                            setDefaultGroupModalOpen(true);
+                          }}
+                          sx={{ minWidth: 80 }}
+                        >
+                          기본설정
+                        </Button>
                       </Grid>
                       {/* 생성 상태 표시 */}
                       {batchGenerationStatus[setting.id] && (
@@ -2635,6 +2724,107 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
           </Box>
         )}
       </Popover>
+
+      {/* 기본 그룹 설정 모달 */}
+      <Dialog open={defaultGroupModalOpen} onClose={() => setDefaultGroupModalOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          기본 정책영업그룹 설정
+        </DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                선택한 그룹이 이 정책표 생성 시 자동으로 선택됩니다.
+              </Typography>
+              <Autocomplete
+                multiple
+                options={userGroups || []}
+                getOptionLabel={(option) => option?.groupName || ''}
+                value={userGroups.filter(g => defaultGroupFormData.defaultGroupIds.includes(g.id)) || []}
+                onChange={(event, newValue) => {
+                  setDefaultGroupFormData({
+                    ...defaultGroupFormData,
+                    defaultGroupIds: newValue.map(g => g.id)
+                  });
+                }}
+                isOptionEqualToValue={(option, value) => option?.id === value?.id}
+                noOptionsText="등록된 그룹이 없습니다."
+                filterSelectedOptions
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="기본 정책영업그룹"
+                    placeholder="그룹을 선택하세요 (다중 선택 가능)"
+                  />
+                )}
+                renderTags={(value, getTagProps) =>
+                  value.map((option, index) => {
+                    const { key, ...tagProps } = getTagProps({ index });
+                    return (
+                      <Chip
+                        key={option.id || key}
+                        label={option.groupName || ''}
+                        onDelete={tagProps.onDelete}
+                        {...tagProps}
+                      />
+                    );
+                  })
+                }
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDefaultGroupModalOpen(false)}>취소</Button>
+          <Button
+            onClick={async () => {
+              try {
+                setLoading(true);
+                const userId = loggedInStore?.contactId || loggedInStore?.id;
+                if (!userId) {
+                  setError('사용자 정보를 찾을 수 없습니다.');
+                  return;
+                }
+
+                const response = await fetch(`${API_BASE_URL}/api/policy-table/default-groups/${userId}`, {
+                  method: 'PUT',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'x-user-role': loggedInStore?.userRole || '',
+                    'x-user-id': userId
+                  },
+                  body: JSON.stringify({
+                    policyTableId: defaultGroupFormData.policyTableId,
+                    defaultGroupIds: defaultGroupFormData.defaultGroupIds
+                  })
+                });
+
+                if (response.ok) {
+                  await loadDefaultGroups();
+                  setDefaultGroupModalOpen(false);
+                  setSnackbar({
+                    open: true,
+                    message: '기본 그룹 설정이 저장되었습니다.',
+                    severity: 'success'
+                  });
+                } else {
+                  const errorData = await response.json();
+                  setError(errorData.error || '기본 그룹 설정 저장에 실패했습니다.');
+                }
+              } catch (error) {
+                console.error('기본 그룹 설정 저장 오류:', error);
+                setError('기본 그룹 설정 저장 중 오류가 발생했습니다.');
+              } finally {
+                setLoading(false);
+              }
+            }}
+            variant="contained"
+            disabled={loading}
+          >
+            저장
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Snackbar for notifications */}
       <Snackbar
