@@ -93,10 +93,10 @@ function PolicyInputModal({
     },
     // 부가추가지원정책 전용 필드
     addSupport: {
-      uplayPremiumAmount: '',      // 유플레이(프리미엄) 유치금액
+      uplayPremiumAmount: '',      // 통화편의+구글원패키지 유치금액 (기존: 유플레이(프리미엄))
       phoneExchangePassAmount: '', // 폰교체패스 유치금액
-      musicAmount: '',             // 음악감상 유치금액
-      numberFilteringAmount: ''    // 지정번호필터링 유치금액
+      musicAmount: '',             // 음악감상+벨링콘텐츠팩 유치금액 (기존: 음악감상)
+      numberFilteringAmount: ''    // 002알뜰10000 유치금액 (기존: 지정번호필터링)
     },
     supportConditionalOptions: {
       vas2Both: false,             // VAS 2종 동시유치
@@ -323,9 +323,9 @@ function PolicyInputModal({
       const supportItems = [];
       const supportAmounts = [];
       
-      // 유플레이(프리미엄) 유치금액
+      // 통화편의+구글원패키지 유치금액 (기존: 유플레이(프리미엄))
       if (formData.addSupport?.uplayPremiumAmount?.trim()) {
-        supportItems.push('📺 유플레이(프리미엄)');
+        supportItems.push('📺 통화편의+구글원패키지');
         supportAmounts.push(Number(formData.addSupport.uplayPremiumAmount));
       }
       
@@ -335,15 +335,15 @@ function PolicyInputModal({
         supportAmounts.push(Number(formData.addSupport.phoneExchangePassAmount));
       }
       
-      // 음악감상 유치금액
+      // 음악감상+벨링콘텐츠팩 유치금액 (기존: 음악감상)
       if (formData.addSupport?.musicAmount?.trim()) {
-        supportItems.push('🎵 음악감상');
+        supportItems.push('🎵 음악감상+벨링콘텐츠팩');
         supportAmounts.push(Number(formData.addSupport.musicAmount));
       }
       
-      // 지정번호필터링 유치금액
+      // 002알뜰10000 유치금액 (기존: 지정번호필터링)
       if (formData.addSupport?.numberFilteringAmount?.trim()) {
-        supportItems.push('🔢 지정번호필터링');
+        supportItems.push('🔢 002알뜰10000');
         supportAmounts.push(Number(formData.addSupport.numberFilteringAmount));
       }
       
@@ -354,13 +354,19 @@ function PolicyInputModal({
           ? `${uniqueAmounts[0].toLocaleString()}원`
           : supportAmounts.map(amount => `${amount.toLocaleString()}원`).join('/');
         
+        // 구글원패키지 불가시 대체 정책 문구 추가
+        let replacementText = '';
+        if (formData.addSupport?.uplayPremiumAmount?.trim() && formData.addSupport?.numberFilteringAmount?.trim()) {
+          replacementText = '\n⚠️ 구글원패키지 불가시 002알뜰10000으로 추가정책 대체';
+        }
+        
         let content;
         if (conditions.length > 0) {
           // 조건부가 있는 경우
-          content = `🎯 조건부: ${conditions.join(', ')}\n💰 ${supportItems.join('/')} ${amountText} 추가금액지원`;
+          content = `🎯 조건부: ${conditions.join(', ')}\n💰 ${supportItems.join('/')} ${amountText} 추가금액지원${replacementText}`;
         } else {
           // 조건부가 없는 경우 - 모든 추가지원 금액 표시
-          content = `💰 ${supportItems.join('/')} ${amountText} 추가금액지원`;
+          content = `💰 ${supportItems.join('/')} ${amountText} 추가금액지원${replacementText}`;
         }
         setFormData(prev => ({ ...prev, policyContent: content }));
       } else {
@@ -1376,7 +1382,7 @@ function PolicyInputModal({
                 </Typography>
                 <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
                   <TextField
-                    label="유플레이(프리미엄) 유치금액"
+                    label="통화편의+구글원패키지 유치금액"
                     value={formData.addSupport?.uplayPremiumAmount || ''}
                     onChange={(e) => handleInputChange('addSupport', {
                       ...(formData.addSupport || {}),
@@ -1400,7 +1406,7 @@ function PolicyInputModal({
                     placeholder="금액 입력"
                   />
                   <TextField
-                    label="음악감상 유치금액"
+                    label="음악감상+벨링콘텐츠팩 유치금액"
                     value={formData.addSupport?.musicAmount || ''}
                     onChange={(e) => handleInputChange('addSupport', {
                       ...(formData.addSupport || {}),
@@ -1412,7 +1418,7 @@ function PolicyInputModal({
                     placeholder="금액 입력"
                   />
                   <TextField
-                    label="지정번호필터링 유치금액"
+                    label="002알뜰10000 유치금액"
                     value={formData.addSupport?.numberFilteringAmount || ''}
                     onChange={(e) => handleInputChange('addSupport', {
                       ...(formData.addSupport || {}),
