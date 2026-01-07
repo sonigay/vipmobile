@@ -3996,6 +3996,75 @@ function setupPolicyTableRoutes(app) {
     }
   });
 
+  // PUT /api/policy-tables/:id - 정책표 수정
+  router.put('/policy-tables/:id', express.json(), async (req, res) => {
+    setCORSHeaders(req, res);
+    try {
+      const permission = await checkPermission(req, ['SS', 'TEAM_LEADER']);
+      if (!permission.hasPermission) {
+        return res.status(403).json({ success: false, error: '권한이 없습니다.' });
+      }
+
+      const { id } = req.params;
+      const { applyDate, applyContent, accessGroupIds } = req.body;
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_TABLE_LIST, HEADERS_POLICY_TABLE_LIST);
+
+      const response = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_POLICY_TABLE_LIST}!A:O`
+        });
+      });
+
+      const rows = response.data.values || [];
+      const rowIndex = rows.findIndex(row => row[0] === id);
+
+      if (rowIndex === -1) {
+        return res.status(404).json({ success: false, error: '정책표를 찾을 수 없습니다.' });
+      }
+
+      const existingRow = rows[rowIndex];
+      
+      // 수정할 필드만 업데이트 (기존 값 유지)
+      const updatedRow = [...existingRow];
+      if (applyDate !== undefined) {
+        updatedRow[3] = applyDate; // 정책적용일시
+      }
+      if (applyContent !== undefined) {
+        updatedRow[4] = applyContent; // 정책적용내용
+      }
+      if (accessGroupIds !== undefined) {
+        // accessGroupIds 배열을 JSON 문자열로 변환
+        const accessGroupIdsJson = Array.isArray(accessGroupIds) && accessGroupIds.length > 0
+          ? JSON.stringify(accessGroupIds)
+          : '';
+        updatedRow[5] = accessGroupIdsJson; // 접근권한
+      }
+
+      await withRetry(async () => {
+        return await sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_POLICY_TABLE_LIST}!A${rowIndex + 1}:O${rowIndex + 1}`,
+          valueInputOption: 'USER_ENTERED',
+          resource: { values: [updatedRow] }
+        });
+      });
+
+      // 캐시 무효화: 정책표 수정 시 관련 캐시 무효화
+      invalidateRelatedCaches('policy-table', id);
+
+      return res.json({
+        success: true,
+        message: '정책표가 수정되었습니다.'
+      });
+    } catch (error) {
+      console.error('[정책표] 수정 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // DELETE /api/policy-tables/:id
   router.delete('/policy-tables/:id', async (req, res) => {
     setCORSHeaders(req, res);

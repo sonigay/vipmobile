@@ -23,7 +23,14 @@ import {
   CircularProgress,
   Chip,
   InputAdornment,
-  Divider
+  Divider,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Checkbox,
+  ListItemText,
+  OutlinedInput
 } from '@mui/material';
 import {
   Refresh as RefreshIcon,
@@ -31,7 +38,10 @@ import {
   Delete as DeleteIcon,
   Search as SearchIcon,
   DragIndicator as DragIndicatorIcon,
-  Download as DownloadIcon
+  Download as DownloadIcon,
+  Edit as EditIcon,
+  Save as SaveIcon,
+  Cancel as CancelIcon
 } from '@mui/icons-material';
 import {
   DndContext,
@@ -143,6 +153,15 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
   const [searchCreator, setSearchCreator] = useState('');
   const [filterApplyDateFrom, setFilterApplyDateFrom] = useState('');
 
+  // 수정 모드 관련 상태
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    applyDate: '',
+    applyContent: '',
+    accessGroupIds: []
+  });
+  const [userGroups, setUserGroups] = useState([]);
+
   // 드래그 앤 드롭 센서 설정
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -164,8 +183,36 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
   useEffect(() => {
     if (canAccess) {
       loadTabs();
+      if (mode !== 'generalPolicy') {
+        loadUserGroups();
+      }
     }
-  }, [canAccess]);
+  }, [canAccess, mode]);
+
+  // 정책영업그룹 목록 로드
+  const loadUserGroups = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/policy-table/user-groups`, {
+        headers: {
+          'x-user-role': loggedInStore?.userRole || '',
+          'x-user-id': loggedInStore?.contactId || loggedInStore?.id || ''
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        let groups = [];
+        if (Array.isArray(data)) {
+          groups = data;
+        } else if (data.success !== false && Array.isArray(data.data)) {
+          groups = data.data;
+        }
+        setUserGroups(groups);
+      }
+    } catch (error) {
+      console.error('정책영업그룹 로드 오류:', error);
+      setUserGroups([]);
+    }
+  };
 
   // 정책 목록 캐싱을 위한 상태 (모드별로 분리)
   const [policiesCache, setPoliciesCache] = useState({});
@@ -360,6 +407,19 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
         setSelectedPolicy(data);
         setImageError(false);
         setDetailModalOpen(true);
+        setIsEditMode(false);
+        
+        // 수정 폼 데이터 초기화
+        const accessGroupIds = data.accessGroupId 
+          ? (data.accessGroupId.startsWith('[') 
+              ? JSON.parse(data.accessGroupId) 
+              : [data.accessGroupId])
+          : [];
+        setEditFormData({
+          applyDate: data.applyDate || '',
+          applyContent: data.applyContent || '',
+          accessGroupIds: accessGroupIds
+        });
 
         // 확인이력 기록 (일반정책모드와 정책모드 모두 기록)
         // 확인이력 표시는 정책모드에서만 (아래 UI 코드에서 처리)
@@ -812,7 +872,13 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
     }
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id, e) => {
+    // 이벤트 전파 방지
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+
     if (!window.confirm('정책표를 삭제하시겠습니까?')) {
       return;
     }
@@ -851,6 +917,82 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
     const currentTab = tabs[activeTabIndex];
     if (currentTab) {
       loadPolicies(currentTab.policyTableName);
+    }
+  };
+
+  // 수정 모드 토글
+  const handleToggleEditMode = () => {
+    if (isEditMode) {
+      // 취소: 원래 데이터로 복원
+      const accessGroupIds = selectedPolicy?.accessGroupId 
+        ? (selectedPolicy.accessGroupId.startsWith('[') 
+            ? JSON.parse(selectedPolicy.accessGroupId) 
+            : [selectedPolicy.accessGroupId])
+        : [];
+      setEditFormData({
+        applyDate: selectedPolicy?.applyDate || '',
+        applyContent: selectedPolicy?.applyContent || '',
+        accessGroupIds: accessGroupIds
+      });
+    }
+    setIsEditMode(!isEditMode);
+  };
+
+  // 정책표 수정 저장
+  const handleSaveEdit = async () => {
+    if (!selectedPolicy) return;
+
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_BASE_URL}/api/policy-tables/${selectedPolicy.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-role': loggedInStore?.userRole || '',
+          'x-user-id': loggedInStore?.contactId || loggedInStore?.id || ''
+        },
+        body: JSON.stringify({
+          applyDate: editFormData.applyDate,
+          applyContent: editFormData.applyContent,
+          accessGroupIds: editFormData.accessGroupIds
+        })
+      });
+
+      if (response.ok) {
+        // 정책 목록 새로고침
+        const currentTab = tabs[activeTabIndex];
+        if (currentTab) {
+          await loadPolicies(currentTab.policyTableName);
+        }
+        
+        // 선택된 정책 정보 업데이트
+        const params = new URLSearchParams();
+        if (mode) {
+          params.append('mode', mode);
+        }
+        const detailResponse = await fetch(`${API_BASE_URL}/api/policy-tables/${selectedPolicy.id}?${params}`, {
+          headers: {
+            'x-user-role': loggedInStore?.userRole || '',
+            'x-user-id': loggedInStore?.contactId || loggedInStore?.id || '',
+            'x-user-name': encodeURIComponent(loggedInStore?.userName || loggedInStore?.name || '')
+          }
+        });
+        if (detailResponse.ok) {
+          const updatedData = await detailResponse.json();
+          setSelectedPolicy(updatedData);
+        }
+        
+        setIsEditMode(false);
+        setError(null);
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || '수정에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('정책표 수정 오류:', error);
+      setError('수정 중 오류가 발생했습니다.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -1013,7 +1155,7 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
                       {canDelete && (
                         <IconButton
                           size="small"
-                          onClick={() => handleDelete(policy.id)}
+                          onClick={(e) => handleDelete(policy.id, e)}
                           color="error"
                         >
                           <DeleteIcon />
@@ -1043,18 +1185,106 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
             <Box>
               {/* 상단: 정책적용일시, 정책적용내용 */}
               <Paper sx={{ p: 2, mb: 2, bgcolor: 'background.default' }}>
-                <Typography variant="subtitle2" gutterBottom>
-                  정책적용일시
-                </Typography>
-                <Typography variant="body1" sx={{ mb: 2 }}>
-                  {selectedPolicy.applyDate || '-'}
-                </Typography>
-                <Typography variant="subtitle2" gutterBottom>
-                  정책적용내용
-                </Typography>
-                <Typography variant="body1" sx={{ whiteSpace: 'pre-line' }}>
-                  {selectedPolicy.applyContent}
-                </Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="subtitle2">
+                    정책 정보
+                  </Typography>
+                  {canDelete && (
+                    <Button
+                      size="small"
+                      variant={isEditMode ? 'outlined' : 'contained'}
+                      startIcon={isEditMode ? <CancelIcon /> : <EditIcon />}
+                      onClick={handleToggleEditMode}
+                      disabled={loading}
+                    >
+                      {isEditMode ? '취소' : '수정'}
+                    </Button>
+                  )}
+                </Box>
+                
+                {isEditMode ? (
+                  <>
+                    <TextField
+                      fullWidth
+                      label="정책적용일시"
+                      value={editFormData.applyDate}
+                      onChange={(e) => setEditFormData({ ...editFormData, applyDate: e.target.value })}
+                      sx={{ mb: 2 }}
+                      disabled={loading}
+                    />
+                    <TextField
+                      fullWidth
+                      multiline
+                      rows={4}
+                      label="정책적용내용"
+                      value={editFormData.applyContent}
+                      onChange={(e) => setEditFormData({ ...editFormData, applyContent: e.target.value })}
+                      sx={{ mb: 2 }}
+                      disabled={loading}
+                    />
+                    {mode !== 'generalPolicy' && (
+                      <FormControl fullWidth sx={{ mb: 2 }}>
+                        <InputLabel>정책영업그룹</InputLabel>
+                        <Select
+                          multiple
+                          value={editFormData.accessGroupIds}
+                          onChange={(e) => setEditFormData({ ...editFormData, accessGroupIds: e.target.value })}
+                          input={<OutlinedInput label="정책영업그룹" />}
+                          renderValue={(selected) => {
+                            const selectedNames = selected
+                              .map(id => userGroups.find(g => g.id === id)?.name)
+                              .filter(Boolean);
+                            return selectedNames.length > 0 ? selectedNames.join(', ') : '선택 안 함';
+                          }}
+                          disabled={loading}
+                        >
+                          {userGroups.map((group) => (
+                            <MenuItem key={group.id} value={group.id}>
+                              <Checkbox checked={editFormData.accessGroupIds.indexOf(group.id) > -1} />
+                              <ListItemText primary={group.name} />
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    )}
+                    <Button
+                      variant="contained"
+                      startIcon={<SaveIcon />}
+                      onClick={handleSaveEdit}
+                      disabled={loading}
+                      fullWidth
+                    >
+                      저장
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Typography variant="subtitle2" gutterBottom>
+                      정책적용일시
+                    </Typography>
+                    <Typography variant="body1" sx={{ mb: 2 }}>
+                      {selectedPolicy.applyDate || '-'}
+                    </Typography>
+                    <Typography variant="subtitle2" gutterBottom>
+                      정책적용내용
+                    </Typography>
+                    <Typography variant="body1" sx={{ whiteSpace: 'pre-line', mb: 2 }}>
+                      {selectedPolicy.applyContent}
+                    </Typography>
+                    {mode !== 'generalPolicy' && (
+                      <>
+                        <Typography variant="subtitle2" gutterBottom>
+                          정책영업그룹
+                        </Typography>
+                        <Typography variant="body1">
+                          {selectedPolicy.accessGroupNames && selectedPolicy.accessGroupNames.length > 0
+                            ? selectedPolicy.accessGroupNames.join(', ')
+                            : '-'}
+                        </Typography>
+                      </>
+                    )}
+                  </>
+                )}
               </Paper>
 
               {/* 하단: 이미지 */}
