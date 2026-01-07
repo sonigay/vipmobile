@@ -65,6 +65,11 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { API_BASE_URL } from '../../api';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { TimePicker } from '@mui/x-date-pickers/TimePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { ko } from 'date-fns/locale';
 
 // 드래그 가능한 카드 컴포넌트
 const SortableCard = ({ setting, children }) => {
@@ -146,6 +151,21 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
     accessGroupIds: []
   });
 
+  // 정책적용일시 자동 생성 관련 상태
+  const [autoDateSettings, setAutoDateSettings] = useState({
+    startDate: new Date(), // 시작 날짜 (기본값: 오늘)
+    startHour: new Date().getHours(), // 시작 시간 (시)
+    startMinute: Math.floor(new Date().getMinutes() / 10) * 10, // 시작 시간 (분, 10분 단위)
+    policyType: 'wireless', // 'wireless', 'wired', 'other'
+    otherPolicyName: '이통사지원금', // 기타정책 선택 시 정책명
+    hasEndDate: false, // 종료시점 사용 여부
+    endDate: null, // 종료 날짜
+    endHour: 0, // 종료 시간 (시)
+    endMinute: 0 // 종료 시간 (분, 10분 단위)
+  });
+  const [otherPolicyTypes, setOtherPolicyTypes] = useState(['이통사지원금']); // 기타정책 목록
+  const [newOtherPolicyName, setNewOtherPolicyName] = useState(''); // 새 기타정책명 입력
+
   // 기본 그룹 설정 관련 상태
   const [defaultGroups, setDefaultGroups] = useState({}); // { policyTableId: [groupIds] }
   const [defaultGroupModalOpen, setDefaultGroupModalOpen] = useState(false);
@@ -223,6 +243,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
         if (canAccessPolicyTableCreation) {
           // 정책표 설정만 먼저 로드 (화면 표시에 필수)
           promises.push(loadSettings());
+          promises.push(loadOtherPolicyTypes());
         }
         
         // 정책영업그룹은 정책영업그룹 탭에서만 필요하므로 지연 로드
@@ -859,6 +880,117 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
     }
   };
 
+  // 기타정책 목록 로드
+  const loadOtherPolicyTypes = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/policy-table/other-policy-types`, {
+        headers: {
+          'x-user-role': loggedInStore?.userRole || '',
+          'x-user-id': loggedInStore?.contactId || loggedInStore?.id || ''
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.otherPolicyTypes) {
+          const names = data.otherPolicyTypes.map(item => item.name);
+          // 기본값 "이통사지원금"이 없으면 추가
+          if (!names.includes('이통사지원금')) {
+            names.unshift('이통사지원금');
+          }
+          setOtherPolicyTypes(names);
+        }
+      }
+    } catch (error) {
+      console.error('기타정책 목록 로드 오류:', error);
+    }
+  };
+
+  // 기타정책 추가
+  const handleAddOtherPolicyType = async () => {
+    if (!newOtherPolicyName.trim()) {
+      setError('정책명을 입력해주세요.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_BASE_URL}/api/policy-table/other-policy-types`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-role': loggedInStore?.userRole || '',
+          'x-user-id': loggedInStore?.contactId || loggedInStore?.id || ''
+        },
+        body: JSON.stringify({
+          policyName: newOtherPolicyName.trim()
+        })
+      });
+
+      if (response.ok) {
+        await loadOtherPolicyTypes();
+        setNewOtherPolicyName('');
+        setSnackbar({
+          open: true,
+          message: '기타정책이 추가되었습니다.',
+          severity: 'success'
+        });
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || '기타정책 추가에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('기타정책 추가 오류:', error);
+      setError('기타정책 추가 중 오류가 발생했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 정책적용일시 자동 텍스트 생성
+  const generateApplyDateText = useCallback(() => {
+    const { startDate, startHour, startMinute, policyType, otherPolicyName, hasEndDate, endDate, endHour, endMinute } = autoDateSettings;
+    
+    if (!startDate) return '';
+
+    const year = startDate.getFullYear() % 100; // 2자리 연도
+    const month = startDate.getMonth() + 1;
+    const day = startDate.getDate();
+    const hour = startHour;
+    const minute = startMinute;
+
+    let policyTypeText = '';
+    if (policyType === 'wireless') {
+      policyTypeText = '【무선정책】';
+    } else if (policyType === 'wired') {
+      policyTypeText = '【유선정책】';
+    } else if (policyType === 'other') {
+      policyTypeText = `【${otherPolicyName || '이통사지원금'}】`;
+    }
+
+    let dateText = `◆ ${year}년 ${month}월 ${day}일 ${hour}시${minute > 0 ? minute + '분' : ''} 이후 ${policyTypeText} 변경공지`;
+
+    if (hasEndDate && endDate) {
+      const endDay = endDate.getDate();
+      const endHourText = endHour;
+      const endMinuteText = endMinute > 0 ? endMinute + '분' : '';
+      dateText = `◆ ${year}년 ${month}월 ${day}일 ${hour}시${minute > 0 ? minute + '분' : ''} 이후 ${endDay}일 ${endHourText}시${endMinuteText ? ' ' + endMinuteText : ''} 까지 ${policyTypeText} 변경공지`;
+    }
+
+    return dateText;
+  }, [autoDateSettings]);
+
+  // autoDateSettings 변경 시 자동으로 applyDate 업데이트
+  useEffect(() => {
+    const generatedText = generateApplyDateText();
+    if (generatedText) {
+      setCreationFormData(prev => ({
+        ...prev,
+        applyDate: generatedText
+      }));
+    }
+  }, [generateApplyDateText]);
+
   // 기본 그룹 설정 로드
   const loadDefaultGroups = async () => {
     try {
@@ -891,6 +1023,20 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
     
     // 이미 로드된 기본 그룹 사용 (즉시 모달 열기)
     const defaultGroupIds = defaultGroups[policyTable.id] || [];
+    
+    // 정책적용일시 자동 생성 설정 초기화 (오늘 날짜, 현재 시간)
+    const now = new Date();
+    setAutoDateSettings({
+      startDate: new Date(now),
+      startHour: now.getHours(),
+      startMinute: Math.floor(now.getMinutes() / 10) * 10,
+      policyType: 'wireless',
+      otherPolicyName: '이통사지원금',
+      hasEndDate: false,
+      endDate: null,
+      endHour: 0,
+      endMinute: 0
+    });
     
     setCreationFormData({
       applyDate: '',
@@ -2135,17 +2281,225 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
           정책표 생성 - {selectedPolicyTable?.policyTableName}
         </DialogTitle>
         <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="정책적용일시"
-                value={creationFormData.applyDate}
-                onChange={(e) => setCreationFormData({ ...creationFormData, applyDate: e.target.value })}
-                placeholder="예: 2025-01-01 10:00"
-                required
-              />
+          <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ko}>
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              {/* 정책적용일시 자동 생성 섹션 */}
+              <Grid item xs={12}>
+                <Paper sx={{ p: 2, bgcolor: 'background.default' }}>
+                  <Typography variant="subtitle2" gutterBottom sx={{ mb: 2, fontWeight: 'bold' }}>
+                    정책적용일시 자동 생성
+                  </Typography>
+                  
+                  <Grid container spacing={2}>
+                    {/* 시작 날짜 */}
+                    <Grid item xs={12} sm={6}>
+                      <DatePicker
+                        label="시작 날짜"
+                        value={autoDateSettings.startDate}
+                        onChange={(newValue) => {
+                          setAutoDateSettings(prev => ({ ...prev, startDate: newValue }));
+                        }}
+                        slotProps={{
+                          textField: {
+                            fullWidth: true,
+                            size: 'small'
+                          }
+                        }}
+                      />
+                    </Grid>
+                    
+                    {/* 시작 시간 */}
+                    <Grid item xs={6} sm={3}>
+                      <FormControl fullWidth size="small">
+                        <InputLabel>시</InputLabel>
+                        <Select
+                          value={autoDateSettings.startHour}
+                          label="시"
+                          onChange={(e) => {
+                            setAutoDateSettings(prev => ({ ...prev, startHour: e.target.value }));
+                          }}
+                        >
+                          {Array.from({ length: 24 }, (_, i) => (
+                            <MenuItem key={i} value={i}>{i}시</MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                    
+                    <Grid item xs={6} sm={3}>
+                      <FormControl fullWidth size="small">
+                        <InputLabel>분 (10분 단위)</InputLabel>
+                        <Select
+                          value={autoDateSettings.startMinute}
+                          label="분 (10분 단위)"
+                          onChange={(e) => {
+                            setAutoDateSettings(prev => ({ ...prev, startMinute: e.target.value }));
+                          }}
+                        >
+                          {Array.from({ length: 6 }, (_, i) => {
+                            const minute = i * 10;
+                            return <MenuItem key={minute} value={minute}>{minute}분</MenuItem>;
+                          })}
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                    
+                    {/* 정책 유형 선택 */}
+                    <Grid item xs={12} sm={6}>
+                      <FormControl fullWidth size="small">
+                        <InputLabel>정책 유형</InputLabel>
+                        <Select
+                          value={autoDateSettings.policyType}
+                          label="정책 유형"
+                          onChange={(e) => {
+                            setAutoDateSettings(prev => ({ ...prev, policyType: e.target.value }));
+                          }}
+                        >
+                          <MenuItem value="wireless">무선정책</MenuItem>
+                          <MenuItem value="wired">유선정책</MenuItem>
+                          <MenuItem value="other">기타정책</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                    
+                    {/* 기타정책 선택 */}
+                    {autoDateSettings.policyType === 'other' && (
+                      <Grid item xs={12} sm={6}>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <FormControl fullWidth size="small">
+                            <InputLabel>기타정책명</InputLabel>
+                            <Select
+                              value={autoDateSettings.otherPolicyName}
+                              label="기타정책명"
+                              onChange={(e) => {
+                                setAutoDateSettings(prev => ({ ...prev, otherPolicyName: e.target.value }));
+                              }}
+                            >
+                              {otherPolicyTypes.map((name) => (
+                                <MenuItem key={name} value={name}>{name}</MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={handleAddOtherPolicyType}
+                            sx={{ minWidth: 80 }}
+                          >
+                            추가
+                          </Button>
+                        </Box>
+                      </Grid>
+                    )}
+                    
+                    {/* 기타정책 추가 입력 필드 */}
+                    {autoDateSettings.policyType === 'other' && (
+                      <Grid item xs={12}>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <TextField
+                            fullWidth
+                            size="small"
+                            label="새 기타정책명"
+                            value={newOtherPolicyName}
+                            onChange={(e) => setNewOtherPolicyName(e.target.value)}
+                            placeholder="정책명을 입력하세요"
+                          />
+                        </Box>
+                      </Grid>
+                    )}
+                    
+                    {/* 종료시점 체크박스 */}
+                    <Grid item xs={12}>
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={autoDateSettings.hasEndDate}
+                            onChange={(e) => {
+                              setAutoDateSettings(prev => ({
+                                ...prev,
+                                hasEndDate: e.target.checked,
+                                endDate: e.target.checked ? (prev.endDate || new Date()) : null
+                              }));
+                            }}
+                          />
+                        }
+                        label="종료시점 사용"
+                      />
+                    </Grid>
+                    
+                    {/* 종료 날짜/시간 */}
+                    {autoDateSettings.hasEndDate && (
+                      <>
+                        <Grid item xs={12} sm={6}>
+                          <DatePicker
+                            label="종료 날짜"
+                            value={autoDateSettings.endDate}
+                            onChange={(newValue) => {
+                              setAutoDateSettings(prev => ({ ...prev, endDate: newValue }));
+                            }}
+                            slotProps={{
+                              textField: {
+                                fullWidth: true,
+                                size: 'small'
+                              }
+                            }}
+                          />
+                        </Grid>
+                        
+                        <Grid item xs={6} sm={3}>
+                          <FormControl fullWidth size="small">
+                            <InputLabel>종료 시</InputLabel>
+                            <Select
+                              value={autoDateSettings.endHour}
+                              label="종료 시"
+                              onChange={(e) => {
+                                setAutoDateSettings(prev => ({ ...prev, endHour: e.target.value }));
+                              }}
+                            >
+                              {Array.from({ length: 24 }, (_, i) => (
+                                <MenuItem key={i} value={i}>{i}시</MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                        </Grid>
+                        
+                        <Grid item xs={6} sm={3}>
+                          <FormControl fullWidth size="small">
+                            <InputLabel>종료 분 (10분 단위)</InputLabel>
+                            <Select
+                              value={autoDateSettings.endMinute}
+                              label="종료 분 (10분 단위)"
+                              onChange={(e) => {
+                                setAutoDateSettings(prev => ({ ...prev, endMinute: e.target.value }));
+                              }}
+                            >
+                              {Array.from({ length: 6 }, (_, i) => {
+                                const minute = i * 10;
+                                return <MenuItem key={minute} value={minute}>{minute}분</MenuItem>;
+                              })}
+                            </Select>
+                          </FormControl>
+                        </Grid>
+                      </>
+                    )}
+                  </Grid>
+                </Paper>
+              </Grid>
+              
+              {/* 생성된 정책적용일시 표시 */}
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="정책적용일시"
+                  value={creationFormData.applyDate}
+                  onChange={(e) => setCreationFormData({ ...creationFormData, applyDate: e.target.value })}
+                  placeholder="자동 생성된 텍스트가 여기에 표시됩니다"
+                  required
+                />
+              </Grid>
             </Grid>
+          </LocalizationProvider>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid item xs={12}>
               <TextField
                 fullWidth

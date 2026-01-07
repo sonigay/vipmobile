@@ -402,6 +402,7 @@ const SHEET_USER_GROUPS = '정책모드_일반사용자그룹';
 const SHEET_TAB_ORDER = '정책표목록_탭순서';
 const SHEET_GROUP_CHANGE_HISTORY = '정책모드_정책영업그룹_변경이력';
 const SHEET_DEFAULT_GROUPS = '정책모드_기본정책영업그룹';
+const SHEET_OTHER_POLICY_TYPES = '정책모드_기타정책목록';
 
 // 시트 헤더 정의
 const HEADERS_POLICY_TABLE_SETTINGS = [
@@ -457,6 +458,12 @@ const HEADERS_DEFAULT_GROUPS = [
   '기본그룹ID목록',  // JSON 배열 형식
   '수정일시',
   '수정자'
+];
+
+const HEADERS_OTHER_POLICY_TYPES = [
+  '정책명',
+  '등록일시',
+  '등록자'
 ];
 
 const HEADERS_GROUP_CHANGE_HISTORY = [
@@ -4307,6 +4314,86 @@ function setupPolicyTableRoutes(app) {
       });
     } catch (error) {
       console.error('[정책표] 기본 그룹 설정 저장 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // ========== 기타정책 목록 관리 API ==========
+
+  // GET /api/policy-table/other-policy-types - 기타정책 목록 조회
+  router.get('/policy-table/other-policy-types', async (req, res) => {
+    setCORSHeaders(req, res);
+    try {
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_OTHER_POLICY_TYPES, HEADERS_OTHER_POLICY_TYPES);
+
+      const response = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_OTHER_POLICY_TYPES}!A:C`
+        });
+      });
+
+      const rows = response.data.values || [];
+      const dataRows = rows.length > 1 ? rows.slice(1) : [];
+      
+      const otherPolicyTypes = dataRows
+        .filter(row => row[0]) // 정책명이 있는 것만
+        .map(row => ({
+          name: row[0] || '',
+          registeredAt: row[1] || '',
+          registeredBy: row[2] || ''
+        }));
+
+      return res.json({
+        success: true,
+        otherPolicyTypes: otherPolicyTypes
+      });
+    } catch (error) {
+      console.error('[정책표] 기타정책 목록 조회 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // POST /api/policy-table/other-policy-types - 기타정책 추가
+  router.post('/policy-table/other-policy-types', express.json(), async (req, res) => {
+    setCORSHeaders(req, res);
+    try {
+      const permission = await checkPermission(req, ['SS', 'TEAM_LEADER']);
+      if (!permission.hasPermission) {
+        return res.status(403).json({ success: false, error: '권한이 없습니다.' });
+      }
+
+      const { policyName } = req.body;
+
+      if (!policyName || !policyName.trim()) {
+        return res.status(400).json({ success: false, error: '정책명이 필요합니다.' });
+      }
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_OTHER_POLICY_TYPES, HEADERS_OTHER_POLICY_TYPES);
+
+      const now = new Date().toLocaleString('ko-KR');
+      const registeredBy = permission.userName || 'Unknown';
+
+      await withRetry(async () => {
+        return await sheets.spreadsheets.values.append({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_OTHER_POLICY_TYPES}!A:C`,
+          valueInputOption: 'RAW',
+          insertDataOption: 'INSERT_ROWS',
+          resource: {
+            values: [[policyName.trim(), now, registeredBy]]
+          }
+        });
+      });
+
+      return res.json({
+        success: true,
+        message: '기타정책이 추가되었습니다.'
+      });
+    } catch (error) {
+      console.error('[정책표] 기타정책 추가 오류:', error);
       return res.status(500).json({ success: false, error: error.message });
     }
   });
