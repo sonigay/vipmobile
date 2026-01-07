@@ -874,12 +874,32 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
         const data = await response.json();
         const jobId = data.jobId;
 
+        // 큐 정보 포함하여 상태 설정
+        setGenerationStatus({
+          status: 'queued',
+          progress: 0,
+          message: data.message || '대기 중...',
+          queuePosition: data.queuePosition,
+          queueLength: data.queueLength,
+          queuedUserCount: data.queuedUserCount
+        });
+
         // 상태 폴링 시작 (하이브리드 폴링)
         startPolling(jobId);
       } else {
         const errorData = await response.json();
-        setError(errorData.error || '정책표 생성 요청에 실패했습니다.');
-        setGenerationStatus({ status: 'failed', progress: 0, message: '생성 요청 실패' });
+        // 중복 생성 시도인 경우
+        if (response.status === 409) {
+          setError(errorData.error || '이미 진행 중인 정책표 생성 작업이 있습니다.');
+          setGenerationStatus({ status: 'queued', progress: 0, message: '이미 진행 중인 작업이 있습니다.' });
+          // 기존 작업 ID가 있으면 해당 작업 상태 조회 시작
+          if (errorData.existingJobId) {
+            startPolling(errorData.existingJobId);
+          }
+        } else {
+          setError(errorData.error || '정책표 생성 요청에 실패했습니다.');
+          setGenerationStatus({ status: 'failed', progress: 0, message: '생성 요청 실패' });
+        }
       }
     } catch (error) {
       console.error('정책표 생성 요청 오류:', error);
@@ -905,7 +925,15 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
 
         if (response.ok) {
           const status = await response.json();
-          setGenerationStatus(status);
+          
+          // 큐 정보 포함하여 상태 업데이트
+          setGenerationStatus({
+            ...status,
+            queuePosition: status.queueInfo?.queuePosition,
+            queueLength: status.queueInfo?.queueLength,
+            queuedUserCount: status.queueInfo?.queuedUserCount,
+            isProcessing: status.queueInfo?.isProcessing
+          });
 
           if (status.status === 'completed') {
             setGeneratedResult(status.result);
@@ -1096,6 +1124,25 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
 
           if (!response.ok) {
             const errorData = await response.json();
+            // 중복 생성 시도인 경우
+            if (response.status === 409) {
+              setBatchGenerationStatus(prev => ({
+                ...prev,
+                [setting.id]: { 
+                  status: 'queued', 
+                  jobId: errorData.existingJobId || null, 
+                  result: null, 
+                  error: null,
+                  message: errorData.error || '이미 진행 중인 작업이 있습니다.'
+                }
+              }));
+              // 기존 작업 ID가 있으면 해당 작업 상태 조회 시작
+              if (errorData.existingJobId) {
+                startBatchPolling(setting.id, errorData.existingJobId);
+              }
+              resolve({ settingId: setting.id, jobId: errorData.existingJobId, success: true });
+              return;
+            }
             throw new Error(errorData.error || '정책표 생성 요청에 실패했습니다.');
           }
 
@@ -1104,7 +1151,16 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
 
           setBatchGenerationStatus(prev => ({
             ...prev,
-            [setting.id]: { status: 'processing', jobId, result: null, error: null }
+            [setting.id]: { 
+              status: data.status === 'queued' ? 'queued' : 'processing', 
+              jobId, 
+              result: null, 
+              error: null,
+              message: data.message || '대기 중...',
+              queuePosition: data.queuePosition,
+              queueLength: data.queueLength,
+              queuedUserCount: data.queuedUserCount
+            }
           }));
 
           // 폴링 시작 및 완료될 때까지 기다림
@@ -1205,6 +1261,25 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
 
       if (!response.ok) {
         const errorData = await response.json();
+        // 중복 생성 시도인 경우
+        if (response.status === 409) {
+          setBatchGenerationStatus(prev => ({
+            ...prev,
+            [settingId]: { 
+              status: 'queued', 
+              jobId: errorData.existingJobId || null, 
+              result: null, 
+              error: null,
+              message: errorData.error || '이미 진행 중인 작업이 있습니다.'
+            }
+          }));
+          // 기존 작업 ID가 있으면 해당 작업 상태 조회 시작
+          if (errorData.existingJobId) {
+            startBatchPolling(settingId, errorData.existingJobId);
+          }
+          setSuccessMessage(null);
+          return;
+        }
         throw new Error(errorData.error || '정책표 생성 요청에 실패했습니다.');
       }
 
@@ -1213,7 +1288,16 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
 
       setBatchGenerationStatus(prev => ({
         ...prev,
-        [settingId]: { status: 'processing', jobId, result: null, error: null, message: '재생성 처리 중...' }
+        [settingId]: { 
+          status: data.status === 'queued' ? 'queued' : 'processing', 
+          jobId, 
+          result: null, 
+          error: null, 
+          message: data.message || '재생성 처리 중...',
+          queuePosition: data.queuePosition,
+          queueLength: data.queueLength,
+          queuedUserCount: data.queuedUserCount
+        }
       }));
 
       // 성공 메시지 업데이트
@@ -1262,7 +1346,11 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
               result: data.result || null,
               error: data.error || null,
               progress: data.progress || 0,
-              message: data.message || ''
+              message: data.message || '',
+              queuePosition: data.queueInfo?.queuePosition,
+              queueLength: data.queueInfo?.queueLength,
+              queuedUserCount: data.queueInfo?.queuedUserCount,
+              isProcessing: data.queueInfo?.isProcessing
             }
           }));
 
@@ -1978,6 +2066,26 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                     <Typography variant="subtitle2" gutterBottom>
                       {generationStatus.message || '처리 중...'}
                     </Typography>
+                    
+                    {/* 대기열 정보 표시 */}
+                    {generationStatus.status === 'queued' && generationStatus.queuedUserCount !== undefined && (
+                      <Alert severity="info" sx={{ mt: 1, mb: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <Box>
+                            <Typography variant="body2" fontWeight="bold">
+                              대기 중: {generationStatus.queuedUserCount}명의 사용자가 {generationStatus.queueLength}건 대기 중
+                            </Typography>
+                            {generationStatus.queuePosition !== undefined && generationStatus.queuePosition > 0 && (
+                              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                                내 순번: {generationStatus.queuePosition}번
+                              </Typography>
+                            )}
+                          </Box>
+                          <CircularProgress size={24} />
+                        </Box>
+                      </Alert>
+                    )}
+
                     {generationStatus.progress !== undefined && (
                       <LinearProgress
                         variant="determinate"
@@ -2033,7 +2141,12 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
             <Button
               onClick={handleStartGeneration}
               variant="contained"
-              disabled={loading || !creationFormData.applyDate || !creationFormData.applyContent}
+              disabled={
+                loading || 
+                !creationFormData.applyDate || 
+                !creationFormData.applyContent ||
+                (generationStatus && (generationStatus.status === 'queued' || generationStatus.status === 'processing'))
+              }
             >
               {loading ? <CircularProgress size={24} /> : '정책표생성'}
             </Button>
@@ -2144,7 +2257,23 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                         <Grid item xs={12}>
                           <Box sx={{ mt: 1 }}>
                             {batchGenerationStatus[setting.id].status === 'queued' && (
-                              <Alert severity="info">대기 중...</Alert>
+                              <Alert severity="info">
+                                <Box>
+                                  <Typography variant="body2" fontWeight="bold">
+                                    {batchGenerationStatus[setting.id].message || '대기 중...'}
+                                  </Typography>
+                                  {batchGenerationStatus[setting.id].queuedUserCount !== undefined && (
+                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                                      {batchGenerationStatus[setting.id].queuedUserCount}명의 사용자가 {batchGenerationStatus[setting.id].queueLength}건 대기 중
+                                    </Typography>
+                                  )}
+                                  {batchGenerationStatus[setting.id].queuePosition !== undefined && batchGenerationStatus[setting.id].queuePosition > 0 && (
+                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                                      내 순번: {batchGenerationStatus[setting.id].queuePosition}번
+                                    </Typography>
+                                  )}
+                                </Box>
+                              </Alert>
                             )}
                             {batchGenerationStatus[setting.id].status === 'processing' && (
                               <Box>

@@ -798,6 +798,224 @@ function getJobStatus(jobId) {
   return jobStatusStore.get(jobId) || null;
 }
 
+// ===== 큐 시스템 =====
+// 대기열 관리 및 중복 생성 방지
+const generationQueue = {
+  queue: [], // 대기 중인 작업 목록 { jobId, userId, userName, policyTableName, createdAt, queuePosition }
+  processing: [], // 처리 중인 작업 목록 { jobId, userId, userName, policyTableName, startedAt }
+  maxConcurrent: 1, // 동시에 처리할 수 있는 최대 작업 수 (디스코드 봇이 한 번에 하나만 처리)
+  userActiveJobs: new Map() // 사용자별 활성 작업 추적 { userId: Set<jobId> }
+};
+
+// 큐에 작업 추가
+function addToQueue(jobId, userId, userName, policyTableName) {
+  // 사용자가 이미 대기 중이거나 처리 중인 작업이 있는지 확인
+  const userJobs = generationQueue.userActiveJobs.get(userId) || new Set();
+  if (userJobs.size > 0) {
+    // 이미 활성 작업이 있으면 큐에 추가하지 않고 기존 작업 정보 반환
+    const existingJobId = Array.from(userJobs)[0];
+    const existingJob = generationQueue.queue.find(item => item.jobId === existingJobId) ||
+                       generationQueue.processing.find(item => item.jobId === existingJobId);
+    if (existingJob) {
+      return { ...existingJob, isDuplicate: true };
+    }
+  }
+
+  const queuePosition = generationQueue.queue.length + 1;
+  const queueItem = {
+    jobId,
+    userId,
+    userName,
+    policyTableName,
+    createdAt: new Date().toISOString(),
+    queuePosition
+  };
+  generationQueue.queue.push(queueItem);
+  
+  // 사용자 활성 작업에 추가
+  if (!generationQueue.userActiveJobs.has(userId)) {
+    generationQueue.userActiveJobs.set(userId, new Set());
+  }
+  generationQueue.userActiveJobs.get(userId).add(jobId);
+  
+  console.log(`📋 [큐] 작업 추가: ${jobId} (${policyTableName}, ${userName}), 대기순번: ${queuePosition}`);
+  return queueItem;
+}
+
+// 큐에서 작업 제거
+function removeFromQueue(jobId) {
+  const index = generationQueue.queue.findIndex(item => item.jobId === jobId);
+  if (index !== -1) {
+    const queueItem = generationQueue.queue[index];
+    generationQueue.queue.splice(index, 1);
+    
+    // 사용자 활성 작업에서 제거
+    const userJobs = generationQueue.userActiveJobs.get(queueItem.userId);
+    if (userJobs) {
+      userJobs.delete(jobId);
+      if (userJobs.size === 0) {
+        generationQueue.userActiveJobs.delete(queueItem.userId);
+      }
+    }
+    
+    // 대기순번 재계산
+    generationQueue.queue.forEach((item, idx) => {
+      item.queuePosition = idx + 1;
+    });
+    console.log(`📋 [큐] 작업 제거: ${jobId}, 남은 대기: ${generationQueue.queue.length}`);
+  }
+}
+
+// 처리 중인 작업 추가
+function addToProcessing(jobId, userId, userName, policyTableName) {
+  const processingItem = {
+    jobId,
+    userId,
+    userName,
+    policyTableName,
+    startedAt: new Date().toISOString()
+  };
+  generationQueue.processing.push(processingItem);
+  console.log(`⚙️ [큐] 처리 시작: ${jobId} (${policyTableName}, ${userName}), 처리 중: ${generationQueue.processing.length}`);
+}
+
+// 처리 중인 작업 제거
+function removeFromProcessing(jobId) {
+  const index = generationQueue.processing.findIndex(item => item.jobId === jobId);
+  if (index !== -1) {
+    const processingItem = generationQueue.processing[index];
+    generationQueue.processing.splice(index, 1);
+    
+    // 사용자 활성 작업에서 제거
+    const userJobs = generationQueue.userActiveJobs.get(processingItem.userId);
+    if (userJobs) {
+      userJobs.delete(jobId);
+      if (userJobs.size === 0) {
+        generationQueue.userActiveJobs.delete(processingItem.userId);
+      }
+    }
+    
+    console.log(`⚙️ [큐] 처리 완료: ${jobId}, 처리 중: ${generationQueue.processing.length}`);
+  }
+}
+
+// 큐 상태 조회 (사용자 수와 작업 수 계산)
+function getQueueStatus() {
+  // 대기 중인 사용자 수 계산 (중복 제거)
+  const queuedUserIds = new Set(generationQueue.queue.map(item => item.userId));
+  const queuedUserCount = queuedUserIds.size;
+  const queuedJobCount = generationQueue.queue.length;
+  
+  // 처리 중인 사용자 수 계산
+  const processingUserIds = new Set(generationQueue.processing.map(item => item.userId));
+  const processingUserCount = processingUserIds.size;
+  const processingJobCount = generationQueue.processing.length;
+  
+  return {
+    queueLength: queuedJobCount,
+    processingLength: processingJobCount,
+    maxConcurrent: generationQueue.maxConcurrent,
+    queuedUserCount: queuedUserCount,
+    processingUserCount: processingUserCount,
+    queue: generationQueue.queue.map(item => ({
+      jobId: item.jobId,
+      userName: item.userName,
+      policyTableName: item.policyTableName,
+      queuePosition: item.queuePosition,
+      createdAt: item.createdAt
+    })),
+    processing: generationQueue.processing.map(item => ({
+      jobId: item.jobId,
+      userName: item.userName,
+      policyTableName: item.policyTableName,
+      startedAt: item.startedAt
+    }))
+  };
+}
+
+// 특정 사용자의 대기순번 조회
+function getUserQueuePosition(userId, jobId) {
+  const queueItem = generationQueue.queue.find(item => item.jobId === jobId && item.userId === userId);
+  if (queueItem) {
+    return queueItem.queuePosition;
+  }
+  // 처리 중인 경우
+  const processingItem = generationQueue.processing.find(item => item.jobId === jobId && item.userId === userId);
+  if (processingItem) {
+    return 0; // 처리 중
+  }
+  return null; // 큐에 없음
+}
+
+// 사용자가 이미 활성 작업이 있는지 확인
+function hasUserActiveJob(userId) {
+  const userJobs = generationQueue.userActiveJobs.get(userId);
+  return userJobs && userJobs.size > 0;
+}
+
+// 큐 처리 함수 (대기 중인 작업을 순차적으로 처리)
+let isProcessingQueue = false;
+async function processQueue() {
+  // 이미 처리 중이면 중복 실행 방지
+  if (isProcessingQueue) {
+    return;
+  }
+
+  isProcessingQueue = true;
+
+  try {
+    while (generationQueue.queue.length > 0 && generationQueue.processing.length < generationQueue.maxConcurrent) {
+      const queueItem = generationQueue.queue[0]; // 첫 번째 항목 가져오기
+      const { jobId, userId, userName, policyTableName } = queueItem;
+
+      // 큐에서 제거하고 처리 중으로 이동
+      removeFromQueue(jobId);
+      addToProcessing(jobId, userId, userName, policyTableName);
+      
+      // 작업 상태에서 실제 파라미터 가져오기
+      const jobStatus = getJobStatus(jobId);
+      if (!jobStatus || !jobStatus.params) {
+        console.error(`[큐] 작업 파라미터를 찾을 수 없습니다: ${jobId}`);
+        removeFromProcessing(jobId);
+        continue;
+      }
+
+      const params = jobStatus.params;
+      
+      // 상태 업데이트
+      updateJobStatus(jobId, {
+        ...jobStatus,
+        status: 'processing',
+        progress: 0,
+        message: '처리 중...',
+        queuePosition: 0
+      });
+
+      // 실제 작업 실행 (비동기, 완료를 기다리지 않음)
+      processPolicyTableGeneration(jobId, params)
+        .then(() => {
+          removeFromProcessing(jobId);
+          // 다음 작업 처리
+          processQueue();
+        })
+        .catch(error => {
+          console.error(`[큐] 작업 실패: ${jobId}`, error);
+          removeFromProcessing(jobId);
+          updateJobStatus(jobId, {
+            status: 'failed',
+            progress: 0,
+            message: `처리 실패: ${error.message}`,
+            error: error.message
+          });
+          // 다음 작업 처리
+          processQueue();
+        });
+    }
+  } finally {
+    isProcessingQueue = false;
+  }
+}
+
 // 정책표 생성 백그라운드 작업
 async function processPolicyTableGeneration(jobId, params) {
   const { policyTableId, applyDate, applyContent, accessGroupId, accessGroupIds, creatorName, creatorRole, creatorId } = params;
@@ -2215,30 +2433,106 @@ function setupPolicyTableRoutes(app) {
       // accessGroupIds 배열 처리 (하위 호환성을 위해 accessGroupId도 지원)
       const groupIds = accessGroupIds || (accessGroupId ? [accessGroupId] : []);
 
+      // 사용자가 이미 활성 작업이 있는지 확인
+      const userId = permission.userId || '';
+      if (hasUserActiveJob(userId)) {
+        return res.status(409).json({ 
+          success: false, 
+          error: '이미 진행 중인 정책표 생성 작업이 있습니다. 완료될 때까지 기다려주세요.' 
+        });
+      }
+
+      // 정책표 이름 가져오기 (큐 표시용)
+      let policyTableName = '정책표';
+      try {
+        const { sheets, SPREADSHEET_ID } = createSheetsClient();
+        await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_TABLE_SETTINGS, HEADERS_POLICY_TABLE_SETTINGS);
+        const settingsResponse = await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_POLICY_TABLE_SETTINGS}!A:B`
+        });
+        const settingsRows = settingsResponse.data.values || [];
+        const settingsRow = settingsRows.find(row => row[0] === policyTableId);
+        if (settingsRow && settingsRow[1]) {
+          policyTableName = settingsRow[1];
+        }
+      } catch (error) {
+        console.warn('정책표 이름 조회 실패:', error.message);
+      }
+
       // 작업 ID 생성
       const jobId = `JOB_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-      // 백그라운드 작업 시작
-      processPolicyTableGeneration(jobId, {
+      // 작업 파라미터 저장
+      const jobParams = {
         policyTableId,
         applyDate,
         applyContent,
         accessGroupIds: groupIds,
         creatorName: permission.userName || 'Unknown',
         creatorRole: permission.userRole,
-        creatorId: permission.userId || ''
-      }).catch(error => {
-        console.error('[정책표] 백그라운드 작업 오류:', error);
+        creatorId: userId
+      };
+
+      // 큐에 작업 추가
+      const queueItem = addToQueue(jobId, userId, permission.userName || 'Unknown', policyTableName);
+      
+      // 중복 요청인 경우
+      if (queueItem.isDuplicate) {
+        return res.status(409).json({ 
+          success: false, 
+          error: '이미 진행 중인 정책표 생성 작업이 있습니다.',
+          existingJobId: queueItem.jobId
+        });
+      }
+
+      const queuePosition = queueItem.queuePosition;
+      const queueStatus = getQueueStatus();
+
+      // 초기 상태 설정 (파라미터 포함)
+      updateJobStatus(jobId, {
+        status: 'queued',
+        progress: 0,
+        message: `대기 중... (${queueStatus.queuedUserCount}명의 사용자가 ${queueStatus.queueLength}건 대기 중)`,
+        queuePosition: queuePosition,
+        queueLength: queueStatus.queueLength,
+        queuedUserCount: queueStatus.queuedUserCount,
+        params: jobParams // 큐 처리 시 사용할 파라미터 저장
       });
 
+      // 큐 처리 시작 (비동기)
+      processQueue().catch(error => {
+        console.error('[정책표] 큐 처리 오류:', error);
+      });
+
+      // 큐 상태 반환
       return res.json({
         success: true,
         jobId: jobId,
         status: 'queued',
-        message: '정책표 생성이 시작되었습니다.'
+        message: `대기 중... (${queueStatus.queuedUserCount}명의 사용자가 ${queueStatus.queueLength}건 대기 중)`,
+        queuePosition: queuePosition,
+        queueLength: queueStatus.queueLength,
+        queuedUserCount: queueStatus.queuedUserCount
       });
     } catch (error) {
       console.error('[정책표] 생성 요청 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // GET /api/policy-table/queue-status
+  // 큐 상태 조회 API
+  router.get('/policy-table/queue-status', async (req, res) => {
+    setCORSHeaders(req, res);
+    try {
+      const queueStatus = getQueueStatus();
+      return res.json({
+        success: true,
+        ...queueStatus
+      });
+    } catch (error) {
+      console.error('[정책표] 큐 상태 조회 오류:', error);
       return res.status(500).json({ success: false, error: error.message });
     }
   });
@@ -2254,7 +2548,28 @@ function setupPolicyTableRoutes(app) {
         return res.status(404).json({ success: false, error: '작업을 찾을 수 없습니다.' });
       }
 
-      return res.json(status);
+      // 큐 정보 추가
+      const queueStatus = getQueueStatus();
+      const queueItem = generationQueue.queue.find(item => item.jobId === jobId);
+      const processingItem = generationQueue.processing.find(item => item.jobId === jobId);
+      
+      const response = {
+        ...status,
+        queueInfo: {
+          queuePosition: queueItem ? queueItem.queuePosition : (processingItem ? 0 : null),
+          queueLength: queueStatus.queueLength,
+          queuedUserCount: queueStatus.queuedUserCount,
+          processingLength: queueStatus.processingLength,
+          isProcessing: !!processingItem
+        }
+      };
+
+      // 대기 중인 경우 메시지 업데이트
+      if (status.status === 'queued' && queueItem) {
+        response.message = `대기 중... (${queueStatus.queuedUserCount}명의 사용자가 ${queueStatus.queueLength}건 대기 중)`;
+      }
+
+      return res.json(response);
     } catch (error) {
       console.error('[정책표] 상태 조회 오류:', error);
       return res.status(500).json({ success: false, error: error.message });
