@@ -186,7 +186,7 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tabs, activeTabIndex, mode]);
+  }, [tabs, activeTabIndex, mode, searchCreator, filterApplyDateFrom]);
 
   // loadPolicies 함수 수정하여 캐시에 저장
 
