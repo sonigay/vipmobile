@@ -857,14 +857,11 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
     }
   };
 
-  const handleOpenCreationModal = async (policyTable) => {
+  const handleOpenCreationModal = (policyTable) => {
     setSelectedPolicyTable(policyTable);
     
-    // 기본 그룹 설정 로드
-    const loadedDefaultGroups = await loadDefaultGroups();
-    
-    // 해당 정책표의 기본 그룹이 있으면 자동 선택
-    const defaultGroupIds = loadedDefaultGroups[policyTable.id] || [];
+    // 이미 로드된 기본 그룹 사용 (즉시 모달 열기)
+    const defaultGroupIds = defaultGroups[policyTable.id] || [];
     
     setCreationFormData({
       applyDate: '',
@@ -874,6 +871,23 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
     setGenerationStatus(null);
     setGeneratedResult(null);
     setCreationModalOpen(true);
+    
+    // 백그라운드에서 기본 그룹 다시 로드 (최신 데이터 보장)
+    loadDefaultGroups().then(loadedGroups => {
+      // 로드된 그룹이 있고, 현재 선택된 그룹이 없으면 업데이트
+      if (loadedGroups[policyTable.id] && loadedGroups[policyTable.id].length > 0) {
+        setCreationFormData(prev => {
+          // 이미 그룹이 선택되어 있으면 업데이트하지 않음
+          if (prev.accessGroupIds.length > 0) {
+            return prev;
+          }
+          return {
+            ...prev,
+            accessGroupIds: loadedGroups[policyTable.id]
+          };
+        });
+      }
+    });
   };
 
   const handleCloseCreationModal = () => {
@@ -1635,16 +1649,13 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                   <Button
                     variant="contained"
                     disabled={selectedSettings.length === 0}
-                    onClick={async () => {
+                    onClick={() => {
                       const selected = settings.filter(s => selectedSettings.includes(s.id));
                       
-                      // 기본 그룹 설정 로드
-                      const loadedDefaultGroups = await loadDefaultGroups();
-                      
-                      // 각 정책표별 기본 그룹 자동 선택
+                      // 이미 로드된 기본 그룹 사용 (즉시 모달 열기)
                       const policyTableGroups = {};
                       selected.forEach(setting => {
-                        const defaultGroupIds = loadedDefaultGroups[setting.id] || [];
+                        const defaultGroupIds = defaultGroups[setting.id] || [];
                         if (defaultGroupIds.length > 0) {
                           policyTableGroups[setting.id] = defaultGroupIds;
                         }
@@ -1657,6 +1668,29 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                       });
                       setBatchGenerationStatus({});
                       setBatchCreationModalOpen(true);
+                      
+                      // 백그라운드에서 기본 그룹 다시 로드 (최신 데이터 보장)
+                      loadDefaultGroups().then(loadedGroups => {
+                        // 로드된 그룹으로 업데이트 (현재 선택된 그룹이 없는 경우만)
+                        const updatedGroups = { ...batchCreationFormData.policyTableGroups };
+                        let hasUpdate = false;
+                        
+                        selected.forEach(setting => {
+                          if (loadedGroups[setting.id] && loadedGroups[setting.id].length > 0) {
+                            if (!updatedGroups[setting.id] || updatedGroups[setting.id].length === 0) {
+                              updatedGroups[setting.id] = loadedGroups[setting.id];
+                              hasUpdate = true;
+                            }
+                          }
+                        });
+                        
+                        if (hasUpdate) {
+                          setBatchCreationFormData(prev => ({
+                            ...prev,
+                            policyTableGroups: updatedGroups
+                          }));
+                        }
+                      });
                     }}
                     startIcon={<AddIcon />}
                   >
