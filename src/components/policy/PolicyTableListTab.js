@@ -964,9 +964,17 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
       });
 
       if (response.ok) {
-        // 정책 목록 새로고침
+        // 프론트엔드 캐시 무효화 (수정된 정책이 포함된 모든 캐시)
         const currentTab = tabs[activeTabIndex];
         if (currentTab) {
+          const cacheKey = `${mode || 'default'}_${currentTab.policyTableName}`;
+          setPoliciesCache(prev => {
+            const newCache = { ...prev };
+            delete newCache[cacheKey];
+            return newCache;
+          });
+          
+          // 정책 목록 새로고침 (캐시 무시)
           await loadPolicies(currentTab.policyTableName);
         }
         
