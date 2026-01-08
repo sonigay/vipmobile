@@ -241,28 +241,22 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
         setActiveTab(1);
       }
       
-      // 성능 최적화: 필수 데이터만 먼저 로드
-      const loadInitialData = async () => {
-        const promises = [];
-        
-        // 정책표 생성 기능은 SS 또는 팀장만 사용 가능
-        if (canAccessPolicyTableCreation) {
-          // 정책표 설정만 먼저 로드 (화면 표시에 필수)
-          promises.push(loadSettings());
-          promises.push(loadOtherPolicyTypes());
-        }
-        
-        // 정책영업그룹은 정책영업그룹 탭에서만 필요하므로 지연 로드
-        // companies, teamLeaders는 정책영업그룹 추가/수정 시에만 필요하므로 지연 로드
-        // defaultGroups는 미리 로드하여 모달 열 때 즉시 사용 가능하도록 함
-        if (canAccessPolicyTableCreation) {
-          promises.push(loadDefaultGroups());
-        }
-        
-        await Promise.all(promises);
-      };
-      
-      loadInitialData();
+      // 성능 최적화: 필수 데이터만 먼저 로드, 나머지는 백그라운드에서 로드
+      if (canAccessPolicyTableCreation) {
+        // 정책표 설정만 먼저 로드 (화면 표시에 필수) - 즉시 화면에 표시
+        loadSettings().then(() => {
+          // settings가 로드된 후 백그라운드에서 나머지 로드
+          // 기타정책 목록과 기본 그룹은 덜 중요하므로 백그라운드에서 로드
+          Promise.all([
+            loadOtherPolicyTypes(),
+            loadDefaultGroups()
+          ]).catch(error => {
+            console.error('백그라운드 데이터 로드 오류:', error);
+          });
+        }).catch(error => {
+          console.error('정책표 설정 로드 오류:', error);
+        });
+      }
     }
     return () => {
       if (pollingInterval) {
@@ -300,7 +294,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
 
   const loadSettings = async () => {
     try {
-      setLoading(true);
+      setSettingsLoading(true);
       const response = await fetch(`${API_BASE_URL}/api/policy-table-settings`, {
         headers: {
           'x-user-role': loggedInStore?.userRole || '',
@@ -309,61 +303,23 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
       });
       if (response.ok) {
         const data = await response.json();
-        // 백엔드에서 이미 사용자별 순서가 적용되어 있음
-        setSettings(data);
         // 현재 사용자의 권한에 맞는 정책표만 필터링
         const userRole = loggedInStore?.userRole;
-        console.log('🔍 [정책표생성] 정책표 설정 로드:', {
-          userRole,
-          totalSettings: data.length,
-          settings: data.map(s => ({
-            id: s.id,
-            policyTableName: s.policyTableName,
-            creatorPermissions: s.creatorPermissions,
-            creatorPermissionsType: typeof s.creatorPermissions,
-            isArray: Array.isArray(s.creatorPermissions),
-            includesUserRole: Array.isArray(s.creatorPermissions) ? s.creatorPermissions.includes(userRole) : false
-          }))
-        });
         
-        const filtered = data.filter(setting => {
-          if (userRole === 'SS') return true; // 총괄은 모든 정책표 접근 가능
-          
-          // creatorPermissions가 배열인지 확인
-          if (!Array.isArray(setting.creatorPermissions)) {
-            console.warn('⚠️ [정책표생성] creatorPermissions가 배열이 아닙니다:', {
-              setting: setting.policyTableName,
-              creatorPermissions: setting.creatorPermissions,
-              type: typeof setting.creatorPermissions
+        // 성능 최적화: 필터링 로직 간소화
+        const filtered = userRole === 'SS' 
+          ? data // 총괄은 모든 정책표 접근 가능
+          : data.filter(setting => {
+              // creatorPermissions가 배열인지 확인
+              if (!Array.isArray(setting.creatorPermissions)) {
+                return false;
+              }
+              // 정확한 문자열 비교
+              const normalizedUserRole = (userRole || '').trim();
+              return setting.creatorPermissions.some(perm => 
+                (perm || '').trim() === normalizedUserRole
+              );
             });
-            return false;
-          }
-          
-          // 정확한 문자열 비교를 위해 trim() 및 대소문자 일치 확인
-          const normalizedUserRole = (userRole || '').trim();
-          const includes = setting.creatorPermissions.some(perm => {
-            const normalizedPerm = (perm || '').trim();
-            return normalizedPerm === normalizedUserRole;
-          });
-          
-          console.log(`🔍 [정책표생성] 필터링 체크: ${setting.policyTableName}`, {
-            userRole: normalizedUserRole,
-            creatorPermissions: setting.creatorPermissions,
-            normalizedPermissions: setting.creatorPermissions.map(p => (p || '').trim()),
-            includes,
-            matchDetails: setting.creatorPermissions.map(perm => ({
-              original: perm,
-              normalized: (perm || '').trim(),
-              matches: (perm || '').trim() === normalizedUserRole
-            }))
-          });
-          return includes;
-        });
-        
-        console.log('✅ [정책표생성] 필터링 결과:', {
-          filteredCount: filtered.length,
-          filtered: filtered.map(s => s.policyTableName)
-        });
         
         setSettings(filtered);
       }
@@ -371,7 +327,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
       console.error('정책표 설정 로드 오류:', error);
       setError('정책표 설정을 불러오는 중 오류가 발생했습니다.');
     } finally {
-      setLoading(false);
+      setSettingsLoading(false);
     }
   };
 
@@ -1861,7 +1817,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
       {/* 정책표 생성 탭 */}
       {canAccessPolicyTableCreation && activeTab === 0 && (
         <>
-          {loading && settings.length === 0 ? (
+          {settingsLoading && settings.length === 0 ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
               <CircularProgress />
             </Box>
