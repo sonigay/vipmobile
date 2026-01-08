@@ -254,7 +254,10 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
         
         // 정책영업그룹은 정책영업그룹 탭에서만 필요하므로 지연 로드
         // companies, teamLeaders는 정책영업그룹 추가/수정 시에만 필요하므로 지연 로드
-        // defaultGroups는 정책표 생성 모달 열 때 로드됨
+        // defaultGroups는 미리 로드하여 모달 열 때 즉시 사용 가능하도록 함
+        if (canAccessPolicyTableCreation) {
+          promises.push(loadDefaultGroups());
+        }
         
         await Promise.all(promises);
       };
@@ -1043,8 +1046,13 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
       await loadUserGroupsWithoutHistory();
     }
     
-    // 이미 로드된 기본 그룹 사용 (즉시 모달 열기)
-    const defaultGroupIds = defaultGroups[policyTable.id] || [];
+    // 기본 그룹이 아직 로드되지 않았으면 먼저 로드 (빠른 응답을 위해)
+    let defaultGroupIds = defaultGroups[policyTable.id] || [];
+    if (defaultGroupIds.length === 0 && Object.keys(defaultGroups).length === 0) {
+      // 기본 그룹이 전혀 로드되지 않았으면 로드 대기
+      const loadedGroups = await loadDefaultGroups();
+      defaultGroupIds = loadedGroups[policyTable.id] || [];
+    }
     
     // 정책적용일시 자동 생성 설정 초기화 (오늘 날짜, 현재 시간)
     const now = new Date();
@@ -1069,22 +1077,27 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
     setGeneratedResult(null);
     setCreationModalOpen(true);
     
-    // 백그라운드에서 기본 그룹 다시 로드 (최신 데이터 보장)
-    loadDefaultGroups().then(loadedGroups => {
-      // 로드된 그룹이 있고, 현재 선택된 그룹이 없으면 업데이트
-      if (loadedGroups[policyTable.id] && loadedGroups[policyTable.id].length > 0) {
-        setCreationFormData(prev => {
-          // 이미 그룹이 선택되어 있으면 업데이트하지 않음
-          if (prev.accessGroupIds.length > 0) {
-            return prev;
-          }
-          return {
-            ...prev,
-            accessGroupIds: loadedGroups[policyTable.id]
-          };
-        });
-      }
-    });
+    // 백그라운드에서 기본 그룹 다시 로드 (최신 데이터 보장, 이미 로드된 경우는 스킵)
+    if (Object.keys(defaultGroups).length === 0) {
+      // 이미 위에서 로드했으므로 스킵
+    } else {
+      // 이미 로드된 경우에만 백그라운드에서 최신 데이터 확인
+      loadDefaultGroups().then(loadedGroups => {
+        // 로드된 그룹이 있고, 현재 선택된 그룹이 없으면 업데이트
+        if (loadedGroups[policyTable.id] && loadedGroups[policyTable.id].length > 0) {
+          setCreationFormData(prev => {
+            // 이미 그룹이 선택되어 있으면 업데이트하지 않음
+            if (prev.accessGroupIds.length > 0) {
+              return prev;
+            }
+            return {
+              ...prev,
+              accessGroupIds: loadedGroups[policyTable.id]
+            };
+          });
+        }
+      });
+    }
   };
 
   const handleCloseCreationModal = () => {
@@ -1143,7 +1156,15 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
         // 상태 폴링 시작 (하이브리드 폴링)
         startPolling(jobId);
       } else {
-        const errorData = await response.json();
+        let errorData;
+        try {
+          const text = await response.text();
+          errorData = text ? JSON.parse(text) : {};
+        } catch (parseError) {
+          console.error('응답 파싱 오류:', parseError);
+          errorData = { error: `서버 오류 (${response.status})` };
+        }
+        
         // 중복 생성 시도인 경우
         if (response.status === 409) {
           setError(errorData.error || '이미 진행 중인 정책표 생성 작업이 있습니다.');
@@ -1153,7 +1174,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
             startPolling(errorData.existingJobId);
           }
         } else {
-          setError(errorData.error || '정책표 생성 요청에 실패했습니다.');
+          setError(errorData.error || `정책표 생성 요청에 실패했습니다. (${response.status})`);
           setGenerationStatus({ status: 'failed', progress: 0, message: '생성 요청 실패' });
         }
       }
@@ -1379,7 +1400,15 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
           });
 
           if (!response.ok) {
-            const errorData = await response.json();
+            let errorData;
+            try {
+              const text = await response.text();
+              errorData = text ? JSON.parse(text) : {};
+            } catch (parseError) {
+              console.error('응답 파싱 오류:', parseError);
+              errorData = { error: `서버 오류 (${response.status})` };
+            }
+            
             // 중복 생성 시도인 경우
             if (response.status === 409) {
               setBatchGenerationStatus(prev => ({
@@ -1399,10 +1428,17 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
               resolve({ settingId: setting.id, jobId: errorData.existingJobId, success: true });
               return;
             }
-            throw new Error(errorData.error || '정책표 생성 요청에 실패했습니다.');
+            throw new Error(errorData.error || `정책표 생성 요청에 실패했습니다. (${response.status})`);
           }
 
-          const data = await response.json();
+          let data;
+          try {
+            const text = await response.text();
+            data = text ? JSON.parse(text) : {};
+          } catch (parseError) {
+            console.error('응답 파싱 오류:', parseError);
+            throw new Error('서버 응답을 파싱할 수 없습니다.');
+          }
           const jobId = data.jobId;
 
           setBatchGenerationStatus(prev => ({
@@ -1854,14 +1890,26 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                         await loadUserGroupsWithoutHistory();
                       }
                       
-                      // 이미 로드된 기본 그룹 사용 (즉시 모달 열기)
-                      const policyTableGroups = {};
-                      selected.forEach(setting => {
-                        const defaultGroupIds = defaultGroups[setting.id] || [];
-                        if (defaultGroupIds.length > 0) {
-                          policyTableGroups[setting.id] = defaultGroupIds;
-                        }
-                      });
+                      // 기본 그룹이 아직 로드되지 않았으면 먼저 로드 (빠른 응답을 위해)
+                      let policyTableGroups = {};
+                      if (Object.keys(defaultGroups).length === 0) {
+                        // 기본 그룹이 전혀 로드되지 않았으면 로드 대기
+                        const loadedGroups = await loadDefaultGroups();
+                        selected.forEach(setting => {
+                          const defaultGroupIds = loadedGroups[setting.id] || [];
+                          if (defaultGroupIds.length > 0) {
+                            policyTableGroups[setting.id] = defaultGroupIds;
+                          }
+                        });
+                      } else {
+                        // 이미 로드된 기본 그룹 사용 (즉시 모달 열기)
+                        selected.forEach(setting => {
+                          const defaultGroupIds = defaultGroups[setting.id] || [];
+                          if (defaultGroupIds.length > 0) {
+                            policyTableGroups[setting.id] = defaultGroupIds;
+                          }
+                        });
+                      }
                       
                       setBatchCreationFormData({
                         applyDate: '',
@@ -1871,28 +1919,36 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                       setBatchGenerationStatus({});
                       setBatchCreationModalOpen(true);
                       
-                      // 백그라운드에서 기본 그룹 다시 로드 (최신 데이터 보장)
-                      loadDefaultGroups().then(loadedGroups => {
-                        // 로드된 그룹으로 업데이트 (현재 선택된 그룹이 없는 경우만)
-                        const updatedGroups = { ...batchCreationFormData.policyTableGroups };
-                        let hasUpdate = false;
-                        
-                        selected.forEach(setting => {
-                          if (loadedGroups[setting.id] && loadedGroups[setting.id].length > 0) {
-                            if (!updatedGroups[setting.id] || updatedGroups[setting.id].length === 0) {
-                              updatedGroups[setting.id] = loadedGroups[setting.id];
-                              hasUpdate = true;
+                      // 백그라운드에서 기본 그룹 다시 로드 (최신 데이터 보장, 이미 로드된 경우는 스킵)
+                      if (Object.keys(defaultGroups).length === 0) {
+                        // 이미 위에서 로드했으므로 스킵
+                      } else {
+                        // 이미 로드된 경우에만 백그라운드에서 최신 데이터 확인
+                        loadDefaultGroups().then(loadedGroups => {
+                          // 로드된 그룹으로 업데이트 (현재 선택된 그룹이 없는 경우만)
+                          setBatchCreationFormData(prev => {
+                            const updatedGroups = { ...prev.policyTableGroups };
+                            let hasUpdate = false;
+                            
+                            selected.forEach(setting => {
+                              if (loadedGroups[setting.id] && loadedGroups[setting.id].length > 0) {
+                                if (!updatedGroups[setting.id] || updatedGroups[setting.id].length === 0) {
+                                  updatedGroups[setting.id] = loadedGroups[setting.id];
+                                  hasUpdate = true;
+                                }
+                              }
+                            });
+                            
+                            if (hasUpdate) {
+                              return {
+                                ...prev,
+                                policyTableGroups: updatedGroups
+                              };
                             }
-                          }
+                            return prev;
+                          });
                         });
-                        
-                        if (hasUpdate) {
-                          setBatchCreationFormData(prev => ({
-                            ...prev,
-                            policyTableGroups: updatedGroups
-                          }));
-                        }
-                      });
+                      }
                     }}
                     startIcon={<AddIcon />}
                   >

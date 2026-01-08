@@ -2536,17 +2536,26 @@ function setupPolicyTableRoutes(app) {
       try {
         const { sheets, SPREADSHEET_ID } = createSheetsClient();
         await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_TABLE_SETTINGS, HEADERS_POLICY_TABLE_SETTINGS);
-        const settingsResponse = await sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_POLICY_TABLE_SETTINGS}!A:B`
+        const settingsResponse = await withRetry(async () => {
+          return await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SHEET_POLICY_TABLE_SETTINGS}!A:B`
+          });
         });
-        const settingsRows = settingsResponse.data.values || [];
-        const settingsRow = settingsRows.find(row => row[0] === policyTableId);
-        if (settingsRow && settingsRow[1]) {
-          policyTableName = settingsRow[1];
+        
+        // 응답이 없거나 data가 없는 경우 처리
+        if (!settingsResponse || !settingsResponse.data) {
+          console.warn('정책표 이름 조회 실패: 응답이 없습니다.');
+        } else {
+          const settingsRows = settingsResponse.data.values || [];
+          const settingsRow = settingsRows.find(row => row[0] === policyTableId);
+          if (settingsRow && settingsRow[1]) {
+            policyTableName = settingsRow[1];
+          }
         }
       } catch (error) {
         console.warn('정책표 이름 조회 실패:', error.message);
+        // 에러가 발생해도 기본값 '정책표'를 사용하여 계속 진행
       }
 
       // 작업 ID 생성
