@@ -43,9 +43,24 @@ const BudgetChannelCheckTab = ({ loggedInStore }) => {
       });
       if (response.ok) {
         const data = await response.json();
-        setAllSettings(data);
-        // Initially show all settings
-        setSettings(data);
+        // 권한 필터링 적용
+        const userRole = loggedInStore?.userRole;
+        const filtered = userRole === 'SS' 
+          ? data // 총괄은 모든 예산채널 접근 가능
+          : data.filter(setting => {
+              // checkerPermissions가 배열인지 확인
+              if (!Array.isArray(setting.checkerPermissions)) {
+                return false;
+              }
+              // 정확한 문자열 비교
+              const normalizedUserRole = (userRole || '').trim();
+              return setting.checkerPermissions.some(perm => 
+                (perm || '').trim() === normalizedUserRole
+              );
+            });
+        setAllSettings(filtered);
+        // Initially show filtered settings
+        setSettings(filtered);
       }
     } catch (error) {
       console.error('예산채널 설정 전체 로드 오류:', error);
@@ -68,7 +83,22 @@ const BudgetChannelCheckTab = ({ loggedInStore }) => {
       });
       if (response.ok) {
         const data = await response.json();
-        setSettings(data);
+        // 권한 필터링 적용
+        const userRole = loggedInStore?.userRole;
+        const filtered = userRole === 'SS' 
+          ? data // 총괄은 모든 예산채널 접근 가능
+          : data.filter(setting => {
+              // checkerPermissions가 배열인지 확인
+              if (!Array.isArray(setting.checkerPermissions)) {
+                return false;
+              }
+              // 정확한 문자열 비교
+              const normalizedUserRole = (userRole || '').trim();
+              return setting.checkerPermissions.some(perm => 
+                (perm || '').trim() === normalizedUserRole
+              );
+            });
+        setSettings(filtered);
       } else {
         setError('예산채널 설정을 불러올 수 없습니다.');
       }
