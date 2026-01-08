@@ -1816,14 +1816,17 @@ function setupPolicyTableRoutes(app) {
       // 편집 링크 정규화
       const normalizedEditLink = normalizeGoogleSheetEditLink(channelLink);
 
+      // rows[rowIndex]는 헤더를 포함한 전체 배열에서 찾은 인덱스이므로
+      // 헤더가 0번 인덱스에 있으면 rowIndex는 1 이상입니다
+      // 따라서 rows[rowIndex]가 실제 데이터 행입니다
       const updatedRow = [
         id,
         channelName,
         channelDescription || '',
         normalizedEditLink,
         JSON.stringify(checkerPermissions),
-        rows[rowIndex + 1][5] || new Date().toISOString(), // 등록일시 유지
-        rows[rowIndex + 1][6] || permission.userId || 'Unknown' // 등록자 유지
+        rows[rowIndex][5] || new Date().toISOString(), // 등록일시 유지
+        rows[rowIndex][6] || permission.userId || 'Unknown' // 등록자 유지
       ];
 
       await withRetry(async () => {
