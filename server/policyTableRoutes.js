@@ -564,9 +564,6 @@ function setCache(key, data, ttlMs = 60 * 1000) {
   cacheStore.set(key, { data, expires: Date.now() + ttlMs });
 }
 
-// 정책영업그룹 마지막 성공 응답 (rate limit 시 사용)
-let lastUserGroupsCache = null;
-
 // 캐시 무효화 헬퍼 함수
 function invalidateCache(pattern) {
   const keysToDelete = [];
