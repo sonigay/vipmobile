@@ -792,9 +792,10 @@ async function checkPermission(req, allowedRoles, mode = 'policy') {
   // 대리점아이디관리 시트에서 사용자 정보 찾기
   // C열(2번 인덱스): 연락처(아이디) = contactId
   // A열(0번 인덱스): 대상(이름)
-  // 정책모드: R열(17번 인덱스), S열(18번 인덱스) - 권한레벨
-  // 예산모드: S열(18번 인덱스), T열(19번 인덱스) - 권한레벨
-  const roleIndex = mode === 'budget' ? 18 : 17; // 예산모드는 18, 정책모드는 17
+  // 정책모드: 접근권한 11인덱스, 권한레벨 17인덱스
+  // 예산모드: 접근권한 18인덱스, 권한레벨 19인덱스
+  const roleIndex = mode === 'budget' ? 19 : 17; // 예산모드는 19, 정책모드는 17
+  const accessPermissionIndex = mode === 'budget' ? 18 : 11; // 예산모드는 18, 정책모드는 11
   let userInfo = null;
   if (userId) {
     const userRow = rows.find(row => {
@@ -805,7 +806,8 @@ async function checkPermission(req, allowedRoles, mode = 'policy') {
       userInfo = {
         id: userRow[2] || userId,      // C열: 연락처(아이디)
         name: userRow[0] || userId,    // A열: 대상(이름)
-        role: userRow[roleIndex] || userRole  // 권한레벨 (모드에 따라 인덱스 다름)
+        role: userRow[roleIndex] || userRole,  // 권한레벨 (모드에 따라 인덱스 다름)
+        accessPermission: userRow[accessPermissionIndex] || ''  // 접근권한 (모드에 따라 인덱스 다름)
       };
     }
   }
