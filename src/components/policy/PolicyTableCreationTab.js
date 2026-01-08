@@ -1958,71 +1958,11 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            // 구글시트 링크를 웹 버전으로 강제 열기 (PC/모바일 모두)
                             let url = setting.policyTableLink;
-                            
-                            // 시트 ID만 있는 경우 전체 URL로 변환
                             if (/^[a-zA-Z0-9-_]+$/.test(url)) {
                               url = `https://docs.google.com/spreadsheets/d/${url}/edit`;
                             }
-                            
-                            // 구글시트 ID 추출
-                            const sheetIdMatch = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-                            if (sheetIdMatch) {
-                              const sheetId = sheetIdMatch[1];
-                              // gid 파라미터 추출 (원본 URL에 있는 경우만 사용)
-                              const gidMatch = url.match(/[?&#]gid=([0-9]+)/);
-                              
-                              // 웹 버전으로 강제 열기 (앱 실행 방지)
-                              // usp=drive_web: 웹 버전 강제 (PC/모바일 모두)
-                              // rm=minimal: 모바일 앱 리다이렉트 방지
-                              if (gidMatch) {
-                                // 원본 URL에 gid가 있으면 그대로 사용 (사용자가 의도한 시트)
-                                const gid = gidMatch[1];
-                                url = `https://docs.google.com/spreadsheets/d/${sheetId}/edit?usp=drive_web&rm=minimal&gid=${gid}#gid=${gid}`;
-                              } else {
-                                // 원본 URL에 gid가 없으면 gid 파라미터를 포함하지 않음 (첫 번째 시트로 열림)
-                                url = `https://docs.google.com/spreadsheets/d/${sheetId}/edit?usp=drive_web&rm=minimal`;
-                              }
-                            } else {
-                              // ID를 찾을 수 없으면 원본 URL에 파라미터 추가 (gid는 유지)
-                              const separator = url.includes('?') ? '&' : '?';
-                              // 원본 URL에 이미 gid가 있는지 확인
-                              const hasGid = url.includes('gid=');
-                              if (hasGid) {
-                                url = `${url}${separator}usp=drive_web&rm=minimal`;
-                              } else {
-                                url = `${url}${separator}usp=drive_web&rm=minimal`;
-                              }
-                            }
-                            
-                            // 새 창에서 열기 (앱 리다이렉트 방지)
-                            let newWindow = null;
-                            try {
-                              newWindow = window.open(
-                                url, 
-                                '_blank', 
-                                'noopener,noreferrer,width=1200,height=800'
-                              );
-                              
-                              // 팝업 차단 감지: window.open 직후 즉시 확인
-                              // newWindow가 null이거나 undefined인 경우만 팝업 차단으로 판단
-                              if (!newWindow) {
-                                // 팝업이 차단된 경우 사용자에게 알림
-                                alert('팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해주세요.');
-                                return;
-                              }
-                              
-                              // newWindow가 존재하면 정상적으로 열린 것
-                              // 사용자가 창을 닫은 경우는 newWindow.closed가 true가 되지만,
-                              // 이는 정상적인 동작이므로 알림을 표시하지 않음
-                              // 팝업 차단 감지는 window.open 직후에만 수행하며,
-                              // 이후 창이 닫히는 것은 감지하지 않음
-                            } catch (error) {
-                              // window.open이 예외를 발생시킨 경우 (일부 브라우저에서 발생 가능)
-                              console.error('구글시트 열기 오류:', error);
-                              alert('구글시트를 열 수 없습니다. 브라우저 설정에서 팝업을 허용해주세요.');
-                            }
+                            window.open(url, '_blank');
                           }}
                           style={{ color: '#1976d2', textDecoration: 'none', cursor: 'pointer' }}
                         >
