@@ -124,6 +124,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
   const [settings, setSettings] = useState([]);
   const [userGroups, setUserGroups] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [settingsLoading, setSettingsLoading] = useState(false); // 정책표 설정 로딩 상태
   const [error, setError] = useState(null);
   const [savingCardOrder, setSavingCardOrder] = useState(false);
   const [successMessage, setSuccessMessage] = useState(null);
