@@ -4,6 +4,13 @@ options:
   ports: "4000"
   install: npm ci --production
   start: node index.js
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
   env:
     - name: NODE_ENV
       value: production
