@@ -1835,8 +1835,13 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                   <Button
                     variant="contained"
                     disabled={selectedSettings.length === 0}
-                    onClick={() => {
+                    onClick={async () => {
                       const selected = settings.filter(s => selectedSettings.includes(s.id));
+                      
+                      // 정책영업그룹이 로드되지 않았으면 먼저 로드
+                      if (userGroups.length === 0) {
+                        await loadUserGroupsWithoutHistory();
+                      }
                       
                       // 이미 로드된 기본 그룹 사용 (즉시 모달 열기)
                       const policyTableGroups = {};
