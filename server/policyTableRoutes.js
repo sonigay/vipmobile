@@ -398,6 +398,7 @@ const SHEET_TAB_ORDER = '정책표목록_탭순서';
 const SHEET_GROUP_CHANGE_HISTORY = '정책모드_정책영업그룹_변경이력';
 const SHEET_DEFAULT_GROUPS = '정책모드_기본정책영업그룹';
 const SHEET_OTHER_POLICY_TYPES = '정책모드_기타정책목록';
+const SHEET_BUDGET_CHANNEL_SETTINGS = '예산모드_예산채널설정';
 
 // 시트 헤더 정의
 const HEADERS_POLICY_TABLE_SETTINGS = [
@@ -408,6 +409,16 @@ const HEADERS_POLICY_TABLE_SETTINGS = [
   '정책표공개링크',        // 공개 링크 (/pubhtml, Puppeteer 캡처용)
   '디스코드채널ID',
   '생성자적용권한',
+  '등록일시',
+  '등록자'
+];
+
+const HEADERS_BUDGET_CHANNEL_SETTINGS = [
+  '예산채널ID',
+  '예산채널이름',
+  '예산채널설명',
+  '예산채널링크',
+  '확인자적용권한',
   '등록일시',
   '등록자'
 ];
@@ -755,7 +766,7 @@ async function getAgentManagementData(sheets, SPREADSHEET_ID) {
 }
 
 // 권한 체크 헬퍼 함수
-async function checkPermission(req, allowedRoles) {
+async function checkPermission(req, allowedRoles, mode = 'policy') {
   try {
     const { sheets, SPREADSHEET_ID } = createSheetsClient();
     
@@ -764,13 +775,13 @@ async function checkPermission(req, allowedRoles) {
 
     // 응답이 없거나 data가 없는 경우 처리
     if (!response || !response.data) {
-      console.error('[정책표] 권한 체크 오류: 대리점아이디관리 시트 응답이 없습니다.');
+      console.error(`[${mode === 'budget' ? '예산' : '정책'}표] 권한 체크 오류: 대리점아이디관리 시트 응답이 없습니다.`);
       return { hasPermission: false, error: '대리점아이디관리 시트 조회 실패' };
     }
 
     const rows = response.data.values || [];
     if (rows.length < 2) {
-      console.warn('[정책표] 권한 체크: 대리점아이디관리 시트에 데이터가 없습니다.');
+      console.warn(`[${mode === 'budget' ? '예산' : '정책'}표] 권한 체크: 대리점아이디관리 시트에 데이터가 없습니다.`);
       return { hasPermission: false, error: '대리점아이디관리 시트에 데이터가 없습니다.' };
     }
 
@@ -781,7 +792,9 @@ async function checkPermission(req, allowedRoles) {
   // 대리점아이디관리 시트에서 사용자 정보 찾기
   // C열(2번 인덱스): 연락처(아이디) = contactId
   // A열(0번 인덱스): 대상(이름)
-  // R열(17번 인덱스): 권한레벨
+  // 정책모드: R열(17번 인덱스), S열(18번 인덱스) - 권한레벨
+  // 예산모드: S열(18번 인덱스), T열(19번 인덱스) - 권한레벨
+  const roleIndex = mode === 'budget' ? 18 : 17; // 예산모드는 18, 정책모드는 17
   let userInfo = null;
   if (userId) {
     const userRow = rows.find(row => {
@@ -792,7 +805,7 @@ async function checkPermission(req, allowedRoles) {
       userInfo = {
         id: userRow[2] || userId,      // C열: 연락처(아이디)
         name: userRow[0] || userId,    // A열: 대상(이름)
-        role: userRow[17] || userRole  // R열(17번 인덱스): 권한레벨
+        role: userRow[roleIndex] || userRole  // 권한레벨 (모드에 따라 인덱스 다름)
       };
     }
   }
@@ -1641,6 +1654,257 @@ function setupPolicyTableRoutes(app) {
       });
     } catch (error) {
       console.error('[정책표] 설정 삭제 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // ========== 예산채널설정 관련 API ==========
+
+  // GET /api/budget-channel-settings
+  router.get('/budget-channel-settings', async (req, res) => {
+    setCORSHeaders(req, res);
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
+    try {
+      // 예산채널설정 탭 접근 권한: SS(총괄) 또는 두 글자 대문자 패턴(팀장)
+      const permission = await checkPermission(req, ['SS', 'TEAM_LEADER'], 'budget');
+      if (!permission.hasPermission) {
+        return res.status(403).json({ success: false, error: '권한이 없습니다.' });
+      }
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      
+      // 캐시 확인 (30분 TTL)
+      const userId = req.headers['x-user-id'] || req.query.userId;
+      const cacheKey = `budget-channel-settings-${SPREADSHEET_ID}-${userId || 'all'}`;
+      const cached = getCache(cacheKey);
+      if (cached) {
+        console.log('✅ [캐시 히트] 예산채널 설정 목록');
+        return res.json(cached);
+      }
+
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_BUDGET_CHANNEL_SETTINGS, HEADERS_BUDGET_CHANNEL_SETTINGS);
+
+      const response = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_BUDGET_CHANNEL_SETTINGS}!A:G`
+        });
+      });
+
+      const rows = response.data.values || [];
+      if (rows.length < 2) {
+        return res.json([]);
+      }
+
+      const dataRows = rows.slice(1);
+
+      let settings = dataRows.map(row => ({
+        id: row[0] || '',
+        channelName: row[1] || '',
+        channelDescription: row[2] || '',
+        channelLink: row[3] || '',
+        checkerPermissions: row[4] ? JSON.parse(row[4]) : [],
+        registeredAt: row[5] || '',
+        registeredBy: row[6] || ''
+      }));
+
+      // 캐시에 저장 (30분 TTL)
+      setCache(cacheKey, settings, CACHE_TTL.POLICY_TABLE_SETTINGS);
+
+      return res.json(settings);
+    } catch (error) {
+      console.error('[예산채널] 설정 목록 조회 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // POST /api/budget-channel-settings
+  router.post('/budget-channel-settings', express.json(), async (req, res) => {
+    setCORSHeaders(req, res);
+    try {
+      const permission = await checkPermission(req, ['SS'], 'budget');
+      if (!permission.hasPermission) {
+        return res.status(403).json({ success: false, error: '권한이 없습니다.' });
+      }
+
+      const { channelName, channelDescription, channelLink, checkerPermissions } = req.body;
+
+      if (!channelName || !channelLink || !checkerPermissions || !Array.isArray(checkerPermissions)) {
+        return res.status(400).json({ success: false, error: '필수 필드가 누락되었습니다.' });
+      }
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_BUDGET_CHANNEL_SETTINGS, HEADERS_BUDGET_CHANNEL_SETTINGS);
+
+      // 편집 링크 정규화
+      const normalizedEditLink = normalizeGoogleSheetEditLink(channelLink);
+      
+      const newId = `BC_${Date.now()}`;
+      const registeredAt = new Date().toISOString();
+      const registeredBy = permission.userId || 'Unknown';
+
+      const newRow = [
+        newId,
+        channelName,
+        channelDescription || '',
+        normalizedEditLink,
+        JSON.stringify(checkerPermissions),
+        registeredAt,
+        registeredBy
+      ];
+
+      await withRetry(async () => {
+        return await sheets.spreadsheets.values.append({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_BUDGET_CHANNEL_SETTINGS}!A:G`,
+          valueInputOption: 'USER_ENTERED',
+          resource: {
+            values: [newRow]
+          }
+        });
+      });
+
+      // 캐시 무효화
+      invalidateCache('budget-channel-settings');
+
+      return res.json({
+        success: true,
+        id: newId,
+        message: '예산채널 설정이 추가되었습니다.'
+      });
+    } catch (error) {
+      console.error('[예산채널] 설정 추가 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // PUT /api/budget-channel-settings/:id
+  router.put('/budget-channel-settings/:id', express.json(), async (req, res) => {
+    setCORSHeaders(req, res);
+    try {
+      const permission = await checkPermission(req, ['SS'], 'budget');
+      if (!permission.hasPermission) {
+        return res.status(403).json({ success: false, error: '권한이 없습니다.' });
+      }
+
+      const { id } = req.params;
+      const { channelName, channelDescription, channelLink, checkerPermissions } = req.body;
+
+      if (!channelName || !channelLink || !checkerPermissions || !Array.isArray(checkerPermissions)) {
+        return res.status(400).json({ success: false, error: '필수 필드가 누락되었습니다.' });
+      }
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_BUDGET_CHANNEL_SETTINGS, HEADERS_BUDGET_CHANNEL_SETTINGS);
+
+      const response = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_BUDGET_CHANNEL_SETTINGS}!A:G`
+        });
+      });
+
+      const rows = response.data.values || [];
+      const rowIndex = rows.findIndex(row => row[0] === id);
+
+      if (rowIndex === -1) {
+        return res.status(404).json({ success: false, error: '예산채널 설정을 찾을 수 없습니다.' });
+      }
+
+      // 편집 링크 정규화
+      const normalizedEditLink = normalizeGoogleSheetEditLink(channelLink);
+
+      const updatedRow = [
+        id,
+        channelName,
+        channelDescription || '',
+        normalizedEditLink,
+        JSON.stringify(checkerPermissions),
+        rows[rowIndex + 1][5] || new Date().toISOString(), // 등록일시 유지
+        rows[rowIndex + 1][6] || permission.userId || 'Unknown' // 등록자 유지
+      ];
+
+      await withRetry(async () => {
+        return await sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_BUDGET_CHANNEL_SETTINGS}!A${rowIndex + 2}:G${rowIndex + 2}`,
+          valueInputOption: 'USER_ENTERED',
+          resource: {
+            values: [updatedRow]
+          }
+        });
+      });
+
+      // 캐시 무효화
+      invalidateCache('budget-channel-settings');
+
+      return res.json({
+        success: true,
+        message: '예산채널 설정이 수정되었습니다.'
+      });
+    } catch (error) {
+      console.error('[예산채널] 설정 수정 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // DELETE /api/budget-channel-settings/:id
+  router.delete('/budget-channel-settings/:id', async (req, res) => {
+    setCORSHeaders(req, res);
+    try {
+      const permission = await checkPermission(req, ['SS'], 'budget');
+      if (!permission.hasPermission) {
+        return res.status(403).json({ success: false, error: '권한이 없습니다.' });
+      }
+
+      const { id } = req.params;
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_BUDGET_CHANNEL_SETTINGS, HEADERS_BUDGET_CHANNEL_SETTINGS);
+
+      const response = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_BUDGET_CHANNEL_SETTINGS}!A:G`
+        });
+      });
+
+      const rows = response.data.values || [];
+      const rowIndex = rows.findIndex(row => row[0] === id);
+
+      if (rowIndex === -1) {
+        return res.status(404).json({ success: false, error: '예산채널 설정을 찾을 수 없습니다.' });
+      }
+
+      // 행 삭제 (헤더 행이 있으므로 rowIndex + 1이 실제 시트의 행 번호)
+      await withRetry(async () => {
+        return await sheets.spreadsheets.batchUpdate({
+          spreadsheetId: SPREADSHEET_ID,
+          resource: {
+            requests: [{
+              deleteDimension: {
+                range: {
+                  sheetId: await getSheetId(sheets, SPREADSHEET_ID, SHEET_BUDGET_CHANNEL_SETTINGS),
+                  dimension: 'ROWS',
+                  startIndex: rowIndex + 1, // 헤더 행 다음부터 시작
+                  endIndex: rowIndex + 2
+                }
+              }
+            }]
+          }
+        });
+      });
+
+      // 캐시 무효화
+      invalidateCache('budget-channel-settings');
+
+      return res.json({
+        success: true,
+        message: '예산채널 설정이 삭제되었습니다.'
+      });
+    } catch (error) {
+      console.error('[예산채널] 설정 삭제 오류:', error);
       return res.status(500).json({ success: false, error: error.message });
     }
   });
