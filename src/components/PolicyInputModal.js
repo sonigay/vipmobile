@@ -1482,18 +1482,18 @@ function PolicyInputModal({
                 <Grid container spacing={2} sx={{ mb: 2 }}>
                   {/* 통화편의+구글원패키지 */}
                   <Grid item xs={12} sm={6} md={3}>
-                    <TextField
+                  <TextField
                       fullWidth
                       label="📺 통화편의+구글원패키지 유치금액"
-                      value={formData.addSupport?.uplayPremiumAmount || ''}
-                      onChange={(e) => handleInputChange('addSupport', {
-                        ...(formData.addSupport || {}),
-                        uplayPremiumAmount: e.target.value
-                      })}
-                      type="number"
-                      inputProps={{ min: 0 }}
-                      placeholder="금액 입력"
-                    />
+                    value={formData.addSupport?.uplayPremiumAmount || ''}
+                    onChange={(e) => handleInputChange('addSupport', {
+                      ...(formData.addSupport || {}),
+                      uplayPremiumAmount: e.target.value
+                    })}
+                    type="number"
+                    inputProps={{ min: 0 }}
+                    placeholder="금액 입력"
+                  />
                     <FormControl fullWidth sx={{ mt: 1 }}>
                       <InputLabel>대체상품 선택</InputLabel>
                       <Select
@@ -1519,18 +1519,18 @@ function PolicyInputModal({
 
                   {/* 폰교체패스 */}
                   <Grid item xs={12} sm={6} md={3}>
-                    <TextField
+                  <TextField
                       fullWidth
                       label="📱 폰교체패스 유치금액"
-                      value={formData.addSupport?.phoneExchangePassAmount || ''}
-                      onChange={(e) => handleInputChange('addSupport', {
-                        ...(formData.addSupport || {}),
-                        phoneExchangePassAmount: e.target.value
-                      })}
-                      type="number"
-                      inputProps={{ min: 0 }}
-                      placeholder="금액 입력"
-                    />
+                    value={formData.addSupport?.phoneExchangePassAmount || ''}
+                    onChange={(e) => handleInputChange('addSupport', {
+                      ...(formData.addSupport || {}),
+                      phoneExchangePassAmount: e.target.value
+                    })}
+                    type="number"
+                    inputProps={{ min: 0 }}
+                    placeholder="금액 입력"
+                  />
                     <FormControl fullWidth sx={{ mt: 1 }}>
                       <InputLabel>대체상품 선택</InputLabel>
                       <Select
@@ -1556,18 +1556,18 @@ function PolicyInputModal({
 
                   {/* 음악감상+벨링콘텐츠팩 */}
                   <Grid item xs={12} sm={6} md={3}>
-                    <TextField
+                  <TextField
                       fullWidth
                       label="🎵 음악감상+벨링콘텐츠팩 유치금액"
-                      value={formData.addSupport?.musicAmount || ''}
-                      onChange={(e) => handleInputChange('addSupport', {
-                        ...(formData.addSupport || {}),
-                        musicAmount: e.target.value
-                      })}
-                      type="number"
-                      inputProps={{ min: 0 }}
-                      placeholder="금액 입력"
-                    />
+                    value={formData.addSupport?.musicAmount || ''}
+                    onChange={(e) => handleInputChange('addSupport', {
+                      ...(formData.addSupport || {}),
+                      musicAmount: e.target.value
+                    })}
+                    type="number"
+                    inputProps={{ min: 0 }}
+                    placeholder="금액 입력"
+                  />
                     <FormControl fullWidth sx={{ mt: 1 }}>
                       <InputLabel>대체상품 선택</InputLabel>
                       <Select
@@ -1593,18 +1593,18 @@ function PolicyInputModal({
 
                   {/* 002알뜰10000 */}
                   <Grid item xs={12} sm={6} md={3}>
-                    <TextField
+                  <TextField
                       fullWidth
                       label="🔢 002알뜰10000 유치금액"
-                      value={formData.addSupport?.numberFilteringAmount || ''}
-                      onChange={(e) => handleInputChange('addSupport', {
-                        ...(formData.addSupport || {}),
-                        numberFilteringAmount: e.target.value
-                      })}
-                      type="number"
-                      inputProps={{ min: 0 }}
-                      placeholder="금액 입력"
-                    />
+                    value={formData.addSupport?.numberFilteringAmount || ''}
+                    onChange={(e) => handleInputChange('addSupport', {
+                      ...(formData.addSupport || {}),
+                      numberFilteringAmount: e.target.value
+                    })}
+                    type="number"
+                    inputProps={{ min: 0 }}
+                    placeholder="금액 입력"
+                  />
                     <FormControl fullWidth sx={{ mt: 1 }}>
                       <InputLabel>대체상품 선택</InputLabel>
                       <Select

@@ -712,7 +712,9 @@ async function getAgentManagementData(sheets, SPREADSHEET_ID) {
   // 캐시 확인
   const cached = getCache(cacheKey);
   if (cached) {
-    return cached;
+    console.log('✅ [캐시 히트] 대리점아이디관리');
+    // 캐시된 데이터는 rows 배열이므로 response 형식으로 변환
+    return { data: { values: cached } };
   }
 
   let response;
@@ -740,8 +742,13 @@ async function getAgentManagementData(sheets, SPREADSHEET_ID) {
     throw err;
   }
 
+  // 응답이 없거나 data가 없는 경우 처리
+  if (!response || !response.data) {
+    throw new Error('대리점아이디관리 시트 조회 실패: 응답이 없습니다.');
+  }
+
   const rows = response.data.values || [];
-  // 캐시에 저장
+  // 캐시에 저장 (rows 배열로 저장)
   setCache(cacheKey, rows, CACHE_TTL.AGENT_MANAGEMENT);
   lastAgentManagementCache = rows;
   return response;
@@ -749,15 +756,23 @@ async function getAgentManagementData(sheets, SPREADSHEET_ID) {
 
 // 권한 체크 헬퍼 함수
 async function checkPermission(req, allowedRoles) {
-  const { sheets, SPREADSHEET_ID } = createSheetsClient();
-  
-  // 대리점아이디관리 시트에서 사용자 정보 조회 (캐싱 적용)
-  const response = await getAgentManagementData(sheets, SPREADSHEET_ID);
+  try {
+    const { sheets, SPREADSHEET_ID } = createSheetsClient();
+    
+    // 대리점아이디관리 시트에서 사용자 정보 조회 (캐싱 적용)
+    const response = await getAgentManagementData(sheets, SPREADSHEET_ID);
 
-  const rows = response.data.values || [];
-  if (rows.length < 2) {
-    throw new Error('대리점아이디관리 시트에 데이터가 없습니다.');
-  }
+    // 응답이 없거나 data가 없는 경우 처리
+    if (!response || !response.data) {
+      console.error('[정책표] 권한 체크 오류: 대리점아이디관리 시트 응답이 없습니다.');
+      return { hasPermission: false, error: '대리점아이디관리 시트 조회 실패' };
+    }
+
+    const rows = response.data.values || [];
+    if (rows.length < 2) {
+      console.warn('[정책표] 권한 체크: 대리점아이디관리 시트에 데이터가 없습니다.');
+      return { hasPermission: false, error: '대리점아이디관리 시트에 데이터가 없습니다.' };
+    }
 
   // 로그인한 사용자 정보 찾기 (헤더에서 가져오기)
   const userId = req.headers['x-user-id'] || req.body?.userId || req.query?.userId;
@@ -828,10 +843,10 @@ async function checkPermission(req, allowedRoles) {
   // userName이 없으면 에러 (이름은 필수)
   if (!finalUserName) {
     console.error('[정책표] 사용자 이름을 찾을 수 없습니다:', { userId, userInfo });
-  return { 
-    hasPermission, 
-    userRole: finalUserRole, 
-    userId: finalUserId, 
+    return { 
+      hasPermission, 
+      userRole: finalUserRole, 
+      userId: finalUserId, 
       userName: finalUserId // 폴백: 아이디라도 반환
     };
   }
@@ -842,6 +857,16 @@ async function checkPermission(req, allowedRoles) {
     userId: finalUserId, 
     userName: finalUserName
   };
+  } catch (error) {
+    console.error('[정책표] 권한 체크 오류:', error);
+    return { 
+      hasPermission: false, 
+      error: error.message || '권한 체크 중 오류가 발생했습니다.',
+      userRole: null,
+      userId: null,
+      userName: null
+    };
+  }
 }
 
 // 작업 상태 저장 (메모리 또는 구글시트)
@@ -1297,6 +1322,10 @@ function setupPolicyTableRoutes(app) {
   // GET /api/policy-table-settings
   router.get('/policy-table-settings', async (req, res) => {
     setCORSHeaders(req, res);
+    // OPTIONS 요청 처리
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
     try {
       // 정책표생성 탭 접근 권한: SS(총괄) 또는 두 글자 대문자 패턴(팀장)
       const permission = await checkPermission(req, ['SS', 'TEAM_LEADER']);
@@ -2133,6 +2162,10 @@ function setupPolicyTableRoutes(app) {
   // GET /api/policy-table/user-groups/:id/change-history
   router.get('/policy-table/user-groups/:id/change-history', async (req, res) => {
     setCORSHeaders(req, res);
+    // OPTIONS 요청 처리
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
     try {
       // S 권한자도 변경이력 조회 가능하도록 권한 체크
       const userRole = req.headers['x-user-role'] || req.query?.userRole;
