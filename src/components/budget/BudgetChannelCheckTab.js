@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Paper,
@@ -8,7 +8,11 @@ import {
   CardContent,
   CircularProgress,
   Alert,
-  Chip
+  Chip,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
 } from '@mui/material';
 import { API_BASE_URL } from '../../api';
 
@@ -17,16 +21,46 @@ const BudgetChannelCheckTab = ({ loggedInStore }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [teamLeaders, setTeamLeaders] = useState([]);
+  const [selectedYearMonth, setSelectedYearMonth] = useState('all');
+  const [allSettings, setAllSettings] = useState([]); // For year-month filter options
+
+  useEffect(() => {
+    loadAllSettings(); // Load all settings first to populate year-month filter
+    loadTeamLeaders();
+  }, []);
 
   useEffect(() => {
     loadSettings();
-    loadTeamLeaders();
-  }, []);
+  }, [selectedYearMonth]);
+
+  const loadAllSettings = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/budget-channel-settings`, {
+        headers: {
+          'x-user-role': loggedInStore?.userRole || '',
+          'x-user-id': loggedInStore?.contactId || loggedInStore?.id || ''
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setAllSettings(data);
+        // Initially show all settings
+        setSettings(data);
+      }
+    } catch (error) {
+      console.error('예산채널 설정 전체 로드 오류:', error);
+    }
+  };
 
   const loadSettings = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/api/budget-channel-settings`, {
+      const url = new URL(`${API_BASE_URL}/api/budget-channel-settings`);
+      if (selectedYearMonth && selectedYearMonth !== 'all') {
+        url.searchParams.append('yearMonth', selectedYearMonth);
+      }
+      
+      const response = await fetch(url.toString(), {
         headers: {
           'x-user-role': loggedInStore?.userRole || '',
           'x-user-id': loggedInStore?.contactId || loggedInStore?.id || ''
@@ -111,6 +145,12 @@ const BudgetChannelCheckTab = ({ loggedInStore }) => {
     }
   };
 
+  // Extract unique year-months for the filter
+  const availableYearMonths = useMemo(() => {
+    const months = new Set(allSettings.map(s => s.yearMonth).filter(Boolean));
+    return ['all', ...Array.from(months).sort().reverse()];
+  }, [allSettings]);
+
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h5" gutterBottom sx={{ mb: 3, fontWeight: 'bold' }}>
@@ -122,6 +162,23 @@ const BudgetChannelCheckTab = ({ loggedInStore }) => {
           {error}
         </Alert>
       )}
+
+      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
+        <FormControl sx={{ minWidth: 120 }}>
+          <InputLabel>년월 필터</InputLabel>
+          <Select
+            value={selectedYearMonth}
+            label="년월 필터"
+            onChange={(e) => setSelectedYearMonth(e.target.value)}
+          >
+            {availableYearMonths.map(ym => (
+              <MenuItem key={ym} value={ym}>
+                {ym === 'all' ? '전체' : ym}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </Box>
 
       {loading && settings.length === 0 ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
