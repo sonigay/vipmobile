@@ -6,10 +6,11 @@ options:
   start: node index.js
   healthcheck:
     path: /health
-    initialDelaySeconds: 10
-    periodSeconds: 5
-    timeoutSeconds: 3
-    failureThreshold: 10
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 6
+    successThreshold: 1
   resources:
     requests:
       memory: "128Mi"
