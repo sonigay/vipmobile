@@ -10,23 +10,35 @@ const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const DISCORD_LOGGING_ENABLED = process.env.DISCORD_LOGGING_ENABLED === 'true';
 
 // Discord 봇 초기화 (server/index.js의 전역 봇을 사용하거나 자체 초기화)
+// 서버 시작을 블로킹하지 않도록 비동기로 초기화
 let discordBot = null;
 if (DISCORD_LOGGING_ENABLED && DISCORD_BOT_TOKEN) {
-  discordBot = new Client({
-    intents: [
-      GatewayIntentBits.Guilds,
-      GatewayIntentBits.GuildMessages,
-      GatewayIntentBits.MessageContent
-    ]
-  });
+  // 비동기로 초기화하여 서버 시작을 블로킹하지 않음
+  setImmediate(() => {
+    try {
+      discordBot = new Client({
+        intents: [
+          GatewayIntentBits.Guilds,
+          GatewayIntentBits.GuildMessages,
+          GatewayIntentBits.MessageContent
+        ]
+      });
 
-  discordBot.once('ready', () => {
-    console.log(`✅ [정책표] Discord 봇이 준비되었습니다: ${discordBot.user.tag}`);
-  });
+      discordBot.once('ready', () => {
+        console.log(`✅ [정책표] Discord 봇이 준비되었습니다: ${discordBot.user.tag}`);
+      });
 
-  discordBot.login(DISCORD_BOT_TOKEN)
-    .then(() => console.log('✅ [정책표] Discord 봇 로그인 성공'))
-    .catch(error => console.error('❌ [정책표] Discord 봇 로그인 실패:', error));
+      discordBot.login(DISCORD_BOT_TOKEN)
+        .then(() => console.log('✅ [정책표] Discord 봇 로그인 성공'))
+        .catch(error => {
+          console.error('❌ [정책표] Discord 봇 로그인 실패:', error.message);
+          discordBot = null; // 실패 시 null로 설정
+        });
+    } catch (error) {
+      console.error('❌ [정책표] Discord 봇 초기화 오류:', error.message);
+      discordBot = null;
+    }
+  });
 }
 
 // ===== 로컬 PC 디스코드 봇 명령어 전송용 클라이언트 =====
