@@ -320,6 +320,7 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
     // setPolicies([]);
     setSearchCreator('');
     setFilterApplyDateFrom('');
+    setPage(0); // 탭 변경 시 첫 페이지로 리셋
   };
 
   // 탭 순서 저장
@@ -924,6 +925,7 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
   };
 
   const handleSearch = () => {
+    setPage(0); // 검색 시 첫 페이지로 리셋
     const currentTab = tabs[activeTabIndex];
     if (currentTab) {
       loadPolicies(currentTab.policyTableName);
@@ -1151,7 +1153,9 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
                   </TableCell>
                 </TableRow>
               ) : (
-                policies.map((policy) => (
+                policies
+                  .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                  .map((policy) => (
                   <TableRow
                     key={policy.id}
                     hover
