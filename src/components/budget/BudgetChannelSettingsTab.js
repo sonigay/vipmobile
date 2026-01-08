@@ -20,7 +20,11 @@ import {
   Chip,
   IconButton,
   Alert,
-  CircularProgress
+  CircularProgress,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -41,26 +45,35 @@ const BudgetChannelSettingsTab = ({ loggedInStore }) => {
     channelName: '',
     channelDescription: '',
     channelLink: '',
+    yearMonth: '',
     checkerPermissions: []
   });
 
   // 팀장 권한자 목록 (대리점아이디관리 시트에서 가져옴)
   const [teamLeaders, setTeamLeaders] = useState([]);
+  
+  // 년월 필터
+  const [selectedYearMonth, setSelectedYearMonth] = useState('');
+  const [availableYearMonths, setAvailableYearMonths] = useState([]);
 
   // 권한 체크
   const canAccess = loggedInStore?.userRole === 'SS';
 
   useEffect(() => {
     if (canAccess) {
-      loadSettings();
       loadTeamLeaders();
     }
   }, [canAccess]);
 
-  const loadSettings = async () => {
+  const loadSettings = async (yearMonth = null) => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/api/budget-channel-settings`, {
+      const url = new URL(`${API_BASE_URL}/api/budget-channel-settings`);
+      if (yearMonth) {
+        url.searchParams.append('yearMonth', yearMonth);
+      }
+      
+      const response = await fetch(url.toString(), {
         headers: {
           'x-user-role': loggedInStore?.userRole || '',
           'x-user-id': loggedInStore?.contactId || loggedInStore?.id || ''
@@ -69,6 +82,10 @@ const BudgetChannelSettingsTab = ({ loggedInStore }) => {
       if (response.ok) {
         const data = await response.json();
         setSettings(data);
+        
+        // 사용 가능한 년월 목록 추출 (중복 제거, 정렬)
+        const yearMonths = [...new Set(data.map(s => s.yearMonth).filter(Boolean))].sort().reverse();
+        setAvailableYearMonths(yearMonths);
       } else {
         setError('예산채널 설정을 불러올 수 없습니다.');
       }
@@ -79,6 +96,12 @@ const BudgetChannelSettingsTab = ({ loggedInStore }) => {
       setLoading(false);
     }
   };
+  
+  useEffect(() => {
+    if (canAccess) {
+      loadSettings(selectedYearMonth || null);
+    }
+  }, [canAccess, selectedYearMonth]);
 
   const loadTeamLeaders = async () => {
     try {
@@ -178,14 +201,19 @@ const BudgetChannelSettingsTab = ({ loggedInStore }) => {
         channelName: setting.channelName,
         channelDescription: setting.channelDescription || '',
         channelLink: setting.channelLink,
+        yearMonth: setting.yearMonth || '',
         checkerPermissions: setting.checkerPermissions || []
       });
     } else {
       setEditingSetting(null);
+      // 기본값: 현재 년월
+      const now = new Date();
+      const defaultYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
       setSettingsFormData({
         channelName: '',
         channelDescription: '',
         channelLink: '',
+        yearMonth: defaultYearMonth,
         checkerPermissions: []
       });
     }
@@ -195,10 +223,13 @@ const BudgetChannelSettingsTab = ({ loggedInStore }) => {
   const handleCloseSettingsModal = () => {
     setSettingsModalOpen(false);
     setEditingSetting(null);
+    const now = new Date();
+    const defaultYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     setSettingsFormData({
       channelName: '',
       channelDescription: '',
       channelLink: '',
+      yearMonth: defaultYearMonth,
       checkerPermissions: []
     });
   };
@@ -279,8 +310,23 @@ const BudgetChannelSettingsTab = ({ loggedInStore }) => {
       )}
 
       <Box>
-          <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography variant="h6">예산채널 설정 목록</Typography>
+          <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Typography variant="h6">예산채널 설정 목록</Typography>
+              <FormControl size="small" sx={{ minWidth: 150 }}>
+                <InputLabel>년월 필터</InputLabel>
+                <Select
+                  value={selectedYearMonth}
+                  onChange={(e) => setSelectedYearMonth(e.target.value)}
+                  label="년월 필터"
+                >
+                  <MenuItem value="">전체</MenuItem>
+                  {availableYearMonths.map(ym => (
+                    <MenuItem key={ym} value={ym}>{ym}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Box>
             <Button
               variant="contained"
               startIcon={<AddIcon />}
@@ -300,6 +346,7 @@ const BudgetChannelSettingsTab = ({ loggedInStore }) => {
                 <TableHead>
                   <TableRow>
                     <TableCell>예산채널이름</TableCell>
+                    <TableCell>년월</TableCell>
                     <TableCell>예산채널링크</TableCell>
                     <TableCell>확인자적용권한</TableCell>
                     <TableCell>등록일시</TableCell>
@@ -309,7 +356,7 @@ const BudgetChannelSettingsTab = ({ loggedInStore }) => {
                 <TableBody>
                   {settings.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} align="center">
+                      <TableCell colSpan={6} align="center">
                         등록된 예산채널 설정이 없습니다.
                       </TableCell>
                     </TableRow>
@@ -317,6 +364,7 @@ const BudgetChannelSettingsTab = ({ loggedInStore }) => {
                     settings.map((setting) => (
                       <TableRow key={setting.id}>
                         <TableCell>{setting.channelName}</TableCell>
+                        <TableCell>{setting.yearMonth || '-'}</TableCell>
                         <TableCell>
                           <Typography variant="body2" sx={{ maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {setting.channelLink}
@@ -387,6 +435,18 @@ const BudgetChannelSettingsTab = ({ loggedInStore }) => {
                 required
                 placeholder="시트 ID 또는 전체 URL (예: 1Vy8Qhce3B6_41TxRfVUs883ioLxiGTUjkbD_nKebgrs)"
                 helperText="시트 ID만 입력하거나 전체 편집 URL을 입력하세요"
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="년월"
+                value={settingsFormData.yearMonth}
+                onChange={(e) => setSettingsFormData({ ...settingsFormData, yearMonth: e.target.value })}
+                required
+                placeholder="YYYY-MM (예: 2025-01)"
+                helperText="년월을 입력하세요 (예: 2025-01)"
+                inputProps={{ pattern: '\\d{4}-\\d{2}' }}
               />
             </Grid>
             <Grid item xs={12}>

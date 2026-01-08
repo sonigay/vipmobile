@@ -418,6 +418,7 @@ const HEADERS_BUDGET_CHANNEL_SETTINGS = [
   '예산채널이름',
   '예산채널설명',
   '예산채널링크',
+  '년월',
   '확인자적용권한',
   '등록일시',
   '등록자'
@@ -1677,9 +1678,12 @@ function setupPolicyTableRoutes(app) {
 
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
       
-      // 캐시 확인 (30분 TTL)
+      // 년월 필터 파라미터
+      const yearMonth = req.query.yearMonth;
+      
+      // 캐시 확인 (30분 TTL) - 년월별로 캐시 분리
       const userId = req.headers['x-user-id'] || req.query.userId;
-      const cacheKey = `budget-channel-settings-${SPREADSHEET_ID}-${userId || 'all'}`;
+      const cacheKey = `budget-channel-settings-${SPREADSHEET_ID}-${userId || 'all'}-${yearMonth || 'all'}`;
       const cached = getCache(cacheKey);
       if (cached) {
         console.log('✅ [캐시 히트] 예산채널 설정 목록');
@@ -1691,7 +1695,7 @@ function setupPolicyTableRoutes(app) {
       const response = await withRetry(async () => {
         return await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_BUDGET_CHANNEL_SETTINGS}!A:G`
+          range: `${SHEET_BUDGET_CHANNEL_SETTINGS}!A:H`
         });
       });
 
@@ -1707,10 +1711,16 @@ function setupPolicyTableRoutes(app) {
         channelName: row[1] || '',
         channelDescription: row[2] || '',
         channelLink: row[3] || '',
-        checkerPermissions: row[4] ? JSON.parse(row[4]) : [],
-        registeredAt: row[5] || '',
-        registeredBy: row[6] || ''
+        yearMonth: row[4] || '',
+        checkerPermissions: row[5] ? JSON.parse(row[5]) : [],
+        registeredAt: row[6] || '',
+        registeredBy: row[7] || ''
       }));
+
+      // 년월 필터 적용
+      if (yearMonth) {
+        settings = settings.filter(setting => setting.yearMonth === yearMonth);
+      }
 
       // 캐시에 저장 (30분 TTL)
       setCache(cacheKey, settings, CACHE_TTL.POLICY_TABLE_SETTINGS);
@@ -1731,10 +1741,15 @@ function setupPolicyTableRoutes(app) {
         return res.status(403).json({ success: false, error: '권한이 없습니다.' });
       }
 
-      const { channelName, channelDescription, channelLink, checkerPermissions } = req.body;
+      const { channelName, channelDescription, channelLink, yearMonth, checkerPermissions } = req.body;
 
-      if (!channelName || !channelLink || !checkerPermissions || !Array.isArray(checkerPermissions)) {
+      if (!channelName || !channelLink || !yearMonth || !checkerPermissions || !Array.isArray(checkerPermissions)) {
         return res.status(400).json({ success: false, error: '필수 필드가 누락되었습니다.' });
+      }
+
+      // 년월 형식 검증 (YYYY-MM)
+      if (!/^\d{4}-\d{2}$/.test(yearMonth)) {
+        return res.status(400).json({ success: false, error: '년월 형식이 올바르지 않습니다. (YYYY-MM 형식)' });
       }
 
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
@@ -1752,6 +1767,7 @@ function setupPolicyTableRoutes(app) {
         channelName,
         channelDescription || '',
         normalizedEditLink,
+        yearMonth,
         JSON.stringify(checkerPermissions),
         registeredAt,
         registeredBy
@@ -1760,7 +1776,7 @@ function setupPolicyTableRoutes(app) {
       await withRetry(async () => {
         return await sheets.spreadsheets.values.append({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_BUDGET_CHANNEL_SETTINGS}!A:G`,
+          range: `${SHEET_BUDGET_CHANNEL_SETTINGS}!A:H`,
           valueInputOption: 'USER_ENTERED',
           resource: {
             values: [newRow]
@@ -1792,10 +1808,15 @@ function setupPolicyTableRoutes(app) {
       }
 
       const { id } = req.params;
-      const { channelName, channelDescription, channelLink, checkerPermissions } = req.body;
+      const { channelName, channelDescription, channelLink, yearMonth, checkerPermissions } = req.body;
 
-      if (!channelName || !channelLink || !checkerPermissions || !Array.isArray(checkerPermissions)) {
+      if (!channelName || !channelLink || !yearMonth || !checkerPermissions || !Array.isArray(checkerPermissions)) {
         return res.status(400).json({ success: false, error: '필수 필드가 누락되었습니다.' });
+      }
+
+      // 년월 형식 검증 (YYYY-MM)
+      if (!/^\d{4}-\d{2}$/.test(yearMonth)) {
+        return res.status(400).json({ success: false, error: '년월 형식이 올바르지 않습니다. (YYYY-MM 형식)' });
       }
 
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
@@ -1804,7 +1825,7 @@ function setupPolicyTableRoutes(app) {
       const response = await withRetry(async () => {
         return await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_BUDGET_CHANNEL_SETTINGS}!A:G`
+          range: `${SHEET_BUDGET_CHANNEL_SETTINGS}!A:H`
         });
       });
 
@@ -1826,15 +1847,16 @@ function setupPolicyTableRoutes(app) {
         channelName,
         channelDescription || '',
         normalizedEditLink,
+        yearMonth,
         JSON.stringify(checkerPermissions),
-        rows[rowIndex][5] || new Date().toISOString(), // 등록일시 유지
-        rows[rowIndex][6] || permission.userId || 'Unknown' // 등록자 유지
+        rows[rowIndex][6] || new Date().toISOString(), // 등록일시 유지
+        rows[rowIndex][7] || permission.userId || 'Unknown' // 등록자 유지
       ];
 
       await withRetry(async () => {
         return await sheets.spreadsheets.values.update({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_BUDGET_CHANNEL_SETTINGS}!A${rowIndex + 2}:G${rowIndex + 2}`,
+          range: `${SHEET_BUDGET_CHANNEL_SETTINGS}!A${rowIndex + 2}:H${rowIndex + 2}`,
           valueInputOption: 'USER_ENTERED',
           resource: {
             values: [updatedRow]
@@ -1871,7 +1893,7 @@ function setupPolicyTableRoutes(app) {
       const response = await withRetry(async () => {
         return await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_BUDGET_CHANNEL_SETTINGS}!A:G`
+          range: `${SHEET_BUDGET_CHANNEL_SETTINGS}!A:H`
         });
       });
 
