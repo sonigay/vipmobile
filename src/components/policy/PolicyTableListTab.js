@@ -971,20 +971,6 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
       });
 
       if (response.ok) {
-        // 프론트엔드 캐시 무효화 (수정된 정책이 포함된 모든 캐시)
-        const currentTab = tabs[activeTabIndex];
-        if (currentTab) {
-          const cacheKey = `${mode || 'default'}_${currentTab.policyTableName}`;
-          setPoliciesCache(prev => {
-            const newCache = { ...prev };
-            delete newCache[cacheKey];
-            return newCache;
-          });
-          
-          // 정책 목록 새로고침 (캐시 무시)
-          await loadPolicies(currentTab.policyTableName);
-        }
-        
         // 선택된 정책 정보 업데이트
         const params = new URLSearchParams();
         if (mode) {
@@ -1000,6 +986,42 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
         if (detailResponse.ok) {
           const updatedData = await detailResponse.json();
           setSelectedPolicy(updatedData);
+          
+          // policies 상태에서 해당 정책을 즉시 업데이트
+          setPolicies(prevPolicies => {
+            const updatedPolicies = prevPolicies.map(policy => 
+              policy.id === selectedPolicy.id ? updatedData : policy
+            );
+            // 생성일시 기준으로 내림차순 정렬 유지
+            return updatedPolicies.sort((a, b) => {
+              const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+              const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+              return dateB - dateA;
+            });
+          });
+          
+          // 프론트엔드 캐시 무효화 및 업데이트
+          const currentTab = tabs[activeTabIndex];
+          if (currentTab) {
+            const cacheKey = `${mode || 'default'}_${currentTab.policyTableName}`;
+            setPoliciesCache(prev => {
+              const newCache = { ...prev };
+              // 캐시가 있으면 업데이트, 없으면 삭제
+              if (newCache[cacheKey]) {
+                const updatedCache = newCache[cacheKey].map(policy => 
+                  policy.id === selectedPolicy.id ? updatedData : policy
+                );
+                newCache[cacheKey] = updatedCache.sort((a, b) => {
+                  const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+                  const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+                  return dateB - dateA;
+                });
+              } else {
+                delete newCache[cacheKey];
+              }
+              return newCache;
+            });
+          }
         }
         
         setIsEditMode(false);
