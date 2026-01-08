@@ -2924,7 +2924,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
               </Grid>
             </LocalizationProvider>
             <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={12}>
+              <Grid item xs={12}>
               <TextField
                 fullWidth
                 label="정책적용내용"
