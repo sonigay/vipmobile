@@ -15018,9 +15018,16 @@ app.get('/api/download-chrome-extension', (req, res) => {
 });
 
 // 서버 시작
-const server = app.listen(port, '0.0.0.0', async () => {
+// 서버가 포트를 열고 리스닝을 시작하면 즉시 로그 출력 (헬스체크를 위한 빠른 응답)
+const server = app.listen(port, '0.0.0.0', () => {
+  // 서버가 리스닝을 시작했음을 즉시 로그 출력
+  console.log(`🚀 서버가 포트 ${port}에서 리스닝을 시작했습니다`);
+});
+
+// 서버 시작 후 초기화 작업은 비동기로 실행 (서버 리스닝을 블로킹하지 않음)
+server.on('listening', async () => {
   try {
-    console.log(`🚀 서버가 포트 ${port}에서 실행 중입니다`);
+    console.log(`✅ 서버가 포트 ${port}에서 실행 중입니다`);
     console.log(`🔑 VAPID Public Key: ${vapidKeys.publicKey}`);
     console.log(`📅 서버 시작 시간: ${new Date().toISOString()}`);
     console.log(`🌍 서버 환경: ${process.env.NODE_ENV || 'development'}`);
@@ -15950,9 +15957,11 @@ const server = app.listen(port, '0.0.0.0', async () => {
     }, 360000); // 6분 후 실행 (스케줄러 작업들과 충돌 방지, Rate Limit 고려)
 
   } catch (error) {
-    console.error('서버 시작 중 오류:', error);
+    console.error('서버 초기화 중 오류:', error);
   }
-}).on('error', (error) => {
+});
+
+server.on('error', (error) => {
   console.error('서버 시작 실패:', error);
   process.exit(1);
 });
