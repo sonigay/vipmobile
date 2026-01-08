@@ -11,6 +11,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TablePagination,
   Tabs,
   Tab,
   Dialog,
@@ -152,6 +153,10 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
   // 검색/필터링
   const [searchCreator, setSearchCreator] = useState('');
   const [filterApplyDateFrom, setFilterApplyDateFrom] = useState('');
+
+  // 페이지네이션
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(5);
 
   // 수정 모드 관련 상태
   const [isEditMode, setIsEditMode] = useState(false);
@@ -1184,6 +1189,20 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
               )}
             </TableBody>
           </Table>
+          <TablePagination
+            component="div"
+            count={policies.length}
+            page={page}
+            onPageChange={(event, newPage) => setPage(newPage)}
+            rowsPerPage={rowsPerPage}
+            onRowsPerPageChange={(event) => {
+              setRowsPerPage(parseInt(event.target.value, 10));
+              setPage(0);
+            }}
+            rowsPerPageOptions={[1, 5, 10, 20, 100]}
+            labelRowsPerPage="페이지당 행 수:"
+            labelDisplayedRows={({ from, to, count }) => `${from}-${to} / 총 ${count}개`}
+          />
         </TableContainer>
       )}
 
