@@ -303,12 +303,19 @@ const BudgetChannelSettingsTab = ({ loggedInStore }) => {
         채널별예산시트설정
       </Typography>
 
+      {!canAccess && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          이 탭은 SS(총괄) 권한만 접근할 수 있습니다.
+        </Alert>
+      )}
+
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
           {error}
         </Alert>
       )}
 
+      {canAccess && (
       <Box>
           <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -497,6 +504,7 @@ const BudgetChannelSettingsTab = ({ loggedInStore }) => {
           </Button>
         </DialogActions>
       </Dialog>
+      )}
     </Box>
   );
 };

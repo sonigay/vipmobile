@@ -45,8 +45,8 @@ const BudgetChannelCheckTab = ({ loggedInStore }) => {
         const data = await response.json();
         // 권한 필터링 적용
         const userRole = loggedInStore?.userRole;
-        const filtered = userRole === 'SS' 
-          ? data // 총괄은 모든 예산채널 접근 가능
+        const filtered = (userRole === 'SS' || userRole === 'S')
+          ? data // SS(총괄) 또는 S(정산)은 모든 예산채널 접근 가능
           : data.filter(setting => {
               // checkerPermissions가 배열인지 확인
               if (!Array.isArray(setting.checkerPermissions)) {

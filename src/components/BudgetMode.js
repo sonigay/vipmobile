@@ -60,6 +60,16 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const [activeTab, setActiveTab] = React.useState(0);
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
   
+  // SS 권한 체크
+  const isSS = loggedInStore?.userRole === 'SS';
+  
+  // SS 권한이 아닌데 activeTab이 1이면 0으로 리셋
+  React.useEffect(() => {
+    if (!isSS && activeTab === 1) {
+      setActiveTab(0);
+    }
+  }, [isSS, activeTab]);
+  
   // 액면예산 서브메뉴 상태
   const [faceValueSubMenu, setFaceValueSubMenu] = useState('Ⅰ'); // Ⅰ, Ⅱ, 종합
   const [showFaceValueDropdown, setShowFaceValueDropdown] = useState(false);
@@ -2774,7 +2784,9 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
             }}
           >
             <Tab label="채널별예산확인" icon={<VisibilityIcon />} iconPosition="start" />
-            <Tab label="채널별예산시트설정" icon={<SettingsIcon />} iconPosition="start" />
+            {isSS && (
+              <Tab label="채널별예산시트설정" icon={<SettingsIcon />} iconPosition="start" />
+            )}
           </Tabs>
         </Box>
 
@@ -2782,7 +2794,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         {activeTab === 0 && (
           <BudgetChannelCheckTab loggedInStore={loggedInStore} />
         )}
-        {activeTab === 1 && (
+        {isSS && activeTab === 1 && (
           <BudgetChannelSettingsTab loggedInStore={loggedInStore} />
         )}
         {/* 기존 탭 콘텐츠 제거 - 주석 처리 */}
