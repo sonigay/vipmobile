@@ -23,6 +23,11 @@ const setupPolicyTableRoutes = require('./policyTableRoutes');
 const app = express();
 const port = process.env.PORT || 4000;
 
+// 서버 시작 전 즉시 헬스체크 엔드포인트 등록 (startup probe용)
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 // Google Sheets API 호출 빈도 제한을 위한 변수
 let lastSheetsApiCall = 0;
 const SHEETS_API_COOLDOWN = 2000; // 2초 대기 (Google Sheets API 분당 60회 제한 고려)
