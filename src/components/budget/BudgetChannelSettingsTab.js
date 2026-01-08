@@ -405,8 +405,10 @@ const BudgetChannelSettingsTab = ({ loggedInStore }) => {
             </TableContainer>
           )}
       </Box>
+      )}
 
       {/* 예산채널 설정 모달 */}
+      {canAccess && (
       <Dialog open={settingsModalOpen} onClose={handleCloseSettingsModal} maxWidth="md" fullWidth>
         <DialogTitle>
           {editingSetting ? '예산채널 설정 수정' : '예산채널 설정 추가'}
