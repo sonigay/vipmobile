@@ -986,16 +986,27 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
     return dateText;
   }, [autoDateSettings]);
 
-  // autoDateSettings 변경 시 자동으로 applyDate 업데이트
+  // autoDateSettings 변경 시 자동으로 applyDate 업데이트 (개별 생성)
   useEffect(() => {
     const generatedText = generateApplyDateText();
-    if (generatedText) {
+    if (generatedText && creationModalOpen) {
       setCreationFormData(prev => ({
         ...prev,
         applyDate: generatedText
       }));
     }
-  }, [generateApplyDateText]);
+  }, [generateApplyDateText, creationModalOpen]);
+
+  // autoDateSettings 변경 시 자동으로 applyDate 업데이트 (모두 생성)
+  useEffect(() => {
+    const generatedText = generateApplyDateText();
+    if (generatedText && batchCreationModalOpen) {
+      setBatchCreationFormData(prev => ({
+        ...prev,
+        applyDate: generatedText
+      }));
+    }
+  }, [generateApplyDateText, batchCreationModalOpen]);
 
   // 기본 그룹 설정 로드
   const loadDefaultGroups = async () => {
@@ -2692,21 +2703,227 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
           모두정책생성 ({selectedSettings.length}개)
         </DialogTitle>
         <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            {/* 공통 필드 */}
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="정책적용일시"
-                value={batchCreationFormData.applyDate}
-                onChange={(e) => setBatchCreationFormData({ 
-                  ...batchCreationFormData, 
-                  applyDate: e.target.value 
-                })}
-                placeholder="예: 2025-01-01 10:00"
-                required
-              />
-            </Grid>
+          <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ko}>
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              {/* 정책적용일시 자동 생성 섹션 */}
+              <Grid item xs={12}>
+                <Paper sx={{ p: 2, bgcolor: 'background.default' }}>
+                  <Typography variant="subtitle2" gutterBottom sx={{ mb: 2, fontWeight: 'bold' }}>
+                    정책적용일시 자동 생성
+                  </Typography>
+                  
+                  <Grid container spacing={2}>
+                    {/* 시작 날짜 */}
+                    <Grid item xs={12} sm={6}>
+                      <DatePicker
+                        label="시작 날짜"
+                        value={autoDateSettings.startDate}
+                        onChange={(newValue) => {
+                          setAutoDateSettings(prev => ({ ...prev, startDate: newValue }));
+                        }}
+                        slotProps={{
+                          textField: {
+                            fullWidth: true,
+                            size: 'small'
+                          }
+                        }}
+                      />
+                    </Grid>
+                    
+                    {/* 시작 시간 */}
+                    <Grid item xs={6} sm={3}>
+                      <FormControl fullWidth size="small">
+                        <InputLabel>시</InputLabel>
+                        <Select
+                          value={autoDateSettings.startHour}
+                          label="시"
+                          onChange={(e) => {
+                            setAutoDateSettings(prev => ({ ...prev, startHour: e.target.value }));
+                          }}
+                        >
+                          {Array.from({ length: 24 }, (_, i) => (
+                            <MenuItem key={i} value={i}>{i}시</MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                    
+                    <Grid item xs={6} sm={3}>
+                      <FormControl fullWidth size="small">
+                        <InputLabel>분 (10분 단위)</InputLabel>
+                        <Select
+                          value={autoDateSettings.startMinute}
+                          label="분 (10분 단위)"
+                          onChange={(e) => {
+                            setAutoDateSettings(prev => ({ ...prev, startMinute: e.target.value }));
+                          }}
+                        >
+                          {Array.from({ length: 6 }, (_, i) => {
+                            const minute = i * 10;
+                            return <MenuItem key={minute} value={minute}>{minute}분</MenuItem>;
+                          })}
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                    
+                    {/* 정책 유형 선택 */}
+                    <Grid item xs={12} sm={6}>
+                      <FormControl fullWidth size="small">
+                        <InputLabel>정책 유형</InputLabel>
+                        <Select
+                          value={autoDateSettings.policyType}
+                          label="정책 유형"
+                          onChange={(e) => {
+                            setAutoDateSettings(prev => ({ ...prev, policyType: e.target.value }));
+                          }}
+                        >
+                          <MenuItem value="wireless">무선정책</MenuItem>
+                          <MenuItem value="wired">유선정책</MenuItem>
+                          <MenuItem value="other">기타정책</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                    
+                    {/* 기타정책 선택 */}
+                    {autoDateSettings.policyType === 'other' && (
+                      <Grid item xs={12} sm={6}>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <FormControl fullWidth size="small">
+                            <InputLabel>기타정책명</InputLabel>
+                            <Select
+                              value={autoDateSettings.otherPolicyName}
+                              label="기타정책명"
+                              onChange={(e) => {
+                                setAutoDateSettings(prev => ({ ...prev, otherPolicyName: e.target.value }));
+                              }}
+                            >
+                              {otherPolicyTypes.map((name) => (
+                                <MenuItem key={name} value={name}>{name}</MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={handleAddOtherPolicyType}
+                            sx={{ minWidth: 80 }}
+                          >
+                            추가
+                          </Button>
+                        </Box>
+                      </Grid>
+                    )}
+                    
+                    {/* 기타정책 추가 입력 필드 */}
+                    {autoDateSettings.policyType === 'other' && (
+                      <Grid item xs={12}>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <TextField
+                            fullWidth
+                            size="small"
+                            label="새 기타정책명"
+                            value={newOtherPolicyName}
+                            onChange={(e) => setNewOtherPolicyName(e.target.value)}
+                            placeholder="정책명을 입력하세요"
+                          />
+                        </Box>
+                      </Grid>
+                    )}
+                    
+                    {/* 종료시점 체크박스 */}
+                    <Grid item xs={12}>
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={autoDateSettings.hasEndDate}
+                            onChange={(e) => {
+                              setAutoDateSettings(prev => ({
+                                ...prev,
+                                hasEndDate: e.target.checked,
+                                endDate: e.target.checked ? (prev.endDate || new Date()) : null
+                              }));
+                            }}
+                          />
+                        }
+                        label="종료시점 사용"
+                      />
+                    </Grid>
+                    
+                    {/* 종료 날짜/시간 */}
+                    {autoDateSettings.hasEndDate && (
+                      <>
+                        <Grid item xs={12} sm={6}>
+                          <DatePicker
+                            label="종료 날짜"
+                            value={autoDateSettings.endDate}
+                            onChange={(newValue) => {
+                              setAutoDateSettings(prev => ({ ...prev, endDate: newValue }));
+                            }}
+                            slotProps={{
+                              textField: {
+                                fullWidth: true,
+                                size: 'small'
+                              }
+                            }}
+                          />
+                        </Grid>
+                        
+                        <Grid item xs={6} sm={3}>
+                          <FormControl fullWidth size="small">
+                            <InputLabel>종료 시</InputLabel>
+                            <Select
+                              value={autoDateSettings.endHour}
+                              label="종료 시"
+                              onChange={(e) => {
+                                setAutoDateSettings(prev => ({ ...prev, endHour: e.target.value }));
+                              }}
+                            >
+                              {Array.from({ length: 24 }, (_, i) => (
+                                <MenuItem key={i} value={i}>{i}시</MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                        </Grid>
+                        
+                        <Grid item xs={6} sm={3}>
+                          <FormControl fullWidth size="small">
+                            <InputLabel>종료 분 (10분 단위)</InputLabel>
+                            <Select
+                              value={autoDateSettings.endMinute}
+                              label="종료 분 (10분 단위)"
+                              onChange={(e) => {
+                                setAutoDateSettings(prev => ({ ...prev, endMinute: e.target.value }));
+                              }}
+                            >
+                              {Array.from({ length: 6 }, (_, i) => {
+                                const minute = i * 10;
+                                return <MenuItem key={minute} value={minute}>{minute}분</MenuItem>;
+                              })}
+                            </Select>
+                          </FormControl>
+                        </Grid>
+                      </>
+                    )}
+                  </Grid>
+                </Paper>
+              </Grid>
+              
+              {/* 생성된 정책적용일시 표시 */}
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="정책적용일시"
+                  value={batchCreationFormData.applyDate}
+                  onChange={(e) => setBatchCreationFormData({ 
+                    ...batchCreationFormData, 
+                    applyDate: e.target.value 
+                  })}
+                  placeholder="자동 생성된 텍스트가 여기에 표시됩니다"
+                  required
+                />
+              </Grid>
+            </LocalizationProvider>
+            <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid item xs={12}>
               <TextField
                 fullWidth
