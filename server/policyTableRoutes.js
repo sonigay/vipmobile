@@ -1830,7 +1830,15 @@ function setupPolicyTableRoutes(app) {
       });
 
       const rows = response.data.values || [];
-      const rowIndex = rows.findIndex(row => row[0] === id);
+      
+      // 헤더 행 제외 (첫 번째 행은 헤더)
+      if (rows.length < 2) {
+        return res.status(404).json({ success: false, error: '예산채널 설정을 찾을 수 없습니다.' });
+      }
+      
+      // 헤더를 제외한 데이터 행에서 찾기
+      const dataRows = rows.slice(1);
+      const rowIndex = dataRows.findIndex(row => row[0] === id);
 
       if (rowIndex === -1) {
         return res.status(404).json({ success: false, error: '예산채널 설정을 찾을 수 없습니다.' });
@@ -1839,9 +1847,8 @@ function setupPolicyTableRoutes(app) {
       // 편집 링크 정규화
       const normalizedEditLink = normalizeGoogleSheetEditLink(channelLink);
 
-      // rows[rowIndex]는 헤더를 포함한 전체 배열에서 찾은 인덱스이므로
-      // 헤더가 0번 인덱스에 있으면 rowIndex는 1 이상입니다
-      // 따라서 rows[rowIndex]가 실제 데이터 행입니다
+      // dataRows[rowIndex]는 헤더를 제외한 데이터 행이므로
+      // 업데이트 시 rowIndex + 2를 사용 (헤더 1행 + 0-based 인덱스 + 1)
       const updatedRow = [
         id,
         channelName,
@@ -1849,8 +1856,8 @@ function setupPolicyTableRoutes(app) {
         normalizedEditLink,
         yearMonth,
         JSON.stringify(checkerPermissions),
-        rows[rowIndex][6] || new Date().toISOString(), // 등록일시 유지
-        rows[rowIndex][7] || permission.userId || 'Unknown' // 등록자 유지
+        dataRows[rowIndex][6] || new Date().toISOString(), // 등록일시 유지
+        dataRows[rowIndex][7] || permission.userId || 'Unknown' // 등록자 유지
       ];
 
       await withRetry(async () => {
