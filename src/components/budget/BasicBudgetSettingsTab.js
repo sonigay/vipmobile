@@ -1,0 +1,436 @@
+import React, { useState, useEffect } from 'react';
+import {
+  Box,
+  Paper,
+  Typography,
+  Button,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Grid,
+  Autocomplete,
+  Chip,
+  IconButton,
+  Alert,
+  CircularProgress,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
+} from '@mui/material';
+import {
+  Add as AddIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon
+} from '@mui/icons-material';
+import { API_BASE_URL } from '../../api';
+
+const BasicBudgetSettingsTab = ({ loggedInStore }) => {
+  const [settings, setSettings] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  
+  // 기본예산 설정 모달 상태
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const [editingSetting, setEditingSetting] = useState(null);
+  const [settingsFormData, setSettingsFormData] = useState({
+    name: '',
+    description: '',
+    link: '',
+    yearMonth: '',
+    checkerPermissions: []
+  });
+
+  // 팀장 권한자 목록 (대리점아이디관리 시트에서 가져옴)
+  const [teamLeaders, setTeamLeaders] = useState([]);
+  
+  // 년월 필터
+  const [selectedYearMonth, setSelectedYearMonth] = useState('');
+  const [availableYearMonths, setAvailableYearMonths] = useState([]);
+
+  // 권한 체크
+  const canAccess = loggedInStore?.userRole === 'SS';
+
+  useEffect(() => {
+    if (canAccess) {
+      loadTeamLeaders();
+    }
+  }, [canAccess]);
+
+  const loadSettings = async (yearMonth = null) => {
+    try {
+      setLoading(true);
+      const url = new URL(`${API_BASE_URL}/api/basic-budget-settings`);
+      if (yearMonth) {
+        url.searchParams.append('yearMonth', yearMonth);
+      }
+      
+      const response = await fetch(url.toString(), {
+        headers: {
+          'x-user-role': loggedInStore?.userRole || '',
+          'x-user-id': loggedInStore?.contactId || loggedInStore?.id || ''
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setSettings(data);
+        
+        // 사용 가능한 년월 목록 추출 (중복 제거, 정렬)
+        const yearMonths = [...new Set(data.map(s => s.yearMonth).filter(Boolean))].sort().reverse();
+        setAvailableYearMonths(yearMonths);
+      } else {
+        setError('기본예산 설정을 불러올 수 없습니다.');
+      }
+    } catch (error) {
+      console.error('기본예산 설정 로드 오류:', error);
+      setError('기본예산 설정을 불러오는 중 오류가 발생했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  useEffect(() => {
+    if (canAccess) {
+      loadSettings(selectedYearMonth || null);
+    } else {
+      setSettings([]);
+      setAvailableYearMonths([]);
+    }
+  }, [canAccess, selectedYearMonth]);
+
+  const loadTeamLeaders = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/team-leaders`, {
+        headers: {
+          'x-user-role': loggedInStore?.userRole || '',
+          'x-user-id': loggedInStore?.contactId || loggedInStore?.id || ''
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setTeamLeaders(data);
+      }
+    } catch (error) {
+      console.error('팀장 목록 로드 오류:', error);
+    }
+  };
+
+  const handleOpenSettingsModal = (setting = null) => {
+    if (setting) {
+      setEditingSetting(setting);
+      setSettingsFormData({
+        name: setting.name || '',
+        description: setting.description || '',
+        link: setting.link || '',
+        yearMonth: setting.yearMonth || '',
+        checkerPermissions: setting.checkerPermissions || []
+      });
+    } else {
+      setEditingSetting(null);
+      const currentDate = new Date();
+      const defaultYearMonth = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+      setSettingsFormData({
+        name: '',
+        description: '',
+        link: '',
+        yearMonth: defaultYearMonth,
+        checkerPermissions: []
+      });
+    }
+    setSettingsModalOpen(true);
+  };
+
+  const handleCloseSettingsModal = () => {
+    setSettingsModalOpen(false);
+    setEditingSetting(null);
+    setSettingsFormData({
+      name: '',
+      description: '',
+      link: '',
+      yearMonth: '',
+      checkerPermissions: []
+    });
+  };
+
+  const handleSaveSettings = async () => {
+    try {
+      const url = editingSetting
+        ? `${API_BASE_URL}/api/basic-budget-settings/${editingSetting.id}`
+        : `${API_BASE_URL}/api/basic-budget-settings`;
+      
+      const method = editingSetting ? 'PUT' : 'POST';
+      
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-role': loggedInStore?.userRole || '',
+          'x-user-id': loggedInStore?.contactId || loggedInStore?.id || ''
+        },
+        body: JSON.stringify({
+          name: settingsFormData.name,
+          description: settingsFormData.description,
+          link: settingsFormData.link,
+          yearMonth: settingsFormData.yearMonth,
+          checkerPermissions: settingsFormData.checkerPermissions
+        })
+      });
+
+      if (response.ok) {
+        handleCloseSettingsModal();
+        loadSettings(selectedYearMonth || null);
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || '저장 중 오류가 발생했습니다.');
+      }
+    } catch (error) {
+      console.error('기본예산 설정 저장 오류:', error);
+      setError('저장 중 오류가 발생했습니다.');
+    }
+  };
+
+  const handleDeleteSettings = async (id) => {
+    if (!window.confirm('정말 삭제하시겠습니까?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/basic-budget-settings/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'x-user-role': loggedInStore?.userRole || '',
+          'x-user-id': loggedInStore?.contactId || loggedInStore?.id || ''
+        }
+      });
+
+      if (response.ok) {
+        loadSettings(selectedYearMonth || null);
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || '삭제 중 오류가 발생했습니다.');
+      }
+    } catch (error) {
+      console.error('기본예산 설정 삭제 오류:', error);
+      setError('삭제 중 오류가 발생했습니다.');
+    }
+  };
+
+  return (
+    <Box sx={{ p: 3 }}>
+      <Typography variant="h5" gutterBottom sx={{ mb: 3, fontWeight: 'bold' }}>
+        기본예산시트설정
+      </Typography>
+
+      {!canAccess && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          이 탭은 SS(총괄) 권한만 접근할 수 있습니다.
+        </Alert>
+      )}
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
+
+      {canAccess && (
+        <Box>
+          <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Typography variant="h6">기본예산 설정 목록</Typography>
+              <FormControl size="small" sx={{ minWidth: 150 }}>
+                <InputLabel>년월 필터</InputLabel>
+                <Select
+                  value={selectedYearMonth}
+                  onChange={(e) => setSelectedYearMonth(e.target.value)}
+                  label="년월 필터"
+                >
+                  <MenuItem value="">전체</MenuItem>
+                  {availableYearMonths.map(ym => (
+                    <MenuItem key={ym} value={ym}>{ym}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Box>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => handleOpenSettingsModal()}
+            >
+              기본예산시트 추가
+            </Button>
+          </Box>
+
+          {loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+              <CircularProgress />
+            </Box>
+          ) : (
+            <TableContainer component={Paper}>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>기본예산이름</TableCell>
+                    <TableCell>기본예산링크</TableCell>
+                    <TableCell>년월</TableCell>
+                    <TableCell>확인자적용권한</TableCell>
+                    <TableCell>등록일시</TableCell>
+                    <TableCell>작업</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {settings.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} align="center">
+                        등록된 기본예산 설정이 없습니다.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    settings.map((setting) => (
+                      <TableRow key={setting.id}>
+                        <TableCell>{setting.name}</TableCell>
+                        <TableCell>
+                          <a href={setting.link} target="_blank" rel="noopener noreferrer" style={{ color: '#1976d2' }}>
+                            {setting.link}
+                          </a>
+                        </TableCell>
+                        <TableCell>{setting.yearMonth}</TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                            {setting.checkerPermissions.map((perm) => {
+                              const leader = teamLeaders.find(l => l.code === perm);
+                              const displayLabel = leader ? `${leader.name} (${perm})` : perm;
+                              return (
+                                <Chip key={perm} label={displayLabel} size="small" />
+                              );
+                            })}
+                          </Box>
+                        </TableCell>
+                        <TableCell>{setting.registeredAt ? new Date(setting.registeredAt).toLocaleString('ko-KR') : '-'}</TableCell>
+                        <TableCell>
+                          <IconButton
+                            size="small"
+                            onClick={() => handleOpenSettingsModal(setting)}
+                            sx={{ mr: 1 }}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton
+                            size="small"
+                            onClick={() => handleDeleteSettings(setting.id)}
+                            color="error"
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </Box>
+      )}
+
+      {/* 기본예산 설정 모달 */}
+      {canAccess && (
+        <Dialog open={settingsModalOpen} onClose={handleCloseSettingsModal} maxWidth="md" fullWidth>
+          <DialogTitle>
+            {editingSetting ? '기본예산 설정 수정' : '기본예산 설정 추가'}
+          </DialogTitle>
+          <DialogContent>
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="기본예산이름"
+                  value={settingsFormData.name}
+                  onChange={(e) => setSettingsFormData({ ...settingsFormData, name: e.target.value })}
+                  required
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="기본예산설명"
+                  value={settingsFormData.description}
+                  onChange={(e) => setSettingsFormData({ ...settingsFormData, description: e.target.value })}
+                  multiline
+                  rows={3}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="기본예산링크"
+                  value={settingsFormData.link}
+                  onChange={(e) => setSettingsFormData({ ...settingsFormData, link: e.target.value })}
+                  required
+                  placeholder="https://docs.google.com/spreadsheets/d/..."
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="년월"
+                  value={settingsFormData.yearMonth}
+                  onChange={(e) => setSettingsFormData({ ...settingsFormData, yearMonth: e.target.value })}
+                  required
+                  placeholder="YYYY-MM (예: 2026-01)"
+                  helperText="년월 형식: YYYY-MM"
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <Autocomplete
+                  multiple
+                  options={teamLeaders}
+                  getOptionLabel={(option) => `${option.name} (${option.code})`}
+                  value={teamLeaders.filter(leader => settingsFormData.checkerPermissions.includes(leader.code))}
+                  onChange={(event, newValue) => {
+                    setSettingsFormData({
+                      ...settingsFormData,
+                      checkerPermissions: newValue.map(v => v.code)
+                    });
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="확인자적용권한"
+                      required
+                    />
+                  )}
+                  renderTags={(value, getTagProps) =>
+                    value.map((option, index) => (
+                      <Chip
+                        key={option.code}
+                        label={`${option.name} (${option.code})`}
+                        {...getTagProps({ index })}
+                      />
+                    ))
+                  }
+                />
+              </Grid>
+            </Grid>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseSettingsModal}>취소</Button>
+            <Button onClick={handleSaveSettings} variant="contained">
+              저장
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
+    </Box>
+  );
+};
+
+export default BasicBudgetSettingsTab;

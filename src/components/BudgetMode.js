@@ -53,17 +53,21 @@ import {
 } from '@mui/icons-material';
 import AppUpdatePopup from './AppUpdatePopup';
 import { budgetMonthSheetAPI, budgetUserSheetAPI, budgetPolicyGroupAPI, budgetSummaryAPI } from '../api';
-import BudgetChannelSettingsTab from './budget/BudgetChannelSettingsTab';
-import BudgetChannelCheckTab from './budget/BudgetChannelCheckTab';
+import BudgetCheckTab from './budget/BudgetCheckTab';
+import BudgetSettingsTab from './budget/BudgetSettingsTab';
+import BasicBudgetSettingsTab from './budget/BasicBudgetSettingsTab';
+import BasicDataSettingsTab from './budget/BasicDataSettingsTab';
 
 function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const [activeTab, setActiveTab] = React.useState(0);
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
   
-  // SS 권한 체크
+  // 권한 체크
   const isSS = loggedInStore?.userRole === 'SS';
+  const isS = loggedInStore?.userRole === 'S';
+  const canAccessCheck = isSS || isS; // 예산확인: SS 또는 S 권한
   
-  // SS 권한이 아닌데 activeTab이 1이면 0으로 리셋
+  // SS 권한이 아닌데 시트설정 탭(1)에 접근하려고 하면 0으로 리셋
   React.useEffect(() => {
     if (!isSS && activeTab === 1) {
       setActiveTab(0);
@@ -2783,19 +2787,26 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
               }
             }}
           >
-            <Tab label="채널별예산확인" icon={<VisibilityIcon />} iconPosition="start" />
+            <Tab label="예산확인" icon={<VisibilityIcon />} iconPosition="start" />
             {isSS && (
-              <Tab label="채널별예산시트설정" icon={<SettingsIcon />} iconPosition="start" />
+              <Tab label="시트설정" icon={<SettingsIcon />} iconPosition="start" />
             )}
           </Tabs>
         </Box>
 
         {/* 탭별 콘텐츠 */}
-        {activeTab === 0 && (
-          <BudgetChannelCheckTab loggedInStore={loggedInStore} />
+        {activeTab === 0 && canAccessCheck && (
+          <BudgetCheckTab loggedInStore={loggedInStore} />
+        )}
+        {activeTab === 0 && !canAccessCheck && (
+          <Box sx={{ p: 3 }}>
+            <Alert severity="warning">
+              예산확인 탭은 SS(총괄) 또는 S(정산) 권한이 필요합니다.
+            </Alert>
+          </Box>
         )}
         {isSS && activeTab === 1 && (
-          <BudgetChannelSettingsTab loggedInStore={loggedInStore} />
+          <BudgetSettingsTab loggedInStore={loggedInStore} />
         )}
         {/* 기존 탭 콘텐츠 제거 - 주석 처리 */}
         {false && activeTab === 1 && (

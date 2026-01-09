@@ -183,10 +183,6 @@ const BudgetChannelCheckTab = ({ loggedInStore }) => {
 
   return (
     <Box sx={{ p: 3 }}>
-      <Typography variant="h5" gutterBottom sx={{ mb: 3, fontWeight: 'bold' }}>
-        채널별예산확인
-      </Typography>
-
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
           {error}
@@ -216,52 +212,60 @@ const BudgetChannelCheckTab = ({ loggedInStore }) => {
         </Box>
       ) : (
         <Grid container spacing={2}>
-          {settings.map((setting) => (
-            <Grid item xs={12} sm={6} md={4} key={setting.id}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom>
-                    {setting.channelName}
-                  </Typography>
-                  {setting.channelDescription && (
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      {setting.channelDescription}
-                    </Typography>
-                  )}
-                  <Typography variant="body2" sx={{ mb: 2 }}>
-                    <a 
-                      href="#"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        let url = setting.channelLink;
-                        if (/^[a-zA-Z0-9-_]+$/.test(url)) {
-                          url = `https://docs.google.com/spreadsheets/d/${url}/edit`;
-                        }
-                        window.open(url, '_blank');
-                      }}
-                      style={{ color: '#1976d2', textDecoration: 'none' }}
-                    >
-                      구글시트 바로가기
-                    </a>
-                  </Typography>
-                  <Box sx={{ mt: 2 }}>
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                      확인적용권한자:
-                    </Typography>
-                    {setting.checkerPermissions.map((perm) => {
-                      const leader = teamLeaders.find(l => l.code === perm);
-                      const displayLabel = leader 
-                        ? `${leader.name} (${perm})` 
-                        : perm;
-                      return (
-                        <Chip key={perm} label={displayLabel} size="small" sx={{ mr: 0.5, mb: 0.5 }} />
-                      );
-                    })}
-                  </Box>
-                </CardContent>
-              </Card>
+          {settings.length === 0 ? (
+            <Grid item xs={12}>
+              <Typography variant="body1" color="text.secondary" sx={{ textAlign: 'center', mt: 4 }}>
+                등록된 예산채널이 없습니다. 예산채널시트설정 탭에서 추가해주세요.
+              </Typography>
             </Grid>
-          ))}
+          ) : (
+            settings.map((setting) => (
+              <Grid item xs={12} sm={6} md={4} key={setting.id}>
+                <Card>
+                  <CardContent>
+                    <Typography variant="h6" gutterBottom>
+                      {setting.channelName}
+                    </Typography>
+                    {setting.channelDescription && (
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        {setting.channelDescription}
+                      </Typography>
+                    )}
+                    <Typography variant="body2" sx={{ mb: 2 }}>
+                      <a 
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          let url = setting.channelLink;
+                          if (/^[a-zA-Z0-9-_]+$/.test(url)) {
+                            url = `https://docs.google.com/spreadsheets/d/${url}/edit`;
+                          }
+                          window.open(url, '_blank');
+                        }}
+                        style={{ color: '#1976d2', textDecoration: 'none' }}
+                      >
+                        구글시트 바로가기
+                      </a>
+                    </Typography>
+                    <Box sx={{ mt: 2 }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                        확인적용권한자:
+                      </Typography>
+                      {setting.checkerPermissions.map((perm) => {
+                        const leader = teamLeaders.find(l => l.code === perm);
+                        const displayLabel = leader 
+                          ? `${leader.name} (${perm})` 
+                          : perm;
+                        return (
+                          <Chip key={perm} label={displayLabel} size="small" sx={{ mr: 0.5, mb: 0.5 }} />
+                        );
+                      })}
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))
+          )}
         </Grid>
       )}
     </Box>

@@ -411,6 +411,10 @@ const SHEET_GROUP_CHANGE_HISTORY = '정책모드_정책영업그룹_변경이력
 const SHEET_DEFAULT_GROUPS = '정책모드_기본정책영업그룹';
 const SHEET_OTHER_POLICY_TYPES = '정책모드_기타정책목록';
 const SHEET_BUDGET_CHANNEL_SETTINGS = '예산모드_예산채널설정';
+const SHEET_BASIC_BUDGET_SETTINGS = '예산모드_기본예산설정';
+const SHEET_BASIC_DATA_SETTINGS = '예산모드_기본데이터설정';
+const SHEET_BASIC_BUDGET_SETTINGS = '예산모드_기본예산설정';
+const SHEET_BASIC_DATA_SETTINGS = '예산모드_기본데이터설정';
 
 // 시트 헤더 정의
 const HEADERS_POLICY_TABLE_SETTINGS = [
@@ -430,6 +434,28 @@ const HEADERS_BUDGET_CHANNEL_SETTINGS = [
   '예산채널이름',
   '예산채널설명',
   '예산채널링크',
+  '년월',
+  '확인자적용권한',
+  '등록일시',
+  '등록자'
+];
+
+const HEADERS_BASIC_BUDGET_SETTINGS = [
+  '기본예산ID',
+  '기본예산이름',
+  '기본예산설명',
+  '기본예산링크',
+  '년월',
+  '확인자적용권한',
+  '등록일시',
+  '등록자'
+];
+
+const HEADERS_BASIC_DATA_SETTINGS = [
+  '기본데이터ID',
+  '기본데이터이름',
+  '기본데이터설명',
+  '기본데이터링크',
   '년월',
   '확인자적용권한',
   '등록일시',
@@ -1951,6 +1977,472 @@ function setupPolicyTableRoutes(app) {
       });
     } catch (error) {
       console.error('[예산채널] 설정 삭제 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // ========== 기본예산설정 관련 API ==========
+
+  // GET /api/basic-budget-settings
+  router.get('/basic-budget-settings', async (req, res) => {
+    setCORSHeaders(req, res);
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
+    try {
+      const permission = await checkPermission(req, ['SS', 'TEAM_LEADER'], 'budget');
+      if (!permission.hasPermission) {
+        return res.status(403).json({ success: false, error: '권한이 없습니다.' });
+      }
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      const yearMonth = req.query.yearMonth;
+      const userId = req.headers['x-user-id'] || req.query.userId;
+      const cacheKey = `basic-budget-settings-${SPREADSHEET_ID}-${userId || 'all'}-${yearMonth || 'all'}`;
+      const cached = getCache(cacheKey);
+      if (cached) {
+        console.log('✅ [캐시 히트] 기본예산 설정 목록');
+        return res.json(cached);
+      }
+
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_BASIC_BUDGET_SETTINGS, HEADERS_BASIC_BUDGET_SETTINGS);
+
+      const response = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_BASIC_BUDGET_SETTINGS}!A:H`
+        });
+      });
+
+      const rows = response.data.values || [];
+      if (rows.length < 2) {
+        return res.json([]);
+      }
+
+      const dataRows = rows.slice(1);
+      let settings = dataRows.map(row => ({
+        id: row[0] || '',
+        name: row[1] || '',
+        description: row[2] || '',
+        link: row[3] || '',
+        yearMonth: row[4] || '',
+        checkerPermissions: row[5] ? JSON.parse(row[5]) : [],
+        registeredAt: row[6] || '',
+        registeredBy: row[7] || ''
+      }));
+
+      if (yearMonth) {
+        settings = settings.filter(setting => setting.yearMonth === yearMonth);
+      }
+
+      setCache(cacheKey, settings, CACHE_TTL.POLICY_TABLE_SETTINGS);
+      return res.json(settings);
+    } catch (error) {
+      console.error('[기본예산] 설정 목록 조회 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // POST /api/basic-budget-settings
+  router.post('/basic-budget-settings', express.json(), async (req, res) => {
+    setCORSHeaders(req, res);
+    try {
+      const permission = await checkPermission(req, ['SS'], 'budget');
+      if (!permission.hasPermission) {
+        return res.status(403).json({ success: false, error: '권한이 없습니다.' });
+      }
+
+      const { name, description, link, yearMonth, checkerPermissions } = req.body;
+      if (!name || !link || !yearMonth || !checkerPermissions || !Array.isArray(checkerPermissions)) {
+        return res.status(400).json({ success: false, error: '필수 필드가 누락되었습니다.' });
+      }
+
+      if (!/^\d{4}-\d{2}$/.test(yearMonth)) {
+        return res.status(400).json({ success: false, error: '년월 형식이 올바르지 않습니다. (YYYY-MM 형식)' });
+      }
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_BASIC_BUDGET_SETTINGS, HEADERS_BASIC_BUDGET_SETTINGS);
+      const normalizedEditLink = normalizeGoogleSheetEditLink(link);
+      const newId = `BB_${Date.now()}`;
+      const registeredAt = new Date().toISOString();
+      const registeredBy = permission.userId || 'Unknown';
+
+      const newRow = [
+        newId, name, description || '', normalizedEditLink, yearMonth,
+        JSON.stringify(checkerPermissions), registeredAt, registeredBy
+      ];
+
+      await withRetry(async () => {
+        return await sheets.spreadsheets.values.append({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_BASIC_BUDGET_SETTINGS}!A:H`,
+          valueInputOption: 'USER_ENTERED',
+          resource: { values: [newRow] }
+        });
+      });
+      invalidateCache('basic-budget-settings');
+      return res.json({ success: true, id: newId, message: '기본예산 설정이 추가되었습니다.' });
+    } catch (error) {
+      console.error('[기본예산] 설정 추가 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // PUT /api/basic-budget-settings/:id
+  router.put('/basic-budget-settings/:id', express.json(), async (req, res) => {
+    setCORSHeaders(req, res);
+    try {
+      const permission = await checkPermission(req, ['SS'], 'budget');
+      if (!permission.hasPermission) {
+        return res.status(403).json({ success: false, error: '권한이 없습니다.' });
+      }
+
+      const { id } = req.params;
+      const { name, description, link, yearMonth, checkerPermissions } = req.body;
+      if (!name || !link || !yearMonth || !checkerPermissions || !Array.isArray(checkerPermissions)) {
+        return res.status(400).json({ success: false, error: '필수 필드가 누락되었습니다.' });
+      }
+
+      if (!/^\d{4}-\d{2}$/.test(yearMonth)) {
+        return res.status(400).json({ success: false, error: '년월 형식이 올바르지 않습니다. (YYYY-MM 형식)' });
+      }
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_BASIC_BUDGET_SETTINGS, HEADERS_BASIC_BUDGET_SETTINGS);
+      const response = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_BASIC_BUDGET_SETTINGS}!A:H`
+        });
+      });
+
+      const rows = response.data.values || [];
+      if (rows.length < 2) {
+        return res.status(404).json({ success: false, error: '기본예산 설정을 찾을 수 없습니다.' });
+      }
+
+      const dataRows = rows.slice(1);
+      const rowIndexInFiltered = dataRows.findIndex(row => row[0] === id);
+
+      if (rowIndexInFiltered === -1) {
+        return res.status(404).json({ success: false, error: '기본예산 설정을 찾을 수 없습니다.' });
+      }
+
+      const actualRowIndex = rowIndexInFiltered + 1;
+      const normalizedEditLink = normalizeGoogleSheetEditLink(link);
+      const updatedRow = [
+        id, name, description || '', normalizedEditLink, yearMonth,
+        JSON.stringify(checkerPermissions),
+        dataRows[rowIndexInFiltered][6] || new Date().toISOString(),
+        dataRows[rowIndexInFiltered][7] || permission.userId || 'Unknown'
+      ];
+
+      await withRetry(async () => {
+        return await sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_BASIC_BUDGET_SETTINGS}!A${actualRowIndex + 1}:H${actualRowIndex + 1}`,
+          valueInputOption: 'USER_ENTERED',
+          resource: { values: [updatedRow] }
+        });
+      });
+      invalidateCache('basic-budget-settings');
+      return res.json({ success: true, message: '기본예산 설정이 수정되었습니다.' });
+    } catch (error) {
+      console.error('[기본예산] 설정 수정 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // DELETE /api/basic-budget-settings/:id
+  router.delete('/basic-budget-settings/:id', async (req, res) => {
+    setCORSHeaders(req, res);
+    try {
+      const permission = await checkPermission(req, ['SS'], 'budget');
+      if (!permission.hasPermission) {
+        return res.status(403).json({ success: false, error: '권한이 없습니다.' });
+      }
+
+      const { id } = req.params;
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_BASIC_BUDGET_SETTINGS, HEADERS_BASIC_BUDGET_SETTINGS);
+      const response = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_BASIC_BUDGET_SETTINGS}!A:H`
+        });
+      });
+
+      const rows = response.data.values || [];
+      if (rows.length < 2) {
+        return res.status(404).json({ success: false, error: '기본예산 설정을 찾을 수 없습니다.' });
+      }
+      
+      // 헤더를 제외한 데이터 행에서 찾기
+      const dataRows = rows.slice(1);
+      const rowIndexInFiltered = dataRows.findIndex(row => row[0] === id);
+
+      if (rowIndexInFiltered === -1) {
+        return res.status(404).json({ success: false, error: '기본예산 설정을 찾을 수 없습니다.' });
+      }
+
+      // 실제 시트 행 번호 = 헤더(1행) + 찾은 인덱스 + 1 (0-based to 1-based)
+      const actualRowIndex = rowIndexInFiltered + 1;
+
+      await withRetry(async () => {
+        return await sheets.spreadsheets.batchUpdate({
+          spreadsheetId: SPREADSHEET_ID,
+          resource: {
+            requests: [{
+              deleteDimension: {
+                range: {
+                  sheetId: await getSheetId(sheets, SPREADSHEET_ID, SHEET_BASIC_BUDGET_SETTINGS),
+                  dimension: 'ROWS',
+                  startIndex: actualRowIndex,
+                  endIndex: actualRowIndex + 1
+                }
+              }
+            }]
+          }
+        });
+      });
+      invalidateCache('basic-budget-settings');
+      return res.json({ success: true, message: '기본예산 설정이 삭제되었습니다.' });
+    } catch (error) {
+      console.error('[기본예산] 설정 삭제 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // ========== 기본데이터설정 관련 API ==========
+
+  // GET /api/basic-data-settings
+  router.get('/basic-data-settings', async (req, res) => {
+    setCORSHeaders(req, res);
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
+    try {
+      const permission = await checkPermission(req, ['SS', 'TEAM_LEADER'], 'budget');
+      if (!permission.hasPermission) {
+        return res.status(403).json({ success: false, error: '권한이 없습니다.' });
+      }
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      const yearMonth = req.query.yearMonth;
+      const userId = req.headers['x-user-id'] || req.query.userId;
+      const cacheKey = `basic-data-settings-${SPREADSHEET_ID}-${userId || 'all'}-${yearMonth || 'all'}`;
+      const cached = getCache(cacheKey);
+      if (cached) {
+        console.log('✅ [캐시 히트] 기본데이터 설정 목록');
+        return res.json(cached);
+      }
+
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_BASIC_DATA_SETTINGS, HEADERS_BASIC_DATA_SETTINGS);
+
+      const response = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_BASIC_DATA_SETTINGS}!A:H`
+        });
+      });
+
+      const rows = response.data.values || [];
+      if (rows.length < 2) {
+        return res.json([]);
+      }
+
+      const dataRows = rows.slice(1);
+      let settings = dataRows.map(row => ({
+        id: row[0] || '',
+        name: row[1] || '',
+        description: row[2] || '',
+        link: row[3] || '',
+        yearMonth: row[4] || '',
+        checkerPermissions: row[5] ? JSON.parse(row[5]) : [],
+        registeredAt: row[6] || '',
+        registeredBy: row[7] || ''
+      }));
+
+      if (yearMonth) {
+        settings = settings.filter(setting => setting.yearMonth === yearMonth);
+      }
+
+      setCache(cacheKey, settings, CACHE_TTL.POLICY_TABLE_SETTINGS);
+      return res.json(settings);
+    } catch (error) {
+      console.error('[기본데이터] 설정 목록 조회 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // POST /api/basic-data-settings
+  router.post('/basic-data-settings', express.json(), async (req, res) => {
+    setCORSHeaders(req, res);
+    try {
+      const permission = await checkPermission(req, ['SS'], 'budget');
+      if (!permission.hasPermission) {
+        return res.status(403).json({ success: false, error: '권한이 없습니다.' });
+      }
+
+      const { name, description, link, yearMonth, checkerPermissions } = req.body;
+      if (!name || !link || !yearMonth || !checkerPermissions || !Array.isArray(checkerPermissions)) {
+        return res.status(400).json({ success: false, error: '필수 필드가 누락되었습니다.' });
+      }
+
+      if (!/^\d{4}-\d{2}$/.test(yearMonth)) {
+        return res.status(400).json({ success: false, error: '년월 형식이 올바르지 않습니다. (YYYY-MM 형식)' });
+      }
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_BASIC_DATA_SETTINGS, HEADERS_BASIC_DATA_SETTINGS);
+      const normalizedEditLink = normalizeGoogleSheetEditLink(link);
+      const newId = `BD_${Date.now()}`;
+      const registeredAt = new Date().toISOString();
+      const registeredBy = permission.userId || 'Unknown';
+
+      const newRow = [
+        newId, name, description || '', normalizedEditLink, yearMonth,
+        JSON.stringify(checkerPermissions), registeredAt, registeredBy
+      ];
+
+      await withRetry(async () => {
+        return await sheets.spreadsheets.values.append({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_BASIC_DATA_SETTINGS}!A:H`,
+          valueInputOption: 'USER_ENTERED',
+          resource: { values: [newRow] }
+        });
+      });
+      invalidateCache('basic-data-settings');
+      return res.json({ success: true, id: newId, message: '기본데이터 설정이 추가되었습니다.' });
+    } catch (error) {
+      console.error('[기본데이터] 설정 추가 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // PUT /api/basic-data-settings/:id
+  router.put('/basic-data-settings/:id', express.json(), async (req, res) => {
+    setCORSHeaders(req, res);
+    try {
+      const permission = await checkPermission(req, ['SS'], 'budget');
+      if (!permission.hasPermission) {
+        return res.status(403).json({ success: false, error: '권한이 없습니다.' });
+      }
+
+      const { id } = req.params;
+      const { name, description, link, yearMonth, checkerPermissions } = req.body;
+      if (!name || !link || !yearMonth || !checkerPermissions || !Array.isArray(checkerPermissions)) {
+        return res.status(400).json({ success: false, error: '필수 필드가 누락되었습니다.' });
+      }
+
+      if (!/^\d{4}-\d{2}$/.test(yearMonth)) {
+        return res.status(400).json({ success: false, error: '년월 형식이 올바르지 않습니다. (YYYY-MM 형식)' });
+      }
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_BASIC_DATA_SETTINGS, HEADERS_BASIC_DATA_SETTINGS);
+      const response = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_BASIC_DATA_SETTINGS}!A:H`
+        });
+      });
+
+      const rows = response.data.values || [];
+      if (rows.length < 2) {
+        return res.status(404).json({ success: false, error: '기본데이터 설정을 찾을 수 없습니다.' });
+      }
+
+      const dataRows = rows.slice(1);
+      const rowIndexInFiltered = dataRows.findIndex(row => row[0] === id);
+
+      if (rowIndexInFiltered === -1) {
+        return res.status(404).json({ success: false, error: '기본데이터 설정을 찾을 수 없습니다.' });
+      }
+
+      const actualRowIndex = rowIndexInFiltered + 1;
+      const normalizedEditLink = normalizeGoogleSheetEditLink(link);
+      const updatedRow = [
+        id, name, description || '', normalizedEditLink, yearMonth,
+        JSON.stringify(checkerPermissions),
+        dataRows[rowIndexInFiltered][6] || new Date().toISOString(),
+        dataRows[rowIndexInFiltered][7] || permission.userId || 'Unknown'
+      ];
+
+      await withRetry(async () => {
+        return await sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_BASIC_DATA_SETTINGS}!A${actualRowIndex + 1}:H${actualRowIndex + 1}`,
+          valueInputOption: 'USER_ENTERED',
+          resource: { values: [updatedRow] }
+        });
+      });
+      invalidateCache('basic-data-settings');
+      return res.json({ success: true, message: '기본데이터 설정이 수정되었습니다.' });
+    } catch (error) {
+      console.error('[기본데이터] 설정 수정 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // DELETE /api/basic-data-settings/:id
+  router.delete('/basic-data-settings/:id', async (req, res) => {
+    setCORSHeaders(req, res);
+    try {
+      const permission = await checkPermission(req, ['SS'], 'budget');
+      if (!permission.hasPermission) {
+        return res.status(403).json({ success: false, error: '권한이 없습니다.' });
+      }
+
+      const { id } = req.params;
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_BASIC_DATA_SETTINGS, HEADERS_BASIC_DATA_SETTINGS);
+      const response = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_BASIC_DATA_SETTINGS}!A:H`
+        });
+      });
+
+      const rows = response.data.values || [];
+      if (rows.length < 2) {
+        return res.status(404).json({ success: false, error: '기본데이터 설정을 찾을 수 없습니다.' });
+      }
+      
+      // 헤더를 제외한 데이터 행에서 찾기
+      const dataRows = rows.slice(1);
+      const rowIndexInFiltered = dataRows.findIndex(row => row[0] === id);
+
+      if (rowIndexInFiltered === -1) {
+        return res.status(404).json({ success: false, error: '기본데이터 설정을 찾을 수 없습니다.' });
+      }
+
+      // 실제 시트 행 번호 = 헤더(1행) + 찾은 인덱스 + 1 (0-based to 1-based)
+      const actualRowIndex = rowIndexInFiltered + 1;
+
+      await withRetry(async () => {
+        return await sheets.spreadsheets.batchUpdate({
+          spreadsheetId: SPREADSHEET_ID,
+          resource: {
+            requests: [{
+              deleteDimension: {
+                range: {
+                  sheetId: await getSheetId(sheets, SPREADSHEET_ID, SHEET_BASIC_DATA_SETTINGS),
+                  dimension: 'ROWS',
+                  startIndex: actualRowIndex,
+                  endIndex: actualRowIndex + 1
+                }
+              }
+            }]
+          }
+        });
+      });
+      invalidateCache('basic-data-settings');
+      return res.json({ success: true, message: '기본데이터 설정이 삭제되었습니다.' });
+    } catch (error) {
+      console.error('[기본데이터] 설정 삭제 오류:', error);
       return res.status(500).json({ success: false, error: error.message });
     }
   });
