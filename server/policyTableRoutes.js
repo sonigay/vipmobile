@@ -413,8 +413,6 @@ const SHEET_OTHER_POLICY_TYPES = '정책모드_기타정책목록';
 const SHEET_BUDGET_CHANNEL_SETTINGS = '예산모드_예산채널설정';
 const SHEET_BASIC_BUDGET_SETTINGS = '예산모드_기본예산설정';
 const SHEET_BASIC_DATA_SETTINGS = '예산모드_기본데이터설정';
-const SHEET_BASIC_BUDGET_SETTINGS = '예산모드_기본예산설정';
-const SHEET_BASIC_DATA_SETTINGS = '예산모드_기본데이터설정';
 
 // 시트 헤더 정의
 const HEADERS_POLICY_TABLE_SETTINGS = [
