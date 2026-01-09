@@ -877,7 +877,7 @@ async function checkPermission(req, allowedRoles, mode = 'policy') {
   
   // allowedRoles에 'TEAM_LEADER'가 있으면 두 글자 대문자 패턴 체크
   if (allowedRoles.includes('TEAM_LEADER')) {
-    hasPermission = finalUserRole === 'SS' || twoLetterPattern.test(finalUserRole);
+    hasPermission = finalUserRole === 'SS' || finalUserRole === 'S' || twoLetterPattern.test(finalUserRole);
   } else {
     // 기존 로직: 직접 권한 레벨 비교
     hasPermission = allowedRoles.includes(finalUserRole);
