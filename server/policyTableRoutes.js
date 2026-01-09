@@ -1706,8 +1706,8 @@ function setupPolicyTableRoutes(app) {
       return res.status(200).end();
     }
     try {
-      // 예산채널설정 탭 접근 권한: SS(총괄) 또는 두 글자 대문자 패턴(팀장)
-      const permission = await checkPermission(req, ['SS', 'TEAM_LEADER'], 'budget');
+      // 예산채널설정 탭 접근 권한: SS(총괄), S(정산) 또는 두 글자 대문자 패턴(팀장)
+      const permission = await checkPermission(req, ['SS', 'S', 'TEAM_LEADER'], 'budget');
       if (!permission.hasPermission) {
         return res.status(403).json({ success: false, error: '권한이 없습니다.' });
       }
@@ -1988,7 +1988,8 @@ function setupPolicyTableRoutes(app) {
       return res.status(200).end();
     }
     try {
-      const permission = await checkPermission(req, ['SS', 'TEAM_LEADER'], 'budget');
+      // 기본예산설정 탭 접근 권한: SS(총괄), S(정산) 또는 두 글자 대문자 패턴(팀장)
+      const permission = await checkPermission(req, ['SS', 'S', 'TEAM_LEADER'], 'budget');
       if (!permission.hasPermission) {
         return res.status(403).json({ success: false, error: '권한이 없습니다.' });
       }
@@ -2221,7 +2222,8 @@ function setupPolicyTableRoutes(app) {
       return res.status(200).end();
     }
     try {
-      const permission = await checkPermission(req, ['SS', 'TEAM_LEADER'], 'budget');
+      // 기본데이터설정 탭 접근 권한: SS(총괄), S(정산) 또는 두 글자 대문자 패턴(팀장)
+      const permission = await checkPermission(req, ['SS', 'S', 'TEAM_LEADER'], 'budget');
       if (!permission.hasPermission) {
         return res.status(403).json({ success: false, error: '권한이 없습니다.' });
       }
