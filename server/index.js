@@ -15394,18 +15394,17 @@ server.on('listening', async () => {
     // 서버 시작 시 실행
     console.log('🚀 [스케줄러] 서버 시작 시 자동 실행 시작...');
     
-    // 데이터 재빌드 (서버 시작 시 1회) - 먼저 실행하여 데이터 준비
+    // 데이터 재빌드 (서버 시작 시 1회) - 리소스 부담 감소를 위해 15분 후 실행
     setTimeout(async () => {
-      console.log('🔄 [스케줄러] 서버 시작 시 데이터 재빌드 실행');
+      console.log('🔄 [스케줄러] 서버 시작 시 데이터 재빌드 실행 (지연 실행)');
       await rebuildMasterData();
-    }, 300000); // 5분 후 실행 (서버 초기화 및 다른 작업 완료 대기)
+    }, 900000); // 15분 후 실행 (서버 초기화 및 다른 작업 완료 대기)
     
-    // Discord 모니터링 자동 갱신 (서버 시작 시 1회)
-    // 데이터 재빌드 완료 후 실행하여 정상적인 Discord ID로 갱신
+    // Discord 모니터링 자동 갱신 (서버 시작 시 1회) - 리소스 부담 감소를 위해 30분 후 실행
     setTimeout(async () => {
-      console.log('🔄 [스케줄러] 서버 시작 시 Discord 이미지 자동 갱신 실행');
+      console.log('🔄 [스케줄러] 서버 시작 시 Discord 이미지 자동 갱신 실행 (지연 실행)');
       await refreshAllDiscordImages();
-    }, 600000); // 10분 후 실행 (데이터 재빌드 완료 후 충분한 시간 대기)
+    }, 1800000); // 30분 후 실행 (데이터 재빌드 완료 후 충분한 시간 대기)
     
     // Discord 모니터링 자동 갱신 스케줄 등록
     // 매일 03:30, 07:30, 11:30, 17:30, 20:30, 23:30
@@ -15445,74 +15444,77 @@ server.on('listening', async () => {
     console.log('   - 데이터 재빌드: 서버 시작 시, 매일 11:10-19:10 매시간');
     // ===== 자동 스케줄 기능 초기화 완료 =====
 
-    // 주소 업데이트 함수 호출 (비동기로 처리하여 배정 로직을 방해하지 않도록)
-    console.log('🔍 [서버시작] 주소 업데이트 함수 시작 (비동기 처리)');
-    checkAndUpdateAddresses().then(() => {
-      console.log('✅ [서버시작] 주소 업데이트 함수 완료');
-    }).catch(error => {
-      console.error('❌ [서버시작] 주소 업데이트 함수 실패:', error.message);
-    });
+    // 주소 업데이트 함수 호출 (서버 시작 후 10분 지연하여 리소스 부담 감소)
+    setTimeout(() => {
+      console.log('🔍 [서버시작] 주소 업데이트 함수 시작 (지연 실행)');
+      checkAndUpdateAddresses().then(() => {
+        console.log('✅ [서버시작] 주소 업데이트 함수 완료');
+      }).catch(error => {
+        console.error('❌ [서버시작] 주소 업데이트 함수 실패:', error.message);
+      });
+    }, 600000); // 10분 후 실행
 
-    // SALES_SHEET_ID 주소 업데이트 함수 호출 (비동기로 처리)
-    console.log('🔍 [서버시작] SALES_SHEET_ID 주소 업데이트 함수 시작 (비동기 처리)');
-    checkAndUpdateSalesAddresses().then(() => {
+    // SALES_SHEET_ID 주소 업데이트 함수 호출 (서버 시작 후 10분 지연)
+    setTimeout(() => {
+      console.log('🔍 [서버시작] SALES_SHEET_ID 주소 업데이트 함수 시작 (지연 실행)');
+      checkAndUpdateSalesAddresses().then(() => {
+        console.log('✅ [서버시작] SALES_SHEET_ID 주소 업데이트 함수 완료');
+      }).catch(error => {
+        console.error('❌ [서버시작] SALES_SHEET_ID 주소 업데이트 함수 실패:', error.message);
+      });
+    }, 600000); // 10분 후 실행
 
-    }).catch(error => {
-      console.error('❌ [서버시작] SALES_SHEET_ID 주소 업데이트 함수 실패:', error.message);
-    });
+    // 영업 데이터 미리 로드 (서버 시작 후 15분 지연)
+    setTimeout(() => {
+      console.log('🔍 [서버시작] 영업 데이터 미리 로드 시작 (지연 실행)');
+      preloadSalesData().then(() => {
+        console.log('✅ [서버시작] 영업 데이터 미리 로드 완료');
+      }).catch(error => {
+        console.error('❌ [서버시작] 영업 데이터 미리 로드 실패:', error.message);
+      });
+    }, 900000); // 15분 후 실행
 
-    // 영업 데이터 미리 로드 (비동기로 처리)
-    console.log('🔍 [서버시작] 영업 데이터 미리 로드 시작 (비동기 처리)');
-    preloadSalesData().then(() => {
+    // 매 2시간마다 업데이트 체크 실행 (리소스 부담 감소)
+    setInterval(checkAndUpdateAddresses, 7200000); // 2시간마다
 
-    }).catch(error => {
-      console.error('❌ [서버시작] 영업 데이터 미리 로드 실패:', error.message);
-    });
+    // 푸시 구독 정보 초기화 (서버 시작 후 5분 지연)
+    setTimeout(async () => {
+      console.log('🔍 [서버시작] 푸시 구독 초기화 시작 (지연 실행)');
+      try {
+        await initializePushSubscriptions();
+        console.log('✅ [서버시작] 푸시 구독 초기화 완료');
+      } catch (error) {
+        console.error('❌ [서버시작] 푸시 구독 초기화 실패:', error.message);
+      }
+    }, 300000); // 5분 후 실행
 
-    // 매 시간마다 업데이트 체크 실행 (3600000ms = 1시간)
-    setInterval(checkAndUpdateAddresses, 3600000);
+    // SMS 시트 헤더 초기화 (서버 시작 후 5분 지연)
+    setTimeout(async () => {
+      console.log('📱 [서버시작] SMS 시트 헤더 초기화 시작 (지연 실행)');
+      try {
+        await ensureSmsSheetHeaders();
+        console.log('✅ [서버시작] SMS 시트 헤더 초기화 완료');
+      } catch (error) {
+        console.error('❌ [서버시작] SMS 시트 헤더 초기화 실패:', error.message);
+      }
+    }, 300000); // 5분 후 실행
 
-    // Git 커밋 히스토리를 구글시트에 자동 입력
-    console.log('🔍 [서버시작] Git 히스토리 업데이트 시작');
-    try {
-      await updateGoogleSheetWithGitHistory();
-
-    } catch (error) {
-      console.error('❌ [서버시작] Git 히스토리 업데이트 실패:', error.message);
-    }
-
-    // 푸시 구독 정보 초기화
-    console.log('🔍 [서버시작] 푸시 구독 초기화 시작');
-    try {
-      await initializePushSubscriptions();
-
-    } catch (error) {
-      console.error('❌ [서버시작] 푸시 구독 초기화 실패:', error.message);
-    }
-
-    // SMS 시트 헤더 초기화 (서버 시작 시 한 번만 실행)
-    console.log('📱 [서버시작] SMS 시트 헤더 초기화 시작');
-    try {
-      await ensureSmsSheetHeaders();
-      console.log('✅ [서버시작] SMS 시트 헤더 초기화 완료');
-    } catch (error) {
-      console.error('❌ [서버시작] SMS 시트 헤더 초기화 실패:', error.message);
-    }
-
-    // SMS 자동응답 시트 헤더 초기화 (서버 시작 시 한 번만 실행)
-    console.log('🤖 [서버시작] SMS 자동응답 시트 헤더 초기화 시작');
-    try {
-      await ensureAutoReplySheetHeaders();
-      console.log('✅ [서버시작] SMS 자동응답 시트 헤더 초기화 완료');
-    } catch (error) {
-      console.error('❌ [서버시작] SMS 자동응답 시트 헤더 초기화 실패:', error.message);
-    }
+    // SMS 자동응답 시트 헤더 초기화 (서버 시작 후 5분 지연)
+    setTimeout(async () => {
+      console.log('🤖 [서버시작] SMS 자동응답 시트 헤더 초기화 시작 (지연 실행)');
+      try {
+        await ensureAutoReplySheetHeaders();
+        console.log('✅ [서버시작] SMS 자동응답 시트 헤더 초기화 완료');
+      } catch (error) {
+        console.error('❌ [서버시작] SMS 자동응답 시트 헤더 초기화 실패:', error.message);
+      }
+    }, 300000); // 5분 후 실행
 
     // 서버 시작 시 배정완료된 재고 자동 저장 및 중복 정리 (지연 로딩으로 성능 최적화)
     console.log('💾 [서버시작] 배정완료된 재고 자동 저장 및 중복 정리 시작 (백그라운드에서 실행)');
 
     // 백그라운드에서 데이터 로드 (서버 시작 지연 방지, Rate Limit 고려하여 충분한 지연)
-    // 스케줄러 작업들과 충돌하지 않도록 6분 후 실행
+    // 리소스 부담 감소를 위해 20분 후 실행
     setTimeout(async () => {
       try {
         console.log('🔍 [서버시작] 1단계: 시트 데이터 가져오기 시작 (백그라운드)');
@@ -15896,7 +15898,7 @@ server.on('listening', async () => {
           const memoryUsage = process.memoryUsage();
           const uptime = Math.floor(process.uptime());
           console.log(`📊 [상태체크] 서버 가동시간: ${uptime}초, 메모리: ${Math.round(memoryUsage.heapUsed / 1024 / 1024)}MB`);
-        }, 5 * 60 * 1000); // 5분마다
+        }, 15 * 60 * 1000); // 15분마다 (리소스 부담 감소)
 
         // 실제 시트 데이터와 비교 분석
         console.log('🔍 [서버시작] 실제 시트 데이터와 배정 상태 비교 분석 시작');
