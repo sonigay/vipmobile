@@ -108,18 +108,92 @@ const BasicBudgetSettingsTab = ({ loggedInStore }) => {
 
   const loadTeamLeaders = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/team-leaders`, {
-        headers: {
-          'x-user-role': loggedInStore?.userRole || '',
-          'x-user-id': loggedInStore?.contactId || loggedInStore?.id || ''
-        }
-      });
+      const response = await fetch(`${API_BASE_URL}/api/agents`);
       if (response.ok) {
-        const data = await response.json();
-        setTeamLeaders(data);
+        const agents = await response.json();
+        
+        // 동적으로 두 글자 대문자 권한 레벨 필터링 (팀장: AA, BB, CC, DD, EE, FF 등)
+        const twoLetterPattern = /^[A-Z]{2}$/;
+        
+        const ssAgent = agents.find(agent => agent.permissionLevel === 'SS');
+        
+        const leaders = agents
+          .filter(agent => {
+            const permissionLevel = agent.permissionLevel;
+            return permissionLevel && (permissionLevel === 'SS' || twoLetterPattern.test(permissionLevel));
+          })
+          .map(agent => {
+            const permissionLevel = agent.permissionLevel;
+            let name = agent.target;
+            if (permissionLevel === 'SS' && ssAgent && ssAgent.target) {
+              name = ssAgent.target;
+            } else if (!name || name.trim() === '') {
+              name = permissionLevel;
+            }
+            const qualification = agent.qualification || '';
+            
+            let finalQualification = qualification;
+            if (permissionLevel === 'SS' && ssAgent && ssAgent.qualification) {
+              finalQualification = ssAgent.qualification;
+            }
+            
+            const displayName = finalQualification 
+              ? `${name} (${finalQualification})`
+              : name;
+            
+            return {
+              code: permissionLevel,
+              name: displayName
+            };
+          });
+        
+        const hasSS = leaders.some(leader => leader.code === 'SS');
+        if (!hasSS) {
+          if (ssAgent && ssAgent.target) {
+            const name = ssAgent.target;
+            const qualification = ssAgent.qualification || '';
+            leaders.unshift({
+              code: 'SS',
+              name: qualification ? `${name} (${qualification})` : name
+            });
+          } else {
+            leaders.unshift({
+              code: 'SS',
+              name: '총괄 (총괄)'
+            });
+          }
+        } else {
+          const ssLeader = leaders.find(leader => leader.code === 'SS');
+          if (ssLeader && ssAgent && ssAgent.target) {
+            const name = ssAgent.target;
+            const qualification = ssAgent.qualification || '';
+            if (!ssLeader.name || ssLeader.name.includes('총괄') || ssLeader.name === 'SS') {
+              ssLeader.name = qualification ? `${name} (${qualification})` : name;
+            }
+          }
+        }
+        
+        leaders.sort((a, b) => {
+          if (a.code === 'SS') return -1;
+          if (b.code === 'SS') return 1;
+          return a.code.localeCompare(b.code);
+        });
+        
+        console.log('팀장 목록 로드 완료:', leaders);
+        setTeamLeaders(leaders);
+      } else {
+        console.error('팀장 목록 로드 실패:', response.status);
+        setTeamLeaders([{
+          code: 'SS',
+          name: '총괄 (SS)'
+        }]);
       }
     } catch (error) {
       console.error('팀장 목록 로드 오류:', error);
+      setTeamLeaders([{
+        code: 'SS',
+        name: '총괄 (SS)'
+      }]);
     }
   };
 
