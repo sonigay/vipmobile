@@ -5,8 +5,7 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "update-extension-version": "node update-extension-version.js",
-    "postinstall": "npx puppeteer browsers install chrome"
+    "update-extension-version": "node update-extension-version.js"
   },
   "keywords": [],
   "author": "",
@@ -29,7 +28,6 @@
     "node-cron": "^3.0.3",
     "node-geocoder": "^4.2.0",
     "pdfjs-dist": "^3.11.174",
-    "puppeteer": "^24.30.0",
     "sharp": "^0.34.5",
     "uuid": "^11.1.0",
     "web-push": "^3.6.7",
