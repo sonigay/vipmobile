@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Box,
   AppBar,
@@ -181,12 +181,15 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
   }, [loggedInStore?.contactId]);
 
   // 수정완료 상태 로드
+  // currentView를 ref로 참조하여 의존성 문제 해결
   const loadModificationCompletionStatus = useCallback(async () => {
     if (!loggedInStore?.contactId) return;
     
     try {
+      // ref를 통해 최신 currentView 값 참조
+      const view = currentViewRef.current;
       // 현재 뷰에 따라 수정완료 상태 로드
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/inspection/modification-completion-status?userId=${loggedInStore.contactId}&view=${currentView}`);
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/inspection/modification-completion-status?userId=${loggedInStore.contactId}&view=${view}`);
       if (response.ok) {
         const data = await response.json();
         const completedSet = new Set(data.completedItems || []);
@@ -210,7 +213,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
     } catch (error) {
       console.error('수정완료 상태 로드 오류:', error);
     }
-  }, [loggedInStore?.contactId, currentView]);
+  }, [loggedInStore?.contactId]);
 
 
 
@@ -218,20 +221,20 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
   const [fieldOptions, setFieldOptions] = useState([]);
   
   // initialTab과 detailOptions가 변경되면 상태 업데이트 및 데이터 재로딩
-  React.useEffect(() => {
+  useEffect(() => {
     if (initialTab !== undefined && initialTab !== selectedTab) {
       setSelectedTab(initialTab);
     }
   }, [initialTab, selectedTab]);
   
-  React.useEffect(() => {
+  useEffect(() => {
     if (detailOptions?.selectedField !== undefined && detailOptions.selectedField !== selectedField) {
       setSelectedField(detailOptions.selectedField);
     }
   }, [detailOptions?.selectedField, selectedField]);
   
   // presentation mode에서 initialTab이나 detailOptions가 변경되면 데이터 재로딩
-  React.useEffect(() => {
+  useEffect(() => {
     if (presentationMode && (initialTab !== undefined || detailOptions?.selectedField !== undefined)) {
       loadInspectionData();
     }
