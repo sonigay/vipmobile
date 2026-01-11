@@ -921,6 +921,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
                 value={statistics.total}
                 color="#1976d2"
                 icon={<InfoIcon color="primary" />}
+                securityNote={inspectionData?.securityNote}
               />
             </Grid>
             <Grid item xs={12} sm={6} md={3}>
@@ -929,6 +930,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
                 value={statistics.completed}
                 color="#2e7d32"
                 icon={<CheckCircleIcon color="success" />}
+                securityNote={inspectionData?.securityNote}
               />
             </Grid>
             <Grid item xs={12} sm={6} md={3}>
@@ -937,6 +939,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
                 value={statistics.pending}
                 color="#ed6c02"
                 icon={<WarningIcon color="warning" />}
+                securityNote={inspectionData?.securityNote}
               />
             </Grid>
             <Grid item xs={12} sm={6} md={3}>
@@ -945,6 +948,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
                 value={`${statistics.completionRate}%`}
                 color="#1976d2"
                 icon={<TrendingUpIcon color="primary" />}
+                securityNote={inspectionData?.securityNote}
               />
             </Grid>
           </Grid>
