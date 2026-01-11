@@ -321,12 +321,11 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
     }
   }, [loggedInStore?.contactId, selectedField, presentationMode, detailOptions]);
 
-  // 필드 변경 시 데이터 재로딩
+  // 필드 변경 시 데이터 재로딩 (currentView 변경은 별도 useEffect에서 처리)
   useEffect(() => {
-    loadInspectionData();
     loadCompletionStatus();
     loadModificationCompletionStatus();
-  }, [loadInspectionData, loadCompletionStatus, loadModificationCompletionStatus, selectedField, selectedTab]);
+  }, [loadCompletionStatus, loadModificationCompletionStatus, selectedField, selectedTab]);
 
   // 검수모드 진입 시 업데이트 팝업 표시 (숨김 설정 확인 후)
   useEffect(() => {
@@ -340,10 +339,11 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
     }
   }, []);
 
-  // 뷰 변경 시 수정완료 상태 재로딩
+  // 뷰 변경 시 수정완료 상태 및 데이터 재로딩
   useEffect(() => {
     loadModificationCompletionStatus();
-  }, [currentView, loadModificationCompletionStatus]);
+    loadInspectionData();
+  }, [currentView, loadModificationCompletionStatus, loadInspectionData]);
 
   // 필터링된 데이터 (해시화된 ID 사용)
   const filteredData = useMemo(() => {
