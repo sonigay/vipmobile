@@ -160,6 +160,33 @@ app.use(cors({
   preflightContinue: false
 }));
 
+// CORS 헤더 설정 함수 (재사용)
+const setCORSHeaders = (req, res) => {
+  const origin = req.headers.origin;
+  const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
+  
+  const defaultOrigins = [
+    'https://vipmobile.vercel.app',
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:3002',
+    'http://localhost:4000'
+  ];
+  
+  const allowedOrigins = [...corsOrigins, ...defaultOrigins];
+  
+  if (origin && allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  } else {
+    res.header('Access-Control-Allow-Origin', 'https://vipmobile.vercel.app');
+  }
+  
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key, x-user-id, x-user-role, x-user-name, x-mode');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Max-Age', '86400'); // 24시간 캐시
+};
+
 // OPTIONS 요청 명시적 처리
 app.options('*', (req, res) => {
   // 환경 변수에서 허용할 도메인 목록 가져오기
@@ -33383,6 +33410,9 @@ async function createPolicyNotification(policyId, userId, notificationType, appr
 
 // 마감장표 데이터 조회 API
 app.get('/api/closing-chart', async (req, res) => {
+  // CORS 헤더 설정
+  setCORSHeaders(req, res);
+
   try {
     const { date } = req.query;
     const targetDate = date || new Date().toISOString().split('T')[0];
@@ -35412,6 +35442,9 @@ app.post('/api/closing-chart/targets', async (req, res) => {
 
 // 매핑 실패 데이터 조회 API
 app.get('/api/closing-chart/mapping-failures', async (req, res) => {
+  // CORS 헤더 설정
+  setCORSHeaders(req, res);
+
   try {
     const { date } = req.query;
     const targetDate = date || new Date().toISOString().split('T')[0];
@@ -35431,6 +35464,9 @@ app.get('/api/closing-chart/mapping-failures', async (req, res) => {
 
 // 담당자-코드 조합 추출 API
 app.get('/api/closing-chart/agent-code-combinations', async (req, res) => {
+  // CORS 헤더 설정
+  setCORSHeaders(req, res);
+
   try {
     const { date } = req.query;
     const targetDate = date || new Date().toISOString().split('T')[0];
@@ -36701,6 +36737,9 @@ app.get('/api/last-activation-date', async (req, res) => {
 
 // 영업사원별마감 데이터 조회 API
 app.get('/api/agent-closing-chart', async (req, res) => {
+  // CORS 헤더 설정
+  setCORSHeaders(req, res);
+
   try {
     const { date, agent } = req.query;
     const targetDate = date || new Date().toISOString().split('T')[0];

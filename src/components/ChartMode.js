@@ -2013,13 +2013,12 @@ function TotalClosingTab({ detailOptions, csDetailType: propCsDetailType, csDeta
   React.useEffect(() => {
     // 로딩 중이거나 데이터가 없으면 즉시 false
     if (loading || !data) {
-      console.log('🔄 [TotalClosingTab] 로딩 중이거나 데이터 없음, data-loaded="false" 설정');
       setDataRendered(false);
       return;
     }
     
     if (!containerRef.current) {
-      console.log('⚠️ [TotalClosingTab] containerRef가 없음');
+      // containerRef가 없으면 다음 렌더 사이클에서 다시 시도
       return;
     }
     
@@ -2031,12 +2030,9 @@ function TotalClosingTab({ detailOptions, csDetailType: propCsDetailType, csDeta
                     (data.agentData && data.agentData.length > 0);
     
     if (!hasData) {
-      console.log('⚠️ [TotalClosingTab] 데이터가 없습니다.');
       setDataRendered(false);
       return;
     }
-    
-    console.log('🔍 [TotalClosingTab] 데이터 로드 완료, 렌더링 확인 시작');
     
     // 여러 번 확인하여 확실하게 데이터가 렌더링되었는지 확인
     let checkCount = 0;
@@ -2099,48 +2095,25 @@ function TotalClosingTab({ detailOptions, csDetailType: propCsDetailType, csDeta
       
       if (isReady) {
         stableCount++;
-        console.log(`✅ [TotalClosingTab] 안정적인 상태 확인 (${stableCount}/${requiredStableCount}, ${checkCount}번째 확인):`, {
-          hasTableRows: tableRows.length,
-          hasPaper,
-          hasNoLoadingIndicator,
-          hasNoProgressBar,
-          hasNoLoadingText,
-          hasDataText,
-          textLength: allText.length
-        });
         
         // 연속으로 안정적인 상태가 5초 이상 유지되면 완료
         if (stableCount >= requiredStableCount) {
-          console.log('✅ [TotalClosingTab] 최종 확인 완료 (5초 이상 안정적), data-loaded="true" 설정');
           setDataRendered(true);
           return;
         }
       } else {
         // 안정적이지 않으면 카운터 리셋
         if (stableCount > 0) {
-          console.log(`⚠️ [TotalClosingTab] 안정적인 상태가 깨짐, 카운터 리셋 (이전: ${stableCount})`);
           stableCount = 0;
         }
         
         if (checkCount < maxChecks) {
-          console.log(`🔍 [TotalClosingTab] 데이터 렌더링 확인 중 (${checkCount}/${maxChecks}):`, {
-            hasTableRows: tableRows.length,
-            hasPaper,
-            hasNoLoadingIndicator,
-            hasNoProgressBar,
-            hasNoLoadingText,
-            hasDataText,
-            textLength: allText.length,
-            isReady: false
-          });
           setTimeout(checkRender, 500);
         } else {
-          console.warn('⚠️ [TotalClosingTab] 최대 확인 횟수 도달, 강제로 data-loaded 설정');
           // 최대 확인 횟수 도달 시에도 테이블 행이 있으면 설정
           if (tableRows.length >= 3) {
             setDataRendered(true);
           } else {
-            console.error('❌ [TotalClosingTab] 테이블 행이 부족하여 data-loaded 설정 실패');
             setDataRendered(false);
           }
         }
@@ -2150,7 +2123,6 @@ function TotalClosingTab({ detailOptions, csDetailType: propCsDetailType, csDeta
     // 첫 확인은 3초 후에 시작 (DOM 업데이트 시간 충분히 확보)
     // presentationMode일 때는 더 긴 대기 시간 필요 (권한 확인 등 추가 시간)
     const initialDelay = presentationMode ? 5000 : 3000;
-    console.log(`⏳ [TotalClosingTab] ${initialDelay/1000}초 대기 후 렌더링 확인 시작`, { presentationMode });
     setTimeout(checkRender, initialDelay);
   }, [data, loading, presentationMode]);
 
@@ -2186,7 +2158,6 @@ function TotalClosingTab({ detailOptions, csDetailType: propCsDetailType, csDeta
       }
 
       const result = await response.json();
-      console.log('📊 [TotalClosingTab] 데이터 로드 완료, data 설정 시작');
       
       // 데이터가 실제로 있는지 확인
       const hasRealData = result.csSummary || 
@@ -2197,32 +2168,14 @@ function TotalClosingTab({ detailOptions, csDetailType: propCsDetailType, csDeta
       
       if (!hasRealData) {
         console.warn('⚠️ [TotalClosingTab] 로드된 데이터에 실제 내용이 없습니다.');
-      } else {
-        console.log('✅ [TotalClosingTab] 실제 데이터 확인됨:', {
-          hasCsSummary: !!result.csSummary,
-          codeDataCount: result.codeData?.length || 0,
-          officeDataCount: result.officeData?.length || 0,
-          departmentDataCount: result.departmentData?.length || 0,
-          agentDataCount: result.agentData?.length || 0
-        });
       }
       
       setData(result);
-      console.log('📊 [TotalClosingTab] data 상태 업데이트됨:', !!result);
       
       // 매칭 불일치 데이터 처리
-      console.log('🔍 [프론트엔드] API 응답 확인:', {
-        hasMatchingMismatches: !!result.matchingMismatches,
-        matchingMismatchesLength: result.matchingMismatches ? result.matchingMismatches.length : 0,
-        matchingMismatchesSample: result.matchingMismatches ? result.matchingMismatches.slice(0, 2) : 'none'
-      });
-      
       if (result.matchingMismatches && result.matchingMismatches.length > 0) {
-        console.log('🔍 [프론트엔드] 매칭 불일치 모달 표시:', result.matchingMismatches.length, '건');
         setMatchingMismatches(result.matchingMismatches);
         setShowMismatchModal(true);
-      } else {
-        console.log('🔍 [프론트엔드] 매칭 불일치 데이터 없음');
       }
       
       setLastUpdate(new Date());
@@ -2232,7 +2185,6 @@ function TotalClosingTab({ detailOptions, csDetailType: propCsDetailType, csDeta
       // 데이터 설정 후 약간의 지연을 두고 loading을 false로 설정 (DOM 업데이트 시간 확보)
       // 최소 2초 대기하여 데이터가 완전히 렌더링되도록 함
       setTimeout(() => {
-        console.log('📊 [TotalClosingTab] loading 상태를 false로 변경 (2초 대기 완료)');
         setProgress(0);
         setLoading(false);
       }, 2000);
