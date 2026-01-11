@@ -1752,22 +1752,88 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
 
       const responses = await Promise.allSettled(registerPromises);
       
-      const successCount = responses.filter(r => r.status === 'fulfilled' && r.value.ok).length;
-      const failCount = responses.length - successCount;
+      // 응답 결과 상세 분석 및 상태 업데이트
+      const results = await Promise.all(
+        responses.map(async (response, index) => {
+          const { settingId } = completedResults[index];
+          if (response.status === 'fulfilled' && response.value.ok) {
+            const data = await response.value.json();
+            // 등록 성공 상태 업데이트
+            setBatchGenerationStatus(prev => ({
+              ...prev,
+              [settingId]: {
+                ...prev[settingId],
+                registrationStatus: data.alreadyRegistered ? 'already_registered' : 'registered',
+                registrationMessage: data.alreadyRegistered ? '이미 등록 완료' : '등록 완료'
+              }
+            }));
+            return {
+              success: true,
+              alreadyRegistered: data.alreadyRegistered || false,
+              result: completedResults[index]
+            };
+          } else {
+            let errorMessage = '등록 실패';
+            if (response.status === 'fulfilled') {
+              try {
+                const errorData = await response.value.json();
+                errorMessage = errorData.error || errorMessage;
+              } catch (e) {
+                errorMessage = `HTTP ${response.value.status}`;
+              }
+            } else {
+              errorMessage = response.reason?.message || '등록 실패';
+            }
+            // 등록 실패 상태 업데이트
+            setBatchGenerationStatus(prev => ({
+              ...prev,
+              [settingId]: {
+                ...prev[settingId],
+                registrationStatus: 'registration_failed',
+                registrationError: errorMessage
+              }
+            }));
+            return {
+              success: false,
+              error: errorMessage,
+              result: completedResults[index]
+            };
+          }
+        })
+      );
+      
+      const successCount = results.filter(r => r.success).length;
+      const alreadyRegisteredCount = results.filter(r => r.success && r.alreadyRegistered).length;
+      const newRegisteredCount = successCount - alreadyRegisteredCount;
+      const failCount = results.filter(r => !r.success).length;
 
       if (failCount === 0) {
+        let message = '';
+        if (alreadyRegisteredCount > 0 && newRegisteredCount > 0) {
+          message = `${newRegisteredCount}개 등록 완료, ${alreadyRegisteredCount}개는 이미 등록되어 있었습니다.`;
+        } else if (alreadyRegisteredCount > 0) {
+          message = `모든 정책표(${alreadyRegisteredCount}개)가 이미 등록되어 있었습니다.`;
+        } else {
+          message = `모든 정책표(${successCount}개)가 등록되었습니다.`;
+        }
         setSnackbar({ 
           open: true, 
-          message: `모든 정책표(${successCount}개)가 등록되었습니다.`, 
+          message, 
           severity: 'success' 
         });
         // 정책표 목록 새로고침
         await loadSettings();
-        handleCloseBatchCreationModal();
+        // 모든 정책표가 등록되었거나 이미 등록되어 있었다면 모달 닫기
+        if (newRegisteredCount > 0 || (alreadyRegisteredCount > 0 && failCount === 0)) {
+          handleCloseBatchCreationModal();
+        }
       } else {
-        const errorMessage = `${successCount}개 등록 성공, ${failCount}개 등록 실패했습니다.`;
-        setError(errorMessage);
-        setSnackbar({ open: true, message: errorMessage, severity: 'warning' });
+        // 일부 실패한 경우에도 성공 메시지는 표시하지 않고, UI에서 개별 상태를 확인하도록 함
+        setSnackbar({ 
+          open: true, 
+          message: '일부 정책표 등록에 실패했습니다. 아래 상태를 확인해주세요.', 
+          severity: 'warning' 
+        });
       }
     } catch (error) {
       console.error('배치 정책표 등록 오류:', error);
@@ -3052,12 +3118,333 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                 ))}
             </Grid>
           </Grid>
+          
+          {/* 정책표별 등록 상태 표시 (정책표등록 버튼 위) */}
+          {Object.values(batchGenerationStatus).some(status => 
+            status.status === 'completed' && status.result
+          ) && (
+            <Box sx={{ mt: 3, mb: 2 }}>
+              <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 'bold' }}>
+                정책표 등록 상태
+              </Typography>
+              <Grid container spacing={2}>
+                {settings
+                  .filter(s => selectedSettings.includes(s.id))
+                  .filter(s => {
+                    const status = batchGenerationStatus[s.id];
+                    return status?.status === 'completed' && status?.result;
+                  })
+                  .map((setting) => {
+                    const status = batchGenerationStatus[setting.id];
+                    const registrationStatus = status?.registrationStatus;
+                    const registrationError = status?.registrationError;
+                    const registrationMessage = status?.registrationMessage;
+                    
+                    return (
+                      <Grid item xs={12} key={setting.id}>
+                        <Box sx={{ 
+                          p: 2, 
+                          border: '1px solid', 
+                          borderColor: registrationStatus === 'registration_failed' ? 'error.main' : 
+                                       registrationStatus === 'already_registered' ? 'warning.main' :
+                                       registrationStatus === 'registered' ? 'success.main' :
+                                       'divider',
+                          borderRadius: 1,
+                          bgcolor: registrationStatus === 'registration_failed' ? 'rgba(211, 47, 47, 0.1)' : 
+                                   registrationStatus === 'already_registered' ? 'rgba(237, 108, 2, 0.1)' : 
+                                   registrationStatus === 'registered' ? 'rgba(46, 125, 50, 0.1)' :
+                                   'background.paper'
+                        }}>
+                          <Grid container spacing={2} alignItems="center">
+                            <Grid item xs={12} sm={4}>
+                              <Typography variant="body1" fontWeight="medium">
+                                {setting.policyTableName}
+                              </Typography>
+                            </Grid>
+                            <Grid item xs={12} sm={5}>
+                              {registrationStatus === 'registration_failed' ? (
+                                <Alert severity="error" sx={{ py: 0 }}>
+                                  <Typography variant="body2">
+                                    등록 실패: {registrationError}
+                                  </Typography>
+                                </Alert>
+                              ) : registrationStatus === 'already_registered' ? (
+                                <Alert severity="warning" sx={{ py: 0 }}>
+                                  <Typography variant="body2">
+                                    {registrationMessage || '이미 등록 완료'}
+                                  </Typography>
+                                </Alert>
+                              ) : registrationStatus === 'registered' ? (
+                                <Alert severity="success" sx={{ py: 0 }}>
+                                  <Typography variant="body2">
+                                    {registrationMessage || '등록 완료'}
+                                  </Typography>
+                                </Alert>
+                              ) : (
+                                <Typography variant="body2" color="text.secondary">
+                                  등록 대기 중
+                                </Typography>
+                              )}
+                            </Grid>
+                            <Grid item xs={12} sm={3}>
+                              {registrationStatus === 'registration_failed' && (
+                                <Box sx={{ display: 'flex', gap: 1 }}>
+                                  <Button
+                                    size="small"
+                                    variant="outlined"
+                                    color="error"
+                                    startIcon={<RefreshIcon />}
+                                    onClick={() => handleRetryGeneration(setting.id)}
+                                    disabled={
+                                      !batchCreationFormData.applyDate ||
+                                      !batchCreationFormData.applyContent ||
+                                      batchGenerationStatus[setting.id]?.status === 'processing' ||
+                                      batchGenerationStatus[setting.id]?.status === 'queued'
+                                    }
+                                    sx={{ flex: 1 }}
+                                  >
+                                    재생성
+                                  </Button>
+                                  <Button
+                                    size="small"
+                                    variant="contained"
+                                    color="success"
+                                    startIcon={<CheckCircleIcon />}
+                                    onClick={async () => {
+                                      const status = batchGenerationStatus[setting.id];
+                                      if (!status?.result?.id) return;
+                                      
+                                      try {
+                                        setLoading(true);
+                                        const response = await fetch(`${API_BASE_URL}/api/policy-tables/${status.result.id}/register`, {
+                                          method: 'POST',
+                                          headers: {
+                                            'Content-Type': 'application/json',
+                                            'x-user-role': loggedInStore?.userRole || '',
+                                            'x-user-id': loggedInStore?.contactId || loggedInStore?.id || ''
+                                          }
+                                        });
+                                        
+                                        if (response.ok) {
+                                          const data = await response.json();
+                                          
+                                          // 상태 업데이트 및 모든 정책표 등록 완료 확인
+                                          setBatchGenerationStatus(prev => {
+                                            const updated = {
+                                              ...prev,
+                                              [setting.id]: {
+                                                ...prev[setting.id],
+                                                registrationStatus: data.alreadyRegistered ? 'already_registered' : 'registered',
+                                                registrationMessage: data.alreadyRegistered ? '이미 등록 완료' : '등록 완료'
+                                              }
+                                            };
+                                            
+                                            // 업데이트된 상태에서 모든 정책표 등록 완료 확인
+                                            const completedSettings = settings.filter(s => 
+                                              selectedSettings.includes(s.id) &&
+                                              updated[s.id]?.status === 'completed' &&
+                                              updated[s.id]?.result
+                                            );
+                                            
+                                            const allRegistered = completedSettings.length > 0 && completedSettings.every(s => {
+                                              const status = updated[s.id];
+                                              return status?.registrationStatus === 'registered' || 
+                                                     status?.registrationStatus === 'already_registered';
+                                            });
+                                            
+                                            if (allRegistered) {
+                                              // 모든 정책표가 등록 완료되었으므로 모달 닫기
+                                              setTimeout(() => {
+                                                setSnackbar({ 
+                                                  open: true, 
+                                                  message: `모든 정책표(${completedSettings.length}개) 등록이 완료되었습니다.`, 
+                                                  severity: 'success' 
+                                                });
+                                                loadSettings().then(() => {
+                                                  handleCloseBatchCreationModal();
+                                                });
+                                              }, 0);
+                                            } else {
+                                              setSnackbar({ 
+                                                open: true, 
+                                                message: `${setting.policyTableName} 등록 완료`, 
+                                                severity: 'success' 
+                                              });
+                                              loadSettings();
+                                            }
+                                            
+                                            return updated;
+                                          });
+                                        } else {
+                                          const errorData = await response.json();
+                                          setBatchGenerationStatus(prev => ({
+                                            ...prev,
+                                            [setting.id]: {
+                                              ...prev[setting.id],
+                                              registrationStatus: 'registration_failed',
+                                              registrationError: errorData.error || '등록 실패'
+                                            }
+                                          }));
+                                          setSnackbar({ 
+                                            open: true, 
+                                            message: `${setting.policyTableName} 등록 실패: ${errorData.error || '등록 실패'}`, 
+                                            severity: 'error' 
+                                          });
+                                        }
+                                      } catch (error) {
+                                        console.error('개별 정책표 등록 오류:', error);
+                                        setBatchGenerationStatus(prev => ({
+                                          ...prev,
+                                          [setting.id]: {
+                                            ...prev[setting.id],
+                                            registrationStatus: 'registration_failed',
+                                            registrationError: '등록 중 오류 발생'
+                                          }
+                                        }));
+                                        setSnackbar({ 
+                                          open: true, 
+                                          message: `${setting.policyTableName} 등록 중 오류가 발생했습니다.`, 
+                                          severity: 'error' 
+                                        });
+                                      } finally {
+                                        setLoading(false);
+                                      }
+                                    }}
+                                    disabled={loading}
+                                    sx={{ flex: 1 }}
+                                  >
+                                    등록
+                                  </Button>
+                                </Box>
+                              )}
+                              {!registrationStatus && status?.status === 'completed' && status?.result && (
+                                <Button
+                                  size="small"
+                                  variant="contained"
+                                  color="success"
+                                  startIcon={<CheckCircleIcon />}
+                                  onClick={async () => {
+                                    const status = batchGenerationStatus[setting.id];
+                                    if (!status?.result?.id) return;
+                                    
+                                    try {
+                                      setLoading(true);
+                                      const response = await fetch(`${API_BASE_URL}/api/policy-tables/${status.result.id}/register`, {
+                                        method: 'POST',
+                                        headers: {
+                                          'Content-Type': 'application/json',
+                                          'x-user-role': loggedInStore?.userRole || '',
+                                          'x-user-id': loggedInStore?.contactId || loggedInStore?.id || ''
+                                        }
+                                      });
+                                      
+                                      if (response.ok) {
+                                        const data = await response.json();
+                                        
+                                        // 상태 업데이트 및 모든 정책표 등록 완료 확인
+                                        setBatchGenerationStatus(prev => {
+                                          const updated = {
+                                            ...prev,
+                                            [setting.id]: {
+                                              ...prev[setting.id],
+                                              registrationStatus: data.alreadyRegistered ? 'already_registered' : 'registered',
+                                              registrationMessage: data.alreadyRegistered ? '이미 등록 완료' : '등록 완료'
+                                            }
+                                          };
+                                          
+                                          // 업데이트된 상태에서 모든 정책표 등록 완료 확인
+                                          const completedSettings = settings.filter(s => 
+                                            selectedSettings.includes(s.id) &&
+                                            updated[s.id]?.status === 'completed' &&
+                                            updated[s.id]?.result
+                                          );
+                                          
+                                          const allRegistered = completedSettings.length > 0 && completedSettings.every(s => {
+                                            const status = updated[s.id];
+                                            return status?.registrationStatus === 'registered' || 
+                                                   status?.registrationStatus === 'already_registered';
+                                          });
+                                          
+                                          if (allRegistered) {
+                                            // 모든 정책표가 등록 완료되었으므로 모달 닫기
+                                            setTimeout(() => {
+                                              setSnackbar({ 
+                                                open: true, 
+                                                message: `모든 정책표(${completedSettings.length}개) 등록이 완료되었습니다.`, 
+                                                severity: 'success' 
+                                              });
+                                              loadSettings().then(() => {
+                                                handleCloseBatchCreationModal();
+                                              });
+                                            }, 0);
+                                          } else {
+                                            setSnackbar({ 
+                                              open: true, 
+                                              message: `${setting.policyTableName} 등록 완료`, 
+                                              severity: 'success' 
+                                            });
+                                            loadSettings();
+                                          }
+                                          
+                                          return updated;
+                                        });
+                                      } else {
+                                        const errorData = await response.json();
+                                        setBatchGenerationStatus(prev => ({
+                                          ...prev,
+                                          [setting.id]: {
+                                            ...prev[setting.id],
+                                            registrationStatus: 'registration_failed',
+                                            registrationError: errorData.error || '등록 실패'
+                                          }
+                                        }));
+                                        setSnackbar({ 
+                                          open: true, 
+                                          message: `${setting.policyTableName} 등록 실패: ${errorData.error || '등록 실패'}`, 
+                                          severity: 'error' 
+                                        });
+                                      }
+                                    } catch (error) {
+                                      console.error('개별 정책표 등록 오류:', error);
+                                      setBatchGenerationStatus(prev => ({
+                                        ...prev,
+                                        [setting.id]: {
+                                          ...prev[setting.id],
+                                          registrationStatus: 'registration_failed',
+                                          registrationError: '등록 중 오류 발생'
+                                        }
+                                      }));
+                                      setSnackbar({ 
+                                        open: true, 
+                                        message: `${setting.policyTableName} 등록 중 오류가 발생했습니다.`, 
+                                        severity: 'error' 
+                                      });
+                                    } finally {
+                                      setLoading(false);
+                                    }
+                                  }}
+                                  disabled={loading}
+                                  fullWidth
+                                >
+                                  등록
+                                </Button>
+                              )}
+                            </Grid>
+                          </Grid>
+                        </Box>
+                      </Grid>
+                    );
+                  })}
+              </Grid>
+            </Box>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseBatchCreationModal}>취소</Button>
           {/* 완료된 정책표가 있을 때만 정책표등록 버튼 표시 */}
           {Object.values(batchGenerationStatus).some(status => 
-            status.status === 'completed' && status.result
+            status.status === 'completed' && status.result &&
+            (!status.registrationStatus || status.registrationStatus === 'registration_failed')
           ) && (
             <Button
               onClick={handleBatchRegister}

@@ -4417,6 +4417,17 @@ function setupPolicyTableRoutes(app) {
       }
 
       const existingRow = rows[rowIndex];
+      
+      // 중복 등록 방지: 이미 등록된 경우
+      const isAlreadyRegistered = existingRow[11] === 'Y';
+      if (isAlreadyRegistered) {
+        return res.json({
+          success: true,
+          message: '이미 등록된 정책표입니다.',
+          alreadyRegistered: true
+        });
+      }
+      
       const updatedRow = [...existingRow];
       // 배열 길이를 최소 14로 보장 (생성자ID 포함, N열까지)
       while (updatedRow.length < 14) {

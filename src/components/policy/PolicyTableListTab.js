@@ -149,7 +149,7 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
   const [savingOrder, setSavingOrder] = useState(false);
   const [watermarkedImageUrl, setWatermarkedImageUrl] = useState(null); // 워터마크가 포함된 이미지 URL
   const previousWatermarkedUrlRef = useRef(null); // 이전 워터마크 URL 추적용
-  const deletingPolicyIdRef = useRef(null); // 삭제 중인 정책표 ID 추적
+  const [deletingPolicyId, setDeletingPolicyId] = useState(null); // 삭제 중인 정책표 ID (UI 업데이트용)
 
   // 검색/필터링
   const [searchCreator, setSearchCreator] = useState('');
@@ -892,7 +892,7 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
     }
 
     // 이미 삭제 중인 경우 중복 실행 방지
-    if (deletingPolicyIdRef.current === id) {
+    if (deletingPolicyId === id) {
       return;
     }
 
@@ -900,8 +900,8 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
       return;
     }
 
-    // 삭제 시작 플래그 설정
-    deletingPolicyIdRef.current = id;
+    // 삭제 시작 플래그 설정 (UI 업데이트를 위해 state 사용)
+    setDeletingPolicyId(id);
 
     try {
       setLoading(true);
@@ -916,6 +916,7 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
       if (response.ok) {
         const currentTab = tabs[activeTabIndex];
         if (currentTab) {
+          // 정책 목록 새로고침 (삭제된 정책이 목록에서 사라짐)
           await loadPolicies(currentTab.policyTableName);
         }
         if (selectedPolicy && selectedPolicy.id === id) {
@@ -924,14 +925,21 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
       } else {
         const errorData = await response.json();
         setError(errorData.error || '삭제에 실패했습니다.');
+        // 삭제 실패 시 플래그 해제
+        setDeletingPolicyId(null);
       }
     } catch (error) {
       console.error('정책표 삭제 오류:', error);
       setError('삭제 중 오류가 발생했습니다.');
+      // 삭제 실패 시 플래그 해제
+      setDeletingPolicyId(null);
     } finally {
       setLoading(false);
-      // 삭제 완료 후 플래그 해제
-      deletingPolicyIdRef.current = null;
+      // 삭제 완료 후 플래그 해제 (성공 시 loadPolicies 후 자동으로 사라지므로)
+      // 약간의 지연을 두어 UI 업데이트가 완료되도록 함
+      setTimeout(() => {
+        setDeletingPolicyId(null);
+      }, 100);
     }
   };
 
@@ -1217,9 +1225,13 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
                             handleDelete(policy.id, e);
                           }}
                           color="error"
-                          disabled={deletingPolicyIdRef.current === policy.id || loading}
+                          disabled={deletingPolicyId === policy.id || loading}
                         >
-                          <DeleteIcon />
+                          {deletingPolicyId === policy.id ? (
+                            <CircularProgress size={16} color="error" />
+                          ) : (
+                            <DeleteIcon />
+                          )}
                         </IconButton>
                       )}
                     </TableCell>
