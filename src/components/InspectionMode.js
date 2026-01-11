@@ -128,6 +128,14 @@ const StatCard = ({ title, value, color, icon, securityNote }) => (
 function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes, presentationMode = false, initialTab = 0, detailOptions }) {
   // 상태 관리
   const [currentView, setCurrentView] = useState('personal'); // 'personal' | 'overview'
+  // currentView의 최신 값을 참조하기 위한 ref
+  const currentViewRef = useRef(currentView);
+  
+  // currentView가 변경될 때마다 ref 업데이트
+  useEffect(() => {
+    currentViewRef.current = currentView;
+  }, [currentView]);
+  
   const [inspectionData, setInspectionData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
