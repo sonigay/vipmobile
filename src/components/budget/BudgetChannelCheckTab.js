@@ -47,8 +47,10 @@ const BudgetChannelCheckTab = ({ loggedInStore }) => {
         const data = result.settings || result;
         // 권한 필터링 적용
         const userRole = loggedInStore?.userRole || result.userRole;
+        // SS(총괄) 또는 S(정산)은 모든 예산채널 접근 가능
+        // 팀장의 경우 확인적용권한자로 설정된 카드만 표시
         const filtered = (userRole === 'SS' || userRole === 'S')
-          ? data // SS(총괄) 또는 S(정산)은 모든 예산채널 접근 가능
+          ? data
           : data.filter(setting => {
               // checkerPermissions가 배열인지 확인
               if (!Array.isArray(setting.checkerPermissions)) {
@@ -63,6 +65,13 @@ const BudgetChannelCheckTab = ({ loggedInStore }) => {
         setAllSettings(filtered);
         // Initially show filtered settings
         setSettings(filtered);
+      } else {
+        const errorText = await response.text();
+        console.error('예산채널 설정 전체 로드 실패:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText
+        });
       }
     } catch (error) {
       console.error('예산채널 설정 전체 로드 오류:', error);
@@ -89,8 +98,10 @@ const BudgetChannelCheckTab = ({ loggedInStore }) => {
         const data = result.settings || result;
         // 권한 필터링 적용
         const userRole = loggedInStore?.userRole || result.userRole;
+        // SS(총괄) 또는 S(정산)은 모든 예산채널 접근 가능
+        // 팀장의 경우 확인적용권한자로 설정된 카드만 표시
         const filtered = (userRole === 'SS' || userRole === 'S')
-          ? data // SS(총괄) 또는 S(정산)은 모든 예산채널 접근 가능
+          ? data
           : data.filter(setting => {
               // checkerPermissions가 배열인지 확인
               if (!Array.isArray(setting.checkerPermissions)) {
@@ -103,11 +114,18 @@ const BudgetChannelCheckTab = ({ loggedInStore }) => {
               );
             });
         setSettings(filtered);
+        setError(null); // 성공 시 에러 초기화
       } else {
+        const errorText = await response.text();
+        console.error('예산채널 설정 로드 실패:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText
+        });
         if (response.status === 403) {
-          setError('권한이 없습니다. 확인적용권한자로 설정된 팀장만 접근할 수 있습니다.');
+          setError('권한이 없습니다. 채널별예산확인 탭은 팀장 권한 이상만 접근할 수 있습니다.');
         } else {
-          setError('예산채널 설정을 불러올 수 없습니다.');
+          setError(`예산채널 설정을 불러올 수 없습니다. (${response.status})`);
         }
       }
     } catch (error) {
@@ -223,7 +241,9 @@ const BudgetChannelCheckTab = ({ loggedInStore }) => {
           {settings.length === 0 ? (
             <Grid item xs={12}>
               <Typography variant="body1" color="text.secondary" sx={{ textAlign: 'center', mt: 4 }}>
-                등록된 예산채널이 없습니다. 예산채널시트설정 탭에서 추가해주세요.
+                {error 
+                  ? error 
+                  : '확인적용권한자로 설정된 예산채널이 없습니다. 예산채널시트설정 탭에서 확인적용권한자를 설정해주세요.'}
               </Typography>
             </Grid>
           ) : (
