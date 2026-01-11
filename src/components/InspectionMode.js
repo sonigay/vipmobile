@@ -285,6 +285,43 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
     }
   }, [loggedInStore?.contactId, selectedField, presentationMode, detailOptions]);
 
+  // 필드 목록 불러오기
+  useEffect(() => {
+    async function loadFields() {
+      const response = await fetchAvailableFields();
+      if (response.success) {
+        setFieldOptions([{ key: 'all', name: '전체' }, ...response.data.fields]);
+      } else {
+        setFieldOptions([{ key: 'all', name: '전체' }]);
+      }
+    }
+    loadFields();
+    loadColumnSettings();
+  }, [loadColumnSettings]);
+
+  // 사용자 권한 확인
+  const hasOverviewPermission = loggedInStore?.modePermissions?.inspectionOverview;
+
+  // initialTab과 detailOptions가 변경되면 상태 업데이트 및 데이터 재로딩
+  useEffect(() => {
+    if (initialTab !== undefined && initialTab !== selectedTab) {
+      setSelectedTab(initialTab);
+    }
+  }, [initialTab, selectedTab]);
+  
+  useEffect(() => {
+    if (detailOptions?.selectedField !== undefined && detailOptions.selectedField !== selectedField) {
+      setSelectedField(detailOptions.selectedField);
+    }
+  }, [detailOptions?.selectedField, selectedField]);
+  
+  // presentation mode에서 initialTab이나 detailOptions가 변경되면 데이터 재로딩
+  useEffect(() => {
+    if (presentationMode && (initialTab !== undefined || detailOptions?.selectedField !== undefined)) {
+      loadInspectionData();
+    }
+  }, [presentationMode, initialTab, detailOptions?.selectedField, loadInspectionData]);
+
   // 필드 변경 시 데이터 재로딩 (currentView 변경은 별도 useEffect에서 처리)
   useEffect(() => {
     loadCompletionStatus();
