@@ -73,9 +73,10 @@ import {
 } from '../utils/inspectionUtils';
 import AppUpdatePopup from './AppUpdatePopup';
 
-// 탭별 검수 항목 정의
-const INSPECTION_TABS = {
-  GENERAL: {
+// 탭별 검수 항목 정의 (배열로 변경하여 인덱스 접근 안정성 확보)
+const INSPECTION_TABS = [
+  {
+    key: 'GENERAL',
     label: '일반검수항목',
     items: [
       '대리점코드',
@@ -90,15 +91,17 @@ const INSPECTION_TABS = {
       '유통망지원금 상이'
     ]
   },
-  ADDITIONAL: {
+  {
+    key: 'ADDITIONAL',
     label: '추가검수항목',
     items: ['유플레이 유치 추가', 'V컬러링 음악감상 플러스 유치', '폰교체 패스 유치', '폰교체 슬림 유치', '폰 안심패스 유치', '통화연결음 유치', '청소년요금제추가정책(1)유치', '청소년요금제추가정책(2)유치', '유통망지원금 활성화정책']
   },
-  DEDUCTION: {
+  {
+    key: 'DEDUCTION',
     label: '차감검수항목',
     items: ['유플레이 미유치 차감', '통화연결음 미유치', '보험 미유치', '115군 선택약정 차감', '선택약정 S721(010신규) 차감', '선택약정 S931,S938,S937(MNP) 차감', '선택약정 아이폰16류전체(MNP) 차감', 'A166 44군 대상외요금제(MNP) 차감', 'A166 44군 대상외요금제(기변) 차감', '정책기변 차감', '기변 C타겟 차감', '33군미만, 시니어1군시 차감', '온세일 전략온라인POS 차감']
   }
-};
+];
 
 function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes, presentationMode = false, initialTab = 0, detailOptions }) {
   // 상태 관리
@@ -316,7 +319,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
     let filtered = filterDifferences(differencesWithCompletion, filters);
     
     // 탭별 필터링 적용
-    const currentTabItems = Object.values(INSPECTION_TABS)[selectedTab]?.items || [];
+    const currentTabItems = INSPECTION_TABS[selectedTab]?.items || [];
     if (currentTabItems.length > 0) {
       const beforeFilterCount = filtered.length;
       filtered = filtered.filter(diff => 
@@ -351,7 +354,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
     }));
     
     // 탭별 필터링 적용
-    const currentTabItems = Object.values(INSPECTION_TABS)[selectedTab]?.items || [];
+    const currentTabItems = INSPECTION_TABS[selectedTab]?.items || [];
     let filteredDifferences = differencesWithCompletion;
     if (currentTabItems.length > 0) {
       filteredDifferences = differencesWithCompletion.filter(diff => 
@@ -655,7 +658,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
   // 탭 변경 핸들러 (presentation mode에서는 탭 변경 불가)
   const handleTabChange = (event, newValue) => {
     if (presentationMode) return; // presentation mode에서는 탭 변경 불가
-    console.log('탭 변경:', newValue, INSPECTION_TABS[Object.keys(INSPECTION_TABS)[newValue]]?.label);
+    console.log('탭 변경:', newValue, INSPECTION_TABS[newValue]?.label);
     setSelectedTab(newValue);
     setSelectedField('all'); // 탭 변경 시 필드 선택 초기화
   };
@@ -844,21 +847,21 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
               }}
             >
               <Tab 
-                label={INSPECTION_TABS.GENERAL.label}
+                label={INSPECTION_TABS[0].label}
                 sx={{ 
                   fontWeight: 'bold',
                   '&.Mui-selected': { color: '#1976d2' }
                 }}
               />
               <Tab 
-                label={INSPECTION_TABS.ADDITIONAL.label}
+                label={INSPECTION_TABS[1].label}
                 sx={{ 
                   fontWeight: 'bold',
                   '&.Mui-selected': { color: '#2e7d32' }
                 }}
               />
               <Tab 
-                label={INSPECTION_TABS.DEDUCTION.label}
+                label={INSPECTION_TABS[2].label}
                 sx={{ 
                   fontWeight: 'bold',
                   '&.Mui-selected': { color: '#d32f2f' }
