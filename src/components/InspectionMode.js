@@ -286,11 +286,15 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
   const hasOverviewPermission = loggedInStore?.modePermissions?.inspectionOverview;
 
   // 데이터 로딩 (필드 변경 시 재로딩)
+  // currentView를 ref로 참조하여 의존성 문제 해결
   const loadInspectionData = useCallback(async () => {
     if (!loggedInStore?.contactId) return;
     
     setIsLoading(true);
     setError(null);
+    
+    // ref를 통해 최신 currentView 값 참조
+    const view = currentViewRef.current;
     
     // presentation mode에서는 detailOptions의 selectedField 사용
     const fieldToUse = presentationMode && detailOptions?.selectedField 
@@ -299,8 +303,8 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
     
     try {
       const response = await fetchInspectionData(
-        currentView, 
-        currentView === 'personal' ? loggedInStore.contactId : null,
+        view, 
+        view === 'personal' ? loggedInStore.contactId : null,
         fieldToUse !== 'all' ? fieldToUse : undefined
       );
       
@@ -315,7 +319,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
     } finally {
       setIsLoading(false);
     }
-  }, [currentView, loggedInStore?.contactId, selectedField, presentationMode, detailOptions]);
+  }, [loggedInStore?.contactId, selectedField, presentationMode, detailOptions]);
 
   // 필드 변경 시 데이터 재로딩
   useEffect(() => {
