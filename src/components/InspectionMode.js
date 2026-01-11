@@ -71,7 +71,6 @@ import {
   updateModificationComplete,
   updateModificationNotes
 } from '../utils/inspectionUtils';
-
 import AppUpdatePopup from './AppUpdatePopup';
 
 // 탭별 검수 항목 정의
