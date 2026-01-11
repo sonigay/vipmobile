@@ -171,20 +171,24 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
         setModificationCompletedItems(completedSet);
         
         // 내용 데이터도 함께 로드하여 inspectionData에 업데이트
-        if (data.notes && inspectionData?.differences) {
-          setInspectionData(prev => ({
-            ...prev,
-            differences: prev.differences.map(diff => ({
-              ...diff,
-              notes: data.notes[diff.originalKey || diff.key] || ''
-            }))
-          }));
-        }
+        // inspectionData는 함수형 업데이트를 사용하여 의존성 제거
+        setInspectionData(prev => {
+          if (data.notes && prev?.differences) {
+            return {
+              ...prev,
+              differences: prev.differences.map(diff => ({
+                ...diff,
+                notes: data.notes[diff.originalKey || diff.key] || ''
+              }))
+            };
+          }
+          return prev;
+        });
       }
     } catch (error) {
       console.error('수정완료 상태 로드 오류:', error);
     }
-  }, [loggedInStore?.contactId, currentView, inspectionData]);
+  }, [loggedInStore?.contactId, currentView]);
 
 
 
