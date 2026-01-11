@@ -135,11 +135,12 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
   // 완료된 항목 추적 (해시화된 ID 사용)
   const [completedItems, setCompletedItems] = useState(new Set());
   
+  // 수정완료 상태 추적 (먼저 선언하여 loadModificationCompletionStatus에서 사용 가능하도록)
+  const [modificationCompletedItems, setModificationCompletedItems] = useState(new Set());
+  
   // 업데이트 팝업 상태
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
 
-
-  
   // 완료 상태 로드
   const loadCompletionStatus = useCallback(async () => {
     if (!loggedInStore?.contactId) return;
@@ -183,7 +184,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
     } catch (error) {
       console.error('수정완료 상태 로드 오류:', error);
     }
-  }, [loggedInStore?.contactId, currentView]);
+  }, [loggedInStore?.contactId, currentView, inspectionData]);
 
 
 
