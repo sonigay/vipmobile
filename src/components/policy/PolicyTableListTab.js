@@ -149,6 +149,7 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
   const [savingOrder, setSavingOrder] = useState(false);
   const [watermarkedImageUrl, setWatermarkedImageUrl] = useState(null); // 워터마크가 포함된 이미지 URL
   const previousWatermarkedUrlRef = useRef(null); // 이전 워터마크 URL 추적용
+  const deletingPolicyIdRef = useRef(null); // 삭제 중인 정책표 ID 추적
 
   // 검색/필터링
   const [searchCreator, setSearchCreator] = useState('');
@@ -890,9 +891,17 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
       e.nativeEvent.stopImmediatePropagation();
     }
 
+    // 이미 삭제 중인 경우 중복 실행 방지
+    if (deletingPolicyIdRef.current === id) {
+      return;
+    }
+
     if (!window.confirm('정책표를 삭제하시겠습니까?')) {
       return;
     }
+
+    // 삭제 시작 플래그 설정
+    deletingPolicyIdRef.current = id;
 
     try {
       setLoading(true);
@@ -921,6 +930,8 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
       setError('삭제 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
+      // 삭제 완료 후 플래그 해제
+      deletingPolicyIdRef.current = null;
     }
   };
 
@@ -1202,9 +1213,11 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
                           onClick={(e) => {
                             e.stopPropagation();
                             e.preventDefault();
+                            e.nativeEvent?.stopImmediatePropagation();
                             handleDelete(policy.id, e);
                           }}
                           color="error"
+                          disabled={deletingPolicyIdRef.current === policy.id || loading}
                         >
                           <DeleteIcon />
                         </IconButton>
