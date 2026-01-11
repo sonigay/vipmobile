@@ -222,9 +222,6 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
     settings: null,
     isEditing: false
   });
-  
-  // 수정완료 상태 추적
-  const [modificationCompletedItems, setModificationCompletedItems] = useState(new Set());
 
   // 컬럼 설정 로드
   const loadColumnSettings = useCallback(async () => {
