@@ -103,6 +103,28 @@ const INSPECTION_TABS = [
   }
 ];
 
+// 통계 카드 컴포넌트 (함수 컴포넌트 외부로 이동하여 호이스팅 문제 방지)
+const StatCard = ({ title, value, color, icon, securityNote }) => (
+  <Card sx={{ height: '100%' }}>
+    <CardContent>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+        {icon}
+        <Typography variant="h6" component="div" sx={{ ml: 1 }}>
+          {title}
+        </Typography>
+      </Box>
+      <Typography variant="h4" component="div" sx={{ color }}>
+        {value}
+      </Typography>
+      {securityNote && (
+        <Typography variant="caption" sx={{ color: 'text.secondary', mt: 1, display: 'block' }}>
+          {securityNote}
+        </Typography>
+      )}
+    </CardContent>
+  </Card>
+);
+
 function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes, presentationMode = false, initialTab = 0, detailOptions }) {
   // 상태 관리
   const [currentView, setCurrentView] = useState('personal'); // 'personal' | 'overview'
@@ -693,28 +715,6 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
         return 'default';
     }
   };
-
-  // 통계 카드 컴포넌트
-  const StatCard = ({ title, value, color, icon }) => (
-    <Card sx={{ height: '100%' }}>
-      <CardContent>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          {icon}
-          <Typography variant="h6" component="div" sx={{ ml: 1 }}>
-            {title}
-          </Typography>
-        </Box>
-        <Typography variant="h4" component="div" sx={{ color }}>
-          {value}
-        </Typography>
-        {inspectionData?.securityNote && (
-          <Typography variant="caption" sx={{ color: 'text.secondary', mt: 1, display: 'block' }}>
-            {inspectionData.securityNote}
-          </Typography>
-        )}
-      </CardContent>
-    </Card>
-  );
 
   return (
     <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
