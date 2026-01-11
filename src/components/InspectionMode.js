@@ -128,13 +128,6 @@ const StatCard = ({ title, value, color, icon, securityNote }) => (
 function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes, presentationMode = false, initialTab = 0, detailOptions }) {
   // 상태 관리
   const [currentView, setCurrentView] = useState('personal'); // 'personal' | 'overview'
-  // currentView의 최신 값을 참조하기 위한 ref
-  const currentViewRef = useRef(currentView);
-  
-  // currentView가 변경될 때마다 ref 업데이트
-  useEffect(() => {
-    currentViewRef.current = currentView;
-  }, [currentView]);
   
   const [inspectionData, setInspectionData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -189,13 +182,12 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
   }, [loggedInStore?.contactId]);
 
   // 수정완료 상태 로드
-  // currentView를 ref로 참조하여 의존성 문제 해결
   const loadModificationCompletionStatus = useCallback(async () => {
     if (!loggedInStore?.contactId) return;
     
     try {
-      // ref를 통해 최신 currentView 값 참조
-      const view = currentViewRef.current;
+      // currentView 직접 사용 (ref 제거)
+      const view = currentView;
       // 현재 뷰에 따라 수정완료 상태 로드
       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/inspection/modification-completion-status?userId=${loggedInStore.contactId}&view=${view}`);
       if (response.ok) {
@@ -221,7 +213,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
     } catch (error) {
       console.error('수정완료 상태 로드 오류:', error);
     }
-  }, [loggedInStore?.contactId]);
+  }, [loggedInStore?.contactId, currentView]);
 
 
 
@@ -249,16 +241,14 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
   }, []);
 
   // 데이터 로딩 (필드 변경 시 재로딩)
-  // currentView를 ref로 참조하여 의존성 문제 해결
-  // loadInspectionData를 먼저 선언하여 다른 useEffect에서 사용 가능하도록 함
   const loadInspectionData = useCallback(async () => {
     if (!loggedInStore?.contactId) return;
     
     setIsLoading(true);
     setError(null);
     
-    // ref를 통해 최신 currentView 값 참조
-    const view = currentViewRef.current;
+    // currentView 직접 사용 (ref 제거)
+    const view = currentView;
     
     // presentation mode에서는 detailOptions의 selectedField 사용
     const fieldToUse = presentationMode && detailOptions?.selectedField 
@@ -283,7 +273,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
     } finally {
       setIsLoading(false);
     }
-  }, [loggedInStore?.contactId, selectedField, presentationMode, detailOptions]);
+  }, [loggedInStore?.contactId, currentView, selectedField, presentationMode, detailOptions]);
 
   // 필드 목록 불러오기
   useEffect(() => {
@@ -322,11 +312,32 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
     }
   }, [presentationMode, initialTab, detailOptions?.selectedField, loadInspectionData]);
 
-  // 필드 변경 시 데이터 재로딩 (currentView 변경은 별도 useEffect에서 처리)
+  // 데이터 로딩 통합: 초기 마운트 및 상태 변경 시
   useEffect(() => {
-    loadCompletionStatus();
-    loadModificationCompletionStatus();
-  }, [loadCompletionStatus, loadModificationCompletionStatus, selectedField, selectedTab]);
+    if (!loggedInStore?.contactId) return;
+    
+    const loadAllData = async () => {
+      try {
+        await Promise.all([
+          loadInspectionData(),
+          loadCompletionStatus(),
+          loadModificationCompletionStatus()
+        ]);
+      } catch (error) {
+        console.error('데이터 로딩 오류:', error);
+      }
+    };
+    
+    loadAllData();
+  }, [
+    loggedInStore?.contactId,
+    selectedField,
+    selectedTab,
+    currentView,
+    loadInspectionData,
+    loadCompletionStatus,
+    loadModificationCompletionStatus
+  ]);
 
   // 검수모드 진입 시 업데이트 팝업 표시 (숨김 설정 확인 후)
   useEffect(() => {
@@ -340,11 +351,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
     }
   }, []);
 
-  // 뷰 변경 시 수정완료 상태 및 데이터 재로딩
-  useEffect(() => {
-    loadModificationCompletionStatus();
-    loadInspectionData();
-  }, [currentView, loadModificationCompletionStatus, loadInspectionData]);
+  // 뷰 변경은 위의 통합 useEffect에서 처리되므로 별도 useEffect 제거
 
   // 필터링된 데이터 (해시화된 ID 사용)
   const filteredData = useMemo(() => {
@@ -361,11 +368,9 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
     // 탭별 필터링 적용
     const currentTabItems = INSPECTION_TABS[selectedTab]?.items || [];
     if (currentTabItems.length > 0) {
-      const beforeFilterCount = filtered.length;
       filtered = filtered.filter(diff => 
         currentTabItems.includes(diff.field)
       );
-      console.log(`탭 필터링: ${beforeFilterCount}개 → ${filtered.length}개 (${currentTabItems.join(', ')})`);
     }
     
     // 가입번호 기준 정렬
@@ -696,12 +701,14 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
   };
 
   // 탭 변경 핸들러 (presentation mode에서는 탭 변경 불가)
-  const handleTabChange = (event, newValue) => {
+  const handleTabChange = useCallback((event, newValue) => {
     if (presentationMode) return; // presentation mode에서는 탭 변경 불가
-    console.log('탭 변경:', newValue, INSPECTION_TABS[newValue]?.label);
+    if (newValue === selectedTab) return; // 같은 탭이면 변경하지 않음
+    
     setSelectedTab(newValue);
     setSelectedField('all'); // 탭 변경 시 필드 선택 초기화
-  };
+    // 탭 변경 시 데이터는 useEffect에서 자동으로 재로딩됨
+  }, [presentationMode, selectedTab]);
 
   // 중복 타입 관련 함수들
   const getDuplicateTypeLabel = (duplicateType) => {
@@ -902,7 +909,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
                 <MenuItem value="all">모든 항목</MenuItem>
                 {fieldOptions
                   .filter(option => {
-                    const currentTabItems = Object.values(INSPECTION_TABS)[selectedTab]?.items || [];
+                    const currentTabItems = INSPECTION_TABS[selectedTab]?.items || [];
                     return currentTabItems.includes(option.name);
                   })
                   .map(option => (
@@ -1105,13 +1112,13 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={7} align="center">
+                    <TableCell colSpan={9} align="center">
                       <CircularProgress />
                     </TableCell>
                   </TableRow>
                 ) : filteredData.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} align="center">
+                    <TableCell colSpan={9} align="center">
                       데이터가 없습니다.
                     </TableCell>
                   </TableRow>
@@ -1502,7 +1509,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
         mode="inspection"
         loggedInStore={loggedInStore}
         onUpdateAdded={() => {
-          console.log('검수모드 새 업데이트가 추가되었습니다.');
+          // 업데이트 추가 시 처리 (필요시 로직 추가)
         }}
       />
       
