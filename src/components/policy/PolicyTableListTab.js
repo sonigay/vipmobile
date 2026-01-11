@@ -157,7 +157,7 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
 
   // 페이지네이션
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   // 수정 모드 관련 상태
   const [isEditMode, setIsEditMode] = useState(false);
