@@ -65,7 +65,11 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   // 권한 체크
   const isSS = loggedInStore?.userRole === 'SS';
   const isS = loggedInStore?.userRole === 'S';
-  const canAccessCheck = isSS || isS; // 예산확인: SS 또는 S 권한
+  // 팀장 권한 체크 (두 글자 대문자 패턴: AA, BB, CC 등)
+  const twoLetterPattern = /^[A-Z]{2}$/;
+  const isTeamLeader = loggedInStore?.userRole && twoLetterPattern.test(loggedInStore.userRole);
+  // 예산확인: SS, S 또는 팀장 권한
+  const canAccessCheck = isSS || isS || isTeamLeader;
   
   // SS 권한이 아닌데 시트설정 탭(1)에 접근하려고 하면 0으로 리셋
   React.useEffect(() => {
