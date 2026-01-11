@@ -2789,7 +2789,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
           >
             <Tab label="예산확인" icon={<VisibilityIcon />} iconPosition="start" />
             {isSS && (
-              <Tab label="시트설정" icon={<SettingsIcon />} iconPosition="start" />
+            <Tab label="시트설정" icon={<SettingsIcon />} iconPosition="start" />
             )}
           </Tabs>
         </Box>

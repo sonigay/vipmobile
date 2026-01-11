@@ -1230,7 +1230,7 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
                           {deletingPolicyId === policy.id ? (
                             <CircularProgress size={16} color="error" />
                           ) : (
-                            <DeleteIcon />
+                          <DeleteIcon />
                           )}
                         </IconButton>
                       )}
@@ -1346,25 +1346,25 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
                   </>
                 ) : (
                   <>
-                    <Typography variant="subtitle2" gutterBottom>
-                      정책적용일시
-                    </Typography>
-                    <Typography variant="body1" sx={{ mb: 2 }}>
-                      {selectedPolicy.applyDate || '-'}
-                    </Typography>
+                <Typography variant="subtitle2" gutterBottom>
+                  정책적용일시
+                </Typography>
+                <Typography variant="body1" sx={{ mb: 2 }}>
+                  {selectedPolicy.applyDate || '-'}
+                </Typography>
                     <Typography variant="body1" sx={{ whiteSpace: 'pre-line', mb: 2 }}>
                       {selectedPolicy.applyContent}
                     </Typography>
                     {mode !== 'generalPolicy' && (
                       <>
-                        <Typography variant="subtitle2" gutterBottom>
+                <Typography variant="subtitle2" gutterBottom>
                           정책영업그룹
-                        </Typography>
+                </Typography>
                         <Typography variant="body1">
                           {selectedPolicy.accessGroupNames && selectedPolicy.accessGroupNames.length > 0
                             ? selectedPolicy.accessGroupNames.join(', ')
                             : '-'}
-                        </Typography>
+                </Typography>
                       </>
                     )}
                   </>

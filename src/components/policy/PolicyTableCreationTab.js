@@ -243,7 +243,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
       }
       
       // 성능 최적화: 필수 데이터만 먼저 로드, 나머지는 백그라운드에서 로드
-      if (canAccessPolicyTableCreation) {
+        if (canAccessPolicyTableCreation) {
         // 정책표 설정만 먼저 로드 (화면 표시에 필수) - 즉시 화면에 표시
         loadSettings().then(() => {
           // settings가 로드된 후 백그라운드에서 나머지 로드
@@ -283,11 +283,11 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
       if (groupsWithoutHistory.length > 0) {
         console.log('🔍 [정책영업그룹] 변경이력 로드:', groupsWithoutHistory.length, '개 그룹');
         const changeHistoryPromises = groupsWithoutHistory.map(group => loadChangeHistory(group.id));
-        Promise.all(changeHistoryPromises).then(() => {
-          console.log('✅ [정책영업그룹] 변경이력 로드 완료');
-        }).catch(error => {
-          console.error('❌ [정책영업그룹] 변경이력 로드 실패:', error);
-        });
+      Promise.all(changeHistoryPromises).then(() => {
+        console.log('✅ [정책영업그룹] 변경이력 로드 완료');
+      }).catch(error => {
+        console.error('❌ [정책영업그룹] 변경이력 로드 실패:', error);
+      });
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -311,16 +311,16 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
         const filtered = userRole === 'SS' 
           ? data // 총괄은 모든 정책표 접근 가능
           : data.filter(setting => {
-              // creatorPermissions가 배열인지 확인
-              if (!Array.isArray(setting.creatorPermissions)) {
-                return false;
-              }
+          // creatorPermissions가 배열인지 확인
+          if (!Array.isArray(setting.creatorPermissions)) {
+            return false;
+          }
               // 정확한 문자열 비교
-              const normalizedUserRole = (userRole || '').trim();
+          const normalizedUserRole = (userRole || '').trim();
               return setting.creatorPermissions.some(perm => 
                 (perm || '').trim() === normalizedUserRole
               );
-            });
+        });
         
         setSettings(filtered);
       }
@@ -361,7 +361,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
           console.log('🔍 [정책영업그룹] 변경이력 백그라운드 로드 시작:', groups.length, '개 그룹');
           const changeHistoryPromises = groups.map(group => loadChangeHistory(group.id));
           Promise.all(changeHistoryPromises).then(() => {
-            console.log('✅ [정책영업그룹] 변경이력 로드 완료');
+          console.log('✅ [정책영업그룹] 변경이력 로드 완료');
           }).catch(error => {
             console.error('❌ [정책영업그룹] 변경이력 로드 실패:', error);
           });
@@ -1132,7 +1132,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
           }
         } else {
           setError(errorData.error || `정책표 생성 요청에 실패했습니다. (${response.status})`);
-          setGenerationStatus({ status: 'failed', progress: 0, message: '생성 요청 실패' });
+        setGenerationStatus({ status: 'failed', progress: 0, message: '생성 요청 실패' });
         }
       }
     } catch (error) {
@@ -1825,7 +1825,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
         await loadSettings();
         // 모든 정책표가 등록되었거나 이미 등록되어 있었다면 모달 닫기
         if (newRegisteredCount > 0 || (alreadyRegisteredCount > 0 && failCount === 0)) {
-          handleCloseBatchCreationModal();
+        handleCloseBatchCreationModal();
         }
       } else {
         // 일부 실패한 경우에도 성공 메시지는 표시하지 않고, UI에서 개별 상태를 확인하도록 함
@@ -2328,7 +2328,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
         </DialogTitle>
         <DialogContent>
           <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ko}>
-            <Grid container spacing={2} sx={{ mt: 1 }}>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
               {/* 정책적용일시 자동 생성 섹션 */}
               <Grid item xs={12}>
                 <Paper sx={{ p: 2, bgcolor: 'background.default' }}>
@@ -2533,16 +2533,16 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
               </Grid>
               
               {/* 생성된 정책적용일시 표시 */}
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="정책적용일시"
-                  value={creationFormData.applyDate}
-                  onChange={(e) => setCreationFormData({ ...creationFormData, applyDate: e.target.value })}
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="정책적용일시"
+                value={creationFormData.applyDate}
+                onChange={(e) => setCreationFormData({ ...creationFormData, applyDate: e.target.value })}
                   placeholder="자동 생성된 텍스트가 여기에 표시됩니다"
-                  required
-                />
-              </Grid>
+                required
+              />
+            </Grid>
             </Grid>
           </LocalizationProvider>
           <Grid container spacing={2} sx={{ mt: 1 }}>
@@ -2559,42 +2559,42 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
             </Grid>
             <Grid item xs={12}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                <Autocomplete
-                  multiple
-                  options={userGroups || []}
-                  getOptionLabel={(option) => option?.groupName || ''}
-                  value={userGroups.filter(g => creationFormData.accessGroupIds.includes(g.id)) || []}
-                  onChange={(event, newValue) => {
-                    setCreationFormData({
-                      ...creationFormData,
-                      accessGroupIds: newValue.map(g => g.id)
-                    });
-                  }}
-                  isOptionEqualToValue={(option, value) => option?.id === value?.id}
-                  noOptionsText="등록된 그룹이 없습니다."
-                  filterSelectedOptions
+              <Autocomplete
+                multiple
+                options={userGroups || []}
+                getOptionLabel={(option) => option?.groupName || ''}
+                value={userGroups.filter(g => creationFormData.accessGroupIds.includes(g.id)) || []}
+                onChange={(event, newValue) => {
+                  setCreationFormData({
+                    ...creationFormData,
+                    accessGroupIds: newValue.map(g => g.id)
+                  });
+                }}
+                isOptionEqualToValue={(option, value) => option?.id === value?.id}
+                noOptionsText="등록된 그룹이 없습니다."
+                filterSelectedOptions
                   sx={{ flex: 1 }}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      label="접근권한 (정책영업그룹)"
-                      placeholder="그룹을 선택하세요 (다중 선택 가능)"
-                    />
-                  )}
-                  renderTags={(value, getTagProps) =>
-                    value.map((option, index) => {
-                      const { key, ...tagProps } = getTagProps({ index });
-                      return (
-                        <Chip
-                          key={option.id || key}
-                          label={option.groupName || ''}
-                          onDelete={tagProps.onDelete}
-                          {...tagProps}
-                        />
-                      );
-                    })
-                  }
-                />
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="접근권한 (정책영업그룹)"
+                    placeholder="그룹을 선택하세요 (다중 선택 가능)"
+                  />
+                )}
+                renderTags={(value, getTagProps) =>
+                  value.map((option, index) => {
+                    const { key, ...tagProps } = getTagProps({ index });
+                    return (
+                      <Chip
+                        key={option.id || key}
+                        label={option.groupName || ''}
+                        onDelete={tagProps.onDelete}
+                        {...tagProps}
+                      />
+                    );
+                  })
+                }
+              />
                 <Button
                   size="small"
                   variant="outlined"
@@ -2723,7 +2723,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
         </DialogTitle>
         <DialogContent>
           <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ko}>
-            <Grid container spacing={2} sx={{ mt: 1 }}>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
               {/* 정책적용일시 자동 생성 섹션 */}
               <Grid item xs={12}>
                 <Paper sx={{ p: 2, bgcolor: 'background.default' }}>
@@ -2928,19 +2928,19 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
               </Grid>
               
               {/* 생성된 정책적용일시 표시 */}
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="정책적용일시"
-                  value={batchCreationFormData.applyDate}
-                  onChange={(e) => setBatchCreationFormData({ 
-                    ...batchCreationFormData, 
-                    applyDate: e.target.value 
-                  })}
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="정책적용일시"
+                value={batchCreationFormData.applyDate}
+                onChange={(e) => setBatchCreationFormData({ 
+                  ...batchCreationFormData, 
+                  applyDate: e.target.value 
+                })}
                   placeholder="자동 생성된 텍스트가 여기에 표시됩니다"
-                  required
-                />
-              </Grid>
+                required
+              />
+            </Grid>
             </Grid>
           </LocalizationProvider>
           <Grid container spacing={2} sx={{ mt: 1 }}>
