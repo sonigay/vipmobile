@@ -1709,8 +1709,24 @@ function setupPolicyTableRoutes(app) {
       // 예산채널확인 탭 접근 권한: SS(총괄), S(정산) 또는 두 글자 대문자 패턴(팀장)
       // 팀장의 경우 확인적용권한자로 설정된 것만 프론트엔드에서 필터링됨
       const permission = await checkPermission(req, ['SS', 'S', 'TEAM_LEADER'], 'budget');
+      
+      console.log('[예산채널] 권한 체크 결과:', {
+        hasPermission: permission.hasPermission,
+        userRole: permission.userRole,
+        userId: permission.userId,
+        error: permission.error
+      });
+      
       if (!permission.hasPermission) {
-        return res.status(403).json({ success: false, error: '권한이 없습니다.' });
+        console.error('[예산채널] 접근 거부:', {
+          userRole: permission.userRole,
+          userId: permission.userId,
+          error: permission.error
+        });
+        return res.status(403).json({ 
+          success: false, 
+          error: permission.error || '권한이 없습니다. 채널별예산확인 탭은 팀장 권한 이상만 접근할 수 있습니다.' 
+        });
       }
       
       // 사용자 정보를 응답에 포함 (프론트엔드 필터링에 사용)
