@@ -228,26 +228,6 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
   // 탭 기반 검수 항목 상태 (props에서 받은 값으로 초기화)
   const [fieldOptions, setFieldOptions] = useState([]);
   
-  // initialTab과 detailOptions가 변경되면 상태 업데이트 및 데이터 재로딩
-  useEffect(() => {
-    if (initialTab !== undefined && initialTab !== selectedTab) {
-      setSelectedTab(initialTab);
-    }
-  }, [initialTab, selectedTab]);
-  
-  useEffect(() => {
-    if (detailOptions?.selectedField !== undefined && detailOptions.selectedField !== selectedField) {
-      setSelectedField(detailOptions.selectedField);
-    }
-  }, [detailOptions?.selectedField, selectedField]);
-  
-  // presentation mode에서 initialTab이나 detailOptions가 변경되면 데이터 재로딩
-  useEffect(() => {
-    if (presentationMode && (initialTab !== undefined || detailOptions?.selectedField !== undefined)) {
-      loadInspectionData();
-    }
-  }, [presentationMode, initialTab, detailOptions?.selectedField, loadInspectionData]);
-  
   // 컬럼 설정 상태
   const [columnSettings, setColumnSettings] = useState(null);
   const [columnSettingsDialog, setColumnSettingsDialog] = useState({
@@ -268,25 +248,9 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
     }
   }, []);
 
-  // 필드 목록 불러오기
-  useEffect(() => {
-    async function loadFields() {
-      const response = await fetchAvailableFields();
-      if (response.success) {
-        setFieldOptions([{ key: 'all', name: '전체' }, ...response.data.fields]);
-      } else {
-        setFieldOptions([{ key: 'all', name: '전체' }]);
-      }
-    }
-    loadFields();
-    loadColumnSettings();
-  }, [loadColumnSettings]);
-
-  // 사용자 권한 확인
-  const hasOverviewPermission = loggedInStore?.modePermissions?.inspectionOverview;
-
   // 데이터 로딩 (필드 변경 시 재로딩)
   // currentView를 ref로 참조하여 의존성 문제 해결
+  // loadInspectionData를 먼저 선언하여 다른 useEffect에서 사용 가능하도록 함
   const loadInspectionData = useCallback(async () => {
     if (!loggedInStore?.contactId) return;
     
