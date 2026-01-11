@@ -1749,7 +1749,11 @@ function setupPolicyTableRoutes(app) {
 
       const rows = response.data.values || [];
       if (rows.length < 2) {
-        return res.json([]);
+        return res.json({
+          settings: [],
+          userRole: permission.userRole,
+          userId: permission.userId
+        });
       }
 
       const dataRows = rows.slice(1);
@@ -1770,10 +1774,18 @@ function setupPolicyTableRoutes(app) {
         settings = settings.filter(setting => setting.yearMonth === yearMonth);
       }
 
-      // 캐시에 저장 (30분 TTL)
-      setCache(cacheKey, settings, CACHE_TTL.POLICY_TABLE_SETTINGS);
+      // 응답 데이터 구성
+      const responseData = {
+        settings: settings,
+        userRole: permission.userRole,
+        userId: permission.userId
+      };
 
-      return res.json(settings);
+      // 캐시에 저장 (30분 TTL)
+      setCache(cacheKey, responseData, CACHE_TTL.POLICY_TABLE_SETTINGS);
+
+      // 사용자 정보를 응답에 포함 (프론트엔드 필터링에 사용)
+      return res.json(responseData);
     } catch (error) {
       console.error('[예산채널] 설정 목록 조회 오류:', error);
       return res.status(500).json({ success: false, error: error.message });
