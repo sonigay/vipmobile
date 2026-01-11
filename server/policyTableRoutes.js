@@ -16,20 +16,20 @@ if (DISCORD_LOGGING_ENABLED && DISCORD_BOT_TOKEN) {
   // 비동기로 초기화하여 서버 시작을 블로킹하지 않음
   setImmediate(() => {
     try {
-      discordBot = new Client({
-        intents: [
-          GatewayIntentBits.Guilds,
-          GatewayIntentBits.GuildMessages,
-          GatewayIntentBits.MessageContent
-        ]
-      });
+  discordBot = new Client({
+    intents: [
+      GatewayIntentBits.Guilds,
+      GatewayIntentBits.GuildMessages,
+      GatewayIntentBits.MessageContent
+    ]
+  });
 
-      discordBot.once('ready', () => {
-        console.log(`✅ [정책표] Discord 봇이 준비되었습니다: ${discordBot.user.tag}`);
-      });
+  discordBot.once('ready', () => {
+    console.log(`✅ [정책표] Discord 봇이 준비되었습니다: ${discordBot.user.tag}`);
+  });
 
-      discordBot.login(DISCORD_BOT_TOKEN)
-        .then(() => console.log('✅ [정책표] Discord 봇 로그인 성공'))
+  discordBot.login(DISCORD_BOT_TOKEN)
+    .then(() => console.log('✅ [정책표] Discord 봇 로그인 성공'))
         .catch(error => {
           console.error('❌ [정책표] Discord 봇 로그인 실패:', error.message);
           discordBot = null; // 실패 시 null로 설정
@@ -768,11 +768,11 @@ async function getAgentManagementData(sheets, SPREADSHEET_ID) {
   let response;
   try {
     response = await withRetry(async () => {
-      return await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: `${agentSheetName}!A:Z`
-      });
+    return await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${agentSheetName}!A:Z`
     });
+  });
   } catch (err) {
     // rate limit 등으로 실패 시 마지막 성공 데이터라도 반환
     const isRateLimitError =
@@ -816,11 +816,11 @@ async function checkPermission(req, allowedRoles, mode = 'policy') {
       return { hasPermission: false, error: '대리점아이디관리 시트 조회 실패' };
     }
 
-    const rows = response.data.values || [];
-    if (rows.length < 2) {
+  const rows = response.data.values || [];
+  if (rows.length < 2) {
       console.warn(`[${mode === 'budget' ? '예산' : '정책'}표] 권한 체크: 대리점아이디관리 시트에 데이터가 없습니다.`);
       return { hasPermission: false, error: '대리점아이디관리 시트에 데이터가 없습니다.' };
-    }
+  }
 
   // 로그인한 사용자 정보 찾기 (헤더에서 가져오기)
   const userId = req.headers['x-user-id'] || req.body?.userId || req.query?.userId;
@@ -895,10 +895,10 @@ async function checkPermission(req, allowedRoles, mode = 'policy') {
   // userName이 없으면 에러 (이름은 필수)
   if (!finalUserName) {
     console.error('[정책표] 사용자 이름을 찾을 수 없습니다:', { userId, userInfo });
-    return { 
-      hasPermission, 
-      userRole: finalUserRole, 
-      userId: finalUserId, 
+  return { 
+    hasPermission, 
+    userRole: finalUserRole, 
+    userId: finalUserId, 
       userName: finalUserId // 폴백: 아이디라도 반환
     };
   }
@@ -1489,7 +1489,7 @@ function setupPolicyTableRoutes(app) {
 
       // 캐시에 저장 (30분 TTL)
       setCache(cacheKey, settings, CACHE_TTL.POLICY_TABLE_SETTINGS);
-      
+
       console.log('🔍 [정책표] 설정 목록 조회:', {
         totalSettings: settings.length,
         settings: settings.map(s => ({
@@ -1706,11 +1706,15 @@ function setupPolicyTableRoutes(app) {
       return res.status(200).end();
     }
     try {
-      // 예산채널설정 탭 접근 권한: SS(총괄), S(정산) 또는 두 글자 대문자 패턴(팀장)
+      // 예산채널확인 탭 접근 권한: SS(총괄), S(정산) 또는 두 글자 대문자 패턴(팀장)
+      // 팀장의 경우 확인적용권한자로 설정된 것만 프론트엔드에서 필터링됨
       const permission = await checkPermission(req, ['SS', 'S', 'TEAM_LEADER'], 'budget');
       if (!permission.hasPermission) {
         return res.status(403).json({ success: false, error: '권한이 없습니다.' });
       }
+      
+      // 사용자 정보를 응답에 포함 (프론트엔드 필터링에 사용)
+      const userRole = permission.userRole;
 
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
       
@@ -1723,6 +1727,14 @@ function setupPolicyTableRoutes(app) {
       const cached = getCache(cacheKey);
       if (cached) {
         console.log('✅ [캐시 히트] 예산채널 설정 목록');
+        // 캐시된 데이터가 배열인 경우 (기존 형식)와 객체인 경우 (새 형식) 모두 처리
+        if (Array.isArray(cached)) {
+          return res.json({
+            settings: cached,
+            userRole: permission.userRole,
+            userId: permission.userId
+          });
+        }
         return res.json(cached);
       }
 
@@ -2567,11 +2579,11 @@ function setupPolicyTableRoutes(app) {
       let response;
       try {
         response = await withRetry(async () => {
-          return await sheets.spreadsheets.values.get({
-            spreadsheetId: SPREADSHEET_ID,
-            range: `${SHEET_USER_GROUPS}!A:F`
-          });
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_USER_GROUPS}!A:F`
         });
+      });
       } catch (err) {
         // rate limit 등으로 실패 시 마지막 성공 데이터라도 반환
         const isRateLimitError =
@@ -3572,22 +3584,22 @@ function setupPolicyTableRoutes(app) {
         const [userGroupsData, generalModeData, policyListData] = await Promise.all([
           // 정책영업그룹 목록 조회
           (async () => {
-            if (cachedUserGroups) {
+        if (cachedUserGroups) {
               return cachedUserGroups;
             }
             await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_USER_GROUPS, HEADERS_USER_GROUPS);
-            const userGroupsResponse = await withRetry(async () => {
-              return await sheets.spreadsheets.values.get({
-                spreadsheetId: SPREADSHEET_ID,
-                range: `${SHEET_USER_GROUPS}!A:E`
-              });
+          const userGroupsResponse = await withRetry(async () => {
+            return await sheets.spreadsheets.values.get({
+              spreadsheetId: SPREADSHEET_ID,
+              range: `${SHEET_USER_GROUPS}!A:E`
             });
-            const userGroupsRows = userGroupsResponse.data.values || [];
-            const userGroupsDataRows = userGroupsRows.slice(1);
+          });
+          const userGroupsRows = userGroupsResponse.data.values || [];
+          const userGroupsDataRows = userGroupsRows.slice(1);
             const groups = userGroupsDataRows.map(row => {
               const groupId = row[0] || '';
               const groupName = row[1] || '';
-              const groupData = parseUserGroupData(row[2]);
+            const groupData = parseUserGroupData(row[2]);
               return { 
                 id: groupId, 
                 name: groupName,  // name 필드 추가 (하위 호환성)
@@ -3603,15 +3615,15 @@ function setupPolicyTableRoutes(app) {
             if (cachedGeneralMode) {
               return cachedGeneralMode;
             }
-            const generalModeSheetName = '일반모드권한관리';
-            const generalModeResponse = await withRetry(async () => {
-              return await sheets.spreadsheets.values.get({
-                spreadsheetId: SPREADSHEET_ID,
-                range: `${generalModeSheetName}!A:K`
-              });
+        const generalModeSheetName = '일반모드권한관리';
+          const generalModeResponse = await withRetry(async () => {
+            return await sheets.spreadsheets.values.get({
+              spreadsheetId: SPREADSHEET_ID,
+              range: `${generalModeSheetName}!A:K`
             });
+          });
             const generalModeRows = generalModeResponse.data.values || [];
-            setCache(generalModeCacheKey, generalModeRows, CACHE_TTL.GENERAL_MODE_PERMISSION);
+          setCache(generalModeCacheKey, generalModeRows, CACHE_TTL.GENERAL_MODE_PERMISSION);
             return generalModeRows;
           })(),
           // 정책표목록 조회 (접근권한 확인용 - 캐시 활용)
@@ -3704,13 +3716,13 @@ function setupPolicyTableRoutes(app) {
             if (cachedPolicyList) {
               return cachedPolicyList;
             }
-            const policyListResponse = await withRetry(async () => {
-              return await sheets.spreadsheets.values.get({
-                spreadsheetId: SPREADSHEET_ID,
-                range: `${SHEET_POLICY_TABLE_LIST}!A:O`
-              });
-            });
-            const policyRows = policyListResponse.data.values || [];
+        const policyListResponse = await withRetry(async () => {
+          return await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SHEET_POLICY_TABLE_LIST}!A:O`
+          });
+        });
+        const policyRows = policyListResponse.data.values || [];
             setCache(policyListCacheKey, policyRows, CACHE_TTL.POLICY_TABLES);
             return policyRows;
           })(),
@@ -3720,18 +3732,18 @@ function setupPolicyTableRoutes(app) {
               return cachedUserGroups;
             }
             await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_USER_GROUPS, HEADERS_USER_GROUPS);
-            const userGroupsResponse = await withRetry(async () => {
-              return await sheets.spreadsheets.values.get({
-                spreadsheetId: SPREADSHEET_ID,
-                range: `${SHEET_USER_GROUPS}!A:E`
-              });
-            });
-            const userGroupsRows = userGroupsResponse.data.values || [];
-            const userGroupsDataRows = userGroupsRows.slice(1);
+        const userGroupsResponse = await withRetry(async () => {
+          return await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SHEET_USER_GROUPS}!A:E`
+          });
+        });
+        const userGroupsRows = userGroupsResponse.data.values || [];
+        const userGroupsDataRows = userGroupsRows.slice(1);
             const groups = userGroupsDataRows.map(row => {
               const groupId = row[0] || '';
               const groupName = row[1] || '';
-              const groupData = parseUserGroupData(row[2]);
+          const groupData = parseUserGroupData(row[2]);
               return { 
                 id: groupId, 
                 name: groupName,  // name 필드 추가 (하위 호환성)
@@ -3902,7 +3914,7 @@ function setupPolicyTableRoutes(app) {
       if (!cached) {
         setCache(cacheKey, tabs, CACHE_TTL.POLICY_TABLE_TABS);
       }
-      
+
       return res.json(tabs);
     } catch (error) {
       console.error('[정책표] 탭 목록 조회 오류:', error);
@@ -4056,22 +4068,22 @@ function setupPolicyTableRoutes(app) {
         const [userGroupsData, generalModeData] = await Promise.all([
           // 정책영업그룹 목록 조회
           (async () => {
-            if (cachedUserGroups && Array.isArray(cachedUserGroups)) {
+        if (cachedUserGroups && Array.isArray(cachedUserGroups)) {
               return cachedUserGroups;
             }
-            await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_USER_GROUPS, HEADERS_USER_GROUPS);
-            const userGroupsResponse = await withRetry(async () => {
-              return await sheets.spreadsheets.values.get({
-                spreadsheetId: SPREADSHEET_ID,
-                range: `${SHEET_USER_GROUPS}!A:E`
-              });
+          await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_USER_GROUPS, HEADERS_USER_GROUPS);
+          const userGroupsResponse = await withRetry(async () => {
+            return await sheets.spreadsheets.values.get({
+              spreadsheetId: SPREADSHEET_ID,
+              range: `${SHEET_USER_GROUPS}!A:E`
             });
-            const userGroupsRows = userGroupsResponse.data.values || [];
-            const userGroupsDataRows = userGroupsRows.slice(1);
+          });
+          const userGroupsRows = userGroupsResponse.data.values || [];
+          const userGroupsDataRows = userGroupsRows.slice(1);
             const groups = userGroupsDataRows.map(row => {
               const groupId = row[0] || '';
               const groupName = row[1] || '';
-              const groupData = parseUserGroupData(row[2]);
+            const groupData = parseUserGroupData(row[2]);
               return { 
                 id: groupId, 
                 name: groupName,  // name 필드 추가 (하위 호환성)
@@ -4087,13 +4099,13 @@ function setupPolicyTableRoutes(app) {
             if (cachedGeneralMode && Array.isArray(cachedGeneralMode)) {
               return cachedGeneralMode;
             }
-            const generalModeSheetName = '일반모드권한관리';
-            const generalModeResponse = await withRetry(async () => {
-              return await sheets.spreadsheets.values.get({
-                spreadsheetId: SPREADSHEET_ID,
-                range: `${generalModeSheetName}!A:K`
-              });
+        const generalModeSheetName = '일반모드권한관리';
+          const generalModeResponse = await withRetry(async () => {
+            return await sheets.spreadsheets.values.get({
+              spreadsheetId: SPREADSHEET_ID,
+              range: `${generalModeSheetName}!A:K`
             });
+          });
             const generalModeRows = generalModeResponse.data.values || [];
             setCache(generalModeCacheKey, generalModeRows, CACHE_TTL.GENERAL_MODE_PERMISSION);
             return generalModeRows;

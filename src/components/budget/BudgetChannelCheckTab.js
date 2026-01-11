@@ -42,9 +42,11 @@ const BudgetChannelCheckTab = ({ loggedInStore }) => {
         }
       });
       if (response.ok) {
-        const data = await response.json();
+        const result = await response.json();
+        // 응답이 객체인 경우 (새 형식)와 배열인 경우 (기존 형식) 모두 처리
+        const data = result.settings || result;
         // 권한 필터링 적용
-        const userRole = loggedInStore?.userRole;
+        const userRole = loggedInStore?.userRole || result.userRole;
         const filtered = (userRole === 'SS' || userRole === 'S')
           ? data // SS(총괄) 또는 S(정산)은 모든 예산채널 접근 가능
           : data.filter(setting => {
@@ -82,9 +84,11 @@ const BudgetChannelCheckTab = ({ loggedInStore }) => {
         }
       });
       if (response.ok) {
-        const data = await response.json();
+        const result = await response.json();
+        // 응답이 객체인 경우 (새 형식)와 배열인 경우 (기존 형식) 모두 처리
+        const data = result.settings || result;
         // 권한 필터링 적용
-        const userRole = loggedInStore?.userRole;
+        const userRole = loggedInStore?.userRole || result.userRole;
         const filtered = (userRole === 'SS' || userRole === 'S')
           ? data // SS(총괄) 또는 S(정산)은 모든 예산채널 접근 가능
           : data.filter(setting => {
@@ -100,7 +104,11 @@ const BudgetChannelCheckTab = ({ loggedInStore }) => {
             });
         setSettings(filtered);
       } else {
-        setError('예산채널 설정을 불러올 수 없습니다.');
+        if (response.status === 403) {
+          setError('권한이 없습니다. 확인적용권한자로 설정된 팀장만 접근할 수 있습니다.');
+        } else {
+          setError('예산채널 설정을 불러올 수 없습니다.');
+        }
       }
     } catch (error) {
       console.error('예산채널 설정 로드 오류:', error);
