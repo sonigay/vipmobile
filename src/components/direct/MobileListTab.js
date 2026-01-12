@@ -944,8 +944,8 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
               height: { xs: 'calc(100vh - 350px)', sm: 'calc(100vh - 300px)', md: 'calc(100vh - 250px)' },
               maxHeight: { xs: 'calc(100vh - 350px)', sm: 'calc(100vh - 300px)', md: 'calc(100vh - 250px)' },
               position: 'relative',
-              display: 'flex',
-              flexDirection: 'column'
+              display: 'block', // display: flex 제거, 기본값 block 사용
+              // flexDirection: 'column' 제거
             }}
           >
             <Table stickyHeader sx={{ minWidth: 1000 }}>
