@@ -479,9 +479,11 @@ const OpeningInfoPage = ({
         const support = formData.usePublicSupport ? publicSupport : 0;
         // 선택된 부가서비스가 있으면 유치 금액, 없으면 미유치 금액 사용
         const dynamicStoreSupport = calculateDynamicStoreSupport.current;
+        // 선택된 항목이 있으면 유치 계산, 없으면 미유치 계산
+        const hasSelectedItems = selectedItems.length > 0;
         
         // 부가서비스 선택 여부에 따라 계산 함수 선택
-        return formData.withAddon
+        return hasSelectedItems
             ? calculateInstallmentPrincipalWithAddon(factoryPrice, support, dynamicStoreSupport, formData.usePublicSupport)
             : calculateInstallmentPrincipalWithoutAddon(factoryPrice, support, dynamicStoreSupport, formData.usePublicSupport);
     };
@@ -1740,58 +1742,27 @@ const OpeningInfoPage = ({
                                 </Grid>
                                 <Grid item xs={6}>
                                     <TextField
-                                        label="대리점추가지원금 (부가유치)"
+                                        label={`대리점추가지원금 (${selectedItems.length > 0 ? '부가유치' : '부가미유치'})`}
                                         fullWidth
-                                        value={loadingSupportAmounts ? '로딩 중...' : calculateDynamicStoreSupport.withAddon.toLocaleString()}
+                                        value={loadingSupportAmounts ? '로딩 중...' : calculateDynamicStoreSupport.current.toLocaleString()}
                                         InputProps={{ 
                                             readOnly: true,
                                             endAdornment: loadingSupportAmounts ? <CircularProgress size={20} /> : null
                                         }}
-                                        helperText={loadingSupportAmounts ? "지원금 정보를 불러오는 중..." : "선택된 상품에 따라 자동 계산"}
+                                        helperText={loadingSupportAmounts ? "지원금 정보를 불러오는 중..." : `선택된 부가서비스: ${selectedItems.length}개`}
                                     />
                                 </Grid>
                                 <Grid item xs={6}>
                                     <TextField
-                                        label="대리점추가지원금 (부가미유치)"
+                                        label="할부원금"
                                         fullWidth
-                                        value={loadingSupportAmounts ? '로딩 중...' : calculateDynamicStoreSupport.withoutAddon.toLocaleString()}
-                                        InputProps={{ 
-                                            readOnly: true,
-                                            endAdornment: loadingSupportAmounts ? <CircularProgress size={20} /> : null
-                                        }}
-                                        helperText={loadingSupportAmounts ? "지원금 정보를 불러오는 중..." : "선택된 상품에 따라 자동 계산"}
-                                    />
-                                </Grid>
-                                <Grid item xs={6}>
-                                    <TextField
-                                        label="할부원금 (부가유치)"
-                                        fullWidth
-                                        value={loadingSupportAmounts ? '로딩 중...' : (() => {
-                                            const support = formData.usePublicSupport ? publicSupport : 0;
-                                            const principal = calculateInstallmentPrincipalWithAddon(factoryPrice, support, calculateDynamicStoreSupport.withAddon, formData.usePublicSupport);
-                                            return isNaN(principal) ? 0 : principal;
-                                        })().toLocaleString()}
+                                        value={loadingSupportAmounts ? '로딩 중...' : getCurrentInstallmentPrincipal().toLocaleString()}
                                         InputProps={{ 
                                             readOnly: true,
                                             endAdornment: loadingSupportAmounts ? <CircularProgress size={20} /> : null
                                         }}
                                         sx={{ input: { fontWeight: 'bold', color: theme.primary } }}
-                                    />
-                                </Grid>
-                                <Grid item xs={6}>
-                                    <TextField
-                                        label="할부원금 (부가미유치)"
-                                        fullWidth
-                                        value={loadingSupportAmounts ? '로딩 중...' : (() => {
-                                            const support = formData.usePublicSupport ? publicSupport : 0;
-                                            const principal = calculateInstallmentPrincipalWithoutAddon(factoryPrice, support, calculateDynamicStoreSupport.withoutAddon, formData.usePublicSupport);
-                                            return isNaN(principal) ? 0 : principal;
-                                        })().toLocaleString()}
-                                        InputProps={{ 
-                                            readOnly: true,
-                                            endAdornment: loadingSupportAmounts ? <CircularProgress size={20} /> : null
-                                        }}
-                                        sx={{ input: { fontWeight: 'bold', color: theme.primary } }}
+                                        helperText={loadingSupportAmounts ? "계산 중..." : `부가서비스 선택 여부에 따라 자동 계산`}
                                     />
                                 </Grid>
                                 <Grid item xs={12}>
