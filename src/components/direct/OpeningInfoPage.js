@@ -720,11 +720,17 @@ const OpeningInfoPage = ({
             } else {
                 // 판매일보 시트에 저장 (직영점모드)
                 // 수정 모드인지 확인
-                if (initialData?.id || initialData?.번호) {
-                    const rowId = initialData.id || initialData.번호;
-                    await directStoreApiClient.updateSalesReport(rowId, saveData);
+                // initialData.id는 상품(모델) ID일 수 있으므로 판매일보 ID를 명확히 구분
+                // 판매일보 ID는 'sales-'로 시작하는 ID이거나 '번호' 필드에 있는 경우만 사용
+                const salesReportId = initialData?.번호 || 
+                    (initialData?.id && initialData.id.toString().startsWith('sales-') ? initialData.id : null);
+                
+                if (salesReportId) {
+                    // 판매일보 수정 모드
+                    await directStoreApiClient.updateSalesReport(salesReportId, saveData);
                     alert('개통 정보가 수정되었습니다.');
                 } else {
+                    // 판매일보 생성 모드
                     await directStoreApiClient.createSalesReport(saveData);
                     alert('개통 정보가 저장되었습니다.');
                 }
