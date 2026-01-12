@@ -1559,6 +1559,7 @@ const OpeningInfoPage = ({
                                         label="대리점추가지원금 직접입력"
                                         fullWidth
                                         type="number"
+                                        disabled={mode === 'customer'}
                                         value={additionalStoreSupport !== null && additionalStoreSupport !== undefined ? additionalStoreSupport : ''}
                                         onChange={(e) => {
                                             const inputValue = e.target.value;
@@ -1581,7 +1582,7 @@ const OpeningInfoPage = ({
                                         InputProps={{
                                             endAdornment: <Typography variant="body2" sx={{ mr: 1 }}>원</Typography>
                                         }}
-                                        helperText="추가 금액을 입력하면 대리점추가지원금과 할부원금에 자동 반영됩니다 (음수 입력 가능)"
+                                        helperText={mode === 'customer' ? '고객모드에서는 입력할 수 없습니다' : '추가 금액을 입력하면 대리점추가지원금과 할부원금에 자동 반영됩니다 (음수 입력 가능)'}
                                     />
                                 </Grid>
                                 <Grid item xs={6}>
