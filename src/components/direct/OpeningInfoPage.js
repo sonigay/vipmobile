@@ -611,6 +611,8 @@ const OpeningInfoPage = ({
                 // 구매가 = 출고가 - 이통사지원금 - 대리점추가지원금
                 // - 구매가가 0원 이상이면 정책설정 마진(baseMargin)
                 // - 구매가가 0원 미만(마이너스)이면 그 절대값을 마진으로 사용
+                // - 대리점추가지원금 직접입력이 음수면 그 절대값만큼 마진에 추가
+                // - 대리점추가지원금 직접입력이 양수면 그 값만큼 마진에서 차감
                 margin: (() => {
                     const appliedPublicSupport = formData.usePublicSupport ? publicSupport : 0;
                     // 🔥 개선: 선택된 부가서비스에 따라 하나의 대리점추가지원금만 사용
@@ -618,10 +620,30 @@ const OpeningInfoPage = ({
                     const purchasePrice = factoryPrice - appliedPublicSupport - appliedStoreSupport;
 
                     if (isNaN(purchasePrice)) return 0;
+                    
+                    // 기본 마진 계산
+                    let calculatedMargin = 0;
                     if (purchasePrice >= 0) {
-                        return baseMargin || 0;
+                        calculatedMargin = baseMargin || 0;
+                    } else {
+                        calculatedMargin = Math.abs(purchasePrice);
                     }
-                    return Math.abs(purchasePrice);
+                    
+                    // 🔥 대리점추가지원금 직접입력 반영
+                    // 음수면 그 절대값만큼 마진에 추가, 양수면 그 값만큼 마진에서 차감
+                    // 예: 직접입력 -40,000원 → 마진 +40,000원
+                    // 예: 직접입력 +30,000원 → 마진 -30,000원
+                    if (additionalStoreSupport !== null && additionalStoreSupport !== undefined && additionalStoreSupport !== 0) {
+                        if (additionalStoreSupport < 0) {
+                            // 음수: 마진에 추가
+                            calculatedMargin += Math.abs(additionalStoreSupport);
+                        } else {
+                            // 양수: 마진에서 차감
+                            calculatedMargin = Math.max(0, calculatedMargin - additionalStoreSupport);
+                        }
+                    }
+                    
+                    return calculatedMargin;
                 })(),
                 // 계산된 값들 (참고용, 시트에는 저장 안 됨)
                 installmentPrincipalWithAddon: calculateInstallmentPrincipalWithAddon(factoryPrice, publicSupport, calculateDynamicStoreSupport.withAddon, formData.usePublicSupport),
