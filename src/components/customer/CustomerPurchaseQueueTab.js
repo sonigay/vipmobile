@@ -302,6 +302,11 @@ const CustomerPurchaseQueueTab = ({ customerInfo, isManagementMode = false, logg
                                 // 🔥 수정: dealerSupportWithoutAdd는 실제로는 대리점추가지원금직접입력이므로 additionalStoreSupport로 매핑
                                 additionalStoreSupport: selectedRow.dealerSupportWithoutAdd !== undefined && selectedRow.dealerSupportWithoutAdd !== null ? Number(selectedRow.dealerSupportWithoutAdd) : null,
                                 대리점추가지원금직접입력: selectedRow.dealerSupportWithoutAdd !== undefined && selectedRow.dealerSupportWithoutAdd !== null ? Number(selectedRow.dealerSupportWithoutAdd) : null,
+                                // 🔥 추가: 할부원금과 LG프리미어약정
+                                installmentPrincipal: selectedRow.installmentPrincipal || selectedRow.할부원금 || 0,
+                                할부원금: selectedRow.installmentPrincipal || selectedRow.할부원금 || 0,
+                                lgPremier: selectedRow.lgPremier !== undefined ? Boolean(selectedRow.lgPremier) : (selectedRow.프리미어약정 === 'Y' || selectedRow.프리미어약정 === true || false),
+                                프리미어약정: selectedRow.lgPremier !== undefined ? (selectedRow.lgPremier ? 'Y' : 'N') : (selectedRow.프리미어약정 || 'N'),
                                 openingType: reverseConvertOpeningType(selectedRow.activationType),
                                 customerName: selectedRow.name,
                                 customerContact: selectedRow.ctn,

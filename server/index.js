@@ -1021,7 +1021,7 @@ const HEADERS_TRANSIT_LOCATION = [
 const CUSTOMER_QUEUE_HEADERS = [
   '번호', '고객CTN', '고객명', '통신사', '단말기모델명', '색상', '단말일련번호', '유심모델명', '유심일련번호', '개통유형',
   '전통신사', '할부구분', '할부개월', '약정', '요금제', '부가서비스', '출고가', '이통사지원금', '대리점추가지원금',
-  '대리점추가지원금직접입력', '선택매장업체명', '선택매장전화', '선택매장주소', '선택매장계좌정보', '등록일시', '상태',
+  '대리점추가지원금직접입력', '할부원금', 'LG프리미어약정', '선택매장업체명', '선택매장전화', '선택매장주소', '선택매장계좌정보', '등록일시', '상태',
   '처리매장업체명', '처리일시'
 ];
 const CUSTOMER_BOARD_HEADERS = [
@@ -4499,7 +4499,7 @@ app.get('/api/member/queue/all', async (req, res) => {
     const response = await rateLimitedSheetsCall(() =>
       sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
-        range: `${CUSTOMER_QUEUE_SHEET_NAME}!A:AB`
+        range: `${CUSTOMER_QUEUE_SHEET_NAME}!A:AD` // 🔥 수정: AD로 확장 (할부원금, LG프리미어약정 추가)
       })
     );
 
@@ -4540,7 +4540,7 @@ app.get('/api/member/queue/all', async (req, res) => {
     if (posCode && storeNameToPosCodeMap) {
       // 선택매장업체명(storeName)으로 POS코드를 찾아서 필터링
       filteredRows = rows.filter(row => {
-        const storeName = (row[20] || '').toString().trim(); // U열: 선택매장업체명
+        const storeName = (row[22] || '').toString().trim(); // 🔥 수정: V열로 이동 (할부원금, LG프리미어약정 추가로 인덱스 변경)
         const itemPosCode = storeNameToPosCodeMap.get(storeName);
         return itemPosCode === posCode;
       });
@@ -4567,14 +4567,18 @@ app.get('/api/member/queue/all', async (req, res) => {
       carrierSupport: row[17],
       dealerSupportWithAdd: row[18],
       dealerSupportWithoutAdd: row[19],
-      storeName: row[20],
-      storePhone: row[21],
-      storeAddress: row[22],
-      storeBankInfo: row[23],
-      createdAt: row[24],
-      status: row[25],
-      processedBy: row[26],
-      processedAt: row[27]
+      installmentPrincipal: Number(row[20] || 0), // 🔥 추가: 할부원금
+      할부원금: Number(row[20] || 0), // 🔥 추가: 할부원금 (한글 필드명)
+      lgPremier: (row[21] || '') === 'Y', // 🔥 추가: LG 프리미어 약정 적용
+      프리미어약정: (row[21] || '') === 'Y', // 🔥 추가: LG 프리미어 약정 적용 (한글 필드명)
+      storeName: row[22],
+      storePhone: row[23],
+      storeAddress: row[24],
+      storeBankInfo: row[25],
+      createdAt: row[26],
+      status: row[27],
+      processedBy: row[28],
+      processedAt: row[29]
     }));
 
     // 최신순 정렬
@@ -4599,7 +4603,7 @@ app.get('/api/member/queue', async (req, res) => {
     const response = await rateLimitedSheetsCall(() =>
       sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
-        range: `${CUSTOMER_QUEUE_SHEET_NAME}!A:AB`
+        range: `${CUSTOMER_QUEUE_SHEET_NAME}!A:AD` // 🔥 수정: AD로 확장 (할부원금, LG프리미어약정 추가)
       })
     );
 
@@ -4635,17 +4639,21 @@ app.get('/api/member/queue', async (req, res) => {
         대리점추가지원금: row[18],
         additionalStoreSupport: row[19],
         대리점추가지원금직접입력: row[19],
+        installmentPrincipal: Number(row[20] || 0), // 🔥 추가: 할부원금
+        할부원금: Number(row[20] || 0), // 🔥 추가: 할부원금 (한글 필드명)
+        lgPremier: (row[21] || '') === 'Y', // 🔥 추가: LG 프리미어 약정 적용
+        프리미어약정: (row[21] || '') === 'Y', // 🔥 추가: LG 프리미어 약정 적용 (한글 필드명)
         // 하위 호환을 위한 필드
         dealerSupportWithAdd: row[18],
         dealerSupportWithoutAdd: row[19],
-        storeName: row[20],
-        storePhone: row[21],
-        storeAddress: row[22],
-        storeBankInfo: row[23],
-        createdAt: row[24],
-        status: row[25],
-        processedBy: row[26],
-        processedAt: row[27]
+        storeName: row[22],
+        storePhone: row[23],
+        storeAddress: row[24],
+        storeBankInfo: row[25],
+        createdAt: row[26],
+        status: row[27],
+        processedBy: row[28],
+        processedAt: row[29]
       }));
 
     res.json(queue);
@@ -4683,7 +4691,7 @@ app.post('/api/member/queue', async (req, res) => {
     const createdAt = new Date().toISOString().replace('T', ' ').substring(0, 19);
 
     // 헤더 순서에 맞춰 데이터 배열 생성
-    const newRow = new Array(28).fill('');
+    const newRow = new Array(30).fill(''); // 🔥 수정: 할부원금, LG프리미어약정 추가로 30으로 확장
     newRow[0] = id;
     newRow[1] = data.ctn || '';
     newRow[2] = data.name || '';
@@ -4704,17 +4712,19 @@ app.post('/api/member/queue', async (req, res) => {
     newRow[17] = data.carrierSupport || '';
     newRow[18] = data.dealerSupport || data.dealerSupportWithAdd || '';
     newRow[19] = data.additionalStoreSupport || '';
-    newRow[20] = data.storeName || '';
-    newRow[21] = data.storePhone || '';
-    newRow[22] = data.storeAddress || '';
-    newRow[23] = data.storeBankInfo || '';
-    newRow[24] = createdAt;
-    newRow[25] = '구매대기';
+    newRow[20] = data.installmentPrincipal || 0; // 🔥 추가: 할부원금
+    newRow[21] = data.lgPremier ? 'Y' : 'N'; // 🔥 추가: LG 프리미어 약정 적용 (Y/N)
+    newRow[22] = data.storeName || '';
+    newRow[23] = data.storePhone || '';
+    newRow[24] = data.storeAddress || '';
+    newRow[25] = data.storeBankInfo || '';
+    newRow[26] = createdAt;
+    newRow[27] = '구매대기';
 
     await rateLimitedSheetsCall(() =>
       sheets.spreadsheets.values.append({
         spreadsheetId: SPREADSHEET_ID,
-        range: `${CUSTOMER_QUEUE_SHEET_NAME}!A:AB`,
+        range: `${CUSTOMER_QUEUE_SHEET_NAME}!A:AD`, // 🔥 수정: AD로 확장 (할부원금, LG프리미어약정 추가)
         valueInputOption: 'USER_ENTERED',
         resource: { values: [newRow] }
       })
@@ -4736,7 +4746,7 @@ app.put('/api/member/queue/:id', async (req, res) => {
     const response = await rateLimitedSheetsCall(() =>
       sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
-        range: `${CUSTOMER_QUEUE_SHEET_NAME}!A:AB`
+        range: `${CUSTOMER_QUEUE_SHEET_NAME}!A:AD` // 🔥 수정: AD로 확장 (할부원금, LG프리미어약정 추가)
       })
     );
 
@@ -4768,18 +4778,20 @@ app.put('/api/member/queue/:id', async (req, res) => {
     // 하위 호환을 위한 필드
     if (data.dealerSupportWithAdd !== undefined) updatedRow[18] = data.dealerSupportWithAdd;
     if (data.dealerSupportWithoutAdd !== undefined) updatedRow[19] = data.dealerSupportWithoutAdd;
-    if (data.storeName !== undefined) updatedRow[20] = data.storeName;
-    if (data.storePhone !== undefined) updatedRow[21] = data.storePhone;
-    if (data.storeAddress !== undefined) updatedRow[22] = data.storeAddress;
-    if (data.storeBankInfo !== undefined) updatedRow[23] = data.storeBankInfo;
-    if (data.status !== undefined) updatedRow[25] = data.status;
-    if (data.processedBy !== undefined) updatedRow[26] = data.processedBy;
-    if (data.processedAt !== undefined) updatedRow[27] = data.processedAt;
+    if (data.installmentPrincipal !== undefined) updatedRow[20] = data.installmentPrincipal; // 🔥 추가: 할부원금
+    if (data.lgPremier !== undefined) updatedRow[21] = data.lgPremier ? 'Y' : 'N'; // 🔥 추가: LG 프리미어 약정 적용 (Y/N)
+    if (data.storeName !== undefined) updatedRow[22] = data.storeName;
+    if (data.storePhone !== undefined) updatedRow[23] = data.storePhone;
+    if (data.storeAddress !== undefined) updatedRow[24] = data.storeAddress;
+    if (data.storeBankInfo !== undefined) updatedRow[25] = data.storeBankInfo;
+    if (data.status !== undefined) updatedRow[27] = data.status;
+    if (data.processedBy !== undefined) updatedRow[28] = data.processedBy;
+    if (data.processedAt !== undefined) updatedRow[29] = data.processedAt;
 
     await rateLimitedSheetsCall(() =>
       sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
-        range: `${CUSTOMER_QUEUE_SHEET_NAME}!A${rowIndex + 1}:AB${rowIndex + 1}`,
+        range: `${CUSTOMER_QUEUE_SHEET_NAME}!A${rowIndex + 1}:AD${rowIndex + 1}`, // 🔥 수정: AD로 확장 (할부원금, LG프리미어약정 추가)
         valueInputOption: 'USER_ENTERED',
         resource: { values: [updatedRow] }
       })
