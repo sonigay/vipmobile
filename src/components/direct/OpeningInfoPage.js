@@ -732,7 +732,22 @@ const OpeningInfoPage = ({
             if (onBack) onBack();
         } catch (error) {
             console.error('저장 실패:', error);
-            alert('저장에 실패했습니다. 다시 시도해주세요.');
+            console.error('에러 상세:', {
+                message: error.message,
+                stack: error.stack,
+                response: error.response,
+                data: error.response?.data
+            });
+            
+            // 더 구체적인 에러 메시지 제공
+            let errorMessage = '저장에 실패했습니다.';
+            if (error.response?.data?.error) {
+                errorMessage = `저장에 실패했습니다.\n사유: ${error.response.data.error}`;
+            } else if (error.message) {
+                errorMessage = `저장에 실패했습니다.\n사유: ${error.message}`;
+            }
+            
+            alert(errorMessage);
         } finally {
             setIsSaving(false);
         }
@@ -782,20 +797,33 @@ const OpeningInfoPage = ({
 
                     /* 여백 미세 조정 (디자인 유지하되 불필요한 공백 제거) */
                     .agreement-box {
-                        margin-bottom: 2px !important;
-                        padding: 3px !important;
+                        margin-bottom: 1px !important;
+                        padding: 2px 3px !important;
                         page-break-after: avoid !important;
                     }
 
                     .print-only {
-                        margin-bottom: 5px !important;
+                        margin-bottom: 2px !important;
                         display: block !important;
                     }
                     
                     /* 제목 폰트 크기 약간 조정 (너무 크면 공간 차지하므로) */
                     .print-only .MuiTypography-root {
-                        font-size: 20px !important; 
+                        font-size: 18px !important; 
                         font-weight: bold !important;
+                        line-height: 1.2 !important;
+                        margin: 0 !important;
+                    }
+                    
+                    /* Stack 간격 최소화 */
+                    .print-root .MuiStack-root {
+                        gap: 2px !important;
+                    }
+                    
+                    /* Divider 높이 최소화 */
+                    .print-root .MuiDivider-root {
+                        margin-top: 2px !important;
+                        margin-bottom: 2px !important;
                     }
 
                     /* Grid 레이아웃 강제 2단 (50:50) 유지 */
@@ -820,15 +848,26 @@ const OpeningInfoPage = ({
                     .print-root .MuiPaper-root {
                         box-shadow: none !important;
                         border: 1px solid #e0e0e0 !important;
-                        padding: 4px !important;
-                        margin-bottom: 2px !important;
+                        padding: 2px 4px !important;
+                        margin-bottom: 1px !important;
                         page-break-inside: avoid !important;
                     }
                     
                     /* 부가서비스/보험상품 선택 영역: 인쇄 시 더 컴팩트하게 */
                     .print-root .MuiPaper-root[class*="MuiPaper-outlined"] {
-                        padding: 3px !important;
-                        margin-bottom: 2px !important;
+                        padding: 2px 3px !important;
+                        margin-bottom: 1px !important;
+                    }
+                    
+                    /* Grid 간격 최소화 */
+                    .print-root .MuiGrid-container {
+                        margin: 0 !important;
+                        gap: 2px !important;
+                    }
+                    
+                    /* Grid item 여백 최소화 */
+                    .print-root .MuiGrid-item {
+                        padding: 2px !important;
                     }
                     
                     /* 부가서비스/보험상품 설명 텍스트: 인쇄 시 작게 */
@@ -1278,8 +1317,8 @@ const OpeningInfoPage = ({
                                                     <CircularProgress size={24} />
                                                     <Typography variant="body2" sx={{ ml: 2, color: 'text.secondary' }}>
                                                         부가서비스 및 보험상품 목록을 불러오는 중...
-                                                        </Typography>
-                                                    </Box>
+                                                    </Typography>
+                                                </Box>
                                             ) : (
                                                 <>
                                                     {/* 선택 가능한 항목 목록 (부가서비스 + 보험상품) */}
@@ -1287,10 +1326,20 @@ const OpeningInfoPage = ({
                                                         <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold', color: 'text.secondary' }}>
                                                             선택 가능한 항목
                                                         </Typography>
-                                                        <Stack spacing={1}>
-                                                            {[...availableAddons, ...availableInsurances]
-                                                                .filter(item => !selectedItems.some(selected => selected.name === item.name))
-                                                                .map((item) => (
+                                                        {[...availableAddons, ...availableInsurances].length === 0 ? (
+                                                            <Box sx={{ py: 2, textAlign: 'center' }}>
+                                                                <Typography variant="body2" color="text.secondary">
+                                                                    선택 가능한 항목이 없습니다.
+                                                                </Typography>
+                                                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                                                                    정책 설정에서 부가서비스 및 보험상품을 등록해주세요.
+                                                                </Typography>
+                                                            </Box>
+                                                        ) : (
+                                                            <Stack spacing={1}>
+                                                                {[...availableAddons, ...availableInsurances]
+                                                                    .filter(item => !selectedItems.some(selected => selected.name === item.name))
+                                                                    .map((item) => (
                                                             <Paper key={item.name} variant="outlined" sx={{ p: 1.5 }}>
                                                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                                     <Box sx={{ flex: 1 }}>
@@ -1320,8 +1369,9 @@ const OpeningInfoPage = ({
                                                                 </Box>
                                                             </Paper>
                                                         ))}
-                                                </Stack>
-                                            </Box>
+                                                            </Stack>
+                                                        )}
+                                                    </Box>
 
                                             {/* 선택된 항목 목록 */}
                                             {selectedItems.length > 0 && (
