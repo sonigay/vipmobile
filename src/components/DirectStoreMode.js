@@ -421,7 +421,7 @@ const DirectStoreMode = ({
                 borderRadius: 2, 
                 boxShadow: 1, 
                 minHeight: { xs: '300px', sm: '400px' }, 
-                overflow: 'auto',
+                overflow: 'hidden', // 🔥 수정: overflow를 hidden으로 변경하여 TableContainer에서만 스크롤 처리
                 maxHeight: { xs: 'calc(100vh - 300px)', sm: 'none' },
                 height: '100%',
                 display: activeTab === 0 ? 'block' : 'none'

@@ -218,8 +218,9 @@ const CustomerDashboard = () => {
                 borderRadius: 2, 
                 boxShadow: 1, 
                 minHeight: { xs: '300px', sm: '400px' }, 
-                overflow: 'auto',
-                maxHeight: { xs: 'calc(100vh - 300px)', sm: 'none' }
+                overflow: 'hidden', // 🔥 수정: overflow를 hidden으로 변경하여 TableContainer에서만 스크롤 처리
+                maxHeight: { xs: 'calc(100vh - 300px)', sm: 'none' },
+                height: '100%'
             }}>
                 {tabValue === 0 && (
                     <Box>

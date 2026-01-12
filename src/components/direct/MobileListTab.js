@@ -854,7 +854,7 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
   }, [selectedOpeningTypes, selectedPlanGroups, lookupPrice]);
 
   return (
-    <Box sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <Box sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
 
       <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', color: 'text.primary' }}>
         {isCustomerMode ? '실시간 휴대폰 시세표' : '휴대폰시세표'}
@@ -937,7 +937,8 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
               overflowX: 'auto', 
               overflowY: 'auto',
               maxWidth: '100%',
-              height: '100%',
+              height: { xs: 'calc(100vh - 400px)', sm: 'calc(100vh - 350px)', md: 'calc(100vh - 300px)' },
+              maxHeight: { xs: 'calc(100vh - 400px)', sm: 'calc(100vh - 350px)', md: 'calc(100vh - 300px)' },
               position: 'relative'
             }}
           >
