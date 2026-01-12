@@ -756,7 +756,7 @@ const OpeningInfoPage = ({
 
     return (
         <Box className={`print-root mode-${mode}`} sx={{ p: 3, height: '100%', overflow: 'auto', bgcolor: theme.bg }}>
-            {/* 인쇄용 스타일 (레이아웃 그대로 출력) */}
+            {/* 인쇄용 스타일 (작성 화면과 동일한 구조로 출력) */}
             <style>{`
                 @media print {
                     @page {
@@ -772,9 +772,14 @@ const OpeningInfoPage = ({
                         print-color-adjust: exact !important;
                     }
 
-                    /* 상단 헤더 숨김 */
+                    /* 상단 헤더 숨김 (작성 화면에만 필요한 버튼들) */
                     .no-print {
                         display: none !important;
+                    }
+                    
+                    /* 인쇄용 제목 표시 (작성 화면에는 헤더가 있으므로 인쇄 시에만 제목 표시) */
+                    .print-only {
+                        display: block !important;
                     }
 
                     /* 전체 래퍼: 내용이 A4 한 장에 들어오도록 축소 (Zoom/Scale) */
