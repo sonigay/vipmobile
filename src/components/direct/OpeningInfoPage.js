@@ -552,19 +552,24 @@ const OpeningInfoPage = ({
 
             // 2. 인쇄를 위해 임시로 데스크탑 너비 강제 (레이아웃 틀어짐 방지)
             // A4 가로(약 794px)보다 넓게 설정하여 2단 컬럼 유지
-            printRoot.style.width = '1024px';
-            printRoot.style.maxWidth = '1024px';
-            printRoot.style.minWidth = '1024px';
+            // 1024px는 충분히 넓지만, 인쇄 시 여백을 고려하여 1080px로 설정해 스케일링 비율을 자연스럽게 조정
+            const forcedWidth = '1080px';
+            printRoot.style.width = forcedWidth;
+            printRoot.style.maxWidth = forcedWidth;
+            printRoot.style.minWidth = forcedWidth;
+
+            // 인쇄 시 전체 너비 사용을 위해 마진 제거
+            printRoot.style.margin = '0';
+            printRoot.style.padding = '0';
 
             // 3. 내용 높이 측정
             const scrollHeight = printRoot.scrollHeight;
-            const scrollWidth = printRoot.scrollWidth; // 1024px
+            const scrollWidth = printRoot.scrollWidth;
 
-            // 4. A4 용지 크기 (96DPI 기준, 여백 최소화)
-            // 가로: 210mm ≈ 794px. 여백을 줄여서 내용을 꽉 채움 (좌우 3mm 여백 가정: 204mm ≈ 770px)
-            // 기존 755px -> 780px로 상향 조정하여 더 넓게 표시
-            const a4Width = 780;
-            const a4Height = 1100; // 세로 여백 줄여서 높이 확보
+            // 4. A4 용지 크기 (96DPI 기준: 210mm x 297mm ≈ 794px x 1123px)
+            // 브라우저 기본 여백 제외하고 꽉 채우기 위해 790px 설정
+            const a4Width = 790;
+            const a4Height = 1120;
 
             // 5. 가로/세로 비율에 따른 Zoom 계산
             // 가로를 A4에 맞추기 위한 비율
@@ -574,12 +579,12 @@ const OpeningInfoPage = ({
             const heightScale = a4Height / scrollHeight;
 
             // 둘 중 더 작은 비율 선택 (짤리지 않게)
-            // 단, 너무 작아지면 가독성이 떨어지므로 최소값(0.4) 제한
             let finalScale = Math.min(widthScale, heightScale);
-            // 최대 확대 비율도 1.0까지 허용 (기존 0.9)
+            // 최대 확대 비율도 1.0까지 허용
             finalScale = Math.max(0.4, Math.min(1.0, finalScale));
 
             // 6. Zoom 적용
+            // transform이 아닌 zoom 속성을 사용하여 레이아웃 재계산 유도 (Chrome/Edge 호환)
             printRoot.style.zoom = finalScale;
 
             // 7. 인쇄 실행
@@ -587,11 +592,14 @@ const OpeningInfoPage = ({
                 window.print();
 
                 // 8. 원래 상태로 복원
-                if (originalStyle) {
-                    printRoot.setAttribute('style', originalStyle);
-                } else {
-                    printRoot.removeAttribute('style');
-                }
+                // 약간의 지연 후 복원 (인쇄 대화상자가 뜨는 시간 확보)
+                setTimeout(() => {
+                    if (originalStyle) {
+                        printRoot.setAttribute('style', originalStyle);
+                    } else {
+                        printRoot.removeAttribute('style');
+                    }
+                }, 500);
             }, 100);
         } else {
             window.print();
