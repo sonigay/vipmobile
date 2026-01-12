@@ -934,7 +934,6 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
         <>
           {/* 상품 테이블 */}
           <TableContainer
-            component={Paper}
             sx={{
               flexGrow: 1,
               overflowX: 'auto',
@@ -946,9 +945,12 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
               position: 'relative',
               display: 'block', // display: flex 제거, 기본값 block 사용
               // flexDirection: 'column' 제거
+              bgcolor: 'background.paper',
+              boxShadow: 1,
+              borderRadius: 2
             }}
           >
-            <Table stickyHeader sx={{ minWidth: 1000 }}>
+            <Table sx={{ minWidth: 1000, borderCollapse: 'separate', borderSpacing: 0 }}>
               <TableHead>
                 <TableRow>
                   {!isCustomerMode && (
