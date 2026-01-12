@@ -1127,7 +1127,8 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                 )}
               </TableBody>
             </Table>
-          </TableContainer>
+            </TableContainer>
+          </Paper>
         </>
       )}
     </Box>
