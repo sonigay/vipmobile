@@ -552,7 +552,8 @@ const OpeningInfoPage = ({
                     let calculatedZoom = a4Height / contentHeight;
                     
                     // 최소/최대 zoom 값 제한 (너무 작거나 크면 가독성 저하)
-                    calculatedZoom = Math.max(0.3, Math.min(0.8, calculatedZoom));
+                    // 더 작은 zoom을 허용하여 한 화면에 맞추기
+                    calculatedZoom = Math.max(0.25, Math.min(0.75, calculatedZoom));
                     
                     // 계산된 zoom 값 적용
                     if (printRoot) {
@@ -783,6 +784,7 @@ const OpeningInfoPage = ({
                         overflow: visible !important;
                         position: relative !important;
                         padding: 0 !important;
+                        margin: 0 !important;
                         width: 100% !important;
                         max-width: 100% !important;
                         
@@ -794,36 +796,66 @@ const OpeningInfoPage = ({
                     .print-root.mode-customer {
                         zoom: 0.55; 
                     }
+                    
+                    /* print-area 하단 여백 완전 제거 */
+                    .print-area {
+                        margin-bottom: 0 !important;
+                        padding-bottom: 0 !important;
+                    }
 
                     /* 여백 미세 조정 (디자인 유지하되 불필요한 공백 제거) */
                     .agreement-box {
-                        margin-bottom: 1px !important;
-                        padding: 2px 3px !important;
+                        margin: 0 !important;
+                        margin-bottom: 0px !important;
+                        padding: 1px 2px !important;
                         page-break-after: avoid !important;
                     }
 
                     .print-only {
-                        margin-bottom: 2px !important;
+                        margin: 0 !important;
+                        margin-bottom: 0px !important;
                         display: block !important;
                     }
                     
                     /* 제목 폰트 크기 약간 조정 (너무 크면 공간 차지하므로) */
                     .print-only .MuiTypography-root {
-                        font-size: 18px !important; 
+                        font-size: 16px !important; 
                         font-weight: bold !important;
-                        line-height: 1.2 !important;
+                        line-height: 1.1 !important;
                         margin: 0 !important;
+                        padding: 0 !important;
                     }
                     
                     /* Stack 간격 최소화 */
                     .print-root .MuiStack-root {
-                        gap: 2px !important;
+                        gap: 0px !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
                     }
                     
                     /* Divider 높이 최소화 */
                     .print-root .MuiDivider-root {
-                        margin-top: 2px !important;
-                        margin-bottom: 2px !important;
+                        margin: 0 !important;
+                        margin-top: 0px !important;
+                        margin-bottom: 0px !important;
+                        height: 1px !important;
+                    }
+                    
+                    /* Box 컴포넌트 여백 최소화 */
+                    .print-root .MuiBox-root {
+                        margin: 0 !important;
+                        padding: 0 !important;
+                    }
+                    
+                    /* 모든 섹션의 하단 여백 제거 */
+                    .print-area > * {
+                        margin-bottom: 0px !important;
+                    }
+                    
+                    /* 마지막 요소의 하단 여백 완전 제거 */
+                    .print-area > *:last-child {
+                        margin-bottom: 0 !important;
+                        padding-bottom: 0 !important;
                     }
 
                     /* Grid 레이아웃 강제 2단 (50:50) 유지 */
@@ -832,7 +864,7 @@ const OpeningInfoPage = ({
                         flex-wrap: wrap !important;
                         width: 100% !important;
                         margin: 0 !important;
-                        gap: 10px !important;
+                        gap: 1px !important;
                     }
 
                     /* 메인 좌우 컬럼 강제 50% */
@@ -848,32 +880,62 @@ const OpeningInfoPage = ({
                     .print-root .MuiPaper-root {
                         box-shadow: none !important;
                         border: 1px solid #e0e0e0 !important;
-                        padding: 2px 4px !important;
-                        margin-bottom: 1px !important;
+                        padding: 1px 2px !important;
+                        margin: 0 !important;
+                        margin-bottom: 0px !important;
                         page-break-inside: avoid !important;
                     }
                     
                     /* 부가서비스/보험상품 선택 영역: 인쇄 시 더 컴팩트하게 */
                     .print-root .MuiPaper-root[class*="MuiPaper-outlined"] {
-                        padding: 2px 3px !important;
-                        margin-bottom: 1px !important;
+                        padding: 1px 2px !important;
+                        margin: 0 !important;
+                        margin-bottom: 0px !important;
                     }
                     
                     /* Grid 간격 최소화 */
                     .print-root .MuiGrid-container {
                         margin: 0 !important;
-                        gap: 2px !important;
+                        gap: 0px !important;
                     }
                     
                     /* Grid item 여백 최소화 */
                     .print-root .MuiGrid-item {
-                        padding: 2px !important;
+                        padding: 1px !important;
+                        margin: 0 !important;
                     }
                     
-                    /* 부가서비스/보험상품 설명 텍스트: 인쇄 시 작게 */
+                    /* 모든 Typography 줄간격 최소화 */
+                    .print-root .MuiTypography-root {
+                        line-height: 1.1 !important;
+                        margin-top: 1px !important;
+                        margin-bottom: 1px !important;
+                        padding: 0 !important;
+                    }
+                    
+                    /* 제목 줄간격 최소화 */
+                    .print-root .MuiTypography-h6,
+                    .print-root .MuiTypography-subtitle1,
+                    .print-root .MuiTypography-subtitle2 {
+                        line-height: 1.15 !important;
+                        margin-top: 2px !important;
+                        margin-bottom: 2px !important;
+                    }
+                    
+                    /* 본문 텍스트 줄간격 최소화 */
+                    .print-root .MuiTypography-body1,
                     .print-root .MuiTypography-body2 {
-                        font-size: 0.7rem !important;
-                        line-height: 1.2 !important;
+                        font-size: 0.65rem !important;
+                        line-height: 1.1 !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                    }
+                    
+                    /* 캡션 텍스트 */
+                    .print-root .MuiTypography-caption {
+                        font-size: 0.6rem !important;
+                        line-height: 1.0 !important;
+                        margin: 0 !important;
                     }
 
                     /* 내부 Grid item들도 2단 배치 필요한 경우 강제 */
@@ -889,22 +951,29 @@ const OpeningInfoPage = ({
                          max-width: 50% !important;
                     }
 
-                    /* 입력 필드 높이 약간 줄임 */
+                    /* 입력 필드 높이 최소화 */
                     .print-root .MuiInputBase-root {
-                        min-height: 32px !important;
-                        height: 32px !important;
+                        min-height: 24px !important;
+                        height: 24px !important;
+                        padding: 0 4px !important;
+                        margin: 0 !important;
                     }
                     
-                    /* 부가서비스/보험상품 선택 영역: 인쇄 시 더 컴팩트하게 */
-                    .print-root .MuiPaper-root[class*="MuiPaper-outlined"] {
-                        padding: 3px !important;
-                        margin-bottom: 2px !important;
+                    /* TextField 레이블 최소화 */
+                    .print-root .MuiInputLabel-root {
+                        font-size: 0.6rem !important;
+                        line-height: 1.0 !important;
+                        transform: translate(4px, 12px) scale(1) !important;
                     }
                     
-                    /* 부가서비스/보험상품 설명 텍스트: 인쇄 시 작게 */
-                    .print-root .MuiTypography-body2 {
-                        font-size: 0.7rem !important;
-                        line-height: 1.2 !important;
+                    .print-root .MuiInputLabel-root.MuiInputLabel-shrink {
+                        transform: translate(4px, -9px) scale(0.75) !important;
+                    }
+                    
+                    /* FormControl 여백 최소화 */
+                    .print-root .MuiFormControl-root {
+                        margin: 0 !important;
+                        margin-bottom: 0px !important;
                     }
                     
                     /* 부가서비스/보험상품 버튼: 인쇄 시 숨김 */
