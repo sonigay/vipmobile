@@ -6724,14 +6724,23 @@ function setupDirectRoutes(app) {
         return res.status(400).json({ success: false, error: '매장ID가 필요합니다.' });
       }
 
+      // 🔥 캐싱 추가: storeId별로 캐싱
+      const cacheKey = `store-main-page-texts-${storeId}`;
+      const cached = getCache(cacheKey);
+      if (cached) {
+        return res.json(cached);
+      }
+
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
       
-      // 1. 매장별 설정 조회
+      // 1. 매장별 설정 조회 (withRetry 사용)
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_SETTINGS, HEADERS_SETTINGS);
-      const settingsResponse = await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: `${SHEET_SETTINGS}!A:E`
-      });
+      const settingsResponse = await withRetry(async () =>
+        await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_SETTINGS}!A:E`
+        })
+      );
       const settingsRows = (settingsResponse.data.values || []).slice(1);
       
       let storeMainPageTexts = null;
@@ -6761,13 +6770,19 @@ function setupDirectRoutes(app) {
         }
       }
 
-      // 2. 통신사별 기본값 조회
-      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_MAIN_PAGE_TEXTS, HEADERS_MAIN_PAGE_TEXTS);
-      const mainPageResponse = await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: `${SHEET_MAIN_PAGE_TEXTS}!A:F`
-      });
-      const mainPageRows = (mainPageResponse.data.values || []).slice(1);
+      // 2. 통신사별 기본값 조회 (별도 캐싱으로 재사용)
+      const defaultTextsCacheKey = 'store-main-page-texts-defaults';
+      let defaultTexts = getCache(defaultTextsCacheKey);
+      
+      if (!defaultTexts) {
+        await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_MAIN_PAGE_TEXTS, HEADERS_MAIN_PAGE_TEXTS);
+        const mainPageResponse = await withRetry(async () =>
+          await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SHEET_MAIN_PAGE_TEXTS}!A:F`
+          })
+        );
+        const mainPageRows = (mainPageResponse.data.values || []).slice(1);
 
       const defaultTexts = {
         mainHeader: null,
@@ -6828,7 +6843,10 @@ function setupDirectRoutes(app) {
         });
       });
 
-      res.json({ success: true, data: result });
+      const payload = { success: true, data: result };
+      // 🔥 캐싱 저장 (5분)
+      setCache(cacheKey, payload, 5 * 60 * 1000);
+      res.json(payload);
     } catch (error) {
       console.error('[Direct] store-main-page-texts GET error:', error);
       res.status(500).json({ success: false, error: '문구 조회 실패', message: error.message });
