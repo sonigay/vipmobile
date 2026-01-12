@@ -947,18 +947,66 @@ const OpeningInfoPage = ({
                        handlePrint에서 width를 고정(1120px)했으므로 이를 돕는 스타일 추가
                     */
 
-                    /* Grid Item 강제 배치 (화면과 동일하게) */
-                    /* md={6}인 항목들은 인쇄 시에도 50% 폭 유지 */
+                    /* Grid Item 강제 배치 (화면과 동일하게) & 간격 축소 */
                     .print-root .MuiGrid-container > .MuiGrid-item.MuiGrid-grid-md-6 {
                         flex-basis: 50% !important;
                         max-width: 50% !important;
                         width: 50% !important;
+                        padding-top: 4px !important; /* 상단 여백 축소 */
+                        padding-bottom: 4px !important; /* 하단 여백 축소 */
+                    }
+                    
+                    /* 모든 Grid Item 간격 축소 */
+                    .print-root .MuiGrid-item {
+                        padding-top: 4px !important;
+                        padding-bottom: 4px !important;
                     }
 
-                    /* Paper 그림자 제거 및 테두리 단순화 (선택사항) */
+                    /* 입력 필드 높이 및 여백 강제 축소 */
+                    .print-root .MuiTextField-root,
+                    .print-root .MuiFormControl-root {
+                        margin-bottom: 4px !important;
+                        margin-top: 0 !important;
+                    }
+
+                    /* Input 내부 패딩 축소 (Dense보다 더 좁게) */
+                    .print-root .MuiInputBase-root {
+                        min-height: 32px !important; /* 최소 높이 줄임 */
+                    }
+                    .print-root .MuiInputBase-input {
+                        padding: 4px 8px !important; /* 내부 패딩 최소화 */
+                        font-size: 0.85rem !important; /* 폰트 사이즈 축소 */
+                    }
+                    .print-root .MuiInputLabel-root {
+                        transform: translate(14px, 5px) scale(1) !important; /* 라벨 위치 조정 */
+                        font-size: 0.85rem !important;
+                    }
+                    .print-root .MuiInputLabel-shrink {
+                        transform: translate(14px, -8px) scale(0.75) !important; /* 슈링크 라벨 위치 조정 */
+                    }
+                    
+                    /* 제목 및 텍스트 여백 축소 */
+                    .print-root .MuiTypography-h6 {
+                        font-size: 1rem !important;
+                        margin-bottom: 4px !important;
+                        min-height: auto !important;
+                    }
+                    .print-root .MuiTypography-body2 {
+                        font-size: 0.8rem !important;
+                    }
+                    
+                    /* 구분선 여백 제거 */
+                    .print-root .MuiDivider-root {
+                        margin-top: 4px !important;
+                        margin-bottom: 4px !important;
+                    }
+
+                    /* Paper 그림자 제거 및 테두리 단순화 */
                     .MuiPaper-root {
                         box-shadow: none !important;
                         border: 1px solid #ddd !important;
+                        padding: 8px !important; /* 내부 패딩 축소 */
+                        margin-bottom: 4px !important; /* 외부 여백 축소 */
                     }
                 }
             `}</style>
