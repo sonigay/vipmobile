@@ -66,7 +66,7 @@ const OpeningInfoPage = ({
     const [agreementChecked, setAgreementChecked] = useState(false); // 동의 체크박스 상태
     const [baseMargin, setBaseMargin] = useState(0); // 정책설정에서 가져온 기본 마진
     const [preApprovalMark, setPreApprovalMark] = useState(null); // 사전승낙서 마크
-    
+
     // 🔥 로딩 상태 관리 (항목별)
     const [loadingPlanGroups, setLoadingPlanGroups] = useState(true); // 요금제 그룹 로딩
     const [loadingAddonsAndInsurances, setLoadingAddonsAndInsurances] = useState(true); // 부가서비스/보험상품 로딩
@@ -209,7 +209,7 @@ const OpeningInfoPage = ({
                             .filter(name => name);
 
                         // 저장된 부가서비스 이름과 매칭되는 항목만 선택
-                        const savedAddons = allAddons.filter(addon => 
+                        const savedAddons = allAddons.filter(addon =>
                             savedAddonNames.includes(addon.name)
                         );
                         initialSelectedItems.push(...savedAddons);
@@ -267,28 +267,28 @@ const OpeningInfoPage = ({
                             const minPrice = insurance.minPrice || 0;
                             const maxPrice = insurance.maxPrice || 9999999;
                             const isPriceMatch = factoryPrice >= minPrice && factoryPrice <= maxPrice;
-                            
+
                             if (!isPriceMatch) return false;
-                            
+
                             // 보험상품 이름 확인
                             const insuranceName = (insurance.name || '').toString().toLowerCase();
                             const isFlipFoldInsurance = flipFoldKeywords.some(keyword =>
                                 insuranceName.includes(keyword.toLowerCase())
                             );
-                            
+
                             // 플립/폴드 모델일 때는 플립/폴드 보험상품만, 아닐 때는 일반 보험상품만
-                    if (isFlipFoldModel) {
+                            if (isFlipFoldModel) {
                                 // 플립/폴드 모델: 플립/폴드 보험상품만 포함
                                 if (!isFlipFoldInsurance) {
                                     return false; // 일반 보험상품 제외
                                 }
-                    } else {
+                            } else {
                                 // 일반 모델: 일반 보험상품만 포함
                                 if (isFlipFoldInsurance) {
                                     return false; // 플립/폴드 보험상품 제외
                                 }
                             }
-                            
+
                             return true;
                         })
                         .map(insurance => ({
@@ -309,9 +309,9 @@ const OpeningInfoPage = ({
                             .split(',')
                             .map(name => name.trim())
                             .filter(name => name);
-                        
+
                         // 저장된 보험상품 이름과 매칭되는 항목만 선택
-                        const savedInsurances = allInsurances.filter(insurance => 
+                        const savedInsurances = allInsurances.filter(insurance =>
                             savedItemNames.includes(insurance.name)
                         );
                         initialSelectedItems.push(...savedInsurances);
@@ -374,7 +374,7 @@ const OpeningInfoPage = ({
                 setLoadingSupportAmounts(false);
                 return;
             }
-            
+
             setLoadingSupportAmounts(true);
 
             // planGroup에 해당하는 plan 찾기
@@ -442,7 +442,7 @@ const OpeningInfoPage = ({
         // 서버에서 받은 storeSupportWithoutAddon을 기본값으로 사용
         // (모든 부가서비스가 미유치 상태일 때의 값)
         // 이 값에는 모든 deduction이 이미 포함되어 있음
-        
+
         // 모든 항목의 incentive/deduction 합계
         const allItemsIncentive = allAvailableItems.reduce((sum, item) => sum + (item.incentive || 0), 0);
         const allItemsDeduction = allAvailableItems.reduce((sum, item) => sum + (item.deduction || 0), 0);
@@ -461,17 +461,17 @@ const OpeningInfoPage = ({
         // 동적 대리점지원금 계산
         // 유치 시: 기본값 + 선택한 항목의 incentive
         const dynamicStoreSupportWithAddon = baseStoreSupport + selectedIncentive;
-        
+
         // 미유치 시: 기본값 - 미선택 항목의 deduction
         // (선택한 항목이 없으면 모든 항목이 미선택이므로 모든 deduction 차감)
         const dynamicStoreSupportWithoutAddon = baseStoreSupport - unselectedDeduction;
 
         // 부가서비스 선택 여부에 따라 하나의 대리점추가지원금만 반환
         const hasSelectedItems = selectedItems.length > 0;
-        const baseFinalStoreSupport = hasSelectedItems 
-            ? Math.max(0, dynamicStoreSupportWithAddon) 
+        const baseFinalStoreSupport = hasSelectedItems
+            ? Math.max(0, dynamicStoreSupportWithAddon)
             : Math.max(0, dynamicStoreSupportWithoutAddon);
-        
+
         // 직접입력 추가금액 반영
         const finalStoreSupport = baseFinalStoreSupport + (additionalStoreSupport || 0);
 
@@ -492,7 +492,7 @@ const OpeningInfoPage = ({
         const dynamicStoreSupport = calculateDynamicStoreSupport.current;
         // 선택된 항목이 있으면 유치 계산, 없으면 미유치 계산
         const hasSelectedItems = selectedItems.length > 0;
-        
+
         // 부가서비스 선택 여부에 따라 계산 함수 선택
         return hasSelectedItems
             ? calculateInstallmentPrincipalWithAddon(factoryPrice, support, dynamicStoreSupport, formData.usePublicSupport)
@@ -522,20 +522,20 @@ const OpeningInfoPage = ({
     const installmentPrincipal = useMemo(() => {
         return getCurrentInstallmentPrincipal();
     }, [selectedItems.length, formData.usePublicSupport, factoryPrice, publicSupport, calculateDynamicStoreSupport]);
-    
+
     const installmentFeeResult = useMemo(() => {
         return calculateInstallmentFee(installmentPrincipal, formData.installmentPeriod);
     }, [installmentPrincipal, formData.installmentPeriod]);
-    
+
     const planFeeResult = useMemo(() => {
         return calculatePlanFee(planBasicFee, formData.contractType, selectedCarrier, formData.lgPremier);
     }, [planBasicFee, formData.contractType, selectedCarrier, formData.lgPremier]);
-    
+
     // 🔥 개선: 선택된 항목들의 월 요금 합계
     const addonsFeeResult = useMemo(() => {
         return selectedItems.reduce((sum, item) => sum + (item.monthlyFee || 0), 0);
     }, [selectedItems]);
-    
+
     const totalMonthlyFeeResult = useMemo(() => {
         return calculateTotalMonthlyFee(
             formData.paymentType,
@@ -545,61 +545,60 @@ const OpeningInfoPage = ({
             addonsFeeResult
         );
     }, [formData.paymentType, installmentPrincipal, formData.installmentPeriod, planFeeResult, addonsFeeResult]);
-    
+
     const cashPriceResult = useMemo(() => {
         return calculateCashPrice(installmentPrincipal, formData.cashPrice);
     }, [installmentPrincipal, formData.cashPrice]);
 
     const handlePrint = () => {
-        // 인쇄 전에 내용의 높이를 측정하여 A4 용지에 맞게 zoom 값 계산
-        const printArea = document.querySelector('.print-area');
-        if (printArea) {
-            // 인쇄 모드 전환 전 원본 크기 측정
-            const originalZoom = document.querySelector('.print-root')?.style.zoom || '1';
-            
-            // 임시로 zoom을 1로 설정하여 실제 높이 측정
-            const printRoot = document.querySelector('.print-root');
-            if (printRoot) {
-                printRoot.style.zoom = '1';
-                
-                // 리플로우를 위해 약간의 지연
-                setTimeout(() => {
-                    const contentHeight = printArea.scrollHeight;
-                    
-                    // A4 용지 크기 (마진 5mm 제외)
-                    // A4: 210mm x 297mm, 마진 5mm씩이면 실제 사용 가능: 200mm x 287mm
-                    // 96 DPI 기준: 1mm = 3.7795px
-                    // 실제 사용 가능 높이: 287mm * 3.7795 = 약 1084px
-                    // 하지만 브라우저마다 다를 수 있으므로 약간의 여유를 두고 1000px로 설정
-                    const a4Height = 1000; // A4 용지 사용 가능 높이 (px)
-                    
-                    // zoom 값 계산 (내용이 A4 한 장에 들어오도록)
-                    let calculatedZoom = a4Height / contentHeight;
-                    
-                    // 최소/최대 zoom 값 제한 (너무 작거나 크면 가독성 저하)
-                    // 더 작은 zoom을 허용하여 한 화면에 맞추기
-                    calculatedZoom = Math.max(0.25, Math.min(0.75, calculatedZoom));
-                    
-                    // 계산된 zoom 값 적용
-                    if (printRoot) {
-                        printRoot.style.zoom = calculatedZoom.toString();
-                    }
-                    
-                    // 인쇄 실행
-                    setTimeout(() => {
-        window.print();
-                        
-                        // 인쇄 후 원래 상태로 복원
-                        setTimeout(() => {
-                            if (printRoot) {
-                                printRoot.style.zoom = originalZoom;
-                            }
-                        }, 100);
-                    }, 100);
-                }, 50);
-            } else {
+        // 인쇄 전 A4 한장 출력을 위한 Zoom 계산
+        const printRoot = document.querySelector('.print-root');
+        if (printRoot) {
+            // 1. 현재 화면의 원래 스타일 저장
+            const originalStyle = printRoot.getAttribute('style');
+
+            // 2. 인쇄를 위해 임시로 데스크탑 너비 강제 (레이아웃 틀어짐 방지)
+            // A4 가로(약 794px)보다 넓게 설정하여 2단 컬럼 유지
+            printRoot.style.width = '1024px';
+            printRoot.style.maxWidth = '1024px';
+            printRoot.style.minWidth = '1024px';
+
+            // 3. 내용 높이 측정
+            const scrollHeight = printRoot.scrollHeight;
+            const scrollWidth = printRoot.scrollWidth; // 1024px
+
+            // 4. A4 용지 크기 (96DPI 기준, 여백 고려)
+            // 가로: 210mm - 10mm(여백) = 200mm ≈ 755px
+            // 세로: 297mm - 10mm(여백) = 287mm ≈ 1084px
+            const a4Width = 755;
+            const a4Height = 1084;
+
+            // 5. 가로/세로 비율에 따른 Zoom 계산
+            // 가로를 A4에 맞추기 위한 비율
+            const widthScale = a4Width / scrollWidth;
+
+            // 세로를 A4에 맞추기 위한 비율 (내용이 길 경우)
+            const heightScale = a4Height / scrollHeight;
+
+            // 둘 중 더 작은 비율 선택 (짤리지 않게)
+            // 단, 너무 작아지면 가독성이 떨어지므로 최소값(0.4) 제한
+            let finalScale = Math.min(widthScale, heightScale);
+            finalScale = Math.max(0.4, Math.min(0.9, finalScale));
+
+            // 6. Zoom 적용
+            printRoot.style.zoom = finalScale;
+
+            // 7. 인쇄 실행
+            setTimeout(() => {
                 window.print();
-            }
+
+                // 8. 원래 상태로 복원
+                if (originalStyle) {
+                    printRoot.setAttribute('style', originalStyle);
+                } else {
+                    printRoot.removeAttribute('style');
+                }
+            }, 100);
         } else {
             window.print();
         }
@@ -755,9 +754,9 @@ const OpeningInfoPage = ({
                 // 수정 모드인지 확인
                 // initialData.id는 상품(모델) ID일 수 있으므로 판매일보 ID를 명확히 구분
                 // 판매일보 ID는 'sales-'로 시작하는 ID이거나 '번호' 필드에 있는 경우만 사용
-                const salesReportId = initialData?.번호 || 
+                const salesReportId = initialData?.번호 ||
                     (initialData?.id && initialData.id.toString().startsWith('sales-') ? initialData.id : null);
-                
+
                 if (salesReportId) {
                     // 판매일보 수정 모드
                     await directStoreApiClient.updateSalesReport(salesReportId, saveData);
@@ -778,7 +777,7 @@ const OpeningInfoPage = ({
                 response: error.response,
                 data: error.response?.data
             });
-            
+
             // 더 구체적인 에러 메시지 제공
             let errorMessage = '저장에 실패했습니다.';
             if (error.response?.data?.error) {
@@ -786,7 +785,7 @@ const OpeningInfoPage = ({
             } else if (error.message) {
                 errorMessage = `저장에 실패했습니다.\n사유: ${error.message}`;
             }
-            
+
             alert(errorMessage);
         } finally {
             setIsSaving(false);
@@ -795,7 +794,7 @@ const OpeningInfoPage = ({
 
     return (
         <Box className={`print-root mode-${mode}`} sx={{ p: 3, height: '100%', overflow: 'auto', bgcolor: theme.bg }}>
-            {/* 인쇄용 스타일 (작성 화면과 동일한 구조로 출력) */}
+            {/* 인쇄용 스타일 (WYSIWYG: 화면 그대로 출력) */}
             <style>{`
                 @media print {
                     @page {
@@ -803,247 +802,56 @@ const OpeningInfoPage = ({
                         margin: 5mm;
                     }
 
-                    /* HTML/Body: 배경색 출력 강제 및 높이 제한 해제 */
+                    /* 기본 설정: 배경색 출력 및 크기 제한 해제 */
                     html, body {
                         height: auto !important;
                         overflow: visible !important;
                         -webkit-print-color-adjust: exact !important;
                         print-color-adjust: exact !important;
+                        background-color: white !important;
                     }
 
-                    /* 상단 헤더 숨김 (작성 화면에만 필요한 버튼들) */
-                    .no-print {
+                    /* 인쇄 불필요 요소 숨김 */
+                    .no-print, 
+                    .MuiIconButton-root, 
+                    header, 
+                    nav {
                         display: none !important;
                     }
                     
-                    /* 인쇄용 제목 표시 (작성 화면에는 헤더가 있으므로 인쇄 시에만 제목 표시) */
+                    /* 인쇄 전용 요소 표시 */
                     .print-only {
                         display: block !important;
                     }
 
-                    /* 전체 래퍼: 내용이 A4 한 장에 들어오도록 축소 (Zoom/Scale) */
-                    /* zoom 값은 handlePrint 함수에서 동적으로 계산되어 적용됨 */
-                    .opening-wrapper, .print-root {
+                    /* 메인 컨테이너 설정 */
+                    .print-root {
                         height: auto !important;
                         overflow: visible !important;
-                        position: relative !important;
                         padding: 0 !important;
                         margin: 0 !important;
-                        width: 100% !important;
-                        max-width: 100% !important;
-                        
-                        /* 기본값: 동적 계산 전 기본 zoom (인쇄 시 handlePrint에서 재계산) */
-                        zoom: 0.55; 
+                        background-color: white !important;
                     }
 
-                    /* 고객모드도 동일하게 처리 */
-                    .print-root.mode-customer {
-                        zoom: 0.55; 
-                    }
+                    /* 
+                       중요: 인쇄 시 데스크탑 뷰(2단 컬럼)를 유지하기 위한 스타일
+                       브라우저는 종이 폭에 맞춰 모바일 뷰로 전환하려 할 수 있으므로
+                       Grid 시스템이 반응형으로 동작하지 않도록 오버라이드하거나
+                       handlePrint에서 width를 고 정(1024px)했으므로 이를 돕는 스타일 추가
+                    */
                     
-                    /* print-area 하단 여백 완전 제거 */
-                    .print-area {
-                        margin-bottom: 0 !important;
-                        padding-bottom: 0 !important;
-                    }
-
-                    /* 여백 미세 조정 (디자인 유지하되 불필요한 공백 제거) */
-                    .agreement-box {
-                        margin: 0 !important;
-                        margin-bottom: 0px !important;
-                        padding: 1px 2px !important;
-                        page-break-after: avoid !important;
-                    }
-
-                    .print-only {
-                        margin: 0 !important;
-                        margin-bottom: 0px !important;
-                        display: block !important;
-                    }
-                    
-                    /* 제목 폰트 크기 약간 조정 (너무 크면 공간 차지하므로) */
-                    .print-only .MuiTypography-root {
-                        font-size: 16px !important; 
-                        font-weight: bold !important;
-                        line-height: 1.1 !important;
-                        margin: 0 !important;
-                        padding: 0 !important;
-                    }
-                    
-                    /* Stack 간격 최소화 */
-                    .print-root .MuiStack-root {
-                        gap: 0px !important;
-                        margin: 0 !important;
-                        padding: 0 !important;
-                    }
-                    
-                    /* Divider 높이 최소화 */
-                    .print-root .MuiDivider-root {
-                        margin: 0 !important;
-                        margin-top: 0px !important;
-                        margin-bottom: 0px !important;
-                        height: 1px !important;
-                    }
-                    
-                    /* Box 컴포넌트 여백 최소화 */
-                    .print-root .MuiBox-root {
-                        margin: 0 !important;
-                        padding: 0 !important;
-                    }
-                    
-                    /* 모든 섹션의 하단 여백 제거 */
-                    .print-area > * {
-                        margin-bottom: 0px !important;
-                    }
-                    
-                    /* 마지막 요소의 하단 여백 완전 제거 */
-                    .print-area > *:last-child {
-                        margin-bottom: 0 !important;
-                        padding-bottom: 0 !important;
-                    }
-
-                    /* Grid 레이아웃 강제 2단 (50:50) 유지 */
-                    .print-area > .MuiGrid-container {
-                        display: flex !important;
-                        flex-wrap: wrap !important;
-                        width: 100% !important;
-                        margin: 0 !important;
-                        gap: 1px !important;
-                    }
-
-                    /* 메인 좌우 컬럼 강제 50% */
-                    .print-area > .MuiGrid-container > .MuiGrid-item {
-                        flex-basis: calc(50% - 5px) !important;
-                        max-width: calc(50% - 5px) !important;
-                        width: calc(50% - 5px) !important;
-                        padding: 0 !important;
-                        box-sizing: border-box !important;
-                    }
-
-                    /* Paper 컴포넌트: 그림자 제거, 테두리는 유지, 여백 최소화 */
-                    .print-root .MuiPaper-root {
-                        box-shadow: none !important;
-                        border: 1px solid #e0e0e0 !important;
-                        padding: 1px 2px !important;
-                        margin: 0 !important;
-                        margin-bottom: 0px !important;
-                        page-break-inside: avoid !important;
-                    }
-                    
-                    /* 부가서비스/보험상품 선택 영역: 인쇄 시 더 컴팩트하게 */
-                    .print-root .MuiPaper-root[class*="MuiPaper-outlined"] {
-                        padding: 1px 2px !important;
-                        margin: 0 !important;
-                        margin-bottom: 0px !important;
-                    }
-                    
-                    /* Grid 간격 최소화 */
-                    .print-root .MuiGrid-container {
-                        margin: 0 !important;
-                        gap: 0px !important;
-                    }
-                    
-                    /* Grid item 여백 최소화 */
-                    .print-root .MuiGrid-item {
-                        padding: 1px !important;
-                        margin: 0 !important;
-                    }
-                    
-                    /* 모든 Typography 줄간격 최소화 */
-                    .print-root .MuiTypography-root {
-                        line-height: 1.1 !important;
-                        margin-top: 1px !important;
-                        margin-bottom: 1px !important;
-                        padding: 0 !important;
-                    }
-                    
-                    /* 제목 줄간격 최소화 */
-                    .print-root .MuiTypography-h6,
-                    .print-root .MuiTypography-subtitle1,
-                    .print-root .MuiTypography-subtitle2 {
-                        line-height: 1.15 !important;
-                        margin-top: 2px !important;
-                        margin-bottom: 2px !important;
-                    }
-                    
-                    /* 본문 텍스트 줄간격 최소화 */
-                    .print-root .MuiTypography-body1,
-                    .print-root .MuiTypography-body2 {
-                        font-size: 0.65rem !important;
-                        line-height: 1.1 !important;
-                        margin: 0 !important;
-                        padding: 0 !important;
-                    }
-                    
-                    /* 캡션 텍스트 */
-                    .print-root .MuiTypography-caption {
-                        font-size: 0.6rem !important;
-                        line-height: 1.0 !important;
-                        margin: 0 !important;
-                    }
-
-                    /* 내부 Grid item들도 2단 배치 필요한 경우 강제 */
-                    .print-root .MuiPaper-root .MuiGrid-container > .MuiGrid-item[class*="grid-xs-12"][class*="grid-sm-6"] {
+                    /* Grid Item 강제 배치 (화면과 동일하게) */
+                    /* md={6}인 항목들은 인쇄 시에도 50% 폭 유지 */
+                    .MuiGrid-root.MuiGrid-item.MuiGrid-grid-md-6 {
                         flex-basis: 50% !important;
                         max-width: 50% !important;
-                    }
-                    
-                    /* 요금정보 섹션 내부 배치 */
-                    .plan-info-section .MuiGrid-container > .MuiGrid-item[class*="grid-xs-12"]:nth-child(2),
-                    .plan-info-section .MuiGrid-container > .MuiGrid-item[class*="grid-xs-12"]:nth-child(3) {
-                         flex-basis: 50% !important;
-                         max-width: 50% !important;
+                        width: 50% !important;
                     }
 
-                    /* 입력 필드 높이 최소화 */
-                    .print-root .MuiInputBase-root {
-                        min-height: 24px !important;
-                        height: 24px !important;
-                        padding: 0 4px !important;
-                        margin: 0 !important;
-                    }
-                    
-                    /* TextField 레이블 최소화 */
-                    .print-root .MuiInputLabel-root {
-                        font-size: 0.6rem !important;
-                        line-height: 1.0 !important;
-                        transform: translate(4px, 12px) scale(1) !important;
-                    }
-                    
-                    .print-root .MuiInputLabel-root.MuiInputLabel-shrink {
-                        transform: translate(4px, -9px) scale(0.75) !important;
-                    }
-                    
-                    /* FormControl 여백 최소화 */
-                    .print-root .MuiFormControl-root {
-                        margin: 0 !important;
-                        margin-bottom: 0px !important;
-                    }
-                    
-                    /* 부가서비스/보험상품 버튼: 인쇄 시 숨김 */
-                    .print-root .MuiButton-root {
-                        display: none !important;
-                    }
-                    
-                    /* 계산 로직 상세 텍스트: 인쇄 시에도 표시하되 매우 조밀하게 */
-                    .calculation-details {
-                        display: block !important;
-                        margin-top: 5px !important;
-                    }
-                    
-                    .calculation-details .MuiPaper-root {
-                        padding: 5px !important;
-                        background-color: #f9f9f9 !important;
-                    }
-
-                    .calculation-details pre, .calculation-details .MuiTypography-caption {
-                        font-size: 0.65rem !important;
-                        line-height: 1.2 !important;
-                    }
-
-                    /* 스크롤바 숨김 */
-                    ::-webkit-scrollbar {
-                        display: none;
+                    /* Paper 그림자 제거 및 테두리 단순화 (선택사항) */
+                    .MuiPaper-root {
+                        box-shadow: none !important;
+                        border: 1px solid #ddd !important;
                     }
                 }
             `}</style>
@@ -1376,7 +1184,7 @@ const OpeningInfoPage = ({
                                                     const selectedPlan = planGroups.find(p => p.name === formData.plan);
                                                     return selectedPlan?.group || 'N/A';
                                                 })()}
-                                                InputProps={{ 
+                                                InputProps={{
                                                     readOnly: true,
                                                     endAdornment: loadingPlanGroups ? <CircularProgress size={20} /> : null
                                                 }}
@@ -1387,7 +1195,7 @@ const OpeningInfoPage = ({
                                                 label="기본료"
                                                 fullWidth
                                                 value={loadingPlanGroups ? '로딩 중...' : planBasicFee.toLocaleString()}
-                                                InputProps={{ 
+                                                InputProps={{
                                                     readOnly: true,
                                                     endAdornment: loadingPlanGroups ? <CircularProgress size={20} /> : null
                                                 }}
@@ -1419,12 +1227,12 @@ const OpeningInfoPage = ({
                                             </Grid>
                                         )}
                                         {/* 부가서비스 및 보험 적용시 금액 변경 */}
-                                            <Grid item xs={12}>
-                                                <Divider sx={{ my: 1 }} />
+                                        <Grid item xs={12}>
+                                            <Divider sx={{ my: 1 }} />
                                             <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold' }}>
                                                 부가서비스 및 보험 적용시 금액 변경
                                             </Typography>
-                                            
+
                                             {loadingAddonsAndInsurances ? (
                                                 <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 3 }}>
                                                     <CircularProgress size={24} />
@@ -1453,77 +1261,77 @@ const OpeningInfoPage = ({
                                                                 {[...availableAddons, ...availableInsurances]
                                                                     .filter(item => !selectedItems.some(selected => selected.name === item.name))
                                                                     .map((item) => (
-                                                            <Paper key={item.name} variant="outlined" sx={{ p: 1.5 }}>
-                                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                                    <Box sx={{ flex: 1 }}>
-                                                                        <Typography variant="body2" fontWeight="bold">
-                                                                            {item.name}
-                                                                        </Typography>
-                                                                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-                                                                            월 요금: {item.monthlyFee.toLocaleString()}원
-                                                                            {item.incentive > 0 && ` | 유치시 +${item.incentive.toLocaleString()}원`}
-                                                                            {item.deduction > 0 && ` | 미유치시 -${item.deduction.toLocaleString()}원`}
-                                                                        </Typography>
-                                                                        {item.description && (
-                                                                            <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5, fontSize: '0.75rem' }}>
-                                                                                {item.description}
-                                                                            </Typography>
-                                                                        )}
-                                                                    </Box>
-                                                                    <IconButton
-                                                                        color="primary"
-                                                                        onClick={() => {
-                                                                            setSelectedItems(prev => [...prev, item]);
-                                                                        }}
-                                                                        sx={{ ml: 1 }}
-                                                                    >
-                                                                        <AddIcon />
-                                                                    </IconButton>
-                                                                </Box>
-                                                            </Paper>
-                                                        ))}
+                                                                        <Paper key={item.name} variant="outlined" sx={{ p: 1.5 }}>
+                                                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                                                <Box sx={{ flex: 1 }}>
+                                                                                    <Typography variant="body2" fontWeight="bold">
+                                                                                        {item.name}
+                                                                                    </Typography>
+                                                                                    <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                                                                                        월 요금: {item.monthlyFee.toLocaleString()}원
+                                                                                        {item.incentive > 0 && ` | 유치시 +${item.incentive.toLocaleString()}원`}
+                                                                                        {item.deduction > 0 && ` | 미유치시 -${item.deduction.toLocaleString()}원`}
+                                                                                    </Typography>
+                                                                                    {item.description && (
+                                                                                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5, fontSize: '0.75rem' }}>
+                                                                                            {item.description}
+                                                                                        </Typography>
+                                                                                    )}
+                                                                                </Box>
+                                                                                <IconButton
+                                                                                    color="primary"
+                                                                                    onClick={() => {
+                                                                                        setSelectedItems(prev => [...prev, item]);
+                                                                                    }}
+                                                                                    sx={{ ml: 1 }}
+                                                                                >
+                                                                                    <AddIcon />
+                                                                                </IconButton>
+                                                                            </Box>
+                                                                        </Paper>
+                                                                    ))}
                                                             </Stack>
                                                         )}
                                                     </Box>
 
-                                            {/* 선택된 항목 목록 */}
-                                            {selectedItems.length > 0 && (
-                                                <Box>
-                                                    <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold', color: 'primary.main' }}>
-                                                        선택된 항목
-                                                    </Typography>
-                                                    <Stack spacing={1}>
-                                                        {selectedItems.map((item) => (
-                                                            <Paper key={item.name} variant="outlined" sx={{ p: 1.5, bgcolor: 'action.selected' }}>
-                                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                                    <Box sx={{ flex: 1 }}>
-                                                                        <Typography variant="body2" fontWeight="bold">
-                                                                            {item.name}
-                                                                        </Typography>
-                                                                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-                                                                            월 요금: {item.monthlyFee.toLocaleString()}원
-                                                                            {item.incentive > 0 && ` | 유치시 +${item.incentive.toLocaleString()}원`}
-                                                                            {item.deduction > 0 && ` | 미유치시 -${item.deduction.toLocaleString()}원`}
-                                                                        </Typography>
-                                                                    </Box>
-                                                                    <IconButton
-                                                                        color="error"
-                                                                        onClick={() => {
-                                                                            setSelectedItems(prev => prev.filter(selected => selected.name !== item.name));
-                                                                        }}
-                                                                        sx={{ ml: 1 }}
-                                                                    >
-                                                                        <RemoveIcon />
-                                                                    </IconButton>
-                                                                </Box>
-                                                            </Paper>
-                                                        ))}
-                                                    </Stack>
-                                                </Box>
+                                                    {/* 선택된 항목 목록 */}
+                                                    {selectedItems.length > 0 && (
+                                                        <Box>
+                                                            <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold', color: 'primary.main' }}>
+                                                                선택된 항목
+                                                            </Typography>
+                                                            <Stack spacing={1}>
+                                                                {selectedItems.map((item) => (
+                                                                    <Paper key={item.name} variant="outlined" sx={{ p: 1.5, bgcolor: 'action.selected' }}>
+                                                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                                            <Box sx={{ flex: 1 }}>
+                                                                                <Typography variant="body2" fontWeight="bold">
+                                                                                    {item.name}
+                                                                                </Typography>
+                                                                                <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                                                                                    월 요금: {item.monthlyFee.toLocaleString()}원
+                                                                                    {item.incentive > 0 && ` | 유치시 +${item.incentive.toLocaleString()}원`}
+                                                                                    {item.deduction > 0 && ` | 미유치시 -${item.deduction.toLocaleString()}원`}
+                                                                                </Typography>
+                                                                            </Box>
+                                                                            <IconButton
+                                                                                color="error"
+                                                                                onClick={() => {
+                                                                                    setSelectedItems(prev => prev.filter(selected => selected.name !== item.name));
+                                                                                }}
+                                                                                sx={{ ml: 1 }}
+                                                                            >
+                                                                                <RemoveIcon />
+                                                                            </IconButton>
+                                                                        </Box>
+                                                                    </Paper>
+                                                                ))}
+                                                            </Stack>
+                                                        </Box>
+                                                    )}
+                                                </>
                                             )}
-                                            </>
-                                        )}
-                                    </Grid>
+                                        </Grid>
                                     </>
                                 )}
                             </Grid>
@@ -1746,7 +1554,7 @@ const OpeningInfoPage = ({
                                         label="이통사 지원금"
                                         fullWidth
                                         value={loadingSupportAmounts ? '로딩 중...' : (formData.usePublicSupport ? publicSupport.toLocaleString() : '0')}
-                                        InputProps={{ 
+                                        InputProps={{
                                             readOnly: true,
                                             endAdornment: loadingSupportAmounts ? <CircularProgress size={20} /> : null
                                         }}
@@ -1757,7 +1565,7 @@ const OpeningInfoPage = ({
                                         label="대리점추가지원금"
                                         fullWidth
                                         value={loadingSupportAmounts ? '로딩 중...' : calculateDynamicStoreSupport.current.toLocaleString()}
-                                        InputProps={{ 
+                                        InputProps={{
                                             readOnly: true,
                                             endAdornment: loadingSupportAmounts ? <CircularProgress size={20} /> : null
                                         }}
@@ -1774,7 +1582,7 @@ const OpeningInfoPage = ({
                                             const value = parseFloat(e.target.value) || 0;
                                             setAdditionalStoreSupport(value >= 0 ? value : 0);
                                         }}
-                                        InputProps={{ 
+                                        InputProps={{
                                             endAdornment: <Typography variant="body2" sx={{ mr: 1 }}>원</Typography>
                                         }}
                                         helperText="추가 금액을 입력하면 대리점추가지원금과 할부원금에 자동 반영됩니다"
@@ -1785,7 +1593,7 @@ const OpeningInfoPage = ({
                                         label="할부원금"
                                         fullWidth
                                         value={loadingSupportAmounts ? '로딩 중...' : getCurrentInstallmentPrincipal().toLocaleString()}
-                                        InputProps={{ 
+                                        InputProps={{
                                             readOnly: true,
                                             endAdornment: loadingSupportAmounts ? <CircularProgress size={20} /> : null
                                         }}
