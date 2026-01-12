@@ -873,19 +873,20 @@ const OpeningInfoPage = ({
                     }
 
                     /* 메인 컨테이너 설정 */
+                    /* 메인 컨테이너 설정 */
                     .print-root {
                         /* 
                            인쇄 시 데스크탑 뷰(2단 컬럼) 강제 유지 및 A4 너비에 맞게 축소
                            - A4 가로: 약 794px (96DPI)
-                           - 데스크탑 뷰 기준: 1024px
-                           - 축소 비율: 794 / 1024 ≈ 0.77 (여백 고려하여 0.75 설정)
+                           - 데스크탑 뷰 기준: 1120px (와이드 설정을 통해 텍스트 줄바꿈 감소 -> 높이 절약)
+                           - 축소 비율: 794 / 1120 ≈ 0.70
                         */
-                        width: 1024px !important;
-                        min-width: 1024px !important;
-                        max-width: 1024px !important;
+                        width: 1120px !important;
+                        min-width: 1120px !important;
+                        max-width: 1120px !important;
                         
-                        /* A4 용지에 맞게 축소 */
-                        zoom: 0.75; 
+                        /* A4 용지에 맞게 축소 (0.70배) */
+                        zoom: 0.70; 
                         
                         /* 높이 제한 해제 및 오버플로우 표시 */
                         height: auto !important;
@@ -896,6 +897,9 @@ const OpeningInfoPage = ({
                         background-color: white !important;
                         margin: 0 !important;
                         padding: 0 !important;
+                        
+                        /* 페이지 나눔 방지 노력 */
+                        page-break-inside: avoid;
                         
                         /* 스크롤바 숨김 */
                         scrollbar-width: none;
