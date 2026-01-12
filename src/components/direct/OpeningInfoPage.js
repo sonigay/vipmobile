@@ -635,7 +635,7 @@ const OpeningInfoPage = ({
     // 🔥 수정: 저장된 값이 있으면 초기 로드 시 그대로 사용하고, 부가서비스 선택 변경 시에만 재계산
     const installmentPrincipal = useMemo(() => {
         return getCurrentInstallmentPrincipal();
-    }, [selectedItems.length, formData.usePublicSupport, factoryPrice, publicSupport, calculateDynamicStoreSupport, hasSavedInstallmentPrincipal, savedInstallmentPrincipal]);
+    }, [selectedItems.length, formData.usePublicSupport, factoryPrice, publicSupport, calculateDynamicStoreSupport, hasSavedInstallmentPrincipal, savedInstallmentPrincipal, hasItemsChanged]);
 
     const installmentFeeResult = useMemo(() => {
         return calculateInstallmentFee(installmentPrincipal, formData.installmentPeriod);
