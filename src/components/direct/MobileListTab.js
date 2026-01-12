@@ -823,32 +823,31 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
   // 🔥 핵심 수정: calculatedPrices 대신 lookupPrice를 직접 호출하여 항상 최신 factoryPrice 사용
   const getDisplayValue = useCallback((row, field, selectedOpeningType = null) => {
     // openingType이 null이면 기본값 'MNP' 사용
-    const openingType = selectedOpeningType || selectedOpeningTypes[row.id] || 'MNP';
+    let openingType = selectedOpeningType || selectedOpeningTypes[row.id] || 'MNP';
     const planGroup = selectedPlanGroups[row.id] || '115군';
+    
+    // 🔥 수정: 이통사지원금(publicSupport)만 "010신규/기변" 변환 적용
+    // 대리점지원금은 "010신규", "MNP", "기변"으로 각각 별도 저장되어 있으므로 변환 불필요
+    const isPublicSupport = field === 'publicSupport' || field === 'support';
+    if (isPublicSupport && (openingType === '010신규' || openingType === '기변')) {
+      // 이통사지원금의 경우 "010신규"나 "기변"을 "010신규/기변"으로 변환하여 조회
+      openingType = '010신규/기변';
+    }
     
     // 🔥 핵심 수정: lookupPrice를 직접 호출하여 항상 최신 factoryPrice로 계산
     // 이렇게 하면 mobileList가 변경되어도 항상 최신 가격이 표시됨
     const calculated = lookupPrice(row.id, planGroup, openingType);
 
     // 계산된 값이 있고, 해당 필드가 존재하면 사용
-    // 단, 대리점지원금의 경우 0이면 fallback 사용 (0은 유효하지 않은 값으로 간주)
+    // 🔥 수정: 대리점지원금의 경우 0도 유효한 값으로 간주 (마스터 데이터에 0으로 저장된 경우)
     if (calculated && calculated[field] !== undefined) {
-      // 대리점지원금 필드이고 값이 0이면 fallback 사용
-      if ((field === 'storeSupportWithAddon' || field === 'storeSupportWithoutAddon') && calculated[field] === 0) {
-        return row[field];
-      }
-      // openingType이 일치하는지 확인
-      const normalizedCalculatedOpeningType = calculated.openingType === '010신규/기변'
-        ? (openingType === '010신규' || openingType === '기변' ? '010신규/기변' : calculated.openingType)
-        : calculated.openingType;
-      const normalizedOpeningType = (openingType === '010신규' || openingType === '기변')
-        ? '010신규/기변'
-        : openingType;
-
-      if (calculated.openingType && normalizedCalculatedOpeningType !== normalizedOpeningType) {
+      // 이통사지원금의 경우: "010신규/기변"으로 조회했으므로 openingType 비교는 생략
+      // 대리점지원금의 경우: 원래 openingType과 일치하는지 확인
+      if (!isPublicSupport && calculated.openingType && calculated.openingType !== (selectedOpeningType || selectedOpeningTypes[row.id] || 'MNP')) {
         // openingType이 일치하지 않으면 row 값 반환
         return row[field];
       }
+      // 🔥 수정: 0도 유효한 값으로 반환 (마스터 데이터에 명시적으로 0으로 저장된 경우)
       return calculated[field];
     }
     return row[field];
