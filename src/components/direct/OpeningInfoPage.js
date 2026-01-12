@@ -735,6 +735,10 @@ const OpeningInfoPage = ({
 
                     return calculatedMargin;
                 })(),
+                // 할부원금 저장 (현재 선택된 상태에 따른 값)
+                installmentPrincipal: getCurrentInstallmentPrincipal(),
+                // LG 프리미어 약정 적용
+                lgPremier: formData.lgPremier || false,
                 // 계산된 값들 (참고용, 시트에는 저장 안 됨)
                 installmentPrincipalWithAddon: calculateInstallmentPrincipalWithAddon(factoryPrice, publicSupport, calculateDynamicStoreSupport.withAddon, formData.usePublicSupport),
                 installmentPrincipalWithoutAddon: calculateInstallmentPrincipalWithoutAddon(factoryPrice, publicSupport, calculateDynamicStoreSupport.withoutAddon, formData.usePublicSupport),
