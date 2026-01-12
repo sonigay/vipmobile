@@ -405,11 +405,18 @@ const MobileListRowComponent = ({
         >
           {(() => {
             const displayValue = getDisplayValue(row, 'storeSupportWithAddon', selectedOpeningType);
+            // 🔥 수정: 0도 유효한 값으로 간주 (마스터 데이터에 0으로 저장된 경우)
+            // undefined나 null만 체크하고, 0은 유효한 값으로 표시
+            if (displayValue !== undefined && displayValue !== null) {
+              return displayValue.toLocaleString();
+            }
+            // fallback: row 객체에 저장된 값 사용
             const fallbackValue = row.storeSupport || row.storeSupportWithAddon;
-            const finalValue = (displayValue !== undefined && displayValue !== null && displayValue !== 0)
-              ? displayValue.toLocaleString()
-              : (fallbackValue !== undefined && fallbackValue !== null ? fallbackValue.toLocaleString() : '-');
-            return finalValue;
+            if (fallbackValue !== undefined && fallbackValue !== null) {
+              return fallbackValue.toLocaleString();
+            }
+            // 데이터가 전혀 없으면 '-' 표시
+            return '-';
           })()}
         </Typography>
       </TableCell>
@@ -425,11 +432,18 @@ const MobileListRowComponent = ({
         >
           {(() => {
             const displayValue = getDisplayValue(row, 'storeSupportWithoutAddon', selectedOpeningType);
+            // 🔥 수정: 0도 유효한 값으로 간주 (마스터 데이터에 0으로 저장된 경우)
+            // undefined나 null만 체크하고, 0은 유효한 값으로 표시
+            if (displayValue !== undefined && displayValue !== null) {
+              return displayValue.toLocaleString();
+            }
+            // fallback: row 객체에 저장된 값 사용
             const fallbackValue = row.storeSupportNoAddon;
-            const finalValue = (displayValue !== undefined && displayValue !== null && displayValue !== 0)
-              ? displayValue.toLocaleString()
-              : (fallbackValue !== undefined && fallbackValue !== null ? fallbackValue.toLocaleString() : '-');
-            return finalValue;
+            if (fallbackValue !== undefined && fallbackValue !== null) {
+              return fallbackValue.toLocaleString();
+            }
+            // 데이터가 전혀 없으면 '-' 표시
+            return '-';
           })()}
         </Typography>
       </TableCell>
