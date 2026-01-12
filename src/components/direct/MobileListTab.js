@@ -892,31 +892,6 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
         </Box>
       )}
 
-      {/* 통신사 탭 */}
-      <Paper sx={{ mb: 3, borderRadius: 2, overflow: 'hidden' }}>
-        <Tabs
-          value={carrierTab}
-          onChange={handleCarrierChange}
-          variant="fullWidth"
-          indicatorColor="primary"
-          textColor="primary"
-          sx={{
-            '& .MuiTab-root': {
-              fontWeight: 'bold',
-              fontSize: '1.1rem',
-              py: 2
-            },
-            '& .Mui-selected': {
-              bgcolor: 'rgba(212, 175, 55, 0.05)'
-            }
-          }}
-        >
-          <Tab label="SK Telecom" sx={{ color: '#e60012' }} />
-          <Tab label="KT" sx={{ color: '#00abc7' }} />
-          <Tab label="LG U+" sx={{ color: '#ec008c' }} />
-        </Tabs>
-      </Paper>
-
       {/* 에러 메시지 */}
       {error && (
         <ErrorState error={error} onRetry={handleReload} title="데이터 로딩 실패" />
@@ -929,7 +904,7 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
         />
       ) : (
         <>
-          {/* 상품 테이블 */}
+              {/* 상품 테이블 */}
           <TableContainer 
             component={Paper} 
             sx={{ 
@@ -939,9 +914,44 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
               maxWidth: '100%',
               height: { xs: 'calc(100vh - 400px)', sm: 'calc(100vh - 350px)', md: 'calc(100vh - 300px)' },
               maxHeight: { xs: 'calc(100vh - 400px)', sm: 'calc(100vh - 350px)', md: 'calc(100vh - 300px)' },
-              position: 'relative'
+              position: 'relative',
+              display: 'flex',
+              flexDirection: 'column'
             }}
           >
+            {/* 통신사 탭 - TableContainer 안에서 sticky로 고정 */}
+            <Box sx={{ 
+              position: 'sticky',
+              top: 0,
+              zIndex: 12,
+              backgroundColor: 'background.paper',
+              borderBottom: '1px solid',
+              borderColor: 'divider',
+              mb: 0,
+              flexShrink: 0
+            }}>
+              <Tabs
+                value={carrierTab}
+                onChange={handleCarrierChange}
+                variant="fullWidth"
+                indicatorColor="primary"
+                textColor="primary"
+                sx={{
+                  '& .MuiTab-root': {
+                    fontWeight: 'bold',
+                    fontSize: '1.1rem',
+                    py: 2
+                  },
+                  '& .Mui-selected': {
+                    bgcolor: 'rgba(212, 175, 55, 0.05)'
+                  }
+                }}
+              >
+                <Tab label="SK Telecom" sx={{ color: '#e60012' }} />
+                <Tab label="KT" sx={{ color: '#00abc7' }} />
+                <Tab label="LG U+" sx={{ color: '#ec008c' }} />
+              </Tabs>
+            </Box>
             <Table stickyHeader sx={{ minWidth: 1000 }}>
             <TableHead>
               <TableRow>
@@ -952,7 +962,7 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                     sx={{
                       position: 'sticky',
                       left: 0,
-                      top: 0,
+                      top: '48px', // 🔥 수정: 통신사 탭 높이만큼 아래로 이동
                       zIndex: 11,
                       backgroundColor: 'background.paper',
                       boxShadow: '2px 0 4px rgba(0,0,0,0.1)'
@@ -964,11 +974,11 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                 <ModernTableCell 
                   align="center" 
                   width="100"
-                  sx={{
-                    position: 'sticky',
-                    left: !isCustomerMode ? '120px' : 0,
-                    top: 0,
-                    zIndex: 11,
+                    sx={{
+                      position: 'sticky',
+                      left: !isCustomerMode ? '120px' : 0,
+                      top: '48px', // 🔥 수정: 통신사 탭 높이만큼 아래로 이동
+                      zIndex: 11,
                     backgroundColor: 'background.paper',
                     boxShadow: '2px 0 4px rgba(0,0,0,0.1)'
                   }}
@@ -981,7 +991,7 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                   sx={{
                     position: 'sticky',
                     left: !isCustomerMode ? '220px' : '100px',
-                    top: 0,
+                    top: '48px', // 🔥 수정: 통신사 탭 높이만큼 아래로 이동
                     zIndex: 11,
                     backgroundColor: 'background.paper',
                     boxShadow: '2px 0 4px rgba(0,0,0,0.1)'
@@ -994,7 +1004,7 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                   width="120"
                   sx={{
                     position: 'sticky',
-                    top: 0,
+                    top: '48px', // 🔥 수정: 통신사 탭 높이만큼 아래로 이동 (세로만 고정)
                     zIndex: 10,
                     backgroundColor: 'background.paper'
                   }}
@@ -1006,7 +1016,7 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                   width="100"
                   sx={{
                     position: 'sticky',
-                    top: 0,
+                    top: '48px', // 🔥 수정: 통신사 탭 높이만큼 아래로 이동 (세로만 고정)
                     zIndex: 10,
                     backgroundColor: 'background.paper'
                   }}
@@ -1018,7 +1028,7 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                   width="100"
                   sx={{
                     position: 'sticky',
-                    top: 0,
+                    top: '48px', // 🔥 수정: 통신사 탭 높이만큼 아래로 이동 (세로만 고정)
                     zIndex: 10,
                     backgroundColor: 'background.paper'
                   }}
@@ -1030,7 +1040,7 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                   width="100"
                   sx={{
                     position: 'sticky',
-                    top: 0,
+                    top: '48px', // 🔥 수정: 통신사 탭 높이만큼 아래로 이동 (세로만 고정)
                     zIndex: 10,
                     backgroundColor: 'background.paper'
                   }}
@@ -1044,7 +1054,7 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                   sx={{ 
                     borderLeft: '1px solid rgba(81, 81, 81, 0.5)',
                     position: 'sticky',
-                    top: 0,
+                    top: '48px', // 🔥 수정: 통신사 탭 높이만큼 아래로 이동 (세로만 고정)
                     zIndex: 10,
                     backgroundColor: 'background.paper'
                   }}
@@ -1063,7 +1073,7 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                     borderLeft: '1px solid rgba(81, 81, 81, 0.5)', 
                     bgcolor: 'rgba(212, 175, 55, 0.1)',
                     position: 'sticky',
-                    top: 0,
+                    top: '48px', // 🔥 수정: 통신사 탭 높이만큼 아래로 이동 (세로만 고정)
                     zIndex: 10,
                     backgroundColor: 'rgba(212, 175, 55, 0.1)'
                   }}
