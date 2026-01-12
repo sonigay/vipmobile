@@ -430,6 +430,7 @@ const OpeningInfoPage = ({
     // 🔥 개선: 선택된 부가서비스/보험상품에 따른 대리점지원금 계산
     // 서버에서 받은 storeSupportWithAddon/WithoutAddon은 이미 모든 부가서비스를 고려한 값
     // 따라서 사용자가 선택한 부가서비스에 따라 차이만 계산해야 함
+    // 단, 하나의 대리점추가지원금만 계산 (부가서비스 선택 여부에 따라 유치/미유치 금액 적용)
     const calculateDynamicStoreSupport = useMemo(() => {
         // 모든 가능한 항목 (부가서비스 + 보험상품)
         const allAvailableItems = [...availableAddons, ...availableInsurances];
@@ -456,19 +457,30 @@ const OpeningInfoPage = ({
         // 미유치시 = 서버값 - (모든 항목의 deduction) + (선택한 항목의 deduction)
         const dynamicStoreSupportWithoutAddon = storeSupportWithoutAddon - allItemsDeduction + selectedDeduction;
 
+        // 부가서비스 선택 여부에 따라 하나의 대리점추가지원금만 반환
+        // 선택된 항목이 있으면 유치 금액, 없으면 미유치 금액 사용
+        const hasSelectedItems = selectedItems.length > 0;
+        const finalStoreSupport = hasSelectedItems 
+            ? Math.max(0, dynamicStoreSupportWithAddon) 
+            : Math.max(0, dynamicStoreSupportWithoutAddon);
+
         return {
-            withAddon: Math.max(0, dynamicStoreSupportWithAddon), // 음수 방지
-            withoutAddon: Math.max(0, dynamicStoreSupportWithoutAddon) // 음수 방지
+            // 현재 선택된 상태에 따른 하나의 대리점추가지원금
+            current: finalStoreSupport,
+            // 참고용 (UI 표시용)
+            withAddon: Math.max(0, dynamicStoreSupportWithAddon),
+            withoutAddon: Math.max(0, dynamicStoreSupportWithoutAddon)
         };
     }, [selectedItems, availableAddons, availableInsurances, storeSupportWithAddon, storeSupportWithoutAddon]);
 
     // 계산 로직 (계산 엔진 사용)
+    // 🔥 개선: 선택된 부가서비스에 따라 하나의 대리점추가지원금만 사용
     const getCurrentInstallmentPrincipal = () => {
         const support = formData.usePublicSupport ? publicSupport : 0;
-        const dynamicStoreSupport = formData.withAddon 
-            ? calculateDynamicStoreSupport.withAddon 
-            : calculateDynamicStoreSupport.withoutAddon;
+        // 선택된 부가서비스가 있으면 유치 금액, 없으면 미유치 금액 사용
+        const dynamicStoreSupport = calculateDynamicStoreSupport.current;
         
+        // 부가서비스 선택 여부에 따라 계산 함수 선택
         return formData.withAddon
             ? calculateInstallmentPrincipalWithAddon(factoryPrice, support, dynamicStoreSupport, formData.usePublicSupport)
             : calculateInstallmentPrincipalWithoutAddon(factoryPrice, support, dynamicStoreSupport, formData.usePublicSupport);
@@ -633,16 +645,20 @@ const OpeningInfoPage = ({
                 // 금액 정보
                 factoryPrice: factoryPrice || 0, // 출고가
                 publicSupport: formData.usePublicSupport ? publicSupport : 0, // 이통사지원금
-                storeSupportWithAddon: formData.withAddon ? calculateDynamicStoreSupport.withAddon : 0, // 대리점추가지원금(부가유치) - 동적 계산
-                storeSupportNoAddon: !formData.withAddon ? calculateDynamicStoreSupport.withoutAddon : 0, // 대리점추가지원금(부가미유치) - 동적 계산
-                storeSupportWithoutAddon: !formData.withAddon ? calculateDynamicStoreSupport.withoutAddon : 0, // 하위 호환
+                // 🔥 개선: 선택된 부가서비스에 따라 하나의 대리점추가지원금만 저장
+                storeSupport: calculateDynamicStoreSupport.current, // 대리점추가지원금 (현재 선택된 상태에 따른 값)
+                // 하위 호환을 위한 필드 (기존 API 호환성 유지)
+                storeSupportWithAddon: formData.withAddon ? calculateDynamicStoreSupport.current : 0,
+                storeSupportNoAddon: !formData.withAddon ? calculateDynamicStoreSupport.current : 0,
+                storeSupportWithoutAddon: !formData.withAddon ? calculateDynamicStoreSupport.current : 0,
                 // 마진 계산
                 // 구매가 = 출고가 - 이통사지원금 - 대리점추가지원금
                 // - 구매가가 0원 이상이면 정책설정 마진(baseMargin)
                 // - 구매가가 0원 미만(마이너스)이면 그 절대값을 마진으로 사용
                 margin: (() => {
                     const appliedPublicSupport = formData.usePublicSupport ? publicSupport : 0;
-                    const appliedStoreSupport = formData.withAddon ? calculateDynamicStoreSupport.withAddon : calculateDynamicStoreSupport.withoutAddon;
+                    // 🔥 개선: 선택된 부가서비스에 따라 하나의 대리점추가지원금만 사용
+                    const appliedStoreSupport = calculateDynamicStoreSupport.current;
                     const purchasePrice = factoryPrice - appliedPublicSupport - appliedStoreSupport;
 
                     if (isNaN(purchasePrice)) return 0;
@@ -694,8 +710,11 @@ const OpeningInfoPage = ({
                     additionalServices: selectedItems.map(a => a.name).join(', ') || '',
                     factoryPrice: factoryPrice || 0,
                     carrierSupport: formData.usePublicSupport ? publicSupport : 0,
-                    dealerSupportWithAdd: formData.withAddon ? calculateDynamicStoreSupport.withAddon : 0, // 동적 계산
-                    dealerSupportWithoutAdd: !formData.withAddon ? calculateDynamicStoreSupport.withoutAddon : 0, // 동적 계산
+                    // 🔥 개선: 선택된 부가서비스에 따라 하나의 대리점추가지원금만 저장
+                    dealerSupport: calculateDynamicStoreSupport.current, // 대리점추가지원금 (현재 선택된 상태에 따른 값)
+                    // 하위 호환을 위한 필드
+                    dealerSupportWithAdd: formData.withAddon ? calculateDynamicStoreSupport.current : 0,
+                    dealerSupportWithoutAdd: !formData.withAddon ? calculateDynamicStoreSupport.current : 0,
                     // 선택매장 정보 추가
                     storeName: currentStore?.name || '',
                     storePhone: currentStore?.phone || currentStore?.storePhone || '',
@@ -1535,7 +1554,7 @@ const OpeningInfoPage = ({
                                             <span>로딩 중...</span>
                                         </Box>
                                     ) : (
-                                        `-${(formData.withAddon ? calculateDynamicStoreSupport.withAddon : calculateDynamicStoreSupport.withoutAddon).toLocaleString()}원`
+                                        `-${calculateDynamicStoreSupport.current.toLocaleString()}원`
                                     )}
                                 </Typography>
                             </Stack>
