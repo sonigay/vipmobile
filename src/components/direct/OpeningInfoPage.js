@@ -79,7 +79,8 @@ const OpeningInfoPage = ({
         initialData?.publicSupport || initialData?.이통사지원금 || initialData?.support || 0
     ); // 이통사 지원금
     const [storeSupportWithAddon, setStoreSupportWithAddon] = useState(
-        initialData?.storeSupport || initialData?.storeSupportWithAddon || initialData?.대리점추가지원금 || 0
+        // 🔥 수정: 저장된 대리점추가지원금을 우선적으로 사용 (790000 같은 값이 저장되어 있으면 그대로 사용)
+        initialData?.storeSupport || initialData?.대리점추가지원금 || initialData?.storeSupportWithAddon || 0
     ); // 부가유치시 대리점추가지원금
     const [storeSupportWithoutAddon, setStoreSupportWithoutAddon] = useState(
         initialData?.storeSupportNoAddon || initialData?.storeSupportWithoutAddon || 0
@@ -525,13 +526,20 @@ const OpeningInfoPage = ({
         const unselectedIncentive = allItemsIncentive - selectedIncentive;
         const unselectedDeduction = allItemsDeduction - selectedDeduction;
 
+        // 🔥 핵심 로직: 저장된 대리점추가지원금이 있으면 그 값을 기준으로 계산
+        // 저장된 값이 있으면 (예: 790000) 그 값을 기준으로 선택/해제에 따른 차이만 반영
+        // 저장된 값이 없으면 storeSupportWithAddon을 기준으로 계산
+        const savedStoreSupport = initialData?.storeSupport || initialData?.대리점추가지원금;
+        const baseStoreSupport = savedStoreSupport !== undefined && savedStoreSupport !== null 
+            ? Number(savedStoreSupport) 
+            : (Number(storeSupportWithAddon) || 0);
+        
         // 🔥 핵심 로직: 초기값(모든 항목 유치)에서 시작하여 선택되지 않은 항목의 incentive와 deduction을 모두 차감
         // 예: 초기 130,000원에서 부가서비스 A 제거 시
         //     - incentive 30,000원 차감 (유치 인센티브 제거)
         //     - deduction 10,000원 차감 (미유치 시 deduction 적용)
         //     = 130,000 - 30,000 - 10,000 = 90,000원
         // 이렇게 해야 선택/제거 시 총 40,000원 차이가 발생
-        const baseStoreSupport = Number(storeSupportWithAddon) || 0;
         const finalStoreSupport = baseStoreSupport - unselectedIncentive - unselectedDeduction;
 
         // 직접입력 추가금액 반영 (음수도 허용)
@@ -545,7 +553,7 @@ const OpeningInfoPage = ({
             withAddon: Math.max(0, (Number(storeSupportWithAddon) || 0) + additionalAmount),
             withoutAddon: Math.max(0, (Number(storeSupportWithoutAddon) || 0) + additionalAmount)
         };
-    }, [selectedItems, availableAddons, availableInsurances, storeSupportWithAddon, storeSupportWithoutAddon, additionalStoreSupport]);
+    }, [selectedItems, availableAddons, availableInsurances, storeSupportWithAddon, storeSupportWithoutAddon, additionalStoreSupport, initialData?.storeSupport, initialData?.대리점추가지원금]);
 
     // 계산 로직 (계산 엔진 사용)
     // 🔥 개선: 선택된 부가서비스에 따라 하나의 대리점추가지원금만 사용
@@ -665,7 +673,7 @@ const OpeningInfoPage = ({
                     return new Date().toISOString();
                 })(),
                 customerName: formData.customerName,
-                customerContact: formData.customerContact, // CTN (연락처)
+                customerContact: String(formData.customerContact || ''), // 🔥 수정: CTN을 문자열로 명시적 변환하여 앞의 0 유지
                 carrier: selectedCarrier,
                 model: initialData?.model || '', // 단말기모델명
                 color: formData.deviceColor || '', // 색상

@@ -6505,7 +6505,7 @@ app.post('/api/direct/sales', async (req, res) => {
       data.storeId || '',                       // 매장ID
       soldAt,                                   // 판매일시
       data.customerName || '',                  // 고객명
-      data.customerContact || '',               // CTN
+      String(data.customerContact || ''),       // 🔥 수정: CTN을 문자열로 명시적 변환하여 앞의 0 유지
       data.carrier || '',                       // 통신사
       data.model || '',                         // 단말기모델명
       data.color || '',                         // 색상
@@ -6614,7 +6614,7 @@ app.put('/api/direct/sales/:id', async (req, res) => {
       data.storeId || existingRow[3] || '',      // 매장ID
       data.soldAt || existingRow[4] || '',       // 판매일시
       data.customerName || existingRow[5] || '', // 고객명
-      data.customerContact || existingRow[6] || '', // CTN
+      String(data.customerContact !== undefined ? data.customerContact : (existingRow[6] || '')), // 🔥 수정: CTN을 문자열로 명시적 변환하여 앞의 0 유지
       data.carrier || existingRow[7] || '',      // 통신사
       data.model || existingRow[8] || '',        // 단말기모델명
       data.color || existingRow[9] || '',        // 색상
