@@ -860,7 +860,7 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
         {isCustomerMode ? '실시간 휴대폰 시세표' : '휴대폰시세표'}
       </Typography>
 
-      {/* 통신사 탭 및 컨트롤 패널 - 테이블 외부로 분리 */}
+      {/* 통신사 탭 및 컨트롤 패널 - 테이블 외부 (고정 안됨) */}
       <Paper sx={{ mb: 2, p: 2, bgcolor: 'background.paper', borderRadius: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
           <Box sx={{ flexGrow: 1 }}>
@@ -934,23 +934,22 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
         <>
           {/* 상품 테이블 */}
           <TableContainer
+            component={Paper}
             sx={{
               flexGrow: 1,
               overflowX: 'auto',
               overflowY: 'auto',
               maxWidth: '100%',
               // 테이블 본문만 스크롤되도록 높이 설정 (헤더 고정 위해)
-              height: { xs: 'calc(100vh - 350px)', sm: 'calc(100vh - 300px)', md: 'calc(100vh - 250px)' },
-              maxHeight: { xs: 'calc(100vh - 350px)', sm: 'calc(100vh - 300px)', md: 'calc(100vh - 250px)' },
+              height: { xs: 'calc(100vh - 400px)', sm: 'calc(100vh - 350px)', md: 'calc(100vh - 300px)' },
+              maxHeight: { xs: 'calc(100vh - 400px)', sm: 'calc(100vh - 350px)', md: 'calc(100vh - 300px)' },
               position: 'relative',
-              display: 'block', // display: flex 제거, 기본값 block 사용
-              // flexDirection: 'column' 제거
               bgcolor: 'background.paper',
               boxShadow: 1,
               borderRadius: 2
             }}
           >
-            <Table sx={{ minWidth: 1000, borderCollapse: 'separate', borderSpacing: 0 }}>
+            <Table stickyHeader sx={{ minWidth: 1000, borderCollapse: 'separate', borderSpacing: 0 }}>
               <TableHead>
                 <TableRow>
                   {!isCustomerMode && (
