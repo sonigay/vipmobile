@@ -75,19 +75,35 @@ const OpeningInfoPage = ({
     // 단말/지원금 기본값 정리 (휴대폰목록/오늘의휴대폰에서 전달된 데이터 사용)
     const factoryPrice = initialData?.factoryPrice || 0;
     // 🔥 개선: publicSupport를 state로 변경하여 요금제군/개통유형 변경 시 업데이트 가능하도록
-    const [publicSupport, setPublicSupport] = useState(initialData?.publicSupport || initialData?.support || 0); // 이통사 지원금
-    const [storeSupportWithAddon, setStoreSupportWithAddon] = useState(initialData?.storeSupport || 0); // 부가유치시 대리점추가지원금
-    const [storeSupportWithoutAddon, setStoreSupportWithoutAddon] = useState(initialData?.storeSupportNoAddon || 0); // 부가미유치시 대리점추가지원금
-    const [additionalStoreSupport, setAdditionalStoreSupport] = useState(initialData?.additionalStoreSupport || 0); // 대리점추가지원금 직접입력 추가금액
+    const [publicSupport, setPublicSupport] = useState(
+        initialData?.publicSupport || initialData?.이통사지원금 || initialData?.support || 0
+    ); // 이통사 지원금
+    const [storeSupportWithAddon, setStoreSupportWithAddon] = useState(
+        initialData?.storeSupport || initialData?.storeSupportWithAddon || initialData?.대리점추가지원금 || 0
+    ); // 부가유치시 대리점추가지원금
+    const [storeSupportWithoutAddon, setStoreSupportWithoutAddon] = useState(
+        initialData?.storeSupportNoAddon || initialData?.storeSupportWithoutAddon || 0
+    ); // 부가미유치시 대리점추가지원금
+    const [additionalStoreSupport, setAdditionalStoreSupport] = useState(
+        initialData?.additionalStoreSupport !== undefined && initialData?.additionalStoreSupport !== null
+            ? initialData.additionalStoreSupport
+            : (initialData?.대리점추가지원금직접입력 !== undefined && initialData?.대리점추가지원금직접입력 !== null
+                ? initialData.대리점추가지원금직접입력
+                : null)
+    ); // 대리점추가지원금 직접입력 추가금액
 
     // 적용일시 상태 관리 (날짜, 시, 분)
     const getInitialDateTime = () => {
-        if (initialData?.soldAt) {
-            const date = new Date(initialData.soldAt);
+        // 🔥 수정: soldAt, 판매일시 필드 모두 확인
+        const soldAtValue = initialData?.soldAt || initialData?.판매일시 || initialData?.saleDateTime;
+        if (soldAtValue) {
+            const date = new Date(soldAtValue);
+            // 🔥 수정: UTC 시간을 그대로 사용 (시트에 저장된 UTC 시간)
+            // 예: 2026-01-12T05:12:00.000Z → 05시 12분으로 표시
             return {
                 date: date.toISOString().split('T')[0], // YYYY-MM-DD
-                hour: date.getHours().toString().padStart(2, '0'),
-                minute: date.getMinutes().toString().padStart(2, '0')
+                hour: date.getUTCHours().toString().padStart(2, '0'), // UTC 시간 사용
+                minute: date.getUTCMinutes().toString().padStart(2, '0') // UTC 분 사용
             };
         }
         const now = new Date();
@@ -101,26 +117,60 @@ const OpeningInfoPage = ({
 
     // openingType 변환은 유틸리티 함수 사용
 
+    // 🔥 개선: openingType 변환 함수 (한글 필드명도 처리)
+    const getOpeningType = () => {
+        const openingTypeValue = initialData?.openingType || initialData?.개통유형 || '';
+        if (!openingTypeValue) return 'NEW';
+        // 한글 값 처리
+        if (openingTypeValue === '신규' || openingTypeValue === '010신규' || openingTypeValue === 'NEW') return 'NEW';
+        if (openingTypeValue === '번호이동' || openingTypeValue === 'MNP') return 'MNP';
+        if (openingTypeValue === '기기변경' || openingTypeValue === '기변' || openingTypeValue === 'CHANGE') return 'CHANGE';
+        // 영문 값 처리
+        return convertOpeningType(openingTypeValue);
+    };
+
+    // 🔥 개선: contractType 변환 함수 (한글 필드명도 처리)
+    const getContractType = () => {
+        const contractTypeValue = initialData?.contractType || initialData?.contract || initialData?.약정 || '';
+        if (!contractTypeValue) return 'standard';
+        // 한글 값 처리
+        if (contractTypeValue === '선택약정' || contractTypeValue === 'selected') return 'selected';
+        if (contractTypeValue === '일반약정' || contractTypeValue === 'standard') return 'standard';
+        // 영문 값 처리
+        return contractTypeValue === 'selected' ? 'selected' : 'standard';
+    };
+
+    // 🔥 개선: paymentType 변환 함수 (한글 필드명도 처리)
+    const getPaymentType = () => {
+        const paymentTypeValue = initialData?.paymentType || initialData?.installmentType || initialData?.할부구분 || '';
+        if (!paymentTypeValue) return 'installment';
+        // 한글 값 처리
+        if (paymentTypeValue === '할부' || paymentTypeValue === 'installment') return 'installment';
+        if (paymentTypeValue === '현금' || paymentTypeValue === 'cash') return 'cash';
+        // 영문 값 처리
+        return paymentTypeValue === 'cash' ? 'cash' : 'installment';
+    };
+
     const [formData, setFormData] = useState({
-        customerName: initialData?.customerName || '',
-        customerContact: initialData?.customerContact || '',
+        customerName: initialData?.customerName || initialData?.고객명 || '',
+        customerContact: (initialData?.customerContact || initialData?.CTN || initialData?.ctn || initialData?.연락처 || '').toString(), // 🔥 수정: 문자열로 변환하여 앞의 0 유지
         customerBirth: '',
-        openingType: convertOpeningType(initialData?.openingType) || 'NEW', // NEW, MNP, CHANGE
-        prevCarrier: initialData?.prevCarrier || '',
-        contractType: initialData?.contractType || 'standard', // standard | selected (선택약정)
-        installmentPeriod: initialData?.installmentPeriod || 24,
-        plan: initialData?.plan || '', // 요금제명
-        paymentType: initialData?.paymentType || 'installment', // installment | cash
+        openingType: getOpeningType(), // 🔥 수정: 한글 필드명도 처리
+        prevCarrier: initialData?.prevCarrier || initialData?.전통신사 || '',
+        contractType: getContractType(), // 🔥 수정: 한글 필드명도 처리
+        installmentPeriod: initialData?.installmentPeriod || initialData?.할부개월 || 24,
+        plan: initialData?.plan || initialData?.요금제 || '', // 요금제명
+        paymentType: getPaymentType(), // 🔥 수정: 한글 필드명도 처리
         withAddon: initialData?.withAddon !== undefined ? initialData.withAddon : true, // 부가유치 여부 (true: 부가유치, false: 미유치)
         usePublicSupport: initialData?.usePublicSupport !== undefined ? initialData.usePublicSupport : true, // 이통사지원금 사용 여부
-        lgPremier: initialData?.lgPremier || false, // LG 프리미어 약정 적용 여부
+        lgPremier: initialData?.lgPremier !== undefined ? Boolean(initialData.lgPremier) : (initialData?.프리미어약정 === 'Y' || initialData?.프리미어약정 === true || false), // 🔥 수정: 한글 필드명도 처리, Boolean 변환
         cashPrice: initialData?.cashPrice || 0, // 현금가
         depositAccount: initialData?.depositAccount || '', // 입금계좌
-        // 단말기/유심 정보
-        deviceColor: initialData?.deviceColor || '',
-        deviceSerial: initialData?.deviceSerial || '',
-        simModel: initialData?.simModel || '',
-        simSerial: initialData?.simSerial || '',
+        // 단말기/유심 정보 - 🔥 수정: 한글 필드명도 확인
+        deviceColor: initialData?.deviceColor || initialData?.color || initialData?.색상 || '',
+        deviceSerial: initialData?.deviceSerial || initialData?.단말일련번호 || '',
+        simModel: initialData?.simModel || initialData?.usimModel || initialData?.유심모델명 || '',
+        simSerial: initialData?.simSerial || initialData?.usimSerial || initialData?.유심일련번호 || '',
         // POS코드
         posCode: initialData?.posCode || ''
     });
@@ -604,8 +654,12 @@ const OpeningInfoPage = ({
                     // 적용일시를 ISO 문자열로 변환
                     const { date, hour, minute } = appliedDateTime;
                     if (date && hour !== undefined && minute !== undefined) {
-                        const dateTimeString = `${date}T${hour}:${minute}:00`;
-                        return new Date(dateTimeString).toISOString();
+                        // 🔥 수정: 사용자가 입력한 시간을 그대로 UTC로 저장
+                        // 예: 1월 12일 14시 12분 → 2026-01-12T14:12:00.000Z
+                        // 로컬 시간대 오프셋을 고려하지 않고 입력한 시간을 그대로 UTC로 저장
+                        const h = String(hour).padStart(2, '0');
+                        const m = String(minute).padStart(2, '0');
+                        return `${date}T${h}:${m}:00.000Z`;
                     }
                     // 기본값: 현재 시점
                     return new Date().toISOString();
@@ -1154,10 +1208,10 @@ const OpeningInfoPage = ({
                                                 setFormData({ ...formData, plan: '' });
                                                 setSelectedPlanGroup('');
                                                 setPlanBasicFee(0);
-                                                // 초기값으로 복원
-                                                setPublicSupport(initialData?.publicSupport || initialData?.support || 0);
-                                                setStoreSupportWithAddon(initialData?.storeSupport || 0);
-                                                setStoreSupportWithoutAddon(initialData?.storeSupportNoAddon || 0);
+                                                // 초기값으로 복원 - 🔥 수정: 한글 필드명도 확인
+                                                setPublicSupport(initialData?.publicSupport || initialData?.이통사지원금 || initialData?.support || 0);
+                                                setStoreSupportWithAddon(initialData?.storeSupport || initialData?.storeSupportWithAddon || initialData?.대리점추가지원금 || 0);
+                                                setStoreSupportWithoutAddon(initialData?.storeSupportNoAddon || initialData?.storeSupportWithoutAddon || 0);
                                             }
                                         }}
                                         renderInput={(params) => (
