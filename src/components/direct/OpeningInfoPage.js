@@ -78,6 +78,7 @@ const OpeningInfoPage = ({
     const [publicSupport, setPublicSupport] = useState(initialData?.publicSupport || initialData?.support || 0); // 이통사 지원금
     const [storeSupportWithAddon, setStoreSupportWithAddon] = useState(initialData?.storeSupport || 0); // 부가유치시 대리점추가지원금
     const [storeSupportWithoutAddon, setStoreSupportWithoutAddon] = useState(initialData?.storeSupportNoAddon || 0); // 부가미유치시 대리점추가지원금
+    const [additionalStoreSupport, setAdditionalStoreSupport] = useState(initialData?.additionalStoreSupport || 0); // 대리점추가지원금 직접입력 추가금액
 
     // openingType 변환은 유틸리티 함수 사용
 
@@ -467,18 +468,21 @@ const OpeningInfoPage = ({
 
         // 부가서비스 선택 여부에 따라 하나의 대리점추가지원금만 반환
         const hasSelectedItems = selectedItems.length > 0;
-        const finalStoreSupport = hasSelectedItems 
+        const baseFinalStoreSupport = hasSelectedItems 
             ? Math.max(0, dynamicStoreSupportWithAddon) 
             : Math.max(0, dynamicStoreSupportWithoutAddon);
+        
+        // 직접입력 추가금액 반영
+        const finalStoreSupport = baseFinalStoreSupport + (additionalStoreSupport || 0);
 
         return {
-            // 현재 선택된 상태에 따른 하나의 대리점추가지원금
+            // 현재 선택된 상태에 따른 하나의 대리점추가지원금 (직접입력 추가금액 포함)
             current: finalStoreSupport,
             // 참고용 (UI 표시용)
-            withAddon: Math.max(0, dynamicStoreSupportWithAddon),
-            withoutAddon: Math.max(0, dynamicStoreSupportWithoutAddon)
+            withAddon: Math.max(0, dynamicStoreSupportWithAddon) + (additionalStoreSupport || 0),
+            withoutAddon: Math.max(0, dynamicStoreSupportWithoutAddon) + (additionalStoreSupport || 0)
         };
-    }, [selectedItems, availableAddons, availableInsurances, storeSupportWithAddon, storeSupportWithoutAddon]);
+    }, [selectedItems, availableAddons, availableInsurances, storeSupportWithAddon, storeSupportWithoutAddon, additionalStoreSupport]);
 
     // 계산 로직 (계산 엔진 사용)
     // 🔥 개선: 선택된 부가서비스에 따라 하나의 대리점추가지원금만 사용
@@ -1554,7 +1558,7 @@ const OpeningInfoPage = ({
                             )}
                             <Stack direction="row" justifyContent="space-between" mb={1}>
                                 <Typography variant="body2">
-                                    대리점추가지원금 ({formData.withAddon ? '부가유치' : '부가미유치'})
+                                    대리점추가지원금
                                 </Typography>
                                 <Typography variant="body2">
                                     {loadingSupportAmounts ? (
@@ -1749,14 +1753,30 @@ const OpeningInfoPage = ({
                                 </Grid>
                                 <Grid item xs={6}>
                                     <TextField
-                                        label={`대리점추가지원금 (${selectedItems.length > 0 ? '부가유치' : '부가미유치'})`}
+                                        label="대리점추가지원금"
                                         fullWidth
                                         value={loadingSupportAmounts ? '로딩 중...' : calculateDynamicStoreSupport.current.toLocaleString()}
                                         InputProps={{ 
                                             readOnly: true,
                                             endAdornment: loadingSupportAmounts ? <CircularProgress size={20} /> : null
                                         }}
-                                        helperText={loadingSupportAmounts ? "지원금 정보를 불러오는 중..." : `선택된 부가서비스: ${selectedItems.length}개`}
+                                        helperText={loadingSupportAmounts ? "지원금 정보를 불러오는 중..." : `선택된 부가서비스: ${selectedItems.length}개${additionalStoreSupport > 0 ? `, 추가: +${additionalStoreSupport.toLocaleString()}원` : ''}`}
+                                    />
+                                </Grid>
+                                <Grid item xs={6}>
+                                    <TextField
+                                        label="대리점추가지원금 직접입력"
+                                        fullWidth
+                                        type="number"
+                                        value={additionalStoreSupport || ''}
+                                        onChange={(e) => {
+                                            const value = parseFloat(e.target.value) || 0;
+                                            setAdditionalStoreSupport(value >= 0 ? value : 0);
+                                        }}
+                                        InputProps={{ 
+                                            endAdornment: <Typography variant="body2" sx={{ mr: 1 }}>원</Typography>
+                                        }}
+                                        helperText="추가 금액을 입력하면 대리점추가지원금과 할부원금에 자동 반영됩니다"
                                     />
                                 </Grid>
                                 <Grid item xs={6}>

@@ -6330,7 +6330,7 @@ const DIRECT_SALES_HEADERS = [
   '번호', 'POS코드', '업체명', '매장ID', '판매일시', '고객명', 'CTN', '통신사',
   '단말기모델명', '색상', '단말일련번호', '유심모델명', '유심일련번호',
   '개통유형', '전통신사', '할부구분', '할부개월', '약정', '요금제', '부가서비스',
-  '출고가', '이통사지원금', '대리점추가지원금(부가유치)', '대리점추가지원금(부가미유치)', '마진', '상태'
+  '출고가', '이통사지원금', '대리점추가지원금', '대리점추가지원금직접입력', '마진', '상태'
 ];
 
 // GET /api/direct/sales: 판매일보 목록 조회
@@ -6617,8 +6617,8 @@ app.put('/api/direct/sales/:id', async (req, res) => {
       addonsText,                                // 부가서비스
       data.factoryPrice || existingRow[20] || 0, // 출고가
       data.publicSupport || existingRow[21] || 0,// 이통사지원금
-      data.storeSupportWithAddon || existingRow[22] || 0, // 대리점추가지원금(부가유치)
-      data.storeSupportNoAddon || existingRow[23] || 0,   // 대리점추가지원금(부가미유치)
+      data.storeSupport || data.storeSupportWithAddon || existingRow[22] || 0, // 대리점추가지원금 (통합)
+      data.additionalStoreSupport || existingRow[23] || 0, // 대리점추가지원금 직접입력
       data.margin || existingRow[24] || 0,       // 마진
       data.status || existingRow[25] || '개통대기' // 상태
     ];
