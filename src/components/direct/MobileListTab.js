@@ -933,23 +933,31 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
       ) : (
         <>
           {/* 상품 테이블 */}
-          <TableContainer
-            component={Paper}
+          <Paper
             sx={{
               flexGrow: 1,
-              overflowX: 'auto',
-              overflowY: 'auto',
               maxWidth: '100%',
-              // 테이블 본문만 스크롤되도록 높이 설정 (헤더 고정 위해)
-              height: { xs: 'calc(100vh - 400px)', sm: 'calc(100vh - 350px)', md: 'calc(100vh - 300px)' },
-              maxHeight: { xs: 'calc(100vh - 400px)', sm: 'calc(100vh - 350px)', md: 'calc(100vh - 300px)' },
-              position: 'relative',
               bgcolor: 'background.paper',
               boxShadow: 1,
-              borderRadius: 2
+              borderRadius: 2,
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column'
             }}
           >
-            <Table stickyHeader sx={{ minWidth: 1000, borderCollapse: 'separate', borderSpacing: 0 }}>
+            <TableContainer
+              sx={{
+                flexGrow: 1,
+                overflowX: 'auto',
+                overflowY: 'auto',
+                maxWidth: '100%',
+                // 테이블 본문만 스크롤되도록 높이 설정 (헤더 고정 위해)
+                height: { xs: 'calc(100vh - 400px)', sm: 'calc(100vh - 350px)', md: 'calc(100vh - 300px)' },
+                maxHeight: { xs: 'calc(100vh - 400px)', sm: 'calc(100vh - 350px)', md: 'calc(100vh - 300px)' },
+                position: 'relative'
+              }}
+            >
+              <Table stickyHeader sx={{ minWidth: 1000, borderCollapse: 'separate', borderSpacing: 0 }}>
               <TableHead>
                 <TableRow>
                   {!isCustomerMode && (
