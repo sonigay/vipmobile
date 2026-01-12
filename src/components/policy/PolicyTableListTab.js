@@ -969,6 +969,43 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
     setIsEditMode(!isEditMode);
   };
 
+  // 내용 복사하기
+  const handleCopyContent = async () => {
+    if (!selectedPolicy) return;
+
+    try {
+      // 템플릿 형식: 정책적용일시 + 빈 줄 + 정책적용내용
+      const applyDate = selectedPolicy.applyDate || '';
+      const applyContent = selectedPolicy.applyContent || '';
+      const contentToCopy = `${applyDate}\n\n${applyContent}`.trim();
+
+      if (!contentToCopy) {
+        alert('복사할 내용이 없습니다.');
+        return;
+      }
+
+      // 클립보드에 복사
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(contentToCopy);
+        alert('내용이 클립보드에 복사되었습니다.');
+      } else {
+        // Fallback: 구형 브라우저 지원
+        const textArea = document.createElement('textarea');
+        textArea.value = contentToCopy;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        alert('내용이 클립보드에 복사되었습니다.');
+      }
+    } catch (error) {
+      console.error('내용 복사 오류:', error);
+      alert('내용 복사에 실패했습니다.');
+    }
+  };
+
   // 정책표 수정 저장
   const handleSaveEdit = async () => {
     if (!selectedPolicy) return;
@@ -1276,17 +1313,30 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
                   <Typography variant="subtitle2">
                     정책 정보
                   </Typography>
-                  {canDelete && (
-                    <Button
-                      size="small"
-                      variant={isEditMode ? 'outlined' : 'contained'}
-                      startIcon={isEditMode ? <CancelIcon /> : <EditIcon />}
-                      onClick={handleToggleEditMode}
-                      disabled={loading}
-                    >
-                      {isEditMode ? '취소' : '수정'}
-                    </Button>
-                  )}
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    {!isEditMode && (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<ContentCopyIcon />}
+                        onClick={handleCopyContent}
+                        disabled={loading}
+                      >
+                        내용복사하기
+                      </Button>
+                    )}
+                    {canDelete && (
+                      <Button
+                        size="small"
+                        variant={isEditMode ? 'outlined' : 'contained'}
+                        startIcon={isEditMode ? <CancelIcon /> : <EditIcon />}
+                        onClick={handleToggleEditMode}
+                        disabled={loading}
+                      >
+                        {isEditMode ? '취소' : '수정'}
+                      </Button>
+                    )}
+                  </Box>
                 </Box>
                 
                 {isEditMode ? (
