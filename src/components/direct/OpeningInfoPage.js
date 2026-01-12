@@ -530,10 +530,10 @@ const OpeningInfoPage = ({
         // 저장된 값이 있으면 (예: 790000) 그 값을 기준으로 선택/해제에 따른 차이만 반영
         // 저장된 값이 없으면 storeSupportWithAddon을 기준으로 계산
         const savedStoreSupport = initialData?.storeSupport || initialData?.대리점추가지원금;
-        const baseStoreSupport = savedStoreSupport !== undefined && savedStoreSupport !== null 
-            ? Number(savedStoreSupport) 
+        const baseStoreSupport = savedStoreSupport !== undefined && savedStoreSupport !== null
+            ? Number(savedStoreSupport)
             : (Number(storeSupportWithAddon) || 0);
-        
+
         // 🔥 핵심 로직: 초기값(모든 항목 유치)에서 시작하여 선택되지 않은 항목의 incentive와 deduction을 모두 차감
         // 예: 초기 130,000원에서 부가서비스 A 제거 시
         //     - incentive 30,000원 차감 (유치 인센티브 제거)
@@ -882,21 +882,23 @@ const OpeningInfoPage = ({
 
                     /* 메인 컨테이너 설정 */
                     /* 메인 컨테이너 설정 */
+                    /* 메인 컨테이너 설정 */
                     .print-root {
                         /* 
                            인쇄 시 데스크탑 뷰(2단 컬럼) 강제 유지 및 A4 너비에 맞게 축소
                            - A4 가로: 약 794px (96DPI)
-                           - 데스크탑 뷰 기준: 1120px (와이드 설정을 통해 텍스트 줄바꿈 감소 -> 높이 절약)
-                           - 축소 비율: 794 / 1120 ≈ 0.70
+                           - 좌우 여백 5mm씩 제외 시 사용 가능 너비: 약 756px
+                           - 데스크탑 뷰 기준: 1120px (줄바꿈 최소화)
+                           - 축소 비율: 756 / 1120 ≈ 0.675 (여유있게 0.67 설정)
                         */
                         width: 1120px !important;
                         min-width: 1120px !important;
                         max-width: 1120px !important;
                         
-                        /* A4 용지에 맞게 축소 (0.70배) */
-                        zoom: 0.70; 
+                        /* A4 용지 너비에 딱 맞게 축소 (가로 스크롤 제거 핵심) */
+                        zoom: 0.67; 
                         
-                        /* 높이 제한 해제 및 오버플로우 표시 */
+                        /* 높이 제한 해제 */
                         height: auto !important;
                         min-height: 100% !important;
                         overflow: visible !important;
@@ -908,10 +910,26 @@ const OpeningInfoPage = ({
                         
                         /* 페이지 나눔 방지 노력 */
                         page-break-inside: avoid;
+                    }
+
+                    /* 스크롤바 강제 숨김 (모든 요소) */
+                    @media print {
+                        * {
+                            -webkit-overflow-scrolling: touch !important;
+                            overflow: visible !important; 
+                        }
                         
-                        /* 스크롤바 숨김 */
-                        scrollbar-width: none;
-                        -ms-overflow-style: none;
+                        /* 스크롤바 영역 자체를 제거 */
+                        ::-webkit-scrollbar {
+                            display: none !important;
+                            width: 0 !important;
+                            height: 0 !important;
+                        }
+                        
+                        /* Firefox 호환 */
+                        html, body {
+                            scrollbar-width: none !important;
+                        }
                     }
                     
                     .print-root::-webkit-scrollbar {
