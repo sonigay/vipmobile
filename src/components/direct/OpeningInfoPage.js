@@ -893,14 +893,14 @@ const OpeningInfoPage = ({
                            - A4 가로: 약 794px (96DPI)
                            - 좌우 여백 5mm씩 제외 시 사용 가능 너비: 약 756px
                            - 데스크탑 뷰 기준: 1120px (줄바꿈 최소화)
-                           - 축소 비율: 756 / 1120 ≈ 0.675 (여유있게 0.67 설정)
+                           - 축소 비율: 756 / 1120 ≈ 0.675 -> 더 축소하여 세로 공간 확보
                         */
                         width: 1120px !important;
                         min-width: 1120px !important;
                         max-width: 1120px !important;
                         
-                        /* A4 용지 너비에 딱 맞게 축소 (가로 스크롤 제거 핵심) */
-                        zoom: 0.67; 
+                        /* A4 용지 한 장에 넣기 위해 축소 비율 더 낮춤 */
+                        zoom: 0.60; 
                         
                         /* 높이 제한 해제 */
                         height: auto !important;
@@ -911,6 +911,10 @@ const OpeningInfoPage = ({
                         background-color: white !important;
                         margin: 0 !important;
                         padding: 0 !important;
+                        
+                        /* 폰트 및 줄간격 전역 축소 */
+                        font-family: "Noto Sans KR", sans-serif !important;
+                        line-height: 1.1 !important;
                         
                         /* 페이지 나눔 방지 노력 */
                         page-break-inside: avoid;
@@ -944,73 +948,91 @@ const OpeningInfoPage = ({
                     html, body {
                         scrollbar-width: none !important;
                     }
-                    /* 
-                       중요: 인쇄 시 데스크탑 뷰(2단 컬럼)를 유지하기 위한 스타일
-                       브라우저는 종이 폭에 맞춰 모바일 뷰로 전환하려 할 수 있으므로
-                       Grid 시스템이 반응형으로 동작하지 않도록 오버라이드하거나
-                       handlePrint에서 width를 고정(1120px)했으므로 이를 돕는 스타일 추가
-                    */
 
                     /* Grid Item 강제 배치 (화면과 동일하게) & 간격 축소 */
                     .print-root .MuiGrid-container > .MuiGrid-item.MuiGrid-grid-md-6 {
                         flex-basis: 50% !important;
                         max-width: 50% !important;
                         width: 50% !important;
-                        padding-top: 4px !important; /* 상단 여백 축소 */
-                        padding-bottom: 4px !important; /* 하단 여백 축소 */
+                        padding-top: 2px !important; /* 상단 여백 극한 축소 */
+                        padding-bottom: 2px !important; /* 하단 여백 극한 축소 */
                     }
                     
                     /* 모든 Grid Item 간격 축소 */
                     .print-root .MuiGrid-item {
-                        padding-top: 4px !important;
-                        padding-bottom: 4px !important;
+                        padding-top: 2px !important;
+                        padding-bottom: 2px !important;
                     }
 
                     /* 입력 필드 높이 및 여백 강제 축소 */
                     .print-root .MuiTextField-root,
                     .print-root .MuiFormControl-root {
-                        margin-bottom: 4px !important;
+                        margin-bottom: 2px !important;
                         margin-top: 0 !important;
                     }
 
                     /* Input 내부 패딩 축소 (Dense보다 더 좁게) */
                     .print-root .MuiInputBase-root {
-                        min-height: 32px !important; /* 최소 높이 줄임 */
+                        min-height: 28px !important; /* 최소 높이 더 줄임 */
+                        font-size: 0.8rem !important;
+                        line-height: 1.1 !important;
                     }
                     .print-root .MuiInputBase-input {
-                        padding: 4px 8px !important; /* 내부 패딩 최소화 */
-                        font-size: 0.85rem !important; /* 폰트 사이즈 축소 */
+                        padding: 2px 6px !important; /* 내부 패딩 최소화 */
                     }
                     .print-root .MuiInputLabel-root {
-                        transform: translate(14px, 5px) scale(1) !important; /* 라벨 위치 조정 */
-                        font-size: 0.85rem !important;
+                        transform: translate(12px, 4px) scale(0.9) !important; /* 라벨 위치/크기 조정 */
+                        font-size: 0.8rem !important;
                     }
                     .print-root .MuiInputLabel-shrink {
-                        transform: translate(14px, -8px) scale(0.75) !important; /* 슈링크 라벨 위치 조정 */
+                        transform: translate(12px, -6px) scale(0.7) !important; /* 슈링크 라벨 위치 조정 */
                     }
                     
                     /* 제목 및 텍스트 여백 축소 */
                     .print-root .MuiTypography-h6 {
-                        font-size: 1rem !important;
-                        margin-bottom: 4px !important;
+                        font-size: 0.95rem !important;
+                        margin-bottom: 2px !important;
                         min-height: auto !important;
+                        line-height: 1.2 !important;
                     }
                     .print-root .MuiTypography-body2 {
-                        font-size: 0.8rem !important;
+                        font-size: 0.75rem !important;
+                        line-height: 1.2 !important;
                     }
                     
                     /* 구분선 여백 제거 */
                     .print-root .MuiDivider-root {
-                        margin-top: 4px !important;
-                        margin-bottom: 4px !important;
+                        margin-top: 2px !important;
+                        margin-bottom: 2px !important;
                     }
 
                     /* Paper 그림자 제거 및 테두리 단순화 */
                     .MuiPaper-root {
                         box-shadow: none !important;
                         border: 1px solid #ddd !important;
-                        padding: 8px !important; /* 내부 패딩 축소 */
+                        padding: 6px !important; /* 내부 패딩 축소 */
                         margin-bottom: 4px !important; /* 외부 여백 축소 */
+                    }
+                    
+                    /* 안내문구 박스 (agreement-box) 압축 */
+                    .print-area.agreement-box {
+                        padding: 6px !important;
+                        margin-bottom: 4px !important;
+                        border-radius: 4px !important;
+                    }
+                    .print-area.agreement-box .MuiTypography-body2 {
+                         font-size: 0.7rem !important;
+                         margin-bottom: 0 !important;
+                    }
+                    .print-area.agreement-box .MuiStack-root {
+                        gap: 2px !important;
+                    }
+                    .print-area.agreement-box .MuiFormControlLabel-root {
+                        margin-right: 0 !important;
+                        margin-left: -4px !important;
+                    }
+                    .print-area.agreement-box .MuiCheckbox-root {
+                        padding: 2px !important;
                     }
                 }
             `}</style>
