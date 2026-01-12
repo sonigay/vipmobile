@@ -935,9 +935,47 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
             <Table stickyHeader sx={{ minWidth: 1000 }}>
             <TableHead>
               <TableRow>
-                {!isCustomerMode && <ModernTableCell align="center" width="120">구분</ModernTableCell>}
-                <ModernTableCell align="center" width="100">이미지</ModernTableCell>
-                <ModernTableCell align="center" width="220">모델명 / 펫네임</ModernTableCell>
+                {!isCustomerMode && (
+                  <ModernTableCell 
+                    align="center" 
+                    width="120"
+                    sx={{
+                      position: 'sticky',
+                      left: 0,
+                      zIndex: 10,
+                      backgroundColor: 'background.paper',
+                      boxShadow: '2px 0 4px rgba(0,0,0,0.1)'
+                    }}
+                  >
+                    구분
+                  </ModernTableCell>
+                )}
+                <ModernTableCell 
+                  align="center" 
+                  width="100"
+                  sx={{
+                    position: 'sticky',
+                    left: !isCustomerMode ? '120px' : 0,
+                    zIndex: 10,
+                    backgroundColor: 'background.paper',
+                    boxShadow: '2px 0 4px rgba(0,0,0,0.1)'
+                  }}
+                >
+                  이미지
+                </ModernTableCell>
+                <ModernTableCell 
+                  align="center" 
+                  width="220"
+                  sx={{
+                    position: 'sticky',
+                    left: !isCustomerMode ? '220px' : '100px',
+                    zIndex: 10,
+                    backgroundColor: 'background.paper',
+                    boxShadow: '2px 0 4px rgba(0,0,0,0.1)'
+                  }}
+                >
+                  모델명 / 펫네임
+                </ModernTableCell>
                 <ModernTableCell align="center" width="120">요금제군</ModernTableCell>
                 <ModernTableCell align="center" width="100">유형</ModernTableCell>
                 <ModernTableCell align="center" width="100">출고가</ModernTableCell>

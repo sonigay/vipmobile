@@ -65,7 +65,17 @@ const MobileListRowComponent = ({
       onClick={() => onRowClick(row)}
     >
       {!isCustomerMode && (
-        <TableCell align="center" onClick={(e) => e.stopPropagation()}>
+        <TableCell 
+          align="center" 
+          onClick={(e) => e.stopPropagation()}
+          sx={{
+            position: 'sticky',
+            left: 0,
+            zIndex: 2,
+            backgroundColor: 'background.paper',
+            boxShadow: '2px 0 4px rgba(0,0,0,0.1)'
+          }}
+        >
           <Button
             variant="outlined"
             size="small"
@@ -160,7 +170,17 @@ const MobileListRowComponent = ({
         </TableCell>
       )}
 
-      <TableCell align="center" onClick={(e) => e.stopPropagation()}>
+      <TableCell 
+        align="center" 
+        onClick={(e) => e.stopPropagation()}
+        sx={{
+          position: 'sticky',
+          left: !isCustomerMode ? '120px' : 0,
+          zIndex: 2,
+          backgroundColor: 'background.paper',
+          boxShadow: '2px 0 4px rgba(0,0,0,0.1)'
+        }}
+      >
         <Box sx={{ position: 'relative', display: 'inline-block' }}>
           <Avatar
             variant="rounded"
@@ -302,7 +322,17 @@ const MobileListRowComponent = ({
         </Box>
       </TableCell>
 
-      <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>
+      <TableCell 
+        align="center" 
+        sx={{ 
+          whiteSpace: 'nowrap',
+          position: 'sticky',
+          left: !isCustomerMode ? '220px' : '100px',
+          zIndex: 2,
+          backgroundColor: 'background.paper',
+          boxShadow: '2px 0 4px rgba(0,0,0,0.1)'
+        }}
+      >
         <Typography variant="body1" fontWeight="bold" sx={{ fontSize: '0.95rem' }}>
           {row.petName}
         </Typography>
