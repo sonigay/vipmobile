@@ -1020,8 +1020,8 @@ const HEADERS_TRANSIT_LOCATION = [
 ];
 const CUSTOMER_QUEUE_HEADERS = [
   '번호', '고객CTN', '고객명', '통신사', '단말기모델명', '색상', '단말일련번호', '유심모델명', '유심일련번호', '개통유형',
-  '전통신사', '할부구분', '할부개월', '약정', '요금제', '부가서비스', '출고가', '이통사지원금', '대리점추가지원금(부가유치)',
-  '대리점추가지원금(부가미유치)', '선택매장업체명', '선택매장전화', '선택매장주소', '선택매장계좌정보', '등록일시', '상태',
+  '전통신사', '할부구분', '할부개월', '약정', '요금제', '부가서비스', '출고가', '이통사지원금', '대리점추가지원금',
+  '대리점추가지원금직접입력', '선택매장업체명', '선택매장전화', '선택매장주소', '선택매장계좌정보', '등록일시', '상태',
   '처리매장업체명', '처리일시'
 ];
 const CUSTOMER_BOARD_HEADERS = [
@@ -4416,7 +4416,7 @@ app.post('/api/member/login', async (req, res) => {
     const response = await rateLimitedSheetsCall(() =>
       sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
-        range: '직영점_판매일보!A:Z'
+        range: '직영점_판매일보!A:AA'
       })
     );
 
@@ -4631,6 +4631,11 @@ app.get('/api/member/queue', async (req, res) => {
         additionalServices: row[15],
         factoryPrice: row[16],
         carrierSupport: row[17],
+        dealerSupport: row[18],
+        대리점추가지원금: row[18],
+        additionalStoreSupport: row[19],
+        대리점추가지원금직접입력: row[19],
+        // 하위 호환을 위한 필드
         dealerSupportWithAdd: row[18],
         dealerSupportWithoutAdd: row[19],
         storeName: row[20],
@@ -4697,8 +4702,8 @@ app.post('/api/member/queue', async (req, res) => {
     newRow[15] = data.additionalServices || '';
     newRow[16] = data.factoryPrice || '';
     newRow[17] = data.carrierSupport || '';
-    newRow[18] = data.dealerSupportWithAdd || '';
-    newRow[19] = data.dealerSupportWithoutAdd || '';
+    newRow[18] = data.dealerSupport || data.dealerSupportWithAdd || '';
+    newRow[19] = data.additionalStoreSupport || '';
     newRow[20] = data.storeName || '';
     newRow[21] = data.storePhone || '';
     newRow[22] = data.storeAddress || '';
@@ -4758,6 +4763,9 @@ app.put('/api/member/queue/:id', async (req, res) => {
     if (data.additionalServices !== undefined) updatedRow[15] = data.additionalServices;
     if (data.factoryPrice !== undefined) updatedRow[16] = data.factoryPrice;
     if (data.carrierSupport !== undefined) updatedRow[17] = data.carrierSupport;
+    if (data.dealerSupport !== undefined) updatedRow[18] = data.dealerSupport;
+    if (data.additionalStoreSupport !== undefined) updatedRow[19] = data.additionalStoreSupport;
+    // 하위 호환을 위한 필드
     if (data.dealerSupportWithAdd !== undefined) updatedRow[18] = data.dealerSupportWithAdd;
     if (data.dealerSupportWithoutAdd !== undefined) updatedRow[19] = data.dealerSupportWithoutAdd;
     if (data.storeName !== undefined) updatedRow[20] = data.storeName;
@@ -6340,7 +6348,7 @@ app.get('/api/direct/sales', async (req, res) => {
     await rateLimitedSheetsCall(() =>
       sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
-        range: '직영점_판매일보!A1:Z1',
+        range: '직영점_판매일보!A1:AA1',
         valueInputOption: 'RAW',
         resource: { values: [DIRECT_SALES_HEADERS] }
       })
@@ -6349,7 +6357,7 @@ app.get('/api/direct/sales', async (req, res) => {
     const response = await rateLimitedSheetsCall(() =>
       sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
-        range: '직영점_판매일보!A:Z'
+        range: '직영점_판매일보!A:AA'
       })
     );
 
@@ -6421,6 +6429,11 @@ app.get('/api/direct/sales', async (req, res) => {
         출고가: Number(row[20] || 0),
         publicSupport: Number(row[21] || 0),
         이통사지원금: Number(row[21] || 0),
+        storeSupport: Number(row[22] || 0),
+        대리점추가지원금: Number(row[22] || 0),
+        additionalStoreSupport: Number(row[23] || 0),
+        대리점추가지원금직접입력: Number(row[23] || 0),
+        // 하위 호환을 위한 필드
         storeSupportWithAddon: Number(row[22] || 0),
         '대리점추가지원금(부가유치)': Number(row[22] || 0),
         storeSupportNoAddon: Number(row[23] || 0),
@@ -6508,8 +6521,8 @@ app.post('/api/direct/sales', async (req, res) => {
       addonsText || '',                         // 부가서비스
       data.factoryPrice || 0,                   // 출고가
       data.publicSupport || 0,                  // 이통사지원금
-      data.storeSupportWithAddon || 0,          // 대리점추가지원금(부가유치)
-      data.storeSupportNoAddon || 0,            // 대리점추가지원금(부가미유치)
+      data.storeSupport || data.storeSupportWithAddon || 0, // 대리점추가지원금 (통합)
+      data.additionalStoreSupport || 0,         // 대리점추가지원금 직접입력
       data.margin || 0,                         // 마진
       data.status || '개통대기'                  // 상태
     ];
@@ -6518,7 +6531,7 @@ app.post('/api/direct/sales', async (req, res) => {
     await rateLimitedSheetsCall(() =>
       sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
-        range: '직영점_판매일보!A1:Z1',
+        range: '직영점_판매일보!A1:AA1',
         valueInputOption: 'RAW',
         resource: { values: [DIRECT_SALES_HEADERS] }
       })
@@ -6527,7 +6540,7 @@ app.post('/api/direct/sales', async (req, res) => {
     await rateLimitedSheetsCall(() =>
       sheets.spreadsheets.values.append({
         spreadsheetId: SPREADSHEET_ID,
-        range: '직영점_판매일보!A2',
+        range: '직영점_판매일보!A2:AA2',
         valueInputOption: 'USER_ENTERED',
         insertDataOption: 'INSERT_ROWS',
         resource: {
@@ -6560,7 +6573,7 @@ app.put('/api/direct/sales/:id', async (req, res) => {
     const response = await rateLimitedSheetsCall(() =>
       sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
-        range: '직영점_판매일보!A:Z'
+        range: '직영점_판매일보!A:AA'
       })
     );
 
@@ -6618,7 +6631,7 @@ app.put('/api/direct/sales/:id', async (req, res) => {
       data.factoryPrice || existingRow[20] || 0, // 출고가
       data.publicSupport || existingRow[21] || 0,// 이통사지원금
       data.storeSupport || data.storeSupportWithAddon || existingRow[22] || 0, // 대리점추가지원금 (통합)
-      data.additionalStoreSupport || existingRow[23] || 0, // 대리점추가지원금 직접입력
+      data.additionalStoreSupport !== undefined ? data.additionalStoreSupport : (existingRow[23] || 0), // 대리점추가지원금 직접입력
       data.margin || existingRow[24] || 0,       // 마진
       data.status || existingRow[25] || '개통대기' // 상태
     ];
@@ -6627,7 +6640,7 @@ app.put('/api/direct/sales/:id', async (req, res) => {
     await rateLimitedSheetsCall(() =>
       sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
-        range: `직영점_판매일보!A${rowIndex + 2}`,
+        range: `직영점_판매일보!A${rowIndex + 2}:AA${rowIndex + 2}`,
         valueInputOption: 'USER_ENTERED',
         resource: {
           values: [updatedRow]

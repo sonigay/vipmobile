@@ -724,7 +724,8 @@ const OpeningInfoPage = ({
                     factoryPrice: factoryPrice || 0,
                     carrierSupport: formData.usePublicSupport ? publicSupport : 0,
                     // 🔥 개선: 선택된 부가서비스에 따라 하나의 대리점추가지원금만 저장
-                    dealerSupport: calculateDynamicStoreSupport.current, // 대리점추가지원금 (현재 선택된 상태에 따른 값)
+                    dealerSupport: calculateDynamicStoreSupport.current, // 대리점추가지원금 (현재 선택된 상태에 따른 값, 직접입력 추가금액 포함)
+                    additionalStoreSupport: additionalStoreSupport || 0, // 대리점추가지원금 직접입력 추가금액
                     // 하위 호환을 위한 필드
                     dealerSupportWithAdd: formData.withAddon ? calculateDynamicStoreSupport.current : 0,
                     dealerSupportWithoutAdd: !formData.withAddon ? calculateDynamicStoreSupport.current : 0,
