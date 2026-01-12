@@ -428,17 +428,21 @@ const OpeningInfoPage = ({
     }, [initialData?.planGroup, initialData?.openingType, planGroups, selectedCarrier, initialData?.id, formData.contractType]);
 
     // 🔥 개선: 선택된 부가서비스/보험상품에 따른 대리점지원금 계산
-    // 서버에서 받은 storeSupportWithAddon/WithoutAddon은 이미 모든 부가서비스를 고려한 값
-    // 따라서 사용자가 선택한 부가서비스에 따라 차이만 계산해야 함
-    // 단, 하나의 대리점추가지원금만 계산 (부가서비스 선택 여부에 따라 유치/미유치 금액 적용)
+    // 사용자 의도:
+    // - 부가서비스 유치 시: 기본값 + 선택한 항목의 incentive
+    // - 부가서비스 미유치 시: 기본값 - 미선택 항목의 deduction (유치 인센티브도 빠짐)
+    // 예: incentive=30,000, deduction=10,000인 경우
+    //   - 유치 시: 기본값 + 30,000
+    //   - 미유치 시: 기본값 - 30,000 - 10,000 = 기본값 - 40,000 (차액 40,000)
     const calculateDynamicStoreSupport = useMemo(() => {
         // 모든 가능한 항목 (부가서비스 + 보험상품)
         const allAvailableItems = [...availableAddons, ...availableInsurances];
 
-        // 서버에서 받은 값은 "모든 부가서비스 유치/미유치"를 가정한 값
-        // 사용자가 선택한 항목과의 차이를 계산
+        // 서버에서 받은 storeSupportWithoutAddon을 기본값으로 사용
+        // (모든 부가서비스가 미유치 상태일 때의 값)
+        // 이 값에는 모든 deduction이 이미 포함되어 있음
         
-        // 모든 항목의 incentive/deduction 합계 (서버 기본값 기준)
+        // 모든 항목의 incentive/deduction 합계
         const allItemsIncentive = allAvailableItems.reduce((sum, item) => sum + (item.incentive || 0), 0);
         const allItemsDeduction = allAvailableItems.reduce((sum, item) => sum + (item.deduction || 0), 0);
 
@@ -446,19 +450,22 @@ const OpeningInfoPage = ({
         const selectedIncentive = selectedItems.reduce((sum, item) => sum + (item.incentive || 0), 0);
         const selectedDeduction = selectedItems.reduce((sum, item) => sum + (item.deduction || 0), 0);
 
+        // 미선택 항목들의 deduction 합계 (미유치 시 차감)
+        const unselectedDeduction = allItemsDeduction - selectedDeduction;
+
+        // 기본값 계산: storeSupportWithoutAddon에서 모든 deduction을 제거한 순수 기본값
+        // (서버에서 받은 storeSupportWithoutAddon에는 모든 deduction이 포함되어 있음)
+        const baseStoreSupport = storeSupportWithoutAddon - allItemsDeduction;
+
         // 동적 대리점지원금 계산
-        // 서버의 storeSupportWithAddon = 모든 부가서비스 유치 시 값 (모든 incentive 포함)
-        // 사용자가 선택한 항목만큼만 적용하려면:
-        // 유치시 = 서버값 - (모든 항목의 incentive) + (선택한 항목의 incentive)
-        const dynamicStoreSupportWithAddon = storeSupportWithAddon - allItemsIncentive + selectedIncentive;
+        // 유치 시: 기본값 + 선택한 항목의 incentive
+        const dynamicStoreSupportWithAddon = baseStoreSupport + selectedIncentive;
         
-        // 서버의 storeSupportWithoutAddon = 모든 부가서비스 미유치 시 값 (모든 deduction 포함)
-        // 사용자가 선택한 항목만큼만 적용하려면:
-        // 미유치시 = 서버값 - (모든 항목의 deduction) + (선택한 항목의 deduction)
-        const dynamicStoreSupportWithoutAddon = storeSupportWithoutAddon - allItemsDeduction + selectedDeduction;
+        // 미유치 시: 기본값 - 미선택 항목의 deduction
+        // (선택한 항목이 없으면 모든 항목이 미선택이므로 모든 deduction 차감)
+        const dynamicStoreSupportWithoutAddon = baseStoreSupport - unselectedDeduction;
 
         // 부가서비스 선택 여부에 따라 하나의 대리점추가지원금만 반환
-        // 선택된 항목이 있으면 유치 금액, 없으면 미유치 금액 사용
         const hasSelectedItems = selectedItems.length > 0;
         const finalStoreSupport = hasSelectedItems 
             ? Math.max(0, dynamicStoreSupportWithAddon) 
