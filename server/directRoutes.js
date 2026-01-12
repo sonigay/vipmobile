@@ -6784,12 +6784,12 @@ function setupDirectRoutes(app) {
         );
         const mainPageRows = (mainPageResponse.data.values || []).slice(1);
 
-      const defaultTexts = {
-        mainHeader: null,
-        transitionPages: {}
-      };
+        defaultTexts = {
+          mainHeader: null,
+          transitionPages: {}
+        };
 
-      mainPageRows.forEach(row => {
+        mainPageRows.forEach(row => {
         const carrier = (row[0] || '').trim();
         const category = (row[1] || '').trim();
         const textType = (row[2] || '').trim();
