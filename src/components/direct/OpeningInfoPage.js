@@ -858,12 +858,14 @@ const OpeningInfoPage = ({
                         margin: 5mm; /* 최소 여백 확보 */
                     }
 
-                    /* 기본 설정: 모든 부모 요소의 높이 제한 해제 */
+                    /* 기본 설정: 모든 부모 요소의 높이 제한 해제 & 배경색 강제 출력 */
                     html, body, #root, .App {
                         height: auto !important;
                         min-height: 100% !important;
                         overflow: visible !important;
                         background-color: white !important;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
                     }
 
                     /* 인쇄 불필요 요소 숨김 */
@@ -880,8 +882,6 @@ const OpeningInfoPage = ({
                         display: block !important;
                     }
 
-                    /* 메인 컨테이너 설정 */
-                    /* 메인 컨테이너 설정 */
                     /* 메인 컨테이너 설정 */
                     .print-root {
                         /* 
@@ -903,7 +903,7 @@ const OpeningInfoPage = ({
                         min-height: 100% !important;
                         overflow: visible !important;
                         
-                        /* 배경 및 여백 설정 */
+                        /* 배경 및 여백 설정 - 컨테이너 내부 여백 최소화 */
                         background-color: white !important;
                         margin: 0 !important;
                         padding: 0 !important;
@@ -912,49 +912,56 @@ const OpeningInfoPage = ({
                         page-break-inside: avoid;
                     }
 
-                    /* 스크롤바 강제 숨김 (모든 요소) */
-                    @media print {
-                        * {
-                            -webkit-overflow-scrolling: touch !important;
-                            overflow: visible !important; 
-                        }
-                        
-                        /* 스크롤바 영역 자체를 제거 */
-                        ::-webkit-scrollbar {
-                            display: none !important;
-                            width: 0 !important;
-                            height: 0 !important;
-                        }
-                        
-                        /* Firefox 호환 */
-                        html, body {
-                            scrollbar-width: none !important;
-                        }
+                    /* 인쇄 시 내부 간격 축소 (한 장에 담기 위해) */
+                    .print-root .MuiGrid-root {
+                        margin-top: 0 !important;
+                        margin-bottom: 0 !important;
                     }
                     
-                    .print-root::-webkit-scrollbar {
-                        display: none;
+                    .print-root .MuiBox-root {
+                        padding-top: 4px !important;
+                        padding-bottom: 4px !important;
                     }
 
-                    /* 
-                       중요: 인쇄 시 데스크탑 뷰(2단 컬럼)를 유지하기 위한 스타일
-                       브라우저는 종이 폭에 맞춰 모바일 뷰로 전환하려 할 수 있으므로
-                       Grid 시스템이 반응형으로 동작하지 않도록 오버라이드하거나
-                       handlePrint에서 width를 고 정(1024px)했으므로 이를 돕는 스타일 추가
-                    */
+                    /* 스크롤바 강제 숨김 (모든 요소) */
+                    * {
+                        -webkit-overflow-scrolling: touch !important;
+                        overflow: visible !important; 
+                    }
                     
+                    /* 스크롤바 영역 자체를 제거 */
+                    ::-webkit-scrollbar {
+                        display: none !important;
+                        width: 0 !important;
+                        height: 0 !important;
+                    }
+                    
+                    /* Firefox 호환 */
+                    html, body {
+                        scrollbar-width: none !important;
+                    }
+                }
+            `}</style>
+
+            {/* 상단 타이틀 및 저장 버튼 (인쇄 시 숨김) */}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }} className="no-print">                       중요: 인쇄 시 데스크탑 뷰(2단 컬럼)를 유지하기 위한 스타일
+                브라우저는 종이 폭에 맞춰 모바일 뷰로 전환하려 할 수 있으므로
+                Grid 시스템이 반응형으로 동작하지 않도록 오버라이드하거나
+                handlePrint에서 width를 고 정(1024px)했으므로 이를 돕는 스타일 추가
+                */
+
                     /* Grid Item 강제 배치 (화면과 동일하게) */
                     /* md={6}인 항목들은 인쇄 시에도 50% 폭 유지 */
-                    .MuiGrid-root.MuiGrid-item.MuiGrid-grid-md-6 {
-                        flex-basis: 50% !important;
-                        max-width: 50% !important;
-                        width: 50% !important;
+                .MuiGrid-root.MuiGrid-item.MuiGrid-grid-md-6 {
+                    flex - basis: 50% !important;
+                max-width: 50% !important;
+                width: 50% !important;
                     }
 
-                    /* Paper 그림자 제거 및 테두리 단순화 (선택사항) */
-                    .MuiPaper-root {
-                        box-shadow: none !important;
-                        border: 1px solid #ddd !important;
+                /* Paper 그림자 제거 및 테두리 단순화 (선택사항) */
+                .MuiPaper-root {
+                    box - shadow: none !important;
+                border: 1px solid #ddd !important;
                     }
                 }
             `}</style>
