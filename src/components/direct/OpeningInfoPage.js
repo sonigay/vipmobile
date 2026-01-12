@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
     Box,
     Paper,
@@ -509,31 +509,39 @@ const OpeningInfoPage = ({
     const savedStoreSupport = initialData?.storeSupport || initialData?.대리점추가지원금;
     const hasSavedStoreSupport = savedStoreSupport !== undefined && savedStoreSupport !== null && savedStoreSupport !== 0;
     
+    // 초기 로드 시 부가서비스 선택 상태 추적 (저장된 값과 일치하는지 확인)
+    const initialSelectedItemsRef = useRef(null);
+    const isInitialLoadRef = useRef(true);
+    
+    // 초기 로드 완료 여부 확인 (부가서비스 목록이 로드되고 selectedItems가 설정된 후)
+    useEffect(() => {
+        if (availableAddons.length > 0 || availableInsurances.length > 0) {
+            if (isInitialLoadRef.current && selectedItems.length >= 0) {
+                initialSelectedItemsRef.current = [...selectedItems];
+                isInitialLoadRef.current = false;
+            }
+        }
+    }, [selectedItems, availableAddons.length, availableInsurances.length]);
+    
+    // 부가서비스 선택이 변경되었는지 확인
+    const hasItemsChanged = useMemo(() => {
+        if (!initialSelectedItemsRef.current) return false;
+        if (selectedItems.length !== initialSelectedItemsRef.current.length) return true;
+        const currentNames = selectedItems.map(item => item.name).sort();
+        const initialNames = initialSelectedItemsRef.current.map(item => item.name).sort();
+        return JSON.stringify(currentNames) !== JSON.stringify(initialNames);
+    }, [selectedItems]);
+    
     const calculateDynamicStoreSupport = useMemo(() => {
-        // 🔥 핵심: 저장된 값이 있고 부가서비스 선택이 변경되지 않았다면 저장된 값을 그대로 사용
-        // 부가서비스 목록이 로드되기 전이거나, 선택된 항목이 없고 저장된 값이 있으면 저장된 값을 그대로 반환
-        if (hasSavedStoreSupport) {
-            // 부가서비스 목록이 아직 로드되지 않았거나, 선택된 항목이 없으면 저장된 값을 그대로 반환
-            if (availableAddons.length === 0 && availableInsurances.length === 0) {
-                const additionalAmount = additionalStoreSupport !== null && additionalStoreSupport !== undefined ? Number(additionalStoreSupport) : 0;
-                const savedValue = Number(savedStoreSupport) + additionalAmount;
-                return {
-                    current: Math.max(0, savedValue),
-                    withAddon: Math.max(0, savedValue),
-                    withoutAddon: Math.max(0, savedValue)
-                };
-            }
-            // 부가서비스 목록이 로드되었지만 선택된 항목이 없으면 저장된 값을 그대로 반환
-            // (부가서비스 선택이 변경되면 selectedItems.length가 변경되어 재계산됨)
-            if (selectedItems.length === 0) {
-                const additionalAmount = additionalStoreSupport !== null && additionalStoreSupport !== undefined ? Number(additionalStoreSupport) : 0;
-                const savedValue = Number(savedStoreSupport) + additionalAmount;
-                return {
-                    current: Math.max(0, savedValue),
-                    withAddon: Math.max(0, savedValue),
-                    withoutAddon: Math.max(0, savedValue)
-                };
-            }
+        // 🔥 핵심: 저장된 값이 있고 초기 로드 상태이거나 부가서비스 선택이 변경되지 않았다면 저장된 값을 그대로 사용
+        if (hasSavedStoreSupport && (!hasItemsChanged || isInitialLoadRef.current)) {
+            const additionalAmount = additionalStoreSupport !== null && additionalStoreSupport !== undefined ? Number(additionalStoreSupport) : 0;
+            const savedValue = Number(savedStoreSupport) + additionalAmount;
+            return {
+                current: Math.max(0, savedValue),
+                withAddon: Math.max(0, savedValue),
+                withoutAddon: Math.max(0, savedValue)
+            };
         }
 
         // 모든 가능한 항목 (부가서비스 + 보험상품)
@@ -578,7 +586,7 @@ const OpeningInfoPage = ({
             withAddon: Math.max(0, (Number(storeSupportWithAddon) || 0) + additionalAmount),
             withoutAddon: Math.max(0, (Number(storeSupportWithoutAddon) || 0) + additionalAmount)
         };
-    }, [selectedItems, availableAddons, availableInsurances, storeSupportWithAddon, storeSupportWithoutAddon, additionalStoreSupport, hasSavedStoreSupport, savedStoreSupport]);
+    }, [selectedItems, availableAddons, availableInsurances, storeSupportWithAddon, storeSupportWithoutAddon, additionalStoreSupport, hasSavedStoreSupport, savedStoreSupport, hasItemsChanged]);
 
     // 🔥 수정: 저장된 할부원금을 초기값으로 사용하고, 부가서비스 선택 변경 시에만 재계산
     const savedInstallmentPrincipal = initialData?.installmentPrincipal || initialData?.할부원금;
@@ -587,10 +595,8 @@ const OpeningInfoPage = ({
     // 계산 로직 (계산 엔진 사용)
     // 🔥 개선: 선택된 부가서비스에 따라 하나의 대리점추가지원금만 사용
     const getCurrentInstallmentPrincipal = () => {
-        // 🔥 핵심: 저장된 값이 있으면 그 값을 그대로 사용 (부가서비스 선택이 변경되면 재계산)
-        if (hasSavedInstallmentPrincipal) {
-            // 부가서비스 선택이 변경되지 않았다면 저장된 값을 그대로 반환
-            // (부가서비스 선택이 변경되면 selectedItems.length가 변경되어 재계산됨)
+        // 🔥 핵심: 저장된 값이 있고 초기 로드 상태이거나 부가서비스 선택이 변경되지 않았다면 저장된 값을 그대로 사용
+        if (hasSavedInstallmentPrincipal && (!hasItemsChanged || isInitialLoadRef.current)) {
             return Number(savedInstallmentPrincipal);
         }
 
