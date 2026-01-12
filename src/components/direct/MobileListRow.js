@@ -71,7 +71,7 @@ const MobileListRowComponent = ({
           sx={{
             position: 'sticky',
             left: 0,
-            zIndex: 2,
+            zIndex: 3,
             backgroundColor: 'background.paper',
             boxShadow: '2px 0 4px rgba(0,0,0,0.1)'
           }}
@@ -176,7 +176,7 @@ const MobileListRowComponent = ({
         sx={{
           position: 'sticky',
           left: !isCustomerMode ? '120px' : 0,
-          zIndex: 2,
+          zIndex: 3,
           backgroundColor: 'background.paper',
           boxShadow: '2px 0 4px rgba(0,0,0,0.1)'
         }}
@@ -328,7 +328,7 @@ const MobileListRowComponent = ({
           whiteSpace: 'nowrap',
           position: 'sticky',
           left: !isCustomerMode ? '220px' : '100px',
-          zIndex: 2,
+          zIndex: 3,
           backgroundColor: 'background.paper',
           boxShadow: '2px 0 4px rgba(0,0,0,0.1)'
         }}

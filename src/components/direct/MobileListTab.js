@@ -855,7 +855,7 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
   }, [selectedOpeningTypes, selectedPlanGroups, lookupPrice]);
 
   return (
-    <Box sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <Box sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
       <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', color: 'text.primary' }}>
         {isCustomerMode ? '실시간 휴대폰 시세표' : '휴대폰시세표'}
@@ -931,7 +931,17 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
       ) : (
         <>
           {/* 상품 테이블 */}
-          <TableContainer component={Paper} sx={{ flexGrow: 1, overflowX: 'auto', maxWidth: '100%' }}>
+          <TableContainer 
+            component={Paper} 
+            sx={{ 
+              flexGrow: 1, 
+              overflowX: 'auto', 
+              overflowY: 'auto',
+              maxWidth: '100%',
+              height: '100%',
+              position: 'relative'
+            }}
+          >
             <Table stickyHeader sx={{ minWidth: 1000 }}>
             <TableHead>
               <TableRow>
@@ -942,7 +952,8 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                     sx={{
                       position: 'sticky',
                       left: 0,
-                      zIndex: 10,
+                      top: 0,
+                      zIndex: 11,
                       backgroundColor: 'background.paper',
                       boxShadow: '2px 0 4px rgba(0,0,0,0.1)'
                     }}
@@ -956,7 +967,8 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                   sx={{
                     position: 'sticky',
                     left: !isCustomerMode ? '120px' : 0,
-                    zIndex: 10,
+                    top: 0,
+                    zIndex: 11,
                     backgroundColor: 'background.paper',
                     boxShadow: '2px 0 4px rgba(0,0,0,0.1)'
                   }}
@@ -969,25 +981,93 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                   sx={{
                     position: 'sticky',
                     left: !isCustomerMode ? '220px' : '100px',
-                    zIndex: 10,
+                    top: 0,
+                    zIndex: 11,
                     backgroundColor: 'background.paper',
                     boxShadow: '2px 0 4px rgba(0,0,0,0.1)'
                   }}
                 >
                   모델명 / 펫네임
                 </ModernTableCell>
-                <ModernTableCell align="center" width="120">요금제군</ModernTableCell>
-                <ModernTableCell align="center" width="100">유형</ModernTableCell>
-                <ModernTableCell align="center" width="100">출고가</ModernTableCell>
-                <ModernTableCell align="center" width="100">이통사지원금</ModernTableCell>
-                <ModernTableCell align="center" colSpan={2} width="180" sx={{ borderLeft: '1px solid rgba(81, 81, 81, 0.5)' }}>
+                <ModernTableCell 
+                  align="center" 
+                  width="120"
+                  sx={{
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 10,
+                    backgroundColor: 'background.paper'
+                  }}
+                >
+                  요금제군
+                </ModernTableCell>
+                <ModernTableCell 
+                  align="center" 
+                  width="100"
+                  sx={{
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 10,
+                    backgroundColor: 'background.paper'
+                  }}
+                >
+                  유형
+                </ModernTableCell>
+                <ModernTableCell 
+                  align="center" 
+                  width="100"
+                  sx={{
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 10,
+                    backgroundColor: 'background.paper'
+                  }}
+                >
+                  출고가
+                </ModernTableCell>
+                <ModernTableCell 
+                  align="center" 
+                  width="100"
+                  sx={{
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 10,
+                    backgroundColor: 'background.paper'
+                  }}
+                >
+                  이통사지원금
+                </ModernTableCell>
+                <ModernTableCell 
+                  align="center" 
+                  colSpan={2} 
+                  width="180" 
+                  sx={{ 
+                    borderLeft: '1px solid rgba(81, 81, 81, 0.5)',
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 10,
+                    backgroundColor: 'background.paper'
+                  }}
+                >
                   대리점 지원금
                   <Box sx={{ display: 'flex', justifyContent: 'space-around', fontSize: '0.75rem', color: 'text.secondary', mt: 0.5 }}>
                     <span>부가유치</span>
                     <span>미유치</span>
                   </Box>
                 </ModernTableCell>
-                <ModernTableCell align="center" colSpan={2} width="180" sx={{ borderLeft: '1px solid rgba(81, 81, 81, 0.5)', bgcolor: 'rgba(212, 175, 55, 0.1)' }}>
+                <ModernTableCell 
+                  align="center" 
+                  colSpan={2} 
+                  width="180" 
+                  sx={{ 
+                    borderLeft: '1px solid rgba(81, 81, 81, 0.5)', 
+                    bgcolor: 'rgba(212, 175, 55, 0.1)',
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 10,
+                    backgroundColor: 'rgba(212, 175, 55, 0.1)'
+                  }}
+                >
                   구매가 (할부원금)
                   <Box sx={{ display: 'flex', justifyContent: 'space-around', fontSize: '0.75rem', color: 'text.secondary', mt: 0.5 }}>
                     <span>부가유치</span>
