@@ -439,9 +439,9 @@ const OpeningInfoPage = ({
         // 모든 가능한 항목 (부가서비스 + 보험상품)
         const allAvailableItems = [...availableAddons, ...availableInsurances];
 
-        // 서버에서 받은 storeSupportWithoutAddon을 기본값으로 사용
-        // (모든 부가서비스가 미유치 상태일 때의 값)
-        // 이 값에는 모든 deduction이 이미 포함되어 있음
+        // 🔥 수정: 초기값은 storeSupportWithAddon (모든 항목이 유치된 상태)
+        // 예: storeSupportWithAddon = 130,000원 (모든 항목 유치)
+        //     storeSupportWithoutAddon = 100,000원 (모든 항목 미유치)
 
         // 모든 항목의 incentive/deduction 합계
         const allItemsIncentive = allAvailableItems.reduce((sum, item) => sum + (item.incentive || 0), 0);
@@ -451,36 +451,26 @@ const OpeningInfoPage = ({
         const selectedIncentive = selectedItems.reduce((sum, item) => sum + (item.incentive || 0), 0);
         const selectedDeduction = selectedItems.reduce((sum, item) => sum + (item.deduction || 0), 0);
 
-        // 미선택 항목들의 deduction 합계 (미유치 시 차감)
+        // 선택되지 않은 항목들의 incentive/deduction 합계
+        const unselectedIncentive = allItemsIncentive - selectedIncentive;
         const unselectedDeduction = allItemsDeduction - selectedDeduction;
 
-        // 기본값 계산: storeSupportWithoutAddon에서 모든 deduction을 제거한 순수 기본값
-        // (서버에서 받은 storeSupportWithoutAddon에는 모든 deduction이 포함되어 있음)
-        const baseStoreSupport = storeSupportWithoutAddon - allItemsDeduction;
-
-        // 동적 대리점지원금 계산
-        // 유치 시: 기본값 + 선택한 항목의 incentive
-        const dynamicStoreSupportWithAddon = baseStoreSupport + selectedIncentive;
-
-        // 미유치 시: 기본값 - 미선택 항목의 deduction
-        // (선택한 항목이 없으면 모든 항목이 미선택이므로 모든 deduction 차감)
-        const dynamicStoreSupportWithoutAddon = baseStoreSupport - unselectedDeduction;
-
-        // 부가서비스 선택 여부에 따라 하나의 대리점추가지원금만 반환
-        const hasSelectedItems = selectedItems.length > 0;
-        const baseFinalStoreSupport = hasSelectedItems
-            ? Math.max(0, dynamicStoreSupportWithAddon)
-            : Math.max(0, dynamicStoreSupportWithoutAddon);
+        // 🔥 수정: 초기값(모든 항목 유치)에서 시작하여 선택되지 않은 항목의 incentive와 deduction을 차감
+        // 예: 초기 130,000원에서 부가서비스 A 제거 시
+        //     - incentive 30,000원 차감
+        //     - deduction 10,000원 차감
+        //     = 130,000 - 30,000 - 10,000 = 90,000원
+        const finalStoreSupport = storeSupportWithAddon - unselectedIncentive - unselectedDeduction;
 
         // 직접입력 추가금액 반영
-        const finalStoreSupport = baseFinalStoreSupport + (additionalStoreSupport || 0);
+        const finalWithAdditional = Math.max(0, finalStoreSupport) + (additionalStoreSupport || 0);
 
         return {
             // 현재 선택된 상태에 따른 하나의 대리점추가지원금 (직접입력 추가금액 포함)
-            current: finalStoreSupport,
+            current: finalWithAdditional,
             // 참고용 (UI 표시용)
-            withAddon: Math.max(0, dynamicStoreSupportWithAddon) + (additionalStoreSupport || 0),
-            withoutAddon: Math.max(0, dynamicStoreSupportWithoutAddon) + (additionalStoreSupport || 0)
+            withAddon: Math.max(0, storeSupportWithAddon) + (additionalStoreSupport || 0),
+            withoutAddon: Math.max(0, storeSupportWithoutAddon) + (additionalStoreSupport || 0)
         };
     }, [selectedItems, availableAddons, availableInsurances, storeSupportWithAddon, storeSupportWithoutAddon, additionalStoreSupport]);
 
@@ -567,11 +557,11 @@ const OpeningInfoPage = ({
             const scrollHeight = printRoot.scrollHeight;
             const scrollWidth = printRoot.scrollWidth; // 1024px
 
-            // 4. A4 용지 크기 (96DPI 기준, 여백 고려)
-            // 가로: 210mm - 10mm(여백) = 200mm ≈ 755px
-            // 세로: 297mm - 10mm(여백) = 287mm ≈ 1084px
-            const a4Width = 755;
-            const a4Height = 1084;
+            // 4. A4 용지 크기 (96DPI 기준, 여백 최소화)
+            // 가로: 210mm ≈ 794px. 여백을 줄여서 내용을 꽉 채움 (좌우 3mm 여백 가정: 204mm ≈ 770px)
+            // 기존 755px -> 780px로 상향 조정하여 더 넓게 표시
+            const a4Width = 780;
+            const a4Height = 1100; // 세로 여백 줄여서 높이 확보
 
             // 5. 가로/세로 비율에 따른 Zoom 계산
             // 가로를 A4에 맞추기 위한 비율
@@ -583,7 +573,8 @@ const OpeningInfoPage = ({
             // 둘 중 더 작은 비율 선택 (짤리지 않게)
             // 단, 너무 작아지면 가독성이 떨어지므로 최소값(0.4) 제한
             let finalScale = Math.min(widthScale, heightScale);
-            finalScale = Math.max(0.4, Math.min(0.9, finalScale));
+            // 최대 확대 비율도 1.0까지 허용 (기존 0.9)
+            finalScale = Math.max(0.4, Math.min(1.0, finalScale));
 
             // 6. Zoom 적용
             printRoot.style.zoom = finalScale;
@@ -799,7 +790,7 @@ const OpeningInfoPage = ({
                 @media print {
                     @page {
                         size: A4;
-                        margin: 5mm;
+                        margin: 3mm;
                     }
 
                     /* 기본 설정: 배경색 출력 및 크기 제한 해제 */
