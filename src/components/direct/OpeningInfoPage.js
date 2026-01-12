@@ -80,6 +80,25 @@ const OpeningInfoPage = ({
     const [storeSupportWithoutAddon, setStoreSupportWithoutAddon] = useState(initialData?.storeSupportNoAddon || 0); // 부가미유치시 대리점추가지원금
     const [additionalStoreSupport, setAdditionalStoreSupport] = useState(initialData?.additionalStoreSupport || 0); // 대리점추가지원금 직접입력 추가금액
 
+    // 적용일시 상태 관리 (날짜, 시, 분)
+    const getInitialDateTime = () => {
+        if (initialData?.soldAt) {
+            const date = new Date(initialData.soldAt);
+            return {
+                date: date.toISOString().split('T')[0], // YYYY-MM-DD
+                hour: date.getHours().toString().padStart(2, '0'),
+                minute: date.getMinutes().toString().padStart(2, '0')
+            };
+        }
+        const now = new Date();
+        return {
+            date: now.toISOString().split('T')[0],
+            hour: now.getHours().toString().padStart(2, '0'),
+            minute: now.getMinutes().toString().padStart(2, '0')
+        };
+    };
+    const [appliedDateTime, setAppliedDateTime] = useState(getInitialDateTime());
+
     // openingType 변환은 유틸리티 함수 사용
 
     const [formData, setFormData] = useState({
@@ -581,7 +600,16 @@ const OpeningInfoPage = ({
                 company: currentStore?.name || '',
                 storeName: currentStore?.name || '',
                 storeId: currentStore?.id || '',
-                soldAt: new Date().toISOString(),
+                soldAt: (() => {
+                    // 적용일시를 ISO 문자열로 변환
+                    const { date, hour, minute } = appliedDateTime;
+                    if (date && hour !== undefined && minute !== undefined) {
+                        const dateTimeString = `${date}T${hour}:${minute}:00`;
+                        return new Date(dateTimeString).toISOString();
+                    }
+                    // 기본값: 현재 시점
+                    return new Date().toISOString();
+                })(),
                 customerName: formData.customerName,
                 customerContact: formData.customerContact, // CTN (연락처)
                 carrier: selectedCarrier,
@@ -1512,6 +1540,56 @@ const OpeningInfoPage = ({
                                         value={formData.simSerial}
                                         onChange={(e) => setFormData({ ...formData, simSerial: e.target.value })}
                                     />
+                                </Grid>
+                                <Grid item xs={12}>
+                                    <Divider sx={{ my: 1 }} />
+                                    <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold', mb: 1 }}>
+                                        적용일시
+                                    </Typography>
+                                </Grid>
+                                <Grid item xs={12} sm={4}>
+                                    <TextField
+                                        label="날짜"
+                                        fullWidth
+                                        type="date"
+                                        value={appliedDateTime.date}
+                                        onChange={(e) => setAppliedDateTime({ ...appliedDateTime, date: e.target.value })}
+                                        InputLabelProps={{
+                                            shrink: true,
+                                        }}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={4}>
+                                    <FormControl fullWidth>
+                                        <InputLabel>시</InputLabel>
+                                        <Select
+                                            value={appliedDateTime.hour}
+                                            label="시"
+                                            onChange={(e) => setAppliedDateTime({ ...appliedDateTime, hour: e.target.value })}
+                                        >
+                                            {Array.from({ length: 24 }, (_, i) => (
+                                                <MenuItem key={i} value={i.toString().padStart(2, '0')}>
+                                                    {i.toString().padStart(2, '0')}시
+                                                </MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
+                                </Grid>
+                                <Grid item xs={12} sm={4}>
+                                    <FormControl fullWidth>
+                                        <InputLabel>분</InputLabel>
+                                        <Select
+                                            value={appliedDateTime.minute}
+                                            label="분"
+                                            onChange={(e) => setAppliedDateTime({ ...appliedDateTime, minute: e.target.value })}
+                                        >
+                                            {Array.from({ length: 60 }, (_, i) => (
+                                                <MenuItem key={i} value={i.toString().padStart(2, '0')}>
+                                                    {i.toString().padStart(2, '0')}분
+                                                </MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
                                 </Grid>
                                 <Grid item xs={12}>
                                     <Alert severity="info" sx={{ mt: 1, mb: 1 }}>
