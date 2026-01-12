@@ -507,10 +507,10 @@ const OpeningInfoPage = ({
     }, [selectedItems.length]);
 
     // 계산된 값들을 메모이제이션하여 불필요한 재계산 방지
-    // 🔥 개선: formData.withAddon 변경 시 할부원금 재계산되도록 useMemo 사용
+    // 🔥 개선: selectedItems 변경 시 할부원금 재계산되도록 useMemo 사용
     const installmentPrincipal = useMemo(() => {
         return getCurrentInstallmentPrincipal();
-    }, [formData.withAddon, formData.usePublicSupport, factoryPrice, publicSupport, calculateDynamicStoreSupport]);
+    }, [selectedItems.length, formData.usePublicSupport, factoryPrice, publicSupport, calculateDynamicStoreSupport]);
     
     const installmentFeeResult = useMemo(() => {
         return calculateInstallmentFee(installmentPrincipal, formData.installmentPeriod);
