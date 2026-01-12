@@ -505,13 +505,39 @@ const OpeningInfoPage = ({
     //   예: incentive=30,000, deduction=10,000인 경우
     //   - 유치 시: 130,000원
     //   - 제거 시: 130,000 - 30,000 - 10,000 = 90,000원 (차액 40,000원)
+    // 🔥 수정: 저장된 대리점추가지원금을 초기값으로 사용하고, 부가서비스 선택 변경 시에만 재계산
+    const savedStoreSupport = initialData?.storeSupport || initialData?.대리점추가지원금;
+    const hasSavedStoreSupport = savedStoreSupport !== undefined && savedStoreSupport !== null && savedStoreSupport !== 0;
+    
     const calculateDynamicStoreSupport = useMemo(() => {
+        // 🔥 핵심: 저장된 값이 있고 부가서비스 선택이 변경되지 않았다면 저장된 값을 그대로 사용
+        // 부가서비스 목록이 로드되기 전이거나, 선택된 항목이 없고 저장된 값이 있으면 저장된 값을 그대로 반환
+        if (hasSavedStoreSupport) {
+            // 부가서비스 목록이 아직 로드되지 않았거나, 선택된 항목이 없으면 저장된 값을 그대로 반환
+            if (availableAddons.length === 0 && availableInsurances.length === 0) {
+                const additionalAmount = additionalStoreSupport !== null && additionalStoreSupport !== undefined ? Number(additionalStoreSupport) : 0;
+                const savedValue = Number(savedStoreSupport) + additionalAmount;
+                return {
+                    current: Math.max(0, savedValue),
+                    withAddon: Math.max(0, savedValue),
+                    withoutAddon: Math.max(0, savedValue)
+                };
+            }
+            // 부가서비스 목록이 로드되었지만 선택된 항목이 없으면 저장된 값을 그대로 반환
+            // (부가서비스 선택이 변경되면 selectedItems.length가 변경되어 재계산됨)
+            if (selectedItems.length === 0) {
+                const additionalAmount = additionalStoreSupport !== null && additionalStoreSupport !== undefined ? Number(additionalStoreSupport) : 0;
+                const savedValue = Number(savedStoreSupport) + additionalAmount;
+                return {
+                    current: Math.max(0, savedValue),
+                    withAddon: Math.max(0, savedValue),
+                    withoutAddon: Math.max(0, savedValue)
+                };
+            }
+        }
+
         // 모든 가능한 항목 (부가서비스 + 보험상품)
         const allAvailableItems = [...availableAddons, ...availableInsurances];
-
-        // 초기값: storeSupportWithAddon (모든 항목이 유치된 상태)
-        // 예: storeSupportWithAddon = 130,000원 (모든 항목 유치)
-        //     storeSupportWithoutAddon = 100,000원 (모든 항목 미유치)
 
         // 🔥 핵심: 선택된 항목들의 incentive/deduction 합계 계산
         // selectedItems는 사용자가 현재 선택한 항목들 (체크박스로 선택/해제한 항목들)
@@ -529,8 +555,7 @@ const OpeningInfoPage = ({
         // 🔥 핵심 로직: 저장된 대리점추가지원금이 있으면 그 값을 기준으로 계산
         // 저장된 값이 있으면 (예: 790000) 그 값을 기준으로 선택/해제에 따른 차이만 반영
         // 저장된 값이 없으면 storeSupportWithAddon을 기준으로 계산
-        const savedStoreSupport = initialData?.storeSupport || initialData?.대리점추가지원금;
-        const baseStoreSupport = savedStoreSupport !== undefined && savedStoreSupport !== null
+        const baseStoreSupport = hasSavedStoreSupport
             ? Number(savedStoreSupport)
             : (Number(storeSupportWithAddon) || 0);
 
@@ -553,11 +578,22 @@ const OpeningInfoPage = ({
             withAddon: Math.max(0, (Number(storeSupportWithAddon) || 0) + additionalAmount),
             withoutAddon: Math.max(0, (Number(storeSupportWithoutAddon) || 0) + additionalAmount)
         };
-    }, [selectedItems, availableAddons, availableInsurances, storeSupportWithAddon, storeSupportWithoutAddon, additionalStoreSupport, initialData?.storeSupport, initialData?.대리점추가지원금]);
+    }, [selectedItems, availableAddons, availableInsurances, storeSupportWithAddon, storeSupportWithoutAddon, additionalStoreSupport, hasSavedStoreSupport, savedStoreSupport]);
+
+    // 🔥 수정: 저장된 할부원금을 초기값으로 사용하고, 부가서비스 선택 변경 시에만 재계산
+    const savedInstallmentPrincipal = initialData?.installmentPrincipal || initialData?.할부원금;
+    const hasSavedInstallmentPrincipal = savedInstallmentPrincipal !== undefined && savedInstallmentPrincipal !== null && savedInstallmentPrincipal !== 0;
 
     // 계산 로직 (계산 엔진 사용)
     // 🔥 개선: 선택된 부가서비스에 따라 하나의 대리점추가지원금만 사용
     const getCurrentInstallmentPrincipal = () => {
+        // 🔥 핵심: 저장된 값이 있으면 그 값을 그대로 사용 (부가서비스 선택이 변경되면 재계산)
+        if (hasSavedInstallmentPrincipal) {
+            // 부가서비스 선택이 변경되지 않았다면 저장된 값을 그대로 반환
+            // (부가서비스 선택이 변경되면 selectedItems.length가 변경되어 재계산됨)
+            return Number(savedInstallmentPrincipal);
+        }
+
         const support = formData.usePublicSupport ? publicSupport : 0;
         // 선택된 부가서비스가 있으면 유치 금액, 없으면 미유치 금액 사용
         const dynamicStoreSupport = calculateDynamicStoreSupport.current;
@@ -590,9 +626,10 @@ const OpeningInfoPage = ({
 
     // 계산된 값들을 메모이제이션하여 불필요한 재계산 방지
     // 🔥 개선: selectedItems 변경 시 할부원금 재계산되도록 useMemo 사용
+    // 🔥 수정: 저장된 값이 있으면 초기 로드 시 그대로 사용하고, 부가서비스 선택 변경 시에만 재계산
     const installmentPrincipal = useMemo(() => {
         return getCurrentInstallmentPrincipal();
-    }, [selectedItems.length, formData.usePublicSupport, factoryPrice, publicSupport, calculateDynamicStoreSupport]);
+    }, [selectedItems.length, formData.usePublicSupport, factoryPrice, publicSupport, calculateDynamicStoreSupport, hasSavedInstallmentPrincipal, savedInstallmentPrincipal]);
 
     const installmentFeeResult = useMemo(() => {
         return calculateInstallmentFee(installmentPrincipal, formData.installmentPeriod);

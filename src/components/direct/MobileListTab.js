@@ -959,7 +959,6 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                       sx={{
                         position: 'sticky',
                         left: 0,
-                        top: 0,
                         zIndex: 11,
                         backgroundColor: 'background.paper',
                         boxShadow: '2px 0 4px rgba(0,0,0,0.1)'
@@ -974,7 +973,6 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                     sx={{
                       position: 'sticky',
                       left: !isCustomerMode ? '120px' : 0,
-                      top: 0,
                       zIndex: 11,
                       backgroundColor: 'background.paper',
                       boxShadow: '2px 0 4px rgba(0,0,0,0.1)'
@@ -988,7 +986,6 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                     sx={{
                       position: 'sticky',
                       left: !isCustomerMode ? '220px' : '100px',
-                      top: 0,
                       zIndex: 11,
                       backgroundColor: 'background.paper',
                       boxShadow: '2px 0 4px rgba(0,0,0,0.1)'
@@ -1001,7 +998,6 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                     width="120"
                     sx={{
                       position: 'sticky',
-                      top: 0, // 🔥 수정: 통신사 탭 높이만큼 아래로 이동 (세로만 고정)
                       zIndex: 10,
                       backgroundColor: 'background.paper'
                     }}
@@ -1013,7 +1009,6 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                     width="100"
                     sx={{
                       position: 'sticky',
-                      top: 0, // 🔥 수정: 통신사 탭 높이만큼 아래로 이동 (세로만 고정)
                       zIndex: 10,
                       backgroundColor: 'background.paper'
                     }}
@@ -1025,7 +1020,6 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                     width="100"
                     sx={{
                       position: 'sticky',
-                      top: 0, // 🔥 수정: 통신사 탭 높이만큼 아래로 이동 (세로만 고정)
                       zIndex: 10,
                       backgroundColor: 'background.paper'
                     }}
@@ -1037,7 +1031,6 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                     width="100"
                     sx={{
                       position: 'sticky',
-                      top: 0, // 🔥 수정: 통신사 탭 높이만큼 아래로 이동 (세로만 고정)
                       zIndex: 10,
                       backgroundColor: 'background.paper'
                     }}
@@ -1051,7 +1044,6 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                     sx={{
                       borderLeft: '1px solid rgba(81, 81, 81, 0.5)',
                       position: 'sticky',
-                      top: 0, // 🔥 수정: 통신사 탭 높이만큼 아래로 이동 (세로만 고정)
                       zIndex: 10,
                       backgroundColor: 'background.paper'
                     }}
@@ -1070,7 +1062,6 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                       borderLeft: '1px solid rgba(81, 81, 81, 0.5)',
                       bgcolor: 'rgba(212, 175, 55, 0.1)',
                       position: 'sticky',
-                      top: 0, // 🔥 수정: 통신사 탭 높이만큼 아래로 이동 (세로만 고정)
                       zIndex: 10,
                       backgroundColor: 'rgba(212, 175, 55, 0.1)'
                     }}
