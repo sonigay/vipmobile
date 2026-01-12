@@ -465,15 +465,16 @@ const OpeningInfoPage = ({
         const baseStoreSupport = Number(storeSupportWithAddon) || 0;
         const finalStoreSupport = baseStoreSupport - unselectedIncentive - unselectedDeduction;
 
-        // 직접입력 추가금액 반영
-        const finalWithAdditional = Math.max(0, finalStoreSupport) + (Number(additionalStoreSupport) || 0);
+        // 직접입력 추가금액 반영 (음수도 허용)
+        const additionalAmount = additionalStoreSupport !== null && additionalStoreSupport !== undefined ? Number(additionalStoreSupport) : 0;
+        const finalWithAdditional = Math.max(0, finalStoreSupport + additionalAmount);
 
         return {
             // 현재 선택된 상태에 따른 하나의 대리점추가지원금 (직접입력 추가금액 포함)
             current: finalWithAdditional,
             // 참고용 (UI 표시용)
-            withAddon: Math.max(0, Number(storeSupportWithAddon) || 0) + (Number(additionalStoreSupport) || 0),
-            withoutAddon: Math.max(0, Number(storeSupportWithoutAddon) || 0) + (Number(additionalStoreSupport) || 0)
+            withAddon: Math.max(0, (Number(storeSupportWithAddon) || 0) + additionalAmount),
+            withoutAddon: Math.max(0, (Number(storeSupportWithoutAddon) || 0) + additionalAmount)
         };
     }, [selectedItems, availableAddons, availableInsurances, storeSupportWithAddon, storeSupportWithoutAddon, additionalStoreSupport]);
 
@@ -726,7 +727,7 @@ const OpeningInfoPage = ({
                     carrierSupport: formData.usePublicSupport ? publicSupport : 0,
                     // 🔥 개선: 선택된 부가서비스에 따라 하나의 대리점추가지원금만 저장
                     dealerSupport: calculateDynamicStoreSupport.current, // 대리점추가지원금 (현재 선택된 상태에 따른 값, 직접입력 추가금액 포함)
-                    additionalStoreSupport: additionalStoreSupport || 0, // 대리점추가지원금 직접입력 추가금액
+                    additionalStoreSupport: additionalStoreSupport !== null && additionalStoreSupport !== undefined ? additionalStoreSupport : 0, // 대리점추가지원금 직접입력 추가금액 (음수 허용)
                     // 하위 호환을 위한 필드
                     dealerSupportWithAdd: formData.withAddon ? calculateDynamicStoreSupport.current : 0,
                     dealerSupportWithoutAdd: !formData.withAddon ? calculateDynamicStoreSupport.current : 0,
@@ -1571,7 +1572,7 @@ const OpeningInfoPage = ({
                                             readOnly: true,
                                             endAdornment: loadingSupportAmounts ? <CircularProgress size={20} /> : null
                                         }}
-                                        helperText={loadingSupportAmounts ? "지원금 정보를 불러오는 중..." : `선택된 부가서비스: ${selectedItems.length}개${additionalStoreSupport > 0 ? `, 추가: +${additionalStoreSupport.toLocaleString()}원` : ''}`}
+                                        helperText={loadingSupportAmounts ? "지원금 정보를 불러오는 중..." : `선택된 부가서비스: ${selectedItems.length}개${additionalStoreSupport !== null && additionalStoreSupport !== undefined && additionalStoreSupport !== 0 ? `, 직접입력: ${additionalStoreSupport > 0 ? '+' : ''}${additionalStoreSupport.toLocaleString()}원` : ''}`}
                                     />
                                 </Grid>
                                 <Grid item xs={6}>
@@ -1579,15 +1580,29 @@ const OpeningInfoPage = ({
                                         label="대리점추가지원금 직접입력"
                                         fullWidth
                                         type="number"
-                                        value={additionalStoreSupport || ''}
+                                        value={additionalStoreSupport !== null && additionalStoreSupport !== undefined ? additionalStoreSupport : ''}
                                         onChange={(e) => {
-                                            const value = parseFloat(e.target.value) || 0;
-                                            setAdditionalStoreSupport(value >= 0 ? value : 0);
+                                            const inputValue = e.target.value;
+                                            // 빈 문자열이면 null로 설정
+                                            if (inputValue === '') {
+                                                setAdditionalStoreSupport(null);
+                                                return;
+                                            }
+                                            // '-'만 입력된 경우는 허용 (음수 입력 중)
+                                            if (inputValue === '-') {
+                                                setAdditionalStoreSupport(null);
+                                                return;
+                                            }
+                                            const value = parseFloat(inputValue);
+                                            // NaN이 아니면 (양수, 음수 모두 허용)
+                                            if (!isNaN(value)) {
+                                                setAdditionalStoreSupport(value);
+                                            }
                                         }}
                                         InputProps={{
                                             endAdornment: <Typography variant="body2" sx={{ mr: 1 }}>원</Typography>
                                         }}
-                                        helperText="추가 금액을 입력하면 대리점추가지원금과 할부원금에 자동 반영됩니다"
+                                        helperText="추가 금액을 입력하면 대리점추가지원금과 할부원금에 자동 반영됩니다 (음수 입력 가능)"
                                     />
                                 </Grid>
                                 <Grid item xs={6}>
