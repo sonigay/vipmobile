@@ -545,66 +545,7 @@ const OpeningInfoPage = ({
     }, [installmentPrincipal, formData.cashPrice]);
 
     const handlePrint = () => {
-        // 인쇄 전 A4 한장 출력을 위한 Zoom 계산
-        const printRoot = document.querySelector('.print-root');
-        if (printRoot) {
-            // 1. 현재 화면의 원래 스타일 저장
-            const originalStyle = printRoot.getAttribute('style');
-
-            // 2. 인쇄를 위해 임시로 데스크탑 너비 강제 (레이아웃 틀어짐 방지)
-            // A4 가로(약 794px)보다 넓게 설정하여 2단 컬럼 유지
-            // 1024px는 충분히 넓지만, 인쇄 시 여백을 고려하여 1080px로 설정해 스케일링 비율을 자연스럽게 조정
-            const forcedWidth = '1080px';
-            printRoot.style.width = forcedWidth;
-            printRoot.style.maxWidth = forcedWidth;
-            printRoot.style.minWidth = forcedWidth;
-
-            // 인쇄 시 전체 너비 사용을 위해 마진 제거
-            printRoot.style.margin = '0';
-            printRoot.style.padding = '0';
-
-            // 3. 내용 높이 측정
-            const scrollHeight = printRoot.scrollHeight;
-            const scrollWidth = printRoot.scrollWidth;
-
-            // 4. A4 용지 크기 (96DPI 기준: 210mm x 297mm ≈ 794px x 1123px)
-            // 브라우저 기본 여백 제외하고 꽉 채우기 위해 790px 설정
-            const a4Width = 790;
-            const a4Height = 1120;
-
-            // 5. 가로/세로 비율에 따른 Zoom 계산
-            // 가로를 A4에 맞추기 위한 비율
-            const widthScale = a4Width / scrollWidth;
-
-            // 세로를 A4에 맞추기 위한 비율 (내용이 길 경우)
-            const heightScale = a4Height / scrollHeight;
-
-            // 둘 중 더 작은 비율 선택 (짤리지 않게)
-            let finalScale = Math.min(widthScale, heightScale);
-            // 최대 확대 비율도 1.0까지 허용
-            finalScale = Math.max(0.4, Math.min(1.0, finalScale));
-
-            // 6. Zoom 적용
-            // transform이 아닌 zoom 속성을 사용하여 레이아웃 재계산 유도 (Chrome/Edge 호환)
-            printRoot.style.zoom = finalScale;
-
-            // 7. 인쇄 실행
-            setTimeout(() => {
-                window.print();
-
-                // 8. 원래 상태로 복원
-                // 약간의 지연 후 복원 (인쇄 대화상자가 뜨는 시간 확보)
-                setTimeout(() => {
-                    if (originalStyle) {
-                        printRoot.setAttribute('style', originalStyle);
-                    } else {
-                        printRoot.removeAttribute('style');
-                    }
-                }, 500);
-            }, 100);
-        } else {
-            window.print();
-        }
+        window.print();
     };
 
     const handleComplete = async () => {
@@ -828,12 +769,28 @@ const OpeningInfoPage = ({
                     }
 
                     /* 메인 컨테이너 설정 */
+                    /* 메인 컨테이너 설정 */
                     .print-root {
+                        /* 
+                           인쇄 시 데스크탑 뷰(2단 컬럼) 강제 유지 및 A4 너비에 맞게 축소
+                           - A4 가로: 약 794px (96DPI)
+                           - 데스크탑 뷰 기준: 1024px
+                           - 축소 비율: 794 / 1024 ≈ 0.77 (여백 고려하여 0.75 설정)
+                        */
+                        width: 1024px !important;
+                        min-width: 1024px !important;
+                        max-width: 1024px !important;
+                        
+                        /* A4 용지에 맞게 축소 */
+                        zoom: 0.75; 
+                        
                         height: auto !important;
                         overflow: visible !important;
-                        padding: 0 !important;
-                        margin: 0 !important;
                         background-color: white !important;
+                        
+                        /* 여백 초기화 */
+                        margin: 0 !important;
+                        padding: 0 !important;
                     }
 
                     /* 
