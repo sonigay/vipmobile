@@ -943,28 +943,7 @@ const OpeningInfoPage = ({
                 }
             `}</style>
 
-            {/* 상단 타이틀 및 저장 버튼 (인쇄 시 숨김) */}
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }} className="no-print">                       중요: 인쇄 시 데스크탑 뷰(2단 컬럼)를 유지하기 위한 스타일
-                브라우저는 종이 폭에 맞춰 모바일 뷰로 전환하려 할 수 있으므로
-                Grid 시스템이 반응형으로 동작하지 않도록 오버라이드하거나
-                handlePrint에서 width를 고 정(1024px)했으므로 이를 돕는 스타일 추가
-                */
 
-                    /* Grid Item 강제 배치 (화면과 동일하게) */
-                    /* md={6}인 항목들은 인쇄 시에도 50% 폭 유지 */
-                .MuiGrid-root.MuiGrid-item.MuiGrid-grid-md-6 {
-                    flex - basis: 50% !important;
-                max-width: 50% !important;
-                width: 50% !important;
-                    }
-
-                /* Paper 그림자 제거 및 테두리 단순화 (선택사항) */
-                .MuiPaper-root {
-                    box - shadow: none !important;
-                border: 1px solid #ddd !important;
-                    }
-                }
-            `}</style>
 
             {/* 헤더 */}
             <Box className="no-print" sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
