@@ -429,48 +429,51 @@ const OpeningInfoPage = ({
     }, [initialData?.planGroup, initialData?.openingType, planGroups, selectedCarrier, initialData?.id, formData.contractType]);
 
     // 🔥 개선: 선택된 부가서비스/보험상품에 따른 대리점지원금 계산
-    // 사용자 의도:
-    // - 부가서비스 유치 시: 기본값 + 선택한 항목의 incentive
-    // - 부가서비스 미유치 시: 기본값 - 미선택 항목의 deduction (유치 인센티브도 빠짐)
-    // 예: incentive=30,000, deduction=10,000인 경우
-    //   - 유치 시: 기본값 + 30,000
-    //   - 미유치 시: 기본값 - 30,000 - 10,000 = 기본값 - 40,000 (차액 40,000)
+    // 계산 로직:
+    // - 초기값: storeSupportWithAddon (모든 항목이 유치된 상태, 예: 130,000원)
+    // - 부가서비스 제거 시: 해당 항목의 incentive + deduction을 모두 차감
+    //   예: incentive=30,000, deduction=10,000인 경우
+    //   - 유치 시: 130,000원
+    //   - 제거 시: 130,000 - 30,000 - 10,000 = 90,000원 (차액 40,000원)
     const calculateDynamicStoreSupport = useMemo(() => {
         // 모든 가능한 항목 (부가서비스 + 보험상품)
         const allAvailableItems = [...availableAddons, ...availableInsurances];
 
-        // 🔥 수정: 초기값은 storeSupportWithAddon (모든 항목이 유치된 상태)
+        // 초기값: storeSupportWithAddon (모든 항목이 유치된 상태)
         // 예: storeSupportWithAddon = 130,000원 (모든 항목 유치)
         //     storeSupportWithoutAddon = 100,000원 (모든 항목 미유치)
 
-        // 모든 항목의 incentive/deduction 합계
-        const allItemsIncentive = allAvailableItems.reduce((sum, item) => sum + (item.incentive || 0), 0);
-        const allItemsDeduction = allAvailableItems.reduce((sum, item) => sum + (item.deduction || 0), 0);
+        // 🔥 핵심: 선택된 항목들의 incentive/deduction 합계 계산
+        // selectedItems는 사용자가 현재 선택한 항목들 (체크박스로 선택/해제한 항목들)
+        const selectedIncentive = selectedItems.reduce((sum, item) => sum + (Number(item.incentive) || 0), 0);
+        const selectedDeduction = selectedItems.reduce((sum, item) => sum + (Number(item.deduction) || 0), 0);
 
-        // 사용자가 선택한 항목들의 incentive/deduction 합계
-        const selectedIncentive = selectedItems.reduce((sum, item) => sum + (item.incentive || 0), 0);
-        const selectedDeduction = selectedItems.reduce((sum, item) => sum + (item.deduction || 0), 0);
+        // 모든 항목의 incentive/deduction 합계
+        const allItemsIncentive = allAvailableItems.reduce((sum, item) => sum + (Number(item.incentive) || 0), 0);
+        const allItemsDeduction = allAvailableItems.reduce((sum, item) => sum + (Number(item.deduction) || 0), 0);
 
         // 선택되지 않은 항목들의 incentive/deduction 합계
         const unselectedIncentive = allItemsIncentive - selectedIncentive;
         const unselectedDeduction = allItemsDeduction - selectedDeduction;
 
-        // 🔥 수정: 초기값(모든 항목 유치)에서 시작하여 선택되지 않은 항목의 incentive와 deduction을 차감
+        // 🔥 핵심 로직: 초기값(모든 항목 유치)에서 시작하여 선택되지 않은 항목의 incentive와 deduction을 모두 차감
         // 예: 초기 130,000원에서 부가서비스 A 제거 시
-        //     - incentive 30,000원 차감
-        //     - deduction 10,000원 차감
+        //     - incentive 30,000원 차감 (유치 인센티브 제거)
+        //     - deduction 10,000원 차감 (미유치 시 deduction 적용)
         //     = 130,000 - 30,000 - 10,000 = 90,000원
-        const finalStoreSupport = storeSupportWithAddon - unselectedIncentive - unselectedDeduction;
+        // 이렇게 해야 선택/제거 시 총 40,000원 차이가 발생
+        const baseStoreSupport = Number(storeSupportWithAddon) || 0;
+        const finalStoreSupport = baseStoreSupport - unselectedIncentive - unselectedDeduction;
 
         // 직접입력 추가금액 반영
-        const finalWithAdditional = Math.max(0, finalStoreSupport) + (additionalStoreSupport || 0);
+        const finalWithAdditional = Math.max(0, finalStoreSupport) + (Number(additionalStoreSupport) || 0);
 
         return {
             // 현재 선택된 상태에 따른 하나의 대리점추가지원금 (직접입력 추가금액 포함)
             current: finalWithAdditional,
             // 참고용 (UI 표시용)
-            withAddon: Math.max(0, storeSupportWithAddon) + (additionalStoreSupport || 0),
-            withoutAddon: Math.max(0, storeSupportWithoutAddon) + (additionalStoreSupport || 0)
+            withAddon: Math.max(0, Number(storeSupportWithAddon) || 0) + (Number(additionalStoreSupport) || 0),
+            withoutAddon: Math.max(0, Number(storeSupportWithoutAddon) || 0) + (Number(additionalStoreSupport) || 0)
         };
     }, [selectedItems, availableAddons, availableInsurances, storeSupportWithAddon, storeSupportWithoutAddon, additionalStoreSupport]);
 
