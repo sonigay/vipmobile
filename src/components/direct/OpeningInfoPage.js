@@ -243,178 +243,184 @@ const OpeningInfoPage = ({
         loadPlanGroups();
     }, [selectedCarrier, initialData?.planGroup, initialData?.plan]);
 
-    // 필수 부가서비스 및 보험상품 로드 (정책설정에서 가져오기)
-    useEffect(() => {
-        const loadAvailableItems = async () => {
-            setLoadingAddonsAndInsurances(true);
-            try {
-                const policySettings = await directStoreApi.getPolicySettings(selectedCarrier);
-                const initialSelectedItems = [];
+    // 필수 부가서비스 및 보험상품 로드 함수 (재사용 가능하도록 분리)
+    const loadAvailableItems = useCallback(async () => {
+        setLoadingAddonsAndInsurances(true);
+        try {
+            const policySettings = await directStoreApi.getPolicySettings(selectedCarrier);
+            const initialSelectedItems = [];
 
-                // 마진 설정 값 저장
-                if (policySettings.success && policySettings.margin?.baseMargin != null) {
-                    setBaseMargin(Number(policySettings.margin.baseMargin) || 0);
-                } else {
-                    setBaseMargin(0);
-                }
+            // 마진 설정 값 저장
+            if (policySettings.success && policySettings.margin?.baseMargin != null) {
+                setBaseMargin(Number(policySettings.margin.baseMargin) || 0);
+            } else {
+                setBaseMargin(0);
+            }
 
-                if (policySettings.success && policySettings.addon?.list) {
-                    // 모든 부가서비스 목록 저장 (incentive, deduction, description, url 정보 포함)
-                    const allAddons = policySettings.addon.list.map(addon => ({
-                        name: addon.name,
-                        monthlyFee: addon.fee || 0,
-                        incentive: addon.incentive || 0,
-                        deduction: addon.deduction || 0,
-                        description: addon.description || '',
-                        url: addon.url || '',
-                        type: 'addon'
-                    }));
-                    setAvailableAddons(allAddons);
+            if (policySettings.success && policySettings.addon?.list) {
+                // 모든 부가서비스 목록 저장 (incentive, deduction, description, url 정보 포함)
+                const allAddons = policySettings.addon.list.map(addon => ({
+                    name: addon.name,
+                    monthlyFee: addon.fee || 0,
+                    incentive: addon.incentive || 0,
+                    deduction: addon.deduction || 0,
+                    description: addon.description || '',
+                    url: addon.url || '',
+                    type: 'addon'
+                }));
+                setAvailableAddons(allAddons);
 
-                    // 🔥 초기값: 정책설정에 있는 모든 부가서비스를 초기 선택
-                    // initialData에 이미 선택된 부가서비스가 있으면 그것을 우선 사용
-                    if (initialData?.additionalServices || initialData?.addons) {
-                        const savedAddonNames = (initialData.additionalServices || initialData.addons || '')
-                            .split(',')
-                            .map(name => name.trim())
-                            .filter(name => name);
+                // 🔥 초기값: 정책설정에 있는 모든 부가서비스를 초기 선택
+                // initialData에 이미 선택된 부가서비스가 있으면 그것을 우선 사용
+                if (initialData?.additionalServices || initialData?.addons) {
+                    const savedAddonNames = (initialData.additionalServices || initialData.addons || '')
+                        .split(',')
+                        .map(name => name.trim())
+                        .filter(name => name);
 
-                        // 저장된 부가서비스 이름과 매칭되는 항목만 선택
-                        const savedAddons = allAddons.filter(addon =>
-                            savedAddonNames.includes(addon.name)
-                        );
-                        initialSelectedItems.push(...savedAddons);
-                    } else {
-                        // 새로 입력하는 경우: 정책설정에 있는 모든 부가서비스를 초기 선택
-                        initialSelectedItems.push(...allAddons);
-                    }
-                }
-
-                // 보험상품: 출고가 및 모델 유형(플립/폴드 여부)에 맞는 보험상품 찾기
-                if (policySettings.success && policySettings.insurance?.list && factoryPrice > 0) {
-                    const insuranceList = policySettings.insurance.list || [];
-
-                    // 현재 단말이 플립/폴드 계열인지 여부 (펫네임/모델명 기준)
-                    const modelNameForCheck = (initialData?.petName || initialData?.model || '').toString();
-                    const lowerModelName = modelNameForCheck.toLowerCase();
-                    const flipFoldKeywords = ['플립', '폴드', 'flip', 'fold'];
-                    const isFlipFoldModel = flipFoldKeywords.some(keyword =>
-                        lowerModelName.includes(keyword.toLowerCase())
+                    // 저장된 부가서비스 이름과 매칭되는 항목만 선택
+                    const savedAddons = allAddons.filter(addon =>
+                        savedAddonNames.includes(addon.name)
                     );
+                    initialSelectedItems.push(...savedAddons);
+                } else {
+                    // 새로 입력하는 경우: 정책설정에 있는 모든 부가서비스를 초기 선택
+                    initialSelectedItems.push(...allAddons);
+                }
+            } else {
+                setAvailableAddons([]);
+            }
 
-                    // 보험상품 중 이름에 플립/폴드 관련 키워드가 포함된 상품
-                    const flipFoldInsurances = insuranceList.filter(item => {
-                        const name = (item.name || '').toString().toLowerCase();
-                        return flipFoldKeywords.some(keyword =>
-                            name.includes(keyword.toLowerCase())
-                        );
+            // 보험상품: 출고가 및 모델 유형(플립/폴드 여부)에 맞는 보험상품 찾기
+            if (policySettings.success && policySettings.insurance?.list && factoryPrice > 0) {
+                const insuranceList = policySettings.insurance.list || [];
+
+                // 현재 단말이 플립/폴드 계열인지 여부 (펫네임/모델명 기준)
+                const modelNameForCheck = (initialData?.petName || initialData?.model || '').toString();
+                const lowerModelName = modelNameForCheck.toLowerCase();
+                const flipFoldKeywords = ['플립', '폴드', 'flip', 'fold'];
+                const isFlipFoldModel = flipFoldKeywords.some(keyword =>
+                    lowerModelName.includes(keyword.toLowerCase())
+                );
+
+                // 보험상품 중 이름에 플립/폴드 관련 키워드가 포함된 상품
+                const flipFoldInsurances = insuranceList.filter(item => {
+                    const name = (item.name || '').toString().toLowerCase();
+                    return flipFoldKeywords.some(keyword =>
+                        name.includes(keyword.toLowerCase())
+                    );
+                });
+
+                // 일반 보험상품 (플립/폴드 전용 상품 제외)
+                const normalInsurances = insuranceList.filter(item => !flipFoldInsurances.includes(item));
+
+                let matchingInsurance = null;
+
+                if (selectedCarrier === 'LG' && isFlipFoldModel && flipFoldInsurances.length > 0) {
+                    matchingInsurance = flipFoldInsurances.find(insurance => {
+                        const minPrice = insurance.minPrice || 0;
+                        const maxPrice = insurance.maxPrice || 9999999;
+                        return factoryPrice >= minPrice && factoryPrice <= maxPrice;
+                    }) || flipFoldInsurances[0];
+                } else {
+                    const baseList = normalInsurances.length > 0 ? normalInsurances : insuranceList;
+                    matchingInsurance = baseList.find(insurance => {
+                        const minPrice = insurance.minPrice || 0;
+                        const maxPrice = insurance.maxPrice || 9999999;
+                        return factoryPrice >= minPrice && factoryPrice <= maxPrice;
                     });
+                }
 
-                    // 일반 보험상품 (플립/폴드 전용 상품 제외)
-                    const normalInsurances = insuranceList.filter(item => !flipFoldInsurances.includes(item));
+                // 모든 보험상품 목록 저장 (incentive, deduction, description, url 정보 포함)
+                // 플립/폴드 모델일 때는 플립/폴드 보험상품만, 아닐 때는 일반 보험상품만 표시
+                const allInsurances = insuranceList
+                    .filter(insurance => {
+                        // 출고가 범위 체크
+                        const minPrice = insurance.minPrice || 0;
+                        const maxPrice = insurance.maxPrice || 9999999;
+                        const isPriceMatch = factoryPrice >= minPrice && factoryPrice <= maxPrice;
 
-                    let matchingInsurance = null;
+                        if (!isPriceMatch) return false;
 
-                    if (selectedCarrier === 'LG' && isFlipFoldModel && flipFoldInsurances.length > 0) {
-                        matchingInsurance = flipFoldInsurances.find(insurance => {
-                            const minPrice = insurance.minPrice || 0;
-                            const maxPrice = insurance.maxPrice || 9999999;
-                            return factoryPrice >= minPrice && factoryPrice <= maxPrice;
-                        }) || flipFoldInsurances[0];
-                    } else {
-                        const baseList = normalInsurances.length > 0 ? normalInsurances : insuranceList;
-                        matchingInsurance = baseList.find(insurance => {
-                            const minPrice = insurance.minPrice || 0;
-                            const maxPrice = insurance.maxPrice || 9999999;
-                            return factoryPrice >= minPrice && factoryPrice <= maxPrice;
-                        });
-                    }
-
-                    // 모든 보험상품 목록 저장 (incentive, deduction, description, url 정보 포함)
-                    // 플립/폴드 모델일 때는 플립/폴드 보험상품만, 아닐 때는 일반 보험상품만 표시
-                    const allInsurances = insuranceList
-                        .filter(insurance => {
-                            // 출고가 범위 체크
-                            const minPrice = insurance.minPrice || 0;
-                            const maxPrice = insurance.maxPrice || 9999999;
-                            const isPriceMatch = factoryPrice >= minPrice && factoryPrice <= maxPrice;
-
-                            if (!isPriceMatch) return false;
-
-                            // 보험상품 이름 확인
-                            const insuranceName = (insurance.name || '').toString().toLowerCase();
-                            const isFlipFoldInsurance = flipFoldKeywords.some(keyword =>
-                                insuranceName.includes(keyword.toLowerCase())
-                            );
-
-                            // 플립/폴드 모델일 때는 플립/폴드 보험상품만, 아닐 때는 일반 보험상품만
-                            if (isFlipFoldModel) {
-                                // 플립/폴드 모델: 플립/폴드 보험상품만 포함
-                                if (!isFlipFoldInsurance) {
-                                    return false; // 일반 보험상품 제외
-                                }
-                            } else {
-                                // 일반 모델: 일반 보험상품만 포함
-                                if (isFlipFoldInsurance) {
-                                    return false; // 플립/폴드 보험상품 제외
-                                }
-                            }
-
-                            return true;
-                        })
-                        .map(insurance => ({
-                            name: insurance.name,
-                            monthlyFee: insurance.fee || 0,
-                            incentive: insurance.incentive || 0,
-                            deduction: insurance.deduction || 0,
-                            description: insurance.description || '',
-                            url: insurance.url || '',
-                            type: 'insurance'
-                        }));
-                    setAvailableInsurances(allInsurances);
-
-                    // 🔥 초기값: 정책설정에 있는 보험상품 중 출고가에 맞는 항목을 초기 선택
-                    // initialData에 이미 선택된 보험상품이 있으면 그것을 우선 사용
-                    if (initialData?.additionalServices || initialData?.addons) {
-                        const savedItemNames = (initialData.additionalServices || initialData.addons || '')
-                            .split(',')
-                            .map(name => name.trim())
-                            .filter(name => name);
-
-                        // 저장된 보험상품 이름과 매칭되는 항목만 선택
-                        const savedInsurances = allInsurances.filter(insurance =>
-                            savedItemNames.includes(insurance.name)
+                        // 보험상품 이름 확인
+                        const insuranceName = (insurance.name || '').toString().toLowerCase();
+                        const isFlipFoldInsurance = flipFoldKeywords.some(keyword =>
+                            insuranceName.includes(keyword.toLowerCase())
                         );
-                        initialSelectedItems.push(...savedInsurances);
-                    } else {
-                        // 새로 입력하는 경우: 기존 로직대로 플립/폴드는 해당 상품, 그 외는 일반 보험을 선택
-                        // matchingInsurance가 있으면 그것을 선택, 없으면 첫 번째 보험상품 선택
-                        if (matchingInsurance) {
-                            const matchedInsurance = allInsurances.find(ins => ins.name === matchingInsurance.name);
-                            if (matchedInsurance) {
-                                initialSelectedItems.push(matchedInsurance);
-                            } else if (allInsurances.length > 0) {
-                                // 매칭되는 보험상품이 없으면 첫 번째 보험상품 선택
-                                initialSelectedItems.push(allInsurances[0]);
+
+                        // 플립/폴드 모델일 때는 플립/폴드 보험상품만, 아닐 때는 일반 보험상품만
+                        if (isFlipFoldModel) {
+                            // 플립/폴드 모델: 플립/폴드 보험상품만 포함
+                            if (!isFlipFoldInsurance) {
+                                return false; // 일반 보험상품 제외
                             }
+                        } else {
+                            // 일반 모델: 일반 보험상품만 포함
+                            if (isFlipFoldInsurance) {
+                                return false; // 플립/폴드 보험상품 제외
+                            }
+                        }
+
+                        return true;
+                    })
+                    .map(insurance => ({
+                        name: insurance.name,
+                        monthlyFee: insurance.fee || 0,
+                        incentive: insurance.incentive || 0,
+                        deduction: insurance.deduction || 0,
+                        description: insurance.description || '',
+                        url: insurance.url || '',
+                        type: 'insurance'
+                    }));
+                setAvailableInsurances(allInsurances);
+
+                // 🔥 초기값: 정책설정에 있는 보험상품 중 출고가에 맞는 항목을 초기 선택
+                // initialData에 이미 선택된 보험상품이 있으면 그것을 우선 사용
+                if (initialData?.additionalServices || initialData?.addons) {
+                    const savedItemNames = (initialData.additionalServices || initialData.addons || '')
+                        .split(',')
+                        .map(name => name.trim())
+                        .filter(name => name);
+
+                    // 저장된 보험상품 이름과 매칭되는 항목만 선택
+                    const savedInsurances = allInsurances.filter(insurance =>
+                        savedItemNames.includes(insurance.name)
+                    );
+                    initialSelectedItems.push(...savedInsurances);
+                } else {
+                    // 새로 입력하는 경우: 기존 로직대로 플립/폴드는 해당 상품, 그 외는 일반 보험을 선택
+                    // matchingInsurance가 있으면 그것을 선택, 없으면 첫 번째 보험상품 선택
+                    if (matchingInsurance) {
+                        const matchedInsurance = allInsurances.find(ins => ins.name === matchingInsurance.name);
+                        if (matchedInsurance) {
+                            initialSelectedItems.push(matchedInsurance);
                         } else if (allInsurances.length > 0) {
-                            // matchingInsurance가 없어도 보험상품이 있으면 첫 번째 보험상품 선택
+                            // 매칭되는 보험상품이 없으면 첫 번째 보험상품 선택
                             initialSelectedItems.push(allInsurances[0]);
                         }
+                    } else if (allInsurances.length > 0) {
+                        // matchingInsurance가 없어도 보험상품이 있으면 첫 번째 보험상품 선택
+                        initialSelectedItems.push(allInsurances[0]);
                     }
                 }
-
-                // 초기 선택 항목 설정
-                setSelectedItems(initialSelectedItems);
-            } catch (err) {
-                console.error('부가서비스/보험상품 로드 실패:', err);
-                setSelectedItems([]);
-            } finally {
-                setLoadingAddonsAndInsurances(false);
+            } else {
+                setAvailableInsurances([]);
             }
-        };
+
+            // 초기 선택 항목 설정
+            setSelectedItems(initialSelectedItems);
+        } catch (err) {
+            console.error('부가서비스/보험상품 로드 실패:', err);
+            setSelectedItems([]);
+        } finally {
+            setLoadingAddonsAndInsurances(false);
+        }
+    }, [selectedCarrier, factoryPrice, initialData?.petName, initialData?.model, initialData?.additionalServices, initialData?.addons]);
+
+    // 필수 부가서비스 및 보험상품 로드 (정책설정에서 가져오기)
+    useEffect(() => {
         loadAvailableItems();
-    }, [selectedCarrier, factoryPrice, initialData?.petName, initialData?.model]);
+    }, [loadAvailableItems]);
 
     // 사전승낙서 마크 로드
     useEffect(() => {
@@ -1471,10 +1477,28 @@ const OpeningInfoPage = ({
                                                 <>
                                                     {/* 선택 가능한 항목 목록 (부가서비스 + 보험상품) */}
                                                     <Box sx={{ mb: 2 }}>
-                                                        <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold', color: 'text.secondary' }}>
-                                                            선택 가능한 항목
-                                                        </Typography>
-                                                        {[...availableAddons, ...availableInsurances].length === 0 ? (
+                                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                                                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'text.secondary' }}>
+                                                                선택 가능한 항목
+                                                            </Typography>
+                                                            <Button
+                                                                size="small"
+                                                                startIcon={<RefreshIcon />}
+                                                                onClick={loadAvailableItems}
+                                                                disabled={loadingAddonsAndInsurances}
+                                                                sx={{ minWidth: 'auto', px: 1 }}
+                                                            >
+                                                                새로고침
+                                                            </Button>
+                                                        </Box>
+                                                        {loadingAddonsAndInsurances ? (
+                                                            <Box sx={{ py: 2, textAlign: 'center' }}>
+                                                                <CircularProgress size={24} />
+                                                                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                                                    부가서비스 및 보험상품을 불러오는 중...
+                                                                </Typography>
+                                                            </Box>
+                                                        ) : [...availableAddons, ...availableInsurances].length === 0 ? (
                                                             <Box sx={{ py: 2, textAlign: 'center' }}>
                                                                 <Typography variant="body2" color="text.secondary">
                                                                     선택 가능한 항목이 없습니다.
