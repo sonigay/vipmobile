@@ -702,7 +702,7 @@ const OpeningInfoPage = ({
                     const purchasePrice = factoryPrice - appliedPublicSupport - appliedStoreSupport;
 
                     if (isNaN(purchasePrice)) return 0;
-                    
+
                     // 기본 마진 계산
                     let calculatedMargin = 0;
                     if (purchasePrice >= 0) {
@@ -710,7 +710,7 @@ const OpeningInfoPage = ({
                     } else {
                         calculatedMargin = Math.abs(purchasePrice);
                     }
-                    
+
                     // 🔥 대리점추가지원금 직접입력 반영
                     // 음수면 그 절대값만큼 마진에 추가, 양수면 그 값만큼 마진에서 차감
                     // 예: 직접입력 -40,000원 → 마진 +40,000원
@@ -724,7 +724,7 @@ const OpeningInfoPage = ({
                             calculatedMargin = Math.max(0, calculatedMargin - additionalStoreSupport);
                         }
                     }
-                    
+
                     return calculatedMargin;
                 })(),
                 // 계산된 값들 (참고용, 시트에는 저장 안 됨)
@@ -847,15 +847,14 @@ const OpeningInfoPage = ({
                 @media print {
                     @page {
                         size: A4;
-                        margin: 3mm;
+                        margin: 5mm; /* 최소 여백 확보 */
                     }
 
-                    /* 기본 설정: 배경색 출력 및 크기 제한 해제 */
-                    html, body {
+                    /* 기본 설정: 모든 부모 요소의 높이 제한 해제 */
+                    html, body, #root, .App {
                         height: auto !important;
+                        min-height: 100% !important;
                         overflow: visible !important;
-                        -webkit-print-color-adjust: exact !important;
-                        print-color-adjust: exact !important;
                         background-color: white !important;
                     }
 
@@ -863,7 +862,8 @@ const OpeningInfoPage = ({
                     .no-print, 
                     .MuiIconButton-root, 
                     header, 
-                    nav {
+                    nav,
+                    .MuiDialog-container {
                         display: none !important;
                     }
                     
@@ -872,7 +872,6 @@ const OpeningInfoPage = ({
                         display: block !important;
                     }
 
-                    /* 메인 컨테이너 설정 */
                     /* 메인 컨테이너 설정 */
                     .print-root {
                         /* 
@@ -888,13 +887,23 @@ const OpeningInfoPage = ({
                         /* A4 용지에 맞게 축소 */
                         zoom: 0.75; 
                         
+                        /* 높이 제한 해제 및 오버플로우 표시 */
                         height: auto !important;
+                        min-height: 100% !important;
                         overflow: visible !important;
-                        background-color: white !important;
                         
-                        /* 여백 초기화 */
+                        /* 배경 및 여백 설정 */
+                        background-color: white !important;
                         margin: 0 !important;
                         padding: 0 !important;
+                        
+                        /* 스크롤바 숨김 */
+                        scrollbar-width: none;
+                        -ms-overflow-style: none;
+                    }
+                    
+                    .print-root::-webkit-scrollbar {
+                        display: none;
                     }
 
                     /* 
