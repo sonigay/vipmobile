@@ -4416,7 +4416,7 @@ app.post('/api/member/login', async (req, res) => {
     const response = await rateLimitedSheetsCall(() =>
       sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
-        range: '직영점_판매일보!A:AA'
+        range: '직영점_판매일보!A:AB', // 🔥 수정: AB로 확장
       })
     );
 
@@ -6338,7 +6338,7 @@ const DIRECT_SALES_HEADERS = [
   '번호', 'POS코드', '업체명', '매장ID', '판매일시', '고객명', 'CTN', '통신사',
   '단말기모델명', '색상', '단말일련번호', '유심모델명', '유심일련번호',
   '개통유형', '전통신사', '할부구분', '할부개월', '약정', '요금제', '부가서비스',
-  '출고가', '이통사지원금', '대리점추가지원금', '대리점추가지원금직접입력', '마진', '상태'
+  '출고가', '이통사지원금', '대리점추가지원금', '대리점추가지원금직접입력', '마진', '할부원금', 'LG프리미어약정', '상태'
 ];
 
 // GET /api/direct/sales: 판매일보 목록 조회
@@ -6348,7 +6348,7 @@ app.get('/api/direct/sales', async (req, res) => {
     await rateLimitedSheetsCall(() =>
       sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
-        range: '직영점_판매일보!A1:AA1',
+        range: '직영점_판매일보!A1:AB1', // 🔥 수정: AB로 확장
         valueInputOption: 'RAW',
         resource: { values: [DIRECT_SALES_HEADERS] }
       })
@@ -6357,7 +6357,7 @@ app.get('/api/direct/sales', async (req, res) => {
     const response = await rateLimitedSheetsCall(() =>
       sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
-        range: '직영점_판매일보!A:AA'
+        range: '직영점_판매일보!A:AB', // 🔥 수정: AB로 확장
       })
     );
 
@@ -6387,10 +6387,10 @@ app.get('/api/direct/sales', async (req, res) => {
         soldAt: row[4] || '',
         customerName: row[5] || '',
         고객명: row[5] || '',
-        customerContact: row[6] || '',
-        CTN: row[6] || '',
-        ctn: row[6] || '',
-        연락처: row[6] || '',
+        customerContact: String(row[6] || '').replace(/^'/, ''), // 🔥 수정: CTN을 텍스트로 불러오기 (앞의 ' 접두사 제거하여 앞의 0 유지)
+        CTN: String(row[6] || '').replace(/^'/, ''), // 🔥 수정: CTN을 텍스트로 불러오기 (앞의 ' 접두사 제거하여 앞의 0 유지)
+        ctn: String(row[6] || '').replace(/^'/, ''), // 🔥 수정: CTN을 텍스트로 불러오기 (앞의 ' 접두사 제거하여 앞의 0 유지)
+        연락처: String(row[6] || '').replace(/^'/, ''), // 🔥 수정: CTN을 텍스트로 불러오기 (앞의 ' 접두사 제거하여 앞의 0 유지)
         carrier: row[7] || '',
         통신사: row[7] || '',
         model: row[8] || '',
@@ -6440,8 +6440,12 @@ app.get('/api/direct/sales', async (req, res) => {
         '대리점추가지원금(부가미유치)': Number(row[23] || 0),
         margin: Number(row[24] || 0),
         마진: Number(row[24] || 0),
-        status: row[25] || '',
-        상태: row[25] || ''
+        installmentPrincipal: Number(row[25] || 0), // 🔥 추가: 할부원금
+        할부원금: Number(row[25] || 0), // 🔥 추가: 할부원금 (한글 필드명)
+        lgPremier: row[26] === 'Y' || row[26] === true || row[26] === 'true', // 🔥 추가: LG 프리미어 약정 적용
+        프리미어약정: row[26] === 'Y' || row[26] === true || row[26] === 'true', // 🔥 추가: LG 프리미어 약정 적용 (한글 필드명)
+        status: row[27] || '',
+        상태: row[27] || ''
       }))
       .filter(report => {
         // 빈 행 제외
@@ -6505,7 +6509,7 @@ app.post('/api/direct/sales', async (req, res) => {
       data.storeId || '',                       // 매장ID
       soldAt,                                   // 판매일시
       data.customerName || '',                  // 고객명
-      String(data.customerContact || ''),       // 🔥 수정: CTN을 문자열로 명시적 변환하여 앞의 0 유지
+      `'${String(data.customerContact || '')}`, // 🔥 수정: CTN을 텍스트 형식으로 저장 (앞의 0 유지)
       data.carrier || '',                       // 통신사
       data.model || '',                         // 단말기모델명
       data.color || '',                         // 색상
@@ -6524,6 +6528,8 @@ app.post('/api/direct/sales', async (req, res) => {
       data.storeSupport || data.storeSupportWithAddon || 0, // 대리점추가지원금 (통합)
       data.additionalStoreSupport || 0,         // 대리점추가지원금 직접입력
       data.margin || 0,                         // 마진
+      data.installmentPrincipal || 0,           // 🔥 추가: 할부원금
+      data.lgPremier ? 'Y' : 'N',               // 🔥 추가: LG 프리미어 약정 적용 (Y/N)
       data.status || '개통대기'                  // 상태
     ];
 
@@ -6531,7 +6537,7 @@ app.post('/api/direct/sales', async (req, res) => {
     await rateLimitedSheetsCall(() =>
       sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
-        range: '직영점_판매일보!A1:AA1',
+        range: '직영점_판매일보!A1:AB1', // 🔥 수정: AB로 확장
         valueInputOption: 'RAW',
         resource: { values: [DIRECT_SALES_HEADERS] }
       })
@@ -6540,8 +6546,8 @@ app.post('/api/direct/sales', async (req, res) => {
     await rateLimitedSheetsCall(() =>
       sheets.spreadsheets.values.append({
         spreadsheetId: SPREADSHEET_ID,
-        range: '직영점_판매일보!A2:AA2',
-        valueInputOption: 'USER_ENTERED',
+        range: '직영점_판매일보!A2:AB2', // 🔥 수정: AB로 확장 (할부원금, LG프리미어약정 추가)
+        valueInputOption: 'RAW', // 🔥 수정: RAW로 변경하여 텍스트 형식 유지 (CTN 앞의 0 유지)
         insertDataOption: 'INSERT_ROWS',
         resource: {
           values: [row]
@@ -6573,7 +6579,7 @@ app.put('/api/direct/sales/:id', async (req, res) => {
     const response = await rateLimitedSheetsCall(() =>
       sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
-        range: '직영점_판매일보!A:AA'
+        range: '직영점_판매일보!A:AB', // 🔥 수정: AB로 확장
       })
     );
 
@@ -6614,7 +6620,7 @@ app.put('/api/direct/sales/:id', async (req, res) => {
       data.storeId || existingRow[3] || '',      // 매장ID
       data.soldAt || existingRow[4] || '',       // 판매일시
       data.customerName || existingRow[5] || '', // 고객명
-      String(data.customerContact !== undefined ? data.customerContact : (existingRow[6] || '')), // 🔥 수정: CTN을 문자열로 명시적 변환하여 앞의 0 유지
+      data.customerContact !== undefined ? `'${String(data.customerContact)}` : (existingRow[6] ? (String(existingRow[6]).startsWith("'") ? String(existingRow[6]) : `'${String(existingRow[6])}`) : ''), // 🔥 수정: CTN을 텍스트 형식으로 저장 (앞의 0 유지)
       data.carrier || existingRow[7] || '',      // 통신사
       data.model || existingRow[8] || '',        // 단말기모델명
       data.color || existingRow[9] || '',        // 색상
@@ -6633,15 +6639,17 @@ app.put('/api/direct/sales/:id', async (req, res) => {
       data.storeSupport || data.storeSupportWithAddon || existingRow[22] || 0, // 대리점추가지원금 (통합)
       data.additionalStoreSupport !== undefined ? data.additionalStoreSupport : (existingRow[23] || 0), // 대리점추가지원금 직접입력
       data.margin || existingRow[24] || 0,       // 마진
-      data.status || existingRow[25] || '개통대기' // 상태
+      data.installmentPrincipal !== undefined ? data.installmentPrincipal : (existingRow[25] || 0), // 🔥 추가: 할부원금
+      data.lgPremier !== undefined ? (data.lgPremier ? 'Y' : 'N') : (existingRow[26] || 'N'), // 🔥 추가: LG 프리미어 약정 적용
+      data.status || existingRow[27] || '개통대기' // 상태
     ];
 
     // 행 업데이트 (행 번호는 2부터 시작, 헤더 제외)
     await rateLimitedSheetsCall(() =>
       sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
-        range: `직영점_판매일보!A${rowIndex + 2}:AA${rowIndex + 2}`,
-        valueInputOption: 'USER_ENTERED',
+        range: `직영점_판매일보!A${rowIndex + 2}:AB${rowIndex + 2}`, // 🔥 수정: AB로 확장
+        valueInputOption: 'RAW', // 🔥 수정: RAW로 변경하여 텍스트 형식 유지 (CTN 앞의 0 유지)
         resource: {
           values: [updatedRow]
         }
