@@ -296,8 +296,12 @@ const CustomerPurchaseQueueTab = ({ customerInfo, isManagementMode = false, logg
                                 petName: selectedRow.model,
                                 factoryPrice: selectedRow.factoryPrice || 0,
                                 publicSupport: selectedRow.carrierSupport || 0,
-                                storeSupport: selectedRow.dealerSupportWithAdd || 0,
-                                storeSupportNoAddon: selectedRow.dealerSupportWithoutAdd || 0,
+                                // 🔥 수정: 구매대기에서 저장된 대리점추가지원금을 정확히 전달
+                                storeSupport: selectedRow.dealerSupportWithAdd || 0, // 저장된 대리점추가지원금
+                                대리점추가지원금: selectedRow.dealerSupportWithAdd || 0, // 한글 필드명도 추가
+                                // 🔥 수정: dealerSupportWithoutAdd는 실제로는 대리점추가지원금직접입력이므로 additionalStoreSupport로 매핑
+                                additionalStoreSupport: selectedRow.dealerSupportWithoutAdd !== undefined && selectedRow.dealerSupportWithoutAdd !== null ? Number(selectedRow.dealerSupportWithoutAdd) : null,
+                                대리점추가지원금직접입력: selectedRow.dealerSupportWithoutAdd !== undefined && selectedRow.dealerSupportWithoutAdd !== null ? Number(selectedRow.dealerSupportWithoutAdd) : null,
                                 openingType: reverseConvertOpeningType(selectedRow.activationType),
                                 customerName: selectedRow.name,
                                 customerContact: selectedRow.ctn,
