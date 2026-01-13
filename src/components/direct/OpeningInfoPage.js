@@ -563,12 +563,21 @@ const OpeningInfoPage = ({
         // 예: 저장된 값 790000 (보험 1개만 유치, 보험 incentive 40000 포함)
         //     초기 선택: 보험 1개 (incentive 40000)
         //     현재 선택: 보험 1개 + 부가서비스 1개 (incentive 40000 + 30000, deduction -10000)
-        //     = 790000 - 40000 + (40000 + 30000) + (-10000) = 790000 + 30000 - 10000 = 810000
+        //     유치 시: incentive + |deduction| = 30000 + 10000 = 40000 증가
+        //     = 790000 - 40000 + (40000 + 30000 + 10000) = 790000 + 30000 + 10000 = 830000
         const initialSelectedIncentive = (initialSelectedItemsRef.current || []).reduce((sum, item) => sum + (Number(item.incentive) || 0), 0);
-        const initialSelectedDeduction = (initialSelectedItemsRef.current || []).reduce((sum, item) => sum + (Number(item.deduction) || 0), 0);
+        // 🔥 수정: deduction이 음수이므로, 유치 시에는 절댓값을 더해야 함 (미유치 시 차감이므로 유치 시에는 더함)
+        const initialSelectedDeduction = (initialSelectedItemsRef.current || []).reduce((sum, item) => {
+            const deduction = Number(item.deduction) || 0;
+            return sum + Math.abs(deduction); // 유치 시에는 절댓값을 더함
+        }, 0);
         
         const selectedIncentive = selectedItems.reduce((sum, item) => sum + (Number(item.incentive) || 0), 0);
-        const selectedDeduction = selectedItems.reduce((sum, item) => sum + (Number(item.deduction) || 0), 0);
+        // 🔥 수정: deduction이 음수이므로, 유치 시에는 절댓값을 더해야 함
+        const selectedDeduction = selectedItems.reduce((sum, item) => {
+            const deduction = Number(item.deduction) || 0;
+            return sum + Math.abs(deduction); // 유치 시에는 절댓값을 더함
+        }, 0);
         
         // 🔥 수정: 저장된 값에서 초기 선택 항목의 incentive/deduction을 빼고, 현재 선택 항목의 incentive/deduction을 더함
         const finalStoreSupport = baseStoreSupport - initialSelectedIncentive - initialSelectedDeduction + selectedIncentive + selectedDeduction;
