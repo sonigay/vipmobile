@@ -558,20 +558,20 @@ const OpeningInfoPage = ({
             ? Number(savedStoreSupport)
             : (Number(storeSupportWithAddon) || 0);
 
-        // 🔥 수정: 저장된 값은 특정 상태(예: 보험 1개만 유치)의 값이므로,
-        // 현재 선택된 항목들의 incentive와 deduction을 더해야 함
-        // 예: 저장된 값 790000 (보험 1개만 유치 상태)
-        //     부가서비스 추가 (유치 30000, 미유치 -10000)
-        //     = 790000 + 30000 + 10000 = 830000
-        // 하지만 저장된 값에 이미 보험의 incentive/deduction이 포함되어 있으므로,
-        // 현재 선택된 항목들의 incentive/deduction만 더하면 됨
+        // 🔥 수정: 저장된 값은 초기 선택된 항목(예: 보험 1개)의 incentive/deduction이 이미 포함된 값
+        // 따라서 초기 선택된 항목의 incentive/deduction을 빼고, 현재 선택된 항목의 incentive/deduction을 더해야 함
+        // 예: 저장된 값 790000 (보험 1개만 유치, 보험 incentive 40000 포함)
+        //     초기 선택: 보험 1개 (incentive 40000)
+        //     현재 선택: 보험 1개 + 부가서비스 1개 (incentive 40000 + 30000, deduction -10000)
+        //     = 790000 - 40000 + (40000 + 30000) + (-10000) = 790000 + 30000 - 10000 = 810000
+        const initialSelectedIncentive = (initialSelectedItemsRef.current || []).reduce((sum, item) => sum + (Number(item.incentive) || 0), 0);
+        const initialSelectedDeduction = (initialSelectedItemsRef.current || []).reduce((sum, item) => sum + (Number(item.deduction) || 0), 0);
+        
         const selectedIncentive = selectedItems.reduce((sum, item) => sum + (Number(item.incentive) || 0), 0);
         const selectedDeduction = selectedItems.reduce((sum, item) => sum + (Number(item.deduction) || 0), 0);
         
-        // 🔥 수정: baseStoreSupport는 이미 특정 상태의 값이므로, 
-        // 현재 선택된 항목들의 incentive와 deduction을 더함
-        // deduction은 음수일 수 있으므로 더하면 됨 (예: -10000)
-        const finalStoreSupport = baseStoreSupport + selectedIncentive + selectedDeduction;
+        // 🔥 수정: 저장된 값에서 초기 선택 항목의 incentive/deduction을 빼고, 현재 선택 항목의 incentive/deduction을 더함
+        const finalStoreSupport = baseStoreSupport - initialSelectedIncentive - initialSelectedDeduction + selectedIncentive + selectedDeduction;
 
         // 직접입력 추가금액 반영 (음수도 허용)
         const additionalAmount = additionalStoreSupport !== null && additionalStoreSupport !== undefined ? Number(additionalStoreSupport) : 0;
