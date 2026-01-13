@@ -860,8 +860,19 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
         {isCustomerMode ? '실시간 휴대폰 시세표' : '휴대폰시세표'}
       </Typography>
 
-      {/* 통신사 탭 및 컨트롤 패널 - 테이블 외부 (고정 안됨) */}
-      <Paper sx={{ mb: 2, p: 2, bgcolor: 'background.paper', borderRadius: 2 }}>
+      {/* 통신사 탭 및 컬럼 헤더 - 고정 */}
+      <Paper 
+        sx={{ 
+          mb: 0, 
+          p: 2, 
+          bgcolor: 'background.paper', 
+          borderRadius: 0,
+          position: 'sticky',
+          top: 0,
+          zIndex: 20,
+          boxShadow: 2
+        }}
+      >
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
           <Box sx={{ flexGrow: 1 }}>
             <Tabs
@@ -901,7 +912,7 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
 
         {/* 상태 단계 표시 */}
         {loading && (
-          <Box sx={{ display: 'flex', gap: 1 }}>
+          <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
             {Object.values(steps).map((step, index) => (
               <Chip
                 key={index}
@@ -918,6 +929,139 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
             ))}
           </Box>
         )}
+
+        {/* 컬럼 헤더 */}
+        <TableContainer sx={{ overflowX: 'auto', overflowY: 'hidden' }}>
+          <Table sx={{ minWidth: 1000, borderCollapse: 'separate', borderSpacing: 0 }}>
+            <TableHead>
+              <TableRow>
+                {!isCustomerMode && (
+                  <ModernTableCell
+                    align="center"
+                    width="120"
+                    sx={{
+                      backgroundColor: 'background.paper',
+                      fontWeight: 'bold',
+                      borderBottom: '2px solid',
+                      borderColor: 'divider'
+                    }}
+                  >
+                    구분
+                  </ModernTableCell>
+                )}
+                <ModernTableCell
+                  align="center"
+                  width="100"
+                  sx={{
+                    backgroundColor: 'background.paper',
+                    fontWeight: 'bold',
+                    borderBottom: '2px solid',
+                    borderColor: 'divider'
+                  }}
+                >
+                  이미지
+                </ModernTableCell>
+                <ModernTableCell
+                  align="center"
+                  width="220"
+                  sx={{
+                    backgroundColor: 'background.paper',
+                    fontWeight: 'bold',
+                    borderBottom: '2px solid',
+                    borderColor: 'divider'
+                  }}
+                >
+                  모델명 / 펫네임
+                </ModernTableCell>
+                <ModernTableCell
+                  align="center"
+                  width="120"
+                  sx={{
+                    backgroundColor: 'background.paper',
+                    fontWeight: 'bold',
+                    borderBottom: '2px solid',
+                    borderColor: 'divider'
+                  }}
+                >
+                  요금제군
+                </ModernTableCell>
+                <ModernTableCell
+                  align="center"
+                  width="100"
+                  sx={{
+                    backgroundColor: 'background.paper',
+                    fontWeight: 'bold',
+                    borderBottom: '2px solid',
+                    borderColor: 'divider'
+                  }}
+                >
+                  유형
+                </ModernTableCell>
+                <ModernTableCell
+                  align="center"
+                  width="100"
+                  sx={{
+                    backgroundColor: 'background.paper',
+                    fontWeight: 'bold',
+                    borderBottom: '2px solid',
+                    borderColor: 'divider'
+                  }}
+                >
+                  출고가
+                </ModernTableCell>
+                <ModernTableCell
+                  align="center"
+                  width="100"
+                  sx={{
+                    backgroundColor: 'background.paper',
+                    fontWeight: 'bold',
+                    borderBottom: '2px solid',
+                    borderColor: 'divider'
+                  }}
+                >
+                  이통사지원금
+                </ModernTableCell>
+                <ModernTableCell
+                  align="center"
+                  colSpan={2}
+                  width="180"
+                  sx={{
+                    borderLeft: '1px solid rgba(81, 81, 81, 0.5)',
+                    backgroundColor: 'background.paper',
+                    fontWeight: 'bold',
+                    borderBottom: '2px solid',
+                    borderColor: 'divider'
+                  }}
+                >
+                  대리점 지원금
+                  <Box sx={{ display: 'flex', justifyContent: 'space-around', fontSize: '0.75rem', color: 'text.secondary', mt: 0.5 }}>
+                    <span>부가유치</span>
+                    <span>미유치</span>
+                  </Box>
+                </ModernTableCell>
+                <ModernTableCell
+                  align="center"
+                  colSpan={2}
+                  width="180"
+                  sx={{
+                    borderLeft: '1px solid rgba(81, 81, 81, 0.5)',
+                    bgcolor: 'rgba(212, 175, 55, 0.1)',
+                    backgroundColor: 'rgba(212, 175, 55, 0.1)',
+                    fontWeight: 'bold',
+                    borderBottom: '2px solid',
+                    borderColor: 'divider'
+                  }}
+                >
+                  구매가 (할부원금)
+                  <Box sx={{ display: 'flex', justifyContent: 'space-around', fontSize: '0.75rem', color: 'text.secondary', mt: 0.5 }}>
+                    <span>부가유치</span>
+                    <span>미유치</span>
+                  </Box>
+                </ModernTableCell>
+              </TableRow>
+            </TableHead>
+          </Table>
+        </TableContainer>
       </Paper>
 
       {/* 에러 메시지 */}
@@ -951,146 +1095,13 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                 overflowX: 'auto',
                 overflowY: 'auto',
                 maxWidth: '100%',
-                // 테이블 본문만 스크롤되도록 높이 설정 (헤더 고정 위해)
+                // 테이블 본문만 스크롤되도록 높이 설정
                 height: { xs: 'calc(100vh - 400px)', sm: 'calc(100vh - 350px)', md: 'calc(100vh - 300px)' },
                 maxHeight: { xs: 'calc(100vh - 400px)', sm: 'calc(100vh - 350px)', md: 'calc(100vh - 300px)' },
                 position: 'relative'
               }}
             >
-              <Table stickyHeader sx={{ minWidth: 1000, borderCollapse: 'separate', borderSpacing: 0 }}>
-              <TableHead>
-                <TableRow>
-                  {!isCustomerMode && (
-                    <ModernTableCell
-                      align="center"
-                      width="120"
-                      sx={{
-                        position: 'sticky',
-                        left: 0,
-                        top: 0,
-                        zIndex: 11,
-                        backgroundColor: 'background.paper',
-                        boxShadow: '2px 0 4px rgba(0,0,0,0.1)'
-                      }}
-                    >
-                      구분
-                    </ModernTableCell>
-                  )}
-                  <ModernTableCell
-                    align="center"
-                    width="100"
-                    sx={{
-                      position: 'sticky',
-                      left: !isCustomerMode ? '120px' : 0,
-                      top: 0,
-                      zIndex: 11,
-                      backgroundColor: 'background.paper',
-                      boxShadow: '2px 0 4px rgba(0,0,0,0.1)'
-                    }}
-                  >
-                    이미지
-                  </ModernTableCell>
-                  <ModernTableCell
-                    align="center"
-                    width="220"
-                    sx={{
-                      position: 'sticky',
-                      left: !isCustomerMode ? '220px' : '100px',
-                      top: 0,
-                      zIndex: 11,
-                      backgroundColor: 'background.paper',
-                      boxShadow: '2px 0 4px rgba(0,0,0,0.1)'
-                    }}
-                  >
-                    모델명 / 펫네임
-                  </ModernTableCell>
-                  <ModernTableCell
-                    align="center"
-                    width="120"
-                    sx={{
-                      position: 'sticky',
-                      top: 0,
-                      zIndex: 10,
-                      backgroundColor: 'background.paper'
-                    }}
-                  >
-                    요금제군
-                  </ModernTableCell>
-                  <ModernTableCell
-                    align="center"
-                    width="100"
-                    sx={{
-                      position: 'sticky',
-                      top: 0,
-                      zIndex: 10,
-                      backgroundColor: 'background.paper'
-                    }}
-                  >
-                    유형
-                  </ModernTableCell>
-                  <ModernTableCell
-                    align="center"
-                    width="100"
-                    sx={{
-                      position: 'sticky',
-                      top: 0,
-                      zIndex: 10,
-                      backgroundColor: 'background.paper'
-                    }}
-                  >
-                    출고가
-                  </ModernTableCell>
-                  <ModernTableCell
-                    align="center"
-                    width="100"
-                    sx={{
-                      position: 'sticky',
-                      top: 0,
-                      zIndex: 10,
-                      backgroundColor: 'background.paper'
-                    }}
-                  >
-                    이통사지원금
-                  </ModernTableCell>
-                  <ModernTableCell
-                    align="center"
-                    colSpan={2}
-                    width="180"
-                    sx={{
-                      borderLeft: '1px solid rgba(81, 81, 81, 0.5)',
-                      position: 'sticky',
-                      top: 0,
-                      zIndex: 10,
-                      backgroundColor: 'background.paper'
-                    }}
-                  >
-                    대리점 지원금
-                    <Box sx={{ display: 'flex', justifyContent: 'space-around', fontSize: '0.75rem', color: 'text.secondary', mt: 0.5 }}>
-                      <span>부가유치</span>
-                      <span>미유치</span>
-                    </Box>
-                  </ModernTableCell>
-                  <ModernTableCell
-                    align="center"
-                    colSpan={2}
-                    width="180"
-                    sx={{
-                      borderLeft: '1px solid rgba(81, 81, 81, 0.5)',
-                      bgcolor: 'rgba(212, 175, 55, 0.1)',
-                      position: 'sticky',
-                      top: 0,
-                      zIndex: 10,
-                      backgroundColor: 'rgba(212, 175, 55, 0.1)'
-                    }}
-                  >
-                    구매가 (할부원금)
-                    <Box sx={{ display: 'flex', justifyContent: 'space-around', fontSize: '0.75rem', color: 'text.secondary', mt: 0.5 }}>
-                      <span>부가유치</span>
-                      <span>미유치</span>
-                    </Box>
-                  </ModernTableCell>
-                </TableRow>
-              </TableHead>
+              <Table sx={{ minWidth: 1000, borderCollapse: 'separate', borderSpacing: 0 }}>
               <TableBody>
                 {mobileList.length === 0 ? (
                   <EmptyTableRow colSpan={11} message="표시할 데이터가 없습니다." />
