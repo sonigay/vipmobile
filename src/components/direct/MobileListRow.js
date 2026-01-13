@@ -69,6 +69,7 @@ const MobileListRowComponent = ({
           align="center" 
           onClick={(e) => e.stopPropagation()}
           sx={{
+            width: '120px',
             position: 'sticky',
             left: 0,
             zIndex: 3,
@@ -174,6 +175,7 @@ const MobileListRowComponent = ({
         align="center" 
         onClick={(e) => e.stopPropagation()}
         sx={{
+          width: '100px',
           position: 'sticky',
           left: !isCustomerMode ? '120px' : 0,
           zIndex: 3,
@@ -325,6 +327,7 @@ const MobileListRowComponent = ({
       <TableCell 
         align="center" 
         sx={{ 
+          width: '220px',
           whiteSpace: 'nowrap',
           position: 'sticky',
           left: !isCustomerMode ? '220px' : '100px',
@@ -341,7 +344,11 @@ const MobileListRowComponent = ({
         </Typography>
       </TableCell>
 
-      <TableCell align="center" onClick={(e) => e.stopPropagation()}>
+      <TableCell 
+        align="center" 
+        onClick={(e) => e.stopPropagation()}
+        sx={{ width: '120px' }}
+      >
         <Autocomplete
           size="small"
           options={planGroups}
@@ -358,7 +365,11 @@ const MobileListRowComponent = ({
         />
       </TableCell>
 
-      <TableCell align="center" onClick={(e) => e.stopPropagation()}>
+      <TableCell 
+        align="center" 
+        onClick={(e) => e.stopPropagation()}
+        sx={{ width: '100px' }}
+      >
         <Autocomplete
           size="small"
           options={openingTypes}
@@ -375,7 +386,7 @@ const MobileListRowComponent = ({
         />
       </TableCell>
 
-      <TableCell align="center">
+      <TableCell align="center" sx={{ width: '100px' }}>
         <Typography
           variant="body1"
           sx={{
@@ -387,7 +398,7 @@ const MobileListRowComponent = ({
         </Typography>
       </TableCell>
 
-      <TableCell align="center" sx={{ color: 'info.main' }}>
+      <TableCell align="center" sx={{ width: '100px', color: 'info.main' }}>
         {getDisplayValue(row, 'publicSupport', selectedOpeningType)?.toLocaleString() ||
           row.publicSupport?.toLocaleString() ||
           row.support?.toLocaleString()}

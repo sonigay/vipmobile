@@ -931,15 +931,24 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
         )}
 
         {/* 컬럼 헤더 */}
-        <TableContainer sx={{ overflowX: 'auto', overflowY: 'hidden' }}>
-          <Table sx={{ minWidth: 1000, borderCollapse: 'separate', borderSpacing: 0 }}>
+        <TableContainer sx={{ 
+          overflowX: { xs: 'auto', md: 'hidden' }, 
+          overflowY: 'hidden',
+          width: '100%'
+        }}>
+          <Table sx={{ 
+            width: '100%',
+            tableLayout: 'fixed',
+            borderCollapse: 'separate', 
+            borderSpacing: 0 
+          }}>
             <TableHead>
               <TableRow>
                 {!isCustomerMode && (
                   <ModernTableCell
                     align="center"
-                    width="120"
                     sx={{
+                      width: '120px',
                       backgroundColor: 'background.paper',
                       fontWeight: 'bold',
                       borderBottom: '2px solid',
@@ -951,8 +960,8 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                 )}
                 <ModernTableCell
                   align="center"
-                  width="100"
                   sx={{
+                    width: '100px',
                     backgroundColor: 'background.paper',
                     fontWeight: 'bold',
                     borderBottom: '2px solid',
@@ -963,8 +972,8 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                 </ModernTableCell>
                 <ModernTableCell
                   align="center"
-                  width="220"
                   sx={{
+                    width: '220px',
                     backgroundColor: 'background.paper',
                     fontWeight: 'bold',
                     borderBottom: '2px solid',
@@ -975,8 +984,8 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                 </ModernTableCell>
                 <ModernTableCell
                   align="center"
-                  width="120"
                   sx={{
+                    width: '120px',
                     backgroundColor: 'background.paper',
                     fontWeight: 'bold',
                     borderBottom: '2px solid',
@@ -987,8 +996,8 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                 </ModernTableCell>
                 <ModernTableCell
                   align="center"
-                  width="100"
                   sx={{
+                    width: '100px',
                     backgroundColor: 'background.paper',
                     fontWeight: 'bold',
                     borderBottom: '2px solid',
@@ -999,8 +1008,8 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                 </ModernTableCell>
                 <ModernTableCell
                   align="center"
-                  width="100"
                   sx={{
+                    width: '100px',
                     backgroundColor: 'background.paper',
                     fontWeight: 'bold',
                     borderBottom: '2px solid',
@@ -1011,8 +1020,8 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                 </ModernTableCell>
                 <ModernTableCell
                   align="center"
-                  width="100"
                   sx={{
+                    width: '100px',
                     backgroundColor: 'background.paper',
                     fontWeight: 'bold',
                     borderBottom: '2px solid',
@@ -1024,8 +1033,8 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                 <ModernTableCell
                   align="center"
                   colSpan={2}
-                  width="180"
                   sx={{
+                    width: '180px',
                     borderLeft: '1px solid rgba(81, 81, 81, 0.5)',
                     backgroundColor: 'background.paper',
                     fontWeight: 'bold',
@@ -1042,8 +1051,8 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                 <ModernTableCell
                   align="center"
                   colSpan={2}
-                  width="180"
                   sx={{
+                    width: '180px',
                     borderLeft: '1px solid rgba(81, 81, 81, 0.5)',
                     bgcolor: 'rgba(212, 175, 55, 0.1)',
                     backgroundColor: 'rgba(212, 175, 55, 0.1)',
@@ -1092,16 +1101,22 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
             <TableContainer
               sx={{
                 flexGrow: 1,
-                overflowX: 'auto',
+                overflowX: { xs: 'auto', md: 'hidden' },
                 overflowY: 'auto',
                 maxWidth: '100%',
+                width: '100%',
                 // 테이블 본문만 스크롤되도록 높이 설정
                 height: { xs: 'calc(100vh - 400px)', sm: 'calc(100vh - 350px)', md: 'calc(100vh - 300px)' },
                 maxHeight: { xs: 'calc(100vh - 400px)', sm: 'calc(100vh - 350px)', md: 'calc(100vh - 300px)' },
                 position: 'relative'
               }}
             >
-              <Table sx={{ minWidth: 1000, borderCollapse: 'separate', borderSpacing: 0 }}>
+              <Table sx={{ 
+                width: '100%',
+                tableLayout: 'fixed',
+                borderCollapse: 'separate', 
+                borderSpacing: 0 
+              }}>
               <TableBody>
                 {mobileList.length === 0 ? (
                   <EmptyTableRow colSpan={11} message="표시할 데이터가 없습니다." />
