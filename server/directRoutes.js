@@ -6813,7 +6813,11 @@ function setupDirectRoutes(app) {
             updatedAt
           };
         }
-      });
+        });
+
+        // 기본값 캐싱 (5분)
+        setCache(defaultTextsCacheKey, defaultTexts, 5 * 60 * 1000);
+      }
 
       // 3. 매장별 설정이 있으면 우선 사용, 없으면 기본값 사용
       const result = {
