@@ -551,22 +551,6 @@ const OpeningInfoPage = ({
             };
         }
 
-        // 모든 가능한 항목 (부가서비스 + 보험상품)
-        const allAvailableItems = [...availableAddons, ...availableInsurances];
-
-        // 🔥 핵심: 선택된 항목들의 incentive/deduction 합계 계산
-        // selectedItems는 사용자가 현재 선택한 항목들 (체크박스로 선택/해제한 항목들)
-        const selectedIncentive = selectedItems.reduce((sum, item) => sum + (Number(item.incentive) || 0), 0);
-        const selectedDeduction = selectedItems.reduce((sum, item) => sum + (Number(item.deduction) || 0), 0);
-
-        // 모든 항목의 incentive/deduction 합계
-        const allItemsIncentive = allAvailableItems.reduce((sum, item) => sum + (Number(item.incentive) || 0), 0);
-        const allItemsDeduction = allAvailableItems.reduce((sum, item) => sum + (Number(item.deduction) || 0), 0);
-
-        // 선택되지 않은 항목들의 incentive/deduction 합계
-        const unselectedIncentive = allItemsIncentive - selectedIncentive;
-        const unselectedDeduction = allItemsDeduction - selectedDeduction;
-
         // 🔥 핵심 로직: 저장된 대리점추가지원금이 있으면 그 값을 기준으로 계산
         // 저장된 값이 있으면 (예: 790000) 그 값을 기준으로 선택/해제에 따른 차이만 반영
         // 저장된 값이 없으면 storeSupportWithAddon을 기준으로 계산
@@ -574,13 +558,20 @@ const OpeningInfoPage = ({
             ? Number(savedStoreSupport)
             : (Number(storeSupportWithAddon) || 0);
 
-        // 🔥 핵심 로직: 초기값(모든 항목 유치)에서 시작하여 선택되지 않은 항목의 incentive와 deduction을 모두 차감
-        // 예: 초기 130,000원에서 부가서비스 A 제거 시
-        //     - incentive 30,000원 차감 (유치 인센티브 제거)
-        //     - deduction 10,000원 차감 (미유치 시 deduction 적용)
-        //     = 130,000 - 30,000 - 10,000 = 90,000원
-        // 이렇게 해야 선택/제거 시 총 40,000원 차이가 발생
-        const finalStoreSupport = baseStoreSupport - unselectedIncentive - unselectedDeduction;
+        // 🔥 수정: 저장된 값은 특정 상태(예: 보험 1개만 유치)의 값이므로,
+        // 현재 선택된 항목들의 incentive와 deduction을 더해야 함
+        // 예: 저장된 값 790000 (보험 1개만 유치 상태)
+        //     부가서비스 추가 (유치 30000, 미유치 -10000)
+        //     = 790000 + 30000 + 10000 = 830000
+        // 하지만 저장된 값에 이미 보험의 incentive/deduction이 포함되어 있으므로,
+        // 현재 선택된 항목들의 incentive/deduction만 더하면 됨
+        const selectedIncentive = selectedItems.reduce((sum, item) => sum + (Number(item.incentive) || 0), 0);
+        const selectedDeduction = selectedItems.reduce((sum, item) => sum + (Number(item.deduction) || 0), 0);
+        
+        // 🔥 수정: baseStoreSupport는 이미 특정 상태의 값이므로, 
+        // 현재 선택된 항목들의 incentive와 deduction을 더함
+        // deduction은 음수일 수 있으므로 더하면 됨 (예: -10000)
+        const finalStoreSupport = baseStoreSupport + selectedIncentive + selectedDeduction;
 
         // 직접입력 추가금액 반영 (음수도 허용)
         const additionalAmount = additionalStoreSupport !== null && additionalStoreSupport !== undefined ? Number(additionalStoreSupport) : 0;
