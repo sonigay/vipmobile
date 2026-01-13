@@ -4433,9 +4433,14 @@ app.post('/api/member/login', async (req, res) => {
 
     // CTN 기준 검색 (가장 최근 데이터 우선)
     // row[6]이 CTN 컬럼 (G열)
+    // 🔥 수정: CTN이 텍스트 형식으로 저장되어 ' prefix가 있을 수 있으므로 제거
     const recentRows = [...rows].reverse();
     const customerRow = recentRows.find(row => {
-      const rowCtn = (row[6] || '').replace(/[^0-9]/g, '');
+      let rowCtn = (row[6] || '').toString();
+      // ' prefix 제거 (Google Sheets 텍스트 형식)
+      rowCtn = rowCtn.replace(/^'/, '');
+      // 숫자만 추출
+      rowCtn = rowCtn.replace(/[^0-9]/g, '');
       return rowCtn === cleanCtn;
     });
 
