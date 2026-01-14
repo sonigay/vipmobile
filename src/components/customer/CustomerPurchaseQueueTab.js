@@ -8,7 +8,8 @@ import {
     Search as SearchIcon,
     Edit as EditIcon,
     Delete as DeleteIcon,
-    Store as StoreIcon
+    Store as StoreIcon,
+    Visibility as VisibilityIcon
 } from '@mui/icons-material';
 import { customerAPI } from '../../api';
 import { LoadingState } from '../direct/common/LoadingState';
@@ -213,6 +214,7 @@ const CustomerPurchaseQueueTab = ({ customerInfo, isManagementMode = false, logg
                     <Table stickyHeader size="small" sx={{ minWidth: { xs: '1000px', sm: '100%' }, tableLayout: 'fixed' }}>
                         <TableHead>
                             <TableRow>
+                                <TableCell align="center" sx={{ width: { xs: '70px', sm: '80px' }, fontSize: { xs: '0.75rem', sm: '0.875rem' }, fontWeight: 'bold' }}>보기</TableCell>
                                 <TableCell align="center" sx={{ width: '80px', fontSize: { xs: '0.75rem', sm: '0.875rem' }, fontWeight: 'bold', whiteSpace: 'nowrap' }}>등록일시</TableCell>
                                 <TableCell align="center" sx={{ width: '80px', fontSize: { xs: '0.75rem', sm: '0.875rem' }, fontWeight: 'bold' }}>고객명</TableCell>
                                 <TableCell align="center" sx={{ width: '100px', fontSize: { xs: '0.75rem', sm: '0.875rem' }, fontWeight: 'bold' }}>CTN</TableCell>
@@ -238,6 +240,38 @@ const CustomerPurchaseQueueTab = ({ customerInfo, isManagementMode = false, logg
                                         onClick={() => handleRowClick(row)}
                                         sx={{ cursor: 'pointer' }}
                                     >
+                                        <TableCell 
+                                            align="center" 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleRowClick(row);
+                                            }}
+                                            sx={{ width: { xs: '70px', sm: '80px' }, p: { xs: 0.5, sm: 1 } }}
+                                        >
+                                            <Button
+                                                variant="contained"
+                                                size="small"
+                                                startIcon={<VisibilityIcon />}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleRowClick(row);
+                                                }}
+                                                sx={{
+                                                    fontSize: { xs: '0.7rem', sm: '0.75rem' },
+                                                    px: { xs: 0.5, sm: 1 },
+                                                    py: { xs: 0.25, sm: 0.5 },
+                                                    minWidth: { xs: 'auto', sm: '60px' },
+                                                    '& .MuiButton-startIcon': {
+                                                        marginRight: { xs: 0, sm: 0.5 },
+                                                        '& > *:nth-of-type(1)': {
+                                                            fontSize: { xs: '0.875rem', sm: '1rem' }
+                                                        }
+                                                    }
+                                                }}
+                                            >
+                                                {isMobile ? '' : '보기'}
+                                            </Button>
+                                        </TableCell>
                                         <TableCell align="center" sx={{ width: '80px', fontSize: { xs: '0.75rem', sm: '0.875rem' }, whiteSpace: 'nowrap' }}>
                                             {row.createdAt ? new Date(row.createdAt).toLocaleDateString() : '-'}
                                         </TableCell>

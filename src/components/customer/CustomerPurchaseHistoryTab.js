@@ -15,9 +15,10 @@ import {
   DialogTitle,
   DialogContent,
   useMediaQuery,
-  useTheme
+  useTheme,
+  Button
 } from '@mui/material';
-import { Search as SearchIcon } from '@mui/icons-material';
+import { Search as SearchIcon, Visibility as VisibilityIcon } from '@mui/icons-material';
 import { directStoreApiClient } from '../../api/directStoreApiClient';
 import { LoadingState } from '../direct/common/LoadingState';
 import { ErrorState } from '../direct/common/ErrorState';
@@ -139,6 +140,7 @@ const CustomerPurchaseHistoryTab = ({ customerInfo }) => {
           <Table stickyHeader size="small" sx={{ minWidth: { xs: '900px', sm: '100%' }, tableLayout: 'fixed' }}>
             <TableHead>
               <TableRow>
+                <TableCell align="center" sx={{ width: { xs: '70px', sm: '80px' }, fontSize: { xs: '0.75rem', sm: '0.875rem' }, fontWeight: 'bold' }}>보기</TableCell>
                 <TableCell align="center" sx={{ width: '80px', fontSize: { xs: '0.75rem', sm: '0.875rem' }, fontWeight: 'bold', whiteSpace: 'nowrap' }}>판매일시</TableCell>
                 <TableCell align="center" sx={{ width: '60px', fontSize: { xs: '0.75rem', sm: '0.875rem' }, fontWeight: 'bold' }}>통신사</TableCell>
                 <TableCell sx={{ width: '140px', fontSize: { xs: '0.75rem', sm: '0.875rem' }, fontWeight: 'bold' }}>단말기모델명</TableCell>
@@ -157,6 +159,38 @@ const CustomerPurchaseHistoryTab = ({ customerInfo }) => {
                   onClick={() => handleRowClick(row)}
                   sx={{ cursor: 'pointer' }}
                 >
+                  <TableCell 
+                    align="center" 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRowClick(row);
+                    }}
+                    sx={{ width: { xs: '70px', sm: '80px' }, p: { xs: 0.5, sm: 1 } }}
+                  >
+                    <Button
+                      variant="contained"
+                      size="small"
+                      startIcon={<VisibilityIcon />}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRowClick(row);
+                      }}
+                      sx={{
+                        fontSize: { xs: '0.7rem', sm: '0.75rem' },
+                        px: { xs: 0.5, sm: 1 },
+                        py: { xs: 0.25, sm: 0.5 },
+                        minWidth: { xs: 'auto', sm: '60px' },
+                        '& .MuiButton-startIcon': {
+                          marginRight: { xs: 0, sm: 0.5 },
+                          '& > *:nth-of-type(1)': {
+                            fontSize: { xs: '0.875rem', sm: '1rem' }
+                          }
+                        }
+                      }}
+                    >
+                      {isMobile ? '' : '보기'}
+                    </Button>
+                  </TableCell>
                   <TableCell align="center" sx={{ width: '80px', fontSize: { xs: '0.75rem', sm: '0.875rem' }, whiteSpace: 'nowrap' }}>
                     {(() => {
                       const dateValue = row.soldAt || row.판매일시 || '';
