@@ -1087,7 +1087,13 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                     backgroundColor: 'background.paper',
                     fontWeight: 'bold',
                     borderBottom: '2px solid',
-                    borderColor: 'divider'
+                    borderColor: 'divider',
+                    // 고객모드에서는 틀고정 제거
+                    ...(isCustomerMode ? {} : {
+                      position: 'sticky',
+                      left: '220px',
+                      zIndex: 3
+                    })
                   }}
                 >
                   모델명 / 펫네임
