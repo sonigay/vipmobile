@@ -860,9 +860,9 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
     return row[field];
   }, [selectedOpeningTypes, selectedPlanGroups, lookupPrice]);
 
-  // 모바일에서 헤더와 본문의 가로 스크롤 동기화
+  // 모바일에서 헤더와 본문의 가로 스크롤 동기화 (고객모드에서는 헤더 스크롤 숨김으로 동기화 불필요)
   useEffect(() => {
-    if (!isMobile || !headerScrollRef.current || !bodyScrollRef.current) return;
+    if (!isMobile || !headerScrollRef.current || !bodyScrollRef.current || isCustomerMode) return;
 
     const headerContainer = headerScrollRef.current;
     const bodyContainer = bodyScrollRef.current;
@@ -1026,7 +1026,7 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
         <TableContainer 
           ref={headerScrollRef}
           sx={{ 
-            overflowX: 'auto', 
+            overflowX: isCustomerMode ? 'hidden' : 'auto', // 고객모드에서는 헤더 스크롤 숨김
             overflowY: 'hidden',
             width: '100%',
             // 모바일에서 터치 스크롤 최적화
@@ -1034,9 +1034,10 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
             // 모바일에서 헤더 스크롤 방지 (본문과 동기화를 위해)
             ...(isMobile && {
               position: 'relative',
-              overflowX: 'auto',
+              overflowX: isCustomerMode ? 'hidden' : 'auto', // 고객모드에서는 헤더 스크롤 숨김
               '&::-webkit-scrollbar': {
-                height: '4px'
+                height: '4px',
+                display: isCustomerMode ? 'none' : 'block' // 고객모드에서는 스크롤바 숨김
               },
               '&::-webkit-scrollbar-thumb': {
                 backgroundColor: 'rgba(0,0,0,0.2)',
