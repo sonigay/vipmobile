@@ -19,7 +19,9 @@ import {
     IconButton,
     CircularProgress,
     Alert,
-    Autocomplete
+    Autocomplete,
+    useMediaQuery,
+    useTheme
 } from '@mui/material';
 import {
     ArrowBack as ArrowBackIcon,
@@ -54,8 +56,12 @@ const OpeningInfoPage = ({
     selectedStore = null, // 고객모드일 때 선택한 매장 정보
     saveToSheet = 'salesReport' // 'purchaseQueue' | 'salesReport'
 }) => {
+    const muiTheme = useTheme();
+    const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
     const [selectedCarrier, setSelectedCarrier] = useState(initialData?.carrier || 'SK');
     const theme = CARRIER_THEMES[selectedCarrier] || CARRIER_THEMES['SK'];
+    // 🔥 읽기 전용 모드: 고객모드에서 구매내역 상세정보 (판매일보 조회)
+    const isReadOnly = mode === 'customer' && saveToSheet === 'sales';
     const [isSaving, setIsSaving] = useState(false);
     const [planGroups, setPlanGroups] = useState([]); // 요금제 그룹 목록
     const [selectedPlanGroup, setSelectedPlanGroup] = useState('');
@@ -904,7 +910,16 @@ const OpeningInfoPage = ({
     };
 
     return (
-        <Box className={`print-root mode-${mode}`} sx={{ p: 3, height: '100%', overflow: 'auto', bgcolor: theme.bg }}>
+        <Box className={`print-root mode-${mode}`} sx={{ 
+            p: { xs: 1, sm: 2, md: 3 }, 
+            height: '100%', 
+            overflow: 'auto', 
+            bgcolor: theme.bg,
+            '& .MuiTypography-root': {
+                wordBreak: 'keep-all', // 단어 단위로 줄바꿈
+                overflowWrap: 'break-word' // 긴 단어는 강제 줄바꿈
+            }
+        }}>
             {/* 인쇄용 스타일 (WYSIWYG: 화면 그대로 출력) */}
             <style>{`
                 @media print {
@@ -1095,28 +1110,41 @@ const OpeningInfoPage = ({
                 <IconButton onClick={onBack} sx={{ mr: 2 }}>
                     <ArrowBackIcon />
                 </IconButton>
-                <Typography variant="h4" sx={{ fontWeight: 'bold', color: theme.primary }}>
-                    {selectedCarrier} 개통정보를 입력해주세요
+                <Typography variant="h4" sx={{ fontWeight: 'bold', color: theme.primary, fontSize: { xs: '1.25rem', sm: '1.5rem', md: '2rem' } }}>
+                    {isReadOnly ? `${selectedCarrier} 구매내역 상세정보` : `${selectedCarrier} 개통정보를 입력해주세요`}
                 </Typography>
                 <Box sx={{ flexGrow: 1 }} />
                 <Button
                     variant="outlined"
                     startIcon={<PrintIcon />}
-                    sx={{ mr: 2, borderColor: theme.primary, color: theme.primary }}
+                    sx={{ 
+                        mr: isReadOnly ? 0 : 2, 
+                        borderColor: theme.primary, 
+                        color: theme.primary,
+                        fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
+                        px: { xs: 1, sm: 2 }
+                    }}
                     onClick={handlePrint}
                 >
                     인쇄하기
                 </Button>
-                <Button
-                    variant="contained"
-                    size="large"
-                    startIcon={<CheckCircleIcon />}
-                    sx={{ bgcolor: theme.primary, '&:hover': { bgcolor: theme.primary } }}
-                    onClick={handleComplete}
-                    disabled={isSaving || !agreementChecked}
-                >
-                    {isSaving ? <CircularProgress size={24} color="inherit" /> : '입력완료'}
-                </Button>
+                {!isReadOnly && (
+                    <Button
+                        variant="contained"
+                        size="large"
+                        startIcon={<CheckCircleIcon />}
+                        sx={{ 
+                            bgcolor: theme.primary, 
+                            '&:hover': { bgcolor: theme.primary },
+                            fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
+                            px: { xs: 1, sm: 2 }
+                        }}
+                        onClick={handleComplete}
+                        disabled={isSaving || !agreementChecked}
+                    >
+                        {isSaving ? <CircularProgress size={24} color="inherit" /> : '입력완료'}
+                    </Button>
+                )}
             </Box>
 
             {/* 안내문구 및 동의 체크박스 */}
@@ -1129,7 +1157,7 @@ const OpeningInfoPage = ({
                         • 부가서비스는 93일 유지조건
                     </Typography>
                     {/* 고객모드 전용 안내문구 */}
-                    {mode === 'customer' && (
+                    {mode === 'customer' && !isReadOnly && (
                         <>
                             <Typography variant="body2" color="error" sx={{ fontWeight: 600, mt: 1 }}>
                                 • 대기자가 많을수 있으니 빠른 개통업무를 위해 입력된정보를 인쇄해서 방문해주세요
@@ -1139,20 +1167,29 @@ const OpeningInfoPage = ({
                             </Typography>
                         </>
                     )}
-                    <FormControlLabel
-                        control={
-                            <Checkbox
-                                checked={agreementChecked}
-                                onChange={(e) => setAgreementChecked(e.target.checked)}
-                                sx={{ color: theme.primary }}
-                            />
-                        }
-                        label={
-                            <Typography variant="body2" color="text.primary">
-                                미유지되어 계약을 위반할 시 할부금액을 조정해 청구됨에 동의합니다.
+                    {/* 읽기 전용 모드에서는 체크박스 제거하고 안내문구로 강조 */}
+                    {isReadOnly ? (
+                        <Alert severity="warning" sx={{ mt: 1, fontWeight: 'bold' }}>
+                            <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                                ⚠️ 미유지되어 계약을 위반할 시 할부금액을 조정해 청구됩니다.
                             </Typography>
-                        }
-                    />
+                        </Alert>
+                    ) : (
+                        <FormControlLabel
+                            control={
+                                <Checkbox
+                                    checked={agreementChecked}
+                                    onChange={(e) => setAgreementChecked(e.target.checked)}
+                                    sx={{ color: theme.primary }}
+                                />
+                            }
+                            label={
+                                <Typography variant="body2" color="text.primary">
+                                    미유지되어 계약을 위반할 시 할부금액을 조정해 청구됨에 동의합니다.
+                                </Typography>
+                            }
+                        />
+                    )}
                 </Stack>
             </Box>
 
@@ -1171,30 +1208,34 @@ const OpeningInfoPage = ({
                         }
                     }
                 `}</style>
-                <Grid container spacing={1}>
+                <Grid container spacing={{ xs: 1, sm: 1.5, md: 2 }}>
                     {/* 왼쪽: 통신사 정보, 가입 정보, 약정 및 할부 정보, 요금정보, 금액종합안내 */}
                     <Grid item xs={12} md={6}>
                         {/* 매장 정보 표시 (고객모드/직영점모드 공통) */}
                         {(mode === 'customer' ? selectedStore : loggedInStore) && (
-                            <Paper sx={{ p: 1.5, mb: 1.5, borderTop: `3px solid ${theme.primary}`, bgcolor: theme.bg }}>
-                                <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold', color: theme.primary }}>
+                            <Paper sx={{ p: { xs: 1, sm: 1.5 }, mb: { xs: 1, sm: 1.5 }, borderTop: `3px solid ${theme.primary}`, bgcolor: theme.bg }}>
+                                <Typography variant="h6" gutterBottom sx={{ 
+                                    fontWeight: 'bold', 
+                                    color: theme.primary,
+                                    fontSize: { xs: '1rem', sm: '1.25rem', md: '1.5rem' }
+                                }}>
                                     매장 정보
                                 </Typography>
-                                <Grid container spacing={2}>
+                                <Grid container spacing={{ xs: 1, sm: 2 }}>
                                     {/* 왼쪽 컬럼: 기본 정보 */}
                                     <Grid item xs={12} md={6}>
-                                        <Stack spacing={1}>
-                                            <Typography variant="body2">
+                                        <Stack spacing={0.5}>
+                                            <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' }, lineHeight: 1.5 }}>
                                                 <strong>업체명:</strong> {(mode === 'customer' ? selectedStore : loggedInStore)?.name || ''}
                                             </Typography>
-                                            <Typography variant="body2">
+                                            <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' }, lineHeight: 1.5 }}>
                                                 <strong>연락처:</strong> {(mode === 'customer' ? selectedStore : loggedInStore)?.phone || (mode === 'customer' ? selectedStore : loggedInStore)?.storePhone || ''}
                                             </Typography>
-                                            <Typography variant="body2">
+                                            <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' }, lineHeight: 1.5 }}>
                                                 <strong>주소:</strong> {(mode === 'customer' ? selectedStore : loggedInStore)?.address || ''}
                                             </Typography>
                                             {(mode === 'customer' ? selectedStore : loggedInStore)?.accountInfo && (
-                                                <Typography variant="body2">
+                                                <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' }, lineHeight: 1.5 }}>
                                                     <strong>계좌정보:</strong> {(mode === 'customer' ? selectedStore : loggedInStore)?.accountInfo}
                                                 </Typography>
                                             )}
@@ -1297,9 +1338,12 @@ const OpeningInfoPage = ({
                         />
 
                         {/* 요금정보 */}
-                        <Paper className="plan-info-section" sx={{ p: 2, mb: 1.5, borderTop: `3px solid ${theme.primary}` }}>
-                            <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>요금정보</Typography>
-                            <Grid container spacing={1.5}>
+                        <Paper className="plan-info-section" sx={{ p: { xs: 1, sm: 1.5, md: 2 }, mb: { xs: 1, sm: 1.5 }, borderTop: `3px solid ${theme.primary}` }}>
+                            <Typography variant="h6" gutterBottom sx={{ 
+                                fontWeight: 'bold',
+                                fontSize: { xs: '1rem', sm: '1.25rem', md: '1.5rem' }
+                            }}>요금정보</Typography>
+                            <Grid container spacing={{ xs: 1, sm: 1.5 }}>
                                 <Grid item xs={12}>
                                     <Autocomplete
                                         options={planGroups}
