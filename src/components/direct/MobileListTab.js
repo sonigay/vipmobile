@@ -49,7 +49,7 @@ import { debugLog } from '../../utils/debugLogger';
 const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const [carrierTab, setCarrierTab] = useState(0); // 0: SK, 1: KT, 2: LG
+  const [carrierTab, setCarrierTab] = useState(0); // 0: LG, 1: KT, 2: SK
   const [mobileList, setMobileList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -87,10 +87,10 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
 
   const getCurrentCarrier = useCallback(() => {
     switch (carrierTab) {
-      case 0: return 'SK';
+      case 0: return 'LG';
       case 1: return 'KT';
-      case 2: return 'LG';
-      default: return 'SK';
+      case 2: return 'SK';
+      default: return 'LG';
     }
   }, [carrierTab]);
 
@@ -969,9 +969,9 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                 }
               }}
             >
-              <Tab label="SK Telecom" sx={{ color: '#e60012' }} />
-              <Tab label="KT" sx={{ color: '#00abc7' }} />
               <Tab label="LG U+" sx={{ color: '#ec008c' }} />
+              <Tab label="KT" sx={{ color: '#00abc7' }} />
+              <Tab label="SK Telecom" sx={{ color: '#e60012' }} />
             </Tabs>
           </Box>
 
