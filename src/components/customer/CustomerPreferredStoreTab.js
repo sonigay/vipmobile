@@ -215,12 +215,21 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                 },
                 // Leaflet zoom 컨트롤이 제대로 표시되고 작동하도록 스타일 조정
                 '& .leaflet-control-zoom': {
-                    zIndex: 1000,
-                    pointerEvents: 'auto !important'
+                    zIndex: '2000 !important', // 다른 요소들보다 높게 설정
+                    pointerEvents: 'auto !important',
+                    position: 'relative' // z-index가 작동하도록
                 },
                 '& .leaflet-control-zoom-in, & .leaflet-control-zoom-out': {
                     pointerEvents: 'auto !important',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    zIndex: '2000 !important',
+                    position: 'relative'
+                },
+                // Leaflet zoom 컨트롤이 클릭 가능하도록 보장
+                '& .leaflet-control-zoom a': {
+                    pointerEvents: 'auto !important',
+                    cursor: 'pointer !important',
+                    zIndex: '2000 !important'
                 }
             }}>
                 {/* 대중교통 마커 토글 (왼쪽 하단으로 이동) */}
@@ -232,7 +241,8 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                     bgcolor: 'rgba(255,255,255,0.95)',
                     p: 1,
                     borderRadius: 1,
-                    boxShadow: 2
+                    boxShadow: 2,
+                    pointerEvents: 'auto' // 이 요소만 클릭 가능
                 }}>
                     <FormControlLabel
                         control={
@@ -268,7 +278,8 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                         p: 1.5,
                         borderRadius: 1,
                         boxShadow: 2,
-                        borderLeft: '4px solid #1976d2'
+                        borderLeft: '4px solid #1976d2',
+                        pointerEvents: 'auto' // 이 요소만 클릭 가능
                     }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>선택된 모델</Typography>
                         <Typography variant="body2">{selectedProduct.petName} ({selectedProduct.model})</Typography>
