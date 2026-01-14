@@ -244,10 +244,11 @@ const OpeningInfoPage = ({
     }, [selectedCarrier, initialData?.planGroup, initialData?.plan]);
 
     // 필수 부가서비스 및 보험상품 로드 함수 (재사용 가능하도록 분리)
-    const loadAvailableItems = useCallback(async () => {
+    const loadAvailableItems = useCallback(async (forceRefresh = false) => {
         setLoadingAddonsAndInsurances(true);
         try {
-            const policySettings = await directStoreApi.getPolicySettings(selectedCarrier);
+            // 🔥 수정: 새로고침 버튼 클릭 시 캐시 무시하고 실제 데이터 다시 로드
+            const policySettings = await directStoreApiClient.getPolicySettings(selectedCarrier, forceRefresh);
             const initialSelectedItems = [];
 
             // 마진 설정 값 저장
@@ -1484,7 +1485,7 @@ const OpeningInfoPage = ({
                                                             <Button
                                                                 size="small"
                                                                 startIcon={<RefreshIcon />}
-                                                                onClick={loadAvailableItems}
+                                                                onClick={() => loadAvailableItems(true)}
                                                                 disabled={loadingAddonsAndInsurances}
                                                                 sx={{ minWidth: 'auto', px: 1 }}
                                                             >

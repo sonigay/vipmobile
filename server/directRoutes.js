@@ -2243,16 +2243,22 @@ function setupDirectRoutes(app) {
 
   // === 정책 설정 ===
 
-  // GET /api/direct/policy-settings?carrier=SK
+  // GET /api/direct/policy-settings?carrier=SK&noCache=true
   router.get('/policy-settings', async (req, res) => {
     try {
       const carrier = req.query.carrier || 'SK';
+      const noCache = req.query.noCache === 'true' || req.query.noCache === '1';
       
-      // 캐시 확인
+      // 캐시 확인 (noCache가 true이면 캐시 무시)
       const cacheKey = `policy-settings-${carrier}`;
-      const cached = getCache(cacheKey);
-      if (cached) {
-        return res.json(cached);
+      if (!noCache) {
+        const cached = getCache(cacheKey);
+        if (cached) {
+          return res.json(cached);
+        }
+      } else {
+        // 새로고침 요청 시 기존 캐시 삭제
+        cacheStore.delete(cacheKey);
       }
 
       const { sheets, SPREADSHEET_ID } = createSheetsClient();

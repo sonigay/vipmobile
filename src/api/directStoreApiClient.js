@@ -311,10 +311,15 @@ export const directStoreApiClient = {
 
   /**
    * 정책 설정 조회
+   * @param {string} carrier - 통신사 (SK, KT, LG)
+   * @param {boolean} noCache - 캐시 무시 여부 (기본값: false)
    */
-  getPolicySettings: async (carrier) => {
+  getPolicySettings: async (carrier, noCache = false) => {
     try {
-      const response = await fetchWithRetry(`${BASE_URL}/policy-settings?carrier=${carrier}`);
+      const url = noCache 
+        ? `${BASE_URL}/policy-settings?carrier=${carrier}&noCache=true`
+        : `${BASE_URL}/policy-settings?carrier=${carrier}`;
+      const response = await fetchWithRetry(url);
       return handleResponse(response, '정책 설정 조회 실패');
     } catch (error) {
       console.error('정책 설정 조회 실패:', error);
