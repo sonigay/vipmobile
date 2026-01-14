@@ -309,10 +309,32 @@ const CustomerPurchaseQueueTab = ({ customerInfo, isManagementMode = false, logg
                     }}
                     maxWidth="lg"
                     fullWidth
+                    fullScreen={isMobile}
+                    sx={{
+                        '& .MuiDialog-paper': {
+                            m: { xs: 0, sm: 2 },
+                            maxHeight: { xs: '100vh', sm: '90vh' }
+                        }
+                    }}
                 >
-                    <DialogTitle>구매 대기 정보 수정</DialogTitle>
-                    <DialogContent>
-                        <OpeningInfoPage
+                    <DialogTitle sx={{ fontSize: { xs: '1rem', sm: '1.25rem' }, py: { xs: 1.5, sm: 2 } }}>
+                        구매 대기 정보 수정
+                    </DialogTitle>
+                    <DialogContent 
+                        dividers
+                        sx={{ 
+                            p: { xs: 1, sm: 3 },
+                            overflowY: 'auto',
+                            WebkitOverflowScrolling: 'touch',
+                            maxHeight: { xs: 'calc(100vh - 120px)', sm: 'calc(90vh - 120px)' }
+                        }}
+                    >
+                        <Box sx={{ 
+                            '& .print-root': {
+                                p: { xs: 1, sm: 3 }
+                            }
+                        }}>
+                            <OpeningInfoPage
                             initialData={{
                                 ...selectedRow,
                                 purchaseQueueId: selectedRow.id, // 구매대기 항목 ID (수정 모드 구분용)
@@ -361,6 +383,7 @@ const CustomerPurchaseQueueTab = ({ customerInfo, isManagementMode = false, logg
                             loggedInStore={loggedInStore}
                             saveToSheet="purchaseQueue"
                         />
+                        </Box>
                     </DialogContent>
                 </Dialog>
             )}

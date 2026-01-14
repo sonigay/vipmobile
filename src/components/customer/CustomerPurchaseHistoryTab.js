@@ -201,10 +201,32 @@ const CustomerPurchaseHistoryTab = ({ customerInfo }) => {
           }}
           maxWidth="lg"
           fullWidth
+          fullScreen={isMobile}
+          sx={{
+            '& .MuiDialog-paper': {
+              m: { xs: 0, sm: 2 },
+              maxHeight: { xs: '100vh', sm: '90vh' }
+            }
+          }}
         >
-          <DialogTitle>구매 내역 상세 정보</DialogTitle>
-          <DialogContent>
-            <OpeningInfoPage
+          <DialogTitle sx={{ fontSize: { xs: '1rem', sm: '1.25rem' }, py: { xs: 1.5, sm: 2 } }}>
+            구매 내역 상세 정보
+          </DialogTitle>
+          <DialogContent 
+            dividers
+            sx={{ 
+              p: { xs: 1, sm: 3 },
+              overflowY: 'auto',
+              WebkitOverflowScrolling: 'touch',
+              maxHeight: { xs: 'calc(100vh - 120px)', sm: 'calc(90vh - 120px)' }
+            }}
+          >
+            <Box sx={{ 
+              '& .print-root': {
+                p: { xs: 1, sm: 3 }
+              }
+            }}>
+              <OpeningInfoPage
               initialData={{
                 ...selectedRow,
                 번호: selectedRow.id || selectedRow.번호, // 판매일보 ID
@@ -243,6 +265,7 @@ const CustomerPurchaseHistoryTab = ({ customerInfo }) => {
               customerInfo={customerInfo}
               saveToSheet="sales" // 판매일보는 읽기 전용이지만 구조 유지
             />
+            </Box>
           </DialogContent>
         </Dialog>
       )}
