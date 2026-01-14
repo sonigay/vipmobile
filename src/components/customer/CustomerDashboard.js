@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import MobileListTab from '../direct/MobileListTab';
 import CustomerPreferredStoreTab from './CustomerPreferredStoreTab';
 import CustomerPurchaseQueueTab from './CustomerPurchaseQueueTab';
+import CustomerPurchaseHistoryTab from './CustomerPurchaseHistoryTab';
 import CustomerBoardTab from './CustomerBoardTab';
 import CustomerGuidePage from './CustomerGuidePage';
 import OpeningInfoPage from '../direct/OpeningInfoPage';
@@ -202,6 +203,7 @@ const CustomerDashboard = () => {
                         label="게시판" 
                         disabled={customerInfo?.isFirstPurchaseAdmin && customerInfo?.publicIdStatus === 'before'}
                     />
+                    <Tab label="나의 구매 내역" />
                 </Tabs>
             </Paper>
 
@@ -266,6 +268,11 @@ const CustomerDashboard = () => {
                         ) : (
                         <CustomerBoardTab customerInfo={customerInfo} />
                         )}
+                    </Box>
+                )}
+                {tabValue === 4 && (
+                    <Box sx={{ p: 3 }}>
+                        <CustomerPurchaseHistoryTab customerInfo={customerInfo} />
                     </Box>
                 )}
             </Box>

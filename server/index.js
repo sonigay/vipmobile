@@ -6383,8 +6383,14 @@ app.get('/api/direct/sales', async (req, res) => {
       return res.json([]);
     }
 
-    // 쿼리 파라미터에서 storeId 필터 가져오기
+    // 쿼리 파라미터에서 필터 가져오기
     const requestedStoreId = req.query.storeId;
+    // 🔥 추가: CTN(고객 연락처)로 필터링 (고객 모드 '나의 구매내역'용)
+    let requestedCtn = req.query.ctn || '';
+    if (requestedCtn) {
+      // 숫자만 남기기 (하이픈 등 제거)
+      requestedCtn = requestedCtn.toString().replace(/[^0-9]/g, '');
+    }
 
     // 헤더 행 제외
     const rows = values.slice(1);
@@ -6467,11 +6473,25 @@ app.get('/api/direct/sales', async (req, res) => {
       .filter(report => {
         // 빈 행 제외
         if (!report.id) return false;
+
         // storeId 필터가 있으면 해당 매장 데이터만 반환
         if (requestedStoreId) {
-          return report.storeId === requestedStoreId || report.posCode === requestedStoreId;
+          if (!(report.storeId === requestedStoreId || report.posCode === requestedStoreId)) {
+            return false;
+          }
         }
-        // 필터가 없으면 모든 데이터 반환 (관리 모드)
+
+        // CTN 필터가 있으면 해당 CTN의 데이터만 반환
+        if (requestedCtn) {
+          const reportCtn = (report.ctn || report.customerContact || '')
+            .toString()
+            .replace(/[^0-9]/g, '');
+          if (!reportCtn || reportCtn !== requestedCtn) {
+            return false;
+          }
+        }
+
+        // 필터가 없거나 모두 통과한 경우
         return true;
       });
 
