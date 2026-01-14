@@ -3730,7 +3730,27 @@ function setupPolicyTableRoutes(app) {
         // SS(총괄), S(정산) 레벨은 모든 탭 표시
       } else if (userRole && /^[A-Z]{2}$/.test(userRole)) {
         // 팀장 레벨(두 글자 대문자 패턴)은 본인이 생성한 정책표 + 담당자인 그룹의 정책표 탭 표시
-        const currentUserId = req.headers['x-user-id'] || userId;
+        
+        // 🔥 중요: 정책표 생성 시 저장된 creatorId와 동일한 방식으로 사용자 ID를 찾아야 함
+        // checkPermission과 동일한 로직으로 대리점아이디관리 시트에서 사용자 정보 조회
+        let currentUserId = req.headers['x-user-id'] || userId;
+        try {
+          const agentManagementResponse = await getAgentManagementData(sheets, SPREADSHEET_ID);
+          const agentRows = agentManagementResponse?.data?.values || [];
+          if (agentRows.length >= 2 && currentUserId) {
+            const userRow = agentRows.find(row => {
+              // C열(2번 인덱스)에서 contactId로 찾기 (checkPermission과 동일한 로직)
+              return row[2] === currentUserId;
+            });
+            if (userRow) {
+              // 대리점아이디관리 시트의 C열 값 사용 (정책표 생성 시 저장된 creatorId와 동일)
+              currentUserId = userRow[2] || currentUserId;
+            }
+          }
+        } catch (error) {
+          console.warn('[정책표 탭] 사용자 ID 조회 실패, 헤더 값 사용:', error.message);
+          // 에러 발생 시 헤더 값 그대로 사용
+        }
         
         // 정책표목록과 정책영업그룹 목록을 병렬로 조회 (캐시 우선)
         const policyListCacheKey = `policy-tables-list-for-tabs-${SPREADSHEET_ID}`;
@@ -3806,10 +3826,28 @@ function setupPolicyTableRoutes(app) {
         policyDataRows.forEach(row => {
           const creatorId = row[13] || ''; // 생성자ID
           const accessGroupIds = parseAccessGroupIds(row[5]); // 접근권한 (그룹ID 배열)
+          const policyTableId = row[1] || ''; // 정책표ID_설정
           
-          // 1. 본인이 생성한 정책표인지 확인
-          if (creatorId === currentUserId) {
-            accessiblePolicyTableIds.add(row[1]); // 정책표ID_설정
+          // 🔥 디버깅: 본인이 생성한 정책표인지 확인
+          const isCreator = creatorId === currentUserId;
+          if (isCreator) {
+            console.log('✅ [정책표 탭] 본인이 생성한 정책표 발견:', {
+              policyTableId,
+              policyTableName: row[2] || '',
+              creatorId,
+              currentUserId,
+              match: isCreator
+            });
+            accessiblePolicyTableIds.add(policyTableId); // 정책표ID_설정
+          } else if (creatorId && currentUserId) {
+            // 매칭되지 않은 경우만 로그 (너무 많은 로그 방지)
+            console.log('❌ [정책표 탭] 생성자 불일치:', {
+              policyTableId,
+              policyTableName: row[2] || '',
+              creatorId,
+              currentUserId,
+              match: false
+            });
           }
           
           // 2. 본인이 담당자인 그룹의 정책표인지 확인
