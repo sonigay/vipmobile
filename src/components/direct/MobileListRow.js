@@ -176,11 +176,16 @@ const MobileListRowComponent = ({
         onClick={(e) => e.stopPropagation()}
         sx={{
           width: '100px',
-          position: 'sticky',
-          left: !isCustomerMode ? '120px' : 0,
-          zIndex: 3,
-          backgroundColor: 'background.paper',
-          boxShadow: '2px 0 4px rgba(0,0,0,0.1)'
+          // 직영점 모드에서는 이미지 컬럼을 틀고정, 고객모드(특히 좁은 화면)에서는 틀고정을 제거
+          ...(isCustomerMode
+            ? {}
+            : {
+                position: 'sticky',
+                left: '120px',
+                zIndex: 3,
+                backgroundColor: 'background.paper',
+                boxShadow: '2px 0 4px rgba(0,0,0,0.1)'
+              })
         }}
       >
         <Box sx={{ position: 'relative', display: 'inline-block' }}>
