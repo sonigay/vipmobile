@@ -24,7 +24,9 @@ import {
   ListItemText,
   ListItemIcon,
   Autocomplete,
-  TextField
+  TextField,
+  useMediaQuery,
+  useTheme
 } from '@mui/material';
 import {
   PhotoCamera as PhotoCameraIcon,
@@ -45,6 +47,8 @@ import { MobileListRow } from './MobileListRow';
 import { debugLog } from '../../utils/debugLogger';
 
 const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [carrierTab, setCarrierTab] = useState(0); // 0: SK, 1: KT, 2: LG
   const [mobileList, setMobileList] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -66,6 +70,9 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
   const pricingDataRef = useRef(new Map()); // Key: modelId-planGroup-openingType -> PriceData
   const userSelectedOpeningTypesRef = useRef(new Set()); // 사용자가 수동으로 선택한 개통유형 추적
   const initializedRef = useRef(false);
+  const headerScrollRef = useRef(null); // 헤더 스크롤 컨테이너 ref
+  const bodyScrollRef = useRef(null); // 본문 스크롤 컨테이너 ref
+  const isScrollingRef = useRef(false); // 스크롤 동기화 중 플래그
 
   // 개통 유형 목록 (고정)
   const openingTypes = ['010신규', 'MNP', '기변'];
@@ -853,10 +860,66 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
     return row[field];
   }, [selectedOpeningTypes, selectedPlanGroups, lookupPrice]);
 
-  return (
-    <Box sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
+  // 모바일에서 헤더와 본문의 가로 스크롤 동기화
+  useEffect(() => {
+    if (!isMobile || !headerScrollRef.current || !bodyScrollRef.current) return;
 
-      <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', color: 'text.primary' }}>
+    const headerContainer = headerScrollRef.current;
+    const bodyContainer = bodyScrollRef.current;
+
+    const syncHeaderScroll = () => {
+      if (isScrollingRef.current) return;
+      isScrollingRef.current = true;
+      headerContainer.scrollLeft = bodyContainer.scrollLeft;
+      requestAnimationFrame(() => {
+        isScrollingRef.current = false;
+      });
+    };
+
+    const syncBodyScroll = () => {
+      if (isScrollingRef.current) return;
+      isScrollingRef.current = true;
+      bodyContainer.scrollLeft = headerContainer.scrollLeft;
+      requestAnimationFrame(() => {
+        isScrollingRef.current = false;
+      });
+    };
+
+    bodyContainer.addEventListener('scroll', syncHeaderScroll);
+    headerContainer.addEventListener('scroll', syncBodyScroll);
+
+    return () => {
+      bodyContainer.removeEventListener('scroll', syncHeaderScroll);
+      headerContainer.removeEventListener('scroll', syncBodyScroll);
+    };
+  }, [isMobile, mobileList.length]); // mobileList.length가 변경되면 재설정
+
+  return (
+    <Box sx={{ 
+      p: { xs: 1, sm: 2, md: 3 }, 
+      height: '100%', 
+      display: 'flex', 
+      flexDirection: 'column', 
+      overflow: 'hidden', 
+      position: 'relative',
+      // 모바일에서 높이 제한
+      ...(isMobile && {
+        height: '100%',
+        maxHeight: '100%',
+        minHeight: 0
+      })
+    }}>
+
+      <Typography 
+        variant="h5" 
+        gutterBottom 
+        sx={{ 
+          fontWeight: 'bold', 
+          color: 'text.primary',
+          fontSize: { xs: '1.25rem', sm: '1.5rem' },
+          mb: { xs: 1, sm: 2 }
+        }}
+      >
         {isCustomerMode ? '실시간 휴대폰 시세표' : '휴대폰시세표'}
       </Typography>
 
@@ -864,17 +927,29 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
       <Paper 
         sx={{ 
           mb: 0, 
-          p: 2, 
+          p: { xs: 1, sm: 2 }, 
           bgcolor: 'background.paper', 
           borderRadius: 0,
           position: 'sticky',
           top: 0,
           zIndex: 20,
-          boxShadow: 2
+          boxShadow: 2,
+          flexShrink: 0,
+          // 모바일에서 헤더 높이 최적화
+          ...(isMobile && {
+            p: 1,
+            mb: 0
+          })
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <Box sx={{ flexGrow: 1 }}>
+        <Box sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          mb: { xs: 1, sm: 2 },
+          flexWrap: { xs: 'wrap', sm: 'nowrap' },
+          gap: { xs: 1, sm: 0 }
+        }}>
+          <Box sx={{ flexGrow: 1, minWidth: 0 }}>
             <Tabs
               value={carrierTab}
               onChange={handleCarrierChange}
@@ -885,7 +960,9 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
               sx={{
                 '& .MuiTab-root': {
                   fontWeight: 'bold',
-                  fontSize: '1.1rem',
+                  fontSize: { xs: '0.875rem', sm: '1rem', md: '1.1rem' },
+                  minWidth: { xs: 'auto', sm: 'auto' },
+                  px: { xs: 1, sm: 2 }
                 },
                 '& .Mui-selected': {
                   bgcolor: 'rgba(212, 175, 55, 0.05)'
@@ -904,7 +981,13 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
             onClick={handleReload}
             startIcon={<RefreshIcon />}
             disabled={loading}
-            sx={{ ml: 2 }}
+            sx={{ 
+              ml: { xs: 0, sm: 2 },
+              mt: { xs: 1, sm: 0 },
+              fontSize: { xs: '0.75rem', sm: '0.875rem' },
+              minWidth: { xs: 'auto', sm: 'auto' },
+              px: { xs: 1, sm: 2 }
+            }}
           >
             새로고침
           </Button>
@@ -912,12 +995,21 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
 
         {/* 상태 단계 표시 */}
         {loading && (
-          <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+          <Box sx={{ 
+            display: 'flex', 
+            gap: { xs: 0.5, sm: 1 }, 
+            mb: { xs: 1, sm: 2 },
+            flexWrap: 'wrap'
+          }}>
             {Object.values(steps).map((step, index) => (
               <Chip
                 key={index}
                 label={`${step.label}${step.message ? `: ${step.message}` : ''}`}
                 size="small"
+                sx={{
+                  fontSize: { xs: '0.625rem', sm: '0.75rem' },
+                  height: { xs: '24px', sm: '32px' }
+                }}
                 color={
                   step.status === 'success' ? 'success' :
                     step.status === 'loading' ? 'info' :
@@ -931,13 +1023,31 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
         )}
 
         {/* 컬럼 헤더 */}
-        <TableContainer sx={{ 
-          overflowX: { xs: 'auto', md: 'hidden' }, 
-          overflowY: 'hidden',
-          width: '100%'
-        }}>
+        <TableContainer 
+          ref={headerScrollRef}
+          sx={{ 
+            overflowX: 'auto', 
+            overflowY: 'hidden',
+            width: '100%',
+            // 모바일에서 터치 스크롤 최적화
+            WebkitOverflowScrolling: 'touch',
+            // 모바일에서 헤더 스크롤 방지 (본문과 동기화를 위해)
+            ...(isMobile && {
+              position: 'relative',
+              overflowX: 'auto',
+              '&::-webkit-scrollbar': {
+                height: '4px'
+              },
+              '&::-webkit-scrollbar-thumb': {
+                backgroundColor: 'rgba(0,0,0,0.2)',
+                borderRadius: '2px'
+              }
+            })
+          }}
+        >
           <Table sx={{ 
             width: '100%',
+            minWidth: { xs: '800px', sm: '100%' }, // 모바일에서 최소 너비 보장
             tableLayout: 'fixed',
             borderCollapse: 'separate', 
             borderSpacing: 0 
@@ -1095,24 +1205,57 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
               borderRadius: 2,
               overflow: 'hidden',
               display: 'flex',
-              flexDirection: 'column'
+              flexDirection: 'column',
+              minHeight: 0, // flexbox에서 스크롤을 위해 필요
+              // 모바일에서 높이 제한
+              ...(isMobile && {
+                flex: '1 1 auto',
+                minHeight: 0,
+                height: '100%'
+              })
             }}
           >
             <TableContainer
+              ref={bodyScrollRef}
               sx={{
                 flexGrow: 1,
-                overflowX: { xs: 'auto', md: 'hidden' },
+                overflowX: 'auto',
                 overflowY: 'auto',
                 maxWidth: '100%',
                 width: '100%',
-                // 테이블 본문만 스크롤되도록 높이 설정
-                height: { xs: 'calc(100vh - 400px)', sm: 'calc(100vh - 350px)', md: 'calc(100vh - 300px)' },
-                maxHeight: { xs: 'calc(100vh - 400px)', sm: 'calc(100vh - 350px)', md: 'calc(100vh - 300px)' },
-                position: 'relative'
+                position: 'relative',
+                minHeight: 0, // flexbox에서 스크롤을 위해 필요
+                // 모바일에서 터치 스크롤 최적화
+                WebkitOverflowScrolling: 'touch',
+                // 모바일에서 동적 높이 계산
+                ...(isMobile ? {
+                  flex: '1 1 auto',
+                  height: '100%',
+                  maxHeight: '100%',
+                  // 고객모드일 때는 더 많은 공간 확보
+                  ...(isCustomerMode && {
+                    height: 'calc(100vh - 280px)',
+                    maxHeight: 'calc(100vh - 280px)'
+                  }),
+                  // 모바일에서 스크롤바 스타일
+                  '&::-webkit-scrollbar': {
+                    width: '4px',
+                    height: '4px'
+                  },
+                  '&::-webkit-scrollbar-thumb': {
+                    backgroundColor: 'rgba(0,0,0,0.2)',
+                    borderRadius: '2px'
+                  }
+                } : {
+                  // PC에서는 기존 높이 계산 유지
+                  height: { xs: 'calc(100vh - 400px)', sm: 'calc(100vh - 350px)', md: 'calc(100vh - 300px)' },
+                  maxHeight: { xs: 'calc(100vh - 400px)', sm: 'calc(100vh - 350px)', md: 'calc(100vh - 300px)' }
+                })
               }}
             >
               <Table sx={{ 
                 width: '100%',
+                minWidth: { xs: '800px', sm: '100%' }, // 모바일에서 최소 너비 보장 (헤더와 동일)
                 tableLayout: 'fixed',
                 borderCollapse: 'separate', 
                 borderSpacing: 0 

@@ -220,10 +220,20 @@ const CustomerDashboard = () => {
                 minHeight: { xs: '300px', sm: '400px' }, 
                 overflow: 'hidden', // 🔥 수정: overflow를 hidden으로 변경하여 TableContainer에서만 스크롤 처리
                 maxHeight: { xs: 'calc(100vh - 300px)', sm: 'none' },
-                height: '100%'
+                height: { xs: 'calc(100vh - 250px)', sm: '100%' },
+                display: 'flex',
+                flexDirection: 'column',
+                position: 'relative'
             }}>
                 {tabValue === 0 && (
-                    <Box>
+                    <Box sx={{ 
+                        flex: '1 1 auto',
+                        minHeight: 0,
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        overflow: 'hidden'
+                    }}>
                         <MobileListTab onProductSelect={handleProductSelect} isCustomerMode={true} />
                     </Box>
                 )}
