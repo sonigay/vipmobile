@@ -13,7 +13,9 @@ import {
   InputAdornment,
   Dialog,
   DialogTitle,
-  DialogContent
+  DialogContent,
+  useMediaQuery,
+  useTheme
 } from '@mui/material';
 import { Search as SearchIcon } from '@mui/icons-material';
 import { directStoreApiClient } from '../../api/directStoreApiClient';
@@ -28,6 +30,8 @@ import { reverseConvertOpeningType } from '../../utils/directStoreUtils';
  * 직영점_판매일보 시트에서 CTN 기준으로 본인 구매 내역만 조회
  */
 const CustomerPurchaseHistoryTab = ({ customerInfo }) => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [history, setHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -85,9 +89,16 @@ const CustomerPurchaseHistoryTab = ({ customerInfo }) => {
   }
 
   return (
-    <Box sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
+    <Box sx={{ p: { xs: 1, sm: 3 }, height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <Box sx={{ 
+        display: 'flex', 
+        flexDirection: { xs: 'column', sm: 'row' },
+        justifyContent: 'space-between', 
+        alignItems: { xs: 'flex-start', sm: 'center' }, 
+        mb: 3,
+        gap: { xs: 2, sm: 0 }
+      }}>
+        <Typography variant="h5" sx={{ fontWeight: 'bold', fontSize: { xs: '1.1rem', sm: '1.5rem' } }}>
           나의 구매 내역
         </Typography>
         <TextField
@@ -102,7 +113,12 @@ const CustomerPurchaseHistoryTab = ({ customerInfo }) => {
               </InputAdornment>
             ),
           }}
-          sx={{ bgcolor: 'background.paper', borderRadius: 1, minWidth: 250 }}
+          sx={{ 
+            bgcolor: 'background.paper', 
+            borderRadius: 1, 
+            minWidth: { xs: '100%', sm: 250 },
+            width: { xs: '100%', sm: 'auto' }
+          }}
         />
       </Box>
 
@@ -111,19 +127,27 @@ const CustomerPurchaseHistoryTab = ({ customerInfo }) => {
           <Typography color="text.secondary">표시할 구매 내역이 없습니다.</Typography>
         </Paper>
       ) : (
-        <ModernTable sx={{ flexGrow: 1 }}>
-          <Table stickyHeader size="small">
+        <TableContainer 
+          sx={{ 
+            flexGrow: 1,
+            overflowX: 'auto',
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            maxHeight: { xs: 'calc(100vh - 250px)', sm: 'none' }
+          }}
+        >
+          <Table stickyHeader size="small" sx={{ minWidth: { xs: '900px', sm: '100%' }, tableLayout: 'fixed' }}>
             <TableHead>
               <TableRow>
-                <ModernTableCell align="center" width="80">판매일시</ModernTableCell>
-                <ModernTableCell align="center" width="60">통신사</ModernTableCell>
-                <ModernTableCell width="140">단말기모델명</ModernTableCell>
-                <ModernTableCell align="center" width="80">개통유형</ModernTableCell>
-                <ModernTableCell align="center" width="80">할부구분</ModernTableCell>
-                <ModernTableCell align="center" width="80">할부개월</ModernTableCell>
-                <ModernTableCell width="160">요금제</ModernTableCell>
-                <ModernTableCell align="right" width="100">할부원금</ModernTableCell>
-                <ModernTableCell align="center" width="80">상태</ModernTableCell>
+                <TableCell align="center" sx={{ width: '80px', fontSize: { xs: '0.75rem', sm: '0.875rem' }, fontWeight: 'bold', whiteSpace: 'nowrap' }}>판매일시</TableCell>
+                <TableCell align="center" sx={{ width: '60px', fontSize: { xs: '0.75rem', sm: '0.875rem' }, fontWeight: 'bold' }}>통신사</TableCell>
+                <TableCell sx={{ width: '140px', fontSize: { xs: '0.75rem', sm: '0.875rem' }, fontWeight: 'bold' }}>단말기모델명</TableCell>
+                <TableCell align="center" sx={{ width: '80px', fontSize: { xs: '0.75rem', sm: '0.875rem' }, fontWeight: 'bold' }}>개통유형</TableCell>
+                <TableCell align="center" sx={{ width: '80px', fontSize: { xs: '0.75rem', sm: '0.875rem' }, fontWeight: 'bold' }}>할부구분</TableCell>
+                <TableCell align="center" sx={{ width: '80px', fontSize: { xs: '0.75rem', sm: '0.875rem' }, fontWeight: 'bold' }}>할부개월</TableCell>
+                <TableCell sx={{ width: '160px', fontSize: { xs: '0.75rem', sm: '0.875rem' }, fontWeight: 'bold' }}>요금제</TableCell>
+                <TableCell align="right" sx={{ width: '100px', fontSize: { xs: '0.75rem', sm: '0.875rem' }, fontWeight: 'bold' }}>할부원금</TableCell>
+                <TableCell align="center" sx={{ width: '80px', fontSize: { xs: '0.75rem', sm: '0.875rem' }, fontWeight: 'bold' }}>상태</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -133,38 +157,38 @@ const CustomerPurchaseHistoryTab = ({ customerInfo }) => {
                   onClick={() => handleRowClick(row)}
                   sx={{ cursor: 'pointer' }}
                 >
-                  <TableCell align="center">
+                  <TableCell align="center" sx={{ width: '80px', fontSize: { xs: '0.75rem', sm: '0.875rem' }, whiteSpace: 'nowrap' }}>
                     {row.soldAt || row.판매일시 || ''}
                   </TableCell>
-                  <TableCell align="center">
+                  <TableCell align="center" sx={{ width: '60px', fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                     {row.carrier || row.통신사 || ''}
                   </TableCell>
-                  <TableCell>
+                  <TableCell sx={{ width: '140px', fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                     {row.model || row.단말기모델명 || ''}
                   </TableCell>
-                  <TableCell align="center">
+                  <TableCell align="center" sx={{ width: '80px', fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                     {row.개통유형 || row.openingType || ''}
                   </TableCell>
-                  <TableCell align="center">
+                  <TableCell align="center" sx={{ width: '80px', fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                     {row.할부구분 || row.installmentType || ''}
                   </TableCell>
-                  <TableCell align="center">
+                  <TableCell align="center" sx={{ width: '80px', fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                     {row.할부개월 || row.installmentPeriod || ''}
                   </TableCell>
-                  <TableCell>
+                  <TableCell sx={{ width: '160px', fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                     {row.요금제 || row.plan || ''}
                   </TableCell>
-                  <TableCell align="right">
+                  <TableCell align="right" sx={{ width: '100px', fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                     {(row.할부원금 ?? row.installmentPrincipal ?? 0).toLocaleString()}
                   </TableCell>
-                  <TableCell align="center">
+                  <TableCell align="center" sx={{ width: '80px', fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                     {row.상태 || row.status || ''}
                   </TableCell>
                 </HoverableTableRow>
               ))}
             </TableBody>
           </Table>
-        </ModernTable>
+        </TableContainer>
       )}
 
       {/* 상세 정보 다이얼로그 */}
