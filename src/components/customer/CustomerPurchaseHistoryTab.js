@@ -10,13 +10,18 @@ import {
   TableRow,
   Paper,
   TextField,
-  InputAdornment
+  InputAdornment,
+  Dialog,
+  DialogTitle,
+  DialogContent
 } from '@mui/material';
 import { Search as SearchIcon } from '@mui/icons-material';
 import { directStoreApiClient } from '../../api/directStoreApiClient';
 import { LoadingState } from '../direct/common/LoadingState';
 import { ErrorState } from '../direct/common/ErrorState';
 import { ModernTable, ModernTableCell, HoverableTableRow, EmptyTableRow } from '../direct/common/ModernTable';
+import OpeningInfoPage from '../direct/OpeningInfoPage';
+import { reverseConvertOpeningType } from '../../utils/directStoreUtils';
 
 /**
  * 고객모드 - 나의 구매 내역 탭
@@ -27,6 +32,8 @@ const CustomerPurchaseHistoryTab = ({ customerInfo }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedRow, setSelectedRow] = useState(null);
+  const [showDetailDialog, setShowDetailDialog] = useState(false);
 
   const loadHistory = useCallback(async () => {
     if (!customerInfo?.ctn) {
@@ -53,6 +60,11 @@ const CustomerPurchaseHistoryTab = ({ customerInfo }) => {
   useEffect(() => {
     loadHistory();
   }, [loadHistory]);
+
+  const handleRowClick = (row) => {
+    setSelectedRow(row);
+    setShowDetailDialog(true);
+  };
 
   const filteredData = history.filter(row => {
     if (!searchTerm) return true;
@@ -116,7 +128,11 @@ const CustomerPurchaseHistoryTab = ({ customerInfo }) => {
             </TableHead>
             <TableBody>
               {filteredData.map((row) => (
-                <HoverableTableRow key={row.id || row.번호}>
+                <HoverableTableRow 
+                  key={row.id || row.번호}
+                  onClick={() => handleRowClick(row)}
+                  sx={{ cursor: 'pointer' }}
+                >
                   <TableCell align="center">
                     {row.soldAt || row.판매일시 || ''}
                   </TableCell>
@@ -149,6 +165,62 @@ const CustomerPurchaseHistoryTab = ({ customerInfo }) => {
             </TableBody>
           </Table>
         </ModernTable>
+      )}
+
+      {/* 상세 정보 다이얼로그 */}
+      {selectedRow && showDetailDialog && (
+        <Dialog
+          open={showDetailDialog}
+          onClose={() => {
+            setShowDetailDialog(false);
+            setSelectedRow(null);
+          }}
+          maxWidth="lg"
+          fullWidth
+        >
+          <DialogTitle>구매 내역 상세 정보</DialogTitle>
+          <DialogContent>
+            <OpeningInfoPage
+              initialData={{
+                ...selectedRow,
+                번호: selectedRow.id || selectedRow.번호, // 판매일보 ID
+                model: selectedRow.model || selectedRow.단말기모델명 || '',
+                petName: selectedRow.model || selectedRow.단말기모델명 || '',
+                factoryPrice: selectedRow.factoryPrice || selectedRow.출고가 || 0,
+                publicSupport: selectedRow.publicSupport || selectedRow.이통사지원금 || 0,
+                storeSupport: selectedRow.storeSupport || selectedRow.대리점추가지원금 || 0,
+                대리점추가지원금: selectedRow.storeSupport || selectedRow.대리점추가지원금 || 0,
+                additionalStoreSupport: selectedRow.additionalStoreSupport || selectedRow.대리점추가지원금직접입력 || 0,
+                대리점추가지원금직접입력: selectedRow.additionalStoreSupport || selectedRow.대리점추가지원금직접입력 || 0,
+                installmentPrincipal: selectedRow.installmentPrincipal || selectedRow.할부원금 || 0,
+                할부원금: selectedRow.installmentPrincipal || selectedRow.할부원금 || 0,
+                lgPremier: selectedRow.lgPremier !== undefined ? Boolean(selectedRow.lgPremier) : (selectedRow.프리미어약정 === 'Y' || selectedRow.프리미어약정 === true || false),
+                프리미어약정: selectedRow.lgPremier !== undefined ? (selectedRow.lgPremier ? 'Y' : 'N') : (selectedRow.프리미어약정 || 'N'),
+                openingType: reverseConvertOpeningType(selectedRow.개통유형 || selectedRow.openingType || ''),
+                customerName: selectedRow.customerName || selectedRow.고객명 || '',
+                customerContact: selectedRow.customerContact || selectedRow.CTN || selectedRow.ctn || '',
+                carrier: selectedRow.carrier || selectedRow.통신사 || '',
+                plan: selectedRow.plan || selectedRow.요금제 || '',
+                deviceColor: selectedRow.color || selectedRow.색상 || '',
+                deviceSerial: selectedRow.deviceSerial || selectedRow.단말일련번호 || '',
+                simModel: selectedRow.usimModel || selectedRow.유심모델명 || '',
+                simSerial: selectedRow.usimSerial || selectedRow.유심일련번호 || '',
+                contractType: selectedRow.contractType === '선택약정' ? 'selected' : (selectedRow.약정 || 'standard'),
+                installmentPeriod: selectedRow.installmentPeriod || selectedRow.할부개월 || 24,
+                paymentType: selectedRow.installmentType === '현금' ? 'cash' : (selectedRow.할부구분 === '현금' ? 'cash' : 'installment'),
+                prevCarrier: selectedRow.prevCarrier || selectedRow.전통신사 || ''
+              }}
+              onBack={async () => {
+                await loadHistory(); // 목록 새로고침
+                setShowDetailDialog(false);
+                setSelectedRow(null);
+              }}
+              mode="customer"
+              customerInfo={customerInfo}
+              saveToSheet="sales" // 판매일보는 읽기 전용이지만 구조 유지
+            />
+          </DialogContent>
+        </Dialog>
       )}
     </Box>
   );

@@ -51,9 +51,9 @@ const CustomerDashboard = () => {
     }, [navigate]);
 
     const handleTabChange = (event, newValue) => {
-        // 첫구매 어드민 계정이고 공개아이디(아이디부여전) 상태인 경우, 나의구매대기(2)와 게시판(3) 탭 접근 제한
+        // 첫구매 어드민 계정이고 공개아이디(아이디부여전) 상태인 경우, 나의구매대기(2)와 게시판(4) 탭 접근 제한
         if (customerInfo?.isFirstPurchaseAdmin && customerInfo?.publicIdStatus === 'before') {
-            if (newValue === 2 || newValue === 3) {
+            if (newValue === 2 || newValue === 4) {
                 // 탭 변경을 막고 경고 표시
                 return;
             }
@@ -199,11 +199,11 @@ const CustomerDashboard = () => {
                         label="나의 구매 대기" 
                         disabled={customerInfo?.isFirstPurchaseAdmin && customerInfo?.publicIdStatus === 'before'}
                     />
+                    <Tab label="나의 구매 내역" />
                     <Tab 
                         label="게시판" 
                         disabled={customerInfo?.isFirstPurchaseAdmin && customerInfo?.publicIdStatus === 'before'}
                     />
-                    <Tab label="나의 구매 내역" />
                 </Tabs>
             </Paper>
 
@@ -261,6 +261,11 @@ const CustomerDashboard = () => {
                 )}
                 {tabValue === 3 && (
                     <Box sx={{ p: 3 }}>
+                        <CustomerPurchaseHistoryTab customerInfo={customerInfo} />
+                    </Box>
+                )}
+                {tabValue === 4 && (
+                    <Box sx={{ p: 3 }}>
                         {customerInfo?.isFirstPurchaseAdmin && customerInfo?.publicIdStatus === 'before' ? (
                             <Alert severity="error">
                                 아이디 부여 후 사용 가능한 기능입니다. 현재 공개아이디(아이디부여전) 상태로 접근할 수 없습니다.
@@ -268,11 +273,6 @@ const CustomerDashboard = () => {
                         ) : (
                         <CustomerBoardTab customerInfo={customerInfo} />
                         )}
-                    </Box>
-                )}
-                {tabValue === 4 && (
-                    <Box sx={{ p: 3 }}>
-                        <CustomerPurchaseHistoryTab customerInfo={customerInfo} />
                     </Box>
                 )}
             </Box>
