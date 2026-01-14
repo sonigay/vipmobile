@@ -334,8 +334,12 @@ const MobileListRowComponent = ({
         sx={{ 
           width: '220px',
           whiteSpace: 'nowrap',
-          // 고객모드에서는 틀고정 제거
-          ...(isCustomerMode ? {} : {
+          // 고객모드에서는 틀고정 완전히 제거
+          ...(isCustomerMode ? {
+            position: 'static', // 명시적으로 static으로 설정
+            left: 'auto',
+            zIndex: 'auto'
+          } : {
             position: 'sticky',
             left: '220px',
             zIndex: 3,
