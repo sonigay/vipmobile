@@ -215,14 +215,14 @@ const CustomerDashboard = () => {
             )}
 
             <Box sx={{ 
-                p: { xs: tabValue === 0 ? 0 : 2, sm: tabValue === 0 ? 0 : 3 }, 
+                p: { xs: tabValue === 0 ? 0 : 0, sm: tabValue === 0 ? 0 : 3 }, 
                 bgcolor: '#fff', 
                 borderRadius: 2, 
                 boxShadow: 1, 
                 minHeight: { xs: '300px', sm: '400px' }, 
-                overflow: 'hidden', // 🔥 수정: overflow를 hidden으로 변경하여 TableContainer에서만 스크롤 처리
-                maxHeight: { xs: 'calc(100vh - 300px)', sm: 'none' },
-                height: { xs: 'calc(100vh - 250px)', sm: '100%' },
+                overflow: tabValue === 1 ? 'visible' : 'hidden', // 선호구입매장 탭에서는 스크롤 가능하도록
+                maxHeight: tabValue === 1 ? 'none' : { xs: 'calc(100vh - 300px)', sm: 'none' },
+                height: tabValue === 1 ? 'auto' : { xs: 'calc(100vh - 250px)', sm: '100%' },
                 display: 'flex',
                 flexDirection: 'column',
                 position: 'relative'
@@ -240,7 +240,11 @@ const CustomerDashboard = () => {
                     </Box>
                 )}
                 {tabValue === 1 && (
-                    <Box>
+                    <Box sx={{ 
+                        width: '100%',
+                        minHeight: 0,
+                        flex: '1 1 auto'
+                    }}>
                         <CustomerPreferredStoreTab
                             selectedProduct={selectedProduct}
                             customerInfo={customerInfo}

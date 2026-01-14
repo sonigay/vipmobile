@@ -182,10 +182,9 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
             flexDirection: 'column', 
             gap: 3, 
             p: { xs: 1, sm: 2 },
-            minHeight: 0, // flexbox에서 스크롤을 위해 필요
-            height: '100%',
-            overflowY: 'auto', // 전체 스크롤 가능
-            WebkitOverflowScrolling: 'touch'
+            width: '100%',
+            minHeight: '100%',
+            pb: { xs: 4, sm: 4 } // 하단 여백 추가로 하단 내용이 잘리지 않도록
         }}>
             {/* 지도 설명 문구 - 지도 위쪽으로 이동 */}
             <Box sx={{
