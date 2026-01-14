@@ -158,7 +158,20 @@ const CustomerPurchaseHistoryTab = ({ customerInfo }) => {
                   sx={{ cursor: 'pointer' }}
                 >
                   <TableCell align="center" sx={{ width: '80px', fontSize: { xs: '0.75rem', sm: '0.875rem' }, whiteSpace: 'nowrap' }}>
-                    {row.soldAt || row.판매일시 || ''}
+                    {(() => {
+                      const dateValue = row.soldAt || row.판매일시 || '';
+                      if (!dateValue) return '';
+                      try {
+                        // ISO 문자열이나 날짜 문자열을 Date 객체로 변환
+                        const date = new Date(dateValue);
+                        if (isNaN(date.getTime())) return dateValue; // 유효하지 않은 날짜면 원본 반환
+                        // YYYY-MM-DD 형식으로 반환
+                        return date.toISOString().split('T')[0].replace(/-/g, '.');
+                      } catch (e) {
+                        // 날짜 파싱 실패 시 원본 반환 (이미 날짜 형식일 수 있음)
+                        return dateValue.length > 10 ? dateValue.substring(0, 10).replace(/-/g, '.') : dateValue;
+                      }
+                    })()}
                   </TableCell>
                   <TableCell align="center" sx={{ width: '60px', fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                     {row.carrier || row.통신사 || ''}

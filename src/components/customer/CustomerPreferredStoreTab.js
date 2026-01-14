@@ -177,14 +177,23 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
     }
 
     return (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, p: { xs: 1, sm: 2 } }}>
+        <Box sx={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: 3, 
+            p: { xs: 1, sm: 2 },
+            minHeight: 0, // flexbox에서 스크롤을 위해 필요
+            height: '100%',
+            overflowY: 'auto', // 전체 스크롤 가능
+            WebkitOverflowScrolling: 'touch'
+        }}>
             {/* 지도 설명 문구 - 지도 위쪽으로 이동 */}
             <Box sx={{
                 bgcolor: 'rgba(76, 175, 80, 0.1)',
                 p: { xs: 1.5, sm: 2 },
                 borderRadius: 2,
                 borderLeft: '4px solid #4caf50',
-                mb: { xs: -2, sm: -2 }
+                flexShrink: 0
             }}>
                 <Typography variant="body2" sx={{ fontWeight: 'medium', color: 'text.primary', fontSize: { xs: '0.875rem', sm: '1rem' } }}>
                     고객님의 위치에서 가장 가까운 매장을 안내합니다.
@@ -204,6 +213,15 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                     height: '100%',
                     width: '100%',
                     minHeight: { xs: '300px', sm: '400px', md: '500px' }
+                },
+                // Leaflet zoom 컨트롤이 제대로 표시되고 작동하도록 스타일 조정
+                '& .leaflet-control-zoom': {
+                    zIndex: 1000,
+                    pointerEvents: 'auto !important'
+                },
+                '& .leaflet-control-zoom-in, & .leaflet-control-zoom-out': {
+                    pointerEvents: 'auto !important',
+                    cursor: 'pointer'
                 }
             }}>
                 {/* 대중교통 마커 토글 (왼쪽 하단으로 이동) */}
@@ -263,10 +281,8 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
             {/* 선택된 매장 정보 (맵에서 클릭한 매장만 표시) */}
             {selectedStore ? (
                 <Box sx={{ 
-                    flexShrink: 0,
-                    maxHeight: { xs: 'calc(100vh - 500px)', sm: 'none' },
-                    overflowY: { xs: 'auto', sm: 'visible' },
-                    WebkitOverflowScrolling: 'touch'
+                    flexShrink: 0
+                    // 스크롤은 부모 Box에서 처리하므로 여기서는 제거
                 }}>
                     <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1, fontSize: { xs: '1rem', sm: '1.25rem' } }}>
                         <StoreIcon color="primary" />
