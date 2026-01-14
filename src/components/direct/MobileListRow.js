@@ -334,11 +334,14 @@ const MobileListRowComponent = ({
         sx={{ 
           width: '220px',
           whiteSpace: 'nowrap',
-          position: 'sticky',
-          left: !isCustomerMode ? '220px' : '100px',
-          zIndex: 3,
-          backgroundColor: 'background.paper',
-          boxShadow: '2px 0 4px rgba(0,0,0,0.1)'
+          // 고객모드에서는 틀고정 제거
+          ...(isCustomerMode ? {} : {
+            position: 'sticky',
+            left: '220px',
+            zIndex: 3,
+            backgroundColor: 'background.paper',
+            boxShadow: '2px 0 4px rgba(0,0,0,0.1)'
+          })
         }}
       >
         <Typography variant="body1" fontWeight="bold" sx={{ fontSize: '0.95rem' }}>
