@@ -3398,30 +3398,43 @@ function setupPolicyTableRoutes(app) {
       const groupIds = accessGroupIds || (accessGroupId ? [accessGroupId] : []);
 
       // 🔥 중요: creatorId는 대리점아이디관리 시트의 C열(contactId) 값을 사용해야 함
-      // checkPermission에서 이미 조회했지만, 정확한 contactId를 보장하기 위해 다시 조회
-      let creatorId = permission.userId || '';
+      // req.headers['x-user-id']를 직접 사용하여 대리점아이디관리 시트에서 C열 값을 찾음
+      const headerUserId = req.headers['x-user-id'] || '';
+      let creatorId = headerUserId;
       try {
         const { sheets, SPREADSHEET_ID } = createSheetsClient();
         const agentManagementResponse = await getAgentManagementData(sheets, SPREADSHEET_ID);
         const agentRows = agentManagementResponse?.data?.values || [];
-        if (agentRows.length >= 2 && creatorId) {
-          const userRow = agentRows.find(row => {
-            // C열(2번 인덱스)에서 contactId로 찾기
-            return row[2] === creatorId || row[0] === permission.userName;
+        if (agentRows.length >= 2 && headerUserId) {
+          // C열(contactId)로 먼저 찾기
+          let userRow = agentRows.find(row => {
+            return row[2] === headerUserId;
           });
+          // C열로 못 찾으면 A열(이름)으로 찾기
+          if (!userRow && permission.userName) {
+            userRow = agentRows.find(row => {
+              return row[0] === permission.userName;
+            });
+          }
           if (userRow && userRow[2]) {
             // 대리점아이디관리 시트의 C열 값 사용 (정책표 목록 탭 필터링과 동일)
             creatorId = userRow[2];
             console.log('✅ [정책표 생성] creatorId 설정:', {
-              originalUserId: permission.userId,
+              headerUserId: headerUserId,
               contactId: creatorId,
+              userName: permission.userName,
+              foundBy: userRow[2] === headerUserId ? 'contactId' : 'userName'
+            });
+          } else {
+            console.warn('⚠️ [정책표 생성] 사용자를 찾을 수 없음, headerUserId 사용:', {
+              headerUserId: headerUserId,
               userName: permission.userName
             });
           }
         }
       } catch (error) {
-        console.warn('[정책표 생성] creatorId 조회 실패, permission.userId 사용:', error.message);
-        // 에러 발생 시 permission.userId 그대로 사용
+        console.warn('[정책표 생성] creatorId 조회 실패, headerUserId 사용:', error.message);
+        // 에러 발생 시 headerUserId 그대로 사용
       }
 
       // 사용자가 이미 활성 작업이 있는지 확인
@@ -3759,40 +3772,35 @@ function setupPolicyTableRoutes(app) {
         // 팀장 레벨(두 글자 대문자 패턴)은 본인이 생성한 정책표 + 담당자인 그룹의 정책표 탭 표시
         
         // 🔥 중요: 정책표 생성 시 저장된 creatorId와 동일한 방식으로 사용자 ID를 찾아야 함
-        // checkPermission과 동일한 로직으로 대리점아이디관리 시트에서 사용자 정보 조회
-        let currentUserId = req.headers['x-user-id'] || userId;
+        // req.headers['x-user-id']를 직접 사용하여 대리점아이디관리 시트에서 C열 값을 찾음
+        const headerUserId = req.headers['x-user-id'] || userId;
+        let currentUserId = headerUserId;
         try {
           const agentManagementResponse = await getAgentManagementData(sheets, SPREADSHEET_ID);
           const agentRows = agentManagementResponse?.data?.values || [];
-          if (agentRows.length >= 2 && currentUserId) {
-            // 먼저 C열(contactId)로 찾기
-            let userRow = agentRows.find(row => {
-              return row[2] === currentUserId;
+          if (agentRows.length >= 2 && headerUserId) {
+            // C열(contactId)로 먼저 찾기
+            const userRow = agentRows.find(row => {
+              return row[2] === headerUserId;
             });
-            // C열로 못 찾으면 A열(이름)으로 찾기 (헤더에 이름이 올 수도 있음)
-            if (!userRow && userId) {
-              userRow = agentRows.find(row => {
-                return row[0] === userId || row[2] === userId;
-              });
-            }
             if (userRow && userRow[2]) {
               // 대리점아이디관리 시트의 C열 값 사용 (정책표 생성 시 저장된 creatorId와 동일)
               currentUserId = userRow[2];
               console.log('✅ [정책표 탭] currentUserId 설정:', {
-                originalUserId: req.headers['x-user-id'] || userId,
+                headerUserId: headerUserId,
                 contactId: currentUserId,
                 userName: userRow[0]
               });
             } else {
-              console.warn('⚠️ [정책표 탭] 사용자를 찾을 수 없음:', {
-                searchUserId: currentUserId,
+              console.warn('⚠️ [정책표 탭] 사용자를 찾을 수 없음, headerUserId 사용:', {
+                headerUserId: headerUserId,
                 availableIds: agentRows.slice(1).map(row => ({ name: row[0], contactId: row[2] })).slice(0, 5)
               });
             }
           }
         } catch (error) {
-          console.warn('[정책표 탭] 사용자 ID 조회 실패, 헤더 값 사용:', error.message);
-          // 에러 발생 시 헤더 값 그대로 사용
+          console.warn('[정책표 탭] 사용자 ID 조회 실패, headerUserId 사용:', error.message);
+          // 에러 발생 시 headerUserId 그대로 사용
         }
         
         // 정책표목록과 정책영업그룹 목록을 병렬로 조회 (캐시 우선)
