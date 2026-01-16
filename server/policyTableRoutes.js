@@ -3829,6 +3829,30 @@ function setupPolicyTableRoutes(app) {
           });
         }
         
+        // 🔥 중요: 정책표 설정을 직접 확인하여 생성자적용권한 체크
+        // 정책표 목록에 등록된 정책이 없어도 정책표 설정의 생성자적용권한으로 접근 가능
+        const accessiblePolicyTableIdsByRole = new Set();
+        settingsMap.forEach((creatorPermissions, policyTableId) => {
+          if (userRole) {
+            const twoLetterPattern = /^[A-Z]{2}$/;
+            const isRoleInPermissions = creatorPermissions.includes(userRole);
+            const isSSOrS = (userRole === 'SS' || userRole === 'S');
+            const isTeamLeaderMatch = twoLetterPattern.test(userRole) && creatorPermissions.some(perm => twoLetterPattern.test(perm));
+            
+            if (isRoleInPermissions || isSSOrS || isTeamLeaderMatch) {
+              accessiblePolicyTableIdsByRole.add(policyTableId);
+              console.log('✅ [정책표 탭] 생성자적용권한으로 접근 가능 (정책표 설정 직접 확인):', {
+                policyTableId,
+                userRole,
+                creatorPermissions,
+                isRoleInPermissions,
+                isSSOrS,
+                isTeamLeaderMatch
+              });
+            }
+          }
+        });
+        
         // 정책표목록과 정책영업그룹 목록을 병렬로 조회 (캐시 우선)
         const policyListCacheKey = `policy-tables-list-for-tabs-${SPREADSHEET_ID}`;
         const userGroupsCacheKey = `user-groups-${SPREADSHEET_ID}`;
