@@ -3880,17 +3880,27 @@ function setupPolicyTableRoutes(app) {
           const policyTableId = row[1] || ''; // 정책표ID_설정
           
           // 🔥 디버깅: 본인이 생성한 정책표인지 확인
-          // creatorId와 currentUserId를 문자열로 정규화하여 비교 (공백 제거, 대소문자 구분)
-          const normalizedCreatorId = (creatorId || '').toString().trim();
-          const normalizedCurrentUserId = (currentUserId || '').toString().trim();
-          const isCreator = normalizedCreatorId === normalizedCurrentUserId;
+          // creatorId와 currentUserId를 숫자만 추출하여 비교 (전화번호 형식 차이 해결)
+          const normalizePhoneNumber = (phone) => {
+            if (!phone) return '';
+            // 숫자만 추출
+            const digits = phone.toString().replace(/[^0-9]/g, '');
+            // 앞의 0 제거 (01053336333 -> 1053336333)
+            return digits.replace(/^0+/, '') || digits;
+          };
+          
+          const normalizedCreatorId = normalizePhoneNumber(creatorId);
+          const normalizedCurrentUserId = normalizePhoneNumber(currentUserId);
+          const isCreator = normalizedCreatorId && normalizedCurrentUserId && normalizedCreatorId === normalizedCurrentUserId;
           
           if (isCreator) {
             console.log('✅ [정책표 탭] 본인이 생성한 정책표 발견:', {
               policyTableId,
               policyTableName: row[2] || '',
-              creatorId: normalizedCreatorId,
-              currentUserId: normalizedCurrentUserId,
+              originalCreatorId: creatorId,
+              originalCurrentUserId: currentUserId,
+              normalizedCreatorId: normalizedCreatorId,
+              normalizedCurrentUserId: normalizedCurrentUserId,
               match: isCreator
             });
             accessiblePolicyTableIds.add(policyTableId); // 정책표ID_설정
@@ -3899,11 +3909,11 @@ function setupPolicyTableRoutes(app) {
             console.log('❌ [정책표 탭] 생성자 불일치:', {
               policyTableId,
               policyTableName: row[2] || '',
-              creatorId: normalizedCreatorId,
-              currentUserId: normalizedCurrentUserId,
-              match: false,
-              creatorIdType: typeof creatorId,
-              currentUserIdType: typeof currentUserId
+              originalCreatorId: creatorId,
+              originalCurrentUserId: currentUserId,
+              normalizedCreatorId: normalizedCreatorId,
+              normalizedCurrentUserId: normalizedCurrentUserId,
+              match: false
             });
           }
           
