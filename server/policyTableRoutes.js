@@ -3965,60 +3965,14 @@ function setupPolicyTableRoutes(app) {
             }
           }
           
-          // 3. 정책표 설정의 생성자적용권한에 현재 사용자의 권한 레벨이 포함되어 있는지 확인
-          let hasPermissionByRole = false;
-          if (policyTableId && userRole) {
-            const creatorPermissions = settingsMap.get(policyTableId) || [];
-            // 두 글자 대문자 패턴(팀장) 체크
-            const twoLetterPattern = /^[A-Z]{2}$/;
-            const isRoleInPermissions = creatorPermissions.includes(userRole);
-            const isSSOrS = (userRole === 'SS' || userRole === 'S');
-            const isTeamLeaderMatch = twoLetterPattern.test(userRole) && creatorPermissions.some(perm => twoLetterPattern.test(perm));
-            
-            if (isRoleInPermissions || isSSOrS || isTeamLeaderMatch) {
-              hasPermissionByRole = true;
-              accessiblePolicyTableIds.add(policyTableId); // 정책표ID_설정
-              console.log('✅ [정책표 탭] 생성자적용권한으로 접근 가능:', {
-                policyTableId,
-                policyTableName: row[2] || '',
-                userRole,
-                creatorPermissions,
-                isRoleInPermissions,
-                isSSOrS,
-                isTeamLeaderMatch,
-                hasPermissionByRole
-              });
-            } else {
-              console.log('❌ [정책표 탭] 생성자적용권한 불일치:', {
-                policyTableId,
-                policyTableName: row[2] || '',
-                userRole,
-                creatorPermissions,
-                isRoleInPermissions,
-                isSSOrS,
-                isTeamLeaderMatch
-              });
-            }
-          } else {
-            if (!policyTableId) {
-              console.warn('⚠️ [정책표 탭] policyTableId 없음:', {
-                row: row.slice(0, 3)
-              });
-            }
-            if (!userRole) {
-              console.warn('⚠️ [정책표 탭] userRole 없음');
-            }
-          }
-          
-          if (isCreator || isManager || hasPermissionByRole) {
+          // 정책표 탭에서는 본인이 생성한 정책표 또는 담당자인 그룹의 정책표만 표시
+          if (isCreator || isManager) {
             console.log('✅ [정책표 탭] 접근 가능한 정책표:', {
               policyTableId,
               policyTableName: row[2] || '',
               isCreator,
               isManager,
-              hasPermissionByRole,
-              userRole,
-              creatorPermissions: policyTableId ? settingsMap.get(policyTableId) : []
+              userRole
             });
           }
         });
@@ -4526,20 +4480,8 @@ function setupPolicyTableRoutes(app) {
             }
           }
           
-          // 3. 정책표 설정의 생성자적용권한에 현재 사용자의 권한 레벨이 포함되어 있는지 확인
-          let hasPermissionByRole = false;
-          if (policy.policyTableId && userRole) {
-            const creatorPermissions = settingsMap.get(policy.policyTableId) || [];
-            // 두 글자 대문자 패턴(팀장) 체크
-            const twoLetterPattern = /^[A-Z]{2}$/;
-            if (creatorPermissions.includes(userRole) || 
-                (userRole === 'SS' || userRole === 'S') ||
-                (twoLetterPattern.test(userRole) && creatorPermissions.some(perm => twoLetterPattern.test(perm)))) {
-              hasPermissionByRole = true;
-            }
-          }
-          
-          const hasAccess = isCreator || isManager || hasPermissionByRole;
+          // 정책표 목록 조회에서도 본인이 생성한 정책표 또는 담당자인 그룹의 정책표만 표시
+          const hasAccess = isCreator || isManager;
           
           console.log(`🔍 [정책모드] 팀장 필터링 체크: ${policy.policyTableName}`, {
             policyId: policy.id,
@@ -4549,9 +4491,7 @@ function setupPolicyTableRoutes(app) {
             normalizedCurrentUserId: normalizePhoneNumber(currentUserId),
             isCreator,
             isManager,
-            hasPermissionByRole,
             userRole,
-            creatorPermissions: policy.policyTableId ? settingsMap.get(policy.policyTableId) : [],
             accessGroupIds,
             hasAccess
           });
