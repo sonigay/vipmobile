@@ -1554,6 +1554,10 @@ function setupPolicyTableRoutes(app) {
         });
       });
 
+      // 캐시 무효화
+      invalidateCache('policy-table-settings');
+      invalidateCache('policy-tables-tabs'); // 탭 목록도 무효화
+
       return res.json({
         success: true,
         id: newId,
@@ -1630,6 +1634,10 @@ function setupPolicyTableRoutes(app) {
         });
       });
 
+      // 캐시 무효화
+      invalidateCache('policy-table-settings');
+      invalidateCache('policy-tables-tabs'); // 탭 목록도 무효화
+
       return res.json({
         success: true,
         id: id,
@@ -1686,6 +1694,10 @@ function setupPolicyTableRoutes(app) {
           }
         });
       });
+
+      // 캐시 무효화
+      invalidateCache('policy-table-settings');
+      invalidateCache('policy-tables-tabs'); // 탭 목록도 무효화
 
       return res.json({
         success: true,
