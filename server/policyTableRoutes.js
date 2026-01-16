@@ -3971,11 +3971,42 @@ function setupPolicyTableRoutes(app) {
             const creatorPermissions = settingsMap.get(policyTableId) || [];
             // 두 글자 대문자 패턴(팀장) 체크
             const twoLetterPattern = /^[A-Z]{2}$/;
-            if (creatorPermissions.includes(userRole) || 
-                (userRole === 'SS' || userRole === 'S') ||
-                (twoLetterPattern.test(userRole) && creatorPermissions.some(perm => twoLetterPattern.test(perm)))) {
+            const isRoleInPermissions = creatorPermissions.includes(userRole);
+            const isSSOrS = (userRole === 'SS' || userRole === 'S');
+            const isTeamLeaderMatch = twoLetterPattern.test(userRole) && creatorPermissions.some(perm => twoLetterPattern.test(perm));
+            
+            if (isRoleInPermissions || isSSOrS || isTeamLeaderMatch) {
               hasPermissionByRole = true;
               accessiblePolicyTableIds.add(policyTableId); // 정책표ID_설정
+              console.log('✅ [정책표 탭] 생성자적용권한으로 접근 가능:', {
+                policyTableId,
+                policyTableName: row[2] || '',
+                userRole,
+                creatorPermissions,
+                isRoleInPermissions,
+                isSSOrS,
+                isTeamLeaderMatch,
+                hasPermissionByRole
+              });
+            } else {
+              console.log('❌ [정책표 탭] 생성자적용권한 불일치:', {
+                policyTableId,
+                policyTableName: row[2] || '',
+                userRole,
+                creatorPermissions,
+                isRoleInPermissions,
+                isSSOrS,
+                isTeamLeaderMatch
+              });
+            }
+          } else {
+            if (!policyTableId) {
+              console.warn('⚠️ [정책표 탭] policyTableId 없음:', {
+                row: row.slice(0, 3)
+              });
+            }
+            if (!userRole) {
+              console.warn('⚠️ [정책표 탭] userRole 없음');
             }
           }
           
