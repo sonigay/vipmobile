@@ -4022,6 +4022,18 @@ function setupPolicyTableRoutes(app) {
             });
           }
         });
+        
+        // 정책표 설정의 생성자적용권한으로 접근 가능한 정책표ID도 추가
+        accessiblePolicyTableIdsByRole.forEach(policyTableId => {
+          accessiblePolicyTableIds.add(policyTableId);
+        });
+        
+        console.log('✅ [정책표 탭] 최종 접근 가능한 정책표ID:', {
+          fromPolicyList: Array.from(accessiblePolicyTableIds).filter(id => !accessiblePolicyTableIdsByRole.has(id)),
+          fromSettings: Array.from(accessiblePolicyTableIdsByRole),
+          total: Array.from(accessiblePolicyTableIds)
+        });
+        
         tabs = tabs.filter(tab => accessiblePolicyTableIds.has(tab.policyTableId));
       } else {
         // 그 외 사용자(A-F)는 그룹의 담당자(managerIds)에 포함된 경우만 해당 그룹의 탭 표시
