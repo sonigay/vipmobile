@@ -4368,11 +4368,22 @@ function setupPolicyTableRoutes(app) {
           userGroupsMapSize: userGroupsMap.size
         });
         
+        // 전화번호 정규화 함수 (정책표 탭과 동일한 로직)
+        const normalizePhoneNumber = (phone) => {
+          if (!phone) return '';
+          // 숫자만 추출
+          const digits = phone.toString().replace(/[^0-9]/g, '');
+          // 앞의 0 제거 (01053336333 -> 1053336333)
+          return digits.replace(/^0+/, '') || digits;
+        };
+        
         policies = policies.filter(policy => {
-          // 1. 본인이 생성한 정책표인지 확인
+          // 1. 본인이 생성한 정책표인지 확인 (전화번호 정규화 적용)
           let isCreator = false;
           if (policy.creatorId) {
-            isCreator = policy.creatorId === currentUserId;
+            const normalizedCreatorId = normalizePhoneNumber(policy.creatorId);
+            const normalizedCurrentUserId = normalizePhoneNumber(currentUserId);
+            isCreator = normalizedCreatorId && normalizedCurrentUserId && normalizedCreatorId === normalizedCurrentUserId;
           }
           
           // 2. 본인이 담당자인 그룹의 정책표인지 확인
@@ -4383,7 +4394,13 @@ function setupPolicyTableRoutes(app) {
               const groupData = userGroupsMap.get(accessGroupId);
               if (groupData) {
                 const managerIds = groupData.managerIds || [];
-                if (managerIds.includes(currentUserId)) {
+                // managerIds도 정규화하여 비교
+                const normalizedCurrentUserId = normalizePhoneNumber(currentUserId);
+                const isManagerInGroup = managerIds.some(managerId => {
+                  const normalizedManagerId = normalizePhoneNumber(managerId);
+                  return normalizedManagerId && normalizedCurrentUserId && normalizedManagerId === normalizedCurrentUserId;
+                });
+                if (isManagerInGroup) {
                   isManager = true;
                   break; // 하나라도 매칭되면 true
                 }
@@ -4395,8 +4412,10 @@ function setupPolicyTableRoutes(app) {
           
           console.log(`🔍 [정책모드] 팀장 필터링 체크: ${policy.policyTableName}`, {
             policyId: policy.id,
-            creatorId: policy.creatorId,
-            currentUserId,
+            originalCreatorId: policy.creatorId,
+            originalCurrentUserId: currentUserId,
+            normalizedCreatorId: policy.creatorId ? normalizePhoneNumber(policy.creatorId) : '',
+            normalizedCurrentUserId: normalizePhoneNumber(currentUserId),
             isCreator,
             isManager,
             accessGroupIds,
