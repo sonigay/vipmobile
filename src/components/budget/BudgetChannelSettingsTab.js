@@ -80,11 +80,14 @@ const BudgetChannelSettingsTab = ({ loggedInStore }) => {
         }
       });
       if (response.ok) {
-        const data = await response.json();
-        setSettings(data);
+        const result = await response.json();
+        // 응답이 객체인 경우 (새 형식)와 배열인 경우 (기존 형식) 모두 처리
+        const data = result.settings || result;
+        setSettings(Array.isArray(data) ? data : []);
         
         // 사용 가능한 년월 목록 추출 (중복 제거, 정렬)
-        const yearMonths = [...new Set(data.map(s => s.yearMonth).filter(Boolean))].sort().reverse();
+        const settingsArray = Array.isArray(data) ? data : [];
+        const yearMonths = [...new Set(settingsArray.map(s => s.yearMonth).filter(Boolean))].sort().reverse();
         setAvailableYearMonths(yearMonths);
       } else {
         setError('예산채널 설정을 불러올 수 없습니다.');
