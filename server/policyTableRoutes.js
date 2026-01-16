@@ -3397,6 +3397,33 @@ function setupPolicyTableRoutes(app) {
       // accessGroupIds 배열 처리 (하위 호환성을 위해 accessGroupId도 지원)
       const groupIds = accessGroupIds || (accessGroupId ? [accessGroupId] : []);
 
+      // 🔥 중요: creatorId는 대리점아이디관리 시트의 C열(contactId) 값을 사용해야 함
+      // checkPermission에서 이미 조회했지만, 정확한 contactId를 보장하기 위해 다시 조회
+      let creatorId = permission.userId || '';
+      try {
+        const { sheets, SPREADSHEET_ID } = createSheetsClient();
+        const agentManagementResponse = await getAgentManagementData(sheets, SPREADSHEET_ID);
+        const agentRows = agentManagementResponse?.data?.values || [];
+        if (agentRows.length >= 2 && creatorId) {
+          const userRow = agentRows.find(row => {
+            // C열(2번 인덱스)에서 contactId로 찾기
+            return row[2] === creatorId || row[0] === permission.userName;
+          });
+          if (userRow && userRow[2]) {
+            // 대리점아이디관리 시트의 C열 값 사용 (정책표 목록 탭 필터링과 동일)
+            creatorId = userRow[2];
+            console.log('✅ [정책표 생성] creatorId 설정:', {
+              originalUserId: permission.userId,
+              contactId: creatorId,
+              userName: permission.userName
+            });
+          }
+        }
+      } catch (error) {
+        console.warn('[정책표 생성] creatorId 조회 실패, permission.userId 사용:', error.message);
+        // 에러 발생 시 permission.userId 그대로 사용
+      }
+
       // 사용자가 이미 활성 작업이 있는지 확인
       const userId = permission.userId || '';
       if (hasUserActiveJob(userId)) {
@@ -3444,7 +3471,7 @@ function setupPolicyTableRoutes(app) {
         accessGroupIds: groupIds,
         creatorName: permission.userName || 'Unknown',
         creatorRole: permission.userRole,
-        creatorId: userId
+        creatorId: creatorId // 🔥 수정: contactId (C열 값) 사용
       };
 
       // 큐에 작업 추가
@@ -3829,24 +3856,30 @@ function setupPolicyTableRoutes(app) {
           const policyTableId = row[1] || ''; // 정책표ID_설정
           
           // 🔥 디버깅: 본인이 생성한 정책표인지 확인
-          const isCreator = creatorId === currentUserId;
+          // creatorId와 currentUserId를 문자열로 정규화하여 비교 (공백 제거, 대소문자 구분)
+          const normalizedCreatorId = (creatorId || '').toString().trim();
+          const normalizedCurrentUserId = (currentUserId || '').toString().trim();
+          const isCreator = normalizedCreatorId === normalizedCurrentUserId;
+          
           if (isCreator) {
             console.log('✅ [정책표 탭] 본인이 생성한 정책표 발견:', {
               policyTableId,
               policyTableName: row[2] || '',
-              creatorId,
-              currentUserId,
+              creatorId: normalizedCreatorId,
+              currentUserId: normalizedCurrentUserId,
               match: isCreator
             });
             accessiblePolicyTableIds.add(policyTableId); // 정책표ID_설정
-          } else if (creatorId && currentUserId) {
+          } else if (normalizedCreatorId && normalizedCurrentUserId) {
             // 매칭되지 않은 경우만 로그 (너무 많은 로그 방지)
             console.log('❌ [정책표 탭] 생성자 불일치:', {
               policyTableId,
               policyTableName: row[2] || '',
-              creatorId,
-              currentUserId,
-              match: false
+              creatorId: normalizedCreatorId,
+              currentUserId: normalizedCurrentUserId,
+              match: false,
+              creatorIdType: typeof creatorId,
+              currentUserIdType: typeof currentUserId
             });
           }
           
