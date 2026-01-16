@@ -3803,6 +3803,32 @@ function setupPolicyTableRoutes(app) {
           // 에러 발생 시 headerUserId 그대로 사용
         }
         
+        // 정책표 설정 조회 (생성자적용권한 확인용)
+        await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_TABLE_SETTINGS, HEADERS_POLICY_TABLE_SETTINGS);
+        const settingsResponse = await withRetry(async () => {
+          return await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SHEET_POLICY_TABLE_SETTINGS}!A:I`
+          });
+        });
+        const settingsRows = settingsResponse.data.values || [];
+        const settingsMap = new Map();
+        if (settingsRows.length >= 2) {
+          settingsRows.slice(1).forEach(row => {
+            const policyTableId = row[0] || '';
+            const creatorPermissions = row[6] ? (() => {
+              try {
+                return JSON.parse(row[6]);
+              } catch (e) {
+                return [];
+              }
+            })() : [];
+            if (policyTableId) {
+              settingsMap.set(policyTableId, creatorPermissions);
+            }
+          });
+        }
+        
         // 정책표목록과 정책영업그룹 목록을 병렬로 조회 (캐시 우선)
         const policyListCacheKey = `policy-tables-list-for-tabs-${SPREADSHEET_ID}`;
         const userGroupsCacheKey = `user-groups-${SPREADSHEET_ID}`;
@@ -3918,17 +3944,51 @@ function setupPolicyTableRoutes(app) {
           }
           
           // 2. 본인이 담당자인 그룹의 정책표인지 확인
+          let isManager = false;
           for (const accessGroupId of accessGroupIds) {
             if (accessGroupId) {
               const groupData = userGroupsMap.get(accessGroupId);
               if (groupData) {
                 const managerIds = groupData.managerIds || [];
-                if (managerIds.includes(currentUserId)) {
-                  accessiblePolicyTableIds.add(row[1]); // 정책표ID_설정
+                // managerIds도 정규화하여 비교
+                const normalizedCurrentUserId = normalizePhoneNumber(currentUserId);
+                const isManagerInGroup = managerIds.some(managerId => {
+                  const normalizedManagerId = normalizePhoneNumber(managerId);
+                  return normalizedManagerId && normalizedCurrentUserId && normalizedManagerId === normalizedCurrentUserId;
+                });
+                if (isManagerInGroup) {
+                  isManager = true;
+                  accessiblePolicyTableIds.add(policyTableId); // 정책표ID_설정
                   break; // 하나라도 매칭되면 추가하고 다음 정책표로
                 }
               }
             }
+          }
+          
+          // 3. 정책표 설정의 생성자적용권한에 현재 사용자의 권한 레벨이 포함되어 있는지 확인
+          let hasPermissionByRole = false;
+          if (policyTableId && userRole) {
+            const creatorPermissions = settingsMap.get(policyTableId) || [];
+            // 두 글자 대문자 패턴(팀장) 체크
+            const twoLetterPattern = /^[A-Z]{2}$/;
+            if (creatorPermissions.includes(userRole) || 
+                (userRole === 'SS' || userRole === 'S') ||
+                (twoLetterPattern.test(userRole) && creatorPermissions.some(perm => twoLetterPattern.test(perm)))) {
+              hasPermissionByRole = true;
+              accessiblePolicyTableIds.add(policyTableId); // 정책표ID_설정
+            }
+          }
+          
+          if (isCreator || isManager || hasPermissionByRole) {
+            console.log('✅ [정책표 탭] 접근 가능한 정책표:', {
+              policyTableId,
+              policyTableName: row[2] || '',
+              isCreator,
+              isManager,
+              hasPermissionByRole,
+              userRole,
+              creatorPermissions: policyTableId ? settingsMap.get(policyTableId) : []
+            });
           }
         });
         tabs = tabs.filter(tab => accessiblePolicyTableIds.has(tab.policyTableId));
@@ -4368,6 +4428,32 @@ function setupPolicyTableRoutes(app) {
           userGroupsMapSize: userGroupsMap.size
         });
         
+        // 정책표 설정 조회 (생성자적용권한 확인용)
+        await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_TABLE_SETTINGS, HEADERS_POLICY_TABLE_SETTINGS);
+        const settingsResponse = await withRetry(async () => {
+          return await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SHEET_POLICY_TABLE_SETTINGS}!A:I`
+          });
+        });
+        const settingsRows = settingsResponse.data.values || [];
+        const settingsMap = new Map();
+        if (settingsRows.length >= 2) {
+          settingsRows.slice(1).forEach(row => {
+            const policyTableId = row[0] || '';
+            const creatorPermissions = row[6] ? (() => {
+              try {
+                return JSON.parse(row[6]);
+              } catch (e) {
+                return [];
+              }
+            })() : [];
+            if (policyTableId) {
+              settingsMap.set(policyTableId, creatorPermissions);
+            }
+          });
+        }
+        
         // 전화번호 정규화 함수 (정책표 탭과 동일한 로직)
         const normalizePhoneNumber = (phone) => {
           if (!phone) return '';
@@ -4408,7 +4494,20 @@ function setupPolicyTableRoutes(app) {
             }
           }
           
-          const hasAccess = isCreator || isManager;
+          // 3. 정책표 설정의 생성자적용권한에 현재 사용자의 권한 레벨이 포함되어 있는지 확인
+          let hasPermissionByRole = false;
+          if (policy.policyTableId && userRole) {
+            const creatorPermissions = settingsMap.get(policy.policyTableId) || [];
+            // 두 글자 대문자 패턴(팀장) 체크
+            const twoLetterPattern = /^[A-Z]{2}$/;
+            if (creatorPermissions.includes(userRole) || 
+                (userRole === 'SS' || userRole === 'S') ||
+                (twoLetterPattern.test(userRole) && creatorPermissions.some(perm => twoLetterPattern.test(perm)))) {
+              hasPermissionByRole = true;
+            }
+          }
+          
+          const hasAccess = isCreator || isManager || hasPermissionByRole;
           
           console.log(`🔍 [정책모드] 팀장 필터링 체크: ${policy.policyTableName}`, {
             policyId: policy.id,
@@ -4418,6 +4517,9 @@ function setupPolicyTableRoutes(app) {
             normalizedCurrentUserId: normalizePhoneNumber(currentUserId),
             isCreator,
             isManager,
+            hasPermissionByRole,
+            userRole,
+            creatorPermissions: policy.policyTableId ? settingsMap.get(policy.policyTableId) : [],
             accessGroupIds,
             hasAccess
           });
