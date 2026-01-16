@@ -3765,13 +3765,29 @@ function setupPolicyTableRoutes(app) {
           const agentManagementResponse = await getAgentManagementData(sheets, SPREADSHEET_ID);
           const agentRows = agentManagementResponse?.data?.values || [];
           if (agentRows.length >= 2 && currentUserId) {
-            const userRow = agentRows.find(row => {
-              // C열(2번 인덱스)에서 contactId로 찾기 (checkPermission과 동일한 로직)
+            // 먼저 C열(contactId)로 찾기
+            let userRow = agentRows.find(row => {
               return row[2] === currentUserId;
             });
-            if (userRow) {
+            // C열로 못 찾으면 A열(이름)으로 찾기 (헤더에 이름이 올 수도 있음)
+            if (!userRow && userId) {
+              userRow = agentRows.find(row => {
+                return row[0] === userId || row[2] === userId;
+              });
+            }
+            if (userRow && userRow[2]) {
               // 대리점아이디관리 시트의 C열 값 사용 (정책표 생성 시 저장된 creatorId와 동일)
-              currentUserId = userRow[2] || currentUserId;
+              currentUserId = userRow[2];
+              console.log('✅ [정책표 탭] currentUserId 설정:', {
+                originalUserId: req.headers['x-user-id'] || userId,
+                contactId: currentUserId,
+                userName: userRow[0]
+              });
+            } else {
+              console.warn('⚠️ [정책표 탭] 사용자를 찾을 수 없음:', {
+                searchUserId: currentUserId,
+                availableIds: agentRows.slice(1).map(row => ({ name: row[0], contactId: row[2] })).slice(0, 5)
+              });
             }
           }
         } catch (error) {
