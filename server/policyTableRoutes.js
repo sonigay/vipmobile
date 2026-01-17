@@ -3920,7 +3920,7 @@ function setupPolicyTableRoutes(app) {
             const policyListResponse = await withRetry(async () => {
               return await sheets.spreadsheets.values.get({
                 spreadsheetId: SPREADSHEET_ID,
-                range: `${SHEET_POLICY_TABLE_LIST}!A:M`
+                range: `${SHEET_POLICY_TABLE_LIST}!A:P` // A:M -> A:P로 변경 (엑셀파일URL 포함)
               });
             });
             const policyRows = policyListResponse.data.values || [];
