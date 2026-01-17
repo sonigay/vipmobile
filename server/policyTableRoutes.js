@@ -3632,31 +3632,49 @@ function setupPolicyTableRoutes(app) {
         });
       }
 
-      // 정책표 이름 가져오기 (큐 표시용)
+      // 정책표 이름 가져오기 (큐 표시용, 캐싱 적용)
       let policyTableName = '정책표';
-      try {
-        const { sheets, SPREADSHEET_ID } = createSheetsClient();
-        await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_TABLE_SETTINGS, HEADERS_POLICY_TABLE_SETTINGS);
-        const settingsResponse = await withRetry(async () => {
-          return await sheets.spreadsheets.values.get({
-            spreadsheetId: SPREADSHEET_ID,
-            range: `${SHEET_POLICY_TABLE_SETTINGS}!A:B`
+      const policyTableNameCacheKey = `policy-table-name-${policyTableId}`;
+      const cachedPolicyTableName = getCache(policyTableNameCacheKey);
+      
+      if (cachedPolicyTableName) {
+        policyTableName = cachedPolicyTableName;
+      } else {
+        try {
+          const { sheets, SPREADSHEET_ID } = createSheetsClient();
+          await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_TABLE_SETTINGS, HEADERS_POLICY_TABLE_SETTINGS);
+          const settingsResponse = await withRetry(async () => {
+            return await sheets.spreadsheets.values.get({
+              spreadsheetId: SPREADSHEET_ID,
+              range: `${SHEET_POLICY_TABLE_SETTINGS}!A:B`
+            });
           });
-        });
-        
-        // 응답이 없거나 data가 없는 경우 처리
-        if (!settingsResponse || !settingsResponse.data) {
-          console.warn('정책표 이름 조회 실패: 응답이 없습니다.');
-        } else {
-          const settingsRows = settingsResponse.data.values || [];
-          const settingsRow = settingsRows.find(row => row[0] === policyTableId);
-          if (settingsRow && settingsRow[1]) {
-            policyTableName = settingsRow[1];
+          
+          // 응답이 없거나 data가 없는 경우 처리
+          if (!settingsResponse || !settingsResponse.data) {
+            console.warn('정책표 이름 조회 실패: 응답이 없습니다.');
+          } else {
+            const settingsRows = settingsResponse.data.values || [];
+            const settingsRow = settingsRows.find(row => row[0] === policyTableId);
+            if (settingsRow && settingsRow[1]) {
+              policyTableName = settingsRow[1];
+              // 캐시에 저장 (10분 TTL - 정책표 이름은 자주 변경되지 않음)
+              setCache(policyTableNameCacheKey, policyTableName, 10 * 60 * 1000);
+            }
           }
+        } catch (error) {
+          // 할당량 초과 오류인 경우 경고만 출력하고 기본값 사용
+          const isRateLimitError = error.code === 429 || 
+            error.message?.includes('Quota exceeded') ||
+            error.message?.includes('rateLimitExceeded');
+          
+          if (isRateLimitError) {
+            console.warn('⚠️ [정책표 이름 조회] 할당량 초과로 기본값 사용:', error.message);
+          } else {
+            console.warn('정책표 이름 조회 실패:', error.message);
+          }
+          // 에러가 발생해도 기본값 '정책표'를 사용하여 계속 진행
         }
-      } catch (error) {
-        console.warn('정책표 이름 조회 실패:', error.message);
-        // 에러가 발생해도 기본값 '정책표'를 사용하여 계속 진행
       }
 
       // 작업 ID 생성
