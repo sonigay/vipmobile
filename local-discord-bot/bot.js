@@ -446,13 +446,39 @@ client.on('messageCreate', async (message) => {
           await fs.mkdir('./excel', { recursive: true });
         }
         
-        // URL에서 spreadsheetId 추출
-        const spreadsheetIdMatch = sheetUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-        const spreadsheetId = spreadsheetIdMatch ? spreadsheetIdMatch[1] : null;
+        // URL에서 spreadsheetId 추출 (더 robust한 방식)
+        console.log(`🔍 [로컬PC봇] [${requestId}] 원본 URL: ${sheetUrl}`);
+        
+        let spreadsheetId = null;
+        
+        // 방법 1: 일반 형식 /spreadsheets/d/{ID}/
+        const normalMatch = sheetUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]{44})/);
+        if (normalMatch) {
+          spreadsheetId = normalMatch[1];
+          console.log(`✅ [로컬PC봇] [${requestId}] 일반 형식으로 추출: ${spreadsheetId}`);
+        } else {
+          // 방법 2: 2PACX 형식 /spreadsheets/d/e/2PACX-1v.../
+          const pacxMatch = sheetUrl.match(/\/spreadsheets\/d\/e\/(2PACX-1v[^\/]+)/);
+          if (pacxMatch) {
+            // 2PACX 형식은 실제 spreadsheetId를 찾기 어려우므로 에러
+            console.error(`❌ [로컬PC봇] [${requestId}] 2PACX 형식은 지원하지 않습니다. 편집 링크를 사용해주세요.`);
+            throw new Error('2PACX 형식의 URL은 지원하지 않습니다. Google Sheets 편집 링크를 사용해주세요.');
+          } else {
+            // 방법 3: pubhtml 형식에서도 시도
+            const pubhtmlMatch = sheetUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)\/pubhtml/);
+            if (pubhtmlMatch) {
+              spreadsheetId = pubhtmlMatch[1];
+              console.log(`✅ [로컬PC봇] [${requestId}] pubhtml 형식으로 추출: ${spreadsheetId}`);
+            }
+          }
+        }
         
         if (!spreadsheetId) {
-          throw new Error('Google Sheets URL에서 spreadsheetId를 추출할 수 없습니다.');
+          console.error(`❌ [로컬PC봇] [${requestId}] URL 형식을 인식할 수 없습니다: ${sheetUrl}`);
+          throw new Error('Google Sheets URL에서 spreadsheetId를 추출할 수 없습니다. 편집 링크 형식인지 확인해주세요.');
         }
+        
+        console.log(`📋 [로컬PC봇] [${requestId}] 추출된 spreadsheetId: ${spreadsheetId}`);
         
         // 파일명 생성 (Windows에서 사용 불가능한 문자 제거)
         const safeName = policyTableName
@@ -466,13 +492,16 @@ client.on('messageCreate', async (message) => {
         
         try {
           // Google Sheets API 사용 (서비스 계정 권한 필요)
+          console.log(`🔐 [로컬PC봇] [${requestId}] 서비스 계정으로 접근 시도: ${process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || 'NOT SET'}`);
           await downloadExcelWithAPI(spreadsheetId, excelPath);
           await fs.access(excelPath);
           downloadSuccess = true;
           console.log(`✅ [로컬PC봇] [${requestId}] Google Sheets API로 엑셀 다운로드 완료`);
         } catch (apiError) {
           console.error(`❌ [로컬PC봇] [${requestId}] Google Sheets API 실패: ${apiError.message}`);
-          console.error(`⚠️ [로컬PC봇] [${requestId}] 서비스 계정이 해당 시트에 접근 권한이 있는지 확인하세요.`);
+          console.error(`📋 [로컬PC봇] [${requestId}] spreadsheetId: ${spreadsheetId}`);
+          console.error(`⚠️ [로컬PC봇] [${requestId}] 서비스 계정(${process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || 'NOT SET'})이 해당 시트(${spreadsheetId})에 접근 권한이 있는지 확인하세요.`);
+          console.error(`💡 [로컬PC봇] [${requestId}] 해결 방법: Google Sheets에서 "공유" 버튼 클릭 → 서비스 계정 이메일 추가 → "뷰어" 권한 부여`);
           // API 실패 시 엑셀 파일 생성 실패로 처리 (이미지는 정상)
         }
         
