@@ -957,7 +957,8 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
     }
 
     // 이미 삭제 중인 경우 중복 실행 방지
-    if (deletingPolicyId === id) {
+    if (deletingPolicyId === id || loading) {
+      console.log('⚠️ [정책표 삭제] 이미 삭제 중이거나 로딩 중:', { deletingPolicyId, loading, id });
       return;
     }
 
@@ -967,9 +968,10 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
 
     // 삭제 시작 플래그 설정 (UI 업데이트를 위해 state 사용)
     setDeletingPolicyId(id);
+    setLoading(true);
 
     try {
-      setLoading(true);
+      console.log('🗑️ [정책표 삭제] 삭제 요청 시작:', id);
       const response = await fetch(`${API_BASE_URL}/api/policy-tables/${id}`, {
         method: 'DELETE',
         headers: {
@@ -978,33 +980,51 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
         }
       });
 
-      if (response.ok) {
-        const currentTab = tabs[activeTabIndex];
-        if (currentTab) {
-          // 정책 목록 새로고침 (삭제된 정책이 목록에서 사라짐)
-          await loadPolicies(currentTab.policyTableName);
-        }
-        if (selectedPolicy && selectedPolicy.id === id) {
-          setDetailModalOpen(false);
-        }
-      } else {
-        const errorData = await response.json();
-        setError(errorData.error || '삭제에 실패했습니다.');
-        // 삭제 실패 시 플래그 해제
-        setDeletingPolicyId(null);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: '삭제에 실패했습니다.' }));
+        throw new Error(errorData.error || `HTTP ${response.status}`);
       }
+
+      const result = await response.json();
+      console.log('✅ [정책표 삭제] 서버 응답:', result);
+
+      // 상세 모달이 열려있고 삭제한 정책이면 닫기
+      if (selectedPolicy && selectedPolicy.id === id) {
+        setDetailModalOpen(false);
+        setSelectedPolicy(null);
+      }
+
+      // 정책 목록 새로고침 (삭제된 정책이 목록에서 사라짐)
+      const currentTab = tabs[activeTabIndex];
+      if (currentTab) {
+        console.log('🔄 [정책표 삭제] 목록 새로고침 시작:', currentTab.policyTableName);
+        
+        // 캐시 무효화 (loadPolicies에서 사용하는 캐시 키와 동일하게)
+        const cacheKey = `${mode || 'default'}_${currentTab.policyTableName}`;
+        setPoliciesCache(prev => {
+          const newCache = { ...prev };
+          delete newCache[cacheKey];
+          console.log('🗑️ [정책표 삭제] 캐시 무효화:', cacheKey);
+          return newCache;
+        });
+        
+        // 목록 새로고침 완료 대기 (await로 완전히 완료될 때까지 대기)
+        await loadPolicies(currentTab.policyTableName);
+        console.log('✅ [정책표 삭제] 목록 새로고침 완료');
+      }
+
+      // 성공 메시지 (선택사항)
+      // alert('정책표가 삭제되었습니다.');
+
     } catch (error) {
-      console.error('정책표 삭제 오류:', error);
-      setError('삭제 중 오류가 발생했습니다.');
-      // 삭제 실패 시 플래그 해제
-      setDeletingPolicyId(null);
+      console.error('❌ [정책표 삭제] 오류:', error);
+      setError(error.message || '삭제 중 오류가 발생했습니다.');
+      alert(`삭제 실패: ${error.message || '알 수 없는 오류가 발생했습니다.'}`);
     } finally {
+      // 모든 작업 완료 후 상태 초기화
       setLoading(false);
-      // 삭제 완료 후 플래그 해제 (성공 시 loadPolicies 후 자동으로 사라지므로)
-      // 약간의 지연을 두어 UI 업데이트가 완료되도록 함
-      setTimeout(() => {
-        setDeletingPolicyId(null);
-      }, 100);
+      setDeletingPolicyId(null);
+      console.log('✅ [정책표 삭제] 상태 초기화 완료');
     }
   };
 
