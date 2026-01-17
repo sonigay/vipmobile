@@ -693,8 +693,51 @@ function invalidateRelatedCaches(type, id = null) {
   }
 }
 
-// Rate limit 에러 재시도 함수
+// Google Sheets API 호출 빈도 제한을 위한 변수
+let lastSheetsApiCall = 0;
+const SHEETS_API_COOLDOWN = 1500; // 1.5초 대기 (Google Sheets API 분당 60회 제한 고려, 안전 마진 포함)
+const MAX_CONCURRENT_SHEETS_REQUESTS = 3; // 동시 요청 수 제한
+let currentSheetsRequests = 0;
+const sheetsRequestQueue = [];
+
+// 요청 큐 처리 함수
+async function processSheetsRequestQueue() {
+  if (sheetsRequestQueue.length > 0 && currentSheetsRequests < MAX_CONCURRENT_SHEETS_REQUESTS) {
+    const { resolve, reject, fn } = sheetsRequestQueue.shift();
+    currentSheetsRequests++;
+    
+    try {
+      const result = await fn();
+      resolve(result);
+    } catch (error) {
+      reject(error);
+    } finally {
+      currentSheetsRequests--;
+      processSheetsRequestQueue(); // 다음 요청 처리
+    }
+  }
+}
+
+// Rate limit 에러 재시도 함수 (개선: 호출 빈도 제한 + 동시 요청 제한)
 async function withRetry(fn, maxRetries = 5, baseDelay = 2000) {
+  // 동시 요청 수 제한
+  if (currentSheetsRequests >= MAX_CONCURRENT_SHEETS_REQUESTS) {
+    return new Promise((resolve, reject) => {
+      sheetsRequestQueue.push({ resolve, reject, fn: () => withRetry(fn, maxRetries, baseDelay) });
+      processSheetsRequestQueue();
+    });
+  }
+
+  // API 호출 간격 제한
+  const now = Date.now();
+  const timeSinceLastCall = now - lastSheetsApiCall;
+  if (timeSinceLastCall < SHEETS_API_COOLDOWN) {
+    const waitTime = SHEETS_API_COOLDOWN - timeSinceLastCall;
+    await new Promise(resolve => setTimeout(resolve, waitTime));
+  }
+
+  lastSheetsApiCall = Date.now();
+
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       return await fn();
@@ -713,8 +756,10 @@ async function withRetry(fn, maxRetries = 5, baseDelay = 2000) {
         ));
 
       if (isRateLimitError && attempt < maxRetries - 1) {
-        const jitter = Math.random() * 1000;
-        const delay = baseDelay * Math.pow(2, attempt) + jitter;
+        // Exponential backoff with jitter (더 긴 대기 시간)
+        const jitter = Math.random() * 2000; // 0-2초 랜덤 지터
+        const delay = Math.min(baseDelay * Math.pow(2, attempt) + jitter, 30000); // 최대 30초
+        console.warn(`⚠️ [API-RATE-LIMIT] 할당량 초과 감지, ${Math.ceil(delay / 1000)}초 후 재시도 (시도 ${attempt + 1}/${maxRetries})`);
         await new Promise(resolve => setTimeout(resolve, delay));
         continue;
       }
