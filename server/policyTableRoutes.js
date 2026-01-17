@@ -5255,19 +5255,73 @@ function setupPolicyTableRoutes(app) {
         return res.status(404).json({ success: false, error: '엑셀 파일이 없습니다.' });
       }
 
-      // 엑셀 파일 URL을 직접 반환 (클라이언트에서 다운로드)
-      res.json({
-        success: true,
-        excelUrl: excelUrl
+      // Discord CDN에서 파일 다운로드 (CORS 우회)
+      console.log('📥 [정책표] 엑셀 파일 다운로드 시작:', excelUrl);
+      const https = require('https');
+      const http = require('http');
+      const url = require('url');
+      
+      const parsedUrl = new URL(excelUrl);
+      const client = parsedUrl.protocol === 'https:' ? https : http;
+      
+      return new Promise((resolve, reject) => {
+        const request = client.get(excelUrl, (fileResponse) => {
+          // Content-Type 확인
+          const contentType = fileResponse.headers['content-type'] || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+          
+          // 파일명 추출 (정책표 이름 사용)
+          const policyTableName = row[2] || '정책표';
+          const safeFileName = policyTableName.replace(/[<>:"/\\|?*]/g, '_');
+          const fileName = `${safeFileName}_${id}_${new Date().toISOString().split('T')[0]}.xlsx`;
+          
+          // 응답 헤더 설정
+          res.setHeader('Content-Type', contentType);
+          res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
+          res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
+          res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+          
+          // 파일 스트림을 클라이언트로 전달
+          fileResponse.pipe(res);
+          
+          fileResponse.on('end', () => {
+            console.log('✅ [정책표] 엑셀 파일 다운로드 완료');
+            resolve();
+          });
+        });
+        
+        request.on('error', (error) => {
+          console.error('❌ [정책표] 엑셀 파일 다운로드 오류:', error);
+          if (!res.headersSent) {
+            res.status(500).json({
+              success: false,
+              error: '엑셀 파일 다운로드에 실패했습니다.',
+              message: error.message
+            });
+          }
+          reject(error);
+        });
+        
+        request.setTimeout(30000, () => {
+          request.destroy();
+          if (!res.headersSent) {
+            res.status(500).json({
+              success: false,
+              error: '엑셀 파일 다운로드 타임아웃'
+            });
+          }
+          reject(new Error('다운로드 타임아웃'));
+        });
       });
 
     } catch (error) {
       console.error('❌ [정책표] 엑셀 파일 다운로드 오류:', error);
-      res.status(500).json({
-        success: false,
-        error: '엑셀 파일 다운로드에 실패했습니다.',
-        message: error.message
-      });
+      if (!res.headersSent) {
+        res.status(500).json({
+          success: false,
+          error: '엑셀 파일 다운로드에 실패했습니다.',
+          message: error.message
+        });
+      }
     }
   });
 

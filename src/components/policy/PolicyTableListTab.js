@@ -896,23 +896,39 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
     if (!selectedPolicy || !selectedPolicy.excelFileUrl) return;
 
     try {
-      // 엑셀 파일 URL에서 직접 다운로드
-      const response = await fetch(selectedPolicy.excelFileUrl, {
-        mode: 'cors',
-        credentials: 'omit'
+      // 서버 프록시를 통해 엑셀 파일 다운로드 (CORS 우회)
+      const response = await fetch(`${API_BASE_URL}/api/policy-tables/${selectedPolicy.id}/download-excel`, {
+        method: 'GET',
+        headers: {
+          'x-user-id': loggedInStore?.contactId || loggedInStore?.id || '',
+          'x-user-name': encodeURIComponent(loggedInStore?.userName || loggedInStore?.name || '')
+        }
       });
       
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorData = await response.json().catch(() => ({ error: '다운로드 실패' }));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
 
+      // 응답에서 파일 다운로드
       const blob = await response.blob();
       
       // 파일 다운로드
       const blobUrl = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = blobUrl;
-      link.download = `정책표_${selectedPolicy.policyTableName || selectedPolicy.id}_${new Date().toISOString().split('T')[0]}.xlsx`;
+      
+      // Content-Disposition 헤더에서 파일명 추출 시도
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let fileName = `정책표_${selectedPolicy.policyTableName || selectedPolicy.id}_${new Date().toISOString().split('T')[0]}.xlsx`;
+      if (contentDisposition) {
+        const fileNameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (fileNameMatch && fileNameMatch[1]) {
+          fileName = decodeURIComponent(fileNameMatch[1].replace(/['"]/g, ''));
+        }
+      }
+      
+      link.download = fileName;
       link.style.display = 'none';
       document.body.appendChild(link);
       link.click();
