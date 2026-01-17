@@ -4868,12 +4868,19 @@ function setupPolicyTableRoutes(app) {
       const response = await withRetry(async () => {
         return await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_POLICY_TABLE_LIST}!A:O`
+          range: `${SHEET_POLICY_TABLE_LIST}!A:P` // A:O -> A:P로 변경 (엑셀파일URL 포함)
         });
       });
 
       const rows = response.data.values || [];
       const row = rows.find(r => r[0] === id);
+      
+      // 디버깅: excelUrl 확인
+      console.log('🔍 [정책표 상세] excelUrl 확인:', {
+        id: id,
+        rowLength: row ? row.length : 0,
+        excelUrl: row && row[15] ? row[15].substring(0, 50) + '...' : '없음'
+      });
 
       if (!row) {
         return res.status(404).json({ success: false, error: '정책표를 찾을 수 없습니다.' });
@@ -5147,7 +5154,7 @@ function setupPolicyTableRoutes(app) {
       const response = await withRetry(async () => {
         return await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_POLICY_TABLE_LIST}!A:O`
+          range: `${SHEET_POLICY_TABLE_LIST}!A:P` // A:O -> A:P로 변경 (엑셀파일URL 포함)
         });
       });
 
