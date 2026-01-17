@@ -4857,17 +4857,17 @@ function setupPolicyTableRoutes(app) {
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_TABLE_LIST, HEADERS_POLICY_TABLE_LIST);
 
-      // 캐시 확인 (정책표 목록 캐시 활용)
-      const cacheKey = `policy-tables-${SPREADSHEET_ID}-all`;
+      // 원시 행 데이터 캐시 확인 (정책표 등록은 원시 데이터가 필요)
+      const rawDataCacheKey = `policy-tables-raw-${SPREADSHEET_ID}`;
       let rows = [];
-      const cached = getCache(cacheKey);
+      const cachedRawData = getCache(rawDataCacheKey);
       
-      if (cached && Array.isArray(cached) && cached.length > 0) {
-        // 캐시에서 찾기
-        const cachedRow = cached.find(row => row[0] === id);
+      if (cachedRawData && Array.isArray(cachedRawData) && cachedRawData.length > 0) {
+        // 캐시에서 해당 정책표 찾기
+        const cachedRow = cachedRawData.find(row => row && row[0] === id);
         if (cachedRow) {
-          rows = cached; // 캐시된 전체 목록 사용
-          console.log('✅ [정책표 등록] 캐시에서 데이터 조회');
+          rows = cachedRawData; // 캐시된 전체 원시 데이터 사용
+          console.log('✅ [정책표 등록] 원시 데이터 캐시에서 조회');
         }
       }
       
@@ -4880,19 +4880,22 @@ function setupPolicyTableRoutes(app) {
           });
         });
         rows = response.data.values || [];
-        // 캐시에 저장 (2분 TTL)
+        // 원시 데이터 캐시에 저장 (2분 TTL)
         if (rows.length > 0) {
-          setCache(cacheKey, rows, CACHE_TTL.POLICY_TABLES);
+          setCache(rawDataCacheKey, rows, CACHE_TTL.POLICY_TABLES);
         }
       }
 
-      const rowIndex = rows.findIndex(row => row[0] === id);
+      // 헤더를 제외한 데이터 행에서 찾기 (rows[0]은 헤더)
+      const dataRows = rows.length > 1 ? rows.slice(1) : [];
+      const dataRowIndex = dataRows.findIndex(row => row && row[0] === id);
 
-      if (rowIndex === -1) {
+      if (dataRowIndex === -1) {
+        setCORSHeaders(req, res); // 에러 응답에도 CORS 헤더 추가
         return res.status(404).json({ success: false, error: '정책표를 찾을 수 없습니다.' });
       }
 
-      const existingRow = rows[rowIndex];
+      const existingRow = dataRows[dataRowIndex];
       
       // 중복 등록 방지: 이미 등록된 경우
       const isAlreadyRegistered = existingRow[11] === 'Y';
@@ -4913,11 +4916,14 @@ function setupPolicyTableRoutes(app) {
       updatedRow[12] = new Date().toISOString(); // 등록일시
       // updatedRow[13]은 이미 creatorId가 있거나 빈 문자열
 
+      // 실제 시트 행 번호 = 헤더(1행) + dataRowIndex(0-based) + 1 = dataRowIndex + 2
+      const actualRowNumber = dataRowIndex + 2;
+      
       // N열까지 포함하여 저장 (HEADERS_POLICY_TABLE_LIST에 생성자ID 추가됨)
       await withRetry(async () => {
         return await sheets.spreadsheets.values.update({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_POLICY_TABLE_LIST}!A${rowIndex + 2}:N${rowIndex + 2}`,
+          range: `${SHEET_POLICY_TABLE_LIST}!A${actualRowNumber}:N${actualRowNumber}`,
           valueInputOption: 'USER_ENTERED',
           resource: { values: [updatedRow] }
         });
@@ -4925,6 +4931,10 @@ function setupPolicyTableRoutes(app) {
 
       // 캐시 무효화: 정책표 등록 시 관련 캐시 무효화
       invalidateRelatedCaches('policy-table', id);
+      
+      // 원시 데이터 캐시도 무효화 (위에서 선언한 변수 재사용)
+      cacheStore.delete(rawDataCacheKey);
+      console.log('🗑️ [정책표 등록] 원시 데이터 캐시 무효화');
 
       return res.json({
         success: true,
@@ -4932,6 +4942,7 @@ function setupPolicyTableRoutes(app) {
       });
     } catch (error) {
       console.error('[정책표] 등록 오류:', error);
+      setCORSHeaders(req, res); // 에러 응답에도 CORS 헤더 추가
       return res.status(500).json({ success: false, error: error.message });
     }
   });
