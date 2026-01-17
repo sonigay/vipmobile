@@ -364,11 +364,22 @@ async function captureSheetViaDiscordBot(sheetUrl, policyTableName, userName, ch
               const excelMessage = await targetChannel.messages.fetch(excelMessageId);
               if (excelMessage) {
                 const excelAttachment = excelMessage.attachments.first();
+                console.log(`🔍 [정책표] 엑셀 메시지 확인:`, {
+                  messageId: excelMessageId,
+                  hasAttachment: !!excelAttachment,
+                  attachmentName: excelAttachment?.name || 'N/A',
+                  attachmentUrl: excelAttachment?.url?.substring(0, 50) + '...' || 'N/A'
+                });
                 if (excelAttachment && excelAttachment.name && excelAttachment.name.endsWith('.xlsx')) {
                   excelUrl = excelAttachment.url;
-                  console.log(`✅ [정책표] 엑셀 파일 URL 추출: ${excelUrl}`);
+                  console.log(`✅ [정책표] 엑셀 파일 URL 추출 성공: ${excelUrl.substring(0, 50)}...`);
                 } else {
                   console.warn(`⚠️ [정책표] 엑셀 파일 메시지에 엑셀 파일이 없습니다: ${excelMessageId}`);
+                  console.warn(`⚠️ [정책표] 첨부파일 정보:`, {
+                    hasAttachment: !!excelAttachment,
+                    name: excelAttachment?.name || 'N/A',
+                    contentType: excelAttachment?.contentType || 'N/A'
+                  });
                 }
               } else {
                 console.warn(`⚠️ [정책표] 엑셀 파일 메시지를 찾을 수 없습니다: ${excelMessageId}`);
@@ -1352,6 +1363,15 @@ async function processPolicyTableGeneration(jobId, params, discordRequestId = nu
         excelUrl || ''               // 15: 엑셀파일URL
       ];
 
+      // 디버깅: 저장할 데이터 확인
+      console.log(`💾 [정책표] 구글시트 저장 데이터:`, {
+        id: newRowId,
+        policyTableName,
+        hasImageUrl: !!imageUrl,
+        hasExcelUrl: !!excelUrl,
+        excelUrl: excelUrl ? excelUrl.substring(0, 50) + '...' : '없음'
+      });
+
       await withRetry(async () => {
         return await sheets.spreadsheets.values.append({
           spreadsheetId: SPREADSHEET_ID,
@@ -1376,7 +1396,8 @@ async function processPolicyTableGeneration(jobId, params, discordRequestId = nu
           messageId,
           threadId,
           groupCount: groupIds.length,
-          discordResponseTime: discordResponseTime
+          discordResponseTime: discordResponseTime,
+          excelUrl: excelUrl || null // 엑셀 파일 URL 추가
         }
       });
 

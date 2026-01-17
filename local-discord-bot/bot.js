@@ -549,7 +549,12 @@ client.on('messageCreate', async (message) => {
           });
           
           excelMessageId = excelMessage.id;
-          console.log(`📤 [로컬PC봇] [${requestId}] 엑셀 파일 디스코드 업로드 완료 (메시지 ID: ${excelMessageId})`);
+          const uploadedAttachment = excelMessage.attachments.first();
+          const uploadedExcelUrl = uploadedAttachment ? uploadedAttachment.url : null;
+          console.log(`📤 [로컬PC봇] [${requestId}] 엑셀 파일 디스코드 업로드 완료`);
+          console.log(`📤 [로컬PC봇] [${requestId}] 메시지 ID: ${excelMessageId}`);
+          console.log(`📤 [로컬PC봇] [${requestId}] 파일명: ${uploadedAttachment?.name || 'N/A'}`);
+          console.log(`📤 [로컬PC봇] [${requestId}] 엑셀 파일 URL: ${uploadedExcelUrl || 'N/A'}`);
           
           // 임시 파일 삭제
           await fs.unlink(excelPath).catch(() => {});
