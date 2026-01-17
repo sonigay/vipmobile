@@ -356,13 +356,35 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
         
         setUserGroups(groups);
         
-        // 변경이력은 백그라운드에서 지연 로드
+        // 변경이력은 백그라운드에서 지연 로드 (배치 처리로 API 할당량 초과 방지)
         if (groups.length > 0) {
           console.log('🔍 [정책영업그룹] 변경이력 백그라운드 로드 시작:', groups.length, '개 그룹');
-          const changeHistoryPromises = groups.map(group => loadChangeHistory(group.id));
-          Promise.all(changeHistoryPromises).then(() => {
-          console.log('✅ [정책영업그룹] 변경이력 로드 완료');
-          }).catch(error => {
+          // 배치 크기: 한 번에 3개씩 처리 (API 할당량 초과 방지)
+          const BATCH_SIZE = 3;
+          const BATCH_DELAY = 500; // 배치 간 지연 시간 (ms)
+          
+          const loadChangeHistoryInBatches = async () => {
+            for (let i = 0; i < groups.length; i += BATCH_SIZE) {
+              const batch = groups.slice(i, i + BATCH_SIZE);
+              const batchPromises = batch.map(group => loadChangeHistory(group.id));
+              
+              try {
+                await Promise.all(batchPromises);
+                console.log(`✅ [정책영업그룹] 변경이력 배치 ${Math.floor(i / BATCH_SIZE) + 1} 완료 (${batch.length}개 그룹)`);
+              } catch (error) {
+                console.error(`❌ [정책영업그룹] 변경이력 배치 ${Math.floor(i / BATCH_SIZE) + 1} 실패:`, error);
+              }
+              
+              // 마지막 배치가 아니면 지연 시간 대기
+              if (i + BATCH_SIZE < groups.length) {
+                await new Promise(resolve => setTimeout(resolve, BATCH_DELAY));
+              }
+            }
+            console.log('✅ [정책영업그룹] 변경이력 로드 완료');
+          };
+          
+          // 백그라운드에서 비동기로 실행
+          loadChangeHistoryInBatches().catch(error => {
             console.error('❌ [정책영업그룹] 변경이력 로드 실패:', error);
           });
         }
