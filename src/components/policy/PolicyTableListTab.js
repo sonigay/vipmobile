@@ -879,6 +879,42 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
     }
   };
 
+  const handleDownloadExcel = async () => {
+    if (!selectedPolicy || !selectedPolicy.excelFileUrl) return;
+
+    try {
+      // 엑셀 파일 URL에서 직접 다운로드
+      const response = await fetch(selectedPolicy.excelFileUrl, {
+        mode: 'cors',
+        credentials: 'omit'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      
+      // 파일 다운로드
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `정책표_${selectedPolicy.policyTableName || selectedPolicy.id}_${new Date().toISOString().split('T')[0]}.xlsx`;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Blob URL 정리
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+      
+      alert('엑셀 파일이 다운로드되었습니다.');
+    } catch (error) {
+      console.error('엑셀 파일 다운로드 오류:', error);
+      alert('엑셀 파일 다운로드에 실패했습니다.');
+    }
+  };
+
   const handleDelete = async (id, e) => {
     // 이벤트 전파 방지 (즉시 실행)
     if (e) {
@@ -1439,6 +1475,15 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
                   >
                     {/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ? '이미지 다운로드' : '이미지복사하기'}
                   </Button>
+                  {selectedPolicy?.excelFileUrl && (
+                    <Button
+                      variant="outlined"
+                      startIcon={<DownloadIcon />}
+                      onClick={handleDownloadExcel}
+                    >
+                      엑셀파일다운로드
+                    </Button>
+                  )}
                 </Box>
                 {imageError ? (
                   <Alert severity="warning">

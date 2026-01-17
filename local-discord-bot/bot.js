@@ -1,6 +1,10 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, EmbedBuilder, AttachmentBuilder } = require('discord.js');
 const { initBrowser, captureSheetAsImage, closeBrowser } = require('./screenshot');
+const { google } = require('googleapis');
+const XLSX = require('xlsx');
+const fs = require('fs').promises;
+const path = require('path');
 
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN_LOCAL;
 const DISCORD_CHANNEL_ID = process.env.DISCORD_CHANNEL_ID;
@@ -19,6 +23,283 @@ const client = new Client({
     GatewayIntentBits.MessageContent
   ]
 });
+
+// ===== Google Sheets API 인증 설정 =====
+function getGoogleAuth() {
+  const serviceAccountEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+  const privateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+  
+  if (!serviceAccountEmail || !privateKey) {
+    throw new Error('Google 서비스 계정 정보가 설정되지 않았습니다. GOOGLE_SERVICE_ACCOUNT_EMAIL과 GOOGLE_PRIVATE_KEY를 확인해주세요.');
+  }
+  
+  const auth = new google.auth.JWT(
+    serviceAccountEmail,
+    null,
+    privateKey,
+    ['https://www.googleapis.com/auth/drive.readonly', 'https://www.googleapis.com/auth/spreadsheets.readonly']
+  );
+  
+  return auth;
+}
+
+// ===== Google Sheets API를 사용하여 엑셀 파일 다운로드 =====
+async function downloadExcelWithAPI(spreadsheetId, filePath) {
+  console.log(`📥 [로컬PC봇] Google Sheets API로 다운로드 시작: ${spreadsheetId}`);
+  console.log(`💾 [로컬PC봇] 저장 경로: ${filePath}`);
+  
+  try {
+    const auth = getGoogleAuth();
+    const drive = google.drive({ version: 'v3', auth });
+    
+    // Google Sheets API로 첫 번째 시트 정보 확인
+    const sheets = google.sheets({ version: 'v4', auth });
+    const spreadsheet = await sheets.spreadsheets.get({
+      spreadsheetId: spreadsheetId
+    });
+    
+    if (!spreadsheet.data.sheets || spreadsheet.data.sheets.length === 0) {
+      throw new Error('시트를 찾을 수 없습니다.');
+    }
+    
+    const firstSheet = spreadsheet.data.sheets[0];
+    const firstSheetTitle = firstSheet.properties.title;
+    console.log(`📋 [로컬PC봇] 첫 번째 시트: ${firstSheetTitle}`);
+    console.log(`📊 [로컬PC봇] 전체 시트 수: ${spreadsheet.data.sheets.length}개`);
+    
+    // 원본 파일 다운로드
+    console.log(`📥 [로컬PC봇] 원본 엑셀 파일 다운로드 중...`);
+    const tempFilePath = filePath.replace('.xlsx', '_temp.xlsx');
+    
+    const response = await drive.files.export({
+      fileId: spreadsheetId,
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    }, {
+      responseType: 'stream'
+    });
+    
+    const fileStream = require('fs').createWriteStream(tempFilePath);
+    await new Promise((resolve, reject) => {
+      response.data.pipe(fileStream);
+      fileStream.on('finish', resolve);
+      fileStream.on('error', reject);
+      response.data.on('error', reject);
+    });
+    fileStream.close();
+    
+    console.log(`✅ [로컬PC봇] 원본 파일 다운로드 완료`);
+    
+    // 파일 크기 확인
+    const stats = await fs.stat(tempFilePath);
+    console.log(`📊 [로컬PC봇] 다운로드된 파일 크기: ${stats.size} bytes`);
+    
+    // xlsx 라이브러리를 사용하여 첫 번째 시트만 남기고 수식을 값으로 변환
+    console.log(`📖 [로컬PC봇] xlsx 라이브러리로 첫 번째 시트만 추출 및 수식 변환 중...`);
+    try {
+      // 원본 파일 읽기 (수식 및 서식 포함)
+      const workbook = XLSX.readFile(tempFilePath, {
+        cellStyles: true,
+        cellNF: true,
+        cellHTML: false,
+        cellFormula: true,
+        sheetStubs: true
+      });
+      
+      console.log(`📊 [로컬PC봇] 워크북 시트 수: ${workbook.SheetNames.length}개`);
+      
+      if (workbook.SheetNames.length === 0) {
+        throw new Error('시트를 찾을 수 없습니다.');
+      }
+      
+      const firstSheetName = workbook.SheetNames[0];
+      const firstSheet = workbook.Sheets[firstSheetName];
+      console.log(`📋 [로컬PC봇] 첫 번째 시트: ${firstSheetName}`);
+      
+      // 데이터 확인
+      const range = XLSX.utils.decode_range(firstSheet['!ref'] || 'A1:A1');
+      console.log(`📊 [로컬PC봇] 시트 범위: ${firstSheet['!ref'] || 'A1:A1'}`);
+      
+      let totalDataCount = 0;
+      for (let R = range.s.r; R <= range.e.r; ++R) {
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+          const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+          const cell = firstSheet[cellAddress];
+          if (cell && (cell.v !== undefined || cell.w !== undefined || cell.f !== undefined)) {
+            totalDataCount++;
+          }
+        }
+      }
+      console.log(`📊 [로컬PC봇] 전체 데이터 확인: 총 ${totalDataCount}개 셀에 데이터 있음`);
+      
+      // 데이터가 없으면 원본 파일 사용
+      if (totalDataCount === 0) {
+        throw new Error('읽은 데이터가 없습니다. 원본 파일을 사용합니다.');
+      }
+      
+      // 수식을 값으로 변환 (서식은 유지)
+      console.log(`🔄 [로컬PC봇] 수식을 값으로 변환 중...`);
+      let formulaCount = 0;
+      let valuePreservedCount = 0;
+      
+      for (let R = range.s.r; R <= range.e.r; ++R) {
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+          const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+          const cell = firstSheet[cellAddress];
+          
+          if (cell && cell.f) {
+            // 수식이 있는 경우
+            formulaCount++;
+            const originalFormula = cell.f;
+            
+            // 계산된 값 사용 (cell.v가 우선, 없으면 cell.w 사용)
+            if (cell.v !== undefined) {
+              // 원시 값이 있으면 사용 (서식 유지)
+              delete cell.f; // 수식 제거
+              valuePreservedCount++;
+            } else if (cell.w !== undefined) {
+              // 서식이 적용된 값이 있으면 사용
+              const value = cell.w;
+              delete cell.f; // 수식 제거
+              cell.v = value;
+              cell.t = 's'; // 문자열 타입
+              valuePreservedCount++;
+            } else {
+              // 계산된 값이 없으면 수식 제거하고 빈 값으로 설정
+              delete cell.f;
+              cell.v = '';
+              cell.t = 's'; // 문자열 타입
+            }
+          }
+        }
+      }
+      
+      console.log(`📊 [로컬PC봇] 변환된 수식 수: ${formulaCount}개, 값 보존: ${valuePreservedCount}개`);
+      
+      // 변환 후 데이터 재확인
+      let afterTotalDataCount = 0;
+      for (let R = range.s.r; R <= range.e.r; ++R) {
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+          const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+          const cell = firstSheet[cellAddress];
+          if (cell && (cell.v !== undefined || cell.w !== undefined)) {
+            afterTotalDataCount++;
+          }
+        }
+      }
+      console.log(`📊 [로컬PC봇] 변환 후 데이터 확인: 총 ${afterTotalDataCount}개 셀에 데이터 있음`);
+      
+      // 데이터가 손실되었는지 확인
+      if (afterTotalDataCount < totalDataCount * 0.5) {
+        throw new Error(`데이터 손실 감지: ${totalDataCount}개 -> ${afterTotalDataCount}개. 원본 파일을 사용합니다.`);
+      }
+      
+      // 첫 번째 시트만 포함된 새로운 워크북 생성
+      const newWorkbook = XLSX.utils.book_new();
+      
+      // 워크북 레벨 서식 정보 복사 (있는 경우)
+      if (workbook.SSF) {
+        newWorkbook.SSF = workbook.SSF; // 공유 문자열 서식
+      }
+      if (workbook.Styles) {
+        newWorkbook.Styles = workbook.Styles; // 스타일 정보
+      }
+      if (workbook.Theme) {
+        newWorkbook.Theme = workbook.Theme; // 테마 정보
+      }
+      if (workbook.Props) {
+        newWorkbook.Props = workbook.Props; // 속성 정보
+      }
+      
+      // 시트 추가 (서식 정보 포함: 행 높이, 열 너비, 병합 등)
+      const sheetCopy = JSON.parse(JSON.stringify(firstSheet));
+      
+      // 서식 정보 명시적으로 복사
+      if (firstSheet['!rows']) {
+        sheetCopy['!rows'] = firstSheet['!rows'];
+      }
+      if (firstSheet['!cols']) {
+        sheetCopy['!cols'] = firstSheet['!cols'];
+      }
+      if (firstSheet['!merges']) {
+        sheetCopy['!merges'] = firstSheet['!merges'];
+      }
+      if (firstSheet['!ref']) {
+        sheetCopy['!ref'] = firstSheet['!ref'];
+      }
+      if (firstSheet['!margins']) {
+        sheetCopy['!margins'] = firstSheet['!margins'];
+      }
+      if (firstSheet['!protect']) {
+        sheetCopy['!protect'] = firstSheet['!protect'];
+      }
+      
+      // 셀 스타일 정보도 복사
+      for (const cellAddress in firstSheet) {
+        if (cellAddress.startsWith('!')) continue; // 메타데이터는 이미 복사됨
+        const cell = firstSheet[cellAddress];
+        if (cell && cell.s) {
+          // 셀 스타일 정보가 있으면 복사
+          if (!sheetCopy[cellAddress]) {
+            sheetCopy[cellAddress] = {};
+          }
+          sheetCopy[cellAddress].s = cell.s;
+        }
+      }
+      
+      XLSX.utils.book_append_sheet(newWorkbook, sheetCopy, firstSheetName);
+      
+      // 저장 전 최종 데이터 확인
+      const finalSheet = newWorkbook.Sheets[firstSheetName];
+      const finalRange = XLSX.utils.decode_range(finalSheet['!ref'] || 'A1:A1');
+      let finalDataCount = 0;
+      for (let R = finalRange.s.r; R <= finalRange.e.r; ++R) {
+        for (let C = finalRange.s.c; C <= finalRange.e.c; ++C) {
+          const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+          const cell = finalSheet[cellAddress];
+          if (cell && (cell.v !== undefined || cell.w !== undefined)) {
+            finalDataCount++;
+          }
+        }
+      }
+      console.log(`📊 [로컬PC봇] 저장 전 최종 데이터 확인: ${finalDataCount}개 셀에 데이터 있음`);
+      
+      if (finalDataCount === 0) {
+        throw new Error('저장 전 데이터가 없습니다. 원본 파일을 사용합니다.');
+      }
+      
+      // 새로운 파일로 저장 (서식 유지 옵션 최대화)
+      XLSX.writeFile(newWorkbook, filePath, {
+        bookType: 'xlsx',
+        bookSST: false,
+        cellStyles: true,  // 셀 스타일 쓰기
+        cellNF: true,      // 숫자 서식 쓰기
+        compression: true // 압축 사용
+      });
+      
+      const newStats = await fs.stat(filePath);
+      console.log(`📊 [로컬PC봇] 저장된 파일 크기: ${newStats.size} bytes`);
+      
+      console.log(`✅ [로컬PC봇] 첫 번째 시트만 추출 및 수식 변환 완료 (데이터 유지)`);
+      
+    } catch (xlsxError) {
+      console.error(`⚠️ [로컬PC봇] xlsx 처리 실패, 원본 파일 사용: ${xlsxError.message}`);
+      // xlsx 처리 실패 시 원본 파일 그대로 사용
+      await fs.copyFile(tempFilePath, filePath);
+      const newStats = await fs.stat(filePath);
+      console.log(`📊 [로컬PC봇] 저장된 파일 크기: ${newStats.size} bytes (원본 파일)`);
+    }
+    
+    // 임시 파일 삭제
+    await fs.unlink(tempFilePath).catch(() => {});
+    
+    console.log(`✅ [로컬PC봇] 엑셀 파일 생성 완료 (첫 번째 시트만): ${filePath}`);
+    
+    return filePath;
+  } catch (error) {
+    console.error(`❌ [로컬PC봇] Google Sheets API 오류:`, error.message);
+    throw error;
+  }
+}
 
 // 봇 준비 완료
 client.once('ready', async () => {
@@ -151,10 +432,84 @@ client.on('messageCreate', async (message) => {
       
       console.log(`📤 [로컬PC봇] 이미지 디스코드 업로드 완료 (메시지 ID: ${imageMessage.id})`);
       
+      // ===== 엑셀 파일 생성 =====
+      let excelMessageId = null;
+      let excelBuffer = null;
+
+      try {
+        console.log(`📊 [로컬PC봇] [${requestId}] 엑셀 파일 생성 시작...`);
+        
+        // excel 디렉토리 생성 (없으면)
+        try {
+          await fs.access('./excel');
+        } catch {
+          await fs.mkdir('./excel', { recursive: true });
+        }
+        
+        // URL에서 spreadsheetId 추출
+        const spreadsheetIdMatch = sheetUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+        const spreadsheetId = spreadsheetIdMatch ? spreadsheetIdMatch[1] : null;
+        
+        if (!spreadsheetId) {
+          throw new Error('Google Sheets URL에서 spreadsheetId를 추출할 수 없습니다.');
+        }
+        
+        // 파일명 생성 (Windows에서 사용 불가능한 문자 제거)
+        const safeName = policyTableName
+          .replace(/[<>:"/\\|?*]/g, '_')
+          .replace(/\s+/g, '_');
+        const excelFilename = `${safeName}_${Date.now()}.xlsx`;
+        const excelPath = path.join('./excel', excelFilename);
+        
+        // 엑셀 파일 다운로드 (Google Sheets API 사용)
+        let downloadSuccess = false;
+        
+        try {
+          // Google Sheets API 사용 (서비스 계정 권한 필요)
+          await downloadExcelWithAPI(spreadsheetId, excelPath);
+          await fs.access(excelPath);
+          downloadSuccess = true;
+          console.log(`✅ [로컬PC봇] [${requestId}] Google Sheets API로 엑셀 다운로드 완료`);
+        } catch (apiError) {
+          console.error(`❌ [로컬PC봇] [${requestId}] Google Sheets API 실패: ${apiError.message}`);
+          console.error(`⚠️ [로컬PC봇] [${requestId}] 서비스 계정이 해당 시트에 접근 권한이 있는지 확인하세요.`);
+          // API 실패 시 엑셀 파일 생성 실패로 처리 (이미지는 정상)
+        }
+        
+        if (downloadSuccess) {
+          // 파일을 버퍼로 읽기
+          excelBuffer = await fs.readFile(excelPath);
+          
+          // 엑셀 파일을 디스코드에 업로드
+          const excelAttachment = new AttachmentBuilder(excelBuffer, {
+            name: `${safeName}.xlsx`
+          });
+          
+          const excelMessage = await message.channel.send({
+            content: `📊 **엑셀 파일**`,
+            files: [excelAttachment]
+          });
+          
+          excelMessageId = excelMessage.id;
+          console.log(`📤 [로컬PC봇] [${requestId}] 엑셀 파일 디스코드 업로드 완료 (메시지 ID: ${excelMessageId})`);
+          
+          // 임시 파일 삭제
+          await fs.unlink(excelPath).catch(() => {});
+        } else {
+          console.warn(`⚠️ [로컬PC봇] [${requestId}] 엑셀 파일 생성 실패 (이미지는 정상 생성됨)`);
+        }
+      } catch (excelError) {
+        console.error(`❌ [로컬PC봇] [${requestId}] 엑셀 파일 생성 오류:`, excelError);
+        // 엑셀 파일 생성 실패해도 이미지는 정상이므로 계속 진행
+      }
+      
       // ===== 5단계: 클라우드 서버에 완료 신호 전송 =====
       // 클라우드 서버 봇이 이 신호를 감지하고 이미지 URL을 추출
       const commandMessageId = message.id; // 원본 명령어 메시지 ID
-      const completeSignal = `!screenshot-complete commandId=${commandMessageId} imageId=${imageMessage.id}`;
+      let completeSignal = `!screenshot-complete commandId=${commandMessageId} imageId=${imageMessage.id}`;
+      if (excelMessageId) {
+        completeSignal += ` excelId=${excelMessageId}`;
+      }
       await message.channel.send(completeSignal);
       console.log(`📡 [로컬PC봇] 완료 신호 전송: ${completeSignal}`);
       

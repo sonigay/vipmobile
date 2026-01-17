@@ -347,8 +347,35 @@ async function captureSheetViaDiscordBot(sheetUrl, policyTableName, userName, ch
           const messageId = imageMessage.id;
           const threadId = targetChannel.id; // 포스트/스레드 ID
 
-          console.log(`✅ [정책표] 스크린샷 생성 완료: ${imageUrl} (메시지 ID: ${messageId}, 스레드 ID: ${threadId})`);
-          resolve({ imageUrl, messageId, threadId });
+          // 엑셀 파일 메시지 ID 추출 (선택적)
+          let excelUrl = null;
+          let excelMessageId = null;
+          const excelIdMatch = completeSignalMsg.content.match(/excelId=(\d+)/);
+          if (excelIdMatch) {
+            try {
+              excelMessageId = excelIdMatch[1];
+              console.log(`🔍 [정책표] 엑셀 파일 메시지 ID 추출: ${excelMessageId}`);
+              
+              const excelMessage = await targetChannel.messages.fetch(excelMessageId);
+              if (excelMessage) {
+                const excelAttachment = excelMessage.attachments.first();
+                if (excelAttachment && excelAttachment.name && excelAttachment.name.endsWith('.xlsx')) {
+                  excelUrl = excelAttachment.url;
+                  console.log(`✅ [정책표] 엑셀 파일 URL 추출: ${excelUrl}`);
+                } else {
+                  console.warn(`⚠️ [정책표] 엑셀 파일 메시지에 엑셀 파일이 없습니다: ${excelMessageId}`);
+                }
+              } else {
+                console.warn(`⚠️ [정책표] 엑셀 파일 메시지를 찾을 수 없습니다: ${excelMessageId}`);
+              }
+            } catch (excelError) {
+              console.warn(`⚠️ [정책표] 엑셀 파일 URL 추출 실패: ${excelError.message}`);
+              // 엑셀 파일이 없어도 이미지는 정상이므로 계속 진행
+            }
+          }
+
+          console.log(`✅ [정책표] 스크린샷 생성 완료: ${imageUrl} (메시지 ID: ${messageId}, 스레드 ID: ${threadId})${excelUrl ? `, 엑셀: ${excelUrl}` : ''}`);
+          resolve({ imageUrl, messageId, threadId, excelUrl, excelMessageId });
 
         } catch (error) {
           console.error(`❌ [정책표] 완료 신호 처리 오류:`, error);
@@ -475,7 +502,8 @@ const HEADERS_POLICY_TABLE_LIST = [
   '등록여부',           // 11
   '등록일시',           // 12
   '생성자ID',           // 13: 생성자ID (N열)
-  '확인이력'            // 14: 확인이력 (JSON 배열 형식) (O열)
+  '확인이력',           // 14: 확인이력 (JSON 배열 형식) (O열)
+  '엑셀파일URL'         // 15: 엑셀파일URL (P열)
 ];
 
 const HEADERS_USER_GROUPS = [
@@ -1224,7 +1252,7 @@ async function processPolicyTableGeneration(jobId, params) {
 
     // 로컬 PC 디스코드 봇에 명령어 전송 및 이미지 URL, 메시지 ID, 스레드 ID 받기
     // captureSheetViaDiscordBot에서 포스트/스레드를 찾거나 생성하고 명령어를 전송함
-    const { imageUrl, messageId: discordMessageId, threadId } = await captureSheetViaDiscordBot(
+    const { imageUrl, messageId: discordMessageId, threadId, excelUrl, excelMessageId } = await captureSheetViaDiscordBot(
       sheetUrl,
       policyTableName,
       creatorName, // 실행한 사람 이름 전달
@@ -1266,13 +1294,15 @@ async function processPolicyTableGeneration(jobId, params) {
       imageUrl,                    // 10: 이미지URL
       'N',                         // 11: 등록여부
       '',                          // 12: 등록일시
-      creatorId || ''              // 13: 생성자ID (새로 추가)
+      creatorId || '',             // 13: 생성자ID
+      '',                          // 14: 확인이력 (기존 데이터 호환성)
+      excelUrl || ''               // 15: 엑셀파일URL
     ];
 
     await withRetry(async () => {
       return await sheets.spreadsheets.values.append({
         spreadsheetId: SPREADSHEET_ID,
-        range: `${SHEET_POLICY_TABLE_LIST}!A:N`,
+        range: `${SHEET_POLICY_TABLE_LIST}!A:P`,
         valueInputOption: 'USER_ENTERED',
         resource: { values: [newRow] }
       });
@@ -4143,7 +4173,7 @@ function setupPolicyTableRoutes(app) {
       const response = await withRetry(async () => {
         return await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_POLICY_TABLE_LIST}!A:O`
+          range: `${SHEET_POLICY_TABLE_LIST}!A:P`
         });
       });
 
@@ -4242,7 +4272,8 @@ function setupPolicyTableRoutes(app) {
             threadId: row[9] || '',
             imageUrl: row[10] || '',
             registeredAt: row[12] || '',
-            viewHistory: viewHistory // 확인이력 추가
+            viewHistory: viewHistory, // 확인이력 추가
+            excelFileUrl: row[15] || '' // 엑셀파일URL 추가
           };
         });
 
@@ -4987,7 +5018,8 @@ function setupPolicyTableRoutes(app) {
         threadId: row[9] || '',
         imageUrl: row[10] || '',
         registeredAt: row[12] || '',
-        viewHistory: viewHistory // 확인이력 추가
+        viewHistory: viewHistory, // 확인이력 추가
+        excelFileUrl: row[15] || '' // 엑셀파일URL 추가
       };
 
       // 캐시에 저장 (30초 TTL)
@@ -5083,6 +5115,49 @@ function setupPolicyTableRoutes(app) {
     } catch (error) {
       console.error('[정책표] 이미지 갱신 오류:', error);
       return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // GET /api/policy-tables/:id/download-excel
+  router.get('/policy-tables/:id/download-excel', async (req, res) => {
+    setCORSHeaders(req, res);
+    try {
+      const { id } = req.params;
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_TABLE_LIST, HEADERS_POLICY_TABLE_LIST);
+
+      const response = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_POLICY_TABLE_LIST}!A:P`
+        });
+      });
+
+      const rows = response.data.values || [];
+      const row = rows.find(r => r[0] === id);
+
+      if (!row) {
+        return res.status(404).json({ success: false, error: '정책표를 찾을 수 없습니다.' });
+      }
+
+      const excelUrl = row[15]; // 엑셀파일URL (15번 인덱스)
+      if (!excelUrl) {
+        return res.status(404).json({ success: false, error: '엑셀 파일이 없습니다.' });
+      }
+
+      // 엑셀 파일 URL을 직접 반환 (클라이언트에서 다운로드)
+      res.json({
+        success: true,
+        excelUrl: excelUrl
+      });
+
+    } catch (error) {
+      console.error('❌ [정책표] 엑셀 파일 다운로드 오류:', error);
+      res.status(500).json({
+        success: false,
+        error: '엑셀 파일 다운로드에 실패했습니다.',
+        message: error.message
+      });
     }
   });
 
