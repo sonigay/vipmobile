@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
     Box,
     Paper,
@@ -19,7 +19,9 @@ import {
     IconButton,
     CircularProgress,
     Alert,
-    Autocomplete
+    Autocomplete,
+    useMediaQuery,
+    useTheme
 } from '@mui/material';
 import {
     ArrowBack as ArrowBackIcon,
@@ -27,7 +29,8 @@ import {
     CheckCircle as CheckCircleIcon,
     Calculate as CalculateIcon,
     Add as AddIcon,
-    Remove as RemoveIcon
+    Remove as RemoveIcon,
+    Refresh as RefreshIcon
 } from '@mui/icons-material';
 import { directStoreApi } from '../../api/directStoreApi';
 import { directStoreApiClient } from '../../api/directStoreApiClient';
@@ -53,8 +56,12 @@ const OpeningInfoPage = ({
     selectedStore = null, // 고객모드일 때 선택한 매장 정보
     saveToSheet = 'salesReport' // 'purchaseQueue' | 'salesReport'
 }) => {
+    const muiTheme = useTheme();
+    const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
     const [selectedCarrier, setSelectedCarrier] = useState(initialData?.carrier || 'SK');
     const theme = CARRIER_THEMES[selectedCarrier] || CARRIER_THEMES['SK'];
+    // 🔥 읽기 전용 모드: 고객모드에서 구매내역 상세정보 (판매일보 조회)
+    const isReadOnly = mode === 'customer' && saveToSheet === 'sales';
     const [isSaving, setIsSaving] = useState(false);
     const [planGroups, setPlanGroups] = useState([]); // 요금제 그룹 목록
     const [selectedPlanGroup, setSelectedPlanGroup] = useState('');
@@ -66,7 +73,7 @@ const OpeningInfoPage = ({
     const [agreementChecked, setAgreementChecked] = useState(false); // 동의 체크박스 상태
     const [baseMargin, setBaseMargin] = useState(0); // 정책설정에서 가져온 기본 마진
     const [preApprovalMark, setPreApprovalMark] = useState(null); // 사전승낙서 마크
-    
+
     // 🔥 로딩 상태 관리 (항목별)
     const [loadingPlanGroups, setLoadingPlanGroups] = useState(true); // 요금제 그룹 로딩
     const [loadingAddonsAndInsurances, setLoadingAddonsAndInsurances] = useState(true); // 부가서비스/보험상품 로딩
@@ -75,32 +82,103 @@ const OpeningInfoPage = ({
     // 단말/지원금 기본값 정리 (휴대폰목록/오늘의휴대폰에서 전달된 데이터 사용)
     const factoryPrice = initialData?.factoryPrice || 0;
     // 🔥 개선: publicSupport를 state로 변경하여 요금제군/개통유형 변경 시 업데이트 가능하도록
-    const [publicSupport, setPublicSupport] = useState(initialData?.publicSupport || initialData?.support || 0); // 이통사 지원금
-    const [storeSupportWithAddon, setStoreSupportWithAddon] = useState(initialData?.storeSupport || 0); // 부가유치시 대리점추가지원금
-    const [storeSupportWithoutAddon, setStoreSupportWithoutAddon] = useState(initialData?.storeSupportNoAddon || 0); // 부가미유치시 대리점추가지원금
+    const [publicSupport, setPublicSupport] = useState(
+        initialData?.publicSupport || initialData?.이통사지원금 || initialData?.support || 0
+    ); // 이통사 지원금
+    const [storeSupportWithAddon, setStoreSupportWithAddon] = useState(
+        // 🔥 수정: 저장된 대리점추가지원금을 우선적으로 사용 (790000 같은 값이 저장되어 있으면 그대로 사용)
+        initialData?.storeSupport || initialData?.대리점추가지원금 || initialData?.storeSupportWithAddon || 0
+    ); // 부가유치시 대리점추가지원금
+    const [storeSupportWithoutAddon, setStoreSupportWithoutAddon] = useState(
+        initialData?.storeSupportNoAddon || initialData?.storeSupportWithoutAddon || 0
+    ); // 부가미유치시 대리점추가지원금
+    const [additionalStoreSupport, setAdditionalStoreSupport] = useState(
+        initialData?.additionalStoreSupport !== undefined && initialData?.additionalStoreSupport !== null
+            ? initialData.additionalStoreSupport
+            : (initialData?.대리점추가지원금직접입력 !== undefined && initialData?.대리점추가지원금직접입력 !== null
+                ? initialData.대리점추가지원금직접입력
+                : null)
+    ); // 대리점추가지원금 직접입력 추가금액
+
+    // 적용일시 상태 관리 (날짜, 시, 분)
+    const getInitialDateTime = () => {
+        // 🔥 수정: soldAt, 판매일시 필드 모두 확인
+        const soldAtValue = initialData?.soldAt || initialData?.판매일시 || initialData?.saleDateTime;
+        if (soldAtValue) {
+            const date = new Date(soldAtValue);
+            // 🔥 수정: UTC 시간을 그대로 사용 (시트에 저장된 UTC 시간)
+            // 예: 2026-01-12T05:12:00.000Z → 05시 12분으로 표시
+            return {
+                date: date.toISOString().split('T')[0], // YYYY-MM-DD
+                hour: date.getUTCHours().toString().padStart(2, '0'), // UTC 시간 사용
+                minute: date.getUTCMinutes().toString().padStart(2, '0') // UTC 분 사용
+            };
+        }
+        const now = new Date();
+        return {
+            date: now.toISOString().split('T')[0],
+            hour: now.getHours().toString().padStart(2, '0'),
+            minute: now.getMinutes().toString().padStart(2, '0')
+        };
+    };
+    const [appliedDateTime, setAppliedDateTime] = useState(getInitialDateTime());
 
     // openingType 변환은 유틸리티 함수 사용
 
+    // 🔥 개선: openingType 변환 함수 (한글 필드명도 처리)
+    const getOpeningType = () => {
+        const openingTypeValue = initialData?.openingType || initialData?.개통유형 || '';
+        if (!openingTypeValue) return 'NEW';
+        // 한글 값 처리
+        if (openingTypeValue === '신규' || openingTypeValue === '010신규' || openingTypeValue === 'NEW') return 'NEW';
+        if (openingTypeValue === '번호이동' || openingTypeValue === 'MNP') return 'MNP';
+        if (openingTypeValue === '기기변경' || openingTypeValue === '기변' || openingTypeValue === 'CHANGE') return 'CHANGE';
+        // 영문 값 처리
+        return convertOpeningType(openingTypeValue);
+    };
+
+    // 🔥 개선: contractType 변환 함수 (한글 필드명도 처리)
+    const getContractType = () => {
+        const contractTypeValue = initialData?.contractType || initialData?.contract || initialData?.약정 || '';
+        if (!contractTypeValue) return 'standard';
+        // 한글 값 처리
+        if (contractTypeValue === '선택약정' || contractTypeValue === 'selected') return 'selected';
+        if (contractTypeValue === '일반약정' || contractTypeValue === 'standard') return 'standard';
+        // 영문 값 처리
+        return contractTypeValue === 'selected' ? 'selected' : 'standard';
+    };
+
+    // 🔥 개선: paymentType 변환 함수 (한글 필드명도 처리)
+    const getPaymentType = () => {
+        const paymentTypeValue = initialData?.paymentType || initialData?.installmentType || initialData?.할부구분 || '';
+        if (!paymentTypeValue) return 'installment';
+        // 한글 값 처리
+        if (paymentTypeValue === '할부' || paymentTypeValue === 'installment') return 'installment';
+        if (paymentTypeValue === '현금' || paymentTypeValue === 'cash') return 'cash';
+        // 영문 값 처리
+        return paymentTypeValue === 'cash' ? 'cash' : 'installment';
+    };
+
     const [formData, setFormData] = useState({
-        customerName: initialData?.customerName || '',
-        customerContact: initialData?.customerContact || '',
+        customerName: initialData?.customerName || initialData?.고객명 || '',
+        customerContact: (initialData?.customerContact || initialData?.CTN || initialData?.ctn || initialData?.연락처 || '').toString(), // 🔥 수정: 문자열로 변환하여 앞의 0 유지
         customerBirth: '',
-        openingType: convertOpeningType(initialData?.openingType) || 'NEW', // NEW, MNP, CHANGE
-        prevCarrier: initialData?.prevCarrier || '',
-        contractType: initialData?.contractType || 'standard', // standard | selected (선택약정)
-        installmentPeriod: initialData?.installmentPeriod || 24,
-        plan: initialData?.plan || '', // 요금제명
-        paymentType: initialData?.paymentType || 'installment', // installment | cash
+        openingType: getOpeningType(), // 🔥 수정: 한글 필드명도 처리
+        prevCarrier: initialData?.prevCarrier || initialData?.전통신사 || '',
+        contractType: getContractType(), // 🔥 수정: 한글 필드명도 처리
+        installmentPeriod: initialData?.installmentPeriod || initialData?.할부개월 || 24,
+        plan: initialData?.plan || initialData?.요금제 || '', // 요금제명
+        paymentType: getPaymentType(), // 🔥 수정: 한글 필드명도 처리
         withAddon: initialData?.withAddon !== undefined ? initialData.withAddon : true, // 부가유치 여부 (true: 부가유치, false: 미유치)
         usePublicSupport: initialData?.usePublicSupport !== undefined ? initialData.usePublicSupport : true, // 이통사지원금 사용 여부
-        lgPremier: initialData?.lgPremier || false, // LG 프리미어 약정 적용 여부
+        lgPremier: initialData?.lgPremier !== undefined ? Boolean(initialData.lgPremier) : (initialData?.프리미어약정 === 'Y' || initialData?.프리미어약정 === true || false), // 🔥 수정: 한글 필드명도 처리, Boolean 변환
         cashPrice: initialData?.cashPrice || 0, // 현금가
         depositAccount: initialData?.depositAccount || '', // 입금계좌
-        // 단말기/유심 정보
-        deviceColor: initialData?.deviceColor || '',
-        deviceSerial: initialData?.deviceSerial || '',
-        simModel: initialData?.simModel || '',
-        simSerial: initialData?.simSerial || '',
+        // 단말기/유심 정보 - 🔥 수정: 한글 필드명도 확인
+        deviceColor: initialData?.deviceColor || initialData?.color || initialData?.색상 || '',
+        deviceSerial: initialData?.deviceSerial || initialData?.단말일련번호 || '',
+        simModel: initialData?.simModel || initialData?.usimModel || initialData?.유심모델명 || '',
+        simSerial: initialData?.simSerial || initialData?.usimSerial || initialData?.유심일련번호 || '',
         // POS코드
         posCode: initialData?.posCode || ''
     });
@@ -171,178 +249,185 @@ const OpeningInfoPage = ({
         loadPlanGroups();
     }, [selectedCarrier, initialData?.planGroup, initialData?.plan]);
 
-    // 필수 부가서비스 및 보험상품 로드 (정책설정에서 가져오기)
-    useEffect(() => {
-        const loadAvailableItems = async () => {
-            setLoadingAddonsAndInsurances(true);
-            try {
-                const policySettings = await directStoreApi.getPolicySettings(selectedCarrier);
-                const initialSelectedItems = [];
+    // 필수 부가서비스 및 보험상품 로드 함수 (재사용 가능하도록 분리)
+    const loadAvailableItems = useCallback(async (forceRefresh = false) => {
+        setLoadingAddonsAndInsurances(true);
+        try {
+            // 🔥 수정: 새로고침 버튼 클릭 시 캐시 무시하고 실제 데이터 다시 로드
+            const policySettings = await directStoreApiClient.getPolicySettings(selectedCarrier, forceRefresh);
+            const initialSelectedItems = [];
 
-                // 마진 설정 값 저장
-                if (policySettings.success && policySettings.margin?.baseMargin != null) {
-                    setBaseMargin(Number(policySettings.margin.baseMargin) || 0);
-                } else {
-                    setBaseMargin(0);
-                }
+            // 마진 설정 값 저장
+            if (policySettings.success && policySettings.margin?.baseMargin != null) {
+                setBaseMargin(Number(policySettings.margin.baseMargin) || 0);
+            } else {
+                setBaseMargin(0);
+            }
 
-                if (policySettings.success && policySettings.addon?.list) {
-                    // 모든 부가서비스 목록 저장 (incentive, deduction, description, url 정보 포함)
-                    const allAddons = policySettings.addon.list.map(addon => ({
-                        name: addon.name,
-                        monthlyFee: addon.fee || 0,
-                        incentive: addon.incentive || 0,
-                        deduction: addon.deduction || 0,
-                        description: addon.description || '',
-                        url: addon.url || '',
-                        type: 'addon'
-                    }));
-                    setAvailableAddons(allAddons);
+            if (policySettings.success && policySettings.addon?.list) {
+                // 모든 부가서비스 목록 저장 (incentive, deduction, description, url 정보 포함)
+                const allAddons = policySettings.addon.list.map(addon => ({
+                    name: addon.name,
+                    monthlyFee: addon.fee || 0,
+                    incentive: addon.incentive || 0,
+                    deduction: addon.deduction || 0,
+                    description: addon.description || '',
+                    url: addon.url || '',
+                    type: 'addon'
+                }));
+                setAvailableAddons(allAddons);
 
-                    // 🔥 초기값: 정책설정에 있는 모든 부가서비스를 초기 선택
-                    // initialData에 이미 선택된 부가서비스가 있으면 그것을 우선 사용
-                    if (initialData?.additionalServices || initialData?.addons) {
-                        const savedAddonNames = (initialData.additionalServices || initialData.addons || '')
-                            .split(',')
-                            .map(name => name.trim())
-                            .filter(name => name);
+                // 🔥 초기값: 정책설정에 있는 모든 부가서비스를 초기 선택
+                // initialData에 이미 선택된 부가서비스가 있으면 그것을 우선 사용
+                if (initialData?.additionalServices || initialData?.addons) {
+                    const savedAddonNames = (initialData.additionalServices || initialData.addons || '')
+                        .split(',')
+                        .map(name => name.trim())
+                        .filter(name => name);
 
-                        // 저장된 부가서비스 이름과 매칭되는 항목만 선택
-                        const savedAddons = allAddons.filter(addon => 
-                            savedAddonNames.includes(addon.name)
-                        );
-                        initialSelectedItems.push(...savedAddons);
-                    } else {
-                        // 새로 입력하는 경우: 정책설정에 있는 모든 부가서비스를 초기 선택
-                        initialSelectedItems.push(...allAddons);
-                    }
-                }
-
-                // 보험상품: 출고가 및 모델 유형(플립/폴드 여부)에 맞는 보험상품 찾기
-                if (policySettings.success && policySettings.insurance?.list && factoryPrice > 0) {
-                    const insuranceList = policySettings.insurance.list || [];
-
-                    // 현재 단말이 플립/폴드 계열인지 여부 (펫네임/모델명 기준)
-                    const modelNameForCheck = (initialData?.petName || initialData?.model || '').toString();
-                    const lowerModelName = modelNameForCheck.toLowerCase();
-                    const flipFoldKeywords = ['플립', '폴드', 'flip', 'fold'];
-                    const isFlipFoldModel = flipFoldKeywords.some(keyword =>
-                        lowerModelName.includes(keyword.toLowerCase())
+                    // 저장된 부가서비스 이름과 매칭되는 항목만 선택
+                    const savedAddons = allAddons.filter(addon =>
+                        savedAddonNames.includes(addon.name)
                     );
+                    initialSelectedItems.push(...savedAddons);
+                } else {
+                    // 새로 입력하는 경우: 정책설정에 있는 모든 부가서비스를 초기 선택
+                    initialSelectedItems.push(...allAddons);
+                }
+            } else {
+                setAvailableAddons([]);
+            }
 
-                    // 보험상품 중 이름에 플립/폴드 관련 키워드가 포함된 상품
-                    const flipFoldInsurances = insuranceList.filter(item => {
-                        const name = (item.name || '').toString().toLowerCase();
-                        return flipFoldKeywords.some(keyword =>
-                            name.includes(keyword.toLowerCase())
-                        );
+            // 보험상품: 출고가 및 모델 유형(플립/폴드 여부)에 맞는 보험상품 찾기
+            if (policySettings.success && policySettings.insurance?.list && factoryPrice > 0) {
+                const insuranceList = policySettings.insurance.list || [];
+
+                // 현재 단말이 플립/폴드 계열인지 여부 (펫네임/모델명 기준)
+                const modelNameForCheck = (initialData?.petName || initialData?.model || '').toString();
+                const lowerModelName = modelNameForCheck.toLowerCase();
+                const flipFoldKeywords = ['플립', '폴드', 'flip', 'fold'];
+                const isFlipFoldModel = flipFoldKeywords.some(keyword =>
+                    lowerModelName.includes(keyword.toLowerCase())
+                );
+
+                // 보험상품 중 이름에 플립/폴드 관련 키워드가 포함된 상품
+                const flipFoldInsurances = insuranceList.filter(item => {
+                    const name = (item.name || '').toString().toLowerCase();
+                    return flipFoldKeywords.some(keyword =>
+                        name.includes(keyword.toLowerCase())
+                    );
+                });
+
+                // 일반 보험상품 (플립/폴드 전용 상품 제외)
+                const normalInsurances = insuranceList.filter(item => !flipFoldInsurances.includes(item));
+
+                let matchingInsurance = null;
+
+                if (selectedCarrier === 'LG' && isFlipFoldModel && flipFoldInsurances.length > 0) {
+                    matchingInsurance = flipFoldInsurances.find(insurance => {
+                        const minPrice = insurance.minPrice || 0;
+                        const maxPrice = insurance.maxPrice || 9999999;
+                        return factoryPrice >= minPrice && factoryPrice <= maxPrice;
+                    }) || flipFoldInsurances[0];
+                } else {
+                    const baseList = normalInsurances.length > 0 ? normalInsurances : insuranceList;
+                    matchingInsurance = baseList.find(insurance => {
+                        const minPrice = insurance.minPrice || 0;
+                        const maxPrice = insurance.maxPrice || 9999999;
+                        return factoryPrice >= minPrice && factoryPrice <= maxPrice;
                     });
+                }
 
-                    // 일반 보험상품 (플립/폴드 전용 상품 제외)
-                    const normalInsurances = insuranceList.filter(item => !flipFoldInsurances.includes(item));
+                // 모든 보험상품 목록 저장 (incentive, deduction, description, url 정보 포함)
+                // 플립/폴드 모델일 때는 플립/폴드 보험상품만, 아닐 때는 일반 보험상품만 표시
+                const allInsurances = insuranceList
+                    .filter(insurance => {
+                        // 출고가 범위 체크
+                        const minPrice = insurance.minPrice || 0;
+                        const maxPrice = insurance.maxPrice || 9999999;
+                        const isPriceMatch = factoryPrice >= minPrice && factoryPrice <= maxPrice;
 
-                    let matchingInsurance = null;
+                        if (!isPriceMatch) return false;
 
-                    if (selectedCarrier === 'LG' && isFlipFoldModel && flipFoldInsurances.length > 0) {
-                        matchingInsurance = flipFoldInsurances.find(insurance => {
-                            const minPrice = insurance.minPrice || 0;
-                            const maxPrice = insurance.maxPrice || 9999999;
-                            return factoryPrice >= minPrice && factoryPrice <= maxPrice;
-                        }) || flipFoldInsurances[0];
-                    } else {
-                        const baseList = normalInsurances.length > 0 ? normalInsurances : insuranceList;
-                        matchingInsurance = baseList.find(insurance => {
-                            const minPrice = insurance.minPrice || 0;
-                            const maxPrice = insurance.maxPrice || 9999999;
-                            return factoryPrice >= minPrice && factoryPrice <= maxPrice;
-                        });
-                    }
-
-                    // 모든 보험상품 목록 저장 (incentive, deduction, description, url 정보 포함)
-                    // 플립/폴드 모델일 때는 플립/폴드 보험상품만, 아닐 때는 일반 보험상품만 표시
-                    const allInsurances = insuranceList
-                        .filter(insurance => {
-                            // 출고가 범위 체크
-                            const minPrice = insurance.minPrice || 0;
-                            const maxPrice = insurance.maxPrice || 9999999;
-                            const isPriceMatch = factoryPrice >= minPrice && factoryPrice <= maxPrice;
-                            
-                            if (!isPriceMatch) return false;
-                            
-                            // 보험상품 이름 확인
-                            const insuranceName = (insurance.name || '').toString().toLowerCase();
-                            const isFlipFoldInsurance = flipFoldKeywords.some(keyword =>
-                                insuranceName.includes(keyword.toLowerCase())
-                            );
-                            
-                            // 플립/폴드 모델일 때는 플립/폴드 보험상품만, 아닐 때는 일반 보험상품만
-                    if (isFlipFoldModel) {
-                                // 플립/폴드 모델: 플립/폴드 보험상품만 포함
-                                if (!isFlipFoldInsurance) {
-                                    return false; // 일반 보험상품 제외
-                                }
-                    } else {
-                                // 일반 모델: 일반 보험상품만 포함
-                                if (isFlipFoldInsurance) {
-                                    return false; // 플립/폴드 보험상품 제외
-                                }
-                            }
-                            
-                            return true;
-                        })
-                        .map(insurance => ({
-                            name: insurance.name,
-                            monthlyFee: insurance.fee || 0,
-                            incentive: insurance.incentive || 0,
-                            deduction: insurance.deduction || 0,
-                            description: insurance.description || '',
-                            url: insurance.url || '',
-                            type: 'insurance'
-                        }));
-                    setAvailableInsurances(allInsurances);
-
-                    // 🔥 초기값: 정책설정에 있는 보험상품 중 출고가에 맞는 항목을 초기 선택
-                    // initialData에 이미 선택된 보험상품이 있으면 그것을 우선 사용
-                    if (initialData?.additionalServices || initialData?.addons) {
-                        const savedItemNames = (initialData.additionalServices || initialData.addons || '')
-                            .split(',')
-                            .map(name => name.trim())
-                            .filter(name => name);
-                        
-                        // 저장된 보험상품 이름과 매칭되는 항목만 선택
-                        const savedInsurances = allInsurances.filter(insurance => 
-                            savedItemNames.includes(insurance.name)
+                        // 보험상품 이름 확인
+                        const insuranceName = (insurance.name || '').toString().toLowerCase();
+                        const isFlipFoldInsurance = flipFoldKeywords.some(keyword =>
+                            insuranceName.includes(keyword.toLowerCase())
                         );
-                        initialSelectedItems.push(...savedInsurances);
-                    } else {
-                        // 새로 입력하는 경우: 기존 로직대로 플립/폴드는 해당 상품, 그 외는 일반 보험을 선택
-                        // matchingInsurance가 있으면 그것을 선택, 없으면 첫 번째 보험상품 선택
-                        if (matchingInsurance) {
-                            const matchedInsurance = allInsurances.find(ins => ins.name === matchingInsurance.name);
-                            if (matchedInsurance) {
-                                initialSelectedItems.push(matchedInsurance);
-                            } else if (allInsurances.length > 0) {
-                                // 매칭되는 보험상품이 없으면 첫 번째 보험상품 선택
-                                initialSelectedItems.push(allInsurances[0]);
+
+                        // 플립/폴드 모델일 때는 플립/폴드 보험상품만, 아닐 때는 일반 보험상품만
+                        if (isFlipFoldModel) {
+                            // 플립/폴드 모델: 플립/폴드 보험상품만 포함
+                            if (!isFlipFoldInsurance) {
+                                return false; // 일반 보험상품 제외
                             }
+                        } else {
+                            // 일반 모델: 일반 보험상품만 포함
+                            if (isFlipFoldInsurance) {
+                                return false; // 플립/폴드 보험상품 제외
+                            }
+                        }
+
+                        return true;
+                    })
+                    .map(insurance => ({
+                        name: insurance.name,
+                        monthlyFee: insurance.fee || 0,
+                        incentive: insurance.incentive || 0,
+                        deduction: insurance.deduction || 0,
+                        description: insurance.description || '',
+                        url: insurance.url || '',
+                        type: 'insurance'
+                    }));
+                setAvailableInsurances(allInsurances);
+
+                // 🔥 초기값: 정책설정에 있는 보험상품 중 출고가에 맞는 항목을 초기 선택
+                // initialData에 이미 선택된 보험상품이 있으면 그것을 우선 사용
+                if (initialData?.additionalServices || initialData?.addons) {
+                    const savedItemNames = (initialData.additionalServices || initialData.addons || '')
+                        .split(',')
+                        .map(name => name.trim())
+                        .filter(name => name);
+
+                    // 저장된 보험상품 이름과 매칭되는 항목만 선택
+                    const savedInsurances = allInsurances.filter(insurance =>
+                        savedItemNames.includes(insurance.name)
+                    );
+                    initialSelectedItems.push(...savedInsurances);
+                } else {
+                    // 새로 입력하는 경우: 기존 로직대로 플립/폴드는 해당 상품, 그 외는 일반 보험을 선택
+                    // matchingInsurance가 있으면 그것을 선택, 없으면 첫 번째 보험상품 선택
+                    if (matchingInsurance) {
+                        const matchedInsurance = allInsurances.find(ins => ins.name === matchingInsurance.name);
+                        if (matchedInsurance) {
+                            initialSelectedItems.push(matchedInsurance);
                         } else if (allInsurances.length > 0) {
-                            // matchingInsurance가 없어도 보험상품이 있으면 첫 번째 보험상품 선택
+                            // 매칭되는 보험상품이 없으면 첫 번째 보험상품 선택
                             initialSelectedItems.push(allInsurances[0]);
                         }
+                    } else if (allInsurances.length > 0) {
+                        // matchingInsurance가 없어도 보험상품이 있으면 첫 번째 보험상품 선택
+                        initialSelectedItems.push(allInsurances[0]);
                     }
                 }
-
-                // 초기 선택 항목 설정
-                setSelectedItems(initialSelectedItems);
-            } catch (err) {
-                console.error('부가서비스/보험상품 로드 실패:', err);
-                setSelectedItems([]);
-            } finally {
-                setLoadingAddonsAndInsurances(false);
+            } else {
+                setAvailableInsurances([]);
             }
-        };
+
+            // 초기 선택 항목 설정
+            setSelectedItems(initialSelectedItems);
+        } catch (err) {
+            console.error('부가서비스/보험상품 로드 실패:', err);
+            setSelectedItems([]);
+        } finally {
+            setLoadingAddonsAndInsurances(false);
+        }
+    }, [selectedCarrier, factoryPrice, initialData?.petName, initialData?.model, initialData?.additionalServices, initialData?.addons]);
+
+    // 필수 부가서비스 및 보험상품 로드 (정책설정에서 가져오기)
+    useEffect(() => {
         loadAvailableItems();
-    }, [selectedCarrier, factoryPrice, initialData?.petName, initialData?.model]);
+    }, [loadAvailableItems]);
 
     // 사전승낙서 마크 로드
     useEffect(() => {
@@ -373,7 +458,7 @@ const OpeningInfoPage = ({
                 setLoadingSupportAmounts(false);
                 return;
             }
-            
+
             setLoadingSupportAmounts(true);
 
             // planGroup에 해당하는 plan 찾기
@@ -428,48 +513,115 @@ const OpeningInfoPage = ({
     }, [initialData?.planGroup, initialData?.openingType, planGroups, selectedCarrier, initialData?.id, formData.contractType]);
 
     // 🔥 개선: 선택된 부가서비스/보험상품에 따른 대리점지원금 계산
-    // 서버에서 받은 storeSupportWithAddon/WithoutAddon은 이미 모든 부가서비스를 고려한 값
-    // 따라서 사용자가 선택한 부가서비스에 따라 차이만 계산해야 함
+    // 계산 로직:
+    // - 초기값: storeSupportWithAddon (모든 항목이 유치된 상태, 예: 130,000원)
+    // - 부가서비스 제거 시: 해당 항목의 incentive + deduction을 모두 차감
+    //   예: incentive=30,000, deduction=10,000인 경우
+    //   - 유치 시: 130,000원
+    //   - 제거 시: 130,000 - 30,000 - 10,000 = 90,000원 (차액 40,000원)
+    // 🔥 수정: 저장된 대리점추가지원금을 초기값으로 사용하고, 부가서비스 선택 변경 시에만 재계산
+    const savedStoreSupport = initialData?.storeSupport || initialData?.대리점추가지원금;
+    const hasSavedStoreSupport = savedStoreSupport !== undefined && savedStoreSupport !== null && savedStoreSupport !== 0;
+    
+    // 초기 로드 시 부가서비스 선택 상태 추적 (저장된 값과 일치하는지 확인)
+    const initialSelectedItemsRef = useRef(null);
+    const isInitialLoadRef = useRef(true);
+    
+    // 초기 로드 완료 여부 확인 (부가서비스 목록이 로드되고 selectedItems가 설정된 후)
+    useEffect(() => {
+        if (availableAddons.length > 0 || availableInsurances.length > 0) {
+            if (isInitialLoadRef.current && selectedItems.length >= 0) {
+                initialSelectedItemsRef.current = [...selectedItems];
+                isInitialLoadRef.current = false;
+            }
+        }
+    }, [selectedItems, availableAddons.length, availableInsurances.length]);
+    
+    // 부가서비스 선택이 변경되었는지 확인
+    const hasItemsChanged = useMemo(() => {
+        if (!initialSelectedItemsRef.current) return false;
+        if (selectedItems.length !== initialSelectedItemsRef.current.length) return true;
+        const currentNames = selectedItems.map(item => item.name).sort();
+        const initialNames = initialSelectedItemsRef.current.map(item => item.name).sort();
+        return JSON.stringify(currentNames) !== JSON.stringify(initialNames);
+    }, [selectedItems]);
+    
     const calculateDynamicStoreSupport = useMemo(() => {
-        // 모든 가능한 항목 (부가서비스 + 보험상품)
-        const allAvailableItems = [...availableAddons, ...availableInsurances];
+        // 🔥 핵심: 저장된 값이 있고 초기 로드 상태이거나 부가서비스 선택이 변경되지 않았다면 저장된 값을 그대로 사용
+        if (hasSavedStoreSupport && (!hasItemsChanged || isInitialLoadRef.current)) {
+            const additionalAmount = additionalStoreSupport !== null && additionalStoreSupport !== undefined ? Number(additionalStoreSupport) : 0;
+            const savedValue = Number(savedStoreSupport) + additionalAmount;
+            return {
+                current: Math.max(0, savedValue),
+                withAddon: Math.max(0, savedValue),
+                withoutAddon: Math.max(0, savedValue)
+            };
+        }
 
-        // 서버에서 받은 값은 "모든 부가서비스 유치/미유치"를 가정한 값
-        // 사용자가 선택한 항목과의 차이를 계산
+        // 🔥 핵심 로직: 저장된 대리점추가지원금이 있으면 그 값을 기준으로 계산
+        // 저장된 값이 있으면 (예: 790000) 그 값을 기준으로 선택/해제에 따른 차이만 반영
+        // 저장된 값이 없으면 storeSupportWithAddon을 기준으로 계산
+        const baseStoreSupport = hasSavedStoreSupport
+            ? Number(savedStoreSupport)
+            : (Number(storeSupportWithAddon) || 0);
+
+        // 🔥 수정: 저장된 값은 초기 선택된 항목(예: 보험 1개)의 incentive/deduction이 이미 포함된 값
+        // 따라서 초기 선택된 항목의 incentive/deduction을 빼고, 현재 선택된 항목의 incentive/deduction을 더해야 함
+        // 예: 저장된 값 790000 (보험 1개만 유치, 보험 incentive 40000 포함)
+        //     초기 선택: 보험 1개 (incentive 40000)
+        //     현재 선택: 보험 1개 + 부가서비스 1개 (incentive 40000 + 30000, deduction -10000)
+        //     유치 시: incentive + |deduction| = 30000 + 10000 = 40000 증가
+        //     = 790000 - 40000 + (40000 + 30000 + 10000) = 790000 + 30000 + 10000 = 830000
+        const initialSelectedIncentive = (initialSelectedItemsRef.current || []).reduce((sum, item) => sum + (Number(item.incentive) || 0), 0);
+        // 🔥 수정: deduction이 음수이므로, 유치 시에는 절댓값을 더해야 함 (미유치 시 차감이므로 유치 시에는 더함)
+        const initialSelectedDeduction = (initialSelectedItemsRef.current || []).reduce((sum, item) => {
+            const deduction = Number(item.deduction) || 0;
+            return sum + Math.abs(deduction); // 유치 시에는 절댓값을 더함
+        }, 0);
         
-        // 모든 항목의 incentive/deduction 합계 (서버 기본값 기준)
-        const allItemsIncentive = allAvailableItems.reduce((sum, item) => sum + (item.incentive || 0), 0);
-        const allItemsDeduction = allAvailableItems.reduce((sum, item) => sum + (item.deduction || 0), 0);
-
-        // 사용자가 선택한 항목들의 incentive/deduction 합계
-        const selectedIncentive = selectedItems.reduce((sum, item) => sum + (item.incentive || 0), 0);
-        const selectedDeduction = selectedItems.reduce((sum, item) => sum + (item.deduction || 0), 0);
-
-        // 동적 대리점지원금 계산
-        // 서버의 storeSupportWithAddon = 모든 부가서비스 유치 시 값 (모든 incentive 포함)
-        // 사용자가 선택한 항목만큼만 적용하려면:
-        // 유치시 = 서버값 - (모든 항목의 incentive) + (선택한 항목의 incentive)
-        const dynamicStoreSupportWithAddon = storeSupportWithAddon - allItemsIncentive + selectedIncentive;
+        const selectedIncentive = selectedItems.reduce((sum, item) => sum + (Number(item.incentive) || 0), 0);
+        // 🔥 수정: deduction이 음수이므로, 유치 시에는 절댓값을 더해야 함
+        const selectedDeduction = selectedItems.reduce((sum, item) => {
+            const deduction = Number(item.deduction) || 0;
+            return sum + Math.abs(deduction); // 유치 시에는 절댓값을 더함
+        }, 0);
         
-        // 서버의 storeSupportWithoutAddon = 모든 부가서비스 미유치 시 값 (모든 deduction 포함)
-        // 사용자가 선택한 항목만큼만 적용하려면:
-        // 미유치시 = 서버값 - (모든 항목의 deduction) + (선택한 항목의 deduction)
-        const dynamicStoreSupportWithoutAddon = storeSupportWithoutAddon - allItemsDeduction + selectedDeduction;
+        // 🔥 수정: 저장된 값에서 초기 선택 항목의 incentive/deduction을 빼고, 현재 선택 항목의 incentive/deduction을 더함
+        const finalStoreSupport = baseStoreSupport - initialSelectedIncentive - initialSelectedDeduction + selectedIncentive + selectedDeduction;
+
+        // 직접입력 추가금액 반영 (음수도 허용)
+        const additionalAmount = additionalStoreSupport !== null && additionalStoreSupport !== undefined ? Number(additionalStoreSupport) : 0;
+        const finalWithAdditional = Math.max(0, finalStoreSupport + additionalAmount);
 
         return {
-            withAddon: Math.max(0, dynamicStoreSupportWithAddon), // 음수 방지
-            withoutAddon: Math.max(0, dynamicStoreSupportWithoutAddon) // 음수 방지
+            // 현재 선택된 상태에 따른 하나의 대리점추가지원금 (직접입력 추가금액 포함)
+            current: finalWithAdditional,
+            // 참고용 (UI 표시용)
+            withAddon: Math.max(0, (Number(storeSupportWithAddon) || 0) + additionalAmount),
+            withoutAddon: Math.max(0, (Number(storeSupportWithoutAddon) || 0) + additionalAmount)
         };
-    }, [selectedItems, availableAddons, availableInsurances, storeSupportWithAddon, storeSupportWithoutAddon]);
+    }, [selectedItems, availableAddons, availableInsurances, storeSupportWithAddon, storeSupportWithoutAddon, additionalStoreSupport, hasSavedStoreSupport, savedStoreSupport, hasItemsChanged]);
+
+    // 🔥 수정: 저장된 할부원금을 초기값으로 사용하고, 부가서비스 선택 변경 시에만 재계산
+    const savedInstallmentPrincipal = initialData?.installmentPrincipal || initialData?.할부원금;
+    const hasSavedInstallmentPrincipal = savedInstallmentPrincipal !== undefined && savedInstallmentPrincipal !== null && savedInstallmentPrincipal !== 0;
 
     // 계산 로직 (계산 엔진 사용)
+    // 🔥 개선: 선택된 부가서비스에 따라 하나의 대리점추가지원금만 사용
     const getCurrentInstallmentPrincipal = () => {
+        // 🔥 핵심: 저장된 값이 있고 초기 로드 상태이거나 부가서비스 선택이 변경되지 않았다면 저장된 값을 그대로 사용
+        if (hasSavedInstallmentPrincipal && (!hasItemsChanged || isInitialLoadRef.current)) {
+            return Number(savedInstallmentPrincipal);
+        }
+
         const support = formData.usePublicSupport ? publicSupport : 0;
-        const dynamicStoreSupport = formData.withAddon 
-            ? calculateDynamicStoreSupport.withAddon 
-            : calculateDynamicStoreSupport.withoutAddon;
-        
-        return formData.withAddon
+        // 선택된 부가서비스가 있으면 유치 금액, 없으면 미유치 금액 사용
+        const dynamicStoreSupport = calculateDynamicStoreSupport.current;
+        // 선택된 항목이 있으면 유치 계산, 없으면 미유치 계산
+        const hasSelectedItems = selectedItems.length > 0;
+
+        // 부가서비스 선택 여부에 따라 계산 함수 선택
+        return hasSelectedItems
             ? calculateInstallmentPrincipalWithAddon(factoryPrice, support, dynamicStoreSupport, formData.usePublicSupport)
             : calculateInstallmentPrincipalWithoutAddon(factoryPrice, support, dynamicStoreSupport, formData.usePublicSupport);
     };
@@ -493,24 +645,25 @@ const OpeningInfoPage = ({
     }, [selectedItems.length]);
 
     // 계산된 값들을 메모이제이션하여 불필요한 재계산 방지
-    // 🔥 개선: formData.withAddon 변경 시 할부원금 재계산되도록 useMemo 사용
+    // 🔥 개선: selectedItems 변경 시 할부원금 재계산되도록 useMemo 사용
+    // 🔥 수정: 저장된 값이 있으면 초기 로드 시 그대로 사용하고, 부가서비스 선택 변경 시에만 재계산
     const installmentPrincipal = useMemo(() => {
         return getCurrentInstallmentPrincipal();
-    }, [formData.withAddon, formData.usePublicSupport, factoryPrice, publicSupport, calculateDynamicStoreSupport]);
-    
+    }, [selectedItems.length, formData.usePublicSupport, factoryPrice, publicSupport, calculateDynamicStoreSupport, hasSavedInstallmentPrincipal, savedInstallmentPrincipal, hasItemsChanged]);
+
     const installmentFeeResult = useMemo(() => {
         return calculateInstallmentFee(installmentPrincipal, formData.installmentPeriod);
     }, [installmentPrincipal, formData.installmentPeriod]);
-    
+
     const planFeeResult = useMemo(() => {
         return calculatePlanFee(planBasicFee, formData.contractType, selectedCarrier, formData.lgPremier);
     }, [planBasicFee, formData.contractType, selectedCarrier, formData.lgPremier]);
-    
+
     // 🔥 개선: 선택된 항목들의 월 요금 합계
     const addonsFeeResult = useMemo(() => {
         return selectedItems.reduce((sum, item) => sum + (item.monthlyFee || 0), 0);
     }, [selectedItems]);
-    
+
     const totalMonthlyFeeResult = useMemo(() => {
         return calculateTotalMonthlyFee(
             formData.paymentType,
@@ -520,63 +673,13 @@ const OpeningInfoPage = ({
             addonsFeeResult
         );
     }, [formData.paymentType, installmentPrincipal, formData.installmentPeriod, planFeeResult, addonsFeeResult]);
-    
+
     const cashPriceResult = useMemo(() => {
         return calculateCashPrice(installmentPrincipal, formData.cashPrice);
     }, [installmentPrincipal, formData.cashPrice]);
 
     const handlePrint = () => {
-        // 인쇄 전에 내용의 높이를 측정하여 A4 용지에 맞게 zoom 값 계산
-        const printArea = document.querySelector('.print-area');
-        if (printArea) {
-            // 인쇄 모드 전환 전 원본 크기 측정
-            const originalZoom = document.querySelector('.print-root')?.style.zoom || '1';
-            
-            // 임시로 zoom을 1로 설정하여 실제 높이 측정
-            const printRoot = document.querySelector('.print-root');
-            if (printRoot) {
-                printRoot.style.zoom = '1';
-                
-                // 리플로우를 위해 약간의 지연
-                setTimeout(() => {
-                    const contentHeight = printArea.scrollHeight;
-                    
-                    // A4 용지 크기 (마진 5mm 제외)
-                    // A4: 210mm x 297mm, 마진 5mm씩이면 실제 사용 가능: 200mm x 287mm
-                    // 96 DPI 기준: 1mm = 3.7795px
-                    // 실제 사용 가능 높이: 287mm * 3.7795 = 약 1084px
-                    // 하지만 브라우저마다 다를 수 있으므로 약간의 여유를 두고 1000px로 설정
-                    const a4Height = 1000; // A4 용지 사용 가능 높이 (px)
-                    
-                    // zoom 값 계산 (내용이 A4 한 장에 들어오도록)
-                    let calculatedZoom = a4Height / contentHeight;
-                    
-                    // 최소/최대 zoom 값 제한 (너무 작거나 크면 가독성 저하)
-                    calculatedZoom = Math.max(0.3, Math.min(0.8, calculatedZoom));
-                    
-                    // 계산된 zoom 값 적용
-                    if (printRoot) {
-                        printRoot.style.zoom = calculatedZoom.toString();
-                    }
-                    
-                    // 인쇄 실행
-                    setTimeout(() => {
         window.print();
-                        
-                        // 인쇄 후 원래 상태로 복원
-                        setTimeout(() => {
-                            if (printRoot) {
-                                printRoot.style.zoom = originalZoom;
-                            }
-                        }, 100);
-                    }, 100);
-                }, 50);
-            } else {
-                window.print();
-            }
-        } else {
-            window.print();
-        }
     };
 
     const handleComplete = async () => {
@@ -612,9 +715,22 @@ const OpeningInfoPage = ({
                 company: currentStore?.name || '',
                 storeName: currentStore?.name || '',
                 storeId: currentStore?.id || '',
-                soldAt: new Date().toISOString(),
+                soldAt: (() => {
+                    // 적용일시를 ISO 문자열로 변환
+                    const { date, hour, minute } = appliedDateTime;
+                    if (date && hour !== undefined && minute !== undefined) {
+                        // 🔥 수정: 사용자가 입력한 시간을 그대로 UTC로 저장
+                        // 예: 1월 12일 14시 12분 → 2026-01-12T14:12:00.000Z
+                        // 로컬 시간대 오프셋을 고려하지 않고 입력한 시간을 그대로 UTC로 저장
+                        const h = String(hour).padStart(2, '0');
+                        const m = String(minute).padStart(2, '0');
+                        return `${date}T${h}:${m}:00.000Z`;
+                    }
+                    // 기본값: 현재 시점
+                    return new Date().toISOString();
+                })(),
                 customerName: formData.customerName,
-                customerContact: formData.customerContact, // CTN (연락처)
+                customerContact: String(formData.customerContact || ''), // 🔥 수정: CTN을 문자열로 명시적 변환하여 앞의 0 유지
                 carrier: selectedCarrier,
                 model: initialData?.model || '', // 단말기모델명
                 color: formData.deviceColor || '', // 색상
@@ -632,24 +748,54 @@ const OpeningInfoPage = ({
                 // 금액 정보
                 factoryPrice: factoryPrice || 0, // 출고가
                 publicSupport: formData.usePublicSupport ? publicSupport : 0, // 이통사지원금
-                storeSupportWithAddon: formData.withAddon ? calculateDynamicStoreSupport.withAddon : 0, // 대리점추가지원금(부가유치) - 동적 계산
-                storeSupportNoAddon: !formData.withAddon ? calculateDynamicStoreSupport.withoutAddon : 0, // 대리점추가지원금(부가미유치) - 동적 계산
-                storeSupportWithoutAddon: !formData.withAddon ? calculateDynamicStoreSupport.withoutAddon : 0, // 하위 호환
+                // 🔥 개선: 선택된 부가서비스에 따라 하나의 대리점추가지원금만 저장
+                storeSupport: calculateDynamicStoreSupport.current, // 대리점추가지원금 (현재 선택된 상태에 따른 값)
+                // 하위 호환을 위한 필드 (기존 API 호환성 유지)
+                storeSupportWithAddon: formData.withAddon ? calculateDynamicStoreSupport.current : 0,
+                storeSupportNoAddon: !formData.withAddon ? calculateDynamicStoreSupport.current : 0,
+                storeSupportWithoutAddon: !formData.withAddon ? calculateDynamicStoreSupport.current : 0,
                 // 마진 계산
                 // 구매가 = 출고가 - 이통사지원금 - 대리점추가지원금
                 // - 구매가가 0원 이상이면 정책설정 마진(baseMargin)
                 // - 구매가가 0원 미만(마이너스)이면 그 절대값을 마진으로 사용
+                // - 대리점추가지원금 직접입력이 음수면 그 절대값만큼 마진에 추가
+                // - 대리점추가지원금 직접입력이 양수면 그 값만큼 마진에서 차감
                 margin: (() => {
                     const appliedPublicSupport = formData.usePublicSupport ? publicSupport : 0;
-                    const appliedStoreSupport = formData.withAddon ? calculateDynamicStoreSupport.withAddon : calculateDynamicStoreSupport.withoutAddon;
+                    // 🔥 개선: 선택된 부가서비스에 따라 하나의 대리점추가지원금만 사용
+                    const appliedStoreSupport = calculateDynamicStoreSupport.current;
                     const purchasePrice = factoryPrice - appliedPublicSupport - appliedStoreSupport;
 
                     if (isNaN(purchasePrice)) return 0;
+
+                    // 기본 마진 계산
+                    let calculatedMargin = 0;
                     if (purchasePrice >= 0) {
-                        return baseMargin || 0;
+                        calculatedMargin = baseMargin || 0;
+                    } else {
+                        calculatedMargin = Math.abs(purchasePrice);
                     }
-                    return Math.abs(purchasePrice);
+
+                    // 🔥 대리점추가지원금 직접입력 반영
+                    // 음수면 그 절대값만큼 마진에 추가, 양수면 그 값만큼 마진에서 차감
+                    // 예: 직접입력 -40,000원 → 마진 +40,000원
+                    // 예: 직접입력 +30,000원 → 마진 -30,000원
+                    if (additionalStoreSupport !== null && additionalStoreSupport !== undefined && additionalStoreSupport !== 0) {
+                        if (additionalStoreSupport < 0) {
+                            // 음수: 마진에 추가
+                            calculatedMargin += Math.abs(additionalStoreSupport);
+                        } else {
+                            // 양수: 마진에서 차감
+                            calculatedMargin = Math.max(0, calculatedMargin - additionalStoreSupport);
+                        }
+                    }
+
+                    return calculatedMargin;
                 })(),
+                // 할부원금 저장 (현재 선택된 상태에 따른 값)
+                installmentPrincipal: getCurrentInstallmentPrincipal(),
+                // LG 프리미어 약정 적용
+                lgPremier: formData.lgPremier || false,
                 // 계산된 값들 (참고용, 시트에는 저장 안 됨)
                 installmentPrincipalWithAddon: calculateInstallmentPrincipalWithAddon(factoryPrice, publicSupport, calculateDynamicStoreSupport.withAddon, formData.usePublicSupport),
                 installmentPrincipalWithoutAddon: calculateInstallmentPrincipalWithoutAddon(factoryPrice, publicSupport, calculateDynamicStoreSupport.withoutAddon, formData.usePublicSupport),
@@ -693,8 +839,12 @@ const OpeningInfoPage = ({
                     additionalServices: selectedItems.map(a => a.name).join(', ') || '',
                     factoryPrice: factoryPrice || 0,
                     carrierSupport: formData.usePublicSupport ? publicSupport : 0,
-                    dealerSupportWithAdd: formData.withAddon ? calculateDynamicStoreSupport.withAddon : 0, // 동적 계산
-                    dealerSupportWithoutAdd: !formData.withAddon ? calculateDynamicStoreSupport.withoutAddon : 0, // 동적 계산
+                    // 🔥 개선: 선택된 부가서비스에 따라 하나의 대리점추가지원금만 저장
+                    dealerSupport: calculateDynamicStoreSupport.current, // 대리점추가지원금 (현재 선택된 상태에 따른 값, 직접입력 추가금액 포함)
+                    additionalStoreSupport: additionalStoreSupport !== null && additionalStoreSupport !== undefined ? additionalStoreSupport : 0, // 대리점추가지원금 직접입력 추가금액 (음수 허용)
+                    // 하위 호환을 위한 필드
+                    dealerSupportWithAdd: formData.withAddon ? calculateDynamicStoreSupport.current : 0,
+                    dealerSupportWithoutAdd: !formData.withAddon ? calculateDynamicStoreSupport.current : 0,
                     // 선택매장 정보 추가
                     storeName: currentStore?.name || '',
                     storePhone: currentStore?.phone || currentStore?.storePhone || '',
@@ -719,11 +869,17 @@ const OpeningInfoPage = ({
             } else {
                 // 판매일보 시트에 저장 (직영점모드)
                 // 수정 모드인지 확인
-                if (initialData?.id || initialData?.번호) {
-                    const rowId = initialData.id || initialData.번호;
-                    await directStoreApiClient.updateSalesReport(rowId, saveData);
+                // initialData.id는 상품(모델) ID일 수 있으므로 판매일보 ID를 명확히 구분
+                // 판매일보 ID는 'sales-'로 시작하는 ID이거나 '번호' 필드에 있는 경우만 사용
+                const salesReportId = initialData?.번호 ||
+                    (initialData?.id && initialData.id.toString().startsWith('sales-') ? initialData.id : null);
+
+                if (salesReportId) {
+                    // 판매일보 수정 모드
+                    await directStoreApiClient.updateSalesReport(salesReportId, saveData);
                     alert('개통 정보가 수정되었습니다.');
                 } else {
+                    // 판매일보 생성 모드
                     await directStoreApiClient.createSalesReport(saveData);
                     alert('개통 정보가 저장되었습니다.');
                 }
@@ -732,197 +888,263 @@ const OpeningInfoPage = ({
             if (onBack) onBack();
         } catch (error) {
             console.error('저장 실패:', error);
-            alert('저장에 실패했습니다. 다시 시도해주세요.');
+            console.error('에러 상세:', {
+                message: error.message,
+                stack: error.stack,
+                response: error.response,
+                data: error.response?.data
+            });
+
+            // 더 구체적인 에러 메시지 제공
+            let errorMessage = '저장에 실패했습니다.';
+            if (error.response?.data?.error) {
+                errorMessage = `저장에 실패했습니다.\n사유: ${error.response.data.error}`;
+            } else if (error.message) {
+                errorMessage = `저장에 실패했습니다.\n사유: ${error.message}`;
+            }
+
+            alert(errorMessage);
         } finally {
             setIsSaving(false);
         }
     };
 
     return (
-        <Box className={`print-root mode-${mode}`} sx={{ p: 3, height: '100%', overflow: 'auto', bgcolor: theme.bg }}>
-            {/* 인쇄용 스타일 (레이아웃 그대로 출력) */}
+        <Box className={`print-root mode-${mode}`} sx={{ 
+            p: { xs: 1, sm: 2, md: 3 }, 
+            height: '100%', 
+            overflow: 'auto', 
+            bgcolor: theme.bg,
+            '& .MuiTypography-root': {
+                wordBreak: 'keep-all', // 단어 단위로 줄바꿈
+                overflowWrap: 'break-word' // 긴 단어는 강제 줄바꿈
+            }
+        }}>
+            {/* 인쇄용 스타일 (WYSIWYG: 화면 그대로 출력) */}
             <style>{`
                 @media print {
                     @page {
                         size: A4;
-                        margin: 5mm;
+                        margin: 5mm; /* 최소 여백 확보 */
                     }
 
-                    /* HTML/Body: 배경색 출력 강제 및 높이 제한 해제 */
-                    html, body {
+                    /* 기본 설정: 모든 부모 요소의 높이 제한 해제 & 배경색 강제 출력 */
+                    html, body, #root, .App {
                         height: auto !important;
+                        min-height: 100% !important;
                         overflow: visible !important;
+                        background-color: white !important;
                         -webkit-print-color-adjust: exact !important;
                         print-color-adjust: exact !important;
                     }
 
-                    /* 상단 헤더 숨김 */
-                    .no-print {
+                    /* 인쇄 불필요 요소 숨김 */
+                    .no-print, 
+                    .MuiIconButton-root, 
+                    header, 
+                    nav,
+                    .MuiDialog-container {
                         display: none !important;
                     }
-
-                    /* 전체 래퍼: 내용이 A4 한 장에 들어오도록 축소 (Zoom/Scale) */
-                    /* zoom 값은 handlePrint 함수에서 동적으로 계산되어 적용됨 */
-                    .opening-wrapper, .print-root {
-                        height: auto !important;
-                        overflow: visible !important;
-                        position: relative !important;
-                        padding: 0 !important;
-                        width: 100% !important;
-                        max-width: 100% !important;
-                        
-                        /* 기본값: 동적 계산 전 기본 zoom (인쇄 시 handlePrint에서 재계산) */
-                        zoom: 0.55; 
-                    }
-
-                    /* 고객모드도 동일하게 처리 */
-                    .print-root.mode-customer {
-                        zoom: 0.55; 
-                    }
-
-                    /* 여백 미세 조정 (디자인 유지하되 불필요한 공백 제거) */
-                    .agreement-box {
-                        margin-bottom: 2px !important;
-                        padding: 3px !important;
-                        page-break-after: avoid !important;
-                    }
-
+                    
+                    /* 인쇄 전용 요소 표시 */
                     .print-only {
-                        margin-bottom: 5px !important;
                         display: block !important;
                     }
-                    
-                    /* 제목 폰트 크기 약간 조정 (너무 크면 공간 차지하므로) */
-                    .print-only .MuiTypography-root {
-                        font-size: 20px !important; 
-                        font-weight: bold !important;
-                    }
 
-                    /* Grid 레이아웃 강제 2단 (50:50) 유지 */
-                    .print-area > .MuiGrid-container {
-                        display: flex !important;
-                        flex-wrap: wrap !important;
-                        width: 100% !important;
+                    /* 메인 컨테이너 설정 */
+                    .print-root {
+                        /* 
+                           인쇄 시 데스크탑 뷰(2단 컬럼) 강제 유지 및 A4 너비에 맞게 축소
+                           - A4 가로: 약 794px (96DPI)
+                           - 좌우 여백 5mm씩 제외 시 사용 가능 너비: 약 756px
+                           - 데스크탑 뷰 기준: 1120px (줄바꿈 최소화)
+                           - 축소 비율: 756 / 1120 ≈ 0.675 -> 더 축소하여 세로 공간 확보
+                        */
+                        width: 1120px !important;
+                        min-width: 1120px !important;
+                        max-width: 1120px !important;
+                        
+                        /* A4 용지 한 장에 넣기 위해 축소 비율 더 낮춤 */
+                        zoom: 0.60; 
+                        
+                        /* 높이 제한 해제 */
+                        height: auto !important;
+                        min-height: 100% !important;
+                        overflow: visible !important;
+                        
+                        /* 배경 및 여백 설정 - 컨테이너 내부 여백 최소화 */
+                        background-color: white !important;
                         margin: 0 !important;
-                        gap: 10px !important;
-                    }
-
-                    /* 메인 좌우 컬럼 강제 50% */
-                    .print-area > .MuiGrid-container > .MuiGrid-item {
-                        flex-basis: calc(50% - 5px) !important;
-                        max-width: calc(50% - 5px) !important;
-                        width: calc(50% - 5px) !important;
                         padding: 0 !important;
-                        box-sizing: border-box !important;
+                        
+                        /* 폰트 및 줄간격 전역 축소 */
+                        font-family: "Noto Sans KR", sans-serif !important;
+                        line-height: 1.1 !important;
+                        
+                        /* 페이지 나눔 방지 노력 */
+                        page-break-inside: avoid;
                     }
 
-                    /* Paper 컴포넌트: 그림자 제거, 테두리는 유지, 여백 최소화 */
-                    .print-root .MuiPaper-root {
-                        box-shadow: none !important;
-                        border: 1px solid #e0e0e0 !important;
-                        padding: 4px !important;
-                        margin-bottom: 2px !important;
-                        page-break-inside: avoid !important;
+                    /* 인쇄 시 내부 간격 축소 (한 장에 담기 위해) */
+                    .print-root .MuiGrid-root {
+                        margin-top: 0 !important;
+                        margin-bottom: 0 !important;
                     }
                     
-                    /* 부가서비스/보험상품 선택 영역: 인쇄 시 더 컴팩트하게 */
-                    .print-root .MuiPaper-root[class*="MuiPaper-outlined"] {
-                        padding: 3px !important;
-                        margin-bottom: 2px !important;
-                    }
-                    
-                    /* 부가서비스/보험상품 설명 텍스트: 인쇄 시 작게 */
-                    .print-root .MuiTypography-body2 {
-                        font-size: 0.7rem !important;
-                        line-height: 1.2 !important;
+                    .print-root .MuiBox-root {
+                        padding-top: 4px !important;
+                        padding-bottom: 4px !important;
                     }
 
-                    /* 내부 Grid item들도 2단 배치 필요한 경우 강제 */
-                    .print-root .MuiPaper-root .MuiGrid-container > .MuiGrid-item[class*="grid-xs-12"][class*="grid-sm-6"] {
+                    /* 스크롤바 강제 숨김 (모든 요소) */
+                    * {
+                        -webkit-overflow-scrolling: touch !important;
+                        overflow: visible !important; 
+                    }
+                    
+                    /* 스크롤바 영역 자체를 제거 */
+                    ::-webkit-scrollbar {
+                        display: none !important;
+                        width: 0 !important;
+                        height: 0 !important;
+                    }
+                    
+                    /* Firefox 호환 */
+                    html, body {
+                        scrollbar-width: none !important;
+                    }
+
+                    /* Grid Item 강제 배치 (화면과 동일하게) & 간격 축소 */
+                    .print-root .MuiGrid-container > .MuiGrid-item.MuiGrid-grid-md-6 {
                         flex-basis: 50% !important;
                         max-width: 50% !important;
+                        width: 50% !important;
+                        padding-top: 2px !important; /* 상단 여백 극한 축소 */
+                        padding-bottom: 2px !important; /* 하단 여백 극한 축소 */
                     }
                     
-                    /* 요금정보 섹션 내부 배치 */
-                    .plan-info-section .MuiGrid-container > .MuiGrid-item[class*="grid-xs-12"]:nth-child(2),
-                    .plan-info-section .MuiGrid-container > .MuiGrid-item[class*="grid-xs-12"]:nth-child(3) {
-                         flex-basis: 50% !important;
-                         max-width: 50% !important;
+                    /* 모든 Grid Item 간격 축소 */
+                    .print-root .MuiGrid-item {
+                        padding-top: 2px !important;
+                        padding-bottom: 2px !important;
                     }
 
-                    /* 입력 필드 높이 약간 줄임 */
+                    /* 입력 필드 높이 및 여백 강제 축소 */
+                    .print-root .MuiTextField-root,
+                    .print-root .MuiFormControl-root {
+                        margin-bottom: 2px !important;
+                        margin-top: 0 !important;
+                    }
+
+                    /* Input 내부 패딩 축소 (Dense보다 더 좁게) */
                     .print-root .MuiInputBase-root {
-                        min-height: 32px !important;
-                        height: 32px !important;
+                        min-height: 28px !important; /* 최소 높이 더 줄임 */
+                        font-size: 0.8rem !important;
+                        line-height: 1.1 !important;
+                    }
+                    .print-root .MuiInputBase-input {
+                        padding: 2px 6px !important; /* 내부 패딩 최소화 */
+                    }
+                    .print-root .MuiInputLabel-root {
+                        transform: translate(12px, 4px) scale(0.9) !important; /* 라벨 위치/크기 조정 */
+                        font-size: 0.8rem !important;
+                    }
+                    .print-root .MuiInputLabel-shrink {
+                        transform: translate(12px, -6px) scale(0.7) !important; /* 슈링크 라벨 위치 조정 */
                     }
                     
-                    /* 부가서비스/보험상품 선택 영역: 인쇄 시 더 컴팩트하게 */
-                    .print-root .MuiPaper-root[class*="MuiPaper-outlined"] {
-                        padding: 3px !important;
+                    /* 제목 및 텍스트 여백 축소 */
+                    .print-root .MuiTypography-h6 {
+                        font-size: 0.95rem !important;
+                        margin-bottom: 2px !important;
+                        min-height: auto !important;
+                        line-height: 1.2 !important;
+                    }
+                    .print-root .MuiTypography-body2 {
+                        font-size: 0.75rem !important;
+                        line-height: 1.2 !important;
+                    }
+                    
+                    /* 구분선 여백 제거 */
+                    .print-root .MuiDivider-root {
+                        margin-top: 2px !important;
                         margin-bottom: 2px !important;
                     }
-                    
-                    /* 부가서비스/보험상품 설명 텍스트: 인쇄 시 작게 */
-                    .print-root .MuiTypography-body2 {
-                        font-size: 0.7rem !important;
-                        line-height: 1.2 !important;
-                    }
-                    
-                    /* 부가서비스/보험상품 버튼: 인쇄 시 숨김 */
-                    .print-root .MuiButton-root {
-                        display: none !important;
-                    }
-                    
-                    /* 계산 로직 상세 텍스트: 인쇄 시에도 표시하되 매우 조밀하게 */
-                    .calculation-details {
-                        display: block !important;
-                        margin-top: 5px !important;
-                    }
-                    
-                    .calculation-details .MuiPaper-root {
-                        padding: 5px !important;
-                        background-color: #f9f9f9 !important;
-                    }
 
-                    .calculation-details pre, .calculation-details .MuiTypography-caption {
-                        font-size: 0.65rem !important;
-                        line-height: 1.2 !important;
+                    /* Paper 그림자 제거 및 테두리 단순화 */
+                    .MuiPaper-root {
+                        box-shadow: none !important;
+                        border: 1px solid #ddd !important;
+                        padding: 6px !important; /* 내부 패딩 축소 */
+                        margin-bottom: 4px !important; /* 외부 여백 축소 */
                     }
-
-                    /* 스크롤바 숨김 */
-                    ::-webkit-scrollbar {
-                        display: none;
+                    
+                    /* 안내문구 박스 (agreement-box) 압축 */
+                    .print-area.agreement-box {
+                        padding: 6px !important;
+                        margin-bottom: 4px !important;
+                        border-radius: 4px !important;
+                    }
+                    .print-area.agreement-box .MuiTypography-body2 {
+                         font-size: 0.7rem !important;
+                         margin-bottom: 0 !important;
+                    }
+                    .print-area.agreement-box .MuiStack-root {
+                        gap: 2px !important;
+                    }
+                    .print-area.agreement-box .MuiFormControlLabel-root {
+                        margin-right: 0 !important;
+                        margin-left: -4px !important;
+                    }
+                    .print-area.agreement-box .MuiCheckbox-root {
+                        padding: 2px !important;
                     }
                 }
             `}</style>
+
+
 
             {/* 헤더 */}
             <Box className="no-print" sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                 <IconButton onClick={onBack} sx={{ mr: 2 }}>
                     <ArrowBackIcon />
                 </IconButton>
-                <Typography variant="h4" sx={{ fontWeight: 'bold', color: theme.primary }}>
-                    {selectedCarrier} 개통정보를 입력해주세요
+                <Typography variant="h4" sx={{ fontWeight: 'bold', color: theme.primary, fontSize: { xs: '1.25rem', sm: '1.5rem', md: '2rem' } }}>
+                    {isReadOnly ? `${selectedCarrier} 구매내역 상세정보` : `${selectedCarrier} 개통정보를 입력해주세요`}
                 </Typography>
                 <Box sx={{ flexGrow: 1 }} />
                 <Button
                     variant="outlined"
                     startIcon={<PrintIcon />}
-                    sx={{ mr: 2, borderColor: theme.primary, color: theme.primary }}
+                    sx={{ 
+                        mr: isReadOnly ? 0 : 2, 
+                        borderColor: theme.primary, 
+                        color: theme.primary,
+                        fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
+                        px: { xs: 1, sm: 2 }
+                    }}
                     onClick={handlePrint}
                 >
                     인쇄하기
                 </Button>
-                <Button
-                    variant="contained"
-                    size="large"
-                    startIcon={<CheckCircleIcon />}
-                    sx={{ bgcolor: theme.primary, '&:hover': { bgcolor: theme.primary } }}
-                    onClick={handleComplete}
-                    disabled={isSaving || !agreementChecked}
-                >
-                    {isSaving ? <CircularProgress size={24} color="inherit" /> : '입력완료'}
-                </Button>
+                {!isReadOnly && (
+                    <Button
+                        variant="contained"
+                        size="large"
+                        startIcon={<CheckCircleIcon />}
+                        sx={{ 
+                            bgcolor: theme.primary, 
+                            '&:hover': { bgcolor: theme.primary },
+                            fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
+                            px: { xs: 1, sm: 2 }
+                        }}
+                        onClick={handleComplete}
+                        disabled={isSaving || !agreementChecked}
+                    >
+                        {isSaving ? <CircularProgress size={24} color="inherit" /> : '입력완료'}
+                    </Button>
+                )}
             </Box>
 
             {/* 안내문구 및 동의 체크박스 */}
@@ -935,7 +1157,7 @@ const OpeningInfoPage = ({
                         • 부가서비스는 93일 유지조건
                     </Typography>
                     {/* 고객모드 전용 안내문구 */}
-                    {mode === 'customer' && (
+                    {mode === 'customer' && !isReadOnly && (
                         <>
                             <Typography variant="body2" color="error" sx={{ fontWeight: 600, mt: 1 }}>
                                 • 대기자가 많을수 있으니 빠른 개통업무를 위해 입력된정보를 인쇄해서 방문해주세요
@@ -945,20 +1167,29 @@ const OpeningInfoPage = ({
                             </Typography>
                         </>
                     )}
-                    <FormControlLabel
-                        control={
-                            <Checkbox
-                                checked={agreementChecked}
-                                onChange={(e) => setAgreementChecked(e.target.checked)}
-                                sx={{ color: theme.primary }}
-                            />
-                        }
-                        label={
-                            <Typography variant="body2" color="text.primary">
-                                미유지되어 계약을 위반할 시 할부금액을 조정해 청구됨에 동의합니다.
+                    {/* 읽기 전용 모드에서는 체크박스 제거하고 안내문구로 강조 */}
+                    {isReadOnly ? (
+                        <Alert severity="warning" sx={{ mt: 1, fontWeight: 'bold' }}>
+                            <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                                ⚠️ 미유지되어 계약을 위반할 시 할부금액을 조정해 청구됩니다.
                             </Typography>
-                        }
-                    />
+                        </Alert>
+                    ) : (
+                        <FormControlLabel
+                            control={
+                                <Checkbox
+                                    checked={agreementChecked}
+                                    onChange={(e) => setAgreementChecked(e.target.checked)}
+                                    sx={{ color: theme.primary }}
+                                />
+                            }
+                            label={
+                                <Typography variant="body2" color="text.primary">
+                                    미유지되어 계약을 위반할 시 할부금액을 조정해 청구됨에 동의합니다.
+                                </Typography>
+                            }
+                        />
+                    )}
                 </Stack>
             </Box>
 
@@ -977,30 +1208,34 @@ const OpeningInfoPage = ({
                         }
                     }
                 `}</style>
-                <Grid container spacing={1}>
+                <Grid container spacing={{ xs: 1, sm: 1.5, md: 2 }}>
                     {/* 왼쪽: 통신사 정보, 가입 정보, 약정 및 할부 정보, 요금정보, 금액종합안내 */}
                     <Grid item xs={12} md={6}>
                         {/* 매장 정보 표시 (고객모드/직영점모드 공통) */}
                         {(mode === 'customer' ? selectedStore : loggedInStore) && (
-                            <Paper sx={{ p: 1.5, mb: 1.5, borderTop: `3px solid ${theme.primary}`, bgcolor: theme.bg }}>
-                                <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold', color: theme.primary }}>
+                            <Paper sx={{ p: { xs: 1, sm: 1.5 }, mb: { xs: 1, sm: 1.5 }, borderTop: `3px solid ${theme.primary}`, bgcolor: theme.bg }}>
+                                <Typography variant="h6" gutterBottom sx={{ 
+                                    fontWeight: 'bold', 
+                                    color: theme.primary,
+                                    fontSize: { xs: '1rem', sm: '1.25rem', md: '1.5rem' }
+                                }}>
                                     매장 정보
                                 </Typography>
-                                <Grid container spacing={2}>
+                                <Grid container spacing={{ xs: 1, sm: 2 }}>
                                     {/* 왼쪽 컬럼: 기본 정보 */}
                                     <Grid item xs={12} md={6}>
-                                        <Stack spacing={1}>
-                                            <Typography variant="body2">
+                                        <Stack spacing={0.5}>
+                                            <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' }, lineHeight: 1.5 }}>
                                                 <strong>업체명:</strong> {(mode === 'customer' ? selectedStore : loggedInStore)?.name || ''}
                                             </Typography>
-                                            <Typography variant="body2">
+                                            <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' }, lineHeight: 1.5 }}>
                                                 <strong>연락처:</strong> {(mode === 'customer' ? selectedStore : loggedInStore)?.phone || (mode === 'customer' ? selectedStore : loggedInStore)?.storePhone || ''}
                                             </Typography>
-                                            <Typography variant="body2">
+                                            <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' }, lineHeight: 1.5 }}>
                                                 <strong>주소:</strong> {(mode === 'customer' ? selectedStore : loggedInStore)?.address || ''}
                                             </Typography>
                                             {(mode === 'customer' ? selectedStore : loggedInStore)?.accountInfo && (
-                                                <Typography variant="body2">
+                                                <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' }, lineHeight: 1.5 }}>
                                                     <strong>계좌정보:</strong> {(mode === 'customer' ? selectedStore : loggedInStore)?.accountInfo}
                                                 </Typography>
                                             )}
@@ -1103,9 +1338,12 @@ const OpeningInfoPage = ({
                         />
 
                         {/* 요금정보 */}
-                        <Paper className="plan-info-section" sx={{ p: 2, mb: 1.5, borderTop: `3px solid ${theme.primary}` }}>
-                            <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>요금정보</Typography>
-                            <Grid container spacing={1.5}>
+                        <Paper className="plan-info-section" sx={{ p: { xs: 1, sm: 1.5, md: 2 }, mb: { xs: 1, sm: 1.5 }, borderTop: `3px solid ${theme.primary}` }}>
+                            <Typography variant="h6" gutterBottom sx={{ 
+                                fontWeight: 'bold',
+                                fontSize: { xs: '1rem', sm: '1.25rem', md: '1.5rem' }
+                            }}>요금정보</Typography>
+                            <Grid container spacing={{ xs: 1, sm: 1.5 }}>
                                 <Grid item xs={12}>
                                     <Autocomplete
                                         options={planGroups}
@@ -1184,10 +1422,10 @@ const OpeningInfoPage = ({
                                                 setFormData({ ...formData, plan: '' });
                                                 setSelectedPlanGroup('');
                                                 setPlanBasicFee(0);
-                                                // 초기값으로 복원
-                                                setPublicSupport(initialData?.publicSupport || initialData?.support || 0);
-                                                setStoreSupportWithAddon(initialData?.storeSupport || 0);
-                                                setStoreSupportWithoutAddon(initialData?.storeSupportNoAddon || 0);
+                                                // 초기값으로 복원 - 🔥 수정: 한글 필드명도 확인
+                                                setPublicSupport(initialData?.publicSupport || initialData?.이통사지원금 || initialData?.support || 0);
+                                                setStoreSupportWithAddon(initialData?.storeSupport || initialData?.storeSupportWithAddon || initialData?.대리점추가지원금 || 0);
+                                                setStoreSupportWithoutAddon(initialData?.storeSupportNoAddon || initialData?.storeSupportWithoutAddon || 0);
                                             }
                                         }}
                                         renderInput={(params) => (
@@ -1224,7 +1462,7 @@ const OpeningInfoPage = ({
                                                     const selectedPlan = planGroups.find(p => p.name === formData.plan);
                                                     return selectedPlan?.group || 'N/A';
                                                 })()}
-                                                InputProps={{ 
+                                                InputProps={{
                                                     readOnly: true,
                                                     endAdornment: loadingPlanGroups ? <CircularProgress size={20} /> : null
                                                 }}
@@ -1235,7 +1473,7 @@ const OpeningInfoPage = ({
                                                 label="기본료"
                                                 fullWidth
                                                 value={loadingPlanGroups ? '로딩 중...' : planBasicFee.toLocaleString()}
-                                                InputProps={{ 
+                                                InputProps={{
                                                     readOnly: true,
                                                     endAdornment: loadingPlanGroups ? <CircularProgress size={20} /> : null
                                                 }}
@@ -1267,100 +1505,129 @@ const OpeningInfoPage = ({
                                             </Grid>
                                         )}
                                         {/* 부가서비스 및 보험 적용시 금액 변경 */}
-                                            <Grid item xs={12}>
-                                                <Divider sx={{ my: 1 }} />
+                                        <Grid item xs={12}>
+                                            <Divider sx={{ my: 1 }} />
                                             <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold' }}>
                                                 부가서비스 및 보험 적용시 금액 변경
                                             </Typography>
-                                            
+
                                             {loadingAddonsAndInsurances ? (
                                                 <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 3 }}>
                                                     <CircularProgress size={24} />
                                                     <Typography variant="body2" sx={{ ml: 2, color: 'text.secondary' }}>
                                                         부가서비스 및 보험상품 목록을 불러오는 중...
-                                                        </Typography>
-                                                    </Box>
+                                                    </Typography>
+                                                </Box>
                                             ) : (
                                                 <>
                                                     {/* 선택 가능한 항목 목록 (부가서비스 + 보험상품) */}
                                                     <Box sx={{ mb: 2 }}>
-                                                        <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold', color: 'text.secondary' }}>
-                                                            선택 가능한 항목
-                                                        </Typography>
-                                                        <Stack spacing={1}>
-                                                            {[...availableAddons, ...availableInsurances]
-                                                                .filter(item => !selectedItems.some(selected => selected.name === item.name))
-                                                                .map((item) => (
-                                                            <Paper key={item.name} variant="outlined" sx={{ p: 1.5 }}>
-                                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                                    <Box sx={{ flex: 1 }}>
-                                                                        <Typography variant="body2" fontWeight="bold">
-                                                                            {item.name}
-                                                                        </Typography>
-                                                                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-                                                                            월 요금: {item.monthlyFee.toLocaleString()}원
-                                                                            {item.incentive > 0 && ` | 유치시 +${item.incentive.toLocaleString()}원`}
-                                                                            {item.deduction > 0 && ` | 미유치시 -${item.deduction.toLocaleString()}원`}
-                                                                        </Typography>
-                                                                        {item.description && (
-                                                                            <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5, fontSize: '0.75rem' }}>
-                                                                                {item.description}
-                                                                            </Typography>
-                                                                        )}
-                                                                    </Box>
-                                                                    <IconButton
-                                                                        color="primary"
-                                                                        onClick={() => {
-                                                                            setSelectedItems(prev => [...prev, item]);
-                                                                        }}
-                                                                        sx={{ ml: 1 }}
-                                                                    >
-                                                                        <AddIcon />
-                                                                    </IconButton>
-                                                                </Box>
-                                                            </Paper>
-                                                        ))}
-                                                </Stack>
-                                            </Box>
+                                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                                                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'text.secondary' }}>
+                                                                선택 가능한 항목
+                                                            </Typography>
+                                                            <Button
+                                                                size="small"
+                                                                startIcon={<RefreshIcon />}
+                                                                onClick={() => loadAvailableItems(true)}
+                                                                disabled={loadingAddonsAndInsurances}
+                                                                sx={{ minWidth: 'auto', px: 1 }}
+                                                            >
+                                                                새로고침
+                                                            </Button>
+                                                        </Box>
+                                                        {loadingAddonsAndInsurances ? (
+                                                            <Box sx={{ py: 2, textAlign: 'center' }}>
+                                                                <CircularProgress size={24} />
+                                                                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                                                    부가서비스 및 보험상품을 불러오는 중...
+                                                                </Typography>
+                                                            </Box>
+                                                        ) : [...availableAddons, ...availableInsurances].length === 0 ? (
+                                                            <Box sx={{ py: 2, textAlign: 'center' }}>
+                                                                <Typography variant="body2" color="text.secondary">
+                                                                    선택 가능한 항목이 없습니다.
+                                                                </Typography>
+                                                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                                                                    정책 설정에서 부가서비스 및 보험상품을 등록해주세요.
+                                                                </Typography>
+                                                            </Box>
+                                                        ) : (
+                                                            <Stack spacing={1}>
+                                                                {[...availableAddons, ...availableInsurances]
+                                                                    .filter(item => !selectedItems.some(selected => selected.name === item.name))
+                                                                    .map((item) => (
+                                                                        <Paper key={item.name} variant="outlined" sx={{ p: 1.5 }}>
+                                                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                                                <Box sx={{ flex: 1 }}>
+                                                                                    <Typography variant="body2" fontWeight="bold">
+                                                                                        {item.name}
+                                                                                    </Typography>
+                                                                                    <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                                                                                        월 요금: {item.monthlyFee.toLocaleString()}원
+                                                                                        {item.incentive > 0 && ` | 유치시 +${item.incentive.toLocaleString()}원`}
+                                                                                        {item.deduction > 0 && ` | 미유치시 -${item.deduction.toLocaleString()}원`}
+                                                                                    </Typography>
+                                                                                    {item.description && (
+                                                                                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5, fontSize: '0.75rem' }}>
+                                                                                            {item.description}
+                                                                                        </Typography>
+                                                                                    )}
+                                                                                </Box>
+                                                                                <IconButton
+                                                                                    color="primary"
+                                                                                    onClick={() => {
+                                                                                        setSelectedItems(prev => [...prev, item]);
+                                                                                    }}
+                                                                                    sx={{ ml: 1 }}
+                                                                                >
+                                                                                    <AddIcon />
+                                                                                </IconButton>
+                                                                            </Box>
+                                                                        </Paper>
+                                                                    ))}
+                                                            </Stack>
+                                                        )}
+                                                    </Box>
 
-                                            {/* 선택된 항목 목록 */}
-                                            {selectedItems.length > 0 && (
-                                                <Box>
-                                                    <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold', color: 'primary.main' }}>
-                                                        선택된 항목
-                                                    </Typography>
-                                                    <Stack spacing={1}>
-                                                        {selectedItems.map((item) => (
-                                                            <Paper key={item.name} variant="outlined" sx={{ p: 1.5, bgcolor: 'action.selected' }}>
-                                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                                    <Box sx={{ flex: 1 }}>
-                                                                        <Typography variant="body2" fontWeight="bold">
-                                                                            {item.name}
-                                                                        </Typography>
-                                                                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-                                                                            월 요금: {item.monthlyFee.toLocaleString()}원
-                                                                            {item.incentive > 0 && ` | 유치시 +${item.incentive.toLocaleString()}원`}
-                                                                            {item.deduction > 0 && ` | 미유치시 -${item.deduction.toLocaleString()}원`}
-                                                                        </Typography>
-                                                                    </Box>
-                                                                    <IconButton
-                                                                        color="error"
-                                                                        onClick={() => {
-                                                                            setSelectedItems(prev => prev.filter(selected => selected.name !== item.name));
-                                                                        }}
-                                                                        sx={{ ml: 1 }}
-                                                                    >
-                                                                        <RemoveIcon />
-                                                                    </IconButton>
-                                                                </Box>
-                                                            </Paper>
-                                                        ))}
-                                                    </Stack>
-                                                </Box>
+                                                    {/* 선택된 항목 목록 */}
+                                                    {selectedItems.length > 0 && (
+                                                        <Box>
+                                                            <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold', color: 'primary.main' }}>
+                                                                선택된 항목
+                                                            </Typography>
+                                                            <Stack spacing={1}>
+                                                                {selectedItems.map((item) => (
+                                                                    <Paper key={item.name} variant="outlined" sx={{ p: 1.5, bgcolor: 'action.selected' }}>
+                                                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                                            <Box sx={{ flex: 1 }}>
+                                                                                <Typography variant="body2" fontWeight="bold">
+                                                                                    {item.name}
+                                                                                </Typography>
+                                                                                <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                                                                                    월 요금: {item.monthlyFee.toLocaleString()}원
+                                                                                    {item.incentive > 0 && ` | 유치시 +${item.incentive.toLocaleString()}원`}
+                                                                                    {item.deduction > 0 && ` | 미유치시 -${item.deduction.toLocaleString()}원`}
+                                                                                </Typography>
+                                                                            </Box>
+                                                                            <IconButton
+                                                                                color="error"
+                                                                                onClick={() => {
+                                                                                    setSelectedItems(prev => prev.filter(selected => selected.name !== item.name));
+                                                                                }}
+                                                                                sx={{ ml: 1 }}
+                                                                            >
+                                                                                <RemoveIcon />
+                                                                            </IconButton>
+                                                                        </Box>
+                                                                    </Paper>
+                                                                ))}
+                                                            </Stack>
+                                                        </Box>
+                                                    )}
+                                                </>
                                             )}
-                                            </>
-                                        )}
-                                    </Grid>
+                                        </Grid>
                                     </>
                                 )}
                             </Grid>
@@ -1396,7 +1663,7 @@ const OpeningInfoPage = ({
                             )}
                             <Stack direction="row" justifyContent="space-between" mb={1}>
                                 <Typography variant="body2">
-                                    대리점추가지원금 ({formData.withAddon ? '부가유치' : '부가미유치'})
+                                    대리점추가지원금
                                 </Typography>
                                 <Typography variant="body2">
                                     {loadingSupportAmounts ? (
@@ -1405,7 +1672,7 @@ const OpeningInfoPage = ({
                                             <span>로딩 중...</span>
                                         </Box>
                                     ) : (
-                                        `-${(formData.withAddon ? calculateDynamicStoreSupport.withAddon : calculateDynamicStoreSupport.withoutAddon).toLocaleString()}원`
+                                        `-${calculateDynamicStoreSupport.current.toLocaleString()}원`
                                     )}
                                 </Typography>
                             </Stack>
@@ -1561,6 +1828,56 @@ const OpeningInfoPage = ({
                                     />
                                 </Grid>
                                 <Grid item xs={12}>
+                                    <Divider sx={{ my: 1 }} />
+                                    <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold', mb: 1 }}>
+                                        적용일시
+                                    </Typography>
+                                </Grid>
+                                <Grid item xs={12} sm={4}>
+                                    <TextField
+                                        label="날짜"
+                                        fullWidth
+                                        type="date"
+                                        value={appliedDateTime.date}
+                                        onChange={(e) => setAppliedDateTime({ ...appliedDateTime, date: e.target.value })}
+                                        InputLabelProps={{
+                                            shrink: true,
+                                        }}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={4}>
+                                    <FormControl fullWidth>
+                                        <InputLabel>시</InputLabel>
+                                        <Select
+                                            value={appliedDateTime.hour}
+                                            label="시"
+                                            onChange={(e) => setAppliedDateTime({ ...appliedDateTime, hour: e.target.value })}
+                                        >
+                                            {Array.from({ length: 24 }, (_, i) => (
+                                                <MenuItem key={i} value={i.toString().padStart(2, '0')}>
+                                                    {i.toString().padStart(2, '0')}시
+                                                </MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
+                                </Grid>
+                                <Grid item xs={12} sm={4}>
+                                    <FormControl fullWidth>
+                                        <InputLabel>분</InputLabel>
+                                        <Select
+                                            value={appliedDateTime.minute}
+                                            label="분"
+                                            onChange={(e) => setAppliedDateTime({ ...appliedDateTime, minute: e.target.value })}
+                                        >
+                                            {Array.from({ length: 60 }, (_, i) => (
+                                                <MenuItem key={i} value={i.toString().padStart(2, '0')}>
+                                                    {i.toString().padStart(2, '0')}분
+                                                </MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
+                                </Grid>
+                                <Grid item xs={12}>
                                     <Alert severity="info" sx={{ mt: 1, mb: 1 }}>
                                         <Typography variant="body2">
                                             유심값 7,700원은 첫달 한달만 추가되어 청구됩니다
@@ -1583,7 +1900,7 @@ const OpeningInfoPage = ({
                                         label="이통사 지원금"
                                         fullWidth
                                         value={loadingSupportAmounts ? '로딩 중...' : (formData.usePublicSupport ? publicSupport.toLocaleString() : '0')}
-                                        InputProps={{ 
+                                        InputProps={{
                                             readOnly: true,
                                             endAdornment: loadingSupportAmounts ? <CircularProgress size={20} /> : null
                                         }}
@@ -1591,58 +1908,58 @@ const OpeningInfoPage = ({
                                 </Grid>
                                 <Grid item xs={6}>
                                     <TextField
-                                        label="대리점추가지원금 (부가유치)"
+                                        label="대리점추가지원금"
                                         fullWidth
-                                        value={loadingSupportAmounts ? '로딩 중...' : calculateDynamicStoreSupport.withAddon.toLocaleString()}
-                                        InputProps={{ 
+                                        value={loadingSupportAmounts ? '로딩 중...' : calculateDynamicStoreSupport.current.toLocaleString()}
+                                        InputProps={{
                                             readOnly: true,
                                             endAdornment: loadingSupportAmounts ? <CircularProgress size={20} /> : null
                                         }}
-                                        helperText={loadingSupportAmounts ? "지원금 정보를 불러오는 중..." : "선택된 상품에 따라 자동 계산"}
+                                        helperText={loadingSupportAmounts ? "지원금 정보를 불러오는 중..." : `선택된 부가서비스: ${selectedItems.length}개${additionalStoreSupport !== null && additionalStoreSupport !== undefined && additionalStoreSupport !== 0 ? `, 직접입력: ${additionalStoreSupport > 0 ? '+' : ''}${additionalStoreSupport.toLocaleString()}원` : ''}`}
                                     />
                                 </Grid>
                                 <Grid item xs={6}>
                                     <TextField
-                                        label="대리점추가지원금 (부가미유치)"
+                                        label="대리점추가지원금 직접입력"
                                         fullWidth
-                                        value={loadingSupportAmounts ? '로딩 중...' : calculateDynamicStoreSupport.withoutAddon.toLocaleString()}
-                                        InputProps={{ 
-                                            readOnly: true,
-                                            endAdornment: loadingSupportAmounts ? <CircularProgress size={20} /> : null
+                                        type="number"
+                                        disabled={mode === 'customer'}
+                                        value={additionalStoreSupport !== null && additionalStoreSupport !== undefined ? additionalStoreSupport : ''}
+                                        onChange={(e) => {
+                                            const inputValue = e.target.value;
+                                            // 빈 문자열이면 null로 설정
+                                            if (inputValue === '') {
+                                                setAdditionalStoreSupport(null);
+                                                return;
+                                            }
+                                            // '-'만 입력된 경우는 허용 (음수 입력 중)
+                                            if (inputValue === '-') {
+                                                setAdditionalStoreSupport(null);
+                                                return;
+                                            }
+                                            const value = parseFloat(inputValue);
+                                            // NaN이 아니면 (양수, 음수 모두 허용)
+                                            if (!isNaN(value)) {
+                                                setAdditionalStoreSupport(value);
+                                            }
                                         }}
-                                        helperText={loadingSupportAmounts ? "지원금 정보를 불러오는 중..." : "선택된 상품에 따라 자동 계산"}
+                                        InputProps={{
+                                            endAdornment: <Typography variant="body2" sx={{ mr: 1 }}>원</Typography>
+                                        }}
+                                        helperText={mode === 'customer' ? '고객모드에서는 입력할 수 없습니다' : '추가 금액을 입력하면 대리점추가지원금과 할부원금에 자동 반영됩니다 (음수 입력 가능)'}
                                     />
                                 </Grid>
                                 <Grid item xs={6}>
                                     <TextField
-                                        label="할부원금 (부가유치)"
+                                        label="할부원금"
                                         fullWidth
-                                        value={loadingSupportAmounts ? '로딩 중...' : (() => {
-                                            const support = formData.usePublicSupport ? publicSupport : 0;
-                                            const principal = calculateInstallmentPrincipalWithAddon(factoryPrice, support, calculateDynamicStoreSupport.withAddon, formData.usePublicSupport);
-                                            return isNaN(principal) ? 0 : principal;
-                                        })().toLocaleString()}
-                                        InputProps={{ 
+                                        value={loadingSupportAmounts ? '로딩 중...' : getCurrentInstallmentPrincipal().toLocaleString()}
+                                        InputProps={{
                                             readOnly: true,
                                             endAdornment: loadingSupportAmounts ? <CircularProgress size={20} /> : null
                                         }}
                                         sx={{ input: { fontWeight: 'bold', color: theme.primary } }}
-                                    />
-                                </Grid>
-                                <Grid item xs={6}>
-                                    <TextField
-                                        label="할부원금 (부가미유치)"
-                                        fullWidth
-                                        value={loadingSupportAmounts ? '로딩 중...' : (() => {
-                                            const support = formData.usePublicSupport ? publicSupport : 0;
-                                            const principal = calculateInstallmentPrincipalWithoutAddon(factoryPrice, support, calculateDynamicStoreSupport.withoutAddon, formData.usePublicSupport);
-                                            return isNaN(principal) ? 0 : principal;
-                                        })().toLocaleString()}
-                                        InputProps={{ 
-                                            readOnly: true,
-                                            endAdornment: loadingSupportAmounts ? <CircularProgress size={20} /> : null
-                                        }}
-                                        sx={{ input: { fontWeight: 'bold', color: theme.primary } }}
+                                        helperText={loadingSupportAmounts ? "계산 중..." : `부가서비스 선택 여부에 따라 자동 계산`}
                                     />
                                 </Grid>
                                 <Grid item xs={12}>

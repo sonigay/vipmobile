@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
     Box, Typography, CircularProgress, Alert, Paper, Table, TableBody, 
     TableCell, TableContainer, TableHead, TableRow, Button, Grid, Card, CardContent,
-    FormControlLabel, Switch
+    FormControlLabel, Switch, useMediaQuery, useTheme
 } from '@mui/material';
 import { Store as StoreIcon } from '@mui/icons-material';
 import Map from '../Map';
@@ -10,6 +10,8 @@ import { fetchData, customerAPI } from '../../api';
 import { directStoreApiClient } from '../../api/directStoreApiClient';
 
 const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfirm }) => {
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('md'));
     const [stores, setStores] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -175,7 +177,28 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
     }
 
     return (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, p: { xs: 1, sm: 2 } }}>
+        <Box sx={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: 3, 
+            p: { xs: 1, sm: 2 },
+            width: '100%',
+            minHeight: '100%',
+            pb: { xs: 4, sm: 4 } // 하단 여백 추가로 하단 내용이 잘리지 않도록
+        }}>
+            {/* 지도 설명 문구 - 지도 위쪽으로 이동 */}
+            <Box sx={{
+                bgcolor: 'rgba(76, 175, 80, 0.1)',
+                p: { xs: 1.5, sm: 2 },
+                borderRadius: 2,
+                borderLeft: '4px solid #4caf50',
+                flexShrink: 0
+            }}>
+                <Typography variant="body2" sx={{ fontWeight: 'medium', color: 'text.primary', fontSize: { xs: '0.875rem', sm: '1rem' } }}>
+                    고객님의 위치에서 가장 가까운 매장을 안내합니다.
+                </Typography>
+            </Box>
+
             {/* 지도 */}
             <Box sx={{ 
                 height: { xs: '300px', sm: '400px', md: '500px' }, 
@@ -189,24 +212,26 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                     height: '100%',
                     width: '100%',
                     minHeight: { xs: '300px', sm: '400px', md: '500px' }
+                },
+                // Leaflet zoom 컨트롤이 제대로 표시되고 작동하도록 스타일 조정
+                '& .leaflet-control-zoom': {
+                    zIndex: '2000 !important', // 다른 요소들보다 높게 설정
+                    pointerEvents: 'auto !important',
+                    position: 'relative' // z-index가 작동하도록
+                },
+                '& .leaflet-control-zoom-in, & .leaflet-control-zoom-out': {
+                    pointerEvents: 'auto !important',
+                    cursor: 'pointer',
+                    zIndex: '2000 !important',
+                    position: 'relative'
+                },
+                // Leaflet zoom 컨트롤이 클릭 가능하도록 보장
+                '& .leaflet-control-zoom a': {
+                    pointerEvents: 'auto !important',
+                    cursor: 'pointer !important',
+                    zIndex: '2000 !important'
                 }
             }}>
-                {/* 지도 설명 문구 */}
-                <Box sx={{
-                    position: 'absolute',
-                    top: 10,
-                    right: 10,
-                    zIndex: 1000,
-                    bgcolor: 'rgba(255,255,255,0.95)',
-                    p: 1.5,
-                    borderRadius: 1,
-                    boxShadow: 2,
-                    borderLeft: '4px solid #4caf50'
-                }}>
-                    <Typography variant="body2" sx={{ fontWeight: 'medium', color: 'text.primary' }}>
-                        고객님의 위치에서 가장 가까운 매장을 안내합니다.
-                    </Typography>
-                </Box>
                 {/* 대중교통 마커 토글 (왼쪽 하단으로 이동) */}
                 <Box sx={{
                     position: 'absolute',
@@ -216,7 +241,8 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                     bgcolor: 'rgba(255,255,255,0.95)',
                     p: 1,
                     borderRadius: 1,
-                    boxShadow: 2
+                    boxShadow: 2,
+                    pointerEvents: 'auto' // 이 요소만 클릭 가능
                 }}>
                     <FormControlLabel
                         control={
@@ -252,7 +278,8 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                         p: 1.5,
                         borderRadius: 1,
                         boxShadow: 2,
-                        borderLeft: '4px solid #1976d2'
+                        borderLeft: '4px solid #1976d2',
+                        pointerEvents: 'auto' // 이 요소만 클릭 가능
                     }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>선택된 모델</Typography>
                         <Typography variant="body2">{selectedProduct.petName} ({selectedProduct.model})</Typography>
@@ -263,14 +290,17 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
 
             {/* 선택된 매장 정보 (맵에서 클릭한 매장만 표시) */}
             {selectedStore ? (
-                <Box sx={{ flexShrink: 0 }}>
-                    <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Box sx={{ 
+                    flexShrink: 0
+                    // 스크롤은 부모 Box에서 처리하므로 여기서는 제거
+                }}>
+                    <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1, fontSize: { xs: '1rem', sm: '1.25rem' } }}>
                         <StoreIcon color="primary" />
                         매장 정보 - {selectedStore.name}
                     </Typography>
                     
                     <Card sx={{ boxShadow: 3 }}>
-                        <CardContent>
+                        <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
                             {/* 매장 기본 정보 */}
                             <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', color: 'primary.main' }}>
                                 {selectedStore.name || '-'}

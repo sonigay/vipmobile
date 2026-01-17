@@ -93,10 +93,15 @@ function PolicyInputModal({
     },
     // 부가추가지원정책 전용 필드
     addSupport: {
-      uplayPremiumAmount: '',      // 유플레이(프리미엄) 유치금액
+      uplayPremiumAmount: '',      // 통화편의+구글원패키지 유치금액 (기존: 유플레이(프리미엄))
       phoneExchangePassAmount: '', // 폰교체패스 유치금액
-      musicAmount: '',             // 음악감상 유치금액
-      numberFilteringAmount: ''    // 지정번호필터링 유치금액
+      musicAmount: '',             // 음악감상+벨링콘텐츠팩 유치금액 (기존: 음악감상)
+      numberFilteringAmount: '',   // 002알뜰10000 유치금액 (기존: 지정번호필터링)
+      // 대체상품 선택
+      uplayPremiumReplacement: '', // 통화편의+구글원패키지 대체상품
+      phoneExchangePassReplacement: '', // 폰교체패스 대체상품
+      musicReplacement: '',        // 음악감상+벨링콘텐츠팩 대체상품
+      numberFilteringReplacement: '' // 002알뜰10000 대체상품
     },
     supportConditionalOptions: {
       vas2Both: false,             // VAS 2종 동시유치
@@ -166,7 +171,11 @@ function PolicyInputModal({
             uplayPremiumAmount: '',
             phoneExchangePassAmount: '',
             musicAmount: '',
-            numberFilteringAmount: ''
+            numberFilteringAmount: '',
+            uplayPremiumReplacement: '',
+            phoneExchangePassReplacement: '',
+            musicReplacement: '',
+            numberFilteringReplacement: ''
           },
           supportConditionalOptions: policy.supportConditionalOptions || {
             vas2Both: false,
@@ -218,7 +227,35 @@ function PolicyInputModal({
             addServiceAcquired: false,
             insuranceAcquired: false,
             connectionAcquired: false
-          }
+          },
+          addSupport: {
+            uplayPremiumAmount: '',
+            phoneExchangePassAmount: '',
+            musicAmount: '',
+            numberFilteringAmount: '',
+            uplayPremiumReplacement: '',
+            phoneExchangePassReplacement: '',
+            musicReplacement: '',
+            numberFilteringReplacement: ''
+          },
+          supportConditionalOptions: {
+            vas2Both: false,
+            vas2Either: false,
+            addon3All: false
+          },
+          rateSupports: [],
+          unionSettlementStore: '',
+          unionTargetStores: [],
+          unionConditions: {
+            individualInput: false,
+            postSettlement: false
+          },
+          individualTarget: {
+            activationDate: new Date(),
+            customerName: '',
+            deviceSerial: ''
+          },
+          individualActivationType: ''
         });
       }
       setErrors({});
@@ -323,9 +360,9 @@ function PolicyInputModal({
       const supportItems = [];
       const supportAmounts = [];
       
-      // 유플레이(프리미엄) 유치금액
+      // 통화편의+구글원패키지 유치금액 (기존: 유플레이(프리미엄))
       if (formData.addSupport?.uplayPremiumAmount?.trim()) {
-        supportItems.push('📺 유플레이(프리미엄)');
+        supportItems.push('📺 통화편의+구글원패키지');
         supportAmounts.push(Number(formData.addSupport.uplayPremiumAmount));
       }
       
@@ -335,32 +372,100 @@ function PolicyInputModal({
         supportAmounts.push(Number(formData.addSupport.phoneExchangePassAmount));
       }
       
-      // 음악감상 유치금액
+      // 음악감상+벨링콘텐츠팩 유치금액 (기존: 음악감상)
       if (formData.addSupport?.musicAmount?.trim()) {
-        supportItems.push('🎵 음악감상');
+        supportItems.push('🎵 음악감상+벨링콘텐츠팩');
         supportAmounts.push(Number(formData.addSupport.musicAmount));
       }
       
-      // 지정번호필터링 유치금액
+      // 002알뜰10000 유치금액 (기존: 지정번호필터링)
       if (formData.addSupport?.numberFilteringAmount?.trim()) {
-        supportItems.push('🔢 지정번호필터링');
+        supportItems.push('🔢 002알뜰10000');
         supportAmounts.push(Number(formData.addSupport.numberFilteringAmount));
       }
       
       if (supportItems.length > 0) {
-        // 모든 금액이 동일한 경우 하나의 금액으로 표시
+        // 금액을 만원 단위로 변환하는 함수
+        const formatAmount = (amount) => {
+          if (amount >= 10000 && amount % 10000 === 0) {
+            return `[+${amount / 10000}만원]`;
+          }
+          return `[+${amount.toLocaleString()}원]`;
+        };
+        
+        // 모든 금액이 동일한 경우
         const uniqueAmounts = [...new Set(supportAmounts)];
-        const amountText = uniqueAmounts.length === 1 
-          ? `${uniqueAmounts[0].toLocaleString()}원`
-          : supportAmounts.map(amount => `${amount.toLocaleString()}원`).join('/');
+        let amountText;
+        
+        if (uniqueAmounts.length === 1) {
+          // 단일 금액인 경우
+          const singleAmount = uniqueAmounts[0];
+          const totalAmount = supportAmounts.reduce((sum, amount) => sum + amount, 0);
+          if (supportItems.length > 1) {
+            // 여러 상품이지만 금액이 모두 같은 경우: "각각 [+1만원], 모두 유치시 총[+3만원]"
+            amountText = `각각 ${formatAmount(singleAmount)}, 모두 유치시 총${formatAmount(totalAmount)}`;
+          } else {
+            // 단일 상품인 경우
+            amountText = formatAmount(singleAmount);
+          }
+        } else {
+          // 여러 금액인 경우: "각각 [+1만원], 모두 유치시 총[+3만원]" 형식
+          const individualAmounts = uniqueAmounts.map(formatAmount).join(', ');
+          const totalAmount = supportAmounts.reduce((sum, amount) => sum + amount, 0);
+          amountText = `각각 ${individualAmounts}, 모두 유치시 총${formatAmount(totalAmount)}`;
+        }
+        
+        // 대체상품 문구 생성
+        const replacementTexts = [];
+        
+        // 상품 이름 매핑
+        const productNames = {
+          'uplayPremium': '구글원패키지',
+          'phoneExchangePass': '폰교체패스',
+          'music': '음악감상+벨링콘텐츠팩',
+          'numberFiltering': '002알뜰10000'
+        };
+        
+        const replacementProductNames = {
+          'uplayPremium': '📺 통화편의+구글원패키지',
+          'phoneExchangePass': '📱 폰교체패스',
+          'music': '🎵 음악감상+벨링콘텐츠팩',
+          'numberFiltering': '🔢 002알뜰10000'
+        };
+        
+        // 각 상품별 대체상품 확인
+        if (formData.addSupport?.uplayPremiumAmount?.trim() && formData.addSupport?.uplayPremiumReplacement) {
+          const mainProduct = productNames['uplayPremium'];
+          const replacementProduct = replacementProductNames[formData.addSupport.uplayPremiumReplacement] || formData.addSupport.uplayPremiumReplacement;
+          replacementTexts.push(`${mainProduct} 불가시 ${replacementProduct}으로 추가정책 대체`);
+        }
+        if (formData.addSupport?.phoneExchangePassAmount?.trim() && formData.addSupport?.phoneExchangePassReplacement) {
+          const mainProduct = productNames['phoneExchangePass'];
+          const replacementProduct = replacementProductNames[formData.addSupport.phoneExchangePassReplacement] || formData.addSupport.phoneExchangePassReplacement;
+          replacementTexts.push(`${mainProduct} 불가시 ${replacementProduct}으로 추가정책 대체`);
+        }
+        if (formData.addSupport?.musicAmount?.trim() && formData.addSupport?.musicReplacement) {
+          const mainProduct = productNames['music'];
+          const replacementProduct = replacementProductNames[formData.addSupport.musicReplacement] || formData.addSupport.musicReplacement;
+          replacementTexts.push(`${mainProduct} 불가시 ${replacementProduct}으로 추가정책 대체`);
+        }
+        if (formData.addSupport?.numberFilteringAmount?.trim() && formData.addSupport?.numberFilteringReplacement) {
+          const mainProduct = productNames['numberFiltering'];
+          const replacementProduct = replacementProductNames[formData.addSupport.numberFilteringReplacement] || formData.addSupport.numberFilteringReplacement;
+          replacementTexts.push(`${mainProduct} 불가시 ${replacementProduct}으로 추가정책 대체`);
+        }
+        
+        const replacementText = replacementTexts.length > 0 
+          ? '\n⚠️ ' + replacementTexts.join('\n⚠️ ')
+          : '';
         
         let content;
         if (conditions.length > 0) {
           // 조건부가 있는 경우
-          content = `🎯 조건부: ${conditions.join(', ')}\n💰 ${supportItems.join('/')} ${amountText} 추가금액지원`;
+          content = `🎯 조건부: ${conditions.join(', ')}\n💰 ${supportItems.join('/')} ${amountText} 추가금액지원${replacementText}`;
         } else {
           // 조건부가 없는 경우 - 모든 추가지원 금액 표시
-          content = `💰 ${supportItems.join('/')} ${amountText} 추가금액지원`;
+          content = `💰 ${supportItems.join('/')} ${amountText} 추가금액지원${replacementText}`;
         }
         setFormData(prev => ({ ...prev, policyContent: content }));
       } else {
@@ -1374,9 +1479,12 @@ function PolicyInputModal({
                 <Typography variant="subtitle2" gutterBottom>
                   추가지원설정 *
                 </Typography>
-                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
+                <Grid container spacing={2} sx={{ mb: 2 }}>
+                  {/* 통화편의+구글원패키지 */}
+                  <Grid item xs={12} sm={6} md={3}>
                   <TextField
-                    label="유플레이(프리미엄) 유치금액"
+                      fullWidth
+                      label="📺 통화편의+구글원패키지 유치금액"
                     value={formData.addSupport?.uplayPremiumAmount || ''}
                     onChange={(e) => handleInputChange('addSupport', {
                       ...(formData.addSupport || {}),
@@ -1384,11 +1492,36 @@ function PolicyInputModal({
                     })}
                     type="number"
                     inputProps={{ min: 0 }}
-                    sx={{ width: 200 }}
                     placeholder="금액 입력"
                   />
+                    <FormControl fullWidth sx={{ mt: 1 }}>
+                      <InputLabel>대체상품 선택</InputLabel>
+                      <Select
+                        value={formData.addSupport?.uplayPremiumReplacement || ''}
+                        onChange={(e) => handleInputChange('addSupport', {
+                          ...(formData.addSupport || {}),
+                          uplayPremiumReplacement: e.target.value
+                        })}
+                        label="대체상품 선택"
+                      >
+                        <MenuItem value="">없음</MenuItem>
+                        <MenuItem value="phoneExchangePass">📱 폰교체패스</MenuItem>
+                        <MenuItem value="music">🎵 음악감상+벨링콘텐츠팩</MenuItem>
+                        <MenuItem value="numberFiltering">🔢 002알뜰10000</MenuItem>
+                      </Select>
+                    </FormControl>
+                    {formData.addSupport?.uplayPremiumReplacement && (
+                      <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                        해당상품 불가시 대체상품으로 적용됩니다
+                      </Typography>
+                    )}
+                  </Grid>
+
+                  {/* 폰교체패스 */}
+                  <Grid item xs={12} sm={6} md={3}>
                   <TextField
-                    label="폰교체패스 유치금액"
+                      fullWidth
+                      label="📱 폰교체패스 유치금액"
                     value={formData.addSupport?.phoneExchangePassAmount || ''}
                     onChange={(e) => handleInputChange('addSupport', {
                       ...(formData.addSupport || {}),
@@ -1396,11 +1529,36 @@ function PolicyInputModal({
                     })}
                     type="number"
                     inputProps={{ min: 0 }}
-                    sx={{ width: 200 }}
                     placeholder="금액 입력"
                   />
+                    <FormControl fullWidth sx={{ mt: 1 }}>
+                      <InputLabel>대체상품 선택</InputLabel>
+                      <Select
+                        value={formData.addSupport?.phoneExchangePassReplacement || ''}
+                        onChange={(e) => handleInputChange('addSupport', {
+                          ...(formData.addSupport || {}),
+                          phoneExchangePassReplacement: e.target.value
+                        })}
+                        label="대체상품 선택"
+                      >
+                        <MenuItem value="">없음</MenuItem>
+                        <MenuItem value="uplayPremium">📺 통화편의+구글원패키지</MenuItem>
+                        <MenuItem value="music">🎵 음악감상+벨링콘텐츠팩</MenuItem>
+                        <MenuItem value="numberFiltering">🔢 002알뜰10000</MenuItem>
+                      </Select>
+                    </FormControl>
+                    {formData.addSupport?.phoneExchangePassReplacement && (
+                      <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                        해당상품 불가시 대체상품으로 적용됩니다
+                      </Typography>
+                    )}
+                  </Grid>
+
+                  {/* 음악감상+벨링콘텐츠팩 */}
+                  <Grid item xs={12} sm={6} md={3}>
                   <TextField
-                    label="음악감상 유치금액"
+                      fullWidth
+                      label="🎵 음악감상+벨링콘텐츠팩 유치금액"
                     value={formData.addSupport?.musicAmount || ''}
                     onChange={(e) => handleInputChange('addSupport', {
                       ...(formData.addSupport || {}),
@@ -1408,11 +1566,36 @@ function PolicyInputModal({
                     })}
                     type="number"
                     inputProps={{ min: 0 }}
-                    sx={{ width: 200 }}
                     placeholder="금액 입력"
                   />
+                    <FormControl fullWidth sx={{ mt: 1 }}>
+                      <InputLabel>대체상품 선택</InputLabel>
+                      <Select
+                        value={formData.addSupport?.musicReplacement || ''}
+                        onChange={(e) => handleInputChange('addSupport', {
+                          ...(formData.addSupport || {}),
+                          musicReplacement: e.target.value
+                        })}
+                        label="대체상품 선택"
+                      >
+                        <MenuItem value="">없음</MenuItem>
+                        <MenuItem value="uplayPremium">📺 통화편의+구글원패키지</MenuItem>
+                        <MenuItem value="phoneExchangePass">📱 폰교체패스</MenuItem>
+                        <MenuItem value="numberFiltering">🔢 002알뜰10000</MenuItem>
+                      </Select>
+                    </FormControl>
+                    {formData.addSupport?.musicReplacement && (
+                      <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                        해당상품 불가시 대체상품으로 적용됩니다
+                      </Typography>
+                    )}
+                  </Grid>
+
+                  {/* 002알뜰10000 */}
+                  <Grid item xs={12} sm={6} md={3}>
                   <TextField
-                    label="지정번호필터링 유치금액"
+                      fullWidth
+                      label="🔢 002알뜰10000 유치금액"
                     value={formData.addSupport?.numberFilteringAmount || ''}
                     onChange={(e) => handleInputChange('addSupport', {
                       ...(formData.addSupport || {}),
@@ -1420,10 +1603,31 @@ function PolicyInputModal({
                     })}
                     type="number"
                     inputProps={{ min: 0 }}
-                    sx={{ width: 200 }}
                     placeholder="금액 입력"
                   />
-                </Box>
+                    <FormControl fullWidth sx={{ mt: 1 }}>
+                      <InputLabel>대체상품 선택</InputLabel>
+                      <Select
+                        value={formData.addSupport?.numberFilteringReplacement || ''}
+                        onChange={(e) => handleInputChange('addSupport', {
+                          ...(formData.addSupport || {}),
+                          numberFilteringReplacement: e.target.value
+                        })}
+                        label="대체상품 선택"
+                      >
+                        <MenuItem value="">없음</MenuItem>
+                        <MenuItem value="uplayPremium">📺 통화편의+구글원패키지</MenuItem>
+                        <MenuItem value="phoneExchangePass">📱 폰교체패스</MenuItem>
+                        <MenuItem value="music">🎵 음악감상+벨링콘텐츠팩</MenuItem>
+                      </Select>
+                    </FormControl>
+                    {formData.addSupport?.numberFilteringReplacement && (
+                      <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                        해당상품 불가시 대체상품으로 적용됩니다
+                      </Typography>
+                    )}
+                  </Grid>
+                </Grid>
                 {errors.addSupport && (
                   <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
                     {errors.addSupport}

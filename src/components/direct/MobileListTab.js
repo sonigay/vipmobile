@@ -24,7 +24,9 @@ import {
   ListItemText,
   ListItemIcon,
   Autocomplete,
-  TextField
+  TextField,
+  useMediaQuery,
+  useTheme
 } from '@mui/material';
 import {
   PhotoCamera as PhotoCameraIcon,
@@ -45,7 +47,9 @@ import { MobileListRow } from './MobileListRow';
 import { debugLog } from '../../utils/debugLogger';
 
 const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
-  const [carrierTab, setCarrierTab] = useState(0); // 0: SK, 1: KT, 2: LG
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const [carrierTab, setCarrierTab] = useState(0); // 0: LG, 1: KT, 2: SK
   const [mobileList, setMobileList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -66,6 +70,9 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
   const pricingDataRef = useRef(new Map()); // Key: modelId-planGroup-openingType -> PriceData
   const userSelectedOpeningTypesRef = useRef(new Set()); // 사용자가 수동으로 선택한 개통유형 추적
   const initializedRef = useRef(false);
+  const headerScrollRef = useRef(null); // 헤더 스크롤 컨테이너 ref
+  const bodyScrollRef = useRef(null); // 본문 스크롤 컨테이너 ref
+  const isScrollingRef = useRef(false); // 스크롤 동기화 중 플래그
 
   // 개통 유형 목록 (고정)
   const openingTypes = ['010신규', 'MNP', '기변'];
@@ -80,10 +87,10 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
 
   const getCurrentCarrier = useCallback(() => {
     switch (carrierTab) {
-      case 0: return 'SK';
+      case 0: return 'LG';
       case 1: return 'KT';
-      case 2: return 'LG';
-      default: return 'SK';
+      case 2: return 'SK';
+      default: return 'LG';
     }
   }, [carrierTab]);
 
@@ -302,16 +309,16 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
 
     // 모든 모델의 calculatedPrices 재계산
     const newCalculated = {};
-    
+
     mobileList.forEach(mobile => {
       const modelId = mobile.id;
       const planGroup = selectedPlanGroups[modelId] || '115군';
       const openingType = selectedOpeningTypes[modelId] || 'MNP';
-      
+
       // lookupPrice로 최신 가격 계산
       const priceObj = lookupPrice(modelId, planGroup, openingType);
       const key = `${modelId}-${openingType}`;
-      
+
       newCalculated[key] = priceObj;
     });
 
@@ -322,7 +329,7 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
         const oldValue = prev[key];
         const newValue = newCalculated[key];
         if (!oldValue) return true;
-        
+
         // 주요 필드 비교
         return (
           oldValue.purchasePriceWithAddon !== newValue.purchasePriceWithAddon ||
@@ -337,7 +344,7 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
         console.log('🔄 [가격 재계산] mobileList 변경으로 인한 가격 자동 재계산');
         return { ...prev, ...newCalculated };
       }
-      
+
       return prev;
     });
   }, [mobileList, selectedPlanGroups, selectedOpeningTypes, lookupPrice]);
@@ -360,11 +367,11 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
     // 캐시 무효화 후 즉시 재로딩하면 Rate Limit이나 불완전한 데이터가 반환될 수 있음
     const reloadWithRetry = async (retryCount = 0, maxRetries = 3) => {
       const delay = retryCount === 0 ? 1000 : 2000; // 첫 시도는 1초, 재시도는 2초
-      
+
       setTimeout(async () => {
         try {
           console.log(`🔄 [휴대폰목록] 최신 데이터 재로딩 시도 ${retryCount + 1}/${maxRetries + 1}...`);
-          
+
           // 🔥 핵심 수정: 초기 로드와 동일한 방식으로 데이터 가져오기
           // getMobileList는 id 형식이 다르고 이미 계산된 가격이 포함되어 있어서
           // 초기 로드와 동일하게 getMobilesMaster, getMobilesPricing, getPlansMaster를 사용
@@ -373,10 +380,10 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
             directStoreApiClient.getMobilesPricing(carrier),
             directStoreApiClient.getPlansMaster(carrier)
           ]);
-          
+
           // 요금제군 목록 추출
           const uniqueGroups = [...new Set(plans.map(p => p.planGroup))].filter(Boolean);
-          
+
           // 가격 정책 데이터 인덱싱 (Lookup Map 생성)
           const priceMap = new Map();
           pricing.forEach(p => {
@@ -385,35 +392,35 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
           });
           pricingDataRef.current = priceMap;
           console.log('🔄 [휴대폰목록] 가격 정책 데이터 업데이트 완료');
-          
+
           // 초기 로드와 동일한 방식으로 mobileList 생성
           const newSelectedPlans = {};
           const newSelectedTypes = {};
           const newCalculated = {};
-          
+
           const modList = mobiles.map(m => {
             // 기본값 결정
             let defPlan = '115군';
             if (m.isBudget && !m.isPremium) defPlan = '33군';
             if (!uniqueGroups.includes(defPlan) && uniqueGroups.length > 0) defPlan = uniqueGroups[0];
-            
+
             const defType = 'MNP';
-            
+
             // 상태 저장
             newSelectedPlans[m.modelId] = defPlan;
             newSelectedTypes[m.modelId] = defType;
-            
+
             // 초기 가격 Lookup
             const priceKey = `${m.modelId}-${defPlan}-${defType}`;
             const priceData = priceMap.get(priceKey);
-            
+
             let publicSupport = 0;
-            
+
             if (priceData) {
               publicSupport = priceData.publicSupport || 0;
               const storeSupportWith = priceData.storeSupportWithAddon || 0;
               const storeSupportWithout = priceData.storeSupportWithoutAddon || 0;
-              
+
               // calculatedPrices 초기화
               newCalculated[`${m.modelId}-${defType}`] = {
                 storeSupportWithAddon: storeSupportWith,
@@ -434,7 +441,7 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                 openingType: defType
               };
             }
-            
+
             // Mobile object mapping (초기 로드와 동일한 구조)
             return {
               id: m.modelId, // ID 매핑 (초기 로드와 동일)
@@ -452,12 +459,12 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
               support: publicSupport
             };
           });
-          
+
           // 업로드한 이미지가 포함되어 있는지 확인
-          const hasNewImage = modList.some(item => 
+          const hasNewImage = modList.some(item =>
             (item.id === modelId || item.model === modelId) && item.image === imageUrl
           );
-          
+
           if (hasNewImage || retryCount >= maxRetries) {
             // 상태 일괄 업데이트 (초기 로드와 동일)
             setMobileList(modList);
@@ -482,7 +489,7 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
         }
       }, delay);
     };
-    
+
     reloadWithRetry();
   }, []);
 
@@ -508,21 +515,21 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
         // 서버에서 최신 데이터 재로딩 (재시도 로직 포함)
         const reloadWithRetry = async (retryCount = 0, maxRetries = 3) => {
           const delay = retryCount === 0 ? 1000 : 2000; // 첫 시도는 1초, 재시도는 2초
-          
+
           setTimeout(async () => {
             try {
               console.log(`🔄 [휴대폰목록] 다른 페이지 업로드 후 최신 데이터 재로딩 시도 ${retryCount + 1}/${maxRetries + 1}...`);
-              
+
               // 🔥 핵심 수정: 초기 로드와 동일한 방식으로 데이터 가져오기
               const [mobiles, pricing, plans] = await Promise.all([
                 directStoreApiClient.getMobilesMaster(currentCarrier),
                 directStoreApiClient.getMobilesPricing(currentCarrier),
                 directStoreApiClient.getPlansMaster(currentCarrier)
               ]);
-              
+
               // 요금제군 목록 추출
               const uniqueGroups = [...new Set(plans.map(p => p.planGroup))].filter(Boolean);
-              
+
               // 가격 정책 데이터 인덱싱 (Lookup Map 생성)
               const priceMap = new Map();
               pricing.forEach(p => {
@@ -531,35 +538,35 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
               });
               pricingDataRef.current = priceMap;
               console.log('🔄 [휴대폰목록] 가격 정책 데이터 업데이트 완료');
-              
+
               // 초기 로드와 동일한 방식으로 mobileList 생성
               const newSelectedPlans = {};
               const newSelectedTypes = {};
               const newCalculated = {};
-              
+
               const modList = mobiles.map(m => {
                 // 기본값 결정
                 let defPlan = '115군';
                 if (m.isBudget && !m.isPremium) defPlan = '33군';
                 if (!uniqueGroups.includes(defPlan) && uniqueGroups.length > 0) defPlan = uniqueGroups[0];
-                
+
                 const defType = 'MNP';
-                
+
                 // 상태 저장
                 newSelectedPlans[m.modelId] = defPlan;
                 newSelectedTypes[m.modelId] = defType;
-                
+
                 // 초기 가격 Lookup
                 const priceKey = `${m.modelId}-${defPlan}-${defType}`;
                 const priceData = priceMap.get(priceKey);
-                
+
                 let publicSupport = 0;
-                
+
                 if (priceData) {
                   publicSupport = priceData.publicSupport || 0;
                   const storeSupportWith = priceData.storeSupportWithAddon || 0;
                   const storeSupportWithout = priceData.storeSupportWithoutAddon || 0;
-                  
+
                   // calculatedPrices 초기화
                   newCalculated[`${m.modelId}-${defType}`] = {
                     storeSupportWithAddon: storeSupportWith,
@@ -580,7 +587,7 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                     openingType: defType
                   };
                 }
-                
+
                 // Mobile object mapping (초기 로드와 동일한 구조)
                 return {
                   id: m.modelId, // ID 매핑 (초기 로드와 동일)
@@ -598,12 +605,12 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                   support: publicSupport
                 };
               });
-              
+
               // 업로드한 이미지가 포함되어 있는지 확인
-              const hasNewImage = modList.some(item => 
+              const hasNewImage = modList.some(item =>
                 (item.id === modelId || item.model === modelId) && item.image === imageUrl
               );
-              
+
               if (hasNewImage || retryCount >= maxRetries) {
                 // 상태 일괄 업데이트 (초기 로드와 동일)
                 setMobileList(modList);
@@ -628,7 +635,7 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
             }
           }, delay);
         };
-        
+
         reloadWithRetry();
       }
     };
@@ -823,53 +830,186 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
   // 🔥 핵심 수정: calculatedPrices 대신 lookupPrice를 직접 호출하여 항상 최신 factoryPrice 사용
   const getDisplayValue = useCallback((row, field, selectedOpeningType = null) => {
     // openingType이 null이면 기본값 'MNP' 사용
-    const openingType = selectedOpeningType || selectedOpeningTypes[row.id] || 'MNP';
+    let openingType = selectedOpeningType || selectedOpeningTypes[row.id] || 'MNP';
     const planGroup = selectedPlanGroups[row.id] || '115군';
-    
+
+    // 🔥 수정: 이통사지원금(publicSupport)만 "010신규/기변" 변환 적용
+    // 대리점지원금은 "010신규", "MNP", "기변"으로 각각 별도 저장되어 있으므로 변환 불필요
+    const isPublicSupport = field === 'publicSupport' || field === 'support';
+    if (isPublicSupport && (openingType === '010신규' || openingType === '기변')) {
+      // 이통사지원금의 경우 "010신규"나 "기변"을 "010신규/기변"으로 변환하여 조회
+      openingType = '010신규/기변';
+    }
+
     // 🔥 핵심 수정: lookupPrice를 직접 호출하여 항상 최신 factoryPrice로 계산
     // 이렇게 하면 mobileList가 변경되어도 항상 최신 가격이 표시됨
     const calculated = lookupPrice(row.id, planGroup, openingType);
 
     // 계산된 값이 있고, 해당 필드가 존재하면 사용
-    // 단, 대리점지원금의 경우 0이면 fallback 사용 (0은 유효하지 않은 값으로 간주)
+    // 🔥 수정: 대리점지원금의 경우 0도 유효한 값으로 간주 (마스터 데이터에 0으로 저장된 경우)
     if (calculated && calculated[field] !== undefined) {
-      // 대리점지원금 필드이고 값이 0이면 fallback 사용
-      if ((field === 'storeSupportWithAddon' || field === 'storeSupportWithoutAddon') && calculated[field] === 0) {
-        return row[field];
-      }
-      // openingType이 일치하는지 확인
-      const normalizedCalculatedOpeningType = calculated.openingType === '010신규/기변'
-        ? (openingType === '010신규' || openingType === '기변' ? '010신규/기변' : calculated.openingType)
-        : calculated.openingType;
-      const normalizedOpeningType = (openingType === '010신규' || openingType === '기변')
-        ? '010신규/기변'
-        : openingType;
-
-      if (calculated.openingType && normalizedCalculatedOpeningType !== normalizedOpeningType) {
+      // 이통사지원금의 경우: "010신규/기변"으로 조회했으므로 openingType 비교는 생략
+      // 대리점지원금의 경우: 원래 openingType과 일치하는지 확인
+      if (!isPublicSupport && calculated.openingType && calculated.openingType !== (selectedOpeningType || selectedOpeningTypes[row.id] || 'MNP')) {
         // openingType이 일치하지 않으면 row 값 반환
         return row[field];
       }
+      // 🔥 수정: 0도 유효한 값으로 반환 (마스터 데이터에 명시적으로 0으로 저장된 경우)
       return calculated[field];
     }
     return row[field];
   }, [selectedOpeningTypes, selectedPlanGroups, lookupPrice]);
 
-  return (
-    <Box sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
+  // 모바일에서 헤더와 본문의 가로 스크롤 동기화 (고객모드에서는 헤더 스크롤 숨김으로 동기화 불필요)
+  useEffect(() => {
+    if (!isMobile || !headerScrollRef.current || !bodyScrollRef.current || isCustomerMode) return;
 
-      <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', color: 'text.primary' }}>
+    const headerContainer = headerScrollRef.current;
+    const bodyContainer = bodyScrollRef.current;
+
+    const syncHeaderScroll = () => {
+      if (isScrollingRef.current) return;
+      isScrollingRef.current = true;
+      headerContainer.scrollLeft = bodyContainer.scrollLeft;
+      requestAnimationFrame(() => {
+        isScrollingRef.current = false;
+      });
+    };
+
+    const syncBodyScroll = () => {
+      if (isScrollingRef.current) return;
+      isScrollingRef.current = true;
+      bodyContainer.scrollLeft = headerContainer.scrollLeft;
+      requestAnimationFrame(() => {
+        isScrollingRef.current = false;
+      });
+    };
+
+    bodyContainer.addEventListener('scroll', syncHeaderScroll);
+    headerContainer.addEventListener('scroll', syncBodyScroll);
+
+    return () => {
+      bodyContainer.removeEventListener('scroll', syncHeaderScroll);
+      headerContainer.removeEventListener('scroll', syncBodyScroll);
+    };
+  }, [isMobile, mobileList.length]); // mobileList.length가 변경되면 재설정
+
+  return (
+    <Box sx={{ 
+      p: { xs: 1, sm: 2, md: 3 }, 
+      height: '100%', 
+      display: 'flex', 
+      flexDirection: 'column', 
+      overflow: 'hidden', 
+      position: 'relative',
+      // 모바일에서 높이 제한
+      ...(isMobile && {
+        height: '100%',
+        maxHeight: '100%',
+        minHeight: 0
+      })
+    }}>
+
+      <Typography 
+        variant="h5" 
+        gutterBottom 
+        sx={{ 
+          fontWeight: 'bold', 
+          color: 'text.primary',
+          fontSize: { xs: '1.25rem', sm: '1.5rem' },
+          mb: { xs: 1, sm: 2 }
+        }}
+      >
         {isCustomerMode ? '실시간 휴대폰 시세표' : '휴대폰시세표'}
       </Typography>
 
-      {/* 로딩 단계 표시 (관리자 모드에서만 표시) */}
-      {!isCustomerMode && (
-        <Box sx={{ mb: 2, display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
-          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-            {Object.entries(steps).map(([key, step]) => (
+      {/* 통신사 탭 및 컬럼 헤더 - 고정 */}
+      <Paper 
+        sx={{ 
+          mb: 0, 
+          p: { xs: 1, sm: 2 }, 
+          bgcolor: 'background.paper', 
+          borderRadius: 0,
+          position: 'sticky',
+          top: 0,
+          zIndex: 20,
+          boxShadow: 2,
+          flexShrink: 0,
+          // 모바일에서 헤더 높이 최적화
+          ...(isMobile && {
+            p: 1,
+            mb: 0
+          })
+        }}
+      >
+        <Box sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          mb: { xs: 1, sm: 2 },
+          flexWrap: { xs: 'wrap', sm: 'nowrap' },
+          gap: { xs: 1, sm: 0 }
+        }}>
+          <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+            <Tabs
+              value={carrierTab}
+              onChange={handleCarrierChange}
+              variant="scrollable"
+              scrollButtons="auto"
+              indicatorColor="primary"
+              textColor="primary"
+              sx={{
+                '& .MuiTab-root': {
+                  fontWeight: 'bold',
+                  fontSize: { xs: '0.875rem', sm: '1rem', md: '1.1rem' },
+                  minWidth: { xs: 'auto', sm: 'auto' },
+                  px: { xs: 1, sm: 2 }
+                },
+                '& .Mui-selected': {
+                  bgcolor: 'rgba(212, 175, 55, 0.05)'
+                }
+              }}
+            >
+              <Tab label="LG U+" sx={{ color: '#ec008c' }} />
+              <Tab label="KT" sx={{ color: '#00abc7' }} />
+              <Tab label="SK Telecom" sx={{ color: '#e60012' }} />
+            </Tabs>
+          </Box>
+
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={handleReload}
+            startIcon={<RefreshIcon />}
+            disabled={loading}
+            sx={{ 
+              ml: { xs: 0, sm: 2 },
+              mt: { xs: 1, sm: 0 },
+              fontSize: { xs: '0.75rem', sm: '0.875rem' },
+              minWidth: { xs: 'auto', sm: 'auto' },
+              px: { xs: 1, sm: 2 }
+            }}
+          >
+            새로고침
+          </Button>
+        </Box>
+
+        {/* 상태 단계 표시 */}
+        {loading && (
+          <Box sx={{ 
+            display: 'flex', 
+            gap: { xs: 0.5, sm: 1 }, 
+            mb: { xs: 1, sm: 2 },
+            flexWrap: 'wrap'
+          }}>
+            {Object.values(steps).map((step, index) => (
               <Chip
-                key={key}
+                key={index}
                 label={`${step.label}${step.message ? `: ${step.message}` : ''}`}
                 size="small"
+                sx={{
+                  fontSize: { xs: '0.625rem', sm: '0.75rem' },
+                  height: { xs: '24px', sm: '32px' }
+                }}
                 color={
                   step.status === 'success' ? 'success' :
                     step.status === 'loading' ? 'info' :
@@ -880,42 +1020,178 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
               />
             ))}
           </Box>
-          <Button
-            variant="outlined"
-            size="small"
-            onClick={handleReload}
-            startIcon={<RefreshIcon />}
-            disabled={loading}
-            sx={{ ml: 'auto' }}
-          >
-            새로고침
-          </Button>
-        </Box>
-      )}
+        )}
 
-      {/* 통신사 탭 */}
-      <Paper sx={{ mb: 3, borderRadius: 2, overflow: 'hidden' }}>
-        <Tabs
-          value={carrierTab}
-          onChange={handleCarrierChange}
-          variant="fullWidth"
-          indicatorColor="primary"
-          textColor="primary"
-          sx={{
-            '& .MuiTab-root': {
-              fontWeight: 'bold',
-              fontSize: '1.1rem',
-              py: 2
-            },
-            '& .Mui-selected': {
-              bgcolor: 'rgba(212, 175, 55, 0.05)'
-            }
+        {/* 컬럼 헤더 */}
+        <TableContainer 
+          ref={headerScrollRef}
+          sx={{ 
+            overflowX: isCustomerMode ? 'hidden' : 'auto', // 고객모드에서는 헤더 스크롤 숨김
+            overflowY: 'hidden',
+            width: '100%',
+            // 모바일에서 터치 스크롤 최적화
+            WebkitOverflowScrolling: 'touch',
+            // 모바일에서 헤더 스크롤 방지 (본문과 동기화를 위해)
+            ...(isMobile && {
+              position: 'relative',
+              overflowX: isCustomerMode ? 'hidden' : 'auto', // 고객모드에서는 헤더 스크롤 숨김
+              '&::-webkit-scrollbar': {
+                height: '4px',
+                display: isCustomerMode ? 'none' : 'block' // 고객모드에서는 스크롤바 숨김
+              },
+              '&::-webkit-scrollbar-thumb': {
+                backgroundColor: 'rgba(0,0,0,0.2)',
+                borderRadius: '2px'
+              }
+            })
           }}
         >
-          <Tab label="SK Telecom" sx={{ color: '#e60012' }} />
-          <Tab label="KT" sx={{ color: '#00abc7' }} />
-          <Tab label="LG U+" sx={{ color: '#ec008c' }} />
-        </Tabs>
+          <Table sx={{ 
+            width: '100%',
+            minWidth: { xs: '800px', sm: '100%' }, // 모바일에서 최소 너비 보장
+            tableLayout: 'fixed',
+            borderCollapse: 'separate', 
+            borderSpacing: 0 
+          }}>
+            <TableHead>
+              <TableRow>
+                {!isCustomerMode && (
+                  <ModernTableCell
+                    align="center"
+                    sx={{
+                      width: '120px',
+                      backgroundColor: 'background.paper',
+                      fontWeight: 'bold',
+                      borderBottom: '2px solid',
+                      borderColor: 'divider'
+                    }}
+                  >
+                    구분
+                  </ModernTableCell>
+                )}
+                <ModernTableCell
+                  align="center"
+                  sx={{
+                    width: '100px',
+                    backgroundColor: 'background.paper',
+                    fontWeight: 'bold',
+                    borderBottom: '2px solid',
+                    borderColor: 'divider'
+                  }}
+                >
+                  이미지
+                </ModernTableCell>
+                <ModernTableCell
+                  align="center"
+                  sx={{
+                    width: '220px',
+                    backgroundColor: 'background.paper',
+                    fontWeight: 'bold',
+                    borderBottom: '2px solid',
+                    borderColor: 'divider',
+                    // 고객모드에서는 틀고정 완전히 제거
+                    ...(isCustomerMode ? {
+                      position: 'static', // 명시적으로 static으로 설정
+                      left: 'auto',
+                      zIndex: 'auto'
+                    } : {
+                      position: 'sticky',
+                      left: '220px',
+                      zIndex: 3
+                    })
+                  }}
+                >
+                  모델명 / 펫네임
+                </ModernTableCell>
+                <ModernTableCell
+                  align="center"
+                  sx={{
+                    width: '120px',
+                    backgroundColor: 'background.paper',
+                    fontWeight: 'bold',
+                    borderBottom: '2px solid',
+                    borderColor: 'divider'
+                  }}
+                >
+                  요금제군
+                </ModernTableCell>
+                <ModernTableCell
+                  align="center"
+                  sx={{
+                    width: '100px',
+                    backgroundColor: 'background.paper',
+                    fontWeight: 'bold',
+                    borderBottom: '2px solid',
+                    borderColor: 'divider'
+                  }}
+                >
+                  유형
+                </ModernTableCell>
+                <ModernTableCell
+                  align="center"
+                  sx={{
+                    width: '100px',
+                    backgroundColor: 'background.paper',
+                    fontWeight: 'bold',
+                    borderBottom: '2px solid',
+                    borderColor: 'divider'
+                  }}
+                >
+                  출고가
+                </ModernTableCell>
+                <ModernTableCell
+                  align="center"
+                  sx={{
+                    width: '100px',
+                    backgroundColor: 'background.paper',
+                    fontWeight: 'bold',
+                    borderBottom: '2px solid',
+                    borderColor: 'divider'
+                  }}
+                >
+                  이통사지원금
+                </ModernTableCell>
+                <ModernTableCell
+                  align="center"
+                  colSpan={2}
+                  sx={{
+                    width: '180px',
+                    borderLeft: '1px solid rgba(81, 81, 81, 0.5)',
+                    backgroundColor: 'background.paper',
+                    fontWeight: 'bold',
+                    borderBottom: '2px solid',
+                    borderColor: 'divider'
+                  }}
+                >
+                  대리점 지원금
+                  <Box sx={{ display: 'flex', justifyContent: 'space-around', fontSize: '0.75rem', color: 'text.secondary', mt: 0.5 }}>
+                    <span>부가유치</span>
+                    <span>미유치</span>
+                  </Box>
+                </ModernTableCell>
+                <ModernTableCell
+                  align="center"
+                  colSpan={2}
+                  sx={{
+                    width: '180px',
+                    borderLeft: '1px solid rgba(81, 81, 81, 0.5)',
+                    bgcolor: 'rgba(212, 175, 55, 0.1)',
+                    backgroundColor: 'rgba(212, 175, 55, 0.1)',
+                    fontWeight: 'bold',
+                    borderBottom: '2px solid',
+                    borderColor: 'divider'
+                  }}
+                >
+                  구매가 (할부원금)
+                  <Box sx={{ display: 'flex', justifyContent: 'space-around', fontSize: '0.75rem', color: 'text.secondary', mt: 0.5 }}>
+                    <span>부가유치</span>
+                    <span>미유치</span>
+                  </Box>
+                </ModernTableCell>
+              </TableRow>
+            </TableHead>
+          </Table>
+        </TableContainer>
       </Paper>
 
       {/* 에러 메시지 */}
@@ -931,70 +1207,108 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
       ) : (
         <>
           {/* 상품 테이블 */}
-          <TableContainer component={Paper} sx={{ flexGrow: 1, overflowX: 'auto', maxWidth: '100%' }}>
-            <Table stickyHeader sx={{ minWidth: 1000 }}>
-            <TableHead>
-              <TableRow>
-                {!isCustomerMode && <ModernTableCell align="center" width="120">구분</ModernTableCell>}
-                <ModernTableCell align="center" width="100">이미지</ModernTableCell>
-                <ModernTableCell align="center" width="220">모델명 / 펫네임</ModernTableCell>
-                <ModernTableCell align="center" width="120">요금제군</ModernTableCell>
-                <ModernTableCell align="center" width="100">유형</ModernTableCell>
-                <ModernTableCell align="center" width="100">출고가</ModernTableCell>
-                <ModernTableCell align="center" width="100">이통사지원금</ModernTableCell>
-                <ModernTableCell align="center" colSpan={2} width="180" sx={{ borderLeft: '1px solid rgba(81, 81, 81, 0.5)' }}>
-                  대리점 지원금
-                  <Box sx={{ display: 'flex', justifyContent: 'space-around', fontSize: '0.75rem', color: 'text.secondary', mt: 0.5 }}>
-                    <span>부가유치</span>
-                    <span>미유치</span>
-                  </Box>
-                </ModernTableCell>
-                <ModernTableCell align="center" colSpan={2} width="180" sx={{ borderLeft: '1px solid rgba(81, 81, 81, 0.5)', bgcolor: 'rgba(212, 175, 55, 0.1)' }}>
-                  구매가 (할부원금)
-                  <Box sx={{ display: 'flex', justifyContent: 'space-around', fontSize: '0.75rem', color: 'text.secondary', mt: 0.5 }}>
-                    <span>부가유치</span>
-                    <span>미유치</span>
-                  </Box>
-                </ModernTableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {mobileList.length === 0 ? (
-                <EmptyTableRow colSpan={11} message="표시할 데이터가 없습니다." />
-              ) : (
-                mobileList.map((row) => {
-                  // 🔥 성능 최적화: openingType과 calculatedPrice 계산 최적화
-                  const openingType = selectedOpeningTypes[row.id] || 'MNP';
-                  const priceKey = `${row.id}-${openingType}`;
-                  const calculatedPrice = calculatedPrices[priceKey] || null;
-
-                  return (
-                    <MobileListRow
-                      key={row.id}
-                      row={row}
-                      planGroups={planGroups}
-                      openingTypes={openingTypes}
-                      selectedPlanGroup={selectedPlanGroups[row.id] || null}
-                      selectedOpeningType={openingType}
-                      calculatedPrice={calculatedPrice}
-                      tagMenuAnchor={tagMenuAnchor}
-                      onRowClick={handleRowClick}
-                      onTagMenuOpen={handleTagMenuOpen}
-                      onTagMenuClose={handleTagMenuClose}
-                      onTagChange={handleTagChange}
-                      onPlanGroupChange={handlePlanGroupChange}
-                      onOpeningTypeChange={handleOpeningTypeChange}
-                      onImageUploadSuccess={handleImageUploadSuccess}
-                      getSelectedTags={getSelectedTags}
-                      getDisplayValue={getDisplayValue}
-                      isCustomerMode={isCustomerMode}
-                    />
-                  );
+          <Paper
+            sx={{
+              flexGrow: 1,
+              maxWidth: '100%',
+              bgcolor: 'background.paper',
+              boxShadow: 1,
+              borderRadius: 2,
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              minHeight: 0, // flexbox에서 스크롤을 위해 필요
+              // 모바일에서 높이 제한
+              ...(isMobile && {
+                flex: '1 1 auto',
+                minHeight: 0,
+                height: '100%'
+              })
+            }}
+          >
+            <TableContainer
+              ref={bodyScrollRef}
+              sx={{
+                flexGrow: 1,
+                overflowX: 'auto',
+                overflowY: 'auto',
+                maxWidth: '100%',
+                width: '100%',
+                position: 'relative',
+                minHeight: 0, // flexbox에서 스크롤을 위해 필요
+                // 모바일에서 터치 스크롤 최적화
+                WebkitOverflowScrolling: 'touch',
+                // 모바일에서 동적 높이 계산
+                ...(isMobile ? {
+                  flex: '1 1 auto',
+                  height: '100%',
+                  maxHeight: '100%',
+                  // 고객모드일 때는 더 많은 공간 확보
+                  ...(isCustomerMode && {
+                    height: 'calc(100vh - 280px)',
+                    maxHeight: 'calc(100vh - 280px)'
+                  }),
+                  // 모바일에서 스크롤바 스타일
+                  '&::-webkit-scrollbar': {
+                    width: '4px',
+                    height: '4px'
+                  },
+                  '&::-webkit-scrollbar-thumb': {
+                    backgroundColor: 'rgba(0,0,0,0.2)',
+                    borderRadius: '2px'
+                  }
+                } : {
+                  // PC에서는 기존 높이 계산 유지
+                  height: { xs: 'calc(100vh - 400px)', sm: 'calc(100vh - 350px)', md: 'calc(100vh - 300px)' },
+                  maxHeight: { xs: 'calc(100vh - 400px)', sm: 'calc(100vh - 350px)', md: 'calc(100vh - 300px)' }
                 })
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
+              }}
+            >
+              <Table sx={{ 
+                width: '100%',
+                minWidth: { xs: '800px', sm: '100%' }, // 모바일에서 최소 너비 보장 (헤더와 동일)
+                tableLayout: 'fixed',
+                borderCollapse: 'separate', 
+                borderSpacing: 0 
+              }}>
+              <TableBody>
+                {mobileList.length === 0 ? (
+                  <EmptyTableRow colSpan={11} message="표시할 데이터가 없습니다." />
+                ) : (
+                  mobileList.map((row) => {
+                    // 🔥 성능 최적화: openingType과 calculatedPrice 계산 최적화
+                    const openingType = selectedOpeningTypes[row.id] || 'MNP';
+                    const priceKey = `${row.id}-${openingType}`;
+                    const calculatedPrice = calculatedPrices[priceKey] || null;
+
+                    return (
+                      <MobileListRow
+                        key={row.id}
+                        row={row}
+                        planGroups={planGroups}
+                        openingTypes={openingTypes}
+                        selectedPlanGroup={selectedPlanGroups[row.id] || null}
+                        selectedOpeningType={openingType}
+                        calculatedPrice={calculatedPrice}
+                        tagMenuAnchor={tagMenuAnchor}
+                        onRowClick={handleRowClick}
+                        onTagMenuOpen={handleTagMenuOpen}
+                        onTagMenuClose={handleTagMenuClose}
+                        onTagChange={handleTagChange}
+                        onPlanGroupChange={handlePlanGroupChange}
+                        onOpeningTypeChange={handleOpeningTypeChange}
+                        onImageUploadSuccess={handleImageUploadSuccess}
+                        getSelectedTags={getSelectedTags}
+                        getDisplayValue={getDisplayValue}
+                        isCustomerMode={isCustomerMode}
+                      />
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+            </TableContainer>
+          </Paper>
         </>
       )}
     </Box>

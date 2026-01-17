@@ -65,7 +65,18 @@ const MobileListRowComponent = ({
       onClick={() => onRowClick(row)}
     >
       {!isCustomerMode && (
-        <TableCell align="center" onClick={(e) => e.stopPropagation()}>
+        <TableCell 
+          align="center" 
+          onClick={(e) => e.stopPropagation()}
+          sx={{
+            width: '120px',
+            position: 'sticky',
+            left: 0,
+            zIndex: 3,
+            backgroundColor: 'background.paper',
+            boxShadow: '2px 0 4px rgba(0,0,0,0.1)'
+          }}
+        >
           <Button
             variant="outlined"
             size="small"
@@ -160,7 +171,23 @@ const MobileListRowComponent = ({
         </TableCell>
       )}
 
-      <TableCell align="center" onClick={(e) => e.stopPropagation()}>
+      <TableCell 
+        align="center" 
+        onClick={(e) => e.stopPropagation()}
+        sx={{
+          width: '100px',
+          // 직영점 모드에서는 이미지 컬럼을 틀고정, 고객모드(특히 좁은 화면)에서는 틀고정을 제거
+          ...(isCustomerMode
+            ? {}
+            : {
+                position: 'sticky',
+                left: '120px',
+                zIndex: 3,
+                backgroundColor: 'background.paper',
+                boxShadow: '2px 0 4px rgba(0,0,0,0.1)'
+              })
+        }}
+      >
         <Box sx={{ position: 'relative', display: 'inline-block' }}>
           <Avatar
             variant="rounded"
@@ -302,7 +329,25 @@ const MobileListRowComponent = ({
         </Box>
       </TableCell>
 
-      <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>
+      <TableCell 
+        align="center" 
+        sx={{ 
+          width: '220px',
+          whiteSpace: 'nowrap',
+          // 고객모드에서는 틀고정 완전히 제거
+          ...(isCustomerMode ? {
+            position: 'static', // 명시적으로 static으로 설정
+            left: 'auto',
+            zIndex: 'auto'
+          } : {
+            position: 'sticky',
+            left: '220px',
+            zIndex: 3,
+            backgroundColor: 'background.paper',
+            boxShadow: '2px 0 4px rgba(0,0,0,0.1)'
+          })
+        }}
+      >
         <Typography variant="body1" fontWeight="bold" sx={{ fontSize: '0.95rem' }}>
           {row.petName}
         </Typography>
@@ -311,7 +356,11 @@ const MobileListRowComponent = ({
         </Typography>
       </TableCell>
 
-      <TableCell align="center" onClick={(e) => e.stopPropagation()}>
+      <TableCell 
+        align="center" 
+        onClick={(e) => e.stopPropagation()}
+        sx={{ width: '120px' }}
+      >
         <Autocomplete
           size="small"
           options={planGroups}
@@ -328,7 +377,11 @@ const MobileListRowComponent = ({
         />
       </TableCell>
 
-      <TableCell align="center" onClick={(e) => e.stopPropagation()}>
+      <TableCell 
+        align="center" 
+        onClick={(e) => e.stopPropagation()}
+        sx={{ width: '100px' }}
+      >
         <Autocomplete
           size="small"
           options={openingTypes}
@@ -345,7 +398,7 @@ const MobileListRowComponent = ({
         />
       </TableCell>
 
-      <TableCell align="center">
+      <TableCell align="center" sx={{ width: '100px' }}>
         <Typography
           variant="body1"
           sx={{
@@ -357,7 +410,7 @@ const MobileListRowComponent = ({
         </Typography>
       </TableCell>
 
-      <TableCell align="center" sx={{ color: 'info.main' }}>
+      <TableCell align="center" sx={{ width: '100px', color: 'info.main' }}>
         {getDisplayValue(row, 'publicSupport', selectedOpeningType)?.toLocaleString() ||
           row.publicSupport?.toLocaleString() ||
           row.support?.toLocaleString()}
@@ -375,11 +428,18 @@ const MobileListRowComponent = ({
         >
           {(() => {
             const displayValue = getDisplayValue(row, 'storeSupportWithAddon', selectedOpeningType);
+            // 🔥 수정: 0도 유효한 값으로 간주 (마스터 데이터에 0으로 저장된 경우)
+            // undefined나 null만 체크하고, 0은 유효한 값으로 표시
+            if (displayValue !== undefined && displayValue !== null) {
+              return displayValue.toLocaleString();
+            }
+            // fallback: row 객체에 저장된 값 사용
             const fallbackValue = row.storeSupport || row.storeSupportWithAddon;
-            const finalValue = (displayValue !== undefined && displayValue !== null && displayValue !== 0)
-              ? displayValue.toLocaleString()
-              : (fallbackValue !== undefined && fallbackValue !== null ? fallbackValue.toLocaleString() : '-');
-            return finalValue;
+            if (fallbackValue !== undefined && fallbackValue !== null) {
+              return fallbackValue.toLocaleString();
+            }
+            // 데이터가 전혀 없으면 '-' 표시
+            return '-';
           })()}
         </Typography>
       </TableCell>
@@ -395,11 +455,18 @@ const MobileListRowComponent = ({
         >
           {(() => {
             const displayValue = getDisplayValue(row, 'storeSupportWithoutAddon', selectedOpeningType);
+            // 🔥 수정: 0도 유효한 값으로 간주 (마스터 데이터에 0으로 저장된 경우)
+            // undefined나 null만 체크하고, 0은 유효한 값으로 표시
+            if (displayValue !== undefined && displayValue !== null) {
+              return displayValue.toLocaleString();
+            }
+            // fallback: row 객체에 저장된 값 사용
             const fallbackValue = row.storeSupportNoAddon;
-            const finalValue = (displayValue !== undefined && displayValue !== null && displayValue !== 0)
-              ? displayValue.toLocaleString()
-              : (fallbackValue !== undefined && fallbackValue !== null ? fallbackValue.toLocaleString() : '-');
-            return finalValue;
+            if (fallbackValue !== undefined && fallbackValue !== null) {
+              return fallbackValue.toLocaleString();
+            }
+            // 데이터가 전혀 없으면 '-' 표시
+            return '-';
           })()}
         </Typography>
       </TableCell>

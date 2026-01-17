@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Box,
   AppBar,
@@ -71,12 +71,12 @@ import {
   updateModificationComplete,
   updateModificationNotes
 } from '../utils/inspectionUtils';
-
 import AppUpdatePopup from './AppUpdatePopup';
 
-// 탭별 검수 항목 정의
-const INSPECTION_TABS = {
-  GENERAL: {
+// 탭별 검수 항목 정의 (배열로 변경하여 인덱스 접근 안정성 확보)
+const INSPECTION_TABS = [
+  {
+    key: 'GENERAL',
     label: '일반검수항목',
     items: [
       '대리점코드',
@@ -91,19 +91,44 @@ const INSPECTION_TABS = {
       '유통망지원금 상이'
     ]
   },
-    ADDITIONAL: {
+  {
+    key: 'ADDITIONAL',
     label: '추가검수항목',
     items: ['유플레이 유치 추가', 'V컬러링 음악감상 플러스 유치', '폰교체 패스 유치', '폰교체 슬림 유치', '폰 안심패스 유치', '통화연결음 유치', '청소년요금제추가정책(1)유치', '청소년요금제추가정책(2)유치', '유통망지원금 활성화정책']
   },
-  DEDUCTION: {
+  {
+    key: 'DEDUCTION',
     label: '차감검수항목',
     items: ['유플레이 미유치 차감', '통화연결음 미유치', '보험 미유치', '115군 선택약정 차감', '선택약정 S721(010신규) 차감', '선택약정 S931,S938,S937(MNP) 차감', '선택약정 아이폰16류전체(MNP) 차감', 'A166 44군 대상외요금제(MNP) 차감', 'A166 44군 대상외요금제(기변) 차감', '정책기변 차감', '기변 C타겟 차감', '33군미만, 시니어1군시 차감', '온세일 전략온라인POS 차감']
   }
-};
+];
+
+// 통계 카드 컴포넌트 (함수 컴포넌트 외부로 이동하여 호이스팅 문제 방지)
+const StatCard = ({ title, value, color, icon, securityNote }) => (
+  <Card sx={{ height: '100%' }}>
+    <CardContent>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+        {icon}
+        <Typography variant="h6" component="div" sx={{ ml: 1 }}>
+          {title}
+        </Typography>
+      </Box>
+      <Typography variant="h4" component="div" sx={{ color }}>
+        {value}
+      </Typography>
+      {securityNote && (
+        <Typography variant="caption" sx={{ color: 'text.secondary', mt: 1, display: 'block' }}>
+          {securityNote}
+        </Typography>
+      )}
+    </CardContent>
+  </Card>
+);
 
 function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes, presentationMode = false, initialTab = 0, detailOptions }) {
   // 상태 관리
   const [currentView, setCurrentView] = useState('personal'); // 'personal' | 'overview'
+  
   const [inspectionData, setInspectionData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -133,11 +158,12 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
   // 완료된 항목 추적 (해시화된 ID 사용)
   const [completedItems, setCompletedItems] = useState(new Set());
   
+  // 수정완료 상태 추적 (먼저 선언하여 loadModificationCompletionStatus에서 사용 가능하도록)
+  const [modificationCompletedItems, setModificationCompletedItems] = useState(new Set());
+  
   // 업데이트 팝업 상태
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
 
-
-  
   // 완료 상태 로드
   const loadCompletionStatus = useCallback(async () => {
     if (!loggedInStore?.contactId) return;
@@ -160,23 +186,29 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
     if (!loggedInStore?.contactId) return;
     
     try {
+      // currentView 직접 사용 (ref 제거)
+      const view = currentView;
       // 현재 뷰에 따라 수정완료 상태 로드
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/inspection/modification-completion-status?userId=${loggedInStore.contactId}&view=${currentView}`);
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/inspection/modification-completion-status?userId=${loggedInStore.contactId}&view=${view}`);
       if (response.ok) {
         const data = await response.json();
         const completedSet = new Set(data.completedItems || []);
         setModificationCompletedItems(completedSet);
         
         // 내용 데이터도 함께 로드하여 inspectionData에 업데이트
-        if (data.notes && inspectionData?.differences) {
-          setInspectionData(prev => ({
-            ...prev,
-            differences: prev.differences.map(diff => ({
-              ...diff,
-              notes: data.notes[diff.originalKey || diff.key] || ''
-            }))
-          }));
-        }
+        // inspectionData는 함수형 업데이트를 사용하여 의존성 제거
+        setInspectionData(prev => {
+          if (data.notes && prev?.differences) {
+            return {
+              ...prev,
+              differences: prev.differences.map(diff => ({
+                ...diff,
+                notes: data.notes[diff.originalKey || diff.key] || ''
+              }))
+            };
+          }
+          return prev;
+        });
       }
     } catch (error) {
       console.error('수정완료 상태 로드 오류:', error);
@@ -188,26 +220,6 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
   // 탭 기반 검수 항목 상태 (props에서 받은 값으로 초기화)
   const [fieldOptions, setFieldOptions] = useState([]);
   
-  // initialTab과 detailOptions가 변경되면 상태 업데이트 및 데이터 재로딩
-  React.useEffect(() => {
-    if (initialTab !== undefined && initialTab !== selectedTab) {
-      setSelectedTab(initialTab);
-    }
-  }, [initialTab, selectedTab]);
-  
-  React.useEffect(() => {
-    if (detailOptions?.selectedField !== undefined && detailOptions.selectedField !== selectedField) {
-      setSelectedField(detailOptions.selectedField);
-    }
-  }, [detailOptions?.selectedField, selectedField]);
-  
-  // presentation mode에서 initialTab이나 detailOptions가 변경되면 데이터 재로딩
-  React.useEffect(() => {
-    if (presentationMode && (initialTab !== undefined || detailOptions?.selectedField !== undefined)) {
-      loadInspectionData();
-    }
-  }, [presentationMode, initialTab, detailOptions?.selectedField, loadInspectionData]);
-  
   // 컬럼 설정 상태
   const [columnSettings, setColumnSettings] = useState(null);
   const [columnSettingsDialog, setColumnSettingsDialog] = useState({
@@ -215,9 +227,6 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
     settings: null,
     isEditing: false
   });
-  
-  // 수정완료 상태 추적
-  const [modificationCompletedItems, setModificationCompletedItems] = useState(new Set());
 
   // 컬럼 설정 로드
   const loadColumnSettings = useCallback(async () => {
@@ -230,6 +239,41 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
       console.error('컬럼 설정 로드 오류:', error);
     }
   }, []);
+
+  // 데이터 로딩 (필드 변경 시 재로딩)
+  const loadInspectionData = useCallback(async () => {
+    if (!loggedInStore?.contactId) return;
+    
+    setIsLoading(true);
+    setError(null);
+    
+    // currentView 직접 사용 (ref 제거)
+    const view = currentView;
+    
+    // presentation mode에서는 detailOptions의 selectedField 사용
+    const fieldToUse = presentationMode && detailOptions?.selectedField 
+      ? detailOptions.selectedField 
+      : selectedField;
+    
+    try {
+      const response = await fetchInspectionData(
+        view, 
+        view === 'personal' ? loggedInStore.contactId : null,
+        fieldToUse !== 'all' ? fieldToUse : undefined
+      );
+      
+      if (response.success) {
+        setInspectionData(response.data);
+      } else {
+        setError('데이터를 불러오는데 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('검수 데이터 로딩 오류:', error);
+      setError('서버 연결에 실패했습니다.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [loggedInStore?.contactId, currentView, selectedField, presentationMode, detailOptions]);
 
   // 필드 목록 불러오기
   useEffect(() => {
@@ -248,44 +292,52 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
   // 사용자 권한 확인
   const hasOverviewPermission = loggedInStore?.modePermissions?.inspectionOverview;
 
-  // 데이터 로딩 (필드 변경 시 재로딩)
-  const loadInspectionData = useCallback(async () => {
+  // initialTab과 detailOptions가 변경되면 상태 업데이트 및 데이터 재로딩
+  useEffect(() => {
+    if (initialTab !== undefined && initialTab !== selectedTab) {
+      setSelectedTab(initialTab);
+    }
+  }, [initialTab, selectedTab]);
+  
+  useEffect(() => {
+    if (detailOptions?.selectedField !== undefined && detailOptions.selectedField !== selectedField) {
+      setSelectedField(detailOptions.selectedField);
+    }
+  }, [detailOptions?.selectedField, selectedField]);
+  
+  // presentation mode에서 initialTab이나 detailOptions가 변경되면 데이터 재로딩
+  useEffect(() => {
+    if (presentationMode && (initialTab !== undefined || detailOptions?.selectedField !== undefined)) {
+      loadInspectionData();
+    }
+  }, [presentationMode, initialTab, detailOptions?.selectedField, loadInspectionData]);
+
+  // 데이터 로딩 통합: 초기 마운트 및 상태 변경 시
+  useEffect(() => {
     if (!loggedInStore?.contactId) return;
     
-    setIsLoading(true);
-    setError(null);
-    
-    // presentation mode에서는 detailOptions의 selectedField 사용
-    const fieldToUse = presentationMode && detailOptions?.selectedField 
-      ? detailOptions.selectedField 
-      : selectedField;
-    
-    try {
-      const response = await fetchInspectionData(
-        currentView, 
-        currentView === 'personal' ? loggedInStore.contactId : null,
-        fieldToUse !== 'all' ? fieldToUse : undefined
-      );
-      
-      if (response.success) {
-        setInspectionData(response.data);
-      } else {
-        setError('데이터를 불러오는데 실패했습니다.');
+    const loadAllData = async () => {
+      try {
+        await Promise.all([
+          loadInspectionData(),
+          loadCompletionStatus(),
+          loadModificationCompletionStatus()
+        ]);
+      } catch (error) {
+        console.error('데이터 로딩 오류:', error);
       }
-    } catch (error) {
-      console.error('검수 데이터 로딩 오류:', error);
-      setError('서버 연결에 실패했습니다.');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [currentView, loggedInStore?.contactId, selectedField, presentationMode, detailOptions]);
-
-  // 필드 변경 시 데이터 재로딩
-  useEffect(() => {
-    loadInspectionData();
-    loadCompletionStatus();
-    loadModificationCompletionStatus();
-  }, [loadInspectionData, loadCompletionStatus, loadModificationCompletionStatus, selectedField, selectedTab]);
+    };
+    
+    loadAllData();
+  }, [
+    loggedInStore?.contactId,
+    selectedField,
+    selectedTab,
+    currentView,
+    loadInspectionData,
+    loadCompletionStatus,
+    loadModificationCompletionStatus
+  ]);
 
   // 검수모드 진입 시 업데이트 팝업 표시 (숨김 설정 확인 후)
   useEffect(() => {
@@ -299,10 +351,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
     }
   }, []);
 
-  // 뷰 변경 시 수정완료 상태 재로딩
-  useEffect(() => {
-    loadModificationCompletionStatus();
-  }, [currentView, loadModificationCompletionStatus]);
+  // 뷰 변경은 위의 통합 useEffect에서 처리되므로 별도 useEffect 제거
 
   // 필터링된 데이터 (해시화된 ID 사용)
   const filteredData = useMemo(() => {
@@ -317,13 +366,11 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
     let filtered = filterDifferences(differencesWithCompletion, filters);
     
     // 탭별 필터링 적용
-    const currentTabItems = Object.values(INSPECTION_TABS)[selectedTab]?.items || [];
+    const currentTabItems = INSPECTION_TABS[selectedTab]?.items || [];
     if (currentTabItems.length > 0) {
-      const beforeFilterCount = filtered.length;
       filtered = filtered.filter(diff => 
         currentTabItems.includes(diff.field)
       );
-      console.log(`탭 필터링: ${beforeFilterCount}개 → ${filtered.length}개 (${currentTabItems.join(', ')})`);
     }
     
     // 가입번호 기준 정렬
@@ -352,7 +399,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
     }));
     
     // 탭별 필터링 적용
-    const currentTabItems = Object.values(INSPECTION_TABS)[selectedTab]?.items || [];
+    const currentTabItems = INSPECTION_TABS[selectedTab]?.items || [];
     let filteredDifferences = differencesWithCompletion;
     if (currentTabItems.length > 0) {
       filteredDifferences = differencesWithCompletion.filter(diff => 
@@ -654,12 +701,14 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
   };
 
   // 탭 변경 핸들러 (presentation mode에서는 탭 변경 불가)
-  const handleTabChange = (event, newValue) => {
+  const handleTabChange = useCallback((event, newValue) => {
     if (presentationMode) return; // presentation mode에서는 탭 변경 불가
-    console.log('탭 변경:', newValue, INSPECTION_TABS[Object.keys(INSPECTION_TABS)[newValue]]?.label);
+    if (newValue === selectedTab) return; // 같은 탭이면 변경하지 않음
+    
     setSelectedTab(newValue);
     setSelectedField('all'); // 탭 변경 시 필드 선택 초기화
-  };
+    // 탭 변경 시 데이터는 useEffect에서 자동으로 재로딩됨
+  }, [presentationMode, selectedTab]);
 
   // 중복 타입 관련 함수들
   const getDuplicateTypeLabel = (duplicateType) => {
@@ -689,28 +738,6 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
         return 'default';
     }
   };
-
-  // 통계 카드 컴포넌트
-  const StatCard = ({ title, value, color, icon }) => (
-    <Card sx={{ height: '100%' }}>
-      <CardContent>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          {icon}
-          <Typography variant="h6" component="div" sx={{ ml: 1 }}>
-            {title}
-          </Typography>
-        </Box>
-        <Typography variant="h4" component="div" sx={{ color }}>
-          {value}
-        </Typography>
-        {inspectionData?.securityNote && (
-          <Typography variant="caption" sx={{ color: 'text.secondary', mt: 1, display: 'block' }}>
-            {inspectionData.securityNote}
-          </Typography>
-        )}
-      </CardContent>
-    </Card>
-  );
 
   return (
     <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -845,21 +872,21 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
               }}
             >
               <Tab 
-                label={INSPECTION_TABS.GENERAL.label}
+                label={INSPECTION_TABS[0].label}
                 sx={{ 
                   fontWeight: 'bold',
                   '&.Mui-selected': { color: '#1976d2' }
                 }}
               />
               <Tab 
-                label={INSPECTION_TABS.ADDITIONAL.label}
+                label={INSPECTION_TABS[1].label}
                 sx={{ 
                   fontWeight: 'bold',
                   '&.Mui-selected': { color: '#2e7d32' }
                 }}
               />
               <Tab 
-                label={INSPECTION_TABS.DEDUCTION.label}
+                label={INSPECTION_TABS[2].label}
                 sx={{ 
                   fontWeight: 'bold',
                   '&.Mui-selected': { color: '#d32f2f' }
@@ -882,7 +909,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
                 <MenuItem value="all">모든 항목</MenuItem>
                 {fieldOptions
                   .filter(option => {
-                    const currentTabItems = Object.values(INSPECTION_TABS)[selectedTab]?.items || [];
+                    const currentTabItems = INSPECTION_TABS[selectedTab]?.items || [];
                     return currentTabItems.includes(option.name);
                   })
                   .map(option => (
@@ -917,6 +944,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
                 value={statistics.total}
                 color="#1976d2"
                 icon={<InfoIcon color="primary" />}
+                securityNote={inspectionData?.securityNote}
               />
             </Grid>
             <Grid item xs={12} sm={6} md={3}>
@@ -925,6 +953,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
                 value={statistics.completed}
                 color="#2e7d32"
                 icon={<CheckCircleIcon color="success" />}
+                securityNote={inspectionData?.securityNote}
               />
             </Grid>
             <Grid item xs={12} sm={6} md={3}>
@@ -933,6 +962,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
                 value={statistics.pending}
                 color="#ed6c02"
                 icon={<WarningIcon color="warning" />}
+                securityNote={inspectionData?.securityNote}
               />
             </Grid>
             <Grid item xs={12} sm={6} md={3}>
@@ -941,6 +971,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
                 value={`${statistics.completionRate}%`}
                 color="#1976d2"
                 icon={<TrendingUpIcon color="primary" />}
+                securityNote={inspectionData?.securityNote}
               />
             </Grid>
           </Grid>
@@ -1081,13 +1112,13 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={7} align="center">
+                    <TableCell colSpan={9} align="center">
                       <CircularProgress />
                     </TableCell>
                   </TableRow>
                 ) : filteredData.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} align="center">
+                    <TableCell colSpan={9} align="center">
                       데이터가 없습니다.
                     </TableCell>
                   </TableRow>
@@ -1478,7 +1509,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes,
         mode="inspection"
         loggedInStore={loggedInStore}
         onUpdateAdded={() => {
-          console.log('검수모드 새 업데이트가 추가되었습니다.');
+          // 업데이트 추가 시 처리 (필요시 로직 추가)
         }}
       />
       

@@ -4,6 +4,20 @@ options:
   ports: "4000"
   install: npm ci --production
   start: node index.js
+  healthcheck:
+    path: /health
+    initialDelaySeconds: 60
+    periodSeconds: 15
+    timeoutSeconds: 10
+    failureThreshold: 10
+    successThreshold: 1
+  resources:
+    requests:
+      memory: "32Mi"
+      cpu: "10m"
+    limits:
+      memory: "256Mi"
+      cpu: "200m"
   env:
     - name: NODE_ENV
       value: production

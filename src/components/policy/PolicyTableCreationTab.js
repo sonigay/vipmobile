@@ -29,7 +29,14 @@ import {
   Tab,
   Tooltip,
   Popover,
-  Switch
+  Switch,
+  Snackbar,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Checkbox,
+  FormControlLabel
 } from '@mui/material';
 import {
   Refresh as RefreshIcon,
@@ -64,6 +71,11 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { API_BASE_URL } from '../../api';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { TimePicker } from '@mui/x-date-pickers/TimePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { ko } from 'date-fns/locale';
 
 // 드래그 가능한 카드 컴포넌트
 const SortableCard = ({ setting, children }) => {
@@ -112,9 +124,11 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
   const [settings, setSettings] = useState([]);
   const [userGroups, setUserGroups] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [settingsLoading, setSettingsLoading] = useState(false); // 정책표 설정 로딩 상태
   const [error, setError] = useState(null);
   const [savingCardOrder, setSavingCardOrder] = useState(false);
   const [successMessage, setSuccessMessage] = useState(null);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   
   // 여러 정책표 생성 관련 상태
   const [selectedSettings, setSelectedSettings] = useState([]); // 체크된 카드 ID 배열
@@ -142,6 +156,29 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
     applyDate: '',
     applyContent: '',
     accessGroupIds: []
+  });
+
+  // 정책적용일시 자동 생성 관련 상태
+  const [autoDateSettings, setAutoDateSettings] = useState({
+    startDate: new Date(), // 시작 날짜 (기본값: 오늘)
+    startHour: new Date().getHours(), // 시작 시간 (시)
+    startMinute: Math.floor(new Date().getMinutes() / 10) * 10, // 시작 시간 (분, 10분 단위)
+    policyType: 'wireless', // 'wireless', 'wired', 'other'
+    otherPolicyName: '이통사지원금', // 기타정책 선택 시 정책명
+    hasEndDate: false, // 종료시점 사용 여부
+    endDate: null, // 종료 날짜
+    endHour: 0, // 종료 시간 (시)
+    endMinute: 0 // 종료 시간 (분, 10분 단위)
+  });
+  const [otherPolicyTypes, setOtherPolicyTypes] = useState(['이통사지원금']); // 기타정책 목록
+  const [newOtherPolicyName, setNewOtherPolicyName] = useState(''); // 새 기타정책명 입력
+
+  // 기본 그룹 설정 관련 상태
+  const [defaultGroups, setDefaultGroups] = useState({}); // { policyTableId: [groupIds] }
+  const [defaultGroupModalOpen, setDefaultGroupModalOpen] = useState(false);
+  const [defaultGroupFormData, setDefaultGroupFormData] = useState({
+    policyTableId: '',
+    defaultGroupIds: []
   });
 
   // 생성 진행 상태
@@ -205,23 +242,22 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
         setActiveTab(1);
       }
       
-      // 병렬 로딩으로 성능 개선
-      const loadInitialData = async () => {
-        const promises = [
-          loadUserGroups(),
-          loadCompanies(),
-          loadTeamLeaders()
-        ];
-        
-        // 정책표 생성 기능은 SS 또는 팀장만 사용 가능
+      // 성능 최적화: 필수 데이터만 먼저 로드, 나머지는 백그라운드에서 로드
         if (canAccessPolicyTableCreation) {
-          promises.push(loadSettings());
-        }
-        
-        await Promise.all(promises);
-      };
-      
-      loadInitialData();
+        // 정책표 설정만 먼저 로드 (화면 표시에 필수) - 즉시 화면에 표시
+        loadSettings().then(() => {
+          // settings가 로드된 후 백그라운드에서 나머지 로드
+          // 기타정책 목록과 기본 그룹은 덜 중요하므로 백그라운드에서 로드
+          Promise.all([
+            loadOtherPolicyTypes(),
+            loadDefaultGroups()
+          ]).catch(error => {
+            console.error('백그라운드 데이터 로드 오류:', error);
+          });
+        }).catch(error => {
+          console.error('정책표 설정 로드 오류:', error);
+        });
+      }
     }
     return () => {
       if (pollingInterval) {
@@ -230,23 +266,36 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
     };
   }, [canAccess, userRole, canAccessPolicyTableCreation]);
 
-  // 정책영업그룹 탭이 활성화될 때 변경이력 다시 로드
+  // 정책영업그룹 탭이 활성화될 때 정책영업그룹 목록 로드 (지연 로드)
+  useEffect(() => {
+    if (activeTab === 1 && userGroups.length === 0) {
+      // 정책영업그룹 목록 로드 (변경이력은 제외하여 빠르게 로드)
+      loadUserGroupsWithoutHistory();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  // 정책영업그룹 탭이 활성화되고 그룹이 로드된 후 변경이력 로드
   useEffect(() => {
     if (activeTab === 1 && userGroups.length > 0) {
-      console.log('🔍 [정책영업그룹] 탭 활성화, 변경이력 다시 로드:', userGroups.length, '개 그룹');
-      const changeHistoryPromises = userGroups.map(group => loadChangeHistory(group.id));
+      // 변경이력이 없는 그룹만 로드
+      const groupsWithoutHistory = userGroups.filter(group => !changeHistory[group.id]);
+      if (groupsWithoutHistory.length > 0) {
+        console.log('🔍 [정책영업그룹] 변경이력 로드:', groupsWithoutHistory.length, '개 그룹');
+        const changeHistoryPromises = groupsWithoutHistory.map(group => loadChangeHistory(group.id));
       Promise.all(changeHistoryPromises).then(() => {
         console.log('✅ [정책영업그룹] 변경이력 로드 완료');
       }).catch(error => {
         console.error('❌ [정책영업그룹] 변경이력 로드 실패:', error);
       });
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab]);
+  }, [activeTab, userGroups.length]);
 
   const loadSettings = async () => {
     try {
-      setLoading(true);
+      setSettingsLoading(true);
       const response = await fetch(`${API_BASE_URL}/api/policy-table-settings`, {
         headers: {
           'x-user-role': loggedInStore?.userRole || '',
@@ -255,60 +304,22 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
       });
       if (response.ok) {
         const data = await response.json();
-        // 백엔드에서 이미 사용자별 순서가 적용되어 있음
-        setSettings(data);
         // 현재 사용자의 권한에 맞는 정책표만 필터링
         const userRole = loggedInStore?.userRole;
-        console.log('🔍 [정책표생성] 정책표 설정 로드:', {
-          userRole,
-          totalSettings: data.length,
-          settings: data.map(s => ({
-            id: s.id,
-            policyTableName: s.policyTableName,
-            creatorPermissions: s.creatorPermissions,
-            creatorPermissionsType: typeof s.creatorPermissions,
-            isArray: Array.isArray(s.creatorPermissions),
-            includesUserRole: Array.isArray(s.creatorPermissions) ? s.creatorPermissions.includes(userRole) : false
-          }))
-        });
         
-        const filtered = data.filter(setting => {
-          if (userRole === 'SS') return true; // 총괄은 모든 정책표 접근 가능
-          
+        // 성능 최적화: 필터링 로직 간소화
+        const filtered = userRole === 'SS' 
+          ? data // 총괄은 모든 정책표 접근 가능
+          : data.filter(setting => {
           // creatorPermissions가 배열인지 확인
           if (!Array.isArray(setting.creatorPermissions)) {
-            console.warn('⚠️ [정책표생성] creatorPermissions가 배열이 아닙니다:', {
-              setting: setting.policyTableName,
-              creatorPermissions: setting.creatorPermissions,
-              type: typeof setting.creatorPermissions
-            });
             return false;
           }
-          
-          // 정확한 문자열 비교를 위해 trim() 및 대소문자 일치 확인
+              // 정확한 문자열 비교
           const normalizedUserRole = (userRole || '').trim();
-          const includes = setting.creatorPermissions.some(perm => {
-            const normalizedPerm = (perm || '').trim();
-            return normalizedPerm === normalizedUserRole;
-          });
-          
-          console.log(`🔍 [정책표생성] 필터링 체크: ${setting.policyTableName}`, {
-            userRole: normalizedUserRole,
-            creatorPermissions: setting.creatorPermissions,
-            normalizedPermissions: setting.creatorPermissions.map(p => (p || '').trim()),
-            includes,
-            matchDetails: setting.creatorPermissions.map(perm => ({
-              original: perm,
-              normalized: (perm || '').trim(),
-              matches: (perm || '').trim() === normalizedUserRole
-            }))
-          });
-          return includes;
-        });
-        
-        console.log('✅ [정책표생성] 필터링 결과:', {
-          filteredCount: filtered.length,
-          filtered: filtered.map(s => s.policyTableName)
+              return setting.creatorPermissions.some(perm => 
+                (perm || '').trim() === normalizedUserRole
+              );
         });
         
         setSettings(filtered);
@@ -317,11 +328,12 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
       console.error('정책표 설정 로드 오류:', error);
       setError('정책표 설정을 불러오는 중 오류가 발생했습니다.');
     } finally {
-      setLoading(false);
+      setSettingsLoading(false);
     }
   };
 
-  const loadUserGroups = async () => {
+  // 정책영업그룹 목록만 로드 (변경이력 제외 - 성능 최적화)
+  const loadUserGroupsWithoutHistory = async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/policy-table/user-groups`, {
         headers: {
@@ -342,15 +354,18 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
           groups = [];
         }
         
-        // 모든 그룹의 변경이력을 병렬로 로드 (색상 표시를 위해 필수)
-        if (groups.length > 0) {
-          console.log('🔍 [정책영업그룹] 변경이력 로드 시작:', groups.length, '개 그룹');
-          const changeHistoryPromises = groups.map(group => loadChangeHistory(group.id));
-          await Promise.all(changeHistoryPromises);
-          console.log('✅ [정책영업그룹] 변경이력 로드 완료');
-        }
-        
         setUserGroups(groups);
+        
+        // 변경이력은 백그라운드에서 지연 로드
+        if (groups.length > 0) {
+          console.log('🔍 [정책영업그룹] 변경이력 백그라운드 로드 시작:', groups.length, '개 그룹');
+          const changeHistoryPromises = groups.map(group => loadChangeHistory(group.id));
+          Promise.all(changeHistoryPromises).then(() => {
+          console.log('✅ [정책영업그룹] 변경이력 로드 완료');
+          }).catch(error => {
+            console.error('❌ [정책영업그룹] 변경이력 로드 실패:', error);
+          });
+        }
       } else {
         console.error('정책영업그룹 로드 실패:', response.status);
         setUserGroups([]);
@@ -359,6 +374,11 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
       console.error('정책영업그룹 로드 오류:', error);
       setUserGroups([]);
     }
+  };
+
+  const loadUserGroups = async () => {
+    // loadUserGroupsWithoutHistory를 사용하여 변경이력 제외하고 빠르게 로드
+    await loadUserGroupsWithoutHistory();
   };
 
   // 변경이력 로드 함수
@@ -533,7 +553,14 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
     }
   };
 
-  const handleOpenGroupModal = (group = null) => {
+  const handleOpenGroupModal = async (group = null) => {
+    // companies와 teamLeaders가 없으면 지연 로드
+    if (companies.length === 0) {
+      await loadCompanies();
+    }
+    if (teamLeaders.length === 0) {
+      await loadTeamLeaders();
+    }
     if (group) {
       setEditingGroup(group);
       setGroupFormData({
@@ -819,16 +846,215 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
     }
   };
 
-  const handleOpenCreationModal = (policyTable) => {
+  // 기타정책 목록 로드
+  const loadOtherPolicyTypes = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/policy-table/other-policy-types`, {
+        headers: {
+          'x-user-role': loggedInStore?.userRole || '',
+          'x-user-id': loggedInStore?.contactId || loggedInStore?.id || ''
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.otherPolicyTypes) {
+          const names = data.otherPolicyTypes.map(item => item.name);
+          // 기본값 "이통사지원금"이 없으면 추가
+          if (!names.includes('이통사지원금')) {
+            names.unshift('이통사지원금');
+          }
+          setOtherPolicyTypes(names);
+        }
+      }
+    } catch (error) {
+      console.error('기타정책 목록 로드 오류:', error);
+    }
+  };
+
+  // 기타정책 추가
+  const handleAddOtherPolicyType = async () => {
+    if (!newOtherPolicyName.trim()) {
+      setError('정책명을 입력해주세요.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_BASE_URL}/api/policy-table/other-policy-types`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-role': loggedInStore?.userRole || '',
+          'x-user-id': loggedInStore?.contactId || loggedInStore?.id || ''
+        },
+        body: JSON.stringify({
+          policyName: newOtherPolicyName.trim()
+        })
+      });
+
+      if (response.ok) {
+        await loadOtherPolicyTypes();
+        setNewOtherPolicyName('');
+        setSnackbar({
+          open: true,
+          message: '기타정책이 추가되었습니다.',
+          severity: 'success'
+        });
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || '기타정책 추가에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('기타정책 추가 오류:', error);
+      setError('기타정책 추가 중 오류가 발생했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 정책적용일시 자동 텍스트 생성
+  const generateApplyDateText = useCallback(() => {
+    const { startDate, startHour, startMinute, policyType, otherPolicyName, hasEndDate, endDate, endHour, endMinute } = autoDateSettings;
+    
+    if (!startDate) return '';
+
+    const year = startDate.getFullYear() % 100; // 2자리 연도
+    const month = startDate.getMonth() + 1;
+    const day = startDate.getDate();
+    const hour = startHour;
+    const minute = startMinute;
+
+    let policyTypeText = '';
+    if (policyType === 'wireless') {
+      policyTypeText = '【무선정책】';
+    } else if (policyType === 'wired') {
+      policyTypeText = '【유선정책】';
+    } else if (policyType === 'other') {
+      policyTypeText = `【${otherPolicyName || '이통사지원금'}】`;
+    }
+
+    let dateText = `◆ ${year}년 ${month}월 ${day}일 ${hour}시${minute > 0 ? minute + '분' : ''} 이후 ${policyTypeText} 변경공지`;
+
+    if (hasEndDate && endDate) {
+      const endDay = endDate.getDate();
+      const endHourText = endHour;
+      const endMinuteText = endMinute > 0 ? endMinute + '분' : '';
+      dateText = `◆ ${year}년 ${month}월 ${day}일 ${hour}시${minute > 0 ? minute + '분' : ''} 이후 ${endDay}일 ${endHourText}시${endMinuteText ? ' ' + endMinuteText : ''} 까지 ${policyTypeText} 변경공지`;
+    }
+
+    return dateText;
+  }, [autoDateSettings]);
+
+  // autoDateSettings 변경 시 자동으로 applyDate 업데이트 (개별 생성)
+  useEffect(() => {
+    const generatedText = generateApplyDateText();
+    if (generatedText && creationModalOpen) {
+      setCreationFormData(prev => ({
+        ...prev,
+        applyDate: generatedText
+      }));
+    }
+  }, [generateApplyDateText, creationModalOpen]);
+
+  // autoDateSettings 변경 시 자동으로 applyDate 업데이트 (모두 생성)
+  useEffect(() => {
+    const generatedText = generateApplyDateText();
+    if (generatedText && batchCreationModalOpen) {
+      setBatchCreationFormData(prev => ({
+        ...prev,
+        applyDate: generatedText
+      }));
+    }
+  }, [generateApplyDateText, batchCreationModalOpen]);
+
+  // 기본 그룹 설정 로드
+  const loadDefaultGroups = async () => {
+    try {
+      const userId = loggedInStore?.contactId || loggedInStore?.id;
+      if (!userId) return;
+
+      const response = await fetch(`${API_BASE_URL}/api/policy-table/default-groups/${userId}`, {
+        headers: {
+          'x-user-role': loggedInStore?.userRole || '',
+          'x-user-id': userId
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.defaultGroups) {
+          setDefaultGroups(data.defaultGroups);
+          return data.defaultGroups; // 반환값 추가
+        }
+      }
+      return {};
+    } catch (error) {
+      console.error('기본 그룹 설정 로드 오류:', error);
+      return {};
+    }
+  };
+
+  const handleOpenCreationModal = async (policyTable) => {
     setSelectedPolicyTable(policyTable);
+    
+    // 정책영업그룹이 로드되지 않았으면 먼저 로드
+    if (userGroups.length === 0) {
+      await loadUserGroupsWithoutHistory();
+    }
+    
+    // 기본 그룹이 아직 로드되지 않았으면 먼저 로드 (빠른 응답을 위해)
+    let defaultGroupIds = defaultGroups[policyTable.id] || [];
+    if (defaultGroupIds.length === 0 && Object.keys(defaultGroups).length === 0) {
+      // 기본 그룹이 전혀 로드되지 않았으면 로드 대기
+      const loadedGroups = await loadDefaultGroups();
+      defaultGroupIds = loadedGroups[policyTable.id] || [];
+    }
+    
+    // 정책적용일시 자동 생성 설정 초기화 (오늘 날짜, 현재 시간)
+    const now = new Date();
+    setAutoDateSettings({
+      startDate: new Date(now),
+      startHour: now.getHours(),
+      startMinute: Math.floor(now.getMinutes() / 10) * 10,
+      policyType: 'wireless',
+      otherPolicyName: '이통사지원금',
+      hasEndDate: false,
+      endDate: null,
+      endHour: 0,
+      endMinute: 0
+    });
+    
     setCreationFormData({
       applyDate: '',
       applyContent: '',
-      accessGroupIds: []
+      accessGroupIds: defaultGroupIds
     });
     setGenerationStatus(null);
     setGeneratedResult(null);
     setCreationModalOpen(true);
+    
+    // 백그라운드에서 기본 그룹 다시 로드 (최신 데이터 보장, 이미 로드된 경우는 스킵)
+    if (Object.keys(defaultGroups).length === 0) {
+      // 이미 위에서 로드했으므로 스킵
+    } else {
+      // 이미 로드된 경우에만 백그라운드에서 최신 데이터 확인
+      loadDefaultGroups().then(loadedGroups => {
+        // 로드된 그룹이 있고, 현재 선택된 그룹이 없으면 업데이트
+        if (loadedGroups[policyTable.id] && loadedGroups[policyTable.id].length > 0) {
+          setCreationFormData(prev => {
+            // 이미 그룹이 선택되어 있으면 업데이트하지 않음
+            if (prev.accessGroupIds.length > 0) {
+              return prev;
+            }
+            return {
+              ...prev,
+              accessGroupIds: loadedGroups[policyTable.id]
+            };
+          });
+        }
+      });
+    }
   };
 
   const handleCloseCreationModal = () => {
@@ -882,15 +1108,34 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
           queuePosition: data.queuePosition,
           queueLength: data.queueLength,
           estimatedWaitTime: data.estimatedWaitTime,
-          discordBotStatus: data.discordBotStatus
+          discordBotStatus: data.discordBotStatus,
+          queuedUserCount: data.queuedUserCount
         });
 
         // 상태 폴링 시작 (하이브리드 폴링)
         startPolling(jobId);
       } else {
-        const errorData = await response.json();
-        setError(errorData.error || '정책표 생성 요청에 실패했습니다.');
+        let errorData;
+        try {
+          const text = await response.text();
+          errorData = text ? JSON.parse(text) : {};
+        } catch (parseError) {
+          console.error('응답 파싱 오류:', parseError);
+          errorData = { error: `서버 오류 (${response.status})` };
+        }
+        
+        // 중복 생성 시도인 경우
+        if (response.status === 409) {
+          setError(errorData.error || '이미 진행 중인 정책표 생성 작업이 있습니다.');
+          setGenerationStatus({ status: 'queued', progress: 0, message: '이미 진행 중인 작업이 있습니다.' });
+          // 기존 작업 ID가 있으면 해당 작업 상태 조회 시작
+          if (errorData.existingJobId) {
+            startPolling(errorData.existingJobId);
+          }
+        } else {
+          setError(errorData.error || `정책표 생성 요청에 실패했습니다. (${response.status})`);
         setGenerationStatus({ status: 'failed', progress: 0, message: '생성 요청 실패' });
+        }
       }
     } catch (error) {
       console.error('정책표 생성 요청 오류:', error);
@@ -924,7 +1169,8 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
             queueLength: status.queueInfo?.queueLength,
             estimatedWaitTime: status.queueInfo?.estimatedWaitTime,
             isProcessing: status.queueInfo?.isProcessing,
-            discordBotStatus: status.discordBotStatus
+            discordBotStatus: status.discordBotStatus,
+            queuedUserCount: status.queueInfo?.queuedUserCount
           });
 
           if (status.status === 'completed') {
@@ -1115,16 +1361,59 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
           });
 
           if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || '정책표 생성 요청에 실패했습니다.');
+            let errorData;
+            try {
+              const text = await response.text();
+              errorData = text ? JSON.parse(text) : {};
+            } catch (parseError) {
+              console.error('응답 파싱 오류:', parseError);
+              errorData = { error: `서버 오류 (${response.status})` };
+            }
+            
+            // 중복 생성 시도인 경우
+            if (response.status === 409) {
+              setBatchGenerationStatus(prev => ({
+                ...prev,
+                [setting.id]: { 
+                  status: 'queued', 
+                  jobId: errorData.existingJobId || null, 
+                  result: null, 
+                  error: null,
+                  message: errorData.error || '이미 진행 중인 작업이 있습니다.'
+                }
+              }));
+              // 기존 작업 ID가 있으면 해당 작업 상태 조회 시작
+              if (errorData.existingJobId) {
+                startBatchPolling(setting.id, errorData.existingJobId);
+              }
+              resolve({ settingId: setting.id, jobId: errorData.existingJobId, success: true });
+              return;
+            }
+            throw new Error(errorData.error || `정책표 생성 요청에 실패했습니다. (${response.status})`);
           }
 
-          const data = await response.json();
+          let data;
+          try {
+            const text = await response.text();
+            data = text ? JSON.parse(text) : {};
+          } catch (parseError) {
+            console.error('응답 파싱 오류:', parseError);
+            throw new Error('서버 응답을 파싱할 수 없습니다.');
+          }
           const jobId = data.jobId;
 
           setBatchGenerationStatus(prev => ({
             ...prev,
-            [setting.id]: { status: 'processing', jobId, result: null, error: null }
+            [setting.id]: { 
+              status: data.status === 'queued' ? 'queued' : 'processing', 
+              jobId, 
+              result: null, 
+              error: null,
+              message: data.message || '대기 중...',
+              queuePosition: data.queuePosition,
+              queueLength: data.queueLength,
+              queuedUserCount: data.queuedUserCount
+            }
           }));
 
           // 폴링 시작 및 완료될 때까지 기다림
@@ -1225,6 +1514,25 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
 
       if (!response.ok) {
         const errorData = await response.json();
+        // 중복 생성 시도인 경우
+        if (response.status === 409) {
+          setBatchGenerationStatus(prev => ({
+            ...prev,
+            [settingId]: { 
+              status: 'queued', 
+              jobId: errorData.existingJobId || null, 
+              result: null, 
+              error: null,
+              message: errorData.error || '이미 진행 중인 작업이 있습니다.'
+            }
+          }));
+          // 기존 작업 ID가 있으면 해당 작업 상태 조회 시작
+          if (errorData.existingJobId) {
+            startBatchPolling(settingId, errorData.existingJobId);
+          }
+          setSuccessMessage(null);
+          return;
+        }
         throw new Error(errorData.error || '정책표 생성 요청에 실패했습니다.');
       }
 
@@ -1233,7 +1541,16 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
 
       setBatchGenerationStatus(prev => ({
         ...prev,
-        [settingId]: { status: 'processing', jobId, result: null, error: null, message: '재생성 처리 중...' }
+        [settingId]: { 
+          status: data.status === 'queued' ? 'queued' : 'processing', 
+          jobId, 
+          result: null, 
+          error: null, 
+          message: data.message || '재생성 처리 중...',
+          queuePosition: data.queuePosition,
+          queueLength: data.queueLength,
+          queuedUserCount: data.queuedUserCount
+        }
       }));
 
       // 성공 메시지 업데이트
@@ -1288,7 +1605,8 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
               estimatedWaitTime: data.queueInfo?.estimatedWaitTime,
               isProcessing: data.queueInfo?.isProcessing,
               discordBotStatus: data.discordBotStatus,
-              failureReason: data.failureReason
+              failureReason: data.failureReason,
+              queuedUserCount: data.queueInfo?.queuedUserCount
             }
           }));
 
@@ -1387,15 +1705,21 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
       });
 
       if (response.ok) {
-        alert('정책표가 등록되었습니다.');
+        setSnackbar({ open: true, message: '정책표가 등록되었습니다.', severity: 'success' });
         handleCloseCreationModal();
+        // 정책표 목록 새로고침
+        await loadSettings();
       } else {
         const errorData = await response.json();
-        setError(errorData.error || '정책표 등록에 실패했습니다.');
+        const errorMessage = errorData.error || '정책표 등록에 실패했습니다.';
+        setError(errorMessage);
+        setSnackbar({ open: true, message: errorMessage, severity: 'error' });
       }
     } catch (error) {
       console.error('정책표 등록 오류:', error);
-      setError('정책표 등록 중 오류가 발생했습니다.');
+      const errorMessage = '정책표 등록 중 오류가 발생했습니다.';
+      setError(errorMessage);
+      setSnackbar({ open: true, message: errorMessage, severity: 'error' });
     } finally {
       setLoading(false);
     }
@@ -1435,18 +1759,94 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
 
       const responses = await Promise.allSettled(registerPromises);
       
-      const successCount = responses.filter(r => r.status === 'fulfilled' && r.value.ok).length;
-      const failCount = responses.length - successCount;
+      // 응답 결과 상세 분석 및 상태 업데이트
+      const results = await Promise.all(
+        responses.map(async (response, index) => {
+          const { settingId } = completedResults[index];
+          if (response.status === 'fulfilled' && response.value.ok) {
+            const data = await response.value.json();
+            // 등록 성공 상태 업데이트
+            setBatchGenerationStatus(prev => ({
+              ...prev,
+              [settingId]: {
+                ...prev[settingId],
+                registrationStatus: data.alreadyRegistered ? 'already_registered' : 'registered',
+                registrationMessage: data.alreadyRegistered ? '이미 등록 완료' : '등록 완료'
+              }
+            }));
+            return {
+              success: true,
+              alreadyRegistered: data.alreadyRegistered || false,
+              result: completedResults[index]
+            };
+          } else {
+            let errorMessage = '등록 실패';
+            if (response.status === 'fulfilled') {
+              try {
+                const errorData = await response.value.json();
+                errorMessage = errorData.error || errorMessage;
+              } catch (e) {
+                errorMessage = `HTTP ${response.value.status}`;
+              }
+            } else {
+              errorMessage = response.reason?.message || '등록 실패';
+            }
+            // 등록 실패 상태 업데이트
+            setBatchGenerationStatus(prev => ({
+              ...prev,
+              [settingId]: {
+                ...prev[settingId],
+                registrationStatus: 'registration_failed',
+                registrationError: errorMessage
+              }
+            }));
+            return {
+              success: false,
+              error: errorMessage,
+              result: completedResults[index]
+            };
+          }
+        })
+      );
+      
+      const successCount = results.filter(r => r.success).length;
+      const alreadyRegisteredCount = results.filter(r => r.success && r.alreadyRegistered).length;
+      const newRegisteredCount = successCount - alreadyRegisteredCount;
+      const failCount = results.filter(r => !r.success).length;
 
       if (failCount === 0) {
-        alert(`모든 정책표(${successCount}개)가 등록되었습니다.`);
+        let message = '';
+        if (alreadyRegisteredCount > 0 && newRegisteredCount > 0) {
+          message = `${newRegisteredCount}개 등록 완료, ${alreadyRegisteredCount}개는 이미 등록되어 있었습니다.`;
+        } else if (alreadyRegisteredCount > 0) {
+          message = `모든 정책표(${alreadyRegisteredCount}개)가 이미 등록되어 있었습니다.`;
+        } else {
+          message = `모든 정책표(${successCount}개)가 등록되었습니다.`;
+        }
+        setSnackbar({ 
+          open: true, 
+          message, 
+          severity: 'success' 
+        });
+        // 정책표 목록 새로고침
+        await loadSettings();
+        // 모든 정책표가 등록되었거나 이미 등록되어 있었다면 모달 닫기
+        if (newRegisteredCount > 0 || (alreadyRegisteredCount > 0 && failCount === 0)) {
         handleCloseBatchCreationModal();
+        }
       } else {
-        setError(`${successCount}개 등록 성공, ${failCount}개 등록 실패했습니다.`);
+        // 일부 실패한 경우에도 성공 메시지는 표시하지 않고, UI에서 개별 상태를 확인하도록 함
+        setSnackbar({ 
+          open: true, 
+          message: '일부 정책표 등록에 실패했습니다. 아래 상태를 확인해주세요.', 
+          severity: 'warning' 
+        });
       }
     } catch (error) {
       console.error('배치 정책표 등록 오류:', error);
-      setError('정책표 등록 중 오류가 발생했습니다.');
+      const errorMessage = '정책표 등록 중 오류가 발생했습니다.';
+      setError(errorMessage);
+      setSnackbar({ open: true, message: errorMessage, severity: 'error' });
     } finally {
       setLoading(false);
     }
@@ -1491,7 +1891,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
       {/* 정책표 생성 탭 */}
       {canAccessPolicyTableCreation && activeTab === 0 && (
         <>
-          {loading && settings.length === 0 ? (
+          {settingsLoading && settings.length === 0 ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
               <CircularProgress />
             </Box>
@@ -1512,15 +1912,73 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                   <Button
                     variant="contained"
                     disabled={selectedSettings.length === 0}
-                    onClick={() => {
+                    onClick={async () => {
                       const selected = settings.filter(s => selectedSettings.includes(s.id));
+                      
+                      // 정책영업그룹이 로드되지 않았으면 먼저 로드
+                      if (userGroups.length === 0) {
+                        await loadUserGroupsWithoutHistory();
+                      }
+                      
+                      // 기본 그룹이 아직 로드되지 않았으면 먼저 로드 (빠른 응답을 위해)
+                      let policyTableGroups = {};
+                      if (Object.keys(defaultGroups).length === 0) {
+                        // 기본 그룹이 전혀 로드되지 않았으면 로드 대기
+                        const loadedGroups = await loadDefaultGroups();
+                        selected.forEach(setting => {
+                          const defaultGroupIds = loadedGroups[setting.id] || [];
+                          if (defaultGroupIds.length > 0) {
+                            policyTableGroups[setting.id] = defaultGroupIds;
+                          }
+                        });
+                      } else {
+                        // 이미 로드된 기본 그룹 사용 (즉시 모달 열기)
+                        selected.forEach(setting => {
+                          const defaultGroupIds = defaultGroups[setting.id] || [];
+                          if (defaultGroupIds.length > 0) {
+                            policyTableGroups[setting.id] = defaultGroupIds;
+                          }
+                        });
+                      }
+                      
                       setBatchCreationFormData({
                         applyDate: '',
                         applyContent: '',
-                        policyTableGroups: {}
+                        policyTableGroups: policyTableGroups
                       });
                       setBatchGenerationStatus({});
                       setBatchCreationModalOpen(true);
+                      
+                      // 백그라운드에서 기본 그룹 다시 로드 (최신 데이터 보장, 이미 로드된 경우는 스킵)
+                      if (Object.keys(defaultGroups).length === 0) {
+                        // 이미 위에서 로드했으므로 스킵
+                      } else {
+                        // 이미 로드된 경우에만 백그라운드에서 최신 데이터 확인
+                        loadDefaultGroups().then(loadedGroups => {
+                          // 로드된 그룹으로 업데이트 (현재 선택된 그룹이 없는 경우만)
+                          setBatchCreationFormData(prev => {
+                            const updatedGroups = { ...prev.policyTableGroups };
+                            let hasUpdate = false;
+                            
+                            selected.forEach(setting => {
+                              if (loadedGroups[setting.id] && loadedGroups[setting.id].length > 0) {
+                                if (!updatedGroups[setting.id] || updatedGroups[setting.id].length === 0) {
+                                  updatedGroups[setting.id] = loadedGroups[setting.id];
+                                  hasUpdate = true;
+                                }
+                              }
+                            });
+                            
+                            if (hasUpdate) {
+                              return {
+                                ...prev,
+                                policyTableGroups: updatedGroups
+                              };
+                            }
+                            return prev;
+                          });
+                        });
+                      }
                     }}
                     startIcon={<AddIcon />}
                   >
@@ -1574,71 +2032,11 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            // 구글시트 링크를 웹 버전으로 강제 열기 (PC/모바일 모두)
                             let url = setting.policyTableLink;
-                            
-                            // 시트 ID만 있는 경우 전체 URL로 변환
                             if (/^[a-zA-Z0-9-_]+$/.test(url)) {
                               url = `https://docs.google.com/spreadsheets/d/${url}/edit`;
                             }
-                            
-                            // 구글시트 ID 추출
-                            const sheetIdMatch = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-                            if (sheetIdMatch) {
-                              const sheetId = sheetIdMatch[1];
-                              // gid 파라미터 추출 (원본 URL에 있는 경우만 사용)
-                              const gidMatch = url.match(/[?&#]gid=([0-9]+)/);
-                              
-                              // 웹 버전으로 강제 열기 (앱 실행 방지)
-                              // usp=drive_web: 웹 버전 강제 (PC/모바일 모두)
-                              // rm=minimal: 모바일 앱 리다이렉트 방지
-                              if (gidMatch) {
-                                // 원본 URL에 gid가 있으면 그대로 사용 (사용자가 의도한 시트)
-                                const gid = gidMatch[1];
-                                url = `https://docs.google.com/spreadsheets/d/${sheetId}/edit?usp=drive_web&rm=minimal&gid=${gid}#gid=${gid}`;
-                              } else {
-                                // 원본 URL에 gid가 없으면 gid 파라미터를 포함하지 않음 (첫 번째 시트로 열림)
-                                url = `https://docs.google.com/spreadsheets/d/${sheetId}/edit?usp=drive_web&rm=minimal`;
-                              }
-                            } else {
-                              // ID를 찾을 수 없으면 원본 URL에 파라미터 추가 (gid는 유지)
-                              const separator = url.includes('?') ? '&' : '?';
-                              // 원본 URL에 이미 gid가 있는지 확인
-                              const hasGid = url.includes('gid=');
-                              if (hasGid) {
-                                url = `${url}${separator}usp=drive_web&rm=minimal`;
-                              } else {
-                                url = `${url}${separator}usp=drive_web&rm=minimal`;
-                              }
-                            }
-                            
-                            // 새 창에서 열기 (앱 리다이렉트 방지)
-                            let newWindow = null;
-                            try {
-                              newWindow = window.open(
-                                url, 
-                                '_blank', 
-                                'noopener,noreferrer,width=1200,height=800'
-                              );
-                              
-                              // 팝업 차단 감지: window.open 직후 즉시 확인
-                              // newWindow가 null이거나 undefined인 경우만 팝업 차단으로 판단
-                              if (!newWindow) {
-                                // 팝업이 차단된 경우 사용자에게 알림
-                                alert('팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해주세요.');
-                                return;
-                              }
-                              
-                              // newWindow가 존재하면 정상적으로 열린 것
-                              // 사용자가 창을 닫은 경우는 newWindow.closed가 true가 되지만,
-                              // 이는 정상적인 동작이므로 알림을 표시하지 않음
-                              // 팝업 차단 감지는 window.open 직후에만 수행하며,
-                              // 이후 창이 닫히는 것은 감지하지 않음
-                            } catch (error) {
-                              // window.open이 예외를 발생시킨 경우 (일부 브라우저에서 발생 가능)
-                              console.error('구글시트 열기 오류:', error);
-                              alert('구글시트를 열 수 없습니다. 브라우저 설정에서 팝업을 허용해주세요.');
-                            }
+                            window.open(url, '_blank');
                           }}
                           style={{ color: '#1976d2', textDecoration: 'none', cursor: 'pointer' }}
                         >
@@ -1936,17 +2334,225 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
           정책표 생성 - {selectedPolicyTable?.policyTableName}
         </DialogTitle>
         <DialogContent>
+          <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ko}>
           <Grid container spacing={2} sx={{ mt: 1 }}>
+              {/* 정책적용일시 자동 생성 섹션 */}
+              <Grid item xs={12}>
+                <Paper sx={{ p: 2, bgcolor: 'background.default' }}>
+                  <Typography variant="subtitle2" gutterBottom sx={{ mb: 2, fontWeight: 'bold' }}>
+                    정책적용일시 자동 생성
+                  </Typography>
+                  
+                  <Grid container spacing={2}>
+                    {/* 시작 날짜 */}
+                    <Grid item xs={12} sm={6}>
+                      <DatePicker
+                        label="시작 날짜"
+                        value={autoDateSettings.startDate}
+                        onChange={(newValue) => {
+                          setAutoDateSettings(prev => ({ ...prev, startDate: newValue }));
+                        }}
+                        slotProps={{
+                          textField: {
+                            fullWidth: true,
+                            size: 'small'
+                          }
+                        }}
+                      />
+                    </Grid>
+                    
+                    {/* 시작 시간 */}
+                    <Grid item xs={6} sm={3}>
+                      <FormControl fullWidth size="small">
+                        <InputLabel>시</InputLabel>
+                        <Select
+                          value={autoDateSettings.startHour}
+                          label="시"
+                          onChange={(e) => {
+                            setAutoDateSettings(prev => ({ ...prev, startHour: e.target.value }));
+                          }}
+                        >
+                          {Array.from({ length: 24 }, (_, i) => (
+                            <MenuItem key={i} value={i}>{i}시</MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                    
+                    <Grid item xs={6} sm={3}>
+                      <FormControl fullWidth size="small">
+                        <InputLabel>분 (10분 단위)</InputLabel>
+                        <Select
+                          value={autoDateSettings.startMinute}
+                          label="분 (10분 단위)"
+                          onChange={(e) => {
+                            setAutoDateSettings(prev => ({ ...prev, startMinute: e.target.value }));
+                          }}
+                        >
+                          {Array.from({ length: 6 }, (_, i) => {
+                            const minute = i * 10;
+                            return <MenuItem key={minute} value={minute}>{minute}분</MenuItem>;
+                          })}
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                    
+                    {/* 정책 유형 선택 */}
+                    <Grid item xs={12} sm={6}>
+                      <FormControl fullWidth size="small">
+                        <InputLabel>정책 유형</InputLabel>
+                        <Select
+                          value={autoDateSettings.policyType}
+                          label="정책 유형"
+                          onChange={(e) => {
+                            setAutoDateSettings(prev => ({ ...prev, policyType: e.target.value }));
+                          }}
+                        >
+                          <MenuItem value="wireless">무선정책</MenuItem>
+                          <MenuItem value="wired">유선정책</MenuItem>
+                          <MenuItem value="other">기타정책</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                    
+                    {/* 기타정책 선택 */}
+                    {autoDateSettings.policyType === 'other' && (
+                      <Grid item xs={12} sm={6}>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <FormControl fullWidth size="small">
+                            <InputLabel>기타정책명</InputLabel>
+                            <Select
+                              value={autoDateSettings.otherPolicyName}
+                              label="기타정책명"
+                              onChange={(e) => {
+                                setAutoDateSettings(prev => ({ ...prev, otherPolicyName: e.target.value }));
+                              }}
+                            >
+                              {otherPolicyTypes.map((name) => (
+                                <MenuItem key={name} value={name}>{name}</MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={handleAddOtherPolicyType}
+                            sx={{ minWidth: 80 }}
+                          >
+                            추가
+                          </Button>
+                        </Box>
+                      </Grid>
+                    )}
+                    
+                    {/* 기타정책 추가 입력 필드 */}
+                    {autoDateSettings.policyType === 'other' && (
+                      <Grid item xs={12}>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <TextField
+                            fullWidth
+                            size="small"
+                            label="새 기타정책명"
+                            value={newOtherPolicyName}
+                            onChange={(e) => setNewOtherPolicyName(e.target.value)}
+                            placeholder="정책명을 입력하세요"
+                          />
+                        </Box>
+                      </Grid>
+                    )}
+                    
+                    {/* 종료시점 체크박스 */}
+                    <Grid item xs={12}>
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={autoDateSettings.hasEndDate}
+                            onChange={(e) => {
+                              setAutoDateSettings(prev => ({
+                                ...prev,
+                                hasEndDate: e.target.checked,
+                                endDate: e.target.checked ? (prev.endDate || new Date()) : null
+                              }));
+                            }}
+                          />
+                        }
+                        label="종료시점 사용"
+                      />
+                    </Grid>
+                    
+                    {/* 종료 날짜/시간 */}
+                    {autoDateSettings.hasEndDate && (
+                      <>
+                        <Grid item xs={12} sm={6}>
+                          <DatePicker
+                            label="종료 날짜"
+                            value={autoDateSettings.endDate}
+                            onChange={(newValue) => {
+                              setAutoDateSettings(prev => ({ ...prev, endDate: newValue }));
+                            }}
+                            slotProps={{
+                              textField: {
+                                fullWidth: true,
+                                size: 'small'
+                              }
+                            }}
+                          />
+                        </Grid>
+                        
+                        <Grid item xs={6} sm={3}>
+                          <FormControl fullWidth size="small">
+                            <InputLabel>종료 시</InputLabel>
+                            <Select
+                              value={autoDateSettings.endHour}
+                              label="종료 시"
+                              onChange={(e) => {
+                                setAutoDateSettings(prev => ({ ...prev, endHour: e.target.value }));
+                              }}
+                            >
+                              {Array.from({ length: 24 }, (_, i) => (
+                                <MenuItem key={i} value={i}>{i}시</MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                        </Grid>
+                        
+                        <Grid item xs={6} sm={3}>
+                          <FormControl fullWidth size="small">
+                            <InputLabel>종료 분 (10분 단위)</InputLabel>
+                            <Select
+                              value={autoDateSettings.endMinute}
+                              label="종료 분 (10분 단위)"
+                              onChange={(e) => {
+                                setAutoDateSettings(prev => ({ ...prev, endMinute: e.target.value }));
+                              }}
+                            >
+                              {Array.from({ length: 6 }, (_, i) => {
+                                const minute = i * 10;
+                                return <MenuItem key={minute} value={minute}>{minute}분</MenuItem>;
+                              })}
+                            </Select>
+                          </FormControl>
+                        </Grid>
+                      </>
+                    )}
+                  </Grid>
+                </Paper>
+              </Grid>
+              
+              {/* 생성된 정책적용일시 표시 */}
             <Grid item xs={12}>
               <TextField
                 fullWidth
                 label="정책적용일시"
                 value={creationFormData.applyDate}
                 onChange={(e) => setCreationFormData({ ...creationFormData, applyDate: e.target.value })}
-                placeholder="예: 2025-01-01 10:00"
+                  placeholder="자동 생성된 텍스트가 여기에 표시됩니다"
                 required
               />
             </Grid>
+            </Grid>
+          </LocalizationProvider>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid item xs={12}>
               <TextField
                 fullWidth
@@ -1959,6 +2565,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
               />
             </Grid>
             <Grid item xs={12}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
               <Autocomplete
                 multiple
                 options={userGroups || []}
@@ -1973,6 +2580,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                 isOptionEqualToValue={(option, value) => option?.id === value?.id}
                 noOptionsText="등록된 그룹이 없습니다."
                 filterSelectedOptions
+                  sx={{ flex: 1 }}
                 renderInput={(params) => (
                   <TextField
                     {...params}
@@ -1994,6 +2602,21 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                   })
                 }
               />
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => {
+                    setDefaultGroupFormData({
+                      policyTableId: selectedPolicyTable?.id || '',
+                      defaultGroupIds: creationFormData.accessGroupIds
+                    });
+                    setDefaultGroupModalOpen(true);
+                  }}
+                  sx={{ minWidth: 100 }}
+                >
+                  기본설정
+                </Button>
+              </Box>
             </Grid>
 
             {/* 생성 진행 상황 */}
@@ -2005,17 +2628,19 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                       {generationStatus.message || '처리 중...'}
                     </Typography>
                     
-                    {/* 대기순번 표시 */}
-                    {generationStatus.queuePosition !== undefined && generationStatus.queuePosition > 0 && (
+                    {/* 대기열 정보 표시 */}
+                    {generationStatus.status === 'queued' && (generationStatus.queuePosition !== undefined || generationStatus.queuedUserCount !== undefined) && (
                       <Alert severity="info" sx={{ mt: 1, mb: 1 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                           <Box>
                             <Typography variant="body2" fontWeight="bold">
-                              대기순번: {generationStatus.queuePosition}번
+                              {generationStatus.queuedUserCount !== undefined 
+                                ? `대기 중: ${generationStatus.queuedUserCount}명의 사용자가 ${generationStatus.queueLength}건 대기 중`
+                                : `대기순번: ${generationStatus.queuePosition}번`}
                             </Typography>
-                            {generationStatus.queueLength !== undefined && (
-                              <Typography variant="caption" color="text.secondary">
-                                전체 대기: {generationStatus.queueLength}개
+                            {generationStatus.queuePosition !== undefined && generationStatus.queuePosition > 0 && (
+                              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                                내 순번: {generationStatus.queuePosition}번
                               </Typography>
                             )}
                             {generationStatus.estimatedWaitTime !== undefined && generationStatus.estimatedWaitTime > 0 && (
@@ -2127,7 +2752,12 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
             <Button
               onClick={handleStartGeneration}
               variant="contained"
-              disabled={loading || !creationFormData.applyDate || !creationFormData.applyContent}
+              disabled={
+                loading || 
+                !creationFormData.applyDate || 
+                !creationFormData.applyContent ||
+                (generationStatus && (generationStatus.status === 'queued' || generationStatus.status === 'processing'))
+              }
             >
               {loading ? <CircularProgress size={24} /> : '정책표생성'}
             </Button>
@@ -2149,8 +2779,212 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
           모두정책생성 ({selectedSettings.length}개)
         </DialogTitle>
         <DialogContent>
+          <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ko}>
           <Grid container spacing={2} sx={{ mt: 1 }}>
-            {/* 공통 필드 */}
+              {/* 정책적용일시 자동 생성 섹션 */}
+              <Grid item xs={12}>
+                <Paper sx={{ p: 2, bgcolor: 'background.default' }}>
+                  <Typography variant="subtitle2" gutterBottom sx={{ mb: 2, fontWeight: 'bold' }}>
+                    정책적용일시 자동 생성
+                  </Typography>
+                  
+                  <Grid container spacing={2}>
+                    {/* 시작 날짜 */}
+                    <Grid item xs={12} sm={6}>
+                      <DatePicker
+                        label="시작 날짜"
+                        value={autoDateSettings.startDate}
+                        onChange={(newValue) => {
+                          setAutoDateSettings(prev => ({ ...prev, startDate: newValue }));
+                        }}
+                        slotProps={{
+                          textField: {
+                            fullWidth: true,
+                            size: 'small'
+                          }
+                        }}
+                      />
+                    </Grid>
+                    
+                    {/* 시작 시간 */}
+                    <Grid item xs={6} sm={3}>
+                      <FormControl fullWidth size="small">
+                        <InputLabel>시</InputLabel>
+                        <Select
+                          value={autoDateSettings.startHour}
+                          label="시"
+                          onChange={(e) => {
+                            setAutoDateSettings(prev => ({ ...prev, startHour: e.target.value }));
+                          }}
+                        >
+                          {Array.from({ length: 24 }, (_, i) => (
+                            <MenuItem key={i} value={i}>{i}시</MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                    
+                    <Grid item xs={6} sm={3}>
+                      <FormControl fullWidth size="small">
+                        <InputLabel>분 (10분 단위)</InputLabel>
+                        <Select
+                          value={autoDateSettings.startMinute}
+                          label="분 (10분 단위)"
+                          onChange={(e) => {
+                            setAutoDateSettings(prev => ({ ...prev, startMinute: e.target.value }));
+                          }}
+                        >
+                          {Array.from({ length: 6 }, (_, i) => {
+                            const minute = i * 10;
+                            return <MenuItem key={minute} value={minute}>{minute}분</MenuItem>;
+                          })}
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                    
+                    {/* 정책 유형 선택 */}
+                    <Grid item xs={12} sm={6}>
+                      <FormControl fullWidth size="small">
+                        <InputLabel>정책 유형</InputLabel>
+                        <Select
+                          value={autoDateSettings.policyType}
+                          label="정책 유형"
+                          onChange={(e) => {
+                            setAutoDateSettings(prev => ({ ...prev, policyType: e.target.value }));
+                          }}
+                        >
+                          <MenuItem value="wireless">무선정책</MenuItem>
+                          <MenuItem value="wired">유선정책</MenuItem>
+                          <MenuItem value="other">기타정책</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                    
+                    {/* 기타정책 선택 */}
+                    {autoDateSettings.policyType === 'other' && (
+                      <Grid item xs={12} sm={6}>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <FormControl fullWidth size="small">
+                            <InputLabel>기타정책명</InputLabel>
+                            <Select
+                              value={autoDateSettings.otherPolicyName}
+                              label="기타정책명"
+                              onChange={(e) => {
+                                setAutoDateSettings(prev => ({ ...prev, otherPolicyName: e.target.value }));
+                              }}
+                            >
+                              {otherPolicyTypes.map((name) => (
+                                <MenuItem key={name} value={name}>{name}</MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={handleAddOtherPolicyType}
+                            sx={{ minWidth: 80 }}
+                          >
+                            추가
+                          </Button>
+                        </Box>
+                      </Grid>
+                    )}
+                    
+                    {/* 기타정책 추가 입력 필드 */}
+                    {autoDateSettings.policyType === 'other' && (
+                      <Grid item xs={12}>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <TextField
+                            fullWidth
+                            size="small"
+                            label="새 기타정책명"
+                            value={newOtherPolicyName}
+                            onChange={(e) => setNewOtherPolicyName(e.target.value)}
+                            placeholder="정책명을 입력하세요"
+                          />
+                        </Box>
+                      </Grid>
+                    )}
+                    
+                    {/* 종료시점 체크박스 */}
+                    <Grid item xs={12}>
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={autoDateSettings.hasEndDate}
+                            onChange={(e) => {
+                              setAutoDateSettings(prev => ({
+                                ...prev,
+                                hasEndDate: e.target.checked,
+                                endDate: e.target.checked ? (prev.endDate || new Date()) : null
+                              }));
+                            }}
+                          />
+                        }
+                        label="종료시점 사용"
+                      />
+                    </Grid>
+                    
+                    {/* 종료 날짜/시간 */}
+                    {autoDateSettings.hasEndDate && (
+                      <>
+                        <Grid item xs={12} sm={6}>
+                          <DatePicker
+                            label="종료 날짜"
+                            value={autoDateSettings.endDate}
+                            onChange={(newValue) => {
+                              setAutoDateSettings(prev => ({ ...prev, endDate: newValue }));
+                            }}
+                            slotProps={{
+                              textField: {
+                                fullWidth: true,
+                                size: 'small'
+                              }
+                            }}
+                          />
+                        </Grid>
+                        
+                        <Grid item xs={6} sm={3}>
+                          <FormControl fullWidth size="small">
+                            <InputLabel>종료 시</InputLabel>
+                            <Select
+                              value={autoDateSettings.endHour}
+                              label="종료 시"
+                              onChange={(e) => {
+                                setAutoDateSettings(prev => ({ ...prev, endHour: e.target.value }));
+                              }}
+                            >
+                              {Array.from({ length: 24 }, (_, i) => (
+                                <MenuItem key={i} value={i}>{i}시</MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                        </Grid>
+                        
+                        <Grid item xs={6} sm={3}>
+                          <FormControl fullWidth size="small">
+                            <InputLabel>종료 분 (10분 단위)</InputLabel>
+                            <Select
+                              value={autoDateSettings.endMinute}
+                              label="종료 분 (10분 단위)"
+                              onChange={(e) => {
+                                setAutoDateSettings(prev => ({ ...prev, endMinute: e.target.value }));
+                              }}
+                            >
+                              {Array.from({ length: 6 }, (_, i) => {
+                                const minute = i * 10;
+                                return <MenuItem key={minute} value={minute}>{minute}분</MenuItem>;
+                              })}
+                            </Select>
+                          </FormControl>
+                        </Grid>
+                      </>
+                    )}
+                  </Grid>
+                </Paper>
+              </Grid>
+              
+              {/* 생성된 정책적용일시 표시 */}
             <Grid item xs={12}>
               <TextField
                 fullWidth
@@ -2160,10 +2994,13 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                   ...batchCreationFormData, 
                   applyDate: e.target.value 
                 })}
-                placeholder="예: 2025-01-01 10:00"
+                  placeholder="자동 생성된 텍스트가 여기에 표시됩니다"
                 required
               />
             </Grid>
+            </Grid>
+          </LocalizationProvider>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid item xs={12}>
               <TextField
                 fullWidth
@@ -2194,7 +3031,7 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                           {setting.policyTableName}
                         </Typography>
                       </Grid>
-                      <Grid item xs={12} sm={8}>
+                      <Grid item xs={12} sm={7}>
                         <Autocomplete
                           multiple
                           options={userGroups || []}
@@ -2233,6 +3070,22 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                           }
                         />
                       </Grid>
+                      <Grid item xs={12} sm={1}>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => {
+                            setDefaultGroupFormData({
+                              policyTableId: setting.id,
+                              defaultGroupIds: batchCreationFormData.policyTableGroups[setting.id] || []
+                            });
+                            setDefaultGroupModalOpen(true);
+                          }}
+                          sx={{ minWidth: 80 }}
+                        >
+                          기본설정
+                        </Button>
+                      </Grid>
                       {/* 생성 상태 표시 */}
                       {batchGenerationStatus[setting.id] && (
                         <Grid item xs={12}>
@@ -2241,22 +3094,22 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                               <Alert severity="info">
                                 <Box>
                                   <Typography variant="body2" fontWeight="bold">
-                                    대기 중...
+                                    {batchGenerationStatus[setting.id].message || '대기 중...'}
                                   </Typography>
+                                  {batchGenerationStatus[setting.id].queuedUserCount !== undefined && (
+                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                                      {batchGenerationStatus[setting.id].queuedUserCount}명의 사용자가 {batchGenerationStatus[setting.id].queueLength}건 대기 중
+                                    </Typography>
+                                  )}
                                   {batchGenerationStatus[setting.id].queuePosition !== undefined && batchGenerationStatus[setting.id].queuePosition > 0 && (
-                                    <Box sx={{ mt: 0.5 }}>
-                                      <Typography variant="caption" color="text.secondary">
-                                        대기순번: {batchGenerationStatus[setting.id].queuePosition}번
-                                        {batchGenerationStatus[setting.id].queueLength !== undefined && (
-                                          <> (전체 대기: {batchGenerationStatus[setting.id].queueLength}개)</>
-                                        )}
-                                      </Typography>
-                                      {batchGenerationStatus[setting.id].estimatedWaitTime !== undefined && batchGenerationStatus[setting.id].estimatedWaitTime > 0 && (
-                                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                                          예상 대기 시간: 약 {Math.ceil(batchGenerationStatus[setting.id].estimatedWaitTime / 60)}분
-                                        </Typography>
-                                      )}
-                                    </Box>
+                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                                      내 순번: {batchGenerationStatus[setting.id].queuePosition}번
+                                    </Typography>
+                                  )}
+                                  {batchGenerationStatus[setting.id].estimatedWaitTime !== undefined && batchGenerationStatus[setting.id].estimatedWaitTime > 0 && (
+                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                                      예상 대기 시간: 약 {Math.ceil(batchGenerationStatus[setting.id].estimatedWaitTime / 60)}분
+                                    </Typography>
                                   )}
                                 </Box>
                               </Alert>
@@ -2356,12 +3209,333 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                 ))}
             </Grid>
           </Grid>
+          
+          {/* 정책표별 등록 상태 표시 (정책표등록 버튼 위) */}
+          {Object.values(batchGenerationStatus).some(status => 
+            status.status === 'completed' && status.result
+          ) && (
+            <Box sx={{ mt: 3, mb: 2 }}>
+              <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 'bold' }}>
+                정책표 등록 상태
+              </Typography>
+              <Grid container spacing={2}>
+                {settings
+                  .filter(s => selectedSettings.includes(s.id))
+                  .filter(s => {
+                    const status = batchGenerationStatus[s.id];
+                    return status?.status === 'completed' && status?.result;
+                  })
+                  .map((setting) => {
+                    const status = batchGenerationStatus[setting.id];
+                    const registrationStatus = status?.registrationStatus;
+                    const registrationError = status?.registrationError;
+                    const registrationMessage = status?.registrationMessage;
+                    
+                    return (
+                      <Grid item xs={12} key={setting.id}>
+                        <Box sx={{ 
+                          p: 2, 
+                          border: '1px solid', 
+                          borderColor: registrationStatus === 'registration_failed' ? 'error.main' : 
+                                       registrationStatus === 'already_registered' ? 'warning.main' :
+                                       registrationStatus === 'registered' ? 'success.main' :
+                                       'divider',
+                          borderRadius: 1,
+                          bgcolor: registrationStatus === 'registration_failed' ? 'rgba(211, 47, 47, 0.1)' : 
+                                   registrationStatus === 'already_registered' ? 'rgba(237, 108, 2, 0.1)' : 
+                                   registrationStatus === 'registered' ? 'rgba(46, 125, 50, 0.1)' :
+                                   'background.paper'
+                        }}>
+                          <Grid container spacing={2} alignItems="center">
+                            <Grid item xs={12} sm={4}>
+                              <Typography variant="body1" fontWeight="medium">
+                                {setting.policyTableName}
+                              </Typography>
+                            </Grid>
+                            <Grid item xs={12} sm={5}>
+                              {registrationStatus === 'registration_failed' ? (
+                                <Alert severity="error" sx={{ py: 0 }}>
+                                  <Typography variant="body2">
+                                    등록 실패: {registrationError}
+                                  </Typography>
+                                </Alert>
+                              ) : registrationStatus === 'already_registered' ? (
+                                <Alert severity="warning" sx={{ py: 0 }}>
+                                  <Typography variant="body2">
+                                    {registrationMessage || '이미 등록 완료'}
+                                  </Typography>
+                                </Alert>
+                              ) : registrationStatus === 'registered' ? (
+                                <Alert severity="success" sx={{ py: 0 }}>
+                                  <Typography variant="body2">
+                                    {registrationMessage || '등록 완료'}
+                                  </Typography>
+                                </Alert>
+                              ) : (
+                                <Typography variant="body2" color="text.secondary">
+                                  등록 대기 중
+                                </Typography>
+                              )}
+                            </Grid>
+                            <Grid item xs={12} sm={3}>
+                              {registrationStatus === 'registration_failed' && (
+                                <Box sx={{ display: 'flex', gap: 1 }}>
+                                  <Button
+                                    size="small"
+                                    variant="outlined"
+                                    color="error"
+                                    startIcon={<RefreshIcon />}
+                                    onClick={() => handleRetryGeneration(setting.id)}
+                                    disabled={
+                                      !batchCreationFormData.applyDate ||
+                                      !batchCreationFormData.applyContent ||
+                                      batchGenerationStatus[setting.id]?.status === 'processing' ||
+                                      batchGenerationStatus[setting.id]?.status === 'queued'
+                                    }
+                                    sx={{ flex: 1 }}
+                                  >
+                                    재생성
+                                  </Button>
+                                  <Button
+                                    size="small"
+                                    variant="contained"
+                                    color="success"
+                                    startIcon={<CheckCircleIcon />}
+                                    onClick={async () => {
+                                      const status = batchGenerationStatus[setting.id];
+                                      if (!status?.result?.id) return;
+                                      
+                                      try {
+                                        setLoading(true);
+                                        const response = await fetch(`${API_BASE_URL}/api/policy-tables/${status.result.id}/register`, {
+                                          method: 'POST',
+                                          headers: {
+                                            'Content-Type': 'application/json',
+                                            'x-user-role': loggedInStore?.userRole || '',
+                                            'x-user-id': loggedInStore?.contactId || loggedInStore?.id || ''
+                                          }
+                                        });
+                                        
+                                        if (response.ok) {
+                                          const data = await response.json();
+                                          
+                                          // 상태 업데이트 및 모든 정책표 등록 완료 확인
+                                          setBatchGenerationStatus(prev => {
+                                            const updated = {
+                                              ...prev,
+                                              [setting.id]: {
+                                                ...prev[setting.id],
+                                                registrationStatus: data.alreadyRegistered ? 'already_registered' : 'registered',
+                                                registrationMessage: data.alreadyRegistered ? '이미 등록 완료' : '등록 완료'
+                                              }
+                                            };
+                                            
+                                            // 업데이트된 상태에서 모든 정책표 등록 완료 확인
+                                            const completedSettings = settings.filter(s => 
+                                              selectedSettings.includes(s.id) &&
+                                              updated[s.id]?.status === 'completed' &&
+                                              updated[s.id]?.result
+                                            );
+                                            
+                                            const allRegistered = completedSettings.length > 0 && completedSettings.every(s => {
+                                              const status = updated[s.id];
+                                              return status?.registrationStatus === 'registered' || 
+                                                     status?.registrationStatus === 'already_registered';
+                                            });
+                                            
+                                            if (allRegistered) {
+                                              // 모든 정책표가 등록 완료되었으므로 모달 닫기
+                                              setTimeout(() => {
+                                                setSnackbar({ 
+                                                  open: true, 
+                                                  message: `모든 정책표(${completedSettings.length}개) 등록이 완료되었습니다.`, 
+                                                  severity: 'success' 
+                                                });
+                                                loadSettings().then(() => {
+                                                  handleCloseBatchCreationModal();
+                                                });
+                                              }, 0);
+                                            } else {
+                                              setSnackbar({ 
+                                                open: true, 
+                                                message: `${setting.policyTableName} 등록 완료`, 
+                                                severity: 'success' 
+                                              });
+                                              loadSettings();
+                                            }
+                                            
+                                            return updated;
+                                          });
+                                        } else {
+                                          const errorData = await response.json();
+                                          setBatchGenerationStatus(prev => ({
+                                            ...prev,
+                                            [setting.id]: {
+                                              ...prev[setting.id],
+                                              registrationStatus: 'registration_failed',
+                                              registrationError: errorData.error || '등록 실패'
+                                            }
+                                          }));
+                                          setSnackbar({ 
+                                            open: true, 
+                                            message: `${setting.policyTableName} 등록 실패: ${errorData.error || '등록 실패'}`, 
+                                            severity: 'error' 
+                                          });
+                                        }
+                                      } catch (error) {
+                                        console.error('개별 정책표 등록 오류:', error);
+                                        setBatchGenerationStatus(prev => ({
+                                          ...prev,
+                                          [setting.id]: {
+                                            ...prev[setting.id],
+                                            registrationStatus: 'registration_failed',
+                                            registrationError: '등록 중 오류 발생'
+                                          }
+                                        }));
+                                        setSnackbar({ 
+                                          open: true, 
+                                          message: `${setting.policyTableName} 등록 중 오류가 발생했습니다.`, 
+                                          severity: 'error' 
+                                        });
+                                      } finally {
+                                        setLoading(false);
+                                      }
+                                    }}
+                                    disabled={loading}
+                                    sx={{ flex: 1 }}
+                                  >
+                                    등록
+                                  </Button>
+                                </Box>
+                              )}
+                              {!registrationStatus && status?.status === 'completed' && status?.result && (
+                                <Button
+                                  size="small"
+                                  variant="contained"
+                                  color="success"
+                                  startIcon={<CheckCircleIcon />}
+                                  onClick={async () => {
+                                    const status = batchGenerationStatus[setting.id];
+                                    if (!status?.result?.id) return;
+                                    
+                                    try {
+                                      setLoading(true);
+                                      const response = await fetch(`${API_BASE_URL}/api/policy-tables/${status.result.id}/register`, {
+                                        method: 'POST',
+                                        headers: {
+                                          'Content-Type': 'application/json',
+                                          'x-user-role': loggedInStore?.userRole || '',
+                                          'x-user-id': loggedInStore?.contactId || loggedInStore?.id || ''
+                                        }
+                                      });
+                                      
+                                      if (response.ok) {
+                                        const data = await response.json();
+                                        
+                                        // 상태 업데이트 및 모든 정책표 등록 완료 확인
+                                        setBatchGenerationStatus(prev => {
+                                          const updated = {
+                                            ...prev,
+                                            [setting.id]: {
+                                              ...prev[setting.id],
+                                              registrationStatus: data.alreadyRegistered ? 'already_registered' : 'registered',
+                                              registrationMessage: data.alreadyRegistered ? '이미 등록 완료' : '등록 완료'
+                                            }
+                                          };
+                                          
+                                          // 업데이트된 상태에서 모든 정책표 등록 완료 확인
+                                          const completedSettings = settings.filter(s => 
+                                            selectedSettings.includes(s.id) &&
+                                            updated[s.id]?.status === 'completed' &&
+                                            updated[s.id]?.result
+                                          );
+                                          
+                                          const allRegistered = completedSettings.length > 0 && completedSettings.every(s => {
+                                            const status = updated[s.id];
+                                            return status?.registrationStatus === 'registered' || 
+                                                   status?.registrationStatus === 'already_registered';
+                                          });
+                                          
+                                          if (allRegistered) {
+                                            // 모든 정책표가 등록 완료되었으므로 모달 닫기
+                                            setTimeout(() => {
+                                              setSnackbar({ 
+                                                open: true, 
+                                                message: `모든 정책표(${completedSettings.length}개) 등록이 완료되었습니다.`, 
+                                                severity: 'success' 
+                                              });
+                                              loadSettings().then(() => {
+                                                handleCloseBatchCreationModal();
+                                              });
+                                            }, 0);
+                                          } else {
+                                            setSnackbar({ 
+                                              open: true, 
+                                              message: `${setting.policyTableName} 등록 완료`, 
+                                              severity: 'success' 
+                                            });
+                                            loadSettings();
+                                          }
+                                          
+                                          return updated;
+                                        });
+                                      } else {
+                                        const errorData = await response.json();
+                                        setBatchGenerationStatus(prev => ({
+                                          ...prev,
+                                          [setting.id]: {
+                                            ...prev[setting.id],
+                                            registrationStatus: 'registration_failed',
+                                            registrationError: errorData.error || '등록 실패'
+                                          }
+                                        }));
+                                        setSnackbar({ 
+                                          open: true, 
+                                          message: `${setting.policyTableName} 등록 실패: ${errorData.error || '등록 실패'}`, 
+                                          severity: 'error' 
+                                        });
+                                      }
+                                    } catch (error) {
+                                      console.error('개별 정책표 등록 오류:', error);
+                                      setBatchGenerationStatus(prev => ({
+                                        ...prev,
+                                        [setting.id]: {
+                                          ...prev[setting.id],
+                                          registrationStatus: 'registration_failed',
+                                          registrationError: '등록 중 오류 발생'
+                                        }
+                                      }));
+                                      setSnackbar({ 
+                                        open: true, 
+                                        message: `${setting.policyTableName} 등록 중 오류가 발생했습니다.`, 
+                                        severity: 'error' 
+                                      });
+                                    } finally {
+                                      setLoading(false);
+                                    }
+                                  }}
+                                  disabled={loading}
+                                  fullWidth
+                                >
+                                  등록
+                                </Button>
+                              )}
+                            </Grid>
+                          </Grid>
+                        </Box>
+                      </Grid>
+                    );
+                  })}
+              </Grid>
+            </Box>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseBatchCreationModal}>취소</Button>
           {/* 완료된 정책표가 있을 때만 정책표등록 버튼 표시 */}
           {Object.values(batchGenerationStatus).some(status => 
-            status.status === 'completed' && status.result
+            status.status === 'completed' && status.result &&
+            (!status.registrationStatus || status.registrationStatus === 'registration_failed')
           ) && (
             <Button
               onClick={handleBatchRegister}
@@ -2632,6 +3806,140 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
           </Box>
         )}
       </Popover>
+
+      {/* 기본 그룹 설정 모달 */}
+      <Dialog open={defaultGroupModalOpen} onClose={() => setDefaultGroupModalOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          기본 정책영업그룹 설정
+        </DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                선택한 그룹이 이 정책표 생성 시 자동으로 선택됩니다.
+              </Typography>
+              <Autocomplete
+                multiple
+                options={userGroups || []}
+                getOptionLabel={(option) => option?.groupName || ''}
+                value={userGroups.filter(g => defaultGroupFormData.defaultGroupIds.includes(g.id)) || []}
+                onChange={(event, newValue) => {
+                  setDefaultGroupFormData({
+                    ...defaultGroupFormData,
+                    defaultGroupIds: newValue.map(g => g.id)
+                  });
+                }}
+                isOptionEqualToValue={(option, value) => option?.id === value?.id}
+                noOptionsText="등록된 그룹이 없습니다."
+                filterSelectedOptions
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="기본 정책영업그룹"
+                    placeholder="그룹을 선택하세요 (다중 선택 가능)"
+                  />
+                )}
+                renderTags={(value, getTagProps) =>
+                  value.map((option, index) => {
+                    const { key, ...tagProps } = getTagProps({ index });
+                    return (
+                      <Chip
+                        key={option.id || key}
+                        label={option.groupName || ''}
+                        onDelete={tagProps.onDelete}
+                        {...tagProps}
+                      />
+                    );
+                  })
+                }
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDefaultGroupModalOpen(false)}>취소</Button>
+          <Button
+            onClick={async () => {
+              try {
+                setLoading(true);
+                const userId = loggedInStore?.contactId || loggedInStore?.id;
+                if (!userId) {
+                  setError('사용자 정보를 찾을 수 없습니다.');
+                  return;
+                }
+
+                const response = await fetch(`${API_BASE_URL}/api/policy-table/default-groups/${userId}`, {
+                  method: 'PUT',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'x-user-role': loggedInStore?.userRole || '',
+                    'x-user-id': userId
+                  },
+                  body: JSON.stringify({
+                    policyTableId: defaultGroupFormData.policyTableId,
+                    defaultGroupIds: defaultGroupFormData.defaultGroupIds
+                  })
+                });
+
+                if (response.ok) {
+                  await loadDefaultGroups();
+                  setDefaultGroupModalOpen(false);
+                  setSnackbar({
+                    open: true,
+                    message: '기본 그룹 설정이 저장되었습니다.',
+                    severity: 'success'
+                  });
+                } else {
+                  // 응답이 JSON인지 확인
+                  const contentType = response.headers.get('content-type');
+                  let errorMessage = '기본 그룹 설정 저장에 실패했습니다.';
+                  
+                  if (contentType && contentType.includes('application/json')) {
+                    try {
+                      const errorData = await response.json();
+                      errorMessage = errorData.error || errorMessage;
+                    } catch (e) {
+                      console.error('JSON 파싱 오류:', e);
+                    }
+                  } else {
+                    // HTML 응답인 경우
+                    const text = await response.text();
+                    console.error('서버 응답 (HTML):', text.substring(0, 200));
+                    errorMessage = `서버 오류 (${response.status}): ${response.statusText}`;
+                  }
+                  
+                  setError(errorMessage);
+                }
+              } catch (error) {
+                console.error('기본 그룹 설정 저장 오류:', error);
+                setError('기본 그룹 설정 저장 중 오류가 발생했습니다.');
+              } finally {
+                setLoading(false);
+              }
+            }}
+            variant="contained"
+            disabled={loading}
+          >
+            저장
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={() => setSnackbar({ ...snackbar, open: false })} 
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

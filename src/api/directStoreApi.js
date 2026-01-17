@@ -209,9 +209,12 @@ export const directStoreApi = {
     // === 직영점 관리 모드 API (Mock Data 포함) ===
 
     // 정책 설정 조회
-    getPolicySettings: async (carrier) => {
+    getPolicySettings: async (carrier, noCache = false) => {
         try {
-            const response = await fetch(`${BASE_URL}/policy-settings?carrier=${carrier}`);
+            const url = noCache 
+                ? `${BASE_URL}/policy-settings?carrier=${carrier}&noCache=true`
+                : `${BASE_URL}/policy-settings?carrier=${carrier}`;
+            const response = await fetch(url);
             if (!response.ok) throw new Error('정책 설정 조회 실패');
             return response.json();
         } catch (err) {

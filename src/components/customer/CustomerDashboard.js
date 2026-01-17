@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import MobileListTab from '../direct/MobileListTab';
 import CustomerPreferredStoreTab from './CustomerPreferredStoreTab';
 import CustomerPurchaseQueueTab from './CustomerPurchaseQueueTab';
+import CustomerPurchaseHistoryTab from './CustomerPurchaseHistoryTab';
 import CustomerBoardTab from './CustomerBoardTab';
 import CustomerGuidePage from './CustomerGuidePage';
 import OpeningInfoPage from '../direct/OpeningInfoPage';
@@ -50,9 +51,9 @@ const CustomerDashboard = () => {
     }, [navigate]);
 
     const handleTabChange = (event, newValue) => {
-        // 첫구매 어드민 계정이고 공개아이디(아이디부여전) 상태인 경우, 나의구매대기(2)와 게시판(3) 탭 접근 제한
+        // 첫구매 어드민 계정이고 공개아이디(아이디부여전) 상태인 경우, 나의구매대기(2)와 게시판(4) 탭 접근 제한
         if (customerInfo?.isFirstPurchaseAdmin && customerInfo?.publicIdStatus === 'before') {
-            if (newValue === 2 || newValue === 3) {
+            if (newValue === 2 || newValue === 4) {
                 // 탭 변경을 막고 경고 표시
                 return;
             }
@@ -198,6 +199,7 @@ const CustomerDashboard = () => {
                         label="나의 구매 대기" 
                         disabled={customerInfo?.isFirstPurchaseAdmin && customerInfo?.publicIdStatus === 'before'}
                     />
+                    <Tab label="나의 구매 내역" />
                     <Tab 
                         label="게시판" 
                         disabled={customerInfo?.isFirstPurchaseAdmin && customerInfo?.publicIdStatus === 'before'}
@@ -213,21 +215,36 @@ const CustomerDashboard = () => {
             )}
 
             <Box sx={{ 
-                p: { xs: tabValue === 0 ? 0 : 2, sm: tabValue === 0 ? 0 : 3 }, 
+                p: { xs: tabValue === 0 ? 0 : 0, sm: tabValue === 0 ? 0 : 3 }, 
                 bgcolor: '#fff', 
                 borderRadius: 2, 
                 boxShadow: 1, 
                 minHeight: { xs: '300px', sm: '400px' }, 
-                overflow: 'auto',
-                maxHeight: { xs: 'calc(100vh - 300px)', sm: 'none' }
+                overflow: tabValue === 1 ? 'visible' : 'hidden', // 선호구입매장 탭에서는 스크롤 가능하도록
+                maxHeight: tabValue === 1 ? 'none' : { xs: 'calc(100vh - 300px)', sm: 'none' },
+                height: tabValue === 1 ? 'auto' : { xs: 'calc(100vh - 250px)', sm: '100%' },
+                display: 'flex',
+                flexDirection: 'column',
+                position: 'relative'
             }}>
                 {tabValue === 0 && (
-                    <Box>
+                    <Box sx={{ 
+                        flex: '1 1 auto',
+                        minHeight: 0,
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        overflow: 'hidden'
+                    }}>
                         <MobileListTab onProductSelect={handleProductSelect} isCustomerMode={true} />
                     </Box>
                 )}
                 {tabValue === 1 && (
-                    <Box>
+                    <Box sx={{ 
+                        width: '100%',
+                        minHeight: 0,
+                        flex: '1 1 auto'
+                    }}>
                         <CustomerPreferredStoreTab
                             selectedProduct={selectedProduct}
                             customerInfo={customerInfo}
@@ -247,6 +264,11 @@ const CustomerDashboard = () => {
                     </Box>
                 )}
                 {tabValue === 3 && (
+                    <Box sx={{ p: 3 }}>
+                        <CustomerPurchaseHistoryTab customerInfo={customerInfo} />
+                    </Box>
+                )}
+                {tabValue === 4 && (
                     <Box sx={{ p: 3 }}>
                         {customerInfo?.isFirstPurchaseAdmin && customerInfo?.publicIdStatus === 'before' ? (
                             <Alert severity="error">

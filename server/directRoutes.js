@@ -2243,16 +2243,22 @@ function setupDirectRoutes(app) {
 
   // === 정책 설정 ===
 
-  // GET /api/direct/policy-settings?carrier=SK
+  // GET /api/direct/policy-settings?carrier=SK&noCache=true
   router.get('/policy-settings', async (req, res) => {
     try {
       const carrier = req.query.carrier || 'SK';
+      const noCache = req.query.noCache === 'true' || req.query.noCache === '1';
       
-      // 캐시 확인
+      // 캐시 확인 (noCache가 true이면 캐시 무시)
       const cacheKey = `policy-settings-${carrier}`;
-      const cached = getCache(cacheKey);
-      if (cached) {
-        return res.json(cached);
+      if (!noCache) {
+        const cached = getCache(cacheKey);
+        if (cached) {
+          return res.json(cached);
+        }
+      } else {
+        // 새로고침 요청 시 기존 캐시 삭제
+        cacheStore.delete(cacheKey);
       }
 
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
@@ -6724,14 +6730,23 @@ function setupDirectRoutes(app) {
         return res.status(400).json({ success: false, error: '매장ID가 필요합니다.' });
       }
 
+      // 🔥 캐싱 추가: storeId별로 캐싱
+      const cacheKey = `store-main-page-texts-${storeId}`;
+      const cached = getCache(cacheKey);
+      if (cached) {
+        return res.json(cached);
+      }
+
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
       
-      // 1. 매장별 설정 조회
+      // 1. 매장별 설정 조회 (withRetry 사용)
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_SETTINGS, HEADERS_SETTINGS);
-      const settingsResponse = await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: `${SHEET_SETTINGS}!A:E`
-      });
+      const settingsResponse = await withRetry(async () =>
+        await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_SETTINGS}!A:E`
+        })
+      );
       const settingsRows = (settingsResponse.data.values || []).slice(1);
       
       let storeMainPageTexts = null;
@@ -6761,20 +6776,26 @@ function setupDirectRoutes(app) {
         }
       }
 
-      // 2. 통신사별 기본값 조회
-      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_MAIN_PAGE_TEXTS, HEADERS_MAIN_PAGE_TEXTS);
-      const mainPageResponse = await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: `${SHEET_MAIN_PAGE_TEXTS}!A:F`
-      });
-      const mainPageRows = (mainPageResponse.data.values || []).slice(1);
+      // 2. 통신사별 기본값 조회 (별도 캐싱으로 재사용)
+      const defaultTextsCacheKey = 'store-main-page-texts-defaults';
+      let defaultTexts = getCache(defaultTextsCacheKey);
+      
+      if (!defaultTexts) {
+        await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_MAIN_PAGE_TEXTS, HEADERS_MAIN_PAGE_TEXTS);
+        const mainPageResponse = await withRetry(async () =>
+          await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SHEET_MAIN_PAGE_TEXTS}!A:F`
+          })
+        );
+        const mainPageRows = (mainPageResponse.data.values || []).slice(1);
 
-      const defaultTexts = {
-        mainHeader: null,
-        transitionPages: {}
-      };
+        defaultTexts = {
+          mainHeader: null,
+          transitionPages: {}
+        };
 
-      mainPageRows.forEach(row => {
+        mainPageRows.forEach(row => {
         const carrier = (row[0] || '').trim();
         const category = (row[1] || '').trim();
         const textType = (row[2] || '').trim();
@@ -6798,7 +6819,11 @@ function setupDirectRoutes(app) {
             updatedAt
           };
         }
-      });
+        });
+
+        // 기본값 캐싱 (5분)
+        setCache(defaultTextsCacheKey, defaultTexts, 5 * 60 * 1000);
+      }
 
       // 3. 매장별 설정이 있으면 우선 사용, 없으면 기본값 사용
       const result = {
@@ -6828,7 +6853,10 @@ function setupDirectRoutes(app) {
         });
       });
 
-      res.json({ success: true, data: result });
+      const payload = { success: true, data: result };
+      // 🔥 캐싱 저장 (5분)
+      setCache(cacheKey, payload, 5 * 60 * 1000);
+      res.json(payload);
     } catch (error) {
       console.error('[Direct] store-main-page-texts GET error:', error);
       res.status(500).json({ success: false, error: '문구 조회 실패', message: error.message });

@@ -34,6 +34,8 @@ function TodaysProductCard(props) {
     '기변': { publicSupport: 0, storeSupport: 0, purchasePrice: 0, loading: true }
   });
   const hasLoadedRef = useRef(false);
+  const [imageUrl, setImageUrl] = useState(null); // 이미지 URL 상태 관리
+  const imgElementRef = useRef(null); // 이미지 엘리먼트 ref
   
   // Early return for invalid props AFTER hooks (React rules of hooks)
   if (!props) {
@@ -52,6 +54,91 @@ function TodaysProductCard(props) {
   
   // props로 받은 priceData가 있으면 사용 (초기화 순서 문제 방지 - useMemo 제거하고 직접 계산)
   const finalPriceData = propPriceData || priceData;
+
+  // 🔥 이미지 URL 초기화 및 갱신 로직
+  useEffect(() => {
+    if (!product?.image) {
+      setImageUrl(null);
+      return;
+    }
+
+    // 초기 이미지 URL 설정 (매 렌더링마다 새로운 타임스탬프를 생성하지 않도록)
+    let finalUrl = getProxyImageUrl(product.image);
+    const isDiscordCdn = finalUrl.includes('cdn.discordapp.com') || finalUrl.includes('media.discordapp.net');
+    
+    // Discord 이미지인 경우 타임스탬프 추가 (캐시 방지, 하지만 product.image가 변경될 때만)
+    if (isDiscordCdn && !finalUrl.includes('_t=')) {
+      finalUrl = finalUrl.includes('?') 
+        ? `${finalUrl}&_t=${Date.now()}`
+        : `${finalUrl}?_t=${Date.now()}`;
+    }
+    
+    setImageUrl(finalUrl);
+  }, [product?.image]); // product.image가 변경될 때만 업데이트
+
+  // 🔥 디스코드 이미지 갱신 핸들러 설정 (컴포넌트 마운트 시)
+  useEffect(() => {
+    if (!imgElementRef.current || !product?.discordThreadId || !product?.discordMessageId) {
+      return;
+    }
+
+    const imgElement = imgElementRef.current;
+    const isDiscordUrl = product.image?.includes('cdn.discordapp.com') || product.image?.includes('media.discordapp.net');
+    
+    if (!isDiscordUrl) {
+      return;
+    }
+
+    // 에러 핸들러 설정 (이미지 로드 실패 시 자동 갱신)
+    attachDiscordImageRefreshHandler(
+      imgElement,
+      product.discordThreadId,
+      product.discordMessageId,
+      (newUrl) => {
+        console.log('✅ [TodaysProductCard] Discord 이미지 URL 갱신 성공');
+        const proxyUrl = getProxyImageUrl(newUrl);
+        const timestampedUrl = proxyUrl.includes('?') 
+          ? `${proxyUrl}&_t=${Date.now()}`
+          : `${proxyUrl}?_t=${Date.now()}`;
+        setImageUrl(timestampedUrl);
+      }
+    );
+
+    // 이미지 로드 성공 후에도 주기적으로 갱신 체크 (30초마다)
+    let refreshInterval = null;
+    const handleLoad = () => {
+      // 이미지 로드 성공 후 30초마다 갱신 체크
+      refreshInterval = setInterval(async () => {
+        try {
+          const { refreshDiscordImageUrl } = await import('../../utils/discordImageUtils');
+          const refreshResult = await refreshDiscordImageUrl(product.discordThreadId, product.discordMessageId);
+          
+          if (refreshResult.success && refreshResult.imageUrl) {
+            // 새로운 URL이 기존 URL과 다르면 업데이트
+            if (refreshResult.imageUrl !== product.image) {
+              console.log('✅ [TodaysProductCard] Discord 이미지 URL 갱신 (주기적 체크):', refreshResult.imageUrl.substring(0, 100));
+              const newUrl = getProxyImageUrl(refreshResult.imageUrl);
+              const timestampedUrl = newUrl.includes('?') 
+                ? `${newUrl}&_t=${Date.now()}`
+                : `${newUrl}?_t=${Date.now()}`;
+              setImageUrl(timestampedUrl);
+            }
+          }
+        } catch (error) {
+          console.warn('⚠️ [TodaysProductCard] 이미지 갱신 체크 실패:', error);
+        }
+      }, 30000); // 30초마다 체크
+    };
+
+    imgElement.addEventListener('load', handleLoad, { once: true });
+
+    return () => {
+      imgElement.removeEventListener('load', handleLoad);
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+      }
+    };
+  }, [product?.discordThreadId, product?.discordMessageId, product?.image]);
   
   const getCarrierChipColor = (carrier) => {
     switch (carrier) {
@@ -192,20 +279,10 @@ function TodaysProductCard(props) {
       >
         <CardMedia
           component="img"
-          image={product.image ? (() => {
-            // 🔥 핵심 수정: MobileListRow와 동일하게 처리
-            let finalUrl = getProxyImageUrl(product.image);
-            const isDiscordCdn = finalUrl.includes('cdn.discordapp.com') || finalUrl.includes('media.discordapp.net');
-            if (isDiscordCdn && !finalUrl.includes('_t=')) {
-              // 쿼리 파라미터가 있으면 &로 추가, 없으면 ?로 추가
-              finalUrl = finalUrl.includes('?') 
-                ? `${finalUrl}&_t=${Date.now()}`
-                : `${finalUrl}?_t=${Date.now()}`;
-            }
-            return finalUrl;
-          })() : ''}
+          ref={imgElementRef}
+          image={imageUrl || ''}
           alt={product.petName}
-          onError={(e) => {
+          onError={async (e) => {
             // 🔥 핵심 수정: 이미지 로드 실패 처리 개선
             const retryCount = parseInt(e.target.dataset.retryCount || '0');
             
@@ -217,7 +294,7 @@ function TodaysProductCard(props) {
               return;
             }
             
-            const originalUrl = product.image;
+            const originalUrl = product?.image;
             if (!originalUrl) {
               e.target.dataset.gaveUp = 'true';
               e.target.onerror = null;
@@ -228,7 +305,10 @@ function TodaysProductCard(props) {
             // 🔥 핵심 수정: 프록시 실패 시 원본 URL로 폴백
             if (e.target.src.includes('/api/meetings/proxy-image')) {
               // 프록시 실패 → 원본 URL로 직접 시도
-              e.target.src = originalUrl;
+              const directUrl = originalUrl.includes('?') 
+                ? `${originalUrl}&_t=${Date.now()}`
+                : `${originalUrl}?_t=${Date.now()}`;
+              setImageUrl(directUrl);
               e.target.dataset.retryCount = (retryCount + 1).toString();
               return;
             }
@@ -236,23 +316,33 @@ function TodaysProductCard(props) {
             // Discord 이미지이고 메시지 ID가 있으면 자동 갱신 시도
             const isDiscordUrl = originalUrl.includes('cdn.discordapp.com') || originalUrl.includes('media.discordapp.net');
             if (isDiscordUrl && product.discordThreadId && product.discordMessageId) {
-              attachDiscordImageRefreshHandler(
-                e.target,
-                product.discordThreadId,
-                product.discordMessageId,
-                (newUrl) => {
-                  // 갱신 성공 시 이미지 자동 복구
-                  console.log('✅ [TodaysProductCard] Discord 이미지 URL 갱신 성공');
+              try {
+                const { refreshDiscordImageUrl } = await import('../../utils/discordImageUtils');
+                const refreshResult = await refreshDiscordImageUrl(product.discordThreadId, product.discordMessageId);
+                
+                if (refreshResult.success && refreshResult.imageUrl) {
+                  console.log('✅ [TodaysProductCard] Discord 이미지 URL 갱신 성공 (에러 핸들러)');
+                  const newUrl = getProxyImageUrl(refreshResult.imageUrl);
+                  const timestampedUrl = newUrl.includes('?') 
+                    ? `${newUrl}&_t=${Date.now()}`
+                    : `${newUrl}?_t=${Date.now()}`;
+                  setImageUrl(timestampedUrl);
+                  e.target.dataset.retryCount = (retryCount + 1).toString();
+                  return;
                 }
-              );
-              return;
+              } catch (error) {
+                console.warn('⚠️ [TodaysProductCard] Discord 이미지 갱신 실패:', error);
+              }
             }
             
             // 원본 URL도 실패 → 프록시로 시도
             if (originalUrl && 
                 (originalUrl.includes('cdn.discordapp.com') || originalUrl.includes('media.discordapp.net'))) {
               const proxyUrl = getProxyImageUrl(originalUrl);
-              e.target.src = proxyUrl;
+              const timestampedUrl = proxyUrl.includes('?') 
+                ? `${proxyUrl}&_t=${Date.now()}`
+                : `${proxyUrl}?_t=${Date.now()}`;
+              setImageUrl(timestampedUrl);
               e.target.dataset.retryCount = (retryCount + 1).toString();
               return;
             }
@@ -264,9 +354,9 @@ function TodaysProductCard(props) {
             
             if (process.env.NODE_ENV === 'development') {
               console.warn('⚠️ [TodaysProductCard] 이미지 로드 실패:', {
-                productId: product.id,
-                productName: product.petName,
-                originalUrl: product.image,
+                productId: product?.id,
+                productName: product?.petName,
+                originalUrl: product?.image,
                 attemptedUrl: e.target.src || 'N/A',
                 retryCount
               });

@@ -53,10 +53,30 @@ import {
 } from '@mui/icons-material';
 import AppUpdatePopup from './AppUpdatePopup';
 import { budgetMonthSheetAPI, budgetUserSheetAPI, budgetPolicyGroupAPI, budgetSummaryAPI } from '../api';
+import BudgetCheckTab from './budget/BudgetCheckTab';
+import BudgetSettingsTab from './budget/BudgetSettingsTab';
+import BasicBudgetSettingsTab from './budget/BasicBudgetSettingsTab';
+import BasicDataSettingsTab from './budget/BasicDataSettingsTab';
 
 function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const [activeTab, setActiveTab] = React.useState(0);
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
+  
+  // 권한 체크
+  const isSS = loggedInStore?.userRole === 'SS';
+  const isS = loggedInStore?.userRole === 'S';
+  // 팀장 권한 체크 (두 글자 대문자 패턴: AA, BB, CC 등)
+  const twoLetterPattern = /^[A-Z]{2}$/;
+  const isTeamLeader = loggedInStore?.userRole && twoLetterPattern.test(loggedInStore.userRole);
+  // 예산확인: SS, S 또는 팀장 권한
+  const canAccessCheck = isSS || isS || isTeamLeader;
+  
+  // SS 권한이 아닌데 시트설정 탭(1)에 접근하려고 하면 0으로 리셋
+  React.useEffect(() => {
+    if (!isSS && activeTab === 1) {
+      setActiveTab(0);
+    }
+  }, [isSS, activeTab]);
   
   // 액면예산 서브메뉴 상태
   const [faceValueSubMenu, setFaceValueSubMenu] = useState('Ⅰ'); // Ⅰ, Ⅱ, 종합
@@ -2756,7 +2776,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         }}>
           <Tabs 
             value={activeTab} 
-            onChange={handleTabChange}
+            onChange={(e, newValue) => setActiveTab(newValue)}
             sx={{
               flexGrow: 1,
               '& .MuiTab-root': {
@@ -2771,52 +2791,29 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
               }
             }}
           >
-            <Tab label="액면예산" icon={<BudgetIcon />} iconPosition="start" />
-            <Tab label="기본구두" icon={<AnalyticsIcon />} iconPosition="start" />
-            <Tab label="별도추가" icon={<AnalyticsIcon />} iconPosition="start" />
-            <Tab label="부가추가지원" icon={<SettingsIcon />} iconPosition="start" />
-            <Tab label="부가차감지원" icon={<TimelineIcon />} iconPosition="start" />
+            <Tab label="예산확인" icon={<VisibilityIcon />} iconPosition="start" />
+            {isSS && (
             <Tab label="시트설정" icon={<SettingsIcon />} iconPosition="start" />
+            )}
           </Tabs>
         </Box>
 
         {/* 탭별 콘텐츠 */}
-        {activeTab === 0 && (
+        {activeTab === 0 && canAccessCheck && (
+          <BudgetCheckTab loggedInStore={loggedInStore} />
+        )}
+        {activeTab === 0 && !canAccessCheck && (
           <Box sx={{ p: 3 }}>
-            {/* 액면예산 서브메뉴 드롭다운 */}
-            <Box sx={{ mb: 3, display: 'flex', justifyContent: 'center' }}>
-              <FormControl sx={{ minWidth: 200 }}>
-                <InputLabel>액면예산 서브메뉴</InputLabel>
-                <Select
-                  value={faceValueSubMenu}
-                  onChange={(e) => handleFaceValueSubMenuChange(e.target.value)}
-                  label="액면예산 서브메뉴"
-                  sx={{
-                    '& .MuiOutlinedInput-notchedOutline': {
-                      borderColor: '#795548'
-                    },
-                    '&:hover .MuiOutlinedInput-notchedOutline': {
-                      borderColor: '#5d4037'
-                    },
-                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                      borderColor: '#795548'
-                    }
-                  }}
-                >
-                  <MenuItem value="Ⅰ">액면예산(Ⅰ)</MenuItem>
-                  <MenuItem value="Ⅱ">액면예산(Ⅱ)</MenuItem>
-                  <MenuItem value="종합">액면예산(종합)</MenuItem>
-                </Select>
-              </FormControl>
-            </Box>
-            
-            {/* 서브메뉴별 콘텐츠 */}
-            {faceValueSubMenu === 'Ⅰ' && renderFaceValueBudget('Ⅰ')}
-            {faceValueSubMenu === 'Ⅱ' && renderFaceValueBudget('Ⅱ')}
-            {faceValueSubMenu === '종합' && renderFaceValueSummary()}
+            <Alert severity="warning">
+              예산확인 탭은 SS(총괄) 또는 S(정산) 권한이 필요합니다.
+            </Alert>
           </Box>
         )}
-        {activeTab === 1 && (
+        {isSS && activeTab === 1 && (
+          <BudgetSettingsTab loggedInStore={loggedInStore} />
+        )}
+        {/* 기존 탭 콘텐츠 제거 - 주석 처리 */}
+        {false && activeTab === 1 && (
           <Box sx={{ p: 3 }}>
             <Typography variant="h5" sx={{ mb: 3, color: '#795548', fontWeight: 'bold' }}>
               👞 기본구두 관리
@@ -3100,28 +3097,6 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
             )}
           </Box>
         )}
-        {activeTab === 2 && (
-          <Box sx={{ p: 4, textAlign: 'center' }}>
-            <Typography variant="h4" sx={{ color: '#795548', mb: 2 }}>
-              🚧 별도추가 준비중
-            </Typography>
-          </Box>
-        )}
-        {activeTab === 3 && (
-          <Box sx={{ p: 4, textAlign: 'center' }}>
-            <Typography variant="h4" sx={{ color: '#795548', mb: 2 }}>
-              🚧 부가추가지원 준비중
-            </Typography>
-          </Box>
-        )}
-        {activeTab === 4 && (
-          <Box sx={{ p: 4, textAlign: 'center' }}>
-            <Typography variant="h4" sx={{ color: '#795548', mb: 2 }}>
-              🚧 부가차감지원 준비중
-            </Typography>
-          </Box>
-        )}
-        {activeTab === 5 && renderSheetSettings()}
 
         {/* 업데이트 팝업 */}
         <AppUpdatePopup

@@ -2,13 +2,14 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
     Box, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
     Paper, Chip, IconButton, Tooltip, TextField, InputAdornment, CircularProgress, Alert,
-    Dialog, DialogTitle, DialogContent, DialogActions, Button
+    Dialog, DialogTitle, DialogContent, DialogActions, Button, useMediaQuery, useTheme
 } from '@mui/material';
 import {
     Search as SearchIcon,
     Edit as EditIcon,
     Delete as DeleteIcon,
-    Store as StoreIcon
+    Store as StoreIcon,
+    Visibility as VisibilityIcon
 } from '@mui/icons-material';
 import { customerAPI } from '../../api';
 import { LoadingState } from '../direct/common/LoadingState';
@@ -52,6 +53,8 @@ const maskPersonalInfo = (name, ctn, isManagementMode = false) => {
 };
 
 const CustomerPurchaseQueueTab = ({ customerInfo, isManagementMode = false, loggedInStore = null }) => {
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('md'));
     const [queue, setQueue] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -161,9 +164,16 @@ const CustomerPurchaseQueueTab = ({ customerInfo, isManagementMode = false, logg
     }
 
     return (
-        <Box sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
+        <Box sx={{ p: { xs: 1, sm: 3 }, height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <Box sx={{ 
+                display: 'flex', 
+                flexDirection: { xs: 'column', sm: 'row' },
+                justifyContent: 'space-between', 
+                alignItems: { xs: 'flex-start', sm: 'center' }, 
+                mb: 3,
+                gap: { xs: 2, sm: 0 }
+            }}>
+                <Typography variant="h5" sx={{ fontWeight: 'bold', fontSize: { xs: '1.1rem', sm: '1.5rem' } }}>
                     {isManagementMode ? '전체 구매 대기' : loggedInStore ? '구매 대기' : '나의 구매 대기'}
                 </Typography>
                 <TextField
@@ -178,7 +188,12 @@ const CustomerPurchaseQueueTab = ({ customerInfo, isManagementMode = false, logg
                             </InputAdornment>
                         ),
                     }}
-                    sx={{ bgcolor: 'background.paper', borderRadius: 1, minWidth: 250 }}
+                    sx={{ 
+                        bgcolor: 'background.paper', 
+                        borderRadius: 1, 
+                        minWidth: { xs: '100%', sm: 250 },
+                        width: { xs: '100%', sm: 'auto' }
+                    }}
                 />
             </Box>
 
@@ -187,24 +202,33 @@ const CustomerPurchaseQueueTab = ({ customerInfo, isManagementMode = false, logg
                     <Typography color="text.secondary">대기 중인 구매 내역이 없습니다.</Typography>
                 </Paper>
             ) : (
-                <ModernTable sx={{ flexGrow: 1 }}>
-                    <Table stickyHeader size="small">
+                <TableContainer 
+                    sx={{ 
+                        flexGrow: 1,
+                        overflowX: 'auto',
+                        overflowY: 'auto',
+                        WebkitOverflowScrolling: 'touch',
+                        maxHeight: { xs: 'calc(100vh - 250px)', sm: 'none' }
+                    }}
+                >
+                    <Table stickyHeader size="small" sx={{ minWidth: { xs: '1000px', sm: '100%' }, tableLayout: 'fixed' }}>
                         <TableHead>
                             <TableRow>
-                                <ModernTableCell align="center" width="80">등록일시</ModernTableCell>
-                                <ModernTableCell align="center" width="80">고객명</ModernTableCell>
-                                <ModernTableCell align="center" width="100">CTN</ModernTableCell>
-                                <ModernTableCell align="center" width="60">통신사</ModernTableCell>
-                                <ModernTableCell width="120">단말기모델명</ModernTableCell>
-                                <ModernTableCell align="center" width="60">색상</ModernTableCell>
-                                <ModernTableCell align="center" width="80">개통유형</ModernTableCell>
-                                <ModernTableCell align="center" width="80">할부구분</ModernTableCell>
-                                <ModernTableCell align="center" width="80">할부개월</ModernTableCell>
-                                <ModernTableCell align="center" width="80">약정</ModernTableCell>
-                                <ModernTableCell width="120">요금제</ModernTableCell>
-                                <ModernTableCell align="center" width="100">선택매장</ModernTableCell>
-                                <ModernTableCell align="center" width="80">상태</ModernTableCell>
-                                <ModernTableCell align="center" width="120">관리</ModernTableCell>
+                                <TableCell align="center" sx={{ width: { xs: '70px', sm: '80px' }, fontSize: { xs: '0.75rem', sm: '0.875rem' }, fontWeight: 'bold' }}>보기</TableCell>
+                                <TableCell align="center" sx={{ width: '80px', fontSize: { xs: '0.75rem', sm: '0.875rem' }, fontWeight: 'bold', whiteSpace: 'nowrap' }}>등록일시</TableCell>
+                                <TableCell align="center" sx={{ width: '80px', fontSize: { xs: '0.75rem', sm: '0.875rem' }, fontWeight: 'bold' }}>고객명</TableCell>
+                                <TableCell align="center" sx={{ width: '100px', fontSize: { xs: '0.75rem', sm: '0.875rem' }, fontWeight: 'bold' }}>CTN</TableCell>
+                                <TableCell align="center" sx={{ width: '60px', fontSize: { xs: '0.75rem', sm: '0.875rem' }, fontWeight: 'bold' }}>통신사</TableCell>
+                                <TableCell sx={{ width: '120px', fontSize: { xs: '0.75rem', sm: '0.875rem' }, fontWeight: 'bold' }}>단말기모델명</TableCell>
+                                <TableCell align="center" sx={{ width: '60px', fontSize: { xs: '0.75rem', sm: '0.875rem' }, fontWeight: 'bold' }}>색상</TableCell>
+                                <TableCell align="center" sx={{ width: '80px', fontSize: { xs: '0.75rem', sm: '0.875rem' }, fontWeight: 'bold' }}>개통유형</TableCell>
+                                <TableCell align="center" sx={{ width: '80px', fontSize: { xs: '0.75rem', sm: '0.875rem' }, fontWeight: 'bold' }}>할부구분</TableCell>
+                                <TableCell align="center" sx={{ width: '80px', fontSize: { xs: '0.75rem', sm: '0.875rem' }, fontWeight: 'bold' }}>할부개월</TableCell>
+                                <TableCell align="center" sx={{ width: '80px', fontSize: { xs: '0.75rem', sm: '0.875rem' }, fontWeight: 'bold' }}>약정</TableCell>
+                                <TableCell sx={{ width: '120px', fontSize: { xs: '0.75rem', sm: '0.875rem' }, fontWeight: 'bold' }}>요금제</TableCell>
+                                <TableCell align="center" sx={{ width: '100px', fontSize: { xs: '0.75rem', sm: '0.875rem' }, fontWeight: 'bold' }}>선택매장</TableCell>
+                                <TableCell align="center" sx={{ width: '80px', fontSize: { xs: '0.75rem', sm: '0.875rem' }, fontWeight: 'bold' }}>상태</TableCell>
+                                <TableCell align="center" sx={{ width: '120px', fontSize: { xs: '0.75rem', sm: '0.875rem' }, fontWeight: 'bold' }}>관리</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -216,35 +240,69 @@ const CustomerPurchaseQueueTab = ({ customerInfo, isManagementMode = false, logg
                                         onClick={() => handleRowClick(row)}
                                         sx={{ cursor: 'pointer' }}
                                     >
-                                        <TableCell align="center">
+                                        <TableCell 
+                                            align="center" 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleRowClick(row);
+                                            }}
+                                            sx={{ width: { xs: '70px', sm: '80px' }, p: { xs: 0.5, sm: 1 } }}
+                                        >
+                                            <Button
+                                                variant="contained"
+                                                size="small"
+                                                startIcon={<VisibilityIcon />}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleRowClick(row);
+                                                }}
+                                                sx={{
+                                                    fontSize: { xs: '0.7rem', sm: '0.75rem' },
+                                                    px: { xs: 0.5, sm: 1 },
+                                                    py: { xs: 0.25, sm: 0.5 },
+                                                    minWidth: { xs: 'auto', sm: '60px' },
+                                                    '& .MuiButton-startIcon': {
+                                                        marginRight: { xs: 0, sm: 0.5 },
+                                                        '& > *:nth-of-type(1)': {
+                                                            fontSize: { xs: '0.875rem', sm: '1rem' }
+                                                        }
+                                                    }
+                                                }}
+                                            >
+                                                {isMobile ? '' : '보기'}
+                                            </Button>
+                                        </TableCell>
+                                        <TableCell align="center" sx={{ width: '80px', fontSize: { xs: '0.75rem', sm: '0.875rem' }, whiteSpace: 'nowrap' }}>
                                             {row.createdAt ? new Date(row.createdAt).toLocaleDateString() : '-'}
                                         </TableCell>
-                                        <TableCell align="center">{maskedName}</TableCell>
-                                        <TableCell align="center">{maskedCtn}</TableCell>
-                                        <TableCell align="center">
+                                        <TableCell align="center" sx={{ width: '80px', fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>{maskedName}</TableCell>
+                                        <TableCell align="center" sx={{ width: '100px', fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>{maskedCtn}</TableCell>
+                                        <TableCell align="center" sx={{ width: '60px' }}>
                                             <Chip
                                                 label={row.carrier || '-'}
                                                 size="small"
                                                 sx={{
                                                     bgcolor: row.carrier === 'SK' ? '#e60012' : row.carrier === 'KT' ? '#00abc7' : '#ec008c',
                                                     color: 'white',
-                                                    fontWeight: 'bold'
+                                                    fontWeight: 'bold',
+                                                    fontSize: { xs: '0.7rem', sm: '0.75rem' }
                                                 }}
                                             />
                                         </TableCell>
-                                        <TableCell>{row.model || '-'}</TableCell>
-                                        <TableCell align="center">{row.color || '-'}</TableCell>
-                                        <TableCell align="center">{row.activationType || '-'}</TableCell>
-                                        <TableCell align="center">{row.installmentType || '-'}</TableCell>
-                                        <TableCell align="center">{row.installmentMonths || '-'}</TableCell>
-                                        <TableCell align="center">{row.contractType || '-'}</TableCell>
-                                        <TableCell>{row.plan || '-'}</TableCell>
-                                        <TableCell align="center">{row.storeName || '-'}</TableCell>
-                                        <TableCell align="center">
+                                        <TableCell sx={{ width: '120px', fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>{row.model || '-'}</TableCell>
+                                        <TableCell align="center" sx={{ width: '60px', fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>{row.color || '-'}</TableCell>
+                                        <TableCell align="center" sx={{ width: '80px', fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>{row.activationType || '-'}</TableCell>
+                                        <TableCell align="center" sx={{ width: '80px', fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>{row.installmentType || '-'}</TableCell>
+                                        <TableCell align="center" sx={{ width: '80px', fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>{row.installmentMonths || '-'}</TableCell>
+                                        <TableCell align="center" sx={{ width: '80px', fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>{row.contractType || '-'}</TableCell>
+                                        <TableCell sx={{ width: '120px', fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>{row.plan || '-'}</TableCell>
+                                        <TableCell align="center" sx={{ width: '100px', fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>{row.storeName || '-'}</TableCell>
+                                        <TableCell align="center" sx={{ width: '80px' }}>
                                             <Chip
                                                 label={row.status || '구매대기'}
                                                 size="small"
                                                 color={row.status === '처리완료' ? 'success' : 'primary'}
+                                                sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}
                                             />
                                         </TableCell>
                                         <TableCell align="center" onClick={(e) => e.stopPropagation()}>
@@ -272,7 +330,7 @@ const CustomerPurchaseQueueTab = ({ customerInfo, isManagementMode = false, logg
                             })}
                         </TableBody>
                     </Table>
-                </ModernTable>
+                </TableContainer>
             )}
 
             {/* 수정 다이얼로그 */}
@@ -285,10 +343,32 @@ const CustomerPurchaseQueueTab = ({ customerInfo, isManagementMode = false, logg
                     }}
                     maxWidth="lg"
                     fullWidth
+                    fullScreen={isMobile}
+                    sx={{
+                        '& .MuiDialog-paper': {
+                            m: { xs: 0, sm: 2 },
+                            maxHeight: { xs: '100vh', sm: '90vh' }
+                        }
+                    }}
                 >
-                    <DialogTitle>구매 대기 정보 수정</DialogTitle>
-                    <DialogContent>
-                        <OpeningInfoPage
+                    <DialogTitle sx={{ fontSize: { xs: '1rem', sm: '1.25rem' }, py: { xs: 1.5, sm: 2 } }}>
+                        구매 대기 정보 수정
+                    </DialogTitle>
+                    <DialogContent 
+                        dividers
+                        sx={{ 
+                            p: { xs: 1, sm: 3 },
+                            overflowY: 'auto',
+                            WebkitOverflowScrolling: 'touch',
+                            maxHeight: { xs: 'calc(100vh - 120px)', sm: 'calc(90vh - 120px)' }
+                        }}
+                    >
+                        <Box sx={{ 
+                            '& .print-root': {
+                                p: { xs: 1, sm: 3 }
+                            }
+                        }}>
+                            <OpeningInfoPage
                             initialData={{
                                 ...selectedRow,
                                 purchaseQueueId: selectedRow.id, // 구매대기 항목 ID (수정 모드 구분용)
@@ -296,8 +376,17 @@ const CustomerPurchaseQueueTab = ({ customerInfo, isManagementMode = false, logg
                                 petName: selectedRow.model,
                                 factoryPrice: selectedRow.factoryPrice || 0,
                                 publicSupport: selectedRow.carrierSupport || 0,
-                                storeSupport: selectedRow.dealerSupportWithAdd || 0,
-                                storeSupportNoAddon: selectedRow.dealerSupportWithoutAdd || 0,
+                                // 🔥 수정: 구매대기에서 저장된 대리점추가지원금을 정확히 전달
+                                storeSupport: selectedRow.dealerSupportWithAdd || 0, // 저장된 대리점추가지원금
+                                대리점추가지원금: selectedRow.dealerSupportWithAdd || 0, // 한글 필드명도 추가
+                                // 🔥 수정: dealerSupportWithoutAdd는 실제로는 대리점추가지원금직접입력이므로 additionalStoreSupport로 매핑
+                                additionalStoreSupport: selectedRow.dealerSupportWithoutAdd !== undefined && selectedRow.dealerSupportWithoutAdd !== null ? Number(selectedRow.dealerSupportWithoutAdd) : null,
+                                대리점추가지원금직접입력: selectedRow.dealerSupportWithoutAdd !== undefined && selectedRow.dealerSupportWithoutAdd !== null ? Number(selectedRow.dealerSupportWithoutAdd) : null,
+                                // 🔥 추가: 할부원금과 LG프리미어약정
+                                installmentPrincipal: selectedRow.installmentPrincipal || selectedRow.할부원금 || 0,
+                                할부원금: selectedRow.installmentPrincipal || selectedRow.할부원금 || 0,
+                                lgPremier: selectedRow.lgPremier !== undefined ? Boolean(selectedRow.lgPremier) : (selectedRow.프리미어약정 === 'Y' || selectedRow.프리미어약정 === true || false),
+                                프리미어약정: selectedRow.lgPremier !== undefined ? (selectedRow.lgPremier ? 'Y' : 'N') : (selectedRow.프리미어약정 || 'N'),
                                 openingType: reverseConvertOpeningType(selectedRow.activationType),
                                 customerName: selectedRow.name,
                                 customerContact: selectedRow.ctn,
@@ -328,6 +417,7 @@ const CustomerPurchaseQueueTab = ({ customerInfo, isManagementMode = false, logg
                             loggedInStore={loggedInStore}
                             saveToSheet="purchaseQueue"
                         />
+                        </Box>
                     </DialogContent>
                 </Dialog>
             )}

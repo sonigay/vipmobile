@@ -10,8 +10,12 @@ const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const DISCORD_LOGGING_ENABLED = process.env.DISCORD_LOGGING_ENABLED === 'true';
 
 // Discord 봇 초기화 (server/index.js의 전역 봇을 사용하거나 자체 초기화)
+// 서버 시작을 블로킹하지 않도록 비동기로 초기화
 let discordBot = null;
 if (DISCORD_LOGGING_ENABLED && DISCORD_BOT_TOKEN) {
+  // 비동기로 초기화하여 서버 시작을 블로킹하지 않음
+  setImmediate(() => {
+    try {
   discordBot = new Client({
     intents: [
       GatewayIntentBits.Guilds,
@@ -26,7 +30,15 @@ if (DISCORD_LOGGING_ENABLED && DISCORD_BOT_TOKEN) {
 
   discordBot.login(DISCORD_BOT_TOKEN)
     .then(() => console.log('✅ [정책표] Discord 봇 로그인 성공'))
-    .catch(error => console.error('❌ [정책표] Discord 봇 로그인 실패:', error));
+        .catch(error => {
+          console.error('❌ [정책표] Discord 봇 로그인 실패:', error.message);
+          discordBot = null; // 실패 시 null로 설정
+        });
+    } catch (error) {
+      console.error('❌ [정책표] Discord 봇 초기화 오류:', error.message);
+      discordBot = null;
+    }
+  });
 }
 
 // ===== 로컬 PC 디스코드 봇 명령어 전송용 클라이언트 =====
@@ -102,14 +114,9 @@ async function getCreatorPermissionName(creatorPermissions) {
 
   try {
     const { sheets, SPREADSHEET_ID } = createSheetsClient();
-    const agentSheetName = '대리점아이디관리';
     
-    const response = await withRetry(async () => {
-      return await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: `${agentSheetName}!A:Z`
-      });
-    });
+    // 대리점아이디관리 시트 조회 (캐싱 적용)
+    const response = await getAgentManagementData(sheets, SPREADSHEET_ID);
 
     const rows = response.data.values || [];
     if (rows.length < 2) {
@@ -301,7 +308,7 @@ async function captureSheetViaDiscordBot(sheetUrl, policyTableName, userName, ch
 
     const collector = targetChannel.createMessageCollector({
       filter,
-      time: 90000, // 90초 대기 (Selenium 스크린샷 생성 시간 고려)
+      time: 120000, // 120초 대기 (Selenium 스크린샷 생성 시간 고려)
       max: 1
     });
 
@@ -340,8 +347,35 @@ async function captureSheetViaDiscordBot(sheetUrl, policyTableName, userName, ch
           const messageId = imageMessage.id;
           const threadId = targetChannel.id; // 포스트/스레드 ID
 
-          console.log(`✅ [정책표] 스크린샷 생성 완료: ${imageUrl} (메시지 ID: ${messageId}, 스레드 ID: ${threadId})`);
-          resolve({ imageUrl, messageId, threadId });
+          // 엑셀 파일 메시지 ID 추출 (선택적)
+          let excelUrl = null;
+          let excelMessageId = null;
+          const excelIdMatch = completeSignalMsg.content.match(/excelId=(\d+)/);
+          if (excelIdMatch) {
+            try {
+              excelMessageId = excelIdMatch[1];
+              console.log(`🔍 [정책표] 엑셀 파일 메시지 ID 추출: ${excelMessageId}`);
+              
+              const excelMessage = await targetChannel.messages.fetch(excelMessageId);
+              if (excelMessage) {
+                const excelAttachment = excelMessage.attachments.first();
+                if (excelAttachment && excelAttachment.name && excelAttachment.name.endsWith('.xlsx')) {
+                  excelUrl = excelAttachment.url;
+                  console.log(`✅ [정책표] 엑셀 파일 URL 추출: ${excelUrl}`);
+                } else {
+                  console.warn(`⚠️ [정책표] 엑셀 파일 메시지에 엑셀 파일이 없습니다: ${excelMessageId}`);
+                }
+              } else {
+                console.warn(`⚠️ [정책표] 엑셀 파일 메시지를 찾을 수 없습니다: ${excelMessageId}`);
+              }
+            } catch (excelError) {
+              console.warn(`⚠️ [정책표] 엑셀 파일 URL 추출 실패: ${excelError.message}`);
+              // 엑셀 파일이 없어도 이미지는 정상이므로 계속 진행
+            }
+          }
+
+          console.log(`✅ [정책표] 스크린샷 생성 완료: ${imageUrl} (메시지 ID: ${messageId}, 스레드 ID: ${threadId})${excelUrl ? `, 엑셀: ${excelUrl}` : ''}`);
+          resolve({ imageUrl, messageId, threadId, excelUrl, excelMessageId });
 
         } catch (error) {
           console.error(`❌ [정책표] 완료 신호 처리 오류:`, error);
@@ -362,10 +396,10 @@ async function captureSheetViaDiscordBot(sheetUrl, policyTableName, userName, ch
         });
         
         if (collected.size === 0) {
-          console.error(`❌ [정책표] 완료 신호 수집 실패: 90초 동안 완료 신호를 받지 못했습니다.`);
+          console.error(`❌ [정책표] 완료 신호 수집 실패: 120초 동안 완료 신호를 받지 못했습니다.`);
           console.error(`   타겟 채널/포스트 ID: ${targetChannel.id}`);
           console.error(`   명령어 메시지 ID: ${commandMessageId}`);
-          reject(new Error('디스코드 봇 응답 시간 초과 (90초)'));
+          reject(new Error('디스코드 봇 응답 시간 초과 (120초)'));
         }
       });
     });
@@ -401,6 +435,11 @@ const SHEET_POLICY_TABLE_LIST = '정책모드_정책표목록';
 const SHEET_USER_GROUPS = '정책모드_일반사용자그룹';
 const SHEET_TAB_ORDER = '정책표목록_탭순서';
 const SHEET_GROUP_CHANGE_HISTORY = '정책모드_정책영업그룹_변경이력';
+const SHEET_DEFAULT_GROUPS = '정책모드_기본정책영업그룹';
+const SHEET_OTHER_POLICY_TYPES = '정책모드_기타정책목록';
+const SHEET_BUDGET_CHANNEL_SETTINGS = '예산모드_예산채널설정';
+const SHEET_BASIC_BUDGET_SETTINGS = '예산모드_기본예산설정';
+const SHEET_BASIC_DATA_SETTINGS = '예산모드_기본데이터설정';
 
 // 시트 헤더 정의
 const HEADERS_POLICY_TABLE_SETTINGS = [
@@ -411,6 +450,39 @@ const HEADERS_POLICY_TABLE_SETTINGS = [
   '정책표공개링크',        // 공개 링크 (/pubhtml, Puppeteer 캡처용)
   '디스코드채널ID',
   '생성자적용권한',
+  '등록일시',
+  '등록자'
+];
+
+const HEADERS_BUDGET_CHANNEL_SETTINGS = [
+  '예산채널ID',
+  '예산채널이름',
+  '예산채널설명',
+  '예산채널링크',
+  '년월',
+  '확인자적용권한',
+  '등록일시',
+  '등록자'
+];
+
+const HEADERS_BASIC_BUDGET_SETTINGS = [
+  '기본예산ID',
+  '기본예산이름',
+  '기본예산설명',
+  '기본예산링크',
+  '년월',
+  '확인자적용권한',
+  '등록일시',
+  '등록자'
+];
+
+const HEADERS_BASIC_DATA_SETTINGS = [
+  '기본데이터ID',
+  '기본데이터이름',
+  '기본데이터설명',
+  '기본데이터링크',
+  '년월',
+  '확인자적용권한',
   '등록일시',
   '등록자'
 ];
@@ -430,7 +502,8 @@ const HEADERS_POLICY_TABLE_LIST = [
   '등록여부',           // 11
   '등록일시',           // 12
   '생성자ID',           // 13: 생성자ID (N열)
-  '확인이력'            // 14: 확인이력 (JSON 배열 형식) (O열)
+  '확인이력',           // 14: 확인이력 (JSON 배열 형식) (O열)
+  '엑셀파일URL'         // 15: 엑셀파일URL (P열)
 ];
 
 const HEADERS_USER_GROUPS = [
@@ -448,6 +521,20 @@ const HEADERS_TAB_ORDER = [
   '생성카드순서',
   '수정일시',
   '수정자'
+];
+
+const HEADERS_DEFAULT_GROUPS = [
+  '사용자ID',
+  '정책표ID',
+  '기본그룹ID목록',  // JSON 배열 형식
+  '수정일시',
+  '수정자'
+];
+
+const HEADERS_OTHER_POLICY_TYPES = [
+  '정책명',
+  '등록일시',
+  '등록자'
 ];
 
 const HEADERS_GROUP_CHANGE_HISTORY = [
@@ -514,17 +601,30 @@ function getColumnLetter(columnNumber) {
 // 간단한 메모리 캐시
 const cacheStore = new Map();
 
-// 캐시 TTL 설정 (보수적 접근: 짧은 TTL)
+// 캐시 TTL 설정 (성능 최적화: 적절한 TTL)
 const CACHE_TTL = {
-  USER_GROUPS: 30 * 1000,        // 30초 (정책영업그룹 목록)
-  POLICY_TABLES: 30 * 1000,      // 30초 (정책표 목록)
-  POLICY_TABLE_DETAIL: 30 * 1000, // 30초 (정책표 상세)
-  POLICY_TABLE_SETTINGS: 5 * 60 * 1000, // 5분 (정책표 설정 - 읽기 전용)
-  POLICY_TABLE_TABS: 30 * 1000,  // 30초 (탭 목록)
-  GENERAL_MODE_PERMISSION: 30 * 1000, // 30초 (일반모드권한관리 시트)
-  COMPANIES: 30 * 1000,          // 30초 (업체명 목록)
+  USER_GROUPS: 30 * 60 * 1000,       // 30분 (자주 변하지 않으므로 TTL 연장해 API 호출 수 감소)
+  POLICY_TABLES: 2 * 60 * 1000,      // 2분 (정책표 목록 - 적절한 실시간성 유지)
+  POLICY_TABLE_DETAIL: 30 * 1000, // 30초 (정책표 상세 - 실시간성 중요)
+  POLICY_TABLE_SETTINGS: 30 * 60 * 1000, // 30분 (정책표 설정 - 읽기 전용, 자주 변경되지 않음)
+  POLICY_TABLE_TABS: 2 * 60 * 1000,  // 2분 (탭 목록 - 적절한 실시간성 유지)
+  GENERAL_MODE_PERMISSION: 30 * 60 * 1000, // 30분 (일반모드권한관리 시트 - 자주 변경되지 않음)
+  COMPANIES: 30 * 60 * 1000,          // 30분 (업체명 목록 - 자주 변경되지 않음)
+  AGENT_MANAGEMENT: 30 * 60 * 1000,   // 30분 (대리점아이디관리 - 자주 변경되지 않음, 매우 자주 호출됨)
+  SHEET_HEADERS: 30 * 60 * 1000,      // 30분 (시트 헤더 - 자주 변경되지 않음)
+  DEFAULT_GROUPS: 30 * 60 * 1000,    // 30분 (기본 그룹 설정 - 자주 변경되지 않음)
+  OTHER_POLICY_TYPES: 30 * 60 * 1000, // 30분 (기타정책 목록 - 자주 변경되지 않음)
   // 변경이력은 캐싱하지 않음 (실시간성 중요)
 };
+
+// 정책영업그룹 마지막 성공 응답 (rate limit 시 사용)
+let lastUserGroupsCache = null;
+// 기본 그룹 설정 마지막 성공 응답 (userId별)
+const lastDefaultGroupsCache = new Map();
+// 기타정책 목록 마지막 성공 응답
+let lastOtherPolicyTypesCache = null;
+// 대리점아이디관리 마지막 성공 응답 (rate limit 시 사용)
+let lastAgentManagementCache = null;
 
 function getCache(key) {
   const entry = cacheStore.get(key);
@@ -610,7 +710,6 @@ async function withRetry(fn, maxRetries = 5, baseDelay = 2000) {
 // 시트 헤더 확인 및 생성
 async function ensureSheetHeaders(sheets, spreadsheetId, sheetName, headers) {
   const cacheKey = `headers-${sheetName}-${spreadsheetId}`;
-  const CACHE_TTL = 5 * 60 * 1000;
 
   const cached = getCache(cacheKey);
   if (cached) {
@@ -663,7 +762,7 @@ async function ensureSheetHeaders(sheets, spreadsheetId, sheetName, headers) {
       return headers;
     }
     
-    setCache(cacheKey, headers, CACHE_TTL);
+    setCache(cacheKey, headers, CACHE_TTL.SHEET_HEADERS);
     return headers;
   } catch (error) {
     console.error(`[정책표] Failed to ensure sheet headers for ${sheetName}:`, error);
@@ -681,22 +780,74 @@ async function getSheetId(sheets, spreadsheetId, sheetName) {
   return sheet ? sheet.properties.sheetId : null;
 }
 
-// 권한 체크 헬퍼 함수
-async function checkPermission(req, allowedRoles) {
-  const { sheets, SPREADSHEET_ID } = createSheetsClient();
-  
-  // 대리점아이디관리 시트에서 사용자 정보 조회
+// 대리점아이디관리 시트 조회 (캐싱 적용)
+async function getAgentManagementData(sheets, SPREADSHEET_ID) {
   const agentSheetName = '대리점아이디관리';
-  const response = await withRetry(async () => {
+  const cacheKey = `agent-management-${SPREADSHEET_ID}`;
+  
+  // 캐시 확인
+  const cached = getCache(cacheKey);
+  if (cached) {
+    console.log('✅ [캐시 히트] 대리점아이디관리');
+    // 캐시된 데이터는 rows 배열이므로 response 형식으로 변환
+    return { data: { values: cached } };
+  }
+
+  let response;
+  try {
+    response = await withRetry(async () => {
     return await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
       range: `${agentSheetName}!A:Z`
     });
   });
+  } catch (err) {
+    // rate limit 등으로 실패 시 마지막 성공 데이터라도 반환
+    const isRateLimitError =
+      err?.code === 429 ||
+      err?.response?.status === 429 ||
+      (err?.message && err.message.toLowerCase().includes('quota exceeded')) ||
+      (err?.message && err.message.toLowerCase().includes('ratelimit')) ||
+      (err?.response?.data?.error?.status === 'RESOURCE_EXHAUSTED');
+
+    if (isRateLimitError && lastAgentManagementCache) {
+      console.warn('⚠️ [대리점아이디관리] rate limit 발생, 마지막 캐시 데이터 반환');
+      setCache(cacheKey, lastAgentManagementCache, CACHE_TTL.AGENT_MANAGEMENT);
+      return { data: { values: lastAgentManagementCache } };
+    }
+    throw err;
+  }
+
+  // 응답이 없거나 data가 없는 경우 처리
+  if (!response || !response.data) {
+    throw new Error('대리점아이디관리 시트 조회 실패: 응답이 없습니다.');
+  }
+
+  const rows = response.data.values || [];
+  // 캐시에 저장 (rows 배열로 저장)
+  setCache(cacheKey, rows, CACHE_TTL.AGENT_MANAGEMENT);
+  lastAgentManagementCache = rows;
+  return response;
+}
+
+// 권한 체크 헬퍼 함수
+async function checkPermission(req, allowedRoles, mode = 'policy') {
+  try {
+    const { sheets, SPREADSHEET_ID } = createSheetsClient();
+    
+    // 대리점아이디관리 시트에서 사용자 정보 조회 (캐싱 적용)
+    const response = await getAgentManagementData(sheets, SPREADSHEET_ID);
+
+    // 응답이 없거나 data가 없는 경우 처리
+    if (!response || !response.data) {
+      console.error(`[${mode === 'budget' ? '예산' : '정책'}표] 권한 체크 오류: 대리점아이디관리 시트 응답이 없습니다.`);
+      return { hasPermission: false, error: '대리점아이디관리 시트 조회 실패' };
+    }
 
   const rows = response.data.values || [];
   if (rows.length < 2) {
-    throw new Error('대리점아이디관리 시트에 데이터가 없습니다.');
+      console.warn(`[${mode === 'budget' ? '예산' : '정책'}표] 권한 체크: 대리점아이디관리 시트에 데이터가 없습니다.`);
+      return { hasPermission: false, error: '대리점아이디관리 시트에 데이터가 없습니다.' };
   }
 
   // 로그인한 사용자 정보 찾기 (헤더에서 가져오기)
@@ -706,7 +857,10 @@ async function checkPermission(req, allowedRoles) {
   // 대리점아이디관리 시트에서 사용자 정보 찾기
   // C열(2번 인덱스): 연락처(아이디) = contactId
   // A열(0번 인덱스): 대상(이름)
-  // R열(17번 인덱스): 권한레벨
+  // 정책모드: 접근권한 11인덱스, 권한레벨 17인덱스
+  // 예산모드: 접근권한 18인덱스, 권한레벨 19인덱스
+  const roleIndex = mode === 'budget' ? 19 : 17; // 예산모드는 19, 정책모드는 17
+  const accessPermissionIndex = mode === 'budget' ? 18 : 11; // 예산모드는 18, 정책모드는 11
   let userInfo = null;
   if (userId) {
     const userRow = rows.find(row => {
@@ -717,7 +871,8 @@ async function checkPermission(req, allowedRoles) {
       userInfo = {
         id: userRow[2] || userId,      // C열: 연락처(아이디)
         name: userRow[0] || userId,    // A열: 대상(이름)
-        role: userRow[17] || userRole  // R열(17번 인덱스): 권한레벨
+        role: userRow[roleIndex] || userRole,  // 권한레벨 (모드에 따라 인덱스 다름)
+        accessPermission: userRow[accessPermissionIndex] || ''  // 접근권한 (모드에 따라 인덱스 다름)
       };
     }
   }
@@ -750,7 +905,7 @@ async function checkPermission(req, allowedRoles) {
   
   // allowedRoles에 'TEAM_LEADER'가 있으면 두 글자 대문자 패턴 체크
   if (allowedRoles.includes('TEAM_LEADER')) {
-    hasPermission = finalUserRole === 'SS' || twoLetterPattern.test(finalUserRole);
+    hasPermission = finalUserRole === 'SS' || finalUserRole === 'S' || twoLetterPattern.test(finalUserRole);
   } else {
     // 기존 로직: 직접 권한 레벨 비교
     hasPermission = allowedRoles.includes(finalUserRole);
@@ -782,6 +937,16 @@ async function checkPermission(req, allowedRoles) {
     userId: finalUserId, 
     userName: finalUserName
   };
+  } catch (error) {
+    console.error('[정책표] 권한 체크 오류:', error);
+    return { 
+      hasPermission: false, 
+      error: error.message || '권한 체크 중 오류가 발생했습니다.',
+      userRole: null,
+      userId: null,
+      userName: null
+    };
+  }
 }
 
 // 작업 상태 저장 (메모리 또는 구글시트)
@@ -799,7 +964,7 @@ function getJobStatus(jobId) {
 }
 
 // ===== 큐 시스템 =====
-// 대기순번 관리 및 디스코드 봇 상태 추적
+// 대기순번 관리, 디스코드 봇 상태 추적 및 중복 생성 방지
 const generationQueue = {
   queue: [], // 대기 중인 작업 목록 { jobId, userId, userName, policyTableName, createdAt, queuePosition }
   processing: [], // 처리 중인 작업 목록 { jobId, userId, userName, policyTableName, startedAt, discordRequestId }
@@ -810,11 +975,24 @@ const generationQueue = {
     lastError: null, // 마지막 오류 메시지
     lastErrorTime: null, // 마지막 오류 발생 시간
     activeRequests: 0 // 현재 활성 요청 수
-  }
+  },
+  userActiveJobs: new Map() // 사용자별 활성 작업 추적 { userId: Set<jobId> }
 };
 
 // 큐에 작업 추가
 function addToQueue(jobId, userId, userName, policyTableName) {
+  // 사용자가 이미 대기 중이거나 처리 중인 작업이 있는지 확인
+  const userJobs = generationQueue.userActiveJobs.get(userId) || new Set();
+  if (userJobs.size > 0) {
+    // 이미 활성 작업이 있으면 큐에 추가하지 않고 기존 작업 정보 반환
+    const existingJobId = Array.from(userJobs)[0];
+    const existingJob = generationQueue.queue.find(item => item.jobId === existingJobId) ||
+                       generationQueue.processing.find(item => item.jobId === existingJobId);
+    if (existingJob) {
+      return { ...existingJob, isDuplicate: true };
+    }
+  }
+
   const queuePosition = generationQueue.queue.length + 1;
   const queueItem = {
     jobId,
@@ -825,6 +1003,13 @@ function addToQueue(jobId, userId, userName, policyTableName) {
     queuePosition
   };
   generationQueue.queue.push(queueItem);
+  
+  // 사용자 활성 작업에 추가
+  if (!generationQueue.userActiveJobs.has(userId)) {
+    generationQueue.userActiveJobs.set(userId, new Set());
+  }
+  generationQueue.userActiveJobs.get(userId).add(jobId);
+  
   console.log(`📋 [큐] 작업 추가: ${jobId} (${policyTableName}, ${userName}), 대기순번: ${queuePosition}`);
   return queueItem;
 }
@@ -833,7 +1018,18 @@ function addToQueue(jobId, userId, userName, policyTableName) {
 function removeFromQueue(jobId) {
   const index = generationQueue.queue.findIndex(item => item.jobId === jobId);
   if (index !== -1) {
+    const queueItem = generationQueue.queue[index];
     generationQueue.queue.splice(index, 1);
+    
+    // 사용자 활성 작업에서 제거
+    const userJobs = generationQueue.userActiveJobs.get(queueItem.userId);
+    if (userJobs) {
+      userJobs.delete(jobId);
+      if (userJobs.size === 0) {
+        generationQueue.userActiveJobs.delete(queueItem.userId);
+      }
+    }
+    
     // 대기순번 재계산
     generationQueue.queue.forEach((item, idx) => {
       item.queuePosition = idx + 1;
@@ -843,17 +1039,21 @@ function removeFromQueue(jobId) {
 }
 
 // 처리 중인 작업 추가
-function addToProcessing(jobId, userId, userName, policyTableName, discordRequestId) {
+function addToProcessing(jobId, userId, userName, policyTableName, discordRequestId = null) {
   const processingItem = {
     jobId,
     userId,
     userName,
     policyTableName,
-    startedAt: new Date().toISOString(),
-    discordRequestId
+    startedAt: new Date().toISOString()
   };
+  if (discordRequestId) {
+    processingItem.discordRequestId = discordRequestId;
+  }
   generationQueue.processing.push(processingItem);
-  generationQueue.discordBotStatus.activeRequests++;
+  if (discordRequestId) {
+    generationQueue.discordBotStatus.activeRequests++;
+  }
   console.log(`⚙️ [큐] 처리 시작: ${jobId} (${policyTableName}, ${userName}), 처리 중: ${generationQueue.processing.length}`);
 }
 
@@ -861,18 +1061,45 @@ function addToProcessing(jobId, userId, userName, policyTableName, discordReques
 function removeFromProcessing(jobId) {
   const index = generationQueue.processing.findIndex(item => item.jobId === jobId);
   if (index !== -1) {
+    const processingItem = generationQueue.processing[index];
     generationQueue.processing.splice(index, 1);
-    generationQueue.discordBotStatus.activeRequests = Math.max(0, generationQueue.discordBotStatus.activeRequests - 1);
+    
+    // Discord 봇 상태 업데이트
+    if (processingItem.discordRequestId) {
+      generationQueue.discordBotStatus.activeRequests = Math.max(0, generationQueue.discordBotStatus.activeRequests - 1);
+    }
+    
+    // 사용자 활성 작업에서 제거
+    const userJobs = generationQueue.userActiveJobs.get(processingItem.userId);
+    if (userJobs) {
+      userJobs.delete(jobId);
+      if (userJobs.size === 0) {
+        generationQueue.userActiveJobs.delete(processingItem.userId);
+      }
+    }
+    
     console.log(`⚙️ [큐] 처리 완료: ${jobId}, 처리 중: ${generationQueue.processing.length}`);
   }
 }
 
-// 큐 상태 조회
+// 큐 상태 조회 (사용자 수와 작업 수 계산)
 function getQueueStatus() {
+  // 대기 중인 사용자 수 계산 (중복 제거)
+  const queuedUserIds = new Set(generationQueue.queue.map(item => item.userId));
+  const queuedUserCount = queuedUserIds.size;
+  const queuedJobCount = generationQueue.queue.length;
+  
+  // 처리 중인 사용자 수 계산
+  const processingUserIds = new Set(generationQueue.processing.map(item => item.userId));
+  const processingUserCount = processingUserIds.size;
+  const processingJobCount = generationQueue.processing.length;
+  
   return {
-    queueLength: generationQueue.queue.length,
-    processingLength: generationQueue.processing.length,
+    queueLength: queuedJobCount,
+    processingLength: processingJobCount,
     maxConcurrent: generationQueue.maxConcurrent,
+    queuedUserCount: queuedUserCount,
+    processingUserCount: processingUserCount,
     queue: generationQueue.queue.map(item => ({
       jobId: item.jobId,
       userName: item.userName,
@@ -916,6 +1143,12 @@ function updateDiscordBotStatus(status) {
   } else if (status.isAvailable !== undefined) {
     generationQueue.discordBotStatus.isAvailable = status.isAvailable;
   }
+}
+
+// 사용자가 이미 활성 작업이 있는지 확인
+function hasUserActiveJob(userId) {
+  const userJobs = generationQueue.userActiveJobs.get(userId);
+  return userJobs && userJobs.size > 0;
 }
 
 // 큐 처리 함수 (대기 중인 작업을 순차적으로 처리)
@@ -1060,7 +1293,7 @@ async function processPolicyTableGeneration(jobId, params, discordRequestId = nu
     const discordStartTime = Date.now();
     let discordResponseTime = null;
     try {
-      const { imageUrl, messageId: discordMessageId, threadId } = await captureSheetViaDiscordBot(
+      const { imageUrl, messageId: discordMessageId, threadId, excelUrl, excelMessageId } = await captureSheetViaDiscordBot(
         sheetUrl,
         policyTableName,
         creatorName, // 실행한 사람 이름 전달
@@ -1108,13 +1341,15 @@ async function processPolicyTableGeneration(jobId, params, discordRequestId = nu
         imageUrl,                    // 10: 이미지URL
         'N',                         // 11: 등록여부
         '',                          // 12: 등록일시
-        creatorId || ''              // 13: 생성자ID (새로 추가)
+        creatorId || '',             // 13: 생성자ID
+        '',                          // 14: 확인이력 (기존 데이터 호환성)
+        excelUrl || ''               // 15: 엑셀파일URL
       ];
 
       await withRetry(async () => {
         return await sheets.spreadsheets.values.append({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_POLICY_TABLE_LIST}!A:N`,
+          range: `${SHEET_POLICY_TABLE_LIST}!A:P`,
           valueInputOption: 'USER_ENTERED',
           resource: { values: [newRow] }
         });
@@ -1241,6 +1476,10 @@ function setupPolicyTableRoutes(app) {
   // GET /api/policy-table-settings
   router.get('/policy-table-settings', async (req, res) => {
     setCORSHeaders(req, res);
+    // OPTIONS 요청 처리
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
     try {
       // 정책표생성 탭 접근 권한: SS(총괄) 또는 두 글자 대문자 패턴(팀장)
       const permission = await checkPermission(req, ['SS', 'TEAM_LEADER']);
@@ -1250,7 +1489,7 @@ function setupPolicyTableRoutes(app) {
 
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
       
-      // 캐시 확인 (5분 TTL - 읽기 전용 데이터)
+      // 캐시 확인 (30분 TTL - 읽기 전용 데이터)
       const userId = req.headers['x-user-id'] || req.query.userId;
       const cacheKey = `policy-table-settings-${SPREADSHEET_ID}-${userId || 'all'}`;
       const cached = getCache(cacheKey);
@@ -1350,6 +1589,9 @@ function setupPolicyTableRoutes(app) {
         }
       }
 
+      // 캐시에 저장 (30분 TTL)
+      setCache(cacheKey, settings, CACHE_TTL.POLICY_TABLE_SETTINGS);
+
       console.log('🔍 [정책표] 설정 목록 조회:', {
         totalSettings: settings.length,
         settings: settings.map(s => ({
@@ -1413,6 +1655,10 @@ function setupPolicyTableRoutes(app) {
           resource: { values: [newRow] }
         });
       });
+
+      // 캐시 무효화
+      invalidateCache('policy-table-settings');
+      invalidateCache('policy-tables-tabs'); // 탭 목록도 무효화
 
       return res.json({
         success: true,
@@ -1490,6 +1736,10 @@ function setupPolicyTableRoutes(app) {
         });
       });
 
+      // 캐시 무효화
+      invalidateCache('policy-table-settings');
+      invalidateCache('policy-tables-tabs'); // 탭 목록도 무효화
+
       return res.json({
         success: true,
         id: id,
@@ -1547,12 +1797,806 @@ function setupPolicyTableRoutes(app) {
         });
       });
 
+      // 캐시 무효화
+      invalidateCache('policy-table-settings');
+      invalidateCache('policy-tables-tabs'); // 탭 목록도 무효화
+
       return res.json({
         success: true,
         message: '정책표 설정이 삭제되었습니다.'
       });
     } catch (error) {
       console.error('[정책표] 설정 삭제 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // ========== 예산채널설정 관련 API ==========
+
+  // GET /api/budget-channel-settings
+  router.get('/budget-channel-settings', async (req, res) => {
+    setCORSHeaders(req, res);
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
+    try {
+      // 예산채널확인 탭 접근 권한: SS(총괄), S(정산) 또는 두 글자 대문자 패턴(팀장)
+      // 팀장의 경우 확인적용권한자로 설정된 것만 프론트엔드에서 필터링됨
+      const permission = await checkPermission(req, ['SS', 'S', 'TEAM_LEADER'], 'budget');
+      
+      console.log('[예산채널] 권한 체크 결과:', {
+        hasPermission: permission.hasPermission,
+        userRole: permission.userRole,
+        userId: permission.userId,
+        error: permission.error
+      });
+      
+      if (!permission.hasPermission) {
+        console.error('[예산채널] 접근 거부:', {
+          userRole: permission.userRole,
+          userId: permission.userId,
+          error: permission.error
+        });
+        return res.status(403).json({ 
+          success: false, 
+          error: permission.error || '권한이 없습니다. 채널별예산확인 탭은 팀장 권한 이상만 접근할 수 있습니다.' 
+        });
+      }
+      
+      // 사용자 정보를 응답에 포함 (프론트엔드 필터링에 사용)
+      const userRole = permission.userRole;
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      
+      // 년월 필터 파라미터
+      const yearMonth = req.query.yearMonth;
+      
+      // 캐시 확인 (30분 TTL) - 년월별로 캐시 분리
+      const userId = req.headers['x-user-id'] || req.query.userId;
+      const cacheKey = `budget-channel-settings-${SPREADSHEET_ID}-${userId || 'all'}-${yearMonth || 'all'}`;
+      const cached = getCache(cacheKey);
+      if (cached) {
+        console.log('✅ [캐시 히트] 예산채널 설정 목록');
+        // 캐시된 데이터가 배열인 경우 (기존 형식)와 객체인 경우 (새 형식) 모두 처리
+        if (Array.isArray(cached)) {
+          return res.json({
+            settings: cached,
+            userRole: permission.userRole,
+            userId: permission.userId
+          });
+        }
+        return res.json(cached);
+      }
+
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_BUDGET_CHANNEL_SETTINGS, HEADERS_BUDGET_CHANNEL_SETTINGS);
+
+      const response = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_BUDGET_CHANNEL_SETTINGS}!A:H`
+        });
+      });
+
+      const rows = response.data.values || [];
+      if (rows.length < 2) {
+        return res.json({
+          settings: [],
+          userRole: permission.userRole,
+          userId: permission.userId
+        });
+      }
+
+      const dataRows = rows.slice(1);
+
+      let settings = dataRows.map(row => ({
+        id: row[0] || '',
+        channelName: row[1] || '',
+        channelDescription: row[2] || '',
+        channelLink: row[3] || '',
+        yearMonth: row[4] || '',
+        checkerPermissions: row[5] ? JSON.parse(row[5]) : [],
+        registeredAt: row[6] || '',
+        registeredBy: row[7] || ''
+      }));
+
+      // 년월 필터 적용
+      if (yearMonth) {
+        settings = settings.filter(setting => setting.yearMonth === yearMonth);
+      }
+
+      // 응답 데이터 구성
+      const responseData = {
+        settings: settings,
+        userRole: permission.userRole,
+        userId: permission.userId
+      };
+
+      // 캐시에 저장 (30분 TTL)
+      setCache(cacheKey, responseData, CACHE_TTL.POLICY_TABLE_SETTINGS);
+
+      // 사용자 정보를 응답에 포함 (프론트엔드 필터링에 사용)
+      return res.json(responseData);
+    } catch (error) {
+      console.error('[예산채널] 설정 목록 조회 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // POST /api/budget-channel-settings
+  router.post('/budget-channel-settings', express.json(), async (req, res) => {
+    setCORSHeaders(req, res);
+    try {
+      const permission = await checkPermission(req, ['SS'], 'budget');
+      if (!permission.hasPermission) {
+        return res.status(403).json({ success: false, error: '권한이 없습니다.' });
+      }
+
+      const { channelName, channelDescription, channelLink, yearMonth, checkerPermissions } = req.body;
+
+      if (!channelName || !channelLink || !yearMonth || !checkerPermissions || !Array.isArray(checkerPermissions)) {
+        return res.status(400).json({ success: false, error: '필수 필드가 누락되었습니다.' });
+      }
+
+      // 년월 형식 검증 (YYYY-MM)
+      if (!/^\d{4}-\d{2}$/.test(yearMonth)) {
+        return res.status(400).json({ success: false, error: '년월 형식이 올바르지 않습니다. (YYYY-MM 형식)' });
+      }
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_BUDGET_CHANNEL_SETTINGS, HEADERS_BUDGET_CHANNEL_SETTINGS);
+
+      // 편집 링크 정규화
+      const normalizedEditLink = normalizeGoogleSheetEditLink(channelLink);
+      
+      const newId = `BC_${Date.now()}`;
+      const registeredAt = new Date().toISOString();
+      const registeredBy = permission.userId || 'Unknown';
+
+      const newRow = [
+        newId,
+        channelName,
+        channelDescription || '',
+        normalizedEditLink,
+        yearMonth,
+        JSON.stringify(checkerPermissions),
+        registeredAt,
+        registeredBy
+      ];
+
+      await withRetry(async () => {
+        return await sheets.spreadsheets.values.append({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_BUDGET_CHANNEL_SETTINGS}!A:H`,
+          valueInputOption: 'USER_ENTERED',
+          resource: {
+            values: [newRow]
+          }
+        });
+      });
+
+      // 캐시 무효화
+      invalidateCache('budget-channel-settings');
+
+      return res.json({
+        success: true,
+        id: newId,
+        message: '예산채널 설정이 추가되었습니다.'
+      });
+    } catch (error) {
+      console.error('[예산채널] 설정 추가 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // PUT /api/budget-channel-settings/:id
+  router.put('/budget-channel-settings/:id', express.json(), async (req, res) => {
+    setCORSHeaders(req, res);
+    try {
+      const permission = await checkPermission(req, ['SS'], 'budget');
+      if (!permission.hasPermission) {
+        return res.status(403).json({ success: false, error: '권한이 없습니다.' });
+      }
+
+      const { id } = req.params;
+      const { channelName, channelDescription, channelLink, yearMonth, checkerPermissions } = req.body;
+
+      if (!channelName || !channelLink || !yearMonth || !checkerPermissions || !Array.isArray(checkerPermissions)) {
+        return res.status(400).json({ success: false, error: '필수 필드가 누락되었습니다.' });
+      }
+
+      // 년월 형식 검증 (YYYY-MM)
+      if (!/^\d{4}-\d{2}$/.test(yearMonth)) {
+        return res.status(400).json({ success: false, error: '년월 형식이 올바르지 않습니다. (YYYY-MM 형식)' });
+      }
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_BUDGET_CHANNEL_SETTINGS, HEADERS_BUDGET_CHANNEL_SETTINGS);
+
+      const response = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_BUDGET_CHANNEL_SETTINGS}!A:H`
+        });
+      });
+
+      const rows = response.data.values || [];
+      
+      // 헤더 행 제외 (첫 번째 행은 헤더)
+      if (rows.length < 2) {
+        return res.status(404).json({ success: false, error: '예산채널 설정을 찾을 수 없습니다.' });
+      }
+      
+      // 헤더를 제외한 데이터 행에서 찾기
+      const dataRows = rows.slice(1);
+      const rowIndex = dataRows.findIndex(row => row[0] === id);
+
+      if (rowIndex === -1) {
+        return res.status(404).json({ success: false, error: '예산채널 설정을 찾을 수 없습니다.' });
+      }
+
+      // 편집 링크 정규화
+      const normalizedEditLink = normalizeGoogleSheetEditLink(channelLink);
+
+      // dataRows[rowIndex]는 헤더를 제외한 데이터 행이므로
+      // 업데이트 시 rowIndex + 2를 사용 (헤더 1행 + 0-based 인덱스 + 1)
+      const updatedRow = [
+        id,
+        channelName,
+        channelDescription || '',
+        normalizedEditLink,
+        yearMonth,
+        JSON.stringify(checkerPermissions),
+        dataRows[rowIndex][6] || new Date().toISOString(), // 등록일시 유지
+        dataRows[rowIndex][7] || permission.userId || 'Unknown' // 등록자 유지
+      ];
+
+      await withRetry(async () => {
+        return await sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_BUDGET_CHANNEL_SETTINGS}!A${rowIndex + 2}:H${rowIndex + 2}`,
+          valueInputOption: 'USER_ENTERED',
+          resource: {
+            values: [updatedRow]
+          }
+        });
+      });
+
+      // 캐시 무효화
+      invalidateCache('budget-channel-settings');
+
+      return res.json({
+        success: true,
+        message: '예산채널 설정이 수정되었습니다.'
+      });
+    } catch (error) {
+      console.error('[예산채널] 설정 수정 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // DELETE /api/budget-channel-settings/:id
+  router.delete('/budget-channel-settings/:id', async (req, res) => {
+    setCORSHeaders(req, res);
+    try {
+      const permission = await checkPermission(req, ['SS'], 'budget');
+      if (!permission.hasPermission) {
+        return res.status(403).json({ success: false, error: '권한이 없습니다.' });
+      }
+
+      const { id } = req.params;
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_BUDGET_CHANNEL_SETTINGS, HEADERS_BUDGET_CHANNEL_SETTINGS);
+
+      const response = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_BUDGET_CHANNEL_SETTINGS}!A:H`
+        });
+      });
+
+      const rows = response.data.values || [];
+      const rowIndex = rows.findIndex(row => row[0] === id);
+
+      if (rowIndex === -1) {
+        return res.status(404).json({ success: false, error: '예산채널 설정을 찾을 수 없습니다.' });
+      }
+
+      // 행 삭제 (헤더 행이 있으므로 rowIndex + 1이 실제 시트의 행 번호)
+      await withRetry(async () => {
+        return await sheets.spreadsheets.batchUpdate({
+          spreadsheetId: SPREADSHEET_ID,
+          resource: {
+            requests: [{
+              deleteDimension: {
+                range: {
+                  sheetId: await getSheetId(sheets, SPREADSHEET_ID, SHEET_BUDGET_CHANNEL_SETTINGS),
+                  dimension: 'ROWS',
+                  startIndex: rowIndex + 1, // 헤더 행 다음부터 시작
+                  endIndex: rowIndex + 2
+                }
+              }
+            }]
+          }
+        });
+      });
+
+      // 캐시 무효화
+      invalidateCache('budget-channel-settings');
+
+      return res.json({
+        success: true,
+        message: '예산채널 설정이 삭제되었습니다.'
+      });
+    } catch (error) {
+      console.error('[예산채널] 설정 삭제 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // ========== 기본예산설정 관련 API ==========
+
+  // GET /api/basic-budget-settings
+  router.get('/basic-budget-settings', async (req, res) => {
+    setCORSHeaders(req, res);
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
+    try {
+      // 기본예산설정 탭 접근 권한: SS(총괄), S(정산) 또는 두 글자 대문자 패턴(팀장)
+      const permission = await checkPermission(req, ['SS', 'S', 'TEAM_LEADER'], 'budget');
+      if (!permission.hasPermission) {
+        return res.status(403).json({ success: false, error: '권한이 없습니다.' });
+      }
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      const yearMonth = req.query.yearMonth;
+      const userId = req.headers['x-user-id'] || req.query.userId;
+      const cacheKey = `basic-budget-settings-${SPREADSHEET_ID}-${userId || 'all'}-${yearMonth || 'all'}`;
+      const cached = getCache(cacheKey);
+      if (cached) {
+        console.log('✅ [캐시 히트] 기본예산 설정 목록');
+        return res.json(cached);
+      }
+
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_BASIC_BUDGET_SETTINGS, HEADERS_BASIC_BUDGET_SETTINGS);
+
+      const response = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_BASIC_BUDGET_SETTINGS}!A:H`
+        });
+      });
+
+      const rows = response.data.values || [];
+      if (rows.length < 2) {
+        return res.json([]);
+      }
+
+      const dataRows = rows.slice(1);
+      let settings = dataRows.map(row => ({
+        id: row[0] || '',
+        name: row[1] || '',
+        description: row[2] || '',
+        link: row[3] || '',
+        yearMonth: row[4] || '',
+        checkerPermissions: row[5] ? JSON.parse(row[5]) : [],
+        registeredAt: row[6] || '',
+        registeredBy: row[7] || ''
+      }));
+
+      if (yearMonth) {
+        settings = settings.filter(setting => setting.yearMonth === yearMonth);
+      }
+
+      setCache(cacheKey, settings, CACHE_TTL.POLICY_TABLE_SETTINGS);
+      return res.json(settings);
+    } catch (error) {
+      console.error('[기본예산] 설정 목록 조회 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // POST /api/basic-budget-settings
+  router.post('/basic-budget-settings', express.json(), async (req, res) => {
+    setCORSHeaders(req, res);
+    try {
+      const permission = await checkPermission(req, ['SS'], 'budget');
+      if (!permission.hasPermission) {
+        return res.status(403).json({ success: false, error: '권한이 없습니다.' });
+      }
+
+      const { name, description, link, yearMonth, checkerPermissions } = req.body;
+      if (!name || !link || !yearMonth || !checkerPermissions || !Array.isArray(checkerPermissions)) {
+        return res.status(400).json({ success: false, error: '필수 필드가 누락되었습니다.' });
+      }
+
+      if (!/^\d{4}-\d{2}$/.test(yearMonth)) {
+        return res.status(400).json({ success: false, error: '년월 형식이 올바르지 않습니다. (YYYY-MM 형식)' });
+      }
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_BASIC_BUDGET_SETTINGS, HEADERS_BASIC_BUDGET_SETTINGS);
+      const normalizedEditLink = normalizeGoogleSheetEditLink(link);
+      const newId = `BB_${Date.now()}`;
+      const registeredAt = new Date().toISOString();
+      const registeredBy = permission.userId || 'Unknown';
+
+      const newRow = [
+        newId, name, description || '', normalizedEditLink, yearMonth,
+        JSON.stringify(checkerPermissions), registeredAt, registeredBy
+      ];
+
+      await withRetry(async () => {
+        return await sheets.spreadsheets.values.append({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_BASIC_BUDGET_SETTINGS}!A:H`,
+          valueInputOption: 'USER_ENTERED',
+          resource: { values: [newRow] }
+        });
+      });
+      invalidateCache('basic-budget-settings');
+      return res.json({ success: true, id: newId, message: '기본예산 설정이 추가되었습니다.' });
+    } catch (error) {
+      console.error('[기본예산] 설정 추가 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // PUT /api/basic-budget-settings/:id
+  router.put('/basic-budget-settings/:id', express.json(), async (req, res) => {
+    setCORSHeaders(req, res);
+    try {
+      const permission = await checkPermission(req, ['SS'], 'budget');
+      if (!permission.hasPermission) {
+        return res.status(403).json({ success: false, error: '권한이 없습니다.' });
+      }
+
+      const { id } = req.params;
+      const { name, description, link, yearMonth, checkerPermissions } = req.body;
+      if (!name || !link || !yearMonth || !checkerPermissions || !Array.isArray(checkerPermissions)) {
+        return res.status(400).json({ success: false, error: '필수 필드가 누락되었습니다.' });
+      }
+
+      if (!/^\d{4}-\d{2}$/.test(yearMonth)) {
+        return res.status(400).json({ success: false, error: '년월 형식이 올바르지 않습니다. (YYYY-MM 형식)' });
+      }
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_BASIC_BUDGET_SETTINGS, HEADERS_BASIC_BUDGET_SETTINGS);
+      const response = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_BASIC_BUDGET_SETTINGS}!A:H`
+        });
+      });
+
+      const rows = response.data.values || [];
+      if (rows.length < 2) {
+        return res.status(404).json({ success: false, error: '기본예산 설정을 찾을 수 없습니다.' });
+      }
+
+      const dataRows = rows.slice(1);
+      const rowIndexInFiltered = dataRows.findIndex(row => row[0] === id);
+
+      if (rowIndexInFiltered === -1) {
+        return res.status(404).json({ success: false, error: '기본예산 설정을 찾을 수 없습니다.' });
+      }
+
+      const actualRowIndex = rowIndexInFiltered + 1;
+      const normalizedEditLink = normalizeGoogleSheetEditLink(link);
+      const updatedRow = [
+        id, name, description || '', normalizedEditLink, yearMonth,
+        JSON.stringify(checkerPermissions),
+        dataRows[rowIndexInFiltered][6] || new Date().toISOString(),
+        dataRows[rowIndexInFiltered][7] || permission.userId || 'Unknown'
+      ];
+
+      await withRetry(async () => {
+        return await sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_BASIC_BUDGET_SETTINGS}!A${actualRowIndex + 1}:H${actualRowIndex + 1}`,
+          valueInputOption: 'USER_ENTERED',
+          resource: { values: [updatedRow] }
+        });
+      });
+      invalidateCache('basic-budget-settings');
+      return res.json({ success: true, message: '기본예산 설정이 수정되었습니다.' });
+    } catch (error) {
+      console.error('[기본예산] 설정 수정 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // DELETE /api/basic-budget-settings/:id
+  router.delete('/basic-budget-settings/:id', async (req, res) => {
+    setCORSHeaders(req, res);
+    try {
+      const permission = await checkPermission(req, ['SS'], 'budget');
+      if (!permission.hasPermission) {
+        return res.status(403).json({ success: false, error: '권한이 없습니다.' });
+      }
+
+      const { id } = req.params;
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_BASIC_BUDGET_SETTINGS, HEADERS_BASIC_BUDGET_SETTINGS);
+      const response = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_BASIC_BUDGET_SETTINGS}!A:H`
+        });
+      });
+
+      const rows = response.data.values || [];
+      if (rows.length < 2) {
+        return res.status(404).json({ success: false, error: '기본예산 설정을 찾을 수 없습니다.' });
+      }
+      
+      // 헤더를 제외한 데이터 행에서 찾기
+      const dataRows = rows.slice(1);
+      const rowIndexInFiltered = dataRows.findIndex(row => row[0] === id);
+
+      if (rowIndexInFiltered === -1) {
+        return res.status(404).json({ success: false, error: '기본예산 설정을 찾을 수 없습니다.' });
+      }
+
+      // 실제 시트 행 번호 = 헤더(1행) + 찾은 인덱스 + 1 (0-based to 1-based)
+      const actualRowIndex = rowIndexInFiltered + 1;
+
+      await withRetry(async () => {
+        return await sheets.spreadsheets.batchUpdate({
+          spreadsheetId: SPREADSHEET_ID,
+          resource: {
+            requests: [{
+              deleteDimension: {
+                range: {
+                  sheetId: await getSheetId(sheets, SPREADSHEET_ID, SHEET_BASIC_BUDGET_SETTINGS),
+                  dimension: 'ROWS',
+                  startIndex: actualRowIndex,
+                  endIndex: actualRowIndex + 1
+                }
+              }
+            }]
+          }
+        });
+      });
+      invalidateCache('basic-budget-settings');
+      return res.json({ success: true, message: '기본예산 설정이 삭제되었습니다.' });
+    } catch (error) {
+      console.error('[기본예산] 설정 삭제 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // ========== 기본데이터설정 관련 API ==========
+
+  // GET /api/basic-data-settings
+  router.get('/basic-data-settings', async (req, res) => {
+    setCORSHeaders(req, res);
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
+    try {
+      // 기본데이터설정 탭 접근 권한: SS(총괄), S(정산) 또는 두 글자 대문자 패턴(팀장)
+      const permission = await checkPermission(req, ['SS', 'S', 'TEAM_LEADER'], 'budget');
+      if (!permission.hasPermission) {
+        return res.status(403).json({ success: false, error: '권한이 없습니다.' });
+      }
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      const yearMonth = req.query.yearMonth;
+      const userId = req.headers['x-user-id'] || req.query.userId;
+      const cacheKey = `basic-data-settings-${SPREADSHEET_ID}-${userId || 'all'}-${yearMonth || 'all'}`;
+      const cached = getCache(cacheKey);
+      if (cached) {
+        console.log('✅ [캐시 히트] 기본데이터 설정 목록');
+        return res.json(cached);
+      }
+
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_BASIC_DATA_SETTINGS, HEADERS_BASIC_DATA_SETTINGS);
+
+      const response = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_BASIC_DATA_SETTINGS}!A:H`
+        });
+      });
+
+      const rows = response.data.values || [];
+      if (rows.length < 2) {
+        return res.json([]);
+      }
+
+      const dataRows = rows.slice(1);
+      let settings = dataRows.map(row => ({
+        id: row[0] || '',
+        name: row[1] || '',
+        description: row[2] || '',
+        link: row[3] || '',
+        yearMonth: row[4] || '',
+        checkerPermissions: row[5] ? JSON.parse(row[5]) : [],
+        registeredAt: row[6] || '',
+        registeredBy: row[7] || ''
+      }));
+
+      if (yearMonth) {
+        settings = settings.filter(setting => setting.yearMonth === yearMonth);
+      }
+
+      setCache(cacheKey, settings, CACHE_TTL.POLICY_TABLE_SETTINGS);
+      return res.json(settings);
+    } catch (error) {
+      console.error('[기본데이터] 설정 목록 조회 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // POST /api/basic-data-settings
+  router.post('/basic-data-settings', express.json(), async (req, res) => {
+    setCORSHeaders(req, res);
+    try {
+      const permission = await checkPermission(req, ['SS'], 'budget');
+      if (!permission.hasPermission) {
+        return res.status(403).json({ success: false, error: '권한이 없습니다.' });
+      }
+
+      const { name, description, link, yearMonth, checkerPermissions } = req.body;
+      if (!name || !link || !yearMonth || !checkerPermissions || !Array.isArray(checkerPermissions)) {
+        return res.status(400).json({ success: false, error: '필수 필드가 누락되었습니다.' });
+      }
+
+      if (!/^\d{4}-\d{2}$/.test(yearMonth)) {
+        return res.status(400).json({ success: false, error: '년월 형식이 올바르지 않습니다. (YYYY-MM 형식)' });
+      }
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_BASIC_DATA_SETTINGS, HEADERS_BASIC_DATA_SETTINGS);
+      const normalizedEditLink = normalizeGoogleSheetEditLink(link);
+      const newId = `BD_${Date.now()}`;
+      const registeredAt = new Date().toISOString();
+      const registeredBy = permission.userId || 'Unknown';
+
+      const newRow = [
+        newId, name, description || '', normalizedEditLink, yearMonth,
+        JSON.stringify(checkerPermissions), registeredAt, registeredBy
+      ];
+
+      await withRetry(async () => {
+        return await sheets.spreadsheets.values.append({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_BASIC_DATA_SETTINGS}!A:H`,
+          valueInputOption: 'USER_ENTERED',
+          resource: { values: [newRow] }
+        });
+      });
+      invalidateCache('basic-data-settings');
+      return res.json({ success: true, id: newId, message: '기본데이터 설정이 추가되었습니다.' });
+    } catch (error) {
+      console.error('[기본데이터] 설정 추가 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // PUT /api/basic-data-settings/:id
+  router.put('/basic-data-settings/:id', express.json(), async (req, res) => {
+    setCORSHeaders(req, res);
+    try {
+      const permission = await checkPermission(req, ['SS'], 'budget');
+      if (!permission.hasPermission) {
+        return res.status(403).json({ success: false, error: '권한이 없습니다.' });
+      }
+
+      const { id } = req.params;
+      const { name, description, link, yearMonth, checkerPermissions } = req.body;
+      if (!name || !link || !yearMonth || !checkerPermissions || !Array.isArray(checkerPermissions)) {
+        return res.status(400).json({ success: false, error: '필수 필드가 누락되었습니다.' });
+      }
+
+      if (!/^\d{4}-\d{2}$/.test(yearMonth)) {
+        return res.status(400).json({ success: false, error: '년월 형식이 올바르지 않습니다. (YYYY-MM 형식)' });
+      }
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_BASIC_DATA_SETTINGS, HEADERS_BASIC_DATA_SETTINGS);
+      const response = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_BASIC_DATA_SETTINGS}!A:H`
+        });
+      });
+
+      const rows = response.data.values || [];
+      if (rows.length < 2) {
+        return res.status(404).json({ success: false, error: '기본데이터 설정을 찾을 수 없습니다.' });
+      }
+
+      const dataRows = rows.slice(1);
+      const rowIndexInFiltered = dataRows.findIndex(row => row[0] === id);
+
+      if (rowIndexInFiltered === -1) {
+        return res.status(404).json({ success: false, error: '기본데이터 설정을 찾을 수 없습니다.' });
+      }
+
+      const actualRowIndex = rowIndexInFiltered + 1;
+      const normalizedEditLink = normalizeGoogleSheetEditLink(link);
+      const updatedRow = [
+        id, name, description || '', normalizedEditLink, yearMonth,
+        JSON.stringify(checkerPermissions),
+        dataRows[rowIndexInFiltered][6] || new Date().toISOString(),
+        dataRows[rowIndexInFiltered][7] || permission.userId || 'Unknown'
+      ];
+
+      await withRetry(async () => {
+        return await sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_BASIC_DATA_SETTINGS}!A${actualRowIndex + 1}:H${actualRowIndex + 1}`,
+          valueInputOption: 'USER_ENTERED',
+          resource: { values: [updatedRow] }
+        });
+      });
+      invalidateCache('basic-data-settings');
+      return res.json({ success: true, message: '기본데이터 설정이 수정되었습니다.' });
+    } catch (error) {
+      console.error('[기본데이터] 설정 수정 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // DELETE /api/basic-data-settings/:id
+  router.delete('/basic-data-settings/:id', async (req, res) => {
+    setCORSHeaders(req, res);
+    try {
+      const permission = await checkPermission(req, ['SS'], 'budget');
+      if (!permission.hasPermission) {
+        return res.status(403).json({ success: false, error: '권한이 없습니다.' });
+      }
+
+      const { id } = req.params;
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_BASIC_DATA_SETTINGS, HEADERS_BASIC_DATA_SETTINGS);
+      const response = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_BASIC_DATA_SETTINGS}!A:H`
+        });
+      });
+
+      const rows = response.data.values || [];
+      if (rows.length < 2) {
+        return res.status(404).json({ success: false, error: '기본데이터 설정을 찾을 수 없습니다.' });
+      }
+      
+      // 헤더를 제외한 데이터 행에서 찾기
+      const dataRows = rows.slice(1);
+      const rowIndexInFiltered = dataRows.findIndex(row => row[0] === id);
+
+      if (rowIndexInFiltered === -1) {
+        return res.status(404).json({ success: false, error: '기본데이터 설정을 찾을 수 없습니다.' });
+      }
+
+      // 실제 시트 행 번호 = 헤더(1행) + 찾은 인덱스 + 1 (0-based to 1-based)
+      const actualRowIndex = rowIndexInFiltered + 1;
+
+      await withRetry(async () => {
+        return await sheets.spreadsheets.batchUpdate({
+          spreadsheetId: SPREADSHEET_ID,
+          resource: {
+            requests: [{
+              deleteDimension: {
+                range: {
+                  sheetId: await getSheetId(sheets, SPREADSHEET_ID, SHEET_BASIC_DATA_SETTINGS),
+                  dimension: 'ROWS',
+                  startIndex: actualRowIndex,
+                  endIndex: actualRowIndex + 1
+                }
+              }
+            }]
+          }
+        });
+      });
+      invalidateCache('basic-data-settings');
+      return res.json({ success: true, message: '기본데이터 설정이 삭제되었습니다.' });
+    } catch (error) {
+      console.error('[기본데이터] 설정 삭제 오류:', error);
       return res.status(500).json({ success: false, error: error.message });
     }
   });
@@ -1663,7 +2707,7 @@ function setupPolicyTableRoutes(app) {
 
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
       
-      // 캐시 확인 (30초 TTL)
+      // 캐시 확인 (TTL 내)
       const cacheKey = `user-groups-${SPREADSHEET_ID}`;
       const cached = getCache(cacheKey);
       if (cached) {
@@ -1671,14 +2715,33 @@ function setupPolicyTableRoutes(app) {
         return res.json(cached);
       }
 
+      // 시트 헤더 보장
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_USER_GROUPS, HEADERS_USER_GROUPS);
 
-      const response = await withRetry(async () => {
+      let response;
+      try {
+        response = await withRetry(async () => {
         return await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
           range: `${SHEET_USER_GROUPS}!A:F`
         });
       });
+      } catch (err) {
+        // rate limit 등으로 실패 시 마지막 성공 데이터라도 반환
+        const isRateLimitError =
+          err?.code === 429 ||
+          err?.response?.status === 429 ||
+          (err?.message && err.message.toLowerCase().includes('quota exceeded')) ||
+          (err?.message && err.message.toLowerCase().includes('ratelimit')) ||
+          (err?.response?.data?.error?.status === 'RESOURCE_EXHAUSTED');
+
+        if (isRateLimitError && lastUserGroupsCache) {
+          console.warn('⚠️ [정책영업그룹] rate limit 발생, 마지막 캐시 데이터 반환');
+          setCache(cacheKey, lastUserGroupsCache, CACHE_TTL.USER_GROUPS);
+          return res.json(lastUserGroupsCache);
+        }
+        throw err;
+      }
 
       const rows = response.data.values || [];
       if (rows.length < 2) {
@@ -1691,9 +2754,11 @@ function setupPolicyTableRoutes(app) {
 
       const groups = dataRows.map(row => {
         const groupData = parseUserGroupData(row[2]);
+        const groupName = row[1] || '';
         return {
           id: row[0] || '',
-          groupName: row[1] || '',
+          name: groupName,  // name 필드 추가 (하위 호환성)
+          groupName: groupName,
           companyNames: groupData.companyNames,
           managerIds: groupData.managerIds,
           // 하위 호환성을 위해 userIds도 반환 (기존 코드 호환)
@@ -1704,8 +2769,9 @@ function setupPolicyTableRoutes(app) {
         };
       });
 
-      // 캐시에 저장 (30초 TTL)
+      // 캐시에 저장 (확장된 TTL)
       setCache(cacheKey, groups, CACHE_TTL.USER_GROUPS);
+      lastUserGroupsCache = groups; // rate limit 발생 시 사용할 마지막 성공 데이터
       console.log('💾 [캐시 저장] 정책영업그룹 목록');
 
       return res.json(groups);
@@ -2052,6 +3118,10 @@ function setupPolicyTableRoutes(app) {
   // GET /api/policy-table/user-groups/:id/change-history
   router.get('/policy-table/user-groups/:id/change-history', async (req, res) => {
     setCORSHeaders(req, res);
+    // OPTIONS 요청 처리
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
     try {
       // S 권한자도 변경이력 조회 가능하도록 권한 체크
       const userRole = req.headers['x-user-role'] || req.query?.userRole;
@@ -2340,7 +3410,7 @@ function setupPolicyTableRoutes(app) {
 
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
       
-      // 캐시 확인 (30초 TTL)
+      // 캐시 확인 (30분 TTL)
       const cacheKey = `companies-${SPREADSHEET_ID}`;
       const cached = getCache(cacheKey);
       if (cached) {
@@ -2392,6 +3462,13 @@ function setupPolicyTableRoutes(app) {
 
       const companies = Array.from(companyMap.values());
       
+      // 캐시에 저장 (30분 TTL)
+      const result = {
+        success: true,
+        companies: companies
+      };
+      setCache(cacheKey, result, CACHE_TTL.COMPANIES);
+      
       console.log('✅ [정책표] 업체명 목록 로드:', {
         totalCompanies: companies.length,
         companies: companies.map(c => ({
@@ -2400,10 +3477,7 @@ function setupPolicyTableRoutes(app) {
         }))
       });
 
-      return res.json({
-        success: true,
-        companies: companies
-      });
+      return res.json(result);
     } catch (error) {
       console.error('[정책표] 업체명 목록 로드 오류:', error);
       return res.status(500).json({ success: false, error: error.message });
@@ -2437,30 +3511,84 @@ function setupPolicyTableRoutes(app) {
       // accessGroupIds 배열 처리 (하위 호환성을 위해 accessGroupId도 지원)
       const groupIds = accessGroupIds || (accessGroupId ? [accessGroupId] : []);
 
-      // 작업 ID 생성
-      const jobId = `JOB_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      // 🔥 중요: creatorId는 대리점아이디관리 시트의 C열(contactId) 값을 사용해야 함
+      // req.headers['x-user-id']를 직접 사용하여 대리점아이디관리 시트에서 C열 값을 찾음
+      const headerUserId = req.headers['x-user-id'] || '';
+      let creatorId = headerUserId;
+      try {
+        const { sheets, SPREADSHEET_ID } = createSheetsClient();
+        const agentManagementResponse = await getAgentManagementData(sheets, SPREADSHEET_ID);
+        const agentRows = agentManagementResponse?.data?.values || [];
+        if (agentRows.length >= 2 && headerUserId) {
+          // C열(contactId)로 먼저 찾기
+          let userRow = agentRows.find(row => {
+            return row[2] === headerUserId;
+          });
+          // C열로 못 찾으면 A열(이름)으로 찾기
+          if (!userRow && permission.userName) {
+            userRow = agentRows.find(row => {
+              return row[0] === permission.userName;
+            });
+          }
+          if (userRow && userRow[2]) {
+            // 대리점아이디관리 시트의 C열 값 사용 (정책표 목록 탭 필터링과 동일)
+            creatorId = userRow[2];
+            console.log('✅ [정책표 생성] creatorId 설정:', {
+              headerUserId: headerUserId,
+              contactId: creatorId,
+              userName: permission.userName,
+              foundBy: userRow[2] === headerUserId ? 'contactId' : 'userName'
+            });
+          } else {
+            console.warn('⚠️ [정책표 생성] 사용자를 찾을 수 없음, headerUserId 사용:', {
+              headerUserId: headerUserId,
+              userName: permission.userName
+            });
+          }
+        }
+      } catch (error) {
+        console.warn('[정책표 생성] creatorId 조회 실패, headerUserId 사용:', error.message);
+        // 에러 발생 시 headerUserId 그대로 사용
+      }
+
+      // 사용자가 이미 활성 작업이 있는지 확인
+      const userId = permission.userId || '';
+      if (hasUserActiveJob(userId)) {
+        return res.status(409).json({ 
+          success: false, 
+          error: '이미 진행 중인 정책표 생성 작업이 있습니다. 완료될 때까지 기다려주세요.' 
+        });
+      }
 
       // 정책표 이름 가져오기 (큐 표시용)
       let policyTableName = '정책표';
       try {
         const { sheets, SPREADSHEET_ID } = createSheetsClient();
         await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_TABLE_SETTINGS, HEADERS_POLICY_TABLE_SETTINGS);
-        const settingsResponse = await sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_POLICY_TABLE_SETTINGS}!A:B`
+        const settingsResponse = await withRetry(async () => {
+          return await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SHEET_POLICY_TABLE_SETTINGS}!A:B`
+          });
         });
-        const settingsRows = settingsResponse.data.values || [];
-        const settingsRow = settingsRows.find(row => row[0] === policyTableId);
-        if (settingsRow && settingsRow[1]) {
-          policyTableName = settingsRow[1];
+        
+        // 응답이 없거나 data가 없는 경우 처리
+        if (!settingsResponse || !settingsResponse.data) {
+          console.warn('정책표 이름 조회 실패: 응답이 없습니다.');
+        } else {
+          const settingsRows = settingsResponse.data.values || [];
+          const settingsRow = settingsRows.find(row => row[0] === policyTableId);
+          if (settingsRow && settingsRow[1]) {
+            policyTableName = settingsRow[1];
+          }
         }
       } catch (error) {
         console.warn('정책표 이름 조회 실패:', error.message);
+        // 에러가 발생해도 기본값 '정책표'를 사용하여 계속 진행
       }
 
-      // 큐에 작업 추가
-      const queueItem = addToQueue(jobId, permission.userId || '', permission.userName || 'Unknown', policyTableName);
-      const queuePosition = queueItem.queuePosition;
+      // 작업 ID 생성
+      const jobId = `JOB_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
       // 작업 파라미터 저장
       const jobParams = {
@@ -2470,16 +3598,32 @@ function setupPolicyTableRoutes(app) {
         accessGroupIds: groupIds,
         creatorName: permission.userName || 'Unknown',
         creatorRole: permission.userRole,
-        creatorId: permission.userId || ''
+        creatorId: creatorId // 🔥 수정: contactId (C열 값) 사용
       };
+
+      // 큐에 작업 추가
+      const queueItem = addToQueue(jobId, userId, permission.userName || 'Unknown', policyTableName);
+      
+      // 중복 요청인 경우
+      if (queueItem.isDuplicate) {
+        return res.status(409).json({ 
+          success: false, 
+          error: '이미 진행 중인 정책표 생성 작업이 있습니다.',
+          existingJobId: queueItem.jobId
+        });
+      }
+
+      const queuePosition = queueItem.queuePosition;
+      const queueStatus = getQueueStatus();
 
       // 초기 상태 설정 (파라미터 포함)
       updateJobStatus(jobId, {
         status: 'queued',
         progress: 0,
-        message: `대기 중... (대기순번: ${queuePosition})`,
+        message: `대기 중... (${queueStatus.queuedUserCount}명의 사용자가 ${queueStatus.queueLength}건 대기 중)`,
         queuePosition: queuePosition,
-        queueLength: generationQueue.queue.length,
+        queueLength: queueStatus.queueLength,
+        queuedUserCount: queueStatus.queuedUserCount,
         params: jobParams // 큐 처리 시 사용할 파라미터 저장
       });
 
@@ -2489,14 +3633,14 @@ function setupPolicyTableRoutes(app) {
       });
 
       // 큐 상태 반환
-      const queueStatus = getQueueStatus();
       return res.json({
         success: true,
         jobId: jobId,
         status: 'queued',
-        message: `대기 중... (대기순번: ${queuePosition})`,
+        message: `대기 중... (${queueStatus.queuedUserCount}명의 사용자가 ${queueStatus.queueLength}건 대기 중)`,
         queuePosition: queuePosition,
         queueLength: queueStatus.queueLength,
+        queuedUserCount: queueStatus.queuedUserCount,
         estimatedWaitTime: queuePosition * 30, // 대략적인 대기 시간 (초) - 작업당 약 30초 가정
         discordBotStatus: queueStatus.discordBotStatus
       });
@@ -2543,12 +3687,18 @@ function setupPolicyTableRoutes(app) {
         queueInfo: {
           queuePosition: queueItem ? queueItem.queuePosition : (processingItem ? 0 : null),
           queueLength: queueStatus.queueLength,
+          queuedUserCount: queueStatus.queuedUserCount,
           processingLength: queueStatus.processingLength,
           isProcessing: !!processingItem,
           estimatedWaitTime: queueItem ? queueItem.queuePosition * 30 : 0 // 대략적인 대기 시간 (초)
         },
         discordBotStatus: queueStatus.discordBotStatus
       };
+
+      // 대기 중인 경우 메시지 업데이트
+      if (status.status === 'queued' && queueItem) {
+        response.message = `대기 중... (${queueStatus.queuedUserCount}명의 사용자가 ${queueStatus.queueLength}건 대기 중)`;
+      }
 
       return res.json(response);
     } catch (error) {
@@ -2610,32 +3760,20 @@ function setupPolicyTableRoutes(app) {
         // 일반정책모드 필터링: companyNames 기반
         const currentUserId = req.headers['x-user-id'] || userId;
         
-        // 정책표목록에서 접근권한 확인 (캐시 활용 가능하지만 필터링이 복잡하므로 매번 조회)
-        const policyListResponse = await withRetry(async () => {
-          return await sheets.spreadsheets.values.get({
-            spreadsheetId: SPREADSHEET_ID,
-            range: `${SHEET_POLICY_TABLE_LIST}!A:M`
-          });
-        });
-
-        const policyRows = policyListResponse.data.values || [];
-        const policyDataRows = policyRows.slice(1);
-
-        // 정책영업그룹 목록 조회 (캐시 활용)
+        // 정책영업그룹 목록과 일반모드권한관리 시트를 병렬로 조회 (캐시 우선)
         const userGroupsCacheKey = `user-groups-${SPREADSHEET_ID}`;
+        const generalModeCacheKey = `general-mode-permission-${SPREADSHEET_ID}`;
         const cachedUserGroups = getCache(userGroupsCacheKey);
-        const userGroupsMap = new Map();
+        const cachedGeneralMode = getCache(generalModeCacheKey);
         
+        // 병렬로 필요한 데이터 조회 (캐시에 없을 때만 API 호출)
+        const [userGroupsData, generalModeData, policyListData] = await Promise.all([
+          // 정책영업그룹 목록 조회
+          (async () => {
         if (cachedUserGroups) {
-          // 캐시에서 가져온 데이터로 맵 생성
-          cachedUserGroups.forEach(group => {
-            userGroupsMap.set(group.id, {
-              companyNames: group.companyNames,
-              managerIds: group.managerIds
-            });
-          });
-        } else {
-          // 캐시가 없으면 API 호출
+              return cachedUserGroups;
+            }
+            await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_USER_GROUPS, HEADERS_USER_GROUPS);
           const userGroupsResponse = await withRetry(async () => {
             return await sheets.spreadsheets.values.get({
               spreadsheetId: SPREADSHEET_ID,
@@ -2644,32 +3782,71 @@ function setupPolicyTableRoutes(app) {
           });
           const userGroupsRows = userGroupsResponse.data.values || [];
           const userGroupsDataRows = userGroupsRows.slice(1);
-          userGroupsDataRows.forEach(row => {
-            const groupId = row[0];
+            const groups = userGroupsDataRows.map(row => {
+              const groupId = row[0] || '';
+              const groupName = row[1] || '';
             const groupData = parseUserGroupData(row[2]);
-            userGroupsMap.set(groupId, groupData);
-          });
-        }
-
-        // 현재 사용자의 업체명 확인 (캐시 활용)
+              return { 
+                id: groupId, 
+                name: groupName,  // name 필드 추가 (하위 호환성)
+                groupName: groupName,  // groupName 필드도 유지
+                ...groupData 
+              };
+            });
+            setCache(userGroupsCacheKey, groups, CACHE_TTL.USER_GROUPS);
+            return groups;
+          })(),
+          // 일반모드권한관리 시트 조회
+          (async () => {
+            if (cachedGeneralMode) {
+              return cachedGeneralMode;
+            }
         const generalModeSheetName = '일반모드권한관리';
-        const generalModeCacheKey = `general-mode-permission-${SPREADSHEET_ID}`;
-        let generalModeRows = [];
-        const cachedGeneralMode = getCache(generalModeCacheKey);
-        
-        if (cachedGeneralMode) {
-          generalModeRows = cachedGeneralMode;
-        } else {
           const generalModeResponse = await withRetry(async () => {
             return await sheets.spreadsheets.values.get({
               spreadsheetId: SPREADSHEET_ID,
               range: `${generalModeSheetName}!A:K`
             });
           });
-          generalModeRows = generalModeResponse.data.values || [];
-          // 캐시에 저장 (30초 TTL)
+            const generalModeRows = generalModeResponse.data.values || [];
           setCache(generalModeCacheKey, generalModeRows, CACHE_TTL.GENERAL_MODE_PERMISSION);
+            return generalModeRows;
+          })(),
+          // 정책표목록 조회 (접근권한 확인용 - 캐시 활용)
+          (async () => {
+            const policyListCacheKey = `policy-tables-list-for-tabs-${SPREADSHEET_ID}`;
+            const cachedPolicyList = getCache(policyListCacheKey);
+            if (cachedPolicyList) {
+              return cachedPolicyList;
+            }
+            const policyListResponse = await withRetry(async () => {
+              return await sheets.spreadsheets.values.get({
+                spreadsheetId: SPREADSHEET_ID,
+                range: `${SHEET_POLICY_TABLE_LIST}!A:M`
+              });
+            });
+            const policyRows = policyListResponse.data.values || [];
+            setCache(policyListCacheKey, policyRows, CACHE_TTL.POLICY_TABLES);
+            return policyRows;
+          })()
+        ]);
+
+        // 데이터 처리
+        const userGroupsMap = new Map();
+        if (Array.isArray(userGroupsData)) {
+          userGroupsData.forEach(group => {
+            if (group.id) {
+              userGroupsMap.set(group.id, {
+                companyNames: group.companyNames || [],
+                managerIds: group.managerIds || []
+              });
+            }
+          });
         }
+
+        const generalModeRows = Array.isArray(generalModeData) ? generalModeData : [];
+        const policyRows = Array.isArray(policyListData) ? policyListData : [];
+        const policyDataRows = policyRows.length > 1 ? policyRows.slice(1) : [];
         let userCompanyName = null;
         if (generalModeRows.length > 3) {
           const generalModeDataRows = generalModeRows.slice(3);
@@ -2711,58 +3888,213 @@ function setupPolicyTableRoutes(app) {
         // SS(총괄), S(정산) 레벨은 모든 탭 표시
       } else if (userRole && /^[A-Z]{2}$/.test(userRole)) {
         // 팀장 레벨(두 글자 대문자 패턴)은 본인이 생성한 정책표 + 담당자인 그룹의 정책표 탭 표시
-        const currentUserId = req.headers['x-user-id'] || userId;
+        
+        // 🔥 중요: 정책표 생성 시 저장된 creatorId와 동일한 방식으로 사용자 ID를 찾아야 함
+        // req.headers['x-user-id']를 직접 사용하여 대리점아이디관리 시트에서 C열 값을 찾음
+        const headerUserId = req.headers['x-user-id'] || userId;
+        let currentUserId = headerUserId;
+        try {
+          const agentManagementResponse = await getAgentManagementData(sheets, SPREADSHEET_ID);
+          const agentRows = agentManagementResponse?.data?.values || [];
+          if (agentRows.length >= 2 && headerUserId) {
+            // C열(contactId)로 먼저 찾기
+            const userRow = agentRows.find(row => {
+              return row[2] === headerUserId;
+            });
+            if (userRow && userRow[2]) {
+              // 대리점아이디관리 시트의 C열 값 사용 (정책표 생성 시 저장된 creatorId와 동일)
+              currentUserId = userRow[2];
+              console.log('✅ [정책표 탭] currentUserId 설정:', {
+                headerUserId: headerUserId,
+                contactId: currentUserId,
+                userName: userRow[0]
+              });
+            } else {
+              console.warn('⚠️ [정책표 탭] 사용자를 찾을 수 없음, headerUserId 사용:', {
+                headerUserId: headerUserId,
+                availableIds: agentRows.slice(1).map(row => ({ name: row[0], contactId: row[2] })).slice(0, 5)
+              });
+            }
+          }
+        } catch (error) {
+          console.warn('[정책표 탭] 사용자 ID 조회 실패, headerUserId 사용:', error.message);
+          // 에러 발생 시 headerUserId 그대로 사용
+        }
+        
+        // 정책표 설정 조회 (생성자적용권한 확인용)
+        await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_TABLE_SETTINGS, HEADERS_POLICY_TABLE_SETTINGS);
+        const settingsResponse = await withRetry(async () => {
+          return await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SHEET_POLICY_TABLE_SETTINGS}!A:I`
+          });
+        });
+        const settingsRows = settingsResponse.data.values || [];
+        const settingsMap = new Map();
+        if (settingsRows.length >= 2) {
+          settingsRows.slice(1).forEach(row => {
+            const policyTableId = row[0] || '';
+            const creatorPermissions = row[6] ? (() => {
+              try {
+                return JSON.parse(row[6]);
+              } catch (e) {
+                return [];
+              }
+            })() : [];
+            if (policyTableId) {
+              settingsMap.set(policyTableId, creatorPermissions);
+            }
+          });
+        }
+        
+        // 정책표목록과 정책영업그룹 목록을 병렬로 조회 (캐시 우선)
+        const policyListCacheKey = `policy-tables-list-for-tabs-${SPREADSHEET_ID}`;
+        const userGroupsCacheKey = `user-groups-${SPREADSHEET_ID}`;
+        const cachedPolicyList = getCache(policyListCacheKey);
+        const cachedUserGroups = getCache(userGroupsCacheKey);
+        
+        const [policyListData, userGroupsData] = await Promise.all([
+          // 정책표목록 조회
+          (async () => {
+            if (cachedPolicyList) {
+              return cachedPolicyList;
+            }
         const policyListResponse = await withRetry(async () => {
           return await sheets.spreadsheets.values.get({
             spreadsheetId: SPREADSHEET_ID,
             range: `${SHEET_POLICY_TABLE_LIST}!A:O`
           });
         });
-
         const policyRows = policyListResponse.data.values || [];
-        const policyDataRows = policyRows.slice(1);
-        
-        // 정책영업그룹 목록 조회 (담당자 필터링용)
+            setCache(policyListCacheKey, policyRows, CACHE_TTL.POLICY_TABLES);
+            return policyRows;
+          })(),
+          // 정책영업그룹 목록 조회
+          (async () => {
+            if (cachedUserGroups && Array.isArray(cachedUserGroups)) {
+              return cachedUserGroups;
+            }
+            await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_USER_GROUPS, HEADERS_USER_GROUPS);
         const userGroupsResponse = await withRetry(async () => {
           return await sheets.spreadsheets.values.get({
             spreadsheetId: SPREADSHEET_ID,
             range: `${SHEET_USER_GROUPS}!A:E`
           });
         });
-
         const userGroupsRows = userGroupsResponse.data.values || [];
         const userGroupsDataRows = userGroupsRows.slice(1);
-        const userGroupsMap = new Map();
-        userGroupsDataRows.forEach(row => {
-          const groupId = row[0];
+            const groups = userGroupsDataRows.map(row => {
+              const groupId = row[0] || '';
+              const groupName = row[1] || '';
           const groupData = parseUserGroupData(row[2]);
-          userGroupsMap.set(groupId, groupData);
-        });
+              return { 
+                id: groupId, 
+                name: groupName,  // name 필드 추가 (하위 호환성)
+                groupName: groupName,  // groupName 필드도 유지
+                ...groupData 
+              };
+            });
+            setCache(userGroupsCacheKey, groups, CACHE_TTL.USER_GROUPS);
+            return groups;
+          })()
+        ]);
+        
+        const policyRows = Array.isArray(policyListData) ? policyListData : [];
+        const policyDataRows = policyRows.length > 1 ? policyRows.slice(1) : [];
+        
+        const userGroupsMap = new Map();
+        if (Array.isArray(userGroupsData)) {
+          userGroupsData.forEach(group => {
+            if (group.id) {
+              // name 또는 groupName 필드 모두 지원
+              const groupName = group.name || group.groupName;
+              userGroupsMap.set(group.id, {
+                name: groupName,
+                companyNames: group.companyNames || [],
+                managerIds: group.managerIds || []
+              });
+            }
+          });
+        }
         
         const accessiblePolicyTableIds = new Set();
         policyDataRows.forEach(row => {
           const creatorId = row[13] || ''; // 생성자ID
           const accessGroupIds = parseAccessGroupIds(row[5]); // 접근권한 (그룹ID 배열)
+          const policyTableId = row[1] || ''; // 정책표ID_설정
           
-          // 1. 본인이 생성한 정책표인지 확인
-          if (creatorId === currentUserId) {
-            accessiblePolicyTableIds.add(row[1]); // 정책표ID_설정
+          // 🔥 디버깅: 본인이 생성한 정책표인지 확인
+          // creatorId와 currentUserId를 숫자만 추출하여 비교 (전화번호 형식 차이 해결)
+          const normalizePhoneNumber = (phone) => {
+            if (!phone) return '';
+            // 숫자만 추출
+            const digits = phone.toString().replace(/[^0-9]/g, '');
+            // 앞의 0 제거 (01053336333 -> 1053336333)
+            return digits.replace(/^0+/, '') || digits;
+          };
+          
+          const normalizedCreatorId = normalizePhoneNumber(creatorId);
+          const normalizedCurrentUserId = normalizePhoneNumber(currentUserId);
+          const isCreator = normalizedCreatorId && normalizedCurrentUserId && normalizedCreatorId === normalizedCurrentUserId;
+          
+          if (isCreator) {
+            console.log('✅ [정책표 탭] 본인이 생성한 정책표 발견:', {
+              policyTableId,
+              policyTableName: row[2] || '',
+              originalCreatorId: creatorId,
+              originalCurrentUserId: currentUserId,
+              normalizedCreatorId: normalizedCreatorId,
+              normalizedCurrentUserId: normalizedCurrentUserId,
+              match: isCreator
+            });
+            accessiblePolicyTableIds.add(policyTableId); // 정책표ID_설정
+          } else if (normalizedCreatorId && normalizedCurrentUserId) {
+            // 매칭되지 않은 경우만 로그 (너무 많은 로그 방지)
+            console.log('❌ [정책표 탭] 생성자 불일치:', {
+              policyTableId,
+              policyTableName: row[2] || '',
+              originalCreatorId: creatorId,
+              originalCurrentUserId: currentUserId,
+              normalizedCreatorId: normalizedCreatorId,
+              normalizedCurrentUserId: normalizedCurrentUserId,
+              match: false
+            });
           }
           
           // 2. 본인이 담당자인 그룹의 정책표인지 확인
+          let isManager = false;
           for (const accessGroupId of accessGroupIds) {
             if (accessGroupId) {
               const groupData = userGroupsMap.get(accessGroupId);
               if (groupData) {
                 const managerIds = groupData.managerIds || [];
-                if (managerIds.includes(currentUserId)) {
-                  accessiblePolicyTableIds.add(row[1]); // 정책표ID_설정
+                // managerIds도 정규화하여 비교
+                const normalizedCurrentUserId = normalizePhoneNumber(currentUserId);
+                const isManagerInGroup = managerIds.some(managerId => {
+                  const normalizedManagerId = normalizePhoneNumber(managerId);
+                  return normalizedManagerId && normalizedCurrentUserId && normalizedManagerId === normalizedCurrentUserId;
+                });
+                if (isManagerInGroup) {
+                  isManager = true;
+                  accessiblePolicyTableIds.add(policyTableId); // 정책표ID_설정
                   break; // 하나라도 매칭되면 추가하고 다음 정책표로
                 }
               }
             }
           }
+          
+          // 정책표 탭에서는 본인이 생성한 정책표 또는 담당자인 그룹의 정책표만 표시
+          if (isCreator || isManager) {
+            console.log('✅ [정책표 탭] 접근 가능한 정책표:', {
+              policyTableId,
+              policyTableName: row[2] || '',
+              isCreator,
+              isManager,
+              userRole
+            });
+          }
         });
+        
         tabs = tabs.filter(tab => accessiblePolicyTableIds.has(tab.policyTableId));
       } else {
         // 그 외 사용자(A-F)는 그룹의 담당자(managerIds)에 포함된 경우만 해당 그룹의 탭 표시
@@ -2875,6 +4207,11 @@ function setupPolicyTableRoutes(app) {
         }
       }
 
+      // 캐시에 저장 (캐시 미스인 경우에만)
+      if (!cached) {
+        setCache(cacheKey, tabs, CACHE_TTL.POLICY_TABLE_TABS);
+      }
+
       return res.json(tabs);
     } catch (error) {
       console.error('[정책표] 탭 목록 조회 오류:', error);
@@ -2912,7 +4249,7 @@ function setupPolicyTableRoutes(app) {
       const response = await withRetry(async () => {
         return await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_POLICY_TABLE_LIST}!A:O`
+          range: `${SHEET_POLICY_TABLE_LIST}!A:P`
         });
       });
 
@@ -2924,17 +4261,22 @@ function setupPolicyTableRoutes(app) {
       const dataRows = rows.slice(1);
       
       // 정책영업그룹 목록 조회 (정액영업그룹 이름 표시용 - 정책모드에서만)
-      // 캐시에서 가져오기
+      // 캐시에서 가져오기 또는 병렬 조회
       let userGroupsNameMap = new Map();
+      let userGroupsMap = new Map(); // 일반정책모드에서도 사용
+      
       if (!isGeneralPolicyMode) {
         const userGroupsCacheKey = `user-groups-${SPREADSHEET_ID}`;
         const cachedUserGroups = getCache(userGroupsCacheKey);
         
         if (cachedUserGroups && Array.isArray(cachedUserGroups)) {
           // 캐시에서 가져온 데이터를 Map으로 변환
+          // 캐시 데이터 구조: { id, groupName, companyNames, managerIds, ... }
           cachedUserGroups.forEach(group => {
-            if (group.id && group.name) {
-              userGroupsNameMap.set(group.id, group.name);
+            // groupName 또는 name 필드 모두 지원 (하위 호환성)
+            const groupName = group.groupName || group.name;
+            if (group.id && groupName) {
+              userGroupsNameMap.set(group.id, groupName);
             }
           });
         } else {
@@ -3006,31 +4348,27 @@ function setupPolicyTableRoutes(app) {
             threadId: row[9] || '',
             imageUrl: row[10] || '',
             registeredAt: row[12] || '',
-            viewHistory: viewHistory // 확인이력 추가
+            viewHistory: viewHistory, // 확인이력 추가
+            excelFileUrl: row[15] || '' // 엑셀파일URL 추가
           };
         });
 
       // 권한 필터링
       if (isGeneralPolicyMode) {
         // 일반정책모드 필터링: companyNames 기반
-        // 정책영업그룹 목록을 캐시에서 가져오기
+        // 정책영업그룹 목록과 일반모드권한관리 시트를 병렬로 조회 (캐시 우선)
         const userGroupsCacheKey = `user-groups-${SPREADSHEET_ID}`;
+        const generalModeCacheKey = `general-mode-permission-${SPREADSHEET_ID}`;
         const cachedUserGroups = getCache(userGroupsCacheKey);
+        const cachedGeneralMode = getCache(generalModeCacheKey);
         
-        const userGroupsMap = new Map();
+        // 병렬로 필요한 데이터 조회 (캐시에 없을 때만 API 호출)
+        const [userGroupsData, generalModeData] = await Promise.all([
+          // 정책영업그룹 목록 조회
+          (async () => {
         if (cachedUserGroups && Array.isArray(cachedUserGroups)) {
-          // 캐시에서 가져온 데이터를 Map으로 변환
-          cachedUserGroups.forEach(group => {
-            if (group.id) {
-              userGroupsMap.set(group.id, {
-                name: group.name,
-                companyNames: group.companyNames || [],
-                managerIds: group.managerIds || []
-              });
+              return cachedUserGroups;
             }
-          });
-        } else {
-          // 캐시에 없으면 직접 조회
           await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_USER_GROUPS, HEADERS_USER_GROUPS);
           const userGroupsResponse = await withRetry(async () => {
             return await sheets.spreadsheets.values.get({
@@ -3038,34 +4376,57 @@ function setupPolicyTableRoutes(app) {
               range: `${SHEET_USER_GROUPS}!A:E`
             });
           });
-
           const userGroupsRows = userGroupsResponse.data.values || [];
           const userGroupsDataRows = userGroupsRows.slice(1);
-          userGroupsDataRows.forEach(row => {
-            const groupId = row[0];
+            const groups = userGroupsDataRows.map(row => {
+              const groupId = row[0] || '';
+              const groupName = row[1] || '';
             const groupData = parseUserGroupData(row[2]);
-            userGroupsMap.set(groupId, groupData);
-          });
-        }
-
-        // 현재 사용자의 업체명 확인 - 일반모드권한관리 시트 캐시 활용
+              return { 
+                id: groupId, 
+                name: groupName,  // name 필드 추가 (하위 호환성)
+                groupName: groupName,  // groupName 필드도 유지
+                ...groupData 
+              };
+            });
+            setCache(userGroupsCacheKey, groups, CACHE_TTL.USER_GROUPS);
+            return groups;
+          })(),
+          // 일반모드권한관리 시트 조회
+          (async () => {
+            if (cachedGeneralMode && Array.isArray(cachedGeneralMode)) {
+              return cachedGeneralMode;
+            }
         const generalModeSheetName = '일반모드권한관리';
-        const generalModeCacheKey = `general-mode-permission-${SPREADSHEET_ID}`;
-        const cachedGeneralMode = getCache(generalModeCacheKey);
-        
-        let generalModeRows = [];
-        if (cachedGeneralMode && Array.isArray(cachedGeneralMode)) {
-          generalModeRows = cachedGeneralMode;
-        } else {
-          // 캐시에 없으면 직접 조회
           const generalModeResponse = await withRetry(async () => {
             return await sheets.spreadsheets.values.get({
               spreadsheetId: SPREADSHEET_ID,
               range: `${generalModeSheetName}!A:K`
             });
           });
-          generalModeRows = generalModeResponse.data.values || [];
+            const generalModeRows = generalModeResponse.data.values || [];
+            setCache(generalModeCacheKey, generalModeRows, CACHE_TTL.GENERAL_MODE_PERMISSION);
+            return generalModeRows;
+          })()
+        ]);
+        
+        // 데이터 처리
+        const userGroupsMap = new Map();
+        if (Array.isArray(userGroupsData)) {
+          userGroupsData.forEach(group => {
+            if (group.id) {
+              // name 또는 groupName 필드 모두 지원
+              const groupName = group.name || group.groupName;
+              userGroupsMap.set(group.id, {
+                name: groupName,
+                companyNames: group.companyNames || [],
+                managerIds: group.managerIds || []
+              });
+            }
+          });
         }
+        
+        const generalModeRows = Array.isArray(generalModeData) ? generalModeData : [];
         let userCompanyName = null;
         if (generalModeRows.length > 3) {
           const generalModeDataRows = generalModeRows.slice(3);
@@ -3172,11 +4533,48 @@ function setupPolicyTableRoutes(app) {
           userGroupsMapSize: userGroupsMap.size
         });
         
+        // 정책표 설정 조회 (생성자적용권한 확인용)
+        await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_TABLE_SETTINGS, HEADERS_POLICY_TABLE_SETTINGS);
+        const settingsResponse = await withRetry(async () => {
+          return await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SHEET_POLICY_TABLE_SETTINGS}!A:I`
+          });
+        });
+        const settingsRows = settingsResponse.data.values || [];
+        const settingsMap = new Map();
+        if (settingsRows.length >= 2) {
+          settingsRows.slice(1).forEach(row => {
+            const policyTableId = row[0] || '';
+            const creatorPermissions = row[6] ? (() => {
+              try {
+                return JSON.parse(row[6]);
+              } catch (e) {
+                return [];
+              }
+            })() : [];
+            if (policyTableId) {
+              settingsMap.set(policyTableId, creatorPermissions);
+            }
+          });
+        }
+        
+        // 전화번호 정규화 함수 (정책표 탭과 동일한 로직)
+        const normalizePhoneNumber = (phone) => {
+          if (!phone) return '';
+          // 숫자만 추출
+          const digits = phone.toString().replace(/[^0-9]/g, '');
+          // 앞의 0 제거 (01053336333 -> 1053336333)
+          return digits.replace(/^0+/, '') || digits;
+        };
+        
         policies = policies.filter(policy => {
-          // 1. 본인이 생성한 정책표인지 확인
+          // 1. 본인이 생성한 정책표인지 확인 (전화번호 정규화 적용)
           let isCreator = false;
           if (policy.creatorId) {
-            isCreator = policy.creatorId === currentUserId;
+            const normalizedCreatorId = normalizePhoneNumber(policy.creatorId);
+            const normalizedCurrentUserId = normalizePhoneNumber(currentUserId);
+            isCreator = normalizedCreatorId && normalizedCurrentUserId && normalizedCreatorId === normalizedCurrentUserId;
           }
           
           // 2. 본인이 담당자인 그룹의 정책표인지 확인
@@ -3187,7 +4585,13 @@ function setupPolicyTableRoutes(app) {
               const groupData = userGroupsMap.get(accessGroupId);
               if (groupData) {
                 const managerIds = groupData.managerIds || [];
-                if (managerIds.includes(currentUserId)) {
+                // managerIds도 정규화하여 비교
+                const normalizedCurrentUserId = normalizePhoneNumber(currentUserId);
+                const isManagerInGroup = managerIds.some(managerId => {
+                  const normalizedManagerId = normalizePhoneNumber(managerId);
+                  return normalizedManagerId && normalizedCurrentUserId && normalizedManagerId === normalizedCurrentUserId;
+                });
+                if (isManagerInGroup) {
                   isManager = true;
                   break; // 하나라도 매칭되면 true
                 }
@@ -3195,14 +4599,18 @@ function setupPolicyTableRoutes(app) {
             }
           }
           
+          // 정책표 목록 조회에서도 본인이 생성한 정책표 또는 담당자인 그룹의 정책표만 표시
           const hasAccess = isCreator || isManager;
           
           console.log(`🔍 [정책모드] 팀장 필터링 체크: ${policy.policyTableName}`, {
             policyId: policy.id,
-            creatorId: policy.creatorId,
-            currentUserId,
+            originalCreatorId: policy.creatorId,
+            originalCurrentUserId: currentUserId,
+            normalizedCreatorId: policy.creatorId ? normalizePhoneNumber(policy.creatorId) : '',
+            normalizedCurrentUserId: normalizePhoneNumber(currentUserId),
             isCreator,
             isManager,
+            userRole,
             accessGroupIds,
             hasAccess
           });
@@ -3366,6 +4774,17 @@ function setupPolicyTableRoutes(app) {
       }
 
       const existingRow = rows[rowIndex];
+      
+      // 중복 등록 방지: 이미 등록된 경우
+      const isAlreadyRegistered = existingRow[11] === 'Y';
+      if (isAlreadyRegistered) {
+        return res.json({
+          success: true,
+          message: '이미 등록된 정책표입니다.',
+          alreadyRegistered: true
+        });
+      }
+      
       const updatedRow = [...existingRow];
       // 배열 길이를 최소 14로 보장 (생성자ID 포함, N열까지)
       while (updatedRow.length < 14) {
@@ -3615,20 +5034,68 @@ function setupPolicyTableRoutes(app) {
         viewHistory = [];
       }
 
+      // 정책영업그룹 이름 매핑 (정책모드에서만)
+      const accessGroupId = row[5] || '';
+      const accessGroupIds = parseAccessGroupIds(accessGroupId);
+      let accessGroupNames = [];
+      
+      if (!isGeneralPolicyMode && accessGroupIds.length > 0) {
+        // 정책영업그룹 조회 (캐시 활용)
+        const userGroupsCacheKey = `user-groups-${SPREADSHEET_ID}`;
+        let userGroupsNameMap = new Map();
+        const cachedUserGroups = getCache(userGroupsCacheKey);
+        
+        if (cachedUserGroups) {
+          // 캐시에서 가져온 데이터 사용
+          cachedUserGroups.forEach(group => {
+            if (group.id && group.name) {
+              userGroupsNameMap.set(group.id, group.name);
+            }
+          });
+        } else {
+          // 캐시에 없으면 직접 조회
+          await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_USER_GROUPS, HEADERS_USER_GROUPS);
+          const userGroupsResponse = await withRetry(async () => {
+            return await sheets.spreadsheets.values.get({
+              spreadsheetId: SPREADSHEET_ID,
+              range: `${SHEET_USER_GROUPS}!A:E`
+            });
+          });
+          
+          const userGroupsRows = userGroupsResponse.data.values || [];
+          const userGroupsDataRows = userGroupsRows.slice(1);
+          userGroupsDataRows.forEach(groupRow => {
+            const groupId = groupRow[0] || '';
+            const groupName = groupRow[1] || '';
+            if (groupId && groupName) {
+              userGroupsNameMap.set(groupId, groupName);
+            }
+          });
+        }
+        
+        // 정책영업그룹 이름 배열 생성
+        accessGroupNames = accessGroupIds
+          .map(groupId => userGroupsNameMap.get(groupId))
+          .filter(name => name); // undefined 제거
+      }
+
       const policy = {
         id: row[0] || '',
         policyTableId: row[1] || '',
         policyTableName: row[2] || '',
         applyDate: row[3] || '',
         applyContent: row[4] || '',
-        accessGroupId: row[5] || '',
+        accessGroupId: accessGroupId,
+        accessGroupNames: accessGroupNames, // 정책영업그룹 이름 배열 추가
         creator: row[6] || '',
+        creatorId: row[13] || '', // 생성자ID
         createdAt: row[7] || '',
         messageId: row[8] || '',
         threadId: row[9] || '',
         imageUrl: row[10] || '',
         registeredAt: row[12] || '',
-        viewHistory: viewHistory // 확인이력 추가
+        viewHistory: viewHistory, // 확인이력 추가
+        excelFileUrl: row[15] || '' // 엑셀파일URL 추가
       };
 
       // 캐시에 저장 (30초 TTL)
@@ -3724,6 +5191,49 @@ function setupPolicyTableRoutes(app) {
     } catch (error) {
       console.error('[정책표] 이미지 갱신 오류:', error);
       return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // GET /api/policy-tables/:id/download-excel
+  router.get('/policy-tables/:id/download-excel', async (req, res) => {
+    setCORSHeaders(req, res);
+    try {
+      const { id } = req.params;
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_TABLE_LIST, HEADERS_POLICY_TABLE_LIST);
+
+      const response = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_POLICY_TABLE_LIST}!A:P`
+        });
+      });
+
+      const rows = response.data.values || [];
+      const row = rows.find(r => r[0] === id);
+
+      if (!row) {
+        return res.status(404).json({ success: false, error: '정책표를 찾을 수 없습니다.' });
+      }
+
+      const excelUrl = row[15]; // 엑셀파일URL (15번 인덱스)
+      if (!excelUrl) {
+        return res.status(404).json({ success: false, error: '엑셀 파일이 없습니다.' });
+      }
+
+      // 엑셀 파일 URL을 직접 반환 (클라이언트에서 다운로드)
+      res.json({
+        success: true,
+        excelUrl: excelUrl
+      });
+
+    } catch (error) {
+      console.error('❌ [정책표] 엑셀 파일 다운로드 오류:', error);
+      res.status(500).json({
+        success: false,
+        error: '엑셀 파일 다운로드에 실패했습니다.',
+        message: error.message
+      });
     }
   });
 
@@ -3876,6 +5386,75 @@ function setupPolicyTableRoutes(app) {
     }
   });
 
+  // PUT /api/policy-tables/:id - 정책표 수정
+  router.put('/policy-tables/:id', express.json(), async (req, res) => {
+    setCORSHeaders(req, res);
+    try {
+      const permission = await checkPermission(req, ['SS', 'TEAM_LEADER']);
+      if (!permission.hasPermission) {
+        return res.status(403).json({ success: false, error: '권한이 없습니다.' });
+      }
+
+      const { id } = req.params;
+      const { applyDate, applyContent, accessGroupIds } = req.body;
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_TABLE_LIST, HEADERS_POLICY_TABLE_LIST);
+
+      const response = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_POLICY_TABLE_LIST}!A:O`
+        });
+      });
+
+      const rows = response.data.values || [];
+      const rowIndex = rows.findIndex(row => row[0] === id);
+
+      if (rowIndex === -1) {
+        return res.status(404).json({ success: false, error: '정책표를 찾을 수 없습니다.' });
+      }
+
+      const existingRow = rows[rowIndex];
+      
+      // 수정할 필드만 업데이트 (기존 값 유지)
+      const updatedRow = [...existingRow];
+      if (applyDate !== undefined) {
+        updatedRow[3] = applyDate; // 정책적용일시
+      }
+      if (applyContent !== undefined) {
+        updatedRow[4] = applyContent; // 정책적용내용
+      }
+      if (accessGroupIds !== undefined) {
+        // accessGroupIds 배열을 JSON 문자열로 변환
+        const accessGroupIdsJson = Array.isArray(accessGroupIds) && accessGroupIds.length > 0
+          ? JSON.stringify(accessGroupIds)
+          : '';
+        updatedRow[5] = accessGroupIdsJson; // 접근권한
+      }
+
+      await withRetry(async () => {
+        return await sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_POLICY_TABLE_LIST}!A${rowIndex + 1}:O${rowIndex + 1}`,
+          valueInputOption: 'USER_ENTERED',
+          resource: { values: [updatedRow] }
+        });
+      });
+
+      // 캐시 무효화: 정책표 수정 시 관련 캐시 무효화
+      invalidateRelatedCaches('policy-table', id);
+
+      return res.json({
+        success: true,
+        message: '정책표가 수정되었습니다.'
+      });
+    } catch (error) {
+      console.error('[정책표] 수정 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // DELETE /api/policy-tables/:id
   router.delete('/policy-tables/:id', async (req, res) => {
     setCORSHeaders(req, res);
@@ -3930,6 +5509,286 @@ function setupPolicyTableRoutes(app) {
       });
     } catch (error) {
       console.error('[정책표] 삭제 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // ========== 기본 정책영업그룹 설정 관련 API ==========
+
+  // GET /api/policy-table/default-groups/:userId - 사용자의 기본 그룹 설정 조회
+  router.get('/policy-table/default-groups/:userId', async (req, res) => {
+    setCORSHeaders(req, res);
+    try {
+      const { userId } = req.params;
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      const cacheKey = `default-groups-${SPREADSHEET_ID}-${userId}`;
+
+      // 캐시 확인
+      const cached = getCache(cacheKey);
+      if (cached) {
+        console.log('✅ [캐시 히트] 기본 그룹 설정', userId);
+        return res.json(cached);
+      }
+
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_DEFAULT_GROUPS, HEADERS_DEFAULT_GROUPS);
+
+      let response;
+      try {
+        response = await withRetry(async () => {
+          return await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SHEET_DEFAULT_GROUPS}!A:E`
+          });
+        });
+      } catch (err) {
+        const isRateLimitError =
+          err?.code === 429 ||
+          err?.response?.status === 429 ||
+          (err?.message && err.message.toLowerCase().includes('quota exceeded')) ||
+          (err?.message && err.message.toLowerCase().includes('ratelimit')) ||
+          (err?.response?.data?.error?.status === 'RESOURCE_EXHAUSTED');
+
+        if (isRateLimitError && lastDefaultGroupsCache.has(userId)) {
+          console.warn('⚠️ [기본그룹] rate limit 발생, 마지막 캐시 데이터 반환', userId);
+          const fallback = lastDefaultGroupsCache.get(userId);
+          setCache(cacheKey, fallback, CACHE_TTL.USER_GROUPS);
+          return res.json(fallback);
+        }
+        throw err;
+      }
+
+      const rows = response.data.values || [];
+      const dataRows = rows.length > 1 ? rows.slice(1) : [];
+      
+      // 해당 사용자의 설정만 필터링
+      const userSettings = dataRows
+        .filter(row => row[0] === userId)
+        .map(row => ({
+          policyTableId: row[1] || '',
+          defaultGroupIds: row[2] ? (row[2].startsWith('[') ? JSON.parse(row[2]) : [row[2]]) : []
+        }));
+
+      // 정책표ID별로 매핑
+      const defaultGroups = {};
+      userSettings.forEach(setting => {
+        if (setting.policyTableId) {
+          defaultGroups[setting.policyTableId] = setting.defaultGroupIds;
+        }
+      });
+
+      const result = {
+        success: true,
+        defaultGroups: defaultGroups
+      };
+
+      setCache(cacheKey, result, CACHE_TTL.USER_GROUPS);
+      lastDefaultGroupsCache.set(userId, result);
+      return res.json(result);
+    } catch (error) {
+      console.error('[정책표] 기본 그룹 설정 조회 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // PUT /api/policy-table/default-groups/:userId - 사용자의 기본 그룹 설정 저장
+  router.put('/policy-table/default-groups/:userId', express.json(), async (req, res) => {
+    setCORSHeaders(req, res);
+    try {
+      console.log('[정책표] 기본 그룹 설정 저장 요청:', {
+        userId: req.params.userId,
+        body: req.body,
+        userRole: req.headers['x-user-role'],
+        userIdHeader: req.headers['x-user-id']
+      });
+
+      const permission = await checkPermission(req, ['SS', 'TEAM_LEADER']);
+      if (!permission.hasPermission) {
+        console.log('[정책표] 기본 그룹 설정 저장 권한 없음:', {
+          userRole: req.headers['x-user-role'],
+          requiredRoles: ['SS', 'TEAM_LEADER']
+        });
+        return res.status(403).json({ success: false, error: '권한이 없습니다.' });
+      }
+
+      const { userId } = req.params;
+      const { policyTableId, defaultGroupIds } = req.body;
+
+      if (!policyTableId) {
+        return res.status(400).json({ success: false, error: '정책표ID가 필요합니다.' });
+      }
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_DEFAULT_GROUPS, HEADERS_DEFAULT_GROUPS);
+
+      const response = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_DEFAULT_GROUPS}!A:E`
+        });
+      });
+
+      const rows = response.data.values || [];
+      const dataRows = rows.length > 1 ? rows.slice(1) : [];
+      
+      // 해당 사용자와 정책표ID에 해당하는 행 찾기
+      const rowIndex = dataRows.findIndex(row => row[0] === userId && row[1] === policyTableId);
+
+      const now = new Date().toLocaleString('ko-KR');
+      const updatedBy = permission.userName || 'Unknown';
+      const defaultGroupIdsJson = Array.isArray(defaultGroupIds) && defaultGroupIds.length > 0
+        ? JSON.stringify(defaultGroupIds)
+        : '';
+
+      if (rowIndex !== -1) {
+        // 기존 행 업데이트
+        await withRetry(async () => {
+          return await sheets.spreadsheets.values.update({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SHEET_DEFAULT_GROUPS}!A${rowIndex + 2}:E${rowIndex + 2}`,
+            valueInputOption: 'RAW',
+            resource: {
+              values: [[userId, policyTableId, defaultGroupIdsJson, now, updatedBy]]
+            }
+          });
+        });
+      } else {
+        // 새 행 추가
+        await withRetry(async () => {
+          return await sheets.spreadsheets.values.append({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SHEET_DEFAULT_GROUPS}!A:E`,
+            valueInputOption: 'RAW',
+            insertDataOption: 'INSERT_ROWS',
+            resource: {
+              values: [[userId, policyTableId, defaultGroupIdsJson, now, updatedBy]]
+            }
+          });
+        });
+      }
+
+      // 캐시 무효화
+      invalidateCache(`default-groups-${SPREADSHEET_ID}-${userId}`);
+      lastDefaultGroupsCache.delete(userId);
+
+      return res.json({
+        success: true,
+        message: '기본 그룹 설정이 저장되었습니다.'
+      });
+    } catch (error) {
+      console.error('[정책표] 기본 그룹 설정 저장 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // ========== 기타정책 목록 관리 API ==========
+
+  // GET /api/policy-table/other-policy-types - 기타정책 목록 조회
+  router.get('/policy-table/other-policy-types', async (req, res) => {
+    setCORSHeaders(req, res);
+    try {
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      const cacheKey = `other-policy-types-${SPREADSHEET_ID}`;
+
+      const cached = getCache(cacheKey);
+      if (cached) {
+        console.log('✅ [캐시 히트] 기타정책 목록');
+        return res.json(cached);
+      }
+
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_OTHER_POLICY_TYPES, HEADERS_OTHER_POLICY_TYPES);
+
+      let response;
+      try {
+        response = await withRetry(async () => {
+          return await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SHEET_OTHER_POLICY_TYPES}!A:C`
+          });
+        });
+      } catch (err) {
+        const isRateLimitError =
+          err?.code === 429 ||
+          err?.response?.status === 429 ||
+          (err?.message && err.message.toLowerCase().includes('quota exceeded')) ||
+          (err?.message && err.message.toLowerCase().includes('ratelimit')) ||
+          (err?.response?.data?.error?.status === 'RESOURCE_EXHAUSTED');
+
+        if (isRateLimitError && lastOtherPolicyTypesCache) {
+          console.warn('⚠️ [기타정책] rate limit 발생, 마지막 캐시 데이터 반환');
+          setCache(cacheKey, lastOtherPolicyTypesCache, CACHE_TTL.USER_GROUPS);
+          return res.json(lastOtherPolicyTypesCache);
+        }
+        throw err;
+      }
+
+      const rows = response.data.values || [];
+      const dataRows = rows.length > 1 ? rows.slice(1) : [];
+      
+      const otherPolicyTypes = dataRows
+        .filter(row => row[0]) // 정책명이 있는 것만
+        .map(row => ({
+          name: row[0] || '',
+          registeredAt: row[1] || '',
+          registeredBy: row[2] || ''
+        }));
+
+      const result = {
+        success: true,
+        otherPolicyTypes: otherPolicyTypes
+      };
+
+      setCache(cacheKey, result, CACHE_TTL.USER_GROUPS);
+      lastOtherPolicyTypesCache = result;
+      return res.json(result);
+    } catch (error) {
+      console.error('[정책표] 기타정책 목록 조회 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // POST /api/policy-table/other-policy-types - 기타정책 추가
+  router.post('/policy-table/other-policy-types', express.json(), async (req, res) => {
+    setCORSHeaders(req, res);
+    try {
+      const permission = await checkPermission(req, ['SS', 'TEAM_LEADER']);
+      if (!permission.hasPermission) {
+        return res.status(403).json({ success: false, error: '권한이 없습니다.' });
+      }
+
+      const { policyName } = req.body;
+
+      if (!policyName || !policyName.trim()) {
+        return res.status(400).json({ success: false, error: '정책명이 필요합니다.' });
+      }
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_OTHER_POLICY_TYPES, HEADERS_OTHER_POLICY_TYPES);
+
+      const now = new Date().toLocaleString('ko-KR');
+      const registeredBy = permission.userName || 'Unknown';
+
+      await withRetry(async () => {
+        return await sheets.spreadsheets.values.append({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_OTHER_POLICY_TYPES}!A:C`,
+          valueInputOption: 'RAW',
+          insertDataOption: 'INSERT_ROWS',
+          resource: {
+            values: [[policyName.trim(), now, registeredBy]]
+          }
+        });
+      });
+
+      // 캐시 무효화
+      invalidateCache(`other-policy-types-${SPREADSHEET_ID}`);
+      lastOtherPolicyTypesCache = null;
+
+      return res.json({
+        success: true,
+        message: '기타정책이 추가되었습니다.'
+      });
+    } catch (error) {
+      console.error('[정책표] 기타정책 추가 오류:', error);
       return res.status(500).json({ success: false, error: error.message });
     }
   });
@@ -4021,13 +5880,7 @@ function setupPolicyTableRoutes(app) {
       if (mode !== 'generalPolicy' && userRole) { // 일반정책모드가 아닌 경우
         try {
           const { sheets, SPREADSHEET_ID } = createSheetsClient();
-          const agentSheetName = '대리점아이디관리';
-          const agentResponse = await withRetry(async () => {
-            return await sheets.spreadsheets.values.get({
-              spreadsheetId: SPREADSHEET_ID,
-              range: `${agentSheetName}!A:Z`
-            });
-          });
+          const agentResponse = await getAgentManagementData(sheets, SPREADSHEET_ID);
 
           const agentRows = agentResponse.data.values || [];
           if (agentRows.length >= 2) {

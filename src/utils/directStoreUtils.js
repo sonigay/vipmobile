@@ -97,9 +97,14 @@ export const parseOpeningTypes = (raw) => {
  */
 export const convertOpeningType = (type) => {
   if (!type) return 'NEW';
-  if (type === '010신규' || type === 'NEW') return 'NEW';
+  // 한글 값 처리
+  if (type === '010신규' || type === '신규' || type === 'NEW') return 'NEW';
+  if (type === '번호이동' || type === 'MNP') return 'MNP';
+  if (type === '기기변경' || type === '기변' || type === 'CHANGE') return 'CHANGE';
+  // 영문 값 처리
+  if (type === 'NEW') return 'NEW';
   if (type === 'MNP') return 'MNP';
-  if (type === '기변' || type === 'CHANGE') return 'CHANGE';
+  if (type === 'CHANGE') return 'CHANGE';
   return 'NEW';
 };
 

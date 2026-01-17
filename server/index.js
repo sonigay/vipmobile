@@ -23,6 +23,11 @@ const setupPolicyTableRoutes = require('./policyTableRoutes');
 const app = express();
 const port = process.env.PORT || 4000;
 
+// 서버 시작 전 즉시 헬스체크 엔드포인트 등록 (startup probe용)
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 // Google Sheets API 호출 빈도 제한을 위한 변수
 let lastSheetsApiCall = 0;
 const SHEETS_API_COOLDOWN = 2000; // 2초 대기 (Google Sheets API 분당 60회 제한 고려)
@@ -154,6 +159,33 @@ app.use(cors({
   optionsSuccessStatus: 200,
   preflightContinue: false
 }));
+
+// CORS 헤더 설정 함수 (재사용)
+const setCORSHeaders = (req, res) => {
+  const origin = req.headers.origin;
+  const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
+  
+  const defaultOrigins = [
+    'https://vipmobile.vercel.app',
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:3002',
+    'http://localhost:4000'
+  ];
+  
+  const allowedOrigins = [...corsOrigins, ...defaultOrigins];
+  
+  if (origin && allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  } else {
+    res.header('Access-Control-Allow-Origin', 'https://vipmobile.vercel.app');
+  }
+  
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key, x-user-id, x-user-role, x-user-name, x-mode');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Max-Age', '86400'); // 24시간 캐시
+};
 
 // OPTIONS 요청 명시적 처리
 app.options('*', (req, res) => {
@@ -988,8 +1020,8 @@ const HEADERS_TRANSIT_LOCATION = [
 ];
 const CUSTOMER_QUEUE_HEADERS = [
   '번호', '고객CTN', '고객명', '통신사', '단말기모델명', '색상', '단말일련번호', '유심모델명', '유심일련번호', '개통유형',
-  '전통신사', '할부구분', '할부개월', '약정', '요금제', '부가서비스', '출고가', '이통사지원금', '대리점추가지원금(부가유치)',
-  '대리점추가지원금(부가미유치)', '선택매장업체명', '선택매장전화', '선택매장주소', '선택매장계좌정보', '등록일시', '상태',
+  '전통신사', '할부구분', '할부개월', '약정', '요금제', '부가서비스', '출고가', '이통사지원금', '대리점추가지원금',
+  '대리점추가지원금직접입력', '할부원금', 'LG프리미어약정', '선택매장업체명', '선택매장전화', '선택매장주소', '선택매장계좌정보', '등록일시', '상태',
   '처리매장업체명', '처리일시'
 ];
 const CUSTOMER_BOARD_HEADERS = [
@@ -4384,7 +4416,7 @@ app.post('/api/member/login', async (req, res) => {
     const response = await rateLimitedSheetsCall(() =>
       sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
-        range: '직영점_판매일보!A:Z'
+        range: '직영점_판매일보!A:AB', // 🔥 수정: AB로 확장
       })
     );
 
@@ -4401,9 +4433,14 @@ app.post('/api/member/login', async (req, res) => {
 
     // CTN 기준 검색 (가장 최근 데이터 우선)
     // row[6]이 CTN 컬럼 (G열)
+    // 🔥 수정: CTN이 텍스트 형식으로 저장되어 ' prefix가 있을 수 있으므로 제거
     const recentRows = [...rows].reverse();
     const customerRow = recentRows.find(row => {
-      const rowCtn = (row[6] || '').replace(/[^0-9]/g, '');
+      let rowCtn = (row[6] || '').toString();
+      // ' prefix 제거 (Google Sheets 텍스트 형식)
+      rowCtn = rowCtn.replace(/^'/, '');
+      // 숫자만 추출
+      rowCtn = rowCtn.replace(/[^0-9]/g, '');
       return rowCtn === cleanCtn;
     });
 
@@ -4467,7 +4504,7 @@ app.get('/api/member/queue/all', async (req, res) => {
     const response = await rateLimitedSheetsCall(() =>
       sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
-        range: `${CUSTOMER_QUEUE_SHEET_NAME}!A:AB`
+        range: `${CUSTOMER_QUEUE_SHEET_NAME}!A:AD` // 🔥 수정: AD로 확장 (할부원금, LG프리미어약정 추가)
       })
     );
 
@@ -4508,7 +4545,7 @@ app.get('/api/member/queue/all', async (req, res) => {
     if (posCode && storeNameToPosCodeMap) {
       // 선택매장업체명(storeName)으로 POS코드를 찾아서 필터링
       filteredRows = rows.filter(row => {
-        const storeName = (row[20] || '').toString().trim(); // U열: 선택매장업체명
+        const storeName = (row[22] || '').toString().trim(); // 🔥 수정: V열로 이동 (할부원금, LG프리미어약정 추가로 인덱스 변경)
         const itemPosCode = storeNameToPosCodeMap.get(storeName);
         return itemPosCode === posCode;
       });
@@ -4535,14 +4572,18 @@ app.get('/api/member/queue/all', async (req, res) => {
       carrierSupport: row[17],
       dealerSupportWithAdd: row[18],
       dealerSupportWithoutAdd: row[19],
-      storeName: row[20],
-      storePhone: row[21],
-      storeAddress: row[22],
-      storeBankInfo: row[23],
-      createdAt: row[24],
-      status: row[25],
-      processedBy: row[26],
-      processedAt: row[27]
+      installmentPrincipal: Number(row[20] || 0), // 🔥 추가: 할부원금
+      할부원금: Number(row[20] || 0), // 🔥 추가: 할부원금 (한글 필드명)
+      lgPremier: (row[21] || '') === 'Y', // 🔥 추가: LG 프리미어 약정 적용
+      프리미어약정: (row[21] || '') === 'Y', // 🔥 추가: LG 프리미어 약정 적용 (한글 필드명)
+      storeName: row[22],
+      storePhone: row[23],
+      storeAddress: row[24],
+      storeBankInfo: row[25],
+      createdAt: row[26],
+      status: row[27],
+      processedBy: row[28],
+      processedAt: row[29]
     }));
 
     // 최신순 정렬
@@ -4567,7 +4608,7 @@ app.get('/api/member/queue', async (req, res) => {
     const response = await rateLimitedSheetsCall(() =>
       sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
-        range: `${CUSTOMER_QUEUE_SHEET_NAME}!A:AB`
+        range: `${CUSTOMER_QUEUE_SHEET_NAME}!A:AD` // 🔥 수정: AD로 확장 (할부원금, LG프리미어약정 추가)
       })
     );
 
@@ -4599,16 +4640,25 @@ app.get('/api/member/queue', async (req, res) => {
         additionalServices: row[15],
         factoryPrice: row[16],
         carrierSupport: row[17],
+        dealerSupport: row[18],
+        대리점추가지원금: row[18],
+        additionalStoreSupport: row[19],
+        대리점추가지원금직접입력: row[19],
+        installmentPrincipal: Number(row[20] || 0), // 🔥 추가: 할부원금
+        할부원금: Number(row[20] || 0), // 🔥 추가: 할부원금 (한글 필드명)
+        lgPremier: (row[21] || '') === 'Y', // 🔥 추가: LG 프리미어 약정 적용
+        프리미어약정: (row[21] || '') === 'Y', // 🔥 추가: LG 프리미어 약정 적용 (한글 필드명)
+        // 하위 호환을 위한 필드
         dealerSupportWithAdd: row[18],
         dealerSupportWithoutAdd: row[19],
-        storeName: row[20],
-        storePhone: row[21],
-        storeAddress: row[22],
-        storeBankInfo: row[23],
-        createdAt: row[24],
-        status: row[25],
-        processedBy: row[26],
-        processedAt: row[27]
+        storeName: row[22],
+        storePhone: row[23],
+        storeAddress: row[24],
+        storeBankInfo: row[25],
+        createdAt: row[26],
+        status: row[27],
+        processedBy: row[28],
+        processedAt: row[29]
       }));
 
     res.json(queue);
@@ -4646,7 +4696,7 @@ app.post('/api/member/queue', async (req, res) => {
     const createdAt = new Date().toISOString().replace('T', ' ').substring(0, 19);
 
     // 헤더 순서에 맞춰 데이터 배열 생성
-    const newRow = new Array(28).fill('');
+    const newRow = new Array(30).fill(''); // 🔥 수정: 할부원금, LG프리미어약정 추가로 30으로 확장
     newRow[0] = id;
     newRow[1] = data.ctn || '';
     newRow[2] = data.name || '';
@@ -4665,19 +4715,21 @@ app.post('/api/member/queue', async (req, res) => {
     newRow[15] = data.additionalServices || '';
     newRow[16] = data.factoryPrice || '';
     newRow[17] = data.carrierSupport || '';
-    newRow[18] = data.dealerSupportWithAdd || '';
-    newRow[19] = data.dealerSupportWithoutAdd || '';
-    newRow[20] = data.storeName || '';
-    newRow[21] = data.storePhone || '';
-    newRow[22] = data.storeAddress || '';
-    newRow[23] = data.storeBankInfo || '';
-    newRow[24] = createdAt;
-    newRow[25] = '구매대기';
+    newRow[18] = data.dealerSupport || data.dealerSupportWithAdd || '';
+    newRow[19] = data.additionalStoreSupport || '';
+    newRow[20] = data.installmentPrincipal || 0; // 🔥 추가: 할부원금
+    newRow[21] = data.lgPremier ? 'Y' : 'N'; // 🔥 추가: LG 프리미어 약정 적용 (Y/N)
+    newRow[22] = data.storeName || '';
+    newRow[23] = data.storePhone || '';
+    newRow[24] = data.storeAddress || '';
+    newRow[25] = data.storeBankInfo || '';
+    newRow[26] = createdAt;
+    newRow[27] = '구매대기';
 
     await rateLimitedSheetsCall(() =>
       sheets.spreadsheets.values.append({
         spreadsheetId: SPREADSHEET_ID,
-        range: `${CUSTOMER_QUEUE_SHEET_NAME}!A:AB`,
+        range: `${CUSTOMER_QUEUE_SHEET_NAME}!A:AD`, // 🔥 수정: AD로 확장 (할부원금, LG프리미어약정 추가)
         valueInputOption: 'USER_ENTERED',
         resource: { values: [newRow] }
       })
@@ -4699,7 +4751,7 @@ app.put('/api/member/queue/:id', async (req, res) => {
     const response = await rateLimitedSheetsCall(() =>
       sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
-        range: `${CUSTOMER_QUEUE_SHEET_NAME}!A:AB`
+        range: `${CUSTOMER_QUEUE_SHEET_NAME}!A:AD` // 🔥 수정: AD로 확장 (할부원금, LG프리미어약정 추가)
       })
     );
 
@@ -4726,20 +4778,25 @@ app.put('/api/member/queue/:id', async (req, res) => {
     if (data.additionalServices !== undefined) updatedRow[15] = data.additionalServices;
     if (data.factoryPrice !== undefined) updatedRow[16] = data.factoryPrice;
     if (data.carrierSupport !== undefined) updatedRow[17] = data.carrierSupport;
+    if (data.dealerSupport !== undefined) updatedRow[18] = data.dealerSupport;
+    if (data.additionalStoreSupport !== undefined) updatedRow[19] = data.additionalStoreSupport;
+    // 하위 호환을 위한 필드
     if (data.dealerSupportWithAdd !== undefined) updatedRow[18] = data.dealerSupportWithAdd;
     if (data.dealerSupportWithoutAdd !== undefined) updatedRow[19] = data.dealerSupportWithoutAdd;
-    if (data.storeName !== undefined) updatedRow[20] = data.storeName;
-    if (data.storePhone !== undefined) updatedRow[21] = data.storePhone;
-    if (data.storeAddress !== undefined) updatedRow[22] = data.storeAddress;
-    if (data.storeBankInfo !== undefined) updatedRow[23] = data.storeBankInfo;
-    if (data.status !== undefined) updatedRow[25] = data.status;
-    if (data.processedBy !== undefined) updatedRow[26] = data.processedBy;
-    if (data.processedAt !== undefined) updatedRow[27] = data.processedAt;
+    if (data.installmentPrincipal !== undefined) updatedRow[20] = data.installmentPrincipal; // 🔥 추가: 할부원금
+    if (data.lgPremier !== undefined) updatedRow[21] = data.lgPremier ? 'Y' : 'N'; // 🔥 추가: LG 프리미어 약정 적용 (Y/N)
+    if (data.storeName !== undefined) updatedRow[22] = data.storeName;
+    if (data.storePhone !== undefined) updatedRow[23] = data.storePhone;
+    if (data.storeAddress !== undefined) updatedRow[24] = data.storeAddress;
+    if (data.storeBankInfo !== undefined) updatedRow[25] = data.storeBankInfo;
+    if (data.status !== undefined) updatedRow[27] = data.status;
+    if (data.processedBy !== undefined) updatedRow[28] = data.processedBy;
+    if (data.processedAt !== undefined) updatedRow[29] = data.processedAt;
 
     await rateLimitedSheetsCall(() =>
       sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
-        range: `${CUSTOMER_QUEUE_SHEET_NAME}!A${rowIndex + 1}:AB${rowIndex + 1}`,
+        range: `${CUSTOMER_QUEUE_SHEET_NAME}!A${rowIndex + 1}:AD${rowIndex + 1}`, // 🔥 수정: AD로 확장 (할부원금, LG프리미어약정 추가)
         valueInputOption: 'USER_ENTERED',
         resource: { values: [updatedRow] }
       })
@@ -6298,7 +6355,7 @@ const DIRECT_SALES_HEADERS = [
   '번호', 'POS코드', '업체명', '매장ID', '판매일시', '고객명', 'CTN', '통신사',
   '단말기모델명', '색상', '단말일련번호', '유심모델명', '유심일련번호',
   '개통유형', '전통신사', '할부구분', '할부개월', '약정', '요금제', '부가서비스',
-  '출고가', '이통사지원금', '대리점추가지원금(부가유치)', '대리점추가지원금(부가미유치)', '마진', '상태'
+  '출고가', '이통사지원금', '대리점추가지원금', '대리점추가지원금직접입력', '마진', '할부원금', 'LG프리미어약정', '상태'
 ];
 
 // GET /api/direct/sales: 판매일보 목록 조회
@@ -6308,7 +6365,7 @@ app.get('/api/direct/sales', async (req, res) => {
     await rateLimitedSheetsCall(() =>
       sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
-        range: '직영점_판매일보!A1:Z1',
+        range: '직영점_판매일보!A1:AB1', // 🔥 수정: AB로 확장
         valueInputOption: 'RAW',
         resource: { values: [DIRECT_SALES_HEADERS] }
       })
@@ -6317,7 +6374,7 @@ app.get('/api/direct/sales', async (req, res) => {
     const response = await rateLimitedSheetsCall(() =>
       sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
-        range: '직영점_판매일보!A:Z'
+        range: '직영점_판매일보!A:AB', // 🔥 수정: AB로 확장
       })
     );
 
@@ -6326,8 +6383,14 @@ app.get('/api/direct/sales', async (req, res) => {
       return res.json([]);
     }
 
-    // 쿼리 파라미터에서 storeId 필터 가져오기
+    // 쿼리 파라미터에서 필터 가져오기
     const requestedStoreId = req.query.storeId;
+    // 🔥 추가: CTN(고객 연락처)로 필터링 (고객 모드 '나의 구매내역'용)
+    let requestedCtn = req.query.ctn || '';
+    if (requestedCtn) {
+      // 숫자만 남기기 (하이픈 등 제거)
+      requestedCtn = requestedCtn.toString().replace(/[^0-9]/g, '');
+    }
 
     // 헤더 행 제외
     const rows = values.slice(1);
@@ -6347,10 +6410,10 @@ app.get('/api/direct/sales', async (req, res) => {
         soldAt: row[4] || '',
         customerName: row[5] || '',
         고객명: row[5] || '',
-        customerContact: row[6] || '',
-        CTN: row[6] || '',
-        ctn: row[6] || '',
-        연락처: row[6] || '',
+        customerContact: String(row[6] || '').replace(/^'/, ''), // 🔥 수정: CTN을 텍스트로 불러오기 (앞의 ' 접두사 제거하여 앞의 0 유지)
+        CTN: String(row[6] || '').replace(/^'/, ''), // 🔥 수정: CTN을 텍스트로 불러오기 (앞의 ' 접두사 제거하여 앞의 0 유지)
+        ctn: String(row[6] || '').replace(/^'/, ''), // 🔥 수정: CTN을 텍스트로 불러오기 (앞의 ' 접두사 제거하여 앞의 0 유지)
+        연락처: String(row[6] || '').replace(/^'/, ''), // 🔥 수정: CTN을 텍스트로 불러오기 (앞의 ' 접두사 제거하여 앞의 0 유지)
         carrier: row[7] || '',
         통신사: row[7] || '',
         model: row[8] || '',
@@ -6389,23 +6452,46 @@ app.get('/api/direct/sales', async (req, res) => {
         출고가: Number(row[20] || 0),
         publicSupport: Number(row[21] || 0),
         이통사지원금: Number(row[21] || 0),
+        storeSupport: Number(row[22] || 0),
+        대리점추가지원금: Number(row[22] || 0),
+        additionalStoreSupport: Number(row[23] || 0),
+        대리점추가지원금직접입력: Number(row[23] || 0),
+        // 하위 호환을 위한 필드
         storeSupportWithAddon: Number(row[22] || 0),
         '대리점추가지원금(부가유치)': Number(row[22] || 0),
         storeSupportNoAddon: Number(row[23] || 0),
         '대리점추가지원금(부가미유치)': Number(row[23] || 0),
         margin: Number(row[24] || 0),
         마진: Number(row[24] || 0),
-        status: row[25] || '',
-        상태: row[25] || ''
+        installmentPrincipal: Number(row[25] || 0), // 🔥 추가: 할부원금
+        할부원금: Number(row[25] || 0), // 🔥 추가: 할부원금 (한글 필드명)
+        lgPremier: row[26] === 'Y' || row[26] === true || row[26] === 'true', // 🔥 추가: LG 프리미어 약정 적용
+        프리미어약정: row[26] === 'Y' || row[26] === true || row[26] === 'true', // 🔥 추가: LG 프리미어 약정 적용 (한글 필드명)
+        status: row[27] || '',
+        상태: row[27] || ''
       }))
       .filter(report => {
         // 빈 행 제외
         if (!report.id) return false;
+
         // storeId 필터가 있으면 해당 매장 데이터만 반환
         if (requestedStoreId) {
-          return report.storeId === requestedStoreId || report.posCode === requestedStoreId;
+          if (!(report.storeId === requestedStoreId || report.posCode === requestedStoreId)) {
+            return false;
+          }
         }
-        // 필터가 없으면 모든 데이터 반환 (관리 모드)
+
+        // CTN 필터가 있으면 해당 CTN의 데이터만 반환
+        if (requestedCtn) {
+          const reportCtn = (report.ctn || report.customerContact || '')
+            .toString()
+            .replace(/[^0-9]/g, '');
+          if (!reportCtn || reportCtn !== requestedCtn) {
+            return false;
+          }
+        }
+
+        // 필터가 없거나 모두 통과한 경우
         return true;
       });
 
@@ -6460,7 +6546,7 @@ app.post('/api/direct/sales', async (req, res) => {
       data.storeId || '',                       // 매장ID
       soldAt,                                   // 판매일시
       data.customerName || '',                  // 고객명
-      data.customerContact || '',               // CTN
+      `'${String(data.customerContact || '')}`, // 🔥 수정: CTN을 텍스트 형식으로 저장 (앞의 0 유지)
       data.carrier || '',                       // 통신사
       data.model || '',                         // 단말기모델명
       data.color || '',                         // 색상
@@ -6476,9 +6562,11 @@ app.post('/api/direct/sales', async (req, res) => {
       addonsText || '',                         // 부가서비스
       data.factoryPrice || 0,                   // 출고가
       data.publicSupport || 0,                  // 이통사지원금
-      data.storeSupportWithAddon || 0,          // 대리점추가지원금(부가유치)
-      data.storeSupportNoAddon || 0,            // 대리점추가지원금(부가미유치)
+      data.storeSupport || data.storeSupportWithAddon || 0, // 대리점추가지원금 (통합)
+      data.additionalStoreSupport || 0,         // 대리점추가지원금 직접입력
       data.margin || 0,                         // 마진
+      data.installmentPrincipal || 0,           // 🔥 추가: 할부원금
+      data.lgPremier ? 'Y' : 'N',               // 🔥 추가: LG 프리미어 약정 적용 (Y/N)
       data.status || '개통대기'                  // 상태
     ];
 
@@ -6486,7 +6574,7 @@ app.post('/api/direct/sales', async (req, res) => {
     await rateLimitedSheetsCall(() =>
       sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
-        range: '직영점_판매일보!A1:Z1',
+        range: '직영점_판매일보!A1:AB1', // 🔥 수정: AB로 확장
         valueInputOption: 'RAW',
         resource: { values: [DIRECT_SALES_HEADERS] }
       })
@@ -6495,8 +6583,8 @@ app.post('/api/direct/sales', async (req, res) => {
     await rateLimitedSheetsCall(() =>
       sheets.spreadsheets.values.append({
         spreadsheetId: SPREADSHEET_ID,
-        range: '직영점_판매일보!A2',
-        valueInputOption: 'USER_ENTERED',
+        range: '직영점_판매일보!A2:AB2', // 🔥 수정: AB로 확장 (할부원금, LG프리미어약정 추가)
+        valueInputOption: 'RAW', // 🔥 수정: RAW로 변경하여 텍스트 형식 유지 (CTN 앞의 0 유지)
         insertDataOption: 'INSERT_ROWS',
         resource: {
           values: [row]
@@ -6528,7 +6616,7 @@ app.put('/api/direct/sales/:id', async (req, res) => {
     const response = await rateLimitedSheetsCall(() =>
       sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
-        range: '직영점_판매일보!A:Z'
+        range: '직영점_판매일보!A:AB', // 🔥 수정: AB로 확장
       })
     );
 
@@ -6569,7 +6657,7 @@ app.put('/api/direct/sales/:id', async (req, res) => {
       data.storeId || existingRow[3] || '',      // 매장ID
       data.soldAt || existingRow[4] || '',       // 판매일시
       data.customerName || existingRow[5] || '', // 고객명
-      data.customerContact || existingRow[6] || '', // CTN
+      data.customerContact !== undefined ? `'${String(data.customerContact)}` : (existingRow[6] ? (String(existingRow[6]).startsWith("'") ? String(existingRow[6]) : `'${String(existingRow[6])}`) : ''), // 🔥 수정: CTN을 텍스트 형식으로 저장 (앞의 0 유지)
       data.carrier || existingRow[7] || '',      // 통신사
       data.model || existingRow[8] || '',        // 단말기모델명
       data.color || existingRow[9] || '',        // 색상
@@ -6585,18 +6673,20 @@ app.put('/api/direct/sales/:id', async (req, res) => {
       addonsText,                                // 부가서비스
       data.factoryPrice || existingRow[20] || 0, // 출고가
       data.publicSupport || existingRow[21] || 0,// 이통사지원금
-      data.storeSupportWithAddon || existingRow[22] || 0, // 대리점추가지원금(부가유치)
-      data.storeSupportNoAddon || existingRow[23] || 0,   // 대리점추가지원금(부가미유치)
+      data.storeSupport || data.storeSupportWithAddon || existingRow[22] || 0, // 대리점추가지원금 (통합)
+      data.additionalStoreSupport !== undefined ? data.additionalStoreSupport : (existingRow[23] || 0), // 대리점추가지원금 직접입력
       data.margin || existingRow[24] || 0,       // 마진
-      data.status || existingRow[25] || '개통대기' // 상태
+      data.installmentPrincipal !== undefined ? data.installmentPrincipal : (existingRow[25] || 0), // 🔥 추가: 할부원금
+      data.lgPremier !== undefined ? (data.lgPremier ? 'Y' : 'N') : (existingRow[26] || 'N'), // 🔥 추가: LG 프리미어 약정 적용
+      data.status || existingRow[27] || '개통대기' // 상태
     ];
 
     // 행 업데이트 (행 번호는 2부터 시작, 헤더 제외)
     await rateLimitedSheetsCall(() =>
       sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
-        range: `직영점_판매일보!A${rowIndex + 2}`,
-        valueInputOption: 'USER_ENTERED',
+        range: `직영점_판매일보!A${rowIndex + 2}:AB${rowIndex + 2}`, // 🔥 수정: AB로 확장
+        valueInputOption: 'RAW', // 🔥 수정: RAW로 변경하여 텍스트 형식 유지 (CTN 앞의 0 유지)
         resource: {
           values: [updatedRow]
         }
@@ -15013,9 +15103,17 @@ app.get('/api/download-chrome-extension', (req, res) => {
 });
 
 // 서버 시작
-const server = app.listen(port, '0.0.0.0', async () => {
+// 서버가 포트를 열고 리스닝을 시작하면 즉시 로그 출력 (헬스체크를 위한 빠른 응답)
+console.log(`⏳ 서버 시작 중... 포트 ${port}에서 리스닝을 시작합니다`);
+const server = app.listen(port, '0.0.0.0', () => {
+  // 서버가 리스닝을 시작했음을 즉시 로그 출력
+  console.log(`✅ 서버가 포트 ${port}에서 리스닝을 시작했습니다 - 헬스체크 준비 완료`);
+});
+
+// 서버 시작 후 초기화 작업은 비동기로 실행 (서버 리스닝을 블로킹하지 않음)
+server.on('listening', async () => {
   try {
-    console.log(`🚀 서버가 포트 ${port}에서 실행 중입니다`);
+    console.log(`✅ 서버가 포트 ${port}에서 실행 중입니다`);
     console.log(`🔑 VAPID Public Key: ${vapidKeys.publicKey}`);
     console.log(`📅 서버 시작 시간: ${new Date().toISOString()}`);
     console.log(`🌍 서버 환경: ${process.env.NODE_ENV || 'development'}`);
@@ -15381,18 +15479,17 @@ const server = app.listen(port, '0.0.0.0', async () => {
     // 서버 시작 시 실행
     console.log('🚀 [스케줄러] 서버 시작 시 자동 실행 시작...');
     
-    // 데이터 재빌드 (서버 시작 시 1회) - 먼저 실행하여 데이터 준비
+    // 데이터 재빌드 (서버 시작 시 1회) - 리소스 부담 감소를 위해 15분 후 실행
     setTimeout(async () => {
-      console.log('🔄 [스케줄러] 서버 시작 시 데이터 재빌드 실행');
+      console.log('🔄 [스케줄러] 서버 시작 시 데이터 재빌드 실행 (지연 실행)');
       await rebuildMasterData();
-    }, 300000); // 5분 후 실행 (서버 초기화 및 다른 작업 완료 대기)
+    }, 900000); // 15분 후 실행 (서버 초기화 및 다른 작업 완료 대기)
     
-    // Discord 모니터링 자동 갱신 (서버 시작 시 1회)
-    // 데이터 재빌드 완료 후 실행하여 정상적인 Discord ID로 갱신
+    // Discord 모니터링 자동 갱신 (서버 시작 시 1회) - 리소스 부담 감소를 위해 30분 후 실행
     setTimeout(async () => {
-      console.log('🔄 [스케줄러] 서버 시작 시 Discord 이미지 자동 갱신 실행');
+      console.log('🔄 [스케줄러] 서버 시작 시 Discord 이미지 자동 갱신 실행 (지연 실행)');
       await refreshAllDiscordImages();
-    }, 600000); // 10분 후 실행 (데이터 재빌드 완료 후 충분한 시간 대기)
+    }, 1800000); // 30분 후 실행 (데이터 재빌드 완료 후 충분한 시간 대기)
     
     // Discord 모니터링 자동 갱신 스케줄 등록
     // 매일 03:30, 07:30, 11:30, 17:30, 20:30, 23:30
@@ -15432,74 +15529,77 @@ const server = app.listen(port, '0.0.0.0', async () => {
     console.log('   - 데이터 재빌드: 서버 시작 시, 매일 11:10-19:10 매시간');
     // ===== 자동 스케줄 기능 초기화 완료 =====
 
-    // 주소 업데이트 함수 호출 (비동기로 처리하여 배정 로직을 방해하지 않도록)
-    console.log('🔍 [서버시작] 주소 업데이트 함수 시작 (비동기 처리)');
-    checkAndUpdateAddresses().then(() => {
-      console.log('✅ [서버시작] 주소 업데이트 함수 완료');
-    }).catch(error => {
-      console.error('❌ [서버시작] 주소 업데이트 함수 실패:', error.message);
-    });
+    // 주소 업데이트 함수 호출 (서버 시작 후 10분 지연하여 리소스 부담 감소)
+    setTimeout(() => {
+      console.log('🔍 [서버시작] 주소 업데이트 함수 시작 (지연 실행)');
+      checkAndUpdateAddresses().then(() => {
+        console.log('✅ [서버시작] 주소 업데이트 함수 완료');
+      }).catch(error => {
+        console.error('❌ [서버시작] 주소 업데이트 함수 실패:', error.message);
+      });
+    }, 600000); // 10분 후 실행
 
-    // SALES_SHEET_ID 주소 업데이트 함수 호출 (비동기로 처리)
-    console.log('🔍 [서버시작] SALES_SHEET_ID 주소 업데이트 함수 시작 (비동기 처리)');
-    checkAndUpdateSalesAddresses().then(() => {
+    // SALES_SHEET_ID 주소 업데이트 함수 호출 (서버 시작 후 10분 지연)
+    setTimeout(() => {
+      console.log('🔍 [서버시작] SALES_SHEET_ID 주소 업데이트 함수 시작 (지연 실행)');
+      checkAndUpdateSalesAddresses().then(() => {
+        console.log('✅ [서버시작] SALES_SHEET_ID 주소 업데이트 함수 완료');
+      }).catch(error => {
+        console.error('❌ [서버시작] SALES_SHEET_ID 주소 업데이트 함수 실패:', error.message);
+      });
+    }, 600000); // 10분 후 실행
 
-    }).catch(error => {
-      console.error('❌ [서버시작] SALES_SHEET_ID 주소 업데이트 함수 실패:', error.message);
-    });
+    // 영업 데이터 미리 로드 (서버 시작 후 15분 지연)
+    setTimeout(() => {
+      console.log('🔍 [서버시작] 영업 데이터 미리 로드 시작 (지연 실행)');
+      preloadSalesData().then(() => {
+        console.log('✅ [서버시작] 영업 데이터 미리 로드 완료');
+      }).catch(error => {
+        console.error('❌ [서버시작] 영업 데이터 미리 로드 실패:', error.message);
+      });
+    }, 900000); // 15분 후 실행
 
-    // 영업 데이터 미리 로드 (비동기로 처리)
-    console.log('🔍 [서버시작] 영업 데이터 미리 로드 시작 (비동기 처리)');
-    preloadSalesData().then(() => {
+    // 매 2시간마다 업데이트 체크 실행 (리소스 부담 감소)
+    setInterval(checkAndUpdateAddresses, 7200000); // 2시간마다
 
-    }).catch(error => {
-      console.error('❌ [서버시작] 영업 데이터 미리 로드 실패:', error.message);
-    });
+    // 푸시 구독 정보 초기화 (서버 시작 후 5분 지연)
+    setTimeout(async () => {
+      console.log('🔍 [서버시작] 푸시 구독 초기화 시작 (지연 실행)');
+      try {
+        await initializePushSubscriptions();
+        console.log('✅ [서버시작] 푸시 구독 초기화 완료');
+      } catch (error) {
+        console.error('❌ [서버시작] 푸시 구독 초기화 실패:', error.message);
+      }
+    }, 300000); // 5분 후 실행
 
-    // 매 시간마다 업데이트 체크 실행 (3600000ms = 1시간)
-    setInterval(checkAndUpdateAddresses, 3600000);
+    // SMS 시트 헤더 초기화 (서버 시작 후 5분 지연)
+    setTimeout(async () => {
+      console.log('📱 [서버시작] SMS 시트 헤더 초기화 시작 (지연 실행)');
+      try {
+        await ensureSmsSheetHeaders();
+        console.log('✅ [서버시작] SMS 시트 헤더 초기화 완료');
+      } catch (error) {
+        console.error('❌ [서버시작] SMS 시트 헤더 초기화 실패:', error.message);
+      }
+    }, 300000); // 5분 후 실행
 
-    // Git 커밋 히스토리를 구글시트에 자동 입력
-    console.log('🔍 [서버시작] Git 히스토리 업데이트 시작');
-    try {
-      await updateGoogleSheetWithGitHistory();
-
-    } catch (error) {
-      console.error('❌ [서버시작] Git 히스토리 업데이트 실패:', error.message);
-    }
-
-    // 푸시 구독 정보 초기화
-    console.log('🔍 [서버시작] 푸시 구독 초기화 시작');
-    try {
-      await initializePushSubscriptions();
-
-    } catch (error) {
-      console.error('❌ [서버시작] 푸시 구독 초기화 실패:', error.message);
-    }
-
-    // SMS 시트 헤더 초기화 (서버 시작 시 한 번만 실행)
-    console.log('📱 [서버시작] SMS 시트 헤더 초기화 시작');
-    try {
-      await ensureSmsSheetHeaders();
-      console.log('✅ [서버시작] SMS 시트 헤더 초기화 완료');
-    } catch (error) {
-      console.error('❌ [서버시작] SMS 시트 헤더 초기화 실패:', error.message);
-    }
-
-    // SMS 자동응답 시트 헤더 초기화 (서버 시작 시 한 번만 실행)
-    console.log('🤖 [서버시작] SMS 자동응답 시트 헤더 초기화 시작');
-    try {
-      await ensureAutoReplySheetHeaders();
-      console.log('✅ [서버시작] SMS 자동응답 시트 헤더 초기화 완료');
-    } catch (error) {
-      console.error('❌ [서버시작] SMS 자동응답 시트 헤더 초기화 실패:', error.message);
-    }
+    // SMS 자동응답 시트 헤더 초기화 (서버 시작 후 5분 지연)
+    setTimeout(async () => {
+      console.log('🤖 [서버시작] SMS 자동응답 시트 헤더 초기화 시작 (지연 실행)');
+      try {
+        await ensureAutoReplySheetHeaders();
+        console.log('✅ [서버시작] SMS 자동응답 시트 헤더 초기화 완료');
+      } catch (error) {
+        console.error('❌ [서버시작] SMS 자동응답 시트 헤더 초기화 실패:', error.message);
+      }
+    }, 300000); // 5분 후 실행
 
     // 서버 시작 시 배정완료된 재고 자동 저장 및 중복 정리 (지연 로딩으로 성능 최적화)
     console.log('💾 [서버시작] 배정완료된 재고 자동 저장 및 중복 정리 시작 (백그라운드에서 실행)');
 
     // 백그라운드에서 데이터 로드 (서버 시작 지연 방지, Rate Limit 고려하여 충분한 지연)
-    // 스케줄러 작업들과 충돌하지 않도록 6분 후 실행
+    // 리소스 부담 감소를 위해 20분 후 실행
     setTimeout(async () => {
       try {
         console.log('🔍 [서버시작] 1단계: 시트 데이터 가져오기 시작 (백그라운드)');
@@ -15883,7 +15983,7 @@ const server = app.listen(port, '0.0.0.0', async () => {
           const memoryUsage = process.memoryUsage();
           const uptime = Math.floor(process.uptime());
           console.log(`📊 [상태체크] 서버 가동시간: ${uptime}초, 메모리: ${Math.round(memoryUsage.heapUsed / 1024 / 1024)}MB`);
-        }, 5 * 60 * 1000); // 5분마다
+        }, 15 * 60 * 1000); // 15분마다 (리소스 부담 감소)
 
         // 실제 시트 데이터와 비교 분석
         console.log('🔍 [서버시작] 실제 시트 데이터와 배정 상태 비교 분석 시작');
@@ -15945,9 +16045,11 @@ const server = app.listen(port, '0.0.0.0', async () => {
     }, 360000); // 6분 후 실행 (스케줄러 작업들과 충돌 방지, Rate Limit 고려)
 
   } catch (error) {
-    console.error('서버 시작 중 오류:', error);
+    console.error('서버 초기화 중 오류:', error);
   }
-}).on('error', (error) => {
+});
+
+server.on('error', (error) => {
   console.error('서버 시작 실패:', error);
   process.exit(1);
 });
@@ -33366,6 +33468,9 @@ async function createPolicyNotification(policyId, userId, notificationType, appr
 
 // 마감장표 데이터 조회 API
 app.get('/api/closing-chart', async (req, res) => {
+  // CORS 헤더 설정
+  setCORSHeaders(req, res);
+
   try {
     const { date } = req.query;
     const targetDate = date || new Date().toISOString().split('T')[0];
@@ -35395,6 +35500,9 @@ app.post('/api/closing-chart/targets', async (req, res) => {
 
 // 매핑 실패 데이터 조회 API
 app.get('/api/closing-chart/mapping-failures', async (req, res) => {
+  // CORS 헤더 설정
+  setCORSHeaders(req, res);
+
   try {
     const { date } = req.query;
     const targetDate = date || new Date().toISOString().split('T')[0];
@@ -35414,6 +35522,9 @@ app.get('/api/closing-chart/mapping-failures', async (req, res) => {
 
 // 담당자-코드 조합 추출 API
 app.get('/api/closing-chart/agent-code-combinations', async (req, res) => {
+  // CORS 헤더 설정
+  setCORSHeaders(req, res);
+
   try {
     const { date } = req.query;
     const targetDate = date || new Date().toISOString().split('T')[0];
@@ -36684,6 +36795,9 @@ app.get('/api/last-activation-date', async (req, res) => {
 
 // 영업사원별마감 데이터 조회 API
 app.get('/api/agent-closing-chart', async (req, res) => {
+  // CORS 헤더 설정
+  setCORSHeaders(req, res);
+
   try {
     const { date, agent } = req.query;
     const targetDate = date || new Date().toISOString().split('T')[0];
