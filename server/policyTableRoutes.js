@@ -4908,22 +4908,24 @@ function setupPolicyTableRoutes(app) {
       }
       
       const updatedRow = [...existingRow];
-      // 배열 길이를 최소 14로 보장 (생성자ID 포함, N열까지)
-      while (updatedRow.length < 14) {
+      // 배열 길이를 최소 16으로 보장 (엑셀파일URL 포함, P열까지)
+      while (updatedRow.length < 16) {
         updatedRow.push('');
       }
       updatedRow[11] = 'Y'; // 등록여부
       updatedRow[12] = new Date().toISOString(); // 등록일시
       // updatedRow[13]은 이미 creatorId가 있거나 빈 문자열
+      // updatedRow[14]는 확인이력 (기존 값 유지)
+      // updatedRow[15]는 엑셀파일URL (기존 값 유지)
 
       // 실제 시트 행 번호 = 헤더(1행) + dataRowIndex(0-based) + 1 = dataRowIndex + 2
       const actualRowNumber = dataRowIndex + 2;
       
-      // N열까지 포함하여 저장 (HEADERS_POLICY_TABLE_LIST에 생성자ID 추가됨)
+      // P열까지 포함하여 저장 (HEADERS_POLICY_TABLE_LIST에 엑셀파일URL 포함)
       await withRetry(async () => {
         return await sheets.spreadsheets.values.update({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_POLICY_TABLE_LIST}!A${actualRowNumber}:N${actualRowNumber}`,
+          range: `${SHEET_POLICY_TABLE_LIST}!A${actualRowNumber}:P${actualRowNumber}`,
           valueInputOption: 'USER_ENTERED',
           resource: { values: [updatedRow] }
         });
@@ -5301,17 +5303,17 @@ function setupPolicyTableRoutes(app) {
       const updatedRow = [...row];
       updatedRow[10] = newImageUrl; // 이미지URL
       
-      // 배열 길이를 최소 15로 보장 (O열까지, 확인이력 포함)
-      while (updatedRow.length < 15) {
+      // 배열 길이를 최소 16으로 보장 (P열까지, 엑셀파일URL 포함)
+      while (updatedRow.length < 16) {
         updatedRow.push('');
       }
       
-      // updatedRow가 15개 요소(A~O열)를 가지므로 O열까지 포함하여 업데이트
+      // updatedRow가 16개 요소(A~P열)를 가지므로 P열까지 포함하여 업데이트
       // rowIndex는 헤더를 포함한 배열 인덱스이므로, 실제 시트 행 번호는 rowIndex + 1
       await withRetry(async () => {
         return await sheets.spreadsheets.values.update({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_POLICY_TABLE_LIST}!A${rowIndex + 1}:O${rowIndex + 1}`,
+          range: `${SHEET_POLICY_TABLE_LIST}!A${rowIndex + 1}:P${rowIndex + 1}`,
           valueInputOption: 'USER_ENTERED',
           resource: { values: [updatedRow] }
         });
@@ -5610,6 +5612,10 @@ function setupPolicyTableRoutes(app) {
       
       // 수정할 필드만 업데이트 (기존 값 유지)
       const updatedRow = [...existingRow];
+      // 배열 길이를 최소 16으로 보장 (P열까지, 엑셀파일URL 포함)
+      while (updatedRow.length < 16) {
+        updatedRow.push('');
+      }
       if (applyDate !== undefined) {
         updatedRow[3] = applyDate; // 정책적용일시
       }
@@ -5627,7 +5633,7 @@ function setupPolicyTableRoutes(app) {
       await withRetry(async () => {
         return await sheets.spreadsheets.values.update({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_POLICY_TABLE_LIST}!A${rowIndex + 1}:O${rowIndex + 1}`,
+          range: `${SHEET_POLICY_TABLE_LIST}!A${rowIndex + 1}:P${rowIndex + 1}`,
           valueInputOption: 'USER_ENTERED',
           resource: { values: [updatedRow] }
         });
@@ -6124,8 +6130,8 @@ function setupPolicyTableRoutes(app) {
       const existingRow = dataRows[rowIndex];
       const updatedRow = [...existingRow];
 
-      // 배열 길이를 최소 15로 보장 (O열까지)
-      while (updatedRow.length < 15) {
+      // 배열 길이를 최소 16으로 보장 (P열까지, 엑셀파일URL 포함)
+      while (updatedRow.length < 16) {
         updatedRow.push('');
       }
 
@@ -6168,7 +6174,7 @@ function setupPolicyTableRoutes(app) {
       await withRetry(async () => {
         return await sheets.spreadsheets.values.update({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_POLICY_TABLE_LIST}!A${rowIndex + 2}:O${rowIndex + 2}`,
+          range: `${SHEET_POLICY_TABLE_LIST}!A${rowIndex + 2}:P${rowIndex + 2}`,
           valueInputOption: 'RAW',
           resource: { values: [updatedRow] }
         });
