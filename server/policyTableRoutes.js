@@ -988,7 +988,8 @@ async function checkPermission(req, allowedRoles, mode = 'policy') {
     hasPermission, 
     userRole: finalUserRole, 
     userId: finalUserId, 
-      userName: finalUserId // 폴백: 아이디라도 반환
+      userName: finalUserId, // 폴백: 아이디라도 반환
+      userInfo: userInfo // userInfo 반환 (중복 API 호출 방지)
     };
   }
   
@@ -996,7 +997,8 @@ async function checkPermission(req, allowedRoles, mode = 'policy') {
     hasPermission, 
     userRole: finalUserRole, 
     userId: finalUserId, 
-    userName: finalUserName
+    userName: finalUserName,
+    userInfo: userInfo // 🔥 추가: userInfo 반환 (중복 API 호출 방지)
   };
   } catch (error) {
     console.error('[정책표] 권한 체크 오류:', error);
@@ -3584,43 +3586,49 @@ function setupPolicyTableRoutes(app) {
       const groupIds = accessGroupIds || (accessGroupId ? [accessGroupId] : []);
 
       // 🔥 중요: creatorId는 대리점아이디관리 시트의 C열(contactId) 값을 사용해야 함
-      // req.headers['x-user-id']를 직접 사용하여 대리점아이디관리 시트에서 C열 값을 찾음
+      // checkPermission에서 이미 조회한 userInfo 재사용 (중복 API 호출 방지)
       const headerUserId = req.headers['x-user-id'] || '';
       let creatorId = headerUserId;
-      try {
-        const { sheets, SPREADSHEET_ID } = createSheetsClient();
-        const agentManagementResponse = await getAgentManagementData(sheets, SPREADSHEET_ID);
-        const agentRows = agentManagementResponse?.data?.values || [];
-        if (agentRows.length >= 2 && headerUserId) {
-          // C열(contactId)로 먼저 찾기
-          let userRow = agentRows.find(row => {
-            return row[2] === headerUserId;
-          });
-          // C열로 못 찾으면 A열(이름)으로 찾기
-          if (!userRow && permission.userName) {
-            userRow = agentRows.find(row => {
-              return row[0] === permission.userName;
+      
+      // checkPermission에서 이미 조회한 userInfo 사용 (API 호출 중복 방지)
+      if (permission.userInfo && permission.userInfo.id) {
+        creatorId = permission.userInfo.id; // 이미 조회된 contactId 사용
+        console.log('✅ [정책표 생성] creatorId 설정 (권한 체크에서 재사용):', {
+          headerUserId: headerUserId,
+          contactId: creatorId,
+          userName: permission.userName,
+          foundBy: 'permission-check-cache'
+        });
+      } else {
+        // 권한 체크에서 찾지 못한 경우에만 별도 조회 (거의 발생하지 않음)
+        try {
+          const { sheets, SPREADSHEET_ID } = createSheetsClient();
+          const agentManagementResponse = await getAgentManagementData(sheets, SPREADSHEET_ID);
+          const agentRows = agentManagementResponse?.data?.values || [];
+          if (agentRows.length >= 2 && headerUserId) {
+            // C열(contactId)로 먼저 찾기
+            let userRow = agentRows.find(row => {
+              return row[2] === headerUserId;
             });
+            // C열로 못 찾으면 A열(이름)으로 찾기
+            if (!userRow && permission.userName) {
+              userRow = agentRows.find(row => {
+                return row[0] === permission.userName;
+              });
+            }
+            if (userRow && userRow[2]) {
+              creatorId = userRow[2];
+              console.log('✅ [정책표 생성] creatorId 설정 (별도 조회):', {
+                headerUserId: headerUserId,
+                contactId: creatorId,
+                userName: permission.userName,
+                foundBy: 'separate-query'
+              });
+            }
           }
-          if (userRow && userRow[2]) {
-            // 대리점아이디관리 시트의 C열 값 사용 (정책표 목록 탭 필터링과 동일)
-            creatorId = userRow[2];
-            console.log('✅ [정책표 생성] creatorId 설정:', {
-              headerUserId: headerUserId,
-              contactId: creatorId,
-              userName: permission.userName,
-              foundBy: userRow[2] === headerUserId ? 'contactId' : 'userName'
-            });
-          } else {
-            console.warn('⚠️ [정책표 생성] 사용자를 찾을 수 없음, headerUserId 사용:', {
-              headerUserId: headerUserId,
-              userName: permission.userName
-            });
-          }
+        } catch (error) {
+          console.warn('⚠️ [정책표 생성] creatorId 조회 실패, 기본값 사용:', error.message);
         }
-      } catch (error) {
-        console.warn('[정책표 생성] creatorId 조회 실패, headerUserId 사용:', error.message);
-        // 에러 발생 시 headerUserId 그대로 사용
       }
 
       // 사용자가 이미 활성 작업이 있는지 확인
