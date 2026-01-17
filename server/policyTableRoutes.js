@@ -841,6 +841,65 @@ async function getSheetId(sheets, spreadsheetId, sheetName) {
   return sheet ? sheet.properties.sheetId : null;
 }
 
+// URL에서 스프레드시트 ID 추출
+function extractSpreadsheetId(url) {
+  if (!url) return null;
+  const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  return match ? match[1] : null;
+}
+
+// "정책" 시트를 찾아서 해당 시트의 URL 생성
+async function getPolicySheetUrl(originalUrl, isPublicLink = true) {
+  try {
+    const spreadsheetId = extractSpreadsheetId(originalUrl);
+    if (!spreadsheetId) {
+      console.warn('⚠️ [정책시트] 스프레드시트 ID를 추출할 수 없습니다:', originalUrl);
+      return originalUrl; // 원본 URL 반환
+    }
+
+    const { sheets } = createSheetsClient();
+    
+    // 시트 목록 조회
+    const spreadsheet = await withRetry(async () => {
+      return await sheets.spreadsheets.get({ spreadsheetId });
+    });
+
+    // "정책"이라는 이름의 시트 찾기 (정확히 "정책"인 시트를 우선 찾고, 없으면 "정책"이 포함된 시트 찾기)
+    let policySheet = spreadsheet.data.sheets.find(s => s.properties.title === '정책');
+    if (!policySheet) {
+      // 정확히 "정책"인 시트가 없으면 "정책"이 포함된 시트 찾기
+      policySheet = spreadsheet.data.sheets.find(s => s.properties.title.includes('정책'));
+    }
+
+    if (!policySheet) {
+      console.warn('⚠️ [정책시트] "정책" 시트를 찾을 수 없습니다. 원본 URL 사용:', originalUrl);
+      // 시트 목록 로그
+      const sheetNames = spreadsheet.data.sheets.map(s => s.properties.title);
+      console.warn('📋 [정책시트] 사용 가능한 시트:', sheetNames);
+      return originalUrl; // 원본 URL 반환
+    }
+
+    const sheetId = policySheet.properties.sheetId;
+    console.log(`✅ [정책시트] "정책" 시트 발견: 시트 ID=${sheetId}`);
+
+    // 시트 URL 생성
+    if (isPublicLink) {
+      // 공개 링크 (pubhtml) - 스크린샷용
+      const publicUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/pubhtml?gid=${sheetId}&single=true`;
+      console.log(`📸 [정책시트] 공개 링크 생성: ${publicUrl.substring(0, 80)}...`);
+      return publicUrl;
+    } else {
+      // 편집 링크 - 엑셀 파일 생성용
+      const editUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit#gid=${sheetId}`;
+      console.log(`📝 [정책시트] 편집 링크 생성: ${editUrl.substring(0, 80)}...`);
+      return editUrl;
+    }
+  } catch (error) {
+    console.error('❌ [정책시트] URL 생성 실패:', error);
+    return originalUrl; // 에러 발생 시 원본 URL 반환
+  }
+}
+
 // 대리점아이디관리 시트 조회 (캐싱 적용)
 async function getAgentManagementData(sheets, SPREADSHEET_ID) {
   const agentSheetName = '대리점아이디관리';
@@ -1348,8 +1407,13 @@ async function processPolicyTableGeneration(jobId, params, discordRequestId = nu
       message: '디스코드 봇으로 스크린샷 생성 중...'
     });
 
-    const sheetUrl = policyTablePublicLink || policyTableLink;
-    console.log(`[정책표 생성] 📸 사용할 시트 URL: ${sheetUrl}`);
+    // "정책" 시트를 찾아서 해당 시트의 URL 생성
+    const originalSheetUrl = policyTablePublicLink || policyTableLink;
+    const sheetUrl = await getPolicySheetUrl(originalSheetUrl, true); // 공개 링크 (스크린샷용)
+    const editSheetUrl = await getPolicySheetUrl(policyTableLink, false); // 편집 링크 (엑셀 파일용)
+    
+    console.log(`[정책표 생성] 📸 사용할 시트 URL (스크린샷): ${sheetUrl}`);
+    console.log(`[정책표 생성] 📝 사용할 시트 URL (엑셀): ${editSheetUrl}`);
 
     // 로컬 PC 디스코드 봇에 명령어 전송 및 이미지 URL, 메시지 ID, 스레드 ID 받기
     // captureSheetViaDiscordBot에서 포스트/스레드를 찾거나 생성하고 명령어를 전송함
@@ -1357,12 +1421,12 @@ async function processPolicyTableGeneration(jobId, params, discordRequestId = nu
     let discordResponseTime = null;
     try {
       const { imageUrl, messageId: discordMessageId, threadId, excelUrl, excelMessageId } = await captureSheetViaDiscordBot(
-        sheetUrl, // 스크린샷용 URL (pubhtml 가능)
+        sheetUrl, // 스크린샷용 URL (pubhtml, "정책" 시트)
         policyTableName,
         creatorName, // 실행한 사람 이름 전달
         discordChannelId,
         creatorPermissions, // 생성자적용권한 전달
-        policyTableLink // 엑셀 파일 생성용 편집 링크
+        editSheetUrl // 엑셀 파일 생성용 편집 링크 ("정책" 시트)
       );
       
       discordResponseTime = Date.now() - discordStartTime;
