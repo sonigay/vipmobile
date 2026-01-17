@@ -360,12 +360,18 @@ client.on('messageCreate', async (message) => {
     const waitTime = parseInt(options.waitTime) || 3000;
     const viewportWidth = parseInt(options.viewportWidth) || 1920;
     const viewportHeight = parseInt(options.viewportHeight) || 1080;
+    const editUrl = options.editUrl || null; // 엑셀 파일 생성용 편집 링크
     
     console.log(`📋 [로컬PC봇] [${requestId}] 파싱된 정보:`);
     console.log(`   [${requestId}] URL: ${sheetUrl.substring(0, 50)}...`);
     console.log(`   [${requestId}] 정책표: ${policyTableName}`);
     console.log(`   [${requestId}] 사용자: ${userName}`);
     console.log(`   [${requestId}] 대기시간: ${waitTime}ms`);
+    if (editUrl) {
+      console.log(`   [${requestId}] 편집 링크: ${editUrl.substring(0, 50)}...`);
+    } else {
+      console.log(`   [${requestId}] 편집 링크: 없음 (스크린샷 URL 사용)`);
+    }
     
     // ===== 2단계: 로딩 메시지 전송 =====
     // 클라우드 서버에 작업 시작을 알림
@@ -446,35 +452,58 @@ client.on('messageCreate', async (message) => {
           await fs.mkdir('./excel', { recursive: true });
         }
         
-        // URL에서 spreadsheetId 추출 (더 robust한 방식)
-        console.log(`🔍 [로컬PC봇] [${requestId}] 원본 URL: ${sheetUrl}`);
+        // 엑셀 파일 생성용 URL 결정 (편집 링크 우선 사용)
+        const excelUrl = editUrl || sheetUrl;
+        console.log(`🔍 [로컬PC봇] [${requestId}] 스크린샷용 URL: ${sheetUrl}`);
+        console.log(`🔍 [로컬PC봇] [${requestId}] 엑셀용 URL: ${excelUrl}${editUrl ? ' (편집 링크 사용)' : ' (스크린샷 URL 사용)'}`);
         
+        // URL에서 spreadsheetId 추출 (더 robust한 방식)
         let spreadsheetId = null;
         
         // 방법 1: 일반 형식 /spreadsheets/d/{ID}/
-        const normalMatch = sheetUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]{44})/);
+        const normalMatch = excelUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]{44})/);
         if (normalMatch) {
           spreadsheetId = normalMatch[1];
           console.log(`✅ [로컬PC봇] [${requestId}] 일반 형식으로 추출: ${spreadsheetId}`);
         } else {
           // 방법 2: 2PACX 형식 /spreadsheets/d/e/2PACX-1v.../
-          const pacxMatch = sheetUrl.match(/\/spreadsheets\/d\/e\/(2PACX-1v[^\/]+)/);
+          const pacxMatch = excelUrl.match(/\/spreadsheets\/d\/e\/(2PACX-1v[^\/]+)/);
           if (pacxMatch) {
-            // 2PACX 형식은 실제 spreadsheetId를 찾기 어려우므로 에러
-            console.error(`❌ [로컬PC봇] [${requestId}] 2PACX 형식은 지원하지 않습니다. 편집 링크를 사용해주세요.`);
-            throw new Error('2PACX 형식의 URL은 지원하지 않습니다. Google Sheets 편집 링크를 사용해주세요.');
+            // 2PACX 형식은 실제 spreadsheetId를 찾기 어려우므로 편집 링크 필요
+            if (!editUrl) {
+              console.error(`❌ [로컬PC봇] [${requestId}] 2PACX 형식 URL인데 편집 링크(editUrl)가 전달되지 않았습니다.`);
+              console.error(`❌ [로컬PC봇] [${requestId}] 서버에서 편집 링크를 전송하도록 수정이 필요합니다.`);
+              throw new Error('2PACX 형식의 URL은 편집 링크가 필요합니다. 서버에서 editUrl 파라미터를 전송해야 합니다.');
+            } else {
+              // 편집 링크가 있으면 편집 링크에서 spreadsheetId 추출 시도
+              console.log(`🔄 [로컬PC봇] [${requestId}] 2PACX 형식 감지, 편집 링크에서 spreadsheetId 추출 시도: ${editUrl.substring(0, 50)}...`);
+              const editIdMatch = editUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]{44})/);
+              if (editIdMatch) {
+                spreadsheetId = editIdMatch[1];
+                console.log(`✅ [로컬PC봇] [${requestId}] 편집 링크에서 추출: ${spreadsheetId}`);
+              } else {
+                throw new Error('편집 링크에서도 spreadsheetId를 추출할 수 없습니다.');
+              }
+            }
           } else {
             // 방법 3: pubhtml 형식에서도 시도
-            const pubhtmlMatch = sheetUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)\/pubhtml/);
+            const pubhtmlMatch = excelUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)\/pubhtml/);
             if (pubhtmlMatch) {
               spreadsheetId = pubhtmlMatch[1];
               console.log(`✅ [로컬PC봇] [${requestId}] pubhtml 형식으로 추출: ${spreadsheetId}`);
+            } else {
+              // 방법 4: edit 형식 /spreadsheets/d/{ID}/edit
+              const editMatch = excelUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)\/edit/);
+              if (editMatch) {
+                spreadsheetId = editMatch[1];
+                console.log(`✅ [로컬PC봇] [${requestId}] edit 형식으로 추출: ${spreadsheetId}`);
+              }
             }
           }
         }
         
         if (!spreadsheetId) {
-          console.error(`❌ [로컬PC봇] [${requestId}] URL 형식을 인식할 수 없습니다: ${sheetUrl}`);
+          console.error(`❌ [로컬PC봇] [${requestId}] URL 형식을 인식할 수 없습니다: ${excelUrl}`);
           throw new Error('Google Sheets URL에서 spreadsheetId를 추출할 수 없습니다. 편집 링크 형식인지 확인해주세요.');
         }
         

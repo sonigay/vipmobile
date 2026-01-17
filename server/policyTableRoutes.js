@@ -151,7 +151,7 @@ async function getCreatorPermissionName(creatorPermissions) {
  * @param {Array<string>} creatorPermissions - 생성자적용권한 역할 코드 배열
  * @returns {Promise<{imageUrl: string, messageId: string, threadId: string}>} 이미지 URL, 메시지 ID, 스레드/포스트 ID
  */
-async function captureSheetViaDiscordBot(sheetUrl, policyTableName, userName, channelId, creatorPermissions = []) {
+async function captureSheetViaDiscordBot(sheetUrl, policyTableName, userName, channelId, creatorPermissions = [], editUrl = null) {
   try {
     // 명령어 전송용 봇 초기화
     const bot = await initDiscordBotForCommands();
@@ -223,10 +223,15 @@ async function captureSheetViaDiscordBot(sheetUrl, policyTableName, userName, ch
     }
 
     // 명령어 생성
-    // 형식: !screenshot <URL> policyTableName=<이름> userName=<사용자> requestId=<고유ID>
+    // 형식: !screenshot <URL> policyTableName=<이름> userName=<사용자> requestId=<고유ID> [editUrl=<편집링크>]
     // requestId를 추가하여 여러 요청을 구분할 수 있도록 함
+    // editUrl은 엑셀 파일 생성 시 사용 (pubhtml URL인 경우 편집 링크 필요)
     const requestId = `REQ_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const command = `!screenshot ${sheetUrl} policyTableName=${encodeURIComponent(policyTableName)} userName=${encodeURIComponent(userName)} requestId=${requestId}`;
+    let command = `!screenshot ${sheetUrl} policyTableName=${encodeURIComponent(policyTableName)} userName=${encodeURIComponent(userName)} requestId=${requestId}`;
+    if (editUrl && editUrl !== sheetUrl) {
+      command += ` editUrl=${encodeURIComponent(editUrl)}`;
+      console.log(`📤 [${requestId}] 편집 링크 포함: ${editUrl.substring(0, 50)}...`);
+    }
     console.log(`📤 [${requestId}] 디스코드 명령어 전송: ${command.substring(0, 100)}...`);
     console.log(`📤 [${requestId}] 정책표: ${policyTableName}, URL: ${sheetUrl.substring(0, 50)}...`);
     
@@ -1294,11 +1299,12 @@ async function processPolicyTableGeneration(jobId, params, discordRequestId = nu
     let discordResponseTime = null;
     try {
       const { imageUrl, messageId: discordMessageId, threadId, excelUrl, excelMessageId } = await captureSheetViaDiscordBot(
-        sheetUrl,
+        sheetUrl, // 스크린샷용 URL (pubhtml 가능)
         policyTableName,
         creatorName, // 실행한 사람 이름 전달
         discordChannelId,
-        creatorPermissions // 생성자적용권한 전달
+        creatorPermissions, // 생성자적용권한 전달
+        policyTableLink // 엑셀 파일 생성용 편집 링크
       );
       
       discordResponseTime = Date.now() - discordStartTime;
