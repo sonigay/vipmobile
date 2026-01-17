@@ -891,7 +891,7 @@ async function getAgentManagementData(sheets, SPREADSHEET_ID) {
   return response;
 }
 
-// 권한 체크 헬퍼 함수
+// 권한 체크 헬퍼 함수 (개선: userInfo 반환 추가)
 async function checkPermission(req, allowedRoles, mode = 'policy') {
   try {
     const { sheets, SPREADSHEET_ID } = createSheetsClient();
@@ -909,7 +909,7 @@ async function checkPermission(req, allowedRoles, mode = 'policy') {
   if (rows.length < 2) {
       console.warn(`[${mode === 'budget' ? '예산' : '정책'}표] 권한 체크: 대리점아이디관리 시트에 데이터가 없습니다.`);
       return { hasPermission: false, error: '대리점아이디관리 시트에 데이터가 없습니다.' };
-  }
+    }
 
   // 로그인한 사용자 정보 찾기 (헤더에서 가져오기)
   const userId = req.headers['x-user-id'] || req.body?.userId || req.query?.userId;
@@ -4849,14 +4849,35 @@ function setupPolicyTableRoutes(app) {
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_TABLE_LIST, HEADERS_POLICY_TABLE_LIST);
 
-      const response = await withRetry(async () => {
-        return await sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_POLICY_TABLE_LIST}!A:P` // A:O -> A:P로 변경 (엑셀파일URL 포함)
+      // 캐시 확인 (정책표 목록 캐시 활용)
+      const cacheKey = `policy-tables-${SPREADSHEET_ID}-all`;
+      let rows = [];
+      const cached = getCache(cacheKey);
+      
+      if (cached && Array.isArray(cached) && cached.length > 0) {
+        // 캐시에서 찾기
+        const cachedRow = cached.find(row => row[0] === id);
+        if (cachedRow) {
+          rows = cached; // 캐시된 전체 목록 사용
+          console.log('✅ [정책표 등록] 캐시에서 데이터 조회');
+        }
+      }
+      
+      // 캐시에 없거나 해당 정책표가 없으면 API 호출
+      if (rows.length === 0) {
+        const response = await withRetry(async () => {
+          return await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SHEET_POLICY_TABLE_LIST}!A:P` // A:O -> A:P로 변경 (엑셀파일URL 포함)
+          });
         });
-      });
+        rows = response.data.values || [];
+        // 캐시에 저장 (2분 TTL)
+        if (rows.length > 0) {
+          setCache(cacheKey, rows, CACHE_TTL.POLICY_TABLES);
+        }
+      }
 
-      const rows = response.data.values || [];
       const rowIndex = rows.findIndex(row => row[0] === id);
 
       if (rowIndex === -1) {
