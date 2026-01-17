@@ -2701,6 +2701,16 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                     <Box>
                       <Alert severity="success" sx={{ mb: 2 }}>
                         정책표 생성이 완료되었습니다.
+                        {generatedResult.excelUrl && (
+                          <Typography variant="body2" sx={{ mt: 1, fontWeight: 'bold' }}>
+                            ✅ 이미지 및 엑셀 파일이 모두 생성되었습니다.
+                          </Typography>
+                        )}
+                        {!generatedResult.excelUrl && (
+                          <Typography variant="body2" sx={{ mt: 1, color: 'text.secondary' }}>
+                            ⚠️ 이미지는 생성되었으나 엑셀 파일은 생성되지 않았습니다.
+                          </Typography>
+                        )}
                       </Alert>
                       <Box sx={{ mb: 2, textAlign: 'center' }}>
                         <img
@@ -3149,9 +3159,21 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                                 <Alert severity="success" sx={{ mb: 1 }}>
                                   생성 완료!
                                   {batchGenerationStatus[setting.id].result && (
-                                    <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>
-                                      정책표 ID: {batchGenerationStatus[setting.id].result.id}
-                                    </Typography>
+                                    <>
+                                      <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>
+                                        정책표 ID: {batchGenerationStatus[setting.id].result.id}
+                                      </Typography>
+                                      {batchGenerationStatus[setting.id].result.excelUrl && (
+                                        <Typography variant="caption" sx={{ display: 'block', mt: 0.5, fontWeight: 'bold', color: 'success.main' }}>
+                                          ✅ 이미지 및 엑셀 파일 생성 완료
+                                        </Typography>
+                                      )}
+                                      {!batchGenerationStatus[setting.id].result.excelUrl && (
+                                        <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: 'text.secondary' }}>
+                                          ⚠️ 이미지만 생성됨 (엑셀 파일 없음)
+                                        </Typography>
+                                      )}
+                                    </>
                                   )}
                                 </Alert>
                                 {batchGenerationStatus[setting.id].result?.imageUrl && (

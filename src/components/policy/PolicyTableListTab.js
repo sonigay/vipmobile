@@ -1488,15 +1488,23 @@ const PolicyTableListTab = ({ loggedInStore, mode }) => {
                   >
                     {/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ? '이미지 다운로드' : '이미지복사하기'}
                   </Button>
-                  {selectedPolicy?.excelFileUrl && (
-                    <Button
-                      variant="outlined"
-                      startIcon={<DownloadIcon />}
-                      onClick={handleDownloadExcel}
-                    >
-                      엑셀파일다운로드
-                    </Button>
-                  )}
+                  {(() => {
+                    const hasExcelFile = selectedPolicy?.excelFileUrl;
+                    console.log('[정책표 상세] 엑셀 다운로드 버튼 표시 체크:', {
+                      hasSelectedPolicy: !!selectedPolicy,
+                      excelFileUrl: selectedPolicy?.excelFileUrl || '없음',
+                      willShow: !!hasExcelFile
+                    });
+                    return hasExcelFile ? (
+                      <Button
+                        variant="outlined"
+                        startIcon={<DownloadIcon />}
+                        onClick={handleDownloadExcel}
+                      >
+                        엑셀파일다운로드
+                      </Button>
+                    ) : null;
+                  })()}
                 </Box>
                 {imageError ? (
                   <Alert severity="warning">
