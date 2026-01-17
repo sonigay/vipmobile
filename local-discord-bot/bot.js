@@ -62,9 +62,23 @@ async function downloadExcelWithAPI(spreadsheetId, filePath) {
       throw new Error('시트를 찾을 수 없습니다.');
     }
     
-    const firstSheet = spreadsheet.data.sheets[0];
-    const firstSheetTitle = firstSheet.properties.title;
-    console.log(`📋 [로컬PC봇] 첫 번째 시트: ${firstSheetTitle}`);
+    // "정책" 시트 찾기 (정확히 "정책"인 시트를 우선 찾고, 없으면 "정책"이 포함된 시트 찾기)
+    let targetSheet = spreadsheet.data.sheets.find(s => s.properties.title === '정책');
+    if (!targetSheet) {
+      // 정확히 "정책"인 시트가 없으면 "정책"이 포함된 시트 찾기
+      targetSheet = spreadsheet.data.sheets.find(s => s.properties.title.includes('정책'));
+    }
+    
+    // "정책" 시트를 찾지 못한 경우 첫 번째 시트 사용 (하위 호환성)
+    if (!targetSheet) {
+      console.warn('⚠️ [로컬PC봇] "정책" 시트를 찾을 수 없습니다. 첫 번째 시트를 사용합니다.');
+      const sheetNames = spreadsheet.data.sheets.map(s => s.properties.title);
+      console.warn(`📋 [로컬PC봇] 사용 가능한 시트: ${sheetNames.join(', ')}`);
+      targetSheet = spreadsheet.data.sheets[0];
+    }
+    
+    const targetSheetTitle = targetSheet.properties.title;
+    console.log(`📋 [로컬PC봇] 사용할 시트: ${targetSheetTitle}`);
     console.log(`📊 [로컬PC봇] 전체 시트 수: ${spreadsheet.data.sheets.length}개`);
     
     // 원본 파일 다운로드
@@ -111,9 +125,25 @@ async function downloadExcelWithAPI(spreadsheetId, filePath) {
         throw new Error('시트를 찾을 수 없습니다.');
       }
       
-      const firstSheetName = workbook.SheetNames[0];
-      const firstSheet = workbook.Sheets[firstSheetName];
-      console.log(`📋 [로컬PC봇] 첫 번째 시트: ${firstSheetName}`);
+      // "정책" 시트 찾기 (정확히 "정책"인 시트를 우선 찾고, 없으면 "정책"이 포함된 시트 찾기)
+      let targetSheetName = workbook.SheetNames.find(name => name === '정책');
+      if (!targetSheetName) {
+        // 정확히 "정책"인 시트가 없으면 "정책"이 포함된 시트 찾기
+        targetSheetName = workbook.SheetNames.find(name => name.includes('정책'));
+      }
+      
+      // "정책" 시트를 찾지 못한 경우 첫 번째 시트 사용 (하위 호환성)
+      if (!targetSheetName) {
+        console.warn('⚠️ [로컬PC봇] "정책" 시트를 찾을 수 없습니다. 첫 번째 시트를 사용합니다.');
+        console.warn(`📋 [로컬PC봇] 사용 가능한 시트: ${workbook.SheetNames.join(', ')}`);
+        targetSheetName = workbook.SheetNames[0];
+      }
+      
+      const firstSheet = workbook.Sheets[targetSheetName];
+      if (!firstSheet) {
+        throw new Error(`시트 "${targetSheetName}"을 찾을 수 없습니다.`);
+      }
+      console.log(`📋 [로컬PC봇] 사용할 시트: ${targetSheetName}`);
       
       // 데이터 확인
       const range = XLSX.utils.decode_range(firstSheet['!ref'] || 'A1:A1');
@@ -246,10 +276,10 @@ async function downloadExcelWithAPI(spreadsheetId, filePath) {
         }
       }
       
-      XLSX.utils.book_append_sheet(newWorkbook, sheetCopy, firstSheetName);
+      XLSX.utils.book_append_sheet(newWorkbook, sheetCopy, targetSheetName);
       
       // 저장 전 최종 데이터 확인
-      const finalSheet = newWorkbook.Sheets[firstSheetName];
+      const finalSheet = newWorkbook.Sheets[targetSheetName];
       const finalRange = XLSX.utils.decode_range(finalSheet['!ref'] || 'A1:A1');
       let finalDataCount = 0;
       for (let R = finalRange.s.r; R <= finalRange.e.r; ++R) {
@@ -279,7 +309,7 @@ async function downloadExcelWithAPI(spreadsheetId, filePath) {
       const newStats = await fs.stat(filePath);
       console.log(`📊 [로컬PC봇] 저장된 파일 크기: ${newStats.size} bytes`);
       
-      console.log(`✅ [로컬PC봇] 첫 번째 시트만 추출 및 수식 변환 완료 (데이터 유지)`);
+      console.log(`✅ [로컬PC봇] "${targetSheetName}" 시트만 추출 및 수식 변환 완료 (데이터 유지)`);
       
     } catch (xlsxError) {
       console.error(`⚠️ [로컬PC봇] xlsx 처리 실패, 원본 파일 사용: ${xlsxError.message}`);
@@ -292,7 +322,7 @@ async function downloadExcelWithAPI(spreadsheetId, filePath) {
     // 임시 파일 삭제
     await fs.unlink(tempFilePath).catch(() => {});
     
-    console.log(`✅ [로컬PC봇] 엑셀 파일 생성 완료 (첫 번째 시트만): ${filePath}`);
+    console.log(`✅ [로컬PC봇] 엑셀 파일 생성 완료 ("${targetSheetTitle}" 시트): ${filePath}`);
     
     return filePath;
   } catch (error) {
