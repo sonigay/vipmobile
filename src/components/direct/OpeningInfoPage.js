@@ -1853,7 +1853,12 @@ const OpeningInfoPage = ({
                                     </Typography>
                                 </Stack>
                             )}
-                            {selectedCarrier === 'LG' && formData.lgPremier && planBasicFee >= 85000 && (
+                            {selectedCarrier === 'LG' && formData.lgPremier && (() => {
+                                // 🔥 수정: 요금제군 기준으로 판단 (planBasicFee >= 85000 조건 제거)
+                                // 요금제군이 85군 이상이면 표시 (체크박스 표시 조건과 동일)
+                                const groupNumber = selectedPlanGroup ? parseInt(selectedPlanGroup.replace('군', '')) : 0;
+                                return groupNumber >= 85;
+                            })() && (
                                 <Stack direction="row" justifyContent="space-between" mb={1}>
                                     <Typography variant="body2">LG 프리미어 할인</Typography>
                                     <Typography variant="body2" color="error">-5,250원</Typography>
