@@ -325,15 +325,22 @@ const PolicySettingsTab = () => {
     // 별도정책 추가
     const handleAddSpecial = () => {
         if (newSpecial.name) {
-            setSpecialPolicies([...specialPolicies, {
-                id: Date.now(),
-                name: newSpecial.name,
-                policyType: newSpecial.policyType || 'general',
-                amount: Number(newSpecial.amount) || 0,
-                isActive: newSpecial.isActive,
-                conditions: newSpecial.conditions || []
-            }]);
-            setNewSpecial({ name: '', policyType: 'general', amount: '', isActive: true, conditions: [] });
+            if (editingSpecialId) {
+                // 수정 모드
+                handleSaveEditSpecial();
+            } else {
+                // 추가 모드
+                setSpecialPolicies([...specialPolicies, {
+                    id: Date.now(),
+                    name: newSpecial.name,
+                    policyType: newSpecial.policyType || 'general',
+                    amount: Number(newSpecial.amount) || 0,
+                    isActive: newSpecial.isActive,
+                    conditions: newSpecial.conditions || []
+                }]);
+                setNewSpecial({ name: '', policyType: 'general', amount: '', isActive: true, conditions: [] });
+                setClearedAllFlags({});
+            }
         }
     };
     
@@ -368,6 +375,49 @@ const PolicySettingsTab = () => {
                 i === conditionIndex ? { ...cond, [field]: value } : cond
             )
         }));
+    };
+
+    // 별도정책 수정 중인 항목 ID
+    const [editingSpecialId, setEditingSpecialId] = useState(null);
+
+    // 별도정책 수정 시작
+    const handleEditSpecial = (policy) => {
+        setEditingSpecialId(policy.id);
+        setNewSpecial({
+            name: policy.name,
+            policyType: policy.policyType || 'general',
+            amount: policy.amount !== undefined ? policy.amount : ((policy.addition || 0) - (policy.deduction || 0)),
+            isActive: policy.isActive,
+            conditions: policy.conditions || []
+        });
+        // 수정 중일 때는 clearedAllFlags 초기화
+        setClearedAllFlags({});
+    };
+
+    // 별도정책 수정 취소
+    const handleCancelEditSpecial = () => {
+        setEditingSpecialId(null);
+        setNewSpecial({ name: '', policyType: 'general', amount: '', isActive: true, conditions: [] });
+        setClearedAllFlags({});
+    };
+
+    // 별도정책 수정 저장
+    const handleSaveEditSpecial = () => {
+        if (newSpecial.name && editingSpecialId) {
+            setSpecialPolicies(specialPolicies.map(item => 
+                item.id === editingSpecialId 
+                    ? {
+                        ...item,
+                        name: newSpecial.name,
+                        policyType: newSpecial.policyType || 'general',
+                        amount: Number(newSpecial.amount) || 0,
+                        isActive: newSpecial.isActive,
+                        conditions: newSpecial.conditions || []
+                    }
+                    : item
+            ));
+            handleCancelEditSpecial();
+        }
     };
 
     // 별도정책 삭제
@@ -854,7 +904,9 @@ const PolicySettingsTab = () => {
                     <Stack spacing={3}>
                         {/* 입력 폼 */}
                         <Paper variant="outlined" sx={{ p: 2, bgcolor: 'background.subtle' }}>
-                            <Typography variant="subtitle2" gutterBottom fontWeight="bold">새 정책 추가</Typography>
+                            <Typography variant="subtitle2" gutterBottom fontWeight="bold">
+                                {editingSpecialId ? '정책 수정' : '새 정책 추가'}
+                            </Typography>
                             <Grid container spacing={2} alignItems="flex-start">
                                 <Grid item xs={12} sm={4}>
                                     <TextField
@@ -887,9 +939,20 @@ const PolicySettingsTab = () => {
                                     />
                                 </Grid>
                                 <Grid item xs={12} sm={2}>
-                                    <Button variant="contained" fullWidth startIcon={<AddIcon />} onClick={handleAddSpecial}>
-                                        추가
-                                    </Button>
+                                    {editingSpecialId ? (
+                                        <Stack direction="row" spacing={1}>
+                                            <Button variant="contained" fullWidth startIcon={<SaveIcon />} onClick={handleAddSpecial} color="success">
+                                                저장
+                                            </Button>
+                                            <Button variant="outlined" fullWidth onClick={handleCancelEditSpecial}>
+                                                취소
+                                            </Button>
+                                        </Stack>
+                                    ) : (
+                                        <Button variant="contained" fullWidth startIcon={<AddIcon />} onClick={handleAddSpecial}>
+                                            추가
+                                        </Button>
+                                    )}
                                 </Grid>
                                 
                                 {/* 조건 입력 UI (conditional 타입일 때만 표시) */}
@@ -1181,9 +1244,14 @@ const PolicySettingsTab = () => {
                                             )}
                                         </Stack>
                                         <ListItemSecondaryAction>
-                                            <IconButton edge="end" onClick={() => handleDeleteSpecial(policy.id)}>
-                                                <DeleteIcon />
-                                            </IconButton>
+                                            <Stack direction="row" spacing={1}>
+                                                <IconButton edge="end" onClick={() => handleEditSpecial(policy)} color="primary">
+                                                    <EditIcon />
+                                                </IconButton>
+                                                <IconButton edge="end" onClick={() => handleDeleteSpecial(policy.id)} color="error">
+                                                    <DeleteIcon />
+                                                </IconButton>
+                                            </Stack>
                                         </ListItemSecondaryAction>
                                     </ListItem>
                                     <Divider />
