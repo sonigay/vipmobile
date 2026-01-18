@@ -159,38 +159,34 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
           newSelectedPlans[m.modelId] = defPlan;
           newSelectedTypes[m.modelId] = defType;
 
-          // 초기 가격 Lookup
-          // Key: modelId-defPlan-defType
-          const priceKey = `${m.modelId}-${defPlan}-${defType}`;
-          const priceData = priceMap.get(priceKey);
+            // 초기 가격 Lookup
+            // Key: modelId-defPlan-defType
+            const priceKey = `${m.modelId}-${defPlan}-${defType}`;
+            const priceData = priceMap.get(priceKey);
 
-          let publicSupport = 0;
+            let publicSupport = 0;
 
-          if (priceData) {
-            publicSupport = priceData.publicSupport || 0;
-            const storeSupportWith = priceData.storeSupportWithAddon || 0;
-            const storeSupportWithout = priceData.storeSupportWithoutAddon || 0;
+            if (priceData) {
+              publicSupport = priceData.publicSupport || 0;
+              const storeSupportWith = priceData.storeSupportWithAddon || 0;
 
-            // calculatedPrices 초기화
-            newCalculated[`${m.modelId}-${defType}`] = {
-              storeSupportWithAddon: storeSupportWith,
-              storeSupportWithoutAddon: storeSupportWithout,
-              purchasePriceWithAddon: Math.max(0, m.factoryPrice - publicSupport - storeSupportWith),
-              purchasePriceWithoutAddon: Math.max(0, m.factoryPrice - publicSupport - storeSupportWithout),
-              publicSupport: publicSupport,
-              openingType: defType
-            };
-          } else {
-            // 가격 정보 없음 - 0 처리
-            newCalculated[`${m.modelId}-${defType}`] = {
-              storeSupportWithAddon: 0,
-              storeSupportWithoutAddon: 0,
-              purchasePriceWithAddon: m.factoryPrice,
-              purchasePriceWithoutAddon: m.factoryPrice,
-              publicSupport: 0,
-              openingType: defType
-            };
-          }
+              // 🔥 수정: 부가미유치 기준 제거, 부가유치 기준만 사용
+              // calculatedPrices 초기화
+              newCalculated[`${m.modelId}-${defType}`] = {
+                storeSupportWithAddon: storeSupportWith,
+                purchasePriceWithAddon: Math.max(0, m.factoryPrice - publicSupport - storeSupportWith),
+                publicSupport: publicSupport,
+                openingType: defType
+              };
+            } else {
+              // 가격 정보 없음 - 0 처리
+              newCalculated[`${m.modelId}-${defType}`] = {
+                storeSupportWithAddon: 0,
+                purchasePriceWithAddon: m.factoryPrice,
+                publicSupport: 0,
+                openingType: defType
+              };
+            }
 
           // Mobile object mapping (기존 UI 호환성)
           return {
@@ -260,11 +256,10 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
     const factoryPrice = mobile ? mobile.factoryPrice : 0;
 
     if (priceData) {
+      // 🔥 수정: 부가미유치 기준 제거, 부가유치 기준만 사용
       return {
         storeSupportWithAddon: priceData.storeSupportWithAddon || 0,
-        storeSupportWithoutAddon: priceData.storeSupportWithoutAddon || 0,
         purchasePriceWithAddon: Math.max(0, factoryPrice - (priceData.publicSupport || 0) - (priceData.storeSupportWithAddon || 0)),
-        purchasePriceWithoutAddon: Math.max(0, factoryPrice - (priceData.publicSupport || 0) - (priceData.storeSupportWithoutAddon || 0)),
         publicSupport: priceData.publicSupport || 0,
         openingType: openingType
       };
@@ -279,11 +274,10 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
     }
 
     // 데이터 없으면 0 리턴
+    // 🔥 수정: 부가미유치 기준 제거
     return {
       storeSupportWithAddon: 0,
-      storeSupportWithoutAddon: 0,
       purchasePriceWithAddon: factoryPrice,
-      purchasePriceWithoutAddon: factoryPrice,
       publicSupport: 0,
       openingType: openingType
     };
@@ -331,11 +325,10 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
         if (!oldValue) return true;
 
         // 주요 필드 비교
+        // 🔥 수정: 부가미유치 기준 제거
         return (
           oldValue.purchasePriceWithAddon !== newValue.purchasePriceWithAddon ||
-          oldValue.purchasePriceWithoutAddon !== newValue.purchasePriceWithoutAddon ||
           oldValue.storeSupportWithAddon !== newValue.storeSupportWithAddon ||
-          oldValue.storeSupportWithoutAddon !== newValue.storeSupportWithoutAddon ||
           oldValue.publicSupport !== newValue.publicSupport
         );
       });
@@ -419,14 +412,12 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
             if (priceData) {
               publicSupport = priceData.publicSupport || 0;
               const storeSupportWith = priceData.storeSupportWithAddon || 0;
-              const storeSupportWithout = priceData.storeSupportWithoutAddon || 0;
 
+              // 🔥 수정: 부가미유치 기준 제거, 부가유치 기준만 사용
               // calculatedPrices 초기화
               newCalculated[`${m.modelId}-${defType}`] = {
                 storeSupportWithAddon: storeSupportWith,
-                storeSupportWithoutAddon: storeSupportWithout,
                 purchasePriceWithAddon: Math.max(0, m.factoryPrice - publicSupport - storeSupportWith),
-                purchasePriceWithoutAddon: Math.max(0, m.factoryPrice - publicSupport - storeSupportWithout),
                 publicSupport: publicSupport,
                 openingType: defType
               };
@@ -434,9 +425,7 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
               // 가격 정보 없음 - 0 처리
               newCalculated[`${m.modelId}-${defType}`] = {
                 storeSupportWithAddon: 0,
-                storeSupportWithoutAddon: 0,
                 purchasePriceWithAddon: m.factoryPrice,
-                purchasePriceWithoutAddon: m.factoryPrice,
                 publicSupport: 0,
                 openingType: defType
               };
@@ -565,24 +554,21 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                 if (priceData) {
                   publicSupport = priceData.publicSupport || 0;
                   const storeSupportWith = priceData.storeSupportWithAddon || 0;
-                  const storeSupportWithout = priceData.storeSupportWithoutAddon || 0;
 
+                  // 🔥 수정: 부가미유치 기준 제거, 부가유치 기준만 사용
                   // calculatedPrices 초기화
                   newCalculated[`${m.modelId}-${defType}`] = {
                     storeSupportWithAddon: storeSupportWith,
-                    storeSupportWithoutAddon: storeSupportWithout,
                     purchasePriceWithAddon: Math.max(0, m.factoryPrice - publicSupport - storeSupportWith),
-                    purchasePriceWithoutAddon: Math.max(0, m.factoryPrice - publicSupport - storeSupportWithout),
                     publicSupport: publicSupport,
                     openingType: defType
                   };
                 } else {
                   // 가격 정보 없음 - 0 처리
+                  // 🔥 수정: 부가미유치 기준 제거
                   newCalculated[`${m.modelId}-${defType}`] = {
                     storeSupportWithAddon: 0,
-                    storeSupportWithoutAddon: 0,
                     purchasePriceWithAddon: m.factoryPrice,
-                    purchasePriceWithoutAddon: m.factoryPrice,
                     publicSupport: 0,
                     openingType: defType
                   };
@@ -720,7 +706,7 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
         factoryPrice: currentMobile.factoryPrice,
         publicSupport: currentMobile.publicSupport,
         storeSupport: currentMobile.storeSupportWithAddon,
-        storeSupportNoAddon: currentMobile.storeSupportWithoutAddon,
+        // 🔥 수정: 부가미유치 기준 제거 (storeSupportNoAddon 제거)
         requiredAddons: currentMobile.requiredAddons,
         image: currentMobile.image
       };
@@ -1164,16 +1150,15 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                   }}
                 >
                   대리점 지원금
-                  <Box sx={{ display: 'flex', justifyContent: 'space-around', fontSize: '0.75rem', color: 'text.secondary', mt: 0.5 }}>
-                    <span>부가유치</span>
-                    <span>미유치</span>
+                  <Box sx={{ fontSize: '0.75rem', color: 'text.secondary', mt: 0.5 }}>
+                    <span>부가보험 모두 유치시</span>
                   </Box>
                 </ModernTableCell>
                 <ModernTableCell
                   align="center"
-                  colSpan={2}
+                  colSpan={1}
                   sx={{
-                    width: '180px',
+                    width: '90px',
                     borderLeft: '1px solid rgba(81, 81, 81, 0.5)',
                     bgcolor: 'rgba(212, 175, 55, 0.1)',
                     backgroundColor: 'rgba(212, 175, 55, 0.1)',
@@ -1183,9 +1168,8 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                   }}
                 >
                   구매가 (할부원금)
-                  <Box sx={{ display: 'flex', justifyContent: 'space-around', fontSize: '0.75rem', color: 'text.secondary', mt: 0.5 }}>
-                    <span>부가유치</span>
-                    <span>미유치</span>
+                  <Box sx={{ fontSize: '0.75rem', color: 'text.secondary', mt: 0.5 }}>
+                    <span>부가보험 모두 유치시</span>
                   </Box>
                 </ModernTableCell>
               </TableRow>

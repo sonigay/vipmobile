@@ -165,7 +165,7 @@ const CustomerQueueManagementTab = ({ loggedInStore, onRowClick }) => {
                                                 publicSupport: item.carrierSupport || 0,
                                                 support: item.carrierSupport || 0, // 하위 호환
                                                 storeSupport: item.dealerSupportWithAdd || 0,
-                                                storeSupportNoAddon: item.dealerSupportWithoutAdd || 0,
+                                                // 🔥 수정: 부가미유치 기준 제거 (storeSupportNoAddon 제거, 부가유치 값 사용)
                                                 soldAt: item.createdAt
                                             });
                                         }

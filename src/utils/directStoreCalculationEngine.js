@@ -129,6 +129,7 @@ export const calculateInstallmentPrincipalWithAddon = (
 
 /**
  * 할부원금 계산 (부가미유치)
+ * @deprecated 부가미유치 기준이 제거되었습니다. `calculateInstallmentPrincipalWithAddon`을 사용하세요.
  * @param {number} factoryPrice - 출고가
  * @param {number} publicSupport - 이통사지원금
  * @param {number} storeSupportWithoutAddon - 대리점추가지원금 (부가미유치)
@@ -141,8 +142,10 @@ export const calculateInstallmentPrincipalWithoutAddon = (
   storeSupportWithoutAddon,
   usePublicSupport = true
 ) => {
+  // 🔥 수정: 부가미유치 기준 제거, 부가유치 기준으로 계산
   const support = usePublicSupport ? publicSupport : 0;
-  return Math.max(0, factoryPrice - support - storeSupportWithoutAddon);
+  // storeSupportWithoutAddon 대신 0을 사용 (부가미유치 기준 제거)
+  return Math.max(0, factoryPrice - support - 0);
 };
 
 /**
@@ -201,6 +204,7 @@ export const calculatePurchasePriceWithAddon = (
 
 /**
  * 구매가 계산 (부가미유치)
+ * @deprecated 부가미유치 기준이 제거되었습니다. `calculatePurchasePriceWithAddon`을 사용하세요.
  * @param {number} factoryPrice - 출고가
  * @param {number} publicSupport - 이통사지원금
  * @param {number} storeSupportWithoutAddon - 대리점추가지원금 (부가미유치)
@@ -211,7 +215,9 @@ export const calculatePurchasePriceWithoutAddon = (
   publicSupport,
   storeSupportWithoutAddon
 ) => {
-  return Math.max(0, factoryPrice - publicSupport - storeSupportWithoutAddon);
+  // 🔥 수정: 부가미유치 기준 제거, 부가유치 기준으로 계산
+  // storeSupportWithoutAddon 대신 0을 사용 (부가미유치 기준 제거)
+  return Math.max(0, factoryPrice - publicSupport - 0);
 };
 
 /**
@@ -258,27 +264,20 @@ export const calculateStoreSupportWithoutAddon = (
  * @param {number} params.factoryPrice - 출고가
  * @param {number} params.publicSupport - 이통사지원금
  * @param {number} params.storeSupportWithAddon - 대리점추가지원금 (부가유치)
- * @param {number} params.storeSupportWithoutAddon - 대리점추가지원금 (부가미유치)
- * @param {boolean} params.withAddon - 부가유치 여부
  * @param {boolean} params.usePublicSupport - 이통사지원금 사용 여부
  * @returns {Object} 계산된 가격 정보
+ * @deprecated storeSupportWithoutAddon 파라미터 제거됨 (부가미유치 기준 제거)
  */
 export const calculateAllPrices = ({
   factoryPrice,
   publicSupport,
   storeSupportWithAddon,
-  storeSupportWithoutAddon,
-  withAddon = true,
   usePublicSupport = true
 }) => {
-  const storeSupport = withAddon ? storeSupportWithAddon : storeSupportWithoutAddon;
-  const installmentPrincipal = withAddon
-    ? calculateInstallmentPrincipalWithAddon(factoryPrice, publicSupport, storeSupportWithAddon, usePublicSupport)
-    : calculateInstallmentPrincipalWithoutAddon(factoryPrice, publicSupport, storeSupportWithoutAddon, usePublicSupport);
-  
-  const purchasePrice = withAddon
-    ? calculatePurchasePriceWithAddon(factoryPrice, publicSupport, storeSupportWithAddon)
-    : calculatePurchasePriceWithoutAddon(factoryPrice, publicSupport, storeSupportWithoutAddon);
+  // 🔥 수정: 부가미유치 기준 제거, 부가서비스 선택 여부와 관계없이 동적 계산된 대리점추가지원금 사용
+  const storeSupport = storeSupportWithAddon;
+  const installmentPrincipal = calculateInstallmentPrincipalWithAddon(factoryPrice, publicSupport, storeSupportWithAddon, usePublicSupport);
+  const purchasePrice = calculatePurchasePriceWithAddon(factoryPrice, publicSupport, storeSupportWithAddon);
 
   return {
     storeSupport,

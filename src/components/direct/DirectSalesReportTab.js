@@ -138,7 +138,7 @@ const DirectSalesReportTab = ({ onRowClick, loggedInStore, isManagementMode = fa
                 factoryPrice: row.factoryPrice || row.출고가,
                 publicSupport: row.publicSupport || row.이통사지원금,
                 storeSupport: row.storeSupportWithAddon || row['대리점추가지원금(부가유치)'],
-                storeSupportNoAddon: row.storeSupportWithoutAddon || row['대리점추가지원금(부가미유치)'],
+                // 🔥 수정: 부가미유치 기준 제거 (storeSupportNoAddon 제거, 부가유치 값 사용)
                 openingType: row.openingType || (row.개통유형 === '기변' ? 'CHANGE' : row.개통유형 === '신규' ? 'NEW' : 'MNP'),
                 customerName: row.customerName || row.고객명,
                 customerContact: row.customerContact || row.연락처,

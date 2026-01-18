@@ -324,19 +324,16 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
       // 2) `${modelId}-${planGroup}-${openingType}` -> priceObj (요금제군별 키)
       const pricingMap = {};
       allPricing.forEach(item => {
+        // 🔥 수정: 부가미유치 기준 제거, 부가유치 기준만 사용
         // purchasePrice 계산 (출고가 - 이통사지원금 - 대리점추가지원금)
         const purchasePriceWithAddon = Math.max(0, 
           (item.factoryPrice || 0) - (item.publicSupport || 0) - (item.storeSupportWithAddon || 0)
-        );
-        const purchasePriceWithoutAddon = Math.max(0,
-          (item.factoryPrice || 0) - (item.publicSupport || 0) - (item.storeSupportWithoutAddon || 0)
         );
 
         // 계산된 purchasePrice를 포함한 객체 생성
         const priceItem = {
           ...item,
-          purchasePriceWithAddon,
-          purchasePriceWithoutAddon
+          purchasePriceWithAddon
         };
 
         const basicKey = `${item.modelId}-${item.openingType}`;
@@ -511,17 +508,14 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
       // 가격 데이터 인덱싱
       const pricingMap = {};
       allPricing.forEach(item => {
+        // 🔥 수정: 부가미유치 기준 제거, 부가유치 기준만 사용
         const purchasePriceWithAddon = Math.max(0, 
           (item.factoryPrice || 0) - (item.publicSupport || 0) - (item.storeSupportWithAddon || 0)
-        );
-        const purchasePriceWithoutAddon = Math.max(0,
-          (item.factoryPrice || 0) - (item.publicSupport || 0) - (item.storeSupportWithoutAddon || 0)
         );
 
         const priceItem = {
           ...item,
-          purchasePriceWithAddon,
-          purchasePriceWithoutAddon
+          purchasePriceWithAddon
         };
 
         const basicKey = `${item.modelId}-${item.openingType}`;

@@ -232,10 +232,8 @@ function TodaysProductCard(props) {
           publicSupport: priceForDefaultType.publicSupport || 0,
           support: priceForDefaultType.publicSupport || 0, // 하위 호환 필드
           storeSupport: priceForDefaultType.storeSupport || 0,
-          storeSupportWithAddon: priceForDefaultType.storeSupport || 0,
-          // 미유치 지원금은 Master에서 다시 계산되므로 0으로 초기화
-          storeSupportNoAddon: 0,
-          storeSupportWithoutAddon: 0
+          storeSupportWithAddon: priceForDefaultType.storeSupport || 0
+          // 🔥 수정: 부가미유치 기준 제거 (storeSupportNoAddon, storeSupportWithoutAddon 제거)
         };
 
         onSelect(selectedProduct);
@@ -529,8 +527,7 @@ function TodaysProductCard(props) {
               support: priceForDefaultType.publicSupport || 0,
               storeSupport: priceForDefaultType.storeSupport || 0,
               storeSupportWithAddon: priceForDefaultType.storeSupport || 0,
-              storeSupportNoAddon: 0,
-              storeSupportWithoutAddon: 0
+              // 🔥 수정: 부가미유치 기준 제거 (storeSupportNoAddon, storeSupportWithoutAddon 제거)
             };
 
             onSelect(selectedProduct);

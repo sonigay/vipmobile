@@ -39,7 +39,8 @@ import {
     calculatePlanFee,
     calculateTotalMonthlyFee,
     calculateInstallmentPrincipalWithAddon,
-    calculateInstallmentPrincipalWithoutAddon,
+    // 🔥 수정: 부가미유치 기준 제거
+    // calculateInstallmentPrincipalWithoutAddon,
     calculateCashPrice
 } from '../../utils/directStoreCalculationEngine';
 import { CARRIER_THEMES, convertOpeningType } from '../../utils/directStoreUtils';
@@ -89,9 +90,7 @@ const OpeningInfoPage = ({
         // 🔥 수정: 저장된 대리점추가지원금을 우선적으로 사용 (790000 같은 값이 저장되어 있으면 그대로 사용)
         initialData?.storeSupport || initialData?.대리점추가지원금 || initialData?.storeSupportWithAddon || 0
     ); // 부가유치시 대리점추가지원금
-    const [storeSupportWithoutAddon, setStoreSupportWithoutAddon] = useState(
-        initialData?.storeSupportNoAddon || initialData?.storeSupportWithoutAddon || 0
-    ); // 부가미유치시 대리점추가지원금
+    // 🔥 수정: 부가미유치 기준 제거 (부가서비스 선택/삭제 시 동적 계산으로 대체)
     const [additionalStoreSupport, setAdditionalStoreSupport] = useState(
         initialData?.additionalStoreSupport !== undefined && initialData?.additionalStoreSupport !== null
             ? initialData.additionalStoreSupport
@@ -204,10 +203,20 @@ const OpeningInfoPage = ({
                     setPlanGroups(formattedPlans);
 
                     // 초기값 설정
-                    let initialPlan = formattedPlans[0];
+                    let initialPlan = null;
 
-                    // 1순위: initialData.plan이 있으면 정확히 매칭
-                    if (initialData?.plan) {
+                    // 🔥 수정: 1순위: initialData.planGroup으로 정확히 매칭 (시세표에서 전달한 요금제군 우선)
+                    if (initialData?.planGroup) {
+                        const foundPlan = formattedPlans.find(p =>
+                            p.group === initialData.planGroup
+                        );
+                        if (foundPlan) {
+                            initialPlan = foundPlan;
+                        }
+                    }
+
+                    // 2순위: initialData.plan이 있으면 정확히 매칭
+                    if (!initialPlan && initialData?.plan) {
                         const foundPlan = formattedPlans.find(p =>
                             p.name === initialData.plan ||
                             p.planName === initialData.plan ||
@@ -218,15 +227,9 @@ const OpeningInfoPage = ({
                         }
                     }
 
-                    // 2순위: initialData.planGroup으로 찾기
-                    if (!initialPlan && initialData?.planGroup) {
-                        const foundPlan = formattedPlans.find(p =>
-                            p.group === initialData.planGroup ||
-                            p.name.includes(initialData.planGroup)
-                        );
-                        if (foundPlan) {
-                            initialPlan = foundPlan;
-                        }
+                    // 3순위: 기본값 (첫 번째 요금제)
+                    if (!initialPlan && formattedPlans.length > 0) {
+                        initialPlan = formattedPlans[0];
                     }
 
                     if (initialPlan) {
@@ -461,13 +464,18 @@ const OpeningInfoPage = ({
 
             setLoadingSupportAmounts(true);
 
-            // planGroup에 해당하는 plan 찾기
+            // 🔥 수정: planGroup에 해당하는 plan 정확히 매칭 (시세표에서 전달한 요금제군 우선)
             const foundPlan = planGroups.find(p =>
-                p.group === initialData.planGroup ||
-                p.name.includes(initialData.planGroup)
+                p.group === initialData.planGroup
             );
 
             if (!foundPlan) {
+                // 매칭 실패 시 에러 로그 및 로딩 상태 해제
+                console.warn('요금제군 매칭 실패:', {
+                    requestedPlanGroup: initialData.planGroup,
+                    availablePlanGroups: planGroups.map(p => p.group)
+                });
+                setLoadingSupportAmounts(false);
                 return;
             }
 
@@ -479,7 +487,8 @@ const OpeningInfoPage = ({
                     '기변': '기변',
                     'CHANGE': '기변'
                 };
-                const openingType = openingTypeMap[initialData.openingType] || '010신규';
+                // 🔥 수정: 사용자가 변경한 가입유형 반영 (initialData.openingType → formData.openingType)
+                const openingType = openingTypeMap[formData.openingType] || openingTypeMap[initialData.openingType] || '010신규';
                 const modelId = initialData.id;
 
                 // 마스터 가격 정책 조회
@@ -494,8 +503,14 @@ const OpeningInfoPage = ({
 
                     // 값 업데이트
                     setPublicSupport(pricing.publicSupport || initialData?.publicSupport || 0);
-                    setStoreSupportWithAddon(pricing.storeSupportWithAddon || 0);
-                    setStoreSupportWithoutAddon(pricing.storeSupportWithoutAddon || 0);
+                    
+                    // 🔥 수정: 부가서비스 초기 선택 시 대리점추가지원금 재계산
+                    // 부가서비스 모두 선택 시 (initialData?.additionalServices 없을 때)
+                    // 마스터 데이터의 storeSupportWithAddon은 부가서비스 모두 선택 기준이므로 그대로 사용
+                    // 저장된 부가서비스가 있으면 해당 부가서비스 선택 기준으로 계산 필요
+                    const baseStoreSupport = pricing.storeSupportWithAddon || 0;
+                    setStoreSupportWithAddon(baseStoreSupport);
+                    // 🔥 수정: 부가미유치 기준 제거
 
                     // 일반약정이면 usePublicSupport를 true로 설정
                     if (formData.contractType === 'standard') {
@@ -510,7 +525,9 @@ const OpeningInfoPage = ({
         };
 
         calculateInitialPrice();
-    }, [initialData?.planGroup, initialData?.openingType, planGroups, selectedCarrier, initialData?.id, formData.contractType]);
+        // 🔥 수정: formData.contractType 의존성 제거 (약정유형 변경 시 재계산 불필요)
+        // 🔥 수정: formData.openingType 의존성 추가 (가입유형 변경 시 재계산 필요)
+    }, [initialData?.planGroup, formData.openingType, planGroups, selectedCarrier, initialData?.id]);
 
     // 🔥 개선: 선택된 부가서비스/보험상품에 따른 대리점지원금 계산
     // 계산 로직:
@@ -546,15 +563,38 @@ const OpeningInfoPage = ({
         return JSON.stringify(currentNames) !== JSON.stringify(initialNames);
     }, [selectedItems]);
     
+    // 🔥 수정: 가입유형 변경 감지 및 savedStoreSupport 무효화
+    const previousOpeningTypeRef = useRef(formData.openingType);
+    const openingTypeChangedRef = useRef(false);
+    useEffect(() => {
+        // 가입유형이 변경되었는지 확인
+        if (previousOpeningTypeRef.current !== formData.openingType && previousOpeningTypeRef.current !== undefined) {
+            // 가입유형 변경 시 저장된 값 무효화 (이전 가입유형의 값이므로)
+            // initialSelectedItemsRef를 리셋하여 새로운 가입유형에 맞는 부가서비스 선택 상태로 재설정
+            initialSelectedItemsRef.current = null;
+            isInitialLoadRef.current = true;
+            openingTypeChangedRef.current = true;
+            previousOpeningTypeRef.current = formData.openingType;
+        } else if (previousOpeningTypeRef.current === undefined) {
+            // 초기 로드 시
+            previousOpeningTypeRef.current = formData.openingType;
+        }
+    }, [formData.openingType]);
+    
     const calculateDynamicStoreSupport = useMemo(() => {
+        // 🔥 수정: 가입유형이 변경되었으면 저장된 값 무시하고 최신 storeSupportWithAddon 사용
+        const shouldUseSavedValue = hasSavedStoreSupport && 
+            !openingTypeChangedRef.current && 
+            (!hasItemsChanged || isInitialLoadRef.current);
+        
         // 🔥 핵심: 저장된 값이 있고 초기 로드 상태이거나 부가서비스 선택이 변경되지 않았다면 저장된 값을 그대로 사용
-        if (hasSavedStoreSupport && (!hasItemsChanged || isInitialLoadRef.current)) {
+        if (shouldUseSavedValue) {
             const additionalAmount = additionalStoreSupport !== null && additionalStoreSupport !== undefined ? Number(additionalStoreSupport) : 0;
             const savedValue = Number(savedStoreSupport) + additionalAmount;
             return {
                 current: Math.max(0, savedValue),
-                withAddon: Math.max(0, savedValue),
-                withoutAddon: Math.max(0, savedValue)
+                withAddon: Math.max(0, savedValue)
+                // 🔥 수정: 부가미유치 기준 제거 (withoutAddon 필드 제거)
             };
         }
 
@@ -597,10 +637,33 @@ const OpeningInfoPage = ({
             // 현재 선택된 상태에 따른 하나의 대리점추가지원금 (직접입력 추가금액 포함)
             current: finalWithAdditional,
             // 참고용 (UI 표시용)
-            withAddon: Math.max(0, (Number(storeSupportWithAddon) || 0) + additionalAmount),
-            withoutAddon: Math.max(0, (Number(storeSupportWithoutAddon) || 0) + additionalAmount)
+            withAddon: Math.max(0, (Number(storeSupportWithAddon) || 0) + additionalAmount)
+            // 🔥 수정: 부가미유치 기준 제거 (withoutAddon 필드 제거)
         };
-    }, [selectedItems, availableAddons, availableInsurances, storeSupportWithAddon, storeSupportWithoutAddon, additionalStoreSupport, hasSavedStoreSupport, savedStoreSupport, hasItemsChanged]);
+        // 🔥 수정: formData.openingType 의존성 추가 (가입유형 변경 시 재계산)
+        // 🔥 수정: storeSupportWithoutAddon 의존성 제거
+    }, [selectedItems, availableAddons, availableInsurances, storeSupportWithAddon, additionalStoreSupport, hasSavedStoreSupport, savedStoreSupport, hasItemsChanged, formData.openingType]);
+
+    // 🔥 추가: 일반약정 대리점추가지원금 표시 전용 함수 (표시만 수정, 저장 및 마진 계산에는 사용하지 않음)
+    // 일반약정일 때: min(대리점추가지원금, 출고가 - 이통사지원금)
+    // 선택약정일 때: 그대로 표시
+    const calculateDisplayAgentSupportPrice = useMemo(() => {
+        const dynamicSupport = calculateDynamicStoreSupport.current;
+        
+        // 선택약정이면 그대로 표시
+        if (formData.contractType === 'selected') {
+            return dynamicSupport;
+        }
+        
+        // 일반약정일 때 차액 제한
+        // 출고가 - 이통사지원금이 대리점추가지원금보다 작으면 차액만큼만 표시
+        if (factoryPrice > publicSupport) {
+            const difference = factoryPrice - publicSupport;
+            return Math.min(dynamicSupport, difference);
+        }
+        
+        return 0;
+    }, [calculateDynamicStoreSupport, formData.contractType, factoryPrice, publicSupport]);
 
     // 🔥 수정: 저장된 할부원금을 초기값으로 사용하고, 부가서비스 선택 변경 시에만 재계산
     const savedInstallmentPrincipal = initialData?.installmentPrincipal || initialData?.할부원금;
@@ -615,15 +678,10 @@ const OpeningInfoPage = ({
         }
 
         const support = formData.usePublicSupport ? publicSupport : 0;
-        // 선택된 부가서비스가 있으면 유치 금액, 없으면 미유치 금액 사용
+        // 🔥 수정: 부가미유치 기준 제거, 부가서비스 선택 여부와 관계없이 동적 계산된 대리점추가지원금 사용
         const dynamicStoreSupport = calculateDynamicStoreSupport.current;
-        // 선택된 항목이 있으면 유치 계산, 없으면 미유치 계산
-        const hasSelectedItems = selectedItems.length > 0;
-
-        // 부가서비스 선택 여부에 따라 계산 함수 선택
-        return hasSelectedItems
-            ? calculateInstallmentPrincipalWithAddon(factoryPrice, support, dynamicStoreSupport, formData.usePublicSupport)
-            : calculateInstallmentPrincipalWithoutAddon(factoryPrice, support, dynamicStoreSupport, formData.usePublicSupport);
+        // 부가서비스 선택/삭제에 따라 동적으로 계산된 대리점추가지원금 사용
+        return calculateInstallmentPrincipalWithAddon(factoryPrice, support, dynamicStoreSupport, formData.usePublicSupport);
     };
 
     // 현금가 계산 함수
@@ -751,9 +809,8 @@ const OpeningInfoPage = ({
                 // 🔥 개선: 선택된 부가서비스에 따라 하나의 대리점추가지원금만 저장
                 storeSupport: calculateDynamicStoreSupport.current, // 대리점추가지원금 (현재 선택된 상태에 따른 값)
                 // 하위 호환을 위한 필드 (기존 API 호환성 유지)
-                storeSupportWithAddon: formData.withAddon ? calculateDynamicStoreSupport.current : 0,
-                storeSupportNoAddon: !formData.withAddon ? calculateDynamicStoreSupport.current : 0,
-                storeSupportWithoutAddon: !formData.withAddon ? calculateDynamicStoreSupport.current : 0,
+                storeSupportWithAddon: calculateDynamicStoreSupport.current,
+                // 🔥 수정: 부가미유치 기준 제거 (storeSupportNoAddon, storeSupportWithoutAddon 제거)
                 // 마진 계산
                 // 구매가 = 출고가 - 이통사지원금 - 대리점추가지원금
                 // - 구매가가 0원 이상이면 정책설정 마진(baseMargin)
@@ -797,8 +854,8 @@ const OpeningInfoPage = ({
                 // LG 프리미어 약정 적용
                 lgPremier: formData.lgPremier || false,
                 // 계산된 값들 (참고용, 시트에는 저장 안 됨)
-                installmentPrincipalWithAddon: calculateInstallmentPrincipalWithAddon(factoryPrice, publicSupport, calculateDynamicStoreSupport.withAddon, formData.usePublicSupport),
-                installmentPrincipalWithoutAddon: calculateInstallmentPrincipalWithoutAddon(factoryPrice, publicSupport, calculateDynamicStoreSupport.withoutAddon, formData.usePublicSupport),
+                installmentPrincipalWithAddon: calculateInstallmentPrincipalWithAddon(factoryPrice, publicSupport, calculateDynamicStoreSupport.current, formData.usePublicSupport),
+                // 🔥 수정: 부가미유치 기준 제거 (installmentPrincipalWithoutAddon 제거)
                 installmentFee: installmentFeeResult,
                 planFee: planFeeResult,
                 requiredAddonsFee: addonsFeeResult,
@@ -844,7 +901,7 @@ const OpeningInfoPage = ({
                     additionalStoreSupport: additionalStoreSupport !== null && additionalStoreSupport !== undefined ? additionalStoreSupport : 0, // 대리점추가지원금 직접입력 추가금액 (음수 허용)
                     // 하위 호환을 위한 필드
                     dealerSupportWithAdd: formData.withAddon ? calculateDynamicStoreSupport.current : 0,
-                    dealerSupportWithoutAdd: !formData.withAddon ? calculateDynamicStoreSupport.current : 0,
+                    // 🔥 수정: 부가미유치 기준 제거 (dealerSupportWithoutAdd 제거)
                     // 선택매장 정보 추가
                     storeName: currentStore?.name || '',
                     storePhone: currentStore?.phone || currentStore?.storePhone || '',
@@ -1322,7 +1379,6 @@ const OpeningInfoPage = ({
                             planGroups={planGroups}
                             setPublicSupport={setPublicSupport}
                             setStoreSupportWithAddon={setStoreSupportWithAddon}
-                            setStoreSupportWithoutAddon={setStoreSupportWithoutAddon}
                         />
 
                         {/* 약정 및 할부 정보 */}
@@ -1404,12 +1460,11 @@ const OpeningInfoPage = ({
                                                                     planGroup,
                                                                     openingType,
                                                                     publicSupport: pricing.publicSupport,
-                                                                    storeSupportWithAddon: pricing.storeSupportWithAddon,
-                                                                    storeSupportWithoutAddon: pricing.storeSupportWithoutAddon
+                                                                    storeSupportWithAddon: pricing.storeSupportWithAddon
                                                                 }, 'debug-session', 'run1', 'C');
                                                                 setPublicSupport(pricing.publicSupport || 0);
                                                                 setStoreSupportWithAddon(pricing.storeSupportWithAddon || 0);
-                                                                setStoreSupportWithoutAddon(pricing.storeSupportWithoutAddon || 0);
+                                                                // 🔥 수정: 부가미유치 기준 제거 (setStoreSupportWithoutAddon 호출 제거)
                                                             }
                                                         }
                                                     } catch (err) {
@@ -1425,7 +1480,7 @@ const OpeningInfoPage = ({
                                                 // 초기값으로 복원 - 🔥 수정: 한글 필드명도 확인
                                                 setPublicSupport(initialData?.publicSupport || initialData?.이통사지원금 || initialData?.support || 0);
                                                 setStoreSupportWithAddon(initialData?.storeSupport || initialData?.storeSupportWithAddon || initialData?.대리점추가지원금 || 0);
-                                                setStoreSupportWithoutAddon(initialData?.storeSupportNoAddon || initialData?.storeSupportWithoutAddon || 0);
+                                                // 🔥 수정: 부가미유치 기준 제거 (setStoreSupportWithoutAddon 호출 제거)
                                             }
                                         }}
                                         renderInput={(params) => (
@@ -1486,7 +1541,12 @@ const OpeningInfoPage = ({
                                                 </Alert>
                                             </Grid>
                                         )}
-                                        {selectedCarrier === 'LG' && planBasicFee >= 85000 && (
+                                        {/* 🔥 수정: 85군 이상 모든 요금제군에 LG 프리미어 약정 체크박스 표시 */}
+                                        {selectedCarrier === 'LG' && (() => {
+                                            // 요금제군 숫자 추출 (예: '85군' → 85)
+                                            const groupNumber = selectedPlanGroup ? parseInt(selectedPlanGroup.replace('군', '')) : 0;
+                                            return groupNumber >= 85;
+                                        })() && (
                                             <Grid item xs={12}>
                                                 <FormControlLabel
                                                     control={
@@ -1672,7 +1732,8 @@ const OpeningInfoPage = ({
                                             <span>로딩 중...</span>
                                         </Box>
                                     ) : (
-                                        `-${calculateDynamicStoreSupport.current.toLocaleString()}원`
+                                        // 🔥 수정: 일반약정일 때 차액만큼만 표시 (표시 전용)
+                                        `-${calculateDisplayAgentSupportPrice.toLocaleString()}원`
                                     )}
                                 </Typography>
                             </Stack>
@@ -1910,7 +1971,8 @@ const OpeningInfoPage = ({
                                     <TextField
                                         label="대리점추가지원금"
                                         fullWidth
-                                        value={loadingSupportAmounts ? '로딩 중...' : calculateDynamicStoreSupport.current.toLocaleString()}
+                                        // 🔥 수정: 일반약정일 때 차액만큼만 표시 (표시 전용)
+                                        value={loadingSupportAmounts ? '로딩 중...' : calculateDisplayAgentSupportPrice.toLocaleString()}
                                         InputProps={{
                                             readOnly: true,
                                             endAdornment: loadingSupportAmounts ? <CircularProgress size={20} /> : null

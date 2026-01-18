@@ -54,10 +54,9 @@ const MobileListRowComponent = ({
   isCustomerMode = false
 }) => {
   // 구매가 계산 (메모이제이션을 위해 컴포넌트 내부에서 계산)
+  // 🔥 수정: 부가미유치 기준 제거, 부가유치 기준만 사용
   const purchasePriceAddon = row.purchasePriceWithAddon ||
     (row.factoryPrice || 0) - (row.support || row.publicSupport || 0) - (row.storeSupport || 0);
-  const purchasePriceNoAddon = row.purchasePriceWithoutAddon ||
-    (row.factoryPrice || 0) - (row.support || row.publicSupport || 0) - (row.storeSupportNoAddon || 0);
 
   return (
     <HoverableTableRow
@@ -444,33 +443,6 @@ const MobileListRowComponent = ({
         </Typography>
       </TableCell>
 
-      <TableCell align="center" sx={{ width: '90px' }}>
-        <Typography
-          variant="body1"
-          sx={{
-            fontSize: '1.1rem',
-            fontWeight: 'bold',
-            color: 'warning.main'
-          }}
-        >
-          {(() => {
-            const displayValue = getDisplayValue(row, 'storeSupportWithoutAddon', selectedOpeningType);
-            // 🔥 수정: 0도 유효한 값으로 간주 (마스터 데이터에 0으로 저장된 경우)
-            // undefined나 null만 체크하고, 0은 유효한 값으로 표시
-            if (displayValue !== undefined && displayValue !== null) {
-              return displayValue.toLocaleString();
-            }
-            // fallback: row 객체에 저장된 값 사용
-            const fallbackValue = row.storeSupportNoAddon;
-            if (fallbackValue !== undefined && fallbackValue !== null) {
-              return fallbackValue.toLocaleString();
-            }
-            // 데이터가 전혀 없으면 '-' 표시
-            return '-';
-          })()}
-        </Typography>
-      </TableCell>
-
       {/* 구매가 (할부원금) */}
       <TableCell align="center" sx={{ borderLeft: '1px solid rgba(81, 81, 81, 0.3)', bgcolor: 'rgba(212, 175, 55, 0.05)', width: '90px' }}>
         <Typography
@@ -486,25 +458,6 @@ const MobileListRowComponent = ({
             const finalValue = displayValue !== undefined && displayValue !== null
               ? displayValue.toLocaleString()
               : purchasePriceAddon.toLocaleString();
-            return finalValue;
-          })()}
-        </Typography>
-      </TableCell>
-
-      <TableCell align="center" sx={{ bgcolor: 'rgba(212, 175, 55, 0.05)', width: '90px' }}>
-        <Typography
-          variant="body1"
-          sx={{
-            fontSize: '1.15rem',
-            fontWeight: 'bold',
-            color: 'success.main'
-          }}
-        >
-          {(() => {
-            const displayValue = getDisplayValue(row, 'purchasePriceWithoutAddon', selectedOpeningType);
-            const finalValue = displayValue !== undefined && displayValue !== null
-              ? displayValue.toLocaleString()
-              : purchasePriceNoAddon.toLocaleString();
             return finalValue;
           })()}
         </Typography>

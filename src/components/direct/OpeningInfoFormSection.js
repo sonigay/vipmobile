@@ -25,8 +25,8 @@ const OpeningInfoFormSection = ({
     selectedPlanGroup,
     planGroups,
     setPublicSupport,
-    setStoreSupportWithAddon,
-    setStoreSupportWithoutAddon
+    setStoreSupportWithAddon
+    // 🔥 수정: 부가미유치 기준 제거 (setStoreSupportWithoutAddon prop 제거)
 }) => {
     const handleOpeningTypeChange = async (newOpeningType) => {
         setFormData({ ...formData, openingType: newOpeningType });
@@ -80,13 +80,13 @@ const OpeningInfoFormSection = ({
                                 openingType: newOpeningType,
                                 planGroup: targetPlanGroup,
                                 publicSupport: pricing.publicSupport,
-                                storeSupportWithAddon: pricing.storeSupportWithAddon,
-                                storeSupportWithoutAddon: pricing.storeSupportWithoutAddon
+                                storeSupportWithAddon: pricing.storeSupportWithAddon
+                                // 🔥 수정: 부가미유치 기준 제거 (storeSupportWithoutAddon 제거)
                             }, 'debug-session', 'run1', 'A');
 
                             setPublicSupport(pricing.publicSupport || 0);
                             setStoreSupportWithAddon(pricing.storeSupportWithAddon || 0);
-                            setStoreSupportWithoutAddon(pricing.storeSupportWithoutAddon || 0);
+                            // 🔥 수정: 부가미유치 기준 제거 (setStoreSupportWithoutAddon 호출 제거)
                         }
                     }
                 } catch (err) {

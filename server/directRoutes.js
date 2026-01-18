@@ -89,8 +89,8 @@ const HEADERS_MOBILE_PRICING = [
   '출고가',                     // 6
   '이통사지원금',               // 7
   '대리점추가지원금_부가유치',   // 8
-  '대리점추가지원금_부가미유치', // 9
-  '정책마진',                   // 10
+  // 🔥 수정: 부가미유치 기준 제거 (9번째 컬럼 제거)
+  '정책마진',                   // 9 (인덱스 변경: 10 → 9)
   '정책ID',                    // 11
   '기준일자',                   // 12
   '비고'                        // 13
@@ -1354,8 +1354,8 @@ async function rebuildPricingMaster(carriersParam) {
           const totalSpecialAddition = safePolicySettings.specialPolicies.reduce((acc, cur) => acc + (cur.addition || 0), 0);
           const totalSpecialDeduction = safePolicySettings.specialPolicies.reduce((acc, cur) => acc + (cur.deduction || 0), 0);
 
-          // 기본 정책 마진 (기본마진만 사용, 별도정책은 storeSupport 계산 시 별도로 처리)
-          const baseMargin = safePolicySettings.baseMargin || 0;
+          // 🔥 수정: 정책마진 = 기본마진 + 별도정책 합계 (1278번 라인의 baseMargin 사용)
+          // baseMargin은 for 루프 밖에서 계산되었으므로 그대로 사용
 
           // 보험상품: 출고가 및 모델명(플립/폴드 여부)에 맞는 보험 인센티브/차감 선택
           // 🔥 핵심 수정: safePolicySettings 사용
@@ -1411,14 +1411,8 @@ async function rebuildPricingMaster(carriersParam) {
             + totalSpecialAddition
           );
 
-          // 부가미유치: 정책표리베이트 - 마진 + (부가서비스/보험 차감) + 별도정책차감금액
-          // 차감금액은 이미 음수로 저장되어 있으므로 더하면 자동으로 차감됨
-          const storeSupportNone = Math.max(0,
-            policyRebate
-            - baseMargin
-            + totalAddonDeduction  // 이미 음수이므로 더하면 차감됨
-            + totalSpecialDeduction  // 이미 음수이므로 더하면 차감됨
-          );
+          // 🔥 수정: 부가미유치 기준 제거 (부가서비스 선택/삭제 시 동적 계산으로 대체)
+          // 부가미유치 계산 제거
 
           allRows.push([
             carrier,
@@ -1430,11 +1424,11 @@ async function rebuildPricingMaster(carriersParam) {
             factoryPrice,
             publicSupport,
             storeSupportFull, // 대리점추가지원금_부가유치
-            storeSupportNone, // 대리점추가지원금_부가미유치
-            baseMargin,       // 정책마진 (직영점_정책_마진 + 별도정책 반영)
-            '',               // 정책ID
-            todayStr,         // 기준일자
-            ''                // 비고
+            // 🔥 수정: 부가미유치 기준 제거 (9번째 컬럼 제거, 이후 컬럼 인덱스 -1)
+            baseMargin,       // 정책마진 (직영점_정책_마진 + 별도정책 반영) - 인덱스: 9 (기존 10)
+            '',               // 정책ID - 인덱스: 10 (기존 11)
+            todayStr,         // 기준일자 - 인덱스: 11 (기존 12)
+            ''                // 비고 - 인덱스: 12 (기존 13)
           ]);
           createdCount++;
         }
@@ -1444,19 +1438,21 @@ async function rebuildPricingMaster(carriersParam) {
   }
 
   // 데이터 쓰기
+  // 🔥 수정: 부가미유치 기준 제거로 인해 컬럼 수 감소 (14개 → 13개)
   await withRetry(async () => {
     return await sheets.spreadsheets.values.clear({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${SHEET_MOBILE_PRICING}!A2:N`
+      range: `${SHEET_MOBILE_PRICING}!A2:M` // 인덱스 변경: N → M (14개 → 13개)
     });
   });
 
   if (allRows.length > 0) {
     await withRetry(async () => {
       // A2부터 시작하도록 명시 (헤더는 A1에 있음)
+      // 🔥 수정: 부가미유치 기준 제거로 인해 컬럼 수 감소 (14개 → 13개)
       return await sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
-        range: `${SHEET_MOBILE_PRICING}!A2:N${allRows.length + 1}`, // A2부터 N열까지
+        range: `${SHEET_MOBILE_PRICING}!A2:M${allRows.length + 1}`, // A2부터 M열까지 (인덱스 변경: N → M)
         valueInputOption: 'USER_ENTERED',
         resource: { values: allRows }
       });
@@ -2205,6 +2201,7 @@ function setupDirectRoutes(app) {
           const openingTypeRaw = (row[5] || '').toString().trim();
 
           // 직영점_단말요금정책 시트에는 이미 'MNP'로 저장되어 있으므로 변환 불필요
+          // 🔥 수정: 부가미유치 기준 제거 (9번째 컬럼 제거, 이후 컬럼 인덱스 -1)
           return {
             carrier,
             modelId,
@@ -2215,11 +2212,11 @@ function setupDirectRoutes(app) {
             factoryPrice: Number(row[6] || 0),
             publicSupport: Number(row[7] || 0),
             storeSupportWithAddon: Number(row[8] || 0),
-            storeSupportWithoutAddon: Number(row[9] || 0),
-            policyMargin: Number(row[10] || 0),
-            policyId: (row[11] || '').toString().trim(),
-            baseDate: (row[12] || '').toString().trim(),
-            note: (row[13] || '').toString().trim()
+            // 🔥 수정: 부가미유치 기준 제거 (row[9] 제거)
+            policyMargin: Number(row[9] || 0), // 인덱스 변경: 10 → 9
+            policyId: (row[10] || '').toString().trim(), // 인덱스 변경: 11 → 10
+            baseDate: (row[11] || '').toString().trim(), // 인덱스 변경: 12 → 11
+            note: (row[12] || '').toString().trim() // 인덱스 변경: 13 → 12
           };
         })
         .filter(item => {
@@ -4535,13 +4532,7 @@ function setupDirectRoutes(app) {
           + totalAddonIncentive // 부가서비스 추가금액
           + totalSpecialAddition // 별도정책 추가금액
         );
-        // 부가미유치: 정책표리베이트 - 마진 + 부가서비스차감금액 + 별도정책차감금액
-        const storeSupportWithoutAddon = Math.max(0,
-          policyRebate        // 정책표 요금제군별 리베이트
-          - baseMargin         // 마진 (차감)
-          + totalAddonDeduction // 부가서비스 차감금액
-          + totalSpecialDeduction // 별도정책 차감금액
-        );
+        // 🔥 수정: 부가미유치 기준 제거 (부가서비스 선택/삭제 시 동적 계산으로 대체)
 
         // 로그 제거 (불필요한 로그 정리)
 
@@ -4553,12 +4544,7 @@ function setupDirectRoutes(app) {
           - publicSupport       // 이통사지원금 요금제구간별
           - storeSupportWithAddon  // 대리점추가지원금 (정책표리베이트 - 마진 + 부가서비스추가 + 별도정책추가 포함)
         );
-
-        const purchasePriceWithoutAddon = Math.max(0,
-          factoryPrice
-          - publicSupport       // 이통사지원금 요금제구간별
-          - storeSupportWithoutAddon  // 대리점추가지원금 (정책표리베이트 - 마진 + 부가서비스차감 + 별도정책차감 포함)
-        );
+        // 🔥 수정: 부가미유치 기준 제거 (purchasePriceWithoutAddon 계산 제거)
 
         // tags는 이미 위에서 초기화됨 (요금제군 선택을 위해)
         const tagsArray = [];
@@ -4581,9 +4567,8 @@ function setupDirectRoutes(app) {
           publicSupport: publicSupport,
           storeSupport: storeSupportWithAddon,
           storeSupportWithAddon: storeSupportWithAddon,
-          storeSupportNoAddon: storeSupportWithoutAddon,
+          // 🔥 수정: 부가미유치 기준 제거 (storeSupportNoAddon, purchasePriceWithoutAddon 제거)
           purchasePriceWithAddon: purchasePriceWithAddon,
-          purchasePriceWithoutAddon: purchasePriceWithoutAddon,
           image: (() => {
             // 1. 통신사+모델명 조합으로 먼저 조회 (가장 정확)
             const key = `${carrierParam}:${model}`;
@@ -5020,7 +5005,7 @@ function setupDirectRoutes(app) {
         factoryPrice,
         publicSupport,
         storeSupport,
-        storeSupportNoAddon,
+        // 🔥 수정: 부가미유치 기준 제거 (storeSupportNoAddon 제거)
         requiredAddons,
         image
       } = req.body || {};
@@ -5129,14 +5114,14 @@ function setupDirectRoutes(app) {
         toText(factoryPrice) || existingRow[3] || '',         // D 출고가
         toText(publicSupport) || existingRow[4] || '',        // E 이통사지원금
         toText(storeSupport) || existingRow[5] || '',         // F 대리점지원금(부가유치)
-        toText(storeSupportNoAddon) || existingRow[6] || '',  // G 대리점지원금(부가미유치)
-        image || existingRow[7] || '',                        // H 이미지
-        addonsText || existingRow[8] || '',                   // I 필수부가서비스
-        isPopular ? 'Y' : '',                                 // J 인기
-        isRecommended ? 'Y' : '',                             // K 추천
-        isCheap ? 'Y' : '',                                   // L 저렴
-        isPremium ? 'Y' : '',                                 // M 프리미엄
-        isBudget ? 'Y' : ''                                   // N 중저가
+        // 🔥 수정: 부가미유치 기준 제거 (G 컬럼 제거, 이후 컬럼 인덱스 -1)
+        image || existingRow[6] || '',                        // H 이미지 - 인덱스 변경: 7 → 6
+        addonsText || existingRow[7] || '',                   // I 필수부가서비스 - 인덱스 변경: 8 → 7
+        isPopular ? 'Y' : '',                                 // J 인기 - 인덱스 변경: 9 → 8
+        isRecommended ? 'Y' : '',                             // K 추천 - 인덱스 변경: 10 → 9
+        isCheap ? 'Y' : '',                                   // L 저렴 - 인덱스 변경: 11 → 10
+        isPremium ? 'Y' : '',                                 // M 프리미엄 - 인덱스 변경: 12 → 11
+        isBudget ? 'Y' : ''                                   // N 중저가 - 인덱스 변경: 13 → 12
       ];
 
       // 모든 태그가 체크 해제되었는지 확인
@@ -5387,13 +5372,12 @@ function setupDirectRoutes(app) {
         logWarningOnce(`model-out-of-range-${modelId}`, `[Direct] /calculate 모델 범위 초과 (기본값 반환): ${modelId} (인덱스: ${modelIndex}/${modelData.length})`);
 
         // 기본값 반환 (에러 대신)
+        // 🔥 수정: 부가미유치 기준 제거
         return res.json({
           success: true,
           publicSupport: 0,
           storeSupportWithAddon: 0,
-          storeSupportWithoutAddon: 0,
           purchasePriceWithAddon: 0,
-          purchasePriceWithoutAddon: 0,
           factoryPrice: 0,
           warning: isIndexOutOfRange
             ? `모델 인덱스가 범위를 초과했습니다. (인덱스: ${modelIndex}, 최대: ${modelData.length - 1}). 정책표 설정의 modelRange를 확인하세요.`
@@ -6413,22 +6397,18 @@ function setupDirectRoutes(app) {
       const storeSupportWithAddon = Math.max(0,
         policyRebate - baseMargin + totalAddonIncentive + totalSpecialAddition
       );
-      const storeSupportWithoutAddon = Math.max(0,
-        policyRebate - baseMargin + totalAddonDeduction + totalSpecialDeduction
-      );
+      // 🔥 수정: 부가미유치 기준 제거 (부가서비스 선택/삭제 시 동적 계산으로 대체)
 
       // 구매가 계산
       const purchasePriceWithAddon = Math.max(0, factoryPrice - publicSupport - storeSupportWithAddon);
-      const purchasePriceWithoutAddon = Math.max(0, factoryPrice - publicSupport - storeSupportWithoutAddon);
+      // 🔥 수정: 부가미유치 기준 제거 (purchasePriceWithoutAddon 계산 제거)
 
       // 디버그 로그 제거 (성능 최적화)
 
       res.json({
         success: true,
         storeSupportWithAddon,
-        storeSupportWithoutAddon,
         purchasePriceWithAddon,
-        purchasePriceWithoutAddon,
         policyRebate,
         publicSupport
       });
