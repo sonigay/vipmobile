@@ -94,6 +94,8 @@ const PolicySettingsTab = () => {
     // 모델/요금제군 검색용 데이터
     const [availableModels, setAvailableModels] = useState([]);
     const [availablePlanGroups, setAvailablePlanGroups] = useState([]);
+    // 🔥 "전체" 선택 해제를 위한 플래그 (각 조건별로 관리)
+    const [clearedAllFlags, setClearedAllFlags] = useState({});
 
 
     const getCurrentCarrier = () => {
@@ -918,14 +920,20 @@ const PolicySettingsTab = () => {
                                                                     multiple
                                                                     size="small"
                                                                     options={['전모델', ...availableModels]}
-                                                                    value={(condition.models || []).length === 0 ? ['전모델'] : condition.models}
+                                                                    value={
+                                                                        clearedAllFlags[`models-${condIdx}`] 
+                                                                            ? (condition.models || [])
+                                                                            : ((condition.models || []).length === 0 ? ['전모델'] : condition.models)
+                                                                    }
                                                                     onChange={(e, newValue) => {
                                                                         // 🔥 "전모델" 선택 처리
                                                                         if (newValue.includes('전모델')) {
                                                                             // "전모델"이 선택되면 다른 선택 모두 제거하고 빈 배열로 저장 (전체 의미)
+                                                                            setClearedAllFlags(prev => ({ ...prev, [`models-${condIdx}`]: false }));
                                                                             handleUpdateCondition(condIdx, 'models', []);
                                                                         } else {
                                                                             // "전모델"이 선택되지 않으면 일반 선택 처리
+                                                                            setClearedAllFlags(prev => ({ ...prev, [`models-${condIdx}`]: true }));
                                                                             handleUpdateCondition(condIdx, 'models', newValue);
                                                                         }
                                                                     }}
@@ -933,15 +941,33 @@ const PolicySettingsTab = () => {
                                                                         <TextField {...params} label="대상 모델" placeholder="모델 검색 또는 전모델 선택" />
                                                                     )}
                                                                     renderTags={(value, getTagProps) => {
-                                                                        // "전모델"이 포함되어 있거나 빈 배열이면 "전모델"만 표시
-                                                                        if (value.includes('전모델') || value.length === 0) {
-                                                                            return <Chip label="전모델" size="small" color="primary" onDelete={() => handleUpdateCondition(condIdx, 'models', [])} />;
+                                                                        // "전모델"이 포함되어 있으면 "전모델"만 표시
+                                                                        if (value.includes('전모델')) {
+                                                                            return (
+                                                                                <Chip 
+                                                                                    label="전모델" 
+                                                                                    size="small" 
+                                                                                    color="primary" 
+                                                                                    onDelete={() => {
+                                                                                        // 🔥 "전모델" 삭제 시 플래그 설정하여 다른 모델 선택 가능하도록
+                                                                                        setClearedAllFlags(prev => ({ ...prev, [`models-${condIdx}`]: true }));
+                                                                                        handleUpdateCondition(condIdx, 'models', []);
+                                                                                    }}
+                                                                                />
+                                                                            );
                                                                         }
                                                                         return value.map((option, index) => (
                                                                             <Chip label={option} size="small" {...getTagProps({ index })} />
                                                                         ));
                                                                     }}
                                                                     getOptionLabel={(option) => option === '전모델' ? '전모델 (모든 모델)' : option}
+                                                                    isOptionEqualToValue={(option, value) => {
+                                                                        // 🔥 "전모델"과 빈 배열 처리
+                                                                        if (option === '전모델') {
+                                                                            return (value || []).length === 0 || value.includes('전모델');
+                                                                        }
+                                                                        return option === value;
+                                                                    }}
                                                                 />
                                                             </Grid>
                                                             <Grid item xs={12} sm={6}>
@@ -949,14 +975,20 @@ const PolicySettingsTab = () => {
                                                                     multiple
                                                                     size="small"
                                                                     options={['전유형', '010신규', 'MNP', '기변']}
-                                                                    value={(condition.openingTypes || []).length === 0 ? ['전유형'] : condition.openingTypes}
+                                                                    value={
+                                                                        clearedAllFlags[`openingTypes-${condIdx}`] 
+                                                                            ? (condition.openingTypes || [])
+                                                                            : ((condition.openingTypes || []).length === 0 ? ['전유형'] : condition.openingTypes)
+                                                                    }
                                                                     onChange={(e, newValue) => {
                                                                         // 🔥 "전유형" 선택 처리
                                                                         if (newValue.includes('전유형')) {
                                                                             // "전유형"이 선택되면 다른 선택 모두 제거하고 빈 배열로 저장 (전체 의미)
+                                                                            setClearedAllFlags(prev => ({ ...prev, [`openingTypes-${condIdx}`]: false }));
                                                                             handleUpdateCondition(condIdx, 'openingTypes', []);
                                                                         } else {
                                                                             // "전유형"이 선택되지 않으면 일반 선택 처리
+                                                                            setClearedAllFlags(prev => ({ ...prev, [`openingTypes-${condIdx}`]: true }));
                                                                             handleUpdateCondition(condIdx, 'openingTypes', newValue);
                                                                         }
                                                                     }}
@@ -964,15 +996,33 @@ const PolicySettingsTab = () => {
                                                                         <TextField {...params} label="개통 유형" placeholder="유형 선택 또는 전유형 선택" />
                                                                     )}
                                                                     renderTags={(value, getTagProps) => {
-                                                                        // "전유형"이 포함되어 있거나 빈 배열이면 "전유형"만 표시
-                                                                        if (value.includes('전유형') || value.length === 0) {
-                                                                            return <Chip label="전유형" size="small" color="primary" onDelete={() => handleUpdateCondition(condIdx, 'openingTypes', [])} />;
+                                                                        // "전유형"이 포함되어 있으면 "전유형"만 표시
+                                                                        if (value.includes('전유형')) {
+                                                                            return (
+                                                                                <Chip 
+                                                                                    label="전유형" 
+                                                                                    size="small" 
+                                                                                    color="primary" 
+                                                                                    onDelete={() => {
+                                                                                        // 🔥 "전유형" 삭제 시 플래그 설정하여 다른 유형 선택 가능하도록
+                                                                                        setClearedAllFlags(prev => ({ ...prev, [`openingTypes-${condIdx}`]: true }));
+                                                                                        handleUpdateCondition(condIdx, 'openingTypes', []);
+                                                                                    }}
+                                                                                />
+                                                                            );
                                                                         }
                                                                         return value.map((option, index) => (
                                                                             <Chip label={option} size="small" {...getTagProps({ index })} />
                                                                         ));
                                                                     }}
                                                                     getOptionLabel={(option) => option === '전유형' ? '전유형 (모든 유형)' : option}
+                                                                    isOptionEqualToValue={(option, value) => {
+                                                                        // 🔥 "전유형"과 빈 배열 처리
+                                                                        if (option === '전유형') {
+                                                                            return (value || []).length === 0 || value.includes('전유형');
+                                                                        }
+                                                                        return option === value;
+                                                                    }}
                                                                 />
                                                             </Grid>
                                                             <Grid item xs={12} sm={6}>
@@ -980,14 +1030,20 @@ const PolicySettingsTab = () => {
                                                                     multiple
                                                                     size="small"
                                                                     options={['전요금제', ...availablePlanGroups]}
-                                                                    value={(condition.planGroups || []).length === 0 ? ['전요금제'] : condition.planGroups}
+                                                                    value={
+                                                                        clearedAllFlags[`planGroups-${condIdx}`] 
+                                                                            ? (condition.planGroups || [])
+                                                                            : ((condition.planGroups || []).length === 0 ? ['전요금제'] : condition.planGroups)
+                                                                    }
                                                                     onChange={(e, newValue) => {
                                                                         // 🔥 "전요금제" 선택 처리
                                                                         if (newValue.includes('전요금제')) {
                                                                             // "전요금제"가 선택되면 다른 선택 모두 제거하고 빈 배열로 저장 (전체 의미)
+                                                                            setClearedAllFlags(prev => ({ ...prev, [`planGroups-${condIdx}`]: false }));
                                                                             handleUpdateCondition(condIdx, 'planGroups', []);
                                                                         } else {
                                                                             // "전요금제"가 선택되지 않으면 일반 선택 처리
+                                                                            setClearedAllFlags(prev => ({ ...prev, [`planGroups-${condIdx}`]: true }));
                                                                             handleUpdateCondition(condIdx, 'planGroups', newValue);
                                                                         }
                                                                     }}
@@ -995,15 +1051,33 @@ const PolicySettingsTab = () => {
                                                                         <TextField {...params} label="요금제군" placeholder="요금제군 검색 또는 전요금제 선택" />
                                                                     )}
                                                                     renderTags={(value, getTagProps) => {
-                                                                        // "전요금제"가 포함되어 있거나 빈 배열이면 "전요금제"만 표시
-                                                                        if (value.includes('전요금제') || value.length === 0) {
-                                                                            return <Chip label="전요금제" size="small" color="primary" onDelete={() => handleUpdateCondition(condIdx, 'planGroups', [])} />;
+                                                                        // "전요금제"가 포함되어 있으면 "전요금제"만 표시
+                                                                        if (value.includes('전요금제')) {
+                                                                            return (
+                                                                                <Chip 
+                                                                                    label="전요금제" 
+                                                                                    size="small" 
+                                                                                    color="primary" 
+                                                                                    onDelete={() => {
+                                                                                        // 🔥 "전요금제" 삭제 시 플래그 설정하여 다른 요금제군 선택 가능하도록
+                                                                                        setClearedAllFlags(prev => ({ ...prev, [`planGroups-${condIdx}`]: true }));
+                                                                                        handleUpdateCondition(condIdx, 'planGroups', []);
+                                                                                    }}
+                                                                                />
+                                                                            );
                                                                         }
                                                                         return value.map((option, index) => (
                                                                             <Chip label={option} size="small" {...getTagProps({ index })} />
                                                                         ));
                                                                     }}
                                                                     getOptionLabel={(option) => option === '전요금제' ? '전요금제 (모든 요금제군)' : option}
+                                                                    isOptionEqualToValue={(option, value) => {
+                                                                        // 🔥 "전요금제"와 빈 배열 처리
+                                                                        if (option === '전요금제') {
+                                                                            return (value || []).length === 0 || value.includes('전요금제');
+                                                                        }
+                                                                        return option === value;
+                                                                    }}
                                                                 />
                                                             </Grid>
                                                             <Grid item xs={12} sm={6}>
