@@ -42,7 +42,7 @@ const SHEET_STORE_PHOTO = '직영점_매장사진';
 const HEADERS_POLICY_MARGIN = ['통신사', '마진'];
 const HEADERS_POLICY_ADDON = ['통신사', '서비스명', '월요금', '유치추가금액', '미유치차감금액', '상세설명', '공식사이트URL'];
 const HEADERS_POLICY_INSURANCE = ['통신사', '보험상품명', '출고가최소', '출고가최대', '월요금', '유치추가금액', '미유치차감금액', '상세설명', '공식사이트URL'];
-const HEADERS_POLICY_SPECIAL = ['통신사', '정책명', '추가금액', '차감금액', '적용여부'];
+const HEADERS_POLICY_SPECIAL = ['통신사', '정책명', '정책타입', '금액', '적용여부', '조건JSON'];
 const HEADERS_SETTINGS = ['통신사', '설정유형', '시트ID', '시트URL', '설정값JSON'];
 const HEADERS_MAIN_PAGE_TEXTS = ['통신사', '카테고리', '설정유형', '문구내용', '이미지URL', '수정일시'];
 const HEADERS_PLAN_MASTER = ['통신사', '요금제명', '요금제군', '기본료', '요금제코드', '사용여부', '비고'];
@@ -2500,13 +2500,42 @@ function setupDirectRoutes(app) {
       const specialRows = (specialRes.data.values || []).slice(1);
       const specialPolicies = specialRows
         .filter(row => (row[0] || '').trim() === carrier)
-        .map((row, idx) => ({
-          id: idx + 1,
-          name: (row[1] || '').trim(),
-          addition: Number(row[2] || 0),
-          deduction: Number(row[3] || 0),
-          isActive: (row[4] || '').toString().toLowerCase() === 'true' || (row[4] || '').toString() === '1'
-        }));
+        .map((row, idx) => {
+          // 🔥 기존 데이터 마이그레이션 (5개 컬럼 → 6개 컬럼)
+          if (row.length === 5) {
+            // 기존 형식: ['통신사', '정책명', '추가금액', '차감금액', '적용여부']
+            return {
+              id: idx + 1,
+              name: (row[1] || '').trim(),
+              policyType: 'general', // 기본값
+              amount: Number(row[2] || 0) - Number(row[3] || 0), // addition - deduction
+              isActive: (row[4] || '').toString().toLowerCase() === 'true' || (row[4] || '').toString() === '1',
+              conditionsJson: null,
+              // 하위 호환을 위해 addition, deduction도 유지
+              addition: Number(row[2] || 0),
+              deduction: Number(row[3] || 0)
+            };
+          }
+          // 새 형식: ['통신사', '정책명', '정책타입', '금액', '적용여부', '조건JSON']
+          let conditionsJson = null;
+          try {
+            const conditionsJsonStr = (row[5] || '').trim();
+            if (conditionsJsonStr) {
+              conditionsJson = JSON.parse(conditionsJsonStr);
+            }
+          } catch (e) {
+            console.warn(`[Direct][getPolicySettings] 정책 조건 JSON 파싱 실패: ${row[1]}`, e);
+          }
+          
+          return {
+            id: idx + 1,
+            name: (row[1] || '').trim(),
+            policyType: (row[2] || '').trim() || 'general',
+            amount: Number(row[3] || 0), // 양수: 추가, 음수: 차감
+            isActive: (row[4] || '').toString().toLowerCase() === 'true' || (row[4] || '').toString() === '1',
+            conditionsJson: conditionsJson
+          };
+        });
 
       const result = {
         success: true,
@@ -2713,13 +2742,31 @@ function setupDirectRoutes(app) {
           });
         }
         // 새 데이터 추가
-        const newSpecialRows = special.list.map(item => [
-          carrier,
-          item.name || '',
-          item.addition || 0,
-          item.deduction || 0,
-          item.isActive ? 'TRUE' : 'FALSE'
-        ]);
+        const newSpecialRows = special.list.map(item => {
+          // 🔥 조건JSON 생성
+          let conditionsJsonStr = '';
+          if (item.policyType === 'conditional' && item.conditionsJson) {
+            if (typeof item.conditionsJson === 'string') {
+              conditionsJsonStr = item.conditionsJson;
+            } else {
+              conditionsJsonStr = JSON.stringify(item.conditionsJson);
+            }
+          }
+          
+          // 🔥 amount 필드 사용 (기존 addition/deduction도 지원)
+          const amount = item.amount !== undefined 
+            ? item.amount 
+            : ((item.addition || 0) - (item.deduction || 0));
+          
+          return [
+            carrier,
+            item.name || '',
+            item.policyType || 'general',
+            amount,
+            item.isActive ? 'TRUE' : 'FALSE',
+            conditionsJsonStr
+          ];
+        });
         if (newSpecialRows.length > 0) {
           await sheets.spreadsheets.values.append({
             spreadsheetId: SPREADSHEET_ID,

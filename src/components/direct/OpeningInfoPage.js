@@ -74,6 +74,7 @@ const OpeningInfoPage = ({
     const [agreementChecked, setAgreementChecked] = useState(false); // 동의 체크박스 상태
     const [baseMargin, setBaseMargin] = useState(0); // 정책설정에서 가져온 기본 마진
     const [preApprovalMark, setPreApprovalMark] = useState(null); // 사전승낙서 마크
+    const [policySettings, setPolicySettings] = useState(null); // 🔥 정책 설정 전체 저장
 
     // 🔥 로딩 상태 관리 (항목별)
     const [loadingPlanGroups, setLoadingPlanGroups] = useState(true); // 요금제 그룹 로딩
@@ -266,6 +267,9 @@ const OpeningInfoPage = ({
             // 🔥 수정: 새로고침 버튼 클릭 시 캐시 무시하고 실제 데이터 다시 로드
             const policySettings = await directStoreApiClient.getPolicySettings(selectedCarrier, forceRefresh);
             const initialSelectedItems = [];
+
+            // 🔥 정책 설정 전체 저장
+            setPolicySettings(policySettings);
 
             // 마진 설정 값 저장
             if (policySettings.success && policySettings.margin?.baseMargin != null) {
@@ -625,6 +629,83 @@ const OpeningInfoPage = ({
         }
     }, [formData.openingType]);
     
+    // 🔥 조건 기반 정책 필터링
+    const conditionalPolicies = useMemo(() => {
+        if (!policySettings?.success || !policySettings?.special?.list) {
+            return [];
+        }
+        
+        return policySettings.special.list
+            .filter(policy => policy.isActive && policy.policyType === 'conditional')
+            .map(policy => {
+                try {
+                    const conditionsJson = typeof policy.conditionsJson === 'string' 
+                        ? JSON.parse(policy.conditionsJson) 
+                        : policy.conditionsJson || {};
+                    
+                    if (conditionsJson.type === 'conditional' && conditionsJson.conditions) {
+                        return {
+                            name: policy.name,
+                            conditions: conditionsJson.conditions || []
+                        };
+                    }
+                } catch (e) {
+                    console.warn('정책 조건 JSON 파싱 실패:', e);
+                }
+                return null;
+            })
+            .filter(Boolean);
+    }, [policySettings]);
+    
+    // 🔥 조건 기반 정책 적용 함수 (minStoreSupport 제외)
+    const calculateConditionalPolicies = useMemo(() => {
+        let totalAmount = 0;
+        
+        conditionalPolicies.forEach(policy => {
+            policy.conditions.forEach(condition => {
+                // 모델 매칭
+                const modelMatch = (condition.models || []).length === 0 || 
+                    condition.models.some(model => 
+                        initialData?.model === model ||
+                        initialData?.petName === model ||
+                        (initialData?.model || '').includes(model) ||
+                        (initialData?.petName || '').includes(model)
+                    );
+                
+                // 개통유형 매칭
+                const openingTypeMatch = (condition.openingTypes || []).length === 0 ||
+                    condition.openingTypes.includes(formData.openingType) ||
+                    condition.openingTypes.includes(convertOpeningType(formData.openingType));
+                
+                // 요금제군 매칭
+                const planGroupMatch = (condition.planGroups || []).length === 0 ||
+                    condition.planGroups.includes(selectedPlanGroup) ||
+                    condition.planGroups.includes(initialData?.planGroup);
+                
+                // 약정유형 매칭
+                const contractTypeMatch = !condition.contractType ||
+                    condition.contractType === formData.contractType;
+                
+                // minStoreSupport는 제외 (순환 참조 방지)
+                
+                // 모든 조건이 일치하면 적용 (minStoreSupport 제외)
+                if (modelMatch && openingTypeMatch && planGroupMatch && contractTypeMatch) {
+                    totalAmount += condition.amount || 0;
+                }
+            });
+        });
+        
+        return totalAmount;
+    }, [
+        conditionalPolicies,
+        formData.openingType,
+        formData.contractType,
+        selectedPlanGroup,
+        initialData?.model,
+        initialData?.petName,
+        initialData?.planGroup
+    ]);
+    
     const calculateDynamicStoreSupport = useMemo(() => {
         // 🔥 수정: 부가서비스가 로드되지 않았거나 initialSelectedItemsRef가 설정되지 않았으면 storeSupportWithAddon 그대로 반환
         // 부가서비스 로딩이 완료되지 않았으면 계산하지 않고 기본값 반환
@@ -701,19 +782,55 @@ const OpeningInfoPage = ({
 
         // 직접입력 추가금액 반영 (음수도 허용)
         const additionalAmount = additionalStoreSupport !== null && additionalStoreSupport !== undefined ? Number(additionalStoreSupport) : 0;
-        const finalWithAdditional = Math.max(0, finalStoreSupport + additionalAmount);
+        
+        // 🔥 조건 기반 정책 적용 (minStoreSupport 제외)
+        let conditionalPolicyAmount = calculateConditionalPolicies;
+        
+        // 🔥 minStoreSupport 조건이 있는 정책은 별도로 체크
+        conditionalPolicies.forEach(policy => {
+            policy.conditions.forEach(condition => {
+                if (condition.minStoreSupport) {
+                    // 이미 계산된 대리점추가지원금과 비교
+                    const currentStoreSupport = finalStoreSupport + additionalAmount + conditionalPolicyAmount;
+                    if (currentStoreSupport >= condition.minStoreSupport) {
+                        // 조건 매칭 체크
+                        const modelMatch = (condition.models || []).length === 0 || 
+                            condition.models.some(model => 
+                                initialData?.model === model ||
+                                initialData?.petName === model ||
+                                (initialData?.model || '').includes(model) ||
+                                (initialData?.petName || '').includes(model)
+                            );
+                        const openingTypeMatch = (condition.openingTypes || []).length === 0 ||
+                            condition.openingTypes.includes(formData.openingType) ||
+                            condition.openingTypes.includes(convertOpeningType(formData.openingType));
+                        const planGroupMatch = (condition.planGroups || []).length === 0 ||
+                            condition.planGroups.includes(selectedPlanGroup) ||
+                            condition.planGroups.includes(initialData?.planGroup);
+                        const contractTypeMatch = !condition.contractType ||
+                            condition.contractType === formData.contractType;
+                        
+                        if (modelMatch && openingTypeMatch && planGroupMatch && contractTypeMatch) {
+                            conditionalPolicyAmount += condition.amount || 0;
+                        }
+                    }
+                }
+            });
+        });
+        
+        const finalWithPolicies = Math.max(0, finalStoreSupport + additionalAmount + conditionalPolicyAmount);
 
         return {
-            // 현재 선택된 상태에 따른 하나의 대리점추가지원금 (직접입력 추가금액 포함)
-            current: finalWithAdditional,
+            // 현재 선택된 상태에 따른 하나의 대리점추가지원금 (직접입력 추가금액 + 조건정책 포함)
+            current: finalWithPolicies,
             // 참고용 (UI 표시용)
-            withAddon: Math.max(0, (Number(storeSupportWithAddon) || 0) + additionalAmount)
-            // 🔥 수정: 부가미유치 기준 제거 (withoutAddon 필드 제거)
+            withAddon: Math.max(0, (Number(storeSupportWithAddon) || 0) + additionalAmount + conditionalPolicyAmount)
         };
         // 🔥 수정: formData.openingType 의존성 추가 (가입유형 변경 시 재계산)
         // 🔥 수정: storeSupportWithoutAddon 의존성 제거
         // 🔥 수정: loadingAddonsAndInsurances 의존성 추가 (부가서비스 로딩 완료 후 재계산)
-    }, [selectedItems, availableAddons, availableInsurances, storeSupportWithAddon, additionalStoreSupport, hasSavedStoreSupport, savedStoreSupport, hasItemsChanged, formData.openingType, loadingAddonsAndInsurances]);
+        // 🔥 추가: 조건 기반 정책 의존성 추가
+    }, [selectedItems, availableAddons, availableInsurances, storeSupportWithAddon, additionalStoreSupport, hasSavedStoreSupport, savedStoreSupport, hasItemsChanged, formData.openingType, loadingAddonsAndInsurances, calculateConditionalPolicies, conditionalPolicies, formData.contractType, selectedPlanGroup, initialData?.model, initialData?.petName, initialData?.planGroup]);
 
     // 🔥 추가: 일반약정 대리점추가지원금 표시 전용 함수 (표시만 수정, 저장 및 마진 계산에는 사용하지 않음)
     // 일반약정일 때: min(대리점추가지원금, 출고가 - 이통사지원금)

@@ -24,7 +24,14 @@ import {
     Snackbar,
     Switch,
     FormControlLabel,
-    Chip
+    Chip,
+    Autocomplete,
+    Select,
+    MenuItem,
+    FormControl,
+    InputLabel,
+    RadioGroup,
+    Radio
 } from '@mui/material';
 import {
     AttachMoney as AttachMoneyIcon,
@@ -75,12 +82,18 @@ const PolicySettingsTab = () => {
     const [editingInsuranceId, setEditingInsuranceId] = useState(null);
 
     // 3. 별도정책 설정 리스트
-    const [specialPolicies, setSpecialPolicies] = useState([
-        { id: 1, name: '기기반납', addition: 0, deduction: 100000, isActive: true },
-        { id: 2, name: '제휴카드', addition: 50000, deduction: 0, isActive: false }
-    ]);
+    const [specialPolicies, setSpecialPolicies] = useState([]);
     // 별도정책 입력 폼 상태
-    const [newSpecial, setNewSpecial] = useState({ name: '', addition: '', deduction: '', isActive: true });
+    const [newSpecial, setNewSpecial] = useState({ 
+        name: '', 
+        policyType: 'general', 
+        amount: '', 
+        isActive: true,
+        conditions: [] 
+    });
+    // 모델/요금제군 검색용 데이터
+    const [availableModels, setAvailableModels] = useState([]);
+    const [availablePlanGroups, setAvailablePlanGroups] = useState([]);
 
 
     const getCurrentCarrier = () => {
@@ -119,7 +132,51 @@ const PolicySettingsTab = () => {
                         setInsurances(data.insurance.list);
                     }
                     if (data.special?.list) {
-                        setSpecialPolicies(data.special.list);
+                        // 🔥 기존 데이터 변환 (addition/deduction → amount)
+                        const converted = data.special.list.map(policy => {
+                            // 기존 형식 (addition, deduction) 처리
+                            if (policy.addition !== undefined || policy.deduction !== undefined) {
+                                return {
+                                    ...policy,
+                                    amount: policy.amount !== undefined 
+                                        ? policy.amount 
+                                        : (Number(policy.addition || 0) - Number(policy.deduction || 0)),
+                                    policyType: policy.policyType || 'general',
+                                    conditions: policy.conditionsJson 
+                                        ? (typeof policy.conditionsJson === 'string' 
+                                            ? JSON.parse(policy.conditionsJson)?.conditions || []
+                                            : policy.conditionsJson?.conditions || [])
+                                        : []
+                                };
+                            }
+                            // 새 형식 처리
+                            return {
+                                ...policy,
+                                conditions: policy.conditionsJson 
+                                    ? (typeof policy.conditionsJson === 'string' 
+                                        ? JSON.parse(policy.conditionsJson)?.conditions || []
+                                        : policy.conditionsJson?.conditions || [])
+                                    : []
+                            };
+                        });
+                        setSpecialPolicies(converted);
+                    }
+                    
+                    // 🔥 모델 및 요금제군 목록 로드 (조건 입력용)
+                    const carrier = getCurrentCarrier();
+                    try {
+                        const [mobiles, plans] = await Promise.all([
+                            directStoreApiClient.getMobilesMaster(carrier),
+                            directStoreApiClient.getPlansMaster(carrier)
+                        ]);
+                        // 모델명 목록 추출
+                        const modelNames = [...new Set(mobiles.map(m => m.model || m.petName).filter(Boolean))];
+                        setAvailableModels(modelNames);
+                        // 요금제군 목록 추출
+                        const planGroups = [...new Set(plans.map(p => p.planGroup).filter(Boolean))];
+                        setAvailablePlanGroups(planGroups);
+                    } catch (err) {
+                        console.warn('모델/요금제군 목록 로드 실패:', err);
                     }
                 }
             } catch (err) {
@@ -269,12 +326,46 @@ const PolicySettingsTab = () => {
             setSpecialPolicies([...specialPolicies, {
                 id: Date.now(),
                 name: newSpecial.name,
-                addition: Number(newSpecial.addition) || 0,
-                deduction: Number(newSpecial.deduction) || 0,
-                isActive: newSpecial.isActive
+                policyType: newSpecial.policyType || 'general',
+                amount: Number(newSpecial.amount) || 0,
+                isActive: newSpecial.isActive,
+                conditions: newSpecial.conditions || []
             }]);
-            setNewSpecial({ name: '', addition: '', deduction: '', isActive: true });
+            setNewSpecial({ name: '', policyType: 'general', amount: '', isActive: true, conditions: [] });
         }
+    };
+    
+    // 조건 추가
+    const handleAddCondition = () => {
+        setNewSpecial(prev => ({
+            ...prev,
+            conditions: [...(prev.conditions || []), {
+                models: [],
+                openingTypes: [],
+                planGroups: [],
+                contractType: '',
+                minStoreSupport: '',
+                amount: ''
+            }]
+        }));
+    };
+    
+    // 조건 삭제
+    const handleRemoveCondition = (conditionIndex) => {
+        setNewSpecial(prev => ({
+            ...prev,
+            conditions: prev.conditions.filter((_, i) => i !== conditionIndex)
+        }));
+    };
+    
+    // 조건 업데이트
+    const handleUpdateCondition = (conditionIndex, field, value) => {
+        setNewSpecial(prev => ({
+            ...prev,
+            conditions: prev.conditions.map((cond, i) => 
+                i === conditionIndex ? { ...cond, [field]: value } : cond
+            )
+        }));
     };
 
     // 별도정책 삭제
@@ -302,8 +393,32 @@ const PolicySettingsTab = () => {
                 settings = { margin: { baseMargin: margin } };
             } else if (type === 'addon') {
                 settings = { addon: { list: addons }, insurance: { list: insurances } };
-            } else if (type === 'special') {
-                settings = { special: { list: specialPolicies } };
+            } else             if (type === 'special') {
+                // 🔥 조건JSON 생성
+                const specialData = specialPolicies.map(policy => {
+                    let conditionsJson = null;
+                    if (policy.policyType === 'conditional' && policy.conditions && policy.conditions.length > 0) {
+                        conditionsJson = {
+                            type: 'conditional',
+                            conditions: policy.conditions.map(cond => ({
+                                models: cond.models || [],
+                                openingTypes: cond.openingTypes || [],
+                                planGroups: cond.planGroups || [],
+                                contractType: cond.contractType || '',
+                                minStoreSupport: cond.minStoreSupport ? Number(cond.minStoreSupport) : undefined,
+                                amount: cond.amount ? Number(cond.amount) : 0
+                            }))
+                        };
+                    }
+                    return {
+                        name: policy.name,
+                        policyType: policy.policyType || 'general',
+                        amount: policy.amount !== undefined ? Number(policy.amount) : 0,
+                        isActive: policy.isActive,
+                        conditionsJson: conditionsJson
+                    };
+                });
+                settings = { special: { list: specialData } };
             }
 
             const startTime = Date.now();
@@ -731,41 +846,172 @@ const PolicySettingsTab = () => {
             </Dialog>
 
             {/* 3. 별도정책 설정 모달 */}
-            <Dialog open={openSpecialModal} onClose={() => setOpenSpecialModal(false)} maxWidth="md" fullWidth>
+            <Dialog open={openSpecialModal} onClose={() => setOpenSpecialModal(false)} maxWidth="lg" fullWidth>
                 <DialogTitle>별도정책 설정 ({getCurrentCarrier()})</DialogTitle>
                 <DialogContent dividers>
                     <Stack spacing={3}>
-                        <Alert severity="info">
-                            추후 모델, 개통유형, 요금제, 기간 등 상세 조건 설정 기능이 추가될 예정입니다.
-                        </Alert>
-
                         {/* 입력 폼 */}
                         <Paper variant="outlined" sx={{ p: 2, bgcolor: 'background.subtle' }}>
                             <Typography variant="subtitle2" gutterBottom fontWeight="bold">새 정책 추가</Typography>
-                            <Grid container spacing={2} alignItems="center">
-                                <Grid item xs={12} sm={3}>
+                            <Grid container spacing={2} alignItems="flex-start">
+                                <Grid item xs={12} sm={4}>
                                     <TextField
                                         label="정책 이름" size="small" fullWidth
-                                        value={newSpecial.name} onChange={(e) => setNewSpecial({ ...newSpecial, name: e.target.value })}
+                                        value={newSpecial.name} 
+                                        onChange={(e) => setNewSpecial({ ...newSpecial, name: e.target.value })}
+                                        placeholder="예: 선택약정시 차감정책"
                                     />
                                 </Grid>
-                                <Grid item xs={4} sm={3}>
+                                <Grid item xs={12} sm={3}>
+                                    <FormControl fullWidth size="small">
+                                        <InputLabel>정책 타입</InputLabel>
+                                        <Select
+                                            value={newSpecial.policyType}
+                                            label="정책 타입"
+                                            onChange={(e) => setNewSpecial({ ...newSpecial, policyType: e.target.value })}
+                                        >
+                                            <MenuItem value="general">일반 정책</MenuItem>
+                                            <MenuItem value="conditional">조건 기반 정책</MenuItem>
+                                        </Select>
+                                    </FormControl>
+                                </Grid>
+                                <Grid item xs={12} sm={3}>
                                     <TextField
-                                        label="추가금액(+)" size="small" fullWidth type="number" color="primary"
-                                        value={newSpecial.addition} onChange={(e) => setNewSpecial({ ...newSpecial, addition: e.target.value })}
+                                        label="금액" size="small" fullWidth type="number"
+                                        value={newSpecial.amount} 
+                                        onChange={(e) => setNewSpecial({ ...newSpecial, amount: e.target.value })}
+                                        placeholder="양수: 추가, 음수: 차감"
+                                        helperText="예: 30000 (추가), -30000 (차감)"
                                     />
                                 </Grid>
-                                <Grid item xs={4} sm={3}>
-                                    <TextField
-                                        label="차감금액(-)" size="small" fullWidth type="number" color="error"
-                                        value={newSpecial.deduction} onChange={(e) => setNewSpecial({ ...newSpecial, deduction: e.target.value })}
-                                    />
-                                </Grid>
-                                <Grid item xs={4} sm={3}>
+                                <Grid item xs={12} sm={2}>
                                     <Button variant="contained" fullWidth startIcon={<AddIcon />} onClick={handleAddSpecial}>
                                         추가
                                     </Button>
                                 </Grid>
+                                
+                                {/* 조건 입력 UI (conditional 타입일 때만 표시) */}
+                                {newSpecial.policyType === 'conditional' && (
+                                    <Grid item xs={12}>
+                                        <Divider sx={{ my: 2 }} />
+                                        <Stack spacing={2}>
+                                            <Stack direction="row" justifyContent="space-between" alignItems="center">
+                                                <Typography variant="subtitle2" fontWeight="bold">조건 설정</Typography>
+                                                <Button size="small" startIcon={<AddIcon />} onClick={handleAddCondition}>
+                                                    조건 추가
+                                                </Button>
+                                            </Stack>
+                                            {newSpecial.conditions.map((condition, condIdx) => (
+                                                <Paper key={condIdx} variant="outlined" sx={{ p: 2, bgcolor: 'background.paper' }}>
+                                                    <Stack spacing={2}>
+                                                        <Stack direction="row" justifyContent="space-between" alignItems="center">
+                                                            <Typography variant="caption" color="text.secondary">
+                                                                조건 {condIdx + 1}
+                                                            </Typography>
+                                                            <IconButton size="small" onClick={() => handleRemoveCondition(condIdx)}>
+                                                                <DeleteIcon fontSize="small" />
+                                                            </IconButton>
+                                                        </Stack>
+                                                        <Grid container spacing={2}>
+                                                            <Grid item xs={12} sm={6}>
+                                                                <Autocomplete
+                                                                    multiple
+                                                                    size="small"
+                                                                    options={availableModels}
+                                                                    value={condition.models || []}
+                                                                    onChange={(e, newValue) => handleUpdateCondition(condIdx, 'models', newValue)}
+                                                                    renderInput={(params) => (
+                                                                        <TextField {...params} label="대상 모델" placeholder="모델 검색" />
+                                                                    )}
+                                                                    renderTags={(value, getTagProps) =>
+                                                                        value.map((option, index) => (
+                                                                            <Chip label={option} size="small" {...getTagProps({ index })} />
+                                                                        ))
+                                                                    }
+                                                                />
+                                                            </Grid>
+                                                            <Grid item xs={12} sm={6}>
+                                                                <Autocomplete
+                                                                    multiple
+                                                                    size="small"
+                                                                    options={['010신규', 'MNP', '기변']}
+                                                                    value={condition.openingTypes || []}
+                                                                    onChange={(e, newValue) => handleUpdateCondition(condIdx, 'openingTypes', newValue)}
+                                                                    renderInput={(params) => (
+                                                                        <TextField {...params} label="개통 유형" placeholder="유형 선택" />
+                                                                    )}
+                                                                    renderTags={(value, getTagProps) =>
+                                                                        value.map((option, index) => (
+                                                                            <Chip label={option} size="small" {...getTagProps({ index })} />
+                                                                        ))
+                                                                    }
+                                                                />
+                                                            </Grid>
+                                                            <Grid item xs={12} sm={6}>
+                                                                <Autocomplete
+                                                                    multiple
+                                                                    size="small"
+                                                                    options={availablePlanGroups}
+                                                                    value={condition.planGroups || []}
+                                                                    onChange={(e, newValue) => handleUpdateCondition(condIdx, 'planGroups', newValue)}
+                                                                    renderInput={(params) => (
+                                                                        <TextField {...params} label="요금제군" placeholder="요금제군 검색" />
+                                                                    )}
+                                                                    renderTags={(value, getTagProps) =>
+                                                                        value.map((option, index) => (
+                                                                            <Chip label={option} size="small" {...getTagProps({ index })} />
+                                                                        ))
+                                                                    }
+                                                                />
+                                                            </Grid>
+                                                            <Grid item xs={12} sm={6}>
+                                                                <FormControl fullWidth size="small">
+                                                                    <InputLabel>약정 유형</InputLabel>
+                                                                    <Select
+                                                                        value={condition.contractType || ''}
+                                                                        label="약정 유형"
+                                                                        onChange={(e) => handleUpdateCondition(condIdx, 'contractType', e.target.value)}
+                                                                    >
+                                                                        <MenuItem value="">전체</MenuItem>
+                                                                        <MenuItem value="selected">선택약정</MenuItem>
+                                                                        <MenuItem value="standard">일반약정</MenuItem>
+                                                                    </Select>
+                                                                </FormControl>
+                                                            </Grid>
+                                                            <Grid item xs={12} sm={6}>
+                                                                <TextField
+                                                                    size="small"
+                                                                    fullWidth
+                                                                    type="number"
+                                                                    label="최소 대리점추가지원금 (선택)"
+                                                                    value={condition.minStoreSupport || ''}
+                                                                    onChange={(e) => handleUpdateCondition(condIdx, 'minStoreSupport', e.target.value)}
+                                                                    placeholder="예: 200000"
+                                                                />
+                                                            </Grid>
+                                                            <Grid item xs={12} sm={6}>
+                                                                <TextField
+                                                                    size="small"
+                                                                    fullWidth
+                                                                    type="number"
+                                                                    label="금액"
+                                                                    value={condition.amount || ''}
+                                                                    onChange={(e) => handleUpdateCondition(condIdx, 'amount', e.target.value)}
+                                                                    placeholder="양수: 추가, 음수: 차감"
+                                                                />
+                                                            </Grid>
+                                                        </Grid>
+                                                    </Stack>
+                                                </Paper>
+                                            ))}
+                                            {newSpecial.conditions.length === 0 && (
+                                                <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 2 }}>
+                                                    조건을 추가하면 특정 조건에 맞을 때만 정책이 적용됩니다.
+                                                </Typography>
+                                            )}
+                                        </Stack>
+                                    </Grid>
+                                )}
                             </Grid>
                         </Paper>
 
@@ -796,6 +1042,17 @@ const PolicySettingsTab = () => {
                                             }
                                         />
                                         <Stack direction="row" spacing={2} alignItems="center" sx={{ mr: 2 }}>
+                                            <Chip 
+                                                label={policy.policyType === 'conditional' ? '조건기반' : '일반'} 
+                                                size="small" 
+                                                color={policy.policyType === 'conditional' ? 'primary' : 'default'}
+                                            />
+                                            {policy.amount !== undefined && policy.amount !== 0 && (
+                                                <Typography variant="body2" color={policy.isActive ? (policy.amount > 0 ? "primary" : "error") : "text.disabled"}>
+                                                    {policy.amount > 0 ? '+' : ''}{policy.amount.toLocaleString()}
+                                                </Typography>
+                                            )}
+                                            {/* 하위 호환: 기존 addition/deduction 표시 */}
                                             {policy.addition > 0 && (
                                                 <Typography variant="body2" color={policy.isActive ? "primary" : "text.disabled"}>
                                                     +{policy.addition.toLocaleString()}
