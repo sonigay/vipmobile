@@ -551,13 +551,20 @@ const OpeningInfoPage = ({
     
     // 초기 로드 완료 여부 확인 (부가서비스 목록이 로드되고 selectedItems가 설정된 후)
     useEffect(() => {
-        if (availableAddons.length > 0 || availableInsurances.length > 0) {
-            if (isInitialLoadRef.current && selectedItems.length >= 0) {
-                initialSelectedItemsRef.current = [...selectedItems];
+        // 🔥 수정: 부가서비스 로딩이 완료되고 selectedItems가 설정된 후에만 initialSelectedItemsRef 설정
+        // selectedItems.length >= 0 조건은 항상 true이므로 의미 없음 → selectedItems.length > 0으로 변경
+        if ((availableAddons.length > 0 || availableInsurances.length > 0) && !loadingAddonsAndInsurances) {
+            if (isInitialLoadRef.current && selectedItems.length > 0) {
+                // 🔥 수정: selectedItems의 깊은 복사 및 디버그 로그 추가
+                initialSelectedItemsRef.current = selectedItems.map(item => ({ ...item }));
                 isInitialLoadRef.current = false;
+                console.log('[OpeningInfoPage] initialSelectedItemsRef 설정:', {
+                    count: initialSelectedItemsRef.current.length,
+                    items: initialSelectedItemsRef.current.map(i => ({ name: i.name, incentive: i.incentive, deduction: i.deduction }))
+                });
             }
         }
-    }, [selectedItems, availableAddons.length, availableInsurances.length]);
+    }, [selectedItems, availableAddons.length, availableInsurances.length, loadingAddonsAndInsurances]);
     
     // 부가서비스 선택이 변경되었는지 확인
     const hasItemsChanged = useMemo(() => {
@@ -644,6 +651,19 @@ const OpeningInfoPage = ({
         }, 0);
         
         // 🔥 수정: 저장된 값에서 초기 선택 항목의 incentive/deduction을 빼고, 현재 선택 항목의 incentive/deduction을 더함
+        // 🔥 디버그: 계산 과정 로그 (개발 환경에서만)
+        if (process.env.NODE_ENV === 'development') {
+            console.log('[OpeningInfoPage] calculateDynamicStoreSupport 계산:', {
+                baseStoreSupport,
+                initialSelectedIncentive,
+                initialSelectedDeduction,
+                selectedIncentive,
+                selectedDeduction,
+                initialSelectedItems: initialSelectedItemsRef.current?.map(i => ({ name: i.name, incentive: i.incentive, deduction: i.deduction })),
+                selectedItems: selectedItems.map(i => ({ name: i.name, incentive: i.incentive, deduction: i.deduction })),
+                calculation: `${baseStoreSupport} - ${initialSelectedIncentive} - ${initialSelectedDeduction} + ${selectedIncentive} + ${selectedDeduction}`
+            });
+        }
         const finalStoreSupport = baseStoreSupport - initialSelectedIncentive - initialSelectedDeduction + selectedIncentive + selectedDeduction;
 
         // 직접입력 추가금액 반영 (음수도 허용)

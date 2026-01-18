@@ -248,7 +248,15 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
 
   // 가격 Lookup 함수 (동기식)
   const lookupPrice = useCallback((modelId, planGroup, openingType) => {
-    const key = `${modelId}-${planGroup}-${openingType}`;
+    // 🔥 수정: 이통사지원금 조회 시 "010신규"나 "기변"을 "010신규/기변"으로 변환
+    // 대리점지원금은 원래 openingType 그대로 사용
+    let lookupOpeningType = openingType;
+    const isPublicSupport = true; // lookupPrice는 이통사지원금 조회용으로도 사용됨
+    if (isPublicSupport && (openingType === '010신규' || openingType === '기변')) {
+      lookupOpeningType = '010신규/기변';
+    }
+    
+    const key = `${modelId}-${planGroup}-${lookupOpeningType}`;
     const priceData = pricingDataRef.current.get(key);
 
     // 현재 단말 정보 찾기
@@ -261,13 +269,27 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
         storeSupportWithAddon: priceData.storeSupportWithAddon || 0,
         purchasePriceWithAddon: Math.max(0, factoryPrice - (priceData.publicSupport || 0) - (priceData.storeSupportWithAddon || 0)),
         publicSupport: priceData.publicSupport || 0,
-        openingType: openingType
+        openingType: openingType // 원래 openingType 반환 (표시용)
       };
+    }
+
+    // 🔥 수정: 이통사지원금 조회 실패 시 원래 openingType으로 재시도 (010신규/기변 변환 전)
+    if (isPublicSupport && lookupOpeningType !== openingType) {
+      const originalKey = `${modelId}-${planGroup}-${openingType}`;
+      const originalPriceData = pricingDataRef.current.get(originalKey);
+      if (originalPriceData) {
+        return {
+          storeSupportWithAddon: originalPriceData.storeSupportWithAddon || 0,
+          purchasePriceWithAddon: Math.max(0, factoryPrice - (originalPriceData.publicSupport || 0) - (originalPriceData.storeSupportWithAddon || 0)),
+          publicSupport: originalPriceData.publicSupport || 0,
+          openingType: openingType
+        };
+      }
     }
 
     // 데이터를 찾지 못한 경우 디버깅 로그 (개발 환경에서만)
     if (process.env.NODE_ENV === 'development') {
-      console.warn(`[MobileListTab] 가격 데이터를 찾지 못함: key=${key}, modelId=${modelId}, planGroup=${planGroup}, openingType=${openingType}`);
+      console.warn(`[MobileListTab] 가격 데이터를 찾지 못함: key=${key}, modelId=${modelId}, planGroup=${planGroup}, openingType=${openingType}, lookupOpeningType=${lookupOpeningType}`);
       // pricingDataRef에 있는 키 목록 일부 출력 (디버깅용)
       const availableKeys = Array.from(pricingDataRef.current.keys()).slice(0, 5);
       console.log(`[MobileListTab] 사용 가능한 키 샘플:`, availableKeys);
