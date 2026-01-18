@@ -663,6 +663,11 @@ const OpeningInfoPage = ({
         
         conditionalPolicies.forEach(policy => {
             policy.conditions.forEach(condition => {
+                // 🔥 minStoreSupport가 있는 조건은 여기서 제외 (나중에 별도로 처리)
+                if (condition.minStoreSupport) {
+                    return; // minStoreSupport가 있으면 여기서는 계산하지 않음
+                }
+                
                 // 모델 매칭
                 const modelMatch = (condition.models || []).length === 0 || 
                     condition.models.some(model => 
@@ -686,9 +691,7 @@ const OpeningInfoPage = ({
                 const contractTypeMatch = !condition.contractType ||
                     condition.contractType === formData.contractType;
                 
-                // minStoreSupport는 제외 (순환 참조 방지)
-                
-                // 모든 조건이 일치하면 적용 (minStoreSupport 제외)
+                // 모든 조건이 일치하면 적용 (minStoreSupport 없는 조건만)
                 if (modelMatch && openingTypeMatch && planGroupMatch && contractTypeMatch) {
                     totalAmount += condition.amount || 0;
                 }

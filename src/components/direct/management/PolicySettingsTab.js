@@ -1162,10 +1162,11 @@ const PolicySettingsTab = () => {
                                                                     size="small"
                                                                     fullWidth
                                                                     type="number"
-                                                                    label="최소 대리점추가지원금 (선택)"
+                                                                    label="대리점추가지원금 기준 (선택)"
                                                                     value={condition.minStoreSupport || ''}
                                                                     onChange={(e) => handleUpdateCondition(condIdx, 'minStoreSupport', e.target.value)}
                                                                     placeholder="예: 200000"
+                                                                    helperText="이 금액 이상일 때 적용"
                                                                 />
                                                             </Grid>
                                                             <Grid item xs={12} sm={6}>
