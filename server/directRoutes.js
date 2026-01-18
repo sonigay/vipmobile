@@ -1782,12 +1782,28 @@ async function ensureSheetHeaders(sheets, spreadsheetId, sheetName, headers) {
         if (needsInit) {
           await withRetry(async () => {
             const lastColumn = getColumnLetter(headers.length);
-            // 범위를 명시적으로 지정하여 업데이트 (정확히 headers.length만큼만)
+            // 🔥 수정: 기존 헤더가 더 긴 경우, 나머지 컬럼도 빈 값으로 업데이트하여 중복 제거
+            let updateRange = `${sheetName}!A1:${lastColumn}1`;
+            let updateValues = [headers];
+            
+            // 기존 헤더가 더 긴 경우, 나머지 컬럼도 빈 값으로 업데이트
+            if (firstRow.length > headers.length) {
+              const oldLastColumn = getColumnLetter(firstRow.length);
+              updateRange = `${sheetName}!A1:${oldLastColumn}1`;
+              // headers 뒤에 빈 문자열 추가하여 기존 헤더 제거
+              const extendedHeaders = [...headers];
+              for (let i = headers.length; i < firstRow.length; i++) {
+                extendedHeaders.push('');
+              }
+              updateValues = [extendedHeaders];
+            }
+            
+            // 범위를 명시적으로 지정하여 업데이트
             return await sheets.spreadsheets.values.update({
               spreadsheetId,
-              range: `${sheetName}!A1:${lastColumn}1`,
+              range: updateRange,
               valueInputOption: 'USER_ENTERED',
-              resource: { values: [headers] }
+              resource: { values: updateValues }
             });
           });
           // 헤더 업데이트 후 캐시 무효화
