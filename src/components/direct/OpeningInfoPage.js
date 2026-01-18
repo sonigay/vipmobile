@@ -236,6 +236,13 @@ const OpeningInfoPage = ({
                         setSelectedPlanGroup(initialPlan.name);
                         setPlanBasicFee(initialPlan.basicFee);
                         setFormData(prev => ({ ...prev, plan: initialPlan.name }));
+                        // 🔥 수정: LG 통신사이고 85군 이상 요금제면 lgPremier 자동 체크
+                        if (selectedCarrier === 'LG' && initialPlan.group) {
+                            const groupNumber = parseInt(initialPlan.group.replace('군', '')) || 0;
+                            if (groupNumber >= 85) {
+                                setFormData(prev => ({ ...prev, lgPremier: true }));
+                            }
+                        }
                     }
                 } else {
                     console.warn('요금제 마스터 데이터가 비어있습니다.');
@@ -1472,6 +1479,14 @@ const OpeningInfoPage = ({
                                                 setFormData({ ...formData, plan: newValue.name });
                                                 setSelectedPlanGroup(newValue.name);
                                                 setPlanBasicFee(newValue.basicFee || 0);
+                                                // 🔥 수정: LG 통신사이고 85군 이상 요금제면 lgPremier 자동 체크, 미만이면 해제
+                                                if (selectedCarrier === 'LG' && newValue.group) {
+                                                    const groupNumber = parseInt(newValue.group.replace('군', '')) || 0;
+                                                    setFormData(prev => ({ 
+                                                        ...prev, 
+                                                        lgPremier: groupNumber >= 85 
+                                                    }));
+                                                }
 
                                                 // 요금제군 추출하여 대리점추가지원금 자동 계산
                                                 const planGroup = newValue.group || newValue.name;
@@ -1603,8 +1618,19 @@ const OpeningInfoPage = ({
                                         )}
                                         {/* 🔥 수정: 85군 이상 모든 요금제군에 LG 프리미어 약정 체크박스 표시 */}
                                         {selectedCarrier === 'LG' && (() => {
-                                            // 요금제군 숫자 추출 (예: '85군' → 85)
-                                            const groupNumber = selectedPlanGroup ? parseInt(selectedPlanGroup.replace('군', '')) : 0;
+                                            // 🔥 수정: selectedPlanGroup이 "요금제명(115군)" 형식이므로 괄호 안의 숫자를 추출
+                                            // 예: "요금제명(115군)" → 115, "115군" → 115
+                                            let groupNumber = 0;
+                                            if (selectedPlanGroup) {
+                                                // 괄호 안의 숫자 추출 (예: "요금제명(115군)" → "115군")
+                                                const match = selectedPlanGroup.match(/\((\d+)군\)/);
+                                                if (match) {
+                                                    groupNumber = parseInt(match[1]);
+                                                } else {
+                                                    // 괄호가 없으면 직접 파싱 (예: "115군")
+                                                    groupNumber = parseInt(selectedPlanGroup.replace('군', '')) || 0;
+                                                }
+                                            }
                                             return groupNumber >= 85;
                                         })() && (
                                             <Grid item xs={12}>
@@ -1856,7 +1882,18 @@ const OpeningInfoPage = ({
                             {selectedCarrier === 'LG' && formData.lgPremier && (() => {
                                 // 🔥 수정: 요금제군 기준으로 판단 (planBasicFee >= 85000 조건 제거)
                                 // 요금제군이 85군 이상이면 표시 (체크박스 표시 조건과 동일)
-                                const groupNumber = selectedPlanGroup ? parseInt(selectedPlanGroup.replace('군', '')) : 0;
+                                // 🔥 수정: selectedPlanGroup이 "요금제명(115군)" 형식이므로 괄호 안의 숫자를 추출
+                                let groupNumber = 0;
+                                if (selectedPlanGroup) {
+                                    // 괄호 안의 숫자 추출 (예: "요금제명(115군)" → "115군")
+                                    const match = selectedPlanGroup.match(/\((\d+)군\)/);
+                                    if (match) {
+                                        groupNumber = parseInt(match[1]);
+                                    } else {
+                                        // 괄호가 없으면 직접 파싱 (예: "115군")
+                                        groupNumber = parseInt(selectedPlanGroup.replace('군', '')) || 0;
+                                    }
+                                }
                                 return groupNumber >= 85;
                             })() && (
                                 <Stack direction="row" justifyContent="space-between" mb={1}>
