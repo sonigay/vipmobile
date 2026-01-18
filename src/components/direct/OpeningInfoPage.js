@@ -425,9 +425,10 @@ const OpeningInfoPage = ({
         } finally {
             setLoadingAddonsAndInsurances(false);
         }
-    }, [selectedCarrier, factoryPrice, initialData?.petName, initialData?.model, initialData?.additionalServices, initialData?.addons]);
+    }, [selectedCarrier, factoryPrice, initialData?.petName, initialData?.model, initialData?.additionalServices, initialData?.addons, formData.openingType]);
 
     // 필수 부가서비스 및 보험상품 로드 (정책설정에서 가져오기)
+    // 🔥 수정: 가입유형 변경 시에도 부가서비스 목록을 다시 로드하여 selectedItems 재설정
     useEffect(() => {
         loadAvailableItems();
     }, [loadAvailableItems]);
@@ -556,15 +557,26 @@ const OpeningInfoPage = ({
         if ((availableAddons.length > 0 || availableInsurances.length > 0) && !loadingAddonsAndInsurances) {
             // 🔥 수정: isInitialLoadRef가 true이거나 initialSelectedItemsRef가 null일 때 설정
             // 가입유형 변경 시 initialSelectedItemsRef가 null로 리셋되므로, 다시 설정해야 함
+            // 🔥 중요: selectedItems가 변경되었을 때만 설정 (가입유형 변경 후 loadAvailableItems가 실행되어 selectedItems가 재설정된 경우)
             if ((isInitialLoadRef.current || initialSelectedItemsRef.current === null) && selectedItems.length >= 0) {
                 // 🔥 수정: selectedItems의 깊은 복사 및 디버그 로그 추가
-                initialSelectedItemsRef.current = selectedItems.map(item => ({ ...item }));
-                isInitialLoadRef.current = false;
-                console.log('[OpeningInfoPage] initialSelectedItemsRef 설정:', {
-                    openingType: formData.openingType,
-                    count: initialSelectedItemsRef.current.length,
-                    items: initialSelectedItemsRef.current.map(i => ({ name: i.name, incentive: i.incentive, deduction: i.deduction }))
-                });
+                const previousCount = initialSelectedItemsRef.current?.length || 0;
+                const previousNames = initialSelectedItemsRef.current?.map(i => i.name).sort().join(',') || '';
+                const currentNames = selectedItems.map(i => i.name).sort().join(',');
+                
+                // 🔥 수정: selectedItems가 실제로 변경되었을 때만 설정 (무한 루프 방지)
+                if (previousNames !== currentNames || previousCount !== selectedItems.length || initialSelectedItemsRef.current === null) {
+                    initialSelectedItemsRef.current = selectedItems.map(item => ({ ...item }));
+                    isInitialLoadRef.current = false;
+                    console.log('[OpeningInfoPage] initialSelectedItemsRef 설정:', {
+                        openingType: formData.openingType,
+                        previousCount,
+                        currentCount: initialSelectedItemsRef.current.length,
+                        previousNames,
+                        currentNames,
+                        items: initialSelectedItemsRef.current.map(i => ({ name: i.name, incentive: i.incentive, deduction: i.deduction }))
+                    });
+                }
             }
         }
     }, [selectedItems, availableAddons.length, availableInsurances.length, loadingAddonsAndInsurances, formData.openingType]);
@@ -586,10 +598,16 @@ const OpeningInfoPage = ({
         if (previousOpeningTypeRef.current !== formData.openingType && previousOpeningTypeRef.current !== undefined) {
             // 가입유형 변경 시 저장된 값 무효화 (이전 가입유형의 값이므로)
             // initialSelectedItemsRef를 리셋하여 새로운 가입유형에 맞는 부가서비스 선택 상태로 재설정
+            console.log('[OpeningInfoPage] 가입유형 변경 감지:', {
+                previous: previousOpeningTypeRef.current,
+                current: formData.openingType
+            });
             initialSelectedItemsRef.current = null;
             isInitialLoadRef.current = true;
             openingTypeChangedRef.current = true;
             previousOpeningTypeRef.current = formData.openingType;
+            // 🔥 수정: 가입유형 변경 시 selectedItems도 초기화하여 loadAvailableItems가 다시 실행되도록 함
+            // loadAvailableItems는 selectedItems가 변경되면 다시 실행되므로, 여기서는 초기화만 함
         } else if (previousOpeningTypeRef.current === undefined) {
             // 초기 로드 시
             previousOpeningTypeRef.current = formData.openingType;
