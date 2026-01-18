@@ -66,6 +66,7 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
   const [selectedOpeningTypes, setSelectedOpeningTypes] = useState({}); // { modelId: openingType }
   const [calculatedPrices, setCalculatedPrices] = useState({}); // { modelId-openingType: PriceObj }
   const [reloadTrigger, setReloadTrigger] = useState(0); // 새로고침 트리거
+  const [policySettings, setPolicySettings] = useState(null); // 🔥 정책 설정 저장
 
   const pricingDataRef = useRef(new Map()); // Key: modelId-planGroup-openingType -> PriceData
   const userSelectedOpeningTypesRef = useRef(new Set()); // 사용자가 수동으로 선택한 개통유형 추적
@@ -249,6 +250,21 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
     fetchData();
   }, [carrierTab, getCurrentCarrier, reloadTrigger]);
 
+  // 🔥 정책 설정 로드
+  useEffect(() => {
+    const loadPolicySettings = async () => {
+      const carrier = getCurrentCarrier();
+      try {
+        const settings = await directStoreApiClient.getPolicySettings(carrier);
+        setPolicySettings(settings);
+      } catch (err) {
+        console.error('[MobileListTab] 정책 설정 로드 실패:', err);
+        setPolicySettings(null);
+      }
+    };
+    loadPolicySettings();
+  }, [getCurrentCarrier]);
+
   const handleReload = () => {
     // reloadTrigger를 증가시켜 useEffect 재실행
     setReloadTrigger(prev => prev + 1);
@@ -261,6 +277,34 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
   // useEffect 의존성에 reloadTrigger 추가 권장.
   // 하지만 여기서는 코드 교체가 목표이므로 간단히 유지.
 
+  // 🔥 조건 기반 정책 필터링
+  const conditionalPolicies = useMemo(() => {
+    if (!policySettings?.success || !policySettings?.special?.list) {
+      return [];
+    }
+    
+    return policySettings.special.list
+      .filter(policy => policy.isActive && policy.policyType === 'conditional')
+      .map(policy => {
+        try {
+          const conditionsJson = typeof policy.conditionsJson === 'string' 
+            ? JSON.parse(policy.conditionsJson) 
+            : policy.conditionsJson || {};
+          
+          if (conditionsJson.type === 'conditional' && conditionsJson.conditions) {
+            return {
+              name: policy.name,
+              conditions: conditionsJson.conditions || []
+            };
+          }
+        } catch (e) {
+          console.warn('[MobileListTab] 정책 조건 JSON 파싱 실패:', e);
+        }
+        return null;
+      })
+      .filter(Boolean);
+  }, [policySettings]);
+
   // 가격 Lookup 함수 (동기식)
   const lookupPrice = useCallback((modelId, planGroup, openingType) => {
     // 🔥 수정: 시트 데이터 로드 시 이미 '010신규/기변'을 '010신규'와 '기변'에 매핑했으므로
@@ -271,12 +315,95 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
     // 현재 단말 정보 찾기
     const mobile = mobileList.find(m => m.id === modelId);
     const factoryPrice = mobile ? mobile.factoryPrice : 0;
+    const modelName = mobile?.model || mobile?.petName || '';
 
     if (priceData) {
       // 🔥 수정: 부가미유치 기준 제거, 부가유치 기준만 사용
+      const baseStoreSupport = priceData.storeSupportWithAddon || 0;
+      
+      // 🔥 정책 적용: 시세표는 이통사지원금 기준이므로 contractType 조건 없는 정책만 적용
+      let policyAmount = 0;
+      
+      if (conditionalPolicies.length > 0) {
+        // 1단계: minStoreSupport 없는 정책 적용
+        conditionalPolicies.forEach(policy => {
+          policy.conditions.forEach(condition => {
+            // contractType 조건이 있으면 제외 (선택약정시 차감정책)
+            if (condition.contractType) {
+              return;
+            }
+            
+            // minStoreSupport 조건이 있으면 나중에 처리
+            if (condition.minStoreSupport) {
+              return;
+            }
+            
+            // 모델 매칭
+            const modelMatch = (condition.models || []).length === 0 || 
+              condition.models.some(model => 
+                modelName === model ||
+                modelName.includes(model) ||
+                (mobile?.petName && mobile.petName === model) ||
+                (mobile?.petName && mobile.petName.includes(model))
+              );
+            
+            // 개통유형 매칭
+            const openingTypeMatch = (condition.openingTypes || []).length === 0 ||
+              condition.openingTypes.includes(openingType);
+            
+            // 요금제군 매칭
+            const planGroupMatch = (condition.planGroups || []).length === 0 ||
+              condition.planGroups.includes(planGroup);
+            
+            // 모든 조건이 일치하면 적용
+            if (modelMatch && openingTypeMatch && planGroupMatch) {
+              policyAmount += condition.amount || 0;
+            }
+          });
+        });
+        
+        // 2단계: minStoreSupport 조건이 있는 정책 적용 (이미 계산된 대리점추가지원금과 비교)
+        const currentStoreSupport = baseStoreSupport + policyAmount;
+        conditionalPolicies.forEach(policy => {
+          policy.conditions.forEach(condition => {
+            // contractType 조건이 있으면 제외
+            if (condition.contractType) {
+              return;
+            }
+            
+            // minStoreSupport 조건이 있는 정책만 처리
+            if (condition.minStoreSupport && currentStoreSupport >= condition.minStoreSupport) {
+              // 모델 매칭
+              const modelMatch = (condition.models || []).length === 0 || 
+                condition.models.some(model => 
+                  modelName === model ||
+                  modelName.includes(model) ||
+                  (mobile?.petName && mobile.petName === model) ||
+                  (mobile?.petName && mobile.petName.includes(model))
+                );
+              
+              // 개통유형 매칭
+              const openingTypeMatch = (condition.openingTypes || []).length === 0 ||
+                condition.openingTypes.includes(openingType);
+              
+              // 요금제군 매칭
+              const planGroupMatch = (condition.planGroups || []).length === 0 ||
+                condition.planGroups.includes(planGroup);
+              
+              // 모든 조건이 일치하면 적용
+              if (modelMatch && openingTypeMatch && planGroupMatch) {
+                policyAmount += condition.amount || 0;
+              }
+            }
+          });
+        });
+      }
+      
+      const finalStoreSupport = baseStoreSupport + policyAmount;
+      
       return {
-        storeSupportWithAddon: priceData.storeSupportWithAddon || 0,
-        purchasePriceWithAddon: Math.max(0, factoryPrice - (priceData.publicSupport || 0) - (priceData.storeSupportWithAddon || 0)),
+        storeSupportWithAddon: finalStoreSupport,
+        purchasePriceWithAddon: Math.max(0, factoryPrice - (priceData.publicSupport || 0) - finalStoreSupport),
         publicSupport: priceData.publicSupport || 0,
         openingType: openingType
       };
@@ -298,7 +425,7 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
       publicSupport: 0,
       openingType: openingType
     };
-  }, [mobileList]);
+  }, [mobileList, conditionalPolicies]);
 
   // calculatePrice 대체 (동기식 상태 업데이트)
   const updatePriceState = useCallback((modelId, planGroup, openingType) => {
