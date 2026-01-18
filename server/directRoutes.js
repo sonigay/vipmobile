@@ -1521,6 +1521,18 @@ async function rebuildPricingMaster(carriersParam) {
             + totalAddonIncentive
             + totalSpecialAddition
           );
+          
+          // 🔥 디버그: 대리점추가지원금 계산 확인 (특정 모델만)
+          if (process.env.NODE_ENV === 'development' && modelName === 'SM-A166L' && planGroup === '33군' && openingType === 'MNP') {
+            console.log(`[Direct][rebuildPricingMaster] ${carrier} 대리점추가지원금 계산 (${modelName}, ${planGroup}, ${openingType}):`, {
+              policyRebate,
+              baseMargin,
+              totalAddonIncentive,
+              totalSpecialAddition,
+              calculatedStoreSupportFull: storeSupportFull,
+              formula: `${policyRebate} - ${baseMargin} + ${totalAddonIncentive} + ${totalSpecialAddition} = ${storeSupportFull}`
+            });
+          }
 
           // 🔥 수정: 부가미유치 기준 제거 (부가서비스 선택/삭제 시 동적 계산으로 대체)
           // 부가미유치 계산 제거
