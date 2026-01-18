@@ -587,6 +587,18 @@ const OpeningInfoPage = ({
     }, [formData.openingType]);
     
     const calculateDynamicStoreSupport = useMemo(() => {
+        // 🔥 수정: 부가서비스가 로드되지 않았거나 initialSelectedItemsRef가 설정되지 않았으면 storeSupportWithAddon 그대로 반환
+        // 부가서비스 로딩이 완료되지 않았으면 계산하지 않고 기본값 반환
+        if (loadingAddonsAndInsurances || (initialSelectedItemsRef.current === null && !hasSavedStoreSupport)) {
+            // 부가서비스 로딩 중이거나 초기 선택 항목이 설정되지 않았으면 storeSupportWithAddon 그대로 사용
+            const baseValue = Number(storeSupportWithAddon) || 0;
+            const additionalAmount = additionalStoreSupport !== null && additionalStoreSupport !== undefined ? Number(additionalStoreSupport) : 0;
+            return {
+                current: Math.max(0, baseValue + additionalAmount),
+                withAddon: Math.max(0, baseValue + additionalAmount)
+            };
+        }
+        
         // 🔥 수정: 가입유형이 변경되었으면 저장된 값 무시하고 최신 storeSupportWithAddon 사용
         const shouldUseSavedValue = hasSavedStoreSupport && 
             !openingTypeChangedRef.current && 
@@ -647,7 +659,8 @@ const OpeningInfoPage = ({
         };
         // 🔥 수정: formData.openingType 의존성 추가 (가입유형 변경 시 재계산)
         // 🔥 수정: storeSupportWithoutAddon 의존성 제거
-    }, [selectedItems, availableAddons, availableInsurances, storeSupportWithAddon, additionalStoreSupport, hasSavedStoreSupport, savedStoreSupport, hasItemsChanged, formData.openingType]);
+        // 🔥 수정: loadingAddonsAndInsurances 의존성 추가 (부가서비스 로딩 완료 후 재계산)
+    }, [selectedItems, availableAddons, availableInsurances, storeSupportWithAddon, additionalStoreSupport, hasSavedStoreSupport, savedStoreSupport, hasItemsChanged, formData.openingType, loadingAddonsAndInsurances]);
 
     // 🔥 추가: 일반약정 대리점추가지원금 표시 전용 함수 (표시만 수정, 저장 및 마진 계산에는 사용하지 않음)
     // 일반약정일 때: min(대리점추가지원금, 출고가 - 이통사지원금)
