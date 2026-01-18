@@ -1335,16 +1335,22 @@ async function rebuildPricingMaster(carriersParam) {
 
     // 기본 정책 마진
     // 🔥 수정: baseMargin과 specialPolicySum을 Number로 변환하여 NaN 방지
-    const baseMargin = Number(safePolicySettings.baseMargin) + Number(specialPolicySum);
+    const baseMarginRaw = Number(safePolicySettings.baseMargin) || 0;
+    const specialPolicySumNum = Number(specialPolicySum) || 0;
+    const baseMargin = baseMarginRaw + specialPolicySumNum;
     
-    // 🔥 디버그: baseMargin 계산 확인 (개발 환경에서만)
-    if (process.env.NODE_ENV === 'development' && createdCount === 0) {
-      console.log(`[Direct][rebuildPricingMaster] ${carrier} 정책마진 계산:`, {
-        baseMarginFromSettings: safePolicySettings.baseMargin,
-        specialPolicySum: specialPolicySum,
-        finalBaseMargin: baseMargin
-      });
-    }
+    // 🔥 디버그: baseMargin 계산 확인 (항상 로그 출력하여 문제 추적)
+    console.log(`[Direct][rebuildPricingMaster] ${carrier} 정책마진 계산:`, {
+      baseMarginFromSettings: safePolicySettings.baseMargin,
+      baseMarginRaw: baseMarginRaw,
+      specialPolicySum: specialPolicySum,
+      specialPolicySumNum: specialPolicySumNum,
+      finalBaseMargin: baseMargin,
+      safePolicySettings: {
+        baseMargin: safePolicySettings.baseMargin,
+        specialPoliciesCount: safePolicySettings.specialPolicies.length
+      }
+    });
 
     for (const mobileRow of carrierModels) {
       const modelName = mobileRow[2]; // Model Name
@@ -1417,11 +1423,11 @@ async function rebuildPricingMaster(carriersParam) {
           }
 
           // 부가서비스 인센티브/차감 합계 (보험은 모델별로 1개만 선택하므로 여기서는 제외)
-          // 🔥 핵심 수정: safePolicySettings 사용
-          const addonIncentiveSum = safePolicySettings.addonList.reduce((acc, cur) => acc + (cur.incentive || 0), 0);
-          const addonDeductionSum = safePolicySettings.addonList.reduce((acc, cur) => acc + (cur.deduction || 0), 0);
-          const totalSpecialAddition = safePolicySettings.specialPolicies.reduce((acc, cur) => acc + (cur.addition || 0), 0);
-          const totalSpecialDeduction = safePolicySettings.specialPolicies.reduce((acc, cur) => acc + (cur.deduction || 0), 0);
+          // 🔥 핵심 수정: safePolicySettings 사용 및 Number 변환 추가
+          const addonIncentiveSum = safePolicySettings.addonList.reduce((acc, cur) => acc + (Number(cur.incentive) || 0), 0);
+          const addonDeductionSum = safePolicySettings.addonList.reduce((acc, cur) => acc + (Number(cur.deduction) || 0), 0);
+          const totalSpecialAddition = safePolicySettings.specialPolicies.reduce((acc, cur) => acc + (Number(cur.addition) || 0), 0);
+          const totalSpecialDeduction = safePolicySettings.specialPolicies.reduce((acc, cur) => acc + (Number(cur.deduction) || 0), 0);
 
           // 🔥 수정: 정책마진 = 기본마진 + 별도정책 합계 (1278번 라인의 baseMargin 사용)
           // baseMargin은 for 루프 밖에서 계산되었으므로 그대로 사용
@@ -1747,12 +1753,28 @@ async function ensureSheetHeaders(sheets, spreadsheetId, sheetName, headers) {
     if (needsInit) {
       await withRetry(async () => {
         const lastColumn = getColumnLetter(headers.length);
-        // 범위를 명시적으로 지정하여 업데이트 (정확히 headers.length만큼만)
+        // 🔥 수정: 기존 헤더가 더 긴 경우, 나머지 컬럼도 빈 값으로 업데이트하여 중복 제거
+        let updateRange = `${sheetName}!A1:${lastColumn}1`;
+        let updateValues = [headers];
+        
+        // 기존 헤더가 더 긴 경우, 나머지 컬럼도 빈 값으로 업데이트
+        if (firstRow.length > headers.length) {
+          const oldLastColumn = getColumnLetter(firstRow.length);
+          updateRange = `${sheetName}!A1:${oldLastColumn}1`;
+          // headers 뒤에 빈 문자열 추가하여 기존 헤더 제거
+          const extendedHeaders = [...headers];
+          for (let i = headers.length; i < firstRow.length; i++) {
+            extendedHeaders.push('');
+          }
+          updateValues = [extendedHeaders];
+        }
+        
+        // 범위를 명시적으로 지정하여 업데이트
         return await sheets.spreadsheets.values.update({
           spreadsheetId,
-          range: `${sheetName}!A1:${lastColumn}1`,
+          range: updateRange,
           valueInputOption: 'USER_ENTERED',
-          resource: { values: [headers] }
+          resource: { values: updateValues }
         });
       });
       // 헤더 업데이트 후 캐시 무효화
