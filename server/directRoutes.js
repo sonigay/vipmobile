@@ -91,9 +91,9 @@ const HEADERS_MOBILE_PRICING = [
   '대리점추가지원금_부가유치',   // 8
   // 🔥 수정: 부가미유치 기준 제거 (9번째 컬럼 제거)
   '정책마진',                   // 9 (인덱스 변경: 10 → 9)
-  '정책ID',                    // 11
-  '기준일자',                   // 12
-  '비고'                        // 13
+  '정책ID',                    // 10 (인덱스 변경: 11 → 10)
+  '기준일자',                   // 11 (인덱스 변경: 12 → 11)
+  '비고'                        // 12 (인덱스 변경: 13 → 12)
 ];
 const HEADERS_TRANSIT_LOCATION = [
   'ID',                        // 0 - 고유 ID (자동 생성)
@@ -964,8 +964,9 @@ async function rebuildPricingMaster(carriersParam) {
     }
 
     // 각 속성이 배열인지 확인하고, 없으면 빈 배열로 설정
+    // 🔥 수정: baseMargin을 Number로 변환하여 NaN 방지
     const safePolicySettings = {
-      baseMargin: policySettings.baseMargin || 0,
+      baseMargin: Number(policySettings.baseMargin) || 0,
       addonList: Array.isArray(policySettings.addonList) ? policySettings.addonList : [],
       insuranceList: Array.isArray(policySettings.insuranceList) ? policySettings.insuranceList : [],
       specialPolicies: Array.isArray(policySettings.specialPolicies) ? policySettings.specialPolicies : []
@@ -975,7 +976,7 @@ async function rebuildPricingMaster(carriersParam) {
     try { supportConfig = JSON.parse(supportRow[4] || '{}'); } catch (e) { }
 
     const supportSheetId = supportRow[2];
-    const { modelRange, planGroupRanges } = supportConfig;
+    const { modelRange, planGroupRanges, openingTypeRange } = supportConfig;
 
     if (!supportSheetId || !modelRange || !planGroupRanges) {
       perCarrierStats[carrier] = { count: 0, warning: 'support 설정 불완전 (시트ID/모델범위/요금제군범위 누락)' };
@@ -1007,6 +1008,10 @@ async function rebuildPricingMaster(carriersParam) {
             .map(v => (v || '').toString().trim());
 
           // 2) 각 요금제군/개통유형별 리베이트 범위 읽기
+          // 🔥 성능 개선: 모든 리베이트 범위를 병렬로 읽기
+          const rebateLoadPromises = [];
+          const rebateLoadMap = new Map(); // key: `${pgName}|${openingType}`, value: { pgName, openingType, range }
+          
           for (const [pgName, typeRanges] of Object.entries(policyPlanGroupRanges)) {
             if (typeof typeRanges !== 'object') continue;
             if (!policyRebateData[pgName]) policyRebateData[pgName] = {};
@@ -1017,48 +1022,64 @@ async function rebuildPricingMaster(carriersParam) {
                 continue;
               }
 
-              try {
-                const rebateValues = await getSheetData(policySheetId, range);
-                const flatRebates = (rebateValues || [])
-                  .flat()
-                  .map(v => {
-                    const n = Number((v || '').toString().replace(/,/g, ''));
-                    // 정책표는 "단위(만원)"로 관리되는 경우가 많아 10,000을 곱해 원 단위로 변환
-                    return isNaN(n) ? 0 : n * 10000;
-                  });
-
-                const rebateMap = {};
-                const maxLen = Math.min(policyModels.length, flatRebates.length);
-                for (let i = 0; i < maxLen; i++) {
-                  const m = policyModels[i];
-                  if (!m) continue;
-                  const rebate = flatRebates[i] || 0;
-
-                  // 원본 모델명
-                  rebateMap[m] = rebate;
-
-                  // 정규화된 모델명/대소문자 변형도 함께 저장해 매칭 성공률을 높임
-                  const norm = normalizeModelCode(m);
-                  if (norm) {
-                    rebateMap[norm] = rebate;
-                    rebateMap[norm.toLowerCase()] = rebate;
-                    rebateMap[norm.toUpperCase()] = rebate;
-                  }
-                  rebateMap[m.toLowerCase()] = rebate;
-                  rebateMap[m.toUpperCase()] = rebate;
-                }
-
-                policyRebateData[pgName][openingType] = rebateMap;
-              } catch (err) {
-                console.warn(`[Direct][rebuildPricingMaster] ${carrier} 리베이트 범위 로딩 실패:`, {
-                  planGroup: pgName,
-                  openingType,
-                  range,
-                  error: err.message
-                });
-                policyRebateData[pgName][openingType] = {};
-              }
+              const key = `${pgName}|${openingType}`;
+              rebateLoadMap.set(key, { pgName, openingType, range });
+              rebateLoadPromises.push(
+                getSheetData(policySheetId, range)
+                  .then(rebateValues => ({ key, rebateValues, success: true }))
+                  .catch(err => ({ key, error: err, success: false }))
+              );
             }
+          }
+
+          // 모든 리베이트 범위를 병렬로 읽기
+          const rebateResults = await Promise.all(rebateLoadPromises);
+
+          // 결과 처리
+          for (const result of rebateResults) {
+            const { pgName, openingType, range } = rebateLoadMap.get(result.key);
+            
+            if (!result.success) {
+              console.warn(`[Direct][rebuildPricingMaster] ${carrier} 리베이트 범위 로딩 실패:`, {
+                planGroup: pgName,
+                openingType,
+                range,
+                error: result.error?.message
+              });
+              policyRebateData[pgName][openingType] = {};
+              continue;
+            }
+
+            const flatRebates = (result.rebateValues || [])
+              .flat()
+              .map(v => {
+                const n = Number((v || '').toString().replace(/,/g, ''));
+                // 정책표는 "단위(만원)"로 관리되는 경우가 많아 10,000을 곱해 원 단위로 변환
+                return isNaN(n) ? 0 : n * 10000;
+              });
+
+            const rebateMap = {};
+            const maxLen = Math.min(policyModels.length, flatRebates.length);
+            for (let i = 0; i < maxLen; i++) {
+              const m = policyModels[i];
+              if (!m) continue;
+              const rebate = flatRebates[i] || 0;
+
+              // 원본 모델명
+              rebateMap[m] = rebate;
+
+              // 정규화된 모델명/대소문자 변형도 함께 저장해 매칭 성공률을 높임
+              const norm = normalizeModelCode(m);
+              if (norm) {
+                rebateMap[norm] = rebate;
+                rebateMap[norm.toLowerCase()] = rebate;
+                rebateMap[norm.toUpperCase()] = rebate;
+              }
+              rebateMap[m.toLowerCase()] = rebate;
+              rebateMap[m.toUpperCase()] = rebate;
+            }
+
+            policyRebateData[pgName][openingType] = rebateMap;
           }
         } catch (err) {
           console.warn(`[Direct][rebuildPricingMaster] ${carrier} 정책표 리베이트 데이터 로딩 실패:`, err.message);
@@ -1067,15 +1088,49 @@ async function rebuildPricingMaster(carriersParam) {
     }
 
     // 3. 지원금표(Support Sheet) 데이터 읽기
+    // 🔥 성능 개선: 모델명 리스트와 openingTypeRange를 병렬로 읽기
+    const supportOpeningTypeRange = openingTypeRange || '';
+    const [modelData, openingTypeData] = await Promise.all([
+      getSheetData(supportSheetId, modelRange),
+      supportOpeningTypeRange ? getSheetData(supportSheetId, supportOpeningTypeRange) : Promise.resolve([])
+    ]);
+    
     // 모델명 리스트 (매칭용)
-    const supportModelsRaw = (await getSheetData(supportSheetId, modelRange)).flat().map(v => (v || '').toString().trim());
+    const supportModelsRaw = (modelData || []).flat().map(v => (v || '').toString().trim());
+    let supportOpeningTypeRows = openingTypeData || [];
 
     // 각 요금제군별 지원금 컬럼 읽기 (원본 배열 보존)
+    // 🔥 성능 개선: 모든 요금제군별 지원금 컬럼을 병렬로 읽기
     const planGroupDataMapRaw = {}; // Key: PlanGroup -> Array of Supports
+    const supportLoadPromises = [];
+    const supportLoadMap = new Map(); // key: pgName, value: pgRange
+    
     for (const [pgName, pgRange] of Object.entries(planGroupRanges)) {
       if (!pgRange) continue;
-      const supportValues = (await getSheetData(supportSheetId, pgRange)).flat();
-      planGroupDataMapRaw[pgName] = supportValues.map(v => {
+      supportLoadMap.set(pgName, pgRange);
+      supportLoadPromises.push(
+        getSheetData(supportSheetId, pgRange)
+          .then(supportValues => ({ pgName, supportValues, success: true }))
+          .catch(err => ({ pgName, error: err, success: false }))
+      );
+    }
+
+    // 모든 요금제군별 지원금 컬럼을 병렬로 읽기
+    const supportResults = await Promise.all(supportLoadPromises);
+
+    // 결과 처리
+    for (const result of supportResults) {
+      if (!result.success) {
+        console.warn(`[Direct][rebuildPricingMaster] ${carrier} 요금제군별 지원금 로딩 실패:`, {
+          planGroup: result.pgName,
+          error: result.error?.message
+        });
+        planGroupDataMapRaw[result.pgName] = [];
+        continue;
+      }
+
+      const supportValues = (result.supportValues || []).flat();
+      planGroupDataMapRaw[result.pgName] = supportValues.map(v => {
         const n = Number((v || '').toString().replace(/[^0-9.-]/g, ''));
         return isNaN(n) ? 0 : n;
       });
@@ -1114,17 +1169,21 @@ async function rebuildPricingMaster(carriersParam) {
     // 3-2. 요금제군 + 개통유형별 이통사지원금 맵 생성
     // planGroupSupportData[planGroup][`${model}|openingType`] = supportValue
     const planGroupSupportData = {};
-    const supportOpeningTypeRange = supportConfig.openingTypeRange || '';
-    let supportOpeningTypeRows = [];
+    // 🔥 성능 개선: supportOpeningTypeRows는 이미 병렬로 읽었으므로 재사용 (1094번 라인)
     // 🔥 핵심 수정: getMobileList와 동일하게 같은 인덱스 사용 (오프셋 없이)
     // planGroupSupportData 생성 시에도 같은 인덱스를 사용하므로, 여기서도 같은 인덱스 사용
     // supportModelsRaw와 supportOpeningTypeRows는 같은 시작 행에서 시작한다고 가정
 
-    if (supportOpeningTypeRange) {
+    // 🔥 성능 개선: supportOpeningTypeRows는 이미 병렬로 읽었으므로 재사용 (1094번 라인에서 읽음)
+    if (supportOpeningTypeRange && supportOpeningTypeRows.length === 0) {
+      // 혹시 읽지 못한 경우에만 다시 읽기
       supportOpeningTypeRows = await getSheetData(supportSheetId, supportOpeningTypeRange);
+    }
+    
+    if (supportOpeningTypeRange) {
       
-      // 디버깅 로그 (첫 번째 모델 확인용)
-      if (validIndexes.length > 0) {
+      // 🔥 성능 개선: 디버깅 로그는 개발 환경에서만 실행 (프로덕션 성능 향상)
+      if (process.env.NODE_ENV === 'development' && validIndexes.length > 0) {
         const firstOriginalIndex = validIndexes[0];
         const firstModelName = (supportModelsRaw[firstOriginalIndex] || '').toString().trim();
         // 같은 인덱스 사용 (오프셋 없이)
@@ -1272,10 +1331,20 @@ async function rebuildPricingMaster(carriersParam) {
     const totalAddonDeduction = safePolicySettings.addonList.reduce((acc, cur) => acc + Math.abs(cur.deduction || 0), 0) +
       safePolicySettings.insuranceList.reduce((acc, cur) => acc + Math.abs(cur.deduction || 0), 0);
     // 별도 정책 합계
-    const specialPolicySum = safePolicySettings.specialPolicies.reduce((acc, cur) => acc + (cur.addition || 0) - (cur.deduction || 0), 0);
+    const specialPolicySum = safePolicySettings.specialPolicies.reduce((acc, cur) => acc + (Number(cur.addition) || 0) - (Number(cur.deduction) || 0), 0);
 
     // 기본 정책 마진
-    const baseMargin = safePolicySettings.baseMargin + specialPolicySum;
+    // 🔥 수정: baseMargin과 specialPolicySum을 Number로 변환하여 NaN 방지
+    const baseMargin = Number(safePolicySettings.baseMargin) + Number(specialPolicySum);
+    
+    // 🔥 디버그: baseMargin 계산 확인 (개발 환경에서만)
+    if (process.env.NODE_ENV === 'development' && createdCount === 0) {
+      console.log(`[Direct][rebuildPricingMaster] ${carrier} 정책마진 계산:`, {
+        baseMarginFromSettings: safePolicySettings.baseMargin,
+        specialPolicySum: specialPolicySum,
+        finalBaseMargin: baseMargin
+      });
+    }
 
     for (const mobileRow of carrierModels) {
       const modelName = mobileRow[2]; // Model Name
@@ -1671,11 +1740,14 @@ async function ensureSheetHeaders(sheets, spreadsheetId, sheetName, headers) {
       });
     });
     const firstRow = res.data.values && res.data.values[0] ? res.data.values[0] : [];
-    const needsInit = firstRow.length === 0 || headers.some((h, i) => (firstRow[i] || '') !== h) || firstRow.length < headers.length;
+    // 🔥 수정: 헤더 길이가 다르거나 내용이 다르면 업데이트 (기존 헤더가 더 긴 경우도 처리)
+    const needsInit = firstRow.length === 0 || 
+      firstRow.length !== headers.length || 
+      headers.some((h, i) => (firstRow[i] || '').toString().trim() !== h.toString().trim());
     if (needsInit) {
       await withRetry(async () => {
         const lastColumn = getColumnLetter(headers.length);
-        // 범위를 명시적으로 지정하여 업데이트
+        // 범위를 명시적으로 지정하여 업데이트 (정확히 headers.length만큼만)
         return await sheets.spreadsheets.values.update({
           spreadsheetId,
           range: `${sheetName}!A1:${lastColumn}1`,
@@ -1703,10 +1775,14 @@ async function ensureSheetHeaders(sheets, spreadsheetId, sheetName, headers) {
           });
         });
         const firstRow = res.data.values && res.data.values[0] ? res.data.values[0] : [];
-        const needsInit = firstRow.length === 0 || headers.some((h, i) => (firstRow[i] || '') !== h) || firstRow.length < headers.length;
+        // 🔥 수정: 헤더 길이가 다르거나 내용이 다르면 업데이트 (기존 헤더가 더 긴 경우도 처리)
+        const needsInit = firstRow.length === 0 || 
+          firstRow.length !== headers.length || 
+          headers.some((h, i) => (firstRow[i] || '').toString().trim() !== h.toString().trim());
         if (needsInit) {
           await withRetry(async () => {
             const lastColumn = getColumnLetter(headers.length);
+            // 범위를 명시적으로 지정하여 업데이트 (정확히 headers.length만큼만)
             return await sheets.spreadsheets.values.update({
               spreadsheetId,
               range: `${sheetName}!A1:${lastColumn}1`,
