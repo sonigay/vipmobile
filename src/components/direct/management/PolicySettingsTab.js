@@ -1219,37 +1219,39 @@ const PolicySettingsTab = () => {
                                                     {!policy.isActive && <Chip label="미적용" size="small" />}
                                                 </Stack>
                                             }
+                                            secondary={
+                                                <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
+                                                    <Chip 
+                                                        label={policy.policyType === 'conditional' ? '조건기반' : '일반'} 
+                                                        size="small" 
+                                                        color={policy.policyType === 'conditional' ? 'primary' : 'default'}
+                                                    />
+                                                    {policy.amount !== undefined && policy.amount !== 0 && (
+                                                        <Typography variant="body2" color={policy.isActive ? (policy.amount > 0 ? "primary" : "error") : "text.disabled"}>
+                                                            {policy.amount > 0 ? '+' : ''}{policy.amount.toLocaleString()}
+                                                        </Typography>
+                                                    )}
+                                                    {/* 하위 호환: 기존 addition/deduction 표시 */}
+                                                    {policy.addition > 0 && (
+                                                        <Typography variant="body2" color={policy.isActive ? "primary" : "text.disabled"}>
+                                                            +{policy.addition.toLocaleString()}
+                                                        </Typography>
+                                                    )}
+                                                    {policy.deduction > 0 && (
+                                                        <Typography variant="body2" color={policy.isActive ? "error" : "text.disabled"}>
+                                                            -{policy.deduction.toLocaleString()}
+                                                        </Typography>
+                                                    )}
+                                                </Stack>
+                                            }
                                         />
-                                        <Stack direction="row" spacing={2} alignItems="center" sx={{ mr: 2 }}>
-                                            <Chip 
-                                                label={policy.policyType === 'conditional' ? '조건기반' : '일반'} 
-                                                size="small" 
-                                                color={policy.policyType === 'conditional' ? 'primary' : 'default'}
-                                            />
-                                            {policy.amount !== undefined && policy.amount !== 0 && (
-                                                <Typography variant="body2" color={policy.isActive ? (policy.amount > 0 ? "primary" : "error") : "text.disabled"}>
-                                                    {policy.amount > 0 ? '+' : ''}{policy.amount.toLocaleString()}
-                                                </Typography>
-                                            )}
-                                            {/* 하위 호환: 기존 addition/deduction 표시 */}
-                                            {policy.addition > 0 && (
-                                                <Typography variant="body2" color={policy.isActive ? "primary" : "text.disabled"}>
-                                                    +{policy.addition.toLocaleString()}
-                                                </Typography>
-                                            )}
-                                            {policy.deduction > 0 && (
-                                                <Typography variant="body2" color={policy.isActive ? "error" : "text.disabled"}>
-                                                    -{policy.deduction.toLocaleString()}
-                                                </Typography>
-                                            )}
-                                        </Stack>
                                         <ListItemSecondaryAction>
                                             <Stack direction="row" spacing={1}>
-                                                <IconButton edge="end" onClick={() => handleEditSpecial(policy)} color="primary">
-                                                    <EditIcon />
+                                                <IconButton edge="end" onClick={() => handleEditSpecial(policy)} color="primary" size="small">
+                                                    <EditIcon fontSize="small" />
                                                 </IconButton>
-                                                <IconButton edge="end" onClick={() => handleDeleteSpecial(policy.id)} color="error">
-                                                    <DeleteIcon />
+                                                <IconButton edge="end" onClick={() => handleDeleteSpecial(policy.id)} color="error" size="small">
+                                                    <DeleteIcon fontSize="small" />
                                                 </IconButton>
                                             </Stack>
                                         </ListItemSecondaryAction>
