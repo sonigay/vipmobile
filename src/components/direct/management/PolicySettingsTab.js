@@ -917,51 +917,93 @@ const PolicySettingsTab = () => {
                                                                 <Autocomplete
                                                                     multiple
                                                                     size="small"
-                                                                    options={availableModels}
-                                                                    value={condition.models || []}
-                                                                    onChange={(e, newValue) => handleUpdateCondition(condIdx, 'models', newValue)}
+                                                                    options={['전모델', ...availableModels]}
+                                                                    value={(condition.models || []).length === 0 ? ['전모델'] : condition.models}
+                                                                    onChange={(e, newValue) => {
+                                                                        // 🔥 "전모델" 선택 처리
+                                                                        if (newValue.includes('전모델')) {
+                                                                            // "전모델"이 선택되면 다른 선택 모두 제거하고 빈 배열로 저장 (전체 의미)
+                                                                            handleUpdateCondition(condIdx, 'models', []);
+                                                                        } else {
+                                                                            // "전모델"이 선택되지 않으면 일반 선택 처리
+                                                                            handleUpdateCondition(condIdx, 'models', newValue);
+                                                                        }
+                                                                    }}
                                                                     renderInput={(params) => (
-                                                                        <TextField {...params} label="대상 모델" placeholder="모델 검색" />
+                                                                        <TextField {...params} label="대상 모델" placeholder="모델 검색 또는 전모델 선택" />
                                                                     )}
-                                                                    renderTags={(value, getTagProps) =>
-                                                                        value.map((option, index) => (
+                                                                    renderTags={(value, getTagProps) => {
+                                                                        // "전모델"이 포함되어 있거나 빈 배열이면 "전모델"만 표시
+                                                                        if (value.includes('전모델') || value.length === 0) {
+                                                                            return <Chip label="전모델" size="small" color="primary" onDelete={() => handleUpdateCondition(condIdx, 'models', [])} />;
+                                                                        }
+                                                                        return value.map((option, index) => (
                                                                             <Chip label={option} size="small" {...getTagProps({ index })} />
-                                                                        ))
-                                                                    }
+                                                                        ));
+                                                                    }}
+                                                                    getOptionLabel={(option) => option === '전모델' ? '전모델 (모든 모델)' : option}
                                                                 />
                                                             </Grid>
                                                             <Grid item xs={12} sm={6}>
                                                                 <Autocomplete
                                                                     multiple
                                                                     size="small"
-                                                                    options={['010신규', 'MNP', '기변']}
-                                                                    value={condition.openingTypes || []}
-                                                                    onChange={(e, newValue) => handleUpdateCondition(condIdx, 'openingTypes', newValue)}
+                                                                    options={['전유형', '010신규', 'MNP', '기변']}
+                                                                    value={(condition.openingTypes || []).length === 0 ? ['전유형'] : condition.openingTypes}
+                                                                    onChange={(e, newValue) => {
+                                                                        // 🔥 "전유형" 선택 처리
+                                                                        if (newValue.includes('전유형')) {
+                                                                            // "전유형"이 선택되면 다른 선택 모두 제거하고 빈 배열로 저장 (전체 의미)
+                                                                            handleUpdateCondition(condIdx, 'openingTypes', []);
+                                                                        } else {
+                                                                            // "전유형"이 선택되지 않으면 일반 선택 처리
+                                                                            handleUpdateCondition(condIdx, 'openingTypes', newValue);
+                                                                        }
+                                                                    }}
                                                                     renderInput={(params) => (
-                                                                        <TextField {...params} label="개통 유형" placeholder="유형 선택" />
+                                                                        <TextField {...params} label="개통 유형" placeholder="유형 선택 또는 전유형 선택" />
                                                                     )}
-                                                                    renderTags={(value, getTagProps) =>
-                                                                        value.map((option, index) => (
+                                                                    renderTags={(value, getTagProps) => {
+                                                                        // "전유형"이 포함되어 있거나 빈 배열이면 "전유형"만 표시
+                                                                        if (value.includes('전유형') || value.length === 0) {
+                                                                            return <Chip label="전유형" size="small" color="primary" onDelete={() => handleUpdateCondition(condIdx, 'openingTypes', [])} />;
+                                                                        }
+                                                                        return value.map((option, index) => (
                                                                             <Chip label={option} size="small" {...getTagProps({ index })} />
-                                                                        ))
-                                                                    }
+                                                                        ));
+                                                                    }}
+                                                                    getOptionLabel={(option) => option === '전유형' ? '전유형 (모든 유형)' : option}
                                                                 />
                                                             </Grid>
                                                             <Grid item xs={12} sm={6}>
                                                                 <Autocomplete
                                                                     multiple
                                                                     size="small"
-                                                                    options={availablePlanGroups}
-                                                                    value={condition.planGroups || []}
-                                                                    onChange={(e, newValue) => handleUpdateCondition(condIdx, 'planGroups', newValue)}
+                                                                    options={['전요금제', ...availablePlanGroups]}
+                                                                    value={(condition.planGroups || []).length === 0 ? ['전요금제'] : condition.planGroups}
+                                                                    onChange={(e, newValue) => {
+                                                                        // 🔥 "전요금제" 선택 처리
+                                                                        if (newValue.includes('전요금제')) {
+                                                                            // "전요금제"가 선택되면 다른 선택 모두 제거하고 빈 배열로 저장 (전체 의미)
+                                                                            handleUpdateCondition(condIdx, 'planGroups', []);
+                                                                        } else {
+                                                                            // "전요금제"가 선택되지 않으면 일반 선택 처리
+                                                                            handleUpdateCondition(condIdx, 'planGroups', newValue);
+                                                                        }
+                                                                    }}
                                                                     renderInput={(params) => (
-                                                                        <TextField {...params} label="요금제군" placeholder="요금제군 검색" />
+                                                                        <TextField {...params} label="요금제군" placeholder="요금제군 검색 또는 전요금제 선택" />
                                                                     )}
-                                                                    renderTags={(value, getTagProps) =>
-                                                                        value.map((option, index) => (
+                                                                    renderTags={(value, getTagProps) => {
+                                                                        // "전요금제"가 포함되어 있거나 빈 배열이면 "전요금제"만 표시
+                                                                        if (value.includes('전요금제') || value.length === 0) {
+                                                                            return <Chip label="전요금제" size="small" color="primary" onDelete={() => handleUpdateCondition(condIdx, 'planGroups', [])} />;
+                                                                        }
+                                                                        return value.map((option, index) => (
                                                                             <Chip label={option} size="small" {...getTagProps({ index })} />
-                                                                        ))
-                                                                    }
+                                                                        ));
+                                                                    }}
+                                                                    getOptionLabel={(option) => option === '전요금제' ? '전요금제 (모든 요금제군)' : option}
                                                                 />
                                                             </Grid>
                                                             <Grid item xs={12} sm={6}>
