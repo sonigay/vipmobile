@@ -161,6 +161,107 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
         return stores;
     }, [stores]);
 
+    // 이미지 갱신 함수
+    const handleRefreshImages = async () => {
+        if (!selectedStore?.name || !selectedStoreDetails?.photos) {
+            return;
+        }
+
+        setRefreshingImages(true);
+        try {
+            const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3002';
+            const photoTypes = ['front', 'inside', 'outside', 'outside2', 'manager', 'staff1', 'staff2', 'staff3'];
+            const photoMap = {
+                front: { messageId: 'frontMessageId', threadId: 'frontThreadId' },
+                inside: { messageId: 'insideMessageId', threadId: 'insideThreadId' },
+                outside: { messageId: 'outsideMessageId', threadId: 'outsideThreadId' },
+                outside2: { messageId: 'outside2MessageId', threadId: 'outside2ThreadId' },
+                manager: { messageId: 'managerMessageId', threadId: 'managerThreadId' },
+                staff1: { messageId: 'staff1MessageId', threadId: 'staff1ThreadId' },
+                staff2: { messageId: 'staff2MessageId', threadId: 'staff2ThreadId' },
+                staff3: { messageId: 'staff3MessageId', threadId: 'staff3ThreadId' }
+            };
+
+            // 모든 사진 갱신 시도
+            const refreshPromises = photoTypes.map(async (photoType) => {
+                const messageId = selectedStoreDetails.photos[photoMap[photoType].messageId];
+                const threadId = selectedStoreDetails.photos[photoMap[photoType].threadId];
+                
+                if (messageId && threadId) {
+                    try {
+                        const response = await fetch(`${API_URL}/api/direct/refresh-store-photo-url`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                storeName: selectedStore.name,
+                                photoType: photoType,
+                                threadId: threadId,
+                                messageId: messageId
+                            })
+                        });
+                        return response.json();
+                    } catch (error) {
+                        console.error(`매장 사진 갱신 실패 (${photoType}):`, error);
+                        return { success: false };
+                    }
+                }
+                return { success: false, skipped: true };
+            });
+
+            await Promise.all(refreshPromises);
+
+            // 갱신 후 사진 다시 로드
+            const photos = await customerAPI.getStorePhotos(selectedStore.name);
+            if (photos) {
+                const details = {
+                    ...selectedStoreDetails,
+                    photos: {
+                        frontUrl: photos.frontPhoto,
+                        frontMessageId: photos.frontMessageId,
+                        frontThreadId: photos.frontThreadId,
+                        insideUrl: photos.insidePhoto,
+                        insideMessageId: photos.insideMessageId,
+                        insideThreadId: photos.insideThreadId,
+                        outsideUrl: photos.outsidePhoto,
+                        outsideMessageId: photos.outsideMessageId,
+                        outsideThreadId: photos.outsideThreadId,
+                        outside2Url: photos.outside2Photo,
+                        outside2MessageId: photos.outside2MessageId,
+                        outside2ThreadId: photos.outside2ThreadId,
+                        managerUrl: photos.managerPhoto,
+                        managerMessageId: photos.managerMessageId,
+                        managerThreadId: photos.managerThreadId,
+                        staff1Url: photos.staff1Photo,
+                        staff1MessageId: photos.staff1MessageId,
+                        staff1ThreadId: photos.staff1ThreadId,
+                        staff2Url: photos.staff2Photo,
+                        staff2MessageId: photos.staff2MessageId,
+                        staff2ThreadId: photos.staff2ThreadId,
+                        staff3Url: photos.staff3Photo,
+                        staff3MessageId: photos.staff3MessageId,
+                        staff3ThreadId: photos.staff3ThreadId
+                    }
+                };
+                setSelectedStoreDetails(details);
+                
+                // 메인 사진 업데이트
+                const currentMainPhoto = mainPhoto;
+                const updatedMainPhoto = details.photos.frontUrl || 
+                                       details.photos.insideUrl || 
+                                       details.photos.outsideUrl || 
+                                       details.photos.outside2Url || null;
+                if (currentMainPhoto && updatedMainPhoto) {
+                    setMainPhoto(updatedMainPhoto + '?t=' + Date.now()); // 캐시 무효화
+                }
+            }
+        } catch (error) {
+            console.error('이미지 갱신 오류:', error);
+            alert('이미지 갱신 중 오류가 발생했습니다.');
+        } finally {
+            setRefreshingImages(false);
+        }
+    };
+
     // 맵에서 매장 클릭 시 (상세 정보만 표시, 선택은 버튼으로)
     const handleStoreClick = (store) => {
         setSelectedStore(store);

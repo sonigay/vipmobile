@@ -220,7 +220,10 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
             isRecommended: m.isRecommended,
             isCheap: m.isCheap,
             publicSupport: publicSupport, // 초기값
-            support: publicSupport // Legacy field support
+            support: publicSupport, // Legacy field support
+            discordMessageId: m.discordMessageId, // Discord 메시지 ID
+            discordThreadId: m.discordThreadId, // Discord 스레드 ID
+            modelId: m.modelId // modelId 필드 유지
           };
         });
 
@@ -305,16 +308,20 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               carrier: carrier,
-              modelId: model.id || model.modelId,
+              modelId: model.modelId || model.id,
               modelName: model.model || model.petName,
               threadId: model.discordThreadId,
               messageId: model.discordMessageId
             })
           });
-          return response.json();
+          const result = await response.json();
+          if (!result.success) {
+            console.warn(`모델 이미지 갱신 실패 (${model.model || model.petName}):`, result.error);
+          }
+          return result;
         } catch (error) {
           console.error(`모델 이미지 갱신 실패 (${model.model || model.petName}):`, error);
-          return { success: false };
+          return { success: false, error: error.message };
         }
       });
 
@@ -1289,10 +1296,20 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                         minWidth: 'auto',
                         fontSize: '0.7rem',
                         py: 0.3,
-                        px: 0.8
+                        px: 0.8,
+                        whiteSpace: 'nowrap',
+                        lineHeight: 1.2
                       }}
                     >
-                      {refreshingAllImages ? '갱신 중...' : '이미지갱신하기'}
+                      {refreshingAllImages ? (
+                        <Box component="span" sx={{ fontSize: '0.65rem' }}>
+                          갱신<br />중...
+                        </Box>
+                      ) : (
+                        <Box component="span" sx={{ fontSize: '0.65rem' }}>
+                          이미지<br />갱신하기
+                        </Box>
+                      )}
                     </Button>
                   </Box>
                 </ModernTableCell>
