@@ -395,10 +395,23 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
           const uniqueGroups = [...new Set(plans.map(p => p.planGroup))].filter(Boolean);
 
           // 가격 정책 데이터 인덱싱 (Lookup Map 생성)
+          // 🔥 수정: 시트에 '010신규/기변'으로 저장된 데이터를 '010신규'와 '기변'에도 매핑
           const priceMap = new Map();
           pricing.forEach(p => {
-            const key = `${p.modelId}-${p.planGroup}-${p.openingType}`;
-            priceMap.set(key, p);
+            const baseKey = `${p.modelId}-${p.planGroup}-${p.openingType}`;
+            priceMap.set(baseKey, p);
+            
+            // 🔥 수정: '010신규/기변'으로 저장된 데이터를 '010신규'와 '기변'에도 매핑
+            if (p.openingType === '010신규/기변') {
+              const key010 = `${p.modelId}-${p.planGroup}-010신규`;
+              const key기변 = `${p.modelId}-${p.planGroup}-기변`;
+              if (!priceMap.has(key010)) {
+                priceMap.set(key010, { ...p, openingType: '010신규' });
+              }
+              if (!priceMap.has(key기변)) {
+                priceMap.set(key기변, { ...p, openingType: '기변' });
+              }
+            }
           });
           pricingDataRef.current = priceMap;
           console.log('🔄 [휴대폰목록] 가격 정책 데이터 업데이트 완료');
