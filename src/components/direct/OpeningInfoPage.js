@@ -552,19 +552,22 @@ const OpeningInfoPage = ({
     // 초기 로드 완료 여부 확인 (부가서비스 목록이 로드되고 selectedItems가 설정된 후)
     useEffect(() => {
         // 🔥 수정: 부가서비스 로딩이 완료되고 selectedItems가 설정된 후에만 initialSelectedItemsRef 설정
-        // selectedItems.length >= 0 조건은 항상 true이므로 의미 없음 → selectedItems.length > 0으로 변경
+        // 가입유형 변경 후에도 새로운 selectedItems가 설정되면 initialSelectedItemsRef를 재설정해야 함
         if ((availableAddons.length > 0 || availableInsurances.length > 0) && !loadingAddonsAndInsurances) {
-            if (isInitialLoadRef.current && selectedItems.length > 0) {
+            // 🔥 수정: isInitialLoadRef가 true이거나 initialSelectedItemsRef가 null일 때 설정
+            // 가입유형 변경 시 initialSelectedItemsRef가 null로 리셋되므로, 다시 설정해야 함
+            if ((isInitialLoadRef.current || initialSelectedItemsRef.current === null) && selectedItems.length >= 0) {
                 // 🔥 수정: selectedItems의 깊은 복사 및 디버그 로그 추가
                 initialSelectedItemsRef.current = selectedItems.map(item => ({ ...item }));
                 isInitialLoadRef.current = false;
                 console.log('[OpeningInfoPage] initialSelectedItemsRef 설정:', {
+                    openingType: formData.openingType,
                     count: initialSelectedItemsRef.current.length,
                     items: initialSelectedItemsRef.current.map(i => ({ name: i.name, incentive: i.incentive, deduction: i.deduction }))
                 });
             }
         }
-    }, [selectedItems, availableAddons.length, availableInsurances.length, loadingAddonsAndInsurances]);
+    }, [selectedItems, availableAddons.length, availableInsurances.length, loadingAddonsAndInsurances, formData.openingType]);
     
     // 부가서비스 선택이 변경되었는지 확인
     const hasItemsChanged = useMemo(() => {
@@ -596,7 +599,8 @@ const OpeningInfoPage = ({
     const calculateDynamicStoreSupport = useMemo(() => {
         // 🔥 수정: 부가서비스가 로드되지 않았거나 initialSelectedItemsRef가 설정되지 않았으면 storeSupportWithAddon 그대로 반환
         // 부가서비스 로딩이 완료되지 않았으면 계산하지 않고 기본값 반환
-        if (loadingAddonsAndInsurances || (initialSelectedItemsRef.current === null && !hasSavedStoreSupport)) {
+        // 🔥 수정: 가입유형 변경 후 initialSelectedItemsRef가 null이면 계산하지 않고 기본값 반환
+        if (loadingAddonsAndInsurances || initialSelectedItemsRef.current === null) {
             // 부가서비스 로딩 중이거나 초기 선택 항목이 설정되지 않았으면 storeSupportWithAddon 그대로 사용
             const baseValue = Number(storeSupportWithAddon) || 0;
             const additionalAmount = additionalStoreSupport !== null && additionalStoreSupport !== undefined ? Number(additionalStoreSupport) : 0;
