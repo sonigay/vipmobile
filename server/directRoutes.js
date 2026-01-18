@@ -3874,7 +3874,7 @@ function setupDirectRoutes(app) {
         ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_MARGIN, HEADERS_POLICY_MARGIN)
           .then(() => sheets.spreadsheets.values.get({
             spreadsheetId: SPREADSHEET_ID,
-            range: SHEET_POLICY_MARGIN
+            range: `${SHEET_POLICY_MARGIN}!A:B` // 🔥 수정: 명시적으로 A:B 범위 지정 (getPolicySettings와 동일)
           })),
         ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_ADDON, HEADERS_POLICY_ADDON)
           .then(() => sheets.spreadsheets.values.get({
