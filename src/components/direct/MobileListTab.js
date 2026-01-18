@@ -1301,9 +1301,11 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                     borderColor: 'divider'
                   }}
                 >
-                  대리점 지원금
-                  <Box sx={{ fontSize: '0.75rem', color: 'text.secondary', mt: 0.5 }}>
-                    <span>부가보험 모두 유치시</span>
+                  <Box sx={{ lineHeight: 1.3 }}>
+                    <Box sx={{ mb: 0.5 }}>대리점 지원금</Box>
+                    <Box sx={{ fontSize: '0.65rem', color: 'error.main', fontWeight: 'normal', lineHeight: 1.2 }}>
+                      부가보험<br />모두 유치시
+                    </Box>
                   </Box>
                 </ModernTableCell>
                 <ModernTableCell
@@ -1318,9 +1320,12 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                     borderColor: 'divider'
                   }}
                 >
-                  구매가 (할부원금)
-                  <Box sx={{ fontSize: '0.75rem', color: 'text.secondary', mt: 0.5 }}>
-                    <span>부가보험 모두 유치시</span>
+                  <Box sx={{ lineHeight: 1.3 }}>
+                    <Box sx={{ mb: 0.5 }}>구매가</Box>
+                    <Box sx={{ fontSize: '0.7rem', mb: 0.3 }}>(할부원금)</Box>
+                    <Box sx={{ fontSize: '0.65rem', color: 'error.main', fontWeight: 'normal', lineHeight: 1.2 }}>
+                      부가보험<br />모두 유치시
+                    </Box>
                   </Box>
                 </ModernTableCell>
               </TableRow>
