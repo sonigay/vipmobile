@@ -261,13 +261,49 @@ async function getPolicySettings(carrier) {
     const marginRes = await withRetry(async () => {
       return await sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
-        range: SHEET_POLICY_MARGIN
+        range: `${SHEET_POLICY_MARGIN}!A:B` // 🔥 수정: 명시적으로 A:B 범위 지정
       });
     });
-    const marginRows = (marginRes.data.values || []).slice(1);
-    const marginRow = marginRows.find(row => (row[0] || '').trim() === carrier);
+    const allMarginRows = marginRes.data.values || [];
+    const marginRows = allMarginRows.slice(1); // 헤더 제거
+    const marginRow = marginRows.find(row => {
+      const rowCarrier = (row[0] || '').toString().trim();
+      const targetCarrier = carrier.toString().trim();
+      return rowCarrier === targetCarrier;
+    });
     // 설정된 마진이 없으면 기본값을 0원으로 처리
-    const baseMargin = marginRow ? Number(marginRow[1] || 0) : 0;
+    const marginValue = marginRow && marginRow[1] !== undefined && marginRow[1] !== null && marginRow[1] !== '' 
+      ? marginRow[1] 
+      : null;
+    const baseMargin = marginValue !== null ? Number(marginValue) || 0 : 0;
+    
+    // 🔥 디버그: 정책 마진 읽기 확인 (상세 로그)
+    console.log(`[Direct][getPolicySettings] ${carrier} 정책마진 읽기:`, {
+      sheetName: SHEET_POLICY_MARGIN,
+      allRowsCount: allMarginRows.length,
+      marginRowsCount: marginRows.length,
+      foundRow: marginRow ? true : false,
+      marginRowData: marginRow ? { 
+        carrier: marginRow[0], 
+        carrierType: typeof marginRow[0],
+        margin: marginRow[1],
+        marginType: typeof marginRow[1],
+        marginRaw: marginRow[1],
+        marginNumber: Number(marginRow[1] || 0),
+        rowLength: marginRow.length,
+        fullRow: marginRow
+      } : null,
+      marginValue: marginValue,
+      finalBaseMargin: baseMargin,
+      allCarriers: marginRows.map((r, idx) => ({ 
+        index: idx, 
+        carrier: r[0], 
+        carrierType: typeof r[0],
+        margin: r[1],
+        marginType: typeof r[1],
+        fullRow: r
+      }))
+    });
 
     // 부가서비스, 보험상품, 별도정책 병렬 읽기 (재시도 로직 포함)
     const [addonRes, insuranceRes, specialRes] = await Promise.all([
