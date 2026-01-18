@@ -34,7 +34,8 @@ import {
   Recommend as RecommendIcon,
   Star as StarIcon,
   Label as LabelIcon,
-  Refresh as RefreshIcon
+  Refresh as RefreshIcon,
+  Image as ImageIcon
 } from '@mui/icons-material';
 import { Checkbox } from '@mui/material';
 import { directStoreApiClient } from '../../api/directStoreApiClient';
@@ -67,6 +68,7 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
   const [calculatedPrices, setCalculatedPrices] = useState({}); // { modelId-openingType: PriceObj }
   const [reloadTrigger, setReloadTrigger] = useState(0); // 새로고침 트리거
   const [policySettings, setPolicySettings] = useState(null); // 🔥 정책 설정 저장
+  const [refreshingAllImages, setRefreshingAllImages] = useState(false); // 전체 이미지 갱신 상태
 
   const pricingDataRef = useRef(new Map()); // Key: modelId-planGroup-openingType -> PriceData
   const userSelectedOpeningTypesRef = useRef(new Set()); // 사용자가 수동으로 선택한 개통유형 추적
@@ -271,6 +273,61 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
     initializedRef.current = false;
     setLoading(true);
     setError(null);
+  };
+
+  // 전체 이미지 갱신 함수
+  const handleRefreshAllImages = async () => {
+    if (!mobileList || mobileList.length === 0) {
+      return;
+    }
+
+    setRefreshingAllImages(true);
+    try {
+      const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3002';
+      const carrier = getCurrentCarrier();
+      
+      // Discord 메시지 ID와 스레드 ID가 있는 모델만 필터링
+      const modelsToRefresh = mobileList.filter(m => 
+        m.discordMessageId && m.discordThreadId
+      );
+
+      if (modelsToRefresh.length === 0) {
+        alert('갱신할 수 있는 이미지가 없습니다.');
+        setRefreshingAllImages(false);
+        return;
+      }
+
+      // 모든 모델 이미지 갱신 시도
+      const refreshPromises = modelsToRefresh.map(async (model) => {
+        try {
+          const response = await fetch(`${API_URL}/api/direct/refresh-mobile-image-url`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              carrier: carrier,
+              modelId: model.id || model.modelId,
+              modelName: model.model || model.petName,
+              threadId: model.discordThreadId,
+              messageId: model.discordMessageId
+            })
+          });
+          return response.json();
+        } catch (error) {
+          console.error(`모델 이미지 갱신 실패 (${model.model || model.petName}):`, error);
+          return { success: false };
+        }
+      });
+
+      await Promise.all(refreshPromises);
+
+      // 갱신 후 데이터 다시 로드
+      handleReload();
+    } catch (error) {
+      console.error('이미지 갱신 오류:', error);
+      alert('이미지 갱신 중 오류가 발생했습니다.');
+    } finally {
+      setRefreshingAllImages(false);
+    }
   };
 
   // handleReload 재구현을 위해 useEffect 분리 대신 
@@ -1218,7 +1275,26 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                     borderColor: 'divider'
                   }}
                 >
-                  이미지
+                  <Box>
+                    <Typography variant="body2" sx={{ mb: 0.5 }}>
+                      이미지
+                    </Typography>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<RefreshIcon />}
+                      onClick={handleRefreshAllImages}
+                      disabled={refreshingAllImages}
+                      sx={{ 
+                        minWidth: 'auto',
+                        fontSize: '0.7rem',
+                        py: 0.3,
+                        px: 0.8
+                      }}
+                    >
+                      {refreshingAllImages ? '갱신 중...' : '이미지갱신하기'}
+                    </Button>
+                  </Box>
                 </ModernTableCell>
                 <ModernTableCell
                   align="center"
@@ -1302,8 +1378,8 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                   }}
                 >
                   <Box sx={{ lineHeight: 1.3 }}>
-                    <Box sx={{ mb: 0.5 }}>대리점 지원금</Box>
-                    <Box sx={{ fontSize: '0.65rem', color: 'error.main', fontWeight: 'normal', lineHeight: 1.2 }}>
+                    <Box sx={{ mb: 1 }}>대리점 지원금</Box>
+                    <Box sx={{ fontSize: '0.65rem', color: 'error.main', fontWeight: 'bold', lineHeight: 1.2 }}>
                       부가보험<br />모두 유치시
                     </Box>
                   </Box>
@@ -1322,8 +1398,8 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                 >
                   <Box sx={{ lineHeight: 1.3 }}>
                     <Box sx={{ mb: 0.5 }}>구매가</Box>
-                    <Box sx={{ fontSize: '0.7rem', mb: 0.3 }}>(할부원금)</Box>
-                    <Box sx={{ fontSize: '0.65rem', color: 'error.main', fontWeight: 'normal', lineHeight: 1.2 }}>
+                    <Box sx={{ fontSize: '0.7rem', mb: 1 }}>(할부원금)</Box>
+                    <Box sx={{ fontSize: '0.65rem', color: 'error.main', fontWeight: 'bold', lineHeight: 1.2 }}>
                       부가보험<br />모두 유치시
                     </Box>
                   </Box>

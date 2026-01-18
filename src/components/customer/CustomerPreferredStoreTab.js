@@ -4,7 +4,7 @@ import {
     TableCell, TableContainer, TableHead, TableRow, Button, Grid, Card, CardContent,
     FormControlLabel, Switch, useMediaQuery, useTheme
 } from '@mui/material';
-import { Store as StoreIcon } from '@mui/icons-material';
+import { Store as StoreIcon, Refresh as RefreshIcon } from '@mui/icons-material';
 import Map from '../Map';
 import { fetchData, customerAPI } from '../../api';
 import { directStoreApiClient } from '../../api/directStoreApiClient';
@@ -25,6 +25,8 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
     // 대중교통 위치 데이터
     const [transitLocations, setTransitLocations] = useState([]);
     const [showTransitMarkers, setShowTransitMarkers] = useState(true);
+    // 이미지 갱신 상태
+    const [refreshingImages, setRefreshingImages] = useState(false);
 
     useEffect(() => {
         // Get user location
@@ -104,13 +106,29 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                     preApprovalMark: mark?.url || null,
                     photos: photos ? {
                         frontUrl: photos.frontPhoto,
+                        frontMessageId: photos.frontMessageId,
+                        frontThreadId: photos.frontThreadId,
                         insideUrl: photos.insidePhoto,
+                        insideMessageId: photos.insideMessageId,
+                        insideThreadId: photos.insideThreadId,
                         outsideUrl: photos.outsidePhoto,
+                        outsideMessageId: photos.outsideMessageId,
+                        outsideThreadId: photos.outsideThreadId,
                         outside2Url: photos.outside2Photo,
+                        outside2MessageId: photos.outside2MessageId,
+                        outside2ThreadId: photos.outside2ThreadId,
                         managerUrl: photos.managerPhoto,
+                        managerMessageId: photos.managerMessageId,
+                        managerThreadId: photos.managerThreadId,
                         staff1Url: photos.staff1Photo,
+                        staff1MessageId: photos.staff1MessageId,
+                        staff1ThreadId: photos.staff1ThreadId,
                         staff2Url: photos.staff2Photo,
-                        staff3Url: photos.staff3Photo
+                        staff2MessageId: photos.staff2MessageId,
+                        staff2ThreadId: photos.staff2ThreadId,
+                        staff3Url: photos.staff3Photo,
+                        staff3MessageId: photos.staff3MessageId,
+                        staff3ThreadId: photos.staff3ThreadId
                     } : null
                 };
 
@@ -406,9 +424,21 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                                 </Box>
                             ) : selectedStoreDetails?.photos ? (
                                 <Box sx={{ mb: 3 }}>
-                                    <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 'bold' }}>
-                                        매장 사진
-                                    </Typography>
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                                        <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
+                                            매장 사진
+                                        </Typography>
+                                        <Button
+                                            variant="outlined"
+                                            size="small"
+                                            startIcon={<RefreshIcon />}
+                                            onClick={handleRefreshImages}
+                                            disabled={refreshingImages}
+                                            sx={{ minWidth: 'auto' }}
+                                        >
+                                            {refreshingImages ? '갱신 중...' : '이미지갱신하기'}
+                                        </Button>
+                                    </Box>
                                     
                                     {/* 메인 사진 (큰 사진) */}
                                     <Box sx={{ mb: 2, textAlign: 'center' }}>

@@ -2234,13 +2234,29 @@ export const customerAPI = {
     if (data) {
       return {
         frontPhoto: data.frontUrl,
+        frontMessageId: data.frontMessageId,
+        frontThreadId: data.frontThreadId,
         insidePhoto: data.insideUrl,
+        insideMessageId: data.insideMessageId,
+        insideThreadId: data.insideThreadId,
         outsidePhoto: data.outsideUrl,
+        outsideMessageId: data.outsideMessageId,
+        outsideThreadId: data.outsideThreadId,
         outside2Photo: data.outside2Url,
+        outside2MessageId: data.outside2MessageId,
+        outside2ThreadId: data.outside2ThreadId,
         managerPhoto: data.managerUrl,
+        managerMessageId: data.managerMessageId,
+        managerThreadId: data.managerThreadId,
         staff1Photo: data.staff1Url,
+        staff1MessageId: data.staff1MessageId,
+        staff1ThreadId: data.staff1ThreadId,
         staff2Photo: data.staff2Url,
-        staff3Photo: data.staff3Url
+        staff2MessageId: data.staff2MessageId,
+        staff2ThreadId: data.staff2ThreadId,
+        staff3Photo: data.staff3Url,
+        staff3MessageId: data.staff3MessageId,
+        staff3ThreadId: data.staff3ThreadId
       };
     }
     return null;

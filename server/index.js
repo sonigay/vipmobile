@@ -5342,13 +5342,29 @@ app.get('/api/direct/store-image/:storeName', async (req, res) => {
     res.json({
       storeName: photoRow[0],           // 0: 업체명
       frontUrl: photoRow[1] || '',      // 1: 전면사진URL
+      frontMessageId: photoRow[2] || '', // 2: 전면사진Discord메시지ID
+      frontThreadId: photoRow[4] || '', // 4: 전면사진Discord스레드ID
       insideUrl: photoRow[5] || '',     // 5: 내부사진URL
+      insideMessageId: photoRow[6] || '', // 6: 내부사진Discord메시지ID
+      insideThreadId: photoRow[8] || '', // 8: 내부사진Discord스레드ID
       outsideUrl: photoRow[9] || '',    // 9: 외부사진URL
+      outsideMessageId: photoRow[10] || '', // 10: 외부사진Discord메시지ID
+      outsideThreadId: photoRow[12] || '', // 12: 외부사진Discord스레드ID
       outside2Url: photoRow[13] || '',  // 13: 외부2사진URL
+      outside2MessageId: photoRow[14] || '', // 14: 외부2사진Discord메시지ID
+      outside2ThreadId: photoRow[16] || '', // 16: 외부2사진Discord스레드ID
       managerUrl: photoRow[17] || '',   // 17: 점장사진URL
+      managerMessageId: photoRow[18] || '', // 18: 점장사진Discord메시지ID
+      managerThreadId: photoRow[20] || '', // 20: 점장사진Discord스레드ID
       staff1Url: photoRow[21] || '',    // 21: 직원1사진URL
+      staff1MessageId: photoRow[22] || '', // 22: 직원1사진Discord메시지ID
+      staff1ThreadId: photoRow[24] || '', // 24: 직원1사진Discord스레드ID
       staff2Url: photoRow[25] || '',    // 25: 직원2사진URL
+      staff2MessageId: photoRow[26] || '', // 26: 직원2사진Discord메시지ID
+      staff2ThreadId: photoRow[28] || '', // 28: 직원2사진Discord스레드ID
       staff3Url: photoRow[29] || '',    // 29: 직원3사진URL
+      staff3MessageId: photoRow[30] || '', // 30: 직원3사진Discord메시지ID
+      staff3ThreadId: photoRow[32] || '', // 32: 직원3사진Discord스레드ID
       updatedAt: photoRow[33] || ''     // 33: 수정일시
     });
   } catch (error) {

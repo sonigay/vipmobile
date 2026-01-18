@@ -149,6 +149,12 @@ const CustomerLogin = () => {
                         margin="normal"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
+                        onKeyPress={(e) => {
+                            if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleLogin(e);
+                            }
+                        }}
                         disabled={loading}
                         autoComplete="new-password"
                         inputProps={{
