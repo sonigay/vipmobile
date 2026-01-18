@@ -400,11 +400,18 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
       }
       
       const finalStoreSupport = baseStoreSupport + policyAmount;
+      const publicSupport = priceData.publicSupport || 0;
+      
+      // 🔥 수정: 출고가와 이통사지원금 차액보다 대리점지원금이 더 크다면 그 차액만큼만 표시
+      const maxStoreSupport = factoryPrice > publicSupport 
+        ? factoryPrice - publicSupport 
+        : 0;
+      const limitedStoreSupport = Math.min(finalStoreSupport, maxStoreSupport);
       
       return {
-        storeSupportWithAddon: finalStoreSupport,
-        purchasePriceWithAddon: Math.max(0, factoryPrice - (priceData.publicSupport || 0) - finalStoreSupport),
-        publicSupport: priceData.publicSupport || 0,
+        storeSupportWithAddon: limitedStoreSupport,
+        purchasePriceWithAddon: Math.max(0, factoryPrice - publicSupport - limitedStoreSupport),
+        publicSupport: publicSupport,
         openingType: openingType
       };
     }
@@ -1285,9 +1292,8 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                 </ModernTableCell>
                 <ModernTableCell
                   align="center"
-                  colSpan={2}
                   sx={{
-                    width: '180px',
+                    width: '90px',
                     borderLeft: '1px solid rgba(81, 81, 81, 0.5)',
                     backgroundColor: 'background.paper',
                     fontWeight: 'bold',
@@ -1302,7 +1308,6 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
                 </ModernTableCell>
                 <ModernTableCell
                   align="center"
-                  colSpan={1}
                   sx={{
                     width: '90px',
                     borderLeft: '1px solid rgba(81, 81, 81, 0.5)',
