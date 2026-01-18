@@ -2103,6 +2103,12 @@ function setupDirectRoutes(app) {
       const carrierParam = (req.query.carrier || '').trim().toUpperCase();
       const carriers = carrierParam ? [carrierParam] : ['SK', 'KT', 'LG'];
 
+      // 🔥 수정: 재빌드 시작 전에 정책 설정 캐시 무효화 (최신 데이터 읽기 보장)
+      console.log(`[Direct] Invalidating policy settings cache before rebuild`);
+      for (const carrier of carriers) {
+        deleteCache(`policy-settings-${carrier}`);
+      }
+
       // 1. 요금제 마스터 리빌드
       console.log(`[Direct] Rebuilding Plan Master for ${carriers.join(',')}`);
       const step1 = await rebuildPlanMaster(carriers);
