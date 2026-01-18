@@ -465,10 +465,13 @@ const OpeningInfoPage = ({
     useEffect(() => {
         const calculateInitialPrice = async () => {
             // 🔥 수정: 부가서비스 로딩이 완료될 때까지 대기 (부가서비스 로딩 전에 계산하면 중복 계산 문제 발생)
-            if (!initialData?.planGroup || !initialData?.openingType || !planGroups.length || !initialData?.id || loadingAddonsAndInsurances) {
+            // 🔥 추가: availableAddons나 availableInsurances가 로드되었는지도 확인
+            // 부가서비스 목록이 로드되지 않았으면 대기 (초기 로드 시 부가서비스 정보가 필요함)
+            const isAddonsLoaded = availableAddons.length > 0 || availableInsurances.length > 0;
+            if (!initialData?.planGroup || !initialData?.openingType || !planGroups.length || !initialData?.id || loadingAddonsAndInsurances || !isAddonsLoaded) {
                 // 조건이 맞지 않으면 로딩 상태 해제 (초기값 사용)
-                // 단, 부가서비스 로딩 중이면 대기 (로딩 상태 유지)
-                if (!loadingAddonsAndInsurances) {
+                // 단, 부가서비스 로딩 중이거나 부가서비스 목록이 아직 로드되지 않았으면 대기 (로딩 상태 유지)
+                if (!loadingAddonsAndInsurances && isAddonsLoaded) {
                     setLoadingSupportAmounts(false);
                 }
                 return;
@@ -540,7 +543,8 @@ const OpeningInfoPage = ({
         // 🔥 수정: formData.contractType 의존성 제거 (약정유형 변경 시 재계산 불필요)
         // 🔥 수정: formData.openingType 의존성 추가 (가입유형 변경 시 재계산 필요)
         // 🔥 수정: loadingAddonsAndInsurances 의존성 추가 (부가서비스 로딩 완료 후 계산)
-    }, [initialData?.planGroup, formData.openingType, planGroups, selectedCarrier, initialData?.id, loadingAddonsAndInsurances]);
+        // 🔥 추가: availableAddons, availableInsurances 의존성 추가 (부가서비스 목록 로드 완료 후 계산)
+    }, [initialData?.planGroup, formData.openingType, planGroups, selectedCarrier, initialData?.id, loadingAddonsAndInsurances, availableAddons.length, availableInsurances.length]);
 
     // 🔥 개선: 선택된 부가서비스/보험상품에 따른 대리점지원금 계산
     // 계산 로직:
