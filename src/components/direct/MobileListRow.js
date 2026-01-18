@@ -232,7 +232,7 @@ const MobileListRowComponent = ({
               return finalUrl;
             })() : undefined}
             onError={(e) => {
-              // 🔥 핵심 수정: 이미지 로드 실패 처리 개선
+              // 🔥 수정: 이미지 로드 실패 처리 개선 (에러 로그 최소화)
               const retryCount = parseInt(e.target.dataset.retryCount || '0');
 
               // 최대 3번까지 재시도
@@ -250,7 +250,7 @@ const MobileListRowComponent = ({
                 return;
               }
 
-              // Discord 이미지이고 메시지 ID가 있으면 자동 갱신 시도
+              // Discord 이미지이고 메시지 ID가 있으면 자동 갱신 시도 (조용히)
               const isDiscordUrl = originalUrl.includes('cdn.discordapp.com') || originalUrl.includes('media.discordapp.net');
               if (isDiscordUrl && row.discordThreadId && row.discordMessageId) {
                 attachDiscordImageRefreshHandler(
@@ -258,8 +258,10 @@ const MobileListRowComponent = ({
                   row.discordThreadId,
                   row.discordMessageId,
                   (newUrl) => {
-                    // 갱신 성공 시 시트에 저장 (선택사항)
-                    console.log('✅ [MobileListRow] Discord 이미지 URL 갱신 성공');
+                    // 갱신 성공 시에만 로그 (개발 환경에서만)
+                    if (process.env.NODE_ENV === 'development') {
+                      console.log('✅ [MobileListRow] Discord 이미지 URL 갱신 성공');
+                    }
                   }
                 );
                 return;
@@ -282,20 +284,10 @@ const MobileListRowComponent = ({
                 return;
               }
 
-              // 모든 시도 실패
+              // 모든 시도 실패 - 조용히 처리 (에러 로그 제거)
               e.target.dataset.gaveUp = 'true';
               e.target.onerror = null;
               e.target.style.display = 'none';
-
-              if (process.env.NODE_ENV === 'development') {
-                console.warn('⚠️ [MobileListRow] 이미지 로드 실패:', {
-                  modelId: row.id,
-                  modelName: row.model,
-                  originalUrl: row.image,
-                  attemptedUrl: e.target.src || 'N/A',
-                  retryCount
-                });
-              }
             }}
             sx={{ width: 60, height: 60, bgcolor: 'background.subtle' }}
           >

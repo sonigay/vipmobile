@@ -72,15 +72,19 @@ export function loadImageWithRefresh(imageUrl, threadId = null, messageId = null
     };
     
     img.onerror = async () => {
-      // URL 만료 감지 → 갱신 시도
-      console.log('⚠️ [Discord 이미지] URL 만료 감지, 갱신 시도:', { threadId, messageId });
+      // URL 만료 감지 → 갱신 시도 (개발 환경에서만 로그)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('⚠️ [Discord 이미지] URL 만료 감지, 갱신 시도:', { threadId, messageId });
+      }
       
       try {
         const refreshResult = await refreshDiscordImageUrl(threadId, messageId);
         
         if (refreshResult.success && refreshResult.imageUrl) {
-          // 2차 시도: 갱신된 URL 사용
-          console.log('✅ [Discord 이미지] URL 갱신 성공, 재시도:', refreshResult.imageUrl.substring(0, 100));
+          // 2차 시도: 갱신된 URL 사용 (개발 환경에서만 로그)
+          if (process.env.NODE_ENV === 'development') {
+            console.log('✅ [Discord 이미지] URL 갱신 성공, 재시도:', refreshResult.imageUrl.substring(0, 100));
+          }
           
           if (onRefresh) {
             onRefresh(refreshResult.imageUrl);
@@ -94,7 +98,10 @@ export function loadImageWithRefresh(imageUrl, threadId = null, messageId = null
           reject(new Error(refreshResult.error || 'URL 갱신 실패'));
         }
       } catch (error) {
-        console.error('❌ [Discord 이미지] URL 갱신 중 오류:', error);
+        // 네트워크 에러 등은 조용히 처리 (개발 환경에서만 로그)
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('⚠️ [Discord 이미지] URL 갱신 중 오류:', error);
+        }
         reject(error);
       }
     };
@@ -159,13 +166,19 @@ export function attachDiscordImageRefreshHandler(imgElement, threadId, messageId
   }
 
   const handleError = async () => {
-    console.log('⚠️ [Discord 이미지] 로드 실패, 갱신 시도:', { threadId, messageId });
+    // 개발 환경에서만 로그 출력
+    if (process.env.NODE_ENV === 'development') {
+      console.log('⚠️ [Discord 이미지] 로드 실패, 갱신 시도:', { threadId, messageId });
+    }
     
     try {
       const refreshResult = await refreshDiscordImageUrl(threadId, messageId);
       
       if (refreshResult.success && refreshResult.imageUrl) {
-        console.log('✅ [Discord 이미지] URL 갱신 성공');
+        // 개발 환경에서만 로그 출력
+        if (process.env.NODE_ENV === 'development') {
+          console.log('✅ [Discord 이미지] URL 갱신 성공');
+        }
         
         if (onRefresh) {
           onRefresh(refreshResult.imageUrl);
@@ -174,10 +187,16 @@ export function attachDiscordImageRefreshHandler(imgElement, threadId, messageId
         imgElement.src = refreshResult.imageUrl;
         imgElement.onerror = null; // 무한 루프 방지
       } else {
-        console.error('❌ [Discord 이미지] URL 갱신 실패:', refreshResult.error);
+        // 갱신 실패는 조용히 처리 (개발 환경에서만 로그)
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('⚠️ [Discord 이미지] URL 갱신 실패:', refreshResult.error);
+        }
       }
     } catch (error) {
-      console.error('❌ [Discord 이미지] URL 갱신 중 오류:', error);
+      // 네트워크 에러 등은 조용히 처리 (개발 환경에서만 로그)
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('⚠️ [Discord 이미지] URL 갱신 중 오류:', error);
+      }
     }
   };
 

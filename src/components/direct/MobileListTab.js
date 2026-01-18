@@ -278,7 +278,7 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
     setError(null);
   };
 
-  // 전체 이미지 갱신 함수
+  // 전체 이미지 갱신 함수 (배치 처리)
   const handleRefreshAllImages = async () => {
     if (!mobileList || mobileList.length === 0) {
       return;
@@ -300,35 +300,63 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
         return;
       }
 
-      // 모든 모델 이미지 갱신 시도
-      const refreshPromises = modelsToRefresh.map(async (model) => {
-        try {
-          const response = await fetch(`${API_URL}/api/direct/refresh-mobile-image-url`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              carrier: carrier,
-              modelId: model.modelId || model.id,
-              modelName: model.model || model.petName,
-              threadId: model.discordThreadId,
-              messageId: model.discordMessageId
-            })
-          });
-          const result = await response.json();
-          if (!result.success) {
-            console.warn(`모델 이미지 갱신 실패 (${model.model || model.petName}):`, result.error);
+      // 배치 처리: 한 번에 5개씩 처리 (서버 부하 방지)
+      const BATCH_SIZE = 5;
+      let successCount = 0;
+      let failCount = 0;
+
+      for (let i = 0; i < modelsToRefresh.length; i += BATCH_SIZE) {
+        const batch = modelsToRefresh.slice(i, i + BATCH_SIZE);
+        
+        const batchPromises = batch.map(async (model) => {
+          try {
+            const response = await fetch(`${API_URL}/api/direct/refresh-mobile-image-url`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                carrier: carrier,
+                modelId: model.modelId || model.id,
+                modelName: model.model || model.petName,
+                threadId: model.discordThreadId,
+                messageId: model.discordMessageId
+              })
+            });
+            
+            if (!response.ok) {
+              // CORS나 504 에러는 조용히 처리
+              return { success: false, error: `HTTP ${response.status}` };
+            }
+            
+            const result = await response.json();
+            if (result.success) {
+              successCount++;
+            } else {
+              failCount++;
+            }
+            return result;
+          } catch (error) {
+            // 네트워크 에러는 조용히 처리 (CORS, timeout 등)
+            failCount++;
+            return { success: false, error: error.message };
           }
-          return result;
-        } catch (error) {
-          console.error(`모델 이미지 갱신 실패 (${model.model || model.petName}):`, error);
-          return { success: false, error: error.message };
+        });
+
+        await Promise.all(batchPromises);
+        
+        // 배치 간 짧은 대기 (서버 부하 방지)
+        if (i + BATCH_SIZE < modelsToRefresh.length) {
+          await new Promise(resolve => setTimeout(resolve, 200));
         }
-      });
+      }
 
-      await Promise.all(refreshPromises);
-
-      // 갱신 후 데이터 다시 로드
-      handleReload();
+      // 결과 요약만 표시
+      if (successCount > 0 || failCount === 0) {
+        alert(`${successCount}개 이미지 갱신 완료${failCount > 0 ? ` (${failCount}개 실패)` : ''}`);
+        // 갱신 후 데이터 다시 로드
+        handleReload();
+      } else {
+        alert('이미지 갱신에 실패했습니다. 잠시 후 다시 시도해주세요.');
+      }
     } catch (error) {
       console.error('이미지 갱신 오류:', error);
       alert('이미지 갱신 중 오류가 발생했습니다.');
