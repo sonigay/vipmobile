@@ -124,13 +124,28 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
         setPlanGroups(uniqueGroups);
 
         // 2. 요금정책 데이터 인덱싱 (Lookup Map 생성)
+        // 🔥 수정: 시트에 '010신규/기변'으로 저장된 데이터를 '010신규'와 '기변'에도 매핑
         const priceMap = new Map();
         pricing.forEach(p => {
           // 키: modelId-planGroup-openingType
-          // openingType 정규화: 서버는 '010신규', 'MNP', '기변' 등으로 줌
-          // 프론트에서도 동일하게 사용
-          const key = `${p.modelId}-${p.planGroup}-${p.openingType}`;
-          priceMap.set(key, p);
+          // openingType 정규화: 서버는 '010신규', 'MNP', '기변', '010신규/기변' 등으로 줌
+          const baseKey = `${p.modelId}-${p.planGroup}-${p.openingType}`;
+          priceMap.set(baseKey, p);
+          
+          // 🔥 수정: '010신규/기변'으로 저장된 데이터를 '010신규'와 '기변'에도 매핑
+          // 이통사지원금은 '010신규'와 '기변'이 동일하므로, 시트에 '010신규/기변'으로 저장된 경우
+          // '010신규'나 '기변'으로 조회할 때도 같은 이통사지원금을 반환해야 함
+          if (p.openingType === '010신규/기변') {
+            const key010 = `${p.modelId}-${p.planGroup}-010신규`;
+            const key기변 = `${p.modelId}-${p.planGroup}-기변`;
+            // 이미 해당 키에 데이터가 없을 때만 설정 (우선순위: 개별 유형 > 통합 유형)
+            if (!priceMap.has(key010)) {
+              priceMap.set(key010, { ...p, openingType: '010신규' });
+            }
+            if (!priceMap.has(key기변)) {
+              priceMap.set(key기변, { ...p, openingType: '기변' });
+            }
+          }
         });
         pricingDataRef.current = priceMap;
 
@@ -248,15 +263,9 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
 
   // 가격 Lookup 함수 (동기식)
   const lookupPrice = useCallback((modelId, planGroup, openingType) => {
-    // 🔥 수정: 이통사지원금 조회 시 "010신규"나 "기변"을 "010신규/기변"으로 변환
-    // 대리점지원금은 원래 openingType 그대로 사용
-    let lookupOpeningType = openingType;
-    const isPublicSupport = true; // lookupPrice는 이통사지원금 조회용으로도 사용됨
-    if (isPublicSupport && (openingType === '010신규' || openingType === '기변')) {
-      lookupOpeningType = '010신규/기변';
-    }
-    
-    const key = `${modelId}-${planGroup}-${lookupOpeningType}`;
+    // 🔥 수정: 시트 데이터 로드 시 이미 '010신규/기변'을 '010신규'와 '기변'에 매핑했으므로
+    // lookupPrice에서는 원래 openingType 그대로 조회하면 됨
+    const key = `${modelId}-${planGroup}-${openingType}`;
     const priceData = pricingDataRef.current.get(key);
 
     // 현재 단말 정보 찾기
@@ -269,27 +278,13 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
         storeSupportWithAddon: priceData.storeSupportWithAddon || 0,
         purchasePriceWithAddon: Math.max(0, factoryPrice - (priceData.publicSupport || 0) - (priceData.storeSupportWithAddon || 0)),
         publicSupport: priceData.publicSupport || 0,
-        openingType: openingType // 원래 openingType 반환 (표시용)
+        openingType: openingType
       };
-    }
-
-    // 🔥 수정: 이통사지원금 조회 실패 시 원래 openingType으로 재시도 (010신규/기변 변환 전)
-    if (isPublicSupport && lookupOpeningType !== openingType) {
-      const originalKey = `${modelId}-${planGroup}-${openingType}`;
-      const originalPriceData = pricingDataRef.current.get(originalKey);
-      if (originalPriceData) {
-        return {
-          storeSupportWithAddon: originalPriceData.storeSupportWithAddon || 0,
-          purchasePriceWithAddon: Math.max(0, factoryPrice - (originalPriceData.publicSupport || 0) - (originalPriceData.storeSupportWithAddon || 0)),
-          publicSupport: originalPriceData.publicSupport || 0,
-          openingType: openingType
-        };
-      }
     }
 
     // 데이터를 찾지 못한 경우 디버깅 로그 (개발 환경에서만)
     if (process.env.NODE_ENV === 'development') {
-      console.warn(`[MobileListTab] 가격 데이터를 찾지 못함: key=${key}, modelId=${modelId}, planGroup=${planGroup}, openingType=${openingType}, lookupOpeningType=${lookupOpeningType}`);
+      console.warn(`[MobileListTab] 가격 데이터를 찾지 못함: key=${key}, modelId=${modelId}, planGroup=${planGroup}, openingType=${openingType}`);
       // pricingDataRef에 있는 키 목록 일부 출력 (디버깅용)
       const availableKeys = Array.from(pricingDataRef.current.keys()).slice(0, 5);
       console.log(`[MobileListTab] 사용 가능한 키 샘플:`, availableKeys);
@@ -838,16 +833,11 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
   // 🔥 핵심 수정: calculatedPrices 대신 lookupPrice를 직접 호출하여 항상 최신 factoryPrice 사용
   const getDisplayValue = useCallback((row, field, selectedOpeningType = null) => {
     // openingType이 null이면 기본값 'MNP' 사용
-    let openingType = selectedOpeningType || selectedOpeningTypes[row.id] || 'MNP';
+    const openingType = selectedOpeningType || selectedOpeningTypes[row.id] || 'MNP';
     const planGroup = selectedPlanGroups[row.id] || '115군';
 
-    // 🔥 수정: 이통사지원금(publicSupport)만 "010신규/기변" 변환 적용
-    // 대리점지원금은 "010신규", "MNP", "기변"으로 각각 별도 저장되어 있으므로 변환 불필요
-    const isPublicSupport = field === 'publicSupport' || field === 'support';
-    if (isPublicSupport && (openingType === '010신규' || openingType === '기변')) {
-      // 이통사지원금의 경우 "010신규"나 "기변"을 "010신규/기변"으로 변환하여 조회
-      openingType = '010신규/기변';
-    }
+    // 🔥 수정: 시트 데이터 로드 시 이미 '010신규/기변'을 '010신규'와 '기변'에 매핑했으므로
+    // getDisplayValue에서는 원래 openingType 그대로 lookupPrice 호출하면 됨
 
     // 🔥 핵심 수정: lookupPrice를 직접 호출하여 항상 최신 factoryPrice로 계산
     // 이렇게 하면 mobileList가 변경되어도 항상 최신 가격이 표시됨
@@ -856,12 +846,6 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
     // 계산된 값이 있고, 해당 필드가 존재하면 사용
     // 🔥 수정: 대리점지원금의 경우 0도 유효한 값으로 간주 (마스터 데이터에 0으로 저장된 경우)
     if (calculated && calculated[field] !== undefined) {
-      // 이통사지원금의 경우: "010신규/기변"으로 조회했으므로 openingType 비교는 생략
-      // 대리점지원금의 경우: 원래 openingType과 일치하는지 확인
-      if (!isPublicSupport && calculated.openingType && calculated.openingType !== (selectedOpeningType || selectedOpeningTypes[row.id] || 'MNP')) {
-        // openingType이 일치하지 않으면 row 값 반환
-        return row[field];
-      }
       // 🔥 수정: 0도 유효한 값으로 반환 (마스터 데이터에 명시적으로 0으로 저장된 경우)
       return calculated[field];
     }
