@@ -765,7 +765,7 @@ function Header({ inventoryUserName, isInventoryMode, currentUserId, onLogout, l
 
           {/* 마커 색상 설정 버튼 (관리자모드에서만) */}
           {isAgentMode && onMarkerColorSettingsOpen && (
-            <Tooltip title="마커 색상 설정">
+            <Tooltip title="매장 색상 설정">
               <IconButton
                 color="inherit"
                 onClick={onMarkerColorSettingsOpen}

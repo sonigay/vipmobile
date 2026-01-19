@@ -13,11 +13,11 @@ function MarkerColorInfo({ selectedOption, colorSettings }) {
   if (!selectedOption || selectedOption === 'default') {
     return (
       <Paper elevation={2} sx={{ p: 1.5, mb: 2, backgroundColor: '#f9f9f9' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-          <Typography variant="caption" sx={{ fontSize: '0.75rem', color: '#666', fontWeight: 'bold' }}>
-            마커 색상 설정:
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1, flexWrap: 'wrap' }}>
+          <Typography variant="body2" sx={{ color: '#666', fontWeight: 'bold' }}>
+            매장 색상 설정:
           </Typography>
-          <Typography variant="caption" sx={{ fontSize: '0.75rem', color: '#333' }}>
+          <Typography variant="body2" sx={{ color: '#333' }}>
             {OPTION_LABELS[selectedOption] || OPTION_LABELS.default}
           </Typography>
         </Box>
@@ -31,11 +31,11 @@ function MarkerColorInfo({ selectedOption, colorSettings }) {
   if (entries.length === 0) {
     return (
       <Paper elevation={2} sx={{ p: 1.5, mb: 2, backgroundColor: '#f9f9f9' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-          <Typography variant="caption" sx={{ fontSize: '0.75rem', color: '#666', fontWeight: 'bold' }}>
-            마커 색상 설정:
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1, flexWrap: 'wrap' }}>
+          <Typography variant="body2" sx={{ color: '#666', fontWeight: 'bold' }}>
+            매장 색상 설정:
           </Typography>
-          <Typography variant="caption" sx={{ fontSize: '0.75rem', color: '#333' }}>
+          <Typography variant="body2" sx={{ color: '#333' }}>
             {OPTION_LABELS[selectedOption]} (설정 없음)
           </Typography>
         </Box>
@@ -45,11 +45,11 @@ function MarkerColorInfo({ selectedOption, colorSettings }) {
 
   return (
     <Paper elevation={2} sx={{ p: 1.5, mb: 2, backgroundColor: '#f9f9f9' }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-        <Typography variant="caption" sx={{ fontSize: '0.75rem', color: '#666', fontWeight: 'bold' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1.5, flexWrap: 'wrap' }}>
+        <Typography variant="body2" sx={{ color: '#666', fontWeight: 'bold' }}>
           마커 색상 설정:
         </Typography>
-        <Typography variant="caption" sx={{ fontSize: '0.75rem', color: '#333' }}>
+        <Typography variant="body2" sx={{ color: '#333' }}>
           {OPTION_LABELS[selectedOption]}
         </Typography>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
@@ -62,7 +62,7 @@ function MarkerColorInfo({ selectedOption, colorSettings }) {
                 gap: 0.5
               }}
             >
-              <Typography variant="caption" sx={{ fontSize: '0.7rem', color: '#555' }}>
+              <Typography variant="body2" sx={{ color: '#555' }}>
                 {value}
               </Typography>
               <Box

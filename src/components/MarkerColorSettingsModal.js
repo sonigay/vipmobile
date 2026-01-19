@@ -219,7 +219,7 @@ const MarkerColorSettingsModal = ({ open, onClose, userId, onSave }) => {
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle>마커 색상 설정</DialogTitle>
+      <DialogTitle>매장 색상 설정</DialogTitle>
       <DialogContent>
         {error && (
           <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
