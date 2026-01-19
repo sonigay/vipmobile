@@ -1,5 +1,5 @@
 import React from 'react';
-import { Paper, Typography, Box } from '@mui/material';
+import { Paper, Typography, Box, Button } from '@mui/material';
 
 const OPTION_LABELS = {
   default: '기존 로직 (출고일 기준)',
@@ -9,17 +9,29 @@ const OPTION_LABELS = {
   manager: '담당자별'
 };
 
-function MarkerColorInfo({ selectedOption, colorSettings }) {
+function MarkerColorInfo({ selectedOption, colorSettings, onOpenModal }) {
   if (!selectedOption || selectedOption === 'default') {
     return (
       <Paper elevation={2} sx={{ p: 1.5, mb: 2, backgroundColor: '#f9f9f9' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1, flexWrap: 'wrap' }}>
-          <Typography variant="body2" sx={{ color: '#666', fontWeight: 'bold' }}>
-            매장 색상 설정:
-          </Typography>
-          <Typography variant="body2" sx={{ color: '#333' }}>
-            {OPTION_LABELS[selectedOption] || OPTION_LABELS.default}
-          </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+            <Typography variant="body2" sx={{ color: '#666', fontWeight: 'bold' }}>
+              매장 색상 설정:
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#333' }}>
+              {OPTION_LABELS[selectedOption] || OPTION_LABELS.default}
+            </Typography>
+          </Box>
+          {onOpenModal && (
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={onOpenModal}
+              sx={{ ml: 'auto' }}
+            >
+              색상변경하기
+            </Button>
+          )}
         </Box>
       </Paper>
     );
@@ -31,13 +43,25 @@ function MarkerColorInfo({ selectedOption, colorSettings }) {
   if (entries.length === 0) {
     return (
       <Paper elevation={2} sx={{ p: 1.5, mb: 2, backgroundColor: '#f9f9f9' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1, flexWrap: 'wrap' }}>
-          <Typography variant="body2" sx={{ color: '#666', fontWeight: 'bold' }}>
-            매장 색상 설정:
-          </Typography>
-          <Typography variant="body2" sx={{ color: '#333' }}>
-            {OPTION_LABELS[selectedOption]} (설정 없음)
-          </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+            <Typography variant="body2" sx={{ color: '#666', fontWeight: 'bold' }}>
+              매장 색상 설정:
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#333' }}>
+              {OPTION_LABELS[selectedOption]} (설정 없음)
+            </Typography>
+          </Box>
+          {onOpenModal && (
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={onOpenModal}
+              sx={{ ml: 'auto' }}
+            >
+              색상변경하기
+            </Button>
+          )}
         </Box>
       </Paper>
     );
@@ -45,39 +69,51 @@ function MarkerColorInfo({ selectedOption, colorSettings }) {
 
   return (
     <Paper elevation={2} sx={{ p: 1.5, mb: 2, backgroundColor: '#f9f9f9' }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1.5, flexWrap: 'wrap' }}>
-        <Typography variant="body2" sx={{ color: '#666', fontWeight: 'bold' }}>
-          마커 색상 설정:
-        </Typography>
-        <Typography variant="body2" sx={{ color: '#333' }}>
-          {OPTION_LABELS[selectedOption]}
-        </Typography>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-          {entries.map(([value, color]) => (
-            <Box
-              key={value}
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 0.5
-              }}
-            >
-              <Typography variant="body2" sx={{ color: '#555' }}>
-                {value}
-              </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.5, flexWrap: 'wrap' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+          <Typography variant="body2" sx={{ color: '#666', fontWeight: 'bold' }}>
+            매장 색상 설정:
+          </Typography>
+          <Typography variant="body2" sx={{ color: '#333' }}>
+            {OPTION_LABELS[selectedOption]}
+          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+            {entries.map(([value, color]) => (
               <Box
+                key={value}
                 sx={{
-                  width: 12,
-                  height: 12,
-                  borderRadius: '50%',
-                  backgroundColor: color,
-                  border: '1px solid #ccc',
-                  flexShrink: 0
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 0.5
                 }}
-              />
-            </Box>
-          ))}
+              >
+                <Typography variant="body2" sx={{ color: '#555' }}>
+                  {value}
+                </Typography>
+                <Box
+                  sx={{
+                    width: 12,
+                    height: 12,
+                    borderRadius: '50%',
+                    backgroundColor: color,
+                    border: '1px solid #ccc',
+                    flexShrink: 0
+                  }}
+                />
+              </Box>
+            ))}
+          </Box>
         </Box>
+        {onOpenModal && (
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={onOpenModal}
+            sx={{ ml: 'auto' }}
+          >
+            색상변경하기
+          </Button>
+        )}
       </Box>
     </Paper>
   );

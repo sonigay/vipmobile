@@ -4492,6 +4492,7 @@ ${requestList}
                   <MarkerColorInfo
                     selectedOption={markerColorSettings.selectedOption}
                     colorSettings={markerColorSettings.colorSettings}
+                    onOpenModal={() => setMarkerColorSettingsModalOpen(true)}
                   />
                 </>
               )}
