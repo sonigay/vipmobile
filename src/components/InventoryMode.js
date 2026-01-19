@@ -642,56 +642,18 @@ const MasterInventoryTab = () => {
   const [simData, setSimData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0); // 새로고침 트리거
 
-  const fetchWirelessInventory = async () => {
-    try {
-      setLoading(true);
-      // TODO: 서버 API 연결 필요
-      // const response = await fetch(`${process.env.REACT_APP_API_URL}/api/wireless-inventory`);
-      // const result = await response.json();
-      // if (result.success) {
-      //   setWirelessData(result.data);
-      // }
-      
-      // 임시 데이터
-      setWirelessData({ items: [] });
-    } catch (error) {
-      console.error('무선단말 검수 데이터 조회 오류:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchSimInventory = async () => {
-    try {
-      setLoading(true);
-      // TODO: 서버 API 연결 필요
-      // const response = await fetch(`${process.env.REACT_APP_API_URL}/api/sim-inventory`);
-      // const result = await response.json();
-      // if (result.success) {
-      //   setSimData(result.data);
-      // }
-      
-      // 임시 데이터
-      setSimData({ items: [] });
-    } catch (error) {
-      console.error('유심 검수 데이터 조회 오류:', error);
-    } finally {
-      setLoading(false);
-    }
+  const handleRefresh = () => {
+    setRefreshTrigger(prev => prev + 1); // 트리거 값 증가로 자식 컴포넌트 새로고침
+    setLastUpdate(new Date());
   };
 
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
-    if (newValue === 0) {
-      fetchWirelessInventory();
-    } else {
-      fetchSimInventory();
-    }
   };
 
   useEffect(() => {
-    fetchWirelessInventory();
     setLastUpdate(new Date());
   }, []);
 
@@ -710,7 +672,7 @@ const MasterInventoryTab = () => {
           )}
           <Button
             variant="outlined"
-            onClick={activeTab === 0 ? fetchWirelessInventory : fetchSimInventory}
+            onClick={handleRefresh}
             disabled={loading}
             startIcon={<RefreshIcon />}
           >
@@ -760,19 +722,19 @@ const MasterInventoryTab = () => {
         </Box>
       )}
 
-      {!loading && activeTab === 0 && (
-        <WirelessInventoryContent data={wirelessData} />
+      {activeTab === 0 && (
+        <WirelessInventoryContent data={wirelessData} refreshTrigger={refreshTrigger} />
       )}
 
-      {!loading && activeTab === 1 && (
-        <SimInventoryContent data={simData} />
+      {activeTab === 1 && (
+        <SimInventoryContent data={simData} refreshTrigger={refreshTrigger} />
       )}
     </Box>
   );
 };
 
 // 무선단말검수 콘텐츠 컴포넌트
-const WirelessInventoryContent = ({ data }) => {
+const WirelessInventoryContent = ({ data, refreshTrigger }) => {
   const [inspectionData, setInspectionData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeView, setActiveView] = useState('inspection'); // 'inspection' or 'normalization'
@@ -787,13 +749,20 @@ const WirelessInventoryContent = ({ data }) => {
   // debounce를 위한 ref
   const debounceRef = useRef(null);
 
-  // 재고 검수 데이터 로드
-  const loadInspectionData = useCallback(async () => {
+  // 재고 검수 데이터 로드 (캐시 무시 옵션 추가)
+  const loadInspectionData = useCallback(async (noCache = false) => {
     try {
       setLoading(true);
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/inventory-inspection`, {
+      // 캐시 무시를 위해 타임스탬프 쿼리 파라미터 추가
+      const url = `${process.env.REACT_APP_API_URL}/api/inventory-inspection${noCache ? `?t=${Date.now()}` : ''}`;
+      const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
       });
       const result = await response.json();
       
@@ -815,7 +784,13 @@ const WirelessInventoryContent = ({ data }) => {
   const loadConfirmedData = useCallback(async () => {
     try {
       setConfirmedLoading(true);
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/confirmed-unconfirmed-inventory`);
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/confirmed-unconfirmed-inventory?t=${Date.now()}`, {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
       const result = await response.json();
       
       if (result.success) {
@@ -831,9 +806,10 @@ const WirelessInventoryContent = ({ data }) => {
     }
   }, []);
 
+  // 초기 로드 및 새로고침 트리거 감지
   useEffect(() => {
-    loadInspectionData();
-  }, [loadInspectionData]);
+    loadInspectionData(refreshTrigger > 0); // 새로고침 시 캐시 무시
+  }, [refreshTrigger, loadInspectionData]);
 
   // 확인된 재고 탭이 활성화될 때 데이터 로드
   useEffect(() => {
@@ -895,7 +871,7 @@ const WirelessInventoryContent = ({ data }) => {
         setSelectedItems([]);
         setConfirmNote('');
         setConfirmDialogOpen(false);
-        await loadInspectionData(); // 데이터 새로고침
+        await loadInspectionData(true); // 캐시 무시하고 데이터 새로고침
       } else {
         setSnackbar({ open: true, message: '저장 실패', severity: 'error' });
       }
@@ -932,7 +908,7 @@ const WirelessInventoryContent = ({ data }) => {
       
       if (result.success) {
         setSnackbar({ open: true, message: '모델명 정규화가 저장되었습니다', severity: 'success' });
-        await loadInspectionData(); // 데이터 새로고침
+        await loadInspectionData(true); // 캐시 무시하고 데이터 새로고침
       } else {
         setSnackbar({ open: true, message: '저장 실패', severity: 'error' });
       }
@@ -1306,7 +1282,10 @@ const WirelessInventoryContent = ({ data }) => {
                   <Button
                     variant="outlined"
                     startIcon={<RefreshIcon />}
-                    onClick={loadConfirmedData}
+                    onClick={() => {
+                      loadConfirmedData();
+                      loadInspectionData(true); // 캐시 무시하고 전체 데이터 새로고침
+                    }}
                   >
                     새로고침
                   </Button>
@@ -1445,7 +1424,14 @@ const WirelessInventoryContent = ({ data }) => {
 };
 
 // 유심검수 콘텐츠 컴포넌트
-const SimInventoryContent = ({ data }) => {
+const SimInventoryContent = ({ data, refreshTrigger }) => {
+  // refreshTrigger가 변경되면 로그만 출력 (현재는 개발 중)
+  useEffect(() => {
+    if (refreshTrigger > 0) {
+      console.log('🔄 유심검수 새로고침 요청 (개발 중)');
+    }
+  }, [refreshTrigger]);
+
   if (!data) {
     return (
       <Alert severity="info">

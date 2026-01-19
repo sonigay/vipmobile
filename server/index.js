@@ -37999,6 +37999,18 @@ app.post('/api/inventory-inspection', async (req, res) => {
     console.log('🔍 재고 비교 검수 시작...');
 
     const spreadsheetId = '12_oC7c2xqHlDCppUvWL2EFesszA3oDU5JBdrYccYT7Q';
+    
+    // 캐시 무시 옵션 확인 (쿼리 파라미터 또는 헤더)
+    const noCache = req.query.t || req.headers['cache-control'] === 'no-cache';
+    
+    // 캐시 무시가 요청된 경우 관련 캐시 무효화
+    if (noCache) {
+      console.log('🔄 [캐시 무효화] 마스터재고 관련 캐시 삭제');
+      cacheUtils.deletePattern('sheet_마스터재고_');
+      cacheUtils.deletePattern('sheet_폰클재고_');
+      cacheUtils.deletePattern('sheet_모델명정규화_');
+      cacheUtils.deletePattern('sheet_확인된미확인재고_');
+    }
 
     // 1. 마스터재고 조회
     const masterData = await fetchSheetValuesDirectly('마스터재고', spreadsheetId);
@@ -38108,6 +38120,11 @@ app.post('/api/inventory-inspection', async (req, res) => {
     console.log(`   - 미확인: ${unmatchedItems.filter(i => !i.isConfirmed).length}개`);
     console.log(`   - 확인됨: ${unmatchedItems.filter(i => i.isConfirmed).length}개`);
     console.log(`   - 정규화 필요: ${needsNormalization.size}개`);
+
+    // 캐시 제어 헤더 설정 (항상 최신 데이터 보장)
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
 
     res.json({
       success: true,
