@@ -42743,12 +42743,39 @@ app.get('/api/marker-color-settings', async (req, res) => {
     const dataRows = rows.slice(1);
     
     // userId를 문자열로 정규화 (타입 불일치 방지)
-    const normalizedUserId = userId.toString().trim();
+    const normalizedUserId = userId ? userId.toString().trim() : '';
+    
+    console.log('[마커 색상 설정 조회] 시작:', {
+      원본userId: userId,
+      정규화userId: normalizedUserId,
+      userId타입: typeof userId,
+      dataRowsCount: dataRows.length,
+      샘플행: dataRows.slice(0, 5).map(r => ({ userId: r[0], userId타입: typeof r[0], optionType: r[1], value: r[2] }))
+    });
     
     // 현재 사용자의 설정만 필터링 (userId 비교 시 trim 및 타입 변환)
+    // Google Sheets에서 작은따옴표로 시작하는 문자열은 그대로 저장되지만, 조회 시에는 작은따옴표가 제거될 수 있음
+    // 또한 숫자로 저장된 경우와 문자열로 저장된 경우를 모두 처리
     const userRows = dataRows.filter(row => {
-      const rowUserId = (row[0] || '').toString().trim();
-      return rowUserId === normalizedUserId;
+      let rowUserId = (row[0] || '').toString().trim();
+      // 작은따옴표로 시작하는 경우 제거 (Google Sheets가 자동으로 제거할 수 있음)
+      if (rowUserId.startsWith("'")) {
+        rowUserId = rowUserId.substring(1);
+      }
+      // 숫자로 저장된 경우와 문자열로 저장된 경우 모두 처리
+      const matches = rowUserId === normalizedUserId || 
+                     rowUserId === normalizedUserId.toString() ||
+                     String(rowUserId) === String(normalizedUserId);
+      if (dataRows.indexOf(row) < 5) {
+        console.log('[마커 색상 설정 조회] 행 비교:', {
+          원본rowUserId: row[0],
+          처리된rowUserId: rowUserId,
+          normalizedUserId: normalizedUserId,
+          matches: matches,
+          rowUserId타입: typeof rowUserId
+        });
+      }
+      return matches;
     });
     
     // 선택된 옵션 추출
@@ -42859,19 +42886,30 @@ app.post('/api/marker-color-settings', express.json(), async (req, res) => {
     const now = new Date().toISOString();
 
     // userId를 문자열로 정규화 (타입 불일치 방지)
-    const normalizedUserId = userId.toString().trim();
+    const normalizedUserId = userId ? userId.toString().trim() : '';
     
     console.log('[마커 색상 설정 저장] 시작:', {
-      userId: userId,
-      normalizedUserId: normalizedUserId,
+      원본userId: userId,
+      정규화userId: normalizedUserId,
+      userId타입: typeof userId,
       selectedOption: selectedOption,
-      dataRowsCount: dataRows.length
+      dataRowsCount: dataRows.length,
+      샘플행: dataRows.slice(0, 3).map(r => ({ userId: r[0], userId타입: typeof r[0], optionType: r[1] }))
     });
     
     // 기존 행에서 현재 사용자의 설정 찾기 (userId 비교 시 trim 및 타입 변환)
+    // Google Sheets에서 작은따옴표로 시작하는 문자열은 그대로 저장되지만, 조회 시에는 작은따옴표가 제거될 수 있음
+    // 또한 숫자로 저장된 경우와 문자열로 저장된 경우를 모두 처리
     const existingRows = dataRows.filter(row => {
-      const rowUserId = (row[0] || '').toString().trim();
-      return rowUserId === normalizedUserId;
+      let rowUserId = (row[0] || '').toString().trim();
+      // 작은따옴표로 시작하는 경우 제거 (Google Sheets가 자동으로 제거할 수 있음)
+      if (rowUserId.startsWith("'")) {
+        rowUserId = rowUserId.substring(1);
+      }
+      // 숫자로 저장된 경우와 문자열로 저장된 경우 모두 처리
+      return rowUserId === normalizedUserId || 
+             rowUserId === normalizedUserId.toString() ||
+             String(rowUserId) === String(normalizedUserId);
     });
     
     console.log('[마커 색상 설정 저장] 기존 행 찾기:', {
@@ -42898,15 +42936,18 @@ app.post('/api/marker-color-settings', express.json(), async (req, res) => {
       });
       
       if (rowIndex !== -1) {
+        // Google Sheets에서 숫자를 문자열로 저장하기 위해 작은따옴표 접두사 추가
+        // 또는 명시적으로 문자열로 변환 (valueInputOption: 'USER_ENTERED' 사용)
         rowsToUpdate.push({
           rowIndex: rowIndex + 2,
-          values: [normalizedUserId, 'selected', selectedOption, '', existingSelectedRow[4] || now, now]
+          values: [`'${normalizedUserId}`, 'selected', selectedOption, '', existingSelectedRow[4] || now, now]
         });
-        console.log(`[마커 색상 설정 저장] 선택값 업데이트: ${selectedOption} (행 ${rowIndex + 2}, userId: ${normalizedUserId})`);
+        console.log(`[마커 색상 설정 저장] 선택값 업데이트: ${selectedOption} (행 ${rowIndex + 2}, userId: '${normalizedUserId}')`);
       }
     } else {
-      rowsToAppend.push([normalizedUserId, 'selected', selectedOption, '', now, now]);
-      console.log(`[마커 색상 설정 저장] 선택값 추가: ${selectedOption} (userId: ${normalizedUserId})`);
+      // Google Sheets에서 숫자를 문자열로 저장하기 위해 작은따옴표 접두사 추가
+      rowsToAppend.push([`'${normalizedUserId}`, 'selected', selectedOption, '', now, now]);
+      console.log(`[마커 색상 설정 저장] 선택값 추가: ${selectedOption} (userId: '${normalizedUserId}')`);
     }
 
     // 2. 각 옵션별 색상 설정 저장/업데이트
@@ -42934,11 +42975,11 @@ app.post('/api/marker-color-settings', express.json(), async (req, res) => {
           });
           rowsToUpdate.push({
             rowIndex: rowIndex + 2,
-            values: [normalizedUserId, optionType, value, color, existingRow[4] || now, now]
+            values: [`'${normalizedUserId}`, optionType, value, color, existingRow[4] || now, now]
           });
         } else {
-          // 새로 추가
-          rowsToAppend.push([normalizedUserId, optionType, value, color, now, now]);
+          // 새로 추가 - userId를 문자열로 저장
+          rowsToAppend.push([`'${normalizedUserId}`, optionType, value, color, now, now]);
         }
       });
     });
