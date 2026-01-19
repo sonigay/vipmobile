@@ -938,6 +938,7 @@ const SMS_AUTO_REPLY_RULES_SHEET_NAME = 'SMS자동응답규칙';  // SMS 자동�
 const SMS_AUTO_REPLY_CONTACTS_SHEET_NAME = 'SMS자동응답거래처';  // SMS 자동응답 거래처
 const SMS_AUTO_REPLY_HISTORY_SHEET_NAME = 'SMS자동응답이력';  // SMS 자동응답 이력
 const QUICK_COST_SHEET_NAME = '퀵비용관리';  // 퀵비용 관리 시트
+const MARKER_COLOR_SETTINGS_SHEET_NAME = '관리자모드_마커색상설정';  // 마커 색상 설정 시트
 
 // 단가표 시트 ID (Phase 2에서 사용)
 const PRICE_SHEET_IDS = {
@@ -42574,5 +42575,312 @@ app.post('/api/quick-cost/normalize', async (req, res) => {
       success: false,
       error: error.message || '정규화 제안에 실패했습니다.'
     });
+  }
+});
+
+// ============================================
+// 마커 색상 설정 API
+// ============================================
+
+// 시트 헤더 정의
+const HEADERS_MARKER_COLOR_SETTINGS = [
+  '사용자ID',      // A열: 사용자 ID (x-user-id)
+  '옵션타입',      // B열: 옵션 타입 ('code', 'office', 'department', 'manager', 'selected')
+  '값',            // C열: 옵션 값 (예: "VIP(경수)", "서울사무실", "경수팀", "홍길동")
+  '색상',          // D열: HEX 색상 코드 (예: "#ff5722")
+  '등록일시',      // E열: ISO 형식 날짜
+  '수정일시'       // F열: ISO 형식 날짜
+];
+
+// 컬럼 인덱스를 알파벳으로 변환하는 헬퍼 함수 (0-based 인덱스)
+function getColumnLetter(columnNumber) {
+  let result = '';
+  while (columnNumber > 0) {
+    columnNumber--;
+    result = String.fromCharCode(65 + (columnNumber % 26)) + result;
+    columnNumber = Math.floor(columnNumber / 26);
+  }
+  return result;
+}
+
+// 시트 헤더 확인 및 생성 함수
+async function ensureMarkerColorSheetHeaders(sheets, spreadsheetId) {
+  try {
+    const spreadsheet = await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.get({ spreadsheetId })
+    );
+    const sheetExists = spreadsheet.data.sheets.some(s => s.properties.title === MARKER_COLOR_SETTINGS_SHEET_NAME);
+
+    if (!sheetExists) {
+      await rateLimitedSheetsCall(() =>
+        sheets.spreadsheets.batchUpdate({
+          spreadsheetId,
+          resource: {
+            requests: [{
+              addSheet: {
+                properties: {
+                  title: MARKER_COLOR_SETTINGS_SHEET_NAME
+                }
+              }
+            }]
+          }
+        })
+      );
+    }
+
+    const res = await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: `${MARKER_COLOR_SETTINGS_SHEET_NAME}!1:1`
+      })
+    );
+    const firstRow = res.data.values && res.data.values[0] ? res.data.values[0] : [];
+    const needsInit = firstRow.length === 0 || HEADERS_MARKER_COLOR_SETTINGS.some((h, i) => (firstRow[i] || '') !== h) || firstRow.length < HEADERS_MARKER_COLOR_SETTINGS.length;
+    
+    if (needsInit) {
+      await rateLimitedSheetsCall(() => {
+        const lastColumn = getColumnLetter(HEADERS_MARKER_COLOR_SETTINGS.length - 1);
+        return sheets.spreadsheets.values.update({
+          spreadsheetId,
+          range: `${MARKER_COLOR_SETTINGS_SHEET_NAME}!A1:${lastColumn}1`,
+          valueInputOption: 'USER_ENTERED',
+          resource: { values: [HEADERS_MARKER_COLOR_SETTINGS] }
+        });
+      });
+    }
+    
+    return HEADERS_MARKER_COLOR_SETTINGS;
+  } catch (error) {
+    console.error(`[마커색상] Failed to ensure sheet headers for ${MARKER_COLOR_SETTINGS_SHEET_NAME}:`, error);
+    throw error;
+  }
+}
+
+// GET /api/stores/unique-values - 유니크 값 목록 조회
+app.get('/api/stores/unique-values', async (req, res) => {
+  setCORSHeaders(req, res);
+  try {
+    const { type } = req.query; // 'code', 'office', 'department', 'manager'
+    
+    if (!type || !['code', 'office', 'department', 'manager'].includes(type)) {
+      return res.status(400).json({ success: false, error: '올바른 타입이 필요합니다. (code, office, department, manager)' });
+    }
+
+    // 타입에 따라 컬럼 인덱스 결정
+    const columnIndexMap = {
+      'code': 7,        // H열: 코드
+      'office': 3,     // D열: 사무실
+      'department': 4, // E열: 소속
+      'manager': 5    // F열: 담당자
+    };
+    
+    const columnIndex = columnIndexMap[type];
+    const columnLetter = getColumnLetter(columnIndex + 1); // 1-based로 변환 (A=1, B=2, ...)
+    
+    const auth = new google.auth.JWT({
+      email: GOOGLE_SERVICE_ACCOUNT_EMAIL,
+      key: GOOGLE_PRIVATE_KEY.includes('\\n') ? GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n') : GOOGLE_PRIVATE_KEY,
+      scopes: ['https://www.googleapis.com/auth/spreadsheets']
+    });
+    const sheets = google.sheets({ version: 'v4', auth });
+    
+    const response = await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${STORE_SHEET_NAME}!${columnLetter}:${columnLetter}`
+      })
+    );
+    
+    const rows = response.data.values || [];
+    const values = new Set();
+    
+    // 헤더 제외하고 데이터 처리
+    rows.slice(1).forEach(row => {
+      const value = (row[0] || '').toString().trim();
+      if (value) {
+        values.add(value);
+      }
+    });
+    
+    // 배열로 변환 및 정렬
+    const uniqueValues = Array.from(values).sort();
+    
+    res.json({ success: true, type, values: uniqueValues });
+  } catch (error) {
+    console.error('유니크 값 목록 조회 오류:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/marker-color-settings - 현재 사용자의 색상 설정 조회
+app.get('/api/marker-color-settings', async (req, res) => {
+  setCORSHeaders(req, res);
+  try {
+    const userId = req.headers['x-user-id'] || req.query.userId;
+    if (!userId) {
+      return res.status(400).json({ success: false, error: '사용자 ID가 필요합니다.' });
+    }
+
+    const auth = new google.auth.JWT({
+      email: GOOGLE_SERVICE_ACCOUNT_EMAIL,
+      key: GOOGLE_PRIVATE_KEY.includes('\\n') ? GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n') : GOOGLE_PRIVATE_KEY,
+      scopes: ['https://www.googleapis.com/auth/spreadsheets']
+    });
+    const sheets = google.sheets({ version: 'v4', auth });
+    
+    await ensureMarkerColorSheetHeaders(sheets, SPREADSHEET_ID);
+
+    const response = await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${MARKER_COLOR_SETTINGS_SHEET_NAME}!A:F`
+      })
+    );
+
+    const rows = response.data.values || [];
+    const dataRows = rows.slice(1);
+    
+    // 현재 사용자의 설정만 필터링
+    const userRows = dataRows.filter(row => row[0] === userId);
+    
+    // 선택된 옵션 추출
+    const selectedRow = userRows.find(row => row[1] === 'selected');
+    const selectedOption = selectedRow ? (selectedRow[2] || 'default') : 'default';
+    
+    // 색상 설정을 옵션별로 그룹화
+    const settings = {
+      selectedOption,
+      colorSettings: {
+        code: {},
+        office: {},
+        department: {},
+        manager: {}
+      }
+    };
+    
+    userRows.forEach(row => {
+      const optionType = row[1] || '';
+      const value = row[2] || '';
+      const color = row[3] || '';
+      
+      if (optionType !== 'selected' && optionType && value && color) {
+        if (settings.colorSettings[optionType]) {
+          settings.colorSettings[optionType][value] = color;
+        }
+      }
+    });
+
+    res.json({ success: true, settings });
+  } catch (error) {
+    console.error('색상 설정 조회 오류:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// POST /api/marker-color-settings - 색상 설정 저장/업데이트
+app.post('/api/marker-color-settings', express.json(), async (req, res) => {
+  setCORSHeaders(req, res);
+  try {
+    const userId = req.headers['x-user-id'] || req.body.userId;
+    const { selectedOption, colorSettings } = req.body;
+    // selectedOption: 'default', 'code', 'office', 'department', 'manager' (단일 선택)
+    // colorSettings: { code: {...}, office: {...}, department: {...}, manager: {...} }
+
+    if (!userId) {
+      return res.status(400).json({ success: false, error: '사용자 ID가 필요합니다.' });
+    }
+
+    if (!selectedOption || !colorSettings) {
+      return res.status(400).json({ success: false, error: '옵션 및 색상 설정이 필요합니다.' });
+    }
+
+    const auth = new google.auth.JWT({
+      email: GOOGLE_SERVICE_ACCOUNT_EMAIL,
+      key: GOOGLE_PRIVATE_KEY.includes('\\n') ? GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n') : GOOGLE_PRIVATE_KEY,
+      scopes: ['https://www.googleapis.com/auth/spreadsheets']
+    });
+    const sheets = google.sheets({ version: 'v4', auth });
+    
+    await ensureMarkerColorSheetHeaders(sheets, SPREADSHEET_ID);
+
+    // 기존 설정 조회
+    const response = await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${MARKER_COLOR_SETTINGS_SHEET_NAME}!A:F`
+      })
+    );
+
+    const rows = response.data.values || [];
+    const dataRows = rows.slice(1);
+    const now = new Date().toISOString();
+
+    // 기존 행에서 현재 사용자의 설정 찾기
+    const existingRows = dataRows.filter(row => row[0] === userId);
+    
+    // 업데이트할 행과 새로 추가할 행 분리
+    const rowsToUpdate = [];
+    const rowsToAppend = [];
+
+    // 1. 선택된 옵션 저장/업데이트
+    const existingSelectedRow = existingRows.find(row => row[1] === 'selected');
+    if (existingSelectedRow) {
+      const rowIndex = dataRows.findIndex(row => row[0] === userId && row[1] === 'selected');
+      rowsToUpdate.push({
+        rowIndex: rowIndex + 2,
+        values: [userId, 'selected', selectedOption, '', existingSelectedRow[4] || now, now]
+      });
+    } else {
+      rowsToAppend.push([userId, 'selected', selectedOption, '', now, now]);
+    }
+
+    // 2. 각 옵션별 색상 설정 저장/업데이트
+    const optionTypes = ['code', 'office', 'department', 'manager'];
+    optionTypes.forEach(optionType => {
+      const settings = colorSettings[optionType] || {};
+      Object.entries(settings).forEach(([value, color]) => {
+        const existingRow = existingRows.find(row => row[1] === optionType && row[2] === value);
+        if (existingRow) {
+          // 업데이트
+          const rowIndex = dataRows.findIndex(row => 
+            row[0] === userId && row[1] === optionType && row[2] === value
+          );
+          rowsToUpdate.push({
+            rowIndex: rowIndex + 2,
+            values: [userId, optionType, value, color, existingRow[4] || now, now]
+          });
+        } else {
+          // 새로 추가
+          rowsToAppend.push([userId, optionType, value, color, now, now]);
+        }
+      });
+    });
+
+    // 업데이트 실행
+    await Promise.all([
+      ...rowsToUpdate.map(({ rowIndex, values }) =>
+        rateLimitedSheetsCall(() =>
+          sheets.spreadsheets.values.update({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${MARKER_COLOR_SETTINGS_SHEET_NAME}!A${rowIndex}:F${rowIndex}`,
+            valueInputOption: 'USER_ENTERED',
+            resource: { values: [values] }
+          })
+        )
+      ),
+      rowsToAppend.length > 0 && rateLimitedSheetsCall(() =>
+        sheets.spreadsheets.values.append({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${MARKER_COLOR_SETTINGS_SHEET_NAME}!A:F`,
+          valueInputOption: 'USER_ENTERED',
+          resource: { values: rowsToAppend }
+        })
+      )
+    ]);
+
+    res.json({ success: true, message: '색상 설정이 저장되었습니다.' });
+  } catch (error) {
+    console.error('색상 설정 저장 오류:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
