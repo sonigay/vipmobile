@@ -42894,7 +42894,7 @@ app.post('/api/marker-color-settings', express.json(), async (req, res) => {
       const rowIndex = dataRows.findIndex(row => {
         const rowUserId = (row[0] || '').toString().trim();
         const rowOptionType = (row[1] || '').toString().trim();
-        return rowUserId === userId && rowOptionType === 'selected';
+        return rowUserId === normalizedUserId && rowOptionType === 'selected';
       });
       
       if (rowIndex !== -1) {
