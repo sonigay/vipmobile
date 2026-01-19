@@ -1404,7 +1404,7 @@ async function processPolicyTableGeneration(jobId, params, discordRequestId = nu
     updateJobStatus(jobId, {
       status: 'processing',
       progress: 50,
-      message: '디스코드 봇으로 스크린샷 생성 중...'
+      message: '스크린샷 생성 중...'
     });
 
     // "정책" 시트를 찾아서 해당 시트의 URL 생성
