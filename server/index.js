@@ -42592,7 +42592,7 @@ const HEADERS_MARKER_COLOR_SETTINGS = [
   '수정일시'       // F열: ISO 형식 날짜
 ];
 
-// 컬럼 인덱스를 알파벳으로 변환하는 헬퍼 함수 (0-based 인덱스)
+// 컬럼 인덱스를 알파벳으로 변환하는 헬퍼 함수 (1-based 인덱스: A=1, B=2, ...)
 function getColumnLetter(columnNumber) {
   let result = '';
   while (columnNumber > 0) {
@@ -42639,7 +42639,9 @@ async function ensureMarkerColorSheetHeaders(sheets, spreadsheetId) {
     
     if (needsInit) {
       await rateLimitedSheetsCall(() => {
-        const lastColumn = getColumnLetter(HEADERS_MARKER_COLOR_SETTINGS.length - 1);
+        // HEADERS_MARKER_COLOR_SETTINGS.length = 6 (A~F)
+        // getColumnLetter는 1-based이므로 6을 전달하면 F열이 됨
+        const lastColumn = getColumnLetter(HEADERS_MARKER_COLOR_SETTINGS.length);
         return sheets.spreadsheets.values.update({
           spreadsheetId,
           range: `${MARKER_COLOR_SETTINGS_SHEET_NAME}!A1:${lastColumn}1`,
