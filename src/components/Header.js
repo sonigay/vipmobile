@@ -733,16 +733,6 @@ function Header({ inventoryUserName, isInventoryMode, currentUserId, onLogout, l
                                  agentModePermission === 'M' ||
                                  (agentModePermission && agentModePermission.toString().toUpperCase() === 'M');
             
-            // 디버깅 로그
-            if (isAgentMode) {
-              console.log('🔍 [지도옵션] 권한 체크:', {
-                userRole,
-                agentModePermission,
-                agentInfo: loggedInStore.agentInfo,
-                isMPermission
-              });
-            }
-            
             return isMPermission;
           })() && (
             <Tooltip title="지도 재고 노출 옵션 설정">
