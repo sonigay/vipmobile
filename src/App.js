@@ -390,19 +390,30 @@ function AppContent() {
   // 개통실적 데이터 로드 함수
   // 마커 색상 설정 로드 함수
   const loadMarkerColorSettings = useCallback(async (userId) => {
-    if (!userId || !isAgentMode) return;
+    if (!userId) {
+      console.warn('[마커 색상 설정] userId가 없어 로드를 건너뜁니다.');
+      return;
+    }
+    
+    if (!isAgentMode) {
+      console.warn('[마커 색상 설정] 관리자모드가 아니어서 로드를 건너뜁니다.');
+      return;
+    }
     
     try {
+      console.log('[마커 색상 설정] 로드 시작:', userId);
       const settings = await getMarkerColorSettings(userId);
+      console.log('[마커 색상 설정] 로드 완료:', settings);
       setMarkerColorSettings(settings);
     } catch (error) {
-      console.error('마커 색상 설정 로드 오류:', error);
+      console.error('[마커 색상 설정] 로드 오류:', error);
     }
   }, [isAgentMode]);
 
   // 관리자모드일 때 색상 설정 로드
   useEffect(() => {
     if (isAgentMode && loggedInStore?.id) {
+      console.log('[마커 색상 설정] useEffect에서 로드 트리거:', { isAgentMode, userId: loggedInStore.id });
       loadMarkerColorSettings(loggedInStore.id);
     }
   }, [isAgentMode, loggedInStore?.id, loadMarkerColorSettings]);
@@ -932,8 +943,12 @@ function AppContent() {
           }, 100);
           
           // 관리자 모드일 때 마커 색상 설정 로드
+          // setTimeout을 사용하여 상태가 완전히 설정된 후 로드
           if (parsedState.store?.id) {
-            loadMarkerColorSettings(parsedState.store.id);
+            setTimeout(() => {
+              console.log('[마커 색상 설정] 로그인 상태 복원 시 로드:', parsedState.store.id);
+              loadMarkerColorSettings(parsedState.store.id);
+            }, 200);
           }
         } else if (parsedState.isMeeting) {
           // 회의모드 상태 복원

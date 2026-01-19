@@ -42742,8 +42742,14 @@ app.get('/api/marker-color-settings', async (req, res) => {
     const rows = response.data.values || [];
     const dataRows = rows.slice(1);
     
-    // 현재 사용자의 설정만 필터링
-    const userRows = dataRows.filter(row => row[0] === userId);
+    // userId를 문자열로 정규화 (타입 불일치 방지)
+    const normalizedUserId = userId.toString().trim();
+    
+    // 현재 사용자의 설정만 필터링 (userId 비교 시 trim 및 타입 변환)
+    const userRows = dataRows.filter(row => {
+      const rowUserId = (row[0] || '').toString().trim();
+      return rowUserId === normalizedUserId;
+    });
     
     // 선택된 옵션 추출
     const selectedRow = userRows.find(row => {
@@ -42763,12 +42769,16 @@ app.get('/api/marker-color-settings', async (req, res) => {
           console.warn(`[마커 색상 설정 조회] 잘못된 선택값: ${selectedOption}, 기본값 사용`);
           selectedOption = 'default';
         }
+      } else {
+        console.warn('[마커 색상 설정 조회] selectedRow는 있지만 값이 비어있음:', selectedRow);
       }
+    } else {
+      console.warn('[마커 색상 설정 조회] selectedRow를 찾을 수 없음. userRows:', userRows.map(r => ({ userId: r[0], optionType: r[1], value: r[2] })));
     }
     
     // 디버깅 로그
     console.log('[마커 색상 설정 조회]', {
-      userId,
+      userId: normalizedUserId,
       userRowsCount: userRows.length,
       selectedRow: selectedRow ? {
         userId: selectedRow[0],
@@ -42776,7 +42786,8 @@ app.get('/api/marker-color-settings', async (req, res) => {
         value: selectedRow[2],
         fullRow: selectedRow
       } : null,
-      selectedOption
+      selectedOption,
+      allUserRows: userRows.map(r => ({ userId: r[0], optionType: r[1], value: r[2] }))
     });
     
     // 색상 설정을 옵션별로 그룹화
@@ -42847,8 +42858,14 @@ app.post('/api/marker-color-settings', express.json(), async (req, res) => {
     const dataRows = rows.slice(1);
     const now = new Date().toISOString();
 
-    // 기존 행에서 현재 사용자의 설정 찾기
-    const existingRows = dataRows.filter(row => row[0] === userId);
+    // userId를 문자열로 정규화 (타입 불일치 방지)
+    const normalizedUserId = userId.toString().trim();
+    
+    // 기존 행에서 현재 사용자의 설정 찾기 (userId 비교 시 trim 및 타입 변환)
+    const existingRows = dataRows.filter(row => {
+      const rowUserId = (row[0] || '').toString().trim();
+      return rowUserId === normalizedUserId;
+    });
     
     // 업데이트할 행과 새로 추가할 행 분리
     const rowsToUpdate = [];
