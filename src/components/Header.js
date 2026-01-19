@@ -25,6 +25,7 @@ import {
   debugPushNotificationStatus
 } from '../utils/pushNotificationUtils';
 import { getModeColor, getModeTitle, resolveModeKey } from '../config/modeConfig';
+import MarkerColorSettingsModal from './MarkerColorSettingsModal';
 
 function Header({ inventoryUserName, isInventoryMode, currentUserId, onLogout, loggedInStore, isAgentMode, currentView, onViewChange, activationData, agentTarget, data, onModeChange, availableModes, onCheckUpdate = null, currentMode, mapDisplayOption, onMapDisplayOptionChange, onMarkerColorSettingsOpen }) {
   const [pushDialogOpen, setPushDialogOpen] = useState(false);

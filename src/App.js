@@ -78,6 +78,7 @@ import DialogActions from '@mui/material/DialogActions';
 import { addNotification, addAssignmentCompletedNotification, addSettingsChangedNotification } from './utils/notificationUtils';
 import { resolveModeKey } from './config/modeConfig';
 import { getMarkerColorSettings } from './utils/markerColorUtils';
+import MarkerColorSettingsModal from './components/MarkerColorSettingsModal';
 
 // Logger 유틸리티
 const logActivity = async (activityData) => {
