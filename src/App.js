@@ -32,6 +32,7 @@ import './App.css';
 import StoreInfoTable from './components/StoreInfoTable';
 import RememberedRequestsTable from './components/RememberedRequestsTable';
 import AgentRememberedRequestsTable from './components/AgentRememberedRequestsTable';
+import MarkerColorInfo from './components/MarkerColorInfo';
 import EstimatedQuickCost from './components/EstimatedQuickCost';
 import QuickCostModal from './components/QuickCostModal';
 
@@ -4480,12 +4481,19 @@ ${requestList}
                   onBulkRequest={handleBulkRequest}
                 />
               ) : (
-                <AgentRememberedRequestsTable
-                  rememberedRequests={rememberedRequests}
-                  onRemoveRequest={handleRemoveRequest}
-                  onClearAllRequests={handleClearAllRequests}
-                  onBulkRequest={handleBulkRequest}
-                />
+                <>
+                  <AgentRememberedRequestsTable
+                    rememberedRequests={rememberedRequests}
+                    onRemoveRequest={handleRemoveRequest}
+                    onClearAllRequests={handleClearAllRequests}
+                    onBulkRequest={handleBulkRequest}
+                  />
+                  {/* 마커 색상 설정 정보 */}
+                  <MarkerColorInfo
+                    selectedOption={markerColorSettings.selectedOption}
+                    colorSettings={markerColorSettings.colorSettings}
+                  />
+                </>
               )}
 
               {currentView !== 'activation' && (
