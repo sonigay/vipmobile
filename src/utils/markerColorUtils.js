@@ -19,9 +19,17 @@ export const getUniqueValues = async (type) => {
 // 색상 설정 조회 (옵션별로 그룹화)
 export const getMarkerColorSettings = async (userId) => {
   try {
+    // userId를 문자열로 정규화
+    const normalizedUserId = userId ? userId.toString().trim() : '';
+    console.log('[마커 색상 설정 조회] 프론트엔드:', {
+      원본userId: userId,
+      정규화userId: normalizedUserId,
+      타입: typeof userId
+    });
+    
     const response = await fetch(`${API_BASE_URL}/api/marker-color-settings`, {
       headers: {
-        'x-user-id': userId
+        'x-user-id': normalizedUserId
       }
     });
     
@@ -73,11 +81,20 @@ export const getMarkerColorSettings = async (userId) => {
 // 색상 설정 저장
 export const saveMarkerColorSettings = async (userId, selectedOption, colorSettings) => {
   try {
+    // userId를 문자열로 정규화
+    const normalizedUserId = userId ? userId.toString().trim() : '';
+    console.log('[마커 색상 설정 저장] 프론트엔드:', {
+      원본userId: userId,
+      정규화userId: normalizedUserId,
+      타입: typeof userId,
+      selectedOption: selectedOption
+    });
+    
     const response = await fetch(`${API_BASE_URL}/api/marker-color-settings`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-user-id': userId
+        'x-user-id': normalizedUserId
       },
       body: JSON.stringify({
         selectedOption,
