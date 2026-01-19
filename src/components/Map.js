@@ -263,7 +263,9 @@ function Map({
   fixedHeight = null, // 고정 높이 (px 단위, DirectStorePreferredStoreTab 등에서 사용)
   onStoreConfirm = null, // 고객모드에서 매장 선택 확인 시 호출 (페이지 이동용)
   transitLocations = [], // 대중교통 위치 데이터 배열
-  showTransitMarkers = true // 대중교통 마커 표시 여부
+  showTransitMarkers = true, // 대중교통 마커 표시 여부
+  colorSettings = {}, // 마커 색상 설정 (옵션별)
+  selectedOption = 'default' // 선택된 옵션 ('default', 'code', 'office', 'department', 'manager')
 }) {
   const [preApprovalMark, setPreApprovalMark] = useState(null);
   const [storePhotos, setStorePhotos] = useState(null);
@@ -658,6 +660,16 @@ ${loggedInStore.name}으로 이동 예정입니다.
     return result;
   }, [selectedModel, selectedColor]);
 
+  // 색상 밝기 조정 함수
+  const adjustBrightness = useCallback((hex, percent) => {
+    const num = parseInt(hex.replace('#', ''), 16);
+    const r = (num >> 16) + percent;
+    const g = ((num >> 8) & 0x00FF) + percent;
+    const b = (num & 0x0000FF) + percent;
+    const clamp = (val) => Math.min(255, Math.max(0, val));
+    return `#${((clamp(r) << 16) | (clamp(g) << 8) | clamp(b)).toString(16).padStart(6, '0')}`;
+  }, []);
+
   // 마커 아이콘 생성 함수
   const createMarkerIcon = useCallback((store) => {
     const isSelected = selectedStore?.id === store.id;
@@ -815,7 +827,66 @@ ${loggedInStore.name}으로 이동 예정입니다.
       radius = 16;
       iconStyle = '';
     }
-    // 5. 일반 매장 - 출고일 기준 색상 조정 (비중 기준)
+    // 5. 선택된 옵션별 색상 확인 (관리자모드에서만)
+    else if (isAgentMode && selectedOption && selectedOption !== 'default') {
+      let matchedColor = null;
+      let hasValue = false;
+      
+      // 선택된 옵션에 따라 색상 확인
+      if (selectedOption === 'code' && store.code) {
+        hasValue = true;
+        matchedColor = colorSettings?.code?.[store.code];
+      } else if (selectedOption === 'office' && store.office) {
+        hasValue = true;
+        matchedColor = colorSettings?.office?.[store.office];
+      } else if (selectedOption === 'department' && store.department) {
+        hasValue = true;
+        matchedColor = colorSettings?.department?.[store.department];
+      } else if (selectedOption === 'manager' && store.managerForFilter) {
+        hasValue = true;
+        matchedColor = colorSettings?.manager?.[store.managerForFilter];
+      }
+      
+      // 색상이 매칭되면 적용
+      if (matchedColor) {
+        fillColor = matchedColor;
+        strokeColor = adjustBrightness(matchedColor, -30); // 30% 어둡게
+        radius = hasInventory ? 14 : 10;
+        iconStyle = '';
+        // 여기서 return하지 않고 계속 진행 (아래 L.divIcon에서 반환)
+      } else if (hasValue) {
+        // 값은 있지만 색상이 설정되지 않은 경우 회색 처리
+        fillColor = '#9e9e9e'; // 회색
+        strokeColor = '#757575'; // 어두운 회색
+        radius = hasInventory ? 14 : 10;
+        iconStyle = '';
+        // 여기서 return하지 않고 계속 진행
+      } else {
+        // 값이 없는 경우 기존 로직으로 fallback
+        const totalFilteredInventory = inventoryByAge.within30 + inventoryByAge.within60 + inventoryByAge.over60;
+        if (totalFilteredInventory > 0) {
+          const within30Ratio = inventoryByAge.within30 / totalFilteredInventory;
+          const within60Ratio = inventoryByAge.within60 / totalFilteredInventory;
+          const over60Ratio = inventoryByAge.over60 / totalFilteredInventory;
+          if (over60Ratio >= within30Ratio && over60Ratio >= within60Ratio) {
+            fillColor = hasInventory ? '#ff9800' : '#f44336';
+            strokeColor = hasInventory ? '#f57c00' : '#d32f2f';
+          } else if (within60Ratio >= within30Ratio) {
+            fillColor = hasInventory ? '#ffc107' : '#f44336';
+            strokeColor = hasInventory ? '#ff8f00' : '#d32f2f';
+          } else {
+            fillColor = hasInventory ? '#4caf50' : '#f44336';
+            strokeColor = hasInventory ? '#388e3c' : '#d32f2f';
+          }
+        } else {
+          fillColor = hasInventory ? '#4caf50' : '#f44336';
+          strokeColor = hasInventory ? '#388e3c' : '#d32f2f';
+        }
+        radius = hasInventory ? 14 : 10;
+        iconStyle = '';
+      }
+    }
+    // 6. 기존 로직 (출고일 기준 색상) - 'default' 옵션이 선택된 경우 또는 옵션이 없는 경우
     else {
       const totalFilteredInventory = inventoryByAge.within30 + inventoryByAge.within60 + inventoryByAge.over60;
 
@@ -888,7 +959,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
       iconSize: [radius * 2, radius * 2],
       iconAnchor: [radius, radius]
     });
-  }, [selectedStore, loggedInStoreId, calculateInventory, getInventoryByAge, isCustomerMode, isAgentMode]);
+  }, [selectedStore, loggedInStoreId, calculateInventory, getInventoryByAge, isCustomerMode, isAgentMode, colorSettings, selectedOption, adjustBrightness, requestedStore]);
 
   // 지도 로드 핸들러
   const onMapLoad = useCallback((mapInstance) => {

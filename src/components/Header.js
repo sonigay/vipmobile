@@ -12,7 +12,8 @@ import {
   MoreVert as MoreVertIcon,
   SwapHoriz as SwapHorizIcon,
   Map as MapIcon,
-  Settings as SettingsIcon
+  Settings as SettingsIcon,
+  Palette as PaletteIcon
 } from '@mui/icons-material';
 import { 
   subscribeToPushNotifications, 
@@ -25,7 +26,7 @@ import {
 } from '../utils/pushNotificationUtils';
 import { getModeColor, getModeTitle, resolveModeKey } from '../config/modeConfig';
 
-function Header({ inventoryUserName, isInventoryMode, currentUserId, onLogout, loggedInStore, isAgentMode, currentView, onViewChange, activationData, agentTarget, data, onModeChange, availableModes, onCheckUpdate = null, currentMode, mapDisplayOption, onMapDisplayOptionChange }) {
+function Header({ inventoryUserName, isInventoryMode, currentUserId, onLogout, loggedInStore, isAgentMode, currentView, onViewChange, activationData, agentTarget, data, onModeChange, availableModes, onCheckUpdate = null, currentMode, mapDisplayOption, onMapDisplayOptionChange, onMarkerColorSettingsOpen }) {
   const [pushDialogOpen, setPushDialogOpen] = useState(false);
   const [pushPermission, setPushPermission] = useState('default');
   const [pushSubscribed, setPushSubscribed] = useState(false);
@@ -757,6 +758,22 @@ function Header({ inventoryUserName, isInventoryMode, currentUserId, onLogout, l
                 }}
               >
                 <MapIcon />
+              </IconButton>
+            </Tooltip>
+          )}
+
+          {/* 마커 색상 설정 버튼 (관리자모드에서만) */}
+          {isAgentMode && onMarkerColorSettingsOpen && (
+            <Tooltip title="마커 색상 설정">
+              <IconButton
+                color="inherit"
+                onClick={onMarkerColorSettingsOpen}
+                sx={{ 
+                  border: '1px solid rgba(255,255,255,0.3)',
+                  borderRadius: 1
+                }}
+              >
+                <PaletteIcon />
               </IconButton>
             </Tooltip>
           )}

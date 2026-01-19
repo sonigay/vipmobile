@@ -77,6 +77,7 @@ import DialogActions from '@mui/material/DialogActions';
 
 import { addNotification, addAssignmentCompletedNotification, addSettingsChangedNotification } from './utils/notificationUtils';
 import { resolveModeKey } from './config/modeConfig';
+import { getMarkerColorSettings } from './utils/markerColorUtils';
 
 // Logger 유틸리티
 const logActivity = async (activityData) => {
@@ -134,6 +135,18 @@ function AppContent() {
   const [loggedInStore, setLoggedInStore] = useState(null);
   // 관리자 모드 관련 상태 추가
   const [isAgentMode, setIsAgentMode] = useState(false);
+  
+  // 마커 색상 설정 관련 state
+  const [markerColorSettings, setMarkerColorSettings] = useState({
+    selectedOption: 'default',
+    colorSettings: {
+      code: {},
+      office: {},
+      department: {},
+      manager: {}
+    }
+  });
+  const [markerColorSettingsModalOpen, setMarkerColorSettingsModalOpen] = useState(false);
   const [agentTarget, setAgentTarget] = useState('');
   const [agentQualification, setAgentQualification] = useState('');
   const [agentContactId, setAgentContactId] = useState('');
@@ -373,6 +386,25 @@ function AppContent() {
   }, []);
 
   // 개통실적 데이터 로드 함수
+  // 마커 색상 설정 로드 함수
+  const loadMarkerColorSettings = useCallback(async (userId) => {
+    if (!userId || !isAgentMode) return;
+    
+    try {
+      const settings = await getMarkerColorSettings(userId);
+      setMarkerColorSettings(settings);
+    } catch (error) {
+      console.error('마커 색상 설정 로드 오류:', error);
+    }
+  }, [isAgentMode]);
+
+  // 관리자모드일 때 색상 설정 로드
+  useEffect(() => {
+    if (isAgentMode && loggedInStore?.id) {
+      loadMarkerColorSettings(loggedInStore.id);
+    }
+  }, [isAgentMode, loggedInStore?.id, loadMarkerColorSettings]);
+
   const loadActivationData = useCallback(async () => {
     try {
       // console.log('개통실적 데이터 로딩 시작...');
@@ -896,6 +928,11 @@ function AppContent() {
           setTimeout(() => {
             loadActivationData();
           }, 100);
+          
+          // 관리자 모드일 때 마커 색상 설정 로드
+          if (parsedState.store?.id) {
+            loadMarkerColorSettings(parsedState.store.id);
+          }
         } else if (parsedState.isMeeting) {
           // 회의모드 상태 복원
           setIsMeetingMode(true);
@@ -4055,6 +4092,7 @@ ${requestList}
             onCheckUpdate={() => setShowAppUpdatePopup(true)}
             mapDisplayOption={mapDisplayOption}
             onMapDisplayOptionChange={loadMapDisplayOption}
+            onMarkerColorSettingsOpen={() => setMarkerColorSettingsModalOpen(true)}
           />
           {isLoading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1 }}>
@@ -4094,6 +4132,8 @@ ${requestList}
                           showActivationMarkers={currentView === 'activation'}
                           activationModelSearch={activationModelSearch}
                           activationDateSearch={activationDateSearch}
+                          colorSettings={markerColorSettings.colorSettings}
+                          selectedOption={markerColorSettings.selectedOption}
                           agentTarget={agentTarget}
                           isMapExpanded={isMapExpanded}
                           onMapExpandToggle={handleMapExpandToggle}
@@ -4478,6 +4518,8 @@ ${requestList}
                     agentTarget={agentTarget}
                     isMapExpanded={isMapExpanded}
                     onMapExpandToggle={handleMapExpandToggle}
+                    colorSettings={markerColorSettings.colorSettings}
+                    selectedOption={markerColorSettings.selectedOption}
                     rememberedRequests={rememberedRequests}
                     setRememberedRequests={setRememberedRequests}
                     onQuickCostClick={(fromStore, toStore) => {
@@ -4696,6 +4738,20 @@ ${requestList}
           // console.log('새 업데이트가 추가되었습니다.');
         }}
       />
+
+      {/* 마커 색상 설정 모달 */}
+      {isAgentMode && loggedInStore?.id && (
+        <MarkerColorSettingsModal
+          open={markerColorSettingsModalOpen}
+          onClose={() => setMarkerColorSettingsModalOpen(false)}
+          userId={loggedInStore.id}
+          onSave={(settings) => {
+            setMarkerColorSettings(settings);
+            // 마커 재렌더링을 위해 상태 업데이트
+            setMarkerColorSettingsModalOpen(false);
+          }}
+        />
+      )}
 
       {/* 퀵비용 등록 모달 */}
       <QuickCostModal
