@@ -42861,10 +42861,23 @@ app.post('/api/marker-color-settings', express.json(), async (req, res) => {
     // userId를 문자열로 정규화 (타입 불일치 방지)
     const normalizedUserId = userId.toString().trim();
     
+    console.log('[마커 색상 설정 저장] 시작:', {
+      userId: userId,
+      normalizedUserId: normalizedUserId,
+      selectedOption: selectedOption,
+      dataRowsCount: dataRows.length
+    });
+    
     // 기존 행에서 현재 사용자의 설정 찾기 (userId 비교 시 trim 및 타입 변환)
     const existingRows = dataRows.filter(row => {
       const rowUserId = (row[0] || '').toString().trim();
       return rowUserId === normalizedUserId;
+    });
+    
+    console.log('[마커 색상 설정 저장] 기존 행 찾기:', {
+      normalizedUserId: normalizedUserId,
+      existingRowsCount: existingRows.length,
+      existingRows: existingRows.map(r => ({ userId: r[0], optionType: r[1], value: r[2] }))
     });
     
     // 업데이트할 행과 새로 추가할 행 분리
@@ -42887,13 +42900,13 @@ app.post('/api/marker-color-settings', express.json(), async (req, res) => {
       if (rowIndex !== -1) {
         rowsToUpdate.push({
           rowIndex: rowIndex + 2,
-          values: [userId, 'selected', selectedOption, '', existingSelectedRow[4] || now, now]
+          values: [normalizedUserId, 'selected', selectedOption, '', existingSelectedRow[4] || now, now]
         });
-        console.log(`[마커 색상 설정 저장] 선택값 업데이트: ${selectedOption} (행 ${rowIndex + 2})`);
+        console.log(`[마커 색상 설정 저장] 선택값 업데이트: ${selectedOption} (행 ${rowIndex + 2}, userId: ${normalizedUserId})`);
       }
     } else {
-      rowsToAppend.push([userId, 'selected', selectedOption, '', now, now]);
-      console.log(`[마커 색상 설정 저장] 선택값 추가: ${selectedOption}`);
+      rowsToAppend.push([normalizedUserId, 'selected', selectedOption, '', now, now]);
+      console.log(`[마커 색상 설정 저장] 선택값 추가: ${selectedOption} (userId: ${normalizedUserId})`);
     }
 
     // 2. 각 옵션별 색상 설정 저장/업데이트
@@ -42906,24 +42919,37 @@ app.post('/api/marker-color-settings', express.json(), async (req, res) => {
           return;
         }
         
-        const existingRow = existingRows.find(row => row[1] === optionType && row[2] === value);
+        const existingRow = existingRows.find(row => {
+          const rowOptionType = (row[1] || '').toString().trim();
+          const rowValue = (row[2] || '').toString().trim();
+          return rowOptionType === optionType && rowValue === value;
+        });
         if (existingRow) {
           // 업데이트
-          const rowIndex = dataRows.findIndex(row => 
-            row[0] === userId && row[1] === optionType && row[2] === value
-          );
+          const rowIndex = dataRows.findIndex(row => {
+            const rowUserId = (row[0] || '').toString().trim();
+            const rowOptionType = (row[1] || '').toString().trim();
+            const rowValue = (row[2] || '').toString().trim();
+            return rowUserId === normalizedUserId && rowOptionType === optionType && rowValue === value;
+          });
           rowsToUpdate.push({
             rowIndex: rowIndex + 2,
-            values: [userId, optionType, value, color, existingRow[4] || now, now]
+            values: [normalizedUserId, optionType, value, color, existingRow[4] || now, now]
           });
         } else {
           // 새로 추가
-          rowsToAppend.push([userId, optionType, value, color, now, now]);
+          rowsToAppend.push([normalizedUserId, optionType, value, color, now, now]);
         }
       });
     });
 
     // 업데이트 실행
+    console.log('[마커 색상 설정 저장] 저장 실행:', {
+      rowsToUpdate: rowsToUpdate.length,
+      rowsToAppend: rowsToAppend.length,
+      normalizedUserId: normalizedUserId
+    });
+    
     await Promise.all([
       ...rowsToUpdate.map(({ rowIndex, values }) =>
         rateLimitedSheetsCall(() =>
@@ -42944,6 +42970,11 @@ app.post('/api/marker-color-settings', express.json(), async (req, res) => {
         })
       )
     ]);
+
+    console.log('[마커 색상 설정 저장] 저장 완료:', {
+      normalizedUserId: normalizedUserId,
+      selectedOption: selectedOption
+    });
 
     res.json({ success: true, message: '색상 설정이 저장되었습니다.' });
   } catch (error) {
