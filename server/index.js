@@ -42841,6 +42841,11 @@ app.post('/api/marker-color-settings', express.json(), async (req, res) => {
     optionTypes.forEach(optionType => {
       const settings = colorSettings[optionType] || {};
       Object.entries(settings).forEach(([value, color]) => {
+        // 빈 색상 값은 저장하지 않음
+        if (!color || color.trim() === '') {
+          return;
+        }
+        
         const existingRow = existingRows.find(row => row[1] === optionType && row[2] === value);
         if (existingRow) {
           // 업데이트

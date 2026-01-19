@@ -120,11 +120,28 @@ const MarkerColorSettingsModal = ({ open, onClose, userId, onSave }) => {
       setSaving(true);
       setError(null);
       
-      const result = await saveMarkerColorSettings(userId, selectedOption, colorSettings);
+      // 저장할 색상 설정 준비 (기본 색상 포함)
+      const settingsToSave = { ...colorSettings };
+      
+      // 선택된 옵션이 'default'가 아닌 경우, 모든 값에 대해 색상이 없으면 기본 색상 할당
+      if (selectedOption !== 'default') {
+        const values = uniqueValues[selectedOption] || [];
+        const currentSettings = settingsToSave[selectedOption] || {};
+        const completeSettings = {};
+        
+        values.forEach((value, index) => {
+          // 사용자가 설정한 색상이 있으면 사용하고, 없으면 기본 색상 사용
+          completeSettings[value] = currentSettings[value] || DEFAULT_COLOR_PALETTE[index % DEFAULT_COLOR_PALETTE.length];
+        });
+        
+        settingsToSave[selectedOption] = completeSettings;
+      }
+      
+      const result = await saveMarkerColorSettings(userId, selectedOption, settingsToSave);
       
       if (result.success) {
         if (onSave) {
-          onSave({ selectedOption, colorSettings });
+          onSave({ selectedOption, colorSettings: settingsToSave });
         }
         onClose();
       } else {
