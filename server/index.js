@@ -1495,12 +1495,21 @@ async function fetchSheetValuesDirectly(sheetName, spreadsheetId = SPREADSHEET_I
     // API 호출 기록
     rateLimitUtils.recordRequest();
 
+    // 캐시 무시를 위한 타임스탬프 추가 (valueRenderOption 사용)
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: spreadsheetId,
-      range: range
+      range: range,
+      valueRenderOption: 'UNFORMATTED_VALUE',
+      dateTimeRenderOption: 'FORMATTED_STRING'
     });
 
     const data = response.data.values || [];
+    
+    // 디버깅: 실제로 가져온 데이터의 첫 번째 행 확인
+    if (data.length > 0 && sheetName === '마스터재고') {
+      console.log(`📋 [마스터재고 디버깅] 첫 번째 행 샘플:`, data[0]?.slice(0, 5));
+      console.log(`📋 [마스터재고 디버깅] 두 번째 행 샘플:`, data[1]?.slice(9, 13));
+    }
 
     return data;
   } catch (error) {
@@ -1528,7 +1537,9 @@ async function fetchSheetValuesDirectly(sheetName, spreadsheetId = SPREADSHEET_I
         try {
           const retryResponse = await sheets.spreadsheets.values.get({
             spreadsheetId: spreadsheetId,
-            range: range
+            range: range,
+            valueRenderOption: 'UNFORMATTED_VALUE',
+            dateTimeRenderOption: 'FORMATTED_STRING'
           });
           console.log(`✅ [${errorType}] 재시도 성공 (${retryCount + 1}/${maxRetries})`);
           return retryResponse.data.values || [];
@@ -1570,7 +1581,9 @@ async function fetchSheetValuesDirectly(sheetName, spreadsheetId = SPREADSHEET_I
 
         const retryResponse = await sheets.spreadsheets.values.get({
           spreadsheetId: spreadsheetId,
-          range: retryRange
+          range: retryRange,
+          valueRenderOption: 'UNFORMATTED_VALUE',
+          dateTimeRenderOption: 'FORMATTED_STRING'
         });
 
         const data = retryResponse.data.values || [];
@@ -38013,8 +38026,13 @@ app.post('/api/inventory-inspection', async (req, res) => {
     }
 
     // 1. 마스터재고 조회
+    console.log(`📋 [마스터재고] Spreadsheet ID: ${spreadsheetId}`);
+    console.log(`📋 [마스터재고] 시트 이름: 마스터재고`);
+    console.log(`📋 [마스터재고] 캐시 무시 옵션: ${noCache ? '예' : '아니오'}`);
     const masterData = await fetchSheetValuesDirectly('마스터재고', spreadsheetId);
+    console.log(`📋 [마스터재고] 원본 데이터 행 수: ${masterData.length}개`);
     const masterRows = masterData.slice(1);
+    console.log(`📋 [마스터재고] 헤더 제외 후 행 수: ${masterRows.length}개`);
     const masterInventory = masterRows.map(row => ({
       modelCode: row[9] || '',
       color: row[11] || '',
@@ -38024,6 +38042,7 @@ app.post('/api/inventory-inspection', async (req, res) => {
       firstInDate: row[23] || '',
       dealerInDate: row[26] || ''
     })).filter(item => item.serialNumber);
+    console.log(`📋 [마스터재고] 일련번호 필터링 후: ${masterInventory.length}개`);
 
     // 2. 폰클재고 조회
     const phoneklData = await fetchSheetValuesDirectly('폰클재고', spreadsheetId);
