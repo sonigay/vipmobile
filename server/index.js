@@ -42746,8 +42746,38 @@ app.get('/api/marker-color-settings', async (req, res) => {
     const userRows = dataRows.filter(row => row[0] === userId);
     
     // 선택된 옵션 추출
-    const selectedRow = userRows.find(row => row[1] === 'selected');
-    const selectedOption = selectedRow ? (selectedRow[2] || 'default') : 'default';
+    const selectedRow = userRows.find(row => {
+      const optionType = (row[1] || '').toString().trim();
+      return optionType === 'selected';
+    });
+    
+    let selectedOption = 'default';
+    if (selectedRow) {
+      // Google Sheets API는 빈 셀을 배열에서 제거할 수 있으므로
+      // 인덱스 2가 없을 수도 있음. 안전하게 처리
+      const value = selectedRow[2];
+      if (value !== undefined && value !== null && value !== '') {
+        selectedOption = value.toString().trim();
+        // 유효한 옵션인지 확인
+        if (!['default', 'code', 'office', 'department', 'manager'].includes(selectedOption)) {
+          console.warn(`[마커 색상 설정 조회] 잘못된 선택값: ${selectedOption}, 기본값 사용`);
+          selectedOption = 'default';
+        }
+      }
+    }
+    
+    // 디버깅 로그
+    console.log('[마커 색상 설정 조회]', {
+      userId,
+      userRowsCount: userRows.length,
+      selectedRow: selectedRow ? {
+        userId: selectedRow[0],
+        optionType: selectedRow[1],
+        value: selectedRow[2],
+        fullRow: selectedRow
+      } : null,
+      selectedOption
+    });
     
     // 색상 설정을 옵션별로 그룹화
     const settings = {
@@ -42825,15 +42855,28 @@ app.post('/api/marker-color-settings', express.json(), async (req, res) => {
     const rowsToAppend = [];
 
     // 1. 선택된 옵션 저장/업데이트
-    const existingSelectedRow = existingRows.find(row => row[1] === 'selected');
+    const existingSelectedRow = existingRows.find(row => {
+      const optionType = (row[1] || '').toString().trim();
+      return optionType === 'selected';
+    });
+    
     if (existingSelectedRow) {
-      const rowIndex = dataRows.findIndex(row => row[0] === userId && row[1] === 'selected');
-      rowsToUpdate.push({
-        rowIndex: rowIndex + 2,
-        values: [userId, 'selected', selectedOption, '', existingSelectedRow[4] || now, now]
+      const rowIndex = dataRows.findIndex(row => {
+        const rowUserId = (row[0] || '').toString().trim();
+        const rowOptionType = (row[1] || '').toString().trim();
+        return rowUserId === userId && rowOptionType === 'selected';
       });
+      
+      if (rowIndex !== -1) {
+        rowsToUpdate.push({
+          rowIndex: rowIndex + 2,
+          values: [userId, 'selected', selectedOption, '', existingSelectedRow[4] || now, now]
+        });
+        console.log(`[마커 색상 설정 저장] 선택값 업데이트: ${selectedOption} (행 ${rowIndex + 2})`);
+      }
     } else {
       rowsToAppend.push([userId, 'selected', selectedOption, '', now, now]);
+      console.log(`[마커 색상 설정 저장] 선택값 추가: ${selectedOption}`);
     }
 
     // 2. 각 옵션별 색상 설정 저장/업데이트

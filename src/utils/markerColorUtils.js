@@ -27,6 +27,10 @@ export const getMarkerColorSettings = async (userId) => {
     
     if (response.ok) {
       const data = await response.json();
+      
+      // 디버깅 로그
+      console.log('[마커 색상 설정 조회] 서버 응답:', data);
+      
       // 서버에서 받은 데이터를 옵션별로 그룹화
       const settings = {
         selectedOption: 'default',
@@ -41,6 +45,9 @@ export const getMarkerColorSettings = async (userId) => {
       // 선택된 옵션 처리
       if (data.settings && data.settings.selectedOption) {
         settings.selectedOption = data.settings.selectedOption;
+        console.log('[마커 색상 설정 조회] 선택된 옵션:', settings.selectedOption);
+      } else {
+        console.warn('[마커 색상 설정 조회] 선택된 옵션이 없습니다. 기본값 사용:', data);
       }
       
       // 색상 설정 처리
