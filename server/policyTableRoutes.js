@@ -5239,8 +5239,22 @@ function setupPolicyTableRoutes(app) {
         const creatorId = row[13] || ''; // 생성자ID
         const accessGroupIds = parseAccessGroupIds(row[5]); // 접근권한 (그룹ID 배열)
         
-        // 1. 본인이 생성한 정책표인지 확인
-        const isCreator = creatorId && creatorId === currentUserId;
+        // 전화번호 정규화 함수 (정책표 목록 조회와 동일한 로직)
+        const normalizePhoneNumber = (phone) => {
+          if (!phone) return '';
+          // 숫자만 추출
+          const digits = phone.toString().replace(/[^0-9]/g, '');
+          // 앞의 0 제거 (01053336333 -> 1053336333)
+          return digits.replace(/^0+/, '') || digits;
+        };
+        
+        // 1. 본인이 생성한 정책표인지 확인 (전화번호 정규화 적용)
+        let isCreator = false;
+        if (creatorId && currentUserId) {
+          const normalizedCreatorId = normalizePhoneNumber(creatorId);
+          const normalizedCurrentUserId = normalizePhoneNumber(currentUserId);
+          isCreator = normalizedCreatorId && normalizedCurrentUserId && normalizedCreatorId === normalizedCurrentUserId;
+        }
         
         // 2. 본인이 담당자인 그룹의 정책표인지 확인
         let isManager = false;
@@ -5256,12 +5270,18 @@ function setupPolicyTableRoutes(app) {
           const userGroupsRows = userGroupsResponse.data.values || [];
           const userGroupsDataRows = userGroupsRows.slice(1);
           
+          const normalizedCurrentUserId = normalizePhoneNumber(currentUserId);
           for (const accessGroupId of accessGroupIds) {
             const userGroup = userGroupsDataRows.find(r => r[0] === accessGroupId);
             if (userGroup) {
               const groupData = parseUserGroupData(userGroup[2]);
               const managerIds = groupData.managerIds || [];
-              if (managerIds.includes(currentUserId)) {
+              // managerIds도 정규화하여 비교
+              const isManagerInGroup = managerIds.some(managerId => {
+                const normalizedManagerId = normalizePhoneNumber(managerId);
+                return normalizedManagerId && normalizedCurrentUserId && normalizedManagerId === normalizedCurrentUserId;
+              });
+              if (isManagerInGroup) {
                 isManager = true;
                 break;
               }
@@ -5292,14 +5312,29 @@ function setupPolicyTableRoutes(app) {
         const userGroupsDataRows = userGroupsRows.slice(1);
         const currentUserId = req.headers['x-user-id'];
         
+        // 전화번호 정규화 함수 (정책표 목록 조회와 동일한 로직)
+        const normalizePhoneNumber = (phone) => {
+          if (!phone) return '';
+          // 숫자만 추출
+          const digits = phone.toString().replace(/[^0-9]/g, '');
+          // 앞의 0 제거 (01053336333 -> 1053336333)
+          return digits.replace(/^0+/, '') || digits;
+        };
+        
         // 여러 그룹 중 하나라도 매칭되면 접근 가능
         let hasAccess = false;
+        const normalizedCurrentUserId = normalizePhoneNumber(currentUserId);
         for (const accessGroupId of accessGroupIds) {
           const userGroup = userGroupsDataRows.find(r => r[0] === accessGroupId);
           if (userGroup) {
             const groupData = parseUserGroupData(userGroup[2]);
             const managerIds = groupData.managerIds || [];
-            if (managerIds.includes(currentUserId)) {
+            // managerIds도 정규화하여 비교
+            const isManagerInGroup = managerIds.some(managerId => {
+              const normalizedManagerId = normalizePhoneNumber(managerId);
+              return normalizedManagerId && normalizedCurrentUserId && normalizedManagerId === normalizedCurrentUserId;
+            });
+            if (isManagerInGroup) {
               hasAccess = true;
               break;
             }
