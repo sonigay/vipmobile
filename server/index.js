@@ -155,7 +155,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Origin', 'Accept', 'X-API-Key', 'x-user-id', 'x-user-role', 'x-user-name', 'x-mode'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Origin', 'Accept', 'X-API-Key', 'x-user-id', 'x-user-role', 'x-user-name', 'x-mode', 'Cache-Control', 'Pragma', 'Expires'],
   optionsSuccessStatus: 200,
   preflightContinue: false
 }));
@@ -182,7 +182,7 @@ const setCORSHeaders = (req, res) => {
   }
   
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key, x-user-id, x-user-role, x-user-name, x-mode');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key, x-user-id, x-user-role, x-user-name, x-mode, Cache-Control, Pragma, Expires');
   res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Max-Age', '86400'); // 24시간 캐시
 };
@@ -230,7 +230,7 @@ app.options('*', (req, res) => {
   }
 
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key, x-user-id, x-user-role, x-user-name, x-mode');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key, x-user-id, x-user-role, x-user-name, x-mode, Cache-Control, Pragma, Expires');
   res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Max-Age', '86400'); // 24시간 캐시
   
