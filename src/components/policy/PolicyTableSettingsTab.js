@@ -20,7 +20,9 @@ import {
   Chip,
   IconButton,
   Alert,
-  CircularProgress
+  CircularProgress,
+  FormControlLabel,
+  Checkbox
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -43,7 +45,8 @@ const PolicyTableSettingsTab = ({ loggedInStore }) => {
     policyTableLink: '',
     policyTablePublicLink: '',
     discordChannelId: '',
-    creatorPermissions: []
+    creatorPermissions: [],
+    restrictSettlementTeam: false
   });
 
   // 팀장 권한자 목록 (대리점아이디관리 시트에서 가져옴)
@@ -196,7 +199,8 @@ const PolicyTableSettingsTab = ({ loggedInStore }) => {
         policyTableLink: setting.policyTableLink,
         policyTablePublicLink: setting.policyTablePublicLink || '',
         discordChannelId: setting.discordChannelId,
-        creatorPermissions: setting.creatorPermissions || []
+        creatorPermissions: setting.creatorPermissions || [],
+        restrictSettlementTeam: setting.restrictSettlementTeam || false
       });
     } else {
       setEditingSetting(null);
@@ -206,7 +210,8 @@ const PolicyTableSettingsTab = ({ loggedInStore }) => {
         policyTableLink: '',
         policyTablePublicLink: '',
         discordChannelId: '',
-        creatorPermissions: []
+        creatorPermissions: [],
+        restrictSettlementTeam: false
       });
     }
     setSettingsModalOpen(true);
@@ -221,7 +226,8 @@ const PolicyTableSettingsTab = ({ loggedInStore }) => {
       policyTableLink: '',
       policyTablePublicLink: '',
       discordChannelId: '',
-      creatorPermissions: []
+      creatorPermissions: [],
+      restrictSettlementTeam: false
     });
   };
 
@@ -471,6 +477,23 @@ const PolicyTableSettingsTab = ({ loggedInStore }) => {
                   );
                 }}
               />
+            </Grid>
+            <Grid item xs={12}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={settingsFormData.restrictSettlementTeam || false}
+                    onChange={(e) => setSettingsFormData({
+                      ...settingsFormData,
+                      restrictSettlementTeam: e.target.checked
+                    })}
+                  />
+                }
+                label="정산팀노출제한"
+              />
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, ml: 4 }}>
+                체크 시 S 레벨(정산팀) 사용자는 정책표 목록에서 이 정책표를 확인할 수 없습니다.
+              </Typography>
             </Grid>
           </Grid>
         </DialogContent>

@@ -467,7 +467,8 @@ const HEADERS_POLICY_TABLE_SETTINGS = [
   '디스코드채널ID',
   '생성자적용권한',
   '등록일시',
-  '등록자'
+  '등록자',
+  '정산팀노출제한'         // S 레벨 정산팀 노출 제한 (true/false)
 ];
 
 const HEADERS_BUDGET_CHANNEL_SETTINGS = [
@@ -1368,7 +1369,7 @@ async function processPolicyTableGeneration(jobId, params, discordRequestId = nu
     const settingsResponse = await withRetry(async () => {
       return await sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
-        range: `${SHEET_POLICY_TABLE_SETTINGS}!A:I`
+        range: `${SHEET_POLICY_TABLE_SETTINGS}!A:J`
       });
     });
 
@@ -1642,7 +1643,7 @@ function setupPolicyTableRoutes(app) {
       const response = await withRetry(async () => {
         return await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_POLICY_TABLE_SETTINGS}!A:I`
+          range: `${SHEET_POLICY_TABLE_SETTINGS}!A:J`
         });
       });
 
@@ -1663,7 +1664,8 @@ function setupPolicyTableRoutes(app) {
         discordChannelId: row[5] || '',
         creatorPermissions: row[6] ? JSON.parse(row[6]) : [],
         registeredAt: row[7] || '',
-        registeredBy: row[8] || ''
+        registeredBy: row[8] || '',
+        restrictSettlementTeam: row[9] === 'TRUE' || row[9] === true || row[9] === 'true' || row[9] === '1'
       }));
 
       // 사용자별 생성카드 순서 적용
@@ -1757,7 +1759,7 @@ function setupPolicyTableRoutes(app) {
         return res.status(403).json({ success: false, error: '권한이 없습니다.' });
       }
 
-      const { policyTableName, policyTableDescription, policyTableLink, policyTablePublicLink, discordChannelId, creatorPermissions } = req.body;
+      const { policyTableName, policyTableDescription, policyTableLink, policyTablePublicLink, discordChannelId, creatorPermissions, restrictSettlementTeam } = req.body;
 
       if (!policyTableName || !policyTableLink || !discordChannelId || !creatorPermissions || !Array.isArray(creatorPermissions)) {
         return res.status(400).json({ success: false, error: '필수 필드가 누락되었습니다.' });
@@ -1782,13 +1784,14 @@ function setupPolicyTableRoutes(app) {
         discordChannelId,
         JSON.stringify(creatorPermissions),
         registeredAt,
-        registeredBy
+        registeredBy,
+        restrictSettlementTeam ? 'TRUE' : 'FALSE'  // 정산팀노출제한
       ];
 
       await withRetry(async () => {
         return await sheets.spreadsheets.values.append({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_POLICY_TABLE_SETTINGS}!A:I`,
+          range: `${SHEET_POLICY_TABLE_SETTINGS}!A:J`,
           valueInputOption: 'USER_ENTERED',
           resource: { values: [newRow] }
         });
@@ -1826,7 +1829,7 @@ function setupPolicyTableRoutes(app) {
       const response = await withRetry(async () => {
         return await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_POLICY_TABLE_SETTINGS}!A:I`
+          range: `${SHEET_POLICY_TABLE_SETTINGS}!A:J`
         });
       });
 
@@ -1846,12 +1849,17 @@ function setupPolicyTableRoutes(app) {
       }
 
       const existingRow = dataRows[rowIndex];
-      const { policyTableName, policyTableDescription, policyTableLink, policyTablePublicLink, discordChannelId, creatorPermissions } = req.body;
+      const { policyTableName, policyTableDescription, policyTableLink, policyTablePublicLink, discordChannelId, creatorPermissions, restrictSettlementTeam } = req.body;
       
       // 편집 링크 정규화
       const normalizedEditLink = policyTableLink !== undefined 
         ? normalizeGoogleSheetEditLink(policyTableLink)
         : existingRow[3];
+      
+      // restrictSettlementTeam 처리 (기존 값이 없으면 false)
+      const restrictSettlementTeamValue = restrictSettlementTeam !== undefined 
+        ? (restrictSettlementTeam ? 'TRUE' : 'FALSE')
+        : (existingRow[9] || 'FALSE');
       
       const updatedRow = [
         id, // 정책표ID는 변경 불가
@@ -1862,13 +1870,14 @@ function setupPolicyTableRoutes(app) {
         discordChannelId !== undefined ? discordChannelId : existingRow[5],
         creatorPermissions !== undefined ? JSON.stringify(creatorPermissions) : existingRow[6],
         existingRow[7], // 등록일시는 변경 불가
-        existingRow[8]  // 등록자는 변경 불가
+        existingRow[8],  // 등록자는 변경 불가
+        restrictSettlementTeamValue  // 정산팀노출제한
       ];
 
       await withRetry(async () => {
         return await sheets.spreadsheets.values.update({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_POLICY_TABLE_SETTINGS}!A${rowIndex + 2}:I${rowIndex + 2}`,
+          range: `${SHEET_POLICY_TABLE_SETTINGS}!A${rowIndex + 2}:J${rowIndex + 2}`,
           valueInputOption: 'USER_ENTERED',
           resource: { values: [updatedRow] }
         });
@@ -3899,6 +3908,27 @@ function setupPolicyTableRoutes(app) {
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_USER_GROUPS, HEADERS_USER_GROUPS);
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_TAB_ORDER, HEADERS_TAB_ORDER);
 
+      // 정책표 설정 조회 (restrictSettlementTeam 정보 포함)
+      const settingsResponse = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_POLICY_TABLE_SETTINGS}!A:J`
+        });
+      });
+      const settingsRows = settingsResponse.data.values || [];
+      
+      // restrictSettlementTeam 정보를 포함한 Map 생성
+      const restrictSettlementTeamMap = new Map();
+      if (settingsRows.length >= 2) {
+        settingsRows.slice(1).forEach(row => {
+          const policyTableId = row[0] || '';
+          const restrictSettlementTeam = row[9] === 'TRUE' || row[9] === true || row[9] === 'true' || row[9] === '1';
+          if (policyTableId) {
+            restrictSettlementTeamMap.set(policyTableId, restrictSettlementTeam);
+          }
+        });
+      }
+
       const response = await withRetry(async () => {
         return await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
@@ -3912,9 +3942,11 @@ function setupPolicyTableRoutes(app) {
       }
 
       const dataRows = rows.slice(1);
+      
       let tabs = dataRows.map(row => ({
         policyTableId: row[0] || '',
-        policyTableName: row[1] || ''
+        policyTableName: row[1] || '',
+        restrictSettlementTeam: restrictSettlementTeamMap.get(row[0] || '') || false
       }));
 
       // 권한 필터링
@@ -4046,8 +4078,14 @@ function setupPolicyTableRoutes(app) {
 
         // 접근 가능한 탭만 필터링
         tabs = tabs.filter(tab => accessiblePolicyTableIds.has(tab.policyTableId));
-      } else if (['SS', 'S'].includes(userRole)) {
-        // SS(총괄), S(정산) 레벨은 모든 탭 표시
+      } else if (userRole === 'SS') {
+        // SS(총괄) 레벨은 모든 탭 표시
+      } else if (userRole === 'S') {
+        // S(정산) 레벨은 restrictSettlementTeam이 false인 탭만 표시
+        tabs = tabs.filter(tab => {
+          const restrictSettlementTeam = restrictSettlementTeamMap.get(tab.policyTableId) || false;
+          return !restrictSettlementTeam; // restrictSettlementTeam이 false인 것만 표시
+        });
       } else if (userRole && /^[A-Z]{2}$/.test(userRole)) {
         // 팀장 레벨(두 글자 대문자 패턴)은 본인이 생성한 정책표 + 담당자인 그룹의 정책표 탭 표시
         
@@ -4647,8 +4685,34 @@ function setupPolicyTableRoutes(app) {
         console.log('✅ [일반정책모드] 필터링 완료:', {
           filteredCount: policies.length
         });
-      } else if (['SS', 'S'].includes(userRole)) {
-        // SS(총괄), S(정산) 레벨은 모든 정책표 표시
+      } else if (userRole === 'SS') {
+        // SS(총괄) 레벨은 모든 정책표 표시
+      } else if (userRole === 'S') {
+        // S(정산) 레벨은 restrictSettlementTeam이 false인 정책표만 표시
+        // 정책표 설정 조회
+        await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_TABLE_SETTINGS, HEADERS_POLICY_TABLE_SETTINGS);
+        const settingsResponse = await withRetry(async () => {
+          return await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SHEET_POLICY_TABLE_SETTINGS}!A:J`
+          });
+        });
+        const settingsRows = settingsResponse.data.values || [];
+        const restrictSettlementTeamMap = new Map();
+        if (settingsRows.length >= 2) {
+          settingsRows.slice(1).forEach(row => {
+            const policyTableId = row[0] || '';
+            const restrictSettlementTeam = row[9] === 'TRUE' || row[9] === true || row[9] === 'true' || row[9] === '1';
+            if (policyTableId) {
+              restrictSettlementTeamMap.set(policyTableId, restrictSettlementTeam);
+            }
+          });
+        }
+        // restrictSettlementTeam이 true인 정책표 필터링
+        policies = policies.filter(policy => {
+          const restrictSettlementTeam = restrictSettlementTeamMap.get(policy.policyTableId) || false;
+          return !restrictSettlementTeam; // restrictSettlementTeam이 false인 것만 표시
+        });
       } else if (userRole && /^[A-Z]{2}$/.test(userRole)) {
         // 팀장 레벨(두 글자 대문자 패턴)은 본인이 생성한 정책표 + 담당자인 그룹의 정책표 확인 가능
         const currentUserId = req.headers['x-user-id'] || req.query.userId;
@@ -4700,11 +4764,12 @@ function setupPolicyTableRoutes(app) {
         const settingsResponse = await withRetry(async () => {
           return await sheets.spreadsheets.values.get({
             spreadsheetId: SPREADSHEET_ID,
-            range: `${SHEET_POLICY_TABLE_SETTINGS}!A:I`
+            range: `${SHEET_POLICY_TABLE_SETTINGS}!A:J`
           });
         });
         const settingsRows = settingsResponse.data.values || [];
         const settingsMap = new Map();
+        const restrictSettlementTeamMap = new Map(); // 정산팀노출제한 정보 저장
         if (settingsRows.length >= 2) {
           settingsRows.slice(1).forEach(row => {
             const policyTableId = row[0] || '';
@@ -4715,8 +4780,10 @@ function setupPolicyTableRoutes(app) {
                 return [];
               }
             })() : [];
+            const restrictSettlementTeam = row[9] === 'TRUE' || row[9] === true || row[9] === 'true' || row[9] === '1';
             if (policyTableId) {
               settingsMap.set(policyTableId, creatorPermissions);
+              restrictSettlementTeamMap.set(policyTableId, restrictSettlementTeam);
             }
           });
         }
@@ -5144,8 +5211,28 @@ function setupPolicyTableRoutes(app) {
         if (!hasAccess) {
           return res.status(403).json({ success: false, error: '이 정책표에 접근할 권한이 없습니다.' });
         }
-      } else if (['SS', 'S'].includes(userRole)) {
-        // SS(총괄), S(정산) 레벨은 모든 정책표 접근 가능
+      } else if (userRole === 'SS') {
+        // SS(총괄) 레벨은 모든 정책표 접근 가능
+      } else if (userRole === 'S') {
+        // S(정산) 레벨은 restrictSettlementTeam이 false인 정책표만 접근 가능
+        const policyTableId = row[1] || ''; // 정책표ID_설정
+        await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_TABLE_SETTINGS, HEADERS_POLICY_TABLE_SETTINGS);
+        const settingsResponse = await withRetry(async () => {
+          return await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SHEET_POLICY_TABLE_SETTINGS}!A:J`
+          });
+        });
+        const settingsRows = settingsResponse.data.values || [];
+        if (settingsRows.length >= 2) {
+          const settingRow = settingsRows.slice(1).find(r => r[0] === policyTableId);
+          if (settingRow) {
+            const restrictSettlementTeam = settingRow[9] === 'TRUE' || settingRow[9] === true || settingRow[9] === 'true' || settingRow[9] === '1';
+            if (restrictSettlementTeam) {
+              return res.status(403).json({ success: false, error: '이 정책표에 접근할 권한이 없습니다.' });
+            }
+          }
+        }
       } else if (userRole && /^[A-Z]{2}$/.test(userRole)) {
         // 팀장 레벨(두 글자 대문자 패턴)은 본인이 생성한 정책표 + 담당자인 그룹의 정책표 접근 가능
         const currentUserId = req.headers['x-user-id'];

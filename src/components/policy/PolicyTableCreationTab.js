@@ -2040,9 +2040,23 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
                             </IconButton>
                           </Box>
                     <CardContent sx={{ pl: 6, pt: 2 }}>
-                      <Typography variant="h6" gutterBottom>
-                        {setting.policyTableName}
-                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                        <Typography variant="h6" gutterBottom sx={{ mb: 0 }}>
+                          {setting.policyTableName}
+                        </Typography>
+                        {setting.restrictSettlementTeam && (
+                          <Chip 
+                            label="정산팀노출제한" 
+                            size="small" 
+                            sx={{ 
+                              backgroundColor: 'error.main',
+                              color: 'white',
+                              fontWeight: 'bold',
+                              fontSize: '0.7rem'
+                            }} 
+                          />
+                        )}
+                      </Box>
                       {setting.policyTableDescription && (
                         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                           {setting.policyTableDescription}

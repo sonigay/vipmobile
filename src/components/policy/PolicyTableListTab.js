@@ -106,7 +106,15 @@ const SortableTab = ({ tab, index, activeTabIndex, onTabClick }) => {
             }}
             sx={{ cursor: 'pointer', flex: 1 }}
           >
-            {tab.policyTableName}
+            <Typography
+              component="span"
+              sx={{
+                color: tab.restrictSettlementTeam ? 'error.main' : 'inherit',
+                fontWeight: tab.restrictSettlementTeam ? 'bold' : 'normal'
+              }}
+            >
+              {tab.policyTableName}
+            </Typography>
           </Box>
         </Box>
       }
