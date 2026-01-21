@@ -81,7 +81,7 @@ import { resolveModeKey } from './config/modeConfig';
 import { getMarkerColorSettings } from './utils/markerColorUtils';
 import MarkerColorSettingsModal from './components/MarkerColorSettingsModal';
 import ServerHealthMonitor from './components/common/ServerHealthMonitor'; // 서버 상태 모니터링 컴포넌트 추가
-import ServerHealthMonitor from './components/common/ServerHealthMonitor'; // 서버 상태 모니터링 컴포넌트 추가
+
 
 // Logger 유틸리티
 const logActivity = async (activityData) => {
