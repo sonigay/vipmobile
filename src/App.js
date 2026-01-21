@@ -80,6 +80,8 @@ import { addNotification, addAssignmentCompletedNotification, addSettingsChanged
 import { resolveModeKey } from './config/modeConfig';
 import { getMarkerColorSettings } from './utils/markerColorUtils';
 import MarkerColorSettingsModal from './components/MarkerColorSettingsModal';
+import ServerHealthMonitor from './components/common/ServerHealthMonitor'; // 서버 상태 모니터링 컴포넌트 추가
+import ServerHealthMonitor from './components/common/ServerHealthMonitor'; // 서버 상태 모니터링 컴포넌트 추가
 
 // Logger 유틸리티
 const logActivity = async (activityData) => {
@@ -137,7 +139,7 @@ function AppContent() {
   const [loggedInStore, setLoggedInStore] = useState(null);
   // 관리자 모드 관련 상태 추가
   const [isAgentMode, setIsAgentMode] = useState(false);
-  
+
   // 마커 색상 설정 관련 state
   const [markerColorSettings, setMarkerColorSettings] = useState({
     selectedOption: 'default',
@@ -310,7 +312,7 @@ function AppContent() {
 
           // 다른 모드는 권한이 있으면 포함 (true 또는 'O')
           const hasAccess = hasPermission === true || hasPermission === 'O' || String(hasPermission).trim().toUpperCase() === 'O';
-          
+
           // 일반정책모드 디버깅
           if (mode === 'generalPolicy') {
             console.log('🔍 [일반정책모드] 권한 체크:', {
@@ -321,7 +323,7 @@ function AppContent() {
               stringValue: String(hasPermission).trim().toUpperCase()
             });
           }
-          
+
           return hasAccess;
         })
         .map(([mode]) => mode);
@@ -394,12 +396,12 @@ function AppContent() {
       console.warn('[마커 색상 설정] userId가 없어 로드를 건너뜁니다.');
       return;
     }
-    
+
     if (!isAgentMode) {
       console.warn('[마커 색상 설정] 관리자모드가 아니어서 로드를 건너뜁니다.');
       return;
     }
-    
+
     try {
       console.log('[마커 색상 설정] 로드 시작:', userId);
       const settings = await getMarkerColorSettings(userId);
@@ -410,13 +412,90 @@ function AppContent() {
     }
   }, [isAgentMode]);
 
-  // 관리자모드일 때 색상 설정 로드
+  // 초기 로드 시 세션 복구 및 IP 정보 로드
   useEffect(() => {
-    if (isAgentMode && loggedInStore?.id) {
-      console.log('[마커 색상 설정] useEffect에서 로드 트리거:', { isAgentMode, userId: loggedInStore.id });
-      loadMarkerColorSettings(loggedInStore.id);
-    }
-  }, [isAgentMode, loggedInStore?.id, loadMarkerColorSettings]);
+    const initializeApp = async () => {
+      // 1. IP 정보 로드
+      try {
+        const response = await fetch('https://ipapi.co/json/');
+        const data = await response.json();
+        setIpInfo(data);
+      } catch (error) {
+        console.warn('IP 정보 로드 실패:', error);
+      }
+
+      // 2. 세션 복구 (로그인 유지)
+      try {
+        const savedSession = localStorage.getItem('vip_session');
+        if (savedSession) {
+          const { data, timestamp } = JSON.parse(savedSession);
+          // 세션 유효 시간 체크 (예: 24시간)
+          const ONE_DAY = 24 * 60 * 60 * 1000;
+          if (Date.now() - timestamp < ONE_DAY) {
+            console.log('🔄 저장된 세션으로 자동 로그인 복구 시도...');
+
+            // 데이터 구조에 맞춰 상태 복구
+            if (data.isAgent && data.agentInfo) {
+              // 대리점 관리자
+              setLoggedInStore({
+                id: data.agentInfo.contactId,
+                name: `${data.agentInfo.target} (${data.agentInfo.qualification})`,
+                isAgent: true,
+                target: data.agentInfo.target,
+                qualification: data.agentInfo.qualification,
+                contactId: data.agentInfo.contactId,
+                userRole: data.agentInfo.userRole,
+                obManagementRole: data.agentInfo.obManagementRole,
+                meetingRole: data.agentInfo.meetingRole,
+                modePermissions: data.modePermissions,
+                agentInfo: data.agentInfo
+              });
+              setIsAgentMode(true);
+            } else if (data.isInventory) {
+              // 재고 관리자
+              setLoggedInStore({
+                ...data.storeInfo,
+                isInventory: true,
+                isAgent: false,
+                isSettlement: false
+              });
+              setIsInventoryMode(true);
+            } else if (data.isSettlement) {
+              // 정산 관리자
+              setLoggedInStore({
+                ...data.storeInfo,
+                isSettlement: true,
+                isAgent: false,
+                isInventory: false
+              });
+              setIsSettlementMode(true);
+            } else {
+              // 일반 매장
+              setLoggedInStore({
+                ...data.storeInfo,
+                userRole: data.storeInfo?.userRole,
+                modePermissions: data.modePermissions || data.storeInfo?.modePermissions,
+                isAgent: false,
+                isInventory: false,
+                isSettlement: false
+              });
+            }
+
+            setIsLoggedIn(true);
+            console.log('✅ 자동 로그인 복구 완료');
+          } else {
+            console.log('⚠️ 세션 만료됨, 삭제합니다.');
+            localStorage.removeItem('vip_session');
+          }
+        }
+      } catch (error) {
+        console.error('세션 복구 중 오류:', error);
+        localStorage.removeItem('vip_session');
+      }
+    };
+
+    initializeApp();
+  }, []);
 
   const loadActivationData = useCallback(async () => {
     try {
@@ -941,7 +1020,7 @@ function AppContent() {
           setTimeout(() => {
             loadActivationData();
           }, 100);
-          
+
           // 관리자 모드일 때 마커 색상 설정 로드
           // setTimeout을 사용하여 상태가 완전히 설정된 후 로드
           if (parsedState.store?.id) {
@@ -1229,7 +1308,7 @@ function AppContent() {
       const currentMode = isAgentMode ? '관리자모드' : '일반모드';
       const userId = loggedInStore.id || loggedInStore.contactId || '';
       const API_URL = process.env.REACT_APP_API_URL || '';
-      
+
       if (isAgentMode) {
         // 관리자모드: 자신의 userId로 옵션 조회
         const response = await fetch(`${API_URL}/api/map-display-option?userId=${encodeURIComponent(userId)}&mode=${encodeURIComponent(currentMode)}`, {
