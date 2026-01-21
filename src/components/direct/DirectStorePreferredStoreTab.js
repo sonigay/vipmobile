@@ -285,6 +285,50 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
                         threadId: photos.staff3ThreadId || ''
                     }
                 });
+                
+                // 기존 Discord 정보도 로드
+                setDiscordInfo({
+                    front: {
+                        messageId: photos.frontMessageId || '',
+                        postId: photos.frontPostId || '',
+                        threadId: photos.frontThreadId || ''
+                    },
+                    inside: {
+                        messageId: photos.insideMessageId || '',
+                        postId: photos.insidePostId || '',
+                        threadId: photos.insideThreadId || ''
+                    },
+                    outside: {
+                        messageId: photos.outsideMessageId || '',
+                        postId: photos.outsidePostId || '',
+                        threadId: photos.outsideThreadId || ''
+                    },
+                    outside2: {
+                        messageId: photos.outside2MessageId || '',
+                        postId: photos.outside2PostId || '',
+                        threadId: photos.outside2ThreadId || ''
+                    },
+                    manager: {
+                        messageId: photos.managerMessageId || '',
+                        postId: photos.managerPostId || '',
+                        threadId: photos.managerThreadId || ''
+                    },
+                    staff1: {
+                        messageId: photos.staff1MessageId || '',
+                        postId: photos.staff1PostId || '',
+                        threadId: photos.staff1ThreadId || ''
+                    },
+                    staff2: {
+                        messageId: photos.staff2MessageId || '',
+                        postId: photos.staff2PostId || '',
+                        threadId: photos.staff2ThreadId || ''
+                    },
+                    staff3: {
+                        messageId: photos.staff3MessageId || '',
+                        postId: photos.staff3PostId || '',
+                        threadId: photos.staff3ThreadId || ''
+                    }
+                });
             } else {
                 setEditStorePhotos({
                     frontUrl: '',

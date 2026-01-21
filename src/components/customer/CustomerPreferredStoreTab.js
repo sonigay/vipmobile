@@ -2,9 +2,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
     Box, Typography, CircularProgress, Alert, Paper, Table, TableBody, 
     TableCell, TableContainer, TableHead, TableRow, Button, Grid, Card, CardContent,
-    FormControlLabel, Switch, useMediaQuery, useTheme
+    FormControlLabel, Switch, useMediaQuery, useTheme, Dialog, IconButton
 } from '@mui/material';
-import { Store as StoreIcon, Refresh as RefreshIcon } from '@mui/icons-material';
+import { Store as StoreIcon, Refresh as RefreshIcon, Close as CloseIcon } from '@mui/icons-material';
 import Map from '../Map';
 import { fetchData, customerAPI } from '../../api';
 import { directStoreApiClient } from '../../api/directStoreApiClient';
@@ -23,6 +23,10 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
     // 사진 갤러리: 메인 사진 (선택된 사진) - 매장사진과 직원사진 분리
     const [mainStorePhoto, setMainStorePhoto] = useState(null);
     const [mainStaffPhoto, setMainStaffPhoto] = useState(null);
+    // 이미지 확대 모달 상태
+    const [imageModalOpen, setImageModalOpen] = useState(false);
+    const [modalImageUrl, setModalImageUrl] = useState(null);
+    const [modalImageTitle, setModalImageTitle] = useState('');
     // 대중교통 위치 데이터
     const [transitLocations, setTransitLocations] = useState([]);
     const [showTransitMarkers, setShowTransitMarkers] = useState(true);
@@ -576,14 +580,21 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                                                 <Box sx={{ mb: 2, textAlign: 'center' }}>
                                                     {mainStorePhoto ? (
                                                         <Box
+                                                            onClick={() => {
+                                                                setModalImageUrl(mainStorePhoto);
+                                                                setModalImageTitle('매장사진');
+                                                                setImageModalOpen(true);
+                                                            }}
                                                             sx={{
                                                                 position: 'relative',
                                                                 borderRadius: 2,
                                                                 overflow: 'hidden',
                                                                 boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                                                                 transition: 'transform 0.3s',
+                                                                cursor: 'pointer',
                                                                 '&:hover': {
-                                                                    transform: 'scale(1.02)'
+                                                                    transform: 'scale(1.02)',
+                                                                    boxShadow: '0 6px 16px rgba(0,0,0,0.2)'
                                                                 }
                                                             }}
                                                         >
@@ -714,14 +725,21 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                                                 <Box sx={{ mb: 2, textAlign: 'center' }}>
                                                     {mainStaffPhoto ? (
                                                         <Box
+                                                            onClick={() => {
+                                                                setModalImageUrl(mainStaffPhoto);
+                                                                setModalImageTitle('직원사진');
+                                                                setImageModalOpen(true);
+                                                            }}
                                                             sx={{
                                                                 position: 'relative',
                                                                 borderRadius: 2,
                                                                 overflow: 'hidden',
                                                                 boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                                                                 transition: 'transform 0.3s',
+                                                                cursor: 'pointer',
                                                                 '&:hover': {
-                                                                    transform: 'scale(1.02)'
+                                                                    transform: 'scale(1.02)',
+                                                                    boxShadow: '0 6px 16px rgba(0,0,0,0.2)'
                                                                 }
                                                             }}
                                                         >
@@ -871,6 +889,87 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                     </Paper>
                 </Box>
             )}
+
+            {/* 이미지 확대 모달 */}
+            <Dialog
+                open={imageModalOpen}
+                onClose={() => setImageModalOpen(false)}
+                maxWidth="lg"
+                fullWidth
+                PaperProps={{
+                    sx: {
+                        bgcolor: 'rgba(0, 0, 0, 0.9)',
+                        boxShadow: 'none',
+                        m: 0,
+                        maxHeight: '100vh'
+                    }
+                }}
+            >
+                <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
+                    {/* 닫기 버튼 */}
+                    <IconButton
+                        onClick={() => setImageModalOpen(false)}
+                        sx={{
+                            position: 'absolute',
+                            top: 16,
+                            right: 16,
+                            zIndex: 1,
+                            bgcolor: 'rgba(255, 255, 255, 0.9)',
+                            '&:hover': {
+                                bgcolor: 'rgba(255, 255, 255, 1)'
+                            }
+                        }}
+                    >
+                        <CloseIcon />
+                    </IconButton>
+
+                    {/* 이미지 */}
+                    {modalImageUrl && (
+                        <Box
+                            sx={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                minHeight: '80vh',
+                                p: 3
+                            }}
+                        >
+                            <Typography
+                                variant="h6"
+                                sx={{
+                                    color: 'white',
+                                    mb: 2,
+                                    fontWeight: 'bold'
+                                }}
+                            >
+                                {modalImageTitle}
+                            </Typography>
+                            <Box
+                                sx={{
+                                    maxWidth: '90vw',
+                                    maxHeight: '75vh',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                }}
+                            >
+                                <img
+                                    src={modalImageUrl}
+                                    alt={modalImageTitle}
+                                    style={{
+                                        maxWidth: '100%',
+                                        maxHeight: '75vh',
+                                        objectFit: 'contain',
+                                        borderRadius: '8px',
+                                        boxShadow: '0 8px 32px rgba(0,0,0,0.5)'
+                                    }}
+                                />
+                            </Box>
+                        </Box>
+                    )}
+                </Box>
+            </Dialog>
         </Box>
     );
 };
