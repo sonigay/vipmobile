@@ -20,8 +20,9 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
     // 선택된 매장의 상세 정보 (사전승낙서 마크, 사진)
     const [selectedStoreDetails, setSelectedStoreDetails] = useState(null);
     const [loadingDetails, setLoadingDetails] = useState(false);
-    // 사진 갤러리: 메인 사진 (선택된 사진)
-    const [mainPhoto, setMainPhoto] = useState(null);
+    // 사진 갤러리: 메인 사진 (선택된 사진) - 매장사진과 직원사진 분리
+    const [mainStorePhoto, setMainStorePhoto] = useState(null);
+    const [mainStaffPhoto, setMainStaffPhoto] = useState(null);
     // 대중교통 위치 데이터
     const [transitLocations, setTransitLocations] = useState([]);
     const [showTransitMarkers, setShowTransitMarkers] = useState(true);
@@ -136,18 +137,26 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                 
                 // 첫 번째 사용 가능한 사진을 메인 사진으로 설정
                 if (details.photos) {
-                    const firstPhoto = details.photos.frontUrl || 
-                                     details.photos.insideUrl || 
-                                     details.photos.outsideUrl || 
-                                     details.photos.outside2Url || null;
-                    setMainPhoto(firstPhoto);
+                    const firstStorePhoto = details.photos.frontUrl || 
+                                           details.photos.insideUrl || 
+                                           details.photos.outsideUrl || 
+                                           details.photos.outside2Url || null;
+                    setMainStorePhoto(firstStorePhoto);
+                    
+                    const firstStaffPhoto = details.photos.managerUrl || 
+                                          details.photos.staff1Url || 
+                                          details.photos.staff2Url || 
+                                          details.photos.staff3Url || null;
+                    setMainStaffPhoto(firstStaffPhoto);
                 } else {
-                    setMainPhoto(null);
+                    setMainStorePhoto(null);
+                    setMainStaffPhoto(null);
                 }
             } catch (error) {
                 console.error(`매장 ${selectedStore.name} 상세 정보 로드 실패:`, error);
                 setSelectedStoreDetails(null);
-                setMainPhoto(null);
+                setMainStorePhoto(null);
+                setMainStaffPhoto(null);
             } finally {
                 setLoadingDetails(false);
             }
@@ -245,13 +254,20 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                 setSelectedStoreDetails(details);
                 
                 // 메인 사진 업데이트
-                const currentMainPhoto = mainPhoto;
-                const updatedMainPhoto = details.photos.frontUrl || 
+                const updatedStorePhoto = details.photos.frontUrl || 
                                        details.photos.insideUrl || 
                                        details.photos.outsideUrl || 
                                        details.photos.outside2Url || null;
-                if (currentMainPhoto && updatedMainPhoto) {
-                    setMainPhoto(updatedMainPhoto + '?t=' + Date.now()); // 캐시 무효화
+                if (mainStorePhoto && updatedStorePhoto) {
+                    setMainStorePhoto(updatedStorePhoto + '?t=' + Date.now()); // 캐시 무효화
+                }
+                
+                const updatedStaffPhoto = details.photos.managerUrl || 
+                                        details.photos.staff1Url || 
+                                        details.photos.staff2Url || 
+                                        details.photos.staff3Url || null;
+                if (mainStaffPhoto && updatedStaffPhoto) {
+                    setMainStaffPhoto(updatedStaffPhoto + '?t=' + Date.now()); // 캐시 무효화
                 }
             }
         } catch (error) {
@@ -525,8 +541,8 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                                 </Box>
                             ) : selectedStoreDetails?.photos ? (
                                 <Box sx={{ mb: 3 }}>
-                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                                        <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                                        <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
                                             매장 사진
                                         </Typography>
                                         <Button
@@ -541,116 +557,283 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                                         </Button>
                                     </Box>
                                     
-                                    {/* 메인 사진 (큰 사진) */}
-                                    <Box sx={{ mb: 2, textAlign: 'center' }}>
-                                        {mainPhoto ? (
-                                            <img 
-                                                src={mainPhoto} 
-                                                alt="메인 사진"
-                                                style={{ 
-                                                    width: '100%', 
-                                                    maxWidth: '600px',
-                                                    height: 'auto',
-                                                    maxHeight: '400px',
-                                                    objectFit: 'contain',
-                                                    borderRadius: '8px',
-                                                    border: '2px solid #ddd',
-                                                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-                                                }}
-                                            />
-                                        ) : (
-                                            <Box sx={{ 
-                                                width: '100%', 
-                                                maxWidth: '600px',
-                                                height: '300px',
-                                                bgcolor: '#f0f0f0', 
-                                                borderRadius: '8px',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                border: '2px solid #ddd',
-                                                margin: '0 auto'
+                                    {/* 매장사진과 직원사진을 양쪽으로 나누기 */}
+                                    <Grid container spacing={3}>
+                                        {/* 왼쪽: 매장사진 */}
+                                        <Grid item xs={12} md={6}>
+                                            <Box sx={{
+                                                bgcolor: 'rgba(25, 118, 210, 0.05)',
+                                                borderRadius: 3,
+                                                p: 2,
+                                                border: '2px solid rgba(25, 118, 210, 0.1)',
+                                                height: '100%'
                                             }}>
-                                                <Typography variant="body2" color="text.secondary">
-                                                    사진 없음
+                                                <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 2, color: 'primary.main' }}>
+                                                    매장사진
                                                 </Typography>
-                                            </Box>
-                                        )}
-                                    </Box>
-
-                                    {/* 썸네일 사진들 (작은 사진) */}
-                                    <Grid container spacing={1} justifyContent="center">
-                                        {[
-                                            { key: 'frontUrl', label: '전면' },
-                                            { key: 'insideUrl', label: '내부' },
-                                            { key: 'outsideUrl', label: '외부' },
-                                            { key: 'outside2Url', label: '외부2' }
-                                        ].map(({ key, label }) => {
-                                            const photoUrl = selectedStoreDetails.photos?.[key];
-                                            const isSelected = mainPhoto === photoUrl;
-                                            return (
-                                                <Grid item xs={3} sm={3} key={key}>
-                                                    {photoUrl ? (
+                                                
+                                                {/* 메인 사진 */}
+                                                <Box sx={{ mb: 2, textAlign: 'center' }}>
+                                                    {mainStorePhoto ? (
                                                         <Box
-                                                            onClick={() => setMainPhoto(photoUrl)}
                                                             sx={{
-                                                                cursor: 'pointer',
-                                                                border: isSelected ? '3px solid #1976d2' : '2px solid #ddd',
-                                                                borderRadius: '4px',
+                                                                position: 'relative',
+                                                                borderRadius: 2,
                                                                 overflow: 'hidden',
-                                                                transition: 'all 0.2s',
+                                                                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                                                                transition: 'transform 0.3s',
                                                                 '&:hover': {
-                                                                    borderColor: '#1976d2',
-                                                                    transform: 'scale(1.05)'
+                                                                    transform: 'scale(1.02)'
                                                                 }
                                                             }}
                                                         >
                                                             <img 
-                                                                src={photoUrl} 
-                                                                alt={label}
+                                                                src={mainStorePhoto} 
+                                                                alt="매장 메인 사진"
                                                                 style={{ 
                                                                     width: '100%', 
-                                                                    height: '100px', 
-                                                                    objectFit: 'cover',
+                                                                    height: 'auto',
+                                                                    maxHeight: '350px',
+                                                                    objectFit: 'contain',
                                                                     display: 'block'
                                                                 }}
                                                             />
-                                                            <Typography 
-                                                                variant="caption" 
-                                                                sx={{ 
-                                                                    display: 'block', 
-                                                                    textAlign: 'center',
-                                                                    py: 0.5,
-                                                                    bgcolor: isSelected ? '#e3f2fd' : 'transparent',
-                                                                    fontWeight: isSelected ? 'bold' : 'normal'
-                                                                }}
-                                                            >
-                                                                {label}
-                                                            </Typography>
                                                         </Box>
                                                     ) : (
                                                         <Box sx={{ 
                                                             width: '100%', 
-                                                            height: '100px', 
-                                                            bgcolor: '#f0f0f0', 
-                                                            borderRadius: '4px',
+                                                            height: '250px',
+                                                            bgcolor: 'rgba(0,0,0,0.05)', 
+                                                            borderRadius: 2,
                                                             display: 'flex',
-                                                            flexDirection: 'column',
                                                             alignItems: 'center',
                                                             justifyContent: 'center',
-                                                            border: '2px solid #ddd'
+                                                            border: '2px dashed rgba(0,0,0,0.2)'
                                                         }}>
-                                                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-                                                                {label}
-                                                            </Typography>
-                                                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
-                                                                없음
+                                                            <Typography variant="body2" color="text.secondary">
+                                                                사진 없음
                                                             </Typography>
                                                         </Box>
                                                     )}
+                                                </Box>
+
+                                                {/* 서브 사진들 */}
+                                                <Grid container spacing={1}>
+                                                    {[
+                                                        { key: 'frontUrl', label: '전면' },
+                                                        { key: 'insideUrl', label: '내부' },
+                                                        { key: 'outsideUrl', label: '외부' },
+                                                        { key: 'outside2Url', label: '외부2' }
+                                                    ].map(({ key, label }) => {
+                                                        const photoUrl = selectedStoreDetails.photos?.[key];
+                                                        const isSelected = mainStorePhoto === photoUrl;
+                                                        return (
+                                                            <Grid item xs={6} key={key}>
+                                                                {photoUrl ? (
+                                                                    <Box
+                                                                        onClick={() => setMainStorePhoto(photoUrl)}
+                                                                        sx={{
+                                                                            cursor: 'pointer',
+                                                                            border: isSelected ? '3px solid #1976d2' : '2px solid rgba(0,0,0,0.1)',
+                                                                            borderRadius: 1.5,
+                                                                            overflow: 'hidden',
+                                                                            transition: 'all 0.2s',
+                                                                            bgcolor: isSelected ? 'rgba(25, 118, 210, 0.1)' : 'transparent',
+                                                                            '&:hover': {
+                                                                                borderColor: '#1976d2',
+                                                                                transform: 'translateY(-2px)',
+                                                                                boxShadow: '0 4px 8px rgba(0,0,0,0.15)'
+                                                                            }
+                                                                        }}
+                                                                    >
+                                                                        <img 
+                                                                            src={photoUrl} 
+                                                                            alt={label}
+                                                                            style={{ 
+                                                                                width: '100%', 
+                                                                                height: '100px', 
+                                                                                objectFit: 'cover',
+                                                                                display: 'block'
+                                                                            }}
+                                                                        />
+                                                                        <Typography 
+                                                                            variant="caption" 
+                                                                            sx={{ 
+                                                                                display: 'block', 
+                                                                                textAlign: 'center',
+                                                                                py: 0.5,
+                                                                                bgcolor: isSelected ? 'rgba(25, 118, 210, 0.15)' : 'transparent',
+                                                                                fontWeight: isSelected ? 'bold' : 'normal',
+                                                                                fontSize: '0.75rem'
+                                                                            }}
+                                                                        >
+                                                                            {label}
+                                                                        </Typography>
+                                                                    </Box>
+                                                                ) : (
+                                                                    <Box sx={{ 
+                                                                        width: '100%', 
+                                                                        height: '100px', 
+                                                                        bgcolor: 'rgba(0,0,0,0.03)', 
+                                                                        borderRadius: 1.5,
+                                                                        display: 'flex',
+                                                                        flexDirection: 'column',
+                                                                        alignItems: 'center',
+                                                                        justifyContent: 'center',
+                                                                        border: '2px dashed rgba(0,0,0,0.1)'
+                                                                    }}>
+                                                                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                                                                            {label}
+                                                                        </Typography>
+                                                                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+                                                                            없음
+                                                                        </Typography>
+                                                                    </Box>
+                                                                )}
+                                                            </Grid>
+                                                        );
+                                                    })}
                                                 </Grid>
-                                            );
-                                        })}
+                                            </Box>
+                                        </Grid>
+
+                                        {/* 오른쪽: 직원사진 */}
+                                        <Grid item xs={12} md={6}>
+                                            <Box sx={{
+                                                bgcolor: 'rgba(156, 39, 176, 0.05)',
+                                                borderRadius: 3,
+                                                p: 2,
+                                                border: '2px solid rgba(156, 39, 176, 0.1)',
+                                                height: '100%'
+                                            }}>
+                                                <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 2, color: 'secondary.main' }}>
+                                                    직원사진
+                                                </Typography>
+                                                
+                                                {/* 메인 사진 */}
+                                                <Box sx={{ mb: 2, textAlign: 'center' }}>
+                                                    {mainStaffPhoto ? (
+                                                        <Box
+                                                            sx={{
+                                                                position: 'relative',
+                                                                borderRadius: 2,
+                                                                overflow: 'hidden',
+                                                                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                                                                transition: 'transform 0.3s',
+                                                                '&:hover': {
+                                                                    transform: 'scale(1.02)'
+                                                                }
+                                                            }}
+                                                        >
+                                                            <img 
+                                                                src={mainStaffPhoto} 
+                                                                alt="직원 메인 사진"
+                                                                style={{ 
+                                                                    width: '100%', 
+                                                                    height: 'auto',
+                                                                    maxHeight: '350px',
+                                                                    objectFit: 'contain',
+                                                                    display: 'block'
+                                                                }}
+                                                            />
+                                                        </Box>
+                                                    ) : (
+                                                        <Box sx={{ 
+                                                            width: '100%', 
+                                                            height: '250px',
+                                                            bgcolor: 'rgba(0,0,0,0.05)', 
+                                                            borderRadius: 2,
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            border: '2px dashed rgba(0,0,0,0.2)'
+                                                        }}>
+                                                            <Typography variant="body2" color="text.secondary">
+                                                                사진 없음
+                                                            </Typography>
+                                                        </Box>
+                                                    )}
+                                                </Box>
+
+                                                {/* 서브 사진들 */}
+                                                <Grid container spacing={1}>
+                                                    {[
+                                                        { key: 'managerUrl', label: '점장' },
+                                                        { key: 'staff1Url', label: '직원1' },
+                                                        { key: 'staff2Url', label: '직원2' },
+                                                        { key: 'staff3Url', label: '직원3' }
+                                                    ].map(({ key, label }) => {
+                                                        const photoUrl = selectedStoreDetails.photos?.[key];
+                                                        const isSelected = mainStaffPhoto === photoUrl;
+                                                        return (
+                                                            <Grid item xs={6} key={key}>
+                                                                {photoUrl ? (
+                                                                    <Box
+                                                                        onClick={() => setMainStaffPhoto(photoUrl)}
+                                                                        sx={{
+                                                                            cursor: 'pointer',
+                                                                            border: isSelected ? '3px solid #9c27b0' : '2px solid rgba(0,0,0,0.1)',
+                                                                            borderRadius: 1.5,
+                                                                            overflow: 'hidden',
+                                                                            transition: 'all 0.2s',
+                                                                            bgcolor: isSelected ? 'rgba(156, 39, 176, 0.1)' : 'transparent',
+                                                                            '&:hover': {
+                                                                                borderColor: '#9c27b0',
+                                                                                transform: 'translateY(-2px)',
+                                                                                boxShadow: '0 4px 8px rgba(0,0,0,0.15)'
+                                                                            }
+                                                                        }}
+                                                                    >
+                                                                        <img 
+                                                                            src={photoUrl} 
+                                                                            alt={label}
+                                                                            style={{ 
+                                                                                width: '100%', 
+                                                                                height: '100px', 
+                                                                                objectFit: 'cover',
+                                                                                display: 'block'
+                                                                            }}
+                                                                        />
+                                                                        <Typography 
+                                                                            variant="caption" 
+                                                                            sx={{ 
+                                                                                display: 'block', 
+                                                                                textAlign: 'center',
+                                                                                py: 0.5,
+                                                                                bgcolor: isSelected ? 'rgba(156, 39, 176, 0.15)' : 'transparent',
+                                                                                fontWeight: isSelected ? 'bold' : 'normal',
+                                                                                fontSize: '0.75rem'
+                                                                            }}
+                                                                        >
+                                                                            {label}
+                                                                        </Typography>
+                                                                    </Box>
+                                                                ) : (
+                                                                    <Box sx={{ 
+                                                                        width: '100%', 
+                                                                        height: '100px', 
+                                                                        bgcolor: 'rgba(0,0,0,0.03)', 
+                                                                        borderRadius: 1.5,
+                                                                        display: 'flex',
+                                                                        flexDirection: 'column',
+                                                                        alignItems: 'center',
+                                                                        justifyContent: 'center',
+                                                                        border: '2px dashed rgba(0,0,0,0.1)'
+                                                                    }}>
+                                                                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                                                                            {label}
+                                                                        </Typography>
+                                                                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+                                                                            없음
+                                                                        </Typography>
+                                                                    </Box>
+                                                                )}
+                                                            </Grid>
+                                                        );
+                                                    })}
+                                                </Grid>
+                                            </Box>
+                                        </Grid>
                                     </Grid>
                                 </Box>
                             ) : (
