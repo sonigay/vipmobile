@@ -22,38 +22,20 @@ class ErrorBoundary extends React.Component {
       errorBoundary: this.props.name || 'Unknown',
       timestamp: new Date().toISOString()
     };
-    
+
     console.error('🔴 ErrorBoundary caught an error:', errorDetails);
     console.error('📍 Component Stack:', errorInfo?.componentStack);
     console.error('📋 Error Stack:', error?.stack);
-    
+
     // 서버로 에러 전송 (개발 환경에서만)
-    const isDevelopment = process.env.NODE_ENV === 'development' || 
-                          process.env.REACT_APP_ENV === 'development' ||
-                          !process.env.NODE_ENV;
-    
+    const isDevelopment = process.env.NODE_ENV === 'development' ||
+      process.env.REACT_APP_ENV === 'development' ||
+      !process.env.NODE_ENV;
+
     if (isDevelopment) {
-      try {
-        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          location: 'ErrorBoundary.componentDidCatch',
-          message: `ErrorBoundary [${this.props.name || 'Unknown'}] caught error`,
-          data: errorDetails,
-          timestamp: Date.now(),
-          sessionId: 'debug-session',
-          runId: 'error-catch',
-          hypothesisId: 'ERROR-BOUNDARY'
-        })
-      }).catch(() => {
-        // 네트워크 에러는 조용히 무시 (개발 환경에서만)
-      });
-      } catch (e) {
-        // 로깅 실패 무시
-      }
+      // 로컬 로깅 서버로의 전송 코드 제거됨
     }
-    
+
     this.setState({
       error: error,
       errorInfo: errorInfo
@@ -91,38 +73,38 @@ class ErrorBoundary extends React.Component {
               오류가 발생했습니다
             </Typography>
             <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-              애플리케이션에서 예상치 못한 오류가 발생했습니다. 
+              애플리케이션에서 예상치 못한 오류가 발생했습니다.
               페이지를 새로고침하여 다시 시도해주세요.
             </Typography>
-            
+
             <Alert severity="error" sx={{ mb: 3, textAlign: 'left' }}>
               <Typography variant="body2" component="div" sx={{ fontFamily: 'monospace' }}>
                 <Box sx={{ mb: 2, p: 2, bgcolor: 'rgba(0,0,0,0.05)', borderRadius: 1 }}>
                   <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1, color: 'error.main' }}>
                     🔴 에러 발생 위치 및 원인
                   </Typography>
-                  
+
                   <Box sx={{ mb: 1.5 }}>
                     <strong>📍 발생 컴포넌트:</strong> {this.props.name || '알 수 없음'}
                   </Box>
-                  
+
                   <Box sx={{ mb: 1.5 }}>
                     <strong>❌ 에러 메시지:</strong> {this.state.error?.message || '알 수 없는 오류'}
                   </Box>
-                  
+
                   <Box sx={{ mb: 1.5 }}>
                     <strong>🏷️ 에러 타입:</strong> {this.state.error?.name || 'Unknown'}
                   </Box>
-                  
+
                   {this.state.errorInfo?.componentStack && (
                     <Box sx={{ mb: 1.5 }}>
                       <strong>📋 컴포넌트 호출 스택:</strong>
-                      <Box 
-                        component="pre" 
-                        sx={{ 
-                          fontSize: '0.7rem', 
-                          overflow: 'auto', 
-                          maxHeight: '150px', 
+                      <Box
+                        component="pre"
+                        sx={{
+                          fontSize: '0.7rem',
+                          overflow: 'auto',
+                          maxHeight: '150px',
                           marginTop: '8px',
                           padding: '8px',
                           bgcolor: 'rgba(0,0,0,0.03)',
@@ -136,16 +118,16 @@ class ErrorBoundary extends React.Component {
                       </Box>
                     </Box>
                   )}
-                  
+
                   {this.state.error?.stack && (
                     <Box sx={{ mb: 1.5 }}>
                       <strong>🔍 상세 에러 스택 (파일명 및 라인 번호):</strong>
-                      <Box 
-                        component="pre" 
-                        sx={{ 
-                          fontSize: '0.7rem', 
-                          overflow: 'auto', 
-                          maxHeight: '200px', 
+                      <Box
+                        component="pre"
+                        sx={{
+                          fontSize: '0.7rem',
+                          overflow: 'auto',
+                          maxHeight: '200px',
                           marginTop: '8px',
                           padding: '8px',
                           bgcolor: 'rgba(255,0,0,0.05)',
@@ -172,7 +154,7 @@ class ErrorBoundary extends React.Component {
             >
               페이지 새로고침
             </Button>
-            
+
             <Button
               variant="outlined"
               onClick={() => window.history.back()}

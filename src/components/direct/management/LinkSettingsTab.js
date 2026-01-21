@@ -107,19 +107,14 @@ const LinkSettingsTab = () => {
     // 설정 로드
     useEffect(() => {
         const loadSettings = async () => {
-            // #region agent log
-            const carrier = getCurrentCarrier();
-            fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LinkSettingsTab.js:loadSettings',message:'링크 설정 로드 시작',data:{carrier},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'L1'})}).catch(()=>{});
-            // #endregion
+
             try {
                 setLoading(true);
                 const startTime = Date.now();
                 const data = await directStoreApiClient.getLinkSettings(carrier);
                 const duration = Date.now() - startTime;
-                // #region agent log
-                fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LinkSettingsTab.js:loadSettings',message:'링크 설정 로드 완료',data:{carrier,success:data?.success,duration,hasPlanGroup:!!data?.planGroup,hasSupport:!!data?.support,hasPolicy:!!data?.policy},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'L1'})}).catch(()=>{});
-                // #endregion
-                
+
+
                 if (data.success) {
                     if (data.planGroup) {
                         setPlanGroupSettings({
@@ -240,7 +235,7 @@ const LinkSettingsTab = () => {
             const result = await directStoreApiClient.fetchRangeData(sheetId, range, useUnique);
             if (result.success && result.data) {
                 let previewData = result.data.flat().slice(0, 20); // 최대 20개만 미리보기
-                
+
                 // 정책금 범위는 *10000 적용
                 if (multiplyBy10000) {
                     previewData = previewData.map(item => {
@@ -248,7 +243,7 @@ const LinkSettingsTab = () => {
                         return numValue > 0 ? (numValue * 10000).toLocaleString() : item;
                     });
                 }
-                
+
                 setPreviewDialog({
                     open: true,
                     title: `${fieldName} 미리보기 (최대 20개)${useUnique ? ' - 유니크' : ''}${multiplyBy10000 ? ' - 만원 단위 변환' : ''}`,
@@ -271,10 +266,7 @@ const LinkSettingsTab = () => {
     };
 
     const handleSave = async (type) => {
-        // #region agent log
-        const carrier = getCurrentCarrier();
-        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LinkSettingsTab.js:handleSave',message:'링크 설정 저장 시작',data:{type,carrier},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'L2'})}).catch(()=>{});
-        // #endregion
+
         try {
             setSaving(true);
             let settings = {};
@@ -287,7 +279,7 @@ const LinkSettingsTab = () => {
                     setSaving(false);
                     return;
                 }
-                settings = { 
+                settings = {
                     planGroup: {
                         ...planGroupSettings,
                         link: sheetId, // ID만 저장
@@ -301,7 +293,7 @@ const LinkSettingsTab = () => {
                     setSaving(false);
                     return;
                 }
-                settings = { 
+                settings = {
                     support: {
                         ...supportSettings,
                         link: sheetId,
@@ -315,7 +307,7 @@ const LinkSettingsTab = () => {
                     setSaving(false);
                     return;
                 }
-                settings = { 
+                settings = {
                     policy: {
                         ...policySettings,
                         link: sheetId,
@@ -327,11 +319,9 @@ const LinkSettingsTab = () => {
             const startTime = Date.now();
             await directStoreApi.saveLinkSettings(carrier, settings);
             const duration = Date.now() - startTime;
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LinkSettingsTab.js:handleSave',message:'링크 설정 저장 완료',data:{type,carrier,duration},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'L2'})}).catch(()=>{});
-            // #endregion
+
             setSuccessMessage('설정이 저장되었습니다.');
-            
+
             // 저장 후 자동으로 다시 로드 (planGroups 자동 추출 반영)
             if (type === 'planGroup') {
                 const reloadData = await directStoreApiClient.getLinkSettings(carrier);
@@ -367,7 +357,7 @@ const LinkSettingsTab = () => {
             {error && (
                 <ErrorState error={error} onRetry={() => window.location.reload()} title="링크 설정 로드 실패" />
             )}
-            
+
             <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', mb: 3 }}>
                 링크 설정
             </Typography>
@@ -509,9 +499,9 @@ const LinkSettingsTab = () => {
                                 이 목록은 다른 설정 모달의 동적 필드를 생성하는 데 사용됩니다.
                             </Typography>
                             <Stack direction="row" spacing={1} mb={2} flexWrap="wrap">
-                                <Button 
-                                    variant="outlined" 
-                                    onClick={handleFetchPlanGroups} 
+                                <Button
+                                    variant="outlined"
+                                    onClick={handleFetchPlanGroups}
                                     disabled={!planGroupSettings.link || !planGroupSettings.planGroupRange || loading}
                                     startIcon={<LinkIcon />}
                                 >
@@ -577,8 +567,8 @@ const LinkSettingsTab = () => {
                                         placeholder="예: 정책!A5:A500"
                                         helperText="시트이름!범위"
                                     />
-                                    <Button 
-                                        variant="outlined" 
+                                    <Button
+                                        variant="outlined"
                                         size="small"
                                         onClick={() => handlePreviewRange('support', 'modelRange', supportSettings.link, supportSettings.modelRange)}
                                         disabled={!supportSettings.link || !supportSettings.modelRange}
@@ -598,8 +588,8 @@ const LinkSettingsTab = () => {
                                         placeholder="예: 정책!B5:B500"
                                         helperText="시트이름!범위"
                                     />
-                                    <Button 
-                                        variant="outlined" 
+                                    <Button
+                                        variant="outlined"
                                         size="small"
                                         onClick={() => handlePreviewRange('support', 'petNameRange', supportSettings.link, supportSettings.petNameRange)}
                                         disabled={!supportSettings.link || !supportSettings.petNameRange}
@@ -619,8 +609,8 @@ const LinkSettingsTab = () => {
                                         placeholder="예: 정책!C5:C500"
                                         helperText="시트이름!범위"
                                     />
-                                    <Button 
-                                        variant="outlined" 
+                                    <Button
+                                        variant="outlined"
                                         size="small"
                                         onClick={() => handlePreviewRange('support', 'factoryPriceRange', supportSettings.link, supportSettings.factoryPriceRange)}
                                         disabled={!supportSettings.link || !supportSettings.factoryPriceRange}
@@ -640,8 +630,8 @@ const LinkSettingsTab = () => {
                                         placeholder="예: 정책!D5:D500"
                                         helperText="시트이름!범위"
                                     />
-                                    <Button 
-                                        variant="outlined" 
+                                    <Button
+                                        variant="outlined"
                                         size="small"
                                         onClick={() => handlePreviewRange('support', 'openingTypeRange', supportSettings.link, supportSettings.openingTypeRange)}
                                         disabled={!supportSettings.link || !supportSettings.openingTypeRange}
@@ -759,8 +749,8 @@ const LinkSettingsTab = () => {
                                                                 placeholder="예: 정책!F5:F500"
                                                                 helperText="시트이름!범위 (만원 단위, *10000 적용)"
                                                             />
-                                                            <Button 
-                                                                variant="outlined" 
+                                                            <Button
+                                                                variant="outlined"
                                                                 size="small"
                                                                 onClick={() => handlePreviewRange('policy', `${group} ${type} 리베이트 범위`, policySettings.link, currentRange, false, true)}
                                                                 disabled={!policySettings.link || !currentRange}

@@ -39,14 +39,14 @@ const MainPageTextSettingsTab = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
-  
+
   const [mainHeader, setMainHeader] = useState({ content: '', imageUrl: '' });
   const [transitionPages, setTransitionPages] = useState({});
-  
+
   const [openMainHeaderModal, setOpenMainHeaderModal] = useState(false);
   const [openTransitionModal, setOpenTransitionModal] = useState(false);
   const [editingTransition, setEditingTransition] = useState(null);
-  
+
   const [mainHeaderForm, setMainHeaderForm] = useState({ content: '', imageUrl: '' });
   const [transitionForm, setTransitionForm] = useState({
     carrier: 'SK',
@@ -54,7 +54,7 @@ const MainPageTextSettingsTab = () => {
     content: '',
     imageUrl: ''
   });
-  
+
   const [uploadingImage, setUploadingImage] = useState(false);
   const fileInputRef = React.useRef(null);
 
@@ -63,20 +63,16 @@ const MainPageTextSettingsTab = () => {
   }, []);
 
   const loadData = async () => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MainPageTextSettingsTab.js:loadData',message:'문구 설정 로드 시작',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'T1'})}).catch(()=>{});
-    // #endregion
+
     try {
       setLoading(true);
       setError(null);
       const startTime = Date.now();
       const response = await directStoreApiClient.getMainPageTexts();
       const duration = Date.now() - startTime;
-      
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MainPageTextSettingsTab.js:loadData',message:'문구 설정 로드 완료',data:{success:response?.success,duration,hasMainHeader:!!response?.data?.mainHeader,transitionPageCount:Object.keys(response?.data?.transitionPages||{}).length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'T1'})}).catch(()=>{});
-      // #endregion
-      
+
+
+
       if (response.success && response.data) {
         if (response.data.mainHeader) {
           setMainHeader(response.data.mainHeader);
@@ -121,7 +117,7 @@ const MainPageTextSettingsTab = () => {
         transitionForm.carrier,
         transitionForm.category
       );
-      
+
       if (result.success) {
         setTransitionForm(prev => ({ ...prev, imageUrl: result.imageUrl }));
         setSuccessMessage('이미지가 업로드되었습니다.');
@@ -137,20 +133,16 @@ const MainPageTextSettingsTab = () => {
   };
 
   const handleSaveMainHeader = async () => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MainPageTextSettingsTab.js:handleSaveMainHeader',message:'메인헤더 저장 시작',data:{hasContent:!!mainHeaderForm.content,hasImage:!!mainHeaderForm.imageUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'T2'})}).catch(()=>{});
-    // #endregion
+
     try {
       setSaving(true);
       setError(null);
-      
+
       const startTime = Date.now();
       const response = await directStoreApiClient.saveMainPageText('', '', 'mainHeader', mainHeaderForm.content, mainHeaderForm.imageUrl);
       const duration = Date.now() - startTime;
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MainPageTextSettingsTab.js:handleSaveMainHeader',message:'메인헤더 저장 완료',data:{success:response?.success,duration},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'T2'})}).catch(()=>{});
-      // #endregion
-      
+
+
       if (response.success) {
         setMainHeader(mainHeaderForm);
         setOpenMainHeaderModal(false);
@@ -168,13 +160,11 @@ const MainPageTextSettingsTab = () => {
   };
 
   const handleSaveTransition = async () => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MainPageTextSettingsTab.js:handleSaveTransition',message:'전환 페이지 저장 시작',data:{carrier:transitionForm.carrier,category:transitionForm.category,hasContent:!!transitionForm.content,hasImage:!!transitionForm.imageUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'T3'})}).catch(()=>{});
-    // #endregion
+
     try {
       setSaving(true);
       setError(null);
-      
+
       const startTime = Date.now();
       const response = await directStoreApiClient.saveMainPageText(
         transitionForm.carrier,
@@ -184,10 +174,8 @@ const MainPageTextSettingsTab = () => {
         transitionForm.imageUrl
       );
       const duration = Date.now() - startTime;
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MainPageTextSettingsTab.js:handleSaveTransition',message:'전환 페이지 저장 완료',data:{carrier:transitionForm.carrier,category:transitionForm.category,success:response?.success,duration},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'T3'})}).catch(()=>{});
-      // #endregion
-      
+
+
       if (response.success) {
         if (!transitionPages[transitionForm.carrier]) {
           setTransitionPages(prev => ({ ...prev, [transitionForm.carrier]: {} }));
@@ -202,7 +190,7 @@ const MainPageTextSettingsTab = () => {
             }
           }
         }));
-        
+
         setOpenTransitionModal(false);
         setEditingTransition(null);
         setSuccessMessage('연결페이지 문구가 저장되었습니다.');
@@ -271,7 +259,7 @@ const MainPageTextSettingsTab = () => {
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom>연결페이지 문구설정</Typography>
             <Divider sx={{ my: 2 }} />
-            
+
             {carriers.map(carrier => (
               <Box key={carrier} sx={{ mb: 3 }}>
                 <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>
@@ -361,7 +349,7 @@ const MainPageTextSettingsTab = () => {
                 ))}
               </Select>
             </FormControl>
-            
+
             <FormControl fullWidth>
               <InputLabel>카테고리</InputLabel>
               <Select
@@ -374,7 +362,7 @@ const MainPageTextSettingsTab = () => {
                 ))}
               </Select>
             </FormControl>
-            
+
             <TextField
               label="문구내용"
               multiline
@@ -382,11 +370,11 @@ const MainPageTextSettingsTab = () => {
               fullWidth
               value={transitionForm.content}
               onChange={(e) => setTransitionForm(prev => ({ ...prev, content: e.target.value }))}
-              placeholder={transitionForm.category === 'premium' 
+              placeholder={transitionForm.category === 'premium'
                 ? '예: 최신 스마트폰을 만나보세요! 프리미엄 기기의 혜택을 놓치지 마세요.'
                 : '예: 저렴한걸 찾으신다면 추천합니다. 합리적인 가격의 중저가폰을 확인해보세요.'}
             />
-            
+
             <Box>
               <input
                 ref={fileInputRef}

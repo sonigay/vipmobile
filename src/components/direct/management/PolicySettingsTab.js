@@ -84,12 +84,12 @@ const PolicySettingsTab = () => {
     // 3. 별도정책 설정 리스트
     const [specialPolicies, setSpecialPolicies] = useState([]);
     // 별도정책 입력 폼 상태
-    const [newSpecial, setNewSpecial] = useState({ 
-        name: '', 
-        policyType: 'general', 
-        amount: '', 
+    const [newSpecial, setNewSpecial] = useState({
+        name: '',
+        policyType: 'general',
+        amount: '',
         isActive: true,
-        conditions: [] 
+        conditions: []
     });
     // 모델/요금제군 검색용 데이터
     const [availableModels, setAvailableModels] = useState([]);
@@ -110,19 +110,14 @@ const PolicySettingsTab = () => {
     // 설정 로드
     useEffect(() => {
         const loadSettings = async () => {
-            // #region agent log
-            const carrier = getCurrentCarrier();
-            fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PolicySettingsTab.js:loadSettings',message:'정책 설정 로드 시작',data:{carrier},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'P1'})}).catch(()=>{});
-            // #endregion
+
             try {
                 setLoading(true);
                 const startTime = Date.now();
                 const data = await directStoreApiClient.getPolicySettings(carrier);
                 const duration = Date.now() - startTime;
-                // #region agent log
-                fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PolicySettingsTab.js:loadSettings',message:'정책 설정 로드 완료',data:{carrier,success:data?.success,duration,hasMargin:!!data?.margin,addonCount:data?.addon?.list?.length||0,insuranceCount:data?.insurance?.list?.length||0,specialCount:data?.special?.list?.length||0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'P1'})}).catch(()=>{});
-                // #endregion
-                
+
+
                 if (data.success) {
                     if (data.margin) {
                         setMargin(data.margin.baseMargin || 0);
@@ -140,12 +135,12 @@ const PolicySettingsTab = () => {
                             if (policy.addition !== undefined || policy.deduction !== undefined) {
                                 return {
                                     ...policy,
-                                    amount: policy.amount !== undefined 
-                                        ? policy.amount 
+                                    amount: policy.amount !== undefined
+                                        ? policy.amount
                                         : (Number(policy.addition || 0) - Number(policy.deduction || 0)),
                                     policyType: policy.policyType || 'general',
-                                    conditions: policy.conditionsJson 
-                                        ? (typeof policy.conditionsJson === 'string' 
+                                    conditions: policy.conditionsJson
+                                        ? (typeof policy.conditionsJson === 'string'
                                             ? JSON.parse(policy.conditionsJson)?.conditions || []
                                             : policy.conditionsJson?.conditions || [])
                                         : []
@@ -154,8 +149,8 @@ const PolicySettingsTab = () => {
                             // 새 형식 처리
                             return {
                                 ...policy,
-                                conditions: policy.conditionsJson 
-                                    ? (typeof policy.conditionsJson === 'string' 
+                                conditions: policy.conditionsJson
+                                    ? (typeof policy.conditionsJson === 'string'
                                         ? JSON.parse(policy.conditionsJson)?.conditions || []
                                         : policy.conditionsJson?.conditions || [])
                                     : []
@@ -163,7 +158,7 @@ const PolicySettingsTab = () => {
                         });
                         setSpecialPolicies(converted);
                     }
-                    
+
                     // 🔥 모델 및 요금제군 목록 로드 (조건 입력용)
                     const carrier = getCurrentCarrier();
                     try {
@@ -234,8 +229,8 @@ const PolicySettingsTab = () => {
     // 부가서비스 수정 저장
     const handleSaveEditAddon = () => {
         if (newAddon.name && editingAddonId) {
-            setAddons(addons.map(item => 
-                item.id === editingAddonId 
+            setAddons(addons.map(item =>
+                item.id === editingAddonId
                     ? {
                         ...item,
                         name: newAddon.name,
@@ -298,8 +293,8 @@ const PolicySettingsTab = () => {
     // 보험상품 수정 저장
     const handleSaveEditInsurance = () => {
         if (newInsurance.name && editingInsuranceId) {
-            setInsurances(insurances.map(item => 
-                item.id === editingInsuranceId 
+            setInsurances(insurances.map(item =>
+                item.id === editingInsuranceId
                     ? {
                         ...item,
                         name: newInsurance.name,
@@ -343,7 +338,7 @@ const PolicySettingsTab = () => {
             }
         }
     };
-    
+
     // 조건 추가
     const handleAddCondition = () => {
         setNewSpecial(prev => ({
@@ -358,7 +353,7 @@ const PolicySettingsTab = () => {
             }]
         }));
     };
-    
+
     // 조건 삭제
     const handleRemoveCondition = (conditionIndex) => {
         setNewSpecial(prev => ({
@@ -366,12 +361,12 @@ const PolicySettingsTab = () => {
             conditions: prev.conditions.filter((_, i) => i !== conditionIndex)
         }));
     };
-    
+
     // 조건 업데이트
     const handleUpdateCondition = (conditionIndex, field, value) => {
         setNewSpecial(prev => ({
             ...prev,
-            conditions: prev.conditions.map((cond, i) => 
+            conditions: prev.conditions.map((cond, i) =>
                 i === conditionIndex ? { ...cond, [field]: value } : cond
             )
         }));
@@ -404,8 +399,8 @@ const PolicySettingsTab = () => {
     // 별도정책 수정 저장
     const handleSaveEditSpecial = () => {
         if (newSpecial.name && editingSpecialId) {
-            setSpecialPolicies(specialPolicies.map(item => 
-                item.id === editingSpecialId 
+            setSpecialPolicies(specialPolicies.map(item =>
+                item.id === editingSpecialId
                     ? {
                         ...item,
                         name: newSpecial.name,
@@ -433,10 +428,7 @@ const PolicySettingsTab = () => {
     };
 
     const handleSave = async (type) => {
-        // #region agent log
-        const carrier = getCurrentCarrier();
-        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PolicySettingsTab.js:handleSave',message:'정책 설정 저장 시작',data:{type,carrier},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'P2'})}).catch(()=>{});
-        // #endregion
+
         try {
             setSaving(true);
             let settings = {};
@@ -445,7 +437,7 @@ const PolicySettingsTab = () => {
                 settings = { margin: { baseMargin: margin } };
             } else if (type === 'addon') {
                 settings = { addon: { list: addons }, insurance: { list: insurances } };
-            } else             if (type === 'special') {
+            } else if (type === 'special') {
                 // 🔥 조건JSON 생성
                 const specialData = specialPolicies.map(policy => {
                     let conditionsJson = null;
@@ -476,11 +468,9 @@ const PolicySettingsTab = () => {
             const startTime = Date.now();
             await directStoreApiClient.savePolicySettings(carrier, settings);
             const duration = Date.now() - startTime;
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PolicySettingsTab.js:handleSave',message:'정책 설정 저장 완료',data:{type,carrier,duration},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'P2'})}).catch(()=>{});
-            // #endregion
+
             setSuccessMessage('설정이 저장되었습니다.');
-            
+
             if (type === 'margin') setOpenMarginModal(false);
             if (type === 'addon') setOpenAddonModal(false);
             if (type === 'special') setOpenSpecialModal(false);
@@ -501,7 +491,7 @@ const PolicySettingsTab = () => {
             {error && (
                 <ErrorState error={error} onRetry={() => window.location.reload()} title="정책 설정 로드 실패" />
             )}
-            
+
             <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', mb: 3 }}>
                 정책 설정
             </Typography>
@@ -666,9 +656,9 @@ const PolicySettingsTab = () => {
                                             </Button>
                                         </Stack>
                                     ) : (
-                                    <Button variant="contained" fullWidth startIcon={<AddIcon />} onClick={handleAddAddon}>
-                                        추가
-                                    </Button>
+                                        <Button variant="contained" fullWidth startIcon={<AddIcon />} onClick={handleAddAddon}>
+                                            추가
+                                        </Button>
                                     )}
                                 </Grid>
                                 <Grid item xs={12} sm={6}>
@@ -732,8 +722,8 @@ const PolicySettingsTab = () => {
                                                     <EditIcon />
                                                 </IconButton>
                                                 <IconButton edge="end" onClick={() => handleDeleteAddon(addon.id)} color="error">
-                                                <DeleteIcon />
-                                            </IconButton>
+                                                    <DeleteIcon />
+                                                </IconButton>
                                             </Stack>
                                         </ListItemSecondaryAction>
                                     </ListItem>
@@ -819,9 +809,9 @@ const PolicySettingsTab = () => {
                                             </Button>
                                         </Stack>
                                     ) : (
-                                    <Button variant="contained" startIcon={<AddIcon />} onClick={handleAddInsurance}>
-                                        추가
-                                    </Button>
+                                        <Button variant="contained" startIcon={<AddIcon />} onClick={handleAddInsurance}>
+                                            추가
+                                        </Button>
                                     )}
                                 </Grid>
                             </Grid>
@@ -876,8 +866,8 @@ const PolicySettingsTab = () => {
                                                             <EditIcon />
                                                         </IconButton>
                                                         <IconButton edge="end" onClick={() => handleDeleteInsurance(insurance.id)} color="error">
-                                                        <DeleteIcon />
-                                                    </IconButton>
+                                                            <DeleteIcon />
+                                                        </IconButton>
                                                     </Stack>
                                                 </ListItemSecondaryAction>
                                             </ListItem>
@@ -911,7 +901,7 @@ const PolicySettingsTab = () => {
                                 <Grid item xs={12} sm={4}>
                                     <TextField
                                         label="정책 이름" size="small" fullWidth
-                                        value={newSpecial.name} 
+                                        value={newSpecial.name}
                                         onChange={(e) => setNewSpecial({ ...newSpecial, name: e.target.value })}
                                         placeholder="예: 선택약정시 차감정책"
                                     />
@@ -932,7 +922,7 @@ const PolicySettingsTab = () => {
                                 <Grid item xs={12} sm={3}>
                                     <TextField
                                         label="금액" size="small" fullWidth type="number"
-                                        value={newSpecial.amount} 
+                                        value={newSpecial.amount}
                                         onChange={(e) => setNewSpecial({ ...newSpecial, amount: e.target.value })}
                                         placeholder="양수: 추가, 음수: 차감"
                                         helperText="예: 30000 (추가), -30000 (차감)"
@@ -954,7 +944,7 @@ const PolicySettingsTab = () => {
                                         </Button>
                                     )}
                                 </Grid>
-                                
+
                                 {/* 조건 입력 UI (conditional 타입일 때만 표시) */}
                                 {newSpecial.policyType === 'conditional' && (
                                     <Grid item xs={12}>
@@ -984,7 +974,7 @@ const PolicySettingsTab = () => {
                                                                     size="small"
                                                                     options={['전모델', ...availableModels]}
                                                                     value={
-                                                                        clearedAllFlags[`models-${condIdx}`] 
+                                                                        clearedAllFlags[`models-${condIdx}`]
                                                                             ? (condition.models || [])
                                                                             : ((condition.models || []).length === 0 ? ['전모델'] : condition.models)
                                                                     }
@@ -1007,10 +997,10 @@ const PolicySettingsTab = () => {
                                                                         // "전모델"이 포함되어 있으면 "전모델"만 표시
                                                                         if (value.includes('전모델')) {
                                                                             return (
-                                                                                <Chip 
-                                                                                    label="전모델" 
-                                                                                    size="small" 
-                                                                                    color="primary" 
+                                                                                <Chip
+                                                                                    label="전모델"
+                                                                                    size="small"
+                                                                                    color="primary"
                                                                                     onDelete={() => {
                                                                                         // 🔥 "전모델" 삭제 시 플래그 설정하여 다른 모델 선택 가능하도록
                                                                                         setClearedAllFlags(prev => ({ ...prev, [`models-${condIdx}`]: true }));
@@ -1039,7 +1029,7 @@ const PolicySettingsTab = () => {
                                                                     size="small"
                                                                     options={['전유형', '010신규', 'MNP', '기변']}
                                                                     value={
-                                                                        clearedAllFlags[`openingTypes-${condIdx}`] 
+                                                                        clearedAllFlags[`openingTypes-${condIdx}`]
                                                                             ? (condition.openingTypes || [])
                                                                             : ((condition.openingTypes || []).length === 0 ? ['전유형'] : condition.openingTypes)
                                                                     }
@@ -1062,10 +1052,10 @@ const PolicySettingsTab = () => {
                                                                         // "전유형"이 포함되어 있으면 "전유형"만 표시
                                                                         if (value.includes('전유형')) {
                                                                             return (
-                                                                                <Chip 
-                                                                                    label="전유형" 
-                                                                                    size="small" 
-                                                                                    color="primary" 
+                                                                                <Chip
+                                                                                    label="전유형"
+                                                                                    size="small"
+                                                                                    color="primary"
                                                                                     onDelete={() => {
                                                                                         // 🔥 "전유형" 삭제 시 플래그 설정하여 다른 유형 선택 가능하도록
                                                                                         setClearedAllFlags(prev => ({ ...prev, [`openingTypes-${condIdx}`]: true }));
@@ -1094,7 +1084,7 @@ const PolicySettingsTab = () => {
                                                                     size="small"
                                                                     options={['전요금제', ...availablePlanGroups]}
                                                                     value={
-                                                                        clearedAllFlags[`planGroups-${condIdx}`] 
+                                                                        clearedAllFlags[`planGroups-${condIdx}`]
                                                                             ? (condition.planGroups || [])
                                                                             : ((condition.planGroups || []).length === 0 ? ['전요금제'] : condition.planGroups)
                                                                     }
@@ -1117,10 +1107,10 @@ const PolicySettingsTab = () => {
                                                                         // "전요금제"가 포함되어 있으면 "전요금제"만 표시
                                                                         if (value.includes('전요금제')) {
                                                                             return (
-                                                                                <Chip 
-                                                                                    label="전요금제" 
-                                                                                    size="small" 
-                                                                                    color="primary" 
+                                                                                <Chip
+                                                                                    label="전요금제"
+                                                                                    size="small"
+                                                                                    color="primary"
                                                                                     onDelete={() => {
                                                                                         // 🔥 "전요금제" 삭제 시 플래그 설정하여 다른 요금제군 선택 가능하도록
                                                                                         setClearedAllFlags(prev => ({ ...prev, [`planGroups-${condIdx}`]: true }));
@@ -1222,9 +1212,9 @@ const PolicySettingsTab = () => {
                                             }
                                             secondary={
                                                 <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
-                                                    <Chip 
-                                                        label={policy.policyType === 'conditional' ? '조건기반' : '일반'} 
-                                                        size="small" 
+                                                    <Chip
+                                                        label={policy.policyType === 'conditional' ? '조건기반' : '일반'}
+                                                        size="small"
                                                         color={policy.policyType === 'conditional' ? 'primary' : 'default'}
                                                     />
                                                     {policy.amount !== undefined && policy.amount !== 0 && (

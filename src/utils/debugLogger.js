@@ -3,9 +3,9 @@
  * 개발 환경에서만 로그를 출력하도록 관리
  */
 
-const isDevelopment = process.env.NODE_ENV === 'development' || 
-                      process.env.REACT_APP_ENV === 'development' ||
-                      !process.env.NODE_ENV; // 기본값은 개발 환경으로 간주
+const isDevelopment = process.env.NODE_ENV === 'development' ||
+  process.env.REACT_APP_ENV === 'development' ||
+  !process.env.NODE_ENV; // 기본값은 개발 환경으로 간주
 
 /**
  * 디버그 로그를 개발 환경에서만 출력
@@ -21,25 +21,12 @@ export const debugLog = (location, message, data = {}, sessionId = 'debug-sessio
     return; // 프로덕션 환경에서는 로그 출력 안 함
   }
 
-  try {
-    fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        location,
-        message,
-        data,
-        timestamp: Date.now(),
-        sessionId,
-        runId,
-        hypothesisId
-      })
-    }).catch(() => {
-      // 네트워크 에러는 조용히 무시
-    });
-  } catch (error) {
-    // 에러 발생 시 조용히 무시
-  }
+  // 로컬 로깅 서버(port 7242)로의 전송 코드 제거됨
+  // try {
+  //   fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', {
+  //     ...
+  //   }).catch(() => {});
+  // } catch (error) {}
 };
 
 /**

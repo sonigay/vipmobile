@@ -30,7 +30,7 @@ import {
   Save as SaveIcon
 } from '@mui/icons-material';
 import { directStoreApiClient } from '../../api/directStoreApiClient';
-import { directStoreApi } from '../../api/directStoreApi';
+// import { directStoreApi } from '../../api/directStoreApi'; // Legacy API Removed
 import { LoadingState } from './common/LoadingState';
 import { ErrorState } from './common/ErrorState';
 import TodaysProductCard from './TodaysProductCard';
@@ -71,7 +71,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
   const [manualSlideIndex, setManualSlideIndex] = useState(0);
   const [isManualTransitionPage, setIsManualTransitionPage] = useState(false);
   const [manualTransitionPageData, setManualTransitionPageData] = useState(null);
-  
+
   // 슬라이드 설정 상태 (각 슬라이드별 시간 및 전환 효과, 연결페이지 폰트/스타일)
   const [slideSettings, setSlideSettings] = useState({}); // { index: { duration, transitionEffect, fontSize, fontWeight, color, backgroundColor } }
   const [editingSlideIndex, setEditingSlideIndex] = useState(null); // 현재 편집 중인 슬라이드 인덱스
@@ -142,10 +142,10 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
       }));
 
       // 1. 단말 마스터 데이터 조회 (모든 통신사)
-      // 🔥 Rate Limit 방지: 순차 처리로 변경 (Promise.all 대신)
-      const skMobiles = await directStoreApiClient.getMobilesMaster('SK');
-      const ktMobiles = await directStoreApiClient.getMobilesMaster('KT');
+      // 🔥 Rate Limit 방지: 순차 처리로 변경 (Promise.all 대신) - LG -> KT -> SK 순서
       const lgMobiles = await directStoreApiClient.getMobilesMaster('LG');
+      const ktMobiles = await directStoreApiClient.getMobilesMaster('KT');
+      const skMobiles = await directStoreApiClient.getMobilesMaster('SK');
 
       // 🔥 핵심 수정: API 응답의 imageUrl 필드를 image로 매핑하고,
       // 기본 요금제군(defaultPlanGroup)을 미리 계산해둔다.
@@ -167,27 +167,23 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
         };
       });
 
-      // 필수 부가서비스 및 보험상품 로드 (통신사별)
+      // 필수 부가서비스 및 보험상품 로드 (통신사별) - 순차 처리로 변경
       const policySettingsByCarrier = {};
-      const carriers = ['SK', 'KT', 'LG'];
-      
+      const carriers = ['LG', 'KT', 'SK'];
+
       try {
-        const policyPromises = carriers.map(async (carrier) => {
+        // 🔥 Rate Limit 방지: 순차 처리로 변경
+        for (const carrier of carriers) {
           try {
-            const policySettings = await directStoreApi.getPolicySettings(carrier);
-            return { carrier, policySettings };
+            // directStoreApi -> directStoreApiClient 로 변경 (스마트 스로틀링 적용)
+            const policySettings = await directStoreApiClient.getPolicySettings(carrier);
+            if (policySettings) {
+              policySettingsByCarrier[carrier] = policySettings;
+            }
           } catch (err) {
             console.warn(`[TodaysMobileTab] ${carrier} 정책 설정 로드 실패:`, err);
-            return { carrier, policySettings: null };
           }
-        });
-        
-        const policyResults = await Promise.all(policyPromises);
-        policyResults.forEach(({ carrier, policySettings }) => {
-          if (policySettings) {
-            policySettingsByCarrier[carrier] = policySettings;
-          }
-        });
+        }
       } catch (err) {
         console.error('[TodaysMobileTab] 필수 부가서비스 로드 실패:', err);
       }
@@ -196,7 +192,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
       const allMobilesWithAddons = allMobiles.map(m => {
         const policySettings = policySettingsByCarrier[m.carrier];
         const addonNames = [];
-        
+
         // 1. 미유치차감금액이 있는 부가서비스 추가
         if (policySettings?.success && policySettings.addon?.list) {
           const addonList = policySettings.addon.list
@@ -204,11 +200,11 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
             .map(addon => addon.name);
           addonNames.push(...addonList);
         }
-        
+
         // 2. 보험상품 매칭 (출고가 및 모델 유형 기준)
         if (policySettings?.success && policySettings.insurance?.list && m.factoryPrice > 0) {
           const insuranceList = policySettings.insurance.list || [];
-          
+
           // 현재 단말이 플립/폴드 계열인지 여부 (펫네임/모델명 기준)
           const modelNameForCheck = (m.petName || m.model || '').toString();
           const lowerModelName = modelNameForCheck.toLowerCase();
@@ -216,7 +212,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
           const isFlipFoldModel = flipFoldKeywords.some(keyword =>
             lowerModelName.includes(keyword.toLowerCase())
           );
-          
+
           // 보험상품 중 이름에 플립/폴드 관련 키워드가 포함된 상품
           const flipFoldInsurances = insuranceList.filter(item => {
             const name = (item.name || '').toString().toLowerCase();
@@ -224,12 +220,12 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
               name.includes(keyword.toLowerCase())
             );
           });
-          
+
           // 일반 보험상품 (플립/폴드 전용 상품 제외)
           const normalInsurances = insuranceList.filter(item => !flipFoldInsurances.includes(item));
-          
+
           let matchingInsurance = null;
-          
+
           if (m.carrier === 'LG' && isFlipFoldModel && flipFoldInsurances.length > 0) {
             // LG + 플립/폴드 단말인 경우 → "폰교체 패스 플립/폴드" 상품 우선 사용
             matchingInsurance = flipFoldInsurances.find(insurance => {
@@ -246,18 +242,18 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
               return m.factoryPrice >= minPrice && m.factoryPrice <= maxPrice;
             });
           }
-          
+
           if (matchingInsurance) {
             addonNames.push(matchingInsurance.name);
           }
         }
-        
+
         // 필수 부가서비스 목록을 문자열로 변환
         // 정책 설정에서 가져온 부가서비스가 있으면 사용, 없으면 기존 값 사용
-        const requiredAddonsStr = addonNames.length > 0 
-          ? addonNames.join(', ') 
+        const requiredAddonsStr = addonNames.length > 0
+          ? addonNames.join(', ')
           : (m.requiredAddons || m.addons || '없음');
-        
+
         // 디버깅: 필수부가 설정 확인
         if (process.env.NODE_ENV === 'development' && m.modelId) {
           console.log(`[필수부가] ${m.modelId} (${m.carrier}):`, {
@@ -268,7 +264,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
             policySettingsSuccess: policySettings?.success
           });
         }
-        
+
         return {
           ...m,
           addons: requiredAddonsStr,
@@ -300,11 +296,10 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
       }));
 
       // 2. 단말 요금정책 마스터 조회 (모든 통신사)
-      const [skPricing, ktPricing, lgPricing] = await Promise.all([
-        directStoreApiClient.getMobilesPricing('SK'),
-        directStoreApiClient.getMobilesPricing('KT'),
-        directStoreApiClient.getMobilesPricing('LG')
-      ]);
+      // 🔥 Rate Limit 방지: 순차 처리로 변경 - LG -> KT -> SK 순서
+      const lgPricing = await directStoreApiClient.getMobilesPricing('LG');
+      const ktPricing = await directStoreApiClient.getMobilesPricing('KT');
+      const skPricing = await directStoreApiClient.getMobilesPricing('SK');
 
       const allPricing = [...skPricing, ...ktPricing, ...lgPricing];
 
@@ -324,7 +319,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
       allPricing.forEach(item => {
         // 🔥 수정: 부가미유치 기준 제거, 부가유치 기준만 사용
         // purchasePrice 계산 (출고가 - 이통사지원금 - 대리점추가지원금)
-        const purchasePriceWithAddon = Math.max(0, 
+        const purchasePriceWithAddon = Math.max(0,
           (item.factoryPrice || 0) - (item.publicSupport || 0) - (item.storeSupportWithAddon || 0)
         );
 
@@ -336,12 +331,12 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
 
         const basicKey = `${item.modelId}-${item.openingType}`;
         const planGroupKey = `${item.modelId}-${item.planGroup}-${item.openingType}`;
-        
+
         // 기본 키로 저장 (기존 호환성 유지)
         if (!pricingMap[basicKey]) {
           pricingMap[basicKey] = priceItem;
         }
-        
+
         // 요금제군별 키로도 저장 (요금제군별 조회 가능)
         pricingMap[planGroupKey] = priceItem;
       });
@@ -488,13 +483,11 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
   const updatePricingDataOnly = useCallback(async () => {
     try {
       console.log('🔄 [오늘의휴대폰] 가격 데이터만 업데이트 중...');
-      
-      // 단말 요금정책 마스터 조회 (모든 통신사)
-      const [skPricing, ktPricing, lgPricing] = await Promise.all([
-        directStoreApiClient.getMobilesPricing('SK'),
-        directStoreApiClient.getMobilesPricing('KT'),
-        directStoreApiClient.getMobilesPricing('LG')
-      ]);
+
+      // 단말 요금정책 마스터 조회 (모든 통신사) - 순차 처리 - LG -> KT -> SK 순서
+      const lgPricing = await directStoreApiClient.getMobilesPricing('LG');
+      const ktPricing = await directStoreApiClient.getMobilesPricing('KT');
+      const skPricing = await directStoreApiClient.getMobilesPricing('SK');
 
       const allPricing = [...skPricing, ...ktPricing, ...lgPricing];
 
@@ -507,7 +500,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
       const pricingMap = {};
       allPricing.forEach(item => {
         // 🔥 수정: 부가미유치 기준 제거, 부가유치 기준만 사용
-        const purchasePriceWithAddon = Math.max(0, 
+        const purchasePriceWithAddon = Math.max(0,
           (item.factoryPrice || 0) - (item.publicSupport || 0) - (item.storeSupportWithAddon || 0)
         );
 
@@ -518,7 +511,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
 
         const basicKey = `${item.modelId}-${item.openingType}`;
         const planGroupKey = `${item.modelId}-${item.planGroup}-${item.openingType}`;
-        
+
         if (!pricingMap[basicKey]) {
           pricingMap[basicKey] = priceItem;
         }
@@ -563,7 +556,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
         fetchData();
       }
     }, 60000); // 1분마다
-    
+
     return () => clearInterval(interval);
   }, [isSlideshowActive, updatePricingDataOnly, fetchData]);
 
@@ -597,7 +590,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
       // 안전장치: 직영점_단말요금정책 시트에는 'MNP'로 저장되어 있지만,
       // 혹시 모를 경우를 대비해 '번호이동'도 시도 (양방향 매핑)
       const alternativeType = type === 'MNP' ? '번호이동' : (type === '번호이동' ? 'MNP' : null);
-      
+
       // 1순위: 요금제군별 키로 찾기 `${modelId}-${planGroup}-${openingType}`
       const planGroupKey = `${modelId}-${defaultPlanGroup}-${type}`;
       let pricing = masterPricing[planGroupKey];
@@ -636,7 +629,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
           purchasePrice: 0,
           loading: !isMasterPricingLoaded // 마스터 데이터 로드 완료 여부에 따라 결정
         };
-        
+
         // 디버깅: 데이터를 찾지 못한 경우
         if (isMasterPricingLoaded) {
           console.warn('⚠️ [TodaysMobileTab] 가격 데이터를 찾지 못함:', {
@@ -698,7 +691,9 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
 
       // 마스터 데이터(masterPricing)가 이미 로드되어 있어야 함 (fetchData 완료 가정)
 
-      const carriers = ['SK', 'KT', 'LG'];
+      // 마스터 데이터(masterPricing)가 이미 로드되어 있어야 함 (fetchData 완료 가정)
+
+      const carriers = ['LG', 'KT', 'SK'];
       const allCheckedProducts = [];
 
       // 매장별 연결페이지 텍스트 로드 (있으면 사용, 없으면 기본값)
@@ -721,32 +716,25 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
       // 편의상 fetchData에서 이미 mobiles state를 저장해두면 좋았을 텐데,
       // premiumPhones/budgetPhones만 저장함. 
       // Master API 재호출보다는 state 확장이 나음.
-      // 여기서는 다시 호출 (병렬)
-      const [skMobiles, ktMobiles, lgMobiles] = await Promise.all([
-        directStoreApiClient.getMobilesMaster('SK'),
-        directStoreApiClient.getMobilesMaster('KT'),
-        directStoreApiClient.getMobilesMaster('LG')
-      ]);
+      // 여기서는 다시 호출 (순차 처리) - LG -> KT -> SK 순서
+      const lgMobiles = await directStoreApiClient.getMobilesMaster('LG');
+      const ktMobiles = await directStoreApiClient.getMobilesMaster('KT');
+      const skMobiles = await directStoreApiClient.getMobilesMaster('SK');
 
-      // 필수 부가서비스 및 보험상품 로드 (통신사별) - 슬라이드쇼용
+      // 필수 부가서비스 및 보험상품 로드 (통신사별) - 슬라이드쇼용 (순차 처리)
       const policySettingsByCarrier = {};
       try {
-        const policyPromises = carriers.map(async (carrier) => {
+        for (const carrier of carriers) {
           try {
-            const policySettings = await directStoreApi.getPolicySettings(carrier);
-            return { carrier, policySettings };
+            // directStoreApi -> directStoreApiClient 로 변경
+            const policySettings = await directStoreApiClient.getPolicySettings(carrier);
+            if (policySettings) {
+              policySettingsByCarrier[carrier] = policySettings;
+            }
           } catch (err) {
             console.warn(`[TodaysMobileTab] 슬라이드쇼 ${carrier} 정책 설정 로드 실패:`, err);
-            return { carrier, policySettings: null };
           }
-        });
-        
-        const policyResults = await Promise.all(policyPromises);
-        policyResults.forEach(({ carrier, policySettings }) => {
-          if (policySettings) {
-            policySettingsByCarrier[carrier] = policySettings;
-          }
-        });
+        }
       } catch (err) {
         console.error('[TodaysMobileTab] 슬라이드쇼 필수 부가서비스 로드 실패:', err);
       }
@@ -754,11 +742,11 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
       // 🔥 핵심 수정: 슬라이드쇼 데이터 준비 시에도 imageUrl을 image로 매핑
       // requiredAddons 필드도 제대로 전달되도록 확인 (정책 설정에서 가져온 값 사용)
       // 보험상품도 포함하여 매핑
-      const carrierMobiles = { 
+      const carrierMobiles = {
         'SK': skMobiles.map(m => {
           const policySettings = policySettingsByCarrier['SK'];
           const addonNames = [];
-          
+
           // 1. 미유치차감금액이 있는 부가서비스 추가
           if (policySettings?.success && policySettings.addon?.list) {
             const addonList = policySettings.addon.list
@@ -766,11 +754,11 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
               .map(addon => addon.name);
             addonNames.push(...addonList);
           }
-          
+
           // 2. 보험상품 매칭 (출고가 및 모델 유형 기준)
           if (policySettings?.success && policySettings.insurance?.list && m.factoryPrice > 0) {
             const insuranceList = policySettings.insurance.list || [];
-            
+
             // 현재 단말이 플립/폴드 계열인지 여부 (펫네임/모델명 기준)
             const modelNameForCheck = (m.petName || m.model || '').toString();
             const lowerModelName = modelNameForCheck.toLowerCase();
@@ -778,7 +766,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
             const isFlipFoldModel = flipFoldKeywords.some(keyword =>
               lowerModelName.includes(keyword.toLowerCase())
             );
-            
+
             // 보험상품 중 이름에 플립/폴드 관련 키워드가 포함된 상품
             const flipFoldInsurances = insuranceList.filter(item => {
               const name = (item.name || '').toString().toLowerCase();
@@ -786,12 +774,12 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
                 name.includes(keyword.toLowerCase())
               );
             });
-            
+
             // 일반 보험상품 (플립/폴드 전용 상품 제외)
             const normalInsurances = insuranceList.filter(item => !flipFoldInsurances.includes(item));
-            
+
             let matchingInsurance = null;
-            
+
             if (m.carrier === 'LG' && isFlipFoldModel && flipFoldInsurances.length > 0) {
               // LG + 플립/폴드 단말인 경우 → "폰교체 패스 플립/폴드" 상품 우선 사용
               matchingInsurance = flipFoldInsurances.find(insurance => {
@@ -808,18 +796,18 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
                 return m.factoryPrice >= minPrice && m.factoryPrice <= maxPrice;
               });
             }
-            
+
             if (matchingInsurance) {
               addonNames.push(matchingInsurance.name);
             }
           }
-          
-          const requiredAddonsStr = addonNames.length > 0 
-            ? addonNames.join(', ') 
+
+          const requiredAddonsStr = addonNames.length > 0
+            ? addonNames.join(', ')
             : (m.requiredAddons || m.addons || '');
-          
+
           return {
-            ...m, 
+            ...m,
             image: m.imageUrl || m.image,
             addons: requiredAddonsStr,
             requiredAddons: requiredAddonsStr
@@ -828,7 +816,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
         'KT': ktMobiles.map(m => {
           const policySettings = policySettingsByCarrier['KT'];
           const addonNames = [];
-          
+
           // 1. 미유치차감금액이 있는 부가서비스 추가
           if (policySettings?.success && policySettings.addon?.list) {
             const addonList = policySettings.addon.list
@@ -836,11 +824,11 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
               .map(addon => addon.name);
             addonNames.push(...addonList);
           }
-          
+
           // 2. 보험상품 매칭 (출고가 및 모델 유형 기준)
           if (policySettings?.success && policySettings.insurance?.list && m.factoryPrice > 0) {
             const insuranceList = policySettings.insurance.list || [];
-            
+
             // 현재 단말이 플립/폴드 계열인지 여부 (펫네임/모델명 기준)
             const modelNameForCheck = (m.petName || m.model || '').toString();
             const lowerModelName = modelNameForCheck.toLowerCase();
@@ -848,7 +836,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
             const isFlipFoldModel = flipFoldKeywords.some(keyword =>
               lowerModelName.includes(keyword.toLowerCase())
             );
-            
+
             // 보험상품 중 이름에 플립/폴드 관련 키워드가 포함된 상품
             const flipFoldInsurances = insuranceList.filter(item => {
               const name = (item.name || '').toString().toLowerCase();
@@ -856,12 +844,12 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
                 name.includes(keyword.toLowerCase())
               );
             });
-            
+
             // 일반 보험상품 (플립/폴드 전용 상품 제외)
             const normalInsurances = insuranceList.filter(item => !flipFoldInsurances.includes(item));
-            
+
             let matchingInsurance = null;
-            
+
             if (m.carrier === 'LG' && isFlipFoldModel && flipFoldInsurances.length > 0) {
               // LG + 플립/폴드 단말인 경우 → "폰교체 패스 플립/폴드" 상품 우선 사용
               matchingInsurance = flipFoldInsurances.find(insurance => {
@@ -878,18 +866,18 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
                 return m.factoryPrice >= minPrice && m.factoryPrice <= maxPrice;
               });
             }
-            
+
             if (matchingInsurance) {
               addonNames.push(matchingInsurance.name);
             }
           }
-          
-          const requiredAddonsStr = addonNames.length > 0 
-            ? addonNames.join(', ') 
+
+          const requiredAddonsStr = addonNames.length > 0
+            ? addonNames.join(', ')
             : (m.requiredAddons || m.addons || '');
-          
+
           return {
-            ...m, 
+            ...m,
             image: m.imageUrl || m.image,
             addons: requiredAddonsStr,
             requiredAddons: requiredAddonsStr
@@ -898,7 +886,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
         'LG': lgMobiles.map(m => {
           const policySettings = policySettingsByCarrier['LG'];
           const addonNames = [];
-          
+
           // 1. 미유치차감금액이 있는 부가서비스 추가
           if (policySettings?.success && policySettings.addon?.list) {
             const addonList = policySettings.addon.list
@@ -906,11 +894,11 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
               .map(addon => addon.name);
             addonNames.push(...addonList);
           }
-          
+
           // 2. 보험상품 매칭 (출고가 및 모델 유형 기준)
           if (policySettings?.success && policySettings.insurance?.list && m.factoryPrice > 0) {
             const insuranceList = policySettings.insurance.list || [];
-            
+
             // 현재 단말이 플립/폴드 계열인지 여부 (펫네임/모델명 기준)
             const modelNameForCheck = (m.petName || m.model || '').toString();
             const lowerModelName = modelNameForCheck.toLowerCase();
@@ -918,7 +906,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
             const isFlipFoldModel = flipFoldKeywords.some(keyword =>
               lowerModelName.includes(keyword.toLowerCase())
             );
-            
+
             // 보험상품 중 이름에 플립/폴드 관련 키워드가 포함된 상품
             const flipFoldInsurances = insuranceList.filter(item => {
               const name = (item.name || '').toString().toLowerCase();
@@ -926,12 +914,12 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
                 name.includes(keyword.toLowerCase())
               );
             });
-            
+
             // 일반 보험상품 (플립/폴드 전용 상품 제외)
             const normalInsurances = insuranceList.filter(item => !flipFoldInsurances.includes(item));
-            
+
             let matchingInsurance = null;
-            
+
             if (m.carrier === 'LG' && isFlipFoldModel && flipFoldInsurances.length > 0) {
               // LG + 플립/폴드 단말인 경우 → "폰교체 패스 플립/폴드" 상품 우선 사용
               matchingInsurance = flipFoldInsurances.find(insurance => {
@@ -948,18 +936,18 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
                 return m.factoryPrice >= minPrice && m.factoryPrice <= maxPrice;
               });
             }
-            
+
             if (matchingInsurance) {
               addonNames.push(matchingInsurance.name);
             }
           }
-          
-          const requiredAddonsStr = addonNames.length > 0 
-            ? addonNames.join(', ') 
+
+          const requiredAddonsStr = addonNames.length > 0
+            ? addonNames.join(', ')
             : (m.requiredAddons || m.addons || '');
-          
+
           return {
-            ...m, 
+            ...m,
             image: m.imageUrl || m.image,
             addons: requiredAddonsStr,
             requiredAddons: requiredAddonsStr
@@ -1007,7 +995,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
             const transitionText = storeTransitionTexts[carrier]?.['budget'];
             const content = transitionText?.content || `이어서 ${carrier} 중저가 상품 안내입니다.`;
             const imageUrl = transitionText?.imageUrl || '';
-            
+
             slideshowItems.push({
               type: 'transition',
               carrier,
@@ -1039,7 +1027,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
             const transitionText = storeTransitionTexts[carrier]?.['premium'];
             const content = transitionText?.content || `이어서 ${carrier} 프리미엄 상품 안내입니다.`;
             const imageUrl = transitionText?.imageUrl || '';
-            
+
             slideshowItems.push({
               type: 'transition',
               carrier,
@@ -1060,13 +1048,13 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
               transitionEffect: 'fade' // 기본값: fade
             });
           }
-          
+
           // Premium 이후 Budget이 있으면 Budget 연결 페이지 추가
           if (budget.length > 0) {
             const transitionText = storeTransitionTexts[carrier]?.['budget'];
             const content = transitionText?.content || `이어서 ${carrier} 중저가 상품 안내입니다.`;
             const imageUrl = transitionText?.imageUrl || '';
-            
+
             slideshowItems.push({
               type: 'transition',
               carrier,
@@ -1360,103 +1348,103 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
               <Typography variant="h6" fontWeight="bold">{mainHeaderText}</Typography>
             </Box>
           )}
-          
-          <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, position: 'relative', overflow: 'hidden' }}>
-          {isTransitionPage && transitionPageData ? (
-            // 연결 페이지 (전환 효과 적용)
-            <Box sx={{
-              height: '100%', 
-              width: '100%',
-              display: 'flex', 
-              flexDirection: 'column',
-              alignItems: 'center', 
-              justifyContent: 'center',
-              background: `linear-gradient(135deg, ${getCarrierTheme(transitionPageData.carrier).cardBg} 0%, ${getCarrierTheme(transitionPageData.carrier).primary}15 100%)`,
-              p: 4,
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              ...getTransitionStyle(
-                slideSettings[currentSlideIndex]?.transitionEffect || transitionPageData.transitionEffect || 'fade',
-                !isTransitioning
-              )
-            }}>
-              {transitionPageData.imageUrl ? (
-                <CardMedia
-                  component="img"
-                  image={transitionPageData.imageUrl}
-                  sx={{ 
-                    maxHeight: '50%', 
-                    maxWidth: '70%', 
-                    objectFit: 'contain', 
-                    mb: 6,
-                    filter: 'drop-shadow(0 10px 30px rgba(0,0,0,0.3))'
-                  }}
-                />
-              ) : null}
-              <Typography 
-                variant="h1" 
-                fontWeight={slideSettings[currentSlideIndex]?.fontWeight || '900'}
-                color={slideSettings[currentSlideIndex]?.color || 'primary.main'}
-                textAlign="center"
-                sx={{
-                  fontSize: slideSettings[currentSlideIndex]?.fontSize 
-                    ? { xs: `${Math.max(1, slideSettings[currentSlideIndex].fontSize * 0.5)}rem`, sm: `${Math.max(2, slideSettings[currentSlideIndex].fontSize * 0.7)}rem`, md: `${slideSettings[currentSlideIndex].fontSize}rem`, lg: `${slideSettings[currentSlideIndex].fontSize * 1.2}rem` }
-                    : { xs: '3rem', sm: '4rem', md: '5rem', lg: '6rem' },
-                  lineHeight: 1.2,
-                  textShadow: '2px 2px 8px rgba(0,0,0,0.2)',
-                  letterSpacing: '0.05em',
-                  px: 4,
-                  py: 2,
-                  background: slideSettings[currentSlideIndex]?.backgroundColor
-                    ? `linear-gradient(135deg, ${slideSettings[currentSlideIndex].backgroundColor}E6 0%, ${slideSettings[currentSlideIndex].backgroundColor}B3 100%)`
-                    : 'linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.7) 100%)',
-                  borderRadius: 4,
-                  boxShadow: '0 10px 40px rgba(0,0,0,0.2)',
-                  maxWidth: '90%',
-                  wordBreak: 'keep-all'
-                }}
-              >
-                {transitionPageData.content}
-              </Typography>
-            </Box>
-          ) : (
-            // 상품 목록 페이지 (전환 효과 적용)
-            <Box sx={{
-              height: '100%',
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
-              gap: 2,
-              p: 4,
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              ...getTransitionStyle(
-                slideSettings[currentSlideIndex]?.transitionEffect || slideshowData[currentSlideIndex]?.transitionEffect || 'fade',
-                !isTransitioning
-              )
-            }}>
-              {slideshowData[currentSlideIndex]?.products?.map(product => (
-                <TodaysProductCard
-                  key={product.id}
-                  product={product}
-                  isPremium={product.isPremium}
-                  priceData={getPriceDataForProduct(product)}
-                  onSelect={onProductSelect}
-                  theme={getCarrierTheme(product.carrier)}
-                  compact={false}
-                />
-              ))}
-            </Box>
-          )}
 
-          {/* 하단 컨트롤 (중지 버튼) */}
-          <Box sx={{ position: 'absolute', bottom: 20, right: 20 }}>
-            <Button variant="contained" color="secondary" onClick={toggleSlideshow} size="large">
-              슬라이드쇼 종료
-            </Button>
-          </Box>
+          <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, position: 'relative', overflow: 'hidden' }}>
+            {isTransitionPage && transitionPageData ? (
+              // 연결 페이지 (전환 효과 적용)
+              <Box sx={{
+                height: '100%',
+                width: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: `linear-gradient(135deg, ${getCarrierTheme(transitionPageData.carrier).cardBg} 0%, ${getCarrierTheme(transitionPageData.carrier).primary}15 100%)`,
+                p: 4,
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                ...getTransitionStyle(
+                  slideSettings[currentSlideIndex]?.transitionEffect || transitionPageData.transitionEffect || 'fade',
+                  !isTransitioning
+                )
+              }}>
+                {transitionPageData.imageUrl ? (
+                  <CardMedia
+                    component="img"
+                    image={transitionPageData.imageUrl}
+                    sx={{
+                      maxHeight: '50%',
+                      maxWidth: '70%',
+                      objectFit: 'contain',
+                      mb: 6,
+                      filter: 'drop-shadow(0 10px 30px rgba(0,0,0,0.3))'
+                    }}
+                  />
+                ) : null}
+                <Typography
+                  variant="h1"
+                  fontWeight={slideSettings[currentSlideIndex]?.fontWeight || '900'}
+                  color={slideSettings[currentSlideIndex]?.color || 'primary.main'}
+                  textAlign="center"
+                  sx={{
+                    fontSize: slideSettings[currentSlideIndex]?.fontSize
+                      ? { xs: `${Math.max(1, slideSettings[currentSlideIndex].fontSize * 0.5)}rem`, sm: `${Math.max(2, slideSettings[currentSlideIndex].fontSize * 0.7)}rem`, md: `${slideSettings[currentSlideIndex].fontSize}rem`, lg: `${slideSettings[currentSlideIndex].fontSize * 1.2}rem` }
+                      : { xs: '3rem', sm: '4rem', md: '5rem', lg: '6rem' },
+                    lineHeight: 1.2,
+                    textShadow: '2px 2px 8px rgba(0,0,0,0.2)',
+                    letterSpacing: '0.05em',
+                    px: 4,
+                    py: 2,
+                    background: slideSettings[currentSlideIndex]?.backgroundColor
+                      ? `linear-gradient(135deg, ${slideSettings[currentSlideIndex].backgroundColor}E6 0%, ${slideSettings[currentSlideIndex].backgroundColor}B3 100%)`
+                      : 'linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.7) 100%)',
+                    borderRadius: 4,
+                    boxShadow: '0 10px 40px rgba(0,0,0,0.2)',
+                    maxWidth: '90%',
+                    wordBreak: 'keep-all'
+                  }}
+                >
+                  {transitionPageData.content}
+                </Typography>
+              </Box>
+            ) : (
+              // 상품 목록 페이지 (전환 효과 적용)
+              <Box sx={{
+                height: '100%',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: 2,
+                p: 4,
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                ...getTransitionStyle(
+                  slideSettings[currentSlideIndex]?.transitionEffect || slideshowData[currentSlideIndex]?.transitionEffect || 'fade',
+                  !isTransitioning
+                )
+              }}>
+                {slideshowData[currentSlideIndex]?.products?.map(product => (
+                  <TodaysProductCard
+                    key={product.id}
+                    product={product}
+                    isPremium={product.isPremium}
+                    priceData={getPriceDataForProduct(product)}
+                    onSelect={onProductSelect}
+                    theme={getCarrierTheme(product.carrier)}
+                    compact={false}
+                  />
+                ))}
+              </Box>
+            )}
+
+            {/* 하단 컨트롤 (중지 버튼) */}
+            <Box sx={{ position: 'absolute', bottom: 20, right: 20 }}>
+              <Button variant="contained" color="secondary" onClick={toggleSlideshow} size="large">
+                슬라이드쇼 종료
+              </Button>
+            </Box>
           </Box>
         </Box>
       ) : (
@@ -1486,7 +1474,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
                   )}
                 </Box>
               )}
-              
+
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                 <Typography variant="h6">모든 체크 상품 미리보기 ({slideshowData.length} 슬라이드)</Typography>
                 <Box sx={{ display: 'flex', gap: 1 }}>
@@ -1569,7 +1557,7 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
                       </Select>
                     </FormControl>
                   </Box>
-                  
+
                   {/* 연결 페이지 전용 설정 (텍스트, 폰트 크기, 스타일, 색상) */}
                   {slideshowData[manualSlideIndex]?.type === 'transition' && (
                     <Box sx={{ mt: 3, pt: 2, borderTop: 1, borderColor: 'divider' }}>
