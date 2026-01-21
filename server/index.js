@@ -5372,27 +5372,35 @@ app.get('/api/direct/store-image/:storeName', async (req, res) => {
       storeName: photoRow[0],           // 0: 업체명
       frontUrl: photoRow[1] || '',      // 1: 전면사진URL
       frontMessageId: photoRow[2] || '', // 2: 전면사진Discord메시지ID
+      frontPostId: photoRow[3] || '',   // 3: 전면사진Discord포스트ID
       frontThreadId: photoRow[4] || '', // 4: 전면사진Discord스레드ID
       insideUrl: photoRow[5] || '',     // 5: 내부사진URL
       insideMessageId: photoRow[6] || '', // 6: 내부사진Discord메시지ID
+      insidePostId: photoRow[7] || '',  // 7: 내부사진Discord포스트ID
       insideThreadId: photoRow[8] || '', // 8: 내부사진Discord스레드ID
       outsideUrl: photoRow[9] || '',    // 9: 외부사진URL
       outsideMessageId: photoRow[10] || '', // 10: 외부사진Discord메시지ID
+      outsidePostId: photoRow[11] || '', // 11: 외부사진Discord포스트ID
       outsideThreadId: photoRow[12] || '', // 12: 외부사진Discord스레드ID
       outside2Url: photoRow[13] || '',  // 13: 외부2사진URL
       outside2MessageId: photoRow[14] || '', // 14: 외부2사진Discord메시지ID
+      outside2PostId: photoRow[15] || '', // 15: 외부2사진Discord포스트ID
       outside2ThreadId: photoRow[16] || '', // 16: 외부2사진Discord스레드ID
       managerUrl: photoRow[17] || '',   // 17: 점장사진URL
       managerMessageId: photoRow[18] || '', // 18: 점장사진Discord메시지ID
+      managerPostId: photoRow[19] || '', // 19: 점장사진Discord포스트ID
       managerThreadId: photoRow[20] || '', // 20: 점장사진Discord스레드ID
       staff1Url: photoRow[21] || '',    // 21: 직원1사진URL
       staff1MessageId: photoRow[22] || '', // 22: 직원1사진Discord메시지ID
+      staff1PostId: photoRow[23] || '', // 23: 직원1사진Discord포스트ID
       staff1ThreadId: photoRow[24] || '', // 24: 직원1사진Discord스레드ID
       staff2Url: photoRow[25] || '',    // 25: 직원2사진URL
       staff2MessageId: photoRow[26] || '', // 26: 직원2사진Discord메시지ID
+      staff2PostId: photoRow[27] || '', // 27: 직원2사진Discord포스트ID
       staff2ThreadId: photoRow[28] || '', // 28: 직원2사진Discord스레드ID
       staff3Url: photoRow[29] || '',    // 29: 직원3사진URL
       staff3MessageId: photoRow[30] || '', // 30: 직원3사진Discord메시지ID
+      staff3PostId: photoRow[31] || '', // 31: 직원3사진Discord포스트ID
       staff3ThreadId: photoRow[32] || '', // 32: 직원3사진Discord스레드ID
       updatedAt: photoRow[33] || ''     // 33: 수정일시
     });
@@ -5420,8 +5428,17 @@ app.post('/api/direct/store-image', async (req, res) => {
     const existingRow = rowIndex !== -1 && values ? values[rowIndex] : null;
     
     // 각 URL에 대응하는 Discord 정보 매핑 함수
-    const getDiscordInfo = (urlType, url) => {
+    const getDiscordInfo = (urlType, url, providedDiscordInfo = null) => {
       if (!url) return ['', '', '']; // URL이 없으면 Discord 정보도 없음
+      
+      // 프론트엔드에서 제공한 Discord 정보가 있으면 우선 사용 (업로드 직후 저장 시)
+      if (providedDiscordInfo && providedDiscordInfo.messageId) {
+        return [
+          providedDiscordInfo.messageId || '',
+          providedDiscordInfo.postId || '',
+          providedDiscordInfo.threadId || ''
+        ];
+      }
       
       // 기존 행에서 해당 URL 타입의 Discord 정보 찾기
       if (existingRow) {
@@ -5458,21 +5475,21 @@ app.post('/api/direct/store-image', async (req, res) => {
     const newRow = [
       storeName,  // 0: 업체명
       data.frontUrl || '',  // 1: 전면사진URL
-      ...getDiscordInfo('front', data.frontUrl),  // 2-4: 전면사진Discord정보
+      ...getDiscordInfo('front', data.frontUrl, data.frontMessageId ? { messageId: data.frontMessageId, postId: data.frontPostId, threadId: data.frontThreadId } : null),  // 2-4: 전면사진Discord정보
       data.insideUrl || '',  // 5: 내부사진URL
-      ...getDiscordInfo('inside', data.insideUrl),  // 6-8: 내부사진Discord정보
+      ...getDiscordInfo('inside', data.insideUrl, data.insideMessageId ? { messageId: data.insideMessageId, postId: data.insidePostId, threadId: data.insideThreadId } : null),  // 6-8: 내부사진Discord정보
       data.outsideUrl || '',  // 9: 외부사진URL
-      ...getDiscordInfo('outside', data.outsideUrl),  // 10-12: 외부사진Discord정보
+      ...getDiscordInfo('outside', data.outsideUrl, data.outsideMessageId ? { messageId: data.outsideMessageId, postId: data.outsidePostId, threadId: data.outsideThreadId } : null),  // 10-12: 외부사진Discord정보
       data.outside2Url || '',  // 13: 외부2사진URL
-      ...getDiscordInfo('outside2', data.outside2Url),  // 14-16: 외부2사진Discord정보
+      ...getDiscordInfo('outside2', data.outside2Url, data.outside2MessageId ? { messageId: data.outside2MessageId, postId: data.outside2PostId, threadId: data.outside2ThreadId } : null),  // 14-16: 외부2사진Discord정보
       data.managerUrl || '',  // 17: 점장사진URL
-      ...getDiscordInfo('manager', data.managerUrl),  // 18-20: 점장사진Discord정보
+      ...getDiscordInfo('manager', data.managerUrl, data.managerMessageId ? { messageId: data.managerMessageId, postId: data.managerPostId, threadId: data.managerThreadId } : null),  // 18-20: 점장사진Discord정보
       data.staff1Url || '',  // 21: 직원1사진URL
-      ...getDiscordInfo('staff1', data.staff1Url),  // 22-24: 직원1사진Discord정보
+      ...getDiscordInfo('staff1', data.staff1Url, data.staff1MessageId ? { messageId: data.staff1MessageId, postId: data.staff1PostId, threadId: data.staff1ThreadId } : null),  // 22-24: 직원1사진Discord정보
       data.staff2Url || '',  // 25: 직원2사진URL
-      ...getDiscordInfo('staff2', data.staff2Url),  // 26-28: 직원2사진Discord정보
+      ...getDiscordInfo('staff2', data.staff2Url, data.staff2MessageId ? { messageId: data.staff2MessageId, postId: data.staff2PostId, threadId: data.staff2ThreadId } : null),  // 26-28: 직원2사진Discord정보
       data.staff3Url || '',  // 29: 직원3사진URL
-      ...getDiscordInfo('staff3', data.staff3Url),  // 30-32: 직원3사진Discord정보
+      ...getDiscordInfo('staff3', data.staff3Url, data.staff3MessageId ? { messageId: data.staff3MessageId, postId: data.staff3PostId, threadId: data.staff3ThreadId } : null),  // 30-32: 직원3사진Discord정보
       updatedAt,  // 33: 수정일시
       existingBusTerminals,  // 34: 버스터미널정보 (기존 값 보존)
       existingSubwayStations  // 35: 지하철역정보 (기존 값 보존)

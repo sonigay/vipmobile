@@ -35,6 +35,17 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
         staff2Url: '',
         staff3Url: ''
     });
+    // Discord 메시지 ID 저장 (업로드 시 받은 정보)
+    const [discordInfo, setDiscordInfo] = useState({
+        front: { messageId: '', postId: '', threadId: '' },
+        inside: { messageId: '', postId: '', threadId: '' },
+        outside: { messageId: '', postId: '', threadId: '' },
+        outside2: { messageId: '', postId: '', threadId: '' },
+        manager: { messageId: '', postId: '', threadId: '' },
+        staff1: { messageId: '', postId: '', threadId: '' },
+        staff2: { messageId: '', postId: '', threadId: '' },
+        staff3: { messageId: '', postId: '', threadId: '' }
+    });
     const [isSaving, setIsSaving] = useState(false);
     const [uploadingPhotoType, setUploadingPhotoType] = useState(null); // 현재 업로드 중인 사진 타입
     
@@ -230,6 +241,50 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
                     staff2Url: photos.staff2Photo || '',
                     staff3Url: photos.staff3Photo || ''
                 });
+                
+                // 기존 Discord 정보도 로드
+                setDiscordInfo({
+                    front: {
+                        messageId: photos.frontMessageId || '',
+                        postId: photos.frontPostId || '',
+                        threadId: photos.frontThreadId || ''
+                    },
+                    inside: {
+                        messageId: photos.insideMessageId || '',
+                        postId: photos.insidePostId || '',
+                        threadId: photos.insideThreadId || ''
+                    },
+                    outside: {
+                        messageId: photos.outsideMessageId || '',
+                        postId: photos.outsidePostId || '',
+                        threadId: photos.outsideThreadId || ''
+                    },
+                    outside2: {
+                        messageId: photos.outside2MessageId || '',
+                        postId: photos.outside2PostId || '',
+                        threadId: photos.outside2ThreadId || ''
+                    },
+                    manager: {
+                        messageId: photos.managerMessageId || '',
+                        postId: photos.managerPostId || '',
+                        threadId: photos.managerThreadId || ''
+                    },
+                    staff1: {
+                        messageId: photos.staff1MessageId || '',
+                        postId: photos.staff1PostId || '',
+                        threadId: photos.staff1ThreadId || ''
+                    },
+                    staff2: {
+                        messageId: photos.staff2MessageId || '',
+                        postId: photos.staff2PostId || '',
+                        threadId: photos.staff2ThreadId || ''
+                    },
+                    staff3: {
+                        messageId: photos.staff3MessageId || '',
+                        postId: photos.staff3PostId || '',
+                        threadId: photos.staff3ThreadId || ''
+                    }
+                });
             } else {
                 setEditStorePhotos({
                     frontUrl: '',
@@ -240,6 +295,16 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
                     staff1Url: '',
                     staff2Url: '',
                     staff3Url: ''
+                });
+                setDiscordInfo({
+                    front: { messageId: '', postId: '', threadId: '' },
+                    inside: { messageId: '', postId: '', threadId: '' },
+                    outside: { messageId: '', postId: '', threadId: '' },
+                    outside2: { messageId: '', postId: '', threadId: '' },
+                    manager: { messageId: '', postId: '', threadId: '' },
+                    staff1: { messageId: '', postId: '', threadId: '' },
+                    staff2: { messageId: '', postId: '', threadId: '' },
+                    staff3: { messageId: '', postId: '', threadId: '' }
                 });
             }
         } catch (error) {
@@ -296,6 +361,16 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
             staff1Url: '',
             staff2Url: '',
             staff3Url: ''
+        });
+        setDiscordInfo({
+            front: { messageId: '', postId: '', threadId: '' },
+            inside: { messageId: '', postId: '', threadId: '' },
+            outside: { messageId: '', postId: '', threadId: '' },
+            outside2: { messageId: '', postId: '', threadId: '' },
+            manager: { messageId: '', postId: '', threadId: '' },
+            staff1: { messageId: '', postId: '', threadId: '' },
+            staff2: { messageId: '', postId: '', threadId: '' },
+            staff3: { messageId: '', postId: '', threadId: '' }
         });
         setEditBusTerminalIds([]);
         setEditSubwayStationIds([]);
@@ -354,6 +429,18 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
                 setEditStorePhotos(prev => ({
                     ...prev,
                     [fieldName]: data.url
+                }));
+            }
+
+            // Discord 메시지 ID 정보 저장 (업로드 시 받은 정보)
+            if (data.messageId || data.postId || data.threadId) {
+                setDiscordInfo(prev => ({
+                    ...prev,
+                    [photoType]: {
+                        messageId: data.messageId || '',
+                        postId: data.postId || '',
+                        threadId: data.threadId || ''
+                    }
                 }));
             }
 
@@ -438,7 +525,7 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
                 await customerAPI.savePreApprovalMark(editingStore.name, editPreApprovalMark.trim());
             }
             
-            // 매장 사진 저장
+            // 매장 사진 저장 (Discord 정보 포함)
             await customerAPI.saveStorePhotos({
                 storeName: editingStore.name,
                 frontUrl: editStorePhotos.frontUrl.trim(),
@@ -448,7 +535,32 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
                 managerUrl: editStorePhotos.managerUrl.trim(),
                 staff1Url: editStorePhotos.staff1Url.trim(),
                 staff2Url: editStorePhotos.staff2Url.trim(),
-                staff3Url: editStorePhotos.staff3Url.trim()
+                staff3Url: editStorePhotos.staff3Url.trim(),
+                // Discord 메시지 ID 정보 (업로드 시 받은 정보)
+                frontMessageId: discordInfo.front.messageId,
+                frontPostId: discordInfo.front.postId,
+                frontThreadId: discordInfo.front.threadId,
+                insideMessageId: discordInfo.inside.messageId,
+                insidePostId: discordInfo.inside.postId,
+                insideThreadId: discordInfo.inside.threadId,
+                outsideMessageId: discordInfo.outside.messageId,
+                outsidePostId: discordInfo.outside.postId,
+                outsideThreadId: discordInfo.outside.threadId,
+                outside2MessageId: discordInfo.outside2.messageId,
+                outside2PostId: discordInfo.outside2.postId,
+                outside2ThreadId: discordInfo.outside2.threadId,
+                managerMessageId: discordInfo.manager.messageId,
+                managerPostId: discordInfo.manager.postId,
+                managerThreadId: discordInfo.manager.threadId,
+                staff1MessageId: discordInfo.staff1.messageId,
+                staff1PostId: discordInfo.staff1.postId,
+                staff1ThreadId: discordInfo.staff1.threadId,
+                staff2MessageId: discordInfo.staff2.messageId,
+                staff2PostId: discordInfo.staff2.postId,
+                staff2ThreadId: discordInfo.staff2.threadId,
+                staff3MessageId: discordInfo.staff3.messageId,
+                staff3PostId: discordInfo.staff3.postId,
+                staff3ThreadId: discordInfo.staff3.threadId
             });
             
             // 대중교통 위치 저장 (ID 배열로)
