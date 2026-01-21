@@ -4283,13 +4283,30 @@ function setupPolicyTableRoutes(app) {
             }
           }
           
-          // 정책표 탭에서는 본인이 생성한 정책표 또는 담당자인 그룹의 정책표만 표시
-          if (isCreator || isManager) {
+          // 3. 정책 생성 가능자(creatorPermissions)에 포함되어 있는지 확인
+          let hasCreatorPermission = false;
+          const creatorPermissions = settingsMap.get(policyTableId) || [];
+          if (Array.isArray(creatorPermissions) && creatorPermissions.length > 0 && userRole) {
+            hasCreatorPermission = creatorPermissions.includes(userRole);
+            if (hasCreatorPermission) {
+              console.log('✅ [정책표 탭] 정책 생성 가능자 권한 확인:', {
+                policyTableId,
+                policyTableName: row[2] || '',
+                userRole,
+                creatorPermissions
+              });
+              accessiblePolicyTableIds.add(policyTableId); // 정책표ID_설정
+            }
+          }
+          
+          // 정책표 탭에서는 본인이 생성한 정책표 또는 담당자인 그룹의 정책표 또는 정책 생성 가능자 권한이 있는 정책표만 표시
+          if (isCreator || isManager || hasCreatorPermission) {
             console.log('✅ [정책표 탭] 접근 가능한 정책표:', {
               policyTableId,
               policyTableName: row[2] || '',
               isCreator,
               isManager,
+              hasCreatorPermission,
               userRole
             });
           }
@@ -4828,8 +4845,15 @@ function setupPolicyTableRoutes(app) {
             }
           }
           
-          // 정책표 목록 조회에서도 본인이 생성한 정책표 또는 담당자인 그룹의 정책표만 표시
-          const hasAccess = isCreator || isManager;
+          // 3. 정책 생성 가능자(creatorPermissions)에 포함되어 있는지 확인
+          let hasCreatorPermission = false;
+          const creatorPermissions = settingsMap.get(policy.policyTableId) || [];
+          if (Array.isArray(creatorPermissions) && creatorPermissions.length > 0 && userRole) {
+            hasCreatorPermission = creatorPermissions.includes(userRole);
+          }
+          
+          // 정책표 목록 조회에서도 본인이 생성한 정책표 또는 담당자인 그룹의 정책표 또는 정책 생성 가능자 권한이 있는 정책표만 표시
+          const hasAccess = isCreator || isManager || hasCreatorPermission;
           
           console.log(`🔍 [정책모드] 팀장 필터링 체크: ${policy.policyTableName}`, {
             policyId: policy.id,
@@ -4839,8 +4863,10 @@ function setupPolicyTableRoutes(app) {
             normalizedCurrentUserId: normalizePhoneNumber(currentUserId),
             isCreator,
             isManager,
+            hasCreatorPermission,
             userRole,
             accessGroupIds,
+            creatorPermissions,
             hasAccess
           });
           
