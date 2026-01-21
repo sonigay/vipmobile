@@ -5824,6 +5824,12 @@ app.post('/api/direct/store-image/upload', storeImageUpload.single('image'), asy
     const fileUrl = discordResult.imageUrl;
 
     console.log(`✅ [매장 사진 업로드] Discord 업로드 성공: ${storeName} - ${photoType} - ${fileUrl}`);
+    console.log(`📋 [매장 사진 업로드] Discord 정보:`, {
+      messageId: discordResult.messageId,
+      postId: discordResult.postId,
+      threadId: discordResult.threadId,
+      imageUrl: discordResult.imageUrl
+    });
 
     // 로컬 파일 삭제
     try {
@@ -5861,6 +5867,15 @@ app.post('/api/direct/store-image/upload', storeImageUpload.single('image'), asy
       if (!photoMap) {
         console.warn(`⚠️ [매장 사진 업로드] 알 수 없는 photoType: ${photoType}`);
       } else {
+        console.log(`📝 [매장 사진 업로드] 구글시트 저장 정보:`, {
+          photoType,
+          photoMap,
+          messageId: discordResult.messageId,
+          postId: discordResult.postId,
+          threadId: discordResult.threadId,
+          rowIndex: rowIndex === -1 ? '새 행' : `기존 행 ${rowIndex + 1}`
+        });
+        
         if (rowIndex === -1) {
           // 새 행 생성 (모든 컬럼 초기화)
           const newRow = new Array(34).fill('');
@@ -5870,6 +5885,14 @@ app.post('/api/direct/store-image/upload', storeImageUpload.single('image'), asy
           newRow[photoMap.postId] = discordResult.postId || '';
           newRow[photoMap.threadId] = discordResult.threadId || '';
           newRow[33] = updatedAt;
+          
+          console.log(`📝 [매장 사진 업로드] 새 행 데이터:`, {
+            storeName: newRow[0],
+            url: newRow[photoMap.url],
+            msgId: newRow[photoMap.msgId],
+            postId: newRow[photoMap.postId],
+            threadId: newRow[photoMap.threadId]
+          });
           
           await rateLimitedSheetsCall(() =>
             sheets.spreadsheets.values.append({
@@ -5888,11 +5911,26 @@ app.post('/api/direct/store-image/upload', storeImageUpload.single('image'), asy
           while (updatedRow.length < 36) {
             updatedRow.push('');
           }
+          
+          console.log(`📝 [매장 사진 업로드] 기존 행 업데이트 전:`, {
+            기존url: updatedRow[photoMap.url],
+            기존msgId: updatedRow[photoMap.msgId],
+            기존postId: updatedRow[photoMap.postId],
+            기존threadId: updatedRow[photoMap.threadId]
+          });
+          
           updatedRow[photoMap.url] = fileUrl;
           updatedRow[photoMap.msgId] = discordResult.messageId || '';
           updatedRow[photoMap.postId] = discordResult.postId || '';
           updatedRow[photoMap.threadId] = discordResult.threadId || '';
           updatedRow[33] = updatedAt;
+          
+          console.log(`📝 [매장 사진 업로드] 기존 행 업데이트 후:`, {
+            새url: updatedRow[photoMap.url],
+            새msgId: updatedRow[photoMap.msgId],
+            새postId: updatedRow[photoMap.postId],
+            새threadId: updatedRow[photoMap.threadId]
+          });
           
           await rateLimitedSheetsCall(() =>
             sheets.spreadsheets.values.update({
