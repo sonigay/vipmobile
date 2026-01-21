@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -51,34 +51,54 @@ const MarkerColorSettingsModal = ({ open, onClose, userId, onSave }) => {
     department: [],
     manager: []
   });
+  const [loadingValues, setLoadingValues] = useState({
+    code: false,
+    office: false,
+    department: false,
+    manager: false
+  });
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
-  // 데이터 로드
-  useEffect(() => {
-    if (open && userId) {
-      loadData();
-    }
-  }, [open, userId]);
-
-  const loadData = async () => {
+  // 데이터 로드 (메모이제이션)
+  const loadData = useCallback(async () => {
+    if (!userId) return;
+    
     try {
       setLoading(true);
       setError(null);
       
       // 색상 설정 로드
       const settings = await getMarkerColorSettings(userId);
-      setSelectedOption(settings.selectedOption || 'default');
+      const selectedOpt = settings.selectedOption || 'default';
+      setSelectedOption(selectedOpt);
       setColorSettings(settings.colorSettings || { code: {}, office: {}, department: {}, manager: {} });
       
-      // 선택된 옵션의 유니크 값 로드
-      if (settings.selectedOption && settings.selectedOption !== 'default') {
-        const values = await getUniqueValues(settings.selectedOption);
-        setUniqueValues(prev => ({
-          ...prev,
-          [settings.selectedOption]: values
-        }));
+      // 선택된 옵션의 유니크 값 로드 (이미 로드된 값은 재로드하지 않음)
+      if (selectedOpt !== 'default') {
+        // 현재 상태를 확인하기 위해 함수형 업데이트 사용
+        setUniqueValues(prev => {
+          // 이미 로드된 값이 있으면 재로드하지 않음
+          if (prev[selectedOpt]?.length) {
+            return prev;
+          }
+          
+          // 로드되지 않은 경우에만 로드 시작
+          setLoadingValues(loadingPrev => ({ ...loadingPrev, [selectedOpt]: true }));
+          getUniqueValues(selectedOpt).then(values => {
+            setUniqueValues(prevValues => ({
+              ...prevValues,
+              [selectedOpt]: values
+            }));
+            setLoadingValues(loadingPrev => ({ ...loadingPrev, [selectedOpt]: false }));
+          }).catch(err => {
+            console.error('유니크 값 로드 오류:', err);
+            setLoadingValues(loadingPrev => ({ ...loadingPrev, [selectedOpt]: false }));
+          });
+          
+          return prev;
+        });
       }
     } catch (error) {
       console.error('데이터 로드 오류:', error);
@@ -86,13 +106,22 @@ const MarkerColorSettingsModal = ({ open, onClose, userId, onSave }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId]);
 
-  const handleOptionChange = async (option) => {
+  // 모달이 열릴 때만 데이터 로드
+  useEffect(() => {
+    if (open && userId) {
+      loadData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, userId]);
+
+  const handleOptionChange = useCallback(async (option) => {
     setSelectedOption(option);
     
     // 선택된 옵션의 유니크 값 로드 (아직 로드되지 않은 경우)
     if (option !== 'default' && !uniqueValues[option]?.length) {
+      setLoadingValues(prev => ({ ...prev, [option]: true }));
       try {
         const values = await getUniqueValues(option);
         setUniqueValues(prev => ({
@@ -101,11 +130,14 @@ const MarkerColorSettingsModal = ({ open, onClose, userId, onSave }) => {
         }));
       } catch (error) {
         console.error('유니크 값 로드 오류:', error);
+        setError('유니크 값 로드 중 오류가 발생했습니다.');
+      } finally {
+        setLoadingValues(prev => ({ ...prev, [option]: false }));
       }
     }
-  };
+  }, [uniqueValues]);
 
-  const handleColorChange = (optionType, value, color) => {
+  const handleColorChange = useCallback((optionType, value, color) => {
     setColorSettings(prev => ({
       ...prev,
       [optionType]: {
@@ -113,7 +145,7 @@ const MarkerColorSettingsModal = ({ open, onClose, userId, onSave }) => {
         [value]: color
       }
     }));
-  };
+  }, []);
 
   const handleSave = async () => {
     try {
@@ -169,9 +201,18 @@ const MarkerColorSettingsModal = ({ open, onClose, userId, onSave }) => {
     }
   };
 
-  const renderColorList = (optionType) => {
+  const renderColorList = useCallback((optionType) => {
     const values = uniqueValues[optionType] || [];
     const settings = colorSettings[optionType] || {};
+    const isLoading = loadingValues[optionType];
+    
+    if (isLoading) {
+      return (
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+          <CircularProgress size={24} />
+        </Box>
+      );
+    }
     
     if (values.length === 0) {
       return (
@@ -215,7 +256,7 @@ const MarkerColorSettingsModal = ({ open, onClose, userId, onSave }) => {
         })}
       </List>
     );
-  };
+  }, [uniqueValues, colorSettings, loadingValues, handleColorChange]);
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
@@ -258,7 +299,7 @@ const MarkerColorSettingsModal = ({ open, onClose, userId, onSave }) => {
               <Typography variant="subtitle2">
                 {OPTION_LABELS[selectedOption]} 색상 설정
               </Typography>
-              <Button size="small" onClick={handleReset}>
+              <Button size="small" onClick={handleReset} disabled={loadingValues[selectedOption]}>
                 기본값으로 초기화
               </Button>
             </Box>
