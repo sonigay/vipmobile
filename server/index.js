@@ -4266,8 +4266,10 @@ app.post('/api/login', async (req, res) => {
       const generalModeRows = generalModeValues.slice(3); // 4행부터 데이터
 
       const foundGeneralUser = generalModeRows.find(row => {
-        const rowId = row[0]; // A열: 사용자ID(POS코드)
-        return rowId === storeId;
+        const rowId = (row[0] || '').toString().trim(); // A열: 사용자ID(POS코드)
+        const normalizedStoreId = (storeId || '').toString().trim();
+        // 대소문자 구분 없이 비교
+        return rowId.toUpperCase() === normalizedStoreId.toUpperCase();
       });
 
       if (foundGeneralUser) {
@@ -14245,7 +14247,11 @@ app.post('/api/check-general-policy-permission', async (req, res) => {
 
     // 4행부터 데이터
     const dataRows = rows.slice(3);
-    const userRow = dataRows.find(row => row[0] === userId);
+    const normalizedUserId = (userId || '').toString().trim().toUpperCase();
+    const userRow = dataRows.find(row => {
+      const rowId = (row[0] || '').toString().trim().toUpperCase();
+      return rowId === normalizedUserId;
+    });
 
     if (!userRow) {
       console.log(`⚠️ [일반정책모드] 사용자를 찾을 수 없습니다: ${userId}`);
@@ -14313,7 +14319,11 @@ app.post('/api/check-onsale-permission', async (req, res) => {
 
     // 4행부터 데이터
     const dataRows = rows.slice(3);
-    const userRow = dataRows.find(row => row[0] === userId);
+    const normalizedUserId = (userId || '').toString().trim().toUpperCase();
+    const userRow = dataRows.find(row => {
+      const rowId = (row[0] || '').toString().trim().toUpperCase();
+      return rowId === normalizedUserId;
+    });
 
     if (!userRow) {
       console.log(`⚠️ [온세일권한] 사용자를 찾을 수 없습니다: ${userId}`);

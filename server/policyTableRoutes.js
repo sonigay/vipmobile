@@ -4044,9 +4044,12 @@ function setupPolicyTableRoutes(app) {
         let userCompanyName = null;
         if (generalModeRows.length > 3) {
           const generalModeDataRows = generalModeRows.slice(3);
-          const userRow = generalModeDataRows.find(row => 
-            row[0] === currentUserId || row[10] === currentUserId // A열 또는 K열
-          );
+          const normalizedCurrentUserId = (currentUserId || '').toString().trim().toUpperCase();
+          const userRow = generalModeDataRows.find(row => {
+            const rowId0 = (row[0] || '').toString().trim().toUpperCase();
+            const rowId10 = (row[10] || '').toString().trim().toUpperCase();
+            return rowId0 === normalizedCurrentUserId || rowId10 === normalizedCurrentUserId; // A열 또는 K열
+          });
           if (userRow) {
             userCompanyName = (userRow[1] || '').trim(); // B열 업체명
           }
@@ -4647,9 +4650,12 @@ function setupPolicyTableRoutes(app) {
         let userCompanyName = null;
         if (generalModeRows.length > 3) {
           const generalModeDataRows = generalModeRows.slice(3);
-          const userRow = generalModeDataRows.find(row => 
-            row[0] === currentUserId || row[10] === currentUserId // A열 또는 K열
-          );
+          const normalizedCurrentUserId = (currentUserId || '').toString().trim().toUpperCase();
+          const userRow = generalModeDataRows.find(row => {
+            const rowId0 = (row[0] || '').toString().trim().toUpperCase();
+            const rowId10 = (row[10] || '').toString().trim().toUpperCase();
+            return rowId0 === normalizedCurrentUserId || rowId10 === normalizedCurrentUserId; // A열 또는 K열
+          });
           if (userRow) {
             userCompanyName = (userRow[1] || '').trim(); // B열 업체명
           }
@@ -5208,9 +5214,12 @@ function setupPolicyTableRoutes(app) {
         let userCompanyName = null;
         if (generalModeRows.length > 3) {
           const generalModeDataRows = generalModeRows.slice(3);
-          const userRow = generalModeDataRows.find(row => 
-            row[0] === currentUserId || row[10] === currentUserId // A열 또는 K열
-          );
+          const normalizedCurrentUserId = (currentUserId || '').toString().trim().toUpperCase();
+          const userRow = generalModeDataRows.find(row => {
+            const rowId0 = (row[0] || '').toString().trim().toUpperCase();
+            const rowId10 = (row[10] || '').toString().trim().toUpperCase();
+            return rowId0 === normalizedCurrentUserId || rowId10 === normalizedCurrentUserId; // A열 또는 K열
+          });
           if (userRow) {
             userCompanyName = (userRow[1] || '').trim(); // B열 업체명
           }
