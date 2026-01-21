@@ -110,12 +110,10 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
       });
 
       try {
-        // 병렬 요청: 단말마스터, 요금정책마스터, 요금제마스터
-        const [mobiles, pricing, plans] = await Promise.all([
-          directStoreApiClient.getMobilesMaster(carrier),
-          directStoreApiClient.getMobilesPricing(carrier),
-          directStoreApiClient.getPlansMaster(carrier)
-        ]);
+        // 🔥 Rate Limit 방지: 순차 처리로 변경 (Promise.all 대신)
+        const mobiles = await directStoreApiClient.getMobilesMaster(carrier);
+        const pricing = await directStoreApiClient.getMobilesPricing(carrier);
+        const plans = await directStoreApiClient.getPlansMaster(carrier);
 
         // 가격 데이터가 비어있는 경우 경고
         if (!pricing || pricing.length === 0) {

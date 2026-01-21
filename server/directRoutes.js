@@ -150,9 +150,30 @@ function logWarningOnce(key, message, data = {}) {
   }
 }
 
-// Rate limiting을 위한 마지막 요청 시간 추적
+// Rate limiting을 위한 전역 큐 시스템
 let lastApiCallTime = 0;
 const MIN_API_INTERVAL_MS = 2000; // 최소 2초 간격으로 API 호출 (Google Sheets API 분당 60회 제한 고려)
+const MAX_CONCURRENT_SHEETS_REQUESTS = 2; // 동시 요청 수 제한 (2개로 제한하여 rate limit 방지)
+let currentSheetsRequests = 0;
+const sheetsRequestQueue = [];
+
+// 요청 큐 처리 함수
+async function processSheetsRequestQueue() {
+  if (sheetsRequestQueue.length > 0 && currentSheetsRequests < MAX_CONCURRENT_SHEETS_REQUESTS) {
+    const { resolve, reject, fn } = sheetsRequestQueue.shift();
+    currentSheetsRequests++;
+    
+    try {
+      const result = await fn();
+      resolve(result);
+    } catch (error) {
+      reject(error);
+    } finally {
+      currentSheetsRequests--;
+      processSheetsRequestQueue(); // 다음 요청 처리
+    }
+  }
+}
 
 function getCache(key) {
   const entry = cacheStore.get(key);
@@ -168,56 +189,69 @@ function setCache(key, data, ttlMs = 60 * 1000) {
   cacheStore.set(key, { data, expires: Date.now() + ttlMs });
 }
 
-// Rate limit 에러 발생 시 재시도하는 래퍼 함수 (개선: 더 긴 대기 시간, jitter 추가)
+// Rate limit 에러 발생 시 재시도하는 래퍼 함수 (개선: 전역 큐 시스템 + 호출 간격 제어)
 async function withRetry(fn, maxRetries = 5, baseDelay = 2000) {
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      // Rate limiting: 최소 간격 유지
-      const now = Date.now();
-      const timeSinceLastCall = now - lastApiCallTime;
-      if (timeSinceLastCall < MIN_API_INTERVAL_MS) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'directRoutes.js:90', message: 'Rate limiting 대기', data: { waitTime: MIN_API_INTERVAL_MS - timeSinceLastCall, timeSinceLastCall }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'H3' }) }).catch(() => { });
-        // #endregion
-        await new Promise(resolve => setTimeout(resolve, MIN_API_INTERVAL_MS - timeSinceLastCall));
-      }
-      lastApiCallTime = Date.now();
+  // 전역 큐를 통한 동시 요청 제한
+  return new Promise((resolve, reject) => {
+    const executeRequest = async () => {
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          // Rate limiting: 최소 간격 유지
+          const now = Date.now();
+          const timeSinceLastCall = now - lastApiCallTime;
+          if (timeSinceLastCall < MIN_API_INTERVAL_MS) {
+            await new Promise(resolve => setTimeout(resolve, MIN_API_INTERVAL_MS - timeSinceLastCall));
+          }
+          lastApiCallTime = Date.now();
 
-      return await fn();
-    } catch (error) {
-      // Rate limit 에러 감지 개선 (더 많은 케이스 처리)
-      const isRateLimitError =
-        error.code === 429 ||
-        (error.response && error.response.status === 429) ||
-        (error.response && error.response.data && error.response.data.error &&
-          (error.response.data.error.status === 'RESOURCE_EXHAUSTED' ||
-            error.response.data.error.message && error.response.data.error.message.includes('Quota exceeded'))) ||
-        (error.message && (
-          error.message.includes('Quota exceeded') ||
-          error.message.includes('RESOURCE_EXHAUSTED') ||
-          error.message.includes('429') ||
-          error.message.includes('rateLimitExceeded')
-        ));
+          const result = await fn();
+          resolve(result);
+          return;
+        } catch (error) {
+          // Rate limit 에러 감지 개선 (더 많은 케이스 처리)
+          const isRateLimitError =
+            error.code === 429 ||
+            (error.response && error.response.status === 429) ||
+            (error.response && error.response.data && error.response.data.error &&
+              (error.response.data.error.status === 'RESOURCE_EXHAUSTED' ||
+                error.response.data.error.message && error.response.data.error.message.includes('Quota exceeded'))) ||
+            (error.message && (
+              error.message.includes('Quota exceeded') ||
+              error.message.includes('RESOURCE_EXHAUSTED') ||
+              error.message.includes('429') ||
+              error.message.includes('rateLimitExceeded')
+            ));
 
-      if (isRateLimitError && attempt < maxRetries - 1) {
-        // Exponential backoff with jitter (랜덤 지연 추가로 동시 요청 분산)
-        const jitter = Math.random() * 1000; // 0~1초 랜덤
-        const delay = baseDelay * Math.pow(2, attempt) + jitter;
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'directRoutes.js:105', message: 'Rate limit 에러 재시도', data: { attempt: attempt + 1, maxRetries, delay: Math.round(delay), errorCode: error.code, errorStatus: error.response?.status }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'H1' }) }).catch(() => { });
-        // #endregion
-        console.warn(`[Direct] Rate limit 에러 발생, ${Math.round(delay)}ms 후 재시도 (${attempt + 1}/${maxRetries})`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-        continue;
+          if (isRateLimitError && attempt < maxRetries - 1) {
+            // Exponential backoff with jitter (랜덤 지연 추가로 동시 요청 분산)
+            const jitter = Math.random() * 1000; // 0~1초 랜덤
+            const delay = baseDelay * Math.pow(2, attempt) + jitter;
+            console.warn(`[Direct] Rate limit 에러 발생, ${Math.round(delay)}ms 후 재시도 (${attempt + 1}/${maxRetries})`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            continue;
+          }
+          
+          // Rate limit 에러가 아니거나 최대 재시도 횟수 초과 시
+          if (attempt === maxRetries - 1 || !isRateLimitError) {
+            reject(error);
+            return;
+          }
+        }
       }
-      // #region agent log
-      if (isRateLimitError) {
-        fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'directRoutes.js:109', message: 'Rate limit 에러 최종 실패', data: { attempt: attempt + 1, maxRetries, errorCode: error.code, errorStatus: error.response?.status, errorMessage: error.message }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'H1' }) }).catch(() => { });
-      }
-      // #endregion
-      throw error;
-    }
-  }
+      // 모든 재시도 실패
+      reject(new Error('Max retries exceeded'));
+    };
+
+    // 큐에 추가
+    sheetsRequestQueue.push({
+      resolve: () => executeRequest(),
+      reject,
+      fn: executeRequest
+    });
+    
+    // 큐 처리 시작
+    processSheetsRequestQueue();
+  });
 }
 
 // 동시 요청 방지를 위한 래퍼 함수 (재시도 로직 포함)
@@ -305,27 +339,25 @@ async function getPolicySettings(carrier) {
       }))
     });
 
-    // 부가서비스, 보험상품, 별도정책 병렬 읽기 (재시도 로직 포함)
-    const [addonRes, insuranceRes, specialRes] = await Promise.all([
-      withRetry(async () => {
-        return await sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: SHEET_POLICY_ADDON
-        });
-      }),
-      withRetry(async () => {
-        return await sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: SHEET_POLICY_INSURANCE
-        });
-      }),
-      withRetry(async () => {
-        return await sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: SHEET_POLICY_SPECIAL
-        });
-      })
-    ]);
+    // 🔥 Rate Limit 방지: 순차 처리로 변경 (Promise.all 대신)
+    const addonRes = await withRetry(async () => {
+      return await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: SHEET_POLICY_ADDON
+      });
+    });
+    const insuranceRes = await withRetry(async () => {
+      return await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: SHEET_POLICY_INSURANCE
+      });
+    });
+    const specialRes = await withRetry(async () => {
+      return await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: SHEET_POLICY_SPECIAL
+      });
+    });
 
     const addonRows = (addonRes.data.values || []).slice(1);
     const addonList = addonRows
@@ -430,11 +462,10 @@ async function rebuildPlanMaster(carriersParam) {
       continue;
     }
 
-    const [planNames, planGroups, basicFees] = await Promise.all([
-      planNameRange ? getSheetData(sheetId, planNameRange) : Promise.resolve([]),
-      planGroupRange ? getSheetData(sheetId, planGroupRange) : Promise.resolve([]),
-      basicFeeRange ? getSheetData(sheetId, basicFeeRange) : Promise.resolve([])
-    ]);
+    // 🔥 Rate Limit 방지: 순차 처리로 변경 (Promise.all 대신)
+    const planNames = planNameRange ? await getSheetData(sheetId, planNameRange) : [];
+    const planGroups = planGroupRange ? await getSheetData(sheetId, planGroupRange) : [];
+    const basicFees = basicFeeRange ? await getSheetData(sheetId, basicFeeRange) : [];
 
     const flatNames = planNames.flat().map(v => (v || '').toString().trim());
     const flatGroups = planGroups.flat().map(v => (v || '').toString().trim());
@@ -1068,8 +1099,11 @@ async function rebuildPricingMaster(carriersParam) {
             }
           }
 
-          // 모든 리베이트 범위를 병렬로 읽기
-          const rebateResults = await Promise.all(rebateLoadPromises);
+          // 🔥 Rate Limit 방지: 순차 처리로 변경 (Promise.all 대신)
+          const rebateResults = [];
+          for (const promise of rebateLoadPromises) {
+            rebateResults.push(await promise);
+          }
 
           // 결과 처리
           for (const result of rebateResults) {
@@ -1124,12 +1158,10 @@ async function rebuildPricingMaster(carriersParam) {
     }
 
     // 3. 지원금표(Support Sheet) 데이터 읽기
-    // 🔥 성능 개선: 모델명 리스트와 openingTypeRange를 병렬로 읽기
+    // 🔥 Rate Limit 방지: 순차 처리로 변경 (Promise.all 대신)
     const supportOpeningTypeRange = openingTypeRange || '';
-    const [modelData, openingTypeData] = await Promise.all([
-      getSheetData(supportSheetId, modelRange),
-      supportOpeningTypeRange ? getSheetData(supportSheetId, supportOpeningTypeRange) : Promise.resolve([])
-    ]);
+    const modelData = await getSheetData(supportSheetId, modelRange);
+    const openingTypeData = supportOpeningTypeRange ? await getSheetData(supportSheetId, supportOpeningTypeRange) : [];
     
     // 모델명 리스트 (매칭용)
     const supportModelsRaw = (modelData || []).flat().map(v => (v || '').toString().trim());
@@ -1151,8 +1183,11 @@ async function rebuildPricingMaster(carriersParam) {
       );
     }
 
-    // 모든 요금제군별 지원금 컬럼을 병렬로 읽기
-    const supportResults = await Promise.all(supportLoadPromises);
+    // 🔥 Rate Limit 방지: 순차 처리로 변경 (Promise.all 대신)
+    const supportResults = [];
+    for (const promise of supportLoadPromises) {
+      supportResults.push(await promise);
+    }
 
     // 결과 처리
     for (const result of supportResults) {
@@ -2069,11 +2104,10 @@ function setupDirectRoutes(app) {
 
       if (sheetId && (planNameRange || planGroupRange || basicFeeRange)) {
         // 각 범위를 읽어서 인덱스 기준으로 매칭
-        const [planNames, planGroups, basicFees] = await Promise.all([
-          planNameRange ? getSheetData(sheetId, planNameRange) : Promise.resolve([]),
-          planGroupRange ? getSheetData(sheetId, planGroupRange) : Promise.resolve([]),
-          basicFeeRange ? getSheetData(sheetId, basicFeeRange) : Promise.resolve([])
-        ]);
+        // 🔥 Rate Limit 방지: 순차 처리로 변경 (Promise.all 대신)
+        const planNames = planNameRange ? await getSheetData(sheetId, planNameRange) : [];
+        const planGroups = planGroupRange ? await getSheetData(sheetId, planGroupRange) : [];
+        const basicFees = basicFeeRange ? await getSheetData(sheetId, basicFeeRange) : [];
 
         const flatNames = planNames.flat().map(v => (v || '').toString().trim());
         const flatGroups = planGroups.flat().map(v => (v || '').toString().trim());
@@ -2429,40 +2463,37 @@ function setupDirectRoutes(app) {
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
 
       // 🔥 성능 개선: 모든 시트 헤더 확인을 병렬로 처리
-      await Promise.all([
-        ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_MARGIN, HEADERS_POLICY_MARGIN),
-        ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_ADDON, HEADERS_POLICY_ADDON),
-        ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_INSURANCE, HEADERS_POLICY_INSURANCE),
-        ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_SPECIAL, HEADERS_POLICY_SPECIAL)
-      ]);
+      // 🔥 Rate Limit 방지: 순차 처리로 변경 (Promise.all 대신)
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_MARGIN, HEADERS_POLICY_MARGIN);
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_ADDON, HEADERS_POLICY_ADDON);
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_INSURANCE, HEADERS_POLICY_INSURANCE);
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_SPECIAL, HEADERS_POLICY_SPECIAL);
 
-      // 🔥 성능 개선: 모든 시트 읽기를 병렬로 처리
-      const [marginRes, addonRes, insuranceRes, specialRes] = await Promise.all([
-        withRetry(async () => {
-          return await sheets.spreadsheets.values.get({
-            spreadsheetId: SPREADSHEET_ID,
-            range: SHEET_POLICY_MARGIN
-          });
-        }),
-        withRetry(async () => {
-          return await sheets.spreadsheets.values.get({
-            spreadsheetId: SPREADSHEET_ID,
-            range: SHEET_POLICY_ADDON
-          });
-        }),
-        withRetry(async () => {
-          return await sheets.spreadsheets.values.get({
-            spreadsheetId: SPREADSHEET_ID,
-            range: SHEET_POLICY_INSURANCE
-          });
-        }),
-        withRetry(async () => {
-          return await sheets.spreadsheets.values.get({
-            spreadsheetId: SPREADSHEET_ID,
-            range: SHEET_POLICY_SPECIAL
-          });
-        })
-      ]);
+      // 🔥 Rate Limit 방지: 순차 처리로 변경 (Promise.all 대신)
+      const marginRes = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: SHEET_POLICY_MARGIN
+        });
+      });
+      const addonRes = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: SHEET_POLICY_ADDON
+        });
+      });
+      const insuranceRes = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: SHEET_POLICY_INSURANCE
+        });
+      });
+      const specialRes = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: SHEET_POLICY_SPECIAL
+        });
+      });
 
       // 데이터 처리
       const marginRows = (marginRes.data.values || []).slice(1);
@@ -3220,32 +3251,43 @@ function setupDirectRoutes(app) {
       }
 
       // 2. 정책표 시트에서 모델명, 펫네임 읽기 (기준 데이터)
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'directRoutes.js:1132', message: '정책표 모델명/펫네임 읽기 시작', data: { carrier: carrierParam, modelRange, petNameRange }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'H1' }) }).catch(() => { });
-      // #endregion
-      const [modelData, petNameData] = await Promise.all([
-        modelRange ? withRetry(async () => {
-          return await sheets.spreadsheets.values.get({
-            spreadsheetId: policySheetId,
-            range: modelRange,
-            majorDimension: 'ROWS',
-            valueRenderOption: 'UNFORMATTED_VALUE'
+      // 🔥 Rate Limit 방지: 순차 처리로 변경 (Promise.all 대신)
+      let modelData = [];
+      let petNameData = [];
+      
+      if (modelRange) {
+        try {
+          const modelRes = await withRetry(async () => {
+            return await sheets.spreadsheets.values.get({
+              spreadsheetId: policySheetId,
+              range: modelRange,
+              majorDimension: 'ROWS',
+              valueRenderOption: 'UNFORMATTED_VALUE'
+            });
           });
-        }).then(r => r.data.values || []).catch((err) => {
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'directRoutes.js:1138', message: '정책표 모델명 읽기 실패', data: { error: err.message, code: err.code }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'H1' }) }).catch(() => { });
-          // #endregion
-          return [];
-        }) : Promise.resolve([]),
-        petNameRange ? withRetry(async () => {
-          return await sheets.spreadsheets.values.get({
-            spreadsheetId: policySheetId,
-            range: petNameRange,
-            majorDimension: 'ROWS',
-            valueRenderOption: 'UNFORMATTED_VALUE'
+          modelData = modelRes.data.values || [];
+        } catch (err) {
+          console.warn(`[Direct] 정책표 모델명 읽기 실패:`, err.message);
+          modelData = [];
+        }
+      }
+      
+      if (petNameRange) {
+        try {
+          const petNameRes = await withRetry(async () => {
+            return await sheets.spreadsheets.values.get({
+              spreadsheetId: policySheetId,
+              range: petNameRange,
+              majorDimension: 'ROWS',
+              valueRenderOption: 'UNFORMATTED_VALUE'
+            });
           });
-        }).then(r => r.data.values || []).catch(() => []) : Promise.resolve([])
-      ]);
+          petNameData = petNameRes.data.values || [];
+        } catch (err) {
+          console.warn(`[Direct] 정책표 펫네임 읽기 실패:`, err.message);
+          petNameData = [];
+        }
+      }
 
       // 모델명을 기준으로 다른 시트의 데이터를 매칭해야 함
       // 이통사 지원금 시트에서 모델명, 출고가, 개통유형 읽기 (모델명 기준으로 매칭)
@@ -3260,35 +3302,57 @@ function setupDirectRoutes(app) {
       if (supportModelRange && factoryPriceRange && openingTypeRange) {
         try {
           // 이통사 지원금 시트에서 모델명, 출고가, 개통유형 읽기
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/ce34fffa-1b21-49f2-9d28-ef36f8382244', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'directRoutes.js:1159', message: '이통사 지원금 시트 읽기 시작', data: { carrier: carrierParam }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'H4' }) }).catch(() => { });
-          // #endregion
-          [supportModelData, supportFactoryPriceData, supportOpeningTypeData] = await Promise.all([
-            withRetry(async () => {
+          // 🔥 Rate Limit 방지: 순차 처리로 변경 (Promise.all 대신)
+          let supportFactoryPriceData = [];
+          
+          try {
+            const supportModelRes = await withRetry(async () => {
               return await sheets.spreadsheets.values.get({
                 spreadsheetId: supportSheetId,
                 range: supportModelRange,
                 majorDimension: 'ROWS',
                 valueRenderOption: 'UNFORMATTED_VALUE'
               });
-            }).then(r => r.data.values || []).catch(() => []),
-            factoryPriceRange ? withRetry(async () => {
-              return await sheets.spreadsheets.values.get({
-                spreadsheetId: supportSheetId,
-                range: factoryPriceRange,
-                majorDimension: 'ROWS',
-                valueRenderOption: 'UNFORMATTED_VALUE'
+            });
+            supportModelData = supportModelRes.data.values || [];
+          } catch (err) {
+            console.warn(`[Direct] 이통사 지원금 모델명 읽기 실패:`, err.message);
+            supportModelData = [];
+          }
+          
+          if (factoryPriceRange) {
+            try {
+              const factoryPriceRes = await withRetry(async () => {
+                return await sheets.spreadsheets.values.get({
+                  spreadsheetId: supportSheetId,
+                  range: factoryPriceRange,
+                  majorDimension: 'ROWS',
+                  valueRenderOption: 'UNFORMATTED_VALUE'
+                });
               });
-            }).then(r => r.data.values || []).catch(() => []) : Promise.resolve([]),
-            openingTypeRange ? withRetry(async () => {
-              return await sheets.spreadsheets.values.get({
-                spreadsheetId: supportSheetId,
-                range: openingTypeRange,
-                majorDimension: 'ROWS',
-                valueRenderOption: 'UNFORMATTED_VALUE'
+              supportFactoryPriceData = factoryPriceRes.data.values || [];
+            } catch (err) {
+              console.warn(`[Direct] 이통사 지원금 출고가 읽기 실패:`, err.message);
+              supportFactoryPriceData = [];
+            }
+          }
+          
+          if (openingTypeRange) {
+            try {
+              const openingTypeRes = await withRetry(async () => {
+                return await sheets.spreadsheets.values.get({
+                  spreadsheetId: supportSheetId,
+                  range: openingTypeRange,
+                  majorDimension: 'ROWS',
+                  valueRenderOption: 'UNFORMATTED_VALUE'
+                });
               });
-            }).then(r => r.data.values || []).catch(() => []) : Promise.resolve([])
-          ]);
+              supportOpeningTypeData = openingTypeRes.data.values || [];
+            } catch (err) {
+              console.warn(`[Direct] 이통사 지원금 개통유형 읽기 실패:`, err.message);
+              supportOpeningTypeData = [];
+            }
+          }
 
           // 모델명을 키로 하는 맵 생성 (모델명 기준 매칭)
           const maxSupportRows = Math.max(
@@ -5161,15 +5225,17 @@ function setupDirectRoutes(app) {
         return res.json(cached);
       }
 
-      // 각 통신사별로 mobiles 데이터 가져오기 (병렬 처리로 최적화)
-      const mobileListPromises = carriers.map(carrier =>
-        getMobileList(carrier).catch(err => {
+      // 🔥 Rate Limit 방지: 순차 처리로 변경 (Promise.all 대신)
+      const mobileLists = [];
+      for (const carrier of carriers) {
+        try {
+          const mobileList = await getMobileList(carrier);
+          mobileLists.push(mobileList);
+        } catch (err) {
           console.warn(`[Direct] ${carrier} 통신사 데이터 가져오기 실패:`, err);
-          return []; // 에러 시 빈 배열 반환
-        })
-      );
-
-      const mobileLists = await Promise.all(mobileListPromises);
+          mobileLists.push([]); // 에러 시 빈 배열 반환
+        }
+      }
       mobileLists.forEach(mobileList => {
         allMobiles.push(...mobileList);
       });

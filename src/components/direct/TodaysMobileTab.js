@@ -142,12 +142,10 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
       }));
 
       // 1. 단말 마스터 데이터 조회 (모든 통신사)
-      // 병렬로 API 호출
-      const [skMobiles, ktMobiles, lgMobiles] = await Promise.all([
-        directStoreApiClient.getMobilesMaster('SK'),
-        directStoreApiClient.getMobilesMaster('KT'),
-        directStoreApiClient.getMobilesMaster('LG')
-      ]);
+      // 🔥 Rate Limit 방지: 순차 처리로 변경 (Promise.all 대신)
+      const skMobiles = await directStoreApiClient.getMobilesMaster('SK');
+      const ktMobiles = await directStoreApiClient.getMobilesMaster('KT');
+      const lgMobiles = await directStoreApiClient.getMobilesMaster('LG');
 
       // 🔥 핵심 수정: API 응답의 imageUrl 필드를 image로 매핑하고,
       // 기본 요금제군(defaultPlanGroup)을 미리 계산해둔다.
