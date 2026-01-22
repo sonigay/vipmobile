@@ -164,7 +164,7 @@ app.use(cors({
 const setCORSHeaders = (req, res) => {
   const origin = req.headers.origin;
   const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
-  
+
   const defaultOrigins = [
     'https://vipmobile.vercel.app',
     'http://localhost:3000',
@@ -172,15 +172,15 @@ const setCORSHeaders = (req, res) => {
     'http://localhost:3002',
     'http://localhost:4000'
   ];
-  
+
   const allowedOrigins = [...corsOrigins, ...defaultOrigins];
-  
+
   if (origin && allowedOrigins.includes(origin)) {
     res.header('Access-Control-Allow-Origin', origin);
   } else {
     res.header('Access-Control-Allow-Origin', 'https://vipmobile.vercel.app');
   }
-  
+
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key, x-user-id, x-user-role, x-user-name, x-mode, Cache-Control, Pragma, Expires');
   res.header('Access-Control-Allow-Credentials', 'true');
@@ -204,7 +204,7 @@ app.options('*', (req, res) => {
   const allowedOrigins = [...corsOrigins, ...defaultOrigins];
 
   const origin = req.headers.origin;
-  
+
   // 디버깅 로그 (모든 OPTIONS 요청 로깅)
   console.log('🔍 [전역 OPTIONS] 요청 수신:', {
     method: req.method,
@@ -221,7 +221,7 @@ app.options('*', (req, res) => {
     originInAllowed: origin && allowedOrigins.includes(origin),
     isPolicyTableRequest: req.url && req.url.includes('/api/policy-tables')
   });
-  
+
   if (origin && allowedOrigins.includes(origin)) {
     res.header('Access-Control-Allow-Origin', origin);
   } else if (origin) {
@@ -233,7 +233,7 @@ app.options('*', (req, res) => {
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key, x-user-id, x-user-role, x-user-name, x-mode, Cache-Control, Pragma, Expires');
   res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Max-Age', '86400'); // 24시간 캐시
-  
+
   // 디버깅 로그 (정책표 관련 요청만)
   if (req.url && req.url.includes('/api/policy-tables')) {
     console.log('✅ [전역 OPTIONS] CORS 헤더 설정 완료:', {
@@ -243,7 +243,7 @@ app.options('*', (req, res) => {
       'Access-Control-Allow-Credentials': res.getHeader('Access-Control-Allow-Credentials')
     });
   }
-  
+
   res.status(200).end();
 });
 
@@ -1172,20 +1172,20 @@ async function monitoredDriveCall(operation, params) {
   const timestamp = new Date();
   const dateKey = timestamp.toISOString().split('T')[0]; // YYYY-MM-DD
   const operationName = operation; // 'files.list', 'files.create', 'permissions.create' 등
-  
+
   // 일일 호출량 초기화 (없으면)
   if (!driveMonitoring.dailyCalls.has(dateKey)) {
     driveMonitoring.dailyCalls.set(dateKey, { count: 0, errors: 0, operations: {} });
   }
   const dailyStats = driveMonitoring.dailyCalls.get(dateKey);
-  
+
   // 호출 시작
   dailyStats.count++;
   if (!dailyStats.operations[operationName]) {
     dailyStats.operations[operationName] = 0;
   }
   dailyStats.operations[operationName]++;
-  
+
   const callRecord = {
     timestamp: timestamp.toISOString(),
     operation: operationName,
@@ -1194,12 +1194,12 @@ async function monitoredDriveCall(operation, params) {
     error: null,
     duration: null
   };
-  
+
   const startTime = Date.now();
-  
+
   try {
     let result;
-    
+
     // 실제 Drive API 호출
     switch (operation) {
       case 'files.list':
@@ -1217,39 +1217,39 @@ async function monitoredDriveCall(operation, params) {
       default:
         throw new Error(`Unknown operation: ${operation}`);
     }
-    
+
     const duration = Date.now() - startTime;
     callRecord.success = true;
     callRecord.duration = duration;
-    
+
     // 최근 호출 기록에 추가 (최대 1000개 유지)
     driveMonitoring.recentCalls.push(callRecord);
     if (driveMonitoring.recentCalls.length > 1000) {
       driveMonitoring.recentCalls.shift(); // 오래된 것 제거
     }
-    
+
     // 임계값 체크 및 경고
     checkThresholds(dateKey, dailyStats);
-    
+
     return result;
   } catch (error) {
     const duration = Date.now() - startTime;
     callRecord.success = false;
     callRecord.error = error.message || error.toString();
     callRecord.duration = duration;
-    
+
     // 에러 카운트 증가
     dailyStats.errors++;
-    
+
     // 최근 호출 기록에 추가
     driveMonitoring.recentCalls.push(callRecord);
     if (driveMonitoring.recentCalls.length > 1000) {
       driveMonitoring.recentCalls.shift();
     }
-    
+
     // 임계값 체크 및 경고
     checkThresholds(dateKey, dailyStats);
-    
+
     throw error;
   }
 }
@@ -1258,12 +1258,12 @@ async function monitoredDriveCall(operation, params) {
 function checkThresholds(dateKey, dailyStats) {
   const { threshold } = driveMonitoring;
   const errorRate = dailyStats.count > 0 ? dailyStats.errors / dailyStats.count : 0;
-  
+
   // 일일 호출량 경고
   if (dailyStats.count >= threshold.dailyCalls) {
     console.warn(`⚠️ [Google Drive 모니터링] 일일 호출량 임계값 초과: ${dailyStats.count}회 (임계값: ${threshold.dailyCalls}회)`);
   }
-  
+
   // 에러율 경고
   if (errorRate >= threshold.errorRate) {
     console.warn(`⚠️ [Google Drive 모니터링] 에러율 임계값 초과: ${(errorRate * 100).toFixed(2)}% (임계값: ${(threshold.errorRate * 100).toFixed(2)}%)`);
@@ -1274,16 +1274,16 @@ function checkThresholds(dateKey, dailyStats) {
 function getDriveMonitoringData(days = 7) {
   const now = new Date();
   const data = [];
-  
+
   // 최근 N일 데이터 수집
   for (let i = 0; i < days; i++) {
     const date = new Date(now);
     date.setDate(date.getDate() - i);
     const dateKey = date.toISOString().split('T')[0];
-    
+
     const dailyStats = driveMonitoring.dailyCalls.get(dateKey) || { count: 0, errors: 0, operations: {} };
     const errorRate = dailyStats.count > 0 ? dailyStats.errors / dailyStats.count : 0;
-    
+
     data.push({
       date: dateKey,
       totalCalls: dailyStats.count,
@@ -1296,10 +1296,10 @@ function getDriveMonitoringData(days = 7) {
       }
     });
   }
-  
+
   // 최근 호출 기록 (최근 100개)
   const recentCalls = driveMonitoring.recentCalls.slice(-100).reverse();
-  
+
   // 전체 통계
   const totalStats = {
     today: {
@@ -1309,7 +1309,7 @@ function getDriveMonitoringData(days = 7) {
     threshold: driveMonitoring.threshold,
     recentErrors: recentCalls.filter(call => !call.success).slice(0, 20)
   };
-  
+
   return {
     dailyData: data.reverse(), // 오래된 것부터
     recentCalls: recentCalls,
@@ -1390,15 +1390,15 @@ async function getSheetValues(sheetName, spreadsheetId = SPREADSHEET_ID) {
   }
 
   const data = await fetchSheetValuesDirectly(sheetName, spreadsheetId);
-  
+
   // 로그인에 자주 사용되는 시트는 더 긴 TTL 적용 (1분)
   // 이 시트들은 자주 변경되지 않으므로 긴 TTL로 API 호출 감소
   const loginFrequentSheets = ['폰클출고처데이터', '대리점아이디관리', '일반모드권한관리'];
   const ttl = loginFrequentSheets.includes(sheetName) ? 60 * 1000 : CACHE_TTL;
-  
+
   cacheUtils.set(cacheKey, data, ttl);
   console.log(`💾 [캐시 저장] ${sheetName} (TTL: ${ttl / 1000}초)`);
-  
+
   return data;
 }
 
@@ -1504,7 +1504,7 @@ async function fetchSheetValuesDirectly(sheetName, spreadsheetId = SPREADSHEET_I
     });
 
     const data = response.data.values || [];
-    
+
     // 디버깅: 실제로 가져온 데이터 확인
     if (data.length > 0 && sheetName === '마스터재고') {
       console.log(`📋 [마스터재고 디버깅] 첫 번째 행 샘플 (헤더):`, data[0]?.slice(0, 5));
@@ -2429,7 +2429,7 @@ app.get('/api/stores', async (req, res) => {
         const businessNumber = (row[28] || '').toString().trim(); // AC열: 사업자번호 (28번째 컬럼)
         const managerName = (row[29] || '').toString().trim(); // AD열: 점장명 (29번째 컬럼)
         const accountInfo = (row[35] || '').toString().trim(); // AJ열: 계좌정보 (35번째 컬럼)
-        
+
         // 코드/사무실/소속/담당자 정보 추가 (필터링용)
         const code = (row[7] || '').toString().trim();        // H열(7인덱스): 코드
         const office = (row[3] || '').toString().trim();      // D열(3인덱스): 사무실
@@ -2565,7 +2565,7 @@ app.post('/api/map-display-option', async (req, res) => {
     );
 
     const values = response.data.values || [];
-    
+
     // 헤더 확인 및 추가
     if (values.length === 0 || !values[0] || values[0].length === 0 || values[0][0] !== '사용자ID') {
       // 헤더가 없으면 추가
@@ -2675,7 +2675,7 @@ app.post('/api/map-display-option/batch', async (req, res) => {
     );
 
     const values = response.data.values || [];
-    
+
     // 헤더 확인 및 추가
     if (values.length === 0 || !values[0] || values[0].length === 0 || values[0][0] !== '사용자ID') {
       // 헤더가 없으면 추가
@@ -2701,7 +2701,7 @@ app.post('/api/map-display-option/batch', async (req, res) => {
 
     settings.forEach(setting => {
       const { userId, mode, option, value } = setting;
-      
+
       if (!userId || !mode || !option) {
         return; // 필수 파라미터 누락 시 스킵
       }
@@ -2821,7 +2821,7 @@ app.get('/api/map-display-option/values', async (req, res) => {
           value = (row[5] || '').toString().trim(); // F열(5인덱스): 담당자
           break;
       }
-      
+
       if (value) {
         uniqueValues.add(value);
       }
@@ -2849,7 +2849,7 @@ app.get('/api/map-display-option/users', async (req, res) => {
     // 권한 체크: "M" 권한자만 조회 가능
     const userRole = (req.headers['x-user-role'] || '').toString().trim().toUpperCase();
     console.log('🔍 [지도옵션] 사용자 목록 조회 요청:', { userRole, userId: req.headers['x-user-id'] });
-    
+
     if (userRole !== 'M') {
       console.log('🔍 [지도옵션] 권한 없음:', userRole);
       return res.status(403).json({
@@ -2933,7 +2933,7 @@ app.get('/api/map-display-option/users', async (req, res) => {
     const agentUsersWithOptions = agentUsers.map(user => {
       const adminKey = `${user.userId}_관리자모드`;
       const generalKey = `${user.userId}_일반모드`;
-      
+
       return {
         ...user,
         type: 'agent',
@@ -2948,7 +2948,7 @@ app.get('/api/map-display-option/users', async (req, res) => {
     const generalUsersWithOptions = users.map(user => {
       const adminKey = `${user.userId}_관리자모드`;
       const generalKey = `${user.userId}_일반모드`;
-      
+
       return {
         ...user,
         type: 'general',
@@ -4530,7 +4530,7 @@ app.post('/api/member/login', async (req, res) => {
 // GET /api/member/queue/all: 모든 고객 구매 대기 목록 조회 (관리자용 또는 POS코드 필터링)
 app.get('/api/member/queue/all', async (req, res) => {
   const { posCode } = req.query; // POS코드 필터링 (직영점모드용)
-  
+
   try {
     const response = await rateLimitedSheetsCall(() =>
       sheets.spreadsheets.values.get({
@@ -4543,7 +4543,7 @@ app.get('/api/member/queue/all', async (req, res) => {
     if (values.length <= 1) return res.json([]);
 
     const rows = values.slice(1);
-    
+
     // POS코드 필터링이 필요한 경우, 폰클출고처데이터에서 매장명->POS코드 매핑 생성
     let storeNameToPosCodeMap = null;
     if (posCode) {
@@ -4571,7 +4571,7 @@ app.get('/api/member/queue/all', async (req, res) => {
         console.error('폰클출고처데이터 조회 오류:', err);
       }
     }
-    
+
     let filteredRows = rows;
     if (posCode && storeNameToPosCodeMap) {
       // 선택매장업체명(storeName)으로 POS코드를 찾아서 필터링
@@ -4581,7 +4581,7 @@ app.get('/api/member/queue/all', async (req, res) => {
         return itemPosCode === posCode;
       });
     }
-    
+
     const queue = filteredRows.map(row => ({
       id: row[0],
       ctn: row[1],
@@ -4879,7 +4879,7 @@ app.delete('/api/member/queue/:id', async (req, res) => {
 // GET /api/member/board: 게시판 목록 조회
 app.get('/api/member/board', async (req, res) => {
   const { storeName, posCode } = req.query; // 매장명 필터링 (직영점모드용)
-  
+
   try {
     // 시트 존재 확인 및 생성
     let response;
@@ -4947,7 +4947,7 @@ app.get('/api/member/board', async (req, res) => {
     if (values.length <= 1) return res.json([]);
 
     const rows = values.slice(1);
-    
+
     // POS코드 필터링이 필요한 경우, 폰클출고처데이터에서 매장명->POS코드 매핑 생성
     let storeNameToPosCodeMap = null;
     if (posCode) {
@@ -4981,20 +4981,20 @@ app.get('/api/member/board', async (req, res) => {
         // 삭제된 항목 제외
         const status = (row[11] || '').toString().trim();
         if (status === '삭제됨') return false;
-        
+
         // 매장명 필터링
         if (storeName) {
           const rowStoreName = (row[6] || '').toString().trim();
           return rowStoreName === storeName;
         }
-        
+
         // POS코드 필터링
         if (posCode && storeNameToPosCodeMap) {
           const rowStoreName = (row[6] || '').toString().trim();
           const itemPosCode = storeNameToPosCodeMap.get(rowStoreName);
           return itemPosCode === posCode;
         }
-        
+
         return true;
       })
       .map(row => ({
@@ -5025,7 +5025,7 @@ app.get('/api/member/board', async (req, res) => {
 // GET /api/member/board/:id: 게시판 상세 조회
 app.get('/api/member/board/:id', async (req, res) => {
   const { id } = req.params;
-  
+
   try {
     let response;
     try {
@@ -5045,7 +5045,7 @@ app.get('/api/member/board/:id', async (req, res) => {
 
     const values = response.data.values || [];
     const row = values.find(r => r[0] === id);
-    
+
     if (!row) {
       return res.status(404).json({ error: '게시글을 찾을 수 없습니다.' });
     }
@@ -5203,7 +5203,7 @@ app.put('/api/member/board/:id', async (req, res) => {
 
     const updatedRow = [...values[rowIndex]];
     const updatedAt = new Date().toISOString().replace('T', ' ').substring(0, 19);
-    
+
     // 매핑된 필드 업데이트
     if (data.category !== undefined) updatedRow[1] = data.category;
     if (data.title !== undefined) updatedRow[2] = data.title;
@@ -5279,7 +5279,7 @@ app.get('/api/direct/drive-monitoring', async (req, res) => {
   try {
     const days = parseInt(req.query.days) || 7; // 기본 7일
     const data = getDriveMonitoringData(days);
-    
+
     res.json({
       success: true,
       data: data
@@ -5425,14 +5425,14 @@ app.post('/api/direct/store-image', async (req, res) => {
     await ensureSheetHeaders(sheets, SPREADSHEET_ID, CUSTOMER_STORE_PHOTO_SHEET_NAME, HEADERS_STORE_PHOTO);
 
     const rowIndex = values ? values.findIndex(row => row[0] === storeName) : -1;
-    
+
     // 기존 행이 있으면 기존 Discord 정보 보존
     const existingRow = rowIndex !== -1 && values ? values[rowIndex] : null;
-    
+
     // 각 URL에 대응하는 Discord 정보 매핑 함수
     const getDiscordInfo = (urlType, url, providedDiscordInfo = null) => {
       if (!url) return ['', '', '']; // URL이 없으면 Discord 정보도 없음
-      
+
       // 프론트엔드에서 제공한 Discord 정보가 있으면 우선 사용 (업로드 직후 저장 시)
       if (providedDiscordInfo && providedDiscordInfo.messageId) {
         return [
@@ -5441,7 +5441,7 @@ app.post('/api/direct/store-image', async (req, res) => {
           providedDiscordInfo.threadId || ''
         ];
       }
-      
+
       // 기존 행에서 해당 URL 타입의 Discord 정보 찾기
       if (existingRow) {
         const urlIndexMap = {
@@ -5454,7 +5454,7 @@ app.post('/api/direct/store-image', async (req, res) => {
           staff2: { url: 25, msgId: 26, postId: 27, threadId: 28 },
           staff3: { url: 29, msgId: 30, postId: 31, threadId: 32 }
         };
-        
+
         const map = urlIndexMap[urlType];
         if (map && existingRow[map.url] === url) {
           // 기존 URL과 동일하면 Discord 정보 보존
@@ -5465,15 +5465,15 @@ app.post('/api/direct/store-image', async (req, res) => {
           ];
         }
       }
-      
+
       // 새 URL이거나 기존 URL과 다르면 Discord 정보 없음 (나중에 업로드 시 채워짐)
       return ['', '', ''];
     };
-    
+
     // 기존 행에서 대중교통 정보 보존 (있는 경우)
     const existingBusTerminals = existingRow && existingRow[34] ? existingRow[34] : '';
     const existingSubwayStations = existingRow && existingRow[35] ? existingRow[35] : '';
-    
+
     const newRow = [
       storeName,  // 0: 업체명
       data.frontUrl || '',  // 1: 전면사진URL
@@ -5565,7 +5565,7 @@ async function getSpreadsheetParentFolder() {
       fields: 'parents, driveId',
       supportsAllDrives: true
     });
-    
+
     // Google Sheets 파일은 항상 하나의 부모 폴더를 가짐
     if (sheetFile.data.parents && sheetFile.data.parents.length > 0) {
       return {
@@ -5592,9 +5592,9 @@ async function getOrCreateFolder(folderName, parentFolderId = null, driveId = nu
           fields: 'id, name, driveId',
           supportsAllDrives: true
         });
-        
+
         const folderDriveId = folderInfo.data.driveId || null;
-        
+
         // Shared Drive가 아닌 경우 경고
         if (!folderDriveId) {
           console.warn(`⚠️ [폴더 확인] "어플자료" 폴더가 개인 드라이브에 있습니다. Shared Drive에 있어야 Service Account가 저장할 수 있습니다.`);
@@ -5603,7 +5603,7 @@ async function getOrCreateFolder(folderName, parentFolderId = null, driveId = nu
         } else {
           console.log(`✅ [폴더 확인] "어플자료" 폴더 직접 사용: ${APP_DATA_FOLDER_ID}, Drive ID: ${folderDriveId} (Shared Drive)`);
         }
-        
+
         return {
           folderId: folderInfo.data.id,
           driveId: folderDriveId
@@ -5612,7 +5612,7 @@ async function getOrCreateFolder(folderName, parentFolderId = null, driveId = nu
         console.error(`❌ [폴더 확인] 지정된 "어플자료" 폴더 접근 실패:`, error.message);
         console.error(`❌ [폴더 확인] 폴더 ID: ${APP_DATA_FOLDER_ID}`);
         console.error(`❌ [폴더 확인] 에러 코드: ${error.code || 'N/A'}`);
-        
+
         if (error.code === 404) {
           console.error(`❌ [폴더 확인] 404 에러 - 폴더를 찾을 수 없습니다.`);
           console.error(`❌ [폴더 확인] 확인 사항:`);
@@ -5625,12 +5625,12 @@ async function getOrCreateFolder(folderName, parentFolderId = null, driveId = nu
           console.error(`❌ [폴더 확인] 403 에러 - 접근 권한이 없습니다.`);
           console.error(`❌ [폴더 확인] Service Account(${GOOGLE_SERVICE_ACCOUNT_EMAIL})를 폴더에 공유해주세요.`);
         }
-        
+
         console.warn(`⚠️ [폴더 확인] 검색으로 대체 시도...`);
         // 폴더 접근 실패 시 기존 로직으로 폴더 검색
       }
     }
-    
+
     // root 폴더인 경우 Google Sheets와 같은 폴더 사용
     // 단, "어플자료" 폴더는 이미 위에서 처리했으므로 스킵
     if (!parentFolderId && folderName !== '어플자료') {
@@ -5660,7 +5660,7 @@ async function getOrCreateFolder(folderName, parentFolderId = null, driveId = nu
     if (searchResponse.data.files && searchResponse.data.files.length > 0) {
       const foundFolder = searchResponse.data.files[0];
       const foundDriveId = foundFolder.driveId || null;
-      
+
       // "어플자료" 폴더인 경우 Shared Drive 확인
       if (folderName === '어플자료' && !foundDriveId) {
         console.warn(`⚠️ [폴더 확인] 검색으로 찾은 "어플자료" 폴더가 개인 드라이브에 있습니다.`);
@@ -5671,7 +5671,7 @@ async function getOrCreateFolder(folderName, parentFolderId = null, driveId = nu
         console.warn(`   2. 또는 Shared Drive에 새 "어플자료" 폴더를 만들고 Service Account와 공유`);
         console.warn(`   3. Service Account 이메일: ${GOOGLE_SERVICE_ACCOUNT_EMAIL}`);
       }
-      
+
       return {
         folderId: foundFolder.id,
         driveId: foundDriveId
@@ -5693,12 +5693,12 @@ async function getOrCreateFolder(folderName, parentFolderId = null, driveId = nu
       fields: 'id, name',
       supportsAllDrives: true
     };
-    
+
     // Shared Drive에 있는 경우 driveId 지정
     if (driveId) {
       createParams.requestBody.driveId = driveId;
     }
-    
+
     const folderResponse = await monitoredDriveCall('files.create', createParams);
 
     // 폴더를 공개로 설정 (선택사항 - 필요시 주석 해제)
@@ -5719,7 +5719,7 @@ async function getOrCreateFolder(folderName, parentFolderId = null, driveId = nu
 }
 
 // 매장 사진용 Discord 업로드 함수
-async function uploadStorePhotoToDiscord(imageBuffer, filename, storeName, photoType) {
+async function uploadStorePhotoToDiscord(imageBuffer, filename, storeName, photoType, existingThreadId = null) {
   if (!DISCORD_LOGGING_ENABLED || !discordBot) {
     throw new Error('Discord 봇이 초기화되지 않았습니다.');
   }
@@ -5750,42 +5750,58 @@ async function uploadStorePhotoToDiscord(imageBuffer, filename, storeName, photo
 
     // 매장명 포스트 찾기 또는 생성
     const postName = `${storeName} 매장`;
-    let storePost;
+    let storePost = null;
 
-    try {
-      // 활성 스레드에서 찾기
-      const activeThreads = await forumChannel.threads.fetchActive();
-      storePost = Array.from(activeThreads.threads.values()).find(
-        thread => thread.name === postName
-      );
-
-      if (!storePost) {
-        // 아카이브된 스레드에서 찾기
-        try {
-          const archivedThreads = await forumChannel.threads.fetchArchived({ limit: 100 });
-          storePost = Array.from(archivedThreads.threads.values()).find(
-            thread => thread.name === postName
-          );
-        } catch (archivedError) {
-          console.warn('아카이브된 스레드 조회 실패:', archivedError);
+    // 1. 기존 threadId가 있으면 직접 가져오기 (가장 빠름)
+    if (existingThreadId) {
+      try {
+        console.log(`🔍 [매장 사진 업로드] 기존 threadId 사용 시도: ${existingThreadId}`);
+        storePost = await forumChannel.threads.fetch(existingThreadId);
+        if (storePost) {
+          console.log(`✅ [매장 사진 업로드] 기존 threadId 수신 성공: ${storePost.name}`);
         }
+      } catch (fetchError) {
+        console.warn(`⚠️ [매장 사진 업로드] 기존 threadId 조회 실패 (ID: ${existingThreadId}):`, fetchError.message);
       }
+    }
 
-      if (!storePost) {
-        // 포스트 생성
-        console.log(`📌 [매장 사진 업로드] 새 포스트 생성: ${postName}`);
-        storePost = await forumChannel.threads.create({
-          name: postName,
-          message: {
-            content: `${storeName} 매장 사진 저장`
-          },
-          appliedTags: []
-        });
-        console.log(`✅ [매장 사진 업로드] 새 포스트 생성 완료: ${postName} (ID: ${storePost.id})`);
+    // 2. threadId가 없거나 가져오지 못한 경우 검색
+    if (!storePost) {
+      try {
+        // 활성 스레드에서 찾기
+        const activeThreads = await forumChannel.threads.fetchActive();
+        storePost = Array.from(activeThreads.threads.values()).find(
+          thread => thread.name === postName
+        );
+
+        if (!storePost) {
+          // 아카이브된 스레드에서 찾기
+          try {
+            const archivedThreads = await forumChannel.threads.fetchArchived({ limit: 100 });
+            storePost = Array.from(archivedThreads.threads.values()).find(
+              thread => thread.name === postName
+            );
+          } catch (archivedError) {
+            console.warn('아카이브된 스레드 조회 실패:', archivedError);
+          }
+        }
+
+        if (!storePost) {
+          // 포스트 생성
+          console.log(`📌 [매장 사진 업로드] 새 포스트 생성: ${postName}`);
+          storePost = await forumChannel.threads.create({
+            name: postName,
+            message: {
+              content: `${storeName} 매장 사진 저장`
+            },
+            appliedTags: []
+          });
+          console.log(`✅ [매장 사진 업로드] 새 포스트 생성 완료: ${postName} (ID: ${storePost.id})`);
+        }
+      } catch (postError) {
+        console.error('❌ [매장 사진 업로드] 매장 포스트 찾기/생성 실패:', postError);
+        throw postError;
       }
-    } catch (postError) {
-      console.error('❌ [매장 사진 업로드] 매장 포스트 찾기/생성 실패:', postError);
-      throw postError;
     }
 
     // 이미지 업로드
@@ -5810,7 +5826,7 @@ async function uploadStorePhotoToDiscord(imageBuffer, filename, storeName, photo
 // POST /api/direct/store-image/upload: 매장 사진 파일 업로드 (Discord)
 app.post('/api/direct/store-image/upload', storeImageUpload.single('image'), async (req, res) => {
   let localFilePath = null;
-  
+
   try {
     if (!req.file) {
       return res.status(400).json({ error: '이미지 파일이 없습니다.' });
@@ -5837,9 +5853,31 @@ app.post('/api/direct/store-image/upload', storeImageUpload.single('image'), asy
 
     // 파일 읽기
     const fileBuffer = fs.readFileSync(localFilePath);
-    
+
+    // Google Sheets에서 기존 정보 조회 (threadId 활용을 위해)
+    console.log(`🔍 [매장 사진 업로드] 기존 데이터 확인 중: ${storeName}`);
+    let existingThreadId = null;
+    try {
+      const values = await getSheetValues(CUSTOMER_STORE_PHOTO_SHEET_NAME);
+      const rowIndex = values ? values.findIndex(row => row[0] === storeName) : -1;
+      if (rowIndex !== -1 && values) {
+        const rowData = values[rowIndex];
+        // 모든 사진 타입의 threadId 중 하나라도 있으면 사용 (포럼 포스트는 매장당 하나)
+        // threadId 컬럼 인덱스: 4, 8, 12, 16, 20, 24, 28, 32
+        const threadIndices = [4, 8, 12, 16, 20, 24, 28, 32];
+        for (const idx of threadIndices) {
+          if (rowData[idx]) {
+            existingThreadId = rowData[idx];
+            break;
+          }
+        }
+      }
+    } catch (sheetError) {
+      console.warn('⚠️ [매장 사진 업로드] 기존 시트 데이터 조회 실패 (무시 가능):', sheetError.message);
+    }
+
     // Discord에 이미지 업로드
-    const discordResult = await uploadStorePhotoToDiscord(fileBuffer, fileName, storeName, photoType);
+    const discordResult = await uploadStorePhotoToDiscord(fileBuffer, fileName, storeName, photoType, existingThreadId);
     const fileUrl = discordResult.imageUrl;
 
     console.log(`✅ [매장 사진 업로드] Discord 업로드 성공: ${storeName} - ${photoType} - ${fileUrl}`);
@@ -5847,7 +5885,8 @@ app.post('/api/direct/store-image/upload', storeImageUpload.single('image'), asy
       messageId: discordResult.messageId,
       postId: discordResult.postId,
       threadId: discordResult.threadId,
-      imageUrl: discordResult.imageUrl
+      imageUrl: discordResult.imageUrl,
+      isNewThread: !existingThreadId && discordResult.threadId === discordResult.postId
     });
 
     // 로컬 파일 삭제
@@ -5862,14 +5901,14 @@ app.post('/api/direct/store-image/upload', storeImageUpload.single('image'), asy
     try {
       const values = await getSheetValues(CUSTOMER_STORE_PHOTO_SHEET_NAME);
       const updatedAt = new Date().toISOString().replace('T', ' ').substring(0, 19);
-      
+
       // 헤더 확인 및 생성
       const { ensureSheetHeaders } = require('./directRoutes');
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, CUSTOMER_STORE_PHOTO_SHEET_NAME, HEADERS_STORE_PHOTO);
 
       const rowIndex = values ? values.findIndex(row => row[0] === storeName) : -1;
       const existingRow = rowIndex !== -1 && values ? values[rowIndex] : null;
-      
+
       // photoType에 따른 컬럼 인덱스 매핑
       const photoTypeMap = {
         front: { url: 1, msgId: 2, postId: 3, threadId: 4 },
@@ -5881,7 +5920,7 @@ app.post('/api/direct/store-image/upload', storeImageUpload.single('image'), asy
         staff2: { url: 25, msgId: 26, postId: 27, threadId: 28 },
         staff3: { url: 29, msgId: 30, postId: 31, threadId: 32 }
       };
-      
+
       const photoMap = photoTypeMap[photoType];
       if (!photoMap) {
         console.warn(`⚠️ [매장 사진 업로드] 알 수 없는 photoType: ${photoType}`);
@@ -5894,7 +5933,7 @@ app.post('/api/direct/store-image/upload', storeImageUpload.single('image'), asy
           threadId: discordResult.threadId,
           rowIndex: rowIndex === -1 ? '새 행' : `기존 행 ${rowIndex + 1}`
         });
-        
+
         if (rowIndex === -1) {
           // 새 행 생성 (모든 컬럼 초기화)
           const newRow = new Array(34).fill('');
@@ -5904,7 +5943,7 @@ app.post('/api/direct/store-image/upload', storeImageUpload.single('image'), asy
           newRow[photoMap.postId] = discordResult.postId || '';
           newRow[photoMap.threadId] = discordResult.threadId || '';
           newRow[33] = updatedAt;
-          
+
           console.log(`📝 [매장 사진 업로드] 새 행 데이터:`, {
             storeName: newRow[0],
             url: newRow[photoMap.url],
@@ -5912,7 +5951,7 @@ app.post('/api/direct/store-image/upload', storeImageUpload.single('image'), asy
             postId: newRow[photoMap.postId],
             threadId: newRow[photoMap.threadId]
           });
-          
+
           await rateLimitedSheetsCall(() =>
             sheets.spreadsheets.values.append({
               spreadsheetId: SPREADSHEET_ID,
@@ -5930,27 +5969,27 @@ app.post('/api/direct/store-image/upload', storeImageUpload.single('image'), asy
           while (updatedRow.length < 36) {
             updatedRow.push('');
           }
-          
+
           console.log(`📝 [매장 사진 업로드] 기존 행 업데이트 전:`, {
             기존url: updatedRow[photoMap.url],
             기존msgId: updatedRow[photoMap.msgId],
             기존postId: updatedRow[photoMap.postId],
             기존threadId: updatedRow[photoMap.threadId]
           });
-          
+
           updatedRow[photoMap.url] = fileUrl;
           updatedRow[photoMap.msgId] = discordResult.messageId || '';
           updatedRow[photoMap.postId] = discordResult.postId || '';
           updatedRow[photoMap.threadId] = discordResult.threadId || '';
           updatedRow[33] = updatedAt;
-          
+
           console.log(`📝 [매장 사진 업로드] 기존 행 업데이트 후:`, {
             새url: updatedRow[photoMap.url],
             새msgId: updatedRow[photoMap.msgId],
             새postId: updatedRow[photoMap.postId],
             새threadId: updatedRow[photoMap.threadId]
           });
-          
+
           await rateLimitedSheetsCall(() =>
             sheets.spreadsheets.values.update({
               spreadsheetId: SPREADSHEET_ID,
@@ -5977,7 +6016,7 @@ app.post('/api/direct/store-image/upload', storeImageUpload.single('image'), asy
     });
   } catch (error) {
     console.error('❌ [매장 사진 업로드] Discord 업로드 오류:', error);
-    
+
     // 로컬 파일 삭제
     if (localFilePath && fs.existsSync(localFilePath)) {
       try {
@@ -5987,7 +6026,7 @@ app.post('/api/direct/store-image/upload', storeImageUpload.single('image'), asy
       }
     }
 
-    res.status(500).json({ 
+    res.status(500).json({
       error: '업로드에 실패했습니다: ' + (error.message || '알 수 없는 오류'),
       details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
@@ -7150,7 +7189,7 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
 
     // Discord에 이미지 업로드
     const fileBuffer = req.file.buffer;
-    
+
     if (!fileBuffer) {
       console.error('❌ [상품 이미지 업로드] 파일 버퍼가 없습니다.');
       return res.status(400).json({
@@ -7330,14 +7369,14 @@ app.post('/api/direct/upload-image', directStoreUpload.single('image'), async (r
             // Discord 정보는 P, Q, R 컬럼 (인덱스 15, 16, 17)
             const targetRowNumber = existingMasterRowIndex + 2; // 데이터 시작이 2행
             const existingMasterRow = masterRows[existingMasterRowIndex];
-            
+
             // 기존 행 데이터 가져오기 (이미지URL과 Discord 정보만 업데이트)
             const updatedRow = [...existingMasterRow];
             updatedRow[12] = imageUrl;  // M: 이미지URL
             updatedRow[15] = discordResult.messageId || '';  // P: Discord메시지ID
             updatedRow[16] = discordResult.postId || '';     // Q: Discord포스트ID
             updatedRow[17] = discordResult.threadId || '';   // R: Discord스레드ID
-            
+
             await rateLimitedSheetsCall(() =>
               sheets.spreadsheets.values.update({
                 spreadsheetId: SPREADSHEET_ID,
@@ -7489,30 +7528,30 @@ async function refreshDiscordImageUrl(threadId, messageId) {
   if (!DISCORD_LOGGING_ENABLED || !discordBot) {
     throw new Error('Discord 봇이 초기화되지 않았습니다.');
   }
-  
+
   if (!discordBot.isReady()) {
     throw new Error('Discord 봇이 준비되지 않았습니다.');
   }
-  
+
   if (!threadId || !messageId) {
     throw new Error('threadId와 messageId가 필요합니다.');
   }
-  
+
   const thread = await discordBot.channels.fetch(threadId);
   if (!thread) {
     throw new Error('해당 스레드를 찾을 수 없습니다.');
   }
-  
+
   const message = await thread.messages.fetch(messageId);
   if (!message) {
     throw new Error('해당 메시지를 찾을 수 없습니다.');
   }
-  
+
   const attachment = message.attachments.first();
   if (!attachment) {
     throw new Error('첨부파일을 찾을 수 없습니다.');
   }
-  
+
   return {
     imageUrl: attachment.url,
     messageId: message.id,
@@ -7525,7 +7564,7 @@ app.get('/api/discord/refresh-image-url', async (req, res) => {
   try {
     const { threadId, messageId } = req.query;
     const result = await refreshDiscordImageUrl(threadId, messageId);
-    
+
     return res.json({
       success: true,
       ...result
@@ -7543,64 +7582,64 @@ app.get('/api/discord/refresh-image-url', async (req, res) => {
 app.post('/api/direct/refresh-mobile-image-url', express.json(), async (req, res) => {
   try {
     const { carrier, modelId, modelName, threadId, messageId } = req.body;
-    
+
     if (!carrier || !modelId || !threadId || !messageId) {
       return res.status(400).json({
         success: false,
         error: 'carrier, modelId, threadId, messageId가 필요합니다.'
       });
     }
-    
+
     // Discord에서 최신 URL 가져오기
     const refreshResult = await refreshDiscordImageUrl(threadId, messageId);
     const newImageUrl = refreshResult.imageUrl;
-    
+
     // 직영점_모델이미지 시트에서 해당 행 찾기 및 업데이트
     const { HEADERS_MOBILE_IMAGES } = require('./directRoutes');
     const { ensureSheetHeaders } = require('./directRoutes');
     await ensureSheetHeaders(originalSheets, SPREADSHEET_ID, '직영점_모델이미지', HEADERS_MOBILE_IMAGES);
-    
+
     const imageResponse = await rateLimitedSheetsCall(() =>
       originalSheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
         range: '직영점_모델이미지!A:K'
       })
     );
-    
+
     const imageValues = imageResponse.data.values || [];
     const rows = imageValues.slice(1);
-    
+
     // 모델명 정규화 함수
     const normalizeModelCode = (code) => {
       if (!code) return '';
       return code.trim().replace(/\s+/g, '').replace(/-/g, '').toUpperCase();
     };
-    
+
     const normalizedModelId = normalizeModelCode(modelId);
     const normalizedModelName = normalizeModelCode(modelName);
-    
+
     const existingRowIndex = rows.findIndex(row => {
       const rowCarrier = (row[0] || '').trim();
       const rowModelId = (row[1] || '').trim();
       const rowModelName = (row[2] || '').trim();
-      
+
       if (rowCarrier !== carrier) return false;
-      
+
       const normalizedRowModelId = normalizeModelCode(rowModelId);
       const normalizedRowModelName = normalizeModelCode(rowModelName);
-      
+
       return (normalizedRowModelId === normalizedModelId || normalizedRowModelId === normalizedModelName ||
         normalizedRowModelName === normalizedModelId || normalizedRowModelName === normalizedModelName ||
         rowModelId === modelId || rowModelName === modelName);
     });
-    
+
     if (existingRowIndex === -1) {
       return res.status(404).json({
         success: false,
         error: '해당 모델을 찾을 수 없습니다.'
       });
     }
-    
+
     // 기존 행 업데이트 (이미지 URL만 갱신)
     const existingRow = rows[existingRowIndex];
     const updatedRow = [...existingRow];
@@ -7608,7 +7647,7 @@ app.post('/api/direct/refresh-mobile-image-url', express.json(), async (req, res
       updatedRow.push('');
     }
     updatedRow[5] = newImageUrl; // F: 이미지URL
-    
+
     await rateLimitedSheetsCall(() =>
       originalSheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
@@ -7617,9 +7656,9 @@ app.post('/api/direct/refresh-mobile-image-url', express.json(), async (req, res
         resource: { values: [updatedRow] }
       })
     );
-    
+
     console.log(`✅ [URL 갱신] 직영점_모델이미지 업데이트 완료: ${carrier} - ${modelId}`);
-    
+
     return res.json({
       success: true,
       imageUrl: newImageUrl,
@@ -7639,64 +7678,64 @@ app.post('/api/direct/refresh-mobile-image-url', express.json(), async (req, res
 app.post('/api/direct/refresh-master-image-url', express.json(), async (req, res) => {
   try {
     const { carrier, modelId, modelName, threadId, messageId } = req.body;
-    
+
     if (!carrier || !modelId || !threadId || !messageId) {
       return res.status(400).json({
         success: false,
         error: 'carrier, modelId, threadId, messageId가 필요합니다.'
       });
     }
-    
+
     // Discord에서 최신 URL 가져오기
     const refreshResult = await refreshDiscordImageUrl(threadId, messageId);
     const newImageUrl = refreshResult.imageUrl;
-    
+
     // 직영점_단말마스터 시트에서 해당 행 찾기 및 업데이트
     const { HEADERS_MOBILE_MASTER } = require('./directRoutes');
     const { ensureSheetHeaders } = require('./directRoutes');
     await ensureSheetHeaders(originalSheets, SPREADSHEET_ID, '직영점_단말마스터', HEADERS_MOBILE_MASTER);
-    
+
     const masterResponse = await rateLimitedSheetsCall(() =>
       originalSheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
         range: '직영점_단말마스터!A:R'
       })
     );
-    
+
     const masterValues = masterResponse.data.values || [];
     const masterRows = masterValues.slice(1);
-    
+
     // 모델명 정규화 함수
     const normalizeModelCode = (code) => {
       if (!code) return '';
       return code.trim().replace(/\s+/g, '').replace(/-/g, '').toUpperCase();
     };
-    
+
     const normalizedModelId = normalizeModelCode(modelId);
     const normalizedModelName = normalizeModelCode(modelName);
-    
+
     const existingRowIndex = masterRows.findIndex(row => {
       const rowCarrier = (row[0] || '').trim();
       const rowModelId = (row[1] || '').trim();
       const rowModelName = (row[2] || '').trim();
-      
+
       if (rowCarrier !== carrier) return false;
-      
+
       const normalizedRowModelId = normalizeModelCode(rowModelId);
       const normalizedRowModelName = normalizeModelCode(rowModelName);
-      
+
       return (normalizedRowModelId === normalizedModelId || normalizedRowModelId === normalizedModelName ||
         normalizedRowModelName === normalizedModelId || normalizedRowModelName === normalizedModelName ||
         rowModelId === modelId || rowModelName === modelName);
     });
-    
+
     if (existingRowIndex === -1) {
       return res.status(404).json({
         success: false,
         error: '해당 모델을 찾을 수 없습니다.'
       });
     }
-    
+
     // 기존 행 업데이트 (이미지 URL만 갱신)
     const existingRow = masterRows[existingRowIndex];
     const updatedRow = [...existingRow];
@@ -7704,7 +7743,7 @@ app.post('/api/direct/refresh-master-image-url', express.json(), async (req, res
       updatedRow.push('');
     }
     updatedRow[12] = newImageUrl; // M: 이미지URL
-    
+
     await rateLimitedSheetsCall(() =>
       originalSheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
@@ -7713,9 +7752,9 @@ app.post('/api/direct/refresh-master-image-url', express.json(), async (req, res
         resource: { values: [updatedRow] }
       })
     );
-    
+
     console.log(`✅ [URL 갱신] 직영점_단말마스터 업데이트 완료: ${carrier} - ${modelId}`);
-    
+
     return res.json({
       success: true,
       imageUrl: newImageUrl,
@@ -7735,32 +7774,32 @@ app.post('/api/direct/refresh-master-image-url', express.json(), async (req, res
 app.post('/api/direct/refresh-store-photo-url', express.json(), async (req, res) => {
   try {
     const { storeName, photoType, threadId, messageId } = req.body;
-    
+
     if (!storeName || !photoType || !threadId || !messageId) {
       return res.status(400).json({
         success: false,
         error: 'storeName, photoType, threadId, messageId가 필요합니다.'
       });
     }
-    
+
     // Discord에서 최신 URL 가져오기
     const refreshResult = await refreshDiscordImageUrl(threadId, messageId);
     const newImageUrl = refreshResult.imageUrl;
-    
+
     // 직영점_매장사진 시트에서 해당 행 찾기 및 업데이트
     const { ensureSheetHeaders } = require('./directRoutes');
     await ensureSheetHeaders(originalSheets, SPREADSHEET_ID, CUSTOMER_STORE_PHOTO_SHEET_NAME, HEADERS_STORE_PHOTO);
-    
+
     const values = await getSheetValues(CUSTOMER_STORE_PHOTO_SHEET_NAME);
     const rowIndex = values ? values.findIndex(row => row[0] === storeName) : -1;
-    
+
     if (rowIndex === -1) {
       return res.status(404).json({
         success: false,
         error: '해당 매장을 찾을 수 없습니다.'
       });
     }
-    
+
     // photoType에 따른 컬럼 인덱스 매핑
     const photoTypeMap = {
       front: { url: 1, msgId: 2, postId: 3, threadId: 4 },
@@ -7772,7 +7811,7 @@ app.post('/api/direct/refresh-store-photo-url', express.json(), async (req, res)
       staff2: { url: 25, msgId: 26, postId: 27, threadId: 28 },
       staff3: { url: 29, msgId: 30, postId: 31, threadId: 32 }
     };
-    
+
     const photoMap = photoTypeMap[photoType];
     if (!photoMap) {
       return res.status(400).json({
@@ -7780,7 +7819,7 @@ app.post('/api/direct/refresh-store-photo-url', express.json(), async (req, res)
         error: '알 수 없는 photoType입니다.'
       });
     }
-    
+
     // 기존 행 업데이트
     const existingRow = values[rowIndex];
     const updatedRow = [...existingRow];
@@ -7792,7 +7831,7 @@ app.post('/api/direct/refresh-store-photo-url', express.json(), async (req, res)
     updatedRow[photoMap.postId] = refreshResult.postId || '';
     updatedRow[photoMap.threadId] = refreshResult.threadId || '';
     updatedRow[33] = new Date().toISOString().replace('T', ' ').substring(0, 19);
-    
+
     await rateLimitedSheetsCall(() =>
       originalSheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
@@ -7801,9 +7840,9 @@ app.post('/api/direct/refresh-store-photo-url', express.json(), async (req, res)
         resource: { values: [updatedRow] }
       })
     );
-    
+
     console.log(`✅ [URL 갱신] 직영점_매장사진 업데이트 완료: ${storeName} - ${photoType}`);
-    
+
     return res.json({
       success: true,
       imageUrl: newImageUrl,
@@ -7826,7 +7865,7 @@ app.get('/api/discord/image-monitoring', async (req, res) => {
     const sheets = originalSheets;
     const { type, validate } = req.query; // 'direct' 또는 'meeting', validate: 'true'면 URL 유효성 검증 수행
     const shouldValidate = validate === 'true';
-    
+
     const monitoringData = {
       direct: {
         mobileImages: [],
@@ -7837,7 +7876,7 @@ app.get('/api/discord/image-monitoring', async (req, res) => {
         slides: []
       }
     };
-    
+
     // URL 유효성 검증 헬퍼 함수 (병렬 처리)
     async function validateImageUrls(items, maxConcurrent = 10) {
       if (!shouldValidate || items.length === 0) {
@@ -7865,20 +7904,20 @@ app.get('/api/discord/image-monitoring', async (req, res) => {
       }
       return results;
     }
-    
+
     if (!type || type === 'direct') {
       // 직영점_모델이미지 조회
       const { HEADERS_MOBILE_IMAGES } = require('./directRoutes');
       const { ensureSheetHeaders } = require('./directRoutes');
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, '직영점_모델이미지', HEADERS_MOBILE_IMAGES);
-      
+
       const imageResponse = await rateLimitedSheetsCall(() =>
         sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
           range: '직영점_모델이미지!A:K'
         })
       );
-      
+
       const imageRows = (imageResponse.data.values || []).slice(1);
       const mobileImages = imageRows
         .filter(row => {
@@ -7896,20 +7935,20 @@ app.get('/api/discord/image-monitoring', async (req, res) => {
           postId: (row[9] || '').trim(),
           threadId: (row[10] || '').trim()
         }));
-      
+
       monitoringData.direct.mobileImages = await validateImageUrls(mobileImages);
-      
+
       // 직영점_단말마스터 조회
       const { HEADERS_MOBILE_MASTER } = require('./directRoutes');
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, '직영점_단말마스터', HEADERS_MOBILE_MASTER);
-      
+
       const masterResponse = await rateLimitedSheetsCall(() =>
         sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
           range: '직영점_단말마스터!A:R'
         })
       );
-      
+
       const masterRows = (masterResponse.data.values || []).slice(1);
       const masterImages = masterRows
         .filter(row => {
@@ -7927,20 +7966,20 @@ app.get('/api/discord/image-monitoring', async (req, res) => {
           postId: (row[16] || '').trim(),
           threadId: (row[17] || '').trim()
         }));
-      
+
       monitoringData.direct.masterImages = await validateImageUrls(masterImages);
-      
+
       // 직영점_매장사진 조회
       const { ensureSheetHeaders: ensureHeaders } = require('./directRoutes');
       await ensureHeaders(sheets, SPREADSHEET_ID, CUSTOMER_STORE_PHOTO_SHEET_NAME, HEADERS_STORE_PHOTO);
-      
+
       const storePhotoResponse = await rateLimitedSheetsCall(() =>
         sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
           range: `${CUSTOMER_STORE_PHOTO_SHEET_NAME}!A:AH`
         })
       );
-      
+
       const storePhotoRows = (storePhotoResponse.data.values || []).slice(1);
       const photoTypes = ['front', 'inside', 'outside', 'outside2', 'manager', 'staff1', 'staff2', 'staff3'];
       const photoTypeMap = {
@@ -7953,7 +7992,7 @@ app.get('/api/discord/image-monitoring', async (req, res) => {
         staff2: { url: 25, msgId: 26, postId: 27, threadId: 28 },
         staff3: { url: 29, msgId: 30, postId: 31, threadId: 32 }
       };
-      
+
       const storePhotos = [];
       storePhotoRows.forEach(row => {
         const storeName = (row[0] || '').trim();
@@ -7973,10 +8012,10 @@ app.get('/api/discord/image-monitoring', async (req, res) => {
           }
         });
       });
-      
+
       monitoringData.direct.storePhotos = await validateImageUrls(storePhotos);
     }
-    
+
     if (!type || type === 'meeting') {
       // 회의목록 조회
       const meetingResponse = await rateLimitedSheetsCall(() =>
@@ -7985,7 +8024,7 @@ app.get('/api/discord/image-monitoring', async (req, res) => {
           range: '회의목록!A:W'
         })
       );
-      
+
       const meetingRows = (meetingResponse.data.values || []).slice(1);
       const slides = meetingRows
         .filter(row => {
@@ -8004,10 +8043,10 @@ app.get('/api/discord/image-monitoring', async (req, res) => {
           meetingDate: (row[18] || '').trim(),
           meetingNumber: (row[19] || '').trim()
         }));
-      
+
       monitoringData.meeting.slides = await validateImageUrls(slides);
     }
-    
+
     return res.json({
       success: true,
       data: monitoringData
@@ -8024,32 +8063,32 @@ app.get('/api/discord/image-monitoring', async (req, res) => {
 // 배치 갱신 로직을 재사용 가능한 함수로 분리
 async function processBatchRefreshItems(items) {
   const results = [];
-  
+
   // 배치 크기 제한: 한 번에 5개씩 처리 (Rate Limit 고려)
   const BATCH_SIZE = 5;
   const ITEM_DELAY_MS = 2000; // 항목 간 지연 (2초) - API 호출 간격 고려
   const BATCH_DELAY_MS = 5000; // 배치 간 지연 (5초) - Rate Limit 회복 시간 고려
-  
+
   // 전체 항목을 배치로 나누기
   for (let i = 0; i < items.length; i += BATCH_SIZE) {
     const batch = items.slice(i, i + BATCH_SIZE);
     const batchNumber = Math.floor(i / BATCH_SIZE) + 1;
     const totalBatches = Math.ceil(items.length / BATCH_SIZE);
-    
+
     console.log(`🔄 [배치 갱신] 배치 ${batchNumber}/${totalBatches} 처리 시작 (${batch.length}개 항목)`);
-    
+
     // 배치 내 항목 처리
     for (let j = 0; j < batch.length; j++) {
       const item = batch[j];
-      
+
       // 첫 번째 항목이 아니면 지연 추가
       if (j > 0) {
         await new Promise(resolve => setTimeout(resolve, ITEM_DELAY_MS));
       }
-      
+
       try {
         const { type, threadId, messageId } = item;
-        
+
         if (!type || !threadId || !messageId) {
           results.push({
             success: false,
@@ -8058,7 +8097,7 @@ async function processBatchRefreshItems(items) {
           });
           continue;
         }
-        
+
         // threadId와 messageId가 유효한 snowflake 형식인지 검증
         if (!isValidSnowflake(threadId) || !isValidSnowflake(messageId)) {
           console.warn(`⚠️ [배치 갱신] 잘못된 Discord ID 형식: threadId=${threadId}, messageId=${messageId}, type=${type}`);
@@ -8070,7 +8109,7 @@ async function processBatchRefreshItems(items) {
           });
           continue;
         }
-        
+
         // 타입에 따라 직접 로직 호출 (내부 fetch 대신)
         if (type === 'mobile-image') {
           const { carrier, modelId, modelName } = item;
@@ -8078,50 +8117,50 @@ async function processBatchRefreshItems(items) {
             // Discord에서 최신 URL 가져오기
             const refreshResult = await refreshDiscordImageUrl(threadId, messageId);
             const newImageUrl = refreshResult.imageUrl;
-            
+
             // 직영점_모델이미지 시트에서 해당 행 찾기 및 업데이트
             const { HEADERS_MOBILE_IMAGES } = require('./directRoutes');
             const { ensureSheetHeaders } = require('./directRoutes');
             await ensureSheetHeaders(originalSheets, SPREADSHEET_ID, '직영점_모델이미지', HEADERS_MOBILE_IMAGES);
-            
+
             const imageResponse = await rateLimitedSheetsCall(() =>
               originalSheets.spreadsheets.values.get({
                 spreadsheetId: SPREADSHEET_ID,
                 range: '직영점_모델이미지!A:K'
               })
             );
-            
+
             const imageValues = imageResponse.data.values || [];
             const rows = imageValues.slice(1);
-            
+
             // 모델명 정규화 함수
             const normalizeModelCode = (code) => {
               if (!code) return '';
               return code.trim().replace(/\s+/g, '').replace(/-/g, '').toUpperCase();
             };
-            
+
             const normalizedModelId = normalizeModelCode(modelId);
             const normalizedModelName = normalizeModelCode(modelName);
-            
+
             const existingRowIndex = rows.findIndex(row => {
               const rowCarrier = (row[0] || '').trim();
               const rowModelId = (row[1] || '').trim();
               const rowModelName = (row[2] || '').trim();
-              
+
               if (rowCarrier !== carrier) return false;
-              
+
               const normalizedRowModelId = normalizeModelCode(rowModelId);
               const normalizedRowModelName = normalizeModelCode(rowModelName);
-              
+
               return (normalizedRowModelId === normalizedModelId || normalizedRowModelId === normalizedModelName ||
                 normalizedRowModelName === normalizedModelId || normalizedRowModelName === normalizedModelName ||
                 rowModelId === modelId || rowModelName === modelName);
             });
-            
+
             if (existingRowIndex === -1) {
               throw new Error('해당 모델을 찾을 수 없습니다.');
             }
-            
+
             // 기존 행 업데이트 (이미지 URL만 갱신)
             const existingRow = rows[existingRowIndex];
             const updatedRow = [...existingRow];
@@ -8129,7 +8168,7 @@ async function processBatchRefreshItems(items) {
               updatedRow.push('');
             }
             updatedRow[5] = newImageUrl; // F: 이미지URL
-            
+
             await rateLimitedSheetsCall(() =>
               originalSheets.spreadsheets.values.update({
                 spreadsheetId: SPREADSHEET_ID,
@@ -8138,9 +8177,9 @@ async function processBatchRefreshItems(items) {
                 resource: { values: [updatedRow] }
               })
             );
-            
+
             console.log(`✅ [배치 갱신] 직영점_모델이미지 업데이트 완료: ${carrier} - ${modelId}`);
-            
+
             results.push({
               success: true,
               imageUrl: newImageUrl,
@@ -8164,50 +8203,50 @@ async function processBatchRefreshItems(items) {
             // Discord에서 최신 URL 가져오기
             const refreshResult = await refreshDiscordImageUrl(threadId, messageId);
             const newImageUrl = refreshResult.imageUrl;
-            
+
             // 직영점_단말마스터 시트에서 해당 행 찾기 및 업데이트
             const { HEADERS_MOBILE_MASTER } = require('./directRoutes');
             const { ensureSheetHeaders } = require('./directRoutes');
             await ensureSheetHeaders(originalSheets, SPREADSHEET_ID, '직영점_단말마스터', HEADERS_MOBILE_MASTER);
-            
+
             const masterResponse = await rateLimitedSheetsCall(() =>
               originalSheets.spreadsheets.values.get({
                 spreadsheetId: SPREADSHEET_ID,
                 range: '직영점_단말마스터!A:R'
               })
             );
-            
+
             const masterValues = masterResponse.data.values || [];
             const masterRows = masterValues.slice(1);
-            
+
             // 모델명 정규화 함수
             const normalizeModelCode = (code) => {
               if (!code) return '';
               return code.trim().replace(/\s+/g, '').replace(/-/g, '').toUpperCase();
             };
-            
+
             const normalizedModelId = normalizeModelCode(modelId);
             const normalizedModelName = normalizeModelCode(modelName);
-            
+
             const existingRowIndex = masterRows.findIndex(row => {
               const rowCarrier = (row[0] || '').trim();
               const rowModelId = (row[1] || '').trim();
               const rowModelName = (row[2] || '').trim();
-              
+
               if (rowCarrier !== carrier) return false;
-              
+
               const normalizedRowModelId = normalizeModelCode(rowModelId);
               const normalizedRowModelName = normalizeModelCode(rowModelName);
-              
+
               return (normalizedRowModelId === normalizedModelId || normalizedRowModelId === normalizedModelName ||
                 normalizedRowModelName === normalizedModelId || normalizedRowModelName === normalizedModelName ||
                 rowModelId === modelId || rowModelName === modelName);
             });
-            
+
             if (existingRowIndex === -1) {
               throw new Error('해당 모델을 찾을 수 없습니다.');
             }
-            
+
             // 기존 행 업데이트 (이미지 URL만 갱신)
             const existingRow = masterRows[existingRowIndex];
             const updatedRow = [...existingRow];
@@ -8215,7 +8254,7 @@ async function processBatchRefreshItems(items) {
               updatedRow.push('');
             }
             updatedRow[12] = newImageUrl; // M: 이미지URL
-            
+
             await rateLimitedSheetsCall(() =>
               originalSheets.spreadsheets.values.update({
                 spreadsheetId: SPREADSHEET_ID,
@@ -8224,9 +8263,9 @@ async function processBatchRefreshItems(items) {
                 resource: { values: [updatedRow] }
               })
             );
-            
+
             console.log(`✅ [배치 갱신] 직영점_단말마스터 업데이트 완료: ${carrier} - ${modelId}`);
-            
+
             results.push({
               success: true,
               imageUrl: newImageUrl,
@@ -8250,18 +8289,18 @@ async function processBatchRefreshItems(items) {
             // Discord에서 최신 URL 가져오기
             const refreshResult = await refreshDiscordImageUrl(threadId, messageId);
             const newImageUrl = refreshResult.imageUrl;
-            
+
             // 직영점_매장사진 시트에서 해당 행 찾기 및 업데이트
             const { ensureSheetHeaders } = require('./directRoutes');
             await ensureSheetHeaders(originalSheets, SPREADSHEET_ID, CUSTOMER_STORE_PHOTO_SHEET_NAME, HEADERS_STORE_PHOTO);
-            
+
             const values = await getSheetValues(CUSTOMER_STORE_PHOTO_SHEET_NAME);
             const rowIndex = values ? values.findIndex(row => row[0] === storeName) : -1;
-            
+
             if (rowIndex === -1) {
               throw new Error('해당 매장을 찾을 수 없습니다.');
             }
-            
+
             // photoType에 따른 컬럼 인덱스 매핑
             const photoTypeMap = {
               front: { url: 1, msgId: 2, postId: 3, threadId: 4 },
@@ -8273,12 +8312,12 @@ async function processBatchRefreshItems(items) {
               staff2: { url: 25, msgId: 26, postId: 27, threadId: 28 },
               staff3: { url: 29, msgId: 30, postId: 31, threadId: 32 }
             };
-            
+
             const photoMap = photoTypeMap[photoType];
             if (!photoMap) {
               throw new Error('알 수 없는 photoType입니다.');
             }
-            
+
             // 기존 행 업데이트
             const existingRow = values[rowIndex];
             const updatedRow = [...existingRow];
@@ -8290,7 +8329,7 @@ async function processBatchRefreshItems(items) {
             updatedRow[photoMap.postId] = refreshResult.postId || '';
             updatedRow[photoMap.threadId] = refreshResult.threadId || '';
             updatedRow[33] = new Date().toISOString().replace('T', ' ').substring(0, 19);
-            
+
             await rateLimitedSheetsCall(() =>
               originalSheets.spreadsheets.values.update({
                 spreadsheetId: SPREADSHEET_ID,
@@ -8299,9 +8338,9 @@ async function processBatchRefreshItems(items) {
                 resource: { values: [updatedRow] }
               })
             );
-            
+
             console.log(`✅ [배치 갱신] 직영점_매장사진 업데이트 완료: ${storeName} - ${photoType}`);
-            
+
             results.push({
               success: true,
               imageUrl: newImageUrl,
@@ -8331,12 +8370,12 @@ async function processBatchRefreshItems(items) {
             });
             continue;
           }
-          
+
           try {
             // Discord에서 최신 URL 가져오기
             const refreshResult = await refreshDiscordImageUrl(threadId, messageId);
             const newImageUrl = refreshResult.imageUrl;
-            
+
             // 회의목록 시트에서 해당 슬라이드 찾기 및 업데이트
             // ensureSheetHeaders는 directRoutes에 있지만, meetingRoutes에도 있을 수 있음
             // 일단 직접 시트를 읽어서 확인
@@ -8346,13 +8385,13 @@ async function processBatchRefreshItems(items) {
                 range: '회의목록!A:W'
               })
             );
-            
+
             const meetingRows = (meetingResponse.data.values || []).slice(1);
-            const rowIndex = meetingRows.findIndex(row => 
-              (row[0] || '').trim() === meetingId && 
+            const rowIndex = meetingRows.findIndex(row =>
+              (row[0] || '').trim() === meetingId &&
               (row[1] || '').trim() === slideId
             );
-            
+
             if (rowIndex === -1) {
               results.push({
                 success: false,
@@ -8362,7 +8401,7 @@ async function processBatchRefreshItems(items) {
               });
               continue;
             }
-            
+
             // 기존 행 업데이트 (이미지 URL만 갱신)
             const existingRow = meetingRows[rowIndex];
             const updatedRow = [...existingRow];
@@ -8373,18 +8412,18 @@ async function processBatchRefreshItems(items) {
             updatedRow[14] = refreshResult.messageId || ''; // O: Discord메시지ID
             updatedRow[13] = refreshResult.threadId || ''; // N: Discord스레드ID
             updatedRow[12] = refreshResult.postId || refreshResult.threadId || ''; // M: Discord포스트ID
-          
-          await rateLimitedSheetsCall(() =>
-            originalSheets.spreadsheets.values.update({
-              spreadsheetId: SPREADSHEET_ID,
-              range: `회의목록!A${rowIndex + 2}:W${rowIndex + 2}`,
-              valueInputOption: 'USER_ENTERED',
-              resource: { values: [updatedRow] }
-            })
-          );
-          
+
+            await rateLimitedSheetsCall(() =>
+              originalSheets.spreadsheets.values.update({
+                spreadsheetId: SPREADSHEET_ID,
+                range: `회의목록!A${rowIndex + 2}:W${rowIndex + 2}`,
+                valueInputOption: 'USER_ENTERED',
+                resource: { values: [updatedRow] }
+              })
+            );
+
             console.log(`✅ [URL 갱신] 회의 슬라이드 업데이트 완료: ${meetingId} - ${slideId}`);
-            
+
             results.push({
               success: true,
               imageUrl: newImageUrl,
@@ -8418,7 +8457,7 @@ async function processBatchRefreshItems(items) {
         });
       }
     }
-    
+
     // 배치 간 지연 (마지막 배치가 아니면)
     if (i + BATCH_SIZE < items.length) {
       console.log(`⏳ [배치 갱신] 배치 ${batchNumber} 완료, ${BATCH_DELAY_MS}ms 대기 후 다음 배치 진행...`);
@@ -8427,7 +8466,7 @@ async function processBatchRefreshItems(items) {
       console.log(`✅ [배치 갱신] 배치 ${batchNumber} 완료 (마지막 배치)`);
     }
   }
-  
+
   return results;
 }
 
@@ -8435,18 +8474,18 @@ async function processBatchRefreshItems(items) {
 app.post('/api/discord/batch-refresh-urls', express.json(), async (req, res) => {
   try {
     const { items } = req.body; // [{ type, ...params }]
-    
+
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({
         success: false,
         error: 'items 배열이 필요합니다.'
       });
     }
-    
+
     const results = await processBatchRefreshItems(items);
     const successCount = results.filter(r => r.success).length;
     const failCount = results.length - successCount;
-    
+
     return res.json({
       success: true,
       total: results.length,
@@ -15319,12 +15358,12 @@ server.on('listening', async () => {
 
     // ===== 자동 스케줄 기능 초기화 =====
     console.log('⏰ [스케줄러] 자동 스케줄 기능 초기화 시작...');
-    
+
     // Discord 모니터링 자동 갱신 함수
     async function refreshAllDiscordImages() {
       try {
         console.log('🔄 [스케줄러] Discord 이미지 자동 갱신 시작...');
-        
+
         // 모니터링 데이터 직접 조회 (내부 함수 호출)
         const sheets = originalSheets;
         const monitoringData = {
@@ -15334,22 +15373,22 @@ server.on('listening', async () => {
             storePhotos: []
           }
         };
-        
+
         try {
           // 직영점_모델이미지 조회
           const { HEADERS_MOBILE_IMAGES } = require('./directRoutes');
           const { ensureSheetHeaders } = require('./directRoutes');
           await ensureSheetHeaders(sheets, SPREADSHEET_ID, '직영점_모델이미지', HEADERS_MOBILE_IMAGES);
-          
+
           const imageResponse = await rateLimitedSheetsCall(() =>
             sheets.spreadsheets.values.get({
               spreadsheetId: SPREADSHEET_ID,
               range: '직영점_모델이미지!A:K'
             })
           );
-          
+
           const imageRows = (imageResponse.data.values || []).slice(1);
-          
+
           monitoringData.direct.mobileImages = imageRows
             .filter(row => {
               const messageId = (row[8] || '').trim();
@@ -15367,20 +15406,20 @@ server.on('listening', async () => {
               postId: (row[9] || '').trim(),
               threadId: (row[10] || '').trim()
             }));
-          
+
           // 직영점_단말마스터 조회
           const { HEADERS_MOBILE_MASTER } = require('./directRoutes');
           await ensureSheetHeaders(sheets, SPREADSHEET_ID, '직영점_단말마스터', HEADERS_MOBILE_MASTER);
-          
+
           const masterResponse = await rateLimitedSheetsCall(() =>
             sheets.spreadsheets.values.get({
               spreadsheetId: SPREADSHEET_ID,
               range: '직영점_단말마스터!A:R'
             })
           );
-          
+
           const masterRows = (masterResponse.data.values || []).slice(1);
-          
+
           monitoringData.direct.masterImages = masterRows
             .filter(row => {
               const messageId = (row[15] || '').trim();
@@ -15398,18 +15437,18 @@ server.on('listening', async () => {
               postId: (row[16] || '').trim(),
               threadId: (row[17] || '').trim()
             }));
-          
+
           // 직영점_매장사진 조회
           const { ensureSheetHeaders: ensureHeaders } = require('./directRoutes');
           await ensureHeaders(sheets, SPREADSHEET_ID, CUSTOMER_STORE_PHOTO_SHEET_NAME, HEADERS_STORE_PHOTO);
-          
+
           const storePhotoResponse = await rateLimitedSheetsCall(() =>
             sheets.spreadsheets.values.get({
               spreadsheetId: SPREADSHEET_ID,
               range: `${CUSTOMER_STORE_PHOTO_SHEET_NAME}!A:AH`
             })
           );
-          
+
           const storePhotoRows = (storePhotoResponse.data.values || []).slice(1);
           const photoTypes = ['front', 'inside', 'outside', 'outside2', 'manager', 'staff1', 'staff2', 'staff3'];
           const photoTypeMap = {
@@ -15422,7 +15461,7 @@ server.on('listening', async () => {
             staff2: { url: 25, msgId: 26, postId: 27, threadId: 28 },
             staff3: { url: 29, msgId: 30, postId: 31, threadId: 32 }
           };
-          
+
           storePhotoRows.forEach(row => {
             const storeName = (row[0] || '').trim();
             photoTypes.forEach(photoType => {
@@ -15446,19 +15485,19 @@ server.on('listening', async () => {
           console.error('❌ [스케줄러] 모니터링 데이터 조회 오류:', err);
           return;
         }
-        
+
         // 모든 이미지 항목 수집
         const allItems = [
           ...monitoringData.direct.mobileImages.map(item => ({ type: 'mobile-image', ...item })),
           ...monitoringData.direct.masterImages.map(item => ({ type: 'master-image', ...item })),
           ...monitoringData.direct.storePhotos.map(item => ({ type: 'store-photo', ...item }))
         ];
-        
+
         if (allItems.length === 0) {
           console.log('ℹ️ [스케줄러] 갱신할 Discord 이미지가 없습니다.');
           return;
         }
-        
+
         // 스마트 갱신: 만료된 URL만 필터링
         console.log(`🔍 [스케줄러] ${allItems.length}개 이미지 URL 유효성 검증 중...`);
         const itemsToValidate = allItems.filter(item => item.imageUrl);
@@ -15468,22 +15507,22 @@ server.on('listening', async () => {
             return { ...item, urlValid: validation.valid, urlStatus: validation.status };
           })
         );
-        
+
         // 만료되었거나 오류가 있는 항목만 갱신
-        const expiredItems = validationResults.filter(item => 
+        const expiredItems = validationResults.filter(item =>
           !item.urlValid || item.urlStatus === 'expired' || item.urlStatus === 'error' || item.urlStatus === 'timeout'
         );
-        
+
         if (expiredItems.length === 0) {
           console.log('✅ [스케줄러] 모든 Discord 이미지 URL이 정상입니다. 갱신할 항목이 없습니다.');
           return;
         }
-        
+
         console.log(`🔄 [스케줄러] ${expiredItems.length}개 만료/오류 이미지 갱신 시작 (전체 ${allItems.length}개 중)...`);
-        
+
         // 배치 갱신 실행 (재사용 가능한 함수 호출)
         const results = await processBatchRefreshItems(expiredItems);
-        
+
         const successCount = results.filter(r => r.success).length;
         const failCount = results.length - successCount;
         console.log(`✅ [스케줄러] Discord 이미지 자동 갱신 완료: 성공 ${successCount}개, 실패 ${failCount}개`);
@@ -15491,7 +15530,7 @@ server.on('listening', async () => {
         console.error('❌ [스케줄러] Discord 이미지 자동 갱신 오류:', error);
       }
     }
-    
+
     // 재시도 헬퍼 함수 (지수 백오프)
     async function retryWithBackoff(fn, maxRetries = 3, baseDelayMs = 1000) {
       let lastError;
@@ -15509,12 +15548,12 @@ server.on('listening', async () => {
       }
       throw lastError;
     }
-    
+
     // 데이터 재빌드 실행 상태 관리
     let isRebuilding = false;
     let rebuildStartTime = null;
     const MAX_REBUILD_DURATION_MS = 30 * 60 * 1000; // 30분 최대 실행 시간
-    
+
     // 데이터 재빌드 함수
     async function rebuildMasterData() {
       // 이미 재빌드가 진행 중이면 건너뛰기
@@ -15529,17 +15568,17 @@ server.on('listening', async () => {
           return;
         }
       }
-      
+
       isRebuilding = true;
       rebuildStartTime = Date.now();
       const startTime = Date.now();
-      
+
       try {
         console.log('🔄 [스케줄러] 데이터 재빌드 시작...');
-        
+
         const { rebuildPlanMaster, rebuildDeviceMaster, rebuildPricingMaster, invalidateDirectStoreCache } = require('./directRoutes');
         const carriers = ['SK', 'KT', 'LG'];
-        
+
         // 1. 요금제 마스터 리빌드 (재시도 포함)
         console.log(`[스케줄러] Rebuilding Plan Master for ${carriers.join(',')}`);
         const planResult = await retryWithBackoff(
@@ -15548,7 +15587,7 @@ server.on('listening', async () => {
           2000
         );
         console.log(`[스케줄러] Plan Master 완료: ${planResult?.totalCount || 0}개`);
-        
+
         // 2. 단말 마스터 리빌드 (재시도 포함)
         console.log(`[스케줄러] Rebuilding Device Master for ${carriers.join(',')}`);
         const deviceResult = await retryWithBackoff(
@@ -15557,7 +15596,7 @@ server.on('listening', async () => {
           2000
         );
         console.log(`[스케줄러] Device Master 완료: ${deviceResult?.totalCount || 0}개`);
-        
+
         // 3. 단말 요금정책 리빌드 (재시도 포함)
         console.log(`[스케줄러] Rebuilding Pricing Master for ${carriers.join(',')}`);
         const pricingResult = await retryWithBackoff(
@@ -15566,13 +15605,13 @@ server.on('listening', async () => {
           2000
         );
         console.log(`[스케줄러] Pricing Master 완료: ${pricingResult?.totalCount || 0}개`);
-        
+
         // 4. 재빌드 완료 후 모든 관련 캐시 무효화
         console.log(`[스케줄러] Invalidating all related caches after rebuild`);
         if (typeof invalidateDirectStoreCache === 'function') {
           invalidateDirectStoreCache();
         }
-        
+
         const elapsed = Date.now() - startTime;
         console.log(`✅ [스케줄러] 데이터 재빌드 완료 (소요 시간: ${Math.floor(elapsed / 1000)}초)`);
       } catch (error) {
@@ -15585,22 +15624,22 @@ server.on('listening', async () => {
         rebuildStartTime = null;
       }
     }
-    
+
     // 서버 시작 시 실행
     console.log('🚀 [스케줄러] 서버 시작 시 자동 실행 시작...');
-    
+
     // 데이터 재빌드 (서버 시작 시 1회) - 리소스 부담 감소를 위해 15분 후 실행
     setTimeout(async () => {
       console.log('🔄 [스케줄러] 서버 시작 시 데이터 재빌드 실행 (지연 실행)');
       await rebuildMasterData();
     }, 900000); // 15분 후 실행 (서버 초기화 및 다른 작업 완료 대기)
-    
+
     // Discord 모니터링 자동 갱신 (서버 시작 시 1회) - 리소스 부담 감소를 위해 30분 후 실행
     setTimeout(async () => {
       console.log('🔄 [스케줄러] 서버 시작 시 Discord 이미지 자동 갱신 실행 (지연 실행)');
       await refreshAllDiscordImages();
     }, 1800000); // 30분 후 실행 (데이터 재빌드 완료 후 충분한 시간 대기)
-    
+
     // Discord 모니터링 자동 갱신 스케줄 등록
     // 매일 03:30, 07:30, 11:30, 17:30, 20:30, 23:30
     const imageRefreshSchedules = [
@@ -15611,7 +15650,7 @@ server.on('listening', async () => {
       { time: '20:30', cron: '30 20 * * *' },
       { time: '23:30', cron: '30 23 * * *' }
     ];
-    
+
     imageRefreshSchedules.forEach(({ time, cron: cronExpr }) => {
       cron.schedule(cronExpr, async () => {
         console.log(`⏰ [스케줄러] 정기 스케줄 실행: Discord 이미지 자동 갱신 (${time})`);
@@ -15621,7 +15660,7 @@ server.on('listening', async () => {
         timezone: 'Asia/Seoul'
       });
     });
-    
+
     // 데이터 재빌드 스케줄 등록
     // 매일 11:00-19:00 매시간 10분 (11:10, 12:10, 13:10, ..., 19:10)
     for (let hour = 11; hour <= 19; hour++) {
@@ -15633,7 +15672,7 @@ server.on('listening', async () => {
         timezone: 'Asia/Seoul'
       });
     }
-    
+
     console.log('✅ [스케줄러] 자동 스케줄 기능 초기화 완료');
     console.log('   - Discord 이미지 자동 갱신: 서버 시작 시, 매일 03:30, 07:30, 11:30, 17:30, 20:30, 23:30');
     console.log('   - 데이터 재빌드: 서버 시작 시, 매일 11:10-19:10 매시간');
@@ -27986,11 +28025,11 @@ app.get('/api/policies', async (req, res) => {
 app.get('/api/policies/shoe-counting', async (req, res) => {
   try {
     const { yearMonth, policyType, manager } = req.query;
-    
+
     if (!yearMonth || !policyType) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'yearMonth와 policyType이 필요합니다.' 
+      return res.status(400).json({
+        success: false,
+        error: 'yearMonth와 policyType이 필요합니다.'
       });
     }
 
@@ -28005,67 +28044,67 @@ app.get('/api/policies/shoe-counting', async (req, res) => {
 
     // 정책유형 필터링 (무선/유선)
     const policyTypeLabel = policyType === 'wireless' ? '무선' : '유선';
-    
+
     // 구두정책만 필터링 (wireless_shoe 또는 wired_shoe)
     const shoeCategory = policyType === 'wireless' ? 'wireless_shoe' : 'wired_shoe';
-    
+
     // 필터링된 구두정책들
     const shoePolicies = dataRows.filter(row => {
       if (row.length < 29) return false; // 최소 컬럼 수 확인
-      
+
       const policyYearMonth = row[23] || ''; // X열: 대상년월
       const policyTypeData = row[6]; // G열: 정책유형
       const subCategory = row[8]; // I열: 하위카테고리
       const managerName = row[49] || ''; // AX열: 담당자명
-      
+
       // 년월 필터
       if (policyYearMonth !== yearMonth) return false;
-      
+
       // 정책유형 필터
       if (policyTypeData !== policyTypeLabel) return false;
-      
+
       // 구두정책 카테고리 필터
       if (subCategory !== shoeCategory) return false;
-      
+
       // 담당자 필터 (manager가 제공된 경우)
       if (manager && manager !== '전체' && managerName !== manager) return false;
-      
+
       // 취소되지 않은 정책만
       const policyStatus = row[15] || '활성'; // P열: 정책상태
       if (policyStatus === '취소됨') return false;
-      
+
       return true;
     });
 
     // 담당자별로 그룹화
     const managerGroups = new Map();
-    
+
     shoePolicies.forEach(row => {
       const managerName = row[49] || '미지정'; // AX열: 담당자명
       const storeName = row[25] || ''; // Z열: 업체명
       const amount95Above = row[27] || ''; // AB열: 95군이상금액
       const amount95Below = row[28] || ''; // AC열: 95군미만금액
-      
+
       // 업체명이 없으면 스킵
       if (!storeName || !storeName.trim()) return;
-      
+
       if (!managerGroups.has(managerName)) {
         managerGroups.set(managerName, new Map());
       }
-      
+
       const managerMap = managerGroups.get(managerName);
-      
+
       // 금액 조합 키 생성 (95군이상:값/95군미만:값) - 만원 단위로 변환
       const aboveValue = amount95Above ? Number(amount95Above) : null;
       const belowValue = amount95Below ? Number(amount95Below) : null;
-      
+
       // 만원 단위로 변환 (30000원 → 3만원, 20000원 → 2만원)
       const aboveValueManwon = aboveValue !== null ? Math.round(aboveValue / 10000) : null;
       const belowValueManwon = belowValue !== null ? Math.round(belowValue / 10000) : null;
-      
+
       // 키 생성: (95군이상:3만원/95군미만:2만원) 형식
       const key = `(95군이상:${aboveValueManwon !== null ? aboveValueManwon + '만원' : ''}/95군미만:${belowValueManwon !== null ? belowValueManwon + '만원' : ''})`;
-      
+
       if (!managerMap.has(key)) {
         managerMap.set(key, {
           key: key,
@@ -28076,13 +28115,13 @@ app.get('/api/policies/shoe-counting', async (req, res) => {
           companies: new Set()
         });
       }
-      
+
       managerMap.get(key).companies.add(storeName.trim());
     });
 
     // 결과 변환
     const result = {};
-    
+
     managerGroups.forEach((managerMap, managerName) => {
       result[managerName] = Array.from(managerMap.values()).map(item => ({
         key: item.key,
@@ -28101,50 +28140,50 @@ app.get('/api/policies/shoe-counting', async (req, res) => {
       });
     });
 
-  // 전체 담당자도 추가 (manager 필터가 없을 때)
-  if (!manager || manager === '전체') {
-    const allManagerMap = new Map();
-    
-    managerGroups.forEach((managerMap) => {
-      managerMap.forEach((item, key) => {
-        if (!allManagerMap.has(key)) {
-          allManagerMap.set(key, {
-            key: key,
-            aboveAmount: item.aboveAmount,
-            belowAmount: item.belowAmount,
-            companies: new Set()
+    // 전체 담당자도 추가 (manager 필터가 없을 때)
+    if (!manager || manager === '전체') {
+      const allManagerMap = new Map();
+
+      managerGroups.forEach((managerMap) => {
+        managerMap.forEach((item, key) => {
+          if (!allManagerMap.has(key)) {
+            allManagerMap.set(key, {
+              key: key,
+              aboveAmount: item.aboveAmount,
+              belowAmount: item.belowAmount,
+              companies: new Set()
+            });
+          }
+          item.companies.forEach(company => {
+            allManagerMap.get(key).companies.add(company);
           });
-        }
-        item.companies.forEach(company => {
-          allManagerMap.get(key).companies.add(company);
         });
       });
-    });
-    
-    result['전체'] = Array.from(allManagerMap.values()).map(item => ({
-      key: item.key,
-      aboveAmount: item.aboveAmount,
-      belowAmount: item.belowAmount,
-      aboveAmountManwon: item.aboveAmountManwon,
-      belowAmountManwon: item.belowAmountManwon,
-      companyCount: item.companies.size,
-      companies: Array.from(item.companies)
-    })).sort((a, b) => {
-      if (a.aboveAmountManwon !== b.aboveAmountManwon) {
-        return (a.aboveAmountManwon || 0) - (b.aboveAmountManwon || 0);
-      }
-      return (a.belowAmountManwon || 0) - (b.belowAmountManwon || 0);
-    });
-  }
 
-  console.log(`✅ [구두정책카운팅] 조회 완료:`, {
-    yearMonth,
-    policyType,
-    manager,
-    totalManagers: Object.keys(result).length
-  });
+      result['전체'] = Array.from(allManagerMap.values()).map(item => ({
+        key: item.key,
+        aboveAmount: item.aboveAmount,
+        belowAmount: item.belowAmount,
+        aboveAmountManwon: item.aboveAmountManwon,
+        belowAmountManwon: item.belowAmountManwon,
+        companyCount: item.companies.size,
+        companies: Array.from(item.companies)
+      })).sort((a, b) => {
+        if (a.aboveAmountManwon !== b.aboveAmountManwon) {
+          return (a.aboveAmountManwon || 0) - (b.aboveAmountManwon || 0);
+        }
+        return (a.belowAmountManwon || 0) - (b.belowAmountManwon || 0);
+      });
+    }
 
-  res.json({ success: true, counting: result });
+    console.log(`✅ [구두정책카운팅] 조회 완료:`, {
+      yearMonth,
+      policyType,
+      manager,
+      totalManagers: Object.keys(result).length
+    });
+
+    res.json({ success: true, counting: result });
 
   } catch (error) {
     console.error('구두정책 카운팅 조회 실패:', error);
@@ -38092,10 +38131,10 @@ app.post('/api/inventory-inspection', async (req, res) => {
     console.log('🔍 재고 비교 검수 시작...');
 
     const spreadsheetId = '12_oC7c2xqHlDCppUvWL2EFesszA3oDU5JBdrYccYT7Q';
-    
+
     // 캐시 무시 옵션 확인 (쿼리 파라미터 또는 헤더)
     const noCache = req.query.t || req.headers['cache-control'] === 'no-cache';
-    
+
     // 캐시 무시가 요청된 경우 관련 캐시 무효화
     if (noCache) {
       console.log('🔄 [캐시 무효화] 마스터재고 관련 캐시 삭제');
@@ -42326,19 +42365,19 @@ app.get('/api/quick-cost/quality', async (req, res) => {
 // 주소를 위도/경도로 변환하는 API (카카오 API 사용)
 app.get('/api/geocode-address', async (req, res) => {
   setCORSHeaders(req, res);
-  
+
   try {
     const { address } = req.query;
-    
+
     if (!address) {
       return res.status(400).json({
         success: false,
         error: '주소가 필요합니다.'
       });
     }
-    
+
     const coords = await geocodeAddressWithKakao(address);
-    
+
     if (coords) {
       res.json({
         success: true,
@@ -42752,7 +42791,7 @@ async function ensureMarkerColorSheetHeaders(sheets, spreadsheetId) {
     );
     const firstRow = res.data.values && res.data.values[0] ? res.data.values[0] : [];
     const needsInit = firstRow.length === 0 || HEADERS_MARKER_COLOR_SETTINGS.some((h, i) => (firstRow[i] || '') !== h) || firstRow.length < HEADERS_MARKER_COLOR_SETTINGS.length;
-    
+
     if (needsInit) {
       await rateLimitedSheetsCall(() => {
         // HEADERS_MARKER_COLOR_SETTINGS.length = 6 (A~F)
@@ -42766,7 +42805,7 @@ async function ensureMarkerColorSheetHeaders(sheets, spreadsheetId) {
         });
       });
     }
-    
+
     return HEADERS_MARKER_COLOR_SETTINGS;
   } catch (error) {
     console.error(`[마커색상] Failed to ensure sheet headers for ${MARKER_COLOR_SETTINGS_SHEET_NAME}:`, error);
@@ -42779,7 +42818,7 @@ app.get('/api/stores/unique-values', async (req, res) => {
   setCORSHeaders(req, res);
   try {
     const { type } = req.query; // 'code', 'office', 'department', 'manager'
-    
+
     if (!type || !['code', 'office', 'department', 'manager'].includes(type)) {
       return res.status(400).json({ success: false, error: '올바른 타입이 필요합니다. (code, office, department, manager)' });
     }
@@ -42791,27 +42830,27 @@ app.get('/api/stores/unique-values', async (req, res) => {
       'department': 4, // E열: 소속
       'manager': 5    // F열: 담당자
     };
-    
+
     const columnIndex = columnIndexMap[type];
     const columnLetter = getColumnLetter(columnIndex + 1); // 1-based로 변환 (A=1, B=2, ...)
-    
+
     const auth = new google.auth.JWT({
       email: GOOGLE_SERVICE_ACCOUNT_EMAIL,
       key: GOOGLE_PRIVATE_KEY.includes('\\n') ? GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n') : GOOGLE_PRIVATE_KEY,
       scopes: ['https://www.googleapis.com/auth/spreadsheets']
     });
     const sheets = google.sheets({ version: 'v4', auth });
-    
+
     const response = await rateLimitedSheetsCall(() =>
       sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
         range: `${STORE_SHEET_NAME}!${columnLetter}:${columnLetter}`
       })
     );
-    
+
     const rows = response.data.values || [];
     const values = new Set();
-    
+
     // 헤더 제외하고 데이터 처리
     rows.slice(1).forEach(row => {
       const value = (row[0] || '').toString().trim();
@@ -42819,10 +42858,10 @@ app.get('/api/stores/unique-values', async (req, res) => {
         values.add(value);
       }
     });
-    
+
     // 배열로 변환 및 정렬
     const uniqueValues = Array.from(values).sort();
-    
+
     res.json({ success: true, type, values: uniqueValues });
   } catch (error) {
     console.error('유니크 값 목록 조회 오류:', error);
@@ -42845,7 +42884,7 @@ app.get('/api/marker-color-settings', async (req, res) => {
       scopes: ['https://www.googleapis.com/auth/spreadsheets']
     });
     const sheets = google.sheets({ version: 'v4', auth });
-    
+
     await ensureMarkerColorSheetHeaders(sheets, SPREADSHEET_ID);
 
     const response = await rateLimitedSheetsCall(() =>
@@ -42857,10 +42896,10 @@ app.get('/api/marker-color-settings', async (req, res) => {
 
     const rows = response.data.values || [];
     const dataRows = rows.slice(1);
-    
+
     // userId를 문자열로 정규화 (타입 불일치 방지)
     const normalizedUserId = userId ? userId.toString().trim() : '';
-    
+
     console.log('[마커 색상 설정 조회] 시작:', {
       원본userId: userId,
       정규화userId: normalizedUserId,
@@ -42868,7 +42907,7 @@ app.get('/api/marker-color-settings', async (req, res) => {
       dataRowsCount: dataRows.length,
       샘플행: dataRows.slice(0, 5).map(r => ({ userId: r[0], userId타입: typeof r[0], optionType: r[1], value: r[2] }))
     });
-    
+
     // 현재 사용자의 설정만 필터링 (userId 비교 시 trim 및 타입 변환)
     // Google Sheets에서 작은따옴표로 시작하는 문자열은 그대로 저장되지만, 조회 시에는 작은따옴표가 제거될 수 있음
     // 또한 숫자로 저장된 경우와 문자열로 저장된 경우를 모두 처리
@@ -42879,9 +42918,9 @@ app.get('/api/marker-color-settings', async (req, res) => {
         rowUserId = rowUserId.substring(1);
       }
       // 숫자로 저장된 경우와 문자열로 저장된 경우 모두 처리
-      const matches = rowUserId === normalizedUserId || 
-                     rowUserId === normalizedUserId.toString() ||
-                     String(rowUserId) === String(normalizedUserId);
+      const matches = rowUserId === normalizedUserId ||
+        rowUserId === normalizedUserId.toString() ||
+        String(rowUserId) === String(normalizedUserId);
       if (dataRows.indexOf(row) < 5) {
         console.log('[마커 색상 설정 조회] 행 비교:', {
           원본rowUserId: row[0],
@@ -42893,13 +42932,13 @@ app.get('/api/marker-color-settings', async (req, res) => {
       }
       return matches;
     });
-    
+
     // 선택된 옵션 추출
     const selectedRow = userRows.find(row => {
       const optionType = (row[1] || '').toString().trim();
       return optionType === 'selected';
     });
-    
+
     let selectedOption = 'default';
     if (selectedRow) {
       // Google Sheets API는 빈 셀을 배열에서 제거할 수 있으므로
@@ -42918,7 +42957,7 @@ app.get('/api/marker-color-settings', async (req, res) => {
     } else {
       console.warn('[마커 색상 설정 조회] selectedRow를 찾을 수 없음. userRows:', userRows.map(r => ({ userId: r[0], optionType: r[1], value: r[2] })));
     }
-    
+
     // 디버깅 로그
     console.log('[마커 색상 설정 조회]', {
       userId: normalizedUserId,
@@ -42932,7 +42971,7 @@ app.get('/api/marker-color-settings', async (req, res) => {
       selectedOption,
       allUserRows: userRows.map(r => ({ userId: r[0], optionType: r[1], value: r[2] }))
     });
-    
+
     // 색상 설정을 옵션별로 그룹화
     const settings = {
       selectedOption,
@@ -42943,12 +42982,12 @@ app.get('/api/marker-color-settings', async (req, res) => {
         manager: {}
       }
     };
-    
+
     userRows.forEach(row => {
       const optionType = row[1] || '';
       const value = row[2] || '';
       const color = row[3] || '';
-      
+
       if (optionType !== 'selected' && optionType && value && color) {
         if (settings.colorSettings[optionType]) {
           settings.colorSettings[optionType][value] = color;
@@ -42986,7 +43025,7 @@ app.post('/api/marker-color-settings', express.json(), async (req, res) => {
       scopes: ['https://www.googleapis.com/auth/spreadsheets']
     });
     const sheets = google.sheets({ version: 'v4', auth });
-    
+
     await ensureMarkerColorSheetHeaders(sheets, SPREADSHEET_ID);
 
     // 기존 설정 조회
@@ -43003,7 +43042,7 @@ app.post('/api/marker-color-settings', express.json(), async (req, res) => {
 
     // userId를 문자열로 정규화 (타입 불일치 방지)
     const normalizedUserId = userId ? userId.toString().trim() : '';
-    
+
     console.log('[마커 색상 설정 저장] 시작:', {
       원본userId: userId,
       정규화userId: normalizedUserId,
@@ -43012,7 +43051,7 @@ app.post('/api/marker-color-settings', express.json(), async (req, res) => {
       dataRowsCount: dataRows.length,
       샘플행: dataRows.slice(0, 3).map(r => ({ userId: r[0], userId타입: typeof r[0], optionType: r[1] }))
     });
-    
+
     // 기존 행에서 현재 사용자의 설정 찾기 (userId 비교 시 trim 및 타입 변환)
     // Google Sheets에서 작은따옴표로 시작하는 문자열은 그대로 저장되지만, 조회 시에는 작은따옴표가 제거될 수 있음
     // 또한 숫자로 저장된 경우와 문자열로 저장된 경우를 모두 처리
@@ -43023,17 +43062,17 @@ app.post('/api/marker-color-settings', express.json(), async (req, res) => {
         rowUserId = rowUserId.substring(1);
       }
       // 숫자로 저장된 경우와 문자열로 저장된 경우 모두 처리
-      return rowUserId === normalizedUserId || 
-             rowUserId === normalizedUserId.toString() ||
-             String(rowUserId) === String(normalizedUserId);
+      return rowUserId === normalizedUserId ||
+        rowUserId === normalizedUserId.toString() ||
+        String(rowUserId) === String(normalizedUserId);
     });
-    
+
     console.log('[마커 색상 설정 저장] 기존 행 찾기:', {
       normalizedUserId: normalizedUserId,
       existingRowsCount: existingRows.length,
       existingRows: existingRows.map(r => ({ userId: r[0], optionType: r[1], value: r[2] }))
     });
-    
+
     // 업데이트할 행과 새로 추가할 행 분리
     const rowsToUpdate = [];
     const rowsToAppend = [];
@@ -43043,14 +43082,14 @@ app.post('/api/marker-color-settings', express.json(), async (req, res) => {
       const optionType = (row[1] || '').toString().trim();
       return optionType === 'selected';
     });
-    
+
     if (existingSelectedRow) {
       const rowIndex = dataRows.findIndex(row => {
         const rowUserId = (row[0] || '').toString().trim();
         const rowOptionType = (row[1] || '').toString().trim();
         return rowUserId === normalizedUserId && rowOptionType === 'selected';
       });
-      
+
       if (rowIndex !== -1) {
         // Google Sheets에서 숫자를 문자열로 저장하기 위해 작은따옴표 접두사 추가
         // 또는 명시적으로 문자열로 변환 (valueInputOption: 'USER_ENTERED' 사용)
@@ -43075,7 +43114,7 @@ app.post('/api/marker-color-settings', express.json(), async (req, res) => {
         if (!color || color.trim() === '') {
           return;
         }
-        
+
         const existingRow = existingRows.find(row => {
           const rowOptionType = (row[1] || '').toString().trim();
           const rowValue = (row[2] || '').toString().trim();
@@ -43106,7 +43145,7 @@ app.post('/api/marker-color-settings', express.json(), async (req, res) => {
       rowsToAppend: rowsToAppend.length,
       normalizedUserId: normalizedUserId
     });
-    
+
     await Promise.all([
       ...rowsToUpdate.map(({ rowIndex, values }) =>
         rateLimitedSheetsCall(() =>

@@ -32,6 +32,7 @@ import {
   PhoneAndroid as PhoneIcon,
   Slideshow as SlideshowIcon
 } from '@mui/icons-material';
+import { API_BASE_URL } from '../../../api';
 
 const DiscordImageMonitoringTab = () => {
   const [loading, setLoading] = useState(true);
@@ -55,21 +56,21 @@ const DiscordImageMonitoringTab = () => {
       // 검증 요청 시 캐시 무효화를 위해 타임스탬프 추가
       const validateParam = validateUrls ? `&validate=true&_t=${Date.now()}` : '';
       const response = await fetch(
-        `${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/discord/image-monitoring?type=direct${validateParam}`,
+        `${process.env.REACT_APP_API_URL || API_BASE_URL}/api/discord/image-monitoring?type=direct${validateParam}`,
         {
           // 검증 요청 시 캐시 무시
           cache: validateUrls ? 'no-cache' : 'default'
         }
       );
-      
+
       if (!response.ok) {
         throw new Error('모니터링 데이터를 불러오는데 실패했습니다.');
       }
-      
+
       const result = await response.json();
       if (result.success) {
         const data = result.data;
-        
+
         // 검증 결과가 있으면 캐시에 저장
         if (validateUrls) {
           const newCache = new Map();
@@ -84,16 +85,16 @@ const DiscordImageMonitoringTab = () => {
               }
             });
           };
-          
+
           if (data.direct) {
             updateCache(data.direct.mobileImages || []);
             updateCache(data.direct.masterImages || []);
             updateCache(data.direct.storePhotos || []);
           }
-          
+
           setUrlValidationCache(newCache);
         }
-        
+
         // 검증 결과가 없는 경우 캐시에서 복원
         if (!validateUrls && urlValidationCache.size > 0) {
           const restoreValidation = (items) => {
@@ -110,14 +111,14 @@ const DiscordImageMonitoringTab = () => {
               return item;
             });
           };
-          
+
           if (data.direct) {
             data.direct.mobileImages = restoreValidation(data.direct.mobileImages || []);
             data.direct.masterImages = restoreValidation(data.direct.masterImages || []);
             data.direct.storePhotos = restoreValidation(data.direct.storePhotos || []);
           }
         }
-        
+
         setMonitoringData(data);
         setError(null);
       } else {
@@ -157,9 +158,9 @@ const DiscordImageMonitoringTab = () => {
 
     try {
       setRefreshing(true);
-      const isMeetingMode = window.location.pathname.includes('meeting') || 
-                            document.title.includes('회의');
-      
+      const isMeetingMode = window.location.pathname.includes('meeting') ||
+        document.title.includes('회의');
+
       let allItems = [];
       if (isMeetingMode && monitoringData.meeting) {
         allItems = monitoringData.meeting.slides.map(item => ({ type: 'meeting-slide', ...item }));
@@ -172,11 +173,11 @@ const DiscordImageMonitoringTab = () => {
       }
 
       let itemsToRefresh = Array.from(selectedItems).map(index => allItems[index]);
-      
+
       // 스마트 갱신: 만료된 URL만 필터링
       // 프론트엔드에 이미 있는 검증 결과(urlStatus)를 활용
       const originalCount = itemsToRefresh.length;
-      
+
       // 만료되었거나 오류가 있는 항목만 필터링
       // urlStatus가 없거나 'unknown'인 경우도 갱신 (안전을 위해)
       const expiredItems = itemsToRefresh.filter(item => {
@@ -187,22 +188,22 @@ const DiscordImageMonitoringTab = () => {
         // 만료, 오류, 타임아웃, 미확인 상태는 갱신
         return true;
       });
-      
+
       if (expiredItems.length < originalCount) {
         const skippedCount = originalCount - expiredItems.length;
         console.log(`✅ [배치 갱신] ${skippedCount}개 정상 URL 건너뛰기, ${expiredItems.length}개 만료/오류/미확인 URL만 갱신`);
       }
-      
+
       itemsToRefresh = expiredItems;
-      
+
       if (itemsToRefresh.length === 0) {
         alert('갱신할 만료된 URL이 없습니다. 모든 선택한 항목이 정상입니다.\n\n상태 검증 버튼을 먼저 눌러 URL 상태를 확인해주세요.');
         setRefreshing(false);
         return;
       }
-      
+
       console.log(`🔄 [배치 갱신] ${itemsToRefresh.length}개 만료/오류/미확인 항목 갱신 시작 (전체 ${originalCount}개 중)...`);
-      
+
       // 타임아웃 설정 (동적 계산)
       // 배치 크기: 5개, 항목 간 지연: 2초, 배치 간 지연: 5초
       // 각 항목당 예상 소요 시간: 약 3-4초 (Discord API + Google Sheets API)
@@ -210,23 +211,23 @@ const DiscordImageMonitoringTab = () => {
       const ITEM_DELAY_MS = 2000;
       const BATCH_DELAY_MS = 5000;
       const ESTIMATED_TIME_PER_ITEM_MS = 4000; // 항목당 예상 소요 시간
-      
+
       const totalBatches = Math.ceil(itemsToRefresh.length / BATCH_SIZE);
-      const estimatedTimeMs = 
+      const estimatedTimeMs =
         (totalBatches * BATCH_DELAY_MS) + // 배치 간 지연
         (itemsToRefresh.length * ITEM_DELAY_MS) + // 항목 간 지연
         (itemsToRefresh.length * ESTIMATED_TIME_PER_ITEM_MS) + // 실제 처리 시간
         (30000); // 여유 시간 30초
-      
+
       const timeoutMinutes = Math.ceil(estimatedTimeMs / 60000);
       console.log(`⏱️ [배치 갱신] 예상 소요 시간: ${Math.ceil(estimatedTimeMs / 1000)}초 (타임아웃: ${timeoutMinutes}분)`);
-      
+
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), estimatedTimeMs);
-      
+
       try {
         const response = await fetch(
-          `${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/discord/batch-refresh-urls`,
+          `${process.env.REACT_APP_API_URL || API_BASE_URL}/api/discord/batch-refresh-urls`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -244,7 +245,7 @@ const DiscordImageMonitoringTab = () => {
         }
 
         const result = await response.json();
-        
+
         if (result.success) {
           setRefreshResults(result);
           const message = `갱신 완료: 성공 ${result.successCount}개, 실패 ${result.failCount}개`;
@@ -259,7 +260,7 @@ const DiscordImageMonitoringTab = () => {
       } catch (err) {
         clearTimeout(timeoutId);
         console.error('❌ [배치 갱신] URL 갱신 오류:', err);
-        
+
         // 타임아웃 또는 네트워크 오류인 경우에도 서버에서 처리가 완료되었을 수 있으므로 확인
         if (err.name === 'AbortError' || err.message.includes('Failed to fetch') || err.message.includes('CORS') || err.message.includes('504')) {
           // 타임아웃 또는 네트워크 오류지만 서버에서 처리가 완료되었을 수 있음
@@ -308,42 +309,42 @@ const DiscordImageMonitoringTab = () => {
     return null;
   }
 
-      // 모드에 따라 데이터 구조가 다름
-      const isMeetingMode = window.location.pathname.includes('meeting') || 
-                            document.title.includes('회의');
-      
-      let totalCount = 0;
-      let allItems = [];
-      let statsData = null;
-      
-      if (isMeetingMode && monitoringData.meeting) {
-        // 회의모드
-        const { meeting } = monitoringData;
-        totalCount = meeting.slides.length;
-        allItems = meeting.slides.map((item, idx) => ({
-          ...item,
-          index: idx,
-          category: 'meeting-slide',
-          label: `${item.meetingId} - ${item.slideId} (${item.title || '제목 없음'})`
-        }));
-        statsData = {
-          slides: meeting.slides.length
-        };
-      } else if (monitoringData.direct) {
-        // 직영점 관리모드
-        const { direct } = monitoringData;
-        totalCount = direct.mobileImages.length + direct.masterImages.length + direct.storePhotos.length;
-        allItems = [
-          ...direct.mobileImages.map((item, idx) => ({ ...item, index: idx, category: 'mobile-image', label: `${item.carrier} - ${item.modelName || item.modelId}` })),
-          ...direct.masterImages.map((item, idx) => ({ ...item, index: direct.mobileImages.length + idx, category: 'master-image', label: `${item.carrier} - ${item.modelName || item.modelId}` })),
-          ...direct.storePhotos.map((item, idx) => ({ ...item, index: direct.mobileImages.length + direct.masterImages.length + idx, category: 'store-photo', label: `${item.storeName} - ${item.photoType}` }))
-        ];
-        statsData = {
-          mobileImages: direct.mobileImages.length,
-          masterImages: direct.masterImages.length,
-          storePhotos: direct.storePhotos.length
-        };
-      }
+  // 모드에 따라 데이터 구조가 다름
+  const isMeetingMode = window.location.pathname.includes('meeting') ||
+    document.title.includes('회의');
+
+  let totalCount = 0;
+  let allItems = [];
+  let statsData = null;
+
+  if (isMeetingMode && monitoringData.meeting) {
+    // 회의모드
+    const { meeting } = monitoringData;
+    totalCount = meeting.slides.length;
+    allItems = meeting.slides.map((item, idx) => ({
+      ...item,
+      index: idx,
+      category: 'meeting-slide',
+      label: `${item.meetingId} - ${item.slideId} (${item.title || '제목 없음'})`
+    }));
+    statsData = {
+      slides: meeting.slides.length
+    };
+  } else if (monitoringData.direct) {
+    // 직영점 관리모드
+    const { direct } = monitoringData;
+    totalCount = direct.mobileImages.length + direct.masterImages.length + direct.storePhotos.length;
+    allItems = [
+      ...direct.mobileImages.map((item, idx) => ({ ...item, index: idx, category: 'mobile-image', label: `${item.carrier} - ${item.modelName || item.modelId}` })),
+      ...direct.masterImages.map((item, idx) => ({ ...item, index: direct.mobileImages.length + idx, category: 'master-image', label: `${item.carrier} - ${item.modelName || item.modelId}` })),
+      ...direct.storePhotos.map((item, idx) => ({ ...item, index: direct.mobileImages.length + direct.masterImages.length + idx, category: 'store-photo', label: `${item.storeName} - ${item.photoType}` }))
+    ];
+    statsData = {
+      mobileImages: direct.mobileImages.length,
+      masterImages: direct.masterImages.length,
+      storePhotos: direct.storePhotos.length
+    };
+  }
 
   return (
     <Box sx={{ p: 3 }}>
@@ -459,8 +460,8 @@ const DiscordImageMonitoringTab = () => {
 
       {/* 갱신 결과 */}
       {refreshResults && (
-        <Alert 
-          severity={refreshResults.failCount === 0 ? 'success' : 'warning'} 
+        <Alert
+          severity={refreshResults.failCount === 0 ? 'success' : 'warning'}
           sx={{ mb: 3 }}
           onClose={() => setRefreshResults(null)}
         >
@@ -507,17 +508,17 @@ const DiscordImageMonitoringTab = () => {
                 {allItems.map((item, index) => {
                   const isSelected = selectedItems.has(index);
                   const categoryIcon = item.category === 'mobile-image' ? <PhoneIcon /> :
-                                      item.category === 'master-image' ? <ImageIcon /> :
-                                      item.category === 'store-photo' ? <StoreIcon /> :
-                                      <SlideshowIcon />;
+                    item.category === 'master-image' ? <ImageIcon /> :
+                      item.category === 'store-photo' ? <StoreIcon /> :
+                        <SlideshowIcon />;
                   const categoryLabel = item.category === 'mobile-image' ? '모델이미지' :
-                                       item.category === 'master-image' ? '단말마스터' :
-                                       item.category === 'store-photo' ? '매장사진' :
-                                       '회의슬라이드';
-                  
+                    item.category === 'master-image' ? '단말마스터' :
+                      item.category === 'store-photo' ? '매장사진' :
+                        '회의슬라이드';
+
                   return (
-                    <TableRow 
-                      key={index} 
+                    <TableRow
+                      key={index}
                       hover
                       selected={isSelected}
                       onClick={() => handleSelectItem(index)}
@@ -550,11 +551,11 @@ const DiscordImageMonitoringTab = () => {
                       <TableCell>{item.carrier || item.meetingId || '-'}</TableCell>
                       <TableCell>
                         <Tooltip title={item.imageUrl}>
-                          <Typography 
-                            variant="body2" 
-                            sx={{ 
-                              maxWidth: 200, 
-                              overflow: 'hidden', 
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              maxWidth: 200,
+                              overflow: 'hidden',
                               textOverflow: 'ellipsis',
                               whiteSpace: 'nowrap'
                             }}
@@ -577,41 +578,41 @@ const DiscordImageMonitoringTab = () => {
                         {(() => {
                           const urlStatus = item.urlStatus || 'unknown';
                           const urlValid = item.urlValid;
-                          
+
                           if (urlStatus === 'unknown' || urlValid === undefined) {
                             return (
-                              <Chip 
-                                icon={<WarningIcon />} 
-                                label="미확인" 
-                                color="default" 
-                                size="small" 
+                              <Chip
+                                icon={<WarningIcon />}
+                                label="미확인"
+                                color="default"
+                                size="small"
                               />
                             );
                           } else if (urlValid === true && urlStatus === 'valid') {
                             return (
-                              <Chip 
-                                icon={<CheckCircleIcon />} 
-                                label="정상" 
-                                color="success" 
-                                size="small" 
+                              <Chip
+                                icon={<CheckCircleIcon />}
+                                label="정상"
+                                color="success"
+                                size="small"
                               />
                             );
                           } else if (urlStatus === 'expired') {
                             return (
-                              <Chip 
-                                icon={<ErrorIcon />} 
-                                label="만료" 
-                                color="error" 
-                                size="small" 
+                              <Chip
+                                icon={<ErrorIcon />}
+                                label="만료"
+                                color="error"
+                                size="small"
                               />
                             );
                           } else {
                             return (
-                              <Chip 
-                                icon={<ErrorIcon />} 
-                                label={item.urlError || "오류"} 
-                                color="error" 
-                                size="small" 
+                              <Chip
+                                icon={<ErrorIcon />}
+                                label={item.urlError || "오류"}
+                                color="error"
+                                size="small"
                               />
                             );
                           }

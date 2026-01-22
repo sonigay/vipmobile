@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-    Box, Typography, CircularProgress, Alert, Dialog, DialogTitle, DialogContent, 
-    DialogActions, TextField, Button, Grid, IconButton, Stack, Paper, Table, 
+import {
+    Box, Typography, CircularProgress, Alert, Dialog, DialogTitle, DialogContent,
+    DialogActions, TextField, Button, Grid, IconButton, Stack, Paper, Table,
     TableBody, TableCell, TableContainer, TableHead, TableRow, FormControlLabel, Switch
 } from '@mui/material';
 import { Close as CloseIcon, Save as SaveIcon, CloudUpload as CloudUploadIcon, Store as StoreIcon, Add as AddIcon, Delete as DeleteIcon, Edit as EditIcon, Check as CheckIcon, Cancel as CancelIcon } from '@mui/icons-material';
 import { Autocomplete, Chip } from '@mui/material';
 import Map from '../Map';
-import { fetchData, customerAPI } from '../../api';
+import { fetchData, customerAPI, API_BASE_URL } from '../../api';
 import { directStoreApiClient } from '../../api/directStoreApiClient';
 
 /**
@@ -20,7 +20,7 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
     const [error, setError] = useState(null);
     const [selectedStore, setSelectedStore] = useState(null);
     const [userLocation, setUserLocation] = useState(null);
-    
+
     // 편집 다이얼로그 상태
     const [editDialogOpen, setEditDialogOpen] = useState(false);
     const [editingStore, setEditingStore] = useState(null);
@@ -48,7 +48,7 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
     });
     const [isSaving, setIsSaving] = useState(false);
     const [uploadingPhotoType, setUploadingPhotoType] = useState(null); // 현재 업로드 중인 사진 타입
-    
+
     // 대중교통 위치 상태
     const [editBusTerminalIds, setEditBusTerminalIds] = useState([]); // 선택된 버스터미널 ID 배열
     const [editSubwayStationIds, setEditSubwayStationIds] = useState([]); // 선택된 지하철역 ID 배열
@@ -82,10 +82,10 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
                         setUserLocation({ lat: 36.9922, lng: 127.1128, isDefault: true });
                     } else if (loggedInStore?.coords?.lat && loggedInStore?.coords?.lng) {
                         // 직영점모드: 접속 매장 중심 좌표 사용
-                        setUserLocation({ 
-                            lat: loggedInStore.coords.lat, 
+                        setUserLocation({
+                            lat: loggedInStore.coords.lat,
                             lng: loggedInStore.coords.lng,
-                            isDefault: true 
+                            isDefault: true
                         });
                     } else {
                         // 매장 위치 정보가 없으면 평택 중심
@@ -100,10 +100,10 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
                 setUserLocation({ lat: 36.9922, lng: 127.1128, isDefault: true });
             } else if (loggedInStore?.coords?.lat && loggedInStore?.coords?.lng) {
                 // 직영점모드: 접속 매장 중심 좌표 사용
-                setUserLocation({ 
-                    lat: loggedInStore.coords.lat, 
+                setUserLocation({
+                    lat: loggedInStore.coords.lat,
                     lng: loggedInStore.coords.lng,
-                    isDefault: true 
+                    isDefault: true
                 });
             } else {
                 // 매장 위치 정보가 없으면 평택 중심
@@ -117,7 +117,7 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
                 const response = await fetchData(false); // excludeShipped = false
                 if (response.success) {
                     let vipStores;
-                    
+
                     if (isManagementMode) {
                         // 관리 모드: VIP직영인 모든 매장 표시
                         vipStores = response.data.filter(store =>
@@ -134,7 +134,7 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
                             vipStores = [];
                         }
                     }
-                    
+
                     setStores(vipStores);
                 } else {
                     setError('매장 정보를 불러오는데 실패했습니다.');
@@ -193,7 +193,7 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
             const timer = setTimeout(() => {
                 const mapContainer = document.getElementById('direct-store-map-container');
                 if (!mapContainer) return;
-                
+
                 const leafletContainer = mapContainer.querySelector('.leaflet-container');
                 if (leafletContainer && leafletContainer._leaflet && typeof leafletContainer._leaflet.invalidateSize === 'function') {
                     try {
@@ -210,7 +210,7 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
                     }
                 }
             }, 500);
-            
+
             return () => clearTimeout(timer);
         }
     }, [isLoading, stores.length, activeTab]); // activeTab이 변경되면 재계산
@@ -220,16 +220,16 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
         setSelectedStore(store);
         setEditingStore(store);
         setEditDialogOpen(true);
-        
+
         // 기존 데이터 로드
         try {
             const [mark, photos] = await Promise.all([
                 customerAPI.getPreApprovalMark(store.name),
                 customerAPI.getStorePhotos(store.name)
             ]);
-            
+
             setEditPreApprovalMark(mark?.url || '');
-            
+
             if (photos) {
                 setEditStorePhotos({
                     frontUrl: photos.frontPhoto || '',
@@ -241,7 +241,7 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
                     staff2Url: photos.staff2Photo || '',
                     staff3Url: photos.staff3Photo || ''
                 });
-                
+
                 // 기존 Discord 정보도 로드
                 setDiscordInfo({
                     front: {
@@ -285,7 +285,7 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
                         threadId: photos.staff3ThreadId || ''
                     }
                 });
-                
+
                 // 기존 Discord 정보도 로드
                 setDiscordInfo({
                     front: {
@@ -364,9 +364,9 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
                 staff2Url: '',
                 staff3Url: ''
             });
-            
+
         }
-        
+
         // 대중교통 위치 로드 (ID 배열로)
         try {
             const response = await directStoreApiClient.getTransitLocations();
@@ -444,7 +444,7 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
             formData.append('storeName', editingStore.name);
             formData.append('photoType', photoType);
 
-            const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/direct/store-image/upload`, {
+            const response = await fetch(`${API_BASE_URL}/api/direct/store-image/upload`, {
                 method: 'POST',
                 body: formData
             });
@@ -455,7 +455,7 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
             }
 
             const data = await response.json();
-            
+
             // 업로드된 URL을 해당 필드에 자동 입력
             const urlFieldMap = {
                 front: 'frontUrl',
@@ -507,12 +507,12 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
             }
         }
     };
-    
+
     // 버스터미널 삭제 핸들러
     const handleBusTerminalRemove = (idToRemove) => {
         setEditBusTerminalIds(editBusTerminalIds.filter(id => id !== idToRemove));
     };
-    
+
     // 지하철역 선택 핸들러
     const handleSubwayStationSelect = (event, newValue) => {
         if (newValue && newValue.id) {
@@ -521,12 +521,12 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
             }
         }
     };
-    
+
     // 지하철역 삭제 핸들러
     const handleSubwayStationRemove = (idToRemove) => {
         setEditSubwayStationIds(editSubwayStationIds.filter(id => id !== idToRemove));
     };
-    
+
     // 새 대중교통 위치 추가 핸들러
     const handleAddNewTransitLocation = async (type) => {
         const { name, address } = isAddingNewTransit;
@@ -534,7 +534,7 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
             alert('이름과 주소를 모두 입력해주세요.');
             return;
         }
-        
+
         try {
             const response = await directStoreApiClient.createTransitLocation(type, name, address);
             if (response.success && response.data) {
@@ -561,14 +561,14 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
     // 저장
     const handleSaveStoreInfo = async () => {
         if (!editingStore) return;
-        
+
         setIsSaving(true);
         try {
             // 사전승낙서마크 저장
             if (editPreApprovalMark.trim()) {
                 await customerAPI.savePreApprovalMark(editingStore.name, editPreApprovalMark.trim());
             }
-            
+
             // 매장 사진 저장 (Discord 정보 포함)
             await customerAPI.saveStorePhotos({
                 storeName: editingStore.name,
@@ -606,14 +606,14 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
                 staff3PostId: discordInfo.staff3.postId,
                 staff3ThreadId: discordInfo.staff3.threadId
             });
-            
+
             // 대중교통 위치 저장 (ID 배열로)
             const transitResponse = await directStoreApiClient.saveTransitLocation(
                 editingStore.name,
                 editBusTerminalIds,
                 editSubwayStationIds
             );
-            
+
             if (!transitResponse.success) {
                 console.error('대중교통 위치 저장 실패:', transitResponse.error);
                 // 대중교통 위치 저장 실패는 경고만 표시하고 계속 진행
@@ -622,7 +622,7 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
                 await loadTransitLocations();
                 await loadAllTransitLocations();
             }
-            
+
             alert('저장되었습니다.');
             handleCloseEditDialog();
         } catch (error) {
@@ -654,16 +654,16 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
                 지도에서 매장을 클릭하여 사전승낙서마크와 매장 사진을 관리할 수 있습니다.
             </Typography>
 
-            <Box 
+            <Box
                 id="direct-store-map-container"
-                sx={{ 
-                    height: '500px', 
-                    width: '100%', 
-                    position: 'relative', 
-                    borderRadius: 2, 
-                    overflow: 'hidden', 
-                    border: '1px solid #eee', 
-                    mb: 3, 
+                sx={{
+                    height: '500px',
+                    width: '100%',
+                    position: 'relative',
+                    borderRadius: 2,
+                    overflow: 'hidden',
+                    border: '1px solid #eee',
+                    mb: 3,
                     flexShrink: 0,
                     '& .leaflet-container': {
                         height: '100%',
@@ -769,8 +769,8 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
             </Box>
 
             {/* 편집 다이얼로그 */}
-            <Dialog 
-                open={editDialogOpen} 
+            <Dialog
+                open={editDialogOpen}
                 onClose={handleCloseEditDialog}
                 maxWidth="md"
                 fullWidth
@@ -1043,13 +1043,13 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
                                 </Grid>
                             </Grid>
                         </Grid>
-                        
+
                         {/* 대중교통 위치 */}
                         <Grid item xs={12}>
                             <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>
                                 대중교통 위치
                             </Typography>
-                            
+
                             {/* 버스터미널 섹션 */}
                             <Box sx={{ mb: 3 }}>
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
@@ -1057,7 +1057,7 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
                                         버스터미널
                                     </Typography>
                                 </Box>
-                                
+
                                 {/* 선택된 버스터미널 표시 */}
                                 <Box sx={{ mb: 2 }}>
                                     {editBusTerminalIds.length > 0 ? (
@@ -1082,7 +1082,7 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
                                         </Typography>
                                     )}
                                 </Box>
-                                
+
                                 {/* 버스터미널 선택 드롭다운 */}
                                 <Box sx={{ mb: 2 }}>
                                     <Autocomplete
@@ -1112,7 +1112,7 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
                                         )}
                                     />
                                 </Box>
-                                
+
                                 {/* 새 버스터미널 추가 */}
                                 {isAddingNewTransit.type === '버스터미널' ? (
                                     <Paper sx={{ p: 2, mb: 2, border: '1px solid #e0e0e0', bgcolor: '#f9f9f9' }}>
@@ -1170,7 +1170,7 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
                                     </Button>
                                 )}
                             </Box>
-                            
+
                             {/* 지하철역 섹션 */}
                             <Box>
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
@@ -1178,7 +1178,7 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
                                         지하철역
                                     </Typography>
                                 </Box>
-                                
+
                                 {/* 선택된 지하철역 표시 */}
                                 <Box sx={{ mb: 2 }}>
                                     {editSubwayStationIds.length > 0 ? (
@@ -1203,7 +1203,7 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
                                         </Typography>
                                     )}
                                 </Box>
-                                
+
                                 {/* 지하철역 선택 드롭다운 */}
                                 <Box sx={{ mb: 2 }}>
                                     <Autocomplete
@@ -1233,7 +1233,7 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
                                         )}
                                     />
                                 </Box>
-                                
+
                                 {/* 새 지하철역 추가 */}
                                 {isAddingNewTransit.type === '지하철역' ? (
                                     <Paper sx={{ p: 2, mb: 2, border: '1px solid #e0e0e0', bgcolor: '#f9f9f9' }}>
@@ -1298,9 +1298,9 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
                     <Button onClick={handleCloseEditDialog} disabled={isSaving}>
                         취소
                     </Button>
-                    <Button 
-                        onClick={handleSaveStoreInfo} 
-                        variant="contained" 
+                    <Button
+                        onClick={handleSaveStoreInfo}
+                        variant="contained"
                         disabled={isSaving}
                         startIcon={<SaveIcon />}
                     >

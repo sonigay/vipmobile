@@ -55,7 +55,7 @@ class RequestQueue {
 }
 
 // 무거운 요청을 처리하는 전역 큐 (동시 실행 1개로 제한)
-const heavyRequestQueue = new RequestQueue(1);
+const heavyRequestQueue = new RequestQueue(3); // 기존 1에서 3으로 증가 (Master 데이터 병렬 로딩 허용)
 
 // 진행 중인 요청 캐시 (중복 요청 제거용)
 // Key: URL + Params string, Value: Promise

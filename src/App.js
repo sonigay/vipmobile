@@ -1398,6 +1398,16 @@ function AppContent() {
     }
   }, [isLoggedIn, data, loggedInStore?.id]);
 
+  // 사용 가능한 모드 목록 자동 동기화 (헤더의 모드 전환 버튼 활성화를 위함)
+  useEffect(() => {
+    if (isLoggedIn && loggedInStore) {
+      const currentModes = getCurrentUserAvailableModes();
+      if (currentModes.length > 0) {
+        setAvailableModes(currentModes);
+      }
+    }
+  }, [isLoggedIn, loggedInStore]);
+
   // 위치 정보 가져오기
   useEffect(() => {
     if (!userLocation && isLoggedIn && data?.stores?.length > 0) {
