@@ -468,16 +468,17 @@ const OpeningInfoPage = ({
     // initialData에서 planGroup과 openingType이 전달된 경우 대리점지원금 자동 계산 (마스터 데이터 사용)
     useEffect(() => {
         const calculateInitialPrice = async () => {
-            // 🔥 수정: 부가서비스 로딩이 완료될 때까지 대기 (부가서비스 로딩 전에 계산하면 중복 계산 문제 발생)
-            // 🔥 추가: availableAddons나 availableInsurances가 로드되었는지도 확인
+            // 🔥 수정: 부가서비스 로딩이 완료될 때까지 대기
             // 부가서비스 목록이 로드되지 않았으면 대기 (초기 로드 시 부가서비스 정보가 필요함)
-            const isAddonsLoaded = availableAddons.length > 0 || availableInsurances.length > 0;
-            if (!initialData?.planGroup || !initialData?.openingType || !planGroups.length || !initialData?.id || loadingAddonsAndInsurances || !isAddonsLoaded) {
-                // 조건이 맞지 않으면 로딩 상태 해제 (초기값 사용)
-                // 단, 부가서비스 로딩 중이거나 부가서비스 목록이 아직 로드되지 않았으면 대기 (로딩 상태 유지)
-                if (!loadingAddonsAndInsurances && isAddonsLoaded) {
-                    setLoadingSupportAmounts(false);
-                }
+            // 단, 정책 자체가 없어서 availableAddons/Insurances가 0일 수도 있으므로 loadingAddonsAndInsurances 상태를 함께 체크
+            if (loadingAddonsAndInsurances) {
+                return;
+            }
+
+            // 필수 데이터 체크
+            if (!initialData?.planGroup || !initialData?.openingType || !planGroups.length || !initialData?.id) {
+                // 데이터가 부족하면 로딩 종료
+                setLoadingSupportAmounts(false);
                 return;
             }
 
@@ -506,7 +507,7 @@ const OpeningInfoPage = ({
                     '기변': '기변',
                     'CHANGE': '기변'
                 };
-                // 🔥 수정: 사용자가 변경한 가입유형 반영 (initialData.openingType → formData.openingType)
+
                 const openingType = openingTypeMap[formData.openingType] || openingTypeMap[initialData.openingType] || '010신규';
                 const modelId = initialData.id;
 
@@ -522,14 +523,9 @@ const OpeningInfoPage = ({
 
                     // 값 업데이트
                     setPublicSupport(pricing.publicSupport || initialData?.publicSupport || 0);
-                    
-                    // 🔥 수정: 부가서비스 초기 선택 시 대리점추가지원금 재계산
-                    // 부가서비스 모두 선택 시 (initialData?.additionalServices 없을 때)
-                    // 마스터 데이터의 storeSupportWithAddon은 부가서비스 모두 선택 기준이므로 그대로 사용
-                    // 저장된 부가서비스가 있으면 해당 부가서비스 선택 기준으로 계산 필요
+
                     const baseStoreSupport = pricing.storeSupportWithAddon || 0;
                     setStoreSupportWithAddon(baseStoreSupport);
-                    // 🔥 수정: 부가미유치 기준 제거
 
                     // 일반약정이면 usePublicSupport를 true로 설정
                     if (formData.contractType === 'standard') {
@@ -544,11 +540,7 @@ const OpeningInfoPage = ({
         };
 
         calculateInitialPrice();
-        // 🔥 수정: formData.contractType 의존성 제거 (약정유형 변경 시 재계산 불필요)
-        // 🔥 수정: formData.openingType 의존성 추가 (가입유형 변경 시 재계산 필요)
-        // 🔥 수정: loadingAddonsAndInsurances 의존성 추가 (부가서비스 로딩 완료 후 계산)
-        // 🔥 추가: availableAddons, availableInsurances 의존성 추가 (부가서비스 목록 로드 완료 후 계산)
-    }, [initialData?.planGroup, formData.openingType, planGroups, selectedCarrier, initialData?.id, loadingAddonsAndInsurances, availableAddons.length, availableInsurances.length]);
+    }, [initialData?.planGroup, formData.openingType, planGroups, selectedCarrier, initialData?.id, loadingAddonsAndInsurances]);
 
     // 🔥 개선: 선택된 부가서비스/보험상품에 따른 대리점지원금 계산
     // 계산 로직:
@@ -560,11 +552,11 @@ const OpeningInfoPage = ({
     // 🔥 수정: 저장된 대리점추가지원금을 초기값으로 사용하고, 부가서비스 선택 변경 시에만 재계산
     const savedStoreSupport = initialData?.storeSupport || initialData?.대리점추가지원금;
     const hasSavedStoreSupport = savedStoreSupport !== undefined && savedStoreSupport !== null && savedStoreSupport !== 0;
-    
+
     // 초기 로드 시 부가서비스 선택 상태 추적 (저장된 값과 일치하는지 확인)
     const initialSelectedItemsRef = useRef(null);
     const isInitialLoadRef = useRef(true);
-    
+
     // 초기 로드 완료 여부 확인 (부가서비스 목록이 로드되고 selectedItems가 설정된 후)
     useEffect(() => {
         // 🔥 수정: 부가서비스 로딩이 완료되고 selectedItems가 설정된 후에만 initialSelectedItemsRef 설정
@@ -578,7 +570,7 @@ const OpeningInfoPage = ({
                 const previousCount = initialSelectedItemsRef.current?.length || 0;
                 const previousNames = initialSelectedItemsRef.current?.map(i => i.name).sort().join(',') || '';
                 const currentNames = selectedItems.map(i => i.name).sort().join(',');
-                
+
                 // 🔥 수정: selectedItems가 실제로 변경되었을 때만 설정 (무한 루프 방지)
                 if (previousNames !== currentNames || previousCount !== selectedItems.length || initialSelectedItemsRef.current === null) {
                     initialSelectedItemsRef.current = selectedItems.map(item => ({ ...item }));
@@ -595,7 +587,7 @@ const OpeningInfoPage = ({
             }
         }
     }, [selectedItems, availableAddons.length, availableInsurances.length, loadingAddonsAndInsurances, formData.openingType]);
-    
+
     // 부가서비스 선택이 변경되었는지 확인
     const hasItemsChanged = useMemo(() => {
         if (!initialSelectedItemsRef.current) return false;
@@ -604,7 +596,7 @@ const OpeningInfoPage = ({
         const initialNames = initialSelectedItemsRef.current.map(item => item.name).sort();
         return JSON.stringify(currentNames) !== JSON.stringify(initialNames);
     }, [selectedItems]);
-    
+
     // 🔥 수정: 가입유형 변경 감지 및 savedStoreSupport 무효화
     const previousOpeningTypeRef = useRef(formData.openingType);
     const openingTypeChangedRef = useRef(false);
@@ -628,21 +620,21 @@ const OpeningInfoPage = ({
             previousOpeningTypeRef.current = formData.openingType;
         }
     }, [formData.openingType]);
-    
+
     // 🔥 조건 기반 정책 필터링
     const conditionalPolicies = useMemo(() => {
         if (!policySettings?.success || !policySettings?.special?.list) {
             return [];
         }
-        
+
         return policySettings.special.list
             .filter(policy => policy.isActive && policy.policyType === 'conditional')
             .map(policy => {
                 try {
-                    const conditionsJson = typeof policy.conditionsJson === 'string' 
-                        ? JSON.parse(policy.conditionsJson) 
+                    const conditionsJson = typeof policy.conditionsJson === 'string'
+                        ? JSON.parse(policy.conditionsJson)
                         : policy.conditionsJson || {};
-                    
+
                     if (conditionsJson.type === 'conditional' && conditionsJson.conditions) {
                         return {
                             name: policy.name,
@@ -656,48 +648,48 @@ const OpeningInfoPage = ({
             })
             .filter(Boolean);
     }, [policySettings]);
-    
+
     // 🔥 조건 기반 정책 적용 함수 (minStoreSupport 제외)
     const calculateConditionalPolicies = useMemo(() => {
         let totalAmount = 0;
-        
+
         conditionalPolicies.forEach(policy => {
             policy.conditions.forEach(condition => {
                 // 🔥 minStoreSupport가 있는 조건은 여기서 제외 (나중에 별도로 처리)
                 if (condition.minStoreSupport) {
                     return; // minStoreSupport가 있으면 여기서는 계산하지 않음
                 }
-                
+
                 // 모델 매칭
-                const modelMatch = (condition.models || []).length === 0 || 
-                    condition.models.some(model => 
+                const modelMatch = (condition.models || []).length === 0 ||
+                    condition.models.some(model =>
                         initialData?.model === model ||
                         initialData?.petName === model ||
                         (initialData?.model || '').includes(model) ||
                         (initialData?.petName || '').includes(model)
                     );
-                
+
                 // 개통유형 매칭
                 const openingTypeMatch = (condition.openingTypes || []).length === 0 ||
                     condition.openingTypes.includes(formData.openingType) ||
                     condition.openingTypes.includes(convertOpeningType(formData.openingType));
-                
+
                 // 요금제군 매칭
                 const planGroupMatch = (condition.planGroups || []).length === 0 ||
                     condition.planGroups.includes(selectedPlanGroup) ||
                     condition.planGroups.includes(initialData?.planGroup);
-                
+
                 // 약정유형 매칭
                 const contractTypeMatch = !condition.contractType ||
                     condition.contractType === formData.contractType;
-                
+
                 // 모든 조건이 일치하면 적용 (minStoreSupport 없는 조건만)
                 if (modelMatch && openingTypeMatch && planGroupMatch && contractTypeMatch) {
                     totalAmount += condition.amount || 0;
                 }
             });
         });
-        
+
         return totalAmount;
     }, [
         conditionalPolicies,
@@ -708,7 +700,7 @@ const OpeningInfoPage = ({
         initialData?.petName,
         initialData?.planGroup
     ]);
-    
+
     const calculateDynamicStoreSupport = useMemo(() => {
         // 🔥 수정: 부가서비스가 로드되지 않았거나 initialSelectedItemsRef가 설정되지 않았으면 storeSupportWithAddon 그대로 반환
         // 부가서비스 로딩이 완료되지 않았으면 계산하지 않고 기본값 반환
@@ -722,12 +714,12 @@ const OpeningInfoPage = ({
                 withAddon: Math.max(0, baseValue + additionalAmount)
             };
         }
-        
+
         // 🔥 수정: 가입유형이 변경되었으면 저장된 값 무시하고 최신 storeSupportWithAddon 사용
-        const shouldUseSavedValue = hasSavedStoreSupport && 
-            !openingTypeChangedRef.current && 
+        const shouldUseSavedValue = hasSavedStoreSupport &&
+            !openingTypeChangedRef.current &&
             (!hasItemsChanged || isInitialLoadRef.current);
-        
+
         // 🔥 핵심: 저장된 값이 있고 초기 로드 상태이거나 부가서비스 선택이 변경되지 않았다면 저장된 값을 그대로 사용
         if (shouldUseSavedValue) {
             const additionalAmount = additionalStoreSupport !== null && additionalStoreSupport !== undefined ? Number(additionalStoreSupport) : 0;
@@ -759,14 +751,14 @@ const OpeningInfoPage = ({
             const deduction = Number(item.deduction) || 0;
             return sum + Math.abs(deduction); // 유치 시에는 절댓값을 더함
         }, 0);
-        
+
         const selectedIncentive = selectedItems.reduce((sum, item) => sum + (Number(item.incentive) || 0), 0);
         // 🔥 수정: deduction이 음수이므로, 유치 시에는 절댓값을 더해야 함
         const selectedDeduction = selectedItems.reduce((sum, item) => {
             const deduction = Number(item.deduction) || 0;
             return sum + Math.abs(deduction); // 유치 시에는 절댓값을 더함
         }, 0);
-        
+
         // 🔥 수정: 저장된 값에서 초기 선택 항목의 incentive/deduction을 빼고, 현재 선택 항목의 incentive/deduction을 더함
         // 🔥 디버그: 계산 과정 로그 (개발 환경에서만)
         if (process.env.NODE_ENV === 'development') {
@@ -785,10 +777,10 @@ const OpeningInfoPage = ({
 
         // 직접입력 추가금액 반영 (음수도 허용)
         const additionalAmount = additionalStoreSupport !== null && additionalStoreSupport !== undefined ? Number(additionalStoreSupport) : 0;
-        
+
         // 🔥 조건 기반 정책 적용 (minStoreSupport 제외)
         let conditionalPolicyAmount = calculateConditionalPolicies;
-        
+
         // 🔥 minStoreSupport 조건이 있는 정책은 별도로 체크
         conditionalPolicies.forEach(policy => {
             policy.conditions.forEach(condition => {
@@ -797,8 +789,8 @@ const OpeningInfoPage = ({
                     const currentStoreSupport = finalStoreSupport + additionalAmount + conditionalPolicyAmount;
                     if (currentStoreSupport >= condition.minStoreSupport) {
                         // 조건 매칭 체크
-                        const modelMatch = (condition.models || []).length === 0 || 
-                            condition.models.some(model => 
+                        const modelMatch = (condition.models || []).length === 0 ||
+                            condition.models.some(model =>
                                 initialData?.model === model ||
                                 initialData?.petName === model ||
                                 (initialData?.model || '').includes(model) ||
@@ -812,7 +804,7 @@ const OpeningInfoPage = ({
                             condition.planGroups.includes(initialData?.planGroup);
                         const contractTypeMatch = !condition.contractType ||
                             condition.contractType === formData.contractType;
-                        
+
                         if (modelMatch && openingTypeMatch && planGroupMatch && contractTypeMatch) {
                             conditionalPolicyAmount += condition.amount || 0;
                         }
@@ -820,7 +812,7 @@ const OpeningInfoPage = ({
                 }
             });
         });
-        
+
         const finalWithPolicies = Math.max(0, finalStoreSupport + additionalAmount + conditionalPolicyAmount);
 
         return {
@@ -840,19 +832,19 @@ const OpeningInfoPage = ({
     // 선택약정일 때: 그대로 표시
     const calculateDisplayAgentSupportPrice = useMemo(() => {
         const dynamicSupport = calculateDynamicStoreSupport.current;
-        
+
         // 선택약정이면 그대로 표시
         if (formData.contractType === 'selected') {
             return dynamicSupport;
         }
-        
+
         // 일반약정일 때 차액 제한
         // 출고가 - 이통사지원금이 대리점추가지원금보다 작으면 차액만큼만 표시
         if (factoryPrice > publicSupport) {
             const difference = factoryPrice - publicSupport;
             return Math.min(dynamicSupport, difference);
         }
-        
+
         return 0;
     }, [calculateDynamicStoreSupport, formData.contractType, factoryPrice, publicSupport]);
 
@@ -1158,10 +1150,10 @@ const OpeningInfoPage = ({
     };
 
     return (
-        <Box className={`print-root mode-${mode}`} sx={{ 
-            p: { xs: 1, sm: 2, md: 3 }, 
-            height: '100%', 
-            overflow: 'auto', 
+        <Box className={`print-root mode-${mode}`} sx={{
+            p: { xs: 1, sm: 2, md: 3 },
+            height: '100%',
+            overflow: 'auto',
             bgcolor: theme.bg,
             '& .MuiTypography-root': {
                 wordBreak: 'keep-all', // 단어 단위로 줄바꿈
@@ -1365,9 +1357,9 @@ const OpeningInfoPage = ({
                 <Button
                     variant="outlined"
                     startIcon={<PrintIcon />}
-                    sx={{ 
-                        mr: isReadOnly ? 0 : 2, 
-                        borderColor: theme.primary, 
+                    sx={{
+                        mr: isReadOnly ? 0 : 2,
+                        borderColor: theme.primary,
                         color: theme.primary,
                         fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
                         px: { xs: 1, sm: 2 }
@@ -1381,8 +1373,8 @@ const OpeningInfoPage = ({
                         variant="contained"
                         size="large"
                         startIcon={<CheckCircleIcon />}
-                        sx={{ 
-                            bgcolor: theme.primary, 
+                        sx={{
+                            bgcolor: theme.primary,
                             '&:hover': { bgcolor: theme.primary },
                             fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
                             px: { xs: 1, sm: 2 }
@@ -1462,8 +1454,8 @@ const OpeningInfoPage = ({
                         {/* 매장 정보 표시 (고객모드/직영점모드 공통) */}
                         {(mode === 'customer' ? selectedStore : loggedInStore) && (
                             <Paper sx={{ p: { xs: 1, sm: 1.5 }, mb: { xs: 1, sm: 1.5 }, borderTop: `3px solid ${theme.primary}`, bgcolor: theme.bg }}>
-                                <Typography variant="h6" gutterBottom sx={{ 
-                                    fontWeight: 'bold', 
+                                <Typography variant="h6" gutterBottom sx={{
+                                    fontWeight: 'bold',
                                     color: theme.primary,
                                     fontSize: { xs: '1rem', sm: '1.25rem', md: '1.5rem' }
                                 }}>
@@ -1586,7 +1578,7 @@ const OpeningInfoPage = ({
 
                         {/* 요금정보 */}
                         <Paper className="plan-info-section" sx={{ p: { xs: 1, sm: 1.5, md: 2 }, mb: { xs: 1, sm: 1.5 }, borderTop: `3px solid ${theme.primary}` }}>
-                            <Typography variant="h6" gutterBottom sx={{ 
+                            <Typography variant="h6" gutterBottom sx={{
                                 fontWeight: 'bold',
                                 fontSize: { xs: '1rem', sm: '1.25rem', md: '1.5rem' }
                             }}>요금정보</Typography>
@@ -1606,9 +1598,9 @@ const OpeningInfoPage = ({
                                                 // 🔥 수정: LG 통신사이고 85군 이상 요금제면 lgPremier 자동 체크, 미만이면 해제
                                                 if (selectedCarrier === 'LG' && newValue.group) {
                                                     const groupNumber = parseInt(newValue.group.replace('군', '')) || 0;
-                                                    setFormData(prev => ({ 
-                                                        ...prev, 
-                                                        lgPremier: groupNumber >= 85 
+                                                    setFormData(prev => ({
+                                                        ...prev,
+                                                        lgPremier: groupNumber >= 85
                                                     }));
                                                 }
 
@@ -1757,23 +1749,23 @@ const OpeningInfoPage = ({
                                             }
                                             return groupNumber >= 85;
                                         })() && (
-                                            <Grid item xs={12}>
-                                                <FormControlLabel
-                                                    control={
-                                                        <Checkbox
-                                                            checked={formData.lgPremier}
-                                                            onChange={(e) => setFormData({ ...formData, lgPremier: e.target.checked })}
-                                                        />
-                                                    }
-                                                    label="LG 프리미어 약정 적용"
-                                                />
-                                                {formData.lgPremier && (
-                                                    <Typography variant="body2" color="error" sx={{ ml: 4 }}>
-                                                        -5,250원
-                                                    </Typography>
-                                                )}
-                                            </Grid>
-                                        )}
+                                                <Grid item xs={12}>
+                                                    <FormControlLabel
+                                                        control={
+                                                            <Checkbox
+                                                                checked={formData.lgPremier}
+                                                                onChange={(e) => setFormData({ ...formData, lgPremier: e.target.checked })}
+                                                            />
+                                                        }
+                                                        label="LG 프리미어 약정 적용"
+                                                    />
+                                                    {formData.lgPremier && (
+                                                        <Typography variant="body2" color="error" sx={{ ml: 4 }}>
+                                                            -5,250원
+                                                        </Typography>
+                                                    )}
+                                                </Grid>
+                                            )}
                                         {/* 부가서비스 및 보험 적용시 금액 변경 */}
                                         <Grid item xs={12}>
                                             <Divider sx={{ my: 1 }} />
@@ -2020,11 +2012,11 @@ const OpeningInfoPage = ({
                                 }
                                 return groupNumber >= 85;
                             })() && (
-                                <Stack direction="row" justifyContent="space-between" mb={1}>
-                                    <Typography variant="body2">LG 프리미어 할인</Typography>
-                                    <Typography variant="body2" color="error">-5,250원</Typography>
-                                </Stack>
-                            )}
+                                    <Stack direction="row" justifyContent="space-between" mb={1}>
+                                        <Typography variant="body2">LG 프리미어 할인</Typography>
+                                        <Typography variant="body2" color="error">-5,250원</Typography>
+                                    </Stack>
+                                )}
                             {selectedItems.length > 0 && (
                                 <Stack direction="row" justifyContent="space-between" mb={1}>
                                     <Typography variant="body2">부가서비스 및 보험</Typography>

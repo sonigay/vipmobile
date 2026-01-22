@@ -152,17 +152,42 @@ function logWarningOnce(key, message, data = {}) {
 
 // Rate limiting을 위한 전역 큐 시스템
 let lastApiCallTime = 0;
-const MIN_API_INTERVAL_MS = 2000; // 최소 2초 간격으로 API 호출 (Google Sheets API 분당 60회 제한 고려)
-const MAX_CONCURRENT_SHEETS_REQUESTS = 2; // 동시 요청 수 제한 (2개로 제한하여 rate limit 방지)
+const MIN_API_INTERVAL_MS = 500; // 최소 0.5초 간격으로 API 호출 (기존 2초에서 대폭 단축하여 로딩 성능 개선)
+const MAX_CONCURRENT_SHEETS_REQUESTS = 5; // 동시 요청 수 제한 (기존 2개에서 5개로 증가)
 let currentSheetsRequests = 0;
 const sheetsRequestQueue = [];
+
+// SWR 캐시 설정
+const CACHE_FRESH_TTL = 5 * 60 * 1000; // 5분 (신선한 상태)
+const CACHE_STALE_TTL = 30 * 60 * 1000; // 30분 (만료되었지만 사용 가능한 상태)
+const backgroundRefreshing = new Set(); // 현재 백그라운드에서 갱신 중인 키 목록
+
+function getCacheEntry(key) {
+  const entry = cacheStore.get(key);
+  if (!entry) return null;
+
+  const now = Date.now();
+  const isFresh = now < entry.expires;
+  const isStale = now < entry.expires + (CACHE_STALE_TTL - CACHE_FRESH_TTL);
+
+  if (!isFresh && !isStale) {
+    cacheStore.delete(key);
+    return null;
+  }
+
+  return {
+    data: entry.data,
+    isFresh,
+    isStale: !isFresh && isStale
+  };
+}
 
 // 요청 큐 처리 함수
 async function processSheetsRequestQueue() {
   if (sheetsRequestQueue.length > 0 && currentSheetsRequests < MAX_CONCURRENT_SHEETS_REQUESTS) {
     const { resolve, reject, fn } = sheetsRequestQueue.shift();
     currentSheetsRequests++;
-    
+
     try {
       const result = await fn();
       resolve(result);
@@ -230,7 +255,7 @@ async function withRetry(fn, maxRetries = 5, baseDelay = 2000) {
             await new Promise(resolve => setTimeout(resolve, delay));
             continue;
           }
-          
+
           // Rate limit 에러가 아니거나 최대 재시도 횟수 초과 시
           if (attempt === maxRetries - 1 || !isRateLimitError) {
             reject(error);
@@ -248,29 +273,55 @@ async function withRetry(fn, maxRetries = 5, baseDelay = 2000) {
       reject,
       fn: executeRequest
     });
-    
+
     // 큐 처리 시작
     processSheetsRequestQueue();
   });
 }
 
-// 동시 요청 방지를 위한 래퍼 함수 (재시도 로직 포함)
-async function withRequestDeduplication(key, fetchFn) {
-  // 캐시 확인
-  const cached = getCache(key);
-  if (cached) {
-    return cached;
+// 동시 요청 방지를 위한 래퍼 함수 (재시도 로직 포함 + SWR 지원)
+async function withRequestDeduplication(key, fetchFn, ttlOverride = null) {
+  const ttl = ttlOverride || CACHE_FRESH_TTL;
+
+  // 1. 캐시 확인 (SWR 로직)
+  const cacheEntry = getCacheEntry(key);
+  if (cacheEntry) {
+    if (cacheEntry.isFresh) {
+      return cacheEntry.data;
+    }
+
+    // Stale한 경우: 데이터를 즉시 반환하고 백그라운드에서 갱신 시도
+    if (cacheEntry.isStale && !backgroundRefreshing.has(key) && !pendingRequests.has(key)) {
+      console.log(`[SWR] '${key}' 캐시가 오래됨(Stale). 백그라운드 갱신 시작.`);
+      backgroundRefreshing.add(key);
+
+      // 백그라운드에서 실행 (await 하지 않음)
+      withRetry(fetchFn)
+        .then(data => {
+          setCache(key, data, ttl);
+          console.log(`[SWR] '${key}' 백그라운드 갱신 완료.`);
+        })
+        .catch(err => {
+          console.warn(`[SWR] '${key}' 백그라운드 갱신 실패:`, err.message);
+        })
+        .finally(() => {
+          backgroundRefreshing.delete(key);
+        });
+    }
+
+    // Stale 데이터를 즉시 반환
+    return cacheEntry.data;
   }
 
-  // 이미 진행 중인 요청이 있으면 대기
+  // 2. 캐시가 없거나 완전히 만료된 경우: 이미 진행 중인 요청이 있는지 확인
   if (pendingRequests.has(key)) {
     return pendingRequests.get(key);
   }
 
-  // 새로운 요청 시작 (재시도 로직 포함)
+  // 3. 완전히 새로운 요청 시작
   const promise = withRetry(fetchFn)
     .then(data => {
-      setCache(key, data, 10 * 60 * 1000); // 10분 캐시
+      setCache(key, data, ttl);
       pendingRequests.delete(key);
       return data;
     })
@@ -306,19 +357,19 @@ async function getPolicySettings(carrier) {
       return rowCarrier === targetCarrier;
     });
     // 설정된 마진이 없으면 기본값을 0원으로 처리
-    const marginValue = marginRow && marginRow[1] !== undefined && marginRow[1] !== null && marginRow[1] !== '' 
-      ? marginRow[1] 
+    const marginValue = marginRow && marginRow[1] !== undefined && marginRow[1] !== null && marginRow[1] !== ''
+      ? marginRow[1]
       : null;
     const baseMargin = marginValue !== null ? Number(marginValue) || 0 : 0;
-    
+
     // 🔥 디버그: 정책 마진 읽기 확인 (상세 로그)
     console.log(`[Direct][getPolicySettings] ${carrier} 정책마진 읽기:`, {
       sheetName: SHEET_POLICY_MARGIN,
       allRowsCount: allMarginRows.length,
       marginRowsCount: marginRows.length,
       foundRow: marginRow ? true : false,
-      marginRowData: marginRow ? { 
-        carrier: marginRow[0], 
+      marginRowData: marginRow ? {
+        carrier: marginRow[0],
         carrierType: typeof marginRow[0],
         margin: marginRow[1],
         marginType: typeof marginRow[1],
@@ -329,9 +380,9 @@ async function getPolicySettings(carrier) {
       } : null,
       marginValue: marginValue,
       finalBaseMargin: baseMargin,
-      allCarriers: marginRows.map((r, idx) => ({ 
-        index: idx, 
-        carrier: r[0], 
+      allCarriers: marginRows.map((r, idx) => ({
+        index: idx,
+        carrier: r[0],
         carrierType: typeof r[0],
         margin: r[1],
         marginType: typeof r[1],
@@ -508,7 +559,7 @@ async function rebuildPlanMaster(carriersParam) {
     });
     const existingRows = existingRes.data.values || [];
     const existingDataRowCount = existingRows.length - 1; // 헤더 제외
-    
+
     // 헤더를 제외한 모든 행 삭제 (행이 있는 경우만)
     if (existingDataRowCount > 0) {
       const sheetId = await getSheetId(sheets, SPREADSHEET_ID, SHEET_PLAN_MASTER);
@@ -862,7 +913,7 @@ async function rebuildDeviceMaster(carriersParam) {
     });
     const existingRows = existingRes.data.values || [];
     const existingDataRowCount = existingRows.length - 1; // 헤더 제외
-    
+
     // 헤더를 제외한 모든 행 삭제 (행이 있는 경우만)
     if (existingDataRowCount > 0) {
       const sheetId = await getSheetId(sheets, SPREADSHEET_ID, SHEET_MOBILE_MASTER);
@@ -907,12 +958,12 @@ async function rebuildDeviceMaster(carriersParam) {
     // 시트 크기 확인 및 확장
     const requiredRows = filteredRows.length + 1; // 헤더 포함
     const requiredCols = Math.max(...filteredRows.map(row => row.length), 18); // 최소 18열 (R열)
-    
+
     try {
       const sheetId = await getSheetId(sheets, SPREADSHEET_ID, SHEET_MOBILE_MASTER);
       if (sheetId !== null) {
         const spreadsheet = await withRetry(async () => {
-          return await sheets.spreadsheets.get({ 
+          return await sheets.spreadsheets.get({
             spreadsheetId: SPREADSHEET_ID,
             fields: 'sheets.properties'
           });
@@ -921,7 +972,7 @@ async function rebuildDeviceMaster(carriersParam) {
         if (sheet && sheet.properties.gridProperties) {
           const currentRows = sheet.properties.gridProperties.rowCount || 1;
           const currentCols = sheet.properties.gridProperties.columnCount || 26;
-          
+
           if (currentRows < requiredRows || currentCols < requiredCols) {
             console.log(`[Direct][rebuildDeviceMaster] 시트 크기 확장: ${currentRows}행/${currentCols}열 -> ${requiredRows}행/${requiredCols}열`);
             await withRetry(async () => {
@@ -949,7 +1000,7 @@ async function rebuildDeviceMaster(carriersParam) {
     } catch (expandErr) {
       console.warn('[Direct][rebuildDeviceMaster] 시트 크기 확장 실패 (계속 진행):', expandErr.message);
     }
-    
+
     await withRetry(async () => {
       // A2부터 시작하도록 명시 (헤더는 A1에 있음)
       return await sheets.spreadsheets.values.update({
@@ -977,27 +1028,27 @@ async function rebuildPricingMaster(carriersParam) {
     const res = await withRetry(() => sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: SHEET_MOBILE_MASTER }));
     const rows = (res.data.values || []).slice(1);
     mobileMasterRows = rows.filter(r => (r[13] || 'Y').toString().toUpperCase() !== 'N');
-    
+
     if (mobileMasterRows.length === 0) {
       console.warn('[Direct][rebuildPricingMaster] 단말 마스터에 활성화된 모델이 없습니다.');
-      return { 
-        totalCount: 0, 
-        perCarrier: { 
+      return {
+        totalCount: 0,
+        perCarrier: {
           SK: { count: 0, warning: '단말 마스터에 활성화된 모델이 없습니다.' },
           KT: { count: 0, warning: '단말 마스터에 활성화된 모델이 없습니다.' },
           LG: { count: 0, warning: '단말 마스터에 활성화된 모델이 없습니다.' }
-        } 
+        }
       };
     }
   } catch (err) {
     console.error('[Direct][rebuildPricingMaster] 단말 마스터 읽기 실패:', err);
-    return { 
-      totalCount: 0, 
-      perCarrier: { 
+    return {
+      totalCount: 0,
+      perCarrier: {
         SK: { count: 0, error: '단말 마스터 읽기 실패' },
         KT: { count: 0, error: '단말 마스터 읽기 실패' },
         LG: { count: 0, error: '단말 마스터 읽기 실패' }
-      } 
+      }
     };
   }
 
@@ -1078,7 +1129,7 @@ async function rebuildPricingMaster(carriersParam) {
           // 🔥 성능 개선: 모든 리베이트 범위를 병렬로 읽기
           const rebateLoadPromises = [];
           const rebateLoadMap = new Map(); // key: `${pgName}|${openingType}`, value: { pgName, openingType, range }
-          
+
           for (const [pgName, typeRanges] of Object.entries(policyPlanGroupRanges)) {
             if (typeof typeRanges !== 'object') continue;
             if (!policyRebateData[pgName]) policyRebateData[pgName] = {};
@@ -1108,7 +1159,7 @@ async function rebuildPricingMaster(carriersParam) {
           // 결과 처리
           for (const result of rebateResults) {
             const { pgName, openingType, range } = rebateLoadMap.get(result.key);
-            
+
             if (!result.success) {
               console.warn(`[Direct][rebuildPricingMaster] ${carrier} 리베이트 범위 로딩 실패:`, {
                 planGroup: pgName,
@@ -1162,7 +1213,7 @@ async function rebuildPricingMaster(carriersParam) {
     const supportOpeningTypeRange = openingTypeRange || '';
     const modelData = await getSheetData(supportSheetId, modelRange);
     const openingTypeData = supportOpeningTypeRange ? await getSheetData(supportSheetId, supportOpeningTypeRange) : [];
-    
+
     // 모델명 리스트 (매칭용)
     const supportModelsRaw = (modelData || []).flat().map(v => (v || '').toString().trim());
     let supportOpeningTypeRows = openingTypeData || [];
@@ -1172,7 +1223,7 @@ async function rebuildPricingMaster(carriersParam) {
     const planGroupDataMapRaw = {}; // Key: PlanGroup -> Array of Supports
     const supportLoadPromises = [];
     const supportLoadMap = new Map(); // key: pgName, value: pgRange
-    
+
     for (const [pgName, pgRange] of Object.entries(planGroupRanges)) {
       if (!pgRange) continue;
       supportLoadMap.set(pgName, pgRange);
@@ -1250,16 +1301,16 @@ async function rebuildPricingMaster(carriersParam) {
       // 혹시 읽지 못한 경우에만 다시 읽기
       supportOpeningTypeRows = await getSheetData(supportSheetId, supportOpeningTypeRange);
     }
-    
+
     if (supportOpeningTypeRange) {
-      
+
       // 🔥 성능 개선: 디버깅 로그는 개발 환경에서만 실행 (프로덕션 성능 향상)
       if (process.env.NODE_ENV === 'development' && validIndexes.length > 0) {
         const firstOriginalIndex = validIndexes[0];
         const firstModelName = (supportModelsRaw[firstOriginalIndex] || '').toString().trim();
         // 같은 인덱스 사용 (오프셋 없이)
         const firstOpeningTypeRaw = (supportOpeningTypeRows[firstOriginalIndex]?.[0] || '').toString().trim();
-        
+
         // 첫 번째 모델의 모든 행 찾기 (같은 모델명이 여러 행에 있을 수 있음)
         // 주의: 모델명이 연속되지 않을 수 있으므로 validIndexes 전체를 검색
         const firstModelEntries = [];
@@ -1278,7 +1329,7 @@ async function rebuildPricingMaster(carriersParam) {
           // 하지만 성능을 위해 처음 20개 행만 검색
           if (i >= 20) break;
         }
-        
+
         console.log(`[Direct][rebuildPricingMaster] ${carrier} openingType 데이터 확인:`, {
           modelRange,
           openingTypeRange: supportOpeningTypeRange,
@@ -1305,7 +1356,7 @@ async function rebuildPricingMaster(carriersParam) {
       // planGroupSupportData 생성 시에도 같은 인덱스를 사용하므로, 여기서도 같은 인덱스 사용
       // supportModelsRaw와 supportOpeningTypeRows는 같은 시작 행에서 시작한다고 가정
       const openingTypeIndex = originalIndex;
-      
+
       // 배열 범위 체크 및 안전한 접근
       let openingTypeRaw = '';
       if (openingTypeIndex >= 0 && openingTypeIndex < supportOpeningTypeRows.length) {
@@ -1314,7 +1365,7 @@ async function rebuildPricingMaster(carriersParam) {
         // 개발 환경에서만 경고 로그
         console.warn(`[Direct][rebuildPricingMaster] openingTypeIndex 범위 초과: originalIndex=${originalIndex}, calculatedIndex=${openingTypeIndex}, arrayLength=${supportOpeningTypeRows.length}`);
       }
-      
+
       const openingTypes = parseOpeningTypes(openingTypeRaw);
 
       if (!modelEntriesMap[modelName]) {
@@ -1409,7 +1460,7 @@ async function rebuildPricingMaster(carriersParam) {
     const baseMarginRaw = Number(safePolicySettings.baseMargin) || 0;
     const specialPolicySumNum = Number(specialPolicySum) || 0;
     const baseMargin = baseMarginRaw + specialPolicySumNum;
-    
+
     // 🔥 디버그: baseMargin 계산 확인 (항상 로그 출력하여 문제 추적)
     console.log(`[Direct][rebuildPricingMaster] ${carrier} 정책마진 계산:`, {
       baseMarginFromSettings: safePolicySettings.baseMargin,
@@ -1452,7 +1503,7 @@ async function rebuildPricingMaster(carriersParam) {
           const supportKey1 = `${modelName}|${openingType}`;
           const supportKey2 = `${normalizeModelCode(modelName)}|${openingType}`;
           const supportDataEntry = supportMapForGroup[supportKey1] ||
-                                   supportMapForGroup[supportKey2];
+            supportMapForGroup[supportKey2];
 
           if (supportDataEntry != null) {
             publicSupport = Number(supportDataEntry) || 0;
@@ -1556,7 +1607,7 @@ async function rebuildPricingMaster(carriersParam) {
             + totalAddonIncentive
             + totalSpecialAddition
           );
-          
+
           // 🔥 디버그: 대리점추가지원금 계산 확인 (특정 모델만)
           if (process.env.NODE_ENV === 'development' && modelName === 'SM-A166L' && planGroup === '33군' && openingType === 'MNP') {
             console.log(`[Direct][rebuildPricingMaster] ${carrier} 대리점추가지원금 계산 (${modelName}, ${planGroup}, ${openingType}):`, {
@@ -1740,7 +1791,7 @@ function invalidateDirectStoreCache(carrier = null) {
       }
     }
   }
-  
+
   // 레거시 캐시 키도 삭제 (하위 호환성)
   if (carrier) {
     deleteCache(`mobiles-${carrier}`);
@@ -1758,10 +1809,10 @@ function invalidateDirectStoreCache(carrier = null) {
     deleteCache('mobiles-KT-v6');
     deleteCache('mobiles-LG-v6');
   }
-  
+
   // 동적으로 생성된 캐시 키 삭제
   keysToDelete.forEach(key => deleteCache(key));
-  
+
   deleteCache('todays-mobiles');
   console.log(`[Direct] 직영점 캐시 무효화 완료: ${carrier || '모든 통신사'} (${keysToDelete.length}개 동적 키 + 레거시 키)`);
 }
@@ -1830,8 +1881,8 @@ async function ensureSheetHeaders(sheets, spreadsheetId, sheetName, headers) {
     });
     const firstRow = res.data.values && res.data.values[0] ? res.data.values[0] : [];
     // 🔥 수정: 헤더 길이가 다르거나 내용이 다르면 업데이트 (기존 헤더가 더 긴 경우도 처리)
-    const needsInit = firstRow.length === 0 || 
-      firstRow.length !== headers.length || 
+    const needsInit = firstRow.length === 0 ||
+      firstRow.length !== headers.length ||
       headers.some((h, i) => (firstRow[i] || '').toString().trim() !== h.toString().trim());
     if (needsInit) {
       await withRetry(async () => {
@@ -1839,7 +1890,7 @@ async function ensureSheetHeaders(sheets, spreadsheetId, sheetName, headers) {
         // 🔥 수정: 기존 헤더가 더 긴 경우, 나머지 컬럼도 빈 값으로 업데이트하여 중복 제거
         let updateRange = `${sheetName}!A1:${lastColumn}1`;
         let updateValues = [headers];
-        
+
         // 기존 헤더가 더 긴 경우, 나머지 컬럼도 빈 값으로 업데이트
         if (firstRow.length > headers.length) {
           const oldLastColumn = getColumnLetter(firstRow.length);
@@ -1851,7 +1902,7 @@ async function ensureSheetHeaders(sheets, spreadsheetId, sheetName, headers) {
           }
           updateValues = [extendedHeaders];
         }
-        
+
         // 범위를 명시적으로 지정하여 업데이트
         return await sheets.spreadsheets.values.update({
           spreadsheetId,
@@ -1881,8 +1932,8 @@ async function ensureSheetHeaders(sheets, spreadsheetId, sheetName, headers) {
         });
         const firstRow = res.data.values && res.data.values[0] ? res.data.values[0] : [];
         // 🔥 수정: 헤더 길이가 다르거나 내용이 다르면 업데이트 (기존 헤더가 더 긴 경우도 처리)
-        const needsInit = firstRow.length === 0 || 
-          firstRow.length !== headers.length || 
+        const needsInit = firstRow.length === 0 ||
+          firstRow.length !== headers.length ||
           headers.some((h, i) => (firstRow[i] || '').toString().trim() !== h.toString().trim());
         if (needsInit) {
           await withRetry(async () => {
@@ -1890,7 +1941,7 @@ async function ensureSheetHeaders(sheets, spreadsheetId, sheetName, headers) {
             // 🔥 수정: 기존 헤더가 더 긴 경우, 나머지 컬럼도 빈 값으로 업데이트하여 중복 제거
             let updateRange = `${sheetName}!A1:${lastColumn}1`;
             let updateValues = [headers];
-            
+
             // 기존 헤더가 더 긴 경우, 나머지 컬럼도 빈 값으로 업데이트
             if (firstRow.length > headers.length) {
               const oldLastColumn = getColumnLetter(firstRow.length);
@@ -1902,7 +1953,7 @@ async function ensureSheetHeaders(sheets, spreadsheetId, sheetName, headers) {
               }
               updateValues = [extendedHeaders];
             }
-            
+
             // 범위를 명시적으로 지정하여 업데이트
             return await sheets.spreadsheets.values.update({
               spreadsheetId,
@@ -2447,7 +2498,7 @@ function setupDirectRoutes(app) {
     try {
       const carrier = req.query.carrier || 'SK';
       const noCache = req.query.noCache === 'true' || req.query.noCache === '1';
-      
+
       // 캐시 확인 (noCache가 true이면 캐시 무시)
       const cacheKey = `policy-settings-${carrier}`;
       if (!noCache) {
@@ -2557,7 +2608,7 @@ function setupDirectRoutes(app) {
           } catch (e) {
             console.warn(`[Direct][getPolicySettings] 정책 조건 JSON 파싱 실패: ${row[1]}`, e);
           }
-          
+
           return {
             id: idx + 1,
             name: (row[1] || '').trim(),
@@ -2575,10 +2626,10 @@ function setupDirectRoutes(app) {
         insurance: { list: insurances },
         special: { list: specialPolicies }
       };
-      
+
       // 캐시 저장 (5분)
       setCache(cacheKey, result, 5 * 60 * 1000);
-      
+
       res.json(result);
     } catch (error) {
       console.error('[Direct] policy-settings GET error:', error);
@@ -2783,12 +2834,12 @@ function setupDirectRoutes(app) {
               conditionsJsonStr = JSON.stringify(item.conditionsJson);
             }
           }
-          
+
           // 🔥 amount 필드 사용 (기존 addition/deduction도 지원)
-          const amount = item.amount !== undefined 
-            ? item.amount 
+          const amount = item.amount !== undefined
+            ? item.amount
             : ((item.addition || 0) - (item.deduction || 0));
-          
+
           return [
             carrier,
             item.name || '',
@@ -3254,7 +3305,7 @@ function setupDirectRoutes(app) {
       // 🔥 Rate Limit 방지: 순차 처리로 변경 (Promise.all 대신)
       let modelData = [];
       let petNameData = [];
-      
+
       if (modelRange) {
         try {
           const modelRes = await withRetry(async () => {
@@ -3271,7 +3322,7 @@ function setupDirectRoutes(app) {
           modelData = [];
         }
       }
-      
+
       if (petNameRange) {
         try {
           const petNameRes = await withRetry(async () => {
@@ -3304,7 +3355,7 @@ function setupDirectRoutes(app) {
           // 이통사 지원금 시트에서 모델명, 출고가, 개통유형 읽기
           // 🔥 Rate Limit 방지: 순차 처리로 변경 (Promise.all 대신)
           let supportFactoryPriceData = [];
-          
+
           try {
             const supportModelRes = await withRetry(async () => {
               return await sheets.spreadsheets.values.get({
@@ -3319,7 +3370,7 @@ function setupDirectRoutes(app) {
             console.warn(`[Direct] 이통사 지원금 모델명 읽기 실패:`, err.message);
             supportModelData = [];
           }
-          
+
           if (factoryPriceRange) {
             try {
               const factoryPriceRes = await withRetry(async () => {
@@ -3336,7 +3387,7 @@ function setupDirectRoutes(app) {
               supportFactoryPriceData = [];
             }
           }
-          
+
           if (openingTypeRange) {
             try {
               const openingTypeRes = await withRetry(async () => {
@@ -5038,14 +5089,14 @@ function setupDirectRoutes(app) {
     try {
       const carrier = req.query.carrier || 'SK';
       const includeMeta = req.query.meta === '1';
-      
+
       // 🔥 캐시 버전: 버그 수정 시 버전을 올려서 이전 캐시 무효화
       const MOBILES_CACHE_VERSION = 'v6'; // v6: 직영점_단말마스터 순서 기준 정렬 추가
-      
+
       // 정책표 모델 순서 해시 계산 (변경 감지용) - 캐시 우선 확인
       const policyHashCacheKey = `policy-hash-${carrier}`;
       let policyOrderHash = getCache(policyHashCacheKey) || '';
-      
+
       // 캐시에 없거나 Rate Limit 에러가 아닌 경우에만 계산
       if (!policyOrderHash) {
         try {
@@ -5100,7 +5151,7 @@ function setupDirectRoutes(app) {
           policyOrderHash = '';
         }
       }
-      
+
       const cacheKey = `mobiles-${carrier}-${MOBILES_CACHE_VERSION}-${policyOrderHash}`;
       const cached = getCache(cacheKey);
       if (cached) {
@@ -5148,7 +5199,7 @@ function setupDirectRoutes(app) {
           }
           return res.json(cached);
         }
-        
+
         // 캐시도 없으면 에러 메시지 반환
         const errorMsg = 'Google Sheets API 할당량 초과로 데이터를 가져올 수 없습니다. 잠시 후 다시 시도해주세요.';
         if (includeMeta) {
@@ -5295,7 +5346,7 @@ function setupDirectRoutes(app) {
       let carrier = carrierFromBody;
       let index = null;
       let modelNameFromId = null;
-      
+
       const parts = modelId.split('-');
       if (parts.length >= 3 && parts[0] === 'mobile') {
         // 형식: mobile-{carrier}-{index}
@@ -5358,7 +5409,7 @@ function setupDirectRoutes(app) {
           return res.status(500).json({ success: false, error: '모델명을 읽을 수 없습니다.', message: err.message });
         }
       }
-      
+
       // 실제 모델 ID를 사용하는 경우, 정책표 조회 없이 바로 사용
       if (!modelName && modelNameFromId) {
         modelName = modelNameFromId;
@@ -5464,7 +5515,7 @@ function setupDirectRoutes(app) {
           range: `${SHEET_MOBILE_MASTER}!A:R`
         });
         const masterRows = (masterRes.data.values || []).slice(1);
-        
+
         // 모델명과 통신사로 해당 행 찾기 (정규화된 모델명도 시도)
         const normalizedModelName = normalizeModelCode(modelName);
         let masterRowIndex = masterRows.findIndex(row => {
@@ -5480,14 +5531,14 @@ function setupDirectRoutes(app) {
         if (masterRowIndex !== -1) {
           // 기존 행 정보 가져오기
           const existingMasterRow = masterRows[masterRowIndex];
-          
+
           // 태그 컬럼 업데이트 (7: isPremium, 8: isBudget, 9: isPopular, 10: isRecommended, 11: isCheap)
           const updatedMasterRow = [...existingMasterRow];
           // 행이 18개 컬럼보다 짧으면 확장
           while (updatedMasterRow.length < 18) {
             updatedMasterRow.push('');
           }
-          
+
           updatedMasterRow[7] = isPremium ? 'Y' : 'N';  // isPremium
           updatedMasterRow[8] = isBudget ? 'Y' : 'N';    // isBudget
           updatedMasterRow[9] = isPopular ? 'Y' : 'N';  // isPopular
@@ -6847,7 +6898,7 @@ function setupDirectRoutes(app) {
   });
 
   // === 매장별 슬라이드쇼 설정 관리 API ===
-  
+
   // GET /api/direct/store-slideshow-settings?storeId=xxx: 매장별 슬라이드쇼 설정 조회
   router.get('/store-slideshow-settings', async (req, res) => {
     try {
@@ -6857,7 +6908,7 @@ function setupDirectRoutes(app) {
       }
 
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
-      
+
       // 시트 헤더 확인 및 생성
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_SETTINGS, HEADERS_SETTINGS);
 
@@ -6868,7 +6919,7 @@ function setupDirectRoutes(app) {
       });
 
       const rows = (response.data.values || []).slice(1);
-      
+
       // 매장별 슬라이드쇼 설정 찾기
       const storeSetting = rows.find(row => {
         const settingType = (row[1] || '').trim();
@@ -6904,13 +6955,13 @@ function setupDirectRoutes(app) {
   router.post('/store-slideshow-settings', async (req, res) => {
     try {
       const { storeId, slideSettings, mainHeaderText, transitionPageTexts } = req.body;
-      
+
       if (!storeId) {
         return res.status(400).json({ success: false, error: '매장ID가 필요합니다.' });
       }
 
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
-      
+
       // 시트 헤더 확인 및 생성
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_SETTINGS, HEADERS_SETTINGS);
 
@@ -6921,7 +6972,7 @@ function setupDirectRoutes(app) {
       });
 
       const rows = (response.data.values || []).slice(1);
-      
+
       // 저장할 설정 객체 구성
       const settingsData = {
         storeId,
@@ -6999,7 +7050,7 @@ function setupDirectRoutes(app) {
       }
 
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
-      
+
       // 1. 매장별 설정 조회 (withRetry 사용)
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_SETTINGS, HEADERS_SETTINGS);
       const settingsResponse = await withRetry(async () =>
@@ -7009,7 +7060,7 @@ function setupDirectRoutes(app) {
         })
       );
       const settingsRows = (settingsResponse.data.values || []).slice(1);
-      
+
       let storeMainPageTexts = null;
       const storeSetting = settingsRows.find(row => {
         const settingType = (row[1] || '').trim();
@@ -7040,7 +7091,7 @@ function setupDirectRoutes(app) {
       // 2. 통신사별 기본값 조회 (별도 캐싱으로 재사용)
       const defaultTextsCacheKey = 'store-main-page-texts-defaults';
       let defaultTexts = getCache(defaultTextsCacheKey);
-      
+
       if (!defaultTexts) {
         await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_MAIN_PAGE_TEXTS, HEADERS_MAIN_PAGE_TEXTS);
         const mainPageResponse = await withRetry(async () =>
@@ -7057,29 +7108,29 @@ function setupDirectRoutes(app) {
         };
 
         mainPageRows.forEach(row => {
-        const carrier = (row[0] || '').trim();
-        const category = (row[1] || '').trim();
-        const textType = (row[2] || '').trim();
-        const content = (row[3] || '').trim();
-        const imageUrl = (row[4] || '').trim();
-        const updatedAt = (row[5] || '').trim();
+          const carrier = (row[0] || '').trim();
+          const category = (row[1] || '').trim();
+          const textType = (row[2] || '').trim();
+          const content = (row[3] || '').trim();
+          const imageUrl = (row[4] || '').trim();
+          const updatedAt = (row[5] || '').trim();
 
-        if (textType === 'mainHeader') {
-          defaultTexts.mainHeader = {
-            content,
-            imageUrl,
-            updatedAt
-          };
-        } else if (textType === 'transitionPage' && carrier && category) {
-          if (!defaultTexts.transitionPages[carrier]) {
-            defaultTexts.transitionPages[carrier] = {};
+          if (textType === 'mainHeader') {
+            defaultTexts.mainHeader = {
+              content,
+              imageUrl,
+              updatedAt
+            };
+          } else if (textType === 'transitionPage' && carrier && category) {
+            if (!defaultTexts.transitionPages[carrier]) {
+              defaultTexts.transitionPages[carrier] = {};
+            }
+            defaultTexts.transitionPages[carrier][category] = {
+              content,
+              imageUrl,
+              updatedAt
+            };
           }
-          defaultTexts.transitionPages[carrier][category] = {
-            content,
-            imageUrl,
-            updatedAt
-          };
-        }
         });
 
         // 기본값 캐싱 (5분)
@@ -7088,7 +7139,7 @@ function setupDirectRoutes(app) {
 
       // 3. 매장별 설정이 있으면 우선 사용, 없으면 기본값 사용
       const result = {
-        mainHeader: storeMainPageTexts?.mainHeaderText 
+        mainHeader: storeMainPageTexts?.mainHeaderText
           ? { content: storeMainPageTexts.mainHeaderText, imageUrl: '', updatedAt: '' }
           : defaultTexts.mainHeader,
         transitionPages: {}
@@ -7097,7 +7148,7 @@ function setupDirectRoutes(app) {
       // 통신사별 연결페이지 텍스트 병합 (매장별 설정 우선)
       const carriers = ['SK', 'KT', 'LG'];
       const categories = ['budget', 'premium'];
-      
+
       carriers.forEach(carrier => {
         result.transitionPages[carrier] = {};
         categories.forEach(category => {
@@ -7105,7 +7156,7 @@ function setupDirectRoutes(app) {
           const storeText = storeMainPageTexts?.transitionPageTexts?.[carrier]?.[category];
           // 기본값에서 가져온 값 (객체: { content, imageUrl, updatedAt })
           const defaultText = defaultTexts.transitionPages[carrier]?.[category];
-          
+
           // 매장별 설정이 있으면 우선 사용 (문자열을 객체로 변환)
           // 없으면 기본값 사용
           result.transitionPages[carrier][category] = storeText
@@ -7614,7 +7665,7 @@ function setupDirectRoutes(app) {
       // 기존 행 데이터 가져오기
       const existingRow = rows[rowIndex];
       const updatedRow = [...existingRow];
-      
+
       // 배열 길이가 부족하면 확장 (36개 컬럼 보장)
       while (updatedRow.length < 36) {
         updatedRow.push('');
