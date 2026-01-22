@@ -7790,7 +7790,8 @@ app.post('/api/direct/refresh-store-photo-url', express.json(), async (req, res)
     const { ensureSheetHeaders } = require('./directRoutes');
     await ensureSheetHeaders(originalSheets, SPREADSHEET_ID, CUSTOMER_STORE_PHOTO_SHEET_NAME, HEADERS_STORE_PHOTO);
 
-    const values = await getSheetValues(CUSTOMER_STORE_PHOTO_SHEET_NAME);
+    // 🔥 수정: 레이스 컨디션 방지를 위해 캐시를 무시하고 항상 최신 데이터를 읽어옴
+    const values = await getSheetValuesWithoutCache(CUSTOMER_STORE_PHOTO_SHEET_NAME);
     const rowIndex = values ? values.findIndex(row => row[0] === storeName) : -1;
 
     if (rowIndex === -1) {
@@ -7840,6 +7841,11 @@ app.post('/api/direct/refresh-store-photo-url', express.json(), async (req, res)
         resource: { values: [updatedRow] }
       })
     );
+
+    // 🔥 수정: 데이터가 변경되었으므로 즉시 캐시 무효화
+    const cacheKey = `sheet_${CUSTOMER_STORE_PHOTO_SHEET_NAME}_${SPREADSHEET_ID}`;
+    cacheUtils.delete(cacheKey);
+    console.log(`🗑️ [캐시 무효화] ${CUSTOMER_STORE_PHOTO_SHEET_NAME} 캐시 삭제됨 (갱신 후)`);
 
     console.log(`✅ [URL 갱신] 직영점_매장사진 업데이트 완료: ${storeName} - ${photoType}`);
 
