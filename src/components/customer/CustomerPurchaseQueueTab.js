@@ -30,7 +30,7 @@ const maskPersonalInfo = (name, ctn, isManagementMode = false) => {
     if (isManagementMode) {
         return { maskedName: name, maskedCtn: ctn };
     }
-    
+
     // 이름 마스킹: 앞글자와 맨뒷글자만 표시, 가운데는 ***
     let maskedName = name || '';
     if (maskedName.length > 2) {
@@ -38,7 +38,7 @@ const maskPersonalInfo = (name, ctn, isManagementMode = false) => {
     } else if (maskedName.length === 2) {
         maskedName = maskedName[0] + '*';
     }
-    
+
     // CTN 마스킹: 가운데 번호는 ****
     let maskedCtn = ctn || '';
     if (maskedCtn.length >= 11) {
@@ -48,7 +48,7 @@ const maskPersonalInfo = (name, ctn, isManagementMode = false) => {
         // 01012345678 -> 010****5678
         maskedCtn = maskedCtn.substring(0, 3) + '****' + maskedCtn.substring(7);
     }
-    
+
     return { maskedName, maskedCtn };
 };
 
@@ -68,7 +68,7 @@ const CustomerPurchaseQueueTab = ({ customerInfo, isManagementMode = false, logg
         setError(null);
         try {
             let data = [];
-            
+
             if (isManagementMode) {
                 // 직영점관리모드: 전체 구매대기 조회
                 data = await customerAPI.getAllQueue();
@@ -82,7 +82,7 @@ const CustomerPurchaseQueueTab = ({ customerInfo, isManagementMode = false, logg
                 if (!customerInfo?.ctn) return;
                 data = await customerAPI.getPurchaseQueue(customerInfo.ctn);
             }
-            
+
             // '삭제됨' 상태 제외
             setQueue(data.filter(item => item.status !== '삭제됨'));
         } catch (err) {
@@ -165,11 +165,11 @@ const CustomerPurchaseQueueTab = ({ customerInfo, isManagementMode = false, logg
 
     return (
         <Box sx={{ p: { xs: 1, sm: 3 }, height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <Box sx={{ 
-                display: 'flex', 
+            <Box sx={{
+                display: 'flex',
                 flexDirection: { xs: 'column', sm: 'row' },
-                justifyContent: 'space-between', 
-                alignItems: { xs: 'flex-start', sm: 'center' }, 
+                justifyContent: 'space-between',
+                alignItems: { xs: 'flex-start', sm: 'center' },
                 mb: 3,
                 gap: { xs: 2, sm: 0 }
             }}>
@@ -188,9 +188,9 @@ const CustomerPurchaseQueueTab = ({ customerInfo, isManagementMode = false, logg
                             </InputAdornment>
                         ),
                     }}
-                    sx={{ 
-                        bgcolor: 'background.paper', 
-                        borderRadius: 1, 
+                    sx={{
+                        bgcolor: 'background.paper',
+                        borderRadius: 1,
                         minWidth: { xs: '100%', sm: 250 },
                         width: { xs: '100%', sm: 'auto' }
                     }}
@@ -202,8 +202,8 @@ const CustomerPurchaseQueueTab = ({ customerInfo, isManagementMode = false, logg
                     <Typography color="text.secondary">대기 중인 구매 내역이 없습니다.</Typography>
                 </Paper>
             ) : (
-                <TableContainer 
-                    sx={{ 
+                <TableContainer
+                    sx={{
                         flexGrow: 1,
                         overflowX: 'auto',
                         overflowY: 'auto',
@@ -240,8 +240,8 @@ const CustomerPurchaseQueueTab = ({ customerInfo, isManagementMode = false, logg
                                         onClick={() => handleRowClick(row)}
                                         sx={{ cursor: 'pointer' }}
                                     >
-                                        <TableCell 
-                                            align="center" 
+                                        <TableCell
+                                            align="center"
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 handleRowClick(row);
@@ -275,7 +275,39 @@ const CustomerPurchaseQueueTab = ({ customerInfo, isManagementMode = false, logg
                                         <TableCell align="center" sx={{ width: '80px', fontSize: { xs: '0.75rem', sm: '0.875rem' }, whiteSpace: 'nowrap' }}>
                                             {row.createdAt ? new Date(row.createdAt).toLocaleDateString() : '-'}
                                         </TableCell>
-                                        <TableCell align="center" sx={{ width: '80px', fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>{maskedName}</TableCell>
+                                        <TableCell align="center" sx={{ width: '80px', fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+                                                <Typography variant="body2" sx={{ fontSize: 'inherit' }}>{maskedName}</Typography>
+                                                {row.isAnonymous && (
+                                                    <Chip
+                                                        label="첫구매 고객"
+                                                        size="small"
+                                                        color="warning"
+                                                        variant="filled"
+                                                        sx={{
+                                                            fontSize: '0.65rem',
+                                                            height: '18px',
+                                                            '& .MuiChip-label': { px: 0.5 }
+                                                        }}
+                                                    />
+                                                )}
+                                                {(isManagementMode || loggedInStore) && (row.ip || row.deviceInfo) && (
+                                                    <Tooltip
+                                                        title={
+                                                            <Box sx={{ p: 0.5 }}>
+                                                                <Typography variant="caption" display="block">IP: {row.ip || '미수집'}</Typography>
+                                                                <Typography variant="caption" display="block">기기: {row.deviceInfo || '미수집'}</Typography>
+                                                            </Box>
+                                                        }
+                                                        arrow
+                                                    >
+                                                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6rem', cursor: 'help', borderBottom: '1px dotted' }}>
+                                                            추적정보
+                                                        </Typography>
+                                                    </Tooltip>
+                                                )}
+                                            </Box>
+                                        </TableCell>
                                         <TableCell align="center" sx={{ width: '100px', fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>{maskedCtn}</TableCell>
                                         <TableCell align="center" sx={{ width: '60px' }}>
                                             <Chip
@@ -354,69 +386,69 @@ const CustomerPurchaseQueueTab = ({ customerInfo, isManagementMode = false, logg
                     <DialogTitle sx={{ fontSize: { xs: '1rem', sm: '1.25rem' }, py: { xs: 1.5, sm: 2 } }}>
                         구매 대기 정보 수정
                     </DialogTitle>
-                    <DialogContent 
+                    <DialogContent
                         dividers
-                        sx={{ 
+                        sx={{
                             p: { xs: 1, sm: 3 },
                             overflowY: 'auto',
                             WebkitOverflowScrolling: 'touch',
                             maxHeight: { xs: 'calc(100vh - 120px)', sm: 'calc(90vh - 120px)' }
                         }}
                     >
-                        <Box sx={{ 
+                        <Box sx={{
                             '& .print-root': {
                                 p: { xs: 1, sm: 3 }
                             }
                         }}>
                             <OpeningInfoPage
-                            initialData={{
-                                ...selectedRow,
-                                purchaseQueueId: selectedRow.id, // 구매대기 항목 ID (수정 모드 구분용)
-                                model: selectedRow.model,
-                                petName: selectedRow.model,
-                                factoryPrice: selectedRow.factoryPrice || 0,
-                                publicSupport: selectedRow.carrierSupport || 0,
-                                // 🔥 수정: 구매대기에서 저장된 대리점추가지원금을 정확히 전달
-                                storeSupport: selectedRow.dealerSupportWithAdd || 0, // 저장된 대리점추가지원금
-                                대리점추가지원금: selectedRow.dealerSupportWithAdd || 0, // 한글 필드명도 추가
-                                // 🔥 수정: dealerSupportWithoutAdd는 실제로는 대리점추가지원금직접입력이므로 additionalStoreSupport로 매핑
-                                additionalStoreSupport: selectedRow.dealerSupportWithoutAdd !== undefined && selectedRow.dealerSupportWithoutAdd !== null ? Number(selectedRow.dealerSupportWithoutAdd) : null,
-                                대리점추가지원금직접입력: selectedRow.dealerSupportWithoutAdd !== undefined && selectedRow.dealerSupportWithoutAdd !== null ? Number(selectedRow.dealerSupportWithoutAdd) : null,
-                                // 🔥 추가: 할부원금과 LG프리미어약정
-                                installmentPrincipal: selectedRow.installmentPrincipal || selectedRow.할부원금 || 0,
-                                할부원금: selectedRow.installmentPrincipal || selectedRow.할부원금 || 0,
-                                lgPremier: selectedRow.lgPremier !== undefined ? Boolean(selectedRow.lgPremier) : (selectedRow.프리미어약정 === 'Y' || selectedRow.프리미어약정 === true || false),
-                                프리미어약정: selectedRow.lgPremier !== undefined ? (selectedRow.lgPremier ? 'Y' : 'N') : (selectedRow.프리미어약정 || 'N'),
-                                openingType: reverseConvertOpeningType(selectedRow.activationType),
-                                customerName: selectedRow.name,
-                                customerContact: selectedRow.ctn,
-                                carrier: selectedRow.carrier,
-                                plan: selectedRow.plan,
-                                deviceColor: selectedRow.color,
-                                deviceSerial: selectedRow.deviceSerial,
-                                simModel: selectedRow.usimModel,
-                                simSerial: selectedRow.usimSerial,
-                                contractType: selectedRow.contractType === '선택약정' ? 'selected' : 'standard',
-                                installmentPeriod: selectedRow.installmentMonths || 24,
-                                paymentType: selectedRow.installmentType === '현금' ? 'cash' : 'installment',
-                                prevCarrier: selectedRow.oldCarrier
-                            }}
-                            onBack={async () => {
-                                await loadQueue(); // 목록 새로고침
-                                setShowEditDialog(false);
-                                setSelectedRow(null);
-                            }}
-                            mode={isManagementMode ? 'management' : loggedInStore ? 'directStore' : 'customer'}
-                            customerInfo={customerInfo}
-                            selectedStore={selectedRow.storeName ? {
-                                name: selectedRow.storeName,
-                                phone: selectedRow.storePhone,
-                                address: selectedRow.storeAddress,
-                                accountInfo: selectedRow.storeBankInfo
-                            } : null}
-                            loggedInStore={loggedInStore}
-                            saveToSheet="purchaseQueue"
-                        />
+                                initialData={{
+                                    ...selectedRow,
+                                    purchaseQueueId: selectedRow.id, // 구매대기 항목 ID (수정 모드 구분용)
+                                    model: selectedRow.model,
+                                    petName: selectedRow.model,
+                                    factoryPrice: selectedRow.factoryPrice || 0,
+                                    publicSupport: selectedRow.carrierSupport || 0,
+                                    // 🔥 수정: 구매대기에서 저장된 대리점추가지원금을 정확히 전달
+                                    storeSupport: selectedRow.dealerSupportWithAdd || 0, // 저장된 대리점추가지원금
+                                    대리점추가지원금: selectedRow.dealerSupportWithAdd || 0, // 한글 필드명도 추가
+                                    // 🔥 수정: dealerSupportWithoutAdd는 실제로는 대리점추가지원금직접입력이므로 additionalStoreSupport로 매핑
+                                    additionalStoreSupport: selectedRow.dealerSupportWithoutAdd !== undefined && selectedRow.dealerSupportWithoutAdd !== null ? Number(selectedRow.dealerSupportWithoutAdd) : null,
+                                    대리점추가지원금직접입력: selectedRow.dealerSupportWithoutAdd !== undefined && selectedRow.dealerSupportWithoutAdd !== null ? Number(selectedRow.dealerSupportWithoutAdd) : null,
+                                    // 🔥 추가: 할부원금과 LG프리미어약정
+                                    installmentPrincipal: selectedRow.installmentPrincipal || selectedRow.할부원금 || 0,
+                                    할부원금: selectedRow.installmentPrincipal || selectedRow.할부원금 || 0,
+                                    lgPremier: selectedRow.lgPremier !== undefined ? Boolean(selectedRow.lgPremier) : (selectedRow.프리미어약정 === 'Y' || selectedRow.프리미어약정 === true || false),
+                                    프리미어약정: selectedRow.lgPremier !== undefined ? (selectedRow.lgPremier ? 'Y' : 'N') : (selectedRow.프리미어약정 || 'N'),
+                                    openingType: reverseConvertOpeningType(selectedRow.activationType),
+                                    customerName: selectedRow.name,
+                                    customerContact: selectedRow.ctn,
+                                    carrier: selectedRow.carrier,
+                                    plan: selectedRow.plan,
+                                    deviceColor: selectedRow.color,
+                                    deviceSerial: selectedRow.deviceSerial,
+                                    simModel: selectedRow.usimModel,
+                                    simSerial: selectedRow.usimSerial,
+                                    contractType: selectedRow.contractType === '선택약정' ? 'selected' : 'standard',
+                                    installmentPeriod: selectedRow.installmentMonths || 24,
+                                    paymentType: selectedRow.installmentType === '현금' ? 'cash' : 'installment',
+                                    prevCarrier: selectedRow.oldCarrier
+                                }}
+                                onBack={async () => {
+                                    await loadQueue(); // 목록 새로고침
+                                    setShowEditDialog(false);
+                                    setSelectedRow(null);
+                                }}
+                                mode={isManagementMode ? 'management' : loggedInStore ? 'directStore' : 'customer'}
+                                customerInfo={customerInfo}
+                                selectedStore={selectedRow.storeName ? {
+                                    name: selectedRow.storeName,
+                                    phone: selectedRow.storePhone,
+                                    address: selectedRow.storeAddress,
+                                    accountInfo: selectedRow.storeBankInfo
+                                } : null}
+                                loggedInStore={loggedInStore}
+                                saveToSheet="purchaseQueue"
+                            />
                         </Box>
                     </DialogContent>
                 </Dialog>

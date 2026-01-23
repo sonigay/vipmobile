@@ -1023,7 +1023,7 @@ const CUSTOMER_QUEUE_HEADERS = [
   '번호', '고객CTN', '고객명', '통신사', '단말기모델명', '색상', '단말일련번호', '유심모델명', '유심일련번호', '개통유형',
   '전통신사', '할부구분', '할부개월', '약정', '요금제', '부가서비스', '출고가', '이통사지원금', '대리점추가지원금',
   '대리점추가지원금직접입력', '할부원금', 'LG프리미어약정', '선택매장업체명', '선택매장전화', '선택매장주소', '선택매장계좌정보', '등록일시', '상태',
-  '처리매장업체명', '처리일시'
+  '처리매장업체명', '처리일시', '아이피', '기기정보', '첫구매어드민여부'
 ];
 const CUSTOMER_BOARD_HEADERS = [
   '번호', '카테고리', '제목', '내용', '고객명', '고객CTN', '매장명', '매장전화', '매장주소', '등록일시', '수정일시', '상태'
@@ -4521,7 +4521,7 @@ app.get('/api/member/queue/all', async (req, res) => {
     const response = await rateLimitedSheetsCall(() =>
       sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
-        range: `${CUSTOMER_QUEUE_SHEET_NAME}!A:AD` // 🔥 수정: AD로 확장 (할부원금, LG프리미어약정 추가)
+        range: `${CUSTOMER_QUEUE_SHEET_NAME}!A:AG` // 🔥 수정: AG로 확장 (아이피, 기기정보, 첫구매어드민여부 추가)
       })
     );
 
@@ -4600,7 +4600,10 @@ app.get('/api/member/queue/all', async (req, res) => {
       createdAt: row[26],
       status: row[27],
       processedBy: row[28],
-      processedAt: row[29]
+      processedAt: row[29],
+      ip: row[30],
+      deviceInfo: row[31],
+      isAnonymous: row[32] === 'Y'
     }));
 
     // 최신순 정렬
@@ -4675,7 +4678,10 @@ app.get('/api/member/queue', async (req, res) => {
         createdAt: row[26],
         status: row[27],
         processedBy: row[28],
-        processedAt: row[29]
+        processedAt: row[29],
+        ip: row[30],
+        deviceInfo: row[31],
+        isAnonymous: row[32] === 'Y'
       }));
 
     res.json(queue);
@@ -4743,10 +4749,16 @@ app.post('/api/member/queue', async (req, res) => {
     newRow[26] = createdAt;
     newRow[27] = '구매대기';
 
+    // 🔥 추가: 아이피, 기기정보, 첫구매어드민여부
+    const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '';
+    newRow[30] = clientIp;
+    newRow[31] = data.deviceInfo || '';
+    newRow[32] = data.isAnonymous ? 'Y' : 'N';
+
     await rateLimitedSheetsCall(() =>
       sheets.spreadsheets.values.append({
         spreadsheetId: SPREADSHEET_ID,
-        range: `${CUSTOMER_QUEUE_SHEET_NAME}!A:AD`, // 🔥 수정: AD로 확장 (할부원금, LG프리미어약정 추가)
+        range: `${CUSTOMER_QUEUE_SHEET_NAME}!A:AG`, // 🔥 수정: AG로 확장 (아이피, 기기정보, 첫구매어드민여부 추가)
         valueInputOption: 'USER_ENTERED',
         resource: { values: [newRow] }
       })

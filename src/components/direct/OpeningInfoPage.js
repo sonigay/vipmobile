@@ -1062,8 +1062,8 @@ const OpeningInfoPage = ({
                 const activationType = openingTypeMap[formData.openingType] || '신규';
 
                 const purchaseQueueData = {
-                    ctn: customerInfo?.ctn || formData.customerContact,
-                    name: customerInfo?.name || formData.customerName,
+                    ctn: (formData.customerContact || customerInfo?.ctn || '').toString(), // 🔥 수정: 폼 입력을 우선적으로 사용
+                    name: formData.customerName || customerInfo?.name || '',               // 🔥 수정: 폼 입력을 우선적으로 사용
                     carrier: selectedCarrier,
                     model: initialData?.model || '',
                     color: formData.deviceColor || '',
@@ -1089,7 +1089,10 @@ const OpeningInfoPage = ({
                     storeName: currentStore?.name || '',
                     storePhone: currentStore?.phone || currentStore?.storePhone || '',
                     storeAddress: currentStore?.address || '',
-                    storeBankInfo: currentStore?.accountInfo || ''
+                    storeBankInfo: currentStore?.accountInfo || '',
+                    // 🔥 추가: 익명 고객 추적 및 기기 정보
+                    deviceInfo: window.navigator.userAgent,
+                    isAnonymous: customerInfo?.isFirstPurchaseAdmin || false
                 };
 
                 const { customerAPI } = await import('../../api');

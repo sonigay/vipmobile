@@ -3008,6 +3008,8 @@ function AppContent() {
 
     // 로그인 상태 삭제
     localStorage.removeItem('loginState');
+    localStorage.removeItem('vip_session');
+    localStorage.removeItem('customer_info');
   };
 
   const handleModelSelect = useCallback((model) => {

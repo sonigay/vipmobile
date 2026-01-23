@@ -67,7 +67,7 @@ const CustomerDashboard = () => {
         setSelectedProduct(product);
         // localStorage에 저장
         localStorage.setItem('customer_selected_product', JSON.stringify(product));
-        
+
         // 매장이 선택되지 않았으면 안내 페이지 표시
         if (!selectedStore) {
             setGuidePageType('SELECT_STORE');
@@ -109,14 +109,20 @@ const CustomerDashboard = () => {
 
     const handleOpeningInfoBack = () => {
         setShowOpeningInfo(false);
-        // 구매대기 탭으로 이동
-        setTabValue(2);
+        // 첫구매 어드민이 아니고 정상 회원인 경우에만 구매대기 탭으로 이동
+        if (!(customerInfo?.isFirstPurchaseAdmin && customerInfo?.publicIdStatus === 'before')) {
+            setTabValue(2);
+        } else {
+            setTabValue(0); // 첫구매 어드민은 홈(휴대폰 시세표)으로
+        }
     };
 
     const handleLogout = () => {
         localStorage.removeItem('customer_info');
         localStorage.removeItem('customer_selected_product');
         localStorage.removeItem('customer_selected_store');
+        localStorage.removeItem('vip_session');
+        localStorage.removeItem('loginState');
         navigate('/member/login');
     };
 
@@ -156,17 +162,17 @@ const CustomerDashboard = () => {
 
     return (
         <Container maxWidth="xl" sx={{ mt: { xs: 2, sm: 4 }, mb: { xs: 2, sm: 4 }, px: { xs: 1, sm: 2, md: 3 } }}>
-            <Box sx={{ 
-                display: 'flex', 
+            <Box sx={{
+                display: 'flex',
                 flexDirection: { xs: 'column', sm: 'row' },
-                justifyContent: 'space-between', 
-                alignItems: { xs: 'flex-start', sm: 'center' }, 
+                justifyContent: 'space-between',
+                alignItems: { xs: 'flex-start', sm: 'center' },
                 mb: 3,
                 gap: 2
             }}>
                 <Box>
                     <Typography variant="h4" sx={{ fontWeight: 700, fontSize: { xs: '1.5rem', sm: '2rem' } }}>
-                        {customerInfo.name}님, 안녕하세요!
+                        {customerInfo.isFirstPurchaseAdmin ? '반갑습니다! 첫 구매를 환영합니다.' : `${customerInfo.name}님, 안녕하세요!`}
                     </Typography>
                     <Typography variant="body1" color="text.secondary" sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
                         가입 모델: {customerInfo.model} ({customerInfo.carrier}) | 개통일: {customerInfo.soldAt ? new Date(customerInfo.soldAt).toLocaleDateString() : '정보 없음'}
@@ -186,24 +192,22 @@ const CustomerDashboard = () => {
                     variant="scrollable"
                     scrollButtons="auto"
                     sx={{
-                      '& .MuiTab-root': {
-                        fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
-                        minWidth: { xs: 'auto', sm: 'auto' },
-                        px: { xs: 1, sm: 2 }
-                      }
+                        '& .MuiTab-root': {
+                            fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
+                            minWidth: { xs: 'auto', sm: 'auto' },
+                            px: { xs: 1, sm: 2 }
+                        }
                     }}
                 >
                     <Tab label="휴대폰 시세표" />
                     <Tab label="선호 구입 매장" />
-                    <Tab 
-                        label="나의 구매 대기" 
-                        disabled={customerInfo?.isFirstPurchaseAdmin && customerInfo?.publicIdStatus === 'before'}
-                    />
-                    <Tab label="나의 구매 내역" />
-                    <Tab 
-                        label="게시판" 
-                        disabled={customerInfo?.isFirstPurchaseAdmin && customerInfo?.publicIdStatus === 'before'}
-                    />
+                    {!(customerInfo?.isFirstPurchaseAdmin && customerInfo?.publicIdStatus === 'before') && (
+                        <>
+                            <Tab label="나의 구매 대기" />
+                            <Tab label="나의 구매 내역" />
+                        </>
+                    )}
+                    <Tab label="게시판" />
                 </Tabs>
             </Paper>
 
@@ -214,12 +218,12 @@ const CustomerDashboard = () => {
                 </Alert>
             )}
 
-            <Box sx={{ 
-                p: { xs: tabValue === 0 ? 0 : 0, sm: tabValue === 0 ? 0 : 3 }, 
-                bgcolor: '#fff', 
-                borderRadius: 2, 
-                boxShadow: 1, 
-                minHeight: { xs: '300px', sm: '400px' }, 
+            <Box sx={{
+                p: { xs: tabValue === 0 ? 0 : 0, sm: tabValue === 0 ? 0 : 3 },
+                bgcolor: '#fff',
+                borderRadius: 2,
+                boxShadow: 1,
+                minHeight: { xs: '300px', sm: '400px' },
                 overflow: tabValue === 1 ? 'visible' : 'hidden', // 선호구입매장 탭에서는 스크롤 가능하도록
                 maxHeight: tabValue === 1 ? 'none' : { xs: 'calc(100vh - 300px)', sm: 'none' },
                 height: tabValue === 1 ? 'auto' : { xs: 'calc(100vh - 250px)', sm: '100%' },
@@ -228,7 +232,7 @@ const CustomerDashboard = () => {
                 position: 'relative'
             }}>
                 {tabValue === 0 && (
-                    <Box sx={{ 
+                    <Box sx={{
                         flex: '1 1 auto',
                         minHeight: 0,
                         height: '100%',
@@ -240,7 +244,7 @@ const CustomerDashboard = () => {
                     </Box>
                 )}
                 {tabValue === 1 && (
-                    <Box sx={{ 
+                    <Box sx={{
                         width: '100%',
                         minHeight: 0,
                         flex: '1 1 auto'
@@ -259,7 +263,7 @@ const CustomerDashboard = () => {
                                 아이디 부여 후 사용 가능한 기능입니다. 현재 공개아이디(아이디부여전) 상태로 접근할 수 없습니다.
                             </Alert>
                         ) : (
-                        <CustomerPurchaseQueueTab customerInfo={customerInfo} />
+                            <CustomerPurchaseQueueTab customerInfo={customerInfo} />
                         )}
                     </Box>
                 )}
@@ -275,7 +279,7 @@ const CustomerDashboard = () => {
                                 아이디 부여 후 사용 가능한 기능입니다. 현재 공개아이디(아이디부여전) 상태로 접근할 수 없습니다.
                             </Alert>
                         ) : (
-                        <CustomerBoardTab customerInfo={customerInfo} />
+                            <CustomerBoardTab customerInfo={customerInfo} />
                         )}
                     </Box>
                 )}
