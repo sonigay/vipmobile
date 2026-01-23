@@ -195,8 +195,8 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                 staff3: { messageId: 'staff3MessageId', threadId: 'staff3ThreadId' }
             };
 
-            // 모든 사진 갱신 시도
-            const refreshPromises = photoTypes.map(async (photoType) => {
+            // 모든 사진 순차적으로 갱신 (API 할당량 초과 방지)
+            for (const photoType of photoTypes) {
                 const messageId = selectedStoreDetails.photos[photoMap[photoType].messageId];
                 const threadId = selectedStoreDetails.photos[photoMap[photoType].threadId];
 
@@ -212,16 +212,13 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                                 messageId: messageId
                             })
                         });
-                        return response.json();
+                        console.log(`✅ [순차 갱신 완료] ${photoType}`);
+                        await response.json();
                     } catch (error) {
                         console.error(`매장 사진 갱신 실패 (${photoType}):`, error);
-                        return { success: false };
                     }
                 }
-                return { success: false, skipped: true };
-            });
-
-            await Promise.all(refreshPromises);
+            }
 
             // 갱신 후 사진 다시 로드
             const photos = await customerAPI.getStorePhotos(selectedStore.name);
