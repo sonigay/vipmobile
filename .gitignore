@@ -10,9 +10,14 @@ siljuk-ba9eed4a893c.json
 
 # testing
 /coverage
+/server/coverage
 
 # production
 /build
+
+# IDE
+.vscode/
+.idea/
 
 # misc
 .DS_Store
