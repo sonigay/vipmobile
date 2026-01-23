@@ -35,7 +35,7 @@ const CustomerBoardTab = ({ customerInfo }) => {
     const [selectedPost, setSelectedPost] = useState(null);
     const [showDetailDialog, setShowDetailDialog] = useState(false);
     const [viewMode, setViewMode] = useState('card'); // 'card' or 'table'
-    
+
     // 글 작성 폼 상태
     const [formData, setFormData] = useState({
         category: '사용후기',
@@ -189,17 +189,19 @@ const CustomerBoardTab = ({ customerInfo }) => {
                             </Tooltip>
                         </ToggleButton>
                     </ToggleButtonGroup>
-                    <Button
-                        variant="contained"
-                        startIcon={<AddIcon />}
-                        onClick={handleWriteClick}
-                        sx={{
-                            bgcolor: '#1976d2',
-                            '&:hover': { bgcolor: '#1565c0' }
-                        }}
-                    >
-                        글쓰기
-                    </Button>
+                    {!(customerInfo?.isFirstPurchaseAdmin && customerInfo?.publicIdStatus === 'before') && (
+                        <Button
+                            variant="contained"
+                            startIcon={<AddIcon />}
+                            onClick={handleWriteClick}
+                            sx={{
+                                bgcolor: '#1976d2',
+                                '&:hover': { bgcolor: '#1565c0' }
+                            }}
+                        >
+                            글쓰기
+                        </Button>
+                    )}
                 </Box>
             </Box>
 
@@ -300,9 +302,9 @@ const CustomerBoardTab = ({ customerInfo }) => {
                     })}
                 </Grid>
             ) : (
-                <TableContainer 
-                    component={Paper} 
-                    sx={{ 
+                <TableContainer
+                    component={Paper}
+                    sx={{
                         boxShadow: 2,
                         overflowX: 'auto',
                         maxWidth: '100%'
