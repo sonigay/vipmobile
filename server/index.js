@@ -2478,14 +2478,8 @@ app.get('/api/map-display-option', async (req, res) => {
     const { userId, mode } = req.query; // mode: '관리자모드' 또는 '일반모드'
 
     const sheetName = '지도재고노출옵션';
-    const response = await rateLimitedSheetsCall(() =>
-      sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: `${sheetName}!A:F`,
-      })
-    );
+    const values = await getSheetValues(sheetName);
 
-    const values = response.data.values || [];
     if (values.length <= 1) {
       // 헤더만 있거나 데이터가 없으면 기본값 반환
       return res.json({
@@ -4249,16 +4243,8 @@ app.post('/api/login', async (req, res) => {
     console.log('Step 3: 일반모드권한관리 시트에서 검색 시작');
 
     const generalModeSheetName = '일반모드권한관리';
-    const generalModeRange = 'A:K'; // A~K열 (I열: 일반정책모드 권한, J열: 일반정책모드 비밀번호, K열: 담당자 아이디)
+    const generalModeValues = await getSheetValues(generalModeSheetName);
 
-    const generalModeResponse = await rateLimitedSheetsCall(() =>
-      sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: `${generalModeSheetName}!${generalModeRange}`,
-      })
-    );
-
-    const generalModeValues = generalModeResponse.data.values || [];
     console.log(`일반모드권한관리 시트 행 수: ${generalModeValues.length}`);
 
     // 헤더는 3행(인덱스 2), 데이터는 4행(인덱스 3)부터
