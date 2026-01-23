@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-    Box, Typography, CircularProgress, Alert, Paper, Table, TableBody, 
+import {
+    Box, Typography, CircularProgress, Alert, Paper, Table, TableBody,
     TableCell, TableContainer, TableHead, TableRow, Button, Grid, Card, CardContent,
     FormControlLabel, Switch, useMediaQuery, useTheme, Dialog, IconButton
 } from '@mui/material';
@@ -76,7 +76,7 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
         };
 
         loadStores();
-        
+
         // 대중교통 위치 데이터 로드
         const loadTransitLocations = async () => {
             try {
@@ -138,19 +138,19 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                 };
 
                 setSelectedStoreDetails(details);
-                
+
                 // 첫 번째 사용 가능한 사진을 메인 사진으로 설정
                 if (details.photos) {
-                    const firstStorePhoto = details.photos.frontUrl || 
-                                           details.photos.insideUrl || 
-                                           details.photos.outsideUrl || 
-                                           details.photos.outside2Url || null;
+                    const firstStorePhoto = details.photos.frontUrl ||
+                        details.photos.insideUrl ||
+                        details.photos.outsideUrl ||
+                        details.photos.outside2Url || null;
                     setMainStorePhoto(firstStorePhoto);
-                    
-                    const firstStaffPhoto = details.photos.managerUrl || 
-                                          details.photos.staff1Url || 
-                                          details.photos.staff2Url || 
-                                          details.photos.staff3Url || null;
+
+                    const firstStaffPhoto = details.photos.managerUrl ||
+                        details.photos.staff1Url ||
+                        details.photos.staff2Url ||
+                        details.photos.staff3Url || null;
                     setMainStaffPhoto(firstStaffPhoto);
                 } else {
                     setMainStorePhoto(null);
@@ -199,7 +199,7 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
             const refreshPromises = photoTypes.map(async (photoType) => {
                 const messageId = selectedStoreDetails.photos[photoMap[photoType].messageId];
                 const threadId = selectedStoreDetails.photos[photoMap[photoType].threadId];
-                
+
                 if (messageId && threadId) {
                     try {
                         const response = await fetch(`${API_URL}/api/direct/refresh-store-photo-url`, {
@@ -256,22 +256,22 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                     }
                 };
                 setSelectedStoreDetails(details);
-                
+
                 // 메인 사진 업데이트
-                const updatedStorePhoto = details.photos.frontUrl || 
-                                       details.photos.insideUrl || 
-                                       details.photos.outsideUrl || 
-                                       details.photos.outside2Url || null;
-                if (mainStorePhoto && updatedStorePhoto) {
-                    setMainStorePhoto(updatedStorePhoto + '?t=' + Date.now()); // 캐시 무효화
+                const updatedStorePhoto = details.photos.frontUrl ||
+                    details.photos.insideUrl ||
+                    details.photos.outsideUrl ||
+                    details.photos.outside2Url || null;
+                if (updatedStorePhoto) {
+                    setMainStorePhoto(updatedStorePhoto + (updatedStorePhoto.includes('?') ? '&' : '?') + 't=' + Date.now()); // 캐시 무효화 및 상태 업데이트
                 }
-                
-                const updatedStaffPhoto = details.photos.managerUrl || 
-                                        details.photos.staff1Url || 
-                                        details.photos.staff2Url || 
-                                        details.photos.staff3Url || null;
-                if (mainStaffPhoto && updatedStaffPhoto) {
-                    setMainStaffPhoto(updatedStaffPhoto + '?t=' + Date.now()); // 캐시 무효화
+
+                const updatedStaffPhoto = details.photos.managerUrl ||
+                    details.photos.staff1Url ||
+                    details.photos.staff2Url ||
+                    details.photos.staff3Url || null;
+                if (updatedStaffPhoto) {
+                    setMainStaffPhoto(updatedStaffPhoto + (updatedStaffPhoto.includes('?') ? '&' : '?') + 't=' + Date.now()); // 캐시 무효화 및 상태 업데이트
                 }
             }
         } catch (error) {
@@ -316,10 +316,10 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
     }
 
     return (
-        <Box sx={{ 
-            display: 'flex', 
-            flexDirection: 'column', 
-            gap: 3, 
+        <Box sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 3,
             p: { xs: 1, sm: 2 },
             width: '100%',
             minHeight: '100%',
@@ -339,12 +339,12 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
             </Box>
 
             {/* 지도 */}
-            <Box sx={{ 
-                height: { xs: '300px', sm: '400px', md: '500px' }, 
-                width: '100%', 
-                position: 'relative', 
-                borderRadius: 2, 
-                overflow: 'hidden', 
+            <Box sx={{
+                height: { xs: '300px', sm: '400px', md: '500px' },
+                width: '100%',
+                position: 'relative',
+                borderRadius: 2,
+                overflow: 'hidden',
                 border: '1px solid #eee',
                 flexShrink: 0,
                 '& .leaflet-container': {
@@ -429,7 +429,7 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
 
             {/* 선택된 매장 정보 (맵에서 클릭한 매장만 표시) */}
             {selectedStore ? (
-                <Box sx={{ 
+                <Box sx={{
                     flexShrink: 0
                     // 스크롤은 부모 Box에서 처리하므로 여기서는 제거
                 }}>
@@ -437,14 +437,14 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                         <StoreIcon color="primary" />
                         매장 정보 - {selectedStore.name}
                     </Typography>
-                    
+
                     <Card sx={{ boxShadow: 3 }}>
                         <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
                             {/* 매장 기본 정보 */}
                             <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', color: 'primary.main' }}>
                                 {selectedStore.name || '-'}
                             </Typography>
-                            
+
                             <Grid container spacing={2} sx={{ mb: 3 }}>
                                 {/* 왼쪽 컬럼: 기본 정보 */}
                                 <Grid item xs={12} md={6}>
@@ -476,14 +476,14 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                                         )}
                                     </Box>
                                 </Grid>
-                                
+
                                 {/* 오른쪽 컬럼: 사전승낙서 마크 */}
                                 <Grid item xs={12} md={6}>
                                     {loadingDetails ? (
-                                        <Box sx={{ 
-                                            p: 2, 
-                                            bgcolor: '#ffffff', 
-                                            borderRadius: 1, 
+                                        <Box sx={{
+                                            p: 2,
+                                            bgcolor: '#ffffff',
+                                            borderRadius: 1,
                                             textAlign: 'center',
                                             width: '50%',
                                             mx: 'auto'
@@ -506,7 +506,7 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                                             <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
                                                 사전승낙서 마크
                                             </Typography>
-                                            <Box 
+                                            <Box
                                                 dangerouslySetInnerHTML={{ __html: selectedStoreDetails.preApprovalMark }}
                                                 sx={{
                                                     display: 'flex',
@@ -560,7 +560,7 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                                             {refreshingImages ? '갱신 중...' : '이미지갱신하기'}
                                         </Button>
                                     </Box>
-                                    
+
                                     {/* 매장사진과 직원사진을 양쪽으로 나누기 */}
                                     <Grid container spacing={3}>
                                         {/* 왼쪽: 매장사진 */}
@@ -575,7 +575,7 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                                                 <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 2, color: 'primary.main' }}>
                                                     매장사진
                                                 </Typography>
-                                                
+
                                                 {/* 메인 사진 */}
                                                 <Box sx={{ mb: 2, textAlign: 'center' }}>
                                                     {mainStorePhoto ? (
@@ -598,11 +598,11 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                                                                 }
                                                             }}
                                                         >
-                                                            <img 
-                                                                src={mainStorePhoto} 
+                                                            <img
+                                                                src={mainStorePhoto}
                                                                 alt="매장 메인 사진"
-                                                                style={{ 
-                                                                    width: '100%', 
+                                                                style={{
+                                                                    width: '100%',
                                                                     height: 'auto',
                                                                     maxHeight: '350px',
                                                                     objectFit: 'contain',
@@ -611,10 +611,10 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                                                             />
                                                         </Box>
                                                     ) : (
-                                                        <Box sx={{ 
-                                                            width: '100%', 
+                                                        <Box sx={{
+                                                            width: '100%',
                                                             height: '250px',
-                                                            bgcolor: 'rgba(0,0,0,0.05)', 
+                                                            bgcolor: 'rgba(0,0,0,0.05)',
                                                             borderRadius: 2,
                                                             display: 'flex',
                                                             alignItems: 'center',
@@ -657,20 +657,20 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                                                                             }
                                                                         }}
                                                                     >
-                                                                        <img 
-                                                                            src={photoUrl} 
+                                                                        <img
+                                                                            src={photoUrl}
                                                                             alt={label}
-                                                                            style={{ 
-                                                                                width: '100%', 
-                                                                                height: '100px', 
+                                                                            style={{
+                                                                                width: '100%',
+                                                                                height: '100px',
                                                                                 objectFit: 'cover',
                                                                                 display: 'block'
                                                                             }}
                                                                         />
-                                                                        <Typography 
-                                                                            variant="caption" 
-                                                                            sx={{ 
-                                                                                display: 'block', 
+                                                                        <Typography
+                                                                            variant="caption"
+                                                                            sx={{
+                                                                                display: 'block',
                                                                                 textAlign: 'center',
                                                                                 py: 0.5,
                                                                                 bgcolor: isSelected ? 'rgba(25, 118, 210, 0.15)' : 'transparent',
@@ -682,10 +682,10 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                                                                         </Typography>
                                                                     </Box>
                                                                 ) : (
-                                                                    <Box sx={{ 
-                                                                        width: '100%', 
-                                                                        height: '100px', 
-                                                                        bgcolor: 'rgba(0,0,0,0.03)', 
+                                                                    <Box sx={{
+                                                                        width: '100%',
+                                                                        height: '100px',
+                                                                        bgcolor: 'rgba(0,0,0,0.03)',
                                                                         borderRadius: 1.5,
                                                                         display: 'flex',
                                                                         flexDirection: 'column',
@@ -720,7 +720,7 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                                                 <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 2, color: 'secondary.main' }}>
                                                     직원사진
                                                 </Typography>
-                                                
+
                                                 {/* 메인 사진 */}
                                                 <Box sx={{ mb: 2, textAlign: 'center' }}>
                                                     {mainStaffPhoto ? (
@@ -743,11 +743,11 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                                                                 }
                                                             }}
                                                         >
-                                                            <img 
-                                                                src={mainStaffPhoto} 
+                                                            <img
+                                                                src={mainStaffPhoto}
                                                                 alt="직원 메인 사진"
-                                                                style={{ 
-                                                                    width: '100%', 
+                                                                style={{
+                                                                    width: '100%',
                                                                     height: 'auto',
                                                                     maxHeight: '350px',
                                                                     objectFit: 'contain',
@@ -756,10 +756,10 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                                                             />
                                                         </Box>
                                                     ) : (
-                                                        <Box sx={{ 
-                                                            width: '100%', 
+                                                        <Box sx={{
+                                                            width: '100%',
                                                             height: '250px',
-                                                            bgcolor: 'rgba(0,0,0,0.05)', 
+                                                            bgcolor: 'rgba(0,0,0,0.05)',
                                                             borderRadius: 2,
                                                             display: 'flex',
                                                             alignItems: 'center',
@@ -802,20 +802,20 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                                                                             }
                                                                         }}
                                                                     >
-                                                                        <img 
-                                                                            src={photoUrl} 
+                                                                        <img
+                                                                            src={photoUrl}
                                                                             alt={label}
-                                                                            style={{ 
-                                                                                width: '100%', 
-                                                                                height: '100px', 
+                                                                            style={{
+                                                                                width: '100%',
+                                                                                height: '100px',
                                                                                 objectFit: 'cover',
                                                                                 display: 'block'
                                                                             }}
                                                                         />
-                                                                        <Typography 
-                                                                            variant="caption" 
-                                                                            sx={{ 
-                                                                                display: 'block', 
+                                                                        <Typography
+                                                                            variant="caption"
+                                                                            sx={{
+                                                                                display: 'block',
                                                                                 textAlign: 'center',
                                                                                 py: 0.5,
                                                                                 bgcolor: isSelected ? 'rgba(156, 39, 176, 0.15)' : 'transparent',
@@ -827,10 +827,10 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
                                                                         </Typography>
                                                                     </Box>
                                                                 ) : (
-                                                                    <Box sx={{ 
-                                                                        width: '100%', 
-                                                                        height: '100px', 
-                                                                        bgcolor: 'rgba(0,0,0,0.03)', 
+                                                                    <Box sx={{
+                                                                        width: '100%',
+                                                                        height: '100px',
+                                                                        bgcolor: 'rgba(0,0,0,0.03)',
                                                                         borderRadius: 1.5,
                                                                         display: 'flex',
                                                                         flexDirection: 'column',
