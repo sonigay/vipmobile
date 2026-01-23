@@ -5822,6 +5822,9 @@ async function uploadStorePhotoToDiscord(imageBuffer, filename, storeName, photo
 
 // POST /api/direct/store-image/upload: 매장 사진 파일 업로드 (Discord)
 app.post('/api/direct/store-image/upload', storeImageUpload.single('image'), async (req, res) => {
+  // CORS 헤더 명시적 설정 (Vercel 프론트엔드 요청 허용)
+  setCORSHeaders(req, res);
+
   let localFilePath = null;
 
   try {
