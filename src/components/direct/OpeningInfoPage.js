@@ -1198,15 +1198,13 @@ const OpeningInfoPage = ({
                     /* 메인 컨테이너 설정 */
                     .print-root {
                         /* 
-                           인쇄 시 데스크탑 뷰(2단 컬럼) 강제 유지 및 A4 너비에 맞게 축소
-                           - A4 가로: 약 794px (96DPI)
-                           - 좌우 여백 5mm씩 제외 시 사용 가능 너비: 약 756px
-                           - 데스크탑 뷰 기준: 1120px (줄바꿈 최소화)
-                           - 축소 비율: 756 / 1120 ≈ 0.675 -> 더 축소하여 세로 공간 확보
+                           인쇄 시 데스크탑 뷰(2단 컬럼) 강제 유지 및 A4 너비에 자동으로 맞춤
+                           - width: 100%로 설정하여 브라우저가 자동으로 용지 너비에 맞춰 늘림
+                           - zoom: 0.60으로 폰트 크기와 세로 간격 유지
                         */
-                        width: 1120px !important;
-                        min-width: 1120px !important;
-                        max-width: 1120px !important;
+                        width: 100% !important;
+                        min-width: 100% !important;
+                        max-width: 100% !important;
                         
                         /* A4 용지 한 장에 넣기 위해 축소 비율 더 낮춤 */
                         zoom: 0.60; 
