@@ -1308,6 +1308,11 @@ const OpeningInfoPage = ({
                         font-size: 0.75rem !important;
                         line-height: 1.2 !important;
                     }
+
+                    .calculation-details .MuiTypography-root {
+                        font-size: 0.8rem !important;
+                        line-height: 1.3 !important;
+                    }
                     
                     /* 구분선 여백 제거 */
                     .print-root .MuiDivider-root {
@@ -2340,7 +2345,7 @@ const OpeningInfoPage = ({
                                                     <Typography variant="caption" component="pre" sx={{
                                                         whiteSpace: 'pre-wrap',
                                                         fontFamily: 'monospace',
-                                                        fontSize: '0.75rem',
+                                                        fontSize: '0.85rem',
                                                         lineHeight: 1.6
                                                     }}>
                                                         {installmentFeeResult.calculation}
