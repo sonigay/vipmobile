@@ -7608,22 +7608,9 @@ function setupDirectRoutes(app) {
     }
   });
 
-  // CORS 헤더 설정 함수
-  const setCORSHeaders = (req, res) => {
-    const origin = req.headers.origin;
-    if (origin) {
-      res.setHeader('Access-Control-Allow-Origin', origin);
-      res.setHeader('Access-Control-Allow-Credentials', 'true');
-    } else {
-      res.setHeader('Access-Control-Allow-Origin', '*');
-    }
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-user-id, x-user-role');
-  };
-
   // POST /api/direct/transit-location/save: 매장별 대중교통 위치 저장 (ID 목록)
   router.post('/transit-location/save', async (req, res) => {
-    setCORSHeaders(req, res);
+    // CORS 헤더는 전역 corsMiddleware에서 처리됨
     try {
       const { storeName, busTerminalIds, subwayStationIds } = req.body;
 

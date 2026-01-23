@@ -445,34 +445,10 @@ async function deleteMeeting(req, res) {
   }
 }
 
-// CORS 헤더 설정 헬퍼 함수
-function setCORSHeaders(req, res) {
-  const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
-  const defaultOrigins = [
-    'https://vipmobile.vercel.app',
-    'http://localhost:3000',
-    'http://localhost:3001',
-    'http://localhost:4000'
-  ];
-  const allowedOrigins = [...corsOrigins, ...defaultOrigins];
-  const origin = req.headers.origin;
-
-  if (origin && allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-  } else if (allowedOrigins.length > 0) {
-    res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
-  }
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key');
-  res.header('Access-Control-Allow-Credentials', 'true');
-}
 
 // 회의 설정 조회
 async function getMeetingConfig(req, res) {
   try {
-    // CORS 헤더 설정
-    setCORSHeaders(req, res);
-
     const { sheets, SPREADSHEET_ID } = createSheetsClient();
     const { meetingId } = req.params;
     const sheetName = '회의설정';
@@ -591,9 +567,6 @@ async function getMeetingConfig(req, res) {
 // 회의 설정 저장
 async function saveMeetingConfig(req, res) {
   try {
-    // CORS 헤더 설정
-    setCORSHeaders(req, res);
-
     const { sheets, SPREADSHEET_ID } = createSheetsClient();
     const { meetingId } = req.params;
     const { slides } = req.body;
@@ -833,8 +806,6 @@ async function saveMeetingConfig(req, res) {
     res.json({ success: true });
   } catch (error) {
     console.error('회의 설정 저장 오류:', error);
-    // 에러 발생 시에도 CORS 헤더 설정
-    setCORSHeaders(req, res);
     res.status(500).json({ success: false, error: error.message });
   }
 }
@@ -1301,15 +1272,12 @@ const upload = multer({
 
 async function uploadMeetingImage(req, res) {
   try {
-    // CORS 헤더 설정
-    setCORSHeaders(req, res);
 
     const { meetingId } = req.params;
     const { meetingDate, slideOrder } = req.body;
 
     if (!req.file) {
       // 에러 응답에도 CORS 헤더 포함
-      setCORSHeaders(req, res);
       return res.status(400).json({ success: false, error: '이미지 파일이 없습니다.' });
     }
 
@@ -1493,7 +1461,6 @@ async function uploadMeetingImage(req, res) {
     }
 
     // 정상 응답 전에 CORS 헤더 재설정 (확실히 포함되도록)
-    setCORSHeaders(req, res);
 
     res.json({
       success: true,
@@ -1507,8 +1474,6 @@ async function uploadMeetingImage(req, res) {
       croppedHeight: result.croppedHeight
     });
   } catch (error) {
-    // CORS 헤더 설정 (에러 응답에도 포함)
-    setCORSHeaders(req, res);
 
     console.error('❌ [uploadMeetingImage] 이미지 업로드 오류:', error);
     console.error('❌ [uploadMeetingImage] 에러 스택:', error.stack);
@@ -2508,8 +2473,6 @@ function escapeHtml(text) {
 // 커스텀 슬라이드 파일 업로드 (이미지, Excel, PPT 지원)
 async function uploadCustomSlideFile(req, res) {
   try {
-    // CORS 헤더 설정
-    setCORSHeaders(req, res);
 
     const { meetingId } = req.params;
     const { meetingDate, fileType, meetingNumber: bodyMeetingNumber } = req.body;
@@ -2914,8 +2877,6 @@ async function uploadCustomSlideFile(req, res) {
           }
         }
       } catch (excelError) {
-        // CORS 헤더 설정 (에러 응답에도 포함)
-        setCORSHeaders(req, res);
         console.error('Excel 변환 오류:', excelError);
         // Canvas가 없는 경우 더 명확한 에러 메시지
         if (excelError.message.includes('Canvas')) {
@@ -2948,8 +2909,6 @@ async function uploadCustomSlideFile(req, res) {
           };
         }));
       } catch (pptError) {
-        // CORS 헤더 설정 (에러 응답에도 포함)
-        setCORSHeaders(req, res);
         console.error('PPT 변환 오류:', pptError);
         return res.status(500).json({
           success: false,
@@ -3014,8 +2973,6 @@ async function uploadCustomSlideFile(req, res) {
         });
         return;
       } catch (videoError) {
-        // CORS 헤더 설정 (에러 응답에도 포함)
-        setCORSHeaders(req, res);
         console.error('동영상 업로드 오류:', videoError);
         return res.status(500).json({
           success: false,
@@ -3023,8 +2980,6 @@ async function uploadCustomSlideFile(req, res) {
         });
       }
     } else {
-      // CORS 헤더 설정 (에러 응답에도 포함)
-      setCORSHeaders(req, res);
       return res.status(400).json({
         success: false,
         error: '지원하지 않는 파일 형식입니다.'
@@ -3161,8 +3116,6 @@ async function uploadCustomSlideFile(req, res) {
       });
     }
   } catch (error) {
-    // CORS 헤더 설정 (에러 응답에도 포함)
-    setCORSHeaders(req, res);
 
     console.error('파일 업로드 오류:', error);
     res.status(500).json({ success: false, error: error.message });
@@ -3172,8 +3125,6 @@ async function uploadCustomSlideFile(req, res) {
 // Discord CDN 이미지 프록시 (CORS 문제 해결)
 async function proxyDiscordImage(req, res) {
   try {
-    // CORS 헤더 설정
-    setCORSHeaders(req, res);
 
     const imageUrl = req.query.url;
 
@@ -3268,8 +3219,6 @@ async function proxyDiscordImage(req, res) {
     res.send(imageBuffer);
   } catch (error) {
     console.error('Discord 이미지 프록시 오류:', error);
-    // CORS 헤더 설정 (에러 응답에도 포함)
-    setCORSHeaders(req, res);
     res.status(500).json({
       success: false,
       error: '이미지를 가져오는데 실패했습니다.',
@@ -3296,7 +3245,6 @@ module.exports = {
 // 스레드 정보 조회 (제목 확인)
 async function getDiscordThreadInfo(req, res) {
   try {
-    setCORSHeaders(req, res);
     if (!DISCORD_LOGGING_ENABLED || !discordBot) {
       return res.status(503).json({ success: false, error: 'Discord 봇이 활성화되지 않았습니다.' });
     }
@@ -3317,7 +3265,6 @@ async function getDiscordThreadInfo(req, res) {
       name: thread.name
     });
   } catch (error) {
-    setCORSHeaders(req, res);
     console.error('Discord 스레드 조회 오류:', error);
     return res.status(500).json({ success: false, error: error.message });
   }
@@ -3326,7 +3273,6 @@ async function getDiscordThreadInfo(req, res) {
 // 스레드 제목 변경
 async function renameDiscordThread(req, res) {
   try {
-    setCORSHeaders(req, res);
     if (!DISCORD_LOGGING_ENABLED || !discordBot) {
       return res.status(503).json({ success: false, error: 'Discord 봇이 활성화되지 않았습니다.' });
     }
@@ -3350,7 +3296,6 @@ async function renameDiscordThread(req, res) {
     console.log(`✅ [Discord] 스레드 이름 변경 완료: ${threadId} → ${title}`);
     return res.json({ success: true, threadId, name: title });
   } catch (error) {
-    setCORSHeaders(req, res);
     console.error('Discord 스레드 제목 변경 오류:', error);
     return res.status(500).json({ success: false, error: error.message });
   }
@@ -3363,7 +3308,6 @@ module.exports.renameDiscordThread = renameDiscordThread;
 // 단일 슬라이드 이미지 URL 업데이트
 async function updateSlideImageUrl(req, res) {
   try {
-    setCORSHeaders(req, res);
     const { sheets, SPREADSHEET_ID } = createSheetsClient();
     const { meetingId } = req.params;
     const { slideId, imageUrl } = req.body || {};
@@ -3398,7 +3342,6 @@ async function updateSlideImageUrl(req, res) {
     });
     return res.json({ success: true, row: targetRowNumber, imageUrl });
   } catch (error) {
-    setCORSHeaders(req, res);
     console.error('단일 슬라이드 이미지 URL 업데이트 오류:', error);
     return res.status(500).json({ success: false, error: error.message });
   }

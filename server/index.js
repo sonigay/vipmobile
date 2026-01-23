@@ -18,6 +18,7 @@ const setupObRoutes = require('./obRoutes');
 const meetingRoutes = require('./meetingRoutes');
 const setupDirectRoutes = require('./directRoutes');
 const setupPolicyTableRoutes = require('./policyTableRoutes');
+const { corsMiddleware, setCORSHeaders, configManager } = require('./corsMiddleware');
 
 // 기본 설정
 const app = express();
@@ -124,138 +125,11 @@ app.use((req, res, next) => {
   next();
 });
 
-// CORS 설정 - 환경 변수 기반 동적 설정
-app.use(cors({
-  origin: function (origin, callback) {
-    // 환경 변수에서 허용할 도메인 목록 가져오기
-    const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
+// CORS 미들웨어 등록 (요구사항 1.1, 1.4, 1.5)
+// 통합된 CORS 처리를 위해 corsMiddleware만 사용
+app.use(corsMiddleware);
 
-    // 기본 허용 도메인 (개발용 및 프로덕션)
-    const defaultOrigins = [
-      'https://vipmobile.vercel.app',
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'http://localhost:4000'
-    ];
-
-    // 환경 변수 도메인과 기본 도메인 합치기
-    const allowedOrigins = [...corsOrigins, ...defaultOrigins];
-
-    // origin이 없거나 허용된 도메인에 포함되어 있으면 허용
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      // 개발 환경에서는 모든 origin 허용 (디버깅용)
-      if (process.env.NODE_ENV !== 'production') {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Origin', 'Accept', 'X-API-Key', 'x-user-id', 'x-user-role', 'x-user-name', 'x-mode', 'Cache-Control', 'Pragma', 'Expires'],
-  optionsSuccessStatus: 200,
-  preflightContinue: false
-}));
-
-// CORS 헤더 설정 함수 (재사용)
-const setCORSHeaders = (req, res) => {
-  const origin = req.headers.origin;
-  const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
-
-  const defaultOrigins = [
-    'https://vipmobile.vercel.app',
-    'http://localhost:3000',
-    'http://localhost:3001',
-    'http://localhost:3002',
-    'http://localhost:4000'
-  ];
-
-  const allowedOrigins = [...corsOrigins, ...defaultOrigins];
-
-  if (origin && allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-  } else {
-    res.header('Access-Control-Allow-Origin', 'https://vipmobile.vercel.app');
-  }
-
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key, x-user-id, x-user-role, x-user-name, x-mode, Cache-Control, Pragma, Expires');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Max-Age', '86400'); // 24시간 캐시
-};
-
-// OPTIONS 요청 명시적 처리
-app.options('*', (req, res) => {
-  // 환경 변수에서 허용할 도메인 목록 가져오기
-  const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
-
-  // 기본 허용 도메인 (개발용 및 프로덕션)
-  const defaultOrigins = [
-    'https://vipmobile.vercel.app',
-    'http://localhost:3000',
-    'http://localhost:3001',
-    'http://localhost:4000'
-  ];
-
-  // 환경 변수 도메인과 기본 도메인 합치기
-  const allowedOrigins = [...corsOrigins, ...defaultOrigins];
-
-  const origin = req.headers.origin;
-
-  // 디버깅 로그 (모든 OPTIONS 요청 로깅)
-  console.log('🔍 [전역 OPTIONS] 요청 수신:', {
-    method: req.method,
-    url: req.url,
-    path: req.path,
-    origin: origin,
-    'access-control-request-method': req.headers['access-control-request-method'],
-    'access-control-request-headers': req.headers['access-control-request-headers'],
-    allHeaders: Object.keys(req.headers).filter(k => k.toLowerCase().startsWith('access-control-') || k.toLowerCase() === 'origin').reduce((acc, k) => {
-      acc[k] = req.headers[k];
-      return acc;
-    }, {}),
-    allowedOrigins: allowedOrigins,
-    originInAllowed: origin && allowedOrigins.includes(origin),
-    isPolicyTableRequest: req.url && req.url.includes('/api/policy-tables')
-  });
-
-  if (origin && allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-  } else if (origin) {
-    // 환경 변수에 있는 경우도 허용
-    res.header('Access-Control-Allow-Origin', origin);
-  }
-
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key, x-user-id, x-user-role, x-user-name, x-mode, Cache-Control, Pragma, Expires');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Max-Age', '86400'); // 24시간 캐시
-
-  // 디버깅 로그 (정책표 관련 요청만)
-  if (req.url && req.url.includes('/api/policy-tables')) {
-    console.log('✅ [전역 OPTIONS] CORS 헤더 설정 완료:', {
-      'Access-Control-Allow-Origin': res.getHeader('Access-Control-Allow-Origin'),
-      'Access-Control-Allow-Methods': res.getHeader('Access-Control-Allow-Methods'),
-      'Access-Control-Allow-Headers': res.getHeader('Access-Control-Allow-Headers'),
-      'Access-Control-Allow-Credentials': res.getHeader('Access-Control-Allow-Credentials')
-    });
-  }
-
-  res.status(200).end();
-});
-
-// 특정 API 엔드포인트에 대한 OPTIONS 요청 처리
-app.options('/api/budget/user-sheets-v2', (req, res) => {
-  res.header('Access-Control-Allow-Origin', 'https://vipmobile.vercel.app');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Max-Age', '86400'); // 24시간 캐시
-  res.status(200).end();
-});
+// 특정 API 엔드포인트에 대한 OPTIONS 요청은 corsMiddleware에서 통합 처리됨
 
 // 팀 목록 조회 API
 app.get('/api/teams', async (req, res) => {
@@ -691,45 +565,11 @@ process.on('unhandledRejection', async (reason, promise) => {
 });
 
 // 모든 요청에 대한 로깅 미들웨어
+// OPTIONS 요청은 corsMiddleware에서 처리되므로 여기서는 제거됨
 app.use((req, res, next) => {
-  // OPTIONS 요청은 즉시 처리하도록 조기 반환
-  if (req.method === 'OPTIONS') {
-    const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
-    const defaultOrigins = [
-      'https://vipmobile.vercel.app',
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'http://localhost:4000'
-    ];
-    const allowedOrigins = [...corsOrigins, ...defaultOrigins];
-    const origin = req.headers.origin;
-
-    if (origin && allowedOrigins.includes(origin)) {
-      res.header('Access-Control-Allow-Origin', origin);
-    } else if (allowedOrigins.length > 0) {
-      res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
-    } else if (origin) {
-      res.header('Access-Control-Allow-Origin', origin);
-    }
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Max-Age', '86400');
-    return res.status(200).end();
-  }
-
   // console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
   next();
 });
-
-// CORS 설정 (더 구체적으로) - 모든 origin 허용 (개발 환경)
-// 이 설정은 첫 번째 CORS 설정을 보완하여 모든 요청에 대해 CORS 헤더를 보장합니다
-app.use(cors({
-  origin: true, // 모든 origin 허용 (개발 환경)
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Origin', 'Accept', 'X-API-Key']
-}));
 
 // 모든 요청 로깅 미들웨어
 app.use((req, res, next) => {
@@ -757,14 +597,6 @@ app.use(express.json());
 // 클라이언트 원격 로그 수집 (비차단, CORS 적용)
 app.post('/api/client-logs', (req, res) => {
   try {
-    const origin = req.headers.origin;
-    if (origin) {
-      res.header('Access-Control-Allow-Origin', origin);
-    }
-    res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key');
-    res.header('Access-Control-Allow-Credentials', 'true');
-
     const { sessionId, userAgent, ts, logs } = req.body || {};
     if (Array.isArray(logs) && logs.length > 0) {
       console.log('🛰️ [CLIENT LOGS]', {
@@ -2976,19 +2808,7 @@ app.get('/api/map-display-option/users', async (req, res) => {
 
 // 영업 모드 데이터 가져오기 (캐싱 적용)
 app.get('/api/sales-data', async (req, res) => {
-  // CORS 헤더 명시적 설정
-  const allowedOrigins = [
-    'https://vipmobile.vercel.app',
-    'http://localhost:3000',
-    'http://localhost:3001'
-  ];
-
-  const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-  }
-  res.header('Access-Control-Allow-Credentials', 'true');
-
+  // CORS는 corsMiddleware에서 통합 처리됨
   const cacheKey = 'sales_data';
 
   // 캐시에서 먼저 확인
@@ -3243,19 +3063,6 @@ async function processSalesData(spreadsheetId = process.env.SALES_SHEET_ID) {
 
 // 영업 모드 접근 권한 확인
 app.get('/api/sales-mode-access', async (req, res) => {
-  // CORS 헤더 명시적 설정
-  const allowedOrigins = [
-    'https://vipmobile.vercel.app',
-    'http://localhost:3000',
-    'http://localhost:3001'
-  ];
-
-  const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-  }
-  res.header('Access-Control-Allow-Credentials', 'true');
-
   try {
     // 대리점아이디관리 시트에서 U열 권한 확인 (기존 S열 → U열)
     const agentResponse = await sheets.spreadsheets.values.get({
@@ -3299,20 +3106,10 @@ app.get('/api/sales-mode-access', async (req, res) => {
 
 // 재고회수모드 접근권한 확인 API
 app.get('/api/inventoryRecoveryAccess', async (req, res) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-
   if (req.method === 'OPTIONS') {
     res.sendStatus(200);
     return;
   }
-
-  const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-  }
-  res.header('Access-Control-Allow-Credentials', 'true');
 
   try {
     // 대리점아이디관리 시트에서 V열 권한 확인 (기존 T열 → V열)
@@ -5822,8 +5619,7 @@ async function uploadStorePhotoToDiscord(imageBuffer, filename, storeName, photo
 
 // POST /api/direct/store-image/upload: 매장 사진 파일 업로드 (Discord)
 app.post('/api/direct/store-image/upload', storeImageUpload.single('image'), async (req, res) => {
-  // CORS 헤더 명시적 설정 (Vercel 프론트엔드 요청 허용)
-  setCORSHeaders(req, res);
+  // CORS는 corsMiddleware에서 통합 처리됨
 
   let localFilePath = null;
 
@@ -10542,137 +10338,20 @@ try {
   app.get('/api/meetings', meetingRoutes.getMeetings);
   app.post('/api/meetings', meetingRoutes.createMeeting);
 
-  // PUT /api/meetings/:meetingId OPTIONS 요청 처리
-  app.options('/api/meetings/:meetingId', (req, res) => {
-    const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
-    const defaultOrigins = [
-      'https://vipmobile.vercel.app',
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'http://localhost:4000'
-    ];
-    const allowedOrigins = [...corsOrigins, ...defaultOrigins];
-    const origin = req.headers.origin;
-
-    if (origin && allowedOrigins.includes(origin)) {
-      res.header('Access-Control-Allow-Origin', origin);
-    } else if (allowedOrigins.length > 0) {
-      res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
-    }
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Max-Age', '86400'); // 24시간 캐시
-    res.status(200).end();
-  });
+  // OPTIONS 요청은 corsMiddleware에서 통합 처리됨
 
   app.put('/api/meetings/:meetingId', meetingRoutes.updateMeeting);
   app.delete('/api/meetings/:meetingId', meetingRoutes.deleteMeeting);
 
-  // GET /api/meetings OPTIONS 요청 처리
-  app.options('/api/meetings', (req, res) => {
-    const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
-    const defaultOrigins = [
-      'https://vipmobile.vercel.app',
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'http://localhost:4000'
-    ];
-    const allowedOrigins = [...corsOrigins, ...defaultOrigins];
-    const origin = req.headers.origin;
-
-    if (origin && allowedOrigins.includes(origin)) {
-      res.header('Access-Control-Allow-Origin', origin);
-    } else if (allowedOrigins.length > 0) {
-      res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
-    }
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Max-Age', '86400');
-    res.status(200).end();
-  });
-
-  // 회의 설정 API OPTIONS 요청 처리 (라우트 등록 전에 먼저 처리)
-  app.options('/api/meetings/:meetingId/config', (req, res) => {
-    console.log('🔍 [OPTIONS] config preflight 요청');
-    const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
-    const defaultOrigins = [
-      'https://vipmobile.vercel.app',
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'http://localhost:4000'
-    ];
-    const allowedOrigins = [...corsOrigins, ...defaultOrigins];
-    const origin = req.headers.origin;
-
-    if (origin && allowedOrigins.includes(origin)) {
-      res.header('Access-Control-Allow-Origin', origin);
-    } else if (allowedOrigins.length > 0) {
-      res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
-    } else if (origin) {
-      res.header('Access-Control-Allow-Origin', origin);
-    }
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Max-Age', '86400'); // 24시간 캐시
-    console.log('✅ [OPTIONS] config CORS 헤더 설정 완료');
-    return res.status(200).end();
-  });
-
+  // 회의 설정 API (OPTIONS는 corsMiddleware가 처리)
   app.get('/api/meetings/:meetingId/config', meetingRoutes.getMeetingConfig);
   app.post('/api/meetings/:meetingId/config', meetingRoutes.saveMeetingConfig);
 
-  // 회의 이미지 업로드 API OPTIONS 요청 처리 (라우트 등록 전에 먼저 처리)
-  app.options('/api/meetings/:meetingId/upload-image', (req, res) => {
-    console.log('🔍 [OPTIONS] upload-image preflight 요청');
-    const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
-    const defaultOrigins = [
-      'https://vipmobile.vercel.app',
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'http://localhost:4000'
-    ];
-    const allowedOrigins = [...corsOrigins, ...defaultOrigins];
-    const origin = req.headers.origin;
-
-    if (origin && allowedOrigins.includes(origin)) {
-      res.header('Access-Control-Allow-Origin', origin);
-    } else if (allowedOrigins.length > 0) {
-      res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
-    } else if (origin) {
-      res.header('Access-Control-Allow-Origin', origin);
-    }
-    res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Max-Age', '86400'); // 24시간 캐시
-    console.log('✅ [OPTIONS] upload-image CORS 헤더 설정 완료');
-    return res.status(200).end();
-  });
+  // 회의 이미지 업로드 API (OPTIONS는 corsMiddleware가 처리)
 
   // multer 에러 처리 미들웨어
   const handleMulterError = (err, req, res, next) => {
-    // CORS 헤더 설정 (에러가 발생했을 때 항상 설정)
-    const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
-    const defaultOrigins = [
-      'https://vipmobile.vercel.app',
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'http://localhost:4000'
-    ];
-    const allowedOrigins = [...corsOrigins, ...defaultOrigins];
-    const origin = req.headers.origin;
-
-    if (origin && allowedOrigins.includes(origin)) {
-      res.header('Access-Control-Allow-Origin', origin);
-    } else if (allowedOrigins.length > 0) {
-      res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
-    }
-    res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key');
-    res.header('Access-Control-Allow-Credentials', 'true');
+    // CORS 헤더는 corsMiddleware에서 이미 설정됨
 
     if (err instanceof multer.MulterError) {
       console.error('🚨 [Multer 에러]', err.code, err.message);
@@ -10738,29 +10417,7 @@ try {
     meetingRoutes.uploadMeetingImage
   );
 
-  // 커스텀 파일 업로드 API OPTIONS 요청 처리
-  app.options('/api/meetings/:meetingId/upload-file', (req, res) => {
-    const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
-    const defaultOrigins = [
-      'https://vipmobile.vercel.app',
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'http://localhost:4000'
-    ];
-    const allowedOrigins = [...corsOrigins, ...defaultOrigins];
-    const origin = req.headers.origin;
-
-    if (origin && allowedOrigins.includes(origin)) {
-      res.header('Access-Control-Allow-Origin', origin);
-    } else if (allowedOrigins.length > 0) {
-      res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
-    }
-    res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Max-Age', '86400');
-    res.status(200).end();
-  });
+  // 커스텀 파일 업로드 API OPTIONS 요청은 corsMiddleware에서 처리됨 (중복 제거)
 
   app.post('/api/meetings/:meetingId/upload-file', meetingRoutes.upload.single('file'), meetingRoutes.uploadCustomSlideFile);
   app.get('/api/meetings/proxy-image', meetingRoutes.proxyDiscordImage);
@@ -11717,28 +11374,9 @@ app.post('/api/budget/calculate-usage', async (req, res) => {
   }
 });
 
-// Multer 에러 핸들링 미들웨어 (CORS 헤더 포함, multer 에러 특별 처리)
+// Multer 에러 핸들링 미들웨어 (multer 에러 특별 처리)
+// CORS 헤더는 corsMiddleware에서 이미 설정됨
 app.use((error, req, res, next) => {
-  // CORS 헤더를 먼저 설정하여 에러 응답에도 포함
-  const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
-  const defaultOrigins = [
-    'https://vipmobile.vercel.app',
-    'http://localhost:3000',
-    'http://localhost:3001',
-    'http://localhost:4000'
-  ];
-  const allowedOrigins = [...corsOrigins, ...defaultOrigins];
-  const origin = req.headers.origin;
-
-  if (origin && allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-  } else if (allowedOrigins.length > 0) {
-    res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
-  }
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key');
-  res.header('Access-Control-Allow-Credentials', 'true');
-
   // Multer 에러 특별 처리 (multer가 정의된 경우에만)
   if (multer && multer.MulterError && error instanceof multer.MulterError) {
     console.error('🚨 [Multer에러]', error.code, error.message);
@@ -11768,47 +11406,8 @@ app.use((error, req, res, next) => {
 
 // ==================== 가입자증감 관련 API ====================
 
-// 가입자증감 API OPTIONS 요청 처리
-app.options('/api/subscriber-increase/*', (req, res) => {
-  const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
-  const defaultOrigins = [
-    'https://vipmobile.vercel.app',
-    'http://localhost:3000',
-    'http://localhost:3001',
-    'http://localhost:4000'
-  ];
-  const allowedOrigins = [...corsOrigins, ...defaultOrigins];
-  const origin = req.headers.origin;
-
-  if (origin && allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-  } else if (allowedOrigins.length > 0) {
-    res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
-  } else if (origin) {
-    res.header('Access-Control-Allow-Origin', origin);
-  }
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Max-Age', '86400'); // 24시간 캐시
-  res.status(200).end();
-});
-
-// 가입자증감 권한 확인 API
+// 가입자증감 권한 확인 API (OPTIONS는 corsMiddleware가 처리)
 app.get('/api/subscriber-increase/access', async (req, res) => {
-  // CORS 헤더 설정
-  const allowedOrigins = [
-    'https://vipmobile.vercel.app',
-    'http://localhost:3000',
-    'http://localhost:3001'
-  ];
-
-  const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-  }
-  res.header('Access-Control-Allow-Credentials', 'true');
-
   try {
     // 대리점아이디관리 시트에서 K열 권한 확인 (채권장표 메뉴 권한) (기존 I열 → K열)
     const agentResponse = await sheets.spreadsheets.values.get({
@@ -11852,19 +11451,6 @@ app.get('/api/subscriber-increase/access', async (req, res) => {
 
 // 가입자증감 시트 초기화/생성 API
 app.post('/api/subscriber-increase/init-sheet', async (req, res) => {
-  // CORS 헤더 설정
-  const allowedOrigins = [
-    'https://vipmobile.vercel.app',
-    'http://localhost:3000',
-    'http://localhost:3001'
-  ];
-
-  const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-  }
-  res.header('Access-Control-Allow-Credentials', 'true');
-
   try {
     // 시트 존재 여부 확인
     const spreadsheetResponse = await sheets.spreadsheets.get({
@@ -12038,19 +11624,6 @@ app.post('/api/subscriber-increase/init-sheet', async (req, res) => {
 
 // 가입자증감 시트에 315835(제외) 행 추가 API
 app.post('/api/subscriber-increase/add-excluded-row', async (req, res) => {
-  // CORS 헤더 설정
-  const allowedOrigins = [
-    'https://vipmobile.vercel.app',
-    'http://localhost:3000',
-    'http://localhost:3001'
-  ];
-
-  const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-  }
-  res.header('Access-Control-Allow-Credentials', 'true');
-
   try {
     // 기존 데이터 조회
     const dataResponse = await sheets.spreadsheets.values.get({
@@ -12586,32 +12159,8 @@ async function calculateAndUpdateTotals(spreadsheetId, sheetName, yearMonthIndex
 }
 
 // ============================================
-// 재초담초채권 API
+// 재초담초채권 API (OPTIONS는 corsMiddleware가 처리)
 // ============================================
-
-// 재초담초채권 API OPTIONS 요청 처리 (모든 엔드포인트보다 앞에 위치)
-app.options('/api/rechotancho-bond/*', (req, res) => {
-  const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
-  const defaultOrigins = [
-    'https://vipmobile.vercel.app',
-    'http://localhost:3000',
-    'http://localhost:3001',
-    'http://localhost:4000'
-  ];
-  const allowedOrigins = [...corsOrigins, ...defaultOrigins];
-  const origin = req.headers.origin;
-
-  if (origin && allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-  } else if (allowedOrigins.length > 0) {
-    res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
-  }
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Max-Age', '86400');
-  res.status(200).end();
-});
 
 // 재초담초채권 데이터 저장
 app.post('/api/rechotancho-bond/save', async (req, res) => {
@@ -12676,26 +12225,6 @@ app.post('/api/rechotancho-bond/save', async (req, res) => {
 
 // 재초담초채권 저장 시점 목록 조회
 app.get('/api/rechotancho-bond/history', async (req, res) => {
-  // CORS 헤더 설정
-  const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
-  const defaultOrigins = [
-    'https://vipmobile.vercel.app',
-    'http://localhost:3000',
-    'http://localhost:3001',
-    'http://localhost:4000'
-  ];
-  const allowedOrigins = [...corsOrigins, ...defaultOrigins];
-  const origin = req.headers.origin;
-
-  if (origin && allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-  } else if (allowedOrigins.length > 0) {
-    res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
-  }
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key');
-  res.header('Access-Control-Allow-Credentials', 'true');
-
   try {
     const spreadsheetId = process.env.GOOGLE_SHEET_ID || process.env.SHEET_ID;
     const sheetName = '재초담초채권_내역';
@@ -33623,9 +33152,6 @@ async function createPolicyNotification(policyId, userId, notificationType, appr
 
 // 마감장표 데이터 조회 API
 app.get('/api/closing-chart', async (req, res) => {
-  // CORS 헤더 설정
-  setCORSHeaders(req, res);
-
   try {
     const { date } = req.query;
     const targetDate = date || new Date().toISOString().split('T')[0];
@@ -35655,9 +35181,6 @@ app.post('/api/closing-chart/targets', async (req, res) => {
 
 // 매핑 실패 데이터 조회 API
 app.get('/api/closing-chart/mapping-failures', async (req, res) => {
-  // CORS 헤더 설정
-  setCORSHeaders(req, res);
-
   try {
     const { date } = req.query;
     const targetDate = date || new Date().toISOString().split('T')[0];
@@ -35677,9 +35200,6 @@ app.get('/api/closing-chart/mapping-failures', async (req, res) => {
 
 // 담당자-코드 조합 추출 API
 app.get('/api/closing-chart/agent-code-combinations', async (req, res) => {
-  // CORS 헤더 설정
-  setCORSHeaders(req, res);
-
   try {
     const { date } = req.query;
     const targetDate = date || new Date().toISOString().split('T')[0];
@@ -36950,9 +36470,6 @@ app.get('/api/last-activation-date', async (req, res) => {
 
 // 영업사원별마감 데이터 조회 API
 app.get('/api/agent-closing-chart', async (req, res) => {
-  // CORS 헤더 설정
-  setCORSHeaders(req, res);
-
   try {
     const { date, agent } = req.query;
     const targetDate = date || new Date().toISOString().split('T')[0];
@@ -42370,8 +41887,6 @@ app.get('/api/quick-cost/quality', async (req, res) => {
 
 // 주소를 위도/경도로 변환하는 API (카카오 API 사용)
 app.get('/api/geocode-address', async (req, res) => {
-  setCORSHeaders(req, res);
-
   try {
     const { address } = req.query;
 
@@ -42414,8 +41929,6 @@ const transitLocationCache = new Map();
 const TRANSIT_CACHE_TTL = 5 * 60 * 1000; // 5분
 
 app.get('/api/direct/transit-location/list', async (req, res) => {
-  setCORSHeaders(req, res);
-  
   try {
     // 캐시 확인
     const cacheKey = 'transit_locations_by_store';
@@ -42821,7 +42334,6 @@ async function ensureMarkerColorSheetHeaders(sheets, spreadsheetId) {
 
 // GET /api/stores/unique-values - 유니크 값 목록 조회
 app.get('/api/stores/unique-values', async (req, res) => {
-  setCORSHeaders(req, res);
   try {
     const { type } = req.query; // 'code', 'office', 'department', 'manager'
 
@@ -42877,7 +42389,6 @@ app.get('/api/stores/unique-values', async (req, res) => {
 
 // GET /api/marker-color-settings - 현재 사용자의 색상 설정 조회
 app.get('/api/marker-color-settings', async (req, res) => {
-  setCORSHeaders(req, res);
   try {
     const userId = req.headers['x-user-id'] || req.query.userId;
     if (!userId) {
@@ -43010,7 +42521,6 @@ app.get('/api/marker-color-settings', async (req, res) => {
 
 // POST /api/marker-color-settings - 색상 설정 저장/업데이트
 app.post('/api/marker-color-settings', express.json(), async (req, res) => {
-  setCORSHeaders(req, res);
   try {
     const userId = req.headers['x-user-id'] || req.body.userId;
     const { selectedOption, colorSettings } = req.body;

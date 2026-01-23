@@ -1553,68 +1553,12 @@ async function processPolicyTableGeneration(jobId, params, discordRequestId = nu
 function setupPolicyTableRoutes(app) {
   const router = express.Router();
 
-  // CORS 헤더 설정
-  const setCORSHeaders = (req, res) => {
-    // 환경 변수에서 허용할 도메인 목록 가져오기
-    const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
-    
-    // 기본 허용 도메인 (개발용 및 프로덕션)
-    const defaultOrigins = [
-      'https://vipmobile.vercel.app',
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'http://localhost:3002'
-    ];
-    
-    const allowedOrigins = [...defaultOrigins, ...corsOrigins];
-    const origin = req.headers.origin;
-    
-    // 디버깅 로그 (정책표 관련 요청만)
-    const isPolicyTableRequest = req.url && req.url.includes('/api/policy-tables');
-    
-    if (isPolicyTableRequest) {
-      console.log('🔍 [setCORSHeaders] 호출:', {
-        url: req.url,
-        method: req.method,
-        origin: origin,
-        allowedOrigins: allowedOrigins,
-        originInAllowed: origin && allowedOrigins.includes(origin)
-      });
-    }
-    
-    if (origin && allowedOrigins.includes(origin)) {
-      res.setHeader('Access-Control-Allow-Origin', origin);
-    } else if (origin && process.env.CORS_ORIGIN?.includes(origin)) {
-      // 환경 변수에 있는 경우도 허용
-      res.setHeader('Access-Control-Allow-Origin', origin);
-    } else {
-      res.setHeader('Access-Control-Allow-Origin', 'https://vipmobile.vercel.app');
-    }
-    
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key, x-user-id, x-user-role, x-user-name, x-mode');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Max-Age', '86400'); // 24시간 캐시
-    
-    if (isPolicyTableRequest) {
-      console.log('✅ [setCORSHeaders] CORS 헤더 설정 완료:', {
-        'Access-Control-Allow-Origin': res.getHeader('Access-Control-Allow-Origin'),
-        'Access-Control-Allow-Methods': res.getHeader('Access-Control-Allow-Methods'),
-        'Access-Control-Allow-Headers': res.getHeader('Access-Control-Allow-Headers'),
-        'Access-Control-Allow-Credentials': res.getHeader('Access-Control-Allow-Credentials')
-      });
-    }
-  };
-
-  // CORS 헤더는 전역 핸들러(app.options('*'))에서 처리되므로
-  // 라우터에서는 각 라우트 핸들러에서만 setCORSHeaders 호출
-  // OPTIONS 요청은 전역 핸들러가 처리
+  // CORS 헤더는 전역 corsMiddleware에서 처리됨 (중복 제거 완료)
 
   // ========== 정책표생성설정 관련 API ==========
 
   // GET /api/policy-table-settings
   router.get('/policy-table-settings', async (req, res) => {
-    setCORSHeaders(req, res);
     // OPTIONS 요청 처리
     if (req.method === 'OPTIONS') {
       return res.status(200).end();
@@ -1752,7 +1696,6 @@ function setupPolicyTableRoutes(app) {
 
   // POST /api/policy-table-settings
   router.post('/policy-table-settings', express.json(), async (req, res) => {
-    setCORSHeaders(req, res);
     try {
       const permission = await checkPermission(req, ['SS']);
       if (!permission.hasPermission) {
@@ -1814,7 +1757,6 @@ function setupPolicyTableRoutes(app) {
 
   // PUT /api/policy-table-settings/:id
   router.put('/policy-table-settings/:id', express.json(), async (req, res) => {
-    setCORSHeaders(req, res);
     try {
       const permission = await checkPermission(req, ['SS']);
       if (!permission.hasPermission) {
@@ -1900,7 +1842,6 @@ function setupPolicyTableRoutes(app) {
 
   // DELETE /api/policy-table-settings/:id
   router.delete('/policy-table-settings/:id', async (req, res) => {
-    setCORSHeaders(req, res);
     try {
       const permission = await checkPermission(req, ['SS']);
       if (!permission.hasPermission) {
@@ -1962,7 +1903,6 @@ function setupPolicyTableRoutes(app) {
 
   // GET /api/budget-channel-settings
   router.get('/budget-channel-settings', async (req, res) => {
-    setCORSHeaders(req, res);
     if (req.method === 'OPTIONS') {
       return res.status(200).end();
     }
@@ -2071,7 +2011,6 @@ function setupPolicyTableRoutes(app) {
 
   // POST /api/budget-channel-settings
   router.post('/budget-channel-settings', express.json(), async (req, res) => {
-    setCORSHeaders(req, res);
     try {
       const permission = await checkPermission(req, ['SS'], 'budget');
       if (!permission.hasPermission) {
@@ -2137,7 +2076,6 @@ function setupPolicyTableRoutes(app) {
 
   // PUT /api/budget-channel-settings/:id
   router.put('/budget-channel-settings/:id', express.json(), async (req, res) => {
-    setCORSHeaders(req, res);
     try {
       const permission = await checkPermission(req, ['SS'], 'budget');
       if (!permission.hasPermission) {
@@ -2223,7 +2161,6 @@ function setupPolicyTableRoutes(app) {
 
   // DELETE /api/budget-channel-settings/:id
   router.delete('/budget-channel-settings/:id', async (req, res) => {
-    setCORSHeaders(req, res);
     try {
       const permission = await checkPermission(req, ['SS'], 'budget');
       if (!permission.hasPermission) {
@@ -2284,7 +2221,6 @@ function setupPolicyTableRoutes(app) {
 
   // GET /api/basic-budget-settings
   router.get('/basic-budget-settings', async (req, res) => {
-    setCORSHeaders(req, res);
     if (req.method === 'OPTIONS') {
       return res.status(200).end();
     }
@@ -2345,7 +2281,6 @@ function setupPolicyTableRoutes(app) {
 
   // POST /api/basic-budget-settings
   router.post('/basic-budget-settings', express.json(), async (req, res) => {
-    setCORSHeaders(req, res);
     try {
       const permission = await checkPermission(req, ['SS'], 'budget');
       if (!permission.hasPermission) {
@@ -2391,7 +2326,6 @@ function setupPolicyTableRoutes(app) {
 
   // PUT /api/basic-budget-settings/:id
   router.put('/basic-budget-settings/:id', express.json(), async (req, res) => {
-    setCORSHeaders(req, res);
     try {
       const permission = await checkPermission(req, ['SS'], 'budget');
       if (!permission.hasPermission) {
@@ -2456,7 +2390,6 @@ function setupPolicyTableRoutes(app) {
 
   // DELETE /api/basic-budget-settings/:id
   router.delete('/basic-budget-settings/:id', async (req, res) => {
-    setCORSHeaders(req, res);
     try {
       const permission = await checkPermission(req, ['SS'], 'budget');
       if (!permission.hasPermission) {
@@ -2518,7 +2451,6 @@ function setupPolicyTableRoutes(app) {
 
   // GET /api/basic-data-settings
   router.get('/basic-data-settings', async (req, res) => {
-    setCORSHeaders(req, res);
     if (req.method === 'OPTIONS') {
       return res.status(200).end();
     }
@@ -2579,7 +2511,6 @@ function setupPolicyTableRoutes(app) {
 
   // POST /api/basic-data-settings
   router.post('/basic-data-settings', express.json(), async (req, res) => {
-    setCORSHeaders(req, res);
     try {
       const permission = await checkPermission(req, ['SS'], 'budget');
       if (!permission.hasPermission) {
@@ -2625,7 +2556,6 @@ function setupPolicyTableRoutes(app) {
 
   // PUT /api/basic-data-settings/:id
   router.put('/basic-data-settings/:id', express.json(), async (req, res) => {
-    setCORSHeaders(req, res);
     try {
       const permission = await checkPermission(req, ['SS'], 'budget');
       if (!permission.hasPermission) {
@@ -2690,7 +2620,6 @@ function setupPolicyTableRoutes(app) {
 
   // DELETE /api/basic-data-settings/:id
   router.delete('/basic-data-settings/:id', async (req, res) => {
-    setCORSHeaders(req, res);
     try {
       const permission = await checkPermission(req, ['SS'], 'budget');
       if (!permission.hasPermission) {
@@ -2841,7 +2770,6 @@ function setupPolicyTableRoutes(app) {
 
   // GET /api/policy-table/user-groups
   router.get('/policy-table/user-groups', async (req, res) => {
-    setCORSHeaders(req, res);
     try {
       // S 권한자도 정책영업그룹 조회 가능하도록 권한 체크 수정
       const userRole = req.headers['x-user-role'] || req.query?.userRole;
@@ -2930,7 +2858,6 @@ function setupPolicyTableRoutes(app) {
 
   // POST /api/policy-table/user-groups
   router.post('/policy-table/user-groups', express.json(), async (req, res) => {
-    setCORSHeaders(req, res);
     try {
       const permission = await checkPermission(req, ['SS', 'TEAM_LEADER']);
       if (!permission.hasPermission) {
@@ -3028,7 +2955,6 @@ function setupPolicyTableRoutes(app) {
 
   // PUT /api/policy-table/user-groups/:id
   router.put('/policy-table/user-groups/:id', express.json(), async (req, res) => {
-    setCORSHeaders(req, res);
     try {
       const permission = await checkPermission(req, ['SS', 'TEAM_LEADER']);
       if (!permission.hasPermission) {
@@ -3173,7 +3099,6 @@ function setupPolicyTableRoutes(app) {
 
   // DELETE /api/policy-table/user-groups/:id
   router.delete('/policy-table/user-groups/:id', async (req, res) => {
-    setCORSHeaders(req, res);
     try {
       const permission = await checkPermission(req, ['SS', 'TEAM_LEADER']);
       if (!permission.hasPermission) {
@@ -3264,7 +3189,6 @@ function setupPolicyTableRoutes(app) {
 
   // GET /api/policy-table/user-groups/:id/change-history
   router.get('/policy-table/user-groups/:id/change-history', async (req, res) => {
-    setCORSHeaders(req, res);
     // OPTIONS 요청 처리
     if (req.method === 'OPTIONS') {
       return res.status(200).end();
@@ -3358,7 +3282,6 @@ function setupPolicyTableRoutes(app) {
 
   // PUT /api/policy-table/user-groups/:id/change-history/:changeId/apply-phone
   router.put('/policy-table/user-groups/:id/change-history/:changeId/apply-phone', express.json(), async (req, res) => {
-    setCORSHeaders(req, res);
     try {
       // S 권한자도 폰클 적용 가능하도록 권한 체크
       const userRole = req.headers['x-user-role'] || req.query?.userRole;
@@ -3477,7 +3400,6 @@ function setupPolicyTableRoutes(app) {
 
   // PUT /api/policy-table/user-groups/:id/phone-register
   router.put('/policy-table/user-groups/:id/phone-register', express.json(), async (req, res) => {
-    setCORSHeaders(req, res);
     try {
       // S 권한자도 폰클 등록 가능하도록 권한 체크
       const userRole = req.headers['x-user-role'] || req.query?.userRole;
@@ -3544,7 +3466,6 @@ function setupPolicyTableRoutes(app) {
 
   // GET /api/policy-table/companies
   router.get('/policy-table/companies', async (req, res) => {
-    setCORSHeaders(req, res);
     try {
       // S 권한자도 업체명 목록 조회 가능하도록 권한 체크 수정
       const userRole = req.headers['x-user-role'] || req.query?.userRole;
@@ -3635,7 +3556,6 @@ function setupPolicyTableRoutes(app) {
 
   // POST /api/policy-table/generate
   router.post('/policy-table/generate', express.json(), async (req, res) => {
-    setCORSHeaders(req, res);
     try {
       const permission = await checkPermission(req, ['SS', 'TEAM_LEADER']);
       if (!permission.hasPermission) {
@@ -3824,7 +3744,6 @@ function setupPolicyTableRoutes(app) {
   // GET /api/policy-table/queue-status
   // 큐 상태 조회 API
   router.get('/policy-table/queue-status', async (req, res) => {
-    setCORSHeaders(req, res);
     try {
       const queueStatus = getQueueStatus();
       return res.json({
@@ -3839,7 +3758,6 @@ function setupPolicyTableRoutes(app) {
 
   // GET /api/policy-table/generate/:jobId/status
   router.get('/policy-table/generate/:jobId/status', async (req, res) => {
-    setCORSHeaders(req, res);
     try {
       const { jobId } = req.params;
       const status = getJobStatus(jobId);
@@ -3882,7 +3800,6 @@ function setupPolicyTableRoutes(app) {
 
   // GET /api/policy-tables/tabs
   router.get('/policy-tables/tabs', async (req, res) => {
-    setCORSHeaders(req, res);
     try {
       const userRole = req.headers['x-user-role'] || req.query.userRole;
       const userId = req.headers['x-user-id'] || req.query.userId;
@@ -4441,7 +4358,6 @@ function setupPolicyTableRoutes(app) {
 
   // GET /api/policy-tables
   router.get('/policy-tables', async (req, res) => {
-    setCORSHeaders(req, res);
     try {
       const { policyTableName, applyDateSearch, creator, createDateFrom, createDateTo, mode } = req.query;
       const userRole = req.headers['x-user-role'] || req.query.userRole;
@@ -5000,7 +4916,6 @@ function setupPolicyTableRoutes(app) {
 
   // POST /api/policy-tables/:id/register
   router.post('/policy-tables/:id/register', express.json(), async (req, res) => {
-    setCORSHeaders(req, res);
     try {
       // 권한 체크 (S와 SS 모두 허용)
       const permission = await checkPermission(req, ['S', 'SS', 'TEAM_LEADER']);
@@ -5054,7 +4969,6 @@ function setupPolicyTableRoutes(app) {
       const dataRowIndex = dataRows.findIndex(row => row && row[0] === id);
 
       if (dataRowIndex === -1) {
-        setCORSHeaders(req, res); // 에러 응답에도 CORS 헤더 추가
         return res.status(404).json({ success: false, error: '정책표를 찾을 수 없습니다.' });
       }
 
@@ -5107,14 +5021,12 @@ function setupPolicyTableRoutes(app) {
       });
     } catch (error) {
       console.error('[정책표] 등록 오류:', error);
-      setCORSHeaders(req, res); // 에러 응답에도 CORS 헤더 추가
       return res.status(500).json({ success: false, error: error.message });
     }
   });
 
   // GET /api/policy-tables/:id
   router.get('/policy-tables/:id', async (req, res) => {
-    setCORSHeaders(req, res);
     try {
       const { id } = req.params;
       const userRole = req.headers['x-user-role'] || req.query.userRole;
@@ -5471,7 +5383,6 @@ function setupPolicyTableRoutes(app) {
 
   // POST /api/policy-tables/:id/refresh-image
   router.post('/policy-tables/:id/refresh-image', express.json(), async (req, res) => {
-    setCORSHeaders(req, res);
     try {
       const { id } = req.params;
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
@@ -5556,7 +5467,6 @@ function setupPolicyTableRoutes(app) {
 
   // GET /api/policy-tables/:id/download-excel
   router.get('/policy-tables/:id/download-excel', async (req, res) => {
-    setCORSHeaders(req, res);
     try {
       const { id } = req.params;
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
@@ -5653,7 +5563,6 @@ function setupPolicyTableRoutes(app) {
 
   // GET /api/policy-tables/tabs/order
   router.get('/policy-tables/tabs/order', async (req, res) => {
-    setCORSHeaders(req, res);
     try {
       const userId = req.headers['x-user-id'] || req.query.userId;
       
@@ -5719,7 +5628,6 @@ function setupPolicyTableRoutes(app) {
 
   // PUT /api/policy-tables/tabs/order
   router.put('/policy-tables/tabs/order', express.json(), async (req, res) => {
-    setCORSHeaders(req, res);
     try {
       const userId = req.headers['x-user-id'] || req.body.userId;
       const { order, cardOrder } = req.body; // order는 탭 순서, cardOrder는 생성카드 순서
@@ -5802,7 +5710,6 @@ function setupPolicyTableRoutes(app) {
 
   // PUT /api/policy-tables/:id - 정책표 수정
   router.put('/policy-tables/:id', express.json(), async (req, res) => {
-    setCORSHeaders(req, res);
     try {
       const permission = await checkPermission(req, ['SS', 'TEAM_LEADER']);
       if (!permission.hasPermission) {
@@ -5875,7 +5782,6 @@ function setupPolicyTableRoutes(app) {
 
   // DELETE /api/policy-tables/:id
   router.delete('/policy-tables/:id', async (req, res) => {
-    setCORSHeaders(req, res);
     try {
       const permission = await checkPermission(req, ['SS', 'TEAM_LEADER']);
       if (!permission.hasPermission) {
@@ -5935,7 +5841,6 @@ function setupPolicyTableRoutes(app) {
 
   // GET /api/policy-table/default-groups/:userId - 사용자의 기본 그룹 설정 조회
   router.get('/policy-table/default-groups/:userId', async (req, res) => {
-    setCORSHeaders(req, res);
     try {
       const { userId } = req.params;
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
@@ -6010,7 +5915,6 @@ function setupPolicyTableRoutes(app) {
 
   // PUT /api/policy-table/default-groups/:userId - 사용자의 기본 그룹 설정 저장
   router.put('/policy-table/default-groups/:userId', express.json(), async (req, res) => {
-    setCORSHeaders(req, res);
     try {
       console.log('[정책표] 기본 그룹 설정 저장 요청:', {
         userId: req.params.userId,
@@ -6102,7 +6006,6 @@ function setupPolicyTableRoutes(app) {
 
   // GET /api/policy-table/other-policy-types - 기타정책 목록 조회
   router.get('/policy-table/other-policy-types', async (req, res) => {
-    setCORSHeaders(req, res);
     try {
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
       const cacheKey = `other-policy-types-${SPREADSHEET_ID}`;
@@ -6166,7 +6069,6 @@ function setupPolicyTableRoutes(app) {
 
   // POST /api/policy-table/other-policy-types - 기타정책 추가
   router.post('/policy-table/other-policy-types', express.json(), async (req, res) => {
-    setCORSHeaders(req, res);
     try {
       const permission = await checkPermission(req, ['SS', 'TEAM_LEADER']);
       if (!permission.hasPermission) {
@@ -6228,7 +6130,6 @@ function setupPolicyTableRoutes(app) {
       allHeaders: req.headers
     });
     
-    setCORSHeaders(req, res);
     
     console.log('✅ [라우터 OPTIONS] CORS 헤더 설정 완료:', {
       'Access-Control-Allow-Origin': res.getHeader('Access-Control-Allow-Origin'),
@@ -6262,7 +6163,6 @@ function setupPolicyTableRoutes(app) {
       }, {})
     });
     
-    setCORSHeaders(req, res);
     
     try {
       const { id } = req.params;
