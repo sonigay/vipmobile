@@ -492,10 +492,78 @@ function AppContent() {
         console.error('세션 복구 중 오류:', error);
         localStorage.removeItem('vip_session');
       }
+
+      // 3. 모드 상태 복구 (페이지 새로고침 시 현재 모드 유지)
+      try {
+        const savedModeState = localStorage.getItem('current_mode_state');
+        if (savedModeState) {
+          const modeState = JSON.parse(savedModeState);
+          setIsDirectStoreMode(modeState.isDirectStoreMode || false);
+          setIsMeetingMode(modeState.isMeetingMode || false);
+          setIsPolicyMode(modeState.isPolicyMode || false);
+          setIsChartMode(modeState.isChartMode || false);
+          setIsInspectionMode(modeState.isInspectionMode || false);
+          setIsSalesMode(modeState.isSalesMode || false);
+          setIsReservationMode(modeState.isReservationMode || false);
+          setIsBudgetMode(modeState.isBudgetMode || false);
+          setIsInventoryRecoveryMode(modeState.isInventoryRecoveryMode || false);
+          setIsDataCollectionMode(modeState.isDataCollectionMode || false);
+          setIsSmsManagementMode(modeState.isSmsManagementMode || false);
+          setIsObManagementMode(modeState.isObManagementMode || false);
+          setIsOnSaleManagementMode(modeState.isOnSaleManagementMode || false);
+          setIsOnSaleReceptionMode(modeState.isOnSaleReceptionMode || false);
+          setIsMealAllowanceMode(modeState.isMealAllowanceMode || false);
+          setIsAttendanceMode(modeState.isAttendanceMode || false);
+          setIsRiskManagementMode(modeState.isRiskManagementMode || false);
+          setIsQuickServiceManagementMode(modeState.isQuickServiceManagementMode || false);
+          setIsDirectStoreManagementMode(modeState.isDirectStoreManagementMode || false);
+          setIsGeneralPolicyMode(modeState.isGeneralPolicyMode || false);
+          setCurrentMode(modeState.currentMode || '');
+          console.log('✅ 모드 상태 복구 완료:', modeState);
+        }
+      } catch (error) {
+        console.error('모드 상태 복구 중 오류:', error);
+        localStorage.removeItem('current_mode_state');
+      }
     };
 
     initializeApp();
   }, []);
+
+  // 모드 변경 시 localStorage에 저장 (페이지 새로고침 시 현재 모드 유지)
+  useEffect(() => {
+    if (isLoggedIn) {
+      const modeState = {
+        isDirectStoreMode,
+        isMeetingMode,
+        isPolicyMode,
+        isChartMode,
+        isInspectionMode,
+        isSalesMode,
+        isReservationMode,
+        isBudgetMode,
+        isInventoryRecoveryMode,
+        isDataCollectionMode,
+        isSmsManagementMode,
+        isObManagementMode,
+        isOnSaleManagementMode,
+        isOnSaleReceptionMode,
+        isMealAllowanceMode,
+        isAttendanceMode,
+        isRiskManagementMode,
+        isQuickServiceManagementMode,
+        isDirectStoreManagementMode,
+        isGeneralPolicyMode,
+        currentMode
+      };
+      localStorage.setItem('current_mode_state', JSON.stringify(modeState));
+    }
+  }, [isDirectStoreMode, isMeetingMode, isPolicyMode, isChartMode, isInspectionMode,
+    isSalesMode, isReservationMode, isBudgetMode, isInventoryRecoveryMode,
+    isDataCollectionMode, isSmsManagementMode, isObManagementMode,
+    isOnSaleManagementMode, isOnSaleReceptionMode, isMealAllowanceMode,
+    isAttendanceMode, isRiskManagementMode, isQuickServiceManagementMode,
+    isDirectStoreManagementMode, isGeneralPolicyMode, currentMode, isLoggedIn]);
 
   const loadActivationData = useCallback(async () => {
     try {
@@ -3010,6 +3078,7 @@ function AppContent() {
     localStorage.removeItem('loginState');
     localStorage.removeItem('vip_session');
     localStorage.removeItem('customer_info');
+    localStorage.removeItem('current_mode_state'); // 모드 상태도 삭제
   };
 
   const handleModelSelect = useCallback((model) => {

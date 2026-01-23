@@ -444,51 +444,65 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
             formData.append('storeName', editingStore.name);
             formData.append('photoType', photoType);
 
-            const response = await fetch(`${API_BASE_URL}/api/direct/store-image/upload`, {
-                method: 'POST',
-                body: formData
-            });
+            // 타임아웃 설정 (60초)
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 60000);
 
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ error: '업로드 실패' }));
-                throw new Error(errorData.error || '업로드에 실패했습니다.');
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/direct/store-image/upload`, {
+                    method: 'POST',
+                    body: formData,
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ error: '업로드 실패' }));
+                    throw new Error(errorData.error || '업로드에 실패했습니다.');
+                }
+
+                const data = await response.json();
+
+                // 업로드된 URL을 해당 필드에 자동 입력
+                const urlFieldMap = {
+                    front: 'frontUrl',
+                    inside: 'insideUrl',
+                    outside: 'outsideUrl',
+                    outside2: 'outside2Url',
+                    manager: 'managerUrl',
+                    staff1: 'staff1Url',
+                    staff2: 'staff2Url',
+                    staff3: 'staff3Url'
+                };
+
+                const fieldName = urlFieldMap[photoType];
+                if (fieldName) {
+                    setEditStorePhotos(prev => ({
+                        ...prev,
+                        [fieldName]: data.url
+                    }));
+                }
+
+                // Discord 메시지 ID 정보 저장 (업로드 시 받은 정보)
+                if (data.messageId || data.postId || data.threadId) {
+                    setDiscordInfo(prev => ({
+                        ...prev,
+                        [photoType]: {
+                            messageId: data.messageId || '',
+                            postId: data.postId || '',
+                            threadId: data.threadId || ''
+                        }
+                    }));
+                }
+
+                alert('업로드되었습니다.');
+            } catch (fetchError) {
+                clearTimeout(timeoutId);
+                if (fetchError.name === 'AbortError') {
+                    throw new Error('업로드 시간이 초과되었습니다. 파일 크기를 확인하거나 네트워크 연결을 확인해주세요.');
+                }
+                throw fetchError;
             }
-
-            const data = await response.json();
-
-            // 업로드된 URL을 해당 필드에 자동 입력
-            const urlFieldMap = {
-                front: 'frontUrl',
-                inside: 'insideUrl',
-                outside: 'outsideUrl',
-                outside2: 'outside2Url',
-                manager: 'managerUrl',
-                staff1: 'staff1Url',
-                staff2: 'staff2Url',
-                staff3: 'staff3Url'
-            };
-
-            const fieldName = urlFieldMap[photoType];
-            if (fieldName) {
-                setEditStorePhotos(prev => ({
-                    ...prev,
-                    [fieldName]: data.url
-                }));
-            }
-
-            // Discord 메시지 ID 정보 저장 (업로드 시 받은 정보)
-            if (data.messageId || data.postId || data.threadId) {
-                setDiscordInfo(prev => ({
-                    ...prev,
-                    [photoType]: {
-                        messageId: data.messageId || '',
-                        postId: data.postId || '',
-                        threadId: data.threadId || ''
-                    }
-                }));
-            }
-
-            alert('업로드되었습니다.');
         } catch (error) {
             console.error('파일 업로드 실패:', error);
             alert('업로드에 실패했습니다: ' + (error.message || '알 수 없는 오류'));
