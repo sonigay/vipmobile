@@ -4365,43 +4365,45 @@ app.get('/api/member/queue/all', async (req, res) => {
       });
     }
 
-    const queue = filteredRows.map(row => ({
-      id: row[0],
-      ctn: row[1],
-      name: row[2],
-      carrier: row[3],
-      model: row[4],
-      color: row[5],
-      deviceSerial: row[6],
-      usimModel: row[7],
-      usimSerial: row[8],
-      activationType: row[9],
-      oldCarrier: row[10],
-      installmentType: row[11],
-      installmentMonths: row[12],
-      contractType: row[13],
-      plan: row[14],
-      additionalServices: row[15],
-      factoryPrice: row[16],
-      carrierSupport: row[17],
-      dealerSupportWithAdd: row[18],
-      dealerSupportWithoutAdd: row[19],
-      installmentPrincipal: Number(row[20] || 0), // 🔥 추가: 할부원금
-      할부원금: Number(row[20] || 0), // 🔥 추가: 할부원금 (한글 필드명)
-      lgPremier: (row[21] || '') === 'Y', // 🔥 추가: LG 프리미어 약정 적용
-      프리미어약정: (row[21] || '') === 'Y', // 🔥 추가: LG 프리미어 약정 적용 (한글 필드명)
-      storeName: row[22],
-      storePhone: row[23],
-      storeAddress: row[24],
-      storeBankInfo: row[25],
-      createdAt: row[26],
-      status: row[27],
-      processedBy: row[28],
-      processedAt: row[29],
-      ip: row[30],
-      deviceInfo: row[31],
-      isAnonymous: row[32] === 'Y'
-    }));
+    const queue = filteredRows
+      .filter(row => (row[27] || '').toString().trim() !== '삭제됨') // 삭제됨 상태 제외
+      .map(row => ({
+        id: row[0],
+        ctn: row[1],
+        name: row[2],
+        carrier: row[3],
+        model: row[4],
+        color: row[5],
+        deviceSerial: row[6],
+        usimModel: row[7],
+        usimSerial: row[8],
+        activationType: row[9],
+        oldCarrier: row[10],
+        installmentType: row[11],
+        installmentMonths: row[12],
+        contractType: row[13],
+        plan: row[14],
+        additionalServices: row[15],
+        factoryPrice: row[16],
+        carrierSupport: row[17],
+        dealerSupportWithAdd: row[18],
+        dealerSupportWithoutAdd: row[19],
+        installmentPrincipal: Number(row[20] || 0), // 🔥 추가: 할부원금
+        할부원금: Number(row[20] || 0), // 🔥 추가: 할부원금 (한글 필드명)
+        lgPremier: (row[21] || '') === 'Y', // 🔥 추가: LG 프리미어 약정 적용
+        프리미어약정: (row[21] || '') === 'Y', // 🔥 추가: LG 프리미어 약정 적용 (한글 필드명)
+        storeName: row[22],
+        storePhone: row[23],
+        storeAddress: row[24],
+        storeBankInfo: row[25],
+        createdAt: row[26],
+        status: row[27],
+        processedBy: row[28],
+        processedAt: row[29],
+        ip: row[30],
+        deviceInfo: row[31],
+        isAnonymous: row[32] === 'Y'
+      }));
 
     // 최신순 정렬
     queue.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
@@ -4652,11 +4654,11 @@ app.delete('/api/member/queue/:id', async (req, res) => {
 
     if (rowIndex === -1) return res.status(404).json({ error: '대상을 찾을 수 없습니다.' });
 
-    // 상태를 '삭제됨'으로 변경 (Z열 = 25번 인덱스 = 상태)
+    // 상태를 '삭제됨'으로 변경 (AB열 = 27번 인덱스 = 상태)
     await rateLimitedSheetsCall(() =>
       sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
-        range: `${CUSTOMER_QUEUE_SHEET_NAME}!Z${rowIndex + 1}`,
+        range: `${CUSTOMER_QUEUE_SHEET_NAME}!AB${rowIndex + 1}`,
         valueInputOption: 'RAW',
         resource: { values: [['삭제됨']] }
       })

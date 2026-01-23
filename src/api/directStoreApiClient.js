@@ -144,6 +144,23 @@ const CACHE_CONFIG = {
 };
 
 /**
+ * 실제 요청 실행 함수 (헬퍼 함수)
+ * smartFetch 외부에 정의하여 순환 참조 방지
+ */
+const executeRequestWithQueue = async (reqUrl, reqOptions, isHeavy, errMsg) => {
+  // 실제 요청 실행 함수
+  const execute = async () => {
+    const response = await fetchWithRetry(reqUrl, reqOptions);
+    return handleResponse(response, errMsg);
+  };
+
+  if (isHeavy) {
+    return heavyRequestQueue.add(execute);
+  }
+  return execute();
+};
+
+/**
  * 스마트 API 요청 래퍼
  * 1. 중복 요청 제거 (Deduplication)
  * 2. 대기열 처리 (Queueing) - heavyRequest: true 인 경우만
@@ -204,19 +221,6 @@ const smartFetch = async (url, options = {}, config = {}) => {
   if (cacheKey && pendingRequests.has(cacheKey)) {
     return pendingRequests.get(cacheKey);
   }
-
-  const executeRequestWithQueue = async (reqUrl, reqOptions, isHeavy, errMsg) => {
-    // 실제 요청 실행 함수
-    const execute = async () => {
-      const response = await fetchWithRetry(reqUrl, reqOptions);
-      return handleResponse(response, errMsg);
-    };
-
-    if (isHeavy) {
-      return heavyRequestQueue.add(execute);
-    }
-    return execute();
-  };
 
   // 요청 생성 및 대기열 등록
   const requestPromise = executeRequestWithQueue(url, options, heavyRequest, errorMessage)
@@ -345,6 +349,19 @@ export const directStoreApiClient = {
     return smartFetch(`${BASE_URL}/rebuild-master?${params.toString()}`, {
       method: 'POST'
     }, { errorMessage: '마스터 데이터 재빌드 실패' });
+  },
+
+  /**
+   * Discord 메시지 ID를 통한 이미지 재업로드
+   * @param {string} carrier - 통신사 (SK, KT, LG)
+   */
+  refreshImagesFromDiscord: async (carrier) => {
+    const params = new URLSearchParams();
+    if (carrier) params.append('carrier', carrier);
+
+    return smartFetch(`${BASE_URL}/refresh-images-from-discord?${params.toString()}`, {
+      method: 'POST'
+    }, { errorMessage: '이미지 갱신 실패' });
   },
 
   /**
@@ -825,5 +842,74 @@ export const directStoreApiClient = {
       console.error('매장별 메인페이지 문구 조회 실패:', error);
       return { success: false, error: normalizeErrorMessage(error) };
     }
+  },
+
+  // === 캐시 관리 ===
+
+  /**
+   * 통신사별 캐시 무효화
+   * @param {string} carrier - 통신사 (SK, KT, LG)
+   */
+  clearCacheByCarrier: (carrier) => {
+    let clearedCount = 0;
+    
+    // 해당 통신사 관련 캐시만 삭제
+    for (const [key] of memoryCache.entries()) {
+      if (key.includes(carrier)) {
+        memoryCache.delete(key);
+        clearedCount++;
+      }
+    }
+    
+    // 진행 중인 요청도 삭제
+    for (const [key] of pendingRequests.entries()) {
+      if (key.includes(carrier)) {
+        pendingRequests.delete(key);
+      }
+    }
+    
+    console.log(`✅ [API Client] ${carrier} 캐시 초기화 완료 (${clearedCount}개 항목)`);
+  },
+
+  /**
+   * 이미지 캐시만 무효화
+   * @param {string} carrier - 통신사 (SK, KT, LG)
+   */
+  clearImageCache: (carrier) => {
+    let clearedCount = 0;
+    
+    // 이미지 관련 캐시만 삭제 (mobiles-master에 이미지 URL이 포함됨)
+    for (const [key] of memoryCache.entries()) {
+      if (key.includes('mobiles-master') && key.includes(carrier)) {
+        memoryCache.delete(key);
+        clearedCount++;
+      }
+    }
+    
+    console.log(`✅ [API Client] ${carrier} 이미지 캐시 초기화 완료 (${clearedCount}개 항목)`);
+  },
+
+  /**
+   * 전체 캐시 무효화
+   */
+  clearCache: () => {
+    const cacheSize = memoryCache.size;
+    const pendingSize = pendingRequests.size;
+    
+    memoryCache.clear();
+    pendingRequests.clear();
+    
+    console.log(`✅ [API Client] 전체 캐시 초기화 완료 (캐시: ${cacheSize}개, 진행중: ${pendingSize}개)`);
+  },
+
+  /**
+   * 캐시 통계 조회 (디버깅용)
+   */
+  getCacheStats: () => {
+    return {
+      cacheSize: memoryCache.size,
+      pendingRequests: pendingRequests.size,
+      cacheKeys: Array.from(memoryCache.keys())
+    };
   }
 };

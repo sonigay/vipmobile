@@ -269,15 +269,36 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
     loadPolicySettings();
   }, [getCurrentCarrier]);
 
-  const handleReload = () => {
-    // reloadTrigger를 증가시켜 useEffect 재실행
-    setReloadTrigger(prev => prev + 1);
-    initializedRef.current = false;
-    setLoading(true);
-    setError(null);
+  const handleReload = async () => {
+    try {
+      setLoading(true);
+      
+      // 현재 선택된 통신사의 마스터 데이터 재빌드
+      const carrier = getCurrentCarrier();
+      const result = await directStoreApiClient.rebuildMaster(carrier);
+      
+      if (result.success) {
+        // 해당 통신사의 프론트엔드 캐시 무효화
+        directStoreApiClient.clearCacheByCarrier(carrier);
+        
+        // 데이터 재로드 (reloadTrigger 증가)
+        setReloadTrigger(prev => prev + 1);
+        initializedRef.current = false;
+        
+        // 성공 메시지 표시
+        alert(`${carrier} 시세표 갱신 완료!\n단말: ${result.deviceCount}개, 요금제: ${result.planCount}개`);
+      } else {
+        throw new Error(result.error || '알 수 없는 오류');
+      }
+    } catch (error) {
+      console.error('시세표 갱신 실패:', error);
+      alert(`시세표 갱신 실패: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // 전체 이미지 갱신 함수 (배치 처리)
+  // 전체 이미지 갱신 함수 (통신사별 일괄 처리)
   const handleRefreshAllImages = async () => {
     if (!mobileList || mobileList.length === 0) {
       return;
@@ -285,79 +306,36 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
 
     setRefreshingAllImages(true);
     try {
-      const API_URL = process.env.REACT_APP_API_URL || API_BASE_URL;
       const carrier = getCurrentCarrier();
 
-      // Discord 메시지 ID와 스레드 ID가 있는 모델만 필터링
-      const modelsToRefresh = mobileList.filter(m =>
-        m.discordMessageId && m.discordThreadId
-      );
-
-      if (modelsToRefresh.length === 0) {
-        alert('갱신할 수 있는 이미지가 없습니다.');
-        setRefreshingAllImages(false);
-        return;
-      }
-
-      // 배치 처리: 한 번에 5개씩 처리 (서버 부하 방지)
-      const BATCH_SIZE = 5;
-      let successCount = 0;
-      let failCount = 0;
-
-      for (let i = 0; i < modelsToRefresh.length; i += BATCH_SIZE) {
-        const batch = modelsToRefresh.slice(i, i + BATCH_SIZE);
-
-        const batchPromises = batch.map(async (model) => {
-          try {
-            const response = await fetch(`${process.env.REACT_APP_API_URL || API_BASE_URL}/api/direct/refresh-mobile-image-url`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                carrier: carrier,
-                modelId: model.modelId || model.id,
-                modelName: model.model || model.petName,
-                threadId: model.discordThreadId,
-                messageId: model.discordMessageId
-              })
-            });
-
-            if (!response.ok) {
-              // CORS나 504 에러는 조용히 처리
-              return { success: false, error: `HTTP ${response.status}` };
-            }
-
-            const result = await response.json();
-            if (result.success) {
-              successCount++;
-            } else {
-              failCount++;
-            }
-            return result;
-          } catch (error) {
-            // 네트워크 에러는 조용히 처리 (CORS, timeout 등)
-            failCount++;
-            return { success: false, error: error.message };
-          }
-        });
-
-        await Promise.all(batchPromises);
-
-        // 배치 간 짧은 대기 (서버 부하 방지)
-        if (i + BATCH_SIZE < modelsToRefresh.length) {
-          await new Promise(resolve => setTimeout(resolve, 200));
+      // 통신사별 이미지 갱신 API 호출
+      const result = await directStoreApiClient.refreshImagesFromDiscord(carrier);
+      
+      if (result.success) {
+        // 해당 통신사의 이미지 캐시 무효화
+        directStoreApiClient.clearImageCache(carrier);
+        
+        // 데이터 재로드
+        setReloadTrigger(prev => prev + 1);
+        
+        // 성공 메시지 표시
+        alert(`${carrier} 이미지 갱신 완료!\n성공: ${result.updatedCount}개, 실패: ${result.failedCount}개`);
+        
+        // 실패한 이미지가 있으면 상세 정보 표시
+        if (result.failedCount > 0 && result.failedImages) {
+          const failedList = result.failedImages.map(f => `${f.modelId}: ${f.reason}`).join('\n');
+          console.warn('실패한 이미지 목록:\n' + failedList);
         }
-      }
-
-      // 결과 요약만 표시
-      if (successCount > 0 || failCount === 0) {
-        alert(`${successCount}개 이미지 갱신 완료${failCount > 0 ? ` (${failCount}개 실패)` : ''}`);
-        // 갱신 후 데이터 다시 로드
-        handleReload();
       } else {
-        alert('이미지 갱신에 실패했습니다. 잠시 후 다시 시도해주세요.');
+        throw new Error(result.error || '알 수 없는 오류');
       }
     } catch (error) {
-      console.error('이미지 갱신 오류:', error);
+      console.error('이미지 갱신 실패:', error);
+      alert(`이미지 갱신 실패: ${error.message}`);
+    } finally {
+      setRefreshingAllImages(false);
+    }
+  };
       alert('이미지 갱신 중 오류가 발생했습니다.');
     } finally {
       setRefreshingAllImages(false);
@@ -1205,22 +1183,24 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
             </Tabs>
           </Box>
 
-          <Button
-            variant="outlined"
-            size="small"
-            onClick={handleReload}
-            startIcon={<RefreshIcon />}
-            disabled={loading}
-            sx={{
-              ml: { xs: 0, sm: 2 },
-              mt: { xs: 1, sm: 0 },
-              fontSize: { xs: '0.75rem', sm: '0.875rem' },
-              minWidth: { xs: 'auto', sm: 'auto' },
-              px: { xs: 1, sm: 2 }
-            }}
-          >
-            새로고침
-          </Button>
+          <Tooltip title="해당 통신사의 마스터 데이터를 재빌드합니다">
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={handleReload}
+              startIcon={<RefreshIcon />}
+              disabled={loading}
+              sx={{
+                ml: { xs: 0, sm: 2 },
+                mt: { xs: 1, sm: 0 },
+                fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                minWidth: { xs: 'auto', sm: 'auto' },
+                px: { xs: 1, sm: 2 }
+              }}
+            >
+              시세표갱신하기
+            </Button>
+          </Tooltip>
         </Box>
 
         {/* 상태 단계 표시 */}

@@ -363,6 +363,7 @@ const handlePreflightRequest = (req, res) => {
 
 /**
  * 메인 CORS 미들웨어 함수
+ * 요구사항 3.1, 3.2, 3.3 구현
  * 
  * @param {Object} req - Express request 객체
  * @param {Object} res - Express response 객체
@@ -370,50 +371,167 @@ const handlePreflightRequest = (req, res) => {
  */
 const corsMiddleware = (req, res, next) => {
   try {
-    // OPTIONS 요청인 경우 프리플라이트 처리
-    if (req.method === 'OPTIONS') {
-      return handlePreflightRequest(req, res);
+    const origin = req.headers.origin;
+    const config = configManager.getConfiguration();
+    
+    // 1. 오리진 검증 (요구사항 3.1)
+    const validation = validateOrigin(origin, config.allowedOrigins, config.developmentMode);
+    
+    // 검증 실패 시 경고 로그 (요구사항 3.1)
+    if (!validation.isValid && origin) {
+      // 🔥 태스크 7.1: CORS 오류 로깅 강화 - 요청 오리진, 허용된 오리진 목록, 실패 이유 로깅
+      console.warn(`❌ [CORS] 허용되지 않은 오리진:`, {
+        요청오리진: origin,
+        허용된오리진목록: config.allowedOrigins,
+        실패이유: validation.reason,
+        요청정보: {
+          경로: req.path,
+          메서드: req.method,
+          헤더: req.headers
+        },
+        개발모드: config.developmentMode
+      });
+      logValidationFailure(origin, validation.reason, {
+        path: req.path,
+        method: req.method
+      });
     }
     
-    // 모든 요청에 기본 CORS 헤더 설정 및 오리진 검증
-    const validation = setBasicCORSHeaders(req, res);
+    // 2. CORS 헤더 설정 (항상 설정 - 요구사항 3.1, 3.2)
+    // 검증 실패 시에도 헤더를 설정하여 브라우저가 명확한 오류 메시지를 받을 수 있도록 함
+    if (origin) {
+      res.header('Access-Control-Allow-Origin', origin);
+    } else if (config.allowedOrigins.length > 0) {
+      res.header('Access-Control-Allow-Origin', config.allowedOrigins[0]);
+    }
     
-    // 오리진 검증 실패 시 403 응답 (요구사항 2.2)
-    if (!validation.isValid) {
+    res.header('Access-Control-Allow-Methods', config.allowedMethods.join(', '));
+    res.header('Access-Control-Allow-Headers', config.allowedHeaders.join(', '));
+    res.header('Access-Control-Allow-Credentials', config.allowCredentials.toString());
+    res.header('Access-Control-Max-Age', config.maxAge.toString());
+    
+    // 3. OPTIONS 프리플라이트 요청 처리 (요구사항 3.3)
+    if (req.method === 'OPTIONS') {
+      const requestedMethod = req.headers['access-control-request-method'];
+      const requestedHeaders = req.headers['access-control-request-headers'];
+      
+      // 프리플라이트 요청 로깅
+      logPreflight('REQUEST', {
+        method: req.method,
+        url: req.url,
+        origin: origin,
+        requestedMethod: requestedMethod,
+        requestedHeaders: requestedHeaders
+      });
+      
+      // 요청된 메서드 검증 (요구사항 3.3)
+      if (requestedMethod && !validateRequestedMethod(requestedMethod)) {
+        logPreflight('FAILURE', {
+          method: requestedMethod,
+          origin: origin,
+          type: 'METHOD_VALIDATION',
+          allowedMethods: config.allowedMethods
+        });
+        
+        return res.status(400).json({
+          error: 'Invalid preflight request',
+          message: `Method ${requestedMethod} is not allowed`,
+          allowedMethods: config.allowedMethods
+        });
+      }
+      
+      // 요청된 헤더 검증 (요구사항 3.3)
+      if (requestedHeaders && !validateRequestedHeaders(requestedHeaders)) {
+        logPreflight('FAILURE', {
+          headers: requestedHeaders,
+          origin: origin,
+          type: 'HEADERS_VALIDATION'
+        });
+        
+        return res.status(400).json({
+          error: 'Invalid preflight request',
+          message: 'One or more requested headers are not allowed',
+          requestedHeaders: requestedHeaders
+        });
+      }
+      
+      // 검증 통과 - 프리플라이트 성공
+      logPreflight('SUCCESS', {
+        origin: origin,
+        requestedMethod: requestedMethod,
+        requestedHeaders: requestedHeaders,
+        validationPassed: validation.isValid
+      });
+      
+      return res.status(200).end();
+    }
+    
+    // 4. 실제 요청에서 오리진 검증 실패 시 403 응답
+    if (!validation.isValid && origin) {
       return res.status(403).json({
         error: 'Forbidden',
         message: 'Origin not allowed',
-        origin: req.headers.origin,
+        origin: origin,
         reason: validation.reason
       });
     }
     
-    // 다음 미들웨어로 진행
+    // 5. 디버그 모드에서 성공적인 검증 로깅
+    if (config.debugMode && origin && validation.isValid) {
+      logValidationSuccess(origin, validation.matchedOrigin, validation.reason);
+    }
+    
+    // 6. 다음 미들웨어로 진행
     next();
   } catch (error) {
-    // 미들웨어 오류 처리 (요구사항 4.3)
+    // 미들웨어 오류 처리 (요구사항 3.2 - 폴백 메커니즘)
+    // 🔥 태스크 7.1: 백엔드 오류 로깅 강화 - API 오류 상세 로깅
+    console.error('❌ [CORS Middleware] 오류:', {
+      오류타입: error.name || 'Error',
+      오류메시지: error.message,
+      스택트레이스: error.stack,
+      요청정보: {
+        경로: req.path,
+        메서드: req.method,
+        오리진: req.headers.origin,
+        헤더: req.headers
+      }
+    });
     logMiddlewareError(error, {
       path: req.path,
       method: req.method,
       origin: req.headers.origin
     });
     
-    // 기본 CORS 헤더로 폴백하여 처리 계속 (요구사항 4.3)
-    // try-catch로 폴백 처리도 보호
+    // 오류 발생 시에도 기본 CORS 헤더 설정 (요구사항 3.2)
     try {
       const config = configManager.getConfiguration();
-      if (config.allowedOrigins.length > 0) {
+      const origin = req.headers.origin;
+      
+      // 오리진이 있으면 그대로 반환, 없으면 첫 번째 허용된 오리진 사용
+      if (origin) {
+        res.header('Access-Control-Allow-Origin', origin);
+      } else if (config.allowedOrigins.length > 0) {
         res.header('Access-Control-Allow-Origin', config.allowedOrigins[0]);
-        res.header('Access-Control-Allow-Methods', config.allowedMethods.join(', '));
-        res.header('Access-Control-Allow-Headers', config.allowedHeaders.join(', '));
-        res.header('Access-Control-Allow-Credentials', config.allowCredentials.toString());
+      } else {
+        // 설정이 없는 경우 와일드카드 사용 (최후의 폴백)
+        res.header('Access-Control-Allow-Origin', '*');
       }
+      
+      res.header('Access-Control-Allow-Methods', config.allowedMethods.join(', '));
+      res.header('Access-Control-Allow-Headers', config.allowedHeaders.join(', '));
+      res.header('Access-Control-Allow-Credentials', config.allowCredentials.toString());
+      
+      console.log('✅ [CORS Middleware] 폴백 CORS 헤더 설정 완료');
     } catch (fallbackError) {
-      // 폴백 처리도 실패한 경우 로그만 남기고 계속 진행
+      // 폴백 처리도 실패한 경우 최소한의 헤더 설정
       console.error('❌ [CORS Middleware] 폴백 처리 실패:', fallbackError.message);
+      res.header('Access-Control-Allow-Origin', '*');
+      res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     }
     
-    // 오류가 발생해도 항상 next() 호출하여 처리 계속 (요구사항 4.3)
+    // 오류가 발생해도 항상 next() 호출하여 처리 계속 (요구사항 3.2)
     next();
   }
 };

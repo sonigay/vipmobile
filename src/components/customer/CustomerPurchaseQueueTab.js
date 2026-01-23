@@ -108,12 +108,16 @@ const CustomerPurchaseQueueTab = ({ customerInfo, isManagementMode = false, logg
         if (!window.confirm('정말로 삭제하시겠습니까?')) return;
         try {
             await customerAPI.deleteFromPurchaseQueue(id);
+            // 서버에서 상태가 '삭제됨'으로 변경되므로, 로컬 상태에서도 제거
             setQueue(prev => prev.filter(item => item.id !== id));
             if (selectedRow?.id === id) {
                 setSelectedRow(null);
                 setShowEditDialog(false);
             }
+            // 성공 메시지 표시
+            alert('삭제되었습니다.');
         } catch (err) {
+            console.error('Delete error:', err);
             alert('삭제에 실패했습니다.');
         }
     };

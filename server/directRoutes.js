@@ -302,7 +302,12 @@ async function withRequestDeduplication(key, fetchFn, ttlOverride = null) {
           console.log(`[SWR] '${key}' 백그라운드 갱신 완료.`);
         })
         .catch(err => {
-          console.warn(`[SWR] '${key}' 백그라운드 갱신 실패:`, err.message);
+          // 🔥 태스크 7.2: 로그 빈도 제한 적용 - 백그라운드 캐시 갱신 실패 시 경고 로그 빈도 제한
+          logWarningOnce(
+            `swr-background-refresh-failure-${key}`,
+            `[SWR] '${key}' 백그라운드 갱신 실패:`,
+            { 오류메시지: err.message, 캐시키: key }
+          );
         })
         .finally(() => {
           backgroundRefreshing.delete(key);
@@ -479,6 +484,12 @@ async function rebuildPlanMaster(carriersParam) {
   const carriers = carriersParam && carriersParam.length > 0 ? carriersParam : ['SK', 'KT', 'LG'];
   const { sheets, SPREADSHEET_ID } = createSheetsClient();
 
+  // 🔥 태스크 7.3: 중요 작업 로깅 추가 - 시작 시점 로깅
+  const startTime = Date.now();
+  console.log(`🔄 [rebuildPlanMaster] 요금제 마스터 재빌드 시작 - ${new Date(startTime).toISOString()}`, {
+    통신사: carriers.join(', ')
+  });
+
   await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_PLAN_MASTER, HEADERS_PLAN_MASTER);
 
   const allRows = [];
@@ -612,6 +623,15 @@ async function rebuildPlanMaster(carriersParam) {
     });
   }
 
+  // 🔥 태스크 7.3: 중요 작업 로깅 추가 - 완료 시점 로깅 및 소요 시간 측정
+  const elapsedTime = ((Date.now() - startTime) / 1000).toFixed(2);
+  console.log(`✅ [rebuildPlanMaster] 요금제 마스터 재빌드 완료 - ${new Date().toISOString()}`, {
+    소요시간: `${elapsedTime}초`,
+    총개수: filteredRows.length,
+    통신사: carriers.join(', '),
+    통신사별상세: perCarrierStats
+  });
+
   return {
     totalCount: filteredRows.length,
     perCarrier: perCarrierStats
@@ -623,9 +643,15 @@ async function rebuildDeviceMaster(carriersParam) {
   const carriers = carriersParam && carriersParam.length > 0 ? carriersParam : ['SK', 'KT', 'LG'];
   const { sheets, SPREADSHEET_ID } = createSheetsClient();
 
+  // 🔥 태스크 7.3: 중요 작업 로깅 추가 - 시작 시점 로깅
+  const startTime = Date.now();
+  console.log(`🔄 [rebuildDeviceMaster] 단말 마스터 재빌드 시작 - ${new Date(startTime).toISOString()}`, {
+    통신사: carriers.join(', ')
+  });
+
   await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_MOBILE_MASTER, HEADERS_MOBILE_MASTER);
 
-  // 1. 이미지 및 태그 데이터 미리 로드 (전체)
+  // 1. 이미지 및 태그 데이터 미리 로드 (해당 통신사만 필터링)
   let imageMap = new Map(); // Key: Carrier+ModelCode -> { imageUrl, discordMessageId, discordPostId, discordThreadId }
   let tagMap = new Map();   // Key: ModelName -> { isPremium, isBudget, ... }
 
@@ -634,8 +660,14 @@ async function rebuildDeviceMaster(carriersParam) {
       return await sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `${SHEET_MOBILE_IMAGES}!A:K` });
     });
     const imageRows = (imagesRes.data.values || []).slice(1);
+    
+    // 🔥 수정: 통신사 필터링 추가 (해당 통신사 데이터만 처리)
     for (const row of imageRows) {
       const c = (row[0] || '').toString().trim().toUpperCase();
+      
+      // 해당 통신사만 처리
+      if (!carriers.includes(c)) continue;
+      
       const code = normalizeModelCode(row[1] || row[2]); // ModelID or ModelName
       const url = (row[5] || '').toString().trim();
       const discordMessageId = (row[8] || '').toString().trim(); // I: Discord메시지ID
@@ -650,6 +682,8 @@ async function rebuildDeviceMaster(carriersParam) {
         });
       }
     }
+    
+    console.log(`📊 [rebuildDeviceMaster] 이미지 데이터 로드 완료: ${imageMap.size}개`);
 
     const todaysRes = await withRetry(async () => {
       return await sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: SHEET_TODAYS_MOBILES });
@@ -680,7 +714,12 @@ async function rebuildDeviceMaster(carriersParam) {
       }
     }
   } catch (err) {
-    console.warn('[Direct][rebuildDeviceMaster] 보조 데이터(이미지/태그) 로딩 실패 (일부 누락 가능):', err.message);
+    // 🔥 태스크 7.2: 로그 빈도 제한 적용 - 백그라운드 작업 실패 시 경고 로그 빈도 제한
+    logWarningOnce(
+      'rebuildDeviceMaster-auxiliary-data-load-failure',
+      '[Direct][rebuildDeviceMaster] 보조 데이터(이미지/태그) 로딩 실패 (일부 누락 가능):',
+      { 오류메시지: err.message, 통신사: carriers.join(', ') }
+    );
   }
 
   const allRows = [];
@@ -1012,13 +1051,33 @@ async function rebuildDeviceMaster(carriersParam) {
     });
   }
 
-  return { totalCount: filteredRows.length, perCarrier: perCarrierStats };
+  // 🔥 태스크 7.3: 중요 작업 로깅 추가 - 완료 시점 로깅 및 소요 시간 측정
+  const elapsedTime = ((Date.now() - startTime) / 1000).toFixed(2);
+  console.log(`✅ [rebuildDeviceMaster] 단말 마스터 재빌드 완료 - ${new Date().toISOString()}`, {
+    소요시간: `${elapsedTime}초`,
+    총개수: filteredRows.length,
+    통신사: carriers.join(', '),
+    통신사별상세: perCarrierStats
+  });
+
+  return { 
+    success: true,
+    totalCount: filteredRows.length, 
+    perCarrier: perCarrierStats,
+    carriers: carriers
+  };
 }
 
 // 단말요금정책(직영점_단말요금정책) 재빌드 헬퍼
 async function rebuildPricingMaster(carriersParam) {
   const carriers = carriersParam && carriersParam.length > 0 ? carriersParam : ['SK', 'KT', 'LG'];
   const { sheets, SPREADSHEET_ID } = createSheetsClient();
+
+  // 🔥 태스크 7.3: 중요 작업 로깅 추가 - 시작 시점 로깅
+  const startTime = Date.now();
+  console.log(`🔄 [rebuildPricingMaster] 단말 요금정책 재빌드 시작 - ${new Date(startTime).toISOString()}`, {
+    통신사: carriers.join(', ')
+  });
 
   await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_MOBILE_PRICING, HEADERS_MOBILE_PRICING);
 
@@ -1667,10 +1726,316 @@ async function rebuildPricingMaster(carriersParam) {
       });
     });
   } else {
-    console.warn('[Direct][rebuildPricingMaster] 생성할 데이터가 없습니다.');
+    // 🔥 태스크 7.2: 로그 빈도 제한 적용 - 데이터 없음 경고 로그 빈도 제한
+    logWarningOnce(
+      'rebuildPricingMaster-no-data',
+      '[Direct][rebuildPricingMaster] 생성할 데이터가 없습니다.',
+      { 통신사: carriers.join(', ') }
+    );
   }
 
+  // 🔥 태스크 7.3: 중요 작업 로깅 추가 - 완료 시점 로깅 및 소요 시간 측정
+  const elapsedTime = ((Date.now() - startTime) / 1000).toFixed(2);
+  console.log(`✅ [rebuildPricingMaster] 단말 요금정책 재빌드 완료 - ${new Date().toISOString()}`, {
+    소요시간: `${elapsedTime}초`,
+    총개수: allRows.length,
+    통신사: carriers.join(', '),
+    통신사별상세: perCarrierStats
+  });
+
   return { totalCount: allRows.length, perCarrier: perCarrierStats };
+}
+
+/**
+ * Discord 메시지에서 이미지 URL 가져오기
+ * @param {string} messageId - Discord 메시지 ID
+ * @param {string} postId - Discord 포스트 ID (선택)
+ * @param {string} threadId - Discord 스레드 ID (선택)
+ * @returns {Promise<string|null>} 이미지 URL 또는 null
+ */
+async function fetchImageUrlFromDiscordMessage(messageId, postId, threadId) {
+  const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
+  const DISCORD_CHANNEL_ID = process.env.DISCORD_CHANNEL_ID;
+  
+  if (!DISCORD_BOT_TOKEN || !DISCORD_CHANNEL_ID) {
+    throw new Error('Discord 설정이 없습니다 (DISCORD_BOT_TOKEN 또는 DISCORD_CHANNEL_ID 누락)');
+  }
+  
+  try {
+    // Discord API를 통해 메시지 조회
+    // threadId가 있으면 스레드에서 조회, 없으면 채널에서 조회
+    const channelId = threadId || DISCORD_CHANNEL_ID;
+    const url = `https://discord.com/api/v10/channels/${channelId}/messages/${messageId}`;
+    
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bot ${DISCORD_BOT_TOKEN}`
+      }
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Discord API 오류: ${response.status} - ${errorText}`);
+    }
+    
+    const message = await response.json();
+    
+    // 첨부 파일에서 이미지 URL 추출
+    if (message.attachments && message.attachments.length > 0) {
+      const imageAttachment = message.attachments.find(att => 
+        att.content_type && att.content_type.startsWith('image/')
+      );
+      
+      if (imageAttachment) {
+        console.log(`✅ [fetchImageUrlFromDiscordMessage] 이미지 URL 찾음: ${imageAttachment.url}`);
+        return imageAttachment.url;
+      }
+    }
+    
+    // Embed에서 이미지 URL 추출 (첨부 파일이 없는 경우)
+    if (message.embeds && message.embeds.length > 0) {
+      for (const embed of message.embeds) {
+        if (embed.image && embed.image.url) {
+          console.log(`✅ [fetchImageUrlFromDiscordMessage] Embed 이미지 URL 찾음: ${embed.image.url}`);
+          return embed.image.url;
+        }
+      }
+    }
+    
+    throw new Error('메시지에 이미지 첨부 파일이 없습니다');
+  } catch (error) {
+    console.error('❌ [fetchImageUrlFromDiscordMessage] 오류:', {
+      messageId,
+      postId,
+      threadId,
+      error: error.message
+    });
+    throw error;
+  }
+}
+
+/**
+ * Discord 메시지 ID를 통한 이미지 재업로드
+ * @param {string} carrier - 통신사 (SK, KT, LG)
+ * @returns {Promise<Object>} { success, carrier, updatedCount, failedCount, updatedImages, failedImages }
+ */
+async function refreshImagesFromDiscord(carrier) {
+  const { sheets, SPREADSHEET_ID } = createSheetsClient();
+  
+  // 🔥 태스크 7.3: 중요 작업 로깅 추가 - 시작 시점 로깅
+  const startTime = Date.now();
+  console.log(`🔄 [refreshImagesFromDiscord] ${carrier} 이미지 갱신 시작 - ${new Date(startTime).toISOString()}`);
+  
+  try {
+    // 1. 직영점_모델이미지 시트에서 Discord 메시지 ID 조회
+    const imagesRes = await withRetry(async () => {
+      return await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${SHEET_MOBILE_IMAGES}!A:K`
+      });
+    });
+    
+    const imageRows = (imagesRes.data.values || []).slice(1); // 헤더 제외
+    const updatedImages = [];
+    const failedImages = [];
+    
+    // 2. 해당 통신사의 이미지만 필터링
+    const targetRows = imageRows
+      .map((row, index) => ({ row, rowIndex: index + 2 })) // 헤더 포함 행 번호 (1-based, 헤더가 1)
+      .filter(({ row }) => {
+        const rowCarrier = (row[0] || '').toString().trim().toUpperCase();
+        return rowCarrier === carrier;
+      });
+    
+    console.log(`📊 [refreshImagesFromDiscord] ${carrier} 대상: ${targetRows.length}개`);
+    
+    if (targetRows.length === 0) {
+      return {
+        success: true,
+        carrier,
+        updatedCount: 0,
+        failedCount: 0,
+        updatedImages: [],
+        failedImages: [],
+        message: '갱신할 이미지가 없습니다'
+      };
+    }
+    
+    // 3. Google Sheets API Rate Limit 고려: 배치 업데이트 사용
+    // - batchUpdate는 단일 API 호출로 여러 셀 업데이트 가능
+    // - 최대 100개까지 한 번에 처리 권장
+    const BATCH_SIZE = 50; // 안전을 위해 50개씩 처리
+    const updateRequests = [];
+    
+    for (const { row, rowIndex } of targetRows) {
+      const modelId = row[1] || row[2]; // B열(모델ID) 또는 C열(모델명)
+      const currentImageUrl = (row[5] || '').toString().trim(); // F열: 이미지URL
+      const discordMessageId = (row[8] || '').toString().trim(); // I열: Discord메시지ID
+      const discordPostId = (row[9] || '').toString().trim(); // J열: Discord포스트ID
+      const discordThreadId = (row[10] || '').toString().trim(); // K열: Discord스레드ID
+      
+      if (!modelId) {
+        console.warn(`⚠️ [refreshImagesFromDiscord] 모델ID 없음: 행 ${rowIndex}`);
+        continue;
+      }
+      
+      if (!discordMessageId) {
+        console.warn(`⚠️ [refreshImagesFromDiscord] Discord 메시지 ID 없음: ${modelId}`);
+        failedImages.push({
+          modelId,
+          reason: 'Discord 메시지 ID 없음'
+        });
+        continue;
+      }
+      
+      try {
+        // Discord API를 통해 메시지에서 첨부 파일 URL 가져오기
+        const newImageUrl = await fetchImageUrlFromDiscordMessage(
+          discordMessageId,
+          discordPostId,
+          discordThreadId
+        );
+        
+        if (!newImageUrl) {
+          throw new Error('Discord 메시지에서 이미지 URL을 찾을 수 없습니다');
+        }
+        
+        // 이미지 URL이 변경된 경우에만 업데이트
+        if (newImageUrl !== currentImageUrl) {
+          // 업데이트 요청 추가 (실제 업데이트는 나중에 배치로 처리)
+          updateRequests.push({
+            range: `${SHEET_MOBILE_IMAGES}!F${rowIndex}`, // F열: 이미지URL
+            values: [[newImageUrl]]
+          });
+          
+          updatedImages.push({
+            modelId,
+            oldUrl: currentImageUrl,
+            newUrl: newImageUrl
+          });
+          
+          console.log(`✅ [refreshImagesFromDiscord] ${modelId} 이미지 URL 갱신: ${newImageUrl.substring(0, 50)}...`);
+        } else {
+          console.log(`ℹ️ [refreshImagesFromDiscord] ${modelId} 이미지 URL 변경 없음`);
+        }
+        
+        // Discord API Rate Limit 고려: 요청 간 지연
+        await new Promise(resolve => setTimeout(resolve, 100)); // 100ms 지연
+        
+      } catch (error) {
+        // 🔥 태스크 7.1: 백엔드 오류 로깅 강화 - Discord CDN 이미지 404 오류 상세 로깅
+        console.error(`❌ [refreshImagesFromDiscord] ${modelId} 이미지 갱신 실패:`, {
+          오류타입: error.name || 'Error',
+          오류메시지: error.message,
+          스택트레이스: error.stack,
+          모델정보: {
+            모델ID: modelId,
+            통신사: carrier,
+            현재이미지URL: currentImageUrl,
+            Discord메시지ID: discordMessageId,
+            Discord포스트ID: discordPostId,
+            Discord스레드ID: discordThreadId
+          },
+          요청정보: {
+            행번호: rowIndex,
+            시트명: SHEET_MOBILE_IMAGES
+          }
+        });
+        failedImages.push({
+          modelId,
+          reason: error.message
+        });
+      }
+    }
+    
+    // 4. Google Sheets 배치 업데이트 (Rate Limit 최소화)
+    if (updateRequests.length > 0) {
+      console.log(`📝 [refreshImagesFromDiscord] ${carrier} 배치 업데이트 시작: ${updateRequests.length}개`);
+      
+      // 배치를 나누어 처리 (Google Sheets API Rate Limit 고려)
+      for (let i = 0; i < updateRequests.length; i += BATCH_SIZE) {
+        const batch = updateRequests.slice(i, i + BATCH_SIZE);
+        
+        try {
+          await withRetry(async () => {
+            return await sheets.spreadsheets.values.batchUpdate({
+              spreadsheetId: SPREADSHEET_ID,
+              resource: {
+                valueInputOption: 'USER_ENTERED',
+                data: batch
+              }
+            });
+          });
+          
+          console.log(`✅ [refreshImagesFromDiscord] 배치 ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(updateRequests.length / BATCH_SIZE)} 완료`);
+          
+          // 배치 간 지연 (Google Sheets API Rate Limit 고려)
+          if (i + BATCH_SIZE < updateRequests.length) {
+            await new Promise(resolve => setTimeout(resolve, 1000)); // 1초 지연
+          }
+        } catch (error) {
+          // 🔥 태스크 7.1: 백엔드 오류 로깅 강화 - API 오류 상세 로깅
+          console.error(`❌ [refreshImagesFromDiscord] 배치 업데이트 실패:`, {
+            오류타입: error.name || 'Error',
+            오류메시지: error.message,
+            스택트레이스: error.stack,
+            배치정보: {
+              배치번호: Math.floor(i / BATCH_SIZE) + 1,
+              배치크기: batch.length,
+              시작인덱스: i,
+              통신사: carrier
+            },
+            요청정보: {
+              시트ID: SPREADSHEET_ID,
+              시트명: SHEET_MOBILE_IMAGES,
+              업데이트범위: batch.map(b => b.range).join(', ')
+            }
+          });
+          // 실패한 배치의 이미지들을 failedImages에 추가
+          batch.forEach(req => {
+            const modelId = updatedImages.find(img => req.range.includes(`F`))?.modelId;
+            if (modelId) {
+              failedImages.push({
+                modelId,
+                reason: `배치 업데이트 실패: ${error.message}`
+              });
+            }
+          });
+        }
+      }
+    }
+    
+    // 🔥 태스크 7.3: 중요 작업 로깅 추가 - 완료 시점 로깅 및 소요 시간 측정
+    const elapsedTime = ((Date.now() - startTime) / 1000).toFixed(2);
+    console.log(`✅ [refreshImagesFromDiscord] ${carrier} 이미지 갱신 완료 - ${new Date().toISOString()}`, {
+      소요시간: `${elapsedTime}초`,
+      성공: updatedImages.length,
+      실패: failedImages.length,
+      전체: targetRows.length
+    });
+    
+    return {
+      success: true,
+      carrier,
+      updatedCount: updatedImages.length,
+      failedCount: failedImages.length,
+      updatedImages,
+      failedImages
+    };
+  } catch (error) {
+    // 🔥 태스크 7.1: 백엔드 오류 로깅 강화 - 전체 실패 시 상세 로깅
+    console.error(`❌ [refreshImagesFromDiscord] ${carrier} 전체 실패:`, {
+      오류타입: error.name || 'Error',
+      오류메시지: error.message,
+      스택트레이스: error.stack,
+      통신사: carrier,
+      요청정보: {
+        시트ID: SPREADSHEET_ID,
+        시트명: SHEET_MOBILE_IMAGES
+      }
+    });
+    throw error;
+  }
 }
 
 // 시트 데이터 읽기 함수 (캐시 적용, 동시 요청 방지)
@@ -2198,6 +2563,15 @@ function setupDirectRoutes(app) {
   router.post('/rebuild-master', async (req, res) => {
     try {
       const carrierParam = (req.query.carrier || '').trim().toUpperCase();
+      
+      // 🔥 수정: carrier 파라미터 검증 강화 (SK, KT, LG만 허용)
+      if (carrierParam && !['SK', 'KT', 'LG'].includes(carrierParam)) {
+        return res.status(400).json({
+          success: false,
+          error: '유효한 통신사를 지정해주세요 (SK, KT, LG)'
+        });
+      }
+      
       const carriers = carrierParam ? [carrierParam] : ['SK', 'KT', 'LG'];
 
       // 🔥 수정: 재빌드 시작 전에 정책 설정 캐시 무효화 (최신 데이터 읽기 보장)
@@ -2234,8 +2608,16 @@ function setupDirectRoutes(app) {
         invalidateDirectStoreCache();
       }
 
+      // 🔥 수정: 응답 형식 개선 (통신사별 카운트 포함)
+      console.log(`✅ [Direct][rebuild-master] 완료: ${carriers.join(', ')}`);
+      
       return res.json({
         success: true,
+        carrier: carrierParam || 'ALL',
+        carriers: carriers,
+        deviceCount: step2.totalCount,
+        planCount: step1.totalCount,
+        pricingCount: step3.totalCount,
         summary: {
           plans: step1,
           devices: step2,
@@ -2248,6 +2630,41 @@ function setupDirectRoutes(app) {
         success: false,
         error: '마스터 데이터 통합 재빌드 실패',
         message: error.message
+      });
+    }
+  });
+
+  /**
+   * POST /api/direct/refresh-images-from-discord
+   * 
+   * Discord 메시지 ID를 통한 이미지 재업로드
+   * - 쿼리: carrier (필수) - SK, KT, LG 중 하나
+   * - 응답: { success, carrier, updatedCount, failedCount, updatedImages, failedImages }
+   */
+  router.post('/refresh-images-from-discord', async (req, res) => {
+    try {
+      const carrier = (req.query.carrier || '').trim().toUpperCase();
+      
+      // carrier 파라미터 검증
+      if (!carrier || !['SK', 'KT', 'LG'].includes(carrier)) {
+        return res.status(400).json({
+          success: false,
+          error: '유효한 통신사를 지정해주세요 (SK, KT, LG)'
+        });
+      }
+      
+      console.log(`🔄 [refreshImagesFromDiscord] ${carrier} 시작`);
+      
+      const result = await refreshImagesFromDiscord(carrier);
+      
+      console.log(`✅ [refreshImagesFromDiscord] ${carrier} 완료: 성공 ${result.updatedCount}개, 실패 ${result.failedCount}개`);
+      
+      res.json(result);
+    } catch (error) {
+      console.error('❌ [refreshImagesFromDiscord] 오류:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
       });
     }
   });
