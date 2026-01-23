@@ -5360,7 +5360,7 @@ app.post('/api/direct/pre-approval-mark', async (req, res) => {
 app.get('/api/direct/store-image/:storeName', async (req, res) => {
   const { storeName } = req.params;
   try {
-    const values = await getSheetValues(CUSTOMER_STORE_PHOTO_SHEET_NAME);
+    const values = await getSheetValuesWithoutCache(CUSTOMER_STORE_PHOTO_SHEET_NAME);
     if (!values || values.length <= 1) return res.json(null);
 
     const rows = values.slice(1);
