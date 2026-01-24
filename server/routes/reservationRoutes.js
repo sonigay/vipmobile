@@ -228,6 +228,123 @@ module.exports = createReservationRoutes;
     }
   });
 
+  // GET /api/reservation-sales/customers/by-model/:model - 모델별 고객 목록
+  router.get('/api/reservation-sales/customers/by-model/:model', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const { model } = req.params;
+      
+      const values = await getSheetValues('예약판매고객');
+      const customers = values.slice(1).filter(row => row[2] === model);
+      res.json(customers);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET /api/reservation-sales/model-color/by-agent/:agentName - 대리점별 모델색상
+  router.get('/api/reservation-sales/model-color/by-agent/:agentName', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const { agentName } = req.params;
+      
+      const values = await getSheetValues('예약판매모델색상');
+      const data = values.slice(1).filter(row => row[0] === agentName);
+      res.json(data);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET /api/reservation-sales/model-color/by-model/:model - 모델별 색상
+  router.get('/api/reservation-sales/model-color/by-model/:model', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const { model } = req.params;
+      
+      const values = await getSheetValues('예약판매모델색상');
+      const data = values.slice(1).filter(row => row[1] === model);
+      res.json(data);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET /api/reservation-sales/model-color/by-pos/:posName - POS별 모델색상
+  router.get('/api/reservation-sales/model-color/by-pos/:posName', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const { posName } = req.params;
+      
+      const values = await getSheetValues('예약판매모델색상');
+      const data = values.slice(1).filter(row => row[3] === posName);
+      res.json(data);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET /api/reservation-settings/load - 예약 설정 로드
+  router.get('/api/reservation-settings/load', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      
+      const values = await getSheetValues('예약설정');
+      res.json(values.slice(1));
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET /api/reservation-settings/model-data - 예약 모델 데이터
+  router.get('/api/reservation-settings/model-data', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      
+      const values = await getSheetValues('예약모델데이터');
+      res.json(values.slice(1));
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET /api/reservation-settings/normalization-status - 정규화 상태
+  router.get('/api/reservation-settings/normalization-status', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      
+      const values = await getSheetValues('예약정규화상태');
+      res.json(values.slice(1));
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET /api/reservation-settings/normalized-data - 정규화된 데이터
+  router.get('/api/reservation-settings/normalized-data', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      
+      const values = await getSheetValues('예약정규화데이터');
+      res.json(values.slice(1));
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/reservation-settings/test-normalization - 정규화 테스트
+  router.post('/api/reservation-settings/test-normalization', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const { data } = req.body;
+
+      console.log('예약 정규화 테스트:', data);
+      res.json({ success: true, result: data });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   return router;
 }
 
