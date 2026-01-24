@@ -318,10 +318,20 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
           
           setManagers(uniqueNames);
           console.log('담당자 목록 로드 완료:', uniqueNames.length + '명');
+        } else {
+          // 데이터가 없을 경우 빈 배열 설정
+          setManagers([]);
+          console.log('담당자 목록 로드 완료: 0명 (데이터 없음)');
         }
+      } else {
+        // API 호출 실패 시 빈 배열 설정
+        setManagers([]);
+        console.log('담당자 목록 로드 완료: 0명 (API 호출 실패)');
       }
     } catch (error) {
       console.error('담당자 목록 로드 실패:', error);
+      // 에러 발생 시에도 빈 배열 설정
+      setManagers([]);
     }
   };
 
@@ -2081,7 +2091,7 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
               variant={selectedManager === '전체' ? 'filled' : 'outlined'}
               sx={{ fontWeight: selectedManager === '전체' ? 'bold' : 'normal' }}
             />
-            {managers.map((manager) => (
+            {Array.isArray(managers) && managers.map((manager) => (
               <Chip
                 key={manager}
                 label={`${manager} (${managerPolicyCounts[manager] || 0})`}
