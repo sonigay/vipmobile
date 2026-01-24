@@ -39,10 +39,10 @@ function createNotificationRoutes(context) {
 
       let values;
       try {
-        values = await getSheetValues('알림');
+        values = await getSheetValues('정책_알림관리');
       } catch (sheetError) {
         // 시트가 없으면 빈 배열 반환
-        console.warn('알림 시트가 존재하지 않습니다:', sheetError.message);
+        console.warn('정책_알림관리 시트가 존재하지 않습니다:', sheetError.message);
         const emptyResult = { notifications: [] };
         cacheManager.set(cacheKey, emptyResult, 1 * 60 * 1000);
         return res.json(emptyResult);
@@ -50,16 +50,17 @@ function createNotificationRoutes(context) {
 
       const rows = values.slice(1);
 
-      // user_id로 필터링
+      // user_id로 필터링 (정책_알림관리 시트 구조: 알림ID, 정책ID, 알림유형, 대상자ID, 읽음상태, 생성일시)
       const notifications = rows
-        .filter(row => !user_id || row[1] === user_id)
+        .filter(row => !user_id || row[3] === user_id) // 대상자ID는 4번째 컬럼 (인덱스 3)
         .map((row, index) => ({
-          id: row[0] || `notif_${index}`,
-          userId: row[1] || '',
-          message: row[2] || '',
-          type: row[3] || 'info',
-          is_read: row[4] === 'TRUE' || row[4] === true,
-          createdAt: row[5] || new Date().toISOString()
+          id: row[0] || `notif_${index}`, // 알림ID
+          policyId: row[1] || '', // 정책ID
+          type: row[2] || 'info', // 알림유형
+          userId: row[3] || '', // 대상자ID
+          is_read: row[4] === '읽음' || row[4] === 'read', // 읽음상태
+          createdAt: row[5] || new Date().toISOString(), // 생성일시
+          message: `정책 알림: ${row[2] || ''}` // 알림유형을 메시지로 사용
         }));
 
       const result = { notifications };
