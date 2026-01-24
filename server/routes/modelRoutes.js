@@ -5,12 +5,13 @@
  * 
  * Endpoints:
  * - GET /api/models - 모델별 색상 목록 조회
+ * - GET /api/operation-models - 운영 모델 목록 조회
+ * - GET /api/model-normalization - 모델 정규화 데이터 조회
  * 
  * Requirements: 1.1, 1.2, 7.10
  */
 
 const express = require('express');
-const router = express.Router();
 
 /**
  * Model Routes Factory
@@ -22,6 +23,7 @@ const router = express.Router();
  * @returns {express.Router} Express 라우터
  */
 function createModelRoutes(context) {
+  const router = express.Router();
   const { sheetsClient, cacheManager, rateLimiter } = context;
 
   // 시트 이름 상수
@@ -110,6 +112,36 @@ function createModelRoutes(context) {
         error: 'Failed to fetch model and color data',
         message: error.message
       });
+    }
+  });
+
+  // GET /api/operation-models - 운영 모델
+  router.get('/api/operation-models', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      
+      const cacheKey = 'operation_models';
+      const cached = cacheManager.get(cacheKey);
+      if (cached) return res.json(cached);
+
+      const values = await getSheetValues('운영모델');
+      const data = values.slice(1);
+
+      cacheManager.set(cacheKey, data, 5 * 60 * 1000);
+      res.json(data);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET /api/model-normalization - 모델 정규화
+  router.get('/api/model-normalization', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const values = await getSheetValues('모델정규화');
+      res.json(values.slice(1));
+    } catch (error) {
+      res.status(500).json({ error: error.message });
     }
   });
 

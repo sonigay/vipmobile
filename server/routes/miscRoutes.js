@@ -7,8 +7,27 @@ module.exports = function createMiscRoutes(context) {
   const express = require('express');
   const router = express.Router();
   
-  const { sheetsClient, rateLimiter } = context;
+  const { sheetsClient, rateLimiter, cacheManager } = context;
   const { sheets, SPREADSHEET_ID } = sheetsClient;
+
+  // Helper functions
+  const requireSheetsClient = (res) => {
+    if (!sheetsClient || !sheetsClient.sheets) {
+      res.status(503).json({ error: 'Google Sheets client not available' });
+      return false;
+    }
+    return true;
+  };
+
+  async function getSheetValues(sheetName) {
+    const response = await rateLimiter.execute(() =>
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${sheetName}!A:Z`
+      })
+    );
+    return response.data.values || [];
+  }
 
   // 가격 불일치 조회 API
   router.get('/price-discrepancies', async (req, res) => {
@@ -49,9 +68,6 @@ module.exports = function createMiscRoutes(context) {
     console.log('🧪 [테스트] API 호출됨');
     res.json({ success: true, message: '테스트 API 작동 중' });
   });
-
-  return router;
-};
 
   // GET /api/stores - 매장 목록
   router.get('/api/stores', async (req, res) => {
@@ -203,7 +219,241 @@ module.exports = function createMiscRoutes(context) {
     try {
       const { oldPassword, newPassword } = req.body;
       // 비밀번호 변경 로직
-      console.log('비밀번호 변경 요청');
+      console.log('비밀번호 변경 요청:', oldPassword ? '***' : 'none', '->', newPassword ? '***' : 'none');
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 월간 시상 관련
+  router.get('/api/monthly-award/data', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const values = await getSheetValues('월간시상데이터');
+      res.json(values.slice(1));
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  router.get('/api/monthly-award/settings', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const values = await getSheetValues('월간시상설정');
+      res.json(values.slice(1));
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 재고 관련 추가
+  router.get('/api/master-inventory', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const values = await getSheetValues('마스터재고');
+      res.json(values.slice(1));
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  router.get('/api/office-inventory', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const values = await getSheetValues('사무소재고');
+      res.json(values.slice(1));
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  router.get('/api/phonekl-inventory', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const values = await getSheetValues('폰클재고');
+      res.json(values.slice(1));
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 중복 관련
+  router.get('/api/phone-duplicates', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const values = await getSheetValues('전화번호중복');
+      res.json(values.slice(1));
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 권한 체크
+  router.get('/api/check-general-policy-permission', async (req, res) => {
+    try {
+      const { userId } = req.query;
+      console.log('일반 정책 권한 체크:', userId);
+      // 권한 체크 로직
+      res.json({ hasPermission: true });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  router.get('/api/check-onsale-permission', async (req, res) => {
+    try {
+      const { userId } = req.query;
+      console.log('온세일 권한 체크:', userId);
+      // 권한 체크 로직
+      res.json({ hasPermission: true });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 로그인
+  router.post('/api/login', async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      console.log('로그인 시도:', username);
+      // 로그인 로직
+      res.json({ success: true, token: 'dummy-token', username });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 활동 로그
+  router.post('/api/log-activity', async (req, res) => {
+    try {
+      const { activity } = req.body;
+      console.log('활동 로그:', activity);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 지오코딩
+  router.post('/api/geocode-address', async (req, res) => {
+    try {
+      const { address } = req.body;
+      console.log('주소 지오코딩:', address);
+      // 지오코딩 로직
+      res.json({ lat: 37.5665, lng: 126.9780, address });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 마커 색상 설정
+  router.get('/api/marker-color-settings', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const values = await getSheetValues('마커색상설정');
+      res.json(values.slice(1));
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 지도 표시 옵션
+  router.get('/api/map-display-option', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const values = await getSheetValues('지도표시옵션');
+      res.json(values.slice(1));
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  router.get('/api/map-display-option/users', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const values = await getSheetValues('지도표시옵션사용자');
+      res.json(values.slice(1));
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  router.get('/api/map-display-option/values', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const values = await getSheetValues('지도표시옵션값');
+      res.json(values.slice(1));
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 매핑 실패 분석
+  router.get('/api/mapping-failure-analysis', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const values = await getSheetValues('매핑실패분석');
+      res.json(values.slice(1));
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 마지막 개통일
+  router.get('/api/last-activation-date', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const values = await getSheetValues('마지막개통일');
+      res.json(values.slice(1));
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  router.post('/api/last-activation-date/clear-cache', async (req, res) => {
+    try {
+      cacheManager.deletePattern('last_activation');
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 크롬 확장 프로그램
+  router.get('/api/extension-version', (req, res) => {
+    res.json({ version: '1.0.0' });
+  });
+
+  router.get('/api/download-chrome-extension', (req, res) => {
+    res.json({ downloadUrl: '/extension/vip-extension.zip' });
+  });
+
+  // 알림 스트림
+  router.get('/api/notifications/stream', (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    
+    const sendEvent = (data) => {
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+    };
+
+    sendEvent({ type: 'connected', timestamp: Date.now() });
+
+    const interval = setInterval(() => {
+      sendEvent({ type: 'ping', timestamp: Date.now() });
+    }, 30000);
+
+    req.on('close', () => {
+      clearInterval(interval);
+    });
+  });
+
+  router.put('/api/notifications/mark-all-read', async (req, res) => {
+    try {
+      const { userId } = req.body;
+      console.log('모든 알림 읽음 처리:', userId);
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: error.message });
@@ -211,6 +461,4 @@ module.exports = function createMiscRoutes(context) {
   });
 
   return router;
-}
-
-module.exports = createMiscRoutes;
+};

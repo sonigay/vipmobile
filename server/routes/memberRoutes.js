@@ -23,7 +23,6 @@
  */
 
 const express = require('express');
-const router = express.Router();
 
 /**
  * Member Routes Factory
@@ -34,6 +33,7 @@ const router = express.Router();
  * @returns {express.Router} Express 라우터
  */
 function createMemberRoutes(context) {
+  const router = express.Router();
   const { sheetsClient, rateLimiter } = context;
 
   // 시트 이름 상수
