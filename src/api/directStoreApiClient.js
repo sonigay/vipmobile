@@ -198,7 +198,7 @@ const smartFetch = async (url, options = {}, config = {}) => {
       (async () => {
         try {
           const freshData = await executeRequestWithQueue(url, options, heavyRequest, errorMessage);
-          // 갱신 성공 시 캐시 업데이트
+          // 갱신 성공 시 캐시 업데이트 (요구사항 4.1)
           memoryCache.set(cacheKey, {
             data: freshData,
             timestamp: Date.now(),
@@ -206,8 +206,27 @@ const smartFetch = async (url, options = {}, config = {}) => {
           });
           // console.log(`[SmartFetch] 백그라운드 캐시 갱신 완료: ${cacheKey}`);
         } catch (err) {
-          console.warn(`[SmartFetch] 백그라운드 캐시 갱신 실패: ${cacheKey}`, err);
-          cachedItem.isRefreshing = false; // 실패 시 플래그 해제
+          // 🔥 태스크 10.2, 10.3: 백그라운드 갱신 에러 처리 강화 (요구사항 4.2, 4.4)
+          console.warn(`[SmartFetch] 백그라운드 캐시 갱신 실패: ${cacheKey}`, {
+            오류타입: err.name || 'Error',
+            오류메시지: err.message,
+            상태코드: err.status,
+            타임스탬프: new Date().toISOString()
+          });
+          
+          // 실패 시 플래그 해제 및 캐시 무효화 (다음 요청 시 새로 가져오도록)
+          cachedItem.isRefreshing = false;
+          
+          // 캐시 갱신 실패 시 캐시 무효화 (요구사항 4.4)
+          // 기존 캐시는 유지하되, 다음 요청 시 강제로 새로 가져오도록 만료 시간을 과거로 설정
+          if (memoryCache.has(cacheKey)) {
+            const existingCache = memoryCache.get(cacheKey);
+            memoryCache.set(cacheKey, {
+              ...existingCache,
+              timestamp: 0, // 만료된 것으로 표시
+              isRefreshing: false
+            });
+          }
         }
       })();
     }

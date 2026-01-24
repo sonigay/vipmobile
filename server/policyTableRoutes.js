@@ -1559,10 +1559,6 @@ function setupPolicyTableRoutes(app) {
 
   // GET /api/policy-table-settings
   router.get('/policy-table-settings', async (req, res) => {
-    // OPTIONS 요청 처리
-    if (req.method === 'OPTIONS') {
-      return res.status(200).end();
-    }
     try {
       // 정책표생성 탭 접근 권한: SS(총괄) 또는 두 글자 대문자 패턴(팀장)
       const permission = await checkPermission(req, ['SS', 'TEAM_LEADER']);
@@ -1903,9 +1899,6 @@ function setupPolicyTableRoutes(app) {
 
   // GET /api/budget-channel-settings
   router.get('/budget-channel-settings', async (req, res) => {
-    if (req.method === 'OPTIONS') {
-      return res.status(200).end();
-    }
     try {
       // 예산채널확인 탭 접근 권한: SS(총괄), S(정산) 또는 두 글자 대문자 패턴(팀장)
       // 팀장의 경우 확인적용권한자로 설정된 것만 프론트엔드에서 필터링됨
@@ -2221,9 +2214,6 @@ function setupPolicyTableRoutes(app) {
 
   // GET /api/basic-budget-settings
   router.get('/basic-budget-settings', async (req, res) => {
-    if (req.method === 'OPTIONS') {
-      return res.status(200).end();
-    }
     try {
       // 기본예산설정 탭 접근 권한: SS(총괄), S(정산) 또는 두 글자 대문자 패턴(팀장)
       const permission = await checkPermission(req, ['SS', 'S', 'TEAM_LEADER'], 'budget');
@@ -2451,9 +2441,6 @@ function setupPolicyTableRoutes(app) {
 
   // GET /api/basic-data-settings
   router.get('/basic-data-settings', async (req, res) => {
-    if (req.method === 'OPTIONS') {
-      return res.status(200).end();
-    }
     try {
       // 기본데이터설정 탭 접근 권한: SS(총괄), S(정산) 또는 두 글자 대문자 패턴(팀장)
       const permission = await checkPermission(req, ['SS', 'S', 'TEAM_LEADER'], 'budget');
@@ -3188,11 +3175,8 @@ function setupPolicyTableRoutes(app) {
   });
 
   // GET /api/policy-table/user-groups/:id/change-history
+  // 🔥 태스크 6.2: 변경 이력 엔드포인트 에러 처리 강화 (요구사항 3.6)
   router.get('/policy-table/user-groups/:id/change-history', async (req, res) => {
-    // OPTIONS 요청 처리
-    if (req.method === 'OPTIONS') {
-      return res.status(200).end();
-    }
     try {
       // S 권한자도 변경이력 조회 가능하도록 권한 체크
       const userRole = req.headers['x-user-role'] || req.query?.userRole;
@@ -3200,10 +3184,17 @@ function setupPolicyTableRoutes(app) {
       const hasPermission = userRole === 'SS' || userRole === 'S' || twoLetterPattern.test(userRole);
       
       if (!hasPermission) {
+        console.warn('❌ [변경이력] 권한 없음:', {
+          요청경로: req.path,
+          사용자역할: userRole,
+          그룹ID: req.params.id
+        });
         return res.status(403).json({ success: false, error: '권한이 없습니다.' });
       }
 
       const { id } = req.params;
+      console.log('🔍 [변경이력] 변경 이력 조회 시작:', { 그룹ID: id, 사용자역할: userRole });
+      
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_GROUP_CHANGE_HISTORY, HEADERS_GROUP_CHANGE_HISTORY);
 
@@ -3215,7 +3206,10 @@ function setupPolicyTableRoutes(app) {
       });
 
       const rows = response.data.values || [];
+      console.log('🔍 [변경이력] 총 행 수:', rows.length);
+      
       if (rows.length < 2) {
+        console.log('ℹ️ [변경이력] 데이터 없음, 빈 배열 반환');
         return res.json([]);
       }
 
@@ -3224,59 +3218,109 @@ function setupPolicyTableRoutes(app) {
       // 해당 그룹ID의 변경이력만 필터링
       const history = dataRows
         .filter(row => row[1] === id) // 그룹ID로 필터링
-        .map(row => {
-          // 변경전값과 변경후값 파싱 (JSON 배열일 수 있음)
-          let beforeValue = row[5] || '';
-          let afterValue = row[6] || '';
-          
+        .map((row, index) => {
           try {
-            const beforeParsed = JSON.parse(beforeValue);
-            beforeValue = Array.isArray(beforeParsed) ? beforeParsed : beforeValue;
-          } catch (e) {
-            // JSON이 아니면 문자열 그대로 사용
-          }
-          
-          try {
-            const afterParsed = JSON.parse(afterValue);
-            afterValue = Array.isArray(afterParsed) ? afterParsed : afterValue;
-          } catch (e) {
-            // JSON이 아니면 문자열 그대로 사용
-          }
+            // 변경전값과 변경후값 파싱 (JSON 배열일 수 있음)
+            let beforeValue = row[5] || '';
+            let afterValue = row[6] || '';
+            
+            try {
+              const beforeParsed = JSON.parse(beforeValue);
+              beforeValue = Array.isArray(beforeParsed) ? beforeParsed : beforeValue;
+            } catch (e) {
+              // JSON이 아니면 문자열 그대로 사용
+            }
+            
+            try {
+              const afterParsed = JSON.parse(afterValue);
+              afterValue = Array.isArray(afterParsed) ? afterParsed : afterValue;
+            } catch (e) {
+              // JSON이 아니면 문자열 그대로 사용
+            }
 
-          // 폰클적용업체명 파싱 (JSON 배열)
-          let phoneAppliedCompanies = [];
-          try {
-            const phoneAppliedCompaniesStr = row[13] || '[]';
-            const parsed = JSON.parse(phoneAppliedCompaniesStr);
-            phoneAppliedCompanies = Array.isArray(parsed) ? parsed : [];
-          } catch (e) {
-            // JSON 파싱 실패 시 빈 배열
-            phoneAppliedCompanies = [];
-          }
+            // 폰클적용업체명 파싱 (JSON 배열)
+            let phoneAppliedCompanies = [];
+            try {
+              const phoneAppliedCompaniesStr = row[13] || '[]';
+              const parsed = JSON.parse(phoneAppliedCompaniesStr);
+              phoneAppliedCompanies = Array.isArray(parsed) ? parsed : [];
+            } catch (e) {
+              // JSON 파싱 실패 시 빈 배열
+              console.warn('⚠️ [변경이력] 폰클적용업체명 파싱 실패:', {
+                행번호: index + 2,
+                원본값: row[13],
+                에러: e.message
+              });
+              phoneAppliedCompanies = [];
+            }
 
-          return {
-            changeId: row[0] || '',
-            groupId: row[1] || '',
-            groupName: row[2] || '',
-            changeType: row[3] || '',      // 그룹이름/업체명
-            changeAction: row[4] || '',   // 추가/수정/삭제
-            beforeValue: beforeValue,
-            afterValue: afterValue,
-            changedAt: row[7] || '',
-            changedBy: row[8] || '',
-            changedByName: row[9] || '',
-            phoneApplied: row[10] || 'N',  // 폰클적용여부 (하위 호환성)
-            phoneAppliedAt: row[11] || '',  // 폰클적용일시
-            phoneAppliedBy: row[12] || '',  // 폰클적용자
-            phoneAppliedCompanies: phoneAppliedCompanies  // 폰클적용업체명 배열
-          };
+            return {
+              changeId: row[0] || '',
+              groupId: row[1] || '',
+              groupName: row[2] || '',
+              changeType: row[3] || '',      // 그룹이름/업체명
+              changeAction: row[4] || '',   // 추가/수정/삭제
+              beforeValue: beforeValue,
+              afterValue: afterValue,
+              changedAt: row[7] || '',
+              changedBy: row[8] || '',
+              changedByName: row[9] || '',
+              phoneApplied: row[10] || 'N',  // 폰클적용여부 (하위 호환성)
+              phoneAppliedAt: row[11] || '',  // 폰클적용일시
+              phoneAppliedBy: row[12] || '',  // 폰클적용자
+              phoneAppliedCompanies: phoneAppliedCompanies  // 폰클적용업체명 배열
+            };
+          } catch (rowError) {
+            console.error('❌ [변경이력] 행 파싱 오류:', {
+              행번호: index + 2,
+              에러: rowError.message,
+              행데이터: row
+            });
+            // 파싱 실패한 행은 기본값으로 반환
+            return {
+              changeId: row[0] || '',
+              groupId: row[1] || '',
+              groupName: row[2] || '',
+              changeType: row[3] || '',
+              changeAction: row[4] || '',
+              beforeValue: row[5] || '',
+              afterValue: row[6] || '',
+              changedAt: row[7] || '',
+              changedBy: row[8] || '',
+              changedByName: row[9] || '',
+              phoneApplied: row[10] || 'N',
+              phoneAppliedAt: row[11] || '',
+              phoneAppliedBy: row[12] || '',
+              phoneAppliedCompanies: []
+            };
+          }
         })
         .sort((a, b) => new Date(b.changedAt) - new Date(a.changedAt)); // 최신순 정렬
 
+      console.log('✅ [변경이력] 변경 이력 조회 완료:', { 그룹ID: id, 이력개수: history.length });
       return res.json(history);
     } catch (error) {
-      console.error('[정책표] 변경이력 조회 오류:', error);
-      return res.status(500).json({ success: false, error: error.message });
+      console.error('❌ [변경이력] 변경 이력 조회 실패:', {
+        오류타입: error.name || 'Error',
+        오류메시지: error.message,
+        스택트레이스: error.stack,
+        요청경로: req.path,
+        요청메서드: req.method,
+        그룹ID: req.params.id,
+        사용자역할: req.headers['x-user-role'] || req.query?.userRole
+      });
+      
+      // 시트가 존재하지 않는 경우 빈 배열 반환
+      if (error.message && error.message.includes('Unable to parse range')) {
+        console.warn('⚠️ [변경이력] 시트를 찾을 수 없음, 빈 배열 반환');
+        return res.json([]);
+      }
+      
+      return res.status(500).json({ 
+        success: false, 
+        error: '변경 이력 조회에 실패했습니다.', 
+        details: error.message 
+      });
     }
   });
 

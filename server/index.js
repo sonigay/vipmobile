@@ -19,19 +19,24 @@ const meetingRoutes = require('./meetingRoutes');
 const setupDirectRoutes = require('./directRoutes');
 const setupPolicyTableRoutes = require('./policyTableRoutes');
 const { corsMiddleware, setCORSHeaders, configManager } = require('./corsMiddleware');
+const { createHealthCheckHandler } = require('./healthCheck');
 
 // 기본 설정
 const app = express();
 const port = process.env.PORT || 4000;
 
 // 서버 시작 전 즉시 헬스체크 엔드포인트 등록 (startup probe용)
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
-});
+// ✅ 태스크 13.1: 헬스체크 엔드포인트 개선 (요구사항 10.1, 10.2)
+// 헬스체크 모듈을 사용하여 메모리, CPU, Google Sheets 연결 상태 확인
+// 초기에는 Google Sheets 클라이언트 없이 생성 (나중에 업데이트됨)
+let healthCheckHandler = createHealthCheckHandler();
+app.get('/health', (req, res) => healthCheckHandler(req, res));
 
 // Google Sheets API 호출 빈도 제한을 위한 변수
 let lastSheetsApiCall = 0;
-const SHEETS_API_COOLDOWN = 2000; // 2초 대기 (Google Sheets API 분당 60회 제한 고려)
+// 🔥 태스크 7.1: Rate Limiter 설정 변경 (요구사항 2.2)
+// 2000ms → 500ms로 변경하여 성능 개선
+const SHEETS_API_COOLDOWN = 500; // 500ms 대기 (성능 개선)
 
 // Google Sheets API 호출 빈도 제한 함수 (Rate Limit 재시도 포함)
 const rateLimitedSheetsCall = async (apiCall, maxRetries = 5) => {
@@ -73,12 +78,29 @@ const rateLimitedSheetsCall = async (apiCall, maxRetries = 5) => {
         const delay = baseDelay * Math.pow(2, attempt) + jitter;
         const waitTime = Math.min(delay, 60000); // 최대 60초
 
-        console.warn(`⚠️ [Sheets API] Rate limit 오류 발생, ${Math.round(waitTime)}ms 후 재시도 (${attempt + 1}/${maxRetries})`);
+        // 🔥 태스크 11.2: Google Sheets API 에러 로깅 강화 (요구사항 7.3)
+        console.warn(`⚠️ [Sheets API] Rate limit 오류 발생, ${Math.round(waitTime)}ms 후 재시도 (${attempt + 1}/${maxRetries})`, {
+          에러코드: error.code || error.response?.status || 'N/A',
+          에러메시지: error.message || 'Unknown error',
+          재시도횟수: `${attempt + 1}/${maxRetries}`,
+          대기시간: `${Math.round(waitTime)}ms`,
+          타임스탬프: new Date().toISOString()
+        });
         await new Promise(resolve => setTimeout(resolve, waitTime));
         continue;
       }
 
       // Rate Limit 오류가 아니거나 최대 재시도 횟수 초과
+      // 🔥 태스크 11.2: 일반 에러도 로깅 (요구사항 7.3)
+      console.error('❌ [Sheets API] Google Sheets API 호출 실패:', {
+        에러타입: error.name || 'Error',
+        에러코드: error.code || error.response?.status || 'N/A',
+        에러메시지: error.message || 'Unknown error',
+        재시도횟수: `${attempt + 1}/${maxRetries}`,
+        Rate_Limit_에러: isRateLimitError,
+        스택트레이스: error.stack?.split('\n').slice(0, 3).join('\n') || 'No stack trace',
+        타임스탬프: new Date().toISOString()
+      });
       throw error;
     }
   }
@@ -88,6 +110,7 @@ const rateLimitedSheetsCall = async (apiCall, maxRetries = 5) => {
 const smsApiCache = {
   pendingForwards: new Map(), // 전달 대기 목록 캐시 (폰번호별)
   pendingReplies: new Map(),  // 자동응답 대기 목록 캐시 (폰번호별)
+
 };
 
 const SMS_CACHE_TTL = 10000; // 10초간 캐시 유지
@@ -118,16 +141,80 @@ const isValidSnowflake = (value) => {
   return /^\d{17,19}$/.test(str);
 };
 
-// 서버 타임아웃 설정 (5분)
+// ==================== 타임아웃 미들웨어 ====================
+// 태스크 1.3: 타임아웃 미들웨어에 CORS 헤더 추가
+// 요구사항: 2.1, 2.5, 7.4
+// 타임아웃 발생 시 CORS 헤더를 포함하여 브라우저가 에러 메시지를 읽을 수 있도록 함
 app.use((req, res, next) => {
-  req.setTimeout(300000); // 5분
-  res.setTimeout(300000); // 5분
+  const startTime = Date.now();
+  const timeoutDuration = 300000; // 5분
+  
+  req.setTimeout(timeoutDuration);
+  res.setTimeout(timeoutDuration);
+  
+  // 타임아웃 발생 시 처리 (요구사항 2.1, 2.5)
+  req.on('timeout', () => {
+    const elapsedTime = Date.now() - startTime;
+    
+    // 1. CORS 헤더 설정 (요구사항 2.1)
+    const { setBasicCORSHeaders } = require('./corsMiddleware');
+    setBasicCORSHeaders(req, res);
+    
+    // 2. 타임아웃 에러 로깅 (요구사항 7.4)
+    console.error('⏱️ [타임아웃 에러] 요청 시간 초과:', {
+      요청URL: req.originalUrl || req.url,
+      경로: req.path,
+      메서드: req.method,
+      경과시간: `${elapsedTime}ms`,
+      타임아웃설정값: `${timeoutDuration}ms`,
+      오리진: req.headers.origin,
+      타임스탬프: new Date().toISOString()
+    });
+    
+    // 3. 타임아웃 에러 응답 반환
+    if (!res.headersSent) {
+      res.status(504).json({
+        error: 'Gateway Timeout',
+        message: 'Request exceeded 5 minute timeout',
+        url: req.originalUrl || req.url,
+        elapsedTime: elapsedTime,
+        timeout: timeoutDuration,
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
+  
   next();
 });
 
 // CORS 미들웨어 등록 (요구사항 1.1, 1.4, 1.5)
 // 통합된 CORS 처리를 위해 corsMiddleware만 사용
+// 모든 라우트 등록 전에 배치하여 일관된 CORS 헤더 적용
 app.use(corsMiddleware);
+
+// JSON 파싱 미들웨어 (CORS 다음, 라우트 전에 배치)
+app.use(express.json());
+
+// 모든 요청 로깅 미들웨어
+app.use((req, res, next) => {
+  const timestamp = new Date().toISOString();
+  const method = req.method;
+  const url = req.url;
+  const userAgent = req.get('User-Agent') || 'Unknown';
+  const ip = req.ip || req.connection.remoteAddress;
+
+  console.log(`📡 [${timestamp}] ${method} ${url} - IP: ${ip} - UA: ${userAgent.substring(0, 50)}...`);
+
+  // 응답 완료 시 로깅
+  res.on('finish', () => {
+    const statusCode = res.statusCode;
+    const responseTime = Date.now() - req.startTime;
+    console.log(`✅ [${timestamp}] ${method} ${url} - ${statusCode} - ${responseTime}ms`);
+  });
+
+  req.startTime = Date.now();
+  next();
+});
 
 // 특정 API 엔드포인트에 대한 OPTIONS 요청은 corsMiddleware에서 통합 처리됨
 
@@ -141,10 +228,12 @@ app.get('/api/teams', async (req, res) => {
     console.log('🔍 [팀목록] 시트 이름:', sheetName);
 
     const range = 'A:R'; // A열(이름)과 R열(권한레벨) 포함 (기존 P열 → R열)
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range: `${sheetName}!${range}`,
-    });
+    const response = await rateLimitedSheetsCall(() => 
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${sheetName}!${range}`,
+      })
+    );
 
     const rows = response.data.values || [];
     console.log('🔍 [팀목록] 총 행 수:', rows.length);
@@ -174,6 +263,67 @@ app.get('/api/teams', async (req, res) => {
   } catch (error) {
     console.error('❌ [팀목록] 팀 목록 조회 실패:', error);
     res.status(500).json({ error: '팀 목록 조회에 실패했습니다.', details: error.message });
+  }
+});
+
+// 🔥 태스크 6.1: /api/team-leaders 엔드포인트 추가 (요구사항 3.5)
+// 팀장 목록 조회 API (프론트엔드 호환성을 위한 별칭)
+app.get('/api/team-leaders', async (req, res) => {
+  try {
+    console.log('🔍 [팀장목록] 팀장 목록 조회 시작');
+
+    // 대리점아이디관리 시트에서 팀장 목록 가져오기
+    const sheetName = '대리점아이디관리';
+    const range = 'A:R'; // A열(이름)과 R열(권한레벨) 포함
+
+    const response = await rateLimitedSheetsCall(() => 
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${sheetName}!${range}`,
+      })
+    );
+
+    const rows = response.data.values || [];
+    console.log('🔍 [팀장목록] 총 행 수:', rows.length);
+
+    const teamLeaders = [];
+
+    // 헤더 제외하고 데이터 처리
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      const name = row[0]; // A열: 대상(이름)
+      const permissionLevel = row[17]; // R열: 정책모드권한레벨
+
+      // 권한레벨이 알파벳 두 개인 경우 팀장으로 인식 (AA, BB, CC, DD, EE, FF 등)
+      if (permissionLevel && permissionLevel.length === 2 && /^[A-Z]{2}$/.test(permissionLevel)) {
+        teamLeaders.push({
+          code: permissionLevel,
+          name: name
+        });
+        console.log(`✅ [팀장목록] 팀장 추가: ${permissionLevel} - ${name}`);
+      }
+    }
+
+    console.log('🔍 [팀장목록] 최종 팀장 목록:', teamLeaders);
+    
+    // 시트가 존재하지 않거나 데이터가 없는 경우 빈 배열 반환
+    res.json(teamLeaders);
+  } catch (error) {
+    console.error('❌ [팀장목록] 팀장 목록 조회 실패:', {
+      오류타입: error.name || 'Error',
+      오류메시지: error.message,
+      스택트레이스: error.stack,
+      요청경로: req.path,
+      요청메서드: req.method
+    });
+    
+    // 시트가 존재하지 않는 경우 빈 배열 반환
+    if (error.message && error.message.includes('Unable to parse range')) {
+      console.warn('⚠️ [팀장목록] 시트를 찾을 수 없음, 빈 배열 반환');
+      return res.json([]);
+    }
+    
+    res.status(500).json({ error: '팀장 목록 조회에 실패했습니다.', details: error.message });
   }
 });
 
@@ -10463,8 +10613,27 @@ app.get('/api/budget/policy-groups', async (req, res) => {
 
     res.json({ policyGroups: sortedPolicyGroups });
   } catch (error) {
-    console.error('정책그룹 목록 가져오기 오류:', error);
-    res.status(500).json({ error: '정책그룹 목록을 가져오는 중 오류가 발생했습니다.' });
+    // 🔥 태스크 5.2: 예산 API 에러 로깅 강화 (요구사항 3.7, 7.1)
+    console.error('❌ [예산 API] 정책그룹 목록 가져오기 오류:', {
+      오류타입: error.name || 'Error',
+      오류메시지: error.message,
+      스택트레이스: error.stack,
+      요청정보: {
+        경로: req.path,
+        메서드: req.method,
+        쿼리: req.query,
+        헤더: req.headers
+      },
+      시트정보: {
+        spreadsheetId: SPREADSHEET_ID,
+        range: '폰클출고처데이터!S:S'
+      }
+    });
+    res.status(500).json({ 
+      error: '정책그룹 목록을 가져오는 중 오류가 발생했습니다.',
+      message: error.message,
+      details: '폰클출고처데이터 시트의 S열을 읽을 수 없습니다.'
+    });
   }
 });
 
@@ -10520,8 +10689,27 @@ app.post('/api/budget/policy-group-settings', async (req, res) => {
 
     res.json({ message: '정책그룹 설정이 저장되었습니다.' });
   } catch (error) {
-    console.error('정책그룹 설정 저장 오류:', error);
-    res.status(500).json({ error: '정책그룹 설정 저장 중 오류가 발생했습니다.' });
+    // 🔥 태스크 5.2: 예산 API 에러 로깅 강화 (요구사항 3.7, 7.1)
+    console.error('❌ [예산 API] 정책그룹 설정 저장 오류:', {
+      오류타입: error.name || 'Error',
+      오류메시지: error.message,
+      스택트레이스: error.stack,
+      요청정보: {
+        경로: req.path,
+        메서드: req.method,
+        바디: req.body,
+        헤더: req.headers
+      },
+      시트정보: {
+        spreadsheetId: SPREADSHEET_ID,
+        range: '예산_정책그룹관리!A:B'
+      }
+    });
+    res.status(500).json({ 
+      error: '정책그룹 설정 저장 중 오류가 발생했습니다.',
+      message: error.message,
+      details: '예산_정책그룹관리 시트에 데이터를 저장할 수 없습니다.'
+    });
   }
 });
 
@@ -10550,8 +10738,27 @@ app.get('/api/budget/policy-group-settings', async (req, res) => {
 
     res.json({ settings });
   } catch (error) {
-    console.error('정책그룹 설정 목록 가져오기 오류:', error);
-    res.status(500).json({ error: '정책그룹 설정 목록을 가져오는 중 오류가 발생했습니다.' });
+    // 🔥 태스크 5.2: 예산 API 에러 로깅 강화 (요구사항 3.7, 7.1)
+    console.error('❌ [예산 API] 정책그룹 설정 목록 가져오기 오류:', {
+      오류타입: error.name || 'Error',
+      오류메시지: error.message,
+      스택트레이스: error.stack,
+      요청정보: {
+        경로: req.path,
+        메서드: req.method,
+        쿼리: req.query,
+        헤더: req.headers
+      },
+      시트정보: {
+        spreadsheetId: SPREADSHEET_ID,
+        range: '예산_정책그룹관리!A:B'
+      }
+    });
+    res.status(500).json({ 
+      error: '정책그룹 설정 목록을 가져오는 중 오류가 발생했습니다.',
+      message: error.message,
+      details: '예산_정책그룹관리 시트를 읽을 수 없습니다.'
+    });
   }
 });
 
@@ -11371,8 +11578,29 @@ app.post('/api/budget/calculate-usage', async (req, res) => {
     res.json(result);
 
   } catch (error) {
-    console.error('사용예산 계산 오류:', error);
-    res.status(500).json({ error: '사용예산 계산 중 오류가 발생했습니다.' });
+    // 🔥 태스크 5.2: 예산 API 에러 로깅 강화 (요구사항 3.7, 7.1)
+    console.error('❌ [예산 API] 사용예산 계산 오류:', {
+      오류타입: error.name || 'Error',
+      오류메시지: error.message,
+      스택트레이스: error.stack,
+      요청정보: {
+        경로: req.path,
+        메서드: req.method,
+        바디: req.body,
+        헤더: req.headers
+      },
+      계산정보: {
+        sheetId: req.body.sheetId,
+        selectedPolicyGroups: req.body.selectedPolicyGroups,
+        dateRange: req.body.dateRange,
+        budgetType: req.body.budgetType
+      }
+    });
+    res.status(500).json({ 
+      error: '사용예산 계산 중 오류가 발생했습니다.',
+      message: error.message,
+      details: '예산 계산 프로세스에서 오류가 발생했습니다.'
+    });
   }
 });
 
@@ -14786,6 +15014,70 @@ app.get('/api/download-chrome-extension', (req, res) => {
       message: error.message
     });
   }
+});
+
+// ==================== 전역 에러 핸들러 ====================
+// 태스크 1.2: 전역 에러 핸들러에 CORS 헤더 추가
+// 요구사항: 1.5, 3.7, 7.1
+// 모든 에러 응답에 CORS 헤더를 포함하여 브라우저가 에러 메시지를 읽을 수 있도록 함
+app.use((err, req, res, next) => {
+  // 1. 에러 발생 시에도 CORS 헤더 설정 (요구사항 1.5)
+  const { setBasicCORSHeaders } = require('./corsMiddleware');
+  setBasicCORSHeaders(req, res);
+  
+  // 2. 에러 타입, 메시지, 스택 트레이스, 요청 정보 로깅 (요구사항 3.7, 7.1)
+  console.error('❌ [전역 에러 핸들러] API 에러 발생:', {
+    에러타입: err.name || 'Error',
+    에러메시지: err.message || 'Unknown error',
+    스택트레이스: err.stack || 'No stack trace available',
+    요청정보: {
+      경로: req.path,
+      메서드: req.method,
+      오리진: req.headers.origin,
+      헤더: {
+        'content-type': req.headers['content-type'],
+        'user-agent': req.headers['user-agent'],
+        'referer': req.headers['referer']
+      },
+      쿼리: req.query,
+      바디: req.body ? JSON.stringify(req.body).substring(0, 200) : 'N/A'
+    },
+    타임스탬프: new Date().toISOString()
+  });
+  
+  // 3. HTTP 상태 코드 결정
+  const statusCode = err.status || err.statusCode || 500;
+  
+  // 4. 에러 응답 반환
+  res.status(statusCode).json({
+    error: err.name || 'Internal Server Error',
+    message: err.message || 'An unexpected error occurred',
+    path: req.path,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// 404 에러 핸들러 (라우트를 찾을 수 없는 경우)
+app.use((req, res, next) => {
+  // CORS 헤더 설정
+  const { setBasicCORSHeaders } = require('./corsMiddleware');
+  setBasicCORSHeaders(req, res);
+  
+  // 404 에러 로깅
+  console.warn('⚠️ [404 에러] 라우트를 찾을 수 없음:', {
+    경로: req.path,
+    메서드: req.method,
+    오리진: req.headers.origin,
+    타임스탬프: new Date().toISOString()
+  });
+  
+  // 404 응답 반환
+  res.status(404).json({
+    error: 'Not Found',
+    message: `Cannot ${req.method} ${req.path}`,
+    path: req.path,
+    timestamp: new Date().toISOString()
+  });
 });
 
 // 서버 시작
@@ -30281,8 +30573,27 @@ app.get('/api/budget/month-sheets', async (req, res) => {
 
     res.json(data);
   } catch (error) {
-    console.error('예산 대상월 관리 데이터 조회 오류:', error);
-    res.status(500).json({ error: '데이터 조회 중 오류가 발생했습니다.' });
+    // 🔥 태스크 5.2: 예산 API 에러 로깅 강화 (요구사항 3.7, 7.1)
+    console.error('❌ [예산 API] 예산 대상월 관리 데이터 조회 오류:', {
+      오류타입: error.name || 'Error',
+      오류메시지: error.message,
+      스택트레이스: error.stack,
+      요청정보: {
+        경로: req.path,
+        메서드: req.method,
+        쿼리: req.query,
+        헤더: req.headers
+      },
+      시트정보: {
+        spreadsheetId: SPREADSHEET_ID,
+        range: '예산_대상월관리!A:D'
+      }
+    });
+    res.status(500).json({ 
+      error: '예산 대상월 관리 데이터 조회 중 오류가 발생했습니다.',
+      message: error.message,
+      details: '예산_대상월관리 시트를 읽을 수 없습니다.'
+    });
   }
 });
 
@@ -30331,8 +30642,27 @@ app.post('/api/budget/month-sheets', async (req, res) => {
 
     res.json({ message: '월별 시트 ID가 저장되었습니다.' });
   } catch (error) {
-    console.error('예산 대상월 관리 데이터 저장 오류:', error);
-    res.status(500).json({ error: '데이터 저장 중 오류가 발생했습니다.' });
+    // 🔥 태스크 5.2: 예산 API 에러 로깅 강화 (요구사항 3.7, 7.1)
+    console.error('❌ [예산 API] 예산 대상월 관리 데이터 저장 오류:', {
+      오류타입: error.name || 'Error',
+      오류메시지: error.message,
+      스택트레이스: error.stack,
+      요청정보: {
+        경로: req.path,
+        메서드: req.method,
+        바디: req.body,
+        헤더: req.headers
+      },
+      시트정보: {
+        spreadsheetId: SPREADSHEET_ID,
+        range: '예산_대상월관리!A:D'
+      }
+    });
+    res.status(500).json({ 
+      error: '예산 대상월 관리 데이터 저장 중 오류가 발생했습니다.',
+      message: error.message,
+      details: '예산_대상월관리 시트에 데이터를 저장할 수 없습니다.'
+    });
   }
 });
 
@@ -30375,8 +30705,27 @@ app.delete('/api/budget/month-sheets/:month', async (req, res) => {
 
     res.json({ message: '월별 시트 ID가 삭제되었습니다.' });
   } catch (error) {
-    console.error('예산 대상월 관리 데이터 삭제 오류:', error);
-    res.status(500).json({ error: '데이터 삭제 중 오류가 발생했습니다.' });
+    // 🔥 태스크 5.2: 예산 API 에러 로깅 강화 (요구사항 3.7, 7.1)
+    console.error('❌ [예산 API] 예산 대상월 관리 데이터 삭제 오류:', {
+      오류타입: error.name || 'Error',
+      오류메시지: error.message,
+      스택트레이스: error.stack,
+      요청정보: {
+        경로: req.path,
+        메서드: req.method,
+        파라미터: req.params,
+        헤더: req.headers
+      },
+      시트정보: {
+        spreadsheetId: SPREADSHEET_ID,
+        range: '예산_대상월관리!A:D'
+      }
+    });
+    res.status(500).json({ 
+      error: '예산 대상월 관리 데이터 삭제 중 오류가 발생했습니다.',
+      message: error.message,
+      details: '예산_대상월관리 시트에서 데이터를 삭제할 수 없습니다.'
+    });
   }
 });
 

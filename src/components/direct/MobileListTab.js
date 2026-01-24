@@ -336,11 +336,6 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
       setRefreshingAllImages(false);
     }
   };
-      alert('이미지 갱신 중 오류가 발생했습니다.');
-    } finally {
-      setRefreshingAllImages(false);
-    }
-  };
 
   // handleReload 재구현을 위해 useEffect 분리 대신 
   // useEffect 의존성에 reloadTrigger 추가 권장.
