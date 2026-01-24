@@ -98,7 +98,7 @@ const createPolicyNoticeRoutes = require('./routes/policyNoticeRoutes');
 
 // 기존 라우트 모듈
 const setupDirectRoutes = require('./directRoutes');
-const meetingRoutes = require('./meetingRoutes');
+const setupMeetingRoutes = require('./meetingRoutes');
 const setupObRoutes = require('./obRoutes');
 const setupPolicyTableRoutes = require('./policyTableRoutes');
 
@@ -247,9 +247,8 @@ try {
 }
 
 try {
-  // meetingRoutes는 함수가 아니라 객체이므로 별도 처리 필요
-  // 기존 코드에서 직접 app.get/post로 등록되어 있음
-  console.log('⚠️  [Existing] Meeting routes - 기존 방식 유지 (별도 등록 필요)');
+  setupMeetingRoutes(app);
+  console.log('✅ [Existing] Meeting routes mounted');
 } catch (e) {
   console.error('❌ [Existing] Failed to mount meeting routes:', e.message);
 }
