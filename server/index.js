@@ -15057,28 +15057,28 @@ app.use((err, req, res, next) => {
   });
 });
 
-// 404 에러 핸들러 (라우트를 찾을 수 없는 경우)
-app.use((req, res, next) => {
-  // CORS 헤더 설정
-  const { setBasicCORSHeaders } = require('./corsMiddleware');
-  setBasicCORSHeaders(req, res);
-  
-  // 404 에러 로깅
-  console.warn('⚠️ [404 에러] 라우트를 찾을 수 없음:', {
-    경로: req.path,
-    메서드: req.method,
-    오리진: req.headers.origin,
-    타임스탬프: new Date().toISOString()
-  });
-  
-  // 404 응답 반환
-  res.status(404).json({
-    error: 'Not Found',
-    message: `Cannot ${req.method} ${req.path}`,
-    path: req.path,
-    timestamp: new Date().toISOString()
-  });
-});
+// // 404 에러 핸들러 (라우트를 찾을 수 없는 경우)
+// app.use((req, res, next) => {
+//   // CORS 헤더 설정
+//   const { setBasicCORSHeaders } = require('./corsMiddleware');
+//   setBasicCORSHeaders(req, res);
+//   
+//   // 404 에러 로깅
+//   console.warn('⚠️ [404 에러] 라우트를 찾을 수 없음:', {
+//     경로: req.path,
+//     메서드: req.method,
+//     오리진: req.headers.origin,
+//     타임스탬프: new Date().toISOString()
+//   });
+//   
+//   // 404 응답 반환
+//   res.status(404).json({
+//     error: 'Not Found',
+//     message: `Cannot ${req.method} ${req.path}`,
+//     path: req.path,
+//     timestamp: new Date().toISOString()
+//   });
+// });
 
 // 서버 시작
 // 서버가 포트를 열고 리스닝을 시작하면 즉시 로그 출력 (헬스체크를 위한 빠른 응답)
