@@ -310,8 +310,9 @@ export const directStoreApiClient = {
       );
       return data.data || [];
     } catch (error) {
-      console.error('단말 마스터 조회 실패:', error);
-      return [];
+      console.error('❌ [API] 단말 마스터 조회 실패:', error);
+      // 🔥 에러를 throw하여 상위에서 처리하도록 변경
+      throw new Error(`단말 마스터 조회 실패: ${error.message || '알 수 없는 오류'}`);
     }
   },
 
@@ -330,8 +331,9 @@ export const directStoreApiClient = {
       );
       return data.data || [];
     } catch (error) {
-      console.error('요금제 마스터 조회 실패:', error);
-      return [];
+      console.error('❌ [API] 요금제 마스터 조회 실패:', error);
+      // 🔥 에러를 throw하여 상위에서 처리하도록 변경
+      throw new Error(`요금제 마스터 조회 실패: ${error.message || '알 수 없는 오류'}`);
     }
   },
 
@@ -353,8 +355,9 @@ export const directStoreApiClient = {
       );
       return data.data || [];
     } catch (error) {
-      console.error('단말 요금정책 조회 실패:', error);
-      return [];
+      console.error('❌ [API] 단말 요금정책 조회 실패:', error);
+      // 🔥 에러를 throw하여 상위에서 처리하도록 변경
+      throw new Error(`단말 요금정책 조회 실패: ${error.message || '알 수 없는 오류'}`);
     }
   },
 

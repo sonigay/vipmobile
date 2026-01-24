@@ -1,4 +1,4 @@
-const API_URL = process.env.REACT_APP_API_URL || 'https://vipmobile-backend.cloudtype.app';
+import { API_BASE_URL } from '../api';
 
 // 정책 관련 API 엔드포인트
 const POLICY_ENDPOINTS = {
@@ -22,7 +22,7 @@ export class PolicyService {
       if (filters.userId) queryParams.append('userId', filters.userId);
       if (filters.approvalStatus) queryParams.append('approvalStatus', filters.approvalStatus);
       
-      const response = await fetch(`${API_URL}${POLICY_ENDPOINTS.GET_POLICIES}?${queryParams}`);
+      const response = await fetch(`${API_BASE_URL}${POLICY_ENDPOINTS.GET_POLICIES}?${queryParams}`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -39,7 +39,7 @@ export class PolicyService {
   // 정책 생성
   static async createPolicy(policyData) {
     try {
-      const response = await fetch(`${API_URL}${POLICY_ENDPOINTS.CREATE_POLICY}`, {
+      const response = await fetch(`${API_BASE_URL}${POLICY_ENDPOINTS.CREATE_POLICY}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -69,7 +69,7 @@ export class PolicyService {
   // 정책 수정
   static async updatePolicy(policyId, updateData) {
     try {
-      const response = await fetch(`${API_URL}${POLICY_ENDPOINTS.UPDATE_POLICY}/${policyId}`, {
+      const response = await fetch(`${API_BASE_URL}${POLICY_ENDPOINTS.UPDATE_POLICY}/${policyId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -92,7 +92,7 @@ export class PolicyService {
   // 정책 삭제
   static async deletePolicy(policyId) {
     try {
-      const response = await fetch(`${API_URL}${POLICY_ENDPOINTS.DELETE_POLICY}/${policyId}`, {
+      const response = await fetch(`${API_BASE_URL}${POLICY_ENDPOINTS.DELETE_POLICY}/${policyId}`, {
         method: 'DELETE'
       });
       
@@ -111,7 +111,7 @@ export class PolicyService {
   // 정책 취소
   static async cancelPolicy(policyId, cancelData) {
     try {
-      const response = await fetch(`${API_URL}/api/policies/${policyId}/cancel`, {
+      const response = await fetch(`${API_BASE_URL}/api/policies/${policyId}/cancel`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -134,7 +134,7 @@ export class PolicyService {
   // 승인 취소
   static async cancelApproval(policyId, cancelData) {
     try {
-      const response = await fetch(`${API_URL}/api/policies/${policyId}/approval-cancel`, {
+      const response = await fetch(`${API_BASE_URL}/api/policies/${policyId}/approval-cancel`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -157,7 +157,7 @@ export class PolicyService {
   // 정산 반영
   static async reflectSettlement(policyId, settlementData) {
     try {
-      const response = await fetch(`${API_URL}/api/policies/${policyId}/settlement-reflect`, {
+      const response = await fetch(`${API_BASE_URL}/api/policies/${policyId}/settlement-reflect`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -180,7 +180,7 @@ export class PolicyService {
   // 정책 승인
   static async approvePolicy(policyId, approvalData) {
     try {
-      const response = await fetch(`${API_URL}/api/policies/${policyId}/approve`, {
+      const response = await fetch(`${API_BASE_URL}/api/policies/${policyId}/approve`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -204,7 +204,7 @@ export class PolicyService {
   // 알림 목록 조회
   static async getNotifications(userId) {
     try {
-      const response = await fetch(`${API_URL}${POLICY_ENDPOINTS.GET_NOTIFICATIONS}?userId=${userId}`);
+      const response = await fetch(`${API_BASE_URL}${POLICY_ENDPOINTS.GET_NOTIFICATIONS}?userId=${userId}`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -309,7 +309,7 @@ export class PolicyService {
   // 카테고리 목록 조회
   static async getCategories() {
     try {
-      const response = await fetch(`${API_URL}/api/policy-categories`);
+      const response = await fetch(`${API_BASE_URL}/api/policy-categories`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -326,7 +326,7 @@ export class PolicyService {
   // 카테고리 추가
   static async createCategory(categoryData) {
     try {
-      const response = await fetch(`${API_URL}/api/policy-categories`, {
+      const response = await fetch(`${API_BASE_URL}/api/policy-categories`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -378,7 +378,7 @@ export class PolicyService {
       if (filters.policyType) queryParams.append('policyType', filters.policyType);
       if (filters.manager) queryParams.append('manager', filters.manager);
       
-      const response = await fetch(`${API_URL}/api/policies/shoe-counting?${queryParams}`);
+      const response = await fetch(`${API_BASE_URL}/api/policies/shoe-counting?${queryParams}`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);

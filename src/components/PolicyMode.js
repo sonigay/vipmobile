@@ -388,7 +388,6 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   // 공지사항 작성/수정 핸들러
   const handleNoticeSave = async (noticeData) => {
     try {
-      const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://vipmobile-backend.cloudtype.app';
       const url = editingNotice 
         ? `${API_BASE_URL}/api/policy-notices/${editingNotice.id}`
         : `${API_BASE_URL}/api/policy-notices`;
@@ -441,7 +440,6 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     }
     
     try {
-      const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://vipmobile-backend.cloudtype.app';
       const response = await fetch(`${API_BASE_URL}/api/policy-notices/${noticeId}`, {
         method: 'DELETE',
         headers: {
@@ -763,9 +761,6 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
 
     try {
       console.log('정책 삭제 시도:', policy.id);
-      
-      // API 기본 URL 설정
-      const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://vipmobile-backend.cloudtype.app';
       
       // 먼저 테스트 API로 DELETE 메서드가 작동하는지 확인
       console.log('DELETE 테스트 API 호출 시도...');

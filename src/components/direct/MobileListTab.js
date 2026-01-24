@@ -239,11 +239,33 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
 
         initializedRef.current = true;
       } catch (err) {
-        console.error('데이터 로딩 실패:', err);
-        setError('데이터를 불러오는 중 오류가 발생했습니다.');
+        console.error('❌ [휴대폰시세표] 데이터 로딩 실패:', err);
+        
+        // 🔥 사용자 친화적인 에러 메시지 생성
+        let userMessage = '데이터를 불러오는 중 오류가 발생했습니다.';
+        
+        if (err.message) {
+          if (err.message.includes('SHEET_ID')) {
+            userMessage = '서버 설정 오류: Google Sheets ID가 올바르지 않습니다. 관리자에게 문의하세요.';
+          } else if (err.message.includes('Missing Google Sheets')) {
+            userMessage = '서버 설정 오류: Google Sheets 인증 정보가 누락되었습니다. 관리자에게 문의하세요.';
+          } else if (err.message.includes('Requested entity was not found')) {
+            userMessage = '서버 설정 오류: Google Sheets를 찾을 수 없습니다. 관리자에게 문의하세요.';
+          } else if (err.message.includes('단말 마스터 조회 실패')) {
+            userMessage = `단말 정보를 불러올 수 없습니다. (${err.message})`;
+          } else if (err.message.includes('요금제 마스터 조회 실패')) {
+            userMessage = `요금제 정보를 불러올 수 없습니다. (${err.message})`;
+          } else if (err.message.includes('단말 요금정책 조회 실패')) {
+            userMessage = `가격 정보를 불러올 수 없습니다. (${err.message})`;
+          } else {
+            userMessage = `데이터 로딩 실패: ${err.message}`;
+          }
+        }
+        
+        setError(userMessage);
         setSteps(prev => ({
           ...prev,
-          fetch: { ...prev.fetch, status: 'error', message: err.message }
+          fetch: { ...prev.fetch, status: 'error', message: err.message || '알 수 없는 오류' }
         }));
       } finally {
         setLoading(false);

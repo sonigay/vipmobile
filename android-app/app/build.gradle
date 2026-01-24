@@ -13,9 +13,16 @@ android {
         targetSdk 33
         versionCode 9
         versionName "2.1.6"
+        
+        // API URL 중앙화 설정
+        buildConfigField "String", "API_BASE_URL", "\"https://vipmobile-backend.cloudtype.app\""
     }
     
     namespace 'com.vipplus.manager'
+    
+    buildFeatures {
+        buildConfig true
+    }
 
     signingConfigs {
         release {
@@ -31,7 +38,14 @@ android {
     }
 
     buildTypes {
+        debug {
+            // 개발 환경용 로컬 서버 (Android 에뮬레이터에서 호스트 머신의 localhost 접근)
+            buildConfigField "String", "API_BASE_URL", "\"http://10.0.2.2:4000\""
+        }
+        
         release {
+            // 프로덕션 환경
+            buildConfigField "String", "API_BASE_URL", "\"https://vipmobile-backend.cloudtype.app\""
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.release

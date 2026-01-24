@@ -46,9 +46,21 @@ class MainActivity : AppCompatActivity() {
         
         // 저장된 설정 불러오기
         val prefs = getSharedPreferences("VIP_MANAGER", Context.MODE_PRIVATE)
-        val defaultUrl = "https://vipmobile-backend.cloudtype.app"
+        
+        // BuildConfig에서 API URL 가져오기 (빌드 타입별로 다른 URL 사용)
+        val defaultUrl = try {
+            BuildConfig.API_BASE_URL
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Failed to load API_BASE_URL from BuildConfig", e)
+            "https://vipmobile-backend.cloudtype.app" // 폴백 기본값
+        }
+        
         val savedUrl = prefs.getString("SERVER_URL", defaultUrl)
         val savedPhoneNumber = prefs.getString("PHONE_NUMBER", "")
+        
+        // 디버그 로그
+        android.util.Log.d("MainActivity", "Build Type: ${BuildConfig.BUILD_TYPE}")
+        android.util.Log.d("MainActivity", "API Base URL: $defaultUrl")
         
         serverUrlInput.setText(savedUrl)
         phoneNumberInput.setText(savedPhoneNumber)

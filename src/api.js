@@ -1,5 +1,40 @@
 // API 기본 URL 설정
-export const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://vipmobile-backend.cloudtype.app';
+
+/**
+ * URL 형식 검증 함수
+ * @param {string} url - 검증할 URL
+ * @returns {boolean} URL이 유효하면 true, 아니면 false
+ */
+const validateURL = (url) => {
+  try {
+    const urlObj = new URL(url);
+    // HTTP 또는 HTTPS 프로토콜만 허용
+    return urlObj.protocol === 'http:' || urlObj.protocol === 'https:';
+  } catch {
+    return false;
+  }
+};
+
+// 환경 변수 및 기본값 설정
+const envURL = process.env.REACT_APP_API_URL;
+const defaultURL = 'https://vipmobile-backend.cloudtype.app';
+
+// 환경 변수 검증 및 로깅
+if (envURL) {
+  if (validateURL(envURL)) {
+    console.log(`✅ [API Config] 환경 변수 REACT_APP_API_URL 사용: ${envURL}`);
+  } else {
+    console.warn(`⚠️ [API Config] 잘못된 REACT_APP_API_URL 형식: ${envURL}. 기본값 사용: ${defaultURL}`);
+  }
+} else {
+  console.log(`ℹ️ [API Config] REACT_APP_API_URL 미설정. 기본값 사용: ${defaultURL}`);
+}
+
+// 유효한 URL만 사용
+export const API_BASE_URL = (envURL && validateURL(envURL)) ? envURL : defaultURL;
+
+// 최종 사용 URL 로깅
+console.log(`🔗 [API Config] 활성 API URL: ${API_BASE_URL}`);
 
 // API 호출 함수들
 export const api = {

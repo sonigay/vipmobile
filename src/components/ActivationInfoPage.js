@@ -26,6 +26,7 @@ import {
   Print as PrintIcon,
   Save as SaveIcon
 } from '@mui/icons-material';
+import { API_BASE_URL } from '../api';
 
 const ActivationInfoPage = () => {
   const [loading, setLoading] = useState(false);
@@ -84,8 +85,7 @@ const ActivationInfoPage = () => {
     try {
       console.log('📝 [ActivationInfoPage] 수정 데이터 로드 시작:', sheetId, rowIndex);
       setLoading(true);
-      const API_URL = process.env.REACT_APP_API_URL || 'https://vipmobile-backend.cloudtype.app';
-      const response = await fetch(`${API_URL}/api/onsale/activation-info/${sheetId}/${rowIndex}`);
+      const response = await fetch(`${API_BASE_URL}/api/onsale/activation-info/${sheetId}/${rowIndex}`);
       console.log('📝 [ActivationInfoPage] API 응답 상태:', response.status);
       const result = await response.json();
       console.log('📝 [ActivationInfoPage] API 응답 데이터:', result);
@@ -158,7 +158,7 @@ const ActivationInfoPage = () => {
   const loadPlanData = async () => {
     try {
       setPlanLoading(true);
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/ob/plan-data`);
+      const response = await fetch(`${API_BASE_URL}/api/ob/plan-data`);
       const result = await response.json();
       
       if (result.success && result.data) {
@@ -232,7 +232,7 @@ const ActivationInfoPage = () => {
     try {
       if (isEditMode) {
         // 수정 모드: PUT API 호출
-        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/onsale/activation-info/${urlParams.sheetId}/${urlParams.rowIndex}`, {
+        const response = await fetch(`${API_BASE_URL}/api/onsale/activation-info/${urlParams.sheetId}/${urlParams.rowIndex}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -266,7 +266,7 @@ const ActivationInfoPage = () => {
         localStorage.setItem('vip_activation_sheetName', urlParams.activationSheetName);
         localStorage.setItem('vip_activation_phoneNumber', formData.phoneNumber);
         
-        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/onsale/activation-info`, {
+        const response = await fetch(`${API_BASE_URL}/api/onsale/activation-info`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -309,7 +309,7 @@ const ActivationInfoPage = () => {
     setError(null);
     
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/onsale/activation-info/${urlParams.sheetId}/${urlParams.rowIndex}/cancel`, {
+      const response = await fetch(`${API_BASE_URL}/api/onsale/activation-info/${urlParams.sheetId}/${urlParams.rowIndex}/cancel`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -357,7 +357,7 @@ const ActivationInfoPage = () => {
     setError(null);
     
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/onsale/activation-info/${urlParams.sheetId}/${urlParams.rowIndex}/complete`, {
+      const response = await fetch(`${API_BASE_URL}/api/onsale/activation-info/${urlParams.sheetId}/${urlParams.rowIndex}/complete`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
