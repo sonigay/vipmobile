@@ -40,43 +40,28 @@ function createAppUpdateRoutes(context) {
       try {
         values = await getSheetValues('어플업데이트');
       } catch (sheetError) {
-        // 시트가 없으면 기본값 반환
+        // 시트가 없으면 빈 배열 반환 (프론트엔드 형식에 맞춤)
         console.warn('어플업데이트 시트가 존재하지 않습니다:', sheetError.message);
-        const defaultResult = {
-          hasUpdate: false,
-          version: '1.0.0',
-          message: '',
-          forceUpdate: false
-        };
-        cacheManager.set(cacheKey, defaultResult, 10 * 60 * 1000);
-        return res.json(defaultResult);
+        const emptyResult = { success: true, data: [] };
+        cacheManager.set(cacheKey, emptyResult, 10 * 60 * 1000);
+        return res.json(emptyResult);
       }
 
       if (!values || values.length === 0) {
-        return res.json({
-          hasUpdate: false,
-          version: '1.0.0',
-          message: '',
-          forceUpdate: false
-        });
+        const emptyResult = { success: true, data: [] };
+        cacheManager.set(cacheKey, emptyResult, 10 * 60 * 1000);
+        return res.json(emptyResult);
       }
 
-      const rows = values.slice(1);
-      const latestUpdate = rows[0] || [];
+      // 헤더 제외하고 데이터 반환
+      const data = values.slice(1);
+      const result = { success: true, data };
 
-      const updateInfo = {
-        hasUpdate: latestUpdate[0] === 'TRUE' || latestUpdate[0] === true,
-        version: latestUpdate[1] || '1.0.0',
-        message: latestUpdate[2] || '',
-        forceUpdate: latestUpdate[3] === 'TRUE' || latestUpdate[3] === true,
-        releaseDate: latestUpdate[4] || new Date().toISOString()
-      };
-
-      cacheManager.set(cacheKey, updateInfo, 10 * 60 * 1000); // 10분 캐시
-      res.json(updateInfo);
+      cacheManager.set(cacheKey, result, 10 * 60 * 1000); // 10분 캐시
+      res.json(result);
     } catch (error) {
       console.error('Error fetching app updates:', error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 
@@ -85,7 +70,7 @@ function createAppUpdateRoutes(context) {
     try {
       if (!requireSheetsClient(res)) return;
       
-      const { version, message, forceUpdate } = req.body;
+      const { data } = req.body;
 
       await rateLimiter.execute(() =>
         sheetsClient.sheets.spreadsheets.values.append({
@@ -93,7 +78,7 @@ function createAppUpdateRoutes(context) {
           range: '어플업데이트!A:Z',
           valueInputOption: 'RAW',
           resource: {
-            values: [[true, version, message, forceUpdate, new Date().toISOString()]]
+            values: [data]
           }
         })
       );
@@ -102,7 +87,7 @@ function createAppUpdateRoutes(context) {
       res.json({ success: true });
     } catch (error) {
       console.error('Error creating app update:', error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 
