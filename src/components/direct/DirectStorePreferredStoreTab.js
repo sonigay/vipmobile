@@ -583,8 +583,8 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
                 await customerAPI.savePreApprovalMark(editingStore.name, editPreApprovalMark.trim());
             }
 
-            // 매장 사진 저장 (Discord 정보 포함)
-            await customerAPI.saveStorePhotos({
+            // 매장 사진 저장 데이터 준비
+            const photoData = {
                 storeName: editingStore.name,
                 frontUrl: editStorePhotos.frontUrl.trim(),
                 insideUrl: editStorePhotos.insideUrl.trim(),
@@ -593,33 +593,54 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
                 managerUrl: editStorePhotos.managerUrl.trim(),
                 staff1Url: editStorePhotos.staff1Url.trim(),
                 staff2Url: editStorePhotos.staff2Url.trim(),
-                staff3Url: editStorePhotos.staff3Url.trim(),
-                // Discord 메시지 ID 정보 (업로드 시 받은 정보)
-                frontMessageId: discordInfo.front.messageId,
-                frontPostId: discordInfo.front.postId,
-                frontThreadId: discordInfo.front.threadId,
-                insideMessageId: discordInfo.inside.messageId,
-                insidePostId: discordInfo.inside.postId,
-                insideThreadId: discordInfo.inside.threadId,
-                outsideMessageId: discordInfo.outside.messageId,
-                outsidePostId: discordInfo.outside.postId,
-                outsideThreadId: discordInfo.outside.threadId,
-                outside2MessageId: discordInfo.outside2.messageId,
-                outside2PostId: discordInfo.outside2.postId,
-                outside2ThreadId: discordInfo.outside2.threadId,
-                managerMessageId: discordInfo.manager.messageId,
-                managerPostId: discordInfo.manager.postId,
-                managerThreadId: discordInfo.manager.threadId,
-                staff1MessageId: discordInfo.staff1.messageId,
-                staff1PostId: discordInfo.staff1.postId,
-                staff1ThreadId: discordInfo.staff1.threadId,
-                staff2MessageId: discordInfo.staff2.messageId,
-                staff2PostId: discordInfo.staff2.postId,
-                staff2ThreadId: discordInfo.staff2.threadId,
-                staff3MessageId: discordInfo.staff3.messageId,
-                staff3PostId: discordInfo.staff3.postId,
-                staff3ThreadId: discordInfo.staff3.threadId
-            });
+                staff3Url: editStorePhotos.staff3Url.trim()
+            };
+
+            // Discord 정보가 있는 경우에만 추가 (빈 문자열이 아닌 실제 값이 있을 때)
+            // 이렇게 하면 백엔드에서 조건문이 올바르게 작동함
+            if (discordInfo.front.messageId) {
+                photoData.frontMessageId = discordInfo.front.messageId;
+                photoData.frontPostId = discordInfo.front.postId;
+                photoData.frontThreadId = discordInfo.front.threadId;
+            }
+            if (discordInfo.inside.messageId) {
+                photoData.insideMessageId = discordInfo.inside.messageId;
+                photoData.insidePostId = discordInfo.inside.postId;
+                photoData.insideThreadId = discordInfo.inside.threadId;
+            }
+            if (discordInfo.outside.messageId) {
+                photoData.outsideMessageId = discordInfo.outside.messageId;
+                photoData.outsidePostId = discordInfo.outside.postId;
+                photoData.outsideThreadId = discordInfo.outside.threadId;
+            }
+            if (discordInfo.outside2.messageId) {
+                photoData.outside2MessageId = discordInfo.outside2.messageId;
+                photoData.outside2PostId = discordInfo.outside2.postId;
+                photoData.outside2ThreadId = discordInfo.outside2.threadId;
+            }
+            if (discordInfo.manager.messageId) {
+                photoData.managerMessageId = discordInfo.manager.messageId;
+                photoData.managerPostId = discordInfo.manager.postId;
+                photoData.managerThreadId = discordInfo.manager.threadId;
+            }
+            if (discordInfo.staff1.messageId) {
+                photoData.staff1MessageId = discordInfo.staff1.messageId;
+                photoData.staff1PostId = discordInfo.staff1.postId;
+                photoData.staff1ThreadId = discordInfo.staff1.threadId;
+            }
+            if (discordInfo.staff2.messageId) {
+                photoData.staff2MessageId = discordInfo.staff2.messageId;
+                photoData.staff2PostId = discordInfo.staff2.postId;
+                photoData.staff2ThreadId = discordInfo.staff2.threadId;
+            }
+            if (discordInfo.staff3.messageId) {
+                photoData.staff3MessageId = discordInfo.staff3.messageId;
+                photoData.staff3PostId = discordInfo.staff3.postId;
+                photoData.staff3ThreadId = discordInfo.staff3.threadId;
+            }
+
+            // 매장 사진 저장 (Discord 정보 포함)
+            await customerAPI.saveStorePhotos(photoData);
 
             // 대중교통 위치 저장 (ID 배열로)
             const transitResponse = await directStoreApiClient.saveTransitLocation(
