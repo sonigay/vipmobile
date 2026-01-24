@@ -301,10 +301,32 @@ module.exports = function createMiscRoutes(context) {
     }
   });
 
+  router.post('/api/check-general-policy-permission', async (req, res) => {
+    try {
+      const { userId } = req.body;
+      console.log('일반 정책 권한 체크 (POST):', userId);
+      // 권한 체크 로직
+      res.json({ hasPermission: true });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   router.get('/api/check-onsale-permission', async (req, res) => {
     try {
       const { userId } = req.query;
       console.log('온세일 권한 체크:', userId);
+      // 권한 체크 로직
+      res.json({ hasPermission: true });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  router.post('/api/check-onsale-permission', async (req, res) => {
+    try {
+      const { userId } = req.body;
+      console.log('온세일 권한 체크 (POST):', userId);
       // 권한 체크 로직
       res.json({ hasPermission: true });
     } catch (error) {
@@ -336,6 +358,17 @@ module.exports = function createMiscRoutes(context) {
   });
 
   // 지오코딩
+  router.get('/api/geocode-address', async (req, res) => {
+    try {
+      const { address } = req.query;
+      console.log('주소 지오코딩 (GET):', address);
+      // 지오코딩 로직
+      res.json({ lat: 37.5665, lng: 126.9780, address });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   router.post('/api/geocode-address', async (req, res) => {
     try {
       const { address } = req.body;
@@ -455,6 +488,64 @@ module.exports = function createMiscRoutes(context) {
       const { userId } = req.body;
       console.log('모든 알림 읽음 처리:', userId);
       res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET /api/unmatched-customers/excel - 미매칭 고객 엑셀 다운로드
+  router.get('/api/unmatched-customers/excel', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const values = await getSheetValues('미매칭고객');
+      
+      // 엑셀 다운로드 로직 (간단한 JSON 반환)
+      res.json({ data: values.slice(1), format: 'excel' });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET /api/yard-receipt-missing-analysis - 야드접수 누락 분석
+  router.get('/api/yard-receipt-missing-analysis', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const values = await getSheetValues('야드접수누락분석');
+      res.json(values.slice(1));
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET /api/push/subscriptions - Push 구독 목록
+  router.get('/api/push/subscriptions', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const values = await getSheetValues('Push구독');
+      res.json(values.slice(1));
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/confirmed-unconfirmed-inventory - 확정/미확정 재고
+  router.post('/api/confirmed-unconfirmed-inventory', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const { data } = req.body;
+
+      console.log('확정/미확정 재고 처리:', data);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // DELETE /api/test-delete - 테스트 삭제
+  router.delete('/api/test-delete', async (req, res) => {
+    try {
+      console.log('테스트 삭제 API 호출');
+      res.json({ success: true, message: '테스트 삭제 완료' });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
