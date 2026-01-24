@@ -76,3 +76,126 @@ function createSmsRoutes(context) {
 }
 
 module.exports = createSmsRoutes;
+
+  // SMS 자동응답 관련 엔드포인트
+  router.get('/api/sms/auto-reply/rules', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const values = await getSheetValues('SMS자동응답규칙');
+      res.json(values.slice(1));
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  router.post('/api/sms/auto-reply/rules', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const { data } = req.body;
+      await rateLimiter.execute(() =>
+        sheetsClient.sheets.spreadsheets.values.append({
+          spreadsheetId: sheetsClient.SPREADSHEET_ID,
+          range: 'SMS자동응답규칙!A:Z',
+          valueInputOption: 'RAW',
+          resource: { values: [data] }
+        })
+      );
+      cacheManager.deletePattern('sms');
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  router.get('/api/sms/auto-reply/pending', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const values = await getSheetValues('SMS자동응답대기');
+      res.json(values.slice(1));
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  router.get('/api/sms/auto-reply/history', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const values = await getSheetValues('SMS자동응답이력');
+      res.json(values.slice(1));
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  router.get('/api/sms/auto-reply/contacts', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const values = await getSheetValues('SMS연락처');
+      res.json(values.slice(1));
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  router.get('/api/sms/received', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const values = await getSheetValues('SMS수신');
+      res.json(values.slice(1));
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  router.get('/api/sms/history', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const values = await getSheetValues('SMS이력');
+      res.json(values.slice(1));
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  router.get('/api/sms/stats', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const values = await getSheetValues('SMS통계');
+      res.json(values.slice(1));
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  router.post('/api/sms/forward', async (req, res) => {
+    try {
+      const { to, message } = req.body;
+      console.log('SMS 전달:', to, message);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  router.post('/api/sms/register', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const { phoneNumber } = req.body;
+      await rateLimiter.execute(() =>
+        sheetsClient.sheets.spreadsheets.values.append({
+          spreadsheetId: sheetsClient.SPREADSHEET_ID,
+          range: 'SMS등록!A:Z',
+          valueInputOption: 'RAW',
+          resource: { values: [[phoneNumber, new Date().toISOString()]] }
+        })
+      );
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  return router;
+}
+
+module.exports = createSmsRoutes;
