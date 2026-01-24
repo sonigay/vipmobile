@@ -69,8 +69,8 @@ module.exports = function createMiscRoutes(context) {
     res.json({ success: true, message: '테스트 API 작동 중' });
   });
 
-  // GET /api/stores - 매장 목록
-  router.get('/api/stores', async (req, res) => {
+  // GET /stores - 매장 목록
+  router.get('/stores', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
       
@@ -89,8 +89,8 @@ module.exports = function createMiscRoutes(context) {
     }
   });
 
-  // GET /api/stores/unique-values - 매장 고유값
-  router.get('/api/stores/unique-values', async (req, res) => {
+  // GET /stores/unique-values - 매장 고유값
+  router.get('/stores/unique-values', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
       
@@ -110,8 +110,8 @@ module.exports = function createMiscRoutes(context) {
     }
   });
 
-  // GET /api/version - 버전 정보
-  router.get('/api/version', (req, res) => {
+  // GET /version - 버전 정보
+  router.get('/version', (req, res) => {
     res.json({
       version: '1.0.0',
       buildDate: new Date().toISOString(),
@@ -120,11 +120,11 @@ module.exports = function createMiscRoutes(context) {
   });
 
   // Push 알림 관련
-  router.get('/api/push/vapid-public-key', (req, res) => {
+  router.get('/push/vapid-public-key', (req, res) => {
     res.json({ publicKey: process.env.VAPID_PUBLIC_KEY || '' });
   });
 
-  router.post('/api/push/subscribe', async (req, res) => {
+  router.post('/push/subscribe', async (req, res) => {
     try {
       const { subscription } = req.body;
       console.log('Push 구독:', subscription);
@@ -134,7 +134,7 @@ module.exports = function createMiscRoutes(context) {
     }
   });
 
-  router.post('/api/push/unsubscribe', async (req, res) => {
+  router.post('/push/unsubscribe', async (req, res) => {
     try {
       const { endpoint } = req.body;
       console.log('Push 구독 해제:', endpoint);
@@ -144,7 +144,7 @@ module.exports = function createMiscRoutes(context) {
     }
   });
 
-  router.post('/api/push/send', async (req, res) => {
+  router.post('/push/send', async (req, res) => {
     try {
       const { title, message, userId } = req.body;
       console.log('Push 전송:', title, message, userId);
@@ -154,7 +154,7 @@ module.exports = function createMiscRoutes(context) {
     }
   });
 
-  router.post('/api/push/send-all', async (req, res) => {
+  router.post('/push/send-all', async (req, res) => {
     try {
       const { title, message } = req.body;
       console.log('Push 전체 전송:', title, message);
@@ -164,8 +164,18 @@ module.exports = function createMiscRoutes(context) {
     }
   });
 
+  router.get('/push/subscriptions', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const values = await getSheetValues('Push구독');
+      res.json(values.slice(1));
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // 기타 엔드포인트
-  router.get('/api/sales-data', async (req, res) => {
+  router.get('/sales-data', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
       const values = await getSheetValues('판매데이터');
@@ -175,7 +185,7 @@ module.exports = function createMiscRoutes(context) {
     }
   });
 
-  router.get('/api/sim-duplicates', async (req, res) => {
+  router.get('/sim-duplicates', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
       const values = await getSheetValues('유심중복');
@@ -185,7 +195,7 @@ module.exports = function createMiscRoutes(context) {
     }
   });
 
-  router.get('/api/unmatched-customers', async (req, res) => {
+  router.get('/unmatched-customers', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
       const values = await getSheetValues('미매칭고객');
@@ -195,7 +205,17 @@ module.exports = function createMiscRoutes(context) {
     }
   });
 
-  router.post('/api/verify-password', async (req, res) => {
+  router.get('/unmatched-customers/excel', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const values = await getSheetValues('미매칭고객');
+      res.json({ data: values.slice(1), format: 'excel' });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  router.post('/verify-password', async (req, res) => {
     try {
       const { password } = req.body;
       const isValid = password === process.env.ADMIN_PASSWORD;
@@ -205,7 +225,7 @@ module.exports = function createMiscRoutes(context) {
     }
   });
 
-  router.post('/api/verify-direct-store-password', async (req, res) => {
+  router.post('/verify-direct-store-password', async (req, res) => {
     try {
       const { password } = req.body;
       const isValid = password === process.env.DIRECT_STORE_PASSWORD;
@@ -215,10 +235,9 @@ module.exports = function createMiscRoutes(context) {
     }
   });
 
-  router.post('/api/set-password', async (req, res) => {
+  router.post('/set-password', async (req, res) => {
     try {
       const { oldPassword, newPassword } = req.body;
-      // 비밀번호 변경 로직
       console.log('비밀번호 변경 요청:', oldPassword ? '***' : 'none', '->', newPassword ? '***' : 'none');
       res.json({ success: true });
     } catch (error) {
@@ -227,7 +246,7 @@ module.exports = function createMiscRoutes(context) {
   });
 
   // 월간 시상 관련
-  router.get('/api/monthly-award/data', async (req, res) => {
+  router.get('/monthly-award/data', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
       const values = await getSheetValues('월간시상데이터');
@@ -237,7 +256,7 @@ module.exports = function createMiscRoutes(context) {
     }
   });
 
-  router.get('/api/monthly-award/settings', async (req, res) => {
+  router.get('/monthly-award/settings', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
       const values = await getSheetValues('월간시상설정');
@@ -247,8 +266,8 @@ module.exports = function createMiscRoutes(context) {
     }
   });
 
-  // 재고 관련 추가
-  router.get('/api/master-inventory', async (req, res) => {
+  // 재고 관련
+  router.get('/master-inventory', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
       const values = await getSheetValues('마스터재고');
@@ -258,7 +277,7 @@ module.exports = function createMiscRoutes(context) {
     }
   });
 
-  router.get('/api/office-inventory', async (req, res) => {
+  router.get('/office-inventory', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
       const values = await getSheetValues('사무소재고');
@@ -268,7 +287,7 @@ module.exports = function createMiscRoutes(context) {
     }
   });
 
-  router.get('/api/phonekl-inventory', async (req, res) => {
+  router.get('/phonekl-inventory', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
       const values = await getSheetValues('폰클재고');
@@ -278,8 +297,7 @@ module.exports = function createMiscRoutes(context) {
     }
   });
 
-  // 중복 관련
-  router.get('/api/phone-duplicates', async (req, res) => {
+  router.get('/phone-duplicates', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
       const values = await getSheetValues('전화번호중복');
@@ -289,57 +307,63 @@ module.exports = function createMiscRoutes(context) {
     }
   });
 
+  router.post('/confirmed-unconfirmed-inventory', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const { data } = req.body;
+      console.log('확정/미확정 재고 처리:', data);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // 권한 체크
-  router.get('/api/check-general-policy-permission', async (req, res) => {
+  router.get('/check-general-policy-permission', async (req, res) => {
     try {
       const { userId } = req.query;
       console.log('일반 정책 권한 체크:', userId);
-      // 권한 체크 로직
       res.json({ hasPermission: true });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  router.post('/api/check-general-policy-permission', async (req, res) => {
+  router.post('/check-general-policy-permission', async (req, res) => {
     try {
       const { userId } = req.body;
       console.log('일반 정책 권한 체크 (POST):', userId);
-      // 권한 체크 로직
-      res.json({ hasPermission: true });
+      res.json({ hasPermission: true, success: true });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  router.get('/api/check-onsale-permission', async (req, res) => {
+  router.get('/check-onsale-permission', async (req, res) => {
     try {
       const { userId } = req.query;
       console.log('온세일 권한 체크:', userId);
-      // 권한 체크 로직
       res.json({ hasPermission: true });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  router.post('/api/check-onsale-permission', async (req, res) => {
+  router.post('/check-onsale-permission', async (req, res) => {
     try {
       const { userId } = req.body;
       console.log('온세일 권한 체크 (POST):', userId);
-      // 권한 체크 로직
-      res.json({ hasPermission: true });
+      res.json({ hasPermission: true, success: true });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
   });
 
   // 로그인
-  router.post('/api/login', async (req, res) => {
+  router.post('/login', async (req, res) => {
     try {
       const { username, password } = req.body;
       console.log('로그인 시도:', username);
-      // 로그인 로직
       res.json({ success: true, token: 'dummy-token', username });
     } catch (error) {
       res.status(500).json({ error: error.message });
@@ -347,7 +371,7 @@ module.exports = function createMiscRoutes(context) {
   });
 
   // 활동 로그
-  router.post('/api/log-activity', async (req, res) => {
+  router.post('/log-activity', async (req, res) => {
     try {
       const { activity } = req.body;
       console.log('활동 로그:', activity);
@@ -358,22 +382,20 @@ module.exports = function createMiscRoutes(context) {
   });
 
   // 지오코딩
-  router.get('/api/geocode-address', async (req, res) => {
+  router.get('/geocode-address', async (req, res) => {
     try {
       const { address } = req.query;
       console.log('주소 지오코딩 (GET):', address);
-      // 지오코딩 로직
       res.json({ lat: 37.5665, lng: 126.9780, address });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  router.post('/api/geocode-address', async (req, res) => {
+  router.post('/geocode-address', async (req, res) => {
     try {
       const { address } = req.body;
       console.log('주소 지오코딩:', address);
-      // 지오코딩 로직
       res.json({ lat: 37.5665, lng: 126.9780, address });
     } catch (error) {
       res.status(500).json({ error: error.message });
@@ -381,7 +403,7 @@ module.exports = function createMiscRoutes(context) {
   });
 
   // 마커 색상 설정
-  router.get('/api/marker-color-settings', async (req, res) => {
+  router.get('/marker-color-settings', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
       const values = await getSheetValues('마커색상설정');
@@ -392,7 +414,7 @@ module.exports = function createMiscRoutes(context) {
   });
 
   // 지도 표시 옵션
-  router.get('/api/map-display-option', async (req, res) => {
+  router.get('/map-display-option', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
       const values = await getSheetValues('지도표시옵션');
@@ -402,7 +424,7 @@ module.exports = function createMiscRoutes(context) {
     }
   });
 
-  router.get('/api/map-display-option/users', async (req, res) => {
+  router.get('/map-display-option/users', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
       const values = await getSheetValues('지도표시옵션사용자');
@@ -412,7 +434,7 @@ module.exports = function createMiscRoutes(context) {
     }
   });
 
-  router.get('/api/map-display-option/values', async (req, res) => {
+  router.get('/map-display-option/values', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
       const values = await getSheetValues('지도표시옵션값');
@@ -423,7 +445,7 @@ module.exports = function createMiscRoutes(context) {
   });
 
   // 매핑 실패 분석
-  router.get('/api/mapping-failure-analysis', async (req, res) => {
+  router.get('/mapping-failure-analysis', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
       const values = await getSheetValues('매핑실패분석');
@@ -434,7 +456,7 @@ module.exports = function createMiscRoutes(context) {
   });
 
   // 마지막 개통일
-  router.get('/api/last-activation-date', async (req, res) => {
+  router.get('/last-activation-date', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
       const values = await getSheetValues('마지막개통일');
@@ -444,7 +466,7 @@ module.exports = function createMiscRoutes(context) {
     }
   });
 
-  router.post('/api/last-activation-date/clear-cache', async (req, res) => {
+  router.post('/last-activation-date/clear-cache', async (req, res) => {
     try {
       cacheManager.deletePattern('last_activation');
       res.json({ success: true });
@@ -454,16 +476,16 @@ module.exports = function createMiscRoutes(context) {
   });
 
   // 크롬 확장 프로그램
-  router.get('/api/extension-version', (req, res) => {
+  router.get('/extension-version', (req, res) => {
     res.json({ version: '1.0.0' });
   });
 
-  router.get('/api/download-chrome-extension', (req, res) => {
+  router.get('/download-chrome-extension', (req, res) => {
     res.json({ downloadUrl: '/extension/vip-extension.zip' });
   });
 
   // 알림 스트림
-  router.get('/api/notifications/stream', (req, res) => {
+  router.get('/notifications/stream', (req, res) => {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
@@ -483,7 +505,7 @@ module.exports = function createMiscRoutes(context) {
     });
   });
 
-  router.put('/api/notifications/mark-all-read', async (req, res) => {
+  router.put('/notifications/mark-all-read', async (req, res) => {
     try {
       const { userId } = req.body;
       console.log('모든 알림 읽음 처리:', userId);
@@ -493,21 +515,7 @@ module.exports = function createMiscRoutes(context) {
     }
   });
 
-  // GET /api/unmatched-customers/excel - 미매칭 고객 엑셀 다운로드
-  router.get('/api/unmatched-customers/excel', async (req, res) => {
-    try {
-      if (!requireSheetsClient(res)) return;
-      const values = await getSheetValues('미매칭고객');
-      
-      // 엑셀 다운로드 로직 (간단한 JSON 반환)
-      res.json({ data: values.slice(1), format: 'excel' });
-    } catch (error) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // GET /api/yard-receipt-missing-analysis - 야드접수 누락 분석
-  router.get('/api/yard-receipt-missing-analysis', async (req, res) => {
+  router.get('/yard-receipt-missing-analysis', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
       const values = await getSheetValues('야드접수누락분석');
@@ -517,32 +525,7 @@ module.exports = function createMiscRoutes(context) {
     }
   });
 
-  // GET /api/push/subscriptions - Push 구독 목록
-  router.get('/api/push/subscriptions', async (req, res) => {
-    try {
-      if (!requireSheetsClient(res)) return;
-      const values = await getSheetValues('Push구독');
-      res.json(values.slice(1));
-    } catch (error) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // POST /api/confirmed-unconfirmed-inventory - 확정/미확정 재고
-  router.post('/api/confirmed-unconfirmed-inventory', async (req, res) => {
-    try {
-      if (!requireSheetsClient(res)) return;
-      const { data } = req.body;
-
-      console.log('확정/미확정 재고 처리:', data);
-      res.json({ success: true });
-    } catch (error) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // DELETE /api/test-delete - 테스트 삭제
-  router.delete('/api/test-delete', async (req, res) => {
+  router.delete('/test-delete', async (req, res) => {
     try {
       console.log('테스트 삭제 API 호출');
       res.json({ success: true, message: '테스트 삭제 완료' });
