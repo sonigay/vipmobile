@@ -110,8 +110,24 @@ module.exports = function createPolicyRoutes(context) {
     }
   });
 
-  return router;
-};
+  // 헬퍼 함수 추가
+  const requireSheetsClient = (res) => {
+    if (!sheetsClient) {
+      res.status(503).json({ success: false, error: 'Google Sheets client not available' });
+      return false;
+    }
+    return true;
+  };
+
+  async function getSheetValues(sheetName) {
+    const response = await rateLimiter.execute(() =>
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${sheetName}!A:Z`
+      })
+    );
+    return response.data.values || [];
+  }
 
   // GET /api/policies/:policyId - 정책 상세 조회
   router.get('/policies/:policyId', async (req, res) => {
@@ -531,8 +547,8 @@ module.exports = function createPolicyRoutes(context) {
       const { settings } = req.body;
 
       await rateLimiter.execute(() =>
-        sheetsClient.sheets.spreadsheets.values.update({
-          spreadsheetId: sheetsClient.SPREADSHEET_ID,
+        sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
           range: '마커색상설정!A2:Z',
           valueInputOption: 'RAW',
           resource: { values: settings }
@@ -548,6 +564,4 @@ module.exports = function createPolicyRoutes(context) {
   });
 
   return router;
-}
-
-module.exports = createPolicyRoutes;
+};

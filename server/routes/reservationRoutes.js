@@ -69,11 +69,6 @@ function createReservationRoutes(context) {
     }
   });
 
-  return router;
-}
-
-module.exports = createReservationRoutes;
-
   // 예약 설정 관련
   router.get('/api/reservation-settings/list', async (req, res) => {
     try {
