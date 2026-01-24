@@ -18,6 +18,8 @@ const DEFAULT_CONFIG = {
   // 허용된 오리진 목록 (요구사항 2.3, 2.4)
   allowedOrigins: [
     'https://vipmobile.vercel.app',  // 프로덕션 프론트엔드
+    'https://port-0-vipmobile-mh7msgrz3167a0bf.sel3.cloudtype.app',  // Cloudtype 실제 서버 URL
+    'https://vipmobile-backend.cloudtype.app',  // Cloudtype 커스텀 도메인
     'http://localhost:3000',          // 로컬 개발 (기본 포트)
     'http://localhost:3001'           // 로컬 개발 (대체 포트)
   ],
