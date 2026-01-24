@@ -498,11 +498,6 @@ function createInventoryRoutes(context) {
     }
   });
 
-  return router;
-}
-
-module.exports = createInventoryRoutes;
-
   // GET /api/inventory/status - 모델별 재고 현황
   router.get('/api/inventory/status', async (req, res) => {
     try {

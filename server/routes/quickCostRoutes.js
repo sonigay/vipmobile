@@ -67,11 +67,6 @@ function createQuickCostRoutes(context) {
     }
   });
 
-  return router;
-}
-
-module.exports = createQuickCostRoutes;
-
   // GET /api/quick-cost/companies - 통신사 목록
   router.get('/api/quick-cost/companies', async (req, res) => {
     try {

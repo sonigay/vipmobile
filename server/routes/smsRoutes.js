@@ -72,11 +72,6 @@ function createSmsRoutes(context) {
     }
   });
 
-  return router;
-}
-
-module.exports = createSmsRoutes;
-
   // SMS 자동응답 관련 엔드포인트
   router.get('/api/sms/auto-reply/rules', async (req, res) => {
     try {
