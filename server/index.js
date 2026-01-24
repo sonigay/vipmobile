@@ -375,6 +375,14 @@ try {
   console.error('❌ [Additional] Failed to mount POS code routes:', e.message);
 }
 
+try {
+  const createDirectStoreAdditionalRoutes = require('./routes/directStoreAdditionalRoutes');
+  app.use('/api/direct', createDirectStoreAdditionalRoutes(sharedContext));
+  console.log('✅ [Additional] Direct Store Additional routes mounted');
+} catch (e) {
+  console.error('❌ [Additional] Failed to mount direct store additional routes:', e.message);
+}
+
 // 기존 라우트 등록
 try {
   setupDirectRoutes(app);
@@ -384,9 +392,20 @@ try {
 }
 
 try {
-  // meetingRoutes는 함수가 아니라 객체이므로 별도 처리 필요
-  // 기존 코드에서 직접 app.get/post로 등록되어 있음
-  console.log('⚠️  [Existing] Meeting routes - 기존 방식 유지 (별도 등록 필요)');
+  // meetingRoutes는 함수가 아니라 객체이므로 직접 등록
+  app.get('/api/meetings', meetingRoutes.getMeetings);
+  app.post('/api/meetings', meetingRoutes.createMeeting);
+  app.put('/api/meetings/:meetingId', meetingRoutes.updateMeeting);
+  app.delete('/api/meetings/:meetingId', meetingRoutes.deleteMeeting);
+  app.get('/api/meetings/:meetingId/config', meetingRoutes.getMeetingConfig);
+  app.post('/api/meetings/:meetingId/config', meetingRoutes.saveMeetingConfig);
+  app.post('/api/meetings/:meetingId/upload-image', meetingRoutes.uploadMeetingImage);
+  app.post('/api/meetings/:meetingId/upload-file', meetingRoutes.upload.single('file'), meetingRoutes.uploadCustomSlideFile);
+  app.get('/api/meetings/proxy-image', meetingRoutes.proxyDiscordImage);
+  app.get('/api/meetings/discord-thread/:threadId', express.json(), meetingRoutes.getDiscordThreadInfo);
+  app.patch('/api/meetings/discord-thread/:threadId', express.json(), meetingRoutes.renameDiscordThread);
+  app.patch('/api/meetings/:meetingId/slide-image', express.json(), meetingRoutes.updateSlideImageUrl);
+  console.log('✅ [Existing] Meeting routes mounted');
 } catch (e) {
   console.error('❌ [Existing] Failed to mount meeting routes:', e.message);
 }
