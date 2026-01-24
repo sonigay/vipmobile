@@ -1,0 +1,32 @@
+// 운영모델 순서 가져오기
+const operationModelValues = await getSheetValues('운영모델');
+const modelOrder = {};
+operationModelValues.slice(3).forEach((row, index) => {
+  if (row.length >= 3) {
+    const modelName = (row[2] || '').toString().trim(); // C열: 모델명
+    if (modelName && modelName !== '모델명') {
+      modelOrder[modelName] = index;
+    }
+  }
+});
+
+// 운영모델 순서대로 정렬
+const sortedData = Array.from(inventoryMap.values())
+  .map(item => ({
+    ...item,
+    dailyActivation: item.dailyActivation.map((count, index) => ({
+      day: String(index + 1).padStart(2, '0'),
+      count
+    }))
+  }))
+  .sort((a, b) => {
+    const aOrder = modelOrder[a.modelName] !== undefined ? modelOrder[a.modelName] : 999999;
+    const bOrder = modelOrder[b.modelName] !== undefined ? modelOrder[b.modelName] : 999999;
+    return aOrder - bOrder;
+  });
+
+// 결과 데이터 구성
+const result = {
+  success: true,
+  data: sortedData
+};

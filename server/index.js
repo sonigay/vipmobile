@@ -30150,6 +30150,7 @@ app.get('/api/inventory/status', async (req, res) => {
     inventoryValues.slice(3).forEach((row, index) => {
       if (row.length >= 23) {
         const modelName = (row[13] || '').toString().trim(); // N열: 모델명
+        const modelType = (row[12] || '').toString().trim(); // M열: 휴대폰/유심/웨어러블/태블릿
         const color = (row[14] || '').toString().trim(); // O열: 색상
         const category = (row[5] || '').toString().trim(); // F열: 구분
         const office = (row[6] || '').toString().trim(); // G열: 사무실
@@ -30162,7 +30163,7 @@ app.get('/api/inventory/status', async (req, res) => {
           console.log(`재고 행 ${index}: 모델명="${modelName}", 색상="${color}", 구분="${category}", 길이=${row.length}`);
         }
 
-        if (modelName && category !== '#N/A') {
+        if (modelName && category !== '#N/A' && modelType !== '유심') {
           validModels++;
           // 필터링 적용
           if (req.query.agent && req.query.agent !== agent) return;
@@ -30239,16 +30240,38 @@ app.get('/api/inventory/status', async (req, res) => {
     });
 
     // 결과 데이터 구성
-    const result = {
-      success: true,
-      data: Array.from(inventoryMap.values()).map(item => ({
-        ...item,
-        dailyActivation: item.dailyActivation.map((count, index) => ({
-          day: String(index + 1).padStart(2, '0'),
-          count
-        }))
-      }))
-    };
+// 운영모델 순서 가져오기
+const operationModelValues = await getSheetValues('운영모델');
+const modelOrder = {};
+operationModelValues.slice(3).forEach((row, index) => {
+  if (row.length >= 3) {
+    const modelName = (row[2] || '').toString().trim(); // C열: 모델명
+    if (modelName && modelName !== '모델명') {
+      modelOrder[modelName] = index;
+    }
+  }
+});
+
+// 운영모델 순서대로 정렬
+const sortedData = Array.from(inventoryMap.values())
+  .map(item => ({
+    ...item,
+    dailyActivation: item.dailyActivation.map((count, index) => ({
+      day: String(index + 1).padStart(2, '0'),
+      count
+    }))
+  }))
+  .sort((a, b) => {
+    const aOrder = modelOrder[a.modelName] !== undefined ? modelOrder[a.modelName] : 999999;
+    const bOrder = modelOrder[b.modelName] !== undefined ? modelOrder[b.modelName] : 999999;
+    return aOrder - bOrder;
+  });
+
+// 결과 데이터 구성
+const result = {
+  success: true,
+  data: sortedData
+};
 
     // 캐시에 저장
     cacheUtils.set(cacheKey, result);
