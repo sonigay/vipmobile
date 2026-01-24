@@ -279,6 +279,46 @@ try {
   console.error('❌ [Additional] Failed to mount misc routes:', e.message);
 }
 
+try {
+  const createAssignmentRoutes = require('./routes/assignmentRoutes');
+  app.use('/', createAssignmentRoutes(sharedContext));
+  console.log('✅ [Additional] Assignment routes mounted');
+} catch (e) {
+  console.error('❌ [Additional] Failed to mount assignment routes:', e.message);
+}
+
+try {
+  const createClosingChartRoutes = require('./routes/closingChartRoutes');
+  app.use('/', createClosingChartRoutes(sharedContext));
+  console.log('✅ [Additional] Closing Chart routes mounted');
+} catch (e) {
+  console.error('❌ [Additional] Failed to mount closing chart routes:', e.message);
+}
+
+try {
+  const createInspectionRoutes = require('./routes/inspectionRoutes');
+  app.use('/', createInspectionRoutes(sharedContext));
+  console.log('✅ [Additional] Inspection routes mounted');
+} catch (e) {
+  console.error('❌ [Additional] Failed to mount inspection routes:', e.message);
+}
+
+try {
+  const createReservationRoutes = require('./routes/reservationRoutes');
+  app.use('/', createReservationRoutes(sharedContext));
+  console.log('✅ [Additional] Reservation routes mounted');
+} catch (e) {
+  console.error('❌ [Additional] Failed to mount reservation routes:', e.message);
+}
+
+try {
+  const createSmsRoutes = require('./routes/smsRoutes');
+  app.use('/', createSmsRoutes(sharedContext));
+  console.log('✅ [Additional] SMS routes mounted');
+} catch (e) {
+  console.error('❌ [Additional] Failed to mount SMS routes:', e.message);
+}
+
 // 기존 라우트 등록
 try {
   setupDirectRoutes(app);

@@ -343,6 +343,304 @@ function createBudgetRoutes(context) {
     }
   });
 
+  // GET /api/budget/month-sheets - 예산 대상월 관리 목록
+  router.get('/api/budget/month-sheets', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+
+      const cacheKey = 'budget_month_sheets';
+      const cached = cacheManager.get(cacheKey);
+      if (cached) {
+        return res.json(cached);
+      }
+
+      const values = await getSheetValues('예산_대상월관리');
+      
+      if (values.length === 0 || !values[0] || values[0][0] !== '대상월') {
+        return res.json([]);
+      }
+
+      if (values.length <= 1) {
+        return res.json([]);
+      }
+
+      const data = values.slice(1).map(row => ({
+        month: row[0] || '',
+        sheetId: row[1] || '',
+        updatedAt: row[2] || '',
+        updatedBy: row[3] || ''
+      }));
+
+      cacheManager.set(cacheKey, data, 5 * 60 * 1000);
+      res.json(data);
+    } catch (error) {
+      console.error('Error fetching month sheets:', error);
+      res.status(500).json({
+        error: '예산 대상월 관리 데이터 조회 중 오류가 발생했습니다.',
+        message: error.message
+      });
+    }
+  });
+
+  // POST /api/budget/month-sheets - 예산 대상월 관리 저장
+  router.post('/api/budget/month-sheets', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+
+      const { month, sheetId, updatedBy } = req.body;
+
+      if (!month || !sheetId) {
+        return res.status(400).json({ error: '대상월과 시트 ID는 필수입니다.' });
+      }
+
+      const currentTime = new Date().toISOString();
+      const values = await getSheetValues('예산_대상월관리');
+      const rows = values || [];
+      const existingRowIndex = rows.findIndex(row => row[0] === month);
+
+      if (existingRowIndex > 0) {
+        await rateLimiter.execute(() =>
+          sheetsClient.sheets.spreadsheets.values.update({
+            spreadsheetId: sheetsClient.SPREADSHEET_ID,
+            range: `예산_대상월관리!B${existingRowIndex + 1}:D${existingRowIndex + 1}`,
+            valueInputOption: 'RAW',
+            resource: {
+              values: [[sheetId, currentTime, updatedBy]]
+            }
+          })
+        );
+      } else {
+        await rateLimiter.execute(() =>
+          sheetsClient.sheets.spreadsheets.values.append({
+            spreadsheetId: sheetsClient.SPREADSHEET_ID,
+            range: '예산_대상월관리!A:D',
+            valueInputOption: 'RAW',
+            insertDataOption: 'INSERT_ROWS',
+            resource: {
+              values: [[month, sheetId, currentTime, updatedBy]]
+            }
+          })
+        );
+      }
+
+      cacheManager.deletePattern('budget_month_sheets');
+      res.json({ message: '월별 시트 ID가 저장되었습니다.' });
+    } catch (error) {
+      console.error('Error saving month sheet:', error);
+      res.status(500).json({
+        error: '예산 대상월 관리 데이터 저장 중 오류가 발생했습니다.',
+        message: error.message
+      });
+    }
+  });
+
+  // DELETE /api/budget/month-sheets/:month - 예산 대상월 관리 삭제
+  router.delete('/api/budget/month-sheets/:month', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+
+      const { month } = req.params;
+      const values = await getSheetValues('예산_대상월관리');
+      const rows = values || [];
+      const existingRowIndex = rows.findIndex(row => row[0] === month);
+
+      if (existingRowIndex <= 0) {
+        return res.status(404).json({ error: '해당 월의 데이터를 찾을 수 없습니다.' });
+      }
+
+      // 시트 ID 가져오기
+      const response = await rateLimiter.execute(() =>
+        sheetsClient.sheets.spreadsheets.get({
+          spreadsheetId: sheetsClient.SPREADSHEET_ID
+        })
+      );
+
+      const sheet = response.data.sheets.find(s => s.properties.title === '예산_대상월관리');
+      const sheetId = sheet ? sheet.properties.sheetId : null;
+
+      if (!sheetId) {
+        return res.status(404).json({ error: '시트를 찾을 수 없습니다.' });
+      }
+
+      await rateLimiter.execute(() =>
+        sheetsClient.sheets.spreadsheets.batchUpdate({
+          spreadsheetId: sheetsClient.SPREADSHEET_ID,
+          resource: {
+            requests: [{
+              deleteDimension: {
+                range: {
+                  sheetId: sheetId,
+                  dimension: 'ROWS',
+                  startIndex: existingRowIndex,
+                  endIndex: existingRowIndex + 1
+                }
+              }
+            }]
+          }
+        })
+      );
+
+      cacheManager.deletePattern('budget_month_sheets');
+      res.json({ message: '월별 시트 ID가 삭제되었습니다.' });
+    } catch (error) {
+      console.error('Error deleting month sheet:', error);
+      res.status(500).json({
+        error: '예산 대상월 관리 데이터 삭제 중 오류가 발생했습니다.',
+        message: error.message
+      });
+    }
+  });
+
+  // GET /api/budget/user-sheets - 사용자 시트 목록 (레거시)
+  router.get('/api/budget/user-sheets', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+
+      const { userId, targetMonth, showAllUsers, budgetType } = req.query;
+      
+      const cacheKey = `budget_user_sheets_${userId}_${targetMonth}_${showAllUsers}_${budgetType}`;
+      const cached = cacheManager.get(cacheKey);
+      if (cached) {
+        return res.json(cached);
+      }
+
+      const values = await getSheetValues('예산_사용자시트관리');
+      
+      if (values.length <= 1) {
+        return res.json([]);
+      }
+
+      let data = values.slice(1).map(row => ({
+        userId: row[0] || '',
+        sheetId: row[1] || '',
+        sheetName: row[2] || '',
+        createdAt: row[3] || '',
+        createdBy: row[4] || '',
+        targetMonth: row[5] || '',
+        selectedPolicyGroups: row[6] || ''
+      }));
+
+      // 필터링
+      if (userId && showAllUsers !== 'true') {
+        data = data.filter(item => item.userId === userId);
+      }
+      if (targetMonth) {
+        data = data.filter(item => item.targetMonth === targetMonth);
+      }
+      if (budgetType) {
+        data = data.filter(item => item.sheetName.includes(budgetType));
+      }
+
+      cacheManager.set(cacheKey, data, 5 * 60 * 1000);
+      res.json(data);
+    } catch (error) {
+      console.error('Error fetching user sheets:', error);
+      res.status(500).json({
+        error: '사용자 시트 목록 조회 중 오류가 발생했습니다.',
+        message: error.message
+      });
+    }
+  });
+
+  // GET /api/budget/user-sheets-v2 - 사용자 시트 목록 (v2)
+  router.get('/api/budget/user-sheets-v2', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+
+      const { userId, targetMonth, showAllUsers, budgetType } = req.query;
+      
+      const cacheKey = `budget_user_sheets_v2_${userId}_${targetMonth}_${showAllUsers}_${budgetType}`;
+      const cached = cacheManager.get(cacheKey);
+      if (cached) {
+        return res.json({ success: true, data: cached });
+      }
+
+      const values = await getSheetValues('예산_사용자시트관리');
+      
+      if (values.length <= 1) {
+        return res.json({ success: true, data: [] });
+      }
+
+      let data = values.slice(1).map(row => ({
+        userId: row[0] || '',
+        sheetId: row[1] || '',
+        sheetName: row[2] || '',
+        createdAt: row[3] || '',
+        createdBy: row[4] || '',
+        targetMonth: row[5] || '',
+        selectedPolicyGroups: row[6] || '',
+        uuid: row[7] || ''
+      }));
+
+      // 필터링
+      if (userId && showAllUsers !== 'true') {
+        data = data.filter(item => item.userId === userId);
+      }
+      if (targetMonth) {
+        data = data.filter(item => item.targetMonth === targetMonth);
+      }
+      if (budgetType) {
+        data = data.filter(item => item.sheetName.includes(budgetType));
+      }
+
+      cacheManager.set(cacheKey, data, 5 * 60 * 1000);
+      res.json({ success: true, data });
+    } catch (error) {
+      console.error('Error fetching user sheets v2:', error);
+      res.status(500).json({
+        success: false,
+        error: '사용자 시트 목록 조회 중 오류가 발생했습니다.',
+        message: error.message
+      });
+    }
+  });
+
+  // GET /api/budget/basic-shoe - 기본구두 데이터 조회
+  router.get('/api/budget/basic-shoe', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+
+      const { sheetId, policyGroups } = req.query;
+
+      if (!sheetId) {
+        return res.status(400).json({ error: '시트 ID가 필요합니다.' });
+      }
+
+      const cacheKey = `budget_basic_shoe_${sheetId}_${policyGroups}`;
+      const cached = cacheManager.get(cacheKey);
+      if (cached) {
+        return res.json(cached);
+      }
+
+      const values = await getSheetValues('기본구두', sheetId);
+      
+      if (values.length <= 1) {
+        return res.json([]);
+      }
+
+      let data = values.slice(1).map(row => ({
+        policyGroup: row[0] || '',
+        amount: parseFloat(row[1]) || 0,
+        description: row[2] || ''
+      }));
+
+      // 정책그룹 필터링
+      if (policyGroups) {
+        const groups = policyGroups.split(',');
+        data = data.filter(item => groups.includes(item.policyGroup));
+      }
+
+      cacheManager.set(cacheKey, data, 5 * 60 * 1000);
+      res.json(data);
+    } catch (error) {
+      console.error('Error fetching basic shoe data:', error);
+      res.status(500).json({
+        error: '기본구두 데이터 조회 중 오류가 발생했습니다.',
+        message: error.message
+      });
+    }
+  });
+
   return router;
 }
 
