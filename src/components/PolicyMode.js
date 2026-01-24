@@ -290,8 +290,11 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       const response = await fetch(`${API_BASE_URL}/api/teams`);
       if (response.ok) {
         const data = await response.json();
-        // 데이터가 배열인지 확인
-        if (Array.isArray(data)) {
+        // API 응답 구조 확인: {success: true, teams: [...]} 형태
+        if (data.success && Array.isArray(data.teams)) {
+          setTeams(data.teams);
+        } else if (Array.isArray(data)) {
+          // 배열을 직접 반환하는 경우 (하위 호환성)
           setTeams(data);
         } else {
           console.error('팀 목록 데이터가 배열이 아닙니다:', data);
