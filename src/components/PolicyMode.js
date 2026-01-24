@@ -290,10 +290,21 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       const response = await fetch(`${API_BASE_URL}/api/teams`);
       if (response.ok) {
         const data = await response.json();
-        setTeams(data);
+        // 데이터가 배열인지 확인
+        if (Array.isArray(data)) {
+          setTeams(data);
+        } else {
+          console.error('팀 목록 데이터가 배열이 아닙니다:', data);
+          setTeams([]);
+        }
+      } else {
+        // API 호출 실패 시 빈 배열 설정
+        setTeams([]);
       }
     } catch (error) {
       console.error('팀 목록 로드 실패:', error);
+      // 에러 발생 시에도 빈 배열 설정
+      setTeams([]);
     }
   };
 
@@ -2164,7 +2175,7 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                  </Box>
                </Grid>
              ) : (
-               categories[policyType]?.map((category) => (
+               Array.isArray(categories[policyType]) && categories[policyType].map((category) => (
               <Grid item xs={12} sm={6} md={4} key={category.id}>
                 <Card 
                   sx={{ 
@@ -2328,7 +2339,7 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                   label="소속정책팀"
                 >
                   <MenuItem value="all">전체</MenuItem>
-                  {teams.map(team => (
+                  {Array.isArray(teams) && teams.map(team => (
                     <MenuItem key={team.code} value={team.code}>
                       {team.name}
                     </MenuItem>
@@ -2445,7 +2456,7 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                     </Typography>
                   ) : (
                     <Box>
-                      {notices.map((notice) => (
+                      {Array.isArray(notices) && notices.map((notice) => (
                         <Box
                           key={notice.id}
                           sx={{
