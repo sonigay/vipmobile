@@ -197,13 +197,14 @@ function createPolicyRoutes(context) {
       if (cached) return res.json(cached);
 
       const values = await getSheetValues('정책모드_정책표목록');
-      const data = values.slice(1);
+      const policies = values.slice(1);
 
-      cacheManager.set(cacheKey, data, 5 * 60 * 1000);
-      res.json(data);
+      const result = { success: true, policies };
+      cacheManager.set(cacheKey, result, 5 * 60 * 1000);
+      res.json(result);
     } catch (error) {
       console.error('Error fetching policies:', error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 
