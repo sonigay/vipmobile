@@ -2229,7 +2229,7 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
             
                          {/* 카테고리 제목 */}
              <Typography variant="h5" sx={{ mb: 3 }}>
-               {categories[policyType]?.find(cat => cat.id === selectedCategoryForList)?.name} 정책 목록
+               {(categories[policyType] || []).find(cat => cat.id === selectedCategoryForList)?.name} 정책 목록
              </Typography>
             
             {/* 구두정책 카운팅 UI */}
