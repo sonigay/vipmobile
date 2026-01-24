@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { API_BASE_URL } from '../../api';
 import {
   Container,
   Typography,
@@ -598,7 +599,7 @@ function SalesByStoreScreen({ loggedInStore }) {
     // 재고배정 상태도 함께 로드
     try {
       setLoadingAssignment(true);
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/inventory/assignment-status`);
+      const response = await fetch(`${API_BASE_URL}/api/inventory/assignment-status`);
       if (response.ok) {
         const result = await response.json();
         if (result.success) {
@@ -1014,7 +1015,7 @@ function SalesByStoreScreen({ loggedInStore }) {
     // 재고배정 상태도 함께 로드
     try {
       setLoadingAssignment(true);
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/inventory/assignment-status`);
+      const response = await fetch(`${API_BASE_URL}/api/inventory/assignment-status`);
       if (response.ok) {
         const result = await response.json();
         if (result.success) {

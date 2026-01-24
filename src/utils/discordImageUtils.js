@@ -4,8 +4,7 @@
  */
 
 import React from 'react';
-
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3002';
+import { API_BASE_URL } from '../api';
 
 /**
  * Discord 이미지 URL 갱신
@@ -20,7 +19,7 @@ export async function refreshDiscordImageUrl(threadId, messageId) {
     }
 
     const response = await fetch(
-      `${API_URL}/api/discord/refresh-image-url?threadId=${threadId}&messageId=${messageId}`
+      `${API_BASE_URL}/api/discord/refresh-image-url?threadId=${threadId}&messageId=${messageId}`
     );
 
     if (!response.ok) {

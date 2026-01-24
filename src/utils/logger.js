@@ -1,4 +1,6 @@
 // Simple logger with environment gating and throttling
+import { API_BASE_URL } from '../api';
+
 const isDev = typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'development';
 
 let lastLogAt = 0;
@@ -27,8 +29,7 @@ const sendLogsToBackend = async (logs) => {
   if (!logs || logs.length === 0) return;
   
   try {
-    const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:4000';
-    await fetch(`${apiUrl}/api/client-logs`, {
+    await fetch(`${API_BASE_URL}/api/client-logs`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -80,9 +81,8 @@ if (typeof window !== 'undefined') {
       const logsToSend = [...logBuffer];
       logBuffer = [];
       // sendBeacon을 사용하여 비동기 전송 (페이지 언로드 시에도 전송 보장)
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:4000';
       navigator.sendBeacon(
-        `${apiUrl}/api/client-logs`,
+        `${API_BASE_URL}/api/client-logs`,
         JSON.stringify({
           sessionId,
           userAgent: navigator.userAgent,

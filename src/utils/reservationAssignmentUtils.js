@@ -1,7 +1,5 @@
 // 사전예약 배정 관련 유틸리티 함수들
-
-// API 기본 URL 설정
-const API_BASE_URL = process.env.REACT_APP_API_URL;
+import { API_BASE_URL } from '../api';
 
 // 캐시 시스템
 const assignmentCache = new Map();
@@ -137,7 +135,6 @@ export const extractAvailableModels = async () => {
     console.log('사전예약사이트 모델 데이터 추출 시작');
     
     // 새로운 API 사용
-    const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:4000';
     const response = await fetch(`${API_BASE_URL}/api/reservation-settings/model-data`);
     
     if (!response.ok) {

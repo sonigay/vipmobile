@@ -2145,7 +2145,7 @@ export const inventoryRecoveryAPI = {
 export const customerAPI = {
   // 구매 대기 목록 조회
   getPurchaseQueue: async (ctn) => {
-    const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/member/queue?ctn=${ctn}`);
+    const response = await fetch(`${API_BASE_URL}/api/member/queue?ctn=${ctn}`);
     if (!response.ok) throw new Error('구매 대기 목록을 불러오는데 실패했습니다.');
     return response.json();
   },
@@ -2153,8 +2153,8 @@ export const customerAPI = {
   // 전체 구매 대기 목록 조회 (관리자용 또는 POS코드 필터링)
   getAllQueue: async (posCode = null) => {
     const url = posCode 
-      ? `${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/member/queue/all?posCode=${encodeURIComponent(posCode)}`
-      : `${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/member/queue/all`;
+      ? `${API_BASE_URL}/api/member/queue/all?posCode=${encodeURIComponent(posCode)}`
+      : `${API_BASE_URL}/api/member/queue/all`;
     const response = await fetch(url);
     if (!response.ok) throw new Error('전체 구매 대기 목록을 불러오는데 실패했습니다.');
     return response.json();
@@ -2162,7 +2162,7 @@ export const customerAPI = {
 
   // 구매 대기 등록
   addToPurchaseQueue: async (data) => {
-    const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/member/queue`, {
+    const response = await fetch(`${API_BASE_URL}/api/member/queue`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -2173,7 +2173,7 @@ export const customerAPI = {
 
   // 구매 대기 수정
   updatePurchaseQueue: async (id, data) => {
-    const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/member/queue/${id}`, {
+    const response = await fetch(`${API_BASE_URL}/api/member/queue/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -2184,7 +2184,7 @@ export const customerAPI = {
 
   // 구매 대기 삭제
   deleteFromPurchaseQueue: async (id) => {
-    const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/member/queue/${id}`, {
+    const response = await fetch(`${API_BASE_URL}/api/member/queue/${id}`, {
       method: 'DELETE',
     });
     if (!response.ok) throw new Error('구매 대기 삭제에 실패했습니다.');
@@ -2193,7 +2193,7 @@ export const customerAPI = {
 
   // 게시판 목록 조회
   getBoardList: async (storeName = null, posCode = null) => {
-    let url = `${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/member/board`;
+    let url = `${API_BASE_URL}/api/member/board`;
     const params = new URLSearchParams();
     if (storeName) params.append('storeName', storeName);
     if (posCode) params.append('posCode', posCode);
@@ -2206,14 +2206,14 @@ export const customerAPI = {
 
   // 게시판 상세 조회
   getBoardPost: async (id) => {
-    const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/member/board/${id}`);
+    const response = await fetch(`${API_BASE_URL}/api/member/board/${id}`);
     if (!response.ok) throw new Error('게시글을 불러오는데 실패했습니다.');
     return response.json();
   },
 
   // 게시판 글 작성
   createBoardPost: async (data) => {
-    const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/member/board`, {
+    const response = await fetch(`${API_BASE_URL}/api/member/board`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -2224,7 +2224,7 @@ export const customerAPI = {
 
   // 게시판 글 수정
   updateBoardPost: async (id, data) => {
-    const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/member/board/${id}`, {
+    const response = await fetch(`${API_BASE_URL}/api/member/board/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -2235,7 +2235,7 @@ export const customerAPI = {
 
   // 게시판 글 삭제
   deleteBoardPost: async (id) => {
-    const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/member/board/${id}`, {
+    const response = await fetch(`${API_BASE_URL}/api/member/board/${id}`, {
       method: 'DELETE',
     });
     if (!response.ok) throw new Error('글 삭제에 실패했습니다.');
@@ -2244,14 +2244,14 @@ export const customerAPI = {
 
   // 사전승낙서마크 조회
   getPreApprovalMark: async (storeName) => {
-    const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/direct/pre-approval-mark/${encodeURIComponent(storeName)}`);
+    const response = await fetch(`${API_BASE_URL}/api/direct/pre-approval-mark/${encodeURIComponent(storeName)}`);
     if (!response.ok) return { url: '' };
     return response.json();
   },
 
   // 사전승낙서마크 저장
   savePreApprovalMark: async (storeName, url) => {
-    const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/direct/pre-approval-mark`, {
+    const response = await fetch(`${API_BASE_URL}/api/direct/pre-approval-mark`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ storeName, url }),
@@ -2262,7 +2262,7 @@ export const customerAPI = {
 
   // 매장 사진 조회
   getStorePhotos: async (storeName) => {
-    const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/direct/store-image/${encodeURIComponent(storeName)}`);
+    const response = await fetch(`${API_BASE_URL}/api/direct/store-image/${encodeURIComponent(storeName)}`);
     if (!response.ok) return null;
     const data = await response.json();
     // API 응답 필드명을 컴포넌트에서 사용하는 필드명으로 변환
@@ -2307,7 +2307,7 @@ export const customerAPI = {
 
   // 매장 사진 저장
   saveStorePhotos: async (data) => {
-    const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3002'}/api/direct/store-image`, {
+    const response = await fetch(`${API_BASE_URL}/api/direct/store-image`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),

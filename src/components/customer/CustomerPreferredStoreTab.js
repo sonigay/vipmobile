@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { API_BASE_URL } from '../../api';
 import {
     Box, Typography, CircularProgress, Alert, Paper, Table, TableBody,
     TableCell, TableContainer, TableHead, TableRow, Button, Grid, Card, CardContent,
@@ -182,7 +183,6 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
 
         setRefreshingImages(true);
         try {
-            const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3002';
             const photoTypes = ['front', 'inside', 'outside', 'outside2', 'manager', 'staff1', 'staff2', 'staff3'];
             const photoMap = {
                 front: { messageId: 'frontMessageId', threadId: 'frontThreadId' },
@@ -202,7 +202,7 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
 
                 if (messageId && threadId) {
                     try {
-                        const response = await fetch(`${API_URL}/api/direct/refresh-store-photo-url`, {
+                        const response = await fetch(`${API_BASE_URL}/api/direct/refresh-store-photo-url`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
