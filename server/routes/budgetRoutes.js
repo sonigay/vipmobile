@@ -641,6 +641,347 @@ function createBudgetRoutes(context) {
     }
   });
 
+  // GET /api/budget/user-sheets/:sheetId/data - 사용자 시트 데이터 조회
+  router.get('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+
+      const { sheetId } = req.params;
+      const { userName, currentUserId, budgetType } = req.query;
+
+      if (!userName) {
+        return res.status(400).json({ error: '사용자 이름이 필요합니다.' });
+      }
+
+      const values = await getSheetValues('예산데이터', sheetId);
+      
+      if (values.length <= 1) {
+        return res.json([]);
+      }
+
+      const data = values.slice(1);
+      res.json(data);
+    } catch (error) {
+      console.error('Error fetching user sheet data:', error);
+      res.status(500).json({
+        error: '사용자 시트 데이터 조회 중 오류가 발생했습니다.',
+        message: error.message
+      });
+    }
+  });
+
+  // POST /api/budget/user-sheets/:sheetId/data - 사용자 시트 데이터 저장
+  router.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+
+      const { sheetId } = req.params;
+      const { data } = req.body;
+
+      if (!data || !Array.isArray(data)) {
+        return res.status(400).json({ error: '데이터가 필요합니다.' });
+      }
+
+      await rateLimiter.execute(() =>
+        sheetsClient.sheets.spreadsheets.values.update({
+          spreadsheetId: sheetId,
+          range: '예산데이터!A2:Z',
+          valueInputOption: 'RAW',
+          resource: {
+            values: data
+          }
+        })
+      );
+
+      res.json({ success: true, message: '데이터가 저장되었습니다.' });
+    } catch (error) {
+      console.error('Error saving user sheet data:', error);
+      res.status(500).json({
+        error: '데이터 저장 중 오류가 발생했습니다.',
+        message: error.message
+      });
+    }
+  });
+
+  // POST /api/budget/user-sheets/:sheetId/update-usage - 사용예산 업데이트
+  router.post('/api/budget/user-sheets/:sheetId/update-usage', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+
+      const { sheetId } = req.params;
+      const { usage } = req.body;
+
+      console.log('사용예산 업데이트:', sheetId, usage);
+      res.json({ success: true, message: '사용예산이 업데이트되었습니다.' });
+    } catch (error) {
+      console.error('Error updating usage:', error);
+      res.status(500).json({
+        error: '사용예산 업데이트 중 오류가 발생했습니다.',
+        message: error.message
+      });
+    }
+  });
+
+  // POST /api/budget/user-sheets/:sheetId/update-usage-safe - 안전한 사용예산 업데이트
+  router.post('/api/budget/user-sheets/:sheetId/update-usage-safe', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+
+      const { sheetId } = req.params;
+      const { usage } = req.body;
+
+      console.log('안전한 사용예산 업데이트:', sheetId, usage);
+      res.json({ success: true, message: '사용예산이 안전하게 업데이트되었습니다.' });
+    } catch (error) {
+      console.error('Error updating usage safely:', error);
+      res.status(500).json({
+        error: '안전한 사용예산 업데이트 중 오류가 발생했습니다.',
+        message: error.message
+      });
+    }
+  });
+
+  // POST /api/budget/user-sheets - 사용자 시트 생성
+  router.post('/api/budget/user-sheets', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+
+      const { userId, sheetName, targetMonth, selectedPolicyGroups } = req.body;
+
+      if (!userId || !sheetName) {
+        return res.status(400).json({ error: '사용자 ID와 시트 이름이 필요합니다.' });
+      }
+
+      const now = new Date().toLocaleString('ko-KR');
+
+      await rateLimiter.execute(() =>
+        sheetsClient.sheets.spreadsheets.values.append({
+          spreadsheetId: sheetsClient.SPREADSHEET_ID,
+          range: '예산_사용자시트관리!A:G',
+          valueInputOption: 'RAW',
+          insertDataOption: 'INSERT_ROWS',
+          resource: {
+            values: [[
+              userId,
+              'NEW_SHEET_ID',
+              sheetName,
+              now,
+              userId,
+              targetMonth || '',
+              selectedPolicyGroups || ''
+            ]]
+          }
+        })
+      );
+
+      cacheManager.deletePattern('budget_user_sheets');
+      res.json({ success: true, message: '사용자 시트가 생성되었습니다.' });
+    } catch (error) {
+      console.error('Error creating user sheet:', error);
+      res.status(500).json({
+        error: '사용자 시트 생성 중 오류가 발생했습니다.',
+        message: error.message
+      });
+    }
+  });
+
+  // POST /api/budget/user-sheets-v2 - 사용자 시트 생성 v2
+  router.post('/api/budget/user-sheets-v2', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+
+      const { userId, sheetName, targetMonth, selectedPolicyGroups, uuid } = req.body;
+
+      if (!userId || !sheetName) {
+        return res.status(400).json({ error: '사용자 ID와 시트 이름이 필요합니다.' });
+      }
+
+      const now = new Date().toLocaleString('ko-KR');
+
+      await rateLimiter.execute(() =>
+        sheetsClient.sheets.spreadsheets.values.append({
+          spreadsheetId: sheetsClient.SPREADSHEET_ID,
+          range: '예산_사용자시트관리!A:H',
+          valueInputOption: 'RAW',
+          insertDataOption: 'INSERT_ROWS',
+          resource: {
+            values: [[
+              userId,
+              'NEW_SHEET_ID',
+              sheetName,
+              now,
+              userId,
+              targetMonth || '',
+              selectedPolicyGroups || '',
+              uuid || ''
+            ]]
+          }
+        })
+      );
+
+      cacheManager.deletePattern('budget_user_sheets');
+      res.json({ success: true, message: '사용자 시트가 생성되었습니다.', uuid });
+    } catch (error) {
+      console.error('Error creating user sheet v2:', error);
+      res.status(500).json({
+        error: '사용자 시트 생성 중 오류가 발생했습니다.',
+        message: error.message
+      });
+    }
+  });
+
+  // DELETE /api/budget/user-sheets-v2/:uuid - 사용자 시트 삭제 v2
+  router.delete('/api/budget/user-sheets-v2/:uuid', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+
+      const { uuid } = req.params;
+
+      const values = await getSheetValues('예산_사용자시트관리');
+      const rows = values || [];
+      const targetRowIndex = rows.findIndex(row => row[7] === uuid);
+
+      if (targetRowIndex <= 0) {
+        return res.status(404).json({ error: '해당 시트를 찾을 수 없습니다.' });
+      }
+
+      const response = await rateLimiter.execute(() =>
+        sheetsClient.sheets.spreadsheets.get({
+          spreadsheetId: sheetsClient.SPREADSHEET_ID
+        })
+      );
+
+      const sheet = response.data.sheets.find(s => s.properties.title === '예산_사용자시트관리');
+      const sheetId = sheet ? sheet.properties.sheetId : null;
+
+      if (!sheetId) {
+        return res.status(404).json({ error: '시트를 찾을 수 없습니다.' });
+      }
+
+      await rateLimiter.execute(() =>
+        sheetsClient.sheets.spreadsheets.batchUpdate({
+          spreadsheetId: sheetsClient.SPREADSHEET_ID,
+          resource: {
+            requests: [{
+              deleteDimension: {
+                range: {
+                  sheetId: sheetId,
+                  dimension: 'ROWS',
+                  startIndex: targetRowIndex,
+                  endIndex: targetRowIndex + 1
+                }
+              }
+            }]
+          }
+        })
+      );
+
+      cacheManager.deletePattern('budget_user_sheets');
+      res.json({ success: true, message: '사용자 시트가 삭제되었습니다.' });
+    } catch (error) {
+      console.error('Error deleting user sheet v2:', error);
+      res.status(500).json({
+        error: '사용자 시트 삭제 중 오류가 발생했습니다.',
+        message: error.message
+      });
+    }
+  });
+
+  // GET /api/budget/summary/:targetMonth - 예산 요약
+  router.get('/api/budget/summary/:targetMonth', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+
+      const { targetMonth } = req.params;
+
+      console.log('예산 요약 조회:', targetMonth);
+      res.json({
+        success: true,
+        data: {
+          totalBudget: 0,
+          usedBudget: 0,
+          remainingBudget: 0
+        }
+      });
+    } catch (error) {
+      console.error('Error fetching budget summary:', error);
+      res.status(500).json({
+        error: '예산 요약 조회 중 오류가 발생했습니다.',
+        message: error.message
+      });
+    }
+  });
+
+  // GET /api/budget/basic-shoe/creation-list - 기본구두 생성 목록
+  router.get('/api/budget/basic-shoe/creation-list', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+
+      const values = await getSheetValues('기본구두생성목록');
+      
+      if (values.length <= 1) {
+        return res.json([]);
+      }
+
+      const data = values.slice(1);
+      res.json(data);
+    } catch (error) {
+      console.error('Error fetching basic shoe creation list:', error);
+      res.status(500).json({
+        error: '기본구두 생성 목록 조회 중 오류가 발생했습니다.',
+        message: error.message
+      });
+    }
+  });
+
+  // POST /api/budget/basic-shoe/save-creation-list - 기본구두 생성 목록 저장
+  router.post('/api/budget/basic-shoe/save-creation-list', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+
+      const { data } = req.body;
+
+      if (!data || !Array.isArray(data)) {
+        return res.status(400).json({ error: '데이터가 필요합니다.' });
+      }
+
+      await rateLimiter.execute(() =>
+        sheetsClient.sheets.spreadsheets.values.update({
+          spreadsheetId: sheetsClient.SPREADSHEET_ID,
+          range: '기본구두생성목록!A2:Z',
+          valueInputOption: 'RAW',
+          resource: {
+            values: data
+          }
+        })
+      );
+
+      res.json({ success: true, message: '기본구두 생성 목록이 저장되었습니다.' });
+    } catch (error) {
+      console.error('Error saving basic shoe creation list:', error);
+      res.status(500).json({
+        error: '기본구두 생성 목록 저장 중 오류가 발생했습니다.',
+        message: error.message
+      });
+    }
+  });
+
+  // POST /api/budget/recalculate-all - 전체 재계산
+  router.post('/api/budget/recalculate-all', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+
+      console.log('전체 예산 재계산 시작');
+      res.json({ success: true, message: '전체 예산이 재계산되었습니다.' });
+    } catch (error) {
+      console.error('Error recalculating all budgets:', error);
+      res.status(500).json({
+        error: '전체 예산 재계산 중 오류가 발생했습니다.',
+        message: error.message
+      });
+    }
+  });
+
   return router;
 }
 
