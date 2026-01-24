@@ -33,7 +33,7 @@ function createPolicyRoutes(context) {
       if (!requireSheetsClient(res)) return;
       const { policyId } = req.params;
 
-      const values = await getSheetValues('정책목록');
+      const values = await getSheetValues('정책모드_정책표목록');
       const policy = values.slice(1).find(row => row[0] === policyId);
 
       if (!policy) {
@@ -196,7 +196,7 @@ function createPolicyRoutes(context) {
       const cached = cacheManager.get(cacheKey);
       if (cached) return res.json(cached);
 
-      const values = await getSheetValues('정책목록');
+      const values = await getSheetValues('정책모드_정책표목록');
       const data = values.slice(1);
 
       cacheManager.set(cacheKey, data, 5 * 60 * 1000);
@@ -216,7 +216,7 @@ function createPolicyRoutes(context) {
       await rateLimiter.execute(() =>
         sheetsClient.sheets.spreadsheets.values.append({
           spreadsheetId: sheetsClient.SPREADSHEET_ID,
-          range: '정책목록!A:Z',
+          range: '정책모드_정책표목록!A:Z',
           valueInputOption: 'RAW',
           insertDataOption: 'INSERT_ROWS',
           resource: { values: [data] }
@@ -327,7 +327,7 @@ function createPolicyRoutes(context) {
     try {
       if (!requireSheetsClient(res)) return;
       
-      const values = await getSheetValues('정책공지사항');
+      const values = await getSheetValues('정책_알림관리');
       res.json(values.slice(1));
     } catch (error) {
       console.error('Error fetching policy notices:', error);
@@ -344,7 +344,7 @@ function createPolicyRoutes(context) {
       await rateLimiter.execute(() =>
         sheetsClient.sheets.spreadsheets.values.append({
           spreadsheetId: sheetsClient.SPREADSHEET_ID,
-          range: '정책공지사항!A:Z',
+          range: '정책_알림관리!A:Z',
           valueInputOption: 'RAW',
           insertDataOption: 'INSERT_ROWS',
           resource: { values: [data] }
@@ -459,14 +459,61 @@ function createPolicyRoutes(context) {
     }
   });
 
-  // GET /api/policy-categories - 정책 카테고리 목록 (빈 배열 반환)
+  // GET /api/policy-categories - 정책 카테고리 목록
   router.get('/policy-categories', async (req, res) => {
-    res.json({ categories: [] });
+    try {
+      if (!requireSheetsClient(res)) return;
+
+      const cacheKey = 'policy_categories';
+      const cached = cacheManager.get(cacheKey);
+      if (cached) return res.json(cached);
+
+      const values = await getSheetValues('정책_카테고리');
+      const categories = values.slice(1).map(row => ({
+        id: row[0] || '',
+        name: row[1] || '',
+        policyType: row[2] || '',
+        icon: row[3] || '',
+        sortOrder: parseInt(row[4]) || 0,
+        description: row[5] || '',
+        color: row[6] || '',
+        isActive: row[7] || 'Y'
+      }));
+
+      const result = { categories };
+      cacheManager.set(cacheKey, result, 5 * 60 * 1000);
+      res.json(result);
+    } catch (error) {
+      console.error('Error fetching policy categories:', error);
+      // 시트가 없으면 빈 배열 반환
+      res.json({ categories: [] });
+    }
   });
 
-  // POST /api/policy-categories - 정책 카테고리 생성 (미구현)
+  // POST /api/policy-categories - 정책 카테고리 생성
   router.post('/policy-categories', async (req, res) => {
-    res.json({ success: true, category: {} });
+    try {
+      if (!requireSheetsClient(res)) return;
+      const { name, policyType, icon, sortOrder, description, color, isActive } = req.body;
+      
+      const id = `CAT_${Date.now()}`;
+      const newRow = [id, name, policyType, icon, sortOrder, description, color, isActive || 'Y'];
+
+      await rateLimiter.execute(() =>
+        sheetsClient.sheets.spreadsheets.values.append({
+          spreadsheetId: sheetsClient.SPREADSHEET_ID,
+          range: '정책_카테고리!A:H',
+          valueInputOption: 'RAW',
+          resource: { values: [newRow] }
+        })
+      );
+
+      cacheManager.deletePattern('policy');
+      res.json({ success: true, category: { id, name, policyType, icon, sortOrder, description, color, isActive } });
+    } catch (error) {
+      console.error('Error creating policy category:', error);
+      res.status(500).json({ error: error.message });
+    }
   });
 
   return router;
