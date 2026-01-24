@@ -418,7 +418,8 @@ try {
 }
 
 try {
-  setupPolicyTableRoutes(app);
+  const policyTableRouter = setupPolicyTableRoutes(app);
+  app.use('/api', policyTableRouter);
   console.log('✅ [Existing] Policy Table routes mounted');
 } catch (e) {
   console.error('❌ [Existing] Failed to mount policy table routes:', e.message);
