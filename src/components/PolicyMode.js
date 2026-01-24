@@ -521,9 +521,11 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       setManagerPolicyCounts(managerCounts);
       
       // 담당자 필터링 적용
-      const managerFilteredPolicies = selectedManager === '전체'
-        ? policiesWithTeamNames
-        : policiesWithTeamNames.filter(policy => policy.manager === selectedManager);
+      const managerFilteredPolicies = Array.isArray(policiesWithTeamNames)
+        ? (selectedManager === '전체'
+          ? policiesWithTeamNames
+          : policiesWithTeamNames.filter(policy => policy.manager === selectedManager))
+        : [];
       
       // 정책 데이터 파싱 및 정규화 (JSON 문자열 필드 파싱)
       const normalizedPolicies = managerFilteredPolicies.map(policy => {
