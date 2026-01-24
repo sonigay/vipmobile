@@ -3,90 +3,116 @@
  * 알림 관련 API 엔드포인트
  */
 
-module.exports = function createNotificationRoutes(context) {
-  const express = require('express');
-  const router = express.Router();
-  
-  const { sheetsClient, rateLimiter } = context;
-  const { sheets, SPREADSHEET_ID } = sheetsClient;
+const express = require('express');
 
-  // 알림 목록 조회 API
+function createNotificationRoutes(context) {
+  const router = express.Router();
+  const { sheetsClient, rateLimiter, cacheManager } = context;
+
+  const requireSheetsClient = (res) => {
+    if (!sheetsClient || !sheetsClient.sheets) {
+      res.status(503).json({ error: 'Google Sheets client not available' });
+      return false;
+    }
+    return true;
+  };
+
+  async function getSheetValues(sheetName) {
+    const response = await rateLimiter.execute(() =>
+      sheetsClient.sheets.spreadsheets.values.get({
+        spreadsheetId: sheetsClient.SPREADSHEET_ID,
+        range: `${sheetName}!A:Z`
+      })
+    );
+    return response.data.values || [];
+  }
+
+  // GET /api/notifications - 알림 목록
   router.get('/notifications', async (req, res) => {
     try {
-      const { user_id } = req.query;
+      if (!requireSheetsClient(res)) return;
       
-      if (!user_id) {
-        return res.status(400).json({ error: 'user_id가 필요합니다.' });
+      const { user_id } = req.query;
+      const cacheKey = `notifications_${user_id}`;
+      const cached = cacheManager.get(cacheKey);
+      if (cached) return res.json(cached);
+
+      let values;
+      try {
+        values = await getSheetValues('알림');
+      } catch (sheetError) {
+        // 시트가 없으면 빈 배열 반환
+        console.warn('알림 시트가 존재하지 않습니다:', sheetError.message);
+        const emptyResult = [];
+        cacheManager.set(cacheKey, emptyResult, 1 * 60 * 1000);
+        return res.json(emptyResult);
       }
 
-      const response = await rateLimiter.execute(() =>
-        sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: '알림!A:Z'
-        })
-      );
+      const rows = values.slice(1);
 
-      const rows = response.data.values || [];
-      if (rows.length === 0) {
-        return res.json({ notifications: [] });
-      }
-
-      const notifications = rows.slice(1)
-        .filter(row => row[1] === user_id) // user_id 필터링
+      // user_id로 필터링
+      const notifications = rows
+        .filter(row => !user_id || row[1] === user_id)
         .map((row, index) => ({
-          id: row[0] || `NOTIF_${index}`,
+          id: row[0] || `notif_${index}`,
           userId: row[1] || '',
-          type: row[2] || '',
-          title: row[3] || '',
-          message: row[4] || '',
-          isRead: row[5] === 'true' || row[5] === 'TRUE',
-          createdAt: row[6] || '',
-          link: row[7] || ''
+          message: row[2] || '',
+          type: row[3] || 'info',
+          read: row[4] === 'TRUE' || row[4] === true,
+          createdAt: row[5] || new Date().toISOString()
         }));
 
-      res.json({ notifications });
+      cacheManager.set(cacheKey, notifications, 1 * 60 * 1000); // 1분 캐시
+      res.json(notifications);
     } catch (error) {
-      console.error('알림 목록 조회 실패:', error);
-      res.status(500).json({ error: '알림 목록 조회 실패' });
+      console.error('Error fetching notifications:', error);
+      res.status(500).json({ error: error.message });
     }
   });
 
-  // 알림 읽음 처리 API
-  router.put('/notifications/:id/read', async (req, res) => {
+  // GET /api/notifications/stream - SSE 스트림
+  router.get('/notifications/stream', (req, res) => {
+    const { user_id } = req.query;
+    
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+
+    // 초기 연결 메시지
+    res.write(`data: ${JSON.stringify({ type: 'connected', userId: user_id })}\n\n`);
+
+    // Keep-alive 핑 (30초마다)
+    const pingInterval = setInterval(() => {
+      res.write(`: ping\n\n`);
+    }, 30000);
+
+    // 연결 종료 처리
+    req.on('close', () => {
+      clearInterval(pingInterval);
+      console.log(`SSE connection closed for user: ${user_id}`);
+    });
+  });
+
+  // PUT /api/notifications/mark-all-read - 모두 읽음 처리
+  router.put('/notifications/mark-all-read', async (req, res) => {
     try {
-      const { id } = req.params;
+      if (!requireSheetsClient(res)) return;
       
-      // 알림 시트에서 해당 ID 찾아서 읽음 처리
-      const response = await rateLimiter.execute(() =>
-        sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: '알림!A:Z'
-        })
-      );
+      const { userId } = req.body;
+      console.log('Mark all read for user:', userId);
 
-      const rows = response.data.values || [];
-      const rowIndex = rows.findIndex(row => row[0] === id);
+      // 캐시 무효화
+      cacheManager.deletePattern(`notifications_${userId}`);
       
-      if (rowIndex === -1) {
-        return res.status(404).json({ error: '알림을 찾을 수 없습니다.' });
-      }
-
-      // 읽음 상태 업데이트 (F열 = 인덱스 5)
-      await rateLimiter.execute(() =>
-        sheets.spreadsheets.values.update({
-          spreadsheetId: SPREADSHEET_ID,
-          range: `알림!F${rowIndex + 1}`,
-          valueInputOption: 'RAW',
-          resource: { values: [['TRUE']] }
-        })
-      );
-
       res.json({ success: true });
     } catch (error) {
-      console.error('알림 읽음 처리 실패:', error);
-      res.status(500).json({ error: '알림 읽음 처리 실패' });
+      console.error('Error marking notifications as read:', error);
+      res.status(500).json({ error: error.message });
     }
   });
 
   return router;
-};
+}
+
+module.exports = createNotificationRoutes;

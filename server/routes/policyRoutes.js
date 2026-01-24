@@ -15,12 +15,19 @@ module.exports = function createPolicyRoutes(context) {
     try {
       console.log('카테고리 목록 조회 요청');
       
-      const response = await rateLimiter.execute(() =>
-        sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: '정책카테고리!A:E'
-        })
-      );
+      let response;
+      try {
+        response = await rateLimiter.execute(() =>
+          sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: '정책카테고리!A:E'
+          })
+        );
+      } catch (sheetError) {
+        // 시트가 없으면 빈 배열 반환
+        console.warn('정책카테고리 시트가 존재하지 않습니다:', sheetError.message);
+        return res.json({ categories: [] });
+      }
 
       const rows = response.data.values || [];
       if (rows.length === 0) {
@@ -72,12 +79,19 @@ module.exports = function createPolicyRoutes(context) {
     try {
       const { yearMonth, policyType } = req.query;
       
-      const response = await rateLimiter.execute(() =>
-        sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: '정책목록!A:Z'
-        })
-      );
+      let response;
+      try {
+        response = await rateLimiter.execute(() =>
+          sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: '정책목록!A:Z'
+          })
+        );
+      } catch (sheetError) {
+        // 시트가 없으면 빈 배열 반환
+        console.warn('정책목록 시트가 존재하지 않습니다:', sheetError.message);
+        return res.json({ policies: [] });
+      }
 
       const rows = response.data.values || [];
       if (rows.length === 0) {
