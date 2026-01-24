@@ -343,6 +343,38 @@ try {
   console.error('❌ [Additional] Failed to mount quick cost routes:', e.message);
 }
 
+try {
+  const createRechotanchoBondRoutes = require('./routes/rechotanchoBondRoutes');
+  app.use('/', createRechotanchoBondRoutes(sharedContext));
+  console.log('✅ [Additional] Rechotancho Bond routes mounted');
+} catch (e) {
+  console.error('❌ [Additional] Failed to mount rechotancho bond routes:', e.message);
+}
+
+try {
+  const createSubscriberIncreaseRoutes = require('./routes/subscriberIncreaseRoutes');
+  app.use('/', createSubscriberIncreaseRoutes(sharedContext));
+  console.log('✅ [Additional] Subscriber Increase routes mounted');
+} catch (e) {
+  console.error('❌ [Additional] Failed to mount subscriber increase routes:', e.message);
+}
+
+try {
+  const createSalesByStoreRoutes = require('./routes/salesByStoreRoutes');
+  app.use('/', createSalesByStoreRoutes(sharedContext));
+  console.log('✅ [Additional] Sales By Store routes mounted');
+} catch (e) {
+  console.error('❌ [Additional] Failed to mount sales by store routes:', e.message);
+}
+
+try {
+  const createPosCodeRoutes = require('./routes/posCodeRoutes');
+  app.use('/', createPosCodeRoutes(sharedContext));
+  console.log('✅ [Additional] POS Code routes mounted');
+} catch (e) {
+  console.error('❌ [Additional] Failed to mount POS code routes:', e.message);
+}
+
 // 기존 라우트 등록
 try {
   setupDirectRoutes(app);
