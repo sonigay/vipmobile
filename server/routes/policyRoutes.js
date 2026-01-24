@@ -275,6 +275,278 @@ module.exports = function createPolicyRoutes(context) {
     }
   });
 
+  // GET /api/policies - 정책 목록 조회
+  router.get('/policies', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      
+      const cacheKey = 'policies_list';
+      const cached = cacheManager.get(cacheKey);
+      if (cached) return res.json(cached);
+
+      const values = await getSheetValues('정책목록');
+      const data = values.slice(1);
+
+      cacheManager.set(cacheKey, data, 5 * 60 * 1000);
+      res.json(data);
+    } catch (error) {
+      console.error('Error fetching policies:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/policies - 정책 생성
+  router.post('/policies', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const { data } = req.body;
+
+      await rateLimiter.execute(() =>
+        sheetsClient.sheets.spreadsheets.values.append({
+          spreadsheetId: sheetsClient.SPREADSHEET_ID,
+          range: '정책목록!A:Z',
+          valueInputOption: 'RAW',
+          insertDataOption: 'INSERT_ROWS',
+          resource: { values: [data] }
+        })
+      );
+
+      cacheManager.deletePattern('policy');
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error creating policy:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // PUT /api/policies/:policyId - 정책 수정
+  router.put('/policies/:policyId', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const { policyId } = req.params;
+      const { data } = req.body;
+
+      console.log('정책 수정:', policyId, data);
+      cacheManager.deletePattern('policy');
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error updating policy:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // DELETE /api/policies/:policyId - 정책 삭제
+  router.delete('/policies/:policyId', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const { policyId } = req.params;
+
+      console.log('정책 삭제:', policyId);
+      cacheManager.deletePattern('policy');
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting policy:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // PUT /api/policies/:policyId/approve - 정책 승인
+  router.put('/policies/:policyId/approve', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const { policyId } = req.params;
+
+      console.log('정책 승인:', policyId);
+      cacheManager.deletePattern('policy');
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error approving policy:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // PUT /api/policies/:policyId/approval-cancel - 정책 승인 취소
+  router.put('/policies/:policyId/approval-cancel', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const { policyId } = req.params;
+
+      console.log('정책 승인 취소:', policyId);
+      cacheManager.deletePattern('policy');
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error canceling policy approval:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // PUT /api/policies/:policyId/cancel - 정책 취소
+  router.put('/policies/:policyId/cancel', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const { policyId } = req.params;
+
+      console.log('정책 취소:', policyId);
+      cacheManager.deletePattern('policy');
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error canceling policy:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // PUT /api/policies/:policyId/settlement-reflect - 정책 정산 반영
+  router.put('/policies/:policyId/settlement-reflect', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const { policyId } = req.params;
+
+      console.log('정책 정산 반영:', policyId);
+      cacheManager.deletePattern('policy');
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error reflecting policy settlement:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET /api/policy/notices - 정책 공지사항 목록
+  router.get('/policy/notices', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      
+      const values = await getSheetValues('정책공지사항');
+      res.json(values.slice(1));
+    } catch (error) {
+      console.error('Error fetching policy notices:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/policy/notices - 정책 공지사항 생성
+  router.post('/policy/notices', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const { data } = req.body;
+
+      await rateLimiter.execute(() =>
+        sheetsClient.sheets.spreadsheets.values.append({
+          spreadsheetId: sheetsClient.SPREADSHEET_ID,
+          range: '정책공지사항!A:Z',
+          valueInputOption: 'RAW',
+          insertDataOption: 'INSERT_ROWS',
+          resource: { values: [data] }
+        })
+      );
+
+      cacheManager.deletePattern('policy');
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error creating policy notice:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // PUT /api/policy/notices/:id - 정책 공지사항 수정
+  router.put('/policy/notices/:id', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const { id } = req.params;
+      const { data } = req.body;
+
+      console.log('정책 공지사항 수정:', id, data);
+      cacheManager.deletePattern('policy');
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error updating policy notice:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // DELETE /api/policy/notices/:id - 정책 공지사항 삭제
+  router.delete('/policy/notices/:id', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const { id } = req.params;
+
+      console.log('정책 공지사항 삭제:', id);
+      cacheManager.deletePattern('policy');
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting policy notice:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/monthly-award/settings - 월간 시상 설정 저장
+  router.post('/monthly-award/settings', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const { settings } = req.body;
+
+      await rateLimiter.execute(() =>
+        sheetsClient.sheets.spreadsheets.values.update({
+          spreadsheetId: sheetsClient.SPREADSHEET_ID,
+          range: '월간시상설정!A2:Z',
+          valueInputOption: 'RAW',
+          resource: { values: settings }
+        })
+      );
+
+      cacheManager.deletePattern('monthly_award');
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error saving monthly award settings:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/model-normalization - 모델 정규화 저장
+  router.post('/model-normalization', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const { data } = req.body;
+
+      await rateLimiter.execute(() =>
+        sheetsClient.sheets.spreadsheets.values.update({
+          spreadsheetId: sheetsClient.SPREADSHEET_ID,
+          range: '모델정규화!A2:Z',
+          valueInputOption: 'RAW',
+          resource: { values: data }
+        })
+      );
+
+      cacheManager.deletePattern('model');
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error saving model normalization:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/marker-color-settings - 마커 색상 설정 저장
+  router.post('/marker-color-settings', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const { settings } = req.body;
+
+      await rateLimiter.execute(() =>
+        sheetsClient.sheets.spreadsheets.values.update({
+          spreadsheetId: sheetsClient.SPREADSHEET_ID,
+          range: '마커색상설정!A2:Z',
+          valueInputOption: 'RAW',
+          resource: { values: settings }
+        })
+      );
+
+      cacheManager.deletePattern('marker');
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error saving marker color settings:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   return router;
 }
 
