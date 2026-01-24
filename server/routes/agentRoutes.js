@@ -177,31 +177,6 @@ function createAgentRoutes(context) {
     }
   });
 
-  return router;
-}
-
-module.exports = createAgentRoutes;
-
-  // GET /api/agents - 대리점 목록
-  router.get('/api/agents', async (req, res) => {
-    try {
-      if (!requireSheetsClient(res)) return;
-
-      const cacheKey = 'agents_list';
-      const cached = cacheManager.get(cacheKey);
-      if (cached) return res.json(cached);
-
-      const values = await getSheetValues('대리점아이디관리');
-      const data = values.slice(1);
-
-      cacheManager.set(cacheKey, data, 5 * 60 * 1000);
-      res.json(data);
-    } catch (error) {
-      console.error('Error fetching agents:', error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
   // GET /api/agent-office-department - 사무소/부서 목록
   router.get('/api/agent-office-department', async (req, res) => {
     try {
