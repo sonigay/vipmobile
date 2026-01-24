@@ -110,8 +110,29 @@ function createSheetsClient() {
   const GOOGLE_PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY;
   const SPREADSHEET_ID = process.env.SHEET_ID;
 
+  // 🔥 환경 변수 검증 강화
   if (!GOOGLE_SERVICE_ACCOUNT_EMAIL || !GOOGLE_PRIVATE_KEY || !SPREADSHEET_ID) {
-    throw new Error('Missing Google Sheets environment variables');
+    const missingVars = [];
+    if (!GOOGLE_SERVICE_ACCOUNT_EMAIL) missingVars.push('GOOGLE_SERVICE_ACCOUNT_EMAIL');
+    if (!GOOGLE_PRIVATE_KEY) missingVars.push('GOOGLE_PRIVATE_KEY');
+    if (!SPREADSHEET_ID) missingVars.push('SHEET_ID');
+    
+    console.error('❌ [Google Sheets] 필수 환경 변수 누락:', missingVars.join(', '));
+    throw new Error(`Missing Google Sheets environment variables: ${missingVars.join(', ')}`);
+  }
+
+  // 🔥 SPREADSHEET_ID 형식 검증 (최소 길이 체크)
+  if (SPREADSHEET_ID.length < 10) {
+    console.error('❌ [Google Sheets] 잘못된 SHEET_ID 형식:', SPREADSHEET_ID);
+    console.error('   SHEET_ID는 최소 10자 이상이어야 합니다.');
+    console.error('   예시: 1abc2def3ghi4jkl5mno6pqr7stu8vwx9yz0');
+    throw new Error(`Invalid SHEET_ID format: "${SPREADSHEET_ID}" (too short)`);
+  }
+
+  // 🔥 시작 시 SPREADSHEET_ID 로그 출력 (디버깅용, 한 번만)
+  if (!createSheetsClient._logged) {
+    console.log(`✅ [Google Sheets] SPREADSHEET_ID: ${SPREADSHEET_ID.substring(0, 10)}...${SPREADSHEET_ID.substring(SPREADSHEET_ID.length - 5)}`);
+    createSheetsClient._logged = true;
   }
 
   const auth = new google.auth.JWT({
@@ -467,14 +488,32 @@ async function getLinkSettings(carrier) {
 
   return withRequestDeduplication(cacheKey, async () => {
     const { sheets, SPREADSHEET_ID } = createSheetsClient();
+    
+    // 🔥 디버그: 링크설정 읽기 시작 로그
+    console.log(`🔍 [getLinkSettings] ${carrier} 링크설정 읽기 시작`, {
+      SPREADSHEET_ID: SPREADSHEET_ID ? `${SPREADSHEET_ID.substring(0, 10)}...` : 'undefined',
+      sheetName: SHEET_SETTINGS
+    });
+    
     const linkSettingsRes = await withRetry(async () => {
       return await sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
         range: SHEET_SETTINGS
       });
     });
-    const linkSettingsRows = (linkSettingsRes.data.values || []).slice(1);
+    
+    const allRows = linkSettingsRes.data.values || [];
+    const linkSettingsRows = allRows.slice(1); // 헤더 제거
     const carrierSettings = linkSettingsRows.filter(row => (row[0] || '').trim() === carrier);
+    
+    // 🔥 디버그: 링크설정 읽기 결과 로그
+    console.log(`✅ [getLinkSettings] ${carrier} 링크설정 읽기 완료`, {
+      전체행수: allRows.length,
+      데이터행수: linkSettingsRows.length,
+      해당통신사설정수: carrierSettings.length,
+      설정유형: carrierSettings.map(row => row[1]).join(', ')
+    });
+    
     return carrierSettings;
   });
 }
@@ -1127,7 +1166,16 @@ async function rebuildPricingMaster(carriersParam) {
     // 2. 설정 및 정책 로딩
     const settingsRows = await getLinkSettings(carrier);
     const supportRow = settingsRows.find(r => r[1] === 'support' && r[0] === carrier);
+    
+    // 🔥 핵심 수정: 정책 설정 로딩 전에 로그 추가
+    console.log(`🔍 [rebuildPricingMaster] ${carrier} 정책 설정 로딩 시작...`);
     const policySettings = await getPolicySettings(carrier); // { baseMargin, addonList, insuranceList, specialPolicies }
+    console.log(`✅ [rebuildPricingMaster] ${carrier} 정책 설정 로딩 완료:`, {
+      baseMargin: policySettings?.baseMargin,
+      addonListLength: policySettings?.addonList?.length || 0,
+      insuranceListLength: policySettings?.insuranceList?.length || 0,
+      specialPoliciesLength: policySettings?.specialPolicies?.length || 0
+    });
 
     if (!supportRow) {
       perCarrierStats[carrier] = { count: 0, warning: 'support 설정 없음' };
@@ -1136,6 +1184,7 @@ async function rebuildPricingMaster(carriersParam) {
 
     // 🔥 핵심 수정: policySettings 유효성 검사 및 기본값 설정
     if (!policySettings) {
+      console.error(`❌ [rebuildPricingMaster] ${carrier} 정책 설정을 불러올 수 없습니다.`);
       perCarrierStats[carrier] = { count: 0, warning: '정책 설정을 불러올 수 없습니다.' };
       continue;
     }
@@ -1148,6 +1197,9 @@ async function rebuildPricingMaster(carriersParam) {
       insuranceList: Array.isArray(policySettings.insuranceList) ? policySettings.insuranceList : [],
       specialPolicies: Array.isArray(policySettings.specialPolicies) ? policySettings.specialPolicies : []
     };
+    
+    // 🔥 디버그: 안전한 정책 설정 로그
+    console.log(`📊 [rebuildPricingMaster] ${carrier} 안전한 정책 설정:`, safePolicySettings);
 
     let supportConfig = {};
     try { supportConfig = JSON.parse(supportRow[4] || '{}'); } catch (e) { }
@@ -2039,21 +2091,63 @@ async function refreshImagesFromDiscord(carrier) {
 }
 
 // 시트 데이터 읽기 함수 (캐시 적용, 동시 요청 방지)
+// 🔥 중요: 이 함수는 첫 번째 행(헤더)을 제거하고 반환합니다.
+// 외부 시트를 읽을 때는 헤더가 없을 수 있으므로 주의가 필요합니다.
 async function getSheetData(sheetId, range, ttlMs = 10 * 60 * 1000) {
   const cacheKey = `sheet-data-${sheetId}-${range}`;
 
   return withRequestDeduplication(cacheKey, async () => {
     const { sheets } = createSheetsClient();
-    const res = await withRetry(async () => {
-      return await sheets.spreadsheets.values.get({
-        spreadsheetId: sheetId,
-        range: range,
-        majorDimension: 'ROWS',
-        valueRenderOption: 'UNFORMATTED_VALUE'
+    
+    // 🔥 수정: 에러 핸들링 강화 및 상세 로그 추가
+    try {
+      const res = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: sheetId,
+          range: range,
+          majorDimension: 'ROWS',
+          valueRenderOption: 'UNFORMATTED_VALUE'
+        });
       });
-    });
-    const data = (res.data.values || []).slice(1);
-    return data;
+      
+      const values = res.data.values || [];
+      
+      // 🔥 수정: 데이터가 비어있는 경우 경고 로그
+      if (values.length === 0) {
+        console.warn(`⚠️ [getSheetData] 시트 데이터가 비어있음: sheetId=${sheetId.substring(0, 10)}..., range=${range}`);
+        return [];
+      }
+      
+      // 🔥 수정: 첫 번째 행을 헤더로 간주하고 제거
+      // 외부 시트의 경우 헤더가 없을 수 있으므로, 데이터가 1행만 있는 경우 빈 배열 반환
+      const data = values.slice(1);
+      
+      // 🔥 디버그: 데이터 로딩 성공 로그 (개발 환경에서만)
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`✅ [getSheetData] 데이터 로딩 성공: sheetId=${sheetId.substring(0, 10)}..., range=${range}, rows=${data.length}`);
+      }
+      
+      return data;
+    } catch (error) {
+      // 🔥 수정: 에러 메시지 개선
+      console.error(`❌ [getSheetData] 시트 데이터 읽기 실패:`, {
+        sheetId: sheetId ? `${sheetId.substring(0, 10)}...` : 'undefined',
+        range: range,
+        error: error.message,
+        code: error.code
+      });
+      
+      // 사용자 친화적인 에러 메시지 생성
+      if (error.message && error.message.includes('Requested entity was not found')) {
+        throw new Error(`시트를 찾을 수 없습니다. 링크설정에서 시트 ID를 확인해주세요: ${sheetId ? sheetId.substring(0, 15) + '...' : '(없음)'}`);
+      } else if (error.message && error.message.includes('Unable to parse range')) {
+        throw new Error(`잘못된 범위 형식입니다: ${range}`);
+      } else if (error.message && error.message.includes('The caller does not have permission')) {
+        throw new Error(`시트 접근 권한이 없습니다. 시트 공유 설정을 확인해주세요: ${sheetId ? sheetId.substring(0, 15) + '...' : '(없음)'}`);
+      } else {
+        throw new Error(`시트 데이터 읽기 실패: ${error.message}`);
+      }
+    }
   });
 }
 
