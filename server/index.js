@@ -319,6 +319,30 @@ try {
   console.error('❌ [Additional] Failed to mount SMS routes:', e.message);
 }
 
+try {
+  const createCancelCheckRoutes = require('./routes/cancelCheckRoutes');
+  app.use('/', createCancelCheckRoutes(sharedContext));
+  console.log('✅ [Additional] Cancel Check routes mounted');
+} catch (e) {
+  console.error('❌ [Additional] Failed to mount cancel check routes:', e.message);
+}
+
+try {
+  const createDataCollectionRoutes = require('./routes/dataCollectionRoutes');
+  app.use('/', createDataCollectionRoutes(sharedContext));
+  console.log('✅ [Additional] Data Collection routes mounted');
+} catch (e) {
+  console.error('❌ [Additional] Failed to mount data collection routes:', e.message);
+}
+
+try {
+  const createQuickCostRoutes = require('./routes/quickCostRoutes');
+  app.use('/', createQuickCostRoutes(sharedContext));
+  console.log('✅ [Additional] Quick Cost routes mounted');
+} catch (e) {
+  console.error('❌ [Additional] Failed to mount quick cost routes:', e.message);
+}
+
 // 기존 라우트 등록
 try {
   setupDirectRoutes(app);
