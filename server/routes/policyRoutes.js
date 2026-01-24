@@ -327,7 +327,7 @@ function createPolicyRoutes(context) {
     try {
       if (!requireSheetsClient(res)) return;
       
-      const values = await getSheetValues('정책_알림관리');
+      const values = await getSheetValues('정책모드공지사항');
       res.json(values.slice(1));
     } catch (error) {
       console.error('Error fetching policy notices:', error);
@@ -344,7 +344,7 @@ function createPolicyRoutes(context) {
       await rateLimiter.execute(() =>
         sheetsClient.sheets.spreadsheets.values.append({
           spreadsheetId: sheetsClient.SPREADSHEET_ID,
-          range: '정책_알림관리!A:Z',
+          range: '정책모드공지사항!A:Z',
           valueInputOption: 'RAW',
           insertDataOption: 'INSERT_ROWS',
           resource: { values: [data] }
