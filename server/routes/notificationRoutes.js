@@ -43,7 +43,7 @@ function createNotificationRoutes(context) {
       } catch (sheetError) {
         // 시트가 없으면 빈 배열 반환
         console.warn('알림 시트가 존재하지 않습니다:', sheetError.message);
-        const emptyResult = [];
+        const emptyResult = { notifications: [] };
         cacheManager.set(cacheKey, emptyResult, 1 * 60 * 1000);
         return res.json(emptyResult);
       }
@@ -58,12 +58,13 @@ function createNotificationRoutes(context) {
           userId: row[1] || '',
           message: row[2] || '',
           type: row[3] || 'info',
-          read: row[4] === 'TRUE' || row[4] === true,
+          is_read: row[4] === 'TRUE' || row[4] === true,
           createdAt: row[5] || new Date().toISOString()
         }));
 
-      cacheManager.set(cacheKey, notifications, 1 * 60 * 1000); // 1분 캐시
-      res.json(notifications);
+      const result = { notifications };
+      cacheManager.set(cacheKey, result, 1 * 60 * 1000); // 1분 캐시
+      res.json(result);
     } catch (error) {
       console.error('Error fetching notifications:', error);
       res.status(500).json({ error: error.message });
