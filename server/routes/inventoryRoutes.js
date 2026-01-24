@@ -370,6 +370,60 @@ function createInventoryRoutes(context) {
     }
   });
 
+  // GET /api/inventory/agent-filters - 대리점 필터 목록 조회
+  router.get('/api/inventory/agent-filters', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+
+      console.log('🔍 [대리점필터] 대리점 필터 목록 조회 시작');
+
+      // 캐시 키 생성
+      const cacheKey = 'inventory_agent_filters';
+      const cached = cacheManager.get(cacheKey);
+      if (cached) {
+        console.log('✅ [캐시] 대리점 필터 캐시 히트');
+        return res.json({ success: true, data: cached, cached: true });
+      }
+
+      // 대리점아이디관리 시트에서 대리점 목록 조회
+      const values = await getSheetValues('대리점아이디관리');
+      const headers = values[0] || [];
+      const rows = values.slice(1);
+
+      const agentCodeIndex = headers.indexOf('대리점코드');
+      const agentNameIndex = headers.indexOf('대리점명');
+      const officeIndex = headers.indexOf('사무실');
+
+      const filters = rows
+        .filter(row => row[agentCodeIndex] && row[agentNameIndex])
+        .map(row => ({
+          code: row[agentCodeIndex] || '',
+          name: row[agentNameIndex] || '',
+          office: row[officeIndex] || ''
+        }));
+
+      // 중복 제거
+      const uniqueFilters = Array.from(
+        new Map(filters.map(item => [item.code, item])).values()
+      );
+
+      // 캐시 저장 (10분)
+      cacheManager.set(cacheKey, uniqueFilters, 10 * 60 * 1000);
+
+      res.json({
+        success: true,
+        data: uniqueFilters
+      });
+    } catch (error) {
+      console.error('Error fetching agent filters:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch agent filters',
+        message: error.message
+      });
+    }
+  });
+
   // GET /api/inventory-analysis - 재고 현황 분석
   router.get('/api/inventory-analysis', async (req, res) => {
     try {

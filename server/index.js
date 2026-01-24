@@ -238,6 +238,47 @@ try {
   console.error('❌ [Phase 6] Failed to mount policy notice routes:', e.message);
 }
 
+// 추가 라우트 등록 (누락된 엔드포인트)
+try {
+  const createPolicyRoutes = require('./routes/policyRoutes');
+  app.use('/api', createPolicyRoutes(sharedContext));
+  console.log('✅ [Additional] Policy routes mounted');
+} catch (e) {
+  console.error('❌ [Additional] Failed to mount policy routes:', e.message);
+}
+
+try {
+  const createNotificationRoutes = require('./routes/notificationRoutes');
+  app.use('/api', createNotificationRoutes(sharedContext));
+  console.log('✅ [Additional] Notification routes mounted');
+} catch (e) {
+  console.error('❌ [Additional] Failed to mount notification routes:', e.message);
+}
+
+try {
+  const createAppUpdateRoutes = require('./routes/appUpdateRoutes');
+  app.use('/api', createAppUpdateRoutes(sharedContext));
+  console.log('✅ [Additional] App Update routes mounted');
+} catch (e) {
+  console.error('❌ [Additional] Failed to mount app update routes:', e.message);
+}
+
+try {
+  const createDiscordRoutes = require('./routes/discordRoutes');
+  app.use('/api', createDiscordRoutes(sharedContext));
+  console.log('✅ [Additional] Discord routes mounted');
+} catch (e) {
+  console.error('❌ [Additional] Failed to mount discord routes:', e.message);
+}
+
+try {
+  const createMiscRoutes = require('./routes/miscRoutes');
+  app.use('/api', createMiscRoutes(sharedContext));
+  console.log('✅ [Additional] Misc routes mounted');
+} catch (e) {
+  console.error('❌ [Additional] Failed to mount misc routes:', e.message);
+}
+
 // 기존 라우트 등록
 try {
   setupDirectRoutes(app);
