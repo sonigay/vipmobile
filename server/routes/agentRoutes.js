@@ -181,3 +181,121 @@ function createAgentRoutes(context) {
 }
 
 module.exports = createAgentRoutes;
+
+  // GET /api/agents - 대리점 목록
+  router.get('/api/agents', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+
+      const cacheKey = 'agents_list';
+      const cached = cacheManager.get(cacheKey);
+      if (cached) return res.json(cached);
+
+      const values = await getSheetValues('대리점아이디관리');
+      const data = values.slice(1);
+
+      cacheManager.set(cacheKey, data, 5 * 60 * 1000);
+      res.json(data);
+    } catch (error) {
+      console.error('Error fetching agents:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET /api/agent-office-department - 사무소/부서 목록
+  router.get('/api/agent-office-department', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+
+      const cacheKey = 'agent_office_department';
+      const cached = cacheManager.get(cacheKey);
+      if (cached) return res.json(cached);
+
+      const values = await getSheetValues('대리점아이디관리');
+      const rows = values.slice(1);
+
+      const offices = new Set();
+      const departments = new Set();
+
+      rows.forEach(row => {
+        if (row[5]) offices.add(row[5]); // F열: 사무실
+        if (row[6]) departments.add(row[6]); // G열: 소속
+      });
+
+      const result = {
+        offices: Array.from(offices),
+        departments: Array.from(departments)
+      };
+
+      cacheManager.set(cacheKey, result, 5 * 60 * 1000);
+      res.json(result);
+    } catch (error) {
+      console.error('Error fetching office/department:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET /api/agent-closing-chart - 대리점 마감장표
+  router.get('/api/agent-closing-chart', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+
+      const cacheKey = 'agent_closing_chart';
+      const cached = cacheManager.get(cacheKey);
+      if (cached) return res.json(cached);
+
+      const values = await getSheetValues('대리점마감장표');
+      const data = values.slice(1);
+
+      cacheManager.set(cacheKey, data, 5 * 60 * 1000);
+      res.json(data);
+    } catch (error) {
+      console.error('Error fetching agent closing chart:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET /api/agent-closing-agents - 마감 대리점 목록
+  router.get('/api/agent-closing-agents', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+
+      const cacheKey = 'agent_closing_agents';
+      const cached = cacheManager.get(cacheKey);
+      if (cached) return res.json(cached);
+
+      const values = await getSheetValues('마감대리점목록');
+      const data = values.slice(1);
+
+      cacheManager.set(cacheKey, data, 5 * 60 * 1000);
+      res.json(data);
+    } catch (error) {
+      console.error('Error fetching closing agents:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET /api/agent-closing-initial - 마감 초기값
+  router.get('/api/agent-closing-initial', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+
+      const cacheKey = 'agent_closing_initial';
+      const cached = cacheManager.get(cacheKey);
+      if (cached) return res.json(cached);
+
+      const values = await getSheetValues('마감초기값');
+      const data = values.slice(1);
+
+      cacheManager.set(cacheKey, data, 5 * 60 * 1000);
+      res.json(data);
+    } catch (error) {
+      console.error('Error fetching closing initial:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  return router;
+}
+
+module.exports = createAgentRoutes;

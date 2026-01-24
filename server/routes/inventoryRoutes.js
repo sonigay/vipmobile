@@ -502,3 +502,128 @@ function createInventoryRoutes(context) {
 }
 
 module.exports = createInventoryRoutes;
+
+  // GET /api/inventory/status - 모델별 재고 현황
+  router.get('/api/inventory/status', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const { agent, office, department } = req.query;
+
+      const cacheKey = `inventory_status_${agent}_${office}_${department}`;
+      const cached = cacheManager.get(cacheKey);
+      if (cached) return res.json(cached);
+
+      const values = await getSheetValues('폰클재고데이터');
+      let rows = values.slice(1);
+
+      // 필터링 로직
+      if (agent || office || department) {
+        rows = rows.filter(row => {
+          if (agent && row[0] !== agent) return false;
+          if (office && row[1] !== office) return false;
+          if (department && row[2] !== department) return false;
+          return true;
+        });
+      }
+
+      cacheManager.set(cacheKey, rows, 5 * 60 * 1000);
+      res.json(rows);
+    } catch (error) {
+      console.error('Error fetching inventory status:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET /api/inventory/status-by-color - 색상별 재고 현황
+  router.get('/api/inventory/status-by-color', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const { agent, office, department } = req.query;
+
+      const cacheKey = `inventory_status_by_color_${agent}_${office}_${department}`;
+      const cached = cacheManager.get(cacheKey);
+      if (cached) return res.json(cached);
+
+      const values = await getSheetValues('폰클재고데이터');
+      let rows = values.slice(1);
+
+      // 필터링 및 색상별 그룹화
+      const byColor = {};
+      rows.forEach(row => {
+        const color = row[5] || '미지정';
+        if (!byColor[color]) byColor[color] = [];
+        byColor[color].push(row);
+      });
+
+      cacheManager.set(cacheKey, byColor, 5 * 60 * 1000);
+      res.json(byColor);
+    } catch (error) {
+      console.error('Error fetching inventory status by color:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET /api/inventory-inspection - 재고 검수
+  router.get('/api/inventory-inspection', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+
+      const cacheKey = 'inventory_inspection';
+      const cached = cacheManager.get(cacheKey);
+      if (cached) return res.json(cached);
+
+      const values = await getSheetValues('재고검수');
+      const data = values.slice(1);
+
+      cacheManager.set(cacheKey, data, 5 * 60 * 1000);
+      res.json(data);
+    } catch (error) {
+      console.error('Error fetching inventory inspection:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET /api/company-inventory-details - 회사 재고 상세
+  router.get('/api/company-inventory-details', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+
+      const cacheKey = 'company_inventory_details';
+      const cached = cacheManager.get(cacheKey);
+      if (cached) return res.json(cached);
+
+      const values = await getSheetValues('회사재고상세');
+      const data = values.slice(1);
+
+      cacheManager.set(cacheKey, data, 5 * 60 * 1000);
+      res.json(data);
+    } catch (error) {
+      console.error('Error fetching company inventory details:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET /api/confirmed-unconfirmed-inventory - 확정/미확정 재고
+  router.get('/api/confirmed-unconfirmed-inventory', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+
+      const cacheKey = 'confirmed_unconfirmed_inventory';
+      const cached = cacheManager.get(cacheKey);
+      if (cached) return res.json(cached);
+
+      const values = await getSheetValues('확정미확정재고');
+      const data = values.slice(1);
+
+      cacheManager.set(cacheKey, data, 5 * 60 * 1000);
+      res.json(data);
+    } catch (error) {
+      console.error('Error fetching confirmed/unconfirmed inventory:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  return router;
+}
+
+module.exports = createInventoryRoutes;
