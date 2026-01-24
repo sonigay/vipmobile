@@ -330,6 +330,13 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     try {
       const categoriesData = await PolicyService.getCategories();
       
+      // categoriesData가 배열인지 확인
+      if (!Array.isArray(categoriesData)) {
+        console.error('카테고리 데이터가 배열이 아닙니다:', categoriesData);
+        setCategories(DEFAULT_POLICY_CATEGORIES);
+        return;
+      }
+      
       // 정책 타입별로 카테고리 그룹화
       const groupedCategories = {
         wireless: categoriesData.filter(cat => cat.policyType === 'wireless' && cat.isActive).sort((a, b) => a.sortOrder - b.sortOrder),
