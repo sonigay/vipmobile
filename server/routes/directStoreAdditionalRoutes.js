@@ -337,5 +337,86 @@ module.exports = function createDirectStoreAdditionalRoutes(context) {
     }
   });
 
+  // POST /api/verify-password: 패스워드 검증
+  router.post('/verify-password', async (req, res) => {
+    try {
+      const { storeId, password } = req.body;
+      
+      if (!storeId || !password) {
+        return res.status(400).json({ 
+          success: false, 
+          error: '매장 ID와 비밀번호가 필요합니다.' 
+        });
+      }
+
+      // 대리점아이디관리 시트에서 비밀번호 확인
+      const response = await rateLimiter.execute(() =>
+        sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: '대리점아이디관리!A:Z'
+        })
+      );
+
+      const rows = response.data.values || [];
+      const storeRow = rows.find(row => row[0] === storeId);
+      
+      if (!storeRow) {
+        return res.json({ success: false, error: '매장을 찾을 수 없습니다.' });
+      }
+
+      // 비밀번호 컬럼 확인 (실제 컬럼 위치는 시트 구조에 따라 조정 필요)
+      const storedPassword = storeRow[2] || ''; // 예: C열이 비밀번호라고 가정
+      
+      if (storedPassword === password) {
+        res.json({ success: true });
+      } else {
+        res.json({ success: false, error: '비밀번호가 일치하지 않습니다.' });
+      }
+    } catch (error) {
+      console.error('패스워드 검증 실패:', error);
+      res.status(500).json({ success: false, error: '패스워드 검증 실패' });
+    }
+  });
+
+  // POST /api/verify-direct-store-password: 직영점 비밀번호 검증
+  router.post('/verify-direct-store-password', async (req, res) => {
+    try {
+      const { storeId, password } = req.body;
+      
+      if (!storeId || !password) {
+        return res.status(400).json({ 
+          success: false, 
+          error: '매장 ID와 비밀번호가 필요합니다.' 
+        });
+      }
+
+      // 직영점 비밀번호 시트에서 확인
+      const response = await rateLimiter.execute(() =>
+        sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: '직영점_비밀번호!A:Z'
+        })
+      );
+
+      const rows = response.data.values || [];
+      const storeRow = rows.find(row => row[0] === storeId);
+      
+      if (!storeRow) {
+        return res.json({ success: false, error: '매장을 찾을 수 없습니다.' });
+      }
+
+      const storedPassword = storeRow[1] || '';
+      
+      if (storedPassword === password) {
+        res.json({ success: true });
+      } else {
+        res.json({ success: false, error: '비밀번호가 일치하지 않습니다.' });
+      }
+    } catch (error) {
+      console.error('직영점 패스워드 검증 실패:', error);
+      res.status(500).json({ success: false, error: '패스워드 검증 실패' });
+    }
+  });
+
   return router;
 };
