@@ -2066,6 +2066,26 @@ async function refreshImagesFromDiscord(carrier) {
       전체: targetRows.length
     });
     
+    // 🔥 캐시 무효화: 이미지가 갱신되었으므로 관련 캐시 삭제
+    if (updatedImages.length > 0) {
+      // 1. 단말마스터 캐시 삭제 (해당 통신사)
+      const mobileMasterCacheKey = `sheet-data-${SPREADSHEET_ID}-${SHEET_MOBILE_MASTER}!A:R`;
+      cacheStore.delete(mobileMasterCacheKey);
+      console.log(`🗑️ [refreshImagesFromDiscord] 캐시 삭제: ${mobileMasterCacheKey}`);
+      
+      // 2. 모델이미지 캐시 삭제 (해당 통신사)
+      const mobileImagesCacheKey = `sheet-data-${SPREADSHEET_ID}-${SHEET_MOBILE_IMAGES}!A:K`;
+      cacheStore.delete(mobileImagesCacheKey);
+      console.log(`🗑️ [refreshImagesFromDiscord] 캐시 삭제: ${mobileImagesCacheKey}`);
+      
+      // 3. rebuildDeviceMaster 관련 캐시 삭제 (이미지 맵)
+      const imageMapCacheKey = `device-master-images-${carrier}`;
+      cacheStore.delete(imageMapCacheKey);
+      console.log(`🗑️ [refreshImagesFromDiscord] 캐시 삭제: ${imageMapCacheKey}`);
+      
+      console.log(`✅ [refreshImagesFromDiscord] ${carrier} 관련 캐시 무효화 완료`);
+    }
+    
     return {
       success: true,
       carrier,
