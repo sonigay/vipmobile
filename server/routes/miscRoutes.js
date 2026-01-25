@@ -6,6 +6,7 @@
 module.exports = function createMiscRoutes(context) {
   const express = require('express');
   const router = express.Router();
+  const { google } = require('googleapis');
   
   const { sheetsClient, rateLimiter, cacheManager } = context;
   const { sheets, SPREADSHEET_ID } = sheetsClient;
@@ -28,6 +29,11 @@ module.exports = function createMiscRoutes(context) {
     );
     return response.data.values || [];
   }
+
+  // rateLimitedSheetsCall 헬퍼 함수
+  const rateLimitedSheetsCall = async (apiCall) => {
+    return await rateLimiter.execute(apiCall);
+  };
 
   // 가격 불일치 조회 API
   router.get('/price-discrepancies', async (req, res) => {
@@ -402,16 +408,461 @@ module.exports = function createMiscRoutes(context) {
     }
   });
 
-  // 마커 색상 설정
+  // ========================================
+  // 마커 색상 설정 API
+  // ========================================
+  // 원본: server/index.js.backup.original (42632-43100줄)
+
+  // 시트 헤더 정의
+  const HEADERS_MARKER_COLOR_SETTINGS = [
+    '사용자ID',      // A열: 사용자 ID (x-user-id)
+    '옵션타입',      // B열: 옵션 타입 ('code', 'office', 'department', 'manager', 'selected')
+    '값',            // C열: 옵션 값 (코드명, 사무실명, 소속명, 담당자명) 또는 선택된 옵션
+    '색상',          // D열: 색상 값 (hex)
+    '생성일시',      // E열: 생성일시
+    '수정일시'       // F열: 수정일시
+  ];
+
+  const MARKER_COLOR_SETTINGS_SHEET_NAME = '관리자모드_마커색상설정';
+
+  // 시트 헤더 확인 및 생성 함수
+  async function ensureMarkerColorSheetHeaders(sheets, spreadsheetId) {
+    try {
+      const spreadsheet = await rateLimitedSheetsCall(() =>
+        sheets.spreadsheets.get({ spreadsheetId })
+      );
+      const sheetExists = spreadsheet.data.sheets.some(s => s.properties.title === MARKER_COLOR_SETTINGS_SHEET_NAME);
+
+      if (!sheetExists) {
+        await rateLimitedSheetsCall(() =>
+          sheets.spreadsheets.batchUpdate({
+            spreadsheetId,
+            resource: {
+              requests: [{
+                addSheet: {
+                  properties: {
+                    title: MARKER_COLOR_SETTINGS_SHEET_NAME
+                  }
+                }
+              }]
+            }
+          })
+        );
+      }
+
+      const res = await rateLimitedSheetsCall(() =>
+        sheets.spreadsheets.values.get({
+          spreadsheetId,
+          range: `${MARKER_COLOR_SETTINGS_SHEET_NAME}!1:1`
+        })
+      );
+      const firstRow = res.data.values && res.data.values[0] ? res.data.values[0] : [];
+      const needsInit = firstRow.length === 0 || HEADERS_MARKER_COLOR_SETTINGS.some((h, i) => (firstRow[i] || '') !== h) || firstRow.length < HEADERS_MARKER_COLOR_SETTINGS.length;
+
+      if (needsInit) {
+        await rateLimitedSheetsCall(() => {
+          // HEADERS_MARKER_COLOR_SETTINGS.length = 6 (A~F)
+          // getColumnLetter는 1-based이므로 6을 전달하면 F열이 됨
+          const lastColumn = getColumnLetter(HEADERS_MARKER_COLOR_SETTINGS.length);
+          return sheets.spreadsheets.values.update({
+            spreadsheetId,
+            range: `${MARKER_COLOR_SETTINGS_SHEET_NAME}!A1:${lastColumn}1`,
+            valueInputOption: 'USER_ENTERED',
+            resource: { values: [HEADERS_MARKER_COLOR_SETTINGS] }
+          });
+        });
+      }
+
+      return HEADERS_MARKER_COLOR_SETTINGS;
+    } catch (error) {
+      console.error(`[마커색상] Failed to ensure sheet headers for ${MARKER_COLOR_SETTINGS_SHEET_NAME}:`, error);
+      throw error;
+    }
+  }
+
+  // getColumnLetter 헬퍼 함수
+  function getColumnLetter(columnNumber) {
+    let temp, letter = '';
+    while (columnNumber > 0) {
+      temp = (columnNumber - 1) % 26;
+      letter = String.fromCharCode(temp + 65) + letter;
+      columnNumber = (columnNumber - temp - 1) / 26;
+    }
+    return letter;
+  }
+
+  // GET /api/marker-color-settings - 현재 사용자의 색상 설정 조회
   router.get('/marker-color-settings', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
-      const values = await getSheetValues('관리자모드_마커색상설정');
-      res.json(values.slice(1));
+
+      const userId = req.headers['x-user-id'] || req.query.userId;
+      if (!userId) {
+        return res.status(400).json({ success: false, error: '사용자 ID가 필요합니다.' });
+      }
+
+      const auth = new google.auth.JWT({
+        email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+        key: process.env.GOOGLE_PRIVATE_KEY.includes('\\n') ? process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n') : process.env.GOOGLE_PRIVATE_KEY,
+        scopes: ['https://www.googleapis.com/auth/spreadsheets']
+      });
+      const sheets = google.sheets({ version: 'v4', auth });
+
+      await ensureMarkerColorSheetHeaders(sheets, process.env.SHEET_ID);
+
+      const response = await rateLimitedSheetsCall(() =>
+        sheets.spreadsheets.values.get({
+          spreadsheetId: process.env.SHEET_ID,
+          range: `${MARKER_COLOR_SETTINGS_SHEET_NAME}!A:F`
+        })
+      );
+
+      const rows = response.data.values || [];
+      const dataRows = rows.slice(1);
+
+      // userId를 문자열로 정규화 (타입 불일치 방지)
+      const normalizedUserId = userId ? userId.toString().trim() : '';
+
+      console.log('[마커 색상 설정 조회] 시작:', {
+        원본userId: userId,
+        정규화userId: normalizedUserId,
+        userId타입: typeof userId,
+        dataRowsCount: dataRows.length,
+        샘플행: dataRows.slice(0, 5).map(r => ({ userId: r[0], userId타입: typeof r[0], optionType: r[1], value: r[2] }))
+      });
+
+      // 현재 사용자의 설정만 필터링 (userId 비교 시 trim 및 타입 변환)
+      // Google Sheets에서 작은따옴표로 시작하는 문자열은 그대로 저장되지만, 조회 시에는 작은따옴표가 제거될 수 있음
+      // 또한 숫자로 저장된 경우와 문자열로 저장된 경우를 모두 처리
+      const userRows = dataRows.filter(row => {
+        let rowUserId = (row[0] || '').toString().trim();
+        // 작은따옴표로 시작하는 경우 제거 (Google Sheets가 자동으로 제거할 수 있음)
+        if (rowUserId.startsWith("'")) {
+          rowUserId = rowUserId.substring(1);
+        }
+        // 숫자로 저장된 경우와 문자열로 저장된 경우 모두 처리
+        const matches = rowUserId === normalizedUserId ||
+          rowUserId === normalizedUserId.toString() ||
+          String(rowUserId) === String(normalizedUserId);
+        if (dataRows.indexOf(row) < 5) {
+          console.log('[마커 색상 설정 조회] 행 비교:', {
+            원본rowUserId: row[0],
+            처리된rowUserId: rowUserId,
+            normalizedUserId: normalizedUserId,
+            matches: matches,
+            rowUserId타입: typeof rowUserId
+          });
+        }
+        return matches;
+      });
+
+      // 선택된 옵션 추출
+      const selectedRow = userRows.find(row => {
+        const optionType = (row[1] || '').toString().trim();
+        return optionType === 'selected';
+      });
+
+      let selectedOption = 'default';
+      if (selectedRow) {
+        // Google Sheets API는 빈 셀을 배열에서 제거할 수 있으므로
+        // 인덱스 2가 없을 수도 있음. 안전하게 처리
+        const value = selectedRow[2];
+        if (value !== undefined && value !== null && value !== '') {
+          selectedOption = value.toString().trim();
+          // 유효한 옵션인지 확인
+          if (!['default', 'code', 'office', 'department', 'manager'].includes(selectedOption)) {
+            console.warn(`[마커 색상 설정 조회] 잘못된 선택값: ${selectedOption}, 기본값 사용`);
+            selectedOption = 'default';
+          }
+        } else {
+          console.warn('[마커 색상 설정 조회] selectedRow는 있지만 값이 비어있음:', selectedRow);
+        }
+      } else {
+        console.warn('[마커 색상 설정 조회] selectedRow를 찾을 수 없음. userRows:', userRows.map(r => ({ userId: r[0], optionType: r[1], value: r[2] })));
+      }
+
+      // 디버깅 로그
+      console.log('[마커 색상 설정 조회]', {
+        userId: normalizedUserId,
+        userRowsCount: userRows.length,
+        selectedRow: selectedRow ? {
+          userId: selectedRow[0],
+          optionType: selectedRow[1],
+          value: selectedRow[2],
+          fullRow: selectedRow
+        } : null,
+        selectedOption,
+        allUserRows: userRows.map(r => ({ userId: r[0], optionType: r[1], value: r[2] }))
+      });
+
+      // 색상 설정을 옵션별로 그룹화
+      const settings = {
+        selectedOption,
+        colorSettings: {
+          code: {},
+          office: {},
+          department: {},
+          manager: {}
+        }
+      };
+
+      userRows.forEach(row => {
+        const optionType = row[1] || '';
+        const value = row[2] || '';
+        const color = row[3] || '';
+
+        if (optionType !== 'selected' && optionType && value && color) {
+          if (settings.colorSettings[optionType]) {
+            settings.colorSettings[optionType][value] = color;
+          }
+        }
+      });
+
+      res.json({ success: true, settings });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      console.error('색상 설정 조회 오류:', error);
+      res.status(500).json({ success: false, error: error.message });
     }
   });
+
+  // POST /api/marker-color-settings - 색상 설정 저장/업데이트
+  router.post('/marker-color-settings', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+
+      const userId = req.headers['x-user-id'] || req.body.userId;
+      const { selectedOption, colorSettings } = req.body;
+      // selectedOption: 'default', 'code', 'office', 'department', 'manager' (단일 선택)
+      // colorSettings: { code: {...}, office: {...}, department: {...}, manager: {...} }
+
+      if (!userId) {
+        return res.status(400).json({ success: false, error: '사용자 ID가 필요합니다.' });
+      }
+
+      if (!selectedOption || !colorSettings) {
+        return res.status(400).json({ success: false, error: '옵션 및 색상 설정이 필요합니다.' });
+      }
+
+      const auth = new google.auth.JWT({
+        email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+        key: process.env.GOOGLE_PRIVATE_KEY.includes('\\n') ? process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n') : process.env.GOOGLE_PRIVATE_KEY,
+        scopes: ['https://www.googleapis.com/auth/spreadsheets']
+      });
+      const sheets = google.sheets({ version: 'v4', auth });
+
+      await ensureMarkerColorSheetHeaders(sheets, process.env.SHEET_ID);
+
+      // 기존 설정 조회
+      const response = await rateLimitedSheetsCall(() =>
+        sheets.spreadsheets.values.get({
+          spreadsheetId: process.env.SHEET_ID,
+          range: `${MARKER_COLOR_SETTINGS_SHEET_NAME}!A:F`
+        })
+      );
+
+      const rows = response.data.values || [];
+      const dataRows = rows.slice(1);
+      const now = new Date().toISOString();
+
+      // userId를 문자열로 정규화 (타입 불일치 방지)
+      const normalizedUserId = userId ? userId.toString().trim() : '';
+
+      console.log('[마커 색상 설정 저장] 시작:', {
+        원본userId: userId,
+        정규화userId: normalizedUserId,
+        userId타입: typeof userId,
+        selectedOption: selectedOption,
+        dataRowsCount: dataRows.length,
+        샘플행: dataRows.slice(0, 3).map(r => ({ userId: r[0], userId타입: typeof r[0], optionType: r[1] }))
+      });
+
+      // 기존 행에서 현재 사용자의 설정 찾기 (userId 비교 시 trim 및 타입 변환)
+      // Google Sheets에서 작은따옴표로 시작하는 문자열은 그대로 저장되지만, 조회 시에는 작은따옴표가 제거될 수 있음
+      // 또한 숫자로 저장된 경우와 문자열로 저장된 경우를 모두 처리
+      const existingRows = dataRows.filter(row => {
+        let rowUserId = (row[0] || '').toString().trim();
+        // 작은따옴표로 시작하는 경우 제거 (Google Sheets가 자동으로 제거할 수 있음)
+        if (rowUserId.startsWith("'")) {
+          rowUserId = rowUserId.substring(1);
+        }
+        // 숫자로 저장된 경우와 문자열로 저장된 경우 모두 처리
+        return rowUserId === normalizedUserId ||
+          rowUserId === normalizedUserId.toString() ||
+          String(rowUserId) === String(normalizedUserId);
+      });
+
+      console.log('[마커 색상 설정 저장] 기존 행 찾기:', {
+        normalizedUserId: normalizedUserId,
+        existingRowsCount: existingRows.length,
+        existingRows: existingRows.map(r => ({ userId: r[0], optionType: r[1], value: r[2] }))
+      });
+
+      // 업데이트할 행과 새로 추가할 행 분리
+      const rowsToUpdate = [];
+      const rowsToAppend = [];
+
+      // 1. 선택된 옵션 저장/업데이트
+      const existingSelectedRow = existingRows.find(row => {
+        const optionType = (row[1] || '').toString().trim();
+        return optionType === 'selected';
+      });
+
+      if (existingSelectedRow) {
+        const rowIndex = dataRows.findIndex(row => {
+          const rowUserId = (row[0] || '').toString().trim();
+          const rowOptionType = (row[1] || '').toString().trim();
+          return rowUserId === normalizedUserId && rowOptionType === 'selected';
+        });
+
+        if (rowIndex !== -1) {
+          // Google Sheets에서 숫자를 문자열로 저장하기 위해 작은따옴표 접두사 추가
+          // 또는 명시적으로 문자열로 변환 (valueInputOption: 'USER_ENTERED' 사용)
+          rowsToUpdate.push({
+            rowIndex: rowIndex + 2,
+            values: [`'${normalizedUserId}`, 'selected', selectedOption, '', existingSelectedRow[4] || now, now]
+          });
+          console.log(`[마커 색상 설정 저장] 선택값 업데이트: ${selectedOption} (행 ${rowIndex + 2}, userId: '${normalizedUserId}')`);
+        }
+      } else {
+        // Google Sheets에서 숫자를 문자열로 저장하기 위해 작은따옴표 접두사 추가
+        rowsToAppend.push([`'${normalizedUserId}`, 'selected', selectedOption, '', now, now]);
+        console.log(`[마커 색상 설정 저장] 선택값 추가: ${selectedOption} (userId: '${normalizedUserId}')`);
+      }
+
+      // 2. 각 옵션별 색상 설정 저장/업데이트
+      const optionTypes = ['code', 'office', 'department', 'manager'];
+      optionTypes.forEach(optionType => {
+        const settings = colorSettings[optionType] || {};
+        Object.entries(settings).forEach(([value, color]) => {
+          // 빈 색상 값은 저장하지 않음
+          if (!color || color.trim() === '') {
+            return;
+          }
+
+          const existingRow = existingRows.find(row => {
+            const rowOptionType = (row[1] || '').toString().trim();
+            const rowValue = (row[2] || '').toString().trim();
+            return rowOptionType === optionType && rowValue === value;
+          });
+          if (existingRow) {
+            // 업데이트
+            const rowIndex = dataRows.findIndex(row => {
+              const rowUserId = (row[0] || '').toString().trim();
+              const rowOptionType = (row[1] || '').toString().trim();
+              const rowValue = (row[2] || '').toString().trim();
+              return rowUserId === normalizedUserId && rowOptionType === optionType && rowValue === value;
+            });
+            rowsToUpdate.push({
+              rowIndex: rowIndex + 2,
+              values: [`'${normalizedUserId}`, optionType, value, color, existingRow[4] || now, now]
+            });
+          } else {
+            // 새로 추가 - userId를 문자열로 저장
+            rowsToAppend.push([`'${normalizedUserId}`, optionType, value, color, now, now]);
+          }
+        });
+      });
+
+      // 업데이트 실행
+      console.log('[마커 색상 설정 저장] 저장 실행:', {
+        rowsToUpdate: rowsToUpdate.length,
+        rowsToAppend: rowsToAppend.length,
+        normalizedUserId: normalizedUserId
+      });
+
+      await Promise.all([
+        ...rowsToUpdate.map(({ rowIndex, values }) =>
+          rateLimitedSheetsCall(() =>
+            sheets.spreadsheets.values.update({
+              spreadsheetId: process.env.SHEET_ID,
+              range: `${MARKER_COLOR_SETTINGS_SHEET_NAME}!A${rowIndex}:F${rowIndex}`,
+              valueInputOption: 'USER_ENTERED',
+              resource: { values: [values] }
+            })
+          )
+        ),
+        rowsToAppend.length > 0 && rateLimitedSheetsCall(() =>
+          sheets.spreadsheets.values.append({
+            spreadsheetId: process.env.SHEET_ID,
+            range: `${MARKER_COLOR_SETTINGS_SHEET_NAME}!A:F`,
+            valueInputOption: 'USER_ENTERED',
+            resource: { values: rowsToAppend }
+          })
+        )
+      ]);
+
+      console.log('[마커 색상 설정 저장] 저장 완료:', {
+        normalizedUserId: normalizedUserId,
+        selectedOption: selectedOption
+      });
+
+      res.json({ success: true, message: '색상 설정이 저장되었습니다.' });
+    } catch (error) {
+      console.error('색상 설정 저장 오류:', error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // GET /api/stores/unique-values - 유니크 값 목록 조회
+  router.get('/stores/unique-values', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+
+      const { type } = req.query; // 'code', 'office', 'department', 'manager'
+
+      if (!type || !['code', 'office', 'department', 'manager'].includes(type)) {
+        return res.status(400).json({ success: false, error: '올바른 타입이 필요합니다. (code, office, department, manager)' });
+      }
+
+      // 타입에 따라 컬럼 인덱스 결정
+      const columnIndexMap = {
+        'code': 7,        // H열: 코드
+        'office': 3,     // D열: 사무실
+        'department': 4, // E열: 소속
+        'manager': 5    // F열: 담당자
+      };
+
+      const columnIndex = columnIndexMap[type];
+      const columnLetter = getColumnLetter(columnIndex + 1); // 1-based로 변환 (A=1, B=2, ...)
+
+      const auth = new google.auth.JWT({
+        email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+        key: process.env.GOOGLE_PRIVATE_KEY.includes('\\n') ? process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n') : process.env.GOOGLE_PRIVATE_KEY,
+        scopes: ['https://www.googleapis.com/auth/spreadsheets']
+      });
+      const sheets = google.sheets({ version: 'v4', auth });
+
+      const STORE_SHEET_NAME = '폰클출고처데이터';
+
+      const response = await rateLimitedSheetsCall(() =>
+        sheets.spreadsheets.values.get({
+          spreadsheetId: process.env.SHEET_ID,
+          range: `${STORE_SHEET_NAME}!${columnLetter}:${columnLetter}`
+        })
+      );
+
+      const rows = response.data.values || [];
+      const values = new Set();
+
+      // 헤더 제외하고 데이터 처리
+      rows.slice(1).forEach(row => {
+        const value = (row[0] || '').toString().trim();
+        if (value) {
+          values.add(value);
+        }
+      });
+
+      // 배열로 변환 및 정렬
+      const uniqueValues = Array.from(values).sort();
+
+      res.json({ success: true, type, values: uniqueValues });
+    } catch (error) {
+      console.error('유니크 값 목록 조회 오류:', error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // 마커 색상 설정 (기존 단순 구현 - 삭제됨)
 
   // 지도 표시 옵션
   router.get('/map-display-option', async (req, res) => {
