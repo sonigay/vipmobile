@@ -63,14 +63,13 @@ const MIGRATIONS = {
         return {
           "통신사": 통신사,
           "보험상품명": 보험상품명,
-          "월보험료": parseFloat(data["월보험료"]) || null,
-          "보장내용": (data["보장내용"] || '').trim() || null,
-          "가입조건": (data["가입조건"] || '').trim() || null,
+          "출고가최소": parseFloat(data["출고가최소"]) || null,
+          "출고가최대": parseFloat(data["출고가최대"]) || null,
+          "월요금": parseFloat(data["월요금"]) || null,
           "유치추가금액": parseFloat(data["유치추가금액"]) || null,
           "미유치차감금액": parseFloat(data["미유치차감금액"]) || null,
-          "공식사이트URL": (data["공식사이트URL"] || '').trim() || null,
-          "사용여부": data["사용여부"] === 'O' || data["사용여부"] === true,
-          "비고": (data["비고"] || '').trim() || null
+          "상세설명": (data["상세설명"] || '').trim() || null,
+          "공식사이트URL": (data["공식사이트URL"] || '').trim() || null
         };
       }
     },
@@ -115,19 +114,17 @@ const MIGRATIONS = {
       sheetName: '직영점_메인페이지문구',
       tableName: 'direct_store_main_page_texts',
       transformFn: (data) => {
-        // 필수 필드 체크
-        const 섹션명 = (data["섹션명"] || '').trim();
+        // Google Sheets 실제 컬럼: 통신사, 카테고리, 설정유형, 문구내용, 이미지URL, 수정일시
         const 문구내용 = (data["문구내용"] || '').trim();
-        if (!섹션명 || !문구내용) return null;
+        if (!문구내용) return null;
         
         return {
-          "섹션명": 섹션명,
-          "문구타입": (data["문구타입"] || '').trim() || null,
+          "통신사": (data["통신사"] || '').trim() || null,
+          "카테고리": (data["카테고리"] || '').trim() || null,
+          "설정유형": (data["설정유형"] || '').trim() || null,
           "문구내용": 문구내용,
-          "표시순서": parseInt(data["표시순서"]) || 0,
-          "사용여부": data["사용여부"] === 'O' || data["사용여부"] === true,
-          "스타일JSON": data["스타일JSON"] ? JSON.parse(data["스타일JSON"]) : null,
-          "비고": (data["비고"] || '').trim() || null
+          "이미지URL": (data["이미지URL"] || '').trim() || null,
+          "수정일시": data["수정일시"] ? new Date(data["수정일시"]).toISOString() : null
         };
       }
     },
@@ -187,7 +184,7 @@ const MIGRATIONS = {
       sheetName: '직영점_단말요금정책',
       tableName: 'direct_store_device_pricing_policy',
       transformFn: (data) => {
-        // 필수 필드 체크
+        // Google Sheets 실제 컬럼: 통신사, 모델ID, 모델명, 요금제군, 요금제코드, 개통유형, 출고가, 이통사지원금, 대리점추가지원금_부가유치, 정책마진, 정책ID, 기준일자
         const 통신사 = (data["통신사"] || '').trim();
         const 모델ID = (data["모델ID"] || '').trim();
         if (!통신사 || !모델ID) return null;
@@ -195,18 +192,16 @@ const MIGRATIONS = {
         return {
           "통신사": 통신사,
           "모델ID": 모델ID,
-          "요금제명": (data["요금제명"] || '').trim() || null,
+          "모델명": (data["모델명"] || '').trim() || null,
+          "요금제군": (data["요금제군"] || '').trim() || null,
+          "요금제코드": (data["요금제코드"] || '').trim() || null,
           "개통유형": (data["개통유형"] || '').trim() || null,
           "출고가": parseFloat(data["출고가"]) || null,
           "이통사지원금": parseFloat(data["이통사지원금"]) || null,
-          "대리점지원금": parseFloat(data["대리점지원금"]) || null,
-          "추가지원금": parseFloat(data["추가지원금"]) || null,
-          "공시지원금": parseFloat(data["공시지원금"]) || null,
-          "선택약정할인": parseFloat(data["선택약정할인"]) || null,
-          "최종구매가": parseFloat(data["최종구매가"]) || null,
-          "적용시작일": data["적용시작일"] ? new Date(data["적용시작일"]) : null,
-          "적용종료일": data["적용종료일"] ? new Date(data["적용종료일"]) : null,
-          "사용여부": data["사용여부"] === 'O' || data["사용여부"] === true,
+          "대리점추가지원금_부가유치": parseFloat(data["대리점추가지원금_부가유치"]) || null,
+          "정책마진": parseFloat(data["정책마진"]) || null,
+          "정책ID": (data["정책ID"] || '').trim() || null,
+          "기준일자": data["기준일자"] ? new Date(data["기준일자"]) : null,
           "비고": (data["비고"] || '').trim() || null
         };
       }
@@ -224,14 +219,15 @@ const MIGRATIONS = {
         return {
           "통신사": 통신사,
           "모델ID": 모델ID,
-          "이미지타입": (data["이미지타입"] || '').trim() || '메인',
+          "모델명": (data["모델명"] || '').trim() || null,
+          "펫네임": (data["펫네임"] || '').trim() || null,
+          "제조사": (data["제조사"] || '').trim() || null,
           "이미지URL": 이미지URL,
+          "비고": (data["비고"] || '').trim() || null,
+          "색상": (data["색상"] || '').trim() || null,
           "Discord메시지ID": (data["Discord메시지ID"] || '').trim() || null,
           "Discord포스트ID": (data["Discord포스트ID"] || '').trim() || null,
-          "Discord스레드ID": (data["Discord스레드ID"] || '').trim() || null,
-          "표시순서": parseInt(data["표시순서"]) || 0,
-          "사용여부": data["사용여부"] === 'O' || data["사용여부"] === true,
-          "비고": (data["비고"] || '').trim() || null
+          "Discord스레드ID": (data["Discord스레드ID"] || '').trim() || null
         };
       }
     },
@@ -250,18 +246,12 @@ const MIGRATIONS = {
           "모델ID": 모델ID,
           "모델명": 모델명,
           "펫네임": (data["펫네임"] || '').trim() || null,
-          "요금제명": (data["요금제명"] || '').trim() || null,
-          "개통유형": (data["개통유형"] || '').trim() || null,
+          "제조사": (data["제조사"] || '').trim() || null,
           "출고가": parseFloat(data["출고가"]) || null,
-          "이통사지원금": parseFloat(data["이통사지원금"]) || null,
-          "대리점지원금": parseFloat(data["대리점지원금"]) || null,
-          "최종구매가": parseFloat(data["최종구매가"]) || null,
-          "특별혜택": (data["특별혜택"] || '').trim() || null,
-          "표시시작일시": data["표시시작일시"] ? new Date(data["표시시작일시"]).toISOString() : new Date().toISOString(),
-          "표시종료일시": data["표시종료일시"] ? new Date(data["표시종료일시"]).toISOString() : null,
-          "표시순서": parseInt(data["표시순서"]) || 0,
-          "사용여부": data["사용여부"] === 'O' || data["사용여부"] === true,
-          "비고": (data["비고"] || '').trim() || null
+          "이미지URL": (data["이미지URL"] || '').trim() || null,
+          "순서": parseInt(data["순서"]) || null,
+          "표시여부": data["표시여부"] === 'O' || data["표시여부"] === true,
+          "등록일시": data["등록일시"] ? new Date(data["등록일시"]).toISOString() : null
         };
       }
     },
@@ -270,21 +260,17 @@ const MIGRATIONS = {
       tableName: 'direct_store_transit_locations',
       transformFn: (data) => {
         // 필수 필드 체크
-        const 교통수단타입 = (data["교통수단타입"] || '').trim();
-        const 노선명 = (data["노선명"] || '').trim();
-        if (!교통수단타입 || !노선명) return null;
+        const 타입 = (data["타입"] || '').trim();
+        const 이름 = (data["이름"] || '').trim();
+        if (!타입 || !이름) return null;
         
         return {
-          "교통수단타입": 교통수단타입,
-          "노선명": 노선명,
-          "정류장명": (data["정류장명"] || '').trim() || null,
+          "타입": 타입,
+          "이름": 이름,
+          "주소": (data["주소"] || '').trim() || null,
           "위도": parseFloat(data["위도"]) || null,
           "경도": parseFloat(data["경도"]) || null,
-          "매장까지거리": parseFloat(data["매장까지거리"]) || null,
-          "도보소요시간": parseInt(data["도보소요시간"]) || null,
-          "표시순서": parseInt(data["표시순서"]) || 0,
-          "사용여부": data["사용여부"] === 'O' || data["사용여부"] === true,
-          "비고": (data["비고"] || '').trim() || null
+          "수정일시": data["수정일시"] ? new Date(data["수정일시"]).toISOString() : null
         };
       }
     },
@@ -293,19 +279,18 @@ const MIGRATIONS = {
       tableName: 'direct_store_photos',
       transformFn: (data) => {
         // 필수 필드 체크
+        const 매장명 = (data["매장명"] || '').trim();
         const 사진URL = (data["사진URL"] || '').trim();
-        if (!사진URL) return null;
+        if (!매장명 || !사진URL) return null;
         
         return {
-          "사진타입": (data["사진타입"] || '').trim() || '매장외관',
-          "사진제목": (data["사진제목"] || '').trim() || null,
+          "매장명": 매장명,
+          "POS코드": (data["POS코드"] || '').trim() || null,
           "사진URL": 사진URL,
-          "Discord메시지ID": (data["Discord메시지ID"] || '').trim() || null,
-          "Discord포스트ID": (data["Discord포스트ID"] || '').trim() || null,
-          "Discord스레드ID": (data["Discord스레드ID"] || '').trim() || null,
-          "표시순서": parseInt(data["표시순서"]) || 0,
-          "사용여부": data["사용여부"] === 'O' || data["사용여부"] === true,
-          "비고": (data["비고"] || '').trim() || null
+          "사진타입": (data["사진타입"] || '').trim() || null,
+          "설명": (data["설명"] || '').trim() || null,
+          "촬영일시": data["촬영일시"] ? new Date(data["촬영일시"]).toISOString() : null,
+          "등록일시": data["등록일시"] ? new Date(data["등록일시"]).toISOString() : null
         };
       }
     },
@@ -314,26 +299,25 @@ const MIGRATIONS = {
       tableName: 'direct_store_sales_daily',
       transformFn: (data) => {
         // 필수 필드 체크
-        const 통신사 = (data["통신사"] || '').trim();
-        const 모델ID = (data["모델ID"] || '').trim();
-        const 모델명 = (data["모델명"] || '').trim();
-        if (!통신사 || !모델ID || !모델명) return null;
+        const 매장명 = (data["매장명"] || '').trim();
+        const 판매일자 = data["판매일자"];
+        if (!매장명 || !판매일자) return null;
         
         return {
-          "판매일자": data["판매일자"] ? new Date(data["판매일자"]) : new Date(),
-          "통신사": 통신사,
-          "모델ID": 모델ID,
-          "모델명": 모델명,
+          "매장명": 매장명,
+          "POS코드": (data["POS코드"] || '').trim() || null,
+          "판매일자": new Date(판매일자),
+          "통신사": (data["통신사"] || '').trim() || null,
+          "모델명": (data["모델명"] || '').trim() || null,
           "개통유형": (data["개통유형"] || '').trim() || null,
           "요금제명": (data["요금제명"] || '').trim() || null,
-          "판매수량": parseInt(data["판매수량"]) || 1,
+          "고객명": (data["고객명"] || '').trim() || null,
+          "연락처": (data["연락처"] || '').trim() || null,
           "출고가": parseFloat(data["출고가"]) || null,
           "이통사지원금": parseFloat(data["이통사지원금"]) || null,
           "대리점지원금": parseFloat(data["대리점지원금"]) || null,
-          "최종판매가": parseFloat(data["최종판매가"]) || null,
-          "담당자": (data["담당자"] || '').trim() || null,
-          "고객명": (data["고객명"] || '').trim() || null,
-          "고객연락처": (data["고객연락처"] || '').trim() || null,
+          "실구매가": parseFloat(data["실구매가"]) || null,
+          "판매자": (data["판매자"] || '').trim() || null,
           "비고": (data["비고"] || '').trim() || null
         };
       }

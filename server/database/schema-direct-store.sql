@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS direct_store_policy_addon_services (
 CREATE INDEX IF NOT EXISTS idx_addon_services_carrier ON direct_store_policy_addon_services("통신사");
 
 -- 3. 직영점_정책_보험상품
+-- Google Sheets 실제 컬럼: 통신사, 보험상품명, 출고가최소, 출고가최대, 월요금, 유치추가금액, 미유치차감금액, 상세설명, 공식사이트URL
 CREATE TABLE IF NOT EXISTS direct_store_policy_insurance (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "통신사" TEXT NOT NULL,
@@ -99,9 +100,10 @@ CREATE INDEX IF NOT EXISTS idx_settings_carrier ON direct_store_settings("통신
 CREATE INDEX IF NOT EXISTS idx_settings_type ON direct_store_settings("설정유형");
 
 -- 6. 직영점_메인페이지문구
+-- Google Sheets 실제 컬럼: 통신사, 카테고리, 설정유형, 문구내용, 이미지URL, 수정일시
 CREATE TABLE IF NOT EXISTS direct_store_main_page_texts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  "통신사" TEXT NOT NULL,
+  "통신사" TEXT,
   "카테고리" TEXT,
   "설정유형" TEXT,
   "문구내용" TEXT,
@@ -163,6 +165,7 @@ CREATE INDEX IF NOT EXISTS idx_device_premium ON direct_store_device_master("isP
 CREATE INDEX IF NOT EXISTS idx_device_popular ON direct_store_device_master("isPopular");
 
 -- 9. 직영점_단말요금정책
+-- Google Sheets 실제 컬럼: 통신사, 모델ID, 모델명, 요금제군, 요금제코드, 개통유형, 출고가, 이통사지원금, 대리점추가지원금_부가유치, 정책마진, 정책ID, 기준일자
 CREATE TABLE IF NOT EXISTS direct_store_device_pricing_policy (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "통신사" TEXT NOT NULL,
@@ -194,7 +197,7 @@ CREATE TABLE IF NOT EXISTS direct_store_model_images (
   "모델명" TEXT,
   "펫네임" TEXT,
   "제조사" TEXT,
-  "이미지URL" TEXT,
+  "이미지URL" TEXT NOT NULL,
   "비고" TEXT,
   "색상" TEXT,
   "Discord메시지ID" TEXT,
@@ -212,7 +215,7 @@ CREATE TABLE IF NOT EXISTS direct_store_todays_mobiles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "통신사" TEXT NOT NULL,
   "모델ID" TEXT NOT NULL,
-  "모델명" TEXT,
+  "모델명" TEXT NOT NULL,
   "펫네임" TEXT,
   "제조사" TEXT,
   "출고가" NUMERIC(10,2),
