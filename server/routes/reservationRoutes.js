@@ -196,7 +196,7 @@ function createReservationRoutes(context) {
   router.get('/api/reservation-data/on-sale-receipt', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
-      const values = await getSheetValues('온세일접수');
+      const values = await getSheetValues('온세일');
       res.json(values.slice(1));
     } catch (error) {
       res.status(500).json({ error: error.message });
@@ -206,7 +206,7 @@ function createReservationRoutes(context) {
   router.get('/api/reservation-data/yard-receipt', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
-      const values = await getSheetValues('야드접수');
+      const values = await getSheetValues('마당접수');
       res.json(values.slice(1));
     } catch (error) {
       res.status(500).json({ error: error.message });

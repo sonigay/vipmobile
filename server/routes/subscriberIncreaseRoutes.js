@@ -31,7 +31,7 @@ function createSubscriberIncreaseRoutes(context) {
   router.get('/api/subscriber-increase/access', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
-      const values = await getSheetValues('가입자증가접근권한');
+      const values = await getSheetValues('가입자증감');
       res.json(values.slice(1));
     } catch (error) {
       res.status(500).json({ error: error.message });
@@ -47,7 +47,7 @@ function createSubscriberIncreaseRoutes(context) {
       const cached = cacheManager.get(cacheKey);
       if (cached) return res.json(cached);
 
-      const values = await getSheetValues('가입자증가');
+      const values = await getSheetValues('가입자증감');
       const data = values.slice(1);
 
       cacheManager.set(cacheKey, data, 5 * 60 * 1000);
@@ -66,7 +66,7 @@ function createSubscriberIncreaseRoutes(context) {
       await rateLimiter.execute(() =>
         sheetsClient.sheets.spreadsheets.values.append({
           spreadsheetId: sheetsClient.SPREADSHEET_ID,
-          range: '가입자증가!A:Z',
+          range: '가입자증감!A:Z',
           valueInputOption: 'RAW',
           resource: { values: [data] }
         })
@@ -88,7 +88,7 @@ function createSubscriberIncreaseRoutes(context) {
       await rateLimiter.execute(() =>
         sheetsClient.sheets.spreadsheets.values.append({
           spreadsheetId: sheetsClient.SPREADSHEET_ID,
-          range: '가입자증가!A:Z',
+          range: '가입자증감!A:Z',
           valueInputOption: 'RAW',
           resource: { values: data }
         })
@@ -140,7 +140,7 @@ function createSubscriberIncreaseRoutes(context) {
       await rateLimiter.execute(() =>
         sheetsClient.sheets.spreadsheets.values.append({
           spreadsheetId: sheetsClient.SPREADSHEET_ID,
-          range: '가입자증가제외!A:Z',
+          range: '가입자증감제외!A:Z',
           valueInputOption: 'RAW',
           resource: { values: [rowData] }
         })
