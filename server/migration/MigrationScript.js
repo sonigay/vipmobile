@@ -105,6 +105,13 @@ class MigrationScript {
         }
 
         try {
+          // 디버그: 첫 번째 행의 원본 데이터 출력
+          if (i === 0) {
+            console.log('\n🔍 첫 번째 행 원본 데이터 (디버그):');
+            console.log('   컬럼명:', Object.keys(data).slice(0, 10));
+            console.log('   샘플 값:', JSON.stringify(data).substring(0, 200));
+          }
+
           // 데이터 변환 (사용자 정의 함수)
           if (transformFn) {
             data = transformFn(data, i + 1);
@@ -114,9 +121,14 @@ class MigrationScript {
               this.stats.failed++;
               this.stats.errors.push({
                 row: i + 1,
-                data: row,
+                originalData: Object.keys(row._rawData || row).filter(k => !k.startsWith('_')),
                 errors: ['필수 필드가 비어있어 스킵됨']
               });
+              
+              // 첫 3개 실패 행의 컬럼명 출력
+              if (this.stats.failed <= 3) {
+                console.log(`   ❌ Row ${i + 1} 컬럼명:`, Object.keys(row._rawData || row).filter(k => !k.startsWith('_')).slice(0, 5));
+              }
               continue;
             }
           }
