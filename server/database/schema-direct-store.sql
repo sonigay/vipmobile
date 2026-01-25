@@ -5,7 +5,7 @@
 -- 중요: 한글 컬럼명은 큰따옴표로 감싸야 합니다.
 -- 예: SELECT "통신사", "마진" FROM direct_store_policy_margin;
 --
--- 테이블 목록:
+-- 📋 테이블 목록 (14개):
 -- 1. direct_store_policy_margin (직영점_정책_마진)
 -- 2. direct_store_policy_addon_services (직영점_정책_부가서비스)
 -- 3. direct_store_policy_insurance (직영점_정책_보험상품)
