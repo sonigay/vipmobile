@@ -101,7 +101,8 @@ CREATE INDEX IF NOT EXISTS idx_settings_type ON direct_store_settings("설정유
 
 -- 6. 직영점_메인페이지문구
 -- Google Sheets 실제 컬럼: 통신사, 카테고리, 설정유형, 문구내용, 이미지URL, 수정일시
-CREATE TABLE IF NOT EXISTS direct_store_main_page_texts (
+DROP TABLE IF EXISTS direct_store_main_page_texts CASCADE;
+CREATE TABLE direct_store_main_page_texts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "통신사" TEXT,
   "카테고리" TEXT,
@@ -211,7 +212,8 @@ CREATE INDEX IF NOT EXISTS idx_images_carrier ON direct_store_model_images("통�
 CREATE INDEX IF NOT EXISTS idx_images_model_id ON direct_store_model_images("모델ID");
 
 -- 11. 직영점_오늘의휴대폰
-CREATE TABLE IF NOT EXISTS direct_store_todays_mobiles (
+DROP TABLE IF EXISTS direct_store_todays_mobiles CASCADE;
+CREATE TABLE direct_store_todays_mobiles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "통신사" TEXT,
   "모델ID" TEXT,
@@ -248,7 +250,8 @@ CREATE INDEX IF NOT EXISTS idx_transit_type ON direct_store_transit_locations("�
 CREATE INDEX IF NOT EXISTS idx_transit_location ON direct_store_transit_locations("위도", "경도");
 
 -- 13. 직영점_매장사진
-CREATE TABLE IF NOT EXISTS direct_store_photos (
+DROP TABLE IF EXISTS direct_store_photos CASCADE;
+CREATE TABLE direct_store_photos (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "매장명" TEXT,
   "POS코드" TEXT,
