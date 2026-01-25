@@ -73,6 +73,18 @@ class MigrationScript {
         throw new Error(`Sheet not found: ${sheetName}`);
       }
 
+      // 헤더 정보 확인
+      console.log(`   📋 헤더 정보:`);
+      console.log(`      - headerValues: ${sheet.headerValues.length}개`);
+      console.log(`      - 첫 5개: ${sheet.headerValues.slice(0, 5).join(', ')}`);
+      
+      // 헤더가 없으면 첫 번째 행을 헤더로 설정
+      if (sheet.headerValues.length === 0 || sheet.headerValues[0] === '0') {
+        console.log(`   ⚠️  헤더가 없습니다. 시트를 다시 로드합니다...`);
+        await sheet.loadHeaderRow();
+        console.log(`   ✅ 헤더 로드 완료: ${sheet.headerValues.slice(0, 5).join(', ')}`);
+      }
+      
       const rows = await sheet.getRows();
       this.stats.total = rows.length;
       
