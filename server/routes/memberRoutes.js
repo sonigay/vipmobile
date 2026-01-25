@@ -121,37 +121,88 @@ function createMemberRoutes(context) {
       const { posCode } = req.query;
 
       const queueValues = await getSheetValues(QUEUE_SHEET_NAME);
-      const queueRows = queueValues.slice(1);
+      if (!queueValues || queueValues.length <= 1) return res.json([]);
 
-      let queueList = queueRows.map((row, index) => ({
-        id: index + 1,
-        ctn: row[0] || '',
-        name: row[1] || '',
-        model: row[2] || '',
-        color: row[3] || '',
-        posCode: row[4] || '',
-        storeName: row[5] || '',
-        status: row[6] || '대기',
-        createdAt: row[7] || '',
-        memo: row[8] || ''
-      }));
+      const rows = queueValues.slice(1);
 
-      // POS코드 필터링
+      // POS코드 필터링이 필요한 경우, 폰클출고처데이터에서 매장명->POS코드 매핑 생성
+      let storeNameToPosCodeMap = null;
       if (posCode) {
-        queueList = queueList.filter(item => item.posCode === posCode);
+        try {
+          const storeValues = await getSheetValues('폰클출고처데이터');
+          storeNameToPosCodeMap = new Map();
+          if (storeValues && storeValues.length > 1) {
+            storeValues.slice(1).forEach(row => {
+              if (row && row.length > 15) {
+                const storeName = (row[14] || '').toString().trim();
+                const storePosCode = (row[15] || '').toString().trim();
+                if (storeName && storePosCode) {
+                  storeNameToPosCodeMap.set(storeName, storePosCode);
+                }
+              }
+            });
+          }
+        } catch (err) {
+          console.error('폰클출고처데이터 조회 오류:', err);
+        }
       }
 
-      res.json({
-        success: true,
-        data: queueList
-      });
+      let filteredRows = rows;
+      if (posCode && storeNameToPosCodeMap) {
+        filteredRows = rows.filter(row => {
+          const storeName = (row[22] || '').toString().trim();
+          const itemPosCode = storeNameToPosCodeMap.get(storeName);
+          return itemPosCode === posCode;
+        });
+      }
+
+      const queue = filteredRows
+        .filter(row => (row[27] || '').toString().trim() !== '삭제됨')
+        .map(row => ({
+          id: row[0],
+          ctn: row[1],
+          name: row[2],
+          carrier: row[3],
+          model: row[4],
+          color: row[5],
+          deviceSerial: row[6],
+          usimModel: row[7],
+          usimSerial: row[8],
+          activationType: row[9],
+          oldCarrier: row[10],
+          installmentType: row[11],
+          installmentMonths: row[12],
+          contractType: row[13],
+          plan: row[14],
+          additionalServices: row[15],
+          factoryPrice: row[16],
+          carrierSupport: row[17],
+          dealerSupportWithAdd: row[18],
+          dealerSupportWithoutAdd: row[19],
+          installmentPrincipal: Number(row[20] || 0),
+          할부원금: Number(row[20] || 0),
+          lgPremier: (row[21] || '') === 'Y',
+          프리미어약정: (row[21] || '') === 'Y',
+          storeName: row[22],
+          storePhone: row[23],
+          storeAddress: row[24],
+          storeBankInfo: row[25],
+          createdAt: row[26],
+          status: row[27],
+          processedBy: row[28],
+          processedAt: row[29],
+          ip: row[30],
+          deviceInfo: row[31],
+          isAnonymous: row[32] === 'Y'
+        }));
+
+      // 최신순 정렬
+      queue.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+      res.json(queue);
     } catch (error) {
       console.error('Error fetching queue list:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to fetch queue list',
-        message: error.message
-      });
+      res.status(500).json({ error: '목록을 불러오는데 실패했습니다.' });
     }
   });
 
@@ -165,35 +216,63 @@ function createMemberRoutes(context) {
         return res.status(400).json({ error: 'CTN이 필요합니다.' });
       }
 
-      const queueValues = await getSheetValues(QUEUE_SHEET_NAME);
-      const queueRows = queueValues.slice(1);
+      const cleanCtn = ctn.replace(/[^0-9]/g, '');
 
-      const queueList = queueRows
-        .filter(row => (row[0] || '').toString().trim() === ctn)
-        .map((row, index) => ({
-          id: index + 1,
-          ctn: row[0] || '',
-          name: row[1] || '',
-          model: row[2] || '',
-          color: row[3] || '',
-          posCode: row[4] || '',
-          storeName: row[5] || '',
-          status: row[6] || '대기',
-          createdAt: row[7] || '',
-          memo: row[8] || ''
+      const queueValues = await getSheetValues(QUEUE_SHEET_NAME);
+      if (!queueValues || queueValues.length <= 1) return res.json([]);
+
+      const rows = queueValues.slice(1);
+      const queue = rows
+        .filter(row => {
+          const rowCtn = (row[1] || '').replace(/[^0-9]/g, '');
+          return rowCtn === cleanCtn;
+        })
+        .map(row => ({
+          id: row[0],
+          ctn: row[1],
+          name: row[2],
+          carrier: row[3],
+          model: row[4],
+          color: row[5],
+          deviceSerial: row[6],
+          usimModel: row[7],
+          usimSerial: row[8],
+          activationType: row[9],
+          oldCarrier: row[10],
+          installmentType: row[11],
+          installmentMonths: row[12],
+          contractType: row[13],
+          plan: row[14],
+          additionalServices: row[15],
+          factoryPrice: row[16],
+          carrierSupport: row[17],
+          dealerSupport: row[18],
+          대리점추가지원금: row[18],
+          additionalStoreSupport: row[19],
+          대리점추가지원금직접입력: row[19],
+          installmentPrincipal: Number(row[20] || 0),
+          할부원금: Number(row[20] || 0),
+          lgPremier: (row[21] || '') === 'Y',
+          프리미어약정: (row[21] || '') === 'Y',
+          dealerSupportWithAdd: row[18],
+          dealerSupportWithoutAdd: row[19],
+          storeName: row[22],
+          storePhone: row[23],
+          storeAddress: row[24],
+          storeBankInfo: row[25],
+          createdAt: row[26],
+          status: row[27],
+          processedBy: row[28],
+          processedAt: row[29],
+          ip: row[30],
+          deviceInfo: row[31],
+          isAnonymous: row[32] === 'Y'
         }));
 
-      res.json({
-        success: true,
-        data: queueList
-      });
+      res.json(queue);
     } catch (error) {
       console.error('Error fetching member queue:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to fetch member queue',
-        message: error.message
-      });
+      res.status(500).json({ error: '목록을 불러오는데 실패했습니다.' });
     }
   });
 
@@ -338,38 +417,75 @@ function createMemberRoutes(context) {
       const { storeName, posCode } = req.query;
 
       const boardValues = await getSheetValues(BOARD_SHEET_NAME);
-      const boardRows = boardValues.slice(1);
+      if (!boardValues || boardValues.length <= 1) return res.json([]);
 
-      let boardList = boardRows.map((row, index) => ({
-        id: index + 1,
-        title: row[0] || '',
-        content: row[1] || '',
-        author: row[2] || '',
-        storeName: row[3] || '',
-        posCode: row[4] || '',
-        createdAt: row[5] || '',
-        views: parseInt(row[6]) || 0
-      }));
+      const rows = boardValues.slice(1);
 
-      // 필터링
-      if (storeName) {
-        boardList = boardList.filter(item => item.storeName === storeName);
-      }
+      // POS코드 필터링이 필요한 경우, 폰클출고처데이터에서 매장명->POS코드 매핑 생성
+      let storeNameToPosCodeMap = null;
       if (posCode) {
-        boardList = boardList.filter(item => item.posCode === posCode);
+        try {
+          const storeValues = await getSheetValues('폰클출고처데이터');
+          storeNameToPosCodeMap = new Map();
+          if (storeValues && storeValues.length > 1) {
+            storeValues.slice(1).forEach(row => {
+              if (row && row.length > 15) {
+                const storeNameFromData = (row[14] || '').toString().trim();
+                const storePosCode = (row[15] || '').toString().trim();
+                if (storeNameFromData && storePosCode) {
+                  storeNameToPosCodeMap.set(storeNameFromData, storePosCode);
+                }
+              }
+            });
+          }
+        } catch (err) {
+          console.error('매장 데이터 조회 오류:', err);
+        }
       }
 
-      res.json({
-        success: true,
-        data: boardList
-      });
+      let queue = rows
+        .filter(row => {
+          // 삭제된 항목 제외
+          const status = (row[11] || '').toString().trim();
+          if (status === '삭제됨') return false;
+
+          // 매장명 필터링
+          if (storeName) {
+            const rowStoreName = (row[6] || '').toString().trim();
+            return rowStoreName === storeName;
+          }
+
+          // POS코드 필터링
+          if (posCode && storeNameToPosCodeMap) {
+            const rowStoreName = (row[6] || '').toString().trim();
+            const itemPosCode = storeNameToPosCodeMap.get(rowStoreName);
+            return itemPosCode === posCode;
+          }
+
+          return true;
+        })
+        .map(row => ({
+          id: row[0],
+          category: row[1] || '',
+          title: row[2] || '',
+          content: row[3] || '',
+          customerName: row[4] || '',
+          customerCtn: row[5] || '',
+          storeName: row[6] || '',
+          storePhone: row[7] || '',
+          storeAddress: row[8] || '',
+          createdAt: row[9] || '',
+          updatedAt: row[10] || '',
+          status: row[11] || '활성'
+        }));
+
+      // 최신순 정렬
+      queue.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+      res.json(queue);
     } catch (error) {
       console.error('Error fetching board list:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to fetch board list',
-        message: error.message
-      });
+      res.status(500).json({ error: '목록을 불러오는데 실패했습니다.' });
     }
   });
 
