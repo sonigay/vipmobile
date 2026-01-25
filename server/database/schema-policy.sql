@@ -1,8 +1,9 @@
 -- ============================================================================
--- 정책 모드 스키마 (10개 테이블)
+-- 정책 모드 스키마 (11개 테이블)
 -- ============================================================================
 --
--- 📋 테이블 목록 (10개):
+-- 📋 테이블 목록 (11개):
+-- 0. policy_basic_info (정책_기본정보) ⭐ 추가
 -- 1. policy_table_settings (정책모드_정책표설정)
 -- 2. policy_table_list (정책모드_정책표목록)
 -- 3. policy_user_groups (정책모드_일반사용자그룹)
@@ -14,6 +15,70 @@
 -- 9. budget_basic_settings (예산모드_기본예산설정)
 -- 10. budget_basic_data_settings (예산모드_기본데이터설정)
 -- ============================================================================
+
+-- 0. 정책_기본정보 (핵심 테이블)
+CREATE TABLE IF NOT EXISTS policy_basic_info (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "정책ID" TEXT UNIQUE NOT NULL,
+  "정책명" TEXT NOT NULL,
+  "정책적용일" TEXT,
+  "정책적용점" TEXT,
+  "정책내용" TEXT,
+  "금액" TEXT,
+  "정책유형" TEXT,
+  "무선유선" TEXT,
+  "하위카테고리" TEXT,
+  "입력자ID" TEXT,
+  "입력자명" TEXT,
+  "입력일시" TEXT,
+  "승인상태_총괄" TEXT DEFAULT '대기',
+  "승인상태_정산팀" TEXT DEFAULT '대기',
+  "승인상태_소속팀" TEXT DEFAULT '대기',
+  "정책상태" TEXT DEFAULT '활성',
+  "취소사유" TEXT,
+  "취소일시" TEXT,
+  "취소자명" TEXT,
+  "정산반영상태" TEXT DEFAULT '미반영',
+  "정산반영자명" TEXT,
+  "정산반영일시" TEXT,
+  "정산반영자ID" TEXT,
+  "대상년월" TEXT,
+  "복수점명" TEXT,
+  "업체명" TEXT,
+  "개통유형" TEXT,
+  "95군이상금액" TEXT,
+  "95군미만금액" TEXT,
+  "소속팀" TEXT,
+  "부가미유치금액" TEXT,
+  "보험미유치금액" TEXT,
+  "연결음미유치금액" TEXT,
+  "부가유치시조건" TEXT,
+  "보험유치시조건" TEXT,
+  "연결음유치시조건" TEXT,
+  "유플레이프리미엄유치금액" TEXT,
+  "폰교체패스유치금액" TEXT,
+  "음악감상유치금액" TEXT,
+  "지정번호필터링유치금액" TEXT,
+  "VAS2종동시유치조건" TEXT,
+  "VAS2종중1개유치조건" TEXT,
+  "부가3종모두유치조건" TEXT,
+  "요금제유형별정책JSON" JSONB,
+  "정산입금처" TEXT,
+  "연합대상하부점JSON" JSONB,
+  "조건JSON" JSONB,
+  "적용대상JSON" JSONB,
+  "개통유형_개별" TEXT,
+  "담당자명" TEXT,
+  "직접입력여부" TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_policy_basic_id ON policy_basic_info("정책ID");
+CREATE INDEX IF NOT EXISTS idx_policy_basic_yearmonth ON policy_basic_info("대상년월");
+CREATE INDEX IF NOT EXISTS idx_policy_basic_type ON policy_basic_info("정책유형");
+CREATE INDEX IF NOT EXISTS idx_policy_basic_status ON policy_basic_info("정책상태");
+CREATE INDEX IF NOT EXISTS idx_policy_basic_input_user ON policy_basic_info("입력자ID");
 
 -- 1. 정책모드_정책표설정
 CREATE TABLE IF NOT EXISTS policy_table_settings (
@@ -192,6 +257,10 @@ CREATE INDEX IF NOT EXISTS idx_budget_data_active ON budget_basic_data_settings(
 -- ============================================================================
 -- 자동 업데이트 트리거
 -- ============================================================================
+
+CREATE OR REPLACE TRIGGER update_policy_basic_info_updated_at 
+  BEFORE UPDATE ON policy_basic_info
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE OR REPLACE TRIGGER update_policy_table_settings_updated_at 
   BEFORE UPDATE ON policy_table_settings
