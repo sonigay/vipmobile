@@ -75,30 +75,49 @@ function createPolicyRoutes(context) {
   // ============================================================================
   router.get('/policies', async (req, res) => {
     try {
-      if (!requireSheetsClient(res)) return;
-      
       console.log('정책 목록 조회 요청:', req.query);
 
       const { yearMonth, policyType, category, userId, approvalStatus } = req.query;
 
-      // 정책_기본정보 시트에서 데이터 가져오기 (캐시 무시하고 직접 조회)
-      const values = await getSheetValuesWithoutCache('정책_기본정보 ');
+      // 🔥 DAL 사용: Feature Flag에 따라 Supabase 또는 Google Sheets 자동 전환
+      const dal = dalFactory.getDAL('policy');
+      let dataRows = [];
 
-      console.log(`📊 [정책조회] 시트에서 가져온 데이터:`, {
-        totalRows: values ? values.length : 0,
-        firstRow: values && values.length > 0 ? values[0] : null,
-        lastRow: values && values.length > 1 ? values[values.length - 1] : null
-      });
-
-      if (!values || values.length === 0) {
-        console.log('정책 데이터가 없습니다.');
-        return res.json({ success: true, policies: [] });
+      try {
+        // Supabase에서 조회 시도
+        const policies = await dal.read('policy_basic_info', {});
+        
+        // Supabase 데이터를 Google Sheets 형식으로 변환 (기존 로직 재사용)
+        dataRows = policies.map(p => [
+          p["정책ID"], p["정책명"], p["정책적용일"], p["정책적용점"], p["정책내용"],
+          p["금액"], p["정책유형"], p["무선유선"], p["하위카테고리"], p["입력자ID"],
+          p["입력자명"], p["입력일시"], p["승인상태_총괄"], p["승인상태_정산팀"], p["승인상태_소속팀"],
+          p["정책상태"], p["취소사유"], p["취소일시"], p["취소자명"], p["정산반영상태"],
+          p["정산반영자명"], p["정산반영일시"], p["정산반영자ID"], p["대상년월"], p["복수점명"],
+          p["업체명"], p["개통유형"], p["95군이상금액"], p["95군미만금액"], p["소속팀"],
+          p["부가미유치금액"], p["보험미유치금액"], p["연결음미유치금액"], p["부가유치시조건"], p["보험유치시조건"],
+          p["연결음유치시조건"], p["유플레이프리미엄유치금액"], p["폰교체패스유치금액"], p["음악감상유치금액"], p["지정번호필터링유치금액"],
+          p["VAS2종동시유치조건"], p["VAS2종중1개유치조건"], p["부가3종모두유치조건"], p["요금제유형별정책JSON"], p["정산입금처"],
+          p["연합대상하부점JSON"], p["조건JSON"], p["적용대상JSON"], p["개통유형_개별"], p["담당자명"], p["직접입력여부"]
+        ]);
+        
+        console.log(`📊 [정책조회] Supabase에서 가져온 데이터: ${dataRows.length}개`);
+      } catch (dalError) {
+        console.warn('[정책조회] DAL 조회 실패, Google Sheets 폴백:', dalError.message);
+        
+        // Google Sheets 폴백
+        if (!requireSheetsClient(res)) return;
+        const values = await getSheetValuesWithoutCache('정책_기본정보 ');
+        dataRows = values.length > 1 ? values.slice(1) : values;
       }
 
-      // 헤더가 있는 경우 헤더 제거
-      const dataRows = values.length > 1 ? values.slice(1) : values;
+      console.log(`📊 [정책조회] 시트에서 가져온 데이터:`, {
+        totalRows: dataRows ? dataRows.length : 0,
+        firstRow: dataRows && dataRows.length > 0 ? dataRows[0] : null,
+        lastRow: dataRows && dataRows.length > 1 ? dataRows[dataRows.length - 1] : null
+      });
 
-      if (dataRows.length === 0) {
+      if (!dataRows || dataRows.length === 0) {
         console.log('정책 데이터가 없습니다.');
         return res.json({ success: true, policies: [] });
       }
