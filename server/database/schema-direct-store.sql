@@ -5,6 +5,21 @@
 -- 중요: 한글 컬럼명은 큰따옴표로 감싸야 합니다.
 -- 예: SELECT "통신사", "마진" FROM direct_store_policy_margin;
 --
+-- 테이블 목록:
+-- 1. direct_store_policy_margin (직영점_정책_마진)
+-- 2. direct_store_policy_addon_services (직영점_정책_부가서비스)
+-- 3. direct_store_policy_insurance (직영점_정책_보험상품)
+-- 4. direct_store_policy_special (직영점_정책_별도)
+-- 5. direct_store_settings (직영점_설정)
+-- 6. direct_store_main_page_texts (직영점_메인페이지문구)
+-- 7. direct_store_plan_master (직영점_요금제마스터)
+-- 8. direct_store_device_master (직영점_단말마스터)
+-- 9. direct_store_device_pricing_policy (직영점_단말요금정책)
+-- 10. direct_store_model_images (직영점_모델이미지)
+-- 11. direct_store_todays_mobiles (직영점_오늘의휴대폰)
+-- 12. direct_store_transit_locations (직영점_대중교통위치)
+-- 13. direct_store_photos (직영점_매장사진)
+-- 14. direct_store_sales_daily (직영점_판매일보)
 -- ============================================================================
 
 -- 1. 직영점_정책_마진
