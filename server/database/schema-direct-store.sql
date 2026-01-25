@@ -213,9 +213,9 @@ CREATE INDEX IF NOT EXISTS idx_images_model_id ON direct_store_model_images("모
 -- 11. 직영점_오늘의휴대폰
 CREATE TABLE IF NOT EXISTS direct_store_todays_mobiles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  "통신사" TEXT NOT NULL,
-  "모델ID" TEXT NOT NULL,
-  "모델명" TEXT NOT NULL,
+  "통신사" TEXT,
+  "모델ID" TEXT,
+  "모델명" TEXT,
   "펫네임" TEXT,
   "제조사" TEXT,
   "출고가" NUMERIC(10,2),
@@ -250,9 +250,9 @@ CREATE INDEX IF NOT EXISTS idx_transit_location ON direct_store_transit_location
 -- 13. 직영점_매장사진
 CREATE TABLE IF NOT EXISTS direct_store_photos (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  "매장명" TEXT NOT NULL,
+  "매장명" TEXT,
   "POS코드" TEXT,
-  "사진URL" TEXT NOT NULL,
+  "사진URL" TEXT,
   "사진타입" TEXT, -- "외부", "내부", "기타"
   "설명" TEXT,
   "촬영일시" TIMESTAMPTZ,
@@ -267,9 +267,9 @@ CREATE INDEX IF NOT EXISTS idx_photos_pos ON direct_store_photos("POS코드");
 -- 14. 직영점_판매일보
 CREATE TABLE IF NOT EXISTS direct_store_sales_daily (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  "매장명" TEXT NOT NULL,
+  "매장명" TEXT,
   "POS코드" TEXT,
-  "판매일자" DATE NOT NULL,
+  "판매일자" DATE,
   "통신사" TEXT,
   "모델명" TEXT,
   "개통유형" TEXT, -- "신규", "번호이동", "기기변경"

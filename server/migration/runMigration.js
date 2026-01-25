@@ -235,16 +235,23 @@ const MIGRATIONS = {
       sheetName: '직영점_오늘의휴대폰',
       tableName: 'direct_store_todays_mobiles',
       transformFn: (data) => {
-        // 필수 필드 체크
+        // 모든 필드가 비어있는지 체크
+        const hasAnyData = Object.values(data).some(val => val && String(val).trim());
+        if (!hasAnyData) return null; // 완전히 빈 행만 스킵
+        
         const 통신사 = (data["통신사"] || '').trim();
         const 모델ID = (data["모델ID"] || '').trim();
         const 모델명 = (data["모델명"] || '').trim();
-        if (!통신사 || !모델ID || !모델명) return null;
+        
+        // 중요 필드가 비어있으면 경고 (하지만 저장은 진행)
+        if (!통신사 || !모델ID || !모델명) {
+          console.warn(`⚠️  [직영점_오늘의휴대폰] 중요 필드 누락: 통신사=${통신사}, 모델ID=${모델ID}, 모델명=${모델명}`);
+        }
         
         return {
-          "통신사": 통신사,
-          "모델ID": 모델ID,
-          "모델명": 모델명,
+          "통신사": 통신사 || null,
+          "모델ID": 모델ID || null,
+          "모델명": 모델명 || null,
           "펫네임": (data["펫네임"] || '').trim() || null,
           "제조사": (data["제조사"] || '').trim() || null,
           "출고가": parseFloat(data["출고가"]) || null,
@@ -278,15 +285,23 @@ const MIGRATIONS = {
       sheetName: '직영점_매장사진',
       tableName: 'direct_store_photos',
       transformFn: (data) => {
-        // 필수 필드 체크
-        const 매장명 = (data["매장명"] || '').trim();
+        // 모든 필드가 비어있는지 체크
+        const hasAnyData = Object.values(data).some(val => val && String(val).trim());
+        if (!hasAnyData) return null; // 완전히 빈 행만 스킵
+        
+        // Google Sheets 실제 컬럼: 업체명, POS코드, 사진URL, 사진타입, 설명, 촬영일시, 등록일시
+        const 매장명 = (data["업체명"] || data["매장명"] || '').trim();
         const 사진URL = (data["사진URL"] || '').trim();
-        if (!매장명 || !사진URL) return null;
+        
+        // 중요 필드가 비어있으면 경고 (하지만 저장은 진행)
+        if (!매장명 || !사진URL) {
+          console.warn(`⚠️  [직영점_매장사진] 중요 필드 누락: 매장명=${매장명}, 사진URL=${사진URL}`);
+        }
         
         return {
-          "매장명": 매장명,
+          "매장명": 매장명 || null,
           "POS코드": (data["POS코드"] || '').trim() || null,
-          "사진URL": 사진URL,
+          "사진URL": 사진URL || null,
           "사진타입": (data["사진타입"] || '').trim() || null,
           "설명": (data["설명"] || '').trim() || null,
           "촬영일시": data["촬영일시"] ? new Date(data["촬영일시"]).toISOString() : null,
@@ -298,15 +313,23 @@ const MIGRATIONS = {
       sheetName: '직영점_판매일보',
       tableName: 'direct_store_sales_daily',
       transformFn: (data) => {
-        // 필수 필드 체크
-        const 매장명 = (data["매장명"] || '').trim();
-        const 판매일자 = data["판매일자"];
-        if (!매장명 || !판매일자) return null;
+        // 모든 필드가 비어있는지 체크
+        const hasAnyData = Object.values(data).some(val => val && String(val).trim());
+        if (!hasAnyData) return null; // 완전히 빈 행만 스킵
+        
+        // Google Sheets 실제 컬럼: 업체명, POS코드, 판매일시, 통신사, 모델명, 개통유형, 요금제명, 고객명, 연락처, 출고가, 이통사지원금, 대리점지원금, 실구매가, 판매자, 비고
+        const 매장명 = (data["업체명"] || data["매장명"] || '').trim();
+        const 판매일자 = data["판매일시"] || data["판매일자"];
+        
+        // 중요 필드가 비어있으면 경고 (하지만 저장은 진행)
+        if (!매장명 || !판매일자) {
+          console.warn(`⚠️  [직영점_판매일보] 중요 필드 누락: 매장명=${매장명}, 판매일자=${판매일자}`);
+        }
         
         return {
-          "매장명": 매장명,
+          "매장명": 매장명 || null,
           "POS코드": (data["POS코드"] || '').trim() || null,
-          "판매일자": new Date(판매일자),
+          "판매일자": 판매일자 ? new Date(판매일자) : null,
           "통신사": (data["통신사"] || '').trim() || null,
           "모델명": (data["모델명"] || '').trim() || null,
           "개통유형": (data["개통유형"] || '').trim() || null,
