@@ -108,6 +108,17 @@ class MigrationScript {
           // 데이터 변환 (사용자 정의 함수)
           if (transformFn) {
             data = transformFn(data, i + 1);
+            
+            // transformFn이 null을 반환하면 해당 행 스킵 (필수 필드 누락)
+            if (data === null) {
+              this.stats.failed++;
+              this.stats.errors.push({
+                row: i + 1,
+                data: row,
+                errors: ['필수 필드가 비어있어 스킵됨']
+              });
+              continue;
+            }
           }
 
           // 데이터 타입 변환 (Validator)

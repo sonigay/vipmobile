@@ -20,115 +20,323 @@ const MIGRATIONS = {
     {
       sheetName: '직영점_정책_마진',
       tableName: 'direct_store_policy_margin',
-      transformFn: (data) => ({
-        "통신사": data["통신사"],
-        "마진": parseFloat(data["마진"]) || null
-      })
+      transformFn: (data) => {
+        // 필수 필드 체크 (빈 문자열 처리)
+        const 통신사 = (data["통신사"] || '').trim();
+        if (!통신사) return null; // 필수 필드가 비어있으면 스킵
+        
+        return {
+          "통신사": 통신사,
+          "마진": parseFloat(data["마진"]) || null
+        };
+      }
     },
     {
       sheetName: '직영점_정책_부가서비스',
       tableName: 'direct_store_policy_addon_services',
-      transformFn: (data) => ({
-        "통신사": data["통신사"],
-        "서비스명": data["서비스명"],
-        "월요금": parseFloat(data["월요금"]) || null,
-        "유치추가금액": parseFloat(data["유치추가금액"]) || null,
-        "미유치차감금액": parseFloat(data["미유치차감금액"]) || null,
-        "상세설명": data["상세설명"] || null,
-        "공식사이트URL": data["공식사이트URL"] || null
-      })
+      transformFn: (data) => {
+        // 필수 필드 체크
+        const 통신사 = (data["통신사"] || '').trim();
+        const 서비스명 = (data["서비스명"] || '').trim();
+        if (!통신사 || !서비스명) return null;
+        
+        return {
+          "통신사": 통신사,
+          "서비스명": 서비스명,
+          "월요금": parseFloat(data["월요금"]) || null,
+          "유치추가금액": parseFloat(data["유치추가금액"]) || null,
+          "미유치차감금액": parseFloat(data["미유치차감금액"]) || null,
+          "상세설명": (data["상세설명"] || '').trim() || null,
+          "공식사이트URL": (data["공식사이트URL"] || '').trim() || null
+        };
+      }
     },
     {
       sheetName: '직영점_정책_보험상품',
-      tableName: 'direct_store_policy_insurance'
+      tableName: 'direct_store_policy_insurance',
+      transformFn: (data) => {
+        // 필수 필드 체크
+        const 통신사 = (data["통신사"] || '').trim();
+        const 보험상품명 = (data["보험상품명"] || '').trim();
+        if (!통신사 || !보험상품명) return null;
+        
+        return {
+          "통신사": 통신사,
+          "보험상품명": 보험상품명,
+          "월보험료": parseFloat(data["월보험료"]) || null,
+          "보장내용": (data["보장내용"] || '').trim() || null,
+          "가입조건": (data["가입조건"] || '').trim() || null,
+          "유치추가금액": parseFloat(data["유치추가금액"]) || null,
+          "미유치차감금액": parseFloat(data["미유치차감금액"]) || null,
+          "공식사이트URL": (data["공식사이트URL"] || '').trim() || null,
+          "사용여부": data["사용여부"] === 'O' || data["사용여부"] === true,
+          "비고": (data["비고"] || '').trim() || null
+        };
+      }
     },
     {
       sheetName: '직영점_정책_별도',
       tableName: 'direct_store_policy_special',
-      transformFn: (data) => ({
-        "통신사": data["통신사"],
-        "정책명": data["정책명"],
-        "정책타입": data["정책타입"] || null,
-        "금액": parseFloat(data["금액"]) || null,
-        "적용여부": data["적용여부"] === 'O' || data["적용여부"] === true,
-        "조건JSON": data["조건JSON"] ? JSON.parse(data["조건JSON"]) : null
-      })
+      transformFn: (data) => {
+        // 필수 필드 체크
+        const 통신사 = (data["통신사"] || '').trim();
+        const 정책명 = (data["정책명"] || '').trim();
+        if (!통신사 || !정책명) return null;
+        
+        return {
+          "통신사": 통신사,
+          "정책명": 정책명,
+          "정책타입": (data["정책타입"] || '').trim() || null,
+          "금액": parseFloat(data["금액"]) || null,
+          "적용여부": data["적용여부"] === 'O' || data["적용여부"] === true,
+          "조건JSON": data["조건JSON"] ? JSON.parse(data["조건JSON"]) : null
+        };
+      }
     },
     {
       sheetName: '직영점_설정',
       tableName: 'direct_store_settings',
-      transformFn: (data) => ({
-        "통신사": data["통신사"],
-        "설정유형": data["설정유형"],
-        "시트ID": data["시트ID"] || null,
-        "시트URL": data["시트URL"] || null,
-        "설정값JSON": data["설정값JSON"] ? JSON.parse(data["설정값JSON"]) : null
-      })
+      transformFn: (data) => {
+        // 필수 필드 체크
+        const 통신사 = (data["통신사"] || '').trim();
+        const 설정유형 = (data["설정유형"] || '').trim();
+        if (!통신사 || !설정유형) return null;
+        
+        return {
+          "통신사": 통신사,
+          "설정유형": 설정유형,
+          "시트ID": (data["시트ID"] || '').trim() || null,
+          "시트URL": (data["시트URL"] || '').trim() || null,
+          "설정값JSON": data["설정값JSON"] ? JSON.parse(data["설정값JSON"]) : null
+        };
+      }
     },
     {
       sheetName: '직영점_메인페이지문구',
-      tableName: 'direct_store_main_page_texts'
+      tableName: 'direct_store_main_page_texts',
+      transformFn: (data) => {
+        // 필수 필드 체크
+        const 섹션명 = (data["섹션명"] || '').trim();
+        const 문구내용 = (data["문구내용"] || '').trim();
+        if (!섹션명 || !문구내용) return null;
+        
+        return {
+          "섹션명": 섹션명,
+          "문구타입": (data["문구타입"] || '').trim() || null,
+          "문구내용": 문구내용,
+          "표시순서": parseInt(data["표시순서"]) || 0,
+          "사용여부": data["사용여부"] === 'O' || data["사용여부"] === true,
+          "스타일JSON": data["스타일JSON"] ? JSON.parse(data["스타일JSON"]) : null,
+          "비고": (data["비고"] || '').trim() || null
+        };
+      }
     },
     {
       sheetName: '직영점_요금제마스터',
       tableName: 'direct_store_plan_master',
-      transformFn: (data) => ({
-        "통신사": data["통신사"],
-        "요금제명": data["요금제명"],
-        "요금제군": data["요금제군"] || null,
-        "기본료": parseFloat(data["기본료"]) || null,
-        "요금제코드": data["요금제코드"] || null,
-        "사용여부": data["사용여부"] === 'O' || data["사용여부"] === true,
-        "비고": data["비고"] || null
-      })
+      transformFn: (data) => {
+        // 필수 필드 체크
+        const 통신사 = (data["통신사"] || '').trim();
+        const 요금제명 = (data["요금제명"] || '').trim();
+        if (!통신사 || !요금제명) return null;
+        
+        return {
+          "통신사": 통신사,
+          "요금제명": 요금제명,
+          "요금제군": (data["요금제군"] || '').trim() || null,
+          "기본료": parseFloat(data["기본료"]) || null,
+          "요금제코드": (data["요금제코드"] || '').trim() || null,
+          "사용여부": data["사용여부"] === 'O' || data["사용여부"] === true,
+          "비고": (data["비고"] || '').trim() || null
+        };
+      }
     },
     {
       sheetName: '직영점_단말마스터',
       tableName: 'direct_store_device_master',
-      transformFn: (data) => ({
-        "통신사": data["통신사"],
-        "모델ID": data["모델ID"],
-        "모델명": data["모델명"],
-        "펫네임": data["펫네임"] || null,
-        "제조사": data["제조사"] || null,
-        "출고가": parseFloat(data["출고가"]) || null,
-        "기본요금제군": data["기본요금제군"] || null,
-        "isPremium": data["isPremium"] === 'O' || data["isPremium"] === true,
-        "isBudget": data["isBudget"] === 'O' || data["isBudget"] === true,
-        "isPopular": data["isPopular"] === 'O' || data["isPopular"] === true,
-        "isRecommended": data["isRecommended"] === 'O' || data["isRecommended"] === true,
-        "isCheap": data["isCheap"] === 'O' || data["isCheap"] === true,
-        "이미지URL": data["이미지URL"] || null,
-        "사용여부": data["사용여부"] === 'O' || data["사용여부"] === true,
-        "비고": data["비고"] || null,
-        "Discord메시지ID": data["Discord메시지ID"] || null,
-        "Discord포스트ID": data["Discord포스트ID"] || null,
-        "Discord스레드ID": data["Discord스레드ID"] || null
-      })
+      transformFn: (data) => {
+        // 필수 필드 체크
+        const 통신사 = (data["통신사"] || '').trim();
+        const 모델ID = (data["모델ID"] || '').trim();
+        const 모델명 = (data["모델명"] || '').trim();
+        if (!통신사 || !모델ID || !모델명) return null;
+        
+        return {
+          "통신사": 통신사,
+          "모델ID": 모델ID,
+          "모델명": 모델명,
+          "펫네임": (data["펫네임"] || '').trim() || null,
+          "제조사": (data["제조사"] || '').trim() || null,
+          "출고가": parseFloat(data["출고가"]) || null,
+          "기본요금제군": (data["기본요금제군"] || '').trim() || null,
+          "isPremium": data["isPremium"] === 'O' || data["isPremium"] === true,
+          "isBudget": data["isBudget"] === 'O' || data["isBudget"] === true,
+          "isPopular": data["isPopular"] === 'O' || data["isPopular"] === true,
+          "isRecommended": data["isRecommended"] === 'O' || data["isRecommended"] === true,
+          "isCheap": data["isCheap"] === 'O' || data["isCheap"] === true,
+          "이미지URL": (data["이미지URL"] || '').trim() || null,
+          "사용여부": data["사용여부"] === 'O' || data["사용여부"] === true,
+          "비고": (data["비고"] || '').trim() || null,
+          "Discord메시지ID": (data["Discord메시지ID"] || '').trim() || null,
+          "Discord포스트ID": (data["Discord포스트ID"] || '').trim() || null,
+          "Discord스레드ID": (data["Discord스레드ID"] || '').trim() || null
+        };
+      }
     },
     {
       sheetName: '직영점_단말요금정책',
-      tableName: 'direct_store_device_pricing_policy'
+      tableName: 'direct_store_device_pricing_policy',
+      transformFn: (data) => {
+        // 필수 필드 체크
+        const 통신사 = (data["통신사"] || '').trim();
+        const 모델ID = (data["모델ID"] || '').trim();
+        if (!통신사 || !모델ID) return null;
+        
+        return {
+          "통신사": 통신사,
+          "모델ID": 모델ID,
+          "요금제명": (data["요금제명"] || '').trim() || null,
+          "개통유형": (data["개통유형"] || '').trim() || null,
+          "출고가": parseFloat(data["출고가"]) || null,
+          "이통사지원금": parseFloat(data["이통사지원금"]) || null,
+          "대리점지원금": parseFloat(data["대리점지원금"]) || null,
+          "추가지원금": parseFloat(data["추가지원금"]) || null,
+          "공시지원금": parseFloat(data["공시지원금"]) || null,
+          "선택약정할인": parseFloat(data["선택약정할인"]) || null,
+          "최종구매가": parseFloat(data["최종구매가"]) || null,
+          "적용시작일": data["적용시작일"] ? new Date(data["적용시작일"]) : null,
+          "적용종료일": data["적용종료일"] ? new Date(data["적용종료일"]) : null,
+          "사용여부": data["사용여부"] === 'O' || data["사용여부"] === true,
+          "비고": (data["비고"] || '').trim() || null
+        };
+      }
     },
     {
       sheetName: '직영점_모델이미지',
-      tableName: 'direct_store_model_images'
+      tableName: 'direct_store_model_images',
+      transformFn: (data) => {
+        // 필수 필드 체크
+        const 통신사 = (data["통신사"] || '').trim();
+        const 모델ID = (data["모델ID"] || '').trim();
+        const 이미지URL = (data["이미지URL"] || '').trim();
+        if (!통신사 || !모델ID || !이미지URL) return null;
+        
+        return {
+          "통신사": 통신사,
+          "모델ID": 모델ID,
+          "이미지타입": (data["이미지타입"] || '').trim() || '메인',
+          "이미지URL": 이미지URL,
+          "Discord메시지ID": (data["Discord메시지ID"] || '').trim() || null,
+          "Discord포스트ID": (data["Discord포스트ID"] || '').trim() || null,
+          "Discord스레드ID": (data["Discord스레드ID"] || '').trim() || null,
+          "표시순서": parseInt(data["표시순서"]) || 0,
+          "사용여부": data["사용여부"] === 'O' || data["사용여부"] === true,
+          "비고": (data["비고"] || '').trim() || null
+        };
+      }
     },
     {
       sheetName: '직영점_오늘의휴대폰',
-      tableName: 'direct_store_todays_mobiles'
+      tableName: 'direct_store_todays_mobiles',
+      transformFn: (data) => {
+        // 필수 필드 체크
+        const 통신사 = (data["통신사"] || '').trim();
+        const 모델ID = (data["모델ID"] || '').trim();
+        const 모델명 = (data["모델명"] || '').trim();
+        if (!통신사 || !모델ID || !모델명) return null;
+        
+        return {
+          "통신사": 통신사,
+          "모델ID": 모델ID,
+          "모델명": 모델명,
+          "펫네임": (data["펫네임"] || '').trim() || null,
+          "요금제명": (data["요금제명"] || '').trim() || null,
+          "개통유형": (data["개통유형"] || '').trim() || null,
+          "출고가": parseFloat(data["출고가"]) || null,
+          "이통사지원금": parseFloat(data["이통사지원금"]) || null,
+          "대리점지원금": parseFloat(data["대리점지원금"]) || null,
+          "최종구매가": parseFloat(data["최종구매가"]) || null,
+          "특별혜택": (data["특별혜택"] || '').trim() || null,
+          "표시시작일시": data["표시시작일시"] ? new Date(data["표시시작일시"]).toISOString() : new Date().toISOString(),
+          "표시종료일시": data["표시종료일시"] ? new Date(data["표시종료일시"]).toISOString() : null,
+          "표시순서": parseInt(data["표시순서"]) || 0,
+          "사용여부": data["사용여부"] === 'O' || data["사용여부"] === true,
+          "비고": (data["비고"] || '').trim() || null
+        };
+      }
     },
     {
       sheetName: '직영점_대중교통위치',
-      tableName: 'direct_store_transit_locations'
+      tableName: 'direct_store_transit_locations',
+      transformFn: (data) => {
+        // 필수 필드 체크
+        const 교통수단타입 = (data["교통수단타입"] || '').trim();
+        const 노선명 = (data["노선명"] || '').trim();
+        if (!교통수단타입 || !노선명) return null;
+        
+        return {
+          "교통수단타입": 교통수단타입,
+          "노선명": 노선명,
+          "정류장명": (data["정류장명"] || '').trim() || null,
+          "위도": parseFloat(data["위도"]) || null,
+          "경도": parseFloat(data["경도"]) || null,
+          "매장까지거리": parseFloat(data["매장까지거리"]) || null,
+          "도보소요시간": parseInt(data["도보소요시간"]) || null,
+          "표시순서": parseInt(data["표시순서"]) || 0,
+          "사용여부": data["사용여부"] === 'O' || data["사용여부"] === true,
+          "비고": (data["비고"] || '').trim() || null
+        };
+      }
     },
     {
       sheetName: '직영점_매장사진',
-      tableName: 'direct_store_photos'
+      tableName: 'direct_store_photos',
+      transformFn: (data) => {
+        // 필수 필드 체크
+        const 사진URL = (data["사진URL"] || '').trim();
+        if (!사진URL) return null;
+        
+        return {
+          "사진타입": (data["사진타입"] || '').trim() || '매장외관',
+          "사진제목": (data["사진제목"] || '').trim() || null,
+          "사진URL": 사진URL,
+          "Discord메시지ID": (data["Discord메시지ID"] || '').trim() || null,
+          "Discord포스트ID": (data["Discord포스트ID"] || '').trim() || null,
+          "Discord스레드ID": (data["Discord스레드ID"] || '').trim() || null,
+          "표시순서": parseInt(data["표시순서"]) || 0,
+          "사용여부": data["사용여부"] === 'O' || data["사용여부"] === true,
+          "비고": (data["비고"] || '').trim() || null
+        };
+      }
     },
     {
       sheetName: '직영점_판매일보',
-      tableName: 'direct_store_sales_daily'
+      tableName: 'direct_store_sales_daily',
+      transformFn: (data) => {
+        // 필수 필드 체크
+        const 통신사 = (data["통신사"] || '').trim();
+        const 모델ID = (data["모델ID"] || '').trim();
+        const 모델명 = (data["모델명"] || '').trim();
+        if (!통신사 || !모델ID || !모델명) return null;
+        
+        return {
+          "판매일자": data["판매일자"] ? new Date(data["판매일자"]) : new Date(),
+          "통신사": 통신사,
+          "모델ID": 모델ID,
+          "모델명": 모델명,
+          "개통유형": (data["개통유형"] || '').trim() || null,
+          "요금제명": (data["요금제명"] || '').trim() || null,
+          "판매수량": parseInt(data["판매수량"]) || 1,
+          "출고가": parseFloat(data["출고가"]) || null,
+          "이통사지원금": parseFloat(data["이통사지원금"]) || null,
+          "대리점지원금": parseFloat(data["대리점지원금"]) || null,
+          "최종판매가": parseFloat(data["최종판매가"]) || null,
+          "담당자": (data["담당자"] || '').trim() || null,
+          "고객명": (data["고객명"] || '').trim() || null,
+          "고객연락처": (data["고객연락처"] || '').trim() || null,
+          "비고": (data["비고"] || '').trim() || null
+        };
+      }
     }
   ],
 
@@ -136,43 +344,171 @@ const MIGRATIONS = {
   policy: [
     {
       sheetName: '정책모드_정책표설정',
-      tableName: 'policy_table_settings'
+      tableName: 'policy_table_settings',
+      transformFn: (data) => {
+        const 정책표ID = (data["정책표ID"] || '').trim();
+        const 정책표명 = (data["정책표명"] || '').trim();
+        if (!정책표ID || !정책표명) return null;
+        
+        return {
+          "정책표ID": 정책표ID,
+          "정책표명": 정책표명,
+          "시트ID": (data["시트ID"] || '').trim() || null,
+          "시트URL": (data["시트URL"] || '').trim() || null,
+          "사용여부": data["사용여부"] === 'O' || data["사용여부"] === true,
+          "비고": (data["비고"] || '').trim() || null
+        };
+      }
     },
     {
       sheetName: '정책모드_정책표목록',
-      tableName: 'policy_table_list'
+      tableName: 'policy_table_list',
+      transformFn: (data) => {
+        const 정책표ID = (data["정책표ID"] || '').trim();
+        const 정책명 = (data["정책명"] || '').trim();
+        if (!정책표ID || !정책명) return null;
+        
+        return {
+          "정책표ID": 정책표ID,
+          "정책명": 정책명,
+          "정책내용": (data["정책내용"] || '').trim() || null,
+          "표시순서": parseInt(data["표시순서"]) || 0,
+          "사용여부": data["사용여부"] === 'O' || data["사용여부"] === true,
+          "비고": (data["비고"] || '').trim() || null
+        };
+      }
     },
     {
       sheetName: '정책모드_일반사용자그룹',
-      tableName: 'policy_user_groups'
+      tableName: 'policy_user_groups',
+      transformFn: (data) => {
+        const 그룹ID = (data["그룹ID"] || '').trim();
+        const 그룹명 = (data["그룹명"] || '').trim();
+        if (!그룹ID || !그룹명) return null;
+        
+        return {
+          "그룹ID": 그룹ID,
+          "그룹명": 그룹명,
+          "그룹설명": (data["그룹설명"] || '').trim() || null,
+          "사용여부": data["사용여부"] === 'O' || data["사용여부"] === true,
+          "비고": (data["비고"] || '').trim() || null
+        };
+      }
     },
     {
       sheetName: '정책표목록_탭순서',
-      tableName: 'policy_tab_order'
+      tableName: 'policy_tab_order',
+      transformFn: (data) => {
+        const 정책표ID = (data["정책표ID"] || '').trim();
+        const 탭명 = (data["탭명"] || '').trim();
+        if (!정책표ID || !탭명) return null;
+        
+        return {
+          "정책표ID": 정책표ID,
+          "탭명": 탭명,
+          "표시순서": parseInt(data["표시순서"]) || 0,
+          "사용여부": data["사용여부"] === 'O' || data["사용여부"] === true,
+          "비고": (data["비고"] || '').trim() || null
+        };
+      }
     },
     {
       sheetName: '정책모드_정책영업그룹_변경이력',
-      tableName: 'policy_group_change_history'
+      tableName: 'policy_group_change_history',
+      transformFn: (data) => {
+        const 변경일시 = data["변경일시"] ? new Date(data["변경일시"]).toISOString() : new Date().toISOString();
+        const 변경자 = (data["변경자"] || '').trim();
+        if (!변경자) return null;
+        
+        return {
+          "변경일시": 변경일시,
+          "변경자": 변경자,
+          "변경내용": (data["변경내용"] || '').trim() || null,
+          "이전그룹ID": (data["이전그룹ID"] || '').trim() || null,
+          "신규그룹ID": (data["신규그룹ID"] || '').trim() || null,
+          "비고": (data["비고"] || '').trim() || null
+        };
+      }
     },
     {
       sheetName: '정책모드_기본정책영업그룹',
-      tableName: 'policy_default_groups'
+      tableName: 'policy_default_groups',
+      transformFn: (data) => {
+        const 그룹ID = (data["그룹ID"] || '').trim();
+        const 그룹명 = (data["그룹명"] || '').trim();
+        if (!그룹ID || !그룹명) return null;
+        
+        return {
+          "그룹ID": 그룹ID,
+          "그룹명": 그룹명,
+          "그룹설명": (data["그룹설명"] || '').trim() || null,
+          "사용여부": data["사용여부"] === 'O' || data["사용여부"] === true,
+          "비고": (data["비고"] || '').trim() || null
+        };
+      }
     },
     {
       sheetName: '정책모드_기타정책목록',
-      tableName: 'policy_other_types'
+      tableName: 'policy_other_types',
+      transformFn: (data) => {
+        const 정책타입 = (data["정책타입"] || '').trim();
+        const 정책명 = (data["정책명"] || '').trim();
+        if (!정책타입 || !정책명) return null;
+        
+        return {
+          "정책타입": 정책타입,
+          "정책명": 정책명,
+          "정책내용": (data["정책내용"] || '').trim() || null,
+          "사용여부": data["사용여부"] === 'O' || data["사용여부"] === true,
+          "비고": (data["비고"] || '').trim() || null
+        };
+      }
     },
     {
       sheetName: '예산모드_예산채널설정',
-      tableName: 'budget_channel_settings'
+      tableName: 'budget_channel_settings',
+      transformFn: (data) => {
+        const 채널명 = (data["채널명"] || '').trim();
+        if (!채널명) return null;
+        
+        return {
+          "채널명": 채널명,
+          "채널설명": (data["채널설명"] || '').trim() || null,
+          "예산금액": parseFloat(data["예산금액"]) || null,
+          "사용여부": data["사용여부"] === 'O' || data["사용여부"] === true,
+          "비고": (data["비고"] || '').trim() || null
+        };
+      }
     },
     {
       sheetName: '예산모드_기본예산설정',
-      tableName: 'budget_basic_settings'
+      tableName: 'budget_basic_settings',
+      transformFn: (data) => {
+        const 예산항목 = (data["예산항목"] || '').trim();
+        if (!예산항목) return null;
+        
+        return {
+          "예산항목": 예산항목,
+          "예산금액": parseFloat(data["예산금액"]) || null,
+          "사용여부": data["사용여부"] === 'O' || data["사용여부"] === true,
+          "비고": (data["비고"] || '').trim() || null
+        };
+      }
     },
     {
       sheetName: '예산모드_기본데이터설정',
-      tableName: 'budget_basic_data_settings'
+      tableName: 'budget_basic_data_settings',
+      transformFn: (data) => {
+        const 데이터항목 = (data["데이터항목"] || '').trim();
+        if (!데이터항목) return null;
+        
+        return {
+          "데이터항목": 데이터항목,
+          "데이터값": (data["데이터값"] || '').trim() || null,
+          "사용여부": data["사용여부"] === 'O' || data["사용여부"] === true,
+          "비고": (data["비고"] || '').trim() || null
+        };
+      }
     }
   ],
 
@@ -181,106 +517,163 @@ const MIGRATIONS = {
     {
       sheetName: '사전예약사이트',  // 실제 시트 이름
       tableName: 'customer_info',
-      transformFn: (data) => ({
-        "고객명": data["고객명"] || data["성명"],
-        "연락처": data["연락처"] || data["고객전화번호"],
-        "이메일": data["이메일"] || null,
-        "생년월일": data["생년월일"] ? new Date(data["생년월일"]) : null,
-        "주소": data["주소"] || null,
-        "선호매장": data["선호매장"] || null,
-        "선호매장POS코드": data["선호매장POS코드"] || null,
-        "가입일시": data["가입일시"] ? new Date(data["가입일시"]).toISOString() : null,
-        "최근방문일시": data["최근방문일시"] ? new Date(data["최근방문일시"]).toISOString() : null,
-        "총구매횟수": parseInt(data["총구매횟수"]) || 0,
-        "회원등급": data["회원등급"] || null,
-        "비고": data["비고"] || null
-      })
+      transformFn: (data) => {
+        const 고객명 = (data["고객명"] || data["성명"] || '').trim();
+        const 연락처 = (data["연락처"] || data["고객전화번호"] || '').trim();
+        if (!고객명 || !연락처) return null;
+        
+        return {
+          "고객명": 고객명,
+          "연락처": 연락처,
+          "이메일": (data["이메일"] || '').trim() || null,
+          "생년월일": data["생년월일"] ? new Date(data["생년월일"]) : null,
+          "주소": (data["주소"] || '').trim() || null,
+          "선호매장": (data["선호매장"] || '').trim() || null,
+          "선호매장POS코드": (data["선호매장POS코드"] || '').trim() || null,
+          "가입일시": data["가입일시"] ? new Date(data["가입일시"]).toISOString() : null,
+          "최근방문일시": data["최근방문일시"] ? new Date(data["최근방문일시"]).toISOString() : null,
+          "총구매횟수": parseInt(data["총구매횟수"]) || 0,
+          "회원등급": (data["회원등급"] || '').trim() || null,
+          "비고": (data["비고"] || '').trim() || null
+        };
+      }
     },
     {
       sheetName: '직영점_구매대기',  // 실제 시트 이름
       tableName: 'purchase_queue',
-      transformFn: (data) => ({
-        "고객명": data["고객명"],
-        "연락처": data["연락처"],
-        "매장명": data["매장명"] || null,
-        "매장POS코드": data["매장POS코드"] || null,
-        "통신사": data["통신사"] || null,
-        "모델명": data["모델명"] || null,
-        "펫네임": data["펫네임"] || null,
-        "개통유형": data["개통유형"] || null,
-        "요금제명": data["요금제명"] || null,
-        "출고가": parseFloat(data["출고가"]) || null,
-        "이통사지원금": parseFloat(data["이통사지원금"]) || null,
-        "대리점지원금": parseFloat(data["대리점지원금"]) || null,
-        "예상구매가": parseFloat(data["예상구매가"]) || null,
-        "상태": data["상태"] || '구매대기',
-        "등록일시": data["등록일시"] ? new Date(data["등록일시"]).toISOString() : new Date().toISOString(),
-        "처리일시": data["처리일시"] ? new Date(data["처리일시"]).toISOString() : null,
-        "처리자": data["처리자"] || null,
-        "비고": data["비고"] || null
-      })
+      transformFn: (data) => {
+        const 고객명 = (data["고객명"] || '').trim();
+        const 연락처 = (data["연락처"] || '').trim();
+        if (!고객명 || !연락처) return null;
+        
+        return {
+          "고객명": 고객명,
+          "연락처": 연락처,
+          "매장명": (data["매장명"] || '').trim() || null,
+          "매장POS코드": (data["매장POS코드"] || '').trim() || null,
+          "통신사": (data["통신사"] || '').trim() || null,
+          "모델명": (data["모델명"] || '').trim() || null,
+          "펫네임": (data["펫네임"] || '').trim() || null,
+          "개통유형": (data["개통유형"] || '').trim() || null,
+          "요금제명": (data["요금제명"] || '').trim() || null,
+          "출고가": parseFloat(data["출고가"]) || null,
+          "이통사지원금": parseFloat(data["이통사지원금"]) || null,
+          "대리점지원금": parseFloat(data["대리점지원금"]) || null,
+          "예상구매가": parseFloat(data["예상구매가"]) || null,
+          "상태": (data["상태"] || '').trim() || '구매대기',
+          "등록일시": data["등록일시"] ? new Date(data["등록일시"]).toISOString() : new Date().toISOString(),
+          "처리일시": data["처리일시"] ? new Date(data["처리일시"]).toISOString() : null,
+          "처리자": (data["처리자"] || '').trim() || null,
+          "비고": (data["비고"] || '').trim() || null
+        };
+      }
     },
     {
       sheetName: '직영점_게시판',  // 실제 시트 이름
-      tableName: 'board'
+      tableName: 'board',
+      transformFn: (data) => {
+        const 제목 = (data["제목"] || '').trim();
+        const 내용 = (data["내용"] || '').trim();
+        const 작성자 = (data["작성자"] || '').trim();
+        if (!제목 || !내용 || !작성자) return null;
+        
+        return {
+          "제목": 제목,
+          "내용": 내용,
+          "작성자": 작성자,
+          "작성일시": data["작성일시"] ? new Date(data["작성일시"]).toISOString() : new Date().toISOString(),
+          "조회수": parseInt(data["조회수"]) || 0,
+          "공지여부": data["공지여부"] === 'O' || data["공지여부"] === true,
+          "비고": (data["비고"] || '').trim() || null
+        };
+      }
     },
     {
       sheetName: '직영점_사전승낙서마크',
-      tableName: 'direct_store_pre_approval_marks'
+      tableName: 'direct_store_pre_approval_marks',
+      transformFn: (data) => {
+        const 마크명 = (data["마크명"] || '').trim();
+        if (!마크명) return null;
+        
+        return {
+          "마크명": 마크명,
+          "마크설명": (data["마크설명"] || '').trim() || null,
+          "사용여부": data["사용여부"] === 'O' || data["사용여부"] === true,
+          "비고": (data["비고"] || '').trim() || null
+        };
+      }
     },
     {
       sheetName: '사전예약사이트',  // 예약판매전체고객도 사전예약사이트에서 가져옴
       tableName: 'reservation_all_customers',
-      transformFn: (data) => ({
-        "고객명": data["고객명"] || data["성명"],
-        "연락처": data["연락처"] || data["고객전화번호"],
-        "예약모델명": data["예약모델명"] || data["모델명"],
-        "예약통신사": data["예약통신사"] || data["통신사"],
-        "예약매장": data["예약매장"] || null,
-        "예약매장POS코드": data["예약매장POS코드"] || null,
-        "예약일시": data["예약일시"] ? new Date(data["예약일시"]).toISOString() : new Date().toISOString(),
-        "예약상태": data["예약상태"] || data["개통상태"] || '예약대기',
-        "예약금": parseFloat(data["예약금"]) || null,
-        "예약금입금여부": data["예약금입금여부"] === 'O' || data["예약금입금여부"] === true,
-        "비고": data["비고"] || null
-      })
+      transformFn: (data) => {
+        const 고객명 = (data["고객명"] || data["성명"] || '').trim();
+        const 연락처 = (data["연락처"] || data["고객전화번호"] || '').trim();
+        if (!고객명 || !연락처) return null;
+        
+        return {
+          "고객명": 고객명,
+          "연락처": 연락처,
+          "예약모델명": (data["예약모델명"] || data["모델명"] || '').trim() || null,
+          "예약통신사": (data["예약통신사"] || data["통신사"] || '').trim() || null,
+          "예약매장": (data["예약매장"] || '').trim() || null,
+          "예약매장POS코드": (data["예약매장POS코드"] || '').trim() || null,
+          "예약일시": data["예약일시"] ? new Date(data["예약일시"]).toISOString() : new Date().toISOString(),
+          "예약상태": (data["예약상태"] || data["개통상태"] || '').trim() || '예약대기',
+          "예약금": parseFloat(data["예약금"]) || null,
+          "예약금입금여부": data["예약금입금여부"] === 'O' || data["예약금입금여부"] === true,
+          "비고": (data["비고"] || '').trim() || null
+        };
+      }
     },
     {
       sheetName: '사전예약사이트',  // 예약판매고객도 사전예약사이트에서 가져옴
       tableName: 'reservation_customers',
-      transformFn: (data) => ({
-        "고객명": data["고객명"] || data["성명"],
-        "연락처": data["연락처"] || data["고객전화번호"],
-        "예약모델명": data["예약모델명"] || data["모델명"],
-        "예약통신사": data["예약통신사"] || data["통신사"],
-        "예약매장": data["예약매장"] || null,
-        "예약매장POS코드": data["예약매장POS코드"] || null,
-        "예약일시": data["예약일시"] ? new Date(data["예약일시"]).toISOString() : new Date().toISOString(),
-        "희망개통일": data["희망개통일"] ? new Date(data["희망개통일"]) : null,
-        "예약상태": data["예약상태"] || data["개통상태"] || '예약대기',
-        "예약금": parseFloat(data["예약금"]) || null,
-        "예약금입금일시": data["예약금입금일시"] ? new Date(data["예약금입금일시"]).toISOString() : null,
-        "예약금환불일시": data["예약금환불일시"] ? new Date(data["예약금환불일시"]).toISOString() : null,
-        "구매완료일시": data["구매완료일시"] ? new Date(data["구매완료일시"]).toISOString() : null,
-        "담당자": data["담당자"] || null,
-        "상세메모": data["상세메모"] || data["비고"] || null
-      })
+      transformFn: (data) => {
+        const 고객명 = (data["고객명"] || data["성명"] || '').trim();
+        const 연락처 = (data["연락처"] || data["고객전화번호"] || '').trim();
+        if (!고객명 || !연락처) return null;
+        
+        return {
+          "고객명": 고객명,
+          "연락처": 연락처,
+          "예약모델명": (data["예약모델명"] || data["모델명"] || '').trim() || null,
+          "예약통신사": (data["예약통신사"] || data["통신사"] || '').trim() || null,
+          "예약매장": (data["예약매장"] || '').trim() || null,
+          "예약매장POS코드": (data["예약매장POS코드"] || '').trim() || null,
+          "예약일시": data["예약일시"] ? new Date(data["예약일시"]).toISOString() : new Date().toISOString(),
+          "희망개통일": data["희망개통일"] ? new Date(data["희망개통일"]) : null,
+          "예약상태": (data["예약상태"] || data["개통상태"] || '').trim() || '예약대기',
+          "예약금": parseFloat(data["예약금"]) || null,
+          "예약금입금일시": data["예약금입금일시"] ? new Date(data["예약금입금일시"]).toISOString() : null,
+          "예약금환불일시": data["예약금환불일시"] ? new Date(data["예약금환불일시"]).toISOString() : null,
+          "구매완료일시": data["구매완료일시"] ? new Date(data["구매완료일시"]).toISOString() : null,
+          "담당자": (data["담당자"] || '').trim() || null,
+          "상세메모": (data["상세메모"] || data["비고"] || '').trim() || null
+        };
+      }
     },
     {
       sheetName: '마당접수',  // 미매칭고객은 마당접수, 온세일, 모바일가입내역에서 추출
       tableName: 'unmatched_customers',
-      transformFn: (data) => ({
-        "고객명": data["고객명"] || data["성명"],
-        "연락처": data["연락처"] || data["전화번호"],
-        "매장명": data["매장명"] || null,
-        "매장POS코드": data["매장POS코드"] || null,
-        "문의내용": data["문의내용"] || null,
-        "문의일시": data["문의일시"] ? new Date(data["문의일시"]).toISOString() : new Date().toISOString(),
-        "매칭상태": data["매칭상태"] || '미매칭',
-        "매칭일시": data["매칭일시"] ? new Date(data["매칭일시"]).toISOString() : null,
-        "매칭담당자": data["매칭담당자"] || null,
-        "처리메모": data["처리메모"] || null
-      })
+      transformFn: (data) => {
+        const 고객명 = (data["고객명"] || data["성명"] || '').trim();
+        const 연락처 = (data["연락처"] || data["전화번호"] || '').trim();
+        if (!고객명 || !연락처) return null;
+        
+        return {
+          "고객명": 고객명,
+          "연락처": 연락처,
+          "매장명": (data["매장명"] || '').trim() || null,
+          "매장POS코드": (data["매장POS코드"] || '').trim() || null,
+          "문의내용": (data["문의내용"] || '').trim() || null,
+          "문의일시": data["문의일시"] ? new Date(data["문의일시"]).toISOString() : new Date().toISOString(),
+          "매칭상태": (data["매칭상태"] || '').trim() || '미매칭',
+          "매칭일시": data["매칭일시"] ? new Date(data["매칭일시"]).toISOString() : null,
+          "매칭담당자": (data["매칭담당자"] || '').trim() || null,
+          "처리메모": (data["처리메모"] || '').trim() || null
+        };
+      }
     }
   ]
 };
