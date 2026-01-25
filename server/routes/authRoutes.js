@@ -322,65 +322,80 @@ function createAuthRoutes(context) {
   // POST /api/verify-password - 비밀번호 검증
   router.post('/api/verify-password', async (req, res) => {
     try {
-      if (!requireSheetsClient(res)) return;
+      const { storeId, password } = req.body;
 
-      const { userId, password } = req.body;
-
-      if (!userId || !password) {
+      if (!storeId || !password) {
         return res.status(400).json({
           success: false,
-          error: '사용자 ID와 비밀번호가 필요합니다.'
+          error: '아이디와 패스워드를 입력해주세요'
         });
       }
 
-      // 대리점 정보 조회
+      // 대리점아이디관리 시트에서 사용자 정보 가져오기
       const agentValues = await getSheetValues(AGENT_SHEET_NAME);
-      
       if (!agentValues) {
-        throw new Error('Failed to fetch agent data');
+        return res.status(500).json({
+          success: false,
+          error: '시트 데이터를 가져올 수 없습니다'
+        });
       }
 
-      const agentRows = agentValues.slice(1); // 헤더 1행 제외 (원본과 동일)
-      const agentRow = agentRows.find(row => {
-        const rowUserId = (row[2] || '').toString().trim(); // C열: 연락처(아이디)
-        return rowUserId === userId;
-      });
+      const agentRows = agentValues.slice(1);
+      const agent = agentRows.find(row => row[2] === storeId); // C열: 아이디
 
-      if (!agentRow) {
+      if (!agent) {
         return res.status(404).json({
           success: false,
-          error: '사용자를 찾을 수 없습니다.'
+          error: '사용자를 찾을 수 없습니다'
         });
       }
 
-      const storedPassword = (agentRow[4] || '').toString().trim(); // E열: 패스워드
-      const passwordNotUsed = agentRow[3] === 'TRUE'; // D열: 패스워드 미사용
+      const passwordNotUsed = agent[3] === 'TRUE'; // D열: 패스워드 미사용
+      const storedPassword = agent[4] || ''; // E열: 패스워드
 
-      // 패스워드 미사용 체크박스가 체크되어 있으면 비밀번호 검증 스킵
+      console.log(`🔐 [패스워드 검증] 사용자: ${storeId}, 패스워드 미사용: ${passwordNotUsed}`);
+
+      // 패스워드 미사용인 경우, 접속 허용
       if (passwordNotUsed) {
+        console.log(`✅ [패스워드 검증] 패스워드 미사용 - 접속 허용`);
         return res.json({
           success: true,
-          message: '비밀번호 검증 성공 (패스워드 미사용)'
+          verified: true,
+          message: '패스워드 미사용 - 접속 허용'
         });
       }
 
-      // 비밀번호 검증
-      if (storedPassword !== password) {
-        return res.status(401).json({
+      // 패스워드가 설정되지 않은 경우 - 접속 거부
+      if (!storedPassword) {
+        console.log(`❌ [패스워드 검증] 패스워드가 설정되지 않음 - 접속 거부`);
+        return res.json({
           success: false,
-          error: '비밀번호가 일치하지 않습니다.'
+          verified: false,
+          error: '패스워드가 설정되지 않았습니다. 관리자에게 문의하세요.'
         });
       }
 
-      res.json({
-        success: true,
-        message: '비밀번호 검증 성공'
-      });
+      // 패스워드 검증
+      if (storedPassword === password) {
+        console.log(`✅ [패스워드 검증] 패스워드 일치 - 접속 허용`);
+        return res.json({
+          success: true,
+          verified: true,
+          message: '패스워드 일치'
+        });
+      } else {
+        console.log(`❌ [패스워드 검증] 패스워드 불일치`);
+        return res.json({
+          success: false,
+          verified: false,
+          error: '패스워드가 일치하지 않습니다'
+        });
+      }
     } catch (error) {
-      console.error('❌ [비밀번호 검증] 에러:', error);
-      res.status(500).json({
+      console.error('❌ [패스워드 검증] 오류:', error);
+      return res.status(500).json({
         success: false,
-        error: 'Failed to verify password',
+        error: '패스워드 검증 중 오류가 발생했습니다',
         message: error.message
       });
     }
