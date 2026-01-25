@@ -391,6 +391,15 @@ try {
   console.error('❌ [Additional] Failed to mount direct store additional routes:', e.message);
 }
 
+// DAL 기반 직영점 라우트 (Supabase/Google Sheets 자동 전환)
+try {
+  const directStoreDALRoutes = require('./routes/directStoreDALRoutes');
+  app.use('/api/direct-dal', directStoreDALRoutes);
+  console.log('✅ [DAL] Direct Store DAL routes mounted at /api/direct-dal');
+} catch (e) {
+  console.error('❌ [DAL] Failed to mount direct store DAL routes:', e.message);
+}
+
 // 기존 라우트 등록
 try {
   setupDirectRoutes(app);
