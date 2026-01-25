@@ -108,18 +108,19 @@ class MigrationScript {
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
         
-        // row 객체를 일반 객체로 변환 (toObject 메서드가 없을 경우 대비)
+        // row 객체를 일반 객체로 변환 - 헤더 이름으로 직접 접근
         let data = {};
-        if (typeof row.toObject === 'function') {
-          data = row.toObject();
-        } else {
-          // toObject 메서드가 없으면 직접 속성 복사
-          const headers = Object.keys(row._rawData || row);
-          headers.forEach(header => {
-            if (!header.startsWith('_')) {
-              data[header] = row[header];
-            }
+        
+        // google-spreadsheet v3는 row[headerName]으로 접근
+        if (sheet.headerValues && sheet.headerValues.length > 0) {
+          sheet.headerValues.forEach(header => {
+            data[header] = row.get(header);
           });
+        } else {
+          // 헤더가 없으면 toObject 시도
+          if (typeof row.toObject === 'function') {
+            data = row.toObject();
+          }
         }
 
         try {
@@ -145,7 +146,7 @@ class MigrationScript {
               
               // 첫 3개 실패 행의 컬럼명 출력
               if (this.stats.failed <= 3) {
-                console.log(`   ❌ Row ${i + 1} 컬럼명:`, Object.keys(row._rawData || row).filter(k => !k.startsWith('_')).slice(0, 5));
+                console.log(`   ❌ Row ${i + 1} 실패 - 필수 필드 누락`);
               }
               continue;
             }
