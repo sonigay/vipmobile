@@ -1105,6 +1105,169 @@ function findStoreInData(storeCode, storeData) {
   });
 }
 
+// 실제 데이터에서 담당자-코드 조합 추출
+function extractAgentCodeCombinations(phoneklData) {
+  const combinations = new Map();
+
+  phoneklData.forEach(row => {
+    const agent = (row[8] || '').toString().trim(); // I열: 담당자
+    const code = (row[4] || '').toString().trim(); // E열: 코드명
+
+    // 헤더 제외
+    if (agent === '담당자' || code === '코드명') return;
+
+    if (agent && code) {
+      const key = `${agent}|${code}`;
+      if (!combinations.has(key)) {
+        combinations.set(key, {
+          agent,
+          code,
+          displayName: `${agent} (${code})`
+        });
+      }
+    }
+  });
+
+  return Array.from(combinations.values());
+}
+
+// ========================================
+// 목표 설정 API
+// ========================================
+
+router.post('/closing-chart/targets', async (req, res) => {
+  try {
+    const { targets } = req.body;
+
+    if (!targets || !Array.isArray(targets)) {
+      return res.status(400).json({ error: '목표 데이터가 올바르지 않습니다.' });
+    }
+
+    // 헤더 설정
+    const headerData = [
+      ['담당자명', '코드명', '목표값', '제외여부']
+    ];
+
+    // 헤더 먼저 저장
+    await sheetsClient.spreadsheets.values.update({
+      spreadsheetId: process.env.SHEET_ID,
+      range: '영업사원목표!A1',
+      valueInputOption: 'USER_ENTERED',
+      resource: {
+        values: headerData
+      }
+    });
+
+    // 영업사원목표 시트에 저장
+    const targetData = targets.map(target => [
+      target.agent, // A열: 담당자명
+      target.code, // B열: 코드명
+      target.target, // C열: 목표값
+      target.excluded ? 'Y' : 'N' // D열: 제외여부
+    ]);
+
+    await sheetsClient.spreadsheets.values.update({
+      spreadsheetId: process.env.SHEET_ID,
+      range: '영업사원목표!A2',
+      valueInputOption: 'USER_ENTERED',
+      resource: {
+        values: targetData
+      }
+    });
+
+    // 캐시 무효화
+    if (cache && cache.cleanup) {
+      cache.cleanup();
+    }
+
+    res.json({ success: true, message: '목표가 성공적으로 저장되었습니다.' });
+
+  } catch (error) {
+    console.error('목표 설정 오류:', error);
+    res.status(500).json({ error: '목표 설정 중 오류가 발생했습니다.' });
+  }
+});
+
+// ========================================
+// 매핑 실패 데이터 조회 API
+// ========================================
+
+router.get('/closing-chart/mapping-failures', async (req, res) => {
+  try {
+    const { date } = req.query;
+    const targetDate = date || new Date().toISOString().split('T')[0];
+
+    const phoneklData = await getSheetValues('폰클개통데이터');
+    const storeData = await getSheetValues('폰클출고처데이터');
+
+    const failures = findMappingFailures(phoneklData, storeData);
+
+    res.json({ failures });
+
+  } catch (error) {
+    console.error('매핑 실패 데이터 조회 오류:', error);
+    res.status(500).json({ error: '매핑 실패 데이터 조회 중 오류가 발생했습니다.' });
+  }
+});
+
+// ========================================
+// 담당자-코드 조합 추출 API
+// ========================================
+
+router.get('/closing-chart/agent-code-combinations', async (req, res) => {
+  try {
+    const { date } = req.query;
+    const targetDate = date || new Date().toISOString().split('T')[0];
+
+    // 폰클개통데이터 가져오기
+    const phoneklData = await getSheetValues('폰클개통데이터');
+
+    if (!phoneklData || phoneklData.length < 2) {
+      return res.json({ combinations: [] });
+    }
+
+    // 헤더 제외하고 데이터만 처리
+    const dataRows = phoneklData.slice(1);
+
+    // 실제 데이터에서 담당자-코드 조합 추출
+    const combinations = extractAgentCodeCombinations(dataRows);
+
+    // 기존 목표값 데이터 가져오기
+    const targetData = await getSheetValues('영업사원목표');
+    const existingTargets = new Map();
+
+    if (targetData && targetData.length > 1) {
+      targetData.slice(1).forEach(row => {
+        const agent = row[0] || '';
+        const code = row[1] || '';
+        const target = parseInt(row[2]) || 0;
+        const excluded = row[3] === 'Y';
+        const key = `${agent}|${code}`;
+        existingTargets.set(key, { agent, code, target, excluded });
+      });
+    }
+
+    // 조합에 기존 목표값 병합
+    const result = combinations.map(combo => {
+      const key = `${combo.agent}|${combo.code}`;
+      const existing = existingTargets.get(key);
+
+      return {
+        agent: combo.agent,
+        code: combo.code,
+        target: existing ? existing.target : 0,
+        excluded: existing ? existing.excluded : false
+      };
+    });
+
+    res.json({ combinations: result });
+
+  } catch (error) {
+    console.error('담당자-코드 조합 추출 오류:', error);
+    res.status(500).json({ error: '담당자-코드 조합 추출 중 오류가 발생했습니다.' });
+  }
+});
+
   return router;
 }
 
