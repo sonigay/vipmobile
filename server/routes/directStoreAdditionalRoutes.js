@@ -204,7 +204,7 @@ module.exports = function createDirectStoreAdditionalRoutes(context) {
       const values = await getSheetValues(DIRECT_SALES_SHEET_NAME);
       
       if (!values || values.length <= 1) {
-        return res.json({ sales: [] });
+        return res.json([]);
       }
 
       const headers = values[0];
@@ -219,7 +219,7 @@ module.exports = function createDirectStoreAdditionalRoutes(context) {
         return sale;
       });
 
-      res.json({ sales });
+      res.json(sales);
     } catch (error) {
       console.error('판매일보 조회 실패:', error);
       res.status(500).json({ error: '판매일보 조회 실패' });
