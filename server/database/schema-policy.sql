@@ -3,7 +3,7 @@
 -- ============================================================================
 
 -- 1. 정책모드_정책표설정
-CREATE TABLE policy_table_settings (
+CREATE TABLE IF NOT EXISTS policy_table_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "정책표ID" TEXT UNIQUE NOT NULL,
   "정책표명" TEXT NOT NULL,
@@ -23,7 +23,7 @@ CREATE INDEX idx_policy_settings_id ON policy_table_settings("정책표ID");
 CREATE INDEX idx_policy_settings_active ON policy_table_settings("사용여부");
 
 -- 2. 정책모드_정책표목록
-CREATE TABLE policy_table_list (
+CREATE TABLE IF NOT EXISTS policy_table_list (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "정책표ID" TEXT NOT NULL,
   "정책명" TEXT NOT NULL,
@@ -43,7 +43,7 @@ CREATE INDEX idx_policy_list_carrier ON policy_table_list("통신사");
 CREATE INDEX idx_policy_list_active ON policy_table_list("사용여부");
 
 -- 3. 정책모드_일반사용자그룹
-CREATE TABLE policy_user_groups (
+CREATE TABLE IF NOT EXISTS policy_user_groups (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "그룹명" TEXT NOT NULL,
   "그룹코드" TEXT UNIQUE,
@@ -59,7 +59,7 @@ CREATE TABLE policy_user_groups (
 CREATE INDEX idx_user_groups_code ON policy_user_groups("그룹코드");
 
 -- 4. 정책표목록_탭순서
-CREATE TABLE policy_tab_order (
+CREATE TABLE IF NOT EXISTS policy_tab_order (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "정책표ID" TEXT NOT NULL,
   "탭명" TEXT NOT NULL,
@@ -74,7 +74,7 @@ CREATE INDEX idx_tab_order_table_id ON policy_tab_order("정책표ID");
 CREATE INDEX idx_tab_order_sequence ON policy_tab_order("순서");
 
 -- 5. 정책모드_정책영업그룹_변경이력
-CREATE TABLE policy_group_change_history (
+CREATE TABLE IF NOT EXISTS policy_group_change_history (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "정책표ID" TEXT NOT NULL,
   "변경유형" TEXT, -- "생성", "수정", "삭제"
@@ -91,7 +91,7 @@ CREATE INDEX idx_history_table_id ON policy_group_change_history("정책표ID");
 CREATE INDEX idx_history_date ON policy_group_change_history("변경일시");
 
 -- 6. 정책모드_기본정책영업그룹
-CREATE TABLE policy_default_groups (
+CREATE TABLE IF NOT EXISTS policy_default_groups (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "그룹명" TEXT NOT NULL,
   "그룹코드" TEXT UNIQUE,
@@ -108,7 +108,7 @@ CREATE INDEX idx_default_groups_code ON policy_default_groups("그룹코드");
 CREATE INDEX idx_default_groups_default ON policy_default_groups("기본적용여부");
 
 -- 7. 정책모드_기타정책목록
-CREATE TABLE policy_other_types (
+CREATE TABLE IF NOT EXISTS policy_other_types (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "정책타입" TEXT NOT NULL,
   "정책명" TEXT NOT NULL,
@@ -125,7 +125,7 @@ CREATE INDEX idx_other_types_type ON policy_other_types("정책타입");
 CREATE INDEX idx_other_types_active ON policy_other_types("사용여부");
 
 -- 8. 예산모드_예산채널설정
-CREATE TABLE budget_channel_settings (
+CREATE TABLE IF NOT EXISTS budget_channel_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "채널명" TEXT NOT NULL,
   "채널코드" TEXT UNIQUE,
@@ -144,7 +144,7 @@ CREATE INDEX idx_budget_channel_code ON budget_channel_settings("채널코드");
 CREATE INDEX idx_budget_channel_active ON budget_channel_settings("사용여부");
 
 -- 9. 예산모드_기본예산설정
-CREATE TABLE budget_basic_settings (
+CREATE TABLE IF NOT EXISTS budget_basic_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "설정명" TEXT NOT NULL,
   "설정타입" TEXT,
@@ -161,7 +161,7 @@ CREATE INDEX idx_budget_basic_type ON budget_basic_settings("설정타입");
 CREATE INDEX idx_budget_basic_active ON budget_basic_settings("사용여부");
 
 -- 10. 예산모드_기본데이터설정
-CREATE TABLE budget_basic_data_settings (
+CREATE TABLE IF NOT EXISTS budget_basic_data_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "데이터타입" TEXT NOT NULL,
   "데이터명" TEXT NOT NULL,

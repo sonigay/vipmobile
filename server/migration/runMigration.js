@@ -179,11 +179,25 @@ const MIGRATIONS = {
   // 고객 모드 (7개)
   customer: [
     {
-      sheetName: '고객정보',
-      tableName: 'customer_info'
+      sheetName: '사전예약사이트',  // 실제 시트 이름
+      tableName: 'customer_info',
+      transformFn: (data) => ({
+        "고객명": data["고객명"] || data["성명"],
+        "연락처": data["연락처"] || data["고객전화번호"],
+        "이메일": data["이메일"] || null,
+        "생년월일": data["생년월일"] ? new Date(data["생년월일"]) : null,
+        "주소": data["주소"] || null,
+        "선호매장": data["선호매장"] || null,
+        "선호매장POS코드": data["선호매장POS코드"] || null,
+        "가입일시": data["가입일시"] ? new Date(data["가입일시"]).toISOString() : null,
+        "최근방문일시": data["최근방문일시"] ? new Date(data["최근방문일시"]).toISOString() : null,
+        "총구매횟수": parseInt(data["총구매횟수"]) || 0,
+        "회원등급": data["회원등급"] || null,
+        "비고": data["비고"] || null
+      })
     },
     {
-      sheetName: '구매대기',
+      sheetName: '직영점_구매대기',  // 실제 시트 이름
       tableName: 'purchase_queue',
       transformFn: (data) => ({
         "고객명": data["고객명"],
@@ -207,7 +221,7 @@ const MIGRATIONS = {
       })
     },
     {
-      sheetName: '게시판',
+      sheetName: '직영점_게시판',  // 실제 시트 이름
       tableName: 'board'
     },
     {
@@ -215,16 +229,58 @@ const MIGRATIONS = {
       tableName: 'direct_store_pre_approval_marks'
     },
     {
-      sheetName: '예약판매전체고객',
-      tableName: 'reservation_all_customers'
+      sheetName: '사전예약사이트',  // 예약판매전체고객도 사전예약사이트에서 가져옴
+      tableName: 'reservation_all_customers',
+      transformFn: (data) => ({
+        "고객명": data["고객명"] || data["성명"],
+        "연락처": data["연락처"] || data["고객전화번호"],
+        "예약모델명": data["예약모델명"] || data["모델명"],
+        "예약통신사": data["예약통신사"] || data["통신사"],
+        "예약매장": data["예약매장"] || null,
+        "예약매장POS코드": data["예약매장POS코드"] || null,
+        "예약일시": data["예약일시"] ? new Date(data["예약일시"]).toISOString() : new Date().toISOString(),
+        "예약상태": data["예약상태"] || data["개통상태"] || '예약대기',
+        "예약금": parseFloat(data["예약금"]) || null,
+        "예약금입금여부": data["예약금입금여부"] === 'O' || data["예약금입금여부"] === true,
+        "비고": data["비고"] || null
+      })
     },
     {
-      sheetName: '예약판매고객',
-      tableName: 'reservation_customers'
+      sheetName: '사전예약사이트',  // 예약판매고객도 사전예약사이트에서 가져옴
+      tableName: 'reservation_customers',
+      transformFn: (data) => ({
+        "고객명": data["고객명"] || data["성명"],
+        "연락처": data["연락처"] || data["고객전화번호"],
+        "예약모델명": data["예약모델명"] || data["모델명"],
+        "예약통신사": data["예약통신사"] || data["통신사"],
+        "예약매장": data["예약매장"] || null,
+        "예약매장POS코드": data["예약매장POS코드"] || null,
+        "예약일시": data["예약일시"] ? new Date(data["예약일시"]).toISOString() : new Date().toISOString(),
+        "희망개통일": data["희망개통일"] ? new Date(data["희망개통일"]) : null,
+        "예약상태": data["예약상태"] || data["개통상태"] || '예약대기',
+        "예약금": parseFloat(data["예약금"]) || null,
+        "예약금입금일시": data["예약금입금일시"] ? new Date(data["예약금입금일시"]).toISOString() : null,
+        "예약금환불일시": data["예약금환불일시"] ? new Date(data["예약금환불일시"]).toISOString() : null,
+        "구매완료일시": data["구매완료일시"] ? new Date(data["구매완료일시"]).toISOString() : null,
+        "담당자": data["담당자"] || null,
+        "상세메모": data["상세메모"] || data["비고"] || null
+      })
     },
     {
-      sheetName: '미매칭고객',
-      tableName: 'unmatched_customers'
+      sheetName: '마당접수',  // 미매칭고객은 마당접수, 온세일, 모바일가입내역에서 추출
+      tableName: 'unmatched_customers',
+      transformFn: (data) => ({
+        "고객명": data["고객명"] || data["성명"],
+        "연락처": data["연락처"] || data["전화번호"],
+        "매장명": data["매장명"] || null,
+        "매장POS코드": data["매장POS코드"] || null,
+        "문의내용": data["문의내용"] || null,
+        "문의일시": data["문의일시"] ? new Date(data["문의일시"]).toISOString() : new Date().toISOString(),
+        "매칭상태": data["매칭상태"] || '미매칭',
+        "매칭일시": data["매칭일시"] ? new Date(data["매칭일시"]).toISOString() : null,
+        "매칭담당자": data["매칭담당자"] || null,
+        "처리메모": data["처리메모"] || null
+      })
     }
   ]
 };

@@ -8,7 +8,7 @@
 -- ============================================================================
 
 -- 1. 직영점_정책_마진
-CREATE TABLE direct_store_policy_margin (
+CREATE TABLE IF NOT EXISTS direct_store_policy_margin (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "통신사" TEXT NOT NULL,
   "마진" NUMERIC(10,2),
@@ -19,7 +19,7 @@ CREATE TABLE direct_store_policy_margin (
 CREATE INDEX idx_policy_margin_carrier ON direct_store_policy_margin("통신사");
 
 -- 2. 직영점_정책_부가서비스
-CREATE TABLE direct_store_policy_addon_services (
+CREATE TABLE IF NOT EXISTS direct_store_policy_addon_services (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "통신사" TEXT NOT NULL,
   "서비스명" TEXT NOT NULL,
@@ -35,7 +35,7 @@ CREATE TABLE direct_store_policy_addon_services (
 CREATE INDEX idx_addon_services_carrier ON direct_store_policy_addon_services("통신사");
 
 -- 3. 직영점_정책_보험상품
-CREATE TABLE direct_store_policy_insurance (
+CREATE TABLE IF NOT EXISTS direct_store_policy_insurance (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "통신사" TEXT NOT NULL,
   "보험상품명" TEXT NOT NULL,
@@ -53,7 +53,7 @@ CREATE TABLE direct_store_policy_insurance (
 CREATE INDEX idx_insurance_carrier ON direct_store_policy_insurance("통신사");
 
 -- 4. 직영점_정책_별도
-CREATE TABLE direct_store_policy_special (
+CREATE TABLE IF NOT EXISTS direct_store_policy_special (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "통신사" TEXT NOT NULL,
   "정책명" TEXT NOT NULL,
@@ -69,7 +69,7 @@ CREATE INDEX idx_special_carrier ON direct_store_policy_special("통신사");
 CREATE INDEX idx_special_active ON direct_store_policy_special("적용여부");
 
 -- 5. 직영점_설정
-CREATE TABLE direct_store_settings (
+CREATE TABLE IF NOT EXISTS direct_store_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "통신사" TEXT NOT NULL,
   "설정유형" TEXT NOT NULL,
@@ -84,7 +84,7 @@ CREATE INDEX idx_settings_carrier ON direct_store_settings("통신사");
 CREATE INDEX idx_settings_type ON direct_store_settings("설정유형");
 
 -- 6. 직영점_메인페이지문구
-CREATE TABLE direct_store_main_page_texts (
+CREATE TABLE IF NOT EXISTS direct_store_main_page_texts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "통신사" TEXT NOT NULL,
   "카테고리" TEXT,
@@ -99,7 +99,7 @@ CREATE TABLE direct_store_main_page_texts (
 CREATE INDEX idx_main_texts_carrier ON direct_store_main_page_texts("통신사");
 
 -- 7. 직영점_요금제마스터
-CREATE TABLE direct_store_plan_master (
+CREATE TABLE IF NOT EXISTS direct_store_plan_master (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "통신사" TEXT NOT NULL,
   "요금제명" TEXT NOT NULL,
@@ -117,7 +117,7 @@ CREATE INDEX idx_plan_active ON direct_store_plan_master("사용여부");
 CREATE INDEX idx_plan_code ON direct_store_plan_master("요금제코드");
 
 -- 8. 직영점_단말마스터
-CREATE TABLE direct_store_device_master (
+CREATE TABLE IF NOT EXISTS direct_store_device_master (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "통신사" TEXT NOT NULL,
   "모델ID" TEXT NOT NULL,
@@ -148,7 +148,7 @@ CREATE INDEX idx_device_premium ON direct_store_device_master("isPremium");
 CREATE INDEX idx_device_popular ON direct_store_device_master("isPopular");
 
 -- 9. 직영점_단말요금정책
-CREATE TABLE direct_store_device_pricing_policy (
+CREATE TABLE IF NOT EXISTS direct_store_device_pricing_policy (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "통신사" TEXT NOT NULL,
   "모델ID" TEXT NOT NULL,
@@ -172,7 +172,7 @@ CREATE INDEX idx_pricing_model_id ON direct_store_device_pricing_policy("모델I
 CREATE INDEX idx_pricing_date ON direct_store_device_pricing_policy("기준일자");
 
 -- 10. 직영점_모델이미지
-CREATE TABLE direct_store_model_images (
+CREATE TABLE IF NOT EXISTS direct_store_model_images (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "통신사" TEXT NOT NULL,
   "모델ID" TEXT NOT NULL,
@@ -193,7 +193,7 @@ CREATE INDEX idx_images_carrier ON direct_store_model_images("통신사");
 CREATE INDEX idx_images_model_id ON direct_store_model_images("모델ID");
 
 -- 11. 직영점_오늘의휴대폰
-CREATE TABLE direct_store_todays_mobiles (
+CREATE TABLE IF NOT EXISTS direct_store_todays_mobiles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "통신사" TEXT NOT NULL,
   "모델ID" TEXT NOT NULL,
@@ -214,7 +214,7 @@ CREATE INDEX idx_todays_display ON direct_store_todays_mobiles("표시여부");
 CREATE INDEX idx_todays_order ON direct_store_todays_mobiles("순서");
 
 -- 12. 직영점_대중교통위치
-CREATE TABLE direct_store_transit_locations (
+CREATE TABLE IF NOT EXISTS direct_store_transit_locations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "타입" TEXT NOT NULL, -- "버스터미널" 또는 "지하철역"
   "이름" TEXT NOT NULL,
@@ -230,7 +230,7 @@ CREATE INDEX idx_transit_type ON direct_store_transit_locations("타입");
 CREATE INDEX idx_transit_location ON direct_store_transit_locations("위도", "경도");
 
 -- 13. 직영점_매장사진
-CREATE TABLE direct_store_photos (
+CREATE TABLE IF NOT EXISTS direct_store_photos (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "매장명" TEXT NOT NULL,
   "POS코드" TEXT,
@@ -247,7 +247,7 @@ CREATE INDEX idx_photos_store ON direct_store_photos("매장명");
 CREATE INDEX idx_photos_pos ON direct_store_photos("POS코드");
 
 -- 14. 직영점_판매일보
-CREATE TABLE direct_store_sales_daily (
+CREATE TABLE IF NOT EXISTS direct_store_sales_daily (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "매장명" TEXT NOT NULL,
   "POS코드" TEXT,

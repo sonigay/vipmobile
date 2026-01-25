@@ -3,7 +3,7 @@
 -- ============================================================================
 
 -- 1. 고객정보
-CREATE TABLE customer_info (
+CREATE TABLE IF NOT EXISTS customer_info (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "고객명" TEXT NOT NULL,
   "연락처" TEXT NOT NULL UNIQUE,
@@ -26,7 +26,7 @@ CREATE INDEX idx_customer_name ON customer_info("고객명");
 CREATE INDEX idx_customer_store ON customer_info("선호매장POS코드");
 
 -- 2. 구매대기
-CREATE TABLE purchase_queue (
+CREATE TABLE IF NOT EXISTS purchase_queue (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "고객명" TEXT NOT NULL,
   "연락처" TEXT NOT NULL,
@@ -56,7 +56,7 @@ CREATE INDEX idx_queue_status ON purchase_queue("상태");
 CREATE INDEX idx_queue_date ON purchase_queue("등록일시");
 
 -- 3. 게시판
-CREATE TABLE board (
+CREATE TABLE IF NOT EXISTS board (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "제목" TEXT NOT NULL,
   "내용" TEXT NOT NULL,
@@ -83,7 +83,7 @@ CREATE INDEX idx_board_date ON board("작성일시");
 CREATE INDEX idx_board_answered ON board("답변여부");
 
 -- 4. 직영점_사전승낙서마크
-CREATE TABLE direct_store_pre_approval_marks (
+CREATE TABLE IF NOT EXISTS direct_store_pre_approval_marks (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "매장명" TEXT NOT NULL,
   "매장POS코드" TEXT,
@@ -99,7 +99,7 @@ CREATE INDEX idx_approval_marks_store ON direct_store_pre_approval_marks("매장
 CREATE INDEX idx_approval_marks_active ON direct_store_pre_approval_marks("사용여부");
 
 -- 5. 예약판매전체고객
-CREATE TABLE reservation_all_customers (
+CREATE TABLE IF NOT EXISTS reservation_all_customers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "고객명" TEXT NOT NULL,
   "연락처" TEXT NOT NULL,
@@ -122,7 +122,7 @@ CREATE INDEX idx_reservation_all_status ON reservation_all_customers("예약상�
 CREATE INDEX idx_reservation_all_date ON reservation_all_customers("예약일시");
 
 -- 6. 예약판매고객
-CREATE TABLE reservation_customers (
+CREATE TABLE IF NOT EXISTS reservation_customers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "고객명" TEXT NOT NULL,
   "연락처" TEXT NOT NULL,
@@ -150,7 +150,7 @@ CREATE INDEX idx_reservation_date ON reservation_customers("예약일시");
 CREATE INDEX idx_reservation_model ON reservation_customers("예약모델명");
 
 -- 7. 미매칭고객
-CREATE TABLE unmatched_customers (
+CREATE TABLE IF NOT EXISTS unmatched_customers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "고객명" TEXT,
   "연락처" TEXT,
