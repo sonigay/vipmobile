@@ -370,7 +370,7 @@ function createInventoryRoutes(context) {
     }
   });
 
-  // GET /api/inventory/agent-filters - 대리점 필터 목록 조회
+  // GET /api/inventory/agent-filters - 대리점 필터 목록 조회 (원본 로직)
   router.get('/api/inventory/agent-filters', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
@@ -382,38 +382,98 @@ function createInventoryRoutes(context) {
       const cached = cacheManager.get(cacheKey);
       if (cached) {
         console.log('✅ [캐시] 대리점 필터 캐시 히트');
-        return res.json({ success: true, data: cached, cached: true });
+        return res.json(cached);
       }
 
-      // 대리점아이디관리 시트에서 대리점 목록 조회
-      const values = await getSheetValues('대리점아이디관리');
-      const headers = values[0] || [];
-      const rows = values.slice(1);
+      // 폰클재고데이터와 폰클개통데이터 병렬로 가져오기
+      const [inventoryValues, activationValues] = await Promise.all([
+        getSheetValues('폰클재고데이터'),
+        getSheetValues('폰클개통데이터')
+      ]);
 
-      const agentCodeIndex = headers.indexOf('대리점코드');
-      const agentNameIndex = headers.indexOf('대리점명');
-      const officeIndex = headers.indexOf('사무실');
+      if (!inventoryValues || inventoryValues.length < 4) {
+        throw new Error('폰클재고데이터를 가져올 수 없습니다.');
+      }
 
-      const filters = rows
-        .filter(row => row[agentCodeIndex] && row[agentNameIndex])
-        .map(row => ({
-          code: row[agentCodeIndex] || '',
-          name: row[agentNameIndex] || '',
-          office: row[officeIndex] || ''
-        }));
+      if (!activationValues || activationValues.length < 4) {
+        throw new Error('폰클개통데이터를 가져올 수 없습니다.');
+      }
 
-      // 중복 제거
-      const uniqueFilters = Array.from(
-        new Map(filters.map(item => [item.code, item])).values()
-      );
+      // 실제 재고가 있는 담당자 추출
+      const agentsWithInventory = new Set();
+      const agentsWithActivation = new Set();
+      const agentInfo = new Map(); // key: 담당자명, value: { office, department }
 
-      // 캐시 저장 (10분)
-      cacheManager.set(cacheKey, uniqueFilters, 10 * 60 * 1000);
+      // 재고 데이터에서 담당자 추출
+      inventoryValues.slice(3).forEach(row => {
+        if (row.length >= 23) {
+          const modelName = (row[13] || '').toString().trim(); // N열: 모델명
+          const category = (row[5] || '').toString().trim(); // F열: 구분
+          const office = (row[6] || '').toString().trim(); // G열: 사무실
+          const department = (row[7] || '').toString().trim(); // H열: 소속
+          const agent = (row[8] || '').toString().trim(); // I열: 담당자
 
-      res.json({
-        success: true,
-        data: uniqueFilters
+          if (modelName && category !== '#N/A' && agent) {
+            agentsWithInventory.add(agent);
+            if (!agentInfo.has(agent)) {
+              agentInfo.set(agent, { office, department });
+            }
+          }
+        }
       });
+
+      // 개통 데이터에서 담당자 추출 (당월)
+      const currentMonth = new Date().getMonth() + 1;
+      const currentYear = new Date().getFullYear();
+
+      activationValues.slice(3).forEach(row => {
+        if (row.length >= 23) {
+          const activationDate = (row[9] || '').toString().trim(); // J열: 개통일
+          const modelName = (row[21] || '').toString().trim(); // V열: 모델명
+          const office = (row[6] || '').toString().trim(); // G열: 사무실
+          const department = (row[7] || '').toString().trim(); // H열: 소속
+          const agent = (row[8] || '').toString().trim(); // I열: 담당자
+
+          if (activationDate && modelName && agent) {
+            // 날짜 파싱 (2025-08-02 형식에서 날짜 추출)
+            const dateMatch = activationDate.match(/(\d{4})-(\d{2})-(\d{2})/);
+            if (dateMatch) {
+              const [, year, month] = dateMatch;
+              const activationYear = parseInt(year);
+              const activationMonth = parseInt(month);
+
+              // 현재 월의 데이터만 처리
+              if (activationYear === currentYear && activationMonth === currentMonth) {
+                agentsWithActivation.add(agent);
+                if (!agentInfo.has(agent)) {
+                  agentInfo.set(agent, { office, department });
+                }
+              }
+            }
+          }
+        }
+      });
+
+      // 보유재고와 개통재고가 있는 담당자 통합
+      const allAgentsWithData = new Set([...agentsWithInventory, ...agentsWithActivation]);
+
+      // 결과 데이터 구성
+      const result = {
+        success: true,
+        data: Array.from(allAgentsWithData).map(agent => ({
+          target: agent,
+          contactId: agent,
+          office: agentInfo.get(agent)?.office || '',
+          department: agentInfo.get(agent)?.department || '',
+          hasInventory: agentsWithInventory.has(agent),
+          hasActivation: agentsWithActivation.has(agent)
+        })).sort((a, b) => a.target.localeCompare(b.target))
+      };
+
+      // 캐시 저장 (30분)
+      cacheManager.set(cacheKey, result, 30 * 60 * 1000);
+
+      res.json(result);
     } catch (error) {
       console.error('Error fetching agent filters:', error);
       res.status(500).json({
