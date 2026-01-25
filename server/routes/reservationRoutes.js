@@ -186,7 +186,7 @@ function createReservationRoutes(context) {
   router.get('/api/reservation-data/reservation-site', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
-      const values = await getSheetValues('예약사이트');
+      const values = await getSheetValues('사전예약사이트');
       res.json(values.slice(1));
     } catch (error) {
       res.status(500).json({ error: error.message });

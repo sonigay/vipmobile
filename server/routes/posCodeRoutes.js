@@ -36,7 +36,7 @@ function createPosCodeRoutes(context) {
       const cached = cacheManager.get(cacheKey);
       if (cached) return res.json(cached);
 
-      const values = await getSheetValues('POS코드매핑');
+      const values = await getSheetValues('POS코드변경설정');
       const data = values.slice(1);
 
       cacheManager.set(cacheKey, data, 5 * 60 * 1000);
@@ -56,7 +56,7 @@ function createPosCodeRoutes(context) {
       const cached = cacheManager.get(cacheKey);
       if (cached) return res.json(cached);
 
-      const values = await getSheetValues('POS코드매핑');
+      const values = await getSheetValues('POS코드변경설정');
       const data = values.slice(1);
 
       cacheManager.set(cacheKey, data, 5 * 60 * 1000);
@@ -76,7 +76,7 @@ function createPosCodeRoutes(context) {
       await rateLimiter.execute(() =>
         sheetsClient.sheets.spreadsheets.values.append({
           spreadsheetId: sheetsClient.SPREADSHEET_ID,
-          range: 'POS코드매핑!A:Z',
+          range: 'POS코드변경설정!A:Z',
           valueInputOption: 'RAW',
           resource: { values: [data] }
         })
