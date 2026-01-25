@@ -2,6 +2,7 @@ const express = require('express');
 const { google } = require('googleapis');
 const fs = require('fs');
 const path = require('path');
+const dalFactory = require('./dal/DALFactory');
 
 // 디버그 로그 파일 경로
 const DEBUG_LOG_PATH = path.join(__dirname, '..', '.cursor', 'debug.log');
@@ -7291,18 +7292,11 @@ function setupDirectRoutes(app) {
         return res.json(cached);
       }
 
-      const { sheets, SPREADSHEET_ID } = createSheetsClient();
-
-      // 시트 헤더 확인 및 생성
-      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_MAIN_PAGE_TEXTS, HEADERS_MAIN_PAGE_TEXTS);
+      // DAL 사용 (Feature Flag에 따라 Supabase 또는 Google Sheets 자동 전환)
+      const directDAL = dalFactory.getDAL('direct-store');
 
       // 데이터 조회
-      const response = await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: `${SHEET_MAIN_PAGE_TEXTS}!A:F`
-      });
-
-      const rows = (response.data.values || []).slice(1); // 헤더 제외
+      const rows = await directDAL.read('직영점_메인페이지문구');
 
       // 데이터 파싱
       const texts = {
@@ -7311,12 +7305,26 @@ function setupDirectRoutes(app) {
       };
 
       rows.forEach(row => {
-        const carrier = (row[0] || '').trim();
-        const category = (row[1] || '').trim();
-        const textType = (row[2] || '').trim();
-        const content = (row[3] || '').trim();
-        const imageUrl = (row[4] || '').trim();
-        const updatedAt = (row[5] || '').trim();
+        let carrier, category, textType, content, imageUrl, updatedAt;
+        
+        // Supabase 형식 (객체)
+        if (typeof row === 'object' && row.통신사 !== undefined) {
+          carrier = (row.통신사 || '').trim();
+          category = (row.카테고리 || '').trim();
+          textType = (row.설정유형 || '').trim();
+          content = (row.문구내용 || '').trim();
+          imageUrl = (row.이미지URL || '').trim();
+          updatedAt = (row.수정일시 || '').trim();
+        }
+        // Google Sheets 형식 (배열)
+        else {
+          carrier = (row[0] || '').trim();
+          category = (row[1] || '').trim();
+          textType = (row[2] || '').trim();
+          content = (row[3] || '').trim();
+          imageUrl = (row[4] || '').trim();
+          updatedAt = (row[5] || '').trim();
+        }
 
         if (textType === 'mainHeader') {
           texts.mainHeader = {
@@ -7775,7 +7783,6 @@ function setupDirectRoutes(app) {
   // GET /api/direct/transit-location/all: 모든 대중교통 위치 조회
   router.get('/transit-location/all', async (req, res) => {
     try {
-      const { sheets, SPREADSHEET_ID } = createSheetsClient();
       const cacheKey = 'transit-location-all';
 
       // 캐시 확인
@@ -7784,27 +7791,39 @@ function setupDirectRoutes(app) {
         return res.json(cached);
       }
 
-      // 시트 헤더 확인 및 생성
-      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_TRANSIT_LOCATION, HEADERS_TRANSIT_LOCATION);
-
+      // DAL 사용 (Feature Flag에 따라 Supabase 또는 Google Sheets 자동 전환)
+      const directDAL = dalFactory.getDAL('direct-store');
+      
       // 데이터 조회
-      const response = await withRetry(async () => {
-        return await sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_TRANSIT_LOCATION}!A:G`
-        });
-      });
-
-      const rows = (response.data.values || []).slice(1);
-      const locations = rows.map(row => ({
-        id: (row[0] || '').trim(),
-        type: (row[1] || '').trim(),
-        name: (row[2] || '').trim(),
-        address: (row[3] || '').trim(),
-        lat: row[4] ? parseFloat(row[4]) : null,
-        lng: row[5] ? parseFloat(row[5]) : null,
-        updatedAt: (row[6] || '').trim()
-      })).filter(loc => loc.id && loc.type && loc.name);
+      const rows = await directDAL.read('직영점_대중교통위치');
+      
+      // 데이터 변환 (Supabase는 객체, Google Sheets는 배열)
+      const locations = rows.map(row => {
+        // Supabase 형식 (객체)
+        if (typeof row === 'object' && row.id !== undefined) {
+          return {
+            id: (row.id || '').toString().trim(),
+            type: (row.타입 || '').trim(),
+            name: (row.이름 || '').trim(),
+            address: (row.주소 || '').trim(),
+            lat: row.위도 ? parseFloat(row.위도) : null,
+            lng: row.경도 ? parseFloat(row.경도) : null,
+            updatedAt: (row.수정일시 || '').trim()
+          };
+        }
+        // Google Sheets 형식 (배열) - 기존 로직 유지
+        else {
+          return {
+            id: (row[0] || '').trim(),
+            type: (row[1] || '').trim(),
+            name: (row[2] || '').trim(),
+            address: (row[3] || '').trim(),
+            lat: row[4] ? parseFloat(row[4]) : null,
+            lng: row[5] ? parseFloat(row[5]) : null,
+            updatedAt: (row[6] || '').trim()
+          };
+        }
+      }).filter(loc => loc.id && loc.type && loc.name);
 
       const payload = { success: true, data: locations };
       setCache(cacheKey, payload, 5 * 60 * 1000); // 5분 캐시
