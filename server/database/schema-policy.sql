@@ -19,8 +19,8 @@ CREATE TABLE IF NOT EXISTS policy_table_settings (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_policy_settings_id ON policy_table_settings("정책표ID");
-CREATE INDEX idx_policy_settings_active ON policy_table_settings("사용여부");
+CREATE INDEX IF NOT EXISTS idx_policy_settings_id ON policy_table_settings("정책표ID");
+CREATE INDEX IF NOT EXISTS idx_policy_settings_active ON policy_table_settings("사용여부");
 
 -- 2. 정책모드_정책표목록
 CREATE TABLE IF NOT EXISTS policy_table_list (
@@ -38,9 +38,9 @@ CREATE TABLE IF NOT EXISTS policy_table_list (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_policy_list_table_id ON policy_table_list("정책표ID");
-CREATE INDEX idx_policy_list_carrier ON policy_table_list("통신사");
-CREATE INDEX idx_policy_list_active ON policy_table_list("사용여부");
+CREATE INDEX IF NOT EXISTS idx_policy_list_table_id ON policy_table_list("정책표ID");
+CREATE INDEX IF NOT EXISTS idx_policy_list_carrier ON policy_table_list("통신사");
+CREATE INDEX IF NOT EXISTS idx_policy_list_active ON policy_table_list("사용여부");
 
 -- 3. 정책모드_일반사용자그룹
 CREATE TABLE IF NOT EXISTS policy_user_groups (
@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS policy_user_groups (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_user_groups_code ON policy_user_groups("그룹코드");
+CREATE INDEX IF NOT EXISTS idx_user_groups_code ON policy_user_groups("그룹코드");
 
 -- 4. 정책표목록_탭순서
 CREATE TABLE IF NOT EXISTS policy_tab_order (
@@ -70,8 +70,8 @@ CREATE TABLE IF NOT EXISTS policy_tab_order (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_tab_order_table_id ON policy_tab_order("정책표ID");
-CREATE INDEX idx_tab_order_sequence ON policy_tab_order("순서");
+CREATE INDEX IF NOT EXISTS idx_tab_order_table_id ON policy_tab_order("정책표ID");
+CREATE INDEX IF NOT EXISTS idx_tab_order_sequence ON policy_tab_order("순서");
 
 -- 5. 정책모드_정책영업그룹_변경이력
 CREATE TABLE IF NOT EXISTS policy_group_change_history (
@@ -87,8 +87,8 @@ CREATE TABLE IF NOT EXISTS policy_group_change_history (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_history_table_id ON policy_group_change_history("정책표ID");
-CREATE INDEX idx_history_date ON policy_group_change_history("변경일시");
+CREATE INDEX IF NOT EXISTS idx_history_table_id ON policy_group_change_history("정책표ID");
+CREATE INDEX IF NOT EXISTS idx_history_date ON policy_group_change_history("변경일시");
 
 -- 6. 정책모드_기본정책영업그룹
 CREATE TABLE IF NOT EXISTS policy_default_groups (
@@ -104,8 +104,8 @@ CREATE TABLE IF NOT EXISTS policy_default_groups (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_default_groups_code ON policy_default_groups("그룹코드");
-CREATE INDEX idx_default_groups_default ON policy_default_groups("기본적용여부");
+CREATE INDEX IF NOT EXISTS idx_default_groups_code ON policy_default_groups("그룹코드");
+CREATE INDEX IF NOT EXISTS idx_default_groups_default ON policy_default_groups("기본적용여부");
 
 -- 7. 정책모드_기타정책목록
 CREATE TABLE IF NOT EXISTS policy_other_types (
@@ -121,8 +121,8 @@ CREATE TABLE IF NOT EXISTS policy_other_types (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_other_types_type ON policy_other_types("정책타입");
-CREATE INDEX idx_other_types_active ON policy_other_types("사용여부");
+CREATE INDEX IF NOT EXISTS idx_other_types_type ON policy_other_types("정책타입");
+CREATE INDEX IF NOT EXISTS idx_other_types_active ON policy_other_types("사용여부");
 
 -- 8. 예산모드_예산채널설정
 CREATE TABLE IF NOT EXISTS budget_channel_settings (
@@ -140,8 +140,8 @@ CREATE TABLE IF NOT EXISTS budget_channel_settings (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_budget_channel_code ON budget_channel_settings("채널코드");
-CREATE INDEX idx_budget_channel_active ON budget_channel_settings("사용여부");
+CREATE INDEX IF NOT EXISTS idx_budget_channel_code ON budget_channel_settings("채널코드");
+CREATE INDEX IF NOT EXISTS idx_budget_channel_active ON budget_channel_settings("사용여부");
 
 -- 9. 예산모드_기본예산설정
 CREATE TABLE IF NOT EXISTS budget_basic_settings (
@@ -157,8 +157,8 @@ CREATE TABLE IF NOT EXISTS budget_basic_settings (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_budget_basic_type ON budget_basic_settings("설정타입");
-CREATE INDEX idx_budget_basic_active ON budget_basic_settings("사용여부");
+CREATE INDEX IF NOT EXISTS idx_budget_basic_type ON budget_basic_settings("설정타입");
+CREATE INDEX IF NOT EXISTS idx_budget_basic_active ON budget_basic_settings("사용여부");
 
 -- 10. 예산모드_기본데이터설정
 CREATE TABLE IF NOT EXISTS budget_basic_data_settings (
@@ -173,49 +173,49 @@ CREATE TABLE IF NOT EXISTS budget_basic_data_settings (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_budget_data_type ON budget_basic_data_settings("데이터타입");
-CREATE INDEX idx_budget_data_active ON budget_basic_data_settings("사용여부");
+CREATE INDEX IF NOT EXISTS idx_budget_data_type ON budget_basic_data_settings("데이터타입");
+CREATE INDEX IF NOT EXISTS idx_budget_data_active ON budget_basic_data_settings("사용여부");
 
 -- ============================================================================
 -- 자동 업데이트 트리거
 -- ============================================================================
 
-CREATE TRIGGER update_policy_table_settings_updated_at 
+CREATE OR REPLACE TRIGGER update_policy_table_settings_updated_at 
   BEFORE UPDATE ON policy_table_settings
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_policy_table_list_updated_at 
+CREATE OR REPLACE TRIGGER update_policy_table_list_updated_at 
   BEFORE UPDATE ON policy_table_list
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_policy_user_groups_updated_at 
+CREATE OR REPLACE TRIGGER update_policy_user_groups_updated_at 
   BEFORE UPDATE ON policy_user_groups
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_policy_tab_order_updated_at 
+CREATE OR REPLACE TRIGGER update_policy_tab_order_updated_at 
   BEFORE UPDATE ON policy_tab_order
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_policy_group_change_history_updated_at 
+CREATE OR REPLACE TRIGGER update_policy_group_change_history_updated_at 
   BEFORE UPDATE ON policy_group_change_history
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_policy_default_groups_updated_at 
+CREATE OR REPLACE TRIGGER update_policy_default_groups_updated_at 
   BEFORE UPDATE ON policy_default_groups
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_policy_other_types_updated_at 
+CREATE OR REPLACE TRIGGER update_policy_other_types_updated_at 
   BEFORE UPDATE ON policy_other_types
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_budget_channel_settings_updated_at 
+CREATE OR REPLACE TRIGGER update_budget_channel_settings_updated_at 
   BEFORE UPDATE ON budget_channel_settings
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_budget_basic_settings_updated_at 
+CREATE OR REPLACE TRIGGER update_budget_basic_settings_updated_at 
   BEFORE UPDATE ON budget_basic_settings
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_budget_basic_data_settings_updated_at 
+CREATE OR REPLACE TRIGGER update_budget_basic_data_settings_updated_at 
   BEFORE UPDATE ON budget_basic_data_settings
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS direct_store_policy_margin (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_policy_margin_carrier ON direct_store_policy_margin("통신사");
+CREATE INDEX IF NOT EXISTS idx_policy_margin_carrier ON direct_store_policy_margin("통신사");
 
 -- 2. 직영점_정책_부가서비스
 CREATE TABLE IF NOT EXISTS direct_store_policy_addon_services (
@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS direct_store_policy_addon_services (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_addon_services_carrier ON direct_store_policy_addon_services("통신사");
+CREATE INDEX IF NOT EXISTS idx_addon_services_carrier ON direct_store_policy_addon_services("통신사");
 
 -- 3. 직영점_정책_보험상품
 CREATE TABLE IF NOT EXISTS direct_store_policy_insurance (
@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS direct_store_policy_insurance (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_insurance_carrier ON direct_store_policy_insurance("통신사");
+CREATE INDEX IF NOT EXISTS idx_insurance_carrier ON direct_store_policy_insurance("통신사");
 
 -- 4. 직영점_정책_별도
 CREATE TABLE IF NOT EXISTS direct_store_policy_special (
@@ -65,8 +65,8 @@ CREATE TABLE IF NOT EXISTS direct_store_policy_special (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_special_carrier ON direct_store_policy_special("통신사");
-CREATE INDEX idx_special_active ON direct_store_policy_special("적용여부");
+CREATE INDEX IF NOT EXISTS idx_special_carrier ON direct_store_policy_special("통신사");
+CREATE INDEX IF NOT EXISTS idx_special_active ON direct_store_policy_special("적용여부");
 
 -- 5. 직영점_설정
 CREATE TABLE IF NOT EXISTS direct_store_settings (
@@ -80,8 +80,8 @@ CREATE TABLE IF NOT EXISTS direct_store_settings (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_settings_carrier ON direct_store_settings("통신사");
-CREATE INDEX idx_settings_type ON direct_store_settings("설정유형");
+CREATE INDEX IF NOT EXISTS idx_settings_carrier ON direct_store_settings("통신사");
+CREATE INDEX IF NOT EXISTS idx_settings_type ON direct_store_settings("설정유형");
 
 -- 6. 직영점_메인페이지문구
 CREATE TABLE IF NOT EXISTS direct_store_main_page_texts (
@@ -96,7 +96,7 @@ CREATE TABLE IF NOT EXISTS direct_store_main_page_texts (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_main_texts_carrier ON direct_store_main_page_texts("통신사");
+CREATE INDEX IF NOT EXISTS idx_main_texts_carrier ON direct_store_main_page_texts("통신사");
 
 -- 7. 직영점_요금제마스터
 CREATE TABLE IF NOT EXISTS direct_store_plan_master (
@@ -112,9 +112,9 @@ CREATE TABLE IF NOT EXISTS direct_store_plan_master (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_plan_carrier ON direct_store_plan_master("통신사");
-CREATE INDEX idx_plan_active ON direct_store_plan_master("사용여부");
-CREATE INDEX idx_plan_code ON direct_store_plan_master("요금제코드");
+CREATE INDEX IF NOT EXISTS idx_plan_carrier ON direct_store_plan_master("통신사");
+CREATE INDEX IF NOT EXISTS idx_plan_active ON direct_store_plan_master("사용여부");
+CREATE INDEX IF NOT EXISTS idx_plan_code ON direct_store_plan_master("요금제코드");
 
 -- 8. 직영점_단말마스터
 CREATE TABLE IF NOT EXISTS direct_store_device_master (
@@ -141,11 +141,11 @@ CREATE TABLE IF NOT EXISTS direct_store_device_master (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_device_carrier ON direct_store_device_master("통신사");
-CREATE INDEX idx_device_model_id ON direct_store_device_master("모델ID");
-CREATE INDEX idx_device_active ON direct_store_device_master("사용여부");
-CREATE INDEX idx_device_premium ON direct_store_device_master("isPremium");
-CREATE INDEX idx_device_popular ON direct_store_device_master("isPopular");
+CREATE INDEX IF NOT EXISTS idx_device_carrier ON direct_store_device_master("통신사");
+CREATE INDEX IF NOT EXISTS idx_device_model_id ON direct_store_device_master("모델ID");
+CREATE INDEX IF NOT EXISTS idx_device_active ON direct_store_device_master("사용여부");
+CREATE INDEX IF NOT EXISTS idx_device_premium ON direct_store_device_master("isPremium");
+CREATE INDEX IF NOT EXISTS idx_device_popular ON direct_store_device_master("isPopular");
 
 -- 9. 직영점_단말요금정책
 CREATE TABLE IF NOT EXISTS direct_store_device_pricing_policy (
@@ -167,9 +167,9 @@ CREATE TABLE IF NOT EXISTS direct_store_device_pricing_policy (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_pricing_carrier ON direct_store_device_pricing_policy("통신사");
-CREATE INDEX idx_pricing_model_id ON direct_store_device_pricing_policy("모델ID");
-CREATE INDEX idx_pricing_date ON direct_store_device_pricing_policy("기준일자");
+CREATE INDEX IF NOT EXISTS idx_pricing_carrier ON direct_store_device_pricing_policy("통신사");
+CREATE INDEX IF NOT EXISTS idx_pricing_model_id ON direct_store_device_pricing_policy("모델ID");
+CREATE INDEX IF NOT EXISTS idx_pricing_date ON direct_store_device_pricing_policy("기준일자");
 
 -- 10. 직영점_모델이미지
 CREATE TABLE IF NOT EXISTS direct_store_model_images (
@@ -189,8 +189,8 @@ CREATE TABLE IF NOT EXISTS direct_store_model_images (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_images_carrier ON direct_store_model_images("통신사");
-CREATE INDEX idx_images_model_id ON direct_store_model_images("모델ID");
+CREATE INDEX IF NOT EXISTS idx_images_carrier ON direct_store_model_images("통신사");
+CREATE INDEX IF NOT EXISTS idx_images_model_id ON direct_store_model_images("모델ID");
 
 -- 11. 직영점_오늘의휴대폰
 CREATE TABLE IF NOT EXISTS direct_store_todays_mobiles (
@@ -209,9 +209,9 @@ CREATE TABLE IF NOT EXISTS direct_store_todays_mobiles (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_todays_carrier ON direct_store_todays_mobiles("통신사");
-CREATE INDEX idx_todays_display ON direct_store_todays_mobiles("표시여부");
-CREATE INDEX idx_todays_order ON direct_store_todays_mobiles("순서");
+CREATE INDEX IF NOT EXISTS idx_todays_carrier ON direct_store_todays_mobiles("통신사");
+CREATE INDEX IF NOT EXISTS idx_todays_display ON direct_store_todays_mobiles("표시여부");
+CREATE INDEX IF NOT EXISTS idx_todays_order ON direct_store_todays_mobiles("순서");
 
 -- 12. 직영점_대중교통위치
 CREATE TABLE IF NOT EXISTS direct_store_transit_locations (
@@ -226,8 +226,8 @@ CREATE TABLE IF NOT EXISTS direct_store_transit_locations (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_transit_type ON direct_store_transit_locations("타입");
-CREATE INDEX idx_transit_location ON direct_store_transit_locations("위도", "경도");
+CREATE INDEX IF NOT EXISTS idx_transit_type ON direct_store_transit_locations("타입");
+CREATE INDEX IF NOT EXISTS idx_transit_location ON direct_store_transit_locations("위도", "경도");
 
 -- 13. 직영점_매장사진
 CREATE TABLE IF NOT EXISTS direct_store_photos (
@@ -243,8 +243,8 @@ CREATE TABLE IF NOT EXISTS direct_store_photos (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_photos_store ON direct_store_photos("매장명");
-CREATE INDEX idx_photos_pos ON direct_store_photos("POS코드");
+CREATE INDEX IF NOT EXISTS idx_photos_store ON direct_store_photos("매장명");
+CREATE INDEX IF NOT EXISTS idx_photos_pos ON direct_store_photos("POS코드");
 
 -- 14. 직영점_판매일보
 CREATE TABLE IF NOT EXISTS direct_store_sales_daily (
@@ -268,9 +268,9 @@ CREATE TABLE IF NOT EXISTS direct_store_sales_daily (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_sales_store ON direct_store_sales_daily("매장명");
-CREATE INDEX idx_sales_date ON direct_store_sales_daily("판매일자");
-CREATE INDEX idx_sales_carrier ON direct_store_sales_daily("통신사");
+CREATE INDEX IF NOT EXISTS idx_sales_store ON direct_store_sales_daily("매장명");
+CREATE INDEX IF NOT EXISTS idx_sales_date ON direct_store_sales_daily("판매일자");
+CREATE INDEX IF NOT EXISTS idx_sales_carrier ON direct_store_sales_daily("통신사");
 
 -- ============================================================================
 -- 자동 업데이트 트리거 (모든 테이블에 적용)
@@ -285,58 +285,58 @@ END;
 $$ language 'plpgsql';
 
 -- 각 테이블에 트리거 적용
-CREATE TRIGGER update_direct_store_policy_margin_updated_at 
+CREATE OR REPLACE TRIGGER update_direct_store_policy_margin_updated_at 
   BEFORE UPDATE ON direct_store_policy_margin
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_direct_store_policy_addon_services_updated_at 
+CREATE OR REPLACE TRIGGER update_direct_store_policy_addon_services_updated_at 
   BEFORE UPDATE ON direct_store_policy_addon_services
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_direct_store_policy_insurance_updated_at 
+CREATE OR REPLACE TRIGGER update_direct_store_policy_insurance_updated_at 
   BEFORE UPDATE ON direct_store_policy_insurance
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_direct_store_policy_special_updated_at 
+CREATE OR REPLACE TRIGGER update_direct_store_policy_special_updated_at 
   BEFORE UPDATE ON direct_store_policy_special
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_direct_store_settings_updated_at 
+CREATE OR REPLACE TRIGGER update_direct_store_settings_updated_at 
   BEFORE UPDATE ON direct_store_settings
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_direct_store_main_page_texts_updated_at 
+CREATE OR REPLACE TRIGGER update_direct_store_main_page_texts_updated_at 
   BEFORE UPDATE ON direct_store_main_page_texts
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_direct_store_plan_master_updated_at 
+CREATE OR REPLACE TRIGGER update_direct_store_plan_master_updated_at 
   BEFORE UPDATE ON direct_store_plan_master
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_direct_store_device_master_updated_at 
+CREATE OR REPLACE TRIGGER update_direct_store_device_master_updated_at 
   BEFORE UPDATE ON direct_store_device_master
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_direct_store_device_pricing_policy_updated_at 
+CREATE OR REPLACE TRIGGER update_direct_store_device_pricing_policy_updated_at 
   BEFORE UPDATE ON direct_store_device_pricing_policy
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_direct_store_model_images_updated_at 
+CREATE OR REPLACE TRIGGER update_direct_store_model_images_updated_at 
   BEFORE UPDATE ON direct_store_model_images
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_direct_store_todays_mobiles_updated_at 
+CREATE OR REPLACE TRIGGER update_direct_store_todays_mobiles_updated_at 
   BEFORE UPDATE ON direct_store_todays_mobiles
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_direct_store_transit_locations_updated_at 
+CREATE OR REPLACE TRIGGER update_direct_store_transit_locations_updated_at 
   BEFORE UPDATE ON direct_store_transit_locations
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_direct_store_photos_updated_at 
+CREATE OR REPLACE TRIGGER update_direct_store_photos_updated_at 
   BEFORE UPDATE ON direct_store_photos
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_direct_store_sales_daily_updated_at 
+CREATE OR REPLACE TRIGGER update_direct_store_sales_daily_updated_at 
   BEFORE UPDATE ON direct_store_sales_daily
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

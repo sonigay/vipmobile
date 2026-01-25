@@ -21,9 +21,9 @@ CREATE TABLE IF NOT EXISTS customer_info (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_customer_phone ON customer_info("연락처");
-CREATE INDEX idx_customer_name ON customer_info("고객명");
-CREATE INDEX idx_customer_store ON customer_info("선호매장POS코드");
+CREATE INDEX IF NOT EXISTS idx_customer_phone ON customer_info("연락처");
+CREATE INDEX IF NOT EXISTS idx_customer_name ON customer_info("고객명");
+CREATE INDEX IF NOT EXISTS idx_customer_store ON customer_info("선호매장POS코드");
 
 -- 2. 구매대기
 CREATE TABLE IF NOT EXISTS purchase_queue (
@@ -50,10 +50,10 @@ CREATE TABLE IF NOT EXISTS purchase_queue (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_queue_phone ON purchase_queue("연락처");
-CREATE INDEX idx_queue_store ON purchase_queue("매장POS코드");
-CREATE INDEX idx_queue_status ON purchase_queue("상태");
-CREATE INDEX idx_queue_date ON purchase_queue("등록일시");
+CREATE INDEX IF NOT EXISTS idx_queue_phone ON purchase_queue("연락처");
+CREATE INDEX IF NOT EXISTS idx_queue_store ON purchase_queue("매장POS코드");
+CREATE INDEX IF NOT EXISTS idx_queue_status ON purchase_queue("상태");
+CREATE INDEX IF NOT EXISTS idx_queue_date ON purchase_queue("등록일시");
 
 -- 3. 게시판
 CREATE TABLE IF NOT EXISTS board (
@@ -77,10 +77,10 @@ CREATE TABLE IF NOT EXISTS board (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_board_store ON board("매장POS코드");
-CREATE INDEX idx_board_category ON board("카테고리");
-CREATE INDEX idx_board_date ON board("작성일시");
-CREATE INDEX idx_board_answered ON board("답변여부");
+CREATE INDEX IF NOT EXISTS idx_board_store ON board("매장POS코드");
+CREATE INDEX IF NOT EXISTS idx_board_category ON board("카테고리");
+CREATE INDEX IF NOT EXISTS idx_board_date ON board("작성일시");
+CREATE INDEX IF NOT EXISTS idx_board_answered ON board("답변여부");
 
 -- 4. 직영점_사전승낙서마크
 CREATE TABLE IF NOT EXISTS direct_store_pre_approval_marks (
@@ -95,8 +95,8 @@ CREATE TABLE IF NOT EXISTS direct_store_pre_approval_marks (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_approval_marks_store ON direct_store_pre_approval_marks("매장POS코드");
-CREATE INDEX idx_approval_marks_active ON direct_store_pre_approval_marks("사용여부");
+CREATE INDEX IF NOT EXISTS idx_approval_marks_store ON direct_store_pre_approval_marks("매장POS코드");
+CREATE INDEX IF NOT EXISTS idx_approval_marks_active ON direct_store_pre_approval_marks("사용여부");
 
 -- 5. 예약판매전체고객
 CREATE TABLE IF NOT EXISTS reservation_all_customers (
@@ -116,10 +116,10 @@ CREATE TABLE IF NOT EXISTS reservation_all_customers (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_reservation_all_phone ON reservation_all_customers("연락처");
-CREATE INDEX idx_reservation_all_store ON reservation_all_customers("예약매장POS코드");
-CREATE INDEX idx_reservation_all_status ON reservation_all_customers("예약상태");
-CREATE INDEX idx_reservation_all_date ON reservation_all_customers("예약일시");
+CREATE INDEX IF NOT EXISTS idx_reservation_all_phone ON reservation_all_customers("연락처");
+CREATE INDEX IF NOT EXISTS idx_reservation_all_store ON reservation_all_customers("예약매장POS코드");
+CREATE INDEX IF NOT EXISTS idx_reservation_all_status ON reservation_all_customers("예약상태");
+CREATE INDEX IF NOT EXISTS idx_reservation_all_date ON reservation_all_customers("예약일시");
 
 -- 6. 예약판매고객
 CREATE TABLE IF NOT EXISTS reservation_customers (
@@ -143,11 +143,11 @@ CREATE TABLE IF NOT EXISTS reservation_customers (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_reservation_phone ON reservation_customers("연락처");
-CREATE INDEX idx_reservation_store ON reservation_customers("예약매장POS코드");
-CREATE INDEX idx_reservation_status ON reservation_customers("예약상태");
-CREATE INDEX idx_reservation_date ON reservation_customers("예약일시");
-CREATE INDEX idx_reservation_model ON reservation_customers("예약모델명");
+CREATE INDEX IF NOT EXISTS idx_reservation_phone ON reservation_customers("연락처");
+CREATE INDEX IF NOT EXISTS idx_reservation_store ON reservation_customers("예약매장POS코드");
+CREATE INDEX IF NOT EXISTS idx_reservation_status ON reservation_customers("예약상태");
+CREATE INDEX IF NOT EXISTS idx_reservation_date ON reservation_customers("예약일시");
+CREATE INDEX IF NOT EXISTS idx_reservation_model ON reservation_customers("예약모델명");
 
 -- 7. 미매칭고객
 CREATE TABLE IF NOT EXISTS unmatched_customers (
@@ -166,39 +166,39 @@ CREATE TABLE IF NOT EXISTS unmatched_customers (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_unmatched_phone ON unmatched_customers("연락처");
-CREATE INDEX idx_unmatched_store ON unmatched_customers("매장POS코드");
-CREATE INDEX idx_unmatched_status ON unmatched_customers("매칭상태");
-CREATE INDEX idx_unmatched_date ON unmatched_customers("문의일시");
+CREATE INDEX IF NOT EXISTS idx_unmatched_phone ON unmatched_customers("연락처");
+CREATE INDEX IF NOT EXISTS idx_unmatched_store ON unmatched_customers("매장POS코드");
+CREATE INDEX IF NOT EXISTS idx_unmatched_status ON unmatched_customers("매칭상태");
+CREATE INDEX IF NOT EXISTS idx_unmatched_date ON unmatched_customers("문의일시");
 
 -- ============================================================================
 -- 자동 업데이트 트리거
 -- ============================================================================
 
-CREATE TRIGGER update_customer_info_updated_at 
+CREATE OR REPLACE TRIGGER update_customer_info_updated_at 
   BEFORE UPDATE ON customer_info
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_purchase_queue_updated_at 
+CREATE OR REPLACE TRIGGER update_purchase_queue_updated_at 
   BEFORE UPDATE ON purchase_queue
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_board_updated_at 
+CREATE OR REPLACE TRIGGER update_board_updated_at 
   BEFORE UPDATE ON board
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_direct_store_pre_approval_marks_updated_at 
+CREATE OR REPLACE TRIGGER update_direct_store_pre_approval_marks_updated_at 
   BEFORE UPDATE ON direct_store_pre_approval_marks
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_reservation_all_customers_updated_at 
+CREATE OR REPLACE TRIGGER update_reservation_all_customers_updated_at 
   BEFORE UPDATE ON reservation_all_customers
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_reservation_customers_updated_at 
+CREATE OR REPLACE TRIGGER update_reservation_customers_updated_at 
   BEFORE UPDATE ON reservation_customers
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_unmatched_customers_updated_at 
+CREATE OR REPLACE TRIGGER update_unmatched_customers_updated_at 
   BEFORE UPDATE ON unmatched_customers
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
