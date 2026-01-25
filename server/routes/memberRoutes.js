@@ -38,8 +38,8 @@ function createMemberRoutes(context) {
 
   // 시트 이름 상수
   const MEMBER_SHEET_NAME = '고객정보';
-  const QUEUE_SHEET_NAME = '구매대기';
-  const BOARD_SHEET_NAME = '게시판';
+  const QUEUE_SHEET_NAME = '직영점_구매대기';
+  const BOARD_SHEET_NAME = '직영점_게시판';
 
   // Google Sheets 클라이언트가 없으면 에러 응답 반환하는 헬퍼 함수
   const requireSheetsClient = (res) => {
