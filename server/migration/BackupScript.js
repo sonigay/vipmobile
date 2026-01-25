@@ -8,7 +8,7 @@
  * - 백업 이력 관리
  */
 
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
 const { supabase } = require('../supabaseClient');
 const fs = require('fs').promises;
 const path = require('path');

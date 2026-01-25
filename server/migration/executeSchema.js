@@ -5,7 +5,7 @@
  * PostgreSQL 직접 연결 대신 Supabase RPC를 사용합니다.
  */
 
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
 const { supabase } = require('../supabaseClient');
 const fs = require('fs').promises;
 const path = require('path');

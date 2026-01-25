@@ -8,7 +8,7 @@
  */
 
 // 환경 변수 로드
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
 
 const { supabase } = require('../supabaseClient');
 const fs = require('fs').promises;

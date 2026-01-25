@@ -2,7 +2,7 @@
  * 로컬 Supabase 연결 및 스키마 확인 스크립트
  */
 
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 const { createClient } = require('@supabase/supabase-js');
 
 const supabaseUrl = process.env.SUPABASE_URL;
