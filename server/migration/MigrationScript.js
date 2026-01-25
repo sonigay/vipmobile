@@ -111,16 +111,19 @@ class MigrationScript {
         // row 객체를 일반 객체로 변환 - 헤더 이름으로 직접 접근
         let data = {};
         
-        // google-spreadsheet v3는 row[headerName]으로 접근
+        // google-spreadsheet v3는 row[headerName]으로 직접 접근
         if (sheet.headerValues && sheet.headerValues.length > 0) {
           sheet.headerValues.forEach(header => {
-            data[header] = row.get(header);
+            data[header] = row[header];
           });
         } else {
-          // 헤더가 없으면 toObject 시도
-          if (typeof row.toObject === 'function') {
-            data = row.toObject();
-          }
+          // 헤더가 없으면 _rawData 사용
+          const headers = Object.keys(row._rawData || row);
+          headers.forEach(header => {
+            if (!header.startsWith('_')) {
+              data[header] = row[header];
+            }
+          });
         }
 
         try {
