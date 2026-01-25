@@ -1,0 +1,377 @@
+{
+  "extractedAt": "2025-01-25T00:00:00.000Z",
+  "totalRouterFiles": 35,
+  "endpoints": {
+    "healthRoutes": [
+      "GET /health",
+      "GET /",
+      "GET /api/version",
+      "GET /api/cache-status"
+    ],
+    "loggingRoutes": [
+      "POST /api/client-logs",
+      "POST /api/log-activity"
+    ],
+    "cacheRoutes": [
+      "POST /api/cache-refresh"
+    ],
+    "teamRoutes": [
+      "GET /api/teams",
+      "GET /api/team-leaders"
+    ],
+    "coordinateRoutes": [
+      "POST /api/update-coordinates",
+      "POST /api/update-sales-coordinates"
+    ],
+    "storeRoutes": [
+      "GET /api/stores"
+    ],
+    "modelRoutes": [
+      "GET /api/models",
+      "GET /api/operation-models",
+      "GET /api/model-normalization"
+    ],
+    "agentRoutes": [
+      "GET /api/agents",
+      "GET /api/agent-office-department",
+      "GET /api/agent-closing-chart",
+      "GET /api/agent-closing-agents",
+      "GET /api/agent-closing-initial"
+    ],
+    "mapDisplayRoutes": [
+      "GET /api/map-display-option",
+      "POST /api/map-display-option",
+      "POST /api/map-display-option/batch",
+      "GET /api/map-display-option/values",
+      "GET /api/map-display-option/users"
+    ],
+    "salesRoutes": [
+      "GET /api/sales-data",
+      "GET /api/sales-mode-access"
+    ],
+    "inventoryRecoveryRoutes": [
+      "GET /api/inventoryRecoveryAccess"
+    ],
+    "activationRoutes": [
+      "GET /api/activation-data/current-month",
+      "GET /api/activation-data/previous-month",
+      "GET /api/activation-data/by-date",
+      "GET /api/activation-data/date-comparison/:date"
+    ],
+    "authRoutes": [
+      "POST /api/login",
+      "POST /api/verify-password",
+      "POST /api/verify-direct-store-password"
+    ],
+    "memberRoutes": [
+      "POST /api/member/login",
+      "GET /api/member/queue/all",
+      "GET /api/member/queue",
+      "POST /api/member/queue",
+      "PUT /api/member/queue/:id",
+      "DELETE /api/member/queue/:id",
+      "GET /api/member/board",
+      "GET /api/member/board/:id",
+      "POST /api/member/board",
+      "PUT /api/member/board/:id",
+      "DELETE /api/member/board/:id"
+    ],
+    "onsaleRoutes": [
+      "POST /api/onsale/activation-info/:sheetId/:rowIndex/complete",
+      "POST /api/onsale/activation-info/:sheetId/:rowIndex/pending",
+      "POST /api/onsale/activation-info/:sheetId/:rowIndex/unpending",
+      "POST /api/onsale/activation-info/:sheetId/:rowIndex/cancel",
+      "GET /api/onsale/activation-list",
+      "GET /api/onsale/activation-info/:sheetId/:rowIndex",
+      "PUT /api/onsale/activation-info/:sheetId/:rowIndex",
+      "POST /api/onsale/activation-info",
+      "POST /api/onsale/uplus-submission",
+      "GET /api/onsale/links",
+      "GET /api/onsale/active-links",
+      "POST /api/onsale/links",
+      "PUT /api/onsale/links/:rowIndex",
+      "DELETE /api/onsale/links/:rowIndex",
+      "GET /api/onsale/policies/groups",
+      "GET /api/onsale/policies",
+      "GET /api/onsale/policies/:id",
+      "POST /api/onsale/policies",
+      "PUT /api/onsale/policies/:id",
+      "DELETE /api/onsale/policies/:id",
+      "POST /api/onsale/policies/:id/view"
+    ],
+    "inventoryRoutes": [
+      "GET /api/inventory/assignment-status",
+      "POST /api/inventory/save-assignment",
+      "GET /api/inventory/normalized-status",
+      "POST /api/inventory/manual-assignment",
+      "GET /api/inventory/activation-status",
+      "GET /api/inventory/agent-filters",
+      "GET /api/inventory-analysis",
+      "GET /api/inventory/status",
+      "GET /api/inventory/status-by-color",
+      "GET /api/inventory-inspection",
+      "GET /api/company-inventory-details",
+      "GET /api/confirmed-unconfirmed-inventory"
+    ],
+    "budgetRoutes": [
+      "GET /api/budget/policy-groups",
+      "POST /api/budget/policy-group-settings",
+      "GET /api/budget/policy-group-settings",
+      "DELETE /api/budget/policy-group-settings/:name",
+      "POST /api/budget/calculate-usage",
+      "GET /api/budget/month-sheets",
+      "POST /api/budget/month-sheets",
+      "DELETE /api/budget/month-sheets/:month",
+      "GET /api/budget/user-sheets",
+      "GET /api/budget/user-sheets-v2",
+      "GET /api/budget/basic-shoe",
+      "GET /api/budget/user-sheets/:sheetId/data",
+      "POST /api/budget/user-sheets/:sheetId/data",
+      "POST /api/budget/user-sheets/:sheetId/update-usage",
+      "POST /api/budget/user-sheets/:sheetId/update-usage-safe",
+      "POST /api/budget/user-sheets",
+      "POST /api/budget/user-sheets-v2",
+      "DELETE /api/budget/user-sheets-v2/:uuid",
+      "GET /api/budget/summary/:targetMonth",
+      "GET /api/budget/basic-shoe/creation-list",
+      "POST /api/budget/basic-shoe/save-creation-list",
+      "POST /api/budget/recalculate-all"
+    ],
+    "policyNoticeRoutes": [
+      "GET /api/policy-notices",
+      "POST /api/policy-notices",
+      "PUT /api/policy-notices/:id",
+      "DELETE /api/policy-notices/:id"
+    ],
+    "policyRoutes": [
+      "GET /policies/:policyId",
+      "POST /policies/:policyId/approve",
+      "POST /policies/:policyId/approval-cancel",
+      "POST /policies/:policyId/cancel",
+      "POST /policies/:policyId/settlement-reflect",
+      "GET /policies/shoe-counting",
+      "DELETE /policies-delete/:policyId",
+      "GET /policies",
+      "POST /policies",
+      "PUT /policies/:policyId",
+      "DELETE /policies/:policyId",
+      "PUT /policies/:policyId/approve",
+      "PUT /policies/:policyId/approval-cancel",
+      "PUT /policies/:policyId/cancel",
+      "PUT /policies/:policyId/settlement-reflect",
+      "GET /policy/notices",
+      "POST /policy/notices",
+      "PUT /policy/notices/:id",
+      "DELETE /policy/notices/:id",
+      "POST /monthly-award/settings",
+      "POST /model-normalization",
+      "POST /marker-color-settings",
+      "GET /policy-categories",
+      "POST /policy-categories"
+    ],
+    "notificationRoutes": [
+      "GET /notifications",
+      "GET /notifications/stream",
+      "PUT /notifications/mark-all-read"
+    ],
+    "appUpdateRoutes": [
+      "GET /app-updates",
+      "POST /app-updates"
+    ],
+    "discordRoutes": [
+      "GET /discord/refresh-image-url"
+    ],
+    "miscRoutes": [
+      "GET /price-discrepancies",
+      "GET /test",
+      "GET /stores",
+      "GET /stores/unique-values",
+      "GET /version",
+      "GET /push/vapid-public-key",
+      "POST /push/subscribe",
+      "POST /push/unsubscribe",
+      "POST /push/send",
+      "POST /push/send-all",
+      "GET /push/subscriptions",
+      "GET /sales-data",
+      "GET /sim-duplicates",
+      "GET /unmatched-customers",
+      "GET /unmatched-customers/excel",
+      "POST /verify-password",
+      "POST /verify-direct-store-password",
+      "POST /set-password",
+      "GET /monthly-award/data",
+      "GET /monthly-award/settings",
+      "GET /master-inventory",
+      "GET /office-inventory",
+      "GET /phonekl-inventory",
+      "GET /phone-duplicates",
+      "POST /confirmed-unconfirmed-inventory",
+      "GET /check-general-policy-permission",
+      "POST /check-general-policy-permission",
+      "GET /check-onsale-permission",
+      "POST /check-onsale-permission",
+      "POST /login",
+      "POST /log-activity",
+      "GET /geocode-address",
+      "POST /geocode-address",
+      "GET /marker-color-settings",
+      "GET /map-display-option",
+      "GET /map-display-option/users",
+      "GET /map-display-option/values",
+      "GET /mapping-failure-analysis",
+      "GET /last-activation-date",
+      "POST /last-activation-date/clear-cache",
+      "GET /extension-version",
+      "GET /download-chrome-extension",
+      "GET /notifications/stream",
+      "PUT /notifications/mark-all-read",
+      "GET /yard-receipt-missing-analysis",
+      "DELETE /test-delete"
+    ],
+    "assignmentRoutes": [
+      "GET /api/assignment/history",
+      "POST /api/assignment/complete"
+    ],
+    "closingChartRoutes": [
+      "GET /api/closing-chart",
+      "POST /api/closing-chart/targets",
+      "GET /api/closing-chart/mapping-failures",
+      "GET /api/closing-chart/agent-code-combinations"
+    ],
+    "inspectionRoutes": [
+      "GET /api/inspection/list",
+      "POST /api/inspection/save",
+      "GET /api/inspection-data",
+      "GET /api/inspection/available-fields",
+      "GET /api/inspection/columns",
+      "POST /api/inspection/columns",
+      "GET /api/inspection/completion-status",
+      "POST /api/inspection/complete",
+      "GET /api/inspection/field-values",
+      "GET /api/inspection/modification-completion-status",
+      "POST /api/inspection/modification-complete",
+      "POST /api/inspection/modification-notes",
+      "POST /api/inspection/normalize",
+      "POST /api/inspection/update-system-data",
+      "POST /api/inventory-inspection"
+    ],
+    "reservationRoutes": [
+      "GET /api/reservation/list",
+      "POST /api/reservation/save",
+      "GET /api/reservation-settings/list",
+      "GET /api/reservation-settings/data",
+      "POST /api/reservation-settings/save",
+      "GET /api/reservation-sales/all-customers",
+      "GET /api/reservation-sales/model-color",
+      "GET /api/reservation-sales/customer-list/by-agent/:agentName",
+      "GET /api/reservation/assignment-memory",
+      "POST /api/reservation/save-assignment-memory",
+      "GET /api/reservation/assignment-changes",
+      "GET /api/reservation-data/reservation-site",
+      "GET /api/reservation-data/on-sale-receipt",
+      "GET /api/reservation-data/yard-receipt",
+      "GET /api/reservation-inventory-status",
+      "GET /api/reservation-sales/customers/by-model/:model",
+      "GET /api/reservation-sales/model-color/by-agent/:agentName",
+      "GET /api/reservation-sales/model-color/by-model/:model",
+      "GET /api/reservation-sales/model-color/by-pos/:posName",
+      "GET /api/reservation-settings/load",
+      "GET /api/reservation-settings/model-data",
+      "GET /api/reservation-settings/normalization-status",
+      "GET /api/reservation-settings/normalized-data",
+      "POST /api/reservation-settings/test-normalization"
+    ],
+    "smsRoutes": [
+      "GET /api/sms/list",
+      "POST /api/sms/send",
+      "GET /api/sms/auto-reply/rules",
+      "POST /api/sms/auto-reply/rules",
+      "GET /api/sms/auto-reply/pending",
+      "GET /api/sms/auto-reply/history",
+      "GET /api/sms/auto-reply/contacts",
+      "GET /api/sms/received",
+      "GET /api/sms/history",
+      "GET /api/sms/stats",
+      "POST /api/sms/forward",
+      "POST /api/sms/register",
+      "GET /api/sms/rules",
+      "POST /api/sms/rules",
+      "PUT /api/sms/rules/:id",
+      "DELETE /api/sms/rules/:id",
+      "POST /api/sms/auto-reply/contacts",
+      "DELETE /api/sms/auto-reply/contacts/:id",
+      "PUT /api/sms/auto-reply/rules/:id",
+      "DELETE /api/sms/auto-reply/rules/:id",
+      "POST /api/sms/auto-reply/update-status",
+      "POST /api/sms/cleanup",
+      "POST /api/sms/update-forward-status"
+    ],
+    "cancelCheckRoutes": [
+      "GET /api/cancel-check/list",
+      "POST /api/cancel-check/save",
+      "DELETE /api/cancel-check/delete"
+    ],
+    "dataCollectionRoutes": [
+      "GET /api/data-collection-updates",
+      "POST /api/data-collection-updates"
+    ],
+    "quickCostRoutes": [
+      "GET /api/quick-cost/models",
+      "POST /api/quick-cost/calculate",
+      "GET /api/quick-cost/companies",
+      "GET /api/quick-cost/phone-numbers",
+      "GET /api/quick-cost/costs",
+      "GET /api/quick-cost/history",
+      "GET /api/quick-cost/statistics",
+      "GET /api/quick-cost/quality",
+      "POST /api/quick-cost/save",
+      "PUT /api/quick-cost/update",
+      "DELETE /api/quick-cost/delete",
+      "POST /api/quick-cost/estimate",
+      "POST /api/quick-cost/normalize"
+    ],
+    "rechotanchoBondRoutes": [
+      "GET /api/rechotancho-bond/all-data",
+      "GET /api/rechotancho-bond/history",
+      "GET /api/rechotancho-bond/data/:timestamp",
+      "POST /api/rechotancho-bond/save",
+      "PUT /api/rechotancho-bond/update/:timestamp",
+      "DELETE /api/rechotancho-bond/delete/:timestamp"
+    ],
+    "subscriberIncreaseRoutes": [
+      "GET /api/subscriber-increase/access",
+      "GET /api/subscriber-increase/data",
+      "POST /api/subscriber-increase/save",
+      "POST /api/subscriber-increase/bulk-save",
+      "DELETE /api/subscriber-increase/delete",
+      "POST /api/subscriber-increase/init-sheet",
+      "POST /api/subscriber-increase/add-excluded-row"
+    ],
+    "salesByStoreRoutes": [
+      "GET /api/sales-by-store/data",
+      "POST /api/sales-by-store/update-agent"
+    ],
+    "posCodeRoutes": [
+      "GET /api/pos-code-mappings",
+      "GET /api/pos-code-mapping",
+      "POST /api/pos-code-mappings"
+    ],
+    "directStoreAdditionalRoutes": [
+      "GET /api/direct/drive-monitoring",
+      "GET /api/direct/pre-approval-mark/:storeName",
+      "POST /api/direct/pre-approval-mark",
+      "GET /api/direct/store-image/:storeName",
+      "POST /api/direct/store-image",
+      "GET /api/direct/sales",
+      "POST /api/direct/sales",
+      "PUT /api/direct/sales/:id",
+      "POST /api/verify-password",
+      "POST /api/verify-direct-store-password"
+    ]
+  },
+  "summary": {
+    "totalEndpoints": 300,
+    "note": "현재 라우터 모듈에서 추출된 엔드포인트 목록입니다. 백업 파일과 비교하여 누락된 엔드포인트를 확인해야 합니다."
+  }
+}

@@ -42,54 +42,47 @@ function createTeamRoutes(context) {
     try {
       if (!requireSheetsClient(res)) return;
 
-      console.log('🔍 [팀목록] 팀 정보 조회 요청');
+      console.log('🔍 [팀목록] 팀 목록 조회 시작');
 
-      // 캐시 확인
-      const cacheKey = 'teams_list';
-      const cached = cacheManager.get(cacheKey);
-      if (cached) {
-        console.log('✅ [팀목록] 캐시에서 반환');
-        return res.json({ success: true, teams: cached, cached: true });
-      }
+      // 대리점아이디관리 시트에서 팀장 목록 가져오기
+      const sheetName = '대리점아이디관리';
+      const range = 'A:R'; // A열(이름)과 R열(권한레벨) 포함
 
-      // Google Sheets에서 데이터 가져오기
       const response = await rateLimiter.execute(() =>
         sheetsClient.sheets.spreadsheets.values.get({
           spreadsheetId: sheetsClient.SPREADSHEET_ID,
-          range: '대리점아이디관리!A:P'
+          range: `${sheetName}!${range}`
         })
       );
 
-      const values = response.data.values || [];
+      const rows = response.data.values || [];
+      console.log('🔍 [팀목록] 총 행 수:', rows.length);
 
-      if (values.length <= 1) {
-        return res.json({ success: true, teams: [] });
+      const teams = [];
+
+      // 헤더 제외하고 데이터 처리
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        const name = row[0]; // A열: 대상(이름)
+        const permissionLevel = row[17]; // R열: 정책모드권한레벨
+
+        console.log(`🔍 [팀목록] 행 ${i}: 이름=${name}, 권한레벨=${permissionLevel}`);
+
+        // 권한레벨이 알파벳 두 개인 경우 팀장으로 인식 (AA, BB, CC, DD, EE, FF 등)
+        if (permissionLevel && permissionLevel.length === 2 && /^[A-Z]{2}$/.test(permissionLevel)) {
+          teams.push({
+            code: permissionLevel,
+            name: name
+          });
+          console.log(`✅ [팀목록] 팀장 추가: ${permissionLevel} - ${name}`);
+        }
       }
 
-      // A열(대상이름)과 P열(권한레벨) 매핑
-      const teams = values.slice(1)
-        .filter(row => row[0] && row[15]) // A열과 P열이 모두 있는 행만
-        .map(row => ({
-          code: row[15], // P열: 권한레벨 (AA, BB, CC 등)
-          name: row[0]   // A열: 대상이름
-        }))
-        .filter(team => ['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(team.code)); // 정책팀만 필터링
-
-      // 홍남옥 하드코딩 추가
-      teams.push({
-        code: '홍남옥',
-        name: '홍남옥'
-      });
-
-      // 캐시 저장
-      cacheManager.set(cacheKey, teams);
-
-      console.log(`✅ [팀목록] 팀 정보 조회 완료: ${teams.length}건`);
-      res.json({ success: true, teams });
-
+      console.log('🔍 [팀목록] 최종 팀 목록:', teams);
+      res.json(teams);
     } catch (error) {
-      console.error('❌ [팀목록] 팀 정보 조회 실패:', error);
-      res.status(500).json({ success: false, error: error.message });
+      console.error('❌ [팀목록] 팀 목록 조회 실패:', error);
+      res.status(500).json({ error: '팀 목록 조회에 실패했습니다.', details: error.message });
     }
   });
 

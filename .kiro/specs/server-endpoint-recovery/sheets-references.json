@@ -1,0 +1,272 @@
+{
+  "extractedAt": "2025-01-25T00:00:00.000Z",
+  "totalRouterFiles": 35,
+  "sheetsReferences": {
+    "activationRoutes.js": {
+      "sheets": [
+        {
+          "name": "당월개통실적",
+          "constant": "CURRENT_MONTH_ACTIVATION_SHEET_NAME",
+          "usage": "당월 개통 실적 데이터 조회"
+        },
+        {
+          "name": "전월개통실적",
+          "constant": "PREVIOUS_MONTH_ACTIVATION_SHEET_NAME",
+          "usage": "전월 개통 실적 데이터 조회"
+        }
+      ]
+    },
+    "agentRoutes.js": {
+      "sheets": [
+        {
+          "name": "대리점아이디관리",
+          "constant": "AGENT_SHEET_NAME",
+          "usage": "대리점 정보 조회, 권한 확인"
+        }
+      ]
+    },
+    "authRoutes.js": {
+      "sheets": [
+        {
+          "name": "대리점아이디관리",
+          "constant": "AGENT_SHEET_NAME",
+          "usage": "로그인 인증, 권한 확인"
+        },
+        {
+          "name": "폰클출고처데이터",
+          "constant": "STORE_SHEET_NAME",
+          "usage": "매장 정보 조회"
+        },
+        {
+          "name": "일반모드권한관리",
+          "constant": "GENERAL_MODE_SHEET_NAME",
+          "usage": "일반 사용자 권한 확인"
+        }
+      ]
+    },
+    "coordinateRoutes.js": {
+      "sheets": [
+        {
+          "name": "폰클출고처데이터",
+          "constant": "STORE_SHEET_NAME",
+          "usage": "매장 주소 좌표 업데이트"
+        },
+        {
+          "name": "판매점정보",
+          "constant": "SALES_SHEET_NAME",
+          "usage": "판매점 주소 좌표 업데이트",
+          "spreadsheetId": "SALES_SPREADSHEET_ID"
+        }
+      ]
+    },
+    "directStoreAdditionalRoutes.js": {
+      "sheets": [
+        {
+          "name": "직영점_사전승낙서마크",
+          "constant": "CUSTOMER_PRE_APPROVAL_SHEET_NAME",
+          "usage": "사전승낙서 마크 관리"
+        },
+        {
+          "name": "직영점_매장사진",
+          "constant": "CUSTOMER_STORE_PHOTO_SHEET_NAME",
+          "usage": "매장 사진 관리"
+        },
+        {
+          "name": "직영점_판매일보",
+          "constant": "DIRECT_SALES_SHEET_NAME",
+          "usage": "직영점 판매 일보"
+        }
+      ]
+    },
+    "inspectionRoutes.js": {
+      "sheets": [
+        {
+          "name": "검수관리",
+          "constant": null,
+          "usage": "검수 데이터 관리"
+        }
+      ]
+    },
+    "inventoryRecoveryRoutes.js": {
+      "sheets": [
+        {
+          "name": "대리점아이디관리",
+          "constant": "AGENT_SHEET_NAME",
+          "usage": "재고회수 모드 접근 권한 확인"
+        }
+      ]
+    },
+    "inventoryRoutes.js": {
+      "sheets": [
+        {
+          "name": "정규화작업시트",
+          "constant": null,
+          "usage": "정규화 상태 조회"
+        },
+        {
+          "name": "대리점아이디관리",
+          "constant": null,
+          "usage": "대리점 필터 정보"
+        },
+        {
+          "name": "폰클재고데이터",
+          "constant": "INVENTORY_SHEET_NAME",
+          "usage": "재고 상태 조회"
+        }
+      ]
+    },
+    "mapDisplayRoutes.js": {
+      "sheets": [
+        {
+          "name": "지도재고노출옵션",
+          "constant": null,
+          "usage": "지도 표시 옵션 관리"
+        },
+        {
+          "name": "폰클출고처데이터",
+          "constant": null,
+          "usage": "매장 정보 조회 (옵션 값 목록)"
+        },
+        {
+          "name": "일반모드권한관리",
+          "constant": "GENERAL_MODE_SHEET_NAME",
+          "usage": "일반 사용자 목록"
+        },
+        {
+          "name": "대리점아이디관리",
+          "constant": "AGENT_SHEET_NAME",
+          "usage": "관리자 사용자 목록"
+        }
+      ]
+    },
+    "memberRoutes.js": {
+      "sheets": [
+        {
+          "name": "고객정보",
+          "constant": "MEMBER_SHEET_NAME",
+          "usage": "고객 로그인 정보"
+        },
+        {
+          "name": "구매대기",
+          "constant": "QUEUE_SHEET_NAME",
+          "usage": "구매 대기열 관리"
+        },
+        {
+          "name": "게시판",
+          "constant": "BOARD_SHEET_NAME",
+          "usage": "게시판 관리"
+        }
+      ]
+    },
+    "modelRoutes.js": {
+      "sheets": [
+        {
+          "name": "폰클재고데이터",
+          "constant": "INVENTORY_SHEET_NAME",
+          "usage": "모델 및 색상 정보 조회"
+        }
+      ]
+    },
+    "onsaleRoutes.js": {
+      "sheets": [
+        {
+          "name": "일반모드권한관리",
+          "constant": null,
+          "usage": "정책 그룹 목록 조회"
+        },
+        {
+          "name": "온세일_개통정보",
+          "constant": "ACTIVATION_INFO_SHEET_NAME",
+          "usage": "개통 정보 관리"
+        },
+        {
+          "name": "온세일_링크관리",
+          "constant": "LINK_MANAGEMENT_SHEET_NAME",
+          "usage": "링크 관리"
+        },
+        {
+          "name": "온세일_정책게시판",
+          "constant": "POLICY_BOARD_SHEET_NAME",
+          "usage": "정책 게시판 관리"
+        }
+      ]
+    },
+    "reservationRoutes.js": {
+      "sheets": [
+        {
+          "name": "예약관리",
+          "constant": null,
+          "usage": "예약 데이터 관리"
+        },
+        {
+          "name": "예약설정",
+          "constant": null,
+          "usage": "예약 설정 관리"
+        }
+      ]
+    },
+    "salesRoutes.js": {
+      "sheets": [
+        {
+          "name": "대리점아이디관리",
+          "constant": "AGENT_SHEET_NAME",
+          "usage": "영업 모드 접근 권한 확인"
+        },
+        {
+          "name": "raw데이터",
+          "constant": "RAW_DATA_SHEET_NAME",
+          "usage": "영업 데이터 조회"
+        }
+      ]
+    },
+    "storeRoutes.js": {
+      "sheets": [
+        {
+          "name": "폰클재고데이터",
+          "constant": "INVENTORY_SHEET_NAME",
+          "usage": "재고 데이터 조회"
+        },
+        {
+          "name": "폰클출고처데이터",
+          "constant": "STORE_SHEET_NAME",
+          "usage": "매장 정보 조회"
+        }
+      ]
+    },
+    "teamRoutes.js": {
+      "sheets": [
+        {
+          "name": "대리점아이디관리",
+          "constant": "AGENT_SHEET_NAME",
+          "usage": "팀 목록, 팀장 정보 조회"
+        }
+      ]
+    }
+  },
+  "uniqueSheetNames": [
+    "당월개통실적",
+    "전월개통실적",
+    "대리점아이디관리",
+    "폰클출고처데이터",
+    "일반모드권한관리",
+    "판매점정보",
+    "직영점_사전승낙서마크",
+    "직영점_매장사진",
+    "직영점_판매일보",
+    "검수관리",
+    "정규화작업시트",
+    "폰클재고데이터",
+    "지도재고노출옵션",
+    "고객정보",
+    "구매대기",
+    "게시판",
+    "온세일_개통정보",
+    "온세일_링크관리",
+    "온세일_정책게시판",
+    "예약관리",
+    "예약설정",
+    "raw데이터"
+  ],
+  "totalUniqueSheets": 22,
+  "note": "현재 라우터 모듈에서 사용하는 모든 Google Sheets 시트 이름 목록입니다."
+}

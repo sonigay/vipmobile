@@ -37,50 +37,42 @@ function createHealthRoutes(context) {
   // GET /health - 상세 헬스체크
   router.get('/health', createHealthCheckHandler({ sheetsClient }));
 
-  // GET / - 간단한 서버 상태 확인
+  // GET / - 서버 상태 확인 (백업 파일과 동일한 로직)
   router.get('/', (req, res) => {
+    const { sheets, SPREADSHEET_ID } = sheetsClient || {};
+    const GOOGLE_SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+    const GOOGLE_PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY;
+    
     res.json({
-      status: 'ok',
-      message: 'VIP Map Server is running',
-      timestamp: new Date().toISOString()
+      status: 'Server is running',
+      timestamp: new Date().toISOString(),
+      cache: cacheManager.status(),
+      env: {
+        SHEET_ID: SPREADSHEET_ID ? 'SET' : 'NOT SET',
+        GOOGLE_SERVICE_ACCOUNT_EMAIL: GOOGLE_SERVICE_ACCOUNT_EMAIL ? 'SET' : 'NOT SET',
+        GOOGLE_PRIVATE_KEY: GOOGLE_PRIVATE_KEY ? 'SET' : 'NOT SET',
+        PORT: process.env.PORT || 4000
+      }
     });
   });
 
-  // GET /api/version - 서버 버전 정보
+  // GET /api/version - 서버 버전 정보 (백업 파일과 동일한 로직)
   router.get('/api/version', (req, res) => {
-    const packageJson = require('../../package.json');
-    
     res.json({
-      success: true,
-      version: packageJson.version || '1.0.0',
-      name: packageJson.name || 'vip-map-server',
-      node: process.version,
+      version: process.env.npm_package_version || '1.0.0',
+      buildTime: Date.now().toString(),
       environment: process.env.NODE_ENV || 'development',
       timestamp: new Date().toISOString()
     });
   });
 
-  // GET /api/cache-status - 캐시 상태 확인
+  // GET /api/cache-status - 캐시 상태 확인 (백업 파일과 동일한 로직)
   router.get('/api/cache-status', (req, res) => {
-    try {
-      const cacheStatus = cacheManager.status();
-      const memory = getMemoryUsage();
-      const uptime = getUptime();
-      
-      res.json({
-        success: true,
-        cache: cacheStatus,
-        memory: memory.process,
-        uptime: uptime.process,
-        timestamp: new Date().toISOString()
-      });
-    } catch (error) {
-      console.error('❌ Error fetching cache status:', error);
-      res.status(500).json({
-        success: false,
-        error: error.message
-      });
-    }
+    res.json({
+      status: 'success',
+      cache: cacheManager.status(),
+      timestamp: new Date().toISOString()
+    });
   });
 
   return router;
