@@ -89,7 +89,20 @@ class MigrationScript {
       
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
-        let data = row.toObject();
+        
+        // row 객체를 일반 객체로 변환 (toObject 메서드가 없을 경우 대비)
+        let data = {};
+        if (typeof row.toObject === 'function') {
+          data = row.toObject();
+        } else {
+          // toObject 메서드가 없으면 직접 속성 복사
+          const headers = Object.keys(row._rawData || row);
+          headers.forEach(header => {
+            if (!header.startsWith('_')) {
+              data[header] = row[header];
+            }
+          });
+        }
 
         try {
           // 데이터 변환 (사용자 정의 함수)
@@ -107,7 +120,7 @@ class MigrationScript {
             this.stats.failed++;
             this.stats.errors.push({
               row: i + 1,
-              data: row.toObject(),
+              data: data,
               errors: validation.errors
             });
             console.log(`   ❌ Row ${i + 1}: 검증 실패`);
@@ -120,7 +133,7 @@ class MigrationScript {
           this.stats.failed++;
           this.stats.errors.push({
             row: i + 1,
-            data: row.toObject(),
+            data: data,
             error: error.message
           });
           console.log(`   ❌ Row ${i + 1}: ${error.message}`);
