@@ -1,7 +1,32 @@
+/**
+ * Closing Chart Routes
+ * 
+ * 마감장표 관련 엔드포인트를 제공합니다.
+ * 
+ * Endpoints:
+ * - GET /api/closing-chart - 마감장표 데이터 조회
+ * 
+ * Requirements: 1.1, 1.2
+ */
+
 const express = require('express');
-const router = express.Router();
-const { getSheetValues, invalidatePhoneklActivationCache } = require('../PhoneklDataManager');
-const { cache } = require('../cacheMonitor');
+
+/**
+ * Closing Chart Routes Factory
+ * 
+ * @param {Object} context - 공통 컨텍스트 객체
+ * @param {Object} context.sheetsClient - Google Sheets 클라이언트
+ * @param {Object} context.rateLimiter - Rate Limiter
+ * @param {Object} context.cacheManager - Cache Manager
+ * @returns {express.Router} Express 라우터
+ */
+function createClosingChartRoutes(context) {
+  const router = express.Router();
+  const { sheetsClient, rateLimiter, cacheManager } = context;
+
+  // PhoneklDataManager 함수들을 로컬로 가져오기
+  const { getSheetValues, invalidatePhoneklActivationCache } = require('../PhoneklDataManager');
+  const { cache } = require('../cacheMonitor');
 
 // ========================================
 // 마감장표 API
@@ -1080,4 +1105,7 @@ function findStoreInData(storeCode, storeData) {
   });
 }
 
-module.exports = router;
+  return router;
+}
+
+module.exports = createClosingChartRoutes;
