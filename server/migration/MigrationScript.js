@@ -73,16 +73,22 @@ class MigrationScript {
         throw new Error(`Sheet not found: ${sheetName}`);
       }
 
+      // 시트 헤더 로드 (필수)
+      await sheet.loadHeaderRow();
+      
       // 헤더 정보 확인
       console.log(`   📋 헤더 정보:`);
-      console.log(`      - headerValues: ${sheet.headerValues.length}개`);
-      console.log(`      - 첫 5개: ${sheet.headerValues.slice(0, 5).join(', ')}`);
+      console.log(`      - headerValues: ${sheet.headerValues ? sheet.headerValues.length : 0}개`);
       
-      // 헤더가 없으면 첫 번째 행을 헤더로 설정
-      if (sheet.headerValues.length === 0 || sheet.headerValues[0] === '0') {
-        console.log(`   ⚠️  헤더가 없습니다. 시트를 다시 로드합니다...`);
-        await sheet.loadHeaderRow();
-        console.log(`   ✅ 헤더 로드 완료: ${sheet.headerValues.slice(0, 5).join(', ')}`);
+      if (sheet.headerValues && sheet.headerValues.length > 0) {
+        console.log(`      - 첫 5개: ${sheet.headerValues.slice(0, 5).join(', ')}`);
+        
+        // 숫자 인덱스로 되어있는지 확인
+        if (sheet.headerValues[0] === '0' || sheet.headerValues[0] === 0) {
+          console.log(`   ⚠️  헤더가 숫자 인덱스입니다. 시트 구조를 확인하세요.`);
+        }
+      } else {
+        console.log(`   ⚠️  헤더가 없습니다.`);
       }
       
       const rows = await sheet.getRows();
