@@ -182,7 +182,7 @@ try {
 }
 
 try {
-  app.use('/', createInventoryRecoveryRoutes(sharedContext));
+  app.use('/api/inventory-recovery', createInventoryRecoveryRoutes(sharedContext));
   console.log('✅ [Phase 5] Inventory Recovery routes mounted');
 } catch (e) {
   console.error('❌ [Phase 5] Failed to mount inventory recovery routes:', e.message);
