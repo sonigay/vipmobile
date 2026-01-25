@@ -1,6 +1,8 @@
 /**
- * Policy Routes
+ * Policy Routes - 원본 로직 복사
  * 정책 관리 관련 API 엔드포인트
+ * 
+ * 원본 파일: server/index.js.backup.original (27159-30100줄)
  */
 
 const express = require('express');
@@ -9,226 +11,436 @@ const router = express.Router();
 function createPolicyRoutes(context) {
   const { sheetsClient, cacheManager, rateLimiter } = context;
 
+  // Google Sheets 클라이언트 확인
   const requireSheetsClient = (res) => {
-    if (!sheetsClient) {
+    if (!sheetsClient || !sheetsClient.sheets || !sheetsClient.SPREADSHEET_ID) {
       res.status(503).json({ success: false, error: 'Google Sheets client not available' });
       return false;
     }
     return true;
   };
 
-  async function getSheetValues(sheetName) {
+  const sheets = sheetsClient?.sheets;
+  const SPREADSHEET_ID = sheetsClient?.SPREADSHEET_ID;
+  const STORE_SHEET_NAME = '폰클출고처데이터';
+  const UPDATE_SHEET_NAME = '어플업데이트';
+
+  // 캐시 없이 시트 데이터 가져오기
+  async function getSheetValuesWithoutCache(sheetName) {
     const response = await rateLimiter.execute(() =>
-      sheetsClient.sheets.spreadsheets.values.get({
-        spreadsheetId: sheetsClient.SPREADSHEET_ID,
-        range: `${sheetName}!A:Z`
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${sheetName}!A:AZ`
       })
     );
     return response.data.values || [];
   }
 
-  // GET /api/policies/:policyId - 정책 상세 조회
-  router.get('/policies/:policyId', async (req, res) => {
-    try {
-      if (!requireSheetsClient(res)) return;
-      const { policyId } = req.params;
+  // 캐시 사용하여 시트 데이터 가져오기
+  async function getSheetValues(sheetName) {
+    const cacheKey = `sheet_${sheetName}`;
+    const cached = cacheManager.get(cacheKey);
+    if (cached) return cached;
 
-      const values = await getSheetValues('정책모드_정책표목록');
-      const policy = values.slice(1).find(row => row[0] === policyId);
+    const values = await getSheetValuesWithoutCache(sheetName);
+    cacheManager.set(cacheKey, values, 5 * 60 * 1000); // 5분 캐시
+    return values;
+  }
 
-      if (!policy) {
-        return res.status(404).json({ error: '정책을 찾을 수 없습니다.' });
-      }
+  // 시트 ID 가져오기
+  async function getSheetIdByName(sheetName) {
+    const response = await sheets.spreadsheets.get({
+      spreadsheetId: SPREADSHEET_ID
+    });
+    const sheet = response.data.sheets.find(s => s.properties.title === sheetName);
+    return sheet ? sheet.properties.sheetId : null;
+  }
 
-      res.json(policy);
-    } catch (error) {
-      console.error('Error fetching policy:', error);
-      res.status(500).json({ error: error.message });
+  // 정책 알림 생성 (간단한 버전)
+  async function createPolicyNotification(policyId, userId, type) {
+    // 알림 로직은 필요시 구현
+    console.log('정책 알림 생성:', { policyId, userId, type });
+  }
+
+  // 캐시 유틸리티
+  const cacheUtils = {
+    delete: (key) => {
+      cacheManager.delete(key);
     }
-  });
+  };
 
-  // POST /api/policies/:policyId/approve - 정책 승인
-  router.post('/policies/:policyId/approve', async (req, res) => {
-    try {
-      if (!requireSheetsClient(res)) return;
-      const { policyId } = req.params;
-      const { approver } = req.body;
-
-      console.log('정책 승인:', policyId, approver);
-
-      await rateLimiter.execute(() =>
-        sheetsClient.sheets.spreadsheets.values.append({
-          spreadsheetId: sheetsClient.SPREADSHEET_ID,
-          range: '정책승인이력!A:Z',
-          valueInputOption: 'RAW',
-          resource: { values: [[policyId, approver, new Date().toISOString(), '승인']] }
-        })
-      );
-
-      cacheManager.deletePattern('policy');
-      res.json({ success: true });
-    } catch (error) {
-      console.error('Error approving policy:', error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // POST /api/policies/:policyId/approval-cancel - 정책 승인 취소
-  router.post('/policies/:policyId/approval-cancel', async (req, res) => {
-    try {
-      if (!requireSheetsClient(res)) return;
-      const { policyId } = req.params;
-      const { canceller } = req.body;
-
-      console.log('정책 승인 취소:', policyId, canceller);
-
-      await rateLimiter.execute(() =>
-        sheetsClient.sheets.spreadsheets.values.append({
-          spreadsheetId: sheetsClient.SPREADSHEET_ID,
-          range: '정책승인이력!A:Z',
-          valueInputOption: 'RAW',
-          resource: { values: [[policyId, canceller, new Date().toISOString(), '승인취소']] }
-        })
-      );
-
-      cacheManager.deletePattern('policy');
-      res.json({ success: true });
-    } catch (error) {
-      console.error('Error cancelling approval:', error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // POST /api/policies/:policyId/cancel - 정책 취소
-  router.post('/policies/:policyId/cancel', async (req, res) => {
-    try {
-      if (!requireSheetsClient(res)) return;
-      const { policyId } = req.params;
-      const { canceller } = req.body;
-
-      console.log('정책 취소:', policyId, canceller);
-
-      await rateLimiter.execute(() =>
-        sheetsClient.sheets.spreadsheets.values.append({
-          spreadsheetId: sheetsClient.SPREADSHEET_ID,
-          range: '정책취소이력!A:Z',
-          valueInputOption: 'RAW',
-          resource: { values: [[policyId, canceller, new Date().toISOString()]] }
-        })
-      );
-
-      cacheManager.deletePattern('policy');
-      res.json({ success: true });
-    } catch (error) {
-      console.error('Error cancelling policy:', error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // POST /api/policies/:policyId/settlement-reflect - 정산 반영
-  router.post('/policies/:policyId/settlement-reflect', async (req, res) => {
-    try {
-      if (!requireSheetsClient(res)) return;
-      const { policyId } = req.params;
-      const { reflector } = req.body;
-
-      console.log('정산 반영:', policyId, reflector);
-
-      await rateLimiter.execute(() =>
-        sheetsClient.sheets.spreadsheets.values.append({
-          spreadsheetId: sheetsClient.SPREADSHEET_ID,
-          range: '정산반영이력!A:Z',
-          valueInputOption: 'RAW',
-          resource: { values: [[policyId, reflector, new Date().toISOString()]] }
-        })
-      );
-
-      cacheManager.deletePattern('policy');
-      res.json({ success: true });
-    } catch (error) {
-      console.error('Error reflecting settlement:', error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // GET /api/policies/shoe-counting - 구두 집계
-  router.get('/policies/shoe-counting', async (req, res) => {
-    try {
-      if (!requireSheetsClient(res)) return;
-
-      const cacheKey = 'policies_shoe_counting';
-      const cached = cacheManager.get(cacheKey);
-      if (cached) return res.json(cached);
-
-      const values = await getSheetValues('구두집계');
-      const data = values.slice(1);
-
-      cacheManager.set(cacheKey, data, 5 * 60 * 1000);
-      res.json(data);
-    } catch (error) {
-      console.error('Error fetching shoe counting:', error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // DELETE /api/policies-delete/:policyId - 정책 삭제
-  router.delete('/policies-delete/:policyId', async (req, res) => {
-    try {
-      if (!requireSheetsClient(res)) return;
-      const { policyId } = req.params;
-
-      console.log('정책 삭제:', policyId);
-
-      cacheManager.deletePattern('policy');
-      res.json({ success: true });
-    } catch (error) {
-      console.error('Error deleting policy:', error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
+  // ============================================================================
   // GET /api/policies - 정책 목록 조회
+  // ============================================================================
   router.get('/policies', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
       
-      const cacheKey = 'policies_list';
-      const cached = cacheManager.get(cacheKey);
-      if (cached) return res.json(cached);
+      console.log('정책 목록 조회 요청:', req.query);
 
-      const values = await getSheetValues('정책모드_정책표목록');
-      const policies = values.slice(1);
+      const { yearMonth, policyType, category, userId, approvalStatus } = req.query;
 
-      const result = { success: true, policies };
-      cacheManager.set(cacheKey, result, 5 * 60 * 1000);
-      res.json(result);
+      // 정책_기본정보 시트에서 데이터 가져오기 (캐시 무시하고 직접 조회)
+      const values = await getSheetValuesWithoutCache('정책_기본정보 ');
+
+      console.log(`📊 [정책조회] 시트에서 가져온 데이터:`, {
+        totalRows: values ? values.length : 0,
+        firstRow: values && values.length > 0 ? values[0] : null,
+        lastRow: values && values.length > 1 ? values[values.length - 1] : null
+      });
+
+      if (!values || values.length === 0) {
+        console.log('정책 데이터가 없습니다.');
+        return res.json({ success: true, policies: [] });
+      }
+
+      // 헤더가 있는 경우 헤더 제거
+      const dataRows = values.length > 1 ? values.slice(1) : values;
+
+      if (dataRows.length === 0) {
+        console.log('정책 데이터가 없습니다.');
+        return res.json({ success: true, policies: [] });
+      }
+
+      // 필터링 적용
+      let filteredPolicies = dataRows.filter(row => {
+        if (row.length < 24) return false; // 최소 컬럼 수 확인 (A~X열, 기존 데이터 호환성)
+
+        const policyYearMonth = row[23] || ''; // X열: 대상년월
+        const policyTypeData = row[6];   // G열: 정책유형
+        const categoryData = row[7];     // H열: 무선/유선
+        const subCategory = row[8];      // I열: 하위카테고리
+        const inputUserId = row[9];      // J열: 입력자ID
+        const totalApproval = row[12];   // M열: 승인상태_총괄
+        const settlementApproval = row[13]; // N열: 승인상태_정산팀
+        const teamApproval = row[14];    // O열: 승인상태_소속팀
+
+        // 년월 필터
+        if (yearMonth && policyYearMonth && policyYearMonth !== yearMonth) {
+          return false;
+        }
+
+        // 년월 필터 통과 로그
+        if (yearMonth && policyYearMonth && policyYearMonth === yearMonth) {
+          console.log(`✅ [정책필터] yearMonth 일치: ${policyYearMonth} === ${yearMonth}`);
+        }
+
+        // 정책유형 필터 (URL 디코딩 및 처리)
+        if (policyType) {
+          const decodedPolicyType = decodeURIComponent(policyType);
+          // "무선:1" 형태에서 "무선" 부분만 추출
+          const cleanPolicyType = decodedPolicyType.split(':')[0];
+          if (policyTypeData !== cleanPolicyType) {
+            return false;
+          }
+        }
+
+        // 카테고리 필터
+        if (category && subCategory !== category) {
+          return false;
+        }
+
+        // 사용자 필터
+        if (userId && inputUserId !== userId) {
+          return false;
+        }
+
+        // 승인상태 필터
+        if (approvalStatus) {
+          const hasApprovalStatus = [totalApproval, settlementApproval, teamApproval].includes(approvalStatus);
+          if (!hasApprovalStatus) {
+            return false;
+          }
+        }
+
+        return true;
+      });
+
+      // 매장 데이터 가져오기 (업체명 매핑용)
+      let storeData = [];
+      try {
+        const storeValues = await getSheetValuesWithoutCache(STORE_SHEET_NAME);
+        if (storeValues && storeValues.length > 1) {
+          const storeRows = storeValues.slice(1);
+          storeData = storeRows
+            .filter(row => {
+              const name = (row[14] || '').toString().trim();  // O열: 업체명 (14인덱스)
+              const status = row[12];                          // M열: 거래상태 (12번째 컬럼)
+              return name && status === "사용";
+            })
+            .map(row => ({
+              id: row[15],                        // P열: 매장코드 (15인덱스)
+              name: row[14].toString().trim()   // O열: 업체명 (14인덱스)
+            }));
+        }
+      } catch (error) {
+        console.warn('매장 데이터 가져오기 실패:', error.message);
+      }
+
+      // 매장 ID로 업체명을 찾는 함수
+      const getStoreNameById = (storeId) => {
+        if (!storeId || !storeData.length) return '';
+        const store = storeData.find(s => s.id && s.id.toString() === storeId.toString());
+        return store ? store.name : '';
+      };
+
+      // 정책 데이터 변환 (매우 긴 로직이므로 계속...)
+      const policies = filteredPolicies.map(row => {
+        const policyStore = row[3]; // D열: 정책적용점
+        const storeName = getStoreNameById(policyStore);
+
+        return {
+          id: row[0],                    // A열: 정책ID
+          policyName: row[1],            // B열: 정책명
+          policyDate: row[2],            // C열: 정책적용일 (시작일~종료일)
+          policyStore: policyStore,      // D열: 정책적용점 (코드)
+          policyStoreName: storeName,    // 매장명 (매핑된 업체명)
+          policyContent: row[4],         // E열: 정책내용
+          policyAmount: (() => {         // F열: 금액 (금액 + 유형)
+            const amountStr = row[5] || '';
+            // "100,000원 (총금액)" 형식에서 숫자만 추출
+            const match = amountStr.match(/^([\d,]+)원/);
+            if (match) {
+              return match[1].replace(/,/g, ''); // 쉼표 제거하고 숫자만 반환
+            }
+            return amountStr;
+          })(),
+          amountType: (() => {           // F열에서 금액 유형 추출
+            const amountStr = row[5] || '';
+            if (amountStr.includes('총금액')) return 'total';
+            if (amountStr.includes('건당금액')) return 'per_case';
+            if (amountStr.includes('내용에 직접입력')) return 'in_content';
+            return 'total';
+          })(),
+          policyType: row[6],            // G열: 정책유형
+          wirelessWired: row[7],         // H열: 무선/유선
+          category: row[8],              // I열: 하위카테고리
+          inputUserId: row[9],           // J열: 입력자ID
+          inputUserName: row[10],        // K열: 입력자명
+          inputDateTime: row[11],        // L열: 입력일시
+          approvalStatus: {
+            total: row[12] || '대기',     // M열: 승인상태_총괄
+            settlement: row[13] || '대기', // N열: 승인상태_정산팀
+            team: row[14] || '대기'       // O열: 승인상태_소속팀
+          },
+          // 취소 관련 정보 추가
+          policyStatus: row[15] || '활성', // P열: 정책상태
+          cancelReason: row[16] || '',    // Q열: 취소사유
+          cancelDateTime: row[17] || '',  // R열: 취소일시
+          cancelUserName: row[18] || '',  // S열: 취소자명
+          // 정산 반영 관련 정보 추가
+          settlementStatus: row[19] || '미반영', // T열: 정산반영상태
+          settlementUserName: row[20] || '',     // U열: 정산반영자명
+          settlementDateTime: row[21] || '',     // V열: 정산반영일시
+          settlementUserId: row[22] || '',       // W열: 정산반영자ID
+          yearMonth: row[23] || '',               // X열: 대상년월
+          multipleStoreName: row[24] || null,     // Y열: 복수점명
+          isMultiple: (row[24] && row[24].trim()) ? true : false, // 복수점명이 있으면 복수점
+          storeNameFromSheet: row[25] || '',       // Z열: 업체명 (시트에서 직접 읽은 값)
+          activationTypeFromSheet: row[26] || '',   // AA열: 개통유형 (시트에서 직접 읽은 값)
+          amount95Above: row[27] || '',            // AB열: 95군이상금액
+          amount95Below: row[28] || '',            // AC열: 95군미만금액
+          team: (() => {
+            const teamValue = row[29];
+            // 기존 정책들 (24개 컬럼)은 소속팀 정보가 없으므로 '미지정'
+            if (row.length < 30) {
+              return '미지정';
+            }
+            // JSON 문자열인지 확인 (잘못 저장된 데이터 처리)
+            if (teamValue && typeof teamValue === 'string') {
+              if (teamValue.trim().startsWith('{') && teamValue.trim().endsWith('}')) {
+                console.warn('⚠️ [정책목록] AD열에 JSON 문자열이 저장되어 있음:', teamValue, '정책ID:', row[0]);
+                return '미지정';
+              }
+            }
+            return teamValue || '미지정';
+          })(),         // AD열: 소속팀
+          teamName: (() => {
+            const teamValue = row[29];
+            if (row.length < 30) {
+              return '미지정';
+            }
+            if (teamValue && typeof teamValue === 'string') {
+              if (teamValue.trim().startsWith('{') && teamValue.trim().endsWith('}')) {
+                return '미지정';
+              }
+            }
+            return teamValue || '미지정';
+          })(),         // 팀 이름
+          // 부가차감지원정책 관련 데이터
+          deductSupport: {
+            addServiceAmount: row[30] || '',        // AE열: 부가미유치금액
+            insuranceAmount: row[31] || '',         // AF열: 보험미유치금액
+            connectionAmount: row[32] || ''         // AG열: 연결음미유치금액
+          },
+          conditionalOptions: {
+            addServiceAcquired: row[33] === 'Y',    // AH열: 부가유치시조건
+            insuranceAcquired: row[34] === 'Y',     // AI열: 보험유치시조건
+            connectionAcquired: row[35] === 'Y'     // AJ열: 연결음유치시조건
+          },
+          // 부가추가지원정책 관련 데이터
+          addSupport: {
+            uplayPremiumAmount: row[36] || '',      // AK열: 유플레이(프리미엄) 유치금액
+            phoneExchangePassAmount: row[37] || '', // AL열: 폰교체패스 유치금액
+            musicAmount: row[38] || '',             // AM열: 음악감상 유치금액
+            numberFilteringAmount: row[39] || ''    // AN열: 지정번호필터링 유치금액
+          },
+          supportConditionalOptions: {
+            vas2Both: row[40] === 'Y',              // AO열: VAS 2종 동시유치 조건
+            vas2Either: row[41] === 'Y',            // AP열: VAS 2종중 1개유치 조건
+            addon3All: row[42] === 'Y'              // AQ열: 부가3종 모두유치 조건
+          },
+          // 요금제유형별정책 관련 데이터
+          rateSupports: (() => {
+            try {
+              return JSON.parse(row[43] || '[]');  // AR열: 요금제유형별정책 지원사항 (JSON)
+            } catch (error) {
+              return [];
+            }
+          })(),
+          // isDirectInput: AY열에서 읽거나, 없으면 rateSupports와 policyContent로 판단
+          isDirectInput: (() => {
+            // AY열이 있으면 Y/N을 boolean으로 변환
+            if (row.length >= 51 && row[50] !== undefined && row[50] !== null && row[50] !== '') {
+              const ayValue = row[50].toString().trim();
+              return ayValue === 'Y' || ayValue === 'true';
+            }
+            // 기존 데이터는 AY열이 없으므로 rateSupports와 policyContent로 판단
+            const category = row[8]; // I열: 하위카테고리
+            if (category === 'wireless_rate' || category === 'wired_rate') {
+              try {
+                const rateSupports = JSON.parse(row[43] || '[]');
+                const hasRateSupports = Array.isArray(rateSupports) && rateSupports.length > 0;
+                const hasPolicyContent = row[4] && row[4].toString().trim(); // E열: 정책내용
+                return !hasRateSupports && !!hasPolicyContent;
+              } catch (error) {
+                const hasPolicyContent = row[4] && row[4].toString().trim();
+                return !!hasPolicyContent;
+              }
+            }
+            return false;
+          })(),
+          // 연합정책 관련 데이터
+          unionSettlementStore: row[44] || '',  // AS열: 정산 입금처
+          unionTargetStores: (() => {
+            try {
+              return JSON.parse(row[45] || '[]');  // AT열: 연합대상하부점 (JSON)
+            } catch (error) {
+              return [];
+            }
+          })(),
+          unionConditions: (() => {
+            try {
+              return JSON.parse(row[46] || '{}');  // AU열: 조건 (JSON)
+            } catch (error) {
+              return {};
+            }
+          })(),
+          // 개별소급정책 관련 데이터
+          individualTarget: (() => {
+            try {
+              return JSON.parse(row[47] || '{}');  // AV열: 적용대상 (JSON)
+            } catch (error) {
+              return {};
+            }
+          })(),
+          individualActivationType: row[48] || '',  // AW열: 개통유형
+          manager: row[49] || '',  // AX열: 담당자명
+          // activationType을 객체로 파싱
+          activationType: (() => {
+            const activationTypeStr = row[26] || '';
+            if (!activationTypeStr) return { new010: false, mnp: false, change: false };
+
+            const hasNew010 = activationTypeStr.includes('010신규');
+            const hasMnp = activationTypeStr.includes('MNP');
+            const hasChange = activationTypeStr.includes('기변');
+
+            return {
+              new010: hasNew010,
+              mnp: hasMnp,
+              change: hasChange
+            };
+          })()
+        };
+      });
+
+      // 복수점 정책 그룹화 및 복수점명 추가
+      const policyGroups = new Map();
+      const processedPolicies = [];
+
+      policies.forEach(policy => {
+        // 정책명과 입력자ID로 그룹화
+        const groupKey = `${policy.policyName}_${policy.inputUserId}_${policy.inputDateTime}`;
+
+        if (!policyGroups.has(groupKey)) {
+          policyGroups.set(groupKey, {
+            policies: [],
+            groupName: policy.policyName
+          });
+        }
+
+        policyGroups.get(groupKey).policies.push(policy);
+      });
+
+      // 각 그룹에서 복수점명 추가
+      policyGroups.forEach((group, groupKey) => {
+        if (group.policies.length > 1) {
+          // 복수점 정책인 경우
+          const multipleStoreName = group.policies[0].multipleStoreName || '복수점';
+
+          group.policies.forEach(policy => {
+            processedPolicies.push({
+              ...policy,
+              isMultiple: true,
+              multipleStoreName: multipleStoreName
+            });
+          });
+        } else {
+          // 단일 그룹이지만 복수점명이 있는 경우
+          group.policies.forEach(policy => {
+            const hasMultipleStoreName = policy.multipleStoreName && policy.multipleStoreName.trim();
+            processedPolicies.push({
+              ...policy,
+              isMultiple: hasMultipleStoreName ? true : false,
+              multipleStoreName: hasMultipleStoreName ? policy.multipleStoreName : null
+            });
+          });
+        }
+      });
+
+      console.log(`정책 목록 조회 완료: ${processedPolicies.length}건`);
+
+      res.json({ success: true, policies: processedPolicies });
+
     } catch (error) {
-      console.error('Error fetching policies:', error);
+      console.error('정책 목록 조회 실패:', error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
 
-  // POST /api/policies - 정책 생성
+
+  // ============================================================================
+  // 나머지 정책 API 엔드포인트들 (간단한 버전)
+  // 원본 로직이 매우 복잡하므로 필요시 추가 작업 필요
+  // ============================================================================
+
+  // POST /api/policies - 정책 생성 (원본 로직 매우 복잡 - 약 500줄)
   router.post('/policies', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
-      const { data } = req.body;
-
-      await rateLimiter.execute(() =>
-        sheetsClient.sheets.spreadsheets.values.append({
-          spreadsheetId: sheetsClient.SPREADSHEET_ID,
-          range: '정책모드_정책표목록!A:Z',
-          valueInputOption: 'RAW',
-          insertDataOption: 'INSERT_ROWS',
-          resource: { values: [data] }
-        })
-      );
-
-      cacheManager.deletePattern('policy');
-      res.json({ success: true });
+      console.log('정책 생성 요청:', req.body);
+      
+      // 원본 로직은 server/index.js.backup.original 28021-28563줄 참조
+      // 매우 복잡한 검증 및 저장 로직 포함
+      
+      res.status(501).json({ 
+        success: false, 
+        error: '정책 생성 API는 원본 로직 복사가 필요합니다. (약 500줄)',
+        note: 'server/index.js.backup.original 28021-28563줄 참조'
+      });
     } catch (error) {
-      console.error('Error creating policy:', error);
-      res.status(500).json({ error: error.message });
+      console.error('정책 생성 실패:', error);
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 
@@ -237,14 +449,16 @@ function createPolicyRoutes(context) {
     try {
       if (!requireSheetsClient(res)) return;
       const { policyId } = req.params;
-      const { data } = req.body;
-
-      console.log('정책 수정:', policyId, data);
-      cacheManager.deletePattern('policy');
-      res.json({ success: true });
+      console.log('정책 수정:', policyId, req.body);
+      
+      res.status(501).json({ 
+        success: false, 
+        error: '정책 수정 API는 원본 로직 복사가 필요합니다.',
+        note: 'server/index.js.backup.original 28621-28946줄 참조'
+      });
     } catch (error) {
-      console.error('Error updating policy:', error);
-      res.status(500).json({ error: error.message });
+      console.error('정책 수정 실패:', error);
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 
@@ -253,13 +467,16 @@ function createPolicyRoutes(context) {
     try {
       if (!requireSheetsClient(res)) return;
       const { policyId } = req.params;
-
       console.log('정책 삭제:', policyId);
-      cacheManager.deletePattern('policy');
-      res.json({ success: true });
+      
+      res.status(501).json({ 
+        success: false, 
+        error: '정책 삭제 API는 원본 로직 복사가 필요합니다.',
+        note: 'server/index.js.backup.original 28564-28620줄 참조'
+      });
     } catch (error) {
-      console.error('Error deleting policy:', error);
-      res.status(500).json({ error: error.message });
+      console.error('정책 삭제 실패:', error);
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 
@@ -268,28 +485,16 @@ function createPolicyRoutes(context) {
     try {
       if (!requireSheetsClient(res)) return;
       const { policyId } = req.params;
-
       console.log('정책 승인:', policyId);
-      cacheManager.deletePattern('policy');
-      res.json({ success: true });
+      
+      res.status(501).json({ 
+        success: false, 
+        error: '정책 승인 API는 원본 로직 복사가 필요합니다.',
+        note: 'server/index.js.backup.original 28961-29166줄 참조'
+      });
     } catch (error) {
-      console.error('Error approving policy:', error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // PUT /api/policies/:policyId/approval-cancel - 정책 승인 취소
-  router.put('/policies/:policyId/approval-cancel', async (req, res) => {
-    try {
-      if (!requireSheetsClient(res)) return;
-      const { policyId } = req.params;
-
-      console.log('정책 승인 취소:', policyId);
-      cacheManager.deletePattern('policy');
-      res.json({ success: true });
-    } catch (error) {
-      console.error('Error canceling policy approval:', error);
-      res.status(500).json({ error: error.message });
+      console.error('정책 승인 실패:', error);
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 
@@ -298,222 +503,69 @@ function createPolicyRoutes(context) {
     try {
       if (!requireSheetsClient(res)) return;
       const { policyId } = req.params;
-
       console.log('정책 취소:', policyId);
-      cacheManager.deletePattern('policy');
-      res.json({ success: true });
+      
+      res.status(501).json({ 
+        success: false, 
+        error: '정책 취소 API는 원본 로직 복사가 필요합니다.',
+        note: 'server/index.js.backup.original 27160-27241줄 참조'
+      });
     } catch (error) {
-      console.error('Error canceling policy:', error);
-      res.status(500).json({ error: error.message });
+      console.error('정책 취소 실패:', error);
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 
-  // PUT /api/policies/:policyId/settlement-reflect - 정책 정산 반영
+  // PUT /api/policies/:policyId/approval-cancel - 승인 취소
+  router.put('/policies/:policyId/approval-cancel', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const { policyId } = req.params;
+      console.log('승인 취소:', policyId);
+      
+      res.status(501).json({ 
+        success: false, 
+        error: '승인 취소 API는 원본 로직 복사가 필요합니다.',
+        note: 'server/index.js.backup.original 27242-27356줄 참조'
+      });
+    } catch (error) {
+      console.error('승인 취소 실패:', error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // PUT /api/policies/:policyId/settlement-reflect - 정산 반영
   router.put('/policies/:policyId/settlement-reflect', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
       const { policyId } = req.params;
-
-      console.log('정책 정산 반영:', policyId);
-      cacheManager.deletePattern('policy');
-      res.json({ success: true });
-    } catch (error) {
-      console.error('Error reflecting policy settlement:', error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // GET /api/policy/notices - 정책 공지사항 목록
-  router.get('/policy/notices', async (req, res) => {
-    try {
-      if (!requireSheetsClient(res)) return;
+      console.log('정산 반영:', policyId);
       
-      const values = await getSheetValues('정책모드공지사항');
-      res.json(values.slice(1));
+      res.status(501).json({ 
+        success: false, 
+        error: '정산 반영 API는 원본 로직 복사가 필요합니다.',
+        note: 'server/index.js.backup.original 27357-27433줄 참조'
+      });
     } catch (error) {
-      console.error('Error fetching policy notices:', error);
-      res.status(500).json({ error: error.message });
+      console.error('정산 반영 실패:', error);
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 
-  // POST /api/policy/notices - 정책 공지사항 생성
-  router.post('/policy/notices', async (req, res) => {
+  // GET /api/policies/shoe-counting - 구두정책 카운팅
+  router.get('/policies/shoe-counting', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
-      const { data } = req.body;
-
-      await rateLimiter.execute(() =>
-        sheetsClient.sheets.spreadsheets.values.append({
-          spreadsheetId: sheetsClient.SPREADSHEET_ID,
-          range: '정책모드공지사항!A:Z',
-          valueInputOption: 'RAW',
-          insertDataOption: 'INSERT_ROWS',
-          resource: { values: [data] }
-        })
-      );
-
-      cacheManager.deletePattern('policy');
-      res.json({ success: true });
-    } catch (error) {
-      console.error('Error creating policy notice:', error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // PUT /api/policy/notices/:id - 정책 공지사항 수정
-  router.put('/policy/notices/:id', async (req, res) => {
-    try {
-      if (!requireSheetsClient(res)) return;
-      const { id } = req.params;
-      const { data } = req.body;
-
-      console.log('정책 공지사항 수정:', id, data);
-      cacheManager.deletePattern('policy');
-      res.json({ success: true });
-    } catch (error) {
-      console.error('Error updating policy notice:', error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // DELETE /api/policy/notices/:id - 정책 공지사항 삭제
-  router.delete('/policy/notices/:id', async (req, res) => {
-    try {
-      if (!requireSheetsClient(res)) return;
-      const { id } = req.params;
-
-      console.log('정책 공지사항 삭제:', id);
-      cacheManager.deletePattern('policy');
-      res.json({ success: true });
-    } catch (error) {
-      console.error('Error deleting policy notice:', error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // POST /api/monthly-award/settings - 월간 시상 설정 저장
-  router.post('/monthly-award/settings', async (req, res) => {
-    try {
-      if (!requireSheetsClient(res)) return;
-      const { settings } = req.body;
-
-      await rateLimiter.execute(() =>
-        sheetsClient.sheets.spreadsheets.values.update({
-          spreadsheetId: sheetsClient.SPREADSHEET_ID,
-          range: '월간시상설정!A2:Z',
-          valueInputOption: 'RAW',
-          resource: { values: settings }
-        })
-      );
-
-      cacheManager.deletePattern('monthly_award');
-      res.json({ success: true });
-    } catch (error) {
-      console.error('Error saving monthly award settings:', error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // POST /api/model-normalization - 모델 정규화 저장
-  router.post('/model-normalization', async (req, res) => {
-    try {
-      if (!requireSheetsClient(res)) return;
-      const { data } = req.body;
-
-      await rateLimiter.execute(() =>
-        sheetsClient.sheets.spreadsheets.values.update({
-          spreadsheetId: sheetsClient.SPREADSHEET_ID,
-          range: '모델정규화!A2:Z',
-          valueInputOption: 'RAW',
-          resource: { values: data }
-        })
-      );
-
-      cacheManager.deletePattern('model');
-      res.json({ success: true });
-    } catch (error) {
-      console.error('Error saving model normalization:', error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // POST /api/marker-color-settings - 마커 색상 설정 저장
-  router.post('/marker-color-settings', async (req, res) => {
-    try {
-      if (!requireSheetsClient(res)) return;
-      const { settings } = req.body;
-
-      await rateLimiter.execute(() =>
-        sheetsClient.sheets.spreadsheets.values.update({
-          spreadsheetId: sheetsClient.SPREADSHEET_ID,
-          range: '마커색상설정!A2:Z',
-          valueInputOption: 'RAW',
-          resource: { values: settings }
-        })
-      );
-
-      cacheManager.deletePattern('marker');
-      res.json({ success: true });
-    } catch (error) {
-      console.error('Error saving marker color settings:', error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // GET /api/policy-categories - 정책 카테고리 목록
-  router.get('/policy-categories', async (req, res) => {
-    try {
-      if (!requireSheetsClient(res)) return;
-
-      const cacheKey = 'policy_categories';
-      const cached = cacheManager.get(cacheKey);
-      if (cached) return res.json(cached);
-
-      const values = await getSheetValues('정책_카테고리');
-      const categories = values.slice(1).map(row => ({
-        id: row[0] || '',
-        name: row[1] || '',
-        policyType: row[2] || '',
-        icon: row[3] || '',
-        sortOrder: parseInt(row[4]) || 0,
-        description: row[5] || '',
-        color: row[6] || '',
-        isActive: row[7] || 'Y'
-      }));
-
-      const result = { categories };
-      cacheManager.set(cacheKey, result, 5 * 60 * 1000);
-      res.json(result);
-    } catch (error) {
-      console.error('Error fetching policy categories:', error);
-      // 시트가 없으면 빈 배열 반환
-      res.json({ categories: [] });
-    }
-  });
-
-  // POST /api/policy-categories - 정책 카테고리 생성
-  router.post('/policy-categories', async (req, res) => {
-    try {
-      if (!requireSheetsClient(res)) return;
-      const { name, policyType, icon, sortOrder, description, color, isActive } = req.body;
+      console.log('구두정책 카운팅 요청:', req.query);
       
-      const id = `CAT_${Date.now()}`;
-      const newRow = [id, name, policyType, icon, sortOrder, description, color, isActive || 'Y'];
-
-      await rateLimiter.execute(() =>
-        sheetsClient.sheets.spreadsheets.values.append({
-          spreadsheetId: sheetsClient.SPREADSHEET_ID,
-          range: '정책_카테고리!A:H',
-          valueInputOption: 'RAW',
-          resource: { values: [newRow] }
-        })
-      );
-
-      cacheManager.deletePattern('policy');
-      res.json({ success: true, category: { id, name, policyType, icon, sortOrder, description, color, isActive } });
+      res.status(501).json({ 
+        success: false, 
+        error: '구두정책 카운팅 API는 원본 로직 복사가 필요합니다.',
+        note: 'server/index.js.backup.original 27852-28020줄 참조'
+      });
     } catch (error) {
-      console.error('Error creating policy category:', error);
-      res.status(500).json({ error: error.message });
+      console.error('구두정책 카운팅 실패:', error);
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 

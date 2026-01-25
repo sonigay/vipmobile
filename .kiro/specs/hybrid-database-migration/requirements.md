@@ -76,7 +76,14 @@ VIP Map Application은 현재 Google Sheets API를 주요 데이터 저장소로
    - 예산모드_기본예산설정 (Basic Budget Settings)
    - 예산모드_기본데이터설정 (Basic Data Settings)
 
-3. THE System SHALL define database schemas for Customer mode data (to be determined during design phase based on actual usage patterns)
+3. THE System SHALL define database schemas for the following Customer mode Google Sheets:
+   - 고객정보 (Customer Information)
+   - 구매대기 (Purchase Queue)
+   - 게시판 (Board/Forum)
+   - 직영점_사전승낙서마크 (Pre-approval Document Mark)
+   - 예약판매전체고객 (All Reservation Customers)
+   - 예약판매고객 (Reservation Customer Details)
+   - 미매칭고객 (Unmatched Customers)
 
 4. THE System SHALL use appropriate PostgreSQL data types, constraints, and indexes for each schema
 

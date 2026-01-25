@@ -78,7 +78,7 @@ module.exports = function createMiscRoutes(context) {
       const cached = cacheManager.get(cacheKey);
       if (cached) return res.json(cached);
 
-      const values = await getSheetValues('폰클출고처데이터');
+      const values = await getSheetValues('매장목록');
       const data = values.slice(1);
 
       cacheManager.set(cacheKey, data, 5 * 60 * 1000);
@@ -94,7 +94,7 @@ module.exports = function createMiscRoutes(context) {
     try {
       if (!requireSheetsClient(res)) return;
       
-      const values = await getSheetValues('폰클출고처데이터');
+      const values = await getSheetValues('매장목록');
       const rows = values.slice(1);
 
       const uniqueValues = {
@@ -406,7 +406,7 @@ module.exports = function createMiscRoutes(context) {
   router.get('/marker-color-settings', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
-      const values = await getSheetValues('관리자모드_마커색상설정');
+      const values = await getSheetValues('마커색상설정');
       res.json(values.slice(1));
     } catch (error) {
       res.status(500).json({ error: error.message });

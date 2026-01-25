@@ -11,9 +11,13 @@ VIP Map Application은 현재 Google Sheets API를 주요 데이터 저장소로
 - 롤백 가능: 문제 발생 시 Google Sheets로 복귀 가능
 
 **마이그레이션 우선순위:**
-1. **Phase 1 (우선)**: 직영점 모드 (13개 시트), 정책 모드 (10개 시트)
-2. **Phase 2 (차순위)**: 고객 모드
-3. **Phase 3 (점진적)**: 나머지 모드들
+1. **Phase 1 (검토 대상)**: 총 35개 시트 (내일 사용자와 함께 최종 선정)
+   - 직영점 모드 (14개 시트)
+   - 정책 모드 (10개 시트)
+   - 고객 모드 (7개 시트)
+   - 일반정책 모드 (1개 시트)
+   - 온세일 모드 (3개 시트)
+2. **Phase 2 (점진적)**: 나머지 모드들
 
 ## Architecture
 
@@ -75,7 +79,9 @@ graph TB
 
 **Phase 1 마이그레이션 대상 (우선순위):**
 
-직영점 모드 (13개 시트):
+**Phase 1 마이그레이션 대상 (검토 중 - 총 35개 시트):**
+
+직영점 모드 (14개 시트):
 - 직영점_정책_마진
 - 직영점_정책_부가서비스
 - 직영점_정책_보험상품
@@ -89,6 +95,7 @@ graph TB
 - 직영점_오늘의휴대폰
 - 직영점_대중교통위치
 - 직영점_매장사진
+- 직영점_판매일보
 
 정책 모드 (10개 시트):
 - 정책모드_정책표설정
@@ -101,6 +108,25 @@ graph TB
 - 예산모드_예산채널설정
 - 예산모드_기본예산설정
 - 예산모드_기본데이터설정
+
+고객 모드 (7개 시트):
+- 고객정보
+- 구매대기
+- 게시판
+- 직영점_사전승낙서마크
+- 예약판매전체고객
+- 예약판매고객
+- 미매칭고객
+
+일반정책 모드 (1개 시트):
+- 일반모드권한관리
+
+온세일 모드 (3개 시트):
+- 개통정보
+- 온세일링크
+- 정책게시판
+
+**참고:** 위 시트 목록은 검토 대상이며, 내일 사용자와 함께 실제 마이그레이션 대상을 최종 선정할 예정입니다.
 
 
 ## Supabase Setup Guide
@@ -1204,8 +1230,13 @@ router.delete('/api/direct/policy/margin/:id', async (req, res) => {
 - GET/POST/PUT/DELETE `/api/policy/groups` - 그룹
 - GET/POST/PUT/DELETE `/api/policy/history` - 변경 이력
 
-**Customer Mode:**
-- TBD: 실제 사용 패턴 분석 후 결정
+**Customer Mode (memberRoutes.js, directStoreAdditionalRoutes.js, reservationRoutes.js):**
+- GET/POST/PUT/DELETE `/api/member/login` - 고객 로그인
+- GET/POST/PUT/DELETE `/api/member/queue` - 구매 대기 목록
+- GET/POST/PUT/DELETE `/api/member/board` - 게시판
+- GET/POST `/api/direct/pre-approval` - 사전승낙서
+- GET `/api/reservation/customers` - 예약 고객 목록
+- GET `/api/mismatched-customers` - 미매칭 고객
 
 ### Backward Compatibility
 
@@ -1288,7 +1319,26 @@ router.delete('/api/direct/policy/margin/:id', async (req, res) => {
    - 프로덕션에서 일부 사용자 대상 테스트
    - 전체 활성화
 
-### Phase 4: Policy Mode Migration (Week 4)
+### Phase 4: Customer Mode Migration (Week 4)
+
+1. **데이터 마이그레이션 실행**
+   - 7개 시트 마이그레이션
+   - 데이터 무결성 검증
+
+2. **API 엔드포인트 업데이트**
+   - memberRoutes.js, directStoreAdditionalRoutes.js, reservationRoutes.js 수정
+   - 통합 테스트
+
+3. **Feature Flag 활성화**
+   ```bash
+   # server/.env
+   USE_DB_CUSTOMER=false  # 초기에는 false
+   ```
+
+4. **점진적 활성화**
+   - 동일한 롤아웃 프로세스
+
+### Phase 5: Policy Mode Migration (Week 5)
 
 1. **데이터 마이그레이션 실행**
    - 10개 시트 마이그레이션
@@ -1307,14 +1357,26 @@ router.delete('/api/direct/policy/margin/:id', async (req, res) => {
 4. **점진적 활성화**
    - 동일한 롤아웃 프로세스
 
-### Phase 5: Customer Mode Migration (Week 5-6)
+### Phase 5: Policy Mode Migration (Week 5)
 
-1. **사용 패턴 분석**
-   - 실제 데이터 구조 파악
-   - CRUD 빈도 분석
+1. **데이터 마이그레이션 실행**
+   - 10개 시트 마이그레이션
+   - 데이터 무결성 검증
 
-2. **스키마 설계 및 마이그레이션**
-   - 필요시 진행
+2. **API 엔드포인트 업데이트**
+   - policyTableRoutes.js 수정
+   - 통합 테스트
+
+3. **Feature Flag 활성화**
+   ```bash
+   # server/.env
+   USE_DB_POLICY=false  # 초기에는 false
+   ```
+
+4. **점진적 활성화**
+   - 동일한 롤아웃 프로세스
+
+### Phase 6: Remaining Modes (Week 6+)
 
 ### Rollback Strategy
 

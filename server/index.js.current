@@ -240,14 +240,6 @@ try {
 
 // 추가 라우트 등록 (누락된 엔드포인트)
 try {
-  const createAppUpdateRoutes = require('./routes/appUpdateRoutes');
-  app.use('/api', createAppUpdateRoutes(sharedContext));
-  console.log('✅ [Additional] App Update routes mounted');
-} catch (e) {
-  console.error('❌ [Additional] Failed to mount app update routes:', e.message);
-}
-
-try {
   const createPolicyRoutes = require('./routes/policyRoutes');
   app.use('/api', createPolicyRoutes(sharedContext));
   console.log('✅ [Additional] Policy routes mounted');

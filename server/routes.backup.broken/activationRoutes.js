@@ -28,8 +28,8 @@ function createActivationRoutes(context) {
   const { sheetsClient, cacheManager, rateLimiter } = context;
 
   // 시트 이름 상수
-  const CURRENT_MONTH_ACTIVATION_SHEET_NAME = '폰클개통데이터';
-  const PREVIOUS_MONTH_ACTIVATION_SHEET_NAME = '폰클개통데이터(전월)';
+  const CURRENT_MONTH_ACTIVATION_SHEET_NAME = '당월개통실적';
+  const PREVIOUS_MONTH_ACTIVATION_SHEET_NAME = '전월개통실적';
 
   // Google Sheets 클라이언트가 없으면 에러 응답 반환하는 헬퍼 함수
   const requireSheetsClient = (res) => {
