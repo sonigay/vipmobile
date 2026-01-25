@@ -2825,33 +2825,21 @@ function setupDirectRoutes(app) {
   router.get('/plans-master', async (req, res) => {
     try {
       const carrierFilter = (req.query.carrier || '').trim().toUpperCase();
-      const { sheets, SPREADSHEET_ID } = createSheetsClient();
-
-      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_PLAN_MASTER, HEADERS_PLAN_MASTER);
-      const response = await withRetry(async () => {
-        return await sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: SHEET_PLAN_MASTER
-        });
-      });
-
-      const values = response.data.values || [];
-      if (values.length <= 1) {
-        return res.json({ success: true, data: [] });
-      }
-
-      const rows = values.slice(1);
-      const data = rows
-        .map(row => ({
-          carrier: (row[0] || '').toString().trim(),
-          planName: (row[1] || '').toString().trim(),
-          planGroup: (row[2] || '').toString().trim(),
-          basicFee: Number(row[3] || 0),
-          planCode: (row[4] || '').toString().trim(),
-          enabled: ((row[5] || '').toString().trim() || 'Y').toUpperCase() !== 'N',
-          note: (row[6] || '').toString().trim()
-        }))
-        .filter(item => !carrierFilter || item.carrier.toUpperCase() === carrierFilter);
+      
+      // DirectStoreDAL 사용
+      const DirectStoreDAL = require('./dal/DirectStoreDAL');
+      const plans = await DirectStoreDAL.getPlanMaster(carrierFilter || null);
+      
+      // 응답 형식 변환
+      const data = plans.map(plan => ({
+        carrier: plan.carrier,
+        planName: plan.planName,
+        planGroup: plan.planGroup,
+        basicFee: plan.basicFee,
+        planCode: plan.planCode,
+        enabled: plan.isActive,
+        note: plan.note
+      }));
 
       return res.json({ success: true, data });
     } catch (error) {
@@ -2881,55 +2869,35 @@ function setupDirectRoutes(app) {
     try {
       const carrierFilter = (req.query.carrier || '').trim().toUpperCase();
       const modelIdFilter = (req.query.modelId || '').toString().trim();
-      const { sheets, SPREADSHEET_ID } = createSheetsClient();
-
-      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_MOBILE_MASTER, HEADERS_MOBILE_MASTER);
-      const response = await withRetry(async () => {
-        return await sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_MOBILE_MASTER}!A:R`
-        });
-      });
-
-      const values = response.data.values || [];
-      if (values.length <= 1) {
-        return res.json({ success: true, data: [] });
-      }
-
-      const rows = values.slice(1);
-      const data = rows
-        .map(row => {
-          const carrier = (row[0] || '').toString().trim();
-          const modelId = (row[1] || '').toString().trim();
-          const enabled = parseBooleanFlag(row[13] ?? 'Y'); // 기본 사용 여부 Y
-
-          return {
-            carrier,
-            modelId,
-            model: (row[2] || '').toString().trim(),
-            petName: (row[3] || '').toString().trim(),
-            manufacturer: (row[4] || '').toString().trim(),
-            factoryPrice: Number(row[5] || 0),
-            defaultPlanGroup: (row[6] || '').toString().trim(),
-            isPremium: parseBooleanFlag(row[7]),
-            isBudget: parseBooleanFlag(row[8]),
-            isPopular: parseBooleanFlag(row[9]),
-            isRecommended: parseBooleanFlag(row[10]),
-            isCheap: parseBooleanFlag(row[11]),
-            imageUrl: (row[12] || '').toString().trim(),
-            enabled,
-            note: (row[14] || '').toString().trim(),
-            discordMessageId: (row[15] || '').toString().trim() || null, // P: Discord메시지ID
-            discordPostId: (row[16] || '').toString().trim() || null, // Q: Discord포스트ID
-            discordThreadId: (row[17] || '').toString().trim() || null // R: Discord스레드ID
-          };
-        })
-        .filter(item => {
-          if (!item.enabled) return false;
-          if (carrierFilter && item.carrier.toUpperCase() !== carrierFilter) return false;
-          if (modelIdFilter && item.modelId !== modelIdFilter) return false;
-          return true;
-        });
+      
+      // DirectStoreDAL 사용
+      const DirectStoreDAL = require('./dal/DirectStoreDAL');
+      const devices = await DirectStoreDAL.getDeviceMaster(
+        carrierFilter || null,
+        modelIdFilter || null
+      );
+      
+      // 응답 형식 변환
+      const data = devices.map(device => ({
+        carrier: device.carrier,
+        modelId: device.modelId,
+        model: device.modelName,
+        petName: device.petName,
+        manufacturer: device.manufacturer,
+        factoryPrice: device.factoryPrice,
+        defaultPlanGroup: device.defaultPlanGroup,
+        isPremium: device.isPremium,
+        isBudget: device.isBudget,
+        isPopular: device.isPopular,
+        isRecommended: device.isRecommended,
+        isCheap: device.isCheap,
+        imageUrl: device.imageUrl,
+        enabled: device.isActive,
+        note: device.note,
+        discordMessageId: device.discordMessageId,
+        discordPostId: device.discordPostId,
+        discordThreadId: device.discordThreadId
+      }));
 
       return res.json({ success: true, data });
     } catch (error) {
@@ -7805,11 +7773,6 @@ function setupDirectRoutes(app) {
         return res.status(400).json({ success: false, error: '타입은 "버스터미널" 또는 "지하철역"이어야 합니다.' });
       }
 
-      const { sheets, SPREADSHEET_ID } = createSheetsClient();
-
-      // 시트 헤더 확인 및 생성
-      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_TRANSIT_LOCATION, HEADERS_TRANSIT_LOCATION);
-
       // 주소 → 위도/경도 변환
       const coords = await geocodeAddressWithKakao(address);
       if (!coords) {
@@ -7818,27 +7781,16 @@ function setupDirectRoutes(app) {
 
       // 고유 ID 생성
       const id = generateTransitLocationId();
-      const now = new Date().toISOString();
 
-      // 새 행 추가
-      const newRow = [
+      // DirectStoreDAL 사용
+      const DirectStoreDAL = require('./dal/DirectStoreDAL');
+      await DirectStoreDAL.createTransitLocation({
         id,
         type,
         name,
         address,
-        coords.latitude,
-        coords.longitude,
-        now
-      ];
-
-      await withRetry(async () => {
-        return await sheets.spreadsheets.values.append({
-          spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_TRANSIT_LOCATION}!A:G`,
-          valueInputOption: 'USER_ENTERED',
-          insertDataOption: 'INSERT_ROWS',
-          resource: { values: [newRow] }
-        });
+        latitude: coords.latitude,
+        longitude: coords.longitude
       });
 
       // 캐시 무효화
@@ -7854,7 +7806,7 @@ function setupDirectRoutes(app) {
           address,
           lat: coords.latitude,
           lng: coords.longitude,
-          updatedAt: now
+          updatedAt: new Date().toISOString()
         }
       });
     } catch (error) {
@@ -7877,50 +7829,20 @@ function setupDirectRoutes(app) {
         return res.status(400).json({ success: false, error: '타입은 "버스터미널" 또는 "지하철역"이어야 합니다.' });
       }
 
-      const { sheets, SPREADSHEET_ID } = createSheetsClient();
-
-      // 시트 헤더 확인 및 생성
-      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_TRANSIT_LOCATION, HEADERS_TRANSIT_LOCATION);
-
-      // 기존 데이터 조회
-      const response = await withRetry(async () => {
-        return await sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_TRANSIT_LOCATION}!A:G`
-        });
-      });
-
-      const rows = (response.data.values || []).slice(1);
-      const rowIndex = rows.findIndex(row => (row[0] || '').trim() === id);
-
-      if (rowIndex === -1) {
-        return res.status(404).json({ success: false, error: '대중교통 위치를 찾을 수 없습니다.' });
-      }
-
       // 주소 → 위도/경도 변환
       const coords = await geocodeAddressWithKakao(address);
       if (!coords) {
         return res.status(400).json({ success: false, error: '주소를 찾을 수 없습니다.' });
       }
 
-      const now = new Date().toISOString();
-      const updatedRow = [
-        id,
+      // DirectStoreDAL 사용
+      const DirectStoreDAL = require('./dal/DirectStoreDAL');
+      await DirectStoreDAL.updateTransitLocation(id, {
         type,
         name,
         address,
-        coords.latitude,
-        coords.longitude,
-        now
-      ];
-
-      await withRetry(async () => {
-        return await sheets.spreadsheets.values.update({
-          spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_TRANSIT_LOCATION}!A${rowIndex + 2}:G${rowIndex + 2}`,
-          valueInputOption: 'USER_ENTERED',
-          resource: { values: [updatedRow] }
-        });
+        latitude: coords.latitude,
+        longitude: coords.longitude
       });
 
       // 캐시 무효화
@@ -7936,7 +7858,7 @@ function setupDirectRoutes(app) {
           address,
           lat: coords.latitude,
           lng: coords.longitude,
-          updatedAt: now
+          updatedAt: new Date().toISOString()
         }
       });
     } catch (error) {
@@ -7949,47 +7871,10 @@ function setupDirectRoutes(app) {
   router.delete('/transit-location/:id', async (req, res) => {
     try {
       const { id } = req.params;
-      const { sheets, SPREADSHEET_ID } = createSheetsClient();
 
-      // 시트 헤더 확인 및 생성
-      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_TRANSIT_LOCATION, HEADERS_TRANSIT_LOCATION);
-
-      // 기존 데이터 조회
-      const response = await withRetry(async () => {
-        return await sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_TRANSIT_LOCATION}!A:G`
-        });
-      });
-
-      const rows = (response.data.values || []).slice(1);
-      const rowIndex = rows.findIndex(row => (row[0] || '').trim() === id);
-
-      if (rowIndex === -1) {
-        return res.status(404).json({ success: false, error: '대중교통 위치를 찾을 수 없습니다.' });
-      }
-
-      // 행 삭제
-      const sheetId = await getSheetId(sheets, SPREADSHEET_ID, SHEET_TRANSIT_LOCATION);
-      if (sheetId !== null) {
-        await withRetry(async () => {
-          return await sheets.spreadsheets.batchUpdate({
-            spreadsheetId: SPREADSHEET_ID,
-            resource: {
-              requests: [{
-                deleteDimension: {
-                  range: {
-                    sheetId: sheetId,
-                    dimension: 'ROWS',
-                    startIndex: rowIndex + 1,
-                    endIndex: rowIndex + 2
-                  }
-                }
-              }]
-            }
-          });
-        });
-      }
+      // DirectStoreDAL 사용
+      const DirectStoreDAL = require('./dal/DirectStoreDAL');
+      await DirectStoreDAL.deleteTransitLocation(id);
 
       // 캐시 무효화
       deleteCache('transit-location-all');

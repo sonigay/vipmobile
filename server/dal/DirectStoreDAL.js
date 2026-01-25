@@ -347,6 +347,275 @@ class DirectStoreDAL {
       throw error;
     }
   }
+
+  // ==================== 쓰기/수정/삭제 메서드 ====================
+
+  /**
+   * 대중교통 위치 생성
+   */
+  async createTransitLocation(data) {
+    try {
+      const record = {
+        id: data.id,
+        '타입': data.type,
+        '이름': data.name,
+        '주소': data.address,
+        '위도': data.latitude,
+        '경도': data.longitude,
+        '수정일시': new Date().toISOString()
+      };
+      
+      await this.dal.create('direct_store_transit_locations', record);
+      return { success: true, id: data.id };
+    } catch (error) {
+      console.error('[DirectStoreDAL] 대중교통 위치 생성 실패:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 대중교통 위치 수정
+   */
+  async updateTransitLocation(id, data) {
+    try {
+      const updates = {
+        '수정일시': new Date().toISOString()
+      };
+      
+      if (data.type) updates['타입'] = data.type;
+      if (data.name) updates['이름'] = data.name;
+      if (data.address) updates['주소'] = data.address;
+      if (data.latitude !== undefined) updates['위도'] = data.latitude;
+      if (data.longitude !== undefined) updates['경도'] = data.longitude;
+      
+      await this.dal.update('direct_store_transit_locations', { id }, updates);
+      return { success: true };
+    } catch (error) {
+      console.error('[DirectStoreDAL] 대중교통 위치 수정 실패:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 대중교통 위치 삭제
+   */
+  async deleteTransitLocation(id) {
+    try {
+      await this.dal.delete('direct_store_transit_locations', { id });
+      return { success: true };
+    } catch (error) {
+      console.error('[DirectStoreDAL] 대중교통 위치 삭제 실패:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 오늘의 휴대폰 태그 업데이트
+   */
+  async updateTodaysMobileTags(modelName, carrier, tags) {
+    try {
+      const filters = {
+        '모델명': modelName,
+        '통신사': carrier
+      };
+      
+      // 기존 데이터 확인
+      const existing = await this.dal.read('direct_store_todays_mobiles', filters);
+      
+      const updates = {
+        '인기': tags.isPopular ? 'Y' : 'N',
+        '추천': tags.isRecommended ? 'Y' : 'N',
+        '저렴': tags.isCheap ? 'Y' : 'N',
+        '프리미엄': tags.isPremium ? 'Y' : 'N',
+        '중저가': tags.isBudget ? 'Y' : 'N'
+      };
+      
+      if (existing.length > 0) {
+        // 업데이트
+        await this.dal.update('direct_store_todays_mobiles', filters, updates);
+      } else {
+        // 새로 생성
+        const record = {
+          '모델명': modelName,
+          '펫네임': tags.petName || '',
+          '통신사': carrier,
+          '모델ID': tags.modelId || '',
+          '출고가': tags.factoryPrice || 0,
+          '이통사지원금': tags.publicSupport || 0,
+          '대리점지원금(부가유치)': tags.storeSupportWithAddon || 0,
+          '대리점지원금(부가미유치)': tags.storeSupportNoAddon || 0,
+          '이미지': tags.imageUrl || '',
+          '필수부가서비스': tags.requiredAddons || '',
+          ...updates
+        };
+        await this.dal.create('direct_store_todays_mobiles', record);
+      }
+      
+      return { success: true };
+    } catch (error) {
+      console.error('[DirectStoreDAL] 오늘의 휴대폰 태그 업데이트 실패:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 오늘의 휴대폰 삭제 (모든 태그가 false일 때)
+   */
+  async deleteTodaysMobile(modelName, carrier) {
+    try {
+      await this.dal.delete('direct_store_todays_mobiles', {
+        '모델명': modelName,
+        '통신사': carrier
+      });
+      return { success: true };
+    } catch (error) {
+      console.error('[DirectStoreDAL] 오늘의 휴대폰 삭제 실패:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 단말 마스터 태그 업데이트
+   */
+  async updateDeviceMasterTags(modelId, carrier, tags) {
+    try {
+      const updates = {};
+      
+      if (tags.isPremium !== undefined) updates['isPremium'] = tags.isPremium ? 'Y' : 'N';
+      if (tags.isBudget !== undefined) updates['isBudget'] = tags.isBudget ? 'Y' : 'N';
+      if (tags.isPopular !== undefined) updates['isPopular'] = tags.isPopular ? 'Y' : 'N';
+      if (tags.isRecommended !== undefined) updates['isRecommended'] = tags.isRecommended ? 'Y' : 'N';
+      if (tags.isCheap !== undefined) updates['isCheap'] = tags.isCheap ? 'Y' : 'N';
+      
+      await this.dal.update('direct_store_device_master', {
+        '모델ID': modelId,
+        '통신사': carrier
+      }, updates);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('[DirectStoreDAL] 단말 마스터 태그 업데이트 실패:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 판매 일보 생성
+   */
+  async createSalesDaily(data) {
+    try {
+      const record = {
+        '번호': data.id || `sales-${Date.now()}`,
+        'POS코드': data.posCode || '',
+        '업체명': data.storeName || '',
+        '매장ID': data.storeId || '',
+        '판매일시': data.saleDate || new Date().toISOString(),
+        '고객명': data.customerName || '',
+        'CTN': data.ctn || '',
+        '통신사': data.carrier || '',
+        '단말기모델명': data.modelName || '',
+        '색상': data.color || '',
+        '단말일련번호': data.serialNumber || '',
+        '개통유형': data.openingType || '',
+        '요금제명': data.planName || '',
+        '요금제군': data.planGroup || '',
+        '기본료': data.basicFee || 0,
+        '출고가': data.factoryPrice || 0,
+        '이통사지원금': data.publicSupport || 0,
+        '대리점지원금': data.storeSupport || 0,
+        '고객부담금': data.customerPayment || 0,
+        '할부개월': data.installmentMonths || 0,
+        '월할부금': data.monthlyInstallment || 0,
+        '부가서비스': data.addonServices || '',
+        '보험상품': data.insurance || '',
+        '판매자': data.seller || '',
+        '비고': data.note || '',
+        '등록일시': new Date().toISOString()
+      };
+      
+      await this.dal.create('direct_store_sales_daily', record);
+      return { success: true, id: record['번호'] };
+    } catch (error) {
+      console.error('[DirectStoreDAL] 판매 일보 생성 실패:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 메인 페이지 문구 업데이트
+   */
+  async updateMainPageText(carrier, category, type, data) {
+    try {
+      const filters = {
+        '통신사': carrier || '',
+        '카테고리': category || '',
+        '설정유형': type
+      };
+      
+      const updates = {
+        '문구내용': data.content || '',
+        '이미지URL': data.imageUrl || '',
+        '수정일시': new Date().toISOString()
+      };
+      
+      // 기존 데이터 확인
+      const existing = await this.dal.read('direct_store_main_page_texts', filters);
+      
+      if (existing.length > 0) {
+        await this.dal.update('direct_store_main_page_texts', filters, updates);
+      } else {
+        await this.dal.create('direct_store_main_page_texts', { ...filters, ...updates });
+      }
+      
+      return { success: true };
+    } catch (error) {
+      console.error('[DirectStoreDAL] 메인 페이지 문구 업데이트 실패:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 매장 사진 업데이트
+   */
+  async updateStorePhoto(storeName, photoType, data) {
+    try {
+      const filters = { '업체명': storeName };
+      
+      // 기존 데이터 확인
+      const existing = await this.dal.read('direct_store_photos', filters);
+      
+      const updates = {};
+      
+      // photoType에 따라 업데이트할 필드 결정
+      if (photoType === 'front') {
+        updates['전면사진URL'] = data.url || '';
+        updates['전면사진Discord메시지ID'] = data.discordMessageId || '';
+        updates['전면사진Discord포스트ID'] = data.discordPostId || '';
+        updates['전면사진Discord스레드ID'] = data.discordThreadId || '';
+      } else if (photoType === 'interior') {
+        updates['내부사진URL'] = data.url || '';
+        updates['내부사진Discord메시지ID'] = data.discordMessageId || '';
+        updates['내부사진Discord포스트ID'] = data.discordPostId || '';
+        updates['내부사진Discord스레드ID'] = data.discordThreadId || '';
+      } else if (photoType === 'exterior') {
+        updates['외부사진URL'] = data.url || '';
+        updates['외부사진Discord메시지ID'] = data.discordMessageId || '';
+        updates['외부사진Discord포스트ID'] = data.discordPostId || '';
+        updates['외부사진Discord스레드ID'] = data.discordThreadId || '';
+      }
+      
+      if (existing.length > 0) {
+        await this.dal.update('direct_store_photos', filters, updates);
+      } else {
+        await this.dal.create('direct_store_photos', { ...filters, ...updates });
+      }
+      
+      return { success: true };
+    } catch (error) {
+      console.error('[DirectStoreDAL] 매장 사진 업데이트 실패:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = new DirectStoreDAL();
