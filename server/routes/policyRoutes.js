@@ -444,56 +444,437 @@ function createPolicyRoutes(context) {
   // 원본 로직이 매우 복잡하므로 필요시 추가 작업 필요
   // ============================================================================
 
-  // POST /api/policies - 정책 생성 (원본 로직 매우 복잡 - 약 500줄)
+  // POST /api/policies - 정책 생성 (원본 로직 복사 - 약 500줄)
   router.post('/policies', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
-      console.log('정책 생성 요청:', req.body);
+      console.log('새 정책 생성 요청:', req.body);
+
+      const {
+        policyName,
+        policyStartDate,
+        policyEndDate,
+        policyStore,
+        policyContent,
+        policyAmount,
+        amountType,
+        policyType,
+        category,
+        yearMonth,
+        inputUserId,
+        inputUserName,
+        policyTeam
+      } = req.body;
+
+      // 구두정책 여부 확인
+      const isShoePolicy = category === 'wireless_shoe' || category === 'wired_shoe';
+      const isAddDeductPolicy = category === 'wireless_add_deduct' || category === 'wired_add_deduct';
+
+      // 필수 필드 검증
+      const missingFields = [];
+      if (!policyName) missingFields.push('policyName');
+      if (!policyStartDate) missingFields.push('policyStartDate');
+      if (!policyEndDate) missingFields.push('policyEndDate');
       
-      // 원본 로직은 server/index.js.backup.original 28021-28563줄 참조
-      // 매우 복잡한 검증 및 저장 로직 포함
-      
-      res.status(501).json({ 
-        success: false, 
-        error: '정책 생성 API는 원본 로직 복사가 필요합니다. (약 500줄)',
-        note: 'server/index.js.backup.original 28021-28563줄 참조'
-      });
+      // 연합정책이 아닐 때만 policyStore 검증
+      const isUnionPolicy = category === 'wireless_union' || category === 'wired_union';
+      if (!isUnionPolicy && !policyStore) missingFields.push('policyStore');
+      if (!policyTeam || !policyTeam.trim()) missingFields.push('policyTeam');
+
+      // 구두정책이나 부가차감지원정책이 아닌 경우에만 policyContent 필수
+      const isAddSupportPolicyForValidation = category === 'wireless_add_support' || category === 'wired_add_support';
+      const isRatePolicyForValidation = category === 'wireless_rate' || category === 'wired_rate';
+      if (!isShoePolicy && !isAddDeductPolicy && !isAddSupportPolicyForValidation && !isRatePolicyForValidation && !policyContent) {
+        missingFields.push('policyContent');
+      }
+
+      // 구두정책 전용 검증
+      if (isShoePolicy) {
+        if (!req.body.amount95Above && !req.body.amount95Below && !policyContent) {
+          missingFields.push('amount95Above 또는 amount95Below 또는 policyContent');
+        }
+      }
+
+      // 부가차감지원정책 전용 검증
+      if (isAddDeductPolicy) {
+        const deductSupport = req.body.deductSupport || {};
+        const hasAnyAmount = (deductSupport.addServiceAmount && deductSupport.addServiceAmount.trim()) ||
+          (deductSupport.insuranceAmount && deductSupport.insuranceAmount.trim()) ||
+          (deductSupport.connectionAmount && deductSupport.connectionAmount.trim());
+        if (!hasAnyAmount) missingFields.push('차감지원 금액');
+      }
+
+      // 부가추가지원정책 전용 검증
+      const isAddSupportPolicy = category === 'wireless_add_support' || category === 'wired_add_support';
+      if (isAddSupportPolicy) {
+        const addSupport = req.body.addSupport || {};
+        const hasAnyAmount = (addSupport.uplayPremiumAmount && addSupport.uplayPremiumAmount.trim()) ||
+          (addSupport.phoneExchangePassAmount && addSupport.phoneExchangePassAmount.trim()) ||
+          (addSupport.musicAmount && addSupport.musicAmount.trim()) ||
+          (addSupport.numberFilteringAmount && addSupport.numberFilteringAmount.trim());
+        if (!hasAnyAmount) missingFields.push('추가지원 금액');
+      }
+
+      // 요금제유형별정책 전용 검증
+      const isRatePolicy = category === 'wireless_rate' || category === 'wired_rate';
+      if (isRatePolicy) {
+        const rateSupports = req.body.rateSupports || [];
+        const isDirectInput = req.body.isDirectInput === true || req.body.isDirectInput === 'true';
+        if (!isDirectInput && rateSupports.length === 0) {
+          missingFields.push('지원사항');
+        }
+      }
+
+      // 일반 정책 검증
+      if (!isShoePolicy && !isAddDeductPolicy && !isAddSupportPolicy && !isRatePolicy) {
+        if (!amountType) missingFields.push('amountType');
+      }
+
+      if (missingFields.length > 0) {
+        const fieldNames = {
+          'policyName': '정책명',
+          'policyStartDate': '정책 시작일',
+          'policyEndDate': '정책 종료일',
+          'policyStore': '정책적용점',
+          'policyContent': '정책내용',
+          'amountType': '금액 유형',
+          'policyTeam': '소속팀',
+          'amount95Above 또는 amount95Below 또는 policyContent': '95군이상/미만 금액 또는 정책내용',
+          '차감지원 금액': '차감지원 금액',
+          '추가지원 금액': '추가지원 금액',
+          '지원사항': '지원사항'
+        };
+        const missingFieldNames = missingFields.map(field => fieldNames[field] || field);
+        return res.status(400).json({
+          success: false,
+          error: `다음 필수 항목이 누락되었습니다: ${missingFieldNames.join(', ')}`
+        });
+      }
+
+      // amountType이 'in_content'가 아닐 때만 policyAmount 필수
+      if (!isShoePolicy && !isAddDeductPolicy && !isAddSupportPolicy && !isRatePolicy && 
+          amountType !== 'in_content' && !policyAmount) {
+        return res.status(400).json({
+          success: false,
+          error: '금액이 입력되지 않았습니다.'
+        });
+      }
+
+      // 정책 ID 생성
+      const policyId = `POL_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      // 정책 적용일을 시작일~종료일 형태로 변환
+      const startDate = new Date(policyStartDate).toLocaleDateString('ko-KR');
+      const endDate = new Date(policyEndDate).toLocaleDateString('ko-KR');
+      const policyDateRange = `${startDate} ~ ${endDate}`;
+
+      // 금액 정보에 유형 추가
+      const amountWithType = amountType === 'in_content'
+        ? '내용에 직접입력'
+        : `${policyAmount}원 (${amountType === 'total' ? '총금액' : '건당금액'})`;
+
+      // 시트 데이터 확인
+      const existingData = await getSheetValues('정책_기본정보 ');
+
+      // 헤더 정의
+      const headerRow = [
+        '정책ID', '정책명', '정책적용일', '정책적용점', '정책내용', '금액', '정책유형', '무선/유선', '하위카테고리',
+        '입력자ID', '입력자명', '입력일시', '승인상태_총괄', '승인상태_정산팀', '승인상태_소속팀', '정책상태',
+        '취소사유', '취소일시', '취소자명', '정산반영상태', '정산반영자명', '정산반영일시', '정산반영자ID',
+        '대상년월', '복수점명', '업체명', '개통유형', '95군이상금액', '95군미만금액', '소속팀',
+        '부가미유치금액', '보험미유치금액', '연결음미유치금액', '부가유치시조건', '보험유치시조건', '연결음유치시조건',
+        '유플레이프리미엄금액', '폰교체패스금액', '음악감상금액', '지정번호필터링금액',
+        'VAS2종동시유치', 'VAS2종중1개유치', '부가3종모두유치', '요금제유형별지원사항',
+        '연합정산입금처', '연합대상하부점', '연합조건', '개별소급적용대상', '개별소급개통유형', '담당자', '직접입력여부'
+      ];
+
+      // 매장명 조회
+      let storeName = '';
+      try {
+        const storeValues = await getSheetValuesWithoutCache(STORE_SHEET_NAME);
+        if (storeValues && storeValues.length > 1) {
+          const store = storeValues.slice(1).find(row => row[15] && row[15].toString() === policyStore.toString());
+          if (store) storeName = store[14] ? store[14].toString().trim() : '';
+        }
+      } catch (error) {
+        console.warn('매장 데이터 조회 실패:', error.message);
+      }
+
+      // 새 정책 데이터 생성
+      const newPolicyRow = [
+        policyId, policyName, policyDateRange, policyStore, policyContent, amountWithType, policyType,
+        category.startsWith('wireless') ? '무선' : '유선', category, inputUserId, inputUserName,
+        new Date().toISOString(), '대기', '대기', '대기', '활성', '', '', '', '미반영', '', '', '',
+        yearMonth, req.body.multipleStoreName || '', storeName,
+        (() => {
+          if (category === 'wireless_add_deduct' || category === 'wired_add_deduct' ||
+              category === 'wireless_add_support' || category === 'wired_add_support' ||
+              category === 'wireless_rate' || category === 'wired_rate') return '전유형';
+          if (!req.body.activationType) return '';
+          const { new010, mnp, change } = req.body.activationType;
+          const types = [];
+          if (new010) types.push('010신규');
+          if (mnp) types.push('MNP');
+          if (change) types.push('기변');
+          if (types.length === 3) return '전유형';
+          return types.join(', ');
+        })(),
+        (isShoePolicy ? (req.body.amount95Above || '') : ''),
+        (isShoePolicy ? (req.body.amount95Below || '') : ''),
+        (policyTeam && policyTeam.trim()) || '미지정',
+        (isAddDeductPolicy ? (req.body.deductSupport?.addServiceAmount || '') : ''),
+        (isAddDeductPolicy ? (req.body.deductSupport?.insuranceAmount || '') : ''),
+        (isAddDeductPolicy ? (req.body.deductSupport?.connectionAmount || '') : ''),
+        (isAddDeductPolicy ? (req.body.conditionalOptions?.addServiceAcquired ? 'Y' : 'N') : ''),
+        (isAddDeductPolicy ? (req.body.conditionalOptions?.insuranceAcquired ? 'Y' : 'N') : ''),
+        (isAddDeductPolicy ? (req.body.conditionalOptions?.connectionAcquired ? 'Y' : 'N') : ''),
+        (isAddSupportPolicy ? (req.body.addSupport?.uplayPremiumAmount || '') : ''),
+        (isAddSupportPolicy ? (req.body.addSupport?.phoneExchangePassAmount || '') : ''),
+        (isAddSupportPolicy ? (req.body.addSupport?.musicAmount || '') : ''),
+        (isAddSupportPolicy ? (req.body.addSupport?.numberFilteringAmount || '') : ''),
+        (isAddSupportPolicy ? (req.body.supportConditionalOptions?.vas2Both ? 'Y' : 'N') : ''),
+        (isAddSupportPolicy ? (req.body.supportConditionalOptions?.vas2Either ? 'Y' : 'N') : ''),
+        (isAddSupportPolicy ? (req.body.supportConditionalOptions?.addon3All ? 'Y' : 'N') : ''),
+        (isRatePolicy ? JSON.stringify(req.body.rateSupports || []) : ''),
+        (isUnionPolicy ? (req.body.unionSettlementStore || '') : ''),
+        (isUnionPolicy ? JSON.stringify(req.body.unionTargetStores || []) : ''),
+        (isUnionPolicy ? JSON.stringify(req.body.unionConditions || {}) : ''),
+        ((category === 'wireless_individual' || category === 'wired_individual') ? JSON.stringify(req.body.individualTarget || {}) : ''),
+        ((category === 'wireless_individual' || category === 'wired_individual') ? (req.body.individualActivationType || '') : ''),
+        req.body.manager || '',
+        (req.body.isDirectInput === true || req.body.isDirectInput === 'true') ? 'Y' : 'N'
+      ];
+
+      // 시트에 데이터 추가
+      if (!existingData || existingData.length === 0) {
+        await rateLimiter.execute(() =>
+          sheets.spreadsheets.values.append({
+            spreadsheetId: SPREADSHEET_ID,
+            range: '정책_기본정보 !A:AY',
+            valueInputOption: 'RAW',
+            insertDataOption: 'INSERT_ROWS',
+            resource: { values: [headerRow, newPolicyRow] }
+          })
+        );
+      } else {
+        const nextRowIndex = existingData.length + 1;
+        await rateLimiter.execute(() =>
+          sheets.spreadsheets.values.update({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `정책_기본정보 !A${nextRowIndex}:AY${nextRowIndex}`,
+            valueInputOption: 'RAW',
+            resource: { values: [newPolicyRow] }
+          })
+        );
+      }
+
+      // 알림 생성
+      await createPolicyNotification(policyId, inputUserId, 'new_policy');
+
+      // 캐시 무효화
+      cacheManager.delete('sheet_정책_기본정보 ');
+
+      console.log('정책 생성 완료:', policyId);
+      res.json({ success: true, message: '정책이 성공적으로 생성되었습니다.', policyId });
+
     } catch (error) {
       console.error('정책 생성 실패:', error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
 
-  // PUT /api/policies/:policyId - 정책 수정
+  // PUT /api/policies/:policyId - 정책 수정 (원본 로직)
   router.put('/policies/:policyId', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
       const { policyId } = req.params;
       console.log('정책 수정:', policyId, req.body);
+
+      const {
+        policyName, policyStartDate, policyEndDate, policyStore, policyContent,
+        policyAmount, amountType, policyType, category, yearMonth,
+        inputUserId, inputUserName
+      } = req.body;
       
-      res.status(501).json({ 
-        success: false, 
-        error: '정책 수정 API는 원본 로직 복사가 필요합니다.',
-        note: 'server/index.js.backup.original 28621-28946줄 참조'
-      });
+      const policyTeam = (req.body.policyTeam ?? req.body.team ?? '').toString();
+
+      // 구두정책 여부 확인
+      const isShoePolicy = category === 'wireless_shoe' || category === 'wired_shoe';
+      const isAddDeductPolicy = category === 'wireless_add_deduct' || category === 'wired_add_deduct';
+      const isAddSupportPolicy = category === 'wireless_add_support' || category === 'wired_add_support';
+      const isRatePolicy = category === 'wireless_rate' || category === 'wired_rate';
+      const isUnionPolicy = category === 'wireless_union' || category === 'wired_union';
+
+      // 필수 필드 검증
+      const missingFields = [];
+      if (!policyName) missingFields.push('policyName');
+      if (!policyStartDate) missingFields.push('policyStartDate');
+      if (!policyEndDate) missingFields.push('policyEndDate');
+      if (!isUnionPolicy && !policyStore) missingFields.push('policyStore');
+      if (!policyTeam || !policyTeam.trim()) missingFields.push('policyTeam');
+
+      if (!isShoePolicy && !isAddDeductPolicy && !isAddSupportPolicy && !isRatePolicy && !policyContent) {
+        missingFields.push('policyContent');
+      }
+
+      if (missingFields.length > 0) {
+        return res.status(400).json({
+          success: false,
+          error: `다음 필수 항목이 누락되었습니다: ${missingFields.join(', ')}`
+        });
+      }
+
+      // 정책 찾기
+      const values = await getSheetValuesWithoutCache('정책_기본정보 ');
+      if (!values || values.length <= 1) {
+        return res.status(404).json({ success: false, error: '정책을 찾을 수 없습니다.' });
+      }
+
+      const dataRows = values.slice(1);
+      const policyIndex = dataRows.findIndex(row => row[0] === policyId);
+      if (policyIndex === -1) {
+        return res.status(404).json({ success: false, error: '정책을 찾을 수 없습니다.' });
+      }
+
+      const policyRow = dataRows[policyIndex];
+      const rowNumber = policyIndex + 2;
+
+      // 정책 적용일 변환
+      const startDate = new Date(policyStartDate).toLocaleDateString('ko-KR');
+      const endDate = new Date(policyEndDate).toLocaleDateString('ko-KR');
+      const policyDateRange = `${startDate} ~ ${endDate}`;
+
+      // 금액 정보
+      const amountWithType = amountType === 'in_content'
+        ? '내용에 직접입력'
+        : `${policyAmount}원 (${amountType === 'total' ? '총금액' : '건당금액'})`;
+
+      // 매장명 조회
+      let storeName = '';
+      try {
+        const storeValues = await getSheetValues(STORE_SHEET_NAME);
+        if (storeValues && storeValues.length > 1) {
+          const store = storeValues.slice(1).find(row => row[15] && row[15].toString() === policyStore.toString());
+          if (store) storeName = store[14] ? store[14].toString().trim() : '';
+        }
+      } catch (error) {
+        console.warn('매장 데이터 조회 실패:', error.message);
+      }
+
+      // 기존 행 데이터 유지하면서 수정
+      const updatedRow = [...policyRow];
+      while (updatedRow.length < 51) updatedRow.push('');
+
+      updatedRow[1] = policyName;
+      updatedRow[2] = policyDateRange;
+      updatedRow[3] = policyStore;
+      updatedRow[4] = policyContent;
+      updatedRow[5] = amountWithType;
+      updatedRow[6] = policyType;
+      updatedRow[7] = (category && category.startsWith('wireless')) ? '무선' : '유선';
+      updatedRow[8] = category || '';
+      updatedRow[9] = inputUserId;
+      updatedRow[10] = inputUserName;
+      updatedRow[11] = new Date().toISOString();
+      updatedRow[23] = yearMonth;
+      updatedRow[24] = req.body.multipleStoreName || '';
+      updatedRow[25] = storeName;
+      updatedRow[26] = (() => {
+        if (isAddDeductPolicy || isAddSupportPolicy || isRatePolicy) return '전유형';
+        if (!req.body.activationType) return '';
+        const { new010, mnp, change } = req.body.activationType;
+        const types = [];
+        if (new010) types.push('010신규');
+        if (mnp) types.push('MNP');
+        if (change) types.push('기변');
+        if (types.length === 3) return '전유형';
+        return types.join(', ');
+      })();
+      updatedRow[27] = isShoePolicy ? (req.body.amount95Above || '') : '';
+      updatedRow[28] = isShoePolicy ? (req.body.amount95Below || '') : '';
+      updatedRow[29] = (policyTeam && policyTeam.trim()) || '미지정';
+      updatedRow[30] = isAddDeductPolicy ? (req.body.deductSupport?.addServiceAmount || '') : '';
+      updatedRow[31] = isAddDeductPolicy ? (req.body.deductSupport?.insuranceAmount || '') : '';
+      updatedRow[32] = isAddDeductPolicy ? (req.body.deductSupport?.connectionAmount || '') : '';
+      updatedRow[33] = isAddDeductPolicy ? (req.body.conditionalOptions?.addServiceAcquired ? 'Y' : 'N') : '';
+      updatedRow[34] = isAddDeductPolicy ? (req.body.conditionalOptions?.insuranceAcquired ? 'Y' : 'N') : '';
+      updatedRow[35] = isAddDeductPolicy ? (req.body.conditionalOptions?.connectionAcquired ? 'Y' : 'N') : '';
+      updatedRow[36] = isAddSupportPolicy ? (req.body.addSupport?.uplayPremiumAmount || '') : '';
+      updatedRow[37] = isAddSupportPolicy ? (req.body.addSupport?.phoneExchangePassAmount || '') : '';
+      updatedRow[38] = isAddSupportPolicy ? (req.body.addSupport?.musicAmount || '') : '';
+      updatedRow[39] = isAddSupportPolicy ? (req.body.addSupport?.numberFilteringAmount || '') : '';
+      updatedRow[40] = isAddSupportPolicy ? (req.body.supportConditionalOptions?.vas2Both ? 'Y' : 'N') : '';
+      updatedRow[41] = isAddSupportPolicy ? (req.body.supportConditionalOptions?.vas2Either ? 'Y' : 'N') : '';
+      updatedRow[42] = isAddSupportPolicy ? (req.body.supportConditionalOptions?.addon3All ? 'Y' : 'N') : '';
+      updatedRow[43] = isRatePolicy ? JSON.stringify(req.body.rateSupports || []) : '';
+      updatedRow[44] = isUnionPolicy ? (req.body.unionSettlementStore || '') : '';
+      updatedRow[45] = isUnionPolicy ? JSON.stringify(req.body.unionTargetStores || []) : '';
+      updatedRow[46] = isUnionPolicy ? JSON.stringify(req.body.unionConditions || {}) : '';
+      updatedRow[47] = (category === 'wireless_individual' || category === 'wired_individual') ? JSON.stringify(req.body.individualTarget || {}) : '';
+      updatedRow[48] = (category === 'wireless_individual' || category === 'wired_individual') ? (req.body.individualActivationType || '') : '';
+      updatedRow[49] = req.body.manager || '';
+      updatedRow[50] = (req.body.isDirectInput === true || req.body.isDirectInput === 'true') ? 'Y' : 'N';
+
+      await rateLimiter.execute(() =>
+        sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `정책_기본정보 !A${rowNumber}:AY${rowNumber}`,
+          valueInputOption: 'RAW',
+          resource: { values: [updatedRow] }
+        })
+      );
+
+      cacheManager.delete('sheet_정책_기본정보 ');
+      console.log('정책 수정 완료:', policyId);
+      res.json({ success: true, message: '정책이 성공적으로 수정되었습니다.', policyId });
+
     } catch (error) {
       console.error('정책 수정 실패:', error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
 
-  // DELETE /api/policies/:policyId - 정책 삭제
+  // DELETE /api/policies/:policyId - 정책 삭제 (원본 로직)
   router.delete('/policies/:policyId', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
       const { policyId } = req.params;
       console.log('정책 삭제:', policyId);
-      
-      res.status(501).json({ 
-        success: false, 
-        error: '정책 삭제 API는 원본 로직 복사가 필요합니다.',
-        note: 'server/index.js.backup.original 28564-28620줄 참조'
-      });
+
+      const values = await getSheetValuesWithoutCache('정책_기본정보 ');
+      if (!values || values.length <= 1) {
+        return res.status(404).json({ success: false, error: '정책을 찾을 수 없습니다.' });
+      }
+
+      const dataRows = values.slice(1);
+      const policyRowIndex = dataRows.findIndex(row => row[0] === policyId);
+      if (policyRowIndex === -1) {
+        return res.status(404).json({ success: false, error: '정책을 찾을 수 없습니다.' });
+      }
+
+      const sheetId = await getSheetIdByName('정책_기본정보 ');
+      await rateLimiter.execute(() =>
+        sheets.spreadsheets.batchUpdate({
+          spreadsheetId: SPREADSHEET_ID,
+          resource: {
+            requests: [{
+              deleteDimension: {
+                range: {
+                  sheetId: sheetId,
+                  dimension: 'ROWS',
+                  startIndex: policyRowIndex + 1,
+                  endIndex: policyRowIndex + 2
+                }
+              }
+            }]
+          }
+        })
+      );
+
+      cacheManager.delete('sheet_정책_기본정보 ');
+      console.log('정책 삭제 완료:', policyId);
+      res.json({ success: true, message: '정책이 삭제되었습니다.' });
+
     } catch (error) {
       console.error('정책 삭제 실패:', error);
       res.status(500).json({ success: false, error: error.message });
