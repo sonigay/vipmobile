@@ -3304,7 +3304,8 @@ function setupDirectRoutes(app) {
         // Google Sheets에서 조회 (폴백)
         console.log(`📖 [GET /mobiles-master] Google Sheets에서 조회: carrier=${carrierFilter}, modelId=${modelIdFilter}`);
         const sheetName = '직영점_단말마스터';
-        const rows = await withRetry(() => getSheetData(sheetName));
+        const range = `${sheetName}!A:Z`;
+        const rows = await withRetry(() => getSheetData(process.env.SHEET_ID, range));
         
         if (!rows || rows.length === 0) {
           return res.json({ success: true, data: [] });
