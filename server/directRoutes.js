@@ -236,8 +236,38 @@ function setCache(key, data, ttlMs = 60 * 1000) {
   cacheStore.set(key, { data, expires: Date.now() + ttlMs });
 }
 
-// Rate limit 에러 발생 시 재시도하는 래퍼 함수 (개선: 전역 큐 시스템 + 호출 간격 제어)
-async function withRetry(fn, maxRetries = 5, baseDelay = 2000) {
+// Supabase용 재시도 함수 (딜레이 없음, 네트워크 에러만 재시도)
+async function withRetrySupabase(fn, maxRetries = 3) {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const result = await fn();
+      return result;
+    } catch (error) {
+      // 네트워크 에러만 재시도
+      const isNetworkError =
+        error.code === 'ECONNRESET' ||
+        error.code === 'ETIMEDOUT' ||
+        error.code === 'ENOTFOUND' ||
+        (error.message && (
+          error.message.includes('network') ||
+          error.message.includes('timeout') ||
+          error.message.includes('ECONNRESET')
+        ));
+
+      if (isNetworkError && attempt < maxRetries - 1) {
+        console.warn(`[Direct] Supabase 네트워크 에러, 즉시 재시도 (${attempt + 1}/${maxRetries})`);
+        continue;
+      }
+
+      // 네트워크 에러가 아니거나 최대 재시도 횟수 초과 시
+      throw error;
+    }
+  }
+  throw new Error('Max retries exceeded');
+}
+
+// Google Sheets용 재시도 함수 (Rate Limit 로직 유지)
+async function withRetryGoogleSheets(fn, maxRetries = 5, baseDelay = 2000) {
   // 전역 큐를 통한 동시 요청 제한
   return new Promise((resolve, reject) => {
     const executeRequest = async () => {
@@ -300,6 +330,9 @@ async function withRetry(fn, maxRetries = 5, baseDelay = 2000) {
     processSheetsRequestQueue();
   });
 }
+
+// 하위 호환성을 위한 별칭 (기존 코드에서 withRetry 사용하는 경우)
+const withRetry = withRetryGoogleSheets;
 
 // 동시 요청 방지를 위한 래퍼 함수 (재시도 로직 포함 + SWR 지원)
 async function withRequestDeduplication(key, fetchFn, ttlOverride = null) {
@@ -651,16 +684,43 @@ async function rebuildPlanMaster(carriersParam) {
 
   // 새 데이터 쓰기 (빈 행 필터링)
   const filteredRows = allRows.filter(row => row && row.length > 0 && row[0]); // 첫 번째 컬럼(통신사)이 있는 행만
-  if (filteredRows.length > 0) {
-    await withRetry(async () => {
-      return await sheets.spreadsheets.values.append({
-        spreadsheetId: SPREADSHEET_ID,
-        range: SHEET_PLAN_MASTER,
-        valueInputOption: 'USER_ENTERED',
-        insertDataOption: 'INSERT_ROWS',
-        resource: { values: filteredRows }
+  
+  // 🔥 Feature Flag: USE_DB_DIRECT_STORE가 true이면 Supabase에 쓰기, 아니면 Google Sheets에 쓰기
+  const useDatabase = process.env.USE_DB_DIRECT_STORE === 'true';
+  
+  if (useDatabase) {
+    // Supabase에 쓰기 (DirectStoreDAL 사용)
+    console.log(`📝 [rebuildPlanMaster] Supabase에 데이터 쓰기 시작 (${filteredRows.length}개)`);
+    const DirectStoreDAL = require('./dal/DirectStoreDAL');
+    
+    // 배열 데이터를 객체 배열로 변환
+    const planData = filteredRows.map(row => ({
+      carrier: row[0],           // 통신사
+      planName: row[1],          // 요금제명
+      planGroup: row[2],         // 요금제군
+      basicFee: row[3] || 0,     // 기본료
+      planCode: row[4] || '',    // 요금제코드
+      isActive: row[5] === 'Y',  // 사용여부
+      note: row[6] || ''         // 비고
+    }));
+    
+    await DirectStoreDAL.rebuildPlanMaster(planData);
+    console.log(`✅ [rebuildPlanMaster] Supabase에 데이터 쓰기 완료`);
+  } else {
+    // Google Sheets에 쓰기 (기존 로직)
+    console.log(`📝 [rebuildPlanMaster] Google Sheets에 데이터 쓰기 시작 (${filteredRows.length}개)`);
+    if (filteredRows.length > 0) {
+      await withRetry(async () => {
+        return await sheets.spreadsheets.values.append({
+          spreadsheetId: SPREADSHEET_ID,
+          range: SHEET_PLAN_MASTER,
+          valueInputOption: 'USER_ENTERED',
+          insertDataOption: 'INSERT_ROWS',
+          resource: { values: filteredRows }
+        });
       });
-    });
+    }
+    console.log(`✅ [rebuildPlanMaster] Google Sheets에 데이터 쓰기 완료`);
   }
 
   // 🔥 태스크 7.3: 중요 작업 로깅 추가 - 완료 시점 로깅 및 소요 시간 측정
@@ -669,7 +729,8 @@ async function rebuildPlanMaster(carriersParam) {
     소요시간: `${elapsedTime}초`,
     총개수: filteredRows.length,
     통신사: carriers.join(', '),
-    통신사별상세: perCarrierStats
+    통신사별상세: perCarrierStats,
+    저장위치: useDatabase ? 'Supabase' : 'Google Sheets'
   });
 
   return {
@@ -1033,62 +1094,100 @@ async function rebuildDeviceMaster(carriersParam) {
 
   // 새 데이터 쓰기 (빈 행 필터링)
   const filteredRows = allRows.filter(row => row && row.length > 0 && row[0]); // 첫 번째 컬럼(통신사)이 있는 행만
-  if (filteredRows.length > 0) {
-    // 시트 크기 확인 및 확장
-    const requiredRows = filteredRows.length + 1; // 헤더 포함
-    const requiredCols = Math.max(...filteredRows.map(row => row.length), 18); // 최소 18열 (R열)
+  
+  // 🔥 Feature Flag: USE_DB_DIRECT_STORE가 true이면 Supabase에 쓰기, 아니면 Google Sheets에 쓰기
+  const useDatabase = process.env.USE_DB_DIRECT_STORE === 'true';
+  
+  if (useDatabase) {
+    // Supabase에 쓰기 (DirectStoreDAL 사용)
+    console.log(`📝 [rebuildDeviceMaster] Supabase에 데이터 쓰기 시작 (${filteredRows.length}개)`);
+    const DirectStoreDAL = require('./dal/DirectStoreDAL');
+    
+    // 배열 데이터를 객체 배열로 변환
+    const deviceData = filteredRows.map(row => ({
+      carrier: row[0],                    // 통신사
+      modelId: row[1],                    // 모델ID
+      modelName: row[2],                  // 모델명
+      petName: row[3] || '',              // 펫네임
+      manufacturer: row[4] || '',         // 제조사
+      factoryPrice: row[5] || 0,          // 출고가
+      defaultPlanGroup: row[6] || '',     // 기본요금제군
+      isPremium: row[7] === 'Y',          // isPremium
+      isBudget: row[8] === 'Y',           // isBudget
+      isPopular: row[9] === 'Y',          // isPopular
+      isRecommended: row[10] === 'Y',     // isRecommended
+      isCheap: row[11] === 'Y',           // isCheap
+      imageUrl: row[12] || '',            // 이미지URL
+      isActive: row[13] === 'Y',          // 사용여부
+      note: row[14] || '',                // 비고
+      discordMessageId: row[15] || '',    // Discord메시지ID
+      discordPostId: row[16] || '',       // Discord포스트ID
+      discordThreadId: row[17] || ''      // Discord스레드ID
+    }));
+    
+    await DirectStoreDAL.rebuildDeviceMaster(deviceData);
+    console.log(`✅ [rebuildDeviceMaster] Supabase에 데이터 쓰기 완료`);
+  } else {
+    // Google Sheets에 쓰기 (기존 로직)
+    console.log(`📝 [rebuildDeviceMaster] Google Sheets에 데이터 쓰기 시작 (${filteredRows.length}개)`);
+    if (filteredRows.length > 0) {
+      // 시트 크기 확인 및 확장
+      const requiredRows = filteredRows.length + 1; // 헤더 포함
+      const requiredCols = Math.max(...filteredRows.map(row => row.length), 18); // 최소 18열 (R열)
 
-    try {
-      const sheetId = await getSheetId(sheets, SPREADSHEET_ID, SHEET_MOBILE_MASTER);
-      if (sheetId !== null) {
-        const spreadsheet = await withRetry(async () => {
-          return await sheets.spreadsheets.get({
-            spreadsheetId: SPREADSHEET_ID,
-            fields: 'sheets.properties'
-          });
-        });
-        const sheet = spreadsheet.data.sheets.find(s => s.properties.sheetId === sheetId);
-        if (sheet && sheet.properties.gridProperties) {
-          const currentRows = sheet.properties.gridProperties.rowCount || 1;
-          const currentCols = sheet.properties.gridProperties.columnCount || 26;
-
-          if (currentRows < requiredRows || currentCols < requiredCols) {
-            console.log(`[Direct][rebuildDeviceMaster] 시트 크기 확장: ${currentRows}행/${currentCols}열 -> ${requiredRows}행/${requiredCols}열`);
-            await withRetry(async () => {
-              return await sheets.spreadsheets.batchUpdate({
-                spreadsheetId: SPREADSHEET_ID,
-                resource: {
-                  requests: [{
-                    updateSheetProperties: {
-                      properties: {
-                        sheetId: sheetId,
-                        gridProperties: {
-                          rowCount: Math.max(currentRows, requiredRows + 10), // 여유 공간 추가
-                          columnCount: Math.max(currentCols, requiredCols + 5) // 여유 공간 추가
-                        }
-                      },
-                      fields: 'gridProperties.rowCount,gridProperties.columnCount'
-                    }
-                  }]
-                }
-              });
+      try {
+        const sheetId = await getSheetId(sheets, SPREADSHEET_ID, SHEET_MOBILE_MASTER);
+        if (sheetId !== null) {
+          const spreadsheet = await withRetry(async () => {
+            return await sheets.spreadsheets.get({
+              spreadsheetId: SPREADSHEET_ID,
+              fields: 'sheets.properties'
             });
+          });
+          const sheet = spreadsheet.data.sheets.find(s => s.properties.sheetId === sheetId);
+          if (sheet && sheet.properties.gridProperties) {
+            const currentRows = sheet.properties.gridProperties.rowCount || 1;
+            const currentCols = sheet.properties.gridProperties.columnCount || 26;
+
+            if (currentRows < requiredRows || currentCols < requiredCols) {
+              console.log(`[Direct][rebuildDeviceMaster] 시트 크기 확장: ${currentRows}행/${currentCols}열 -> ${requiredRows}행/${requiredCols}열`);
+              await withRetry(async () => {
+                return await sheets.spreadsheets.batchUpdate({
+                  spreadsheetId: SPREADSHEET_ID,
+                  resource: {
+                    requests: [{
+                      updateSheetProperties: {
+                        properties: {
+                          sheetId: sheetId,
+                          gridProperties: {
+                            rowCount: Math.max(currentRows, requiredRows + 10), // 여유 공간 추가
+                            columnCount: Math.max(currentCols, requiredCols + 5) // 여유 공간 추가
+                          }
+                        },
+                        fields: 'gridProperties.rowCount,gridProperties.columnCount'
+                      }
+                    }]
+                  }
+                });
+              });
+            }
           }
         }
+      } catch (expandErr) {
+        console.warn('[Direct][rebuildDeviceMaster] 시트 크기 확장 실패 (계속 진행):', expandErr.message);
       }
-    } catch (expandErr) {
-      console.warn('[Direct][rebuildDeviceMaster] 시트 크기 확장 실패 (계속 진행):', expandErr.message);
-    }
 
-    await withRetry(async () => {
-      // A2부터 시작하도록 명시 (헤더는 A1에 있음)
-      return await sheets.spreadsheets.values.update({
-        spreadsheetId: SPREADSHEET_ID,
-        range: `${SHEET_MOBILE_MASTER}!A2:R${filteredRows.length + 1}`, // A2부터 R열까지
-        valueInputOption: 'USER_ENTERED',
-        resource: { values: filteredRows }
+      await withRetry(async () => {
+        // A2부터 시작하도록 명시 (헤더는 A1에 있음)
+        return await sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_MOBILE_MASTER}!A2:R${filteredRows.length + 1}`, // A2부터 R열까지
+          valueInputOption: 'USER_ENTERED',
+          resource: { values: filteredRows }
+        });
       });
-    });
+    }
+    console.log(`✅ [rebuildDeviceMaster] Google Sheets에 데이터 쓰기 완료`);
   }
 
   // 🔥 태스크 7.3: 중요 작업 로깅 추가 - 완료 시점 로깅 및 소요 시간 측정
@@ -1097,7 +1196,8 @@ async function rebuildDeviceMaster(carriersParam) {
     소요시간: `${elapsedTime}초`,
     총개수: filteredRows.length,
     통신사: carriers.join(', '),
-    통신사별상세: perCarrierStats
+    통신사별상세: perCarrierStats,
+    저장위치: useDatabase ? 'Supabase' : 'Google Sheets'
   });
 
   return { 
@@ -1759,32 +1859,64 @@ async function rebuildPricingMaster(carriersParam) {
   }
 
   // 데이터 쓰기
-  // 🔥 수정: 부가미유치 기준 제거로 인해 컬럼 수 감소 (14개 → 13개)
-  await withRetry(async () => {
-    return await sheets.spreadsheets.values.clear({
-      spreadsheetId: SPREADSHEET_ID,
-      range: `${SHEET_MOBILE_PRICING}!A2:M` // 인덱스 변경: N → M (14개 → 13개)
-    });
-  });
-
-  if (allRows.length > 0) {
+  // 🔥 Feature Flag: USE_DB_DIRECT_STORE가 true이면 Supabase에 쓰기, 아니면 Google Sheets에 쓰기
+  const useDatabase = process.env.USE_DB_DIRECT_STORE === 'true';
+  
+  if (useDatabase) {
+    // Supabase에 쓰기 (DirectStoreDAL 사용)
+    console.log(`📝 [rebuildPricingMaster] Supabase에 데이터 쓰기 시작 (${allRows.length}개)`);
+    const DirectStoreDAL = require('./dal/DirectStoreDAL');
+    
+    // 배열 데이터를 객체 배열로 변환
+    const pricingData = allRows.map(row => ({
+      carrier: row[0],                              // 통신사
+      modelId: row[1],                              // 모델ID
+      modelName: row[2],                            // 모델명
+      planGroup: row[3],                            // 요금제군
+      planCode: row[4] || '',                       // 요금제코드
+      openingType: row[5],                          // 개통유형
+      factoryPrice: row[6] || 0,                    // 출고가
+      publicSupport: row[7] || 0,                   // 이통사지원금
+      storeAdditionalSupportWithAddon: row[8] || 0, // 대리점추가지원금_부가유치
+      policyMargin: row[9] || 0,                    // 정책마진
+      policyId: row[10] || '',                      // 정책ID
+      baseDate: row[11] || '',                      // 기준일자
+      note: row[12] || ''                           // 비고
+    }));
+    
+    await DirectStoreDAL.rebuildPricingMaster(pricingData);
+    console.log(`✅ [rebuildPricingMaster] Supabase에 데이터 쓰기 완료`);
+  } else {
+    // Google Sheets에 쓰기 (기존 로직)
+    console.log(`📝 [rebuildPricingMaster] Google Sheets에 데이터 쓰기 시작 (${allRows.length}개)`);
+    // 🔥 수정: 부가미유치 기준 제거로 인해 컬럼 수 감소 (14개 → 13개)
     await withRetry(async () => {
-      // A2부터 시작하도록 명시 (헤더는 A1에 있음)
-      // 🔥 수정: 부가미유치 기준 제거로 인해 컬럼 수 감소 (14개 → 13개)
-      return await sheets.spreadsheets.values.update({
+      return await sheets.spreadsheets.values.clear({
         spreadsheetId: SPREADSHEET_ID,
-        range: `${SHEET_MOBILE_PRICING}!A2:M${allRows.length + 1}`, // A2부터 M열까지 (인덱스 변경: N → M)
-        valueInputOption: 'USER_ENTERED',
-        resource: { values: allRows }
+        range: `${SHEET_MOBILE_PRICING}!A2:M` // 인덱스 변경: N → M (14개 → 13개)
       });
     });
-  } else {
-    // 🔥 태스크 7.2: 로그 빈도 제한 적용 - 데이터 없음 경고 로그 빈도 제한
-    logWarningOnce(
-      'rebuildPricingMaster-no-data',
-      '[Direct][rebuildPricingMaster] 생성할 데이터가 없습니다.',
-      { 통신사: carriers.join(', ') }
-    );
+
+    if (allRows.length > 0) {
+      await withRetry(async () => {
+        // A2부터 시작하도록 명시 (헤더는 A1에 있음)
+        // 🔥 수정: 부가미유치 기준 제거로 인해 컬럼 수 감소 (14개 → 13개)
+        return await sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_MOBILE_PRICING}!A2:M${allRows.length + 1}`, // A2부터 M열까지 (인덱스 변경: N → M)
+          valueInputOption: 'USER_ENTERED',
+          resource: { values: allRows }
+        });
+      });
+    } else {
+      // 🔥 태스크 7.2: 로그 빈도 제한 적용 - 데이터 없음 경고 로그 빈도 제한
+      logWarningOnce(
+        'rebuildPricingMaster-no-data',
+        '[Direct][rebuildPricingMaster] 생성할 데이터가 없습니다.',
+        { 통신사: carriers.join(', ') }
+      );
+    }
+    console.log(`✅ [rebuildPricingMaster] Google Sheets에 데이터 쓰기 완료`);
   }
 
   // 🔥 태스크 7.3: 중요 작업 로깅 추가 - 완료 시점 로깅 및 소요 시간 측정
@@ -1793,10 +1925,58 @@ async function rebuildPricingMaster(carriersParam) {
     소요시간: `${elapsedTime}초`,
     총개수: allRows.length,
     통신사: carriers.join(', '),
-    통신사별상세: perCarrierStats
+    통신사별상세: perCarrierStats,
+    저장위치: useDatabase ? 'Supabase' : 'Google Sheets'
   });
 
   return { totalCount: allRows.length, perCarrier: perCarrierStats };
+}
+
+/**
+ * Discord API Rate Limit을 고려한 재시도 로직
+ * @param {Function} fn - 실행할 함수
+ * @param {number} maxRetries - 최대 재시도 횟수
+ * @returns {Promise<any>}
+ */
+async function withDiscordRateLimit(fn, maxRetries = 5) {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      // Rate Limit 에러 감지 (429)
+      const isRateLimitError = 
+        error.message && error.message.includes('429') ||
+        error.message && error.message.includes('rate limit');
+      
+      if (isRateLimitError && attempt < maxRetries - 1) {
+        // Discord API가 제공하는 retry_after 값 추출 (초 단위)
+        let retryAfter = 0.5; // 기본값 500ms
+        
+        try {
+          const match = error.message.match(/"retry_after":\s*([\d.]+)/);
+          if (match) {
+            retryAfter = parseFloat(match[1]);
+          }
+        } catch (parseError) {
+          // 파싱 실패 시 기본값 사용
+        }
+        
+        // Exponential backoff: retry_after + 추가 지연
+        const baseDelay = retryAfter * 1000; // 초를 밀리초로 변환
+        const exponentialDelay = Math.pow(2, attempt) * 100; // 100ms, 200ms, 400ms, 800ms...
+        const jitter = Math.random() * 100; // 0~100ms 랜덤
+        const totalDelay = baseDelay + exponentialDelay + jitter;
+        
+        console.warn(`⚠️ [withDiscordRateLimit] Rate Limit 발생, ${Math.round(totalDelay)}ms 후 재시도 (${attempt + 1}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, totalDelay));
+        continue;
+      }
+      
+      // Rate Limit 에러가 아니거나 최대 재시도 횟수 초과
+      throw error;
+    }
+  }
+  throw new Error('Max retries exceeded for Discord API');
 }
 
 /**
@@ -1814,7 +1994,7 @@ async function fetchImageUrlFromDiscordMessage(messageId, postId, threadId) {
     throw new Error('Discord 설정이 없습니다 (DISCORD_BOT_TOKEN 또는 DISCORD_CHANNEL_ID 누락)');
   }
   
-  try {
+  return withDiscordRateLimit(async () => {
     // Discord API를 통해 메시지 조회
     // threadId가 있으면 스레드에서 조회, 없으면 채널에서 조회
     const channelId = threadId || DISCORD_CHANNEL_ID;
@@ -1856,15 +2036,7 @@ async function fetchImageUrlFromDiscordMessage(messageId, postId, threadId) {
     }
     
     throw new Error('메시지에 이미지 첨부 파일이 없습니다');
-  } catch (error) {
-    console.error('❌ [fetchImageUrlFromDiscordMessage] 오류:', {
-      messageId,
-      postId,
-      threadId,
-      error: error.message
-    });
-    throw error;
-  }
+  });
 }
 
 /**
@@ -1873,34 +2045,65 @@ async function fetchImageUrlFromDiscordMessage(messageId, postId, threadId) {
  * @returns {Promise<Object>} { success, carrier, updatedCount, failedCount, updatedImages, failedImages }
  */
 async function refreshImagesFromDiscord(carrier) {
-  const { sheets, SPREADSHEET_ID } = createSheetsClient();
+  const USE_DB = process.env.USE_DB_DIRECT_STORE === 'true';
   
   // 🔥 태스크 7.3: 중요 작업 로깅 추가 - 시작 시점 로깅
   const startTime = Date.now();
   console.log(`🔄 [refreshImagesFromDiscord] ${carrier} 이미지 갱신 시작 - ${new Date(startTime).toISOString()}`);
+  console.log(`📊 [refreshImagesFromDiscord] 데이터 소스: ${USE_DB ? 'Supabase' : 'Google Sheets'}`);
   
   try {
-    // 1. 직영점_모델이미지 시트에서 Discord 메시지 ID 조회
-    const imagesRes = await withRetry(async () => {
-      return await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: `${SHEET_MOBILE_IMAGES}!A:K`
-      });
-    });
-    
-    const imageRows = (imagesRes.data.values || []).slice(1); // 헤더 제외
     const updatedImages = [];
     const failedImages = [];
-    
-    // 2. 해당 통신사의 이미지만 필터링
-    const targetRows = imageRows
-      .map((row, index) => ({ row, rowIndex: index + 2 })) // 헤더 포함 행 번호 (1-based, 헤더가 1)
-      .filter(({ row }) => {
-        const rowCarrier = (row[0] || '').toString().trim().toUpperCase();
-        return rowCarrier === carrier;
+    let targetRows = [];
+
+    // 1. 데이터 소스에서 Discord 메시지 ID 조회
+    if (USE_DB) {
+      // Supabase에서 조회
+      const DirectStoreDAL = require('./dal/DirectStoreDAL');
+      const images = await DirectStoreDAL.getModelImages(carrier);
+      
+      targetRows = images.map((img, index) => ({
+        row: [
+          img.carrier,
+          img.modelId,
+          img.modelName,
+          img.petName,
+          img.manufacturer,
+          img.imageUrl,
+          img.note,
+          img.color,
+          img.discordMessageId,
+          img.discordPostId,
+          img.discordThreadId
+        ],
+        rowIndex: index,
+        dbId: img.id // Supabase ID 저장
+      }));
+      
+      console.log(`📊 [refreshImagesFromDiscord] ${carrier} 대상 (Supabase): ${targetRows.length}개`);
+    } else {
+      // Google Sheets에서 조회
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      const imagesRes = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SHEET_MOBILE_IMAGES}!A:K`
+        });
       });
-    
-    console.log(`📊 [refreshImagesFromDiscord] ${carrier} 대상: ${targetRows.length}개`);
+      
+      const imageRows = (imagesRes.data.values || []).slice(1); // 헤더 제외
+      
+      // 해당 통신사의 이미지만 필터링
+      targetRows = imageRows
+        .map((row, index) => ({ row, rowIndex: index + 2 })) // 헤더 포함 행 번호 (1-based, 헤더가 1)
+        .filter(({ row }) => {
+          const rowCarrier = (row[0] || '').toString().trim().toUpperCase();
+          return rowCarrier === carrier;
+        });
+      
+      console.log(`📊 [refreshImagesFromDiscord] ${carrier} 대상 (Google Sheets): ${targetRows.length}개`);
+    }
     
     if (targetRows.length === 0) {
       return {
@@ -1914,13 +2117,12 @@ async function refreshImagesFromDiscord(carrier) {
       };
     }
     
-    // 3. Google Sheets API Rate Limit 고려: 배치 업데이트 사용
-    // - batchUpdate는 단일 API 호출로 여러 셀 업데이트 가능
-    // - 최대 100개까지 한 번에 처리 권장
+    // 2. Discord API를 통해 이미지 URL 갱신
     const BATCH_SIZE = 50; // 안전을 위해 50개씩 처리
-    const updateRequests = [];
+    const updateRequests = []; // Google Sheets용
+    const supabaseUpdates = []; // Supabase용
     
-    for (const { row, rowIndex } of targetRows) {
+    for (const { row, rowIndex, dbId } of targetRows) {
       const modelId = row[1] || row[2]; // B열(모델ID) 또는 C열(모델명)
       const currentImageUrl = (row[5] || '').toString().trim(); // F열: 이미지URL
       const discordMessageId = (row[8] || '').toString().trim(); // I열: Discord메시지ID
@@ -1955,11 +2157,20 @@ async function refreshImagesFromDiscord(carrier) {
         
         // 이미지 URL이 변경된 경우에만 업데이트
         if (newImageUrl !== currentImageUrl) {
-          // 업데이트 요청 추가 (실제 업데이트는 나중에 배치로 처리)
-          updateRequests.push({
-            range: `${SHEET_MOBILE_IMAGES}!F${rowIndex}`, // F열: 이미지URL
-            values: [[newImageUrl]]
-          });
+          if (USE_DB) {
+            // Supabase 업데이트 준비
+            supabaseUpdates.push({
+              id: dbId,
+              modelId,
+              imageUrl: newImageUrl
+            });
+          } else {
+            // Google Sheets 업데이트 준비
+            updateRequests.push({
+              range: `${SHEET_MOBILE_IMAGES}!F${rowIndex}`, // F열: 이미지URL
+              values: [[newImageUrl]]
+            });
+          }
           
           updatedImages.push({
             modelId,
@@ -1972,8 +2183,7 @@ async function refreshImagesFromDiscord(carrier) {
           console.log(`ℹ️ [refreshImagesFromDiscord] ${modelId} 이미지 URL 변경 없음`);
         }
         
-        // Discord API Rate Limit 고려: 요청 간 지연
-        await new Promise(resolve => setTimeout(resolve, 100)); // 100ms 지연
+        // Discord API Rate Limit은 withDiscordRateLimit 함수에서 자동 처리됨
         
       } catch (error) {
         // 🔥 태스크 7.1: 백엔드 오류 로깅 강화 - Discord CDN 이미지 404 오류 상세 로깅
@@ -1991,7 +2201,7 @@ async function refreshImagesFromDiscord(carrier) {
           },
           요청정보: {
             행번호: rowIndex,
-            시트명: SHEET_MOBILE_IMAGES
+            데이터소스: USE_DB ? 'Supabase' : 'Google Sheets'
           }
         });
         failedImages.push({
@@ -2001,9 +2211,30 @@ async function refreshImagesFromDiscord(carrier) {
       }
     }
     
-    // 4. Google Sheets 배치 업데이트 (Rate Limit 최소화)
-    if (updateRequests.length > 0) {
-      console.log(`📝 [refreshImagesFromDiscord] ${carrier} 배치 업데이트 시작: ${updateRequests.length}개`);
+    // 3. 데이터 소스에 업데이트 적용
+    if (USE_DB && supabaseUpdates.length > 0) {
+      // Supabase 배치 업데이트
+      console.log(`📝 [refreshImagesFromDiscord] ${carrier} Supabase 배치 업데이트 시작: ${supabaseUpdates.length}개`);
+      
+      const DirectStoreDAL = require('./dal/DirectStoreDAL');
+      for (const update of supabaseUpdates) {
+        try {
+          await DirectStoreDAL.updateModelImageUrl(update.id, update.imageUrl);
+        } catch (error) {
+          console.error(`❌ [refreshImagesFromDiscord] Supabase 업데이트 실패: ${update.modelId}`, error);
+          failedImages.push({
+            modelId: update.modelId,
+            reason: `Supabase 업데이트 실패: ${error.message}`
+          });
+        }
+      }
+      
+      console.log(`✅ [refreshImagesFromDiscord] Supabase 배치 업데이트 완료`);
+    } else if (!USE_DB && updateRequests.length > 0) {
+      // Google Sheets 배치 업데이트
+      console.log(`📝 [refreshImagesFromDiscord] ${carrier} Google Sheets 배치 업데이트 시작: ${updateRequests.length}개`);
+      
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
       
       // 배치를 나누어 처리 (Google Sheets API Rate Limit 고려)
       for (let i = 0; i < updateRequests.length; i += BATCH_SIZE) {
@@ -2064,22 +2295,28 @@ async function refreshImagesFromDiscord(carrier) {
       소요시간: `${elapsedTime}초`,
       성공: updatedImages.length,
       실패: failedImages.length,
-      전체: targetRows.length
+      전체: targetRows.length,
+      데이터소스: USE_DB ? 'Supabase' : 'Google Sheets'
     });
     
     // 🔥 캐시 무효화: 이미지가 갱신되었으므로 관련 캐시 삭제
     if (updatedImages.length > 0) {
-      // 1. 단말마스터 캐시 삭제 (해당 통신사)
-      const mobileMasterCacheKey = `sheet-data-${SPREADSHEET_ID}-${SHEET_MOBILE_MASTER}!A:R`;
-      cacheStore.delete(mobileMasterCacheKey);
-      console.log(`🗑️ [refreshImagesFromDiscord] 캐시 삭제: ${mobileMasterCacheKey}`);
+      if (!USE_DB) {
+        // Google Sheets 캐시 삭제
+        const { SPREADSHEET_ID } = createSheetsClient();
+        
+        // 1. 단말마스터 캐시 삭제 (해당 통신사)
+        const mobileMasterCacheKey = `sheet-data-${SPREADSHEET_ID}-${SHEET_MOBILE_MASTER}!A:R`;
+        cacheStore.delete(mobileMasterCacheKey);
+        console.log(`🗑️ [refreshImagesFromDiscord] 캐시 삭제: ${mobileMasterCacheKey}`);
+        
+        // 2. 모델이미지 캐시 삭제 (해당 통신사)
+        const mobileImagesCacheKey = `sheet-data-${SPREADSHEET_ID}-${SHEET_MOBILE_IMAGES}!A:K`;
+        cacheStore.delete(mobileImagesCacheKey);
+        console.log(`🗑️ [refreshImagesFromDiscord] 캐시 삭제: ${mobileImagesCacheKey}`);
+      }
       
-      // 2. 모델이미지 캐시 삭제 (해당 통신사)
-      const mobileImagesCacheKey = `sheet-data-${SPREADSHEET_ID}-${SHEET_MOBILE_IMAGES}!A:K`;
-      cacheStore.delete(mobileImagesCacheKey);
-      console.log(`🗑️ [refreshImagesFromDiscord] 캐시 삭제: ${mobileImagesCacheKey}`);
-      
-      // 3. rebuildDeviceMaster 관련 캐시 삭제 (이미지 맵)
+      // 3. rebuildDeviceMaster 관련 캐시 삭제 (이미지 맵) - 공통
       const imageMapCacheKey = `device-master-images-${carrier}`;
       cacheStore.delete(imageMapCacheKey);
       console.log(`🗑️ [refreshImagesFromDiscord] 캐시 삭제: ${imageMapCacheKey}`);
@@ -2102,10 +2339,7 @@ async function refreshImagesFromDiscord(carrier) {
       오류메시지: error.message,
       스택트레이스: error.stack,
       통신사: carrier,
-      요청정보: {
-        시트ID: SPREADSHEET_ID,
-        시트명: SHEET_MOBILE_IMAGES
-      }
+      데이터소스: process.env.USE_DB_DIRECT_STORE === 'true' ? 'Supabase' : 'Google Sheets'
     });
     throw error;
   }
@@ -2197,26 +2431,11 @@ function deleteCache(key) {
   console.log(`[Direct] 캐시 무효화: ${key}`);
 }
 
-// 모델 코드 정규화 함수 (공백, 하이픈, 언더스코어 제거, 소문자 변환, 용량 표기 통일)
+// 모델 코드 정규화 함수 (공백, 하이픈, 언더스코어 제거, 소문자 변환)
+// 🔥 수정: 원본 로직과 동일하게 변경 (이미지 매핑 문제 해결)
 function normalizeModelCode(modelCode) {
   if (!modelCode) return '';
-  let normalized = modelCode.toString().trim().toUpperCase();
-
-  // 1. 공백, 하이픈, 언더스코어 제거
-  normalized = normalized.replace(/[\s\-_]/g, '');
-
-  // 2. 용량 표기 통일 (사용자 피드백 반영)
-  // 256G, 256GB -> 256
-  // 512G, 512GB -> 512
-  // 128G, 128GB -> 128
-  // 끝에 G나 GB가 붙은 경우 제거
-  normalized = normalized.replace(/(\d+)(GB|G)$/, '$1');
-
-  // 1T, 1TB -> 1T 통일
-  // 끝에 TB가 붙은 경우 T로 변경
-  normalized = normalized.replace(/(\d+)TB$/, '$1T');
-
-  return normalized;
+  return modelCode.replace(/[\s\-_]/g, '').toLowerCase();
 }
 
 // 하이픈 변형 생성 함수 - 더 이상 주력으로 사용하지 않지만 호환성을 위해 유지
@@ -2826,9 +3045,11 @@ function setupDirectRoutes(app) {
     try {
       const carrierFilter = (req.query.carrier || '').trim().toUpperCase();
       
-      // DirectStoreDAL 사용
+      // DirectStoreDAL 사용 - withRetrySupabase 적용
       const DirectStoreDAL = require('./dal/DirectStoreDAL');
-      const plans = await DirectStoreDAL.getPlanMaster(carrierFilter || null);
+      const plans = await withRetrySupabase(async () => {
+        return await DirectStoreDAL.getPlanMaster(carrierFilter || null);
+      });
       
       // 응답 형식 변환
       const data = plans.map(plan => ({
@@ -2853,6 +3074,201 @@ function setupDirectRoutes(app) {
   });
 
   /**
+   * POST /api/direct/plans-master
+   *
+   * - 목적:
+   *   - 요금제 마스터 생성
+   * - Body:
+   *   - carrier: 통신사 (SK/KT/LG)
+   *   - planName: 요금제명
+   *   - planGroup: 요금제군
+   *   - basicFee: 기본료
+   *   - planCode: 요금제코드 (선택)
+   *   - isActive: 사용여부 (선택, 기본값: true)
+   *   - note: 비고 (선택)
+   */
+  router.post('/plans-master', async (req, res) => {
+    try {
+      const { carrier, planName, planGroup, basicFee, planCode, isActive, note } = req.body;
+      
+      // 필수 필드 검증
+      if (!carrier || !planName || !planGroup || basicFee === undefined) {
+        return res.status(400).json({
+          success: false,
+          error: '필수 필드 누락',
+          message: 'carrier, planName, planGroup, basicFee는 필수입니다.'
+        });
+      }
+      
+      const USE_DB = process.env.USE_DB_DIRECT_STORE === 'true';
+      
+      if (USE_DB) {
+        try {
+          const directStoreDAL = require('./dal/DirectStoreDAL');
+          
+          await directStoreDAL.createPlanMaster({
+            carrier: carrier.toUpperCase(),
+            planName,
+            planGroup,
+            basicFee: parseInt(basicFee),
+            planCode: planCode || '',
+            isActive: isActive !== false,
+            note: note || ''
+          });
+          
+          return res.json({ success: true, message: '요금제 마스터 생성 완료' });
+        } catch (err) {
+          console.error('[Direct][plans-master] Supabase 실패, Google Sheets로 폴백:', err.message);
+          // Google Sheets 폴백은 현재 미구현 (빠른 구현을 위해 생략)
+          return res.status(500).json({
+            success: false,
+            error: '요금제 마스터 생성 실패',
+            message: err.message
+          });
+        }
+      }
+      
+      // Google Sheets 로직 (미구현)
+      return res.status(501).json({
+        success: false,
+        error: 'Google Sheets 모드는 아직 지원하지 않습니다.',
+        message: 'USE_DB_DIRECT_STORE=true로 설정해주세요.'
+      });
+    } catch (error) {
+      console.error('[Direct][plans-master] POST error:', error);
+      return res.status(500).json({
+        success: false,
+        error: '요금제 마스터 생성 실패',
+        message: error.message
+      });
+    }
+  });
+
+  /**
+   * PUT /api/direct/plans-master/:carrier/:planName
+   *
+   * - 목적:
+   *   - 요금제 마스터 수정
+   * - 파라미터:
+   *   - carrier: 통신사 (SK/KT/LG)
+   *   - planName: 요금제명
+   * - Body (부분 업데이트):
+   *   - planGroup: 요금제군 (선택)
+   *   - basicFee: 기본료 (선택)
+   *   - planCode: 요금제코드 (선택)
+   *   - isActive: 사용여부 (선택)
+   *   - note: 비고 (선택)
+   */
+  router.put('/plans-master/:carrier/:planName', async (req, res) => {
+    try {
+      const { carrier, planName } = req.params;
+      const updates = req.body;
+      
+      if (!carrier || !planName) {
+        return res.status(400).json({
+          success: false,
+          error: '필수 파라미터 누락',
+          message: 'carrier와 planName은 필수입니다.'
+        });
+      }
+      
+      const USE_DB = process.env.USE_DB_DIRECT_STORE === 'true';
+      
+      if (USE_DB) {
+        try {
+          const directStoreDAL = require('./dal/DirectStoreDAL');
+          
+          // basicFee가 있으면 숫자로 변환
+          if (updates.basicFee !== undefined) {
+            updates.basicFee = parseInt(updates.basicFee);
+          }
+          
+          await directStoreDAL.updatePlanMaster(carrier.toUpperCase(), decodeURIComponent(planName), updates);
+          
+          return res.json({ success: true, message: '요금제 마스터 수정 완료' });
+        } catch (err) {
+          console.error('[Direct][plans-master] Supabase 실패:', err.message);
+          return res.status(500).json({
+            success: false,
+            error: '요금제 마스터 수정 실패',
+            message: err.message
+          });
+        }
+      }
+      
+      // Google Sheets 로직 (미구현)
+      return res.status(501).json({
+        success: false,
+        error: 'Google Sheets 모드는 아직 지원하지 않습니다.',
+        message: 'USE_DB_DIRECT_STORE=true로 설정해주세요.'
+      });
+    } catch (error) {
+      console.error('[Direct][plans-master] PUT error:', error);
+      return res.status(500).json({
+        success: false,
+        error: '요금제 마스터 수정 실패',
+        message: error.message
+      });
+    }
+  });
+
+  /**
+   * DELETE /api/direct/plans-master/:carrier/:planName
+   *
+   * - 목적:
+   *   - 요금제 마스터 삭제
+   * - 파라미터:
+   *   - carrier: 통신사 (SK/KT/LG)
+   *   - planName: 요금제명
+   */
+  router.delete('/plans-master/:carrier/:planName', async (req, res) => {
+    try {
+      const { carrier, planName } = req.params;
+      
+      if (!carrier || !planName) {
+        return res.status(400).json({
+          success: false,
+          error: '필수 파라미터 누락',
+          message: 'carrier와 planName은 필수입니다.'
+        });
+      }
+      
+      const USE_DB = process.env.USE_DB_DIRECT_STORE === 'true';
+      
+      if (USE_DB) {
+        try {
+          const directStoreDAL = require('./dal/DirectStoreDAL');
+          
+          await directStoreDAL.deletePlanMaster(carrier.toUpperCase(), decodeURIComponent(planName));
+          
+          return res.json({ success: true, message: '요금제 마스터 삭제 완료' });
+        } catch (err) {
+          console.error('[Direct][plans-master] Supabase 실패:', err.message);
+          return res.status(500).json({
+            success: false,
+            error: '요금제 마스터 삭제 실패',
+            message: err.message
+          });
+        }
+      }
+      
+      // Google Sheets 로직 (미구현)
+      return res.status(501).json({
+        success: false,
+        error: 'Google Sheets 모드는 아직 지원하지 않습니다.',
+        message: 'USE_DB_DIRECT_STORE=true로 설정해주세요.'
+      });
+    } catch (error) {
+      console.error('[Direct][plans-master] DELETE error:', error);
+      return res.status(500).json({
+        success: false,
+        error: '요금제 마스터 삭제 실패',
+        message: error.message
+      });
+    }
+  });
+
+  /**
    * GET /api/direct/mobiles-master
    *
    * - 목적:
@@ -2870,12 +3286,14 @@ function setupDirectRoutes(app) {
       const carrierFilter = (req.query.carrier || '').trim().toUpperCase();
       const modelIdFilter = (req.query.modelId || '').toString().trim();
       
-      // DirectStoreDAL 사용
+      // DirectStoreDAL 사용 - withRetrySupabase 적용
       const DirectStoreDAL = require('./dal/DirectStoreDAL');
-      const devices = await DirectStoreDAL.getDeviceMaster(
-        carrierFilter || null,
-        modelIdFilter || null
-      );
+      const devices = await withRetrySupabase(async () => {
+        return await DirectStoreDAL.getDeviceMaster(
+          carrierFilter || null,
+          modelIdFilter || null
+        );
+      });
       
       // 응답 형식 변환
       const data = devices.map(device => ({
@@ -2911,6 +3329,187 @@ function setupDirectRoutes(app) {
   });
 
   /**
+   * POST /api/direct/mobiles-master
+   *
+   * - 목적:
+   *   - 직영점_단말마스터에 새로운 단말 정보를 추가
+   * - Body:
+   *   - carrier (필수): 통신사 (SK/KT/LG)
+   *   - modelId (필수): 모델ID
+   *   - modelName (필수): 모델명
+   *   - petName (선택): 펫네임
+   *   - manufacturer (선택): 제조사
+   *   - factoryPrice (선택): 출고가
+   *   - defaultPlanGroup (선택): 기본요금제군
+   *   - isPremium (선택): 프리미엄 여부
+   *   - isBudget (선택): 보급형 여부
+   *   - isPopular (선택): 인기 여부
+   *   - isRecommended (선택): 추천 여부
+   *   - isCheap (선택): 저렴 여부
+   *   - imageUrl (선택): 이미지URL
+   *   - isActive (선택): 사용여부
+   *   - note (선택): 비고
+   *   - discordMessageId (선택): Discord메시지ID
+   *   - discordPostId (선택): Discord포스트ID
+   *   - discordThreadId (선택): Discord스레드ID
+   *
+   * - 비고:
+   *   - Feature Flag에 따라 Supabase 또는 Google Sheets에 저장
+   */
+  router.post('/mobiles-master', async (req, res) => {
+    try {
+      const { carrier, modelId, modelName } = req.body;
+      
+      // 필수 필드 검증
+      if (!carrier || !modelId || !modelName) {
+        return res.status(400).json({
+          success: false,
+          error: '필수 필드 누락',
+          message: 'carrier, modelId, modelName은 필수입니다.'
+        });
+      }
+      
+      // Feature Flag 확인
+      const useDatabase = process.env.USE_DB_DIRECT_STORE === 'true';
+      
+      if (useDatabase) {
+        // Supabase에 저장 (DirectStoreDAL 사용)
+        console.log(`📝 [POST /mobiles-master] Supabase에 데이터 저장: ${carrier} - ${modelId}`);
+        const directStoreDAL = require('./dal/DirectStoreDAL');
+        
+        await withRetrySupabase(async () => {
+          return await directStoreDAL.createDeviceMaster(req.body);
+        });
+        
+        return res.json({ success: true, message: '단말 마스터 생성 완료' });
+      } else {
+        // Google Sheets 폴백 (기존 로직 - 구현 필요 시 추가)
+        console.log(`📝 [POST /mobiles-master] Google Sheets 폴백 (미구현)`);
+        return res.status(501).json({
+          success: false,
+          error: 'Google Sheets 쓰기 미구현',
+          message: 'USE_DB_DIRECT_STORE=true로 설정하여 Supabase를 사용하세요.'
+        });
+      }
+    } catch (error) {
+      console.error('[Direct][mobiles-master POST] error:', error);
+      return res.status(500).json({
+        success: false,
+        error: '단말마스터 생성 실패',
+        message: error.message
+      });
+    }
+  });
+
+  /**
+   * PUT /api/direct/mobiles-master/:carrier/:modelId
+   *
+   * - 목적:
+   *   - 직영점_단말마스터의 특정 단말 정보를 수정
+   * - Params:
+   *   - carrier (필수): 통신사 (SK/KT/LG)
+   *   - modelId (필수): 모델ID
+   * - Body:
+   *   - 수정할 필드들 (모두 선택)
+   *
+   * - 비고:
+   *   - Feature Flag에 따라 Supabase 또는 Google Sheets에서 수정
+   */
+  router.put('/mobiles-master/:carrier/:modelId', async (req, res) => {
+    try {
+      const { carrier, modelId } = req.params;
+      const updates = req.body;
+      
+      // 수정할 필드가 없으면 에러
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: '수정할 필드 없음',
+          message: '최소 하나의 필드를 수정해야 합니다.'
+        });
+      }
+      
+      // Feature Flag 확인
+      const useDatabase = process.env.USE_DB_DIRECT_STORE === 'true';
+      
+      if (useDatabase) {
+        // Supabase에서 수정 (DirectStoreDAL 사용)
+        console.log(`✏️ [PUT /mobiles-master] Supabase에서 데이터 수정: ${carrier} - ${modelId}`);
+        const directStoreDAL = require('./dal/DirectStoreDAL');
+        
+        await withRetrySupabase(async () => {
+          return await directStoreDAL.updateDeviceMaster(carrier, modelId, updates);
+        });
+        
+        return res.json({ success: true, message: '단말 마스터 수정 완료' });
+      } else {
+        // Google Sheets 폴백 (기존 로직 - 구현 필요 시 추가)
+        console.log(`✏️ [PUT /mobiles-master] Google Sheets 폴백 (미구현)`);
+        return res.status(501).json({
+          success: false,
+          error: 'Google Sheets 쓰기 미구현',
+          message: 'USE_DB_DIRECT_STORE=true로 설정하여 Supabase를 사용하세요.'
+        });
+      }
+    } catch (error) {
+      console.error('[Direct][mobiles-master PUT] error:', error);
+      return res.status(500).json({
+        success: false,
+        error: '단말마스터 수정 실패',
+        message: error.message
+      });
+    }
+  });
+
+  /**
+   * DELETE /api/direct/mobiles-master/:carrier/:modelId
+   *
+   * - 목적:
+   *   - 직영점_단말마스터에서 특정 단말 정보를 삭제
+   * - Params:
+   *   - carrier (필수): 통신사 (SK/KT/LG)
+   *   - modelId (필수): 모델ID
+   *
+   * - 비고:
+   *   - Feature Flag에 따라 Supabase 또는 Google Sheets에서 삭제
+   */
+  router.delete('/mobiles-master/:carrier/:modelId', async (req, res) => {
+    try {
+      const { carrier, modelId } = req.params;
+      
+      // Feature Flag 확인
+      const useDatabase = process.env.USE_DB_DIRECT_STORE === 'true';
+      
+      if (useDatabase) {
+        // Supabase에서 삭제 (DirectStoreDAL 사용)
+        console.log(`🗑️ [DELETE /mobiles-master] Supabase에서 데이터 삭제: ${carrier} - ${modelId}`);
+        const directStoreDAL = require('./dal/DirectStoreDAL');
+        
+        await withRetrySupabase(async () => {
+          return await directStoreDAL.deleteDeviceMaster(carrier, modelId);
+        });
+        
+        return res.json({ success: true, message: '단말 마스터 삭제 완료' });
+      } else {
+        // Google Sheets 폴백 (기존 로직 - 구현 필요 시 추가)
+        console.log(`🗑️ [DELETE /mobiles-master] Google Sheets 폴백 (미구현)`);
+        return res.status(501).json({
+          success: false,
+          error: 'Google Sheets 쓰기 미구현',
+          message: 'USE_DB_DIRECT_STORE=true로 설정하여 Supabase를 사용하세요.'
+        });
+      }
+    } catch (error) {
+      console.error('[Direct][mobiles-master DELETE] error:', error);
+      return res.status(500).json({
+        success: false,
+        error: '단말마스터 삭제 실패',
+        message: error.message
+      });
+    }
+  });
+
+  /**
    * GET /api/direct/mobiles-pricing
    *
    * - 목적:
@@ -2930,55 +3529,103 @@ function setupDirectRoutes(app) {
       const modelIdFilter = (req.query.modelId || '').toString().trim();
       const planGroupFilter = (req.query.planGroup || '').toString().trim();
       const openingTypeFilter = (req.query.openingType || '').toString().trim();
-      const { sheets, SPREADSHEET_ID } = createSheetsClient();
-
-      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_MOBILE_PRICING, HEADERS_MOBILE_PRICING);
-      const response = await withRetry(async () => {
-        return await sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: SHEET_MOBILE_PRICING
+      
+      // 🔥 Feature Flag: USE_DB_DIRECT_STORE가 true이면 Supabase에서 읽기, 아니면 Google Sheets에서 읽기
+      const useDatabase = process.env.USE_DB_DIRECT_STORE === 'true';
+      
+      let data = [];
+      
+      if (useDatabase) {
+        // Supabase에서 읽기 (DirectStoreDAL 사용)
+        console.log(`📖 [GET /mobiles-pricing] Supabase에서 데이터 읽기`);
+        const DirectStoreDAL = require('./dal/DirectStoreDAL');
+        
+        const pricingData = await withRetrySupabase(async () => {
+          return await DirectStoreDAL.getDevicePricingPolicy(
+            carrierFilter || null,
+            modelIdFilter || null,
+            planGroupFilter || null
+          );
         });
-      });
+        
+        // 응답 형식 변환 및 openingType 필터링
+        data = pricingData
+          .map(pricing => ({
+            carrier: pricing.carrier,
+            modelId: pricing.modelId,
+            model: pricing.modelName,
+            planGroup: pricing.planGroup,
+            planCode: pricing.planCode,
+            openingType: pricing.openingType,
+            factoryPrice: pricing.factoryPrice,
+            publicSupport: pricing.publicSupport,
+            storeSupportWithAddon: pricing.storeAdditionalSupportWithAddon,
+            policyMargin: pricing.policyMargin,
+            policyId: pricing.policyId,
+            baseDate: pricing.baseDate,
+            note: pricing.note
+          }))
+          .filter(item => {
+            if (openingTypeFilter && item.openingType !== openingTypeFilter) return false;
+            return true;
+          });
+        
+        console.log(`✅ [GET /mobiles-pricing] Supabase에서 데이터 읽기 완료: ${data.length}개`);
+      } else {
+        // Google Sheets에서 읽기 (기존 로직)
+        console.log(`📖 [GET /mobiles-pricing] Google Sheets에서 데이터 읽기`);
+        const { sheets, SPREADSHEET_ID } = createSheetsClient();
 
-      const values = response.data.values || [];
-      if (values.length <= 1) {
-        return res.json({ success: true, data: [] });
+        await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_MOBILE_PRICING, HEADERS_MOBILE_PRICING);
+        const response = await withRetry(async () => {
+          return await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: SHEET_MOBILE_PRICING
+          });
+        });
+
+        const values = response.data.values || [];
+        if (values.length <= 1) {
+          return res.json({ success: true, data: [] });
+        }
+
+        const rows = values.slice(1);
+        data = rows
+          .map(row => {
+            const carrier = (row[0] || '').toString().trim();
+            const modelId = (row[1] || '').toString().trim();
+            const planGroup = (row[3] || '').toString().trim();
+            const openingTypeRaw = (row[5] || '').toString().trim();
+
+            // 직영점_단말요금정책 시트에는 이미 'MNP'로 저장되어 있으므로 변환 불필요
+            // 🔥 수정: 부가미유치 기준 제거 (9번째 컬럼 제거, 이후 컬럼 인덱스 -1)
+            return {
+              carrier,
+              modelId,
+              model: (row[2] || '').toString().trim(),
+              planGroup,
+              planCode: (row[4] || '').toString().trim(),
+              openingType: openingTypeRaw,
+              factoryPrice: Number(row[6] || 0),
+              publicSupport: Number(row[7] || 0),
+              storeSupportWithAddon: Number(row[8] || 0),
+              // 🔥 수정: 부가미유치 기준 제거 (row[9] 제거)
+              policyMargin: Number(row[9] || 0), // 인덱스 변경: 10 → 9
+              policyId: (row[10] || '').toString().trim(), // 인덱스 변경: 11 → 10
+              baseDate: (row[11] || '').toString().trim(), // 인덱스 변경: 12 → 11
+              note: (row[12] || '').toString().trim() // 인덱스 변경: 13 → 12
+            };
+          })
+          .filter(item => {
+            if (carrierFilter && item.carrier.toUpperCase() !== carrierFilter) return false;
+            if (modelIdFilter && item.modelId !== modelIdFilter) return false;
+            if (planGroupFilter && item.planGroup !== planGroupFilter) return false;
+            if (openingTypeFilter && item.openingType !== openingTypeFilter) return false;
+            return true;
+          });
+        
+        console.log(`✅ [GET /mobiles-pricing] Google Sheets에서 데이터 읽기 완료: ${data.length}개`);
       }
-
-      const rows = values.slice(1);
-      const data = rows
-        .map(row => {
-          const carrier = (row[0] || '').toString().trim();
-          const modelId = (row[1] || '').toString().trim();
-          const planGroup = (row[3] || '').toString().trim();
-          const openingTypeRaw = (row[5] || '').toString().trim();
-
-          // 직영점_단말요금정책 시트에는 이미 'MNP'로 저장되어 있으므로 변환 불필요
-          // 🔥 수정: 부가미유치 기준 제거 (9번째 컬럼 제거, 이후 컬럼 인덱스 -1)
-          return {
-            carrier,
-            modelId,
-            model: (row[2] || '').toString().trim(),
-            planGroup,
-            planCode: (row[4] || '').toString().trim(),
-            openingType: openingTypeRaw,
-            factoryPrice: Number(row[6] || 0),
-            publicSupport: Number(row[7] || 0),
-            storeSupportWithAddon: Number(row[8] || 0),
-            // 🔥 수정: 부가미유치 기준 제거 (row[9] 제거)
-            policyMargin: Number(row[9] || 0), // 인덱스 변경: 10 → 9
-            policyId: (row[10] || '').toString().trim(), // 인덱스 변경: 11 → 10
-            baseDate: (row[11] || '').toString().trim(), // 인덱스 변경: 12 → 11
-            note: (row[12] || '').toString().trim() // 인덱스 변경: 13 → 12
-          };
-        })
-        .filter(item => {
-          if (carrierFilter && item.carrier.toUpperCase() !== carrierFilter) return false;
-          if (modelIdFilter && item.modelId !== modelIdFilter) return false;
-          if (planGroupFilter && item.planGroup !== planGroupFilter) return false;
-          if (openingTypeFilter && item.openingType !== openingTypeFilter) return false;
-          return true;
-        });
 
       return res.json({ success: true, data });
     } catch (error) {
@@ -2991,6 +3638,243 @@ function setupDirectRoutes(app) {
     }
   });
 
+  /**
+   * POST /api/direct/mobiles-pricing
+   * 
+   * - 목적: 단말 요금정책 생성
+   * - Body: { carrier, modelId, modelName, planGroup, planCode, openingType, factoryPrice, publicSupport, storeAdditionalSupportWithAddon, policyMargin, policyId, baseDate, note }
+   */
+  router.post('/mobiles-pricing', async (req, res) => {
+    try {
+      const useDatabase = process.env.USE_DB_DIRECT_STORE === 'true';
+      
+      if (useDatabase) {
+        // Supabase에 쓰기 (DirectStoreDAL 사용)
+        console.log(`✍️ [POST /mobiles-pricing] Supabase에 데이터 쓰기`);
+        const DirectStoreDAL = require('./dal/DirectStoreDAL');
+        
+        await withRetrySupabase(async () => {
+          return await DirectStoreDAL.createPricingMaster(req.body);
+        });
+        
+        console.log(`✅ [POST /mobiles-pricing] Supabase에 데이터 쓰기 완료`);
+        return res.json({ success: true, message: '단말 요금정책이 생성되었습니다.' });
+      } else {
+        // Google Sheets에 쓰기 (기존 로직)
+        console.log(`✍️ [POST /mobiles-pricing] Google Sheets에 데이터 쓰기`);
+        const { sheets, SPREADSHEET_ID } = createSheetsClient();
+        
+        await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_MOBILE_PRICING, HEADERS_MOBILE_PRICING);
+        
+        const row = [
+          req.body.carrier || '',
+          req.body.modelId || '',
+          req.body.modelName || '',
+          req.body.planGroup || '',
+          req.body.planCode || '',
+          req.body.openingType || '',
+          req.body.factoryPrice || 0,
+          req.body.publicSupport || 0,
+          req.body.storeAdditionalSupportWithAddon || 0,
+          req.body.policyMargin || 0,
+          req.body.policyId || '',
+          req.body.baseDate || new Date().toISOString().split('T')[0],
+          req.body.note || ''
+        ];
+        
+        await withRetry(async () => {
+          return await sheets.spreadsheets.values.append({
+            spreadsheetId: SPREADSHEET_ID,
+            range: SHEET_MOBILE_PRICING,
+            valueInputOption: 'USER_ENTERED',
+            resource: { values: [row] }
+          });
+        });
+        
+        console.log(`✅ [POST /mobiles-pricing] Google Sheets에 데이터 쓰기 완료`);
+        return res.json({ success: true, message: '단말 요금정책이 생성되었습니다.' });
+      }
+    } catch (error) {
+      console.error('[Direct][mobiles-pricing POST] error:', error);
+      return res.status(500).json({
+        success: false,
+        error: '단말 요금정책 생성 실패',
+        message: error.message
+      });
+    }
+  });
+
+  /**
+   * PUT /api/direct/mobiles-pricing/:carrier/:modelId/:planGroup/:openingType
+   * 
+   * - 목적: 단말 요금정책 수정
+   * - Body: { modelName?, planCode?, factoryPrice?, publicSupport?, storeAdditionalSupportWithAddon?, policyMargin?, policyId?, baseDate?, note? }
+   */
+  router.put('/mobiles-pricing/:carrier/:modelId/:planGroup/:openingType', async (req, res) => {
+    try {
+      const { carrier, modelId, planGroup, openingType } = req.params;
+      const useDatabase = process.env.USE_DB_DIRECT_STORE === 'true';
+      
+      if (useDatabase) {
+        // Supabase에서 수정 (DirectStoreDAL 사용)
+        console.log(`✍️ [PUT /mobiles-pricing] Supabase에서 데이터 수정: ${carrier} - ${modelId} - ${planGroup} - ${openingType}`);
+        const DirectStoreDAL = require('./dal/DirectStoreDAL');
+        
+        await withRetrySupabase(async () => {
+          return await DirectStoreDAL.updatePricingMaster(carrier, modelId, planGroup, openingType, req.body);
+        });
+        
+        console.log(`✅ [PUT /mobiles-pricing] Supabase에서 데이터 수정 완료`);
+        return res.json({ success: true, message: '단말 요금정책이 수정되었습니다.' });
+      } else {
+        // Google Sheets에서 수정 (기존 로직)
+        console.log(`✍️ [PUT /mobiles-pricing] Google Sheets에서 데이터 수정`);
+        const { sheets, SPREADSHEET_ID } = createSheetsClient();
+        
+        await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_MOBILE_PRICING, HEADERS_MOBILE_PRICING);
+        
+        // 1. 기존 데이터 찾기
+        const response = await withRetry(async () => {
+          return await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: SHEET_MOBILE_PRICING
+          });
+        });
+        
+        const values = response.data.values || [];
+        if (values.length <= 1) {
+          return res.status(404).json({ success: false, error: '수정할 데이터를 찾을 수 없습니다.' });
+        }
+        
+        // 2. 해당 행 찾기
+        const rowIndex = values.findIndex((row, idx) => {
+          if (idx === 0) return false; // 헤더 제외
+          return row[0] === carrier && row[1] === modelId && row[3] === planGroup && row[5] === openingType;
+        });
+        
+        if (rowIndex === -1) {
+          return res.status(404).json({ success: false, error: '수정할 데이터를 찾을 수 없습니다.' });
+        }
+        
+        // 3. 기존 데이터 가져오기
+        const existingRow = values[rowIndex];
+        
+        // 4. 업데이트할 데이터 준비 (기존 값 유지하면서 새 값으로 덮어쓰기)
+        const updatedRow = [
+          existingRow[0], // carrier
+          existingRow[1], // modelId
+          req.body.modelName !== undefined ? req.body.modelName : existingRow[2], // modelName
+          existingRow[3], // planGroup
+          req.body.planCode !== undefined ? req.body.planCode : existingRow[4], // planCode
+          existingRow[5], // openingType
+          req.body.factoryPrice !== undefined ? req.body.factoryPrice : existingRow[6], // factoryPrice
+          req.body.publicSupport !== undefined ? req.body.publicSupport : existingRow[7], // publicSupport
+          req.body.storeAdditionalSupportWithAddon !== undefined ? req.body.storeAdditionalSupportWithAddon : existingRow[8], // storeAdditionalSupportWithAddon
+          req.body.policyMargin !== undefined ? req.body.policyMargin : existingRow[9], // policyMargin
+          req.body.policyId !== undefined ? req.body.policyId : existingRow[10], // policyId
+          req.body.baseDate !== undefined ? req.body.baseDate : existingRow[11], // baseDate
+          req.body.note !== undefined ? req.body.note : existingRow[12] // note
+        ];
+        
+        // 5. 업데이트
+        await withRetry(async () => {
+          return await sheets.spreadsheets.values.update({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SHEET_MOBILE_PRICING}!A${rowIndex + 1}`,
+            valueInputOption: 'USER_ENTERED',
+            resource: { values: [updatedRow] }
+          });
+        });
+        
+        console.log(`✅ [PUT /mobiles-pricing] Google Sheets에서 데이터 수정 완료`);
+        return res.json({ success: true, message: '단말 요금정책이 수정되었습니다.' });
+      }
+    } catch (error) {
+      console.error('[Direct][mobiles-pricing PUT] error:', error);
+      return res.status(500).json({
+        success: false,
+        error: '단말 요금정책 수정 실패',
+        message: error.message
+      });
+    }
+  });
+
+  /**
+   * DELETE /api/direct/mobiles-pricing/:carrier/:modelId/:planGroup/:openingType
+   * 
+   * - 목적: 단말 요금정책 삭제
+   */
+  router.delete('/mobiles-pricing/:carrier/:modelId/:planGroup/:openingType', async (req, res) => {
+    try {
+      const { carrier, modelId, planGroup, openingType } = req.params;
+      const useDatabase = process.env.USE_DB_DIRECT_STORE === 'true';
+      
+      if (useDatabase) {
+        // Supabase에서 삭제 (DirectStoreDAL 사용)
+        console.log(`🗑️ [DELETE /mobiles-pricing] Supabase에서 데이터 삭제: ${carrier} - ${modelId} - ${planGroup} - ${openingType}`);
+        const DirectStoreDAL = require('./dal/DirectStoreDAL');
+        
+        await withRetrySupabase(async () => {
+          return await DirectStoreDAL.deletePricingMaster(carrier, modelId, planGroup, openingType);
+        });
+        
+        console.log(`✅ [DELETE /mobiles-pricing] Supabase에서 데이터 삭제 완료`);
+        return res.json({ success: true, message: '단말 요금정책이 삭제되었습니다.' });
+      } else {
+        // Google Sheets에서 삭제 (기존 로직)
+        console.log(`🗑️ [DELETE /mobiles-pricing] Google Sheets에서 데이터 삭제`);
+        const { sheets, SPREADSHEET_ID } = createSheetsClient();
+        
+        await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_MOBILE_PRICING, HEADERS_MOBILE_PRICING);
+        
+        // 1. 기존 데이터 찾기
+        const response = await withRetry(async () => {
+          return await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: SHEET_MOBILE_PRICING
+          });
+        });
+        
+        const values = response.data.values || [];
+        if (values.length <= 1) {
+          return res.status(404).json({ success: false, error: '삭제할 데이터를 찾을 수 없습니다.' });
+        }
+        
+        // 2. 해당 행 찾기
+        const rowIndex = values.findIndex((row, idx) => {
+          if (idx === 0) return false; // 헤더 제외
+          return row[0] === carrier && row[1] === modelId && row[3] === planGroup && row[5] === openingType;
+        });
+        
+        if (rowIndex === -1) {
+          return res.status(404).json({ success: false, error: '삭제할 데이터를 찾을 수 없습니다.' });
+        }
+        
+        // 3. 행 삭제 (Google Sheets API는 행 삭제를 직접 지원하지 않으므로, 빈 값으로 덮어쓰기)
+        const emptyRow = Array(HEADERS_MOBILE_PRICING.length).fill('');
+        
+        await withRetry(async () => {
+          return await sheets.spreadsheets.values.update({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SHEET_MOBILE_PRICING}!A${rowIndex + 1}`,
+            valueInputOption: 'USER_ENTERED',
+            resource: { values: [emptyRow] }
+          });
+        });
+        
+        console.log(`✅ [DELETE /mobiles-pricing] Google Sheets에서 데이터 삭제 완료`);
+        return res.json({ success: true, message: '단말 요금정책이 삭제되었습니다.' });
+      }
+    } catch (error) {
+      console.error('[Direct][mobiles-pricing DELETE] error:', error);
+      return res.status(500).json({
+        success: false,
+        error: '단말 요금정책 삭제 실패',
+        message: error.message
+      });
+    }
+  });
+
   // === 정책 설정 ===
 
   // GET /api/direct/policy-settings?carrier=SK&noCache=true
@@ -2998,6 +3882,77 @@ function setupDirectRoutes(app) {
     try {
       const carrier = req.query.carrier || 'SK';
       const noCache = req.query.noCache === 'true' || req.query.noCache === '1';
+
+      // 🔥 Feature Flag: USE_DB_DIRECT_STORE가 true이면 Supabase에서 읽기
+      const useDatabase = process.env.USE_DB_DIRECT_STORE === 'true';
+
+      if (useDatabase) {
+        try {
+          // Supabase에서 읽기 (DirectStoreDAL 사용)
+          console.log(`📖 [GET /api/direct/policy-settings] Supabase에서 데이터 읽기 시작 (${carrier})`);
+          
+          const DirectStoreDAL = require('./dal/DirectStoreDAL');
+          
+          // 병렬로 모든 정책 데이터 조회 (withRetrySupabase 적용)
+          const [marginData, addonData, insuranceData, specialData] = await Promise.all([
+            withRetrySupabase(async () => await DirectStoreDAL.getPolicyMargin(carrier)),
+            withRetrySupabase(async () => await DirectStoreDAL.getPolicyAddonServices(carrier)),
+            withRetrySupabase(async () => await DirectStoreDAL.getPolicyInsurance(carrier)),
+            withRetrySupabase(async () => await DirectStoreDAL.getPolicySpecial(carrier))
+          ]);
+          
+          // 응답 형식 변환
+          const margin = marginData ? marginData.margin : 50000; // 기본값 50000
+          
+          const addons = addonData.map((item, idx) => ({
+            id: idx + 1,
+            name: item.serviceName,
+            fee: item.monthlyFee,
+            incentive: item.attractionBonus,
+            deduction: item.noAttractionDeduction,
+            description: item.description,
+            url: item.officialUrl
+          }));
+          
+          const insurances = insuranceData.map((item, idx) => ({
+            id: idx + 1,
+            name: item.productName,
+            minPrice: item.minPrice,
+            maxPrice: item.maxPrice,
+            fee: item.monthlyFee,
+            incentive: item.attractionBonus,
+            deduction: item.noAttractionDeduction,
+            description: item.description,
+            url: item.officialUrl
+          }));
+          
+          const specialPolicies = specialData.map((item, idx) => ({
+            id: idx + 1,
+            name: item.policyName,
+            policyType: item.policyType,
+            amount: item.amount,
+            isActive: item.isActive,
+            conditionsJson: item.condition
+          }));
+          
+          const result = {
+            success: true,
+            margin: { baseMargin: margin },
+            addon: { list: addons },
+            insurance: { list: insurances },
+            special: { list: specialPolicies }
+          };
+          
+          console.log(`✅ [GET /api/direct/policy-settings] Supabase에서 데이터 읽기 완료 (${carrier})`);
+          return res.json(result);
+        } catch (supabaseError) {
+          console.error(`⚠️ [GET /api/direct/policy-settings] Supabase 실패, Google Sheets로 폴백:`, supabaseError.message);
+          // Google Sheets 폴백으로 계속 진행
+        }
+      }
+
+      // Google Sheets에서 읽기 (기존 로직)
+      console.log(`📖 [GET /api/direct/policy-settings] Google Sheets에서 데이터 읽기 시작 (${carrier})`);
 
       // 캐시 확인 (noCache가 true이면 캐시 무시)
       const cacheKey = `policy-settings-${carrier}`;
@@ -3370,12 +4325,205 @@ function setupDirectRoutes(app) {
     }
   });
 
+  // DELETE /api/direct/policy-settings/margin/:carrier
+  router.delete('/policy-settings/margin/:carrier', async (req, res) => {
+    try {
+      const { carrier } = req.params;
+      console.log(`🗑️ [DELETE /api/direct/policy-settings/margin] 정책 마진 삭제 시작 (${carrier})`);
+
+      // 🔥 Feature Flag: USE_DB_DIRECT_STORE가 true이면 Supabase에서 삭제
+      const useDatabase = process.env.USE_DB_DIRECT_STORE === 'true';
+
+      if (useDatabase) {
+        // Supabase에서 삭제 (DirectStoreDAL 사용)
+        const DirectStoreDAL = require('./dal/DirectStoreDAL');
+        await DirectStoreDAL.deletePolicyMargin(carrier);
+        console.log(`✅ [DELETE /api/direct/policy-settings/margin] Supabase에서 삭제 완료 (${carrier})`);
+      } else {
+        // Google Sheets에서 삭제 (폴백) - 구현 필요
+        console.log(`⚠️ [DELETE /api/direct/policy-settings/margin] Google Sheets 삭제는 아직 구현되지 않았습니다.`);
+        return res.status(501).json({ success: false, error: 'Google Sheets 삭제 미구현' });
+      }
+
+      // 정책 설정 캐시 무효화
+      deleteCache(`policy-settings-${carrier}`);
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('[Direct] policy-settings/margin DELETE error:', error);
+      res.status(500).json({ success: false, error: '정책 마진 삭제 실패', message: error.message });
+    }
+  });
+
+  // DELETE /api/direct/policy-settings/addon/:carrier
+  router.delete('/policy-settings/addon/:carrier', async (req, res) => {
+    try {
+      const { carrier } = req.params;
+      console.log(`🗑️ [DELETE /api/direct/policy-settings/addon] 부가서비스 정책 삭제 시작 (${carrier})`);
+
+      // 🔥 Feature Flag: USE_DB_DIRECT_STORE가 true이면 Supabase에서 삭제
+      const useDatabase = process.env.USE_DB_DIRECT_STORE === 'true';
+
+      if (useDatabase) {
+        // Supabase에서 삭제 (DirectStoreDAL 사용)
+        const DirectStoreDAL = require('./dal/DirectStoreDAL');
+        await DirectStoreDAL.deletePolicyAddonServices(carrier);
+        console.log(`✅ [DELETE /api/direct/policy-settings/addon] Supabase에서 삭제 완료 (${carrier})`);
+      } else {
+        // Google Sheets에서 삭제 (폴백) - 구현 필요
+        console.log(`⚠️ [DELETE /api/direct/policy-settings/addon] Google Sheets 삭제는 아직 구현되지 않았습니다.`);
+        return res.status(501).json({ success: false, error: 'Google Sheets 삭제 미구현' });
+      }
+
+      // 정책 설정 캐시 무효화
+      deleteCache(`policy-settings-${carrier}`);
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('[Direct] policy-settings/addon DELETE error:', error);
+      res.status(500).json({ success: false, error: '부가서비스 정책 삭제 실패', message: error.message });
+    }
+  });
+
+  // DELETE /api/direct/policy-settings/insurance/:carrier
+  router.delete('/policy-settings/insurance/:carrier', async (req, res) => {
+    try {
+      const { carrier } = req.params;
+      console.log(`🗑️ [DELETE /api/direct/policy-settings/insurance] 보험상품 정책 삭제 시작 (${carrier})`);
+
+      // 🔥 Feature Flag: USE_DB_DIRECT_STORE가 true이면 Supabase에서 삭제
+      const useDatabase = process.env.USE_DB_DIRECT_STORE === 'true';
+
+      if (useDatabase) {
+        // Supabase에서 삭제 (DirectStoreDAL 사용)
+        const DirectStoreDAL = require('./dal/DirectStoreDAL');
+        await DirectStoreDAL.deletePolicyInsurance(carrier);
+        console.log(`✅ [DELETE /api/direct/policy-settings/insurance] Supabase에서 삭제 완료 (${carrier})`);
+      } else {
+        // Google Sheets에서 삭제 (폴백) - 구현 필요
+        console.log(`⚠️ [DELETE /api/direct/policy-settings/insurance] Google Sheets 삭제는 아직 구현되지 않았습니다.`);
+        return res.status(501).json({ success: false, error: 'Google Sheets 삭제 미구현' });
+      }
+
+      // 정책 설정 캐시 무효화
+      deleteCache(`policy-settings-${carrier}`);
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('[Direct] policy-settings/insurance DELETE error:', error);
+      res.status(500).json({ success: false, error: '보험상품 정책 삭제 실패', message: error.message });
+    }
+  });
+
+  // DELETE /api/direct/policy-settings/special/:carrier
+  router.delete('/policy-settings/special/:carrier', async (req, res) => {
+    try {
+      const { carrier } = req.params;
+      console.log(`🗑️ [DELETE /api/direct/policy-settings/special] 특별 정책 삭제 시작 (${carrier})`);
+
+      // 🔥 Feature Flag: USE_DB_DIRECT_STORE가 true이면 Supabase에서 삭제
+      const useDatabase = process.env.USE_DB_DIRECT_STORE === 'true';
+
+      if (useDatabase) {
+        // Supabase에서 삭제 (DirectStoreDAL 사용)
+        const DirectStoreDAL = require('./dal/DirectStoreDAL');
+        await DirectStoreDAL.deletePolicySpecial(carrier);
+        console.log(`✅ [DELETE /api/direct/policy-settings/special] Supabase에서 삭제 완료 (${carrier})`);
+      } else {
+        // Google Sheets에서 삭제 (폴백) - 구현 필요
+        console.log(`⚠️ [DELETE /api/direct/policy-settings/special] Google Sheets 삭제는 아직 구현되지 않았습니다.`);
+        return res.status(501).json({ success: false, error: 'Google Sheets 삭제 미구현' });
+      }
+
+      // 정책 설정 캐시 무효화
+      deleteCache(`policy-settings-${carrier}`);
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('[Direct] policy-settings/special DELETE error:', error);
+      res.status(500).json({ success: false, error: '특별 정책 삭제 실패', message: error.message });
+    }
+  });
+
   // === 링크 설정 ===
 
   // GET /api/direct/link-settings?carrier=SK
   router.get('/link-settings', async (req, res) => {
     try {
       const carrier = req.query.carrier || 'SK';
+
+      // 🔥 Feature Flag: USE_DB_DIRECT_STORE가 true이면 Supabase에서 읽기
+      const useDatabase = process.env.USE_DB_DIRECT_STORE === 'true';
+
+      if (useDatabase) {
+        // Supabase에서 읽기 (DirectStoreDAL 사용)
+        console.log(`📖 [GET /api/direct/link-settings] Supabase에서 데이터 읽기 시작 (${carrier})`);
+        
+        const DirectStoreDAL = require('./dal/DirectStoreDAL');
+        
+        // 모든 설정 조회 (withRetrySupabase 적용)
+        const settingsData = await withRetrySupabase(async () => {
+          return await DirectStoreDAL.getSettings(carrier);
+        });
+        
+        // 설정 유형별로 그룹화
+        const planGroupRow = settingsData.find(row => row.settingType === 'planGroup');
+        const supportRow = settingsData.find(row => row.settingType === 'support');
+        const policyRow = settingsData.find(row => row.settingType === 'policy');
+        
+        let planGroup = { link: '', planGroups: [] };
+        let support = { link: '' };
+        let policy = { link: '' };
+        
+        if (planGroupRow) {
+          const settingsJson = planGroupRow.settings || {};
+          planGroup = {
+            link: planGroupRow.sheetId || '',
+            sheetId: planGroupRow.sheetId || '',
+            planNameRange: settingsJson.planNameRange || '',
+            planGroupRange: settingsJson.planGroupRange || '',
+            basicFeeRange: settingsJson.basicFeeRange || '',
+            planGroups: settingsJson.planGroups || []
+          };
+        }
+        
+        if (supportRow) {
+          const settingsJson = supportRow.settings || {};
+          support = {
+            link: supportRow.sheetId || '',
+            sheetId: supportRow.sheetId || '',
+            modelRange: settingsJson.modelRange || '',
+            petNameRange: settingsJson.petNameRange || '',
+            factoryPriceRange: settingsJson.factoryPriceRange || '',
+            openingTypeRange: settingsJson.openingTypeRange || '',
+            planGroupRanges: settingsJson.planGroupRanges || {}
+          };
+        }
+        
+        if (policyRow) {
+          const settingsJson = policyRow.settings || {};
+          policy = {
+            link: policyRow.sheetId || '',
+            sheetId: policyRow.sheetId || '',
+            modelRange: settingsJson.modelRange || '',
+            petNameRange: settingsJson.petNameRange || '',
+            planGroupRanges: settingsJson.planGroupRanges || {}
+          };
+        }
+        
+        console.log(`✅ [GET /api/direct/link-settings] Supabase에서 데이터 읽기 완료 (${carrier})`);
+        
+        return res.json({
+          success: true,
+          planGroup,
+          support,
+          policy
+        });
+      }
+
+      // Google Sheets에서 읽기 (기존 로직)
+      console.log(`📖 [GET /api/direct/link-settings] Google Sheets에서 데이터 읽기 시작 (${carrier})`);
+
       // 캐시된 링크 설정 사용 (중복 호출 및 rate limit 감소)
       const carrierSettings = await getLinkSettings(carrier);
 
@@ -3457,6 +4605,103 @@ function setupDirectRoutes(app) {
         planGroup: { link: '', planGroups: [] },
         support: { link: '' },
         policy: { link: '' }
+      });
+    }
+  });
+
+  // DELETE /api/direct/link-settings/:carrier/:settingType
+  // 링크 설정 삭제
+  router.delete('/link-settings/:carrier/:settingType', async (req, res) => {
+    try {
+      const { carrier, settingType } = req.params;
+
+      // 🔥 Feature Flag: USE_DB_DIRECT_STORE가 true이면 Supabase에서 삭제
+      const useDatabase = process.env.USE_DB_DIRECT_STORE === 'true';
+
+      if (useDatabase) {
+        // Supabase에서 삭제 (DirectStoreDAL 사용)
+        console.log(`🗑️ [DELETE /api/direct/link-settings] Supabase에서 데이터 삭제 시작 (${carrier} - ${settingType})`);
+        
+        const DirectStoreDAL = require('./dal/DirectStoreDAL');
+        
+        // 링크 설정 삭제 (withRetrySupabase 적용)
+        await withRetrySupabase(async () => {
+          return await DirectStoreDAL.deleteLinkSettings(carrier, settingType);
+        });
+        
+        console.log(`✅ [DELETE /api/direct/link-settings] Supabase에서 데이터 삭제 완료 (${carrier} - ${settingType})`);
+        
+        return res.json({
+          success: true,
+          message: `링크 설정이 삭제되었습니다. (${carrier} - ${settingType})`
+        });
+      }
+
+      // Google Sheets에서 삭제 (기존 로직)
+      console.log(`🗑️ [DELETE /api/direct/link-settings] Google Sheets에서 데이터 삭제 시작 (${carrier} - ${settingType})`);
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      
+      // 직영점_설정 헤더 보장
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_SETTINGS, HEADERS_SETTINGS);
+
+      // 시트 데이터 로드
+      const response = await withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: SHEET_SETTINGS
+        });
+      });
+
+      const rows = (response.data.values || []).slice(1);
+
+      // 삭제할 행 찾기
+      const rowIndex = rows.findIndex(row => 
+        (row[0] || '').trim() === carrier && (row[1] || '').trim() === settingType
+      );
+
+      if (rowIndex === -1) {
+        return res.status(404).json({ 
+          success: false, 
+          error: `링크 설정을 찾을 수 없습니다. (${carrier} - ${settingType})` 
+        });
+      }
+
+      // 행 삭제 (실제 행 번호는 헤더 + 1 + rowIndex)
+      await withRetry(async () => {
+        return await sheets.spreadsheets.batchUpdate({
+          spreadsheetId: SPREADSHEET_ID,
+          resource: {
+            requests: [{
+              deleteDimension: {
+                range: {
+                  sheetId: await getSheetId(sheets, SPREADSHEET_ID, SHEET_SETTINGS),
+                  dimension: 'ROWS',
+                  startIndex: rowIndex + 1, // 헤더 다음부터
+                  endIndex: rowIndex + 2
+                }
+              }
+            }]
+          }
+        });
+      });
+
+      // 캐시 무효화
+      deleteCache(`link-settings-${carrier}`);
+
+      console.log(`✅ [DELETE /api/direct/link-settings] Google Sheets에서 데이터 삭제 완료 (${carrier} - ${settingType})`);
+
+      res.json({
+        success: true,
+        message: `링크 설정이 삭제되었습니다. (${carrier} - ${settingType})`
+      });
+    } catch (error) {
+      console.error(`[Direct] link-settings DELETE error (통신사: ${req.params.carrier}, 설정유형: ${req.params.settingType}):`, error);
+      console.error('[Direct] Error stack:', error.stack);
+      res.status(500).json({
+        success: false,
+        error: '링크 설정 삭제 중 오류가 발생했습니다.',
+        details: error.message
       });
     }
   });
@@ -4679,7 +5924,6 @@ function setupDirectRoutes(app) {
         // 통신사 필터링: 현재 조회 중인 통신사와 정확히 일치하는 경우만 매핑
         // 통신사가 비어있으면 해당 행을 건너뛰어 잘못된 매핑 방지
         if (!rowCarrier) {
-          // 로그 제거 (성능 최적화 - 모든 모델에 대해 반복 실행되는 불필요한 로그)
           return;
         }
 
@@ -4709,14 +5953,11 @@ function setupDirectRoutes(app) {
               imageMap.set(normalizedKey, imageInfo);
               imageMap.set(normalizedCode, imageInfo);
             }
-          } else {
-            // 로그 제거 (성능 최적화 - 모든 모델에 대해 반복 실행되는 불필요한 로그)
           }
         }
       });
 
-      // 이미지 맵 생성 결과 로깅
-      // 로그 제거 (성능 최적화 - 매번 호출되는 불필요한 로그)
+      console.log(`[Direct] 이미지 맵 생성 완료: ${imageMapCount}개 (통신사=${carrierParam})`);
 
       // 8. 직영점_오늘의휴대폰 시트에서 구분(인기/추천/저렴/프리미엄/중저가) 태그 읽기
       let tagMap = new Map(); // { model: { isPopular, isRecommended, isCheap, isPremium, isBudget } }
@@ -5763,6 +7004,81 @@ function setupDirectRoutes(app) {
     res.set('Expires', '0');
 
     try {
+      // 🔥 Feature Flag: USE_DB_DIRECT_STORE가 true이면 Supabase에서 읽기
+      const useDatabase = process.env.USE_DB_DIRECT_STORE === 'true';
+
+      if (useDatabase) {
+        // Supabase에서 읽기 (DirectStoreDAL 사용)
+        console.log(`📖 [GET /api/direct/todays-mobiles] Supabase에서 데이터 읽기 시작`);
+        
+        const DirectStoreDAL = require('./dal/DirectStoreDAL');
+        
+        // 모든 통신사의 오늘의 휴대폰 조회 (withRetrySupabase 적용)
+        const todaysMobiles = await withRetrySupabase(async () => {
+          return await DirectStoreDAL.getTodaysMobiles();
+        });
+        
+        // 프리미엄: isPremium 태그가 true인 상품만 필터링 (3개로 제한)
+        const premium = todaysMobiles
+          .filter(p => p.isPremium === true)
+          .slice(0, 3)
+          .map(p => ({
+            model: p.modelName,
+            petName: p.petName,
+            carrier: p.carrier,
+            modelId: p.modelId,
+            factoryPrice: p.factoryPrice,
+            publicSupport: p.publicSupport,
+            storeSupportWithAddon: p.storeSupportWithAddon,
+            storeSupportNoAddon: p.storeSupportNoAddon,
+            purchasePrice: p.factoryPrice - p.publicSupport - p.storeSupportWithAddon,
+            purchasePriceWithAddon: p.factoryPrice - p.publicSupport - p.storeSupportWithAddon,
+            purchasePriceNoAddon: p.factoryPrice - p.publicSupport - p.storeSupportNoAddon,
+            image: p.imageUrl,
+            requiredAddons: p.requiredAddons,
+            addons: p.requiredAddons,
+            isPremium: p.isPremium,
+            isBudget: p.isBudget,
+            isPopular: p.isPopular,
+            isRecommended: p.isRecommended,
+            isCheap: p.isCheap
+          }));
+        
+        // 중저가: isBudget 태그가 true인 상품만 필터링 (2개로 제한)
+        const budget = todaysMobiles
+          .filter(p => p.isBudget === true)
+          .slice(0, 2)
+          .map(p => ({
+            model: p.modelName,
+            petName: p.petName,
+            carrier: p.carrier,
+            modelId: p.modelId,
+            factoryPrice: p.factoryPrice,
+            publicSupport: p.publicSupport,
+            storeSupportWithAddon: p.storeSupportWithAddon,
+            storeSupportNoAddon: p.storeSupportNoAddon,
+            purchasePrice: p.factoryPrice - p.publicSupport - p.storeSupportWithAddon,
+            purchasePriceWithAddon: p.factoryPrice - p.publicSupport - p.storeSupportWithAddon,
+            purchasePriceNoAddon: p.factoryPrice - p.publicSupport - p.storeSupportNoAddon,
+            image: p.imageUrl,
+            requiredAddons: p.requiredAddons,
+            addons: p.requiredAddons,
+            isPremium: p.isPremium,
+            isBudget: p.isBudget,
+            isPopular: p.isPopular,
+            isRecommended: p.isRecommended,
+            isCheap: p.isCheap
+          }));
+        
+        const result = { premium, budget };
+        console.log(`✅ [GET /api/direct/todays-mobiles] Supabase에서 데이터 읽기 완료 (프리미엄: ${premium.length}개, 중저가: ${budget.length}개)`);
+        
+        return res.json(result);
+      }
+
+      // Google Sheets에서 읽기 (기존 로직)
+      console.log(`📖 [GET /api/direct/todays-mobiles] Google Sheets에서 데이터 읽기 시작`);
+
       // 모든 통신사 데이터 가져오기 (SK, KT, LG)
       const carriers = ['SK', 'KT', 'LG'];
       const allMobiles = [];
@@ -5820,6 +7136,86 @@ function setupDirectRoutes(app) {
     }
   });
 
+  // POST /api/direct/todays-mobiles
+  // 오늘의 휴대폰 추가
+  router.post('/todays-mobiles', async (req, res) => {
+    try {
+      const {
+        modelName,
+        petName,
+        carrier,
+        modelId,
+        factoryPrice,
+        publicSupport,
+        storeSupportWithAddon,
+        storeSupportNoAddon,
+        imageUrl,
+        requiredAddons,
+        isPopular,
+        isRecommended,
+        isCheap,
+        isPremium,
+        isBudget
+      } = req.body;
+
+      // 필수 필드 검증
+      if (!modelName || !carrier) {
+        return res.status(400).json({ 
+          success: false, 
+          error: '모델명과 통신사는 필수입니다.' 
+        });
+      }
+
+      // 🔥 Feature Flag: USE_DB_DIRECT_STORE가 true이면 Supabase에 저장
+      const useDatabase = process.env.USE_DB_DIRECT_STORE === 'true';
+
+      if (useDatabase) {
+        // Supabase에 저장 (DirectStoreDAL 사용)
+        console.log(`📝 [POST /api/direct/todays-mobiles] Supabase에 데이터 저장 시작 (${carrier} - ${modelName})`);
+        
+        const DirectStoreDAL = require('./dal/DirectStoreDAL');
+        
+        const result = await withRetrySupabase(async () => {
+          return await DirectStoreDAL.createTodaysMobile({
+            modelName,
+            petName,
+            carrier,
+            modelId,
+            factoryPrice,
+            publicSupport,
+            storeSupportWithAddon,
+            storeSupportNoAddon,
+            imageUrl,
+            requiredAddons,
+            isPopular: isPopular || false,
+            isRecommended: isRecommended || false,
+            isCheap: isCheap || false,
+            isPremium: isPremium || false,
+            isBudget: isBudget || false
+          });
+        });
+        
+        console.log(`✅ [POST /api/direct/todays-mobiles] Supabase에 데이터 저장 완료`);
+        return res.json(result);
+      }
+
+      // Google Sheets에 저장 (폴백)
+      console.log(`📝 [POST /api/direct/todays-mobiles] Google Sheets 폴백 - 501 응답`);
+      return res.status(501).json({ 
+        success: false, 
+        error: 'Google Sheets 모드에서는 지원하지 않습니다. USE_DB_DIRECT_STORE=true로 설정하세요.' 
+      });
+
+    } catch (error) {
+      console.error('[Direct] todays-mobiles POST error:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: '오늘의 휴대폰 추가 실패', 
+        message: error.message 
+      });
+    }
+  });
+
   // PUT /api/direct/mobiles/:modelId/tags
   // 휴대폰 태그 업데이트 (직영점_오늘의휴대폰 시트에 저장)
   router.put('/mobiles/:modelId/tags', async (req, res) => {
@@ -5841,6 +7237,9 @@ function setupDirectRoutes(app) {
         requiredAddons,
         image
       } = req.body || {};
+      
+      // 🔥 Feature Flag 확인
+      const useDatabase = process.env.USE_DB_DIRECT_STORE === 'true';
 
       // modelId 형식 처리: mobile-{carrier}-{index} 또는 실제 모델 ID
       let carrier = carrierFromBody;
@@ -5919,6 +7318,63 @@ function setupDirectRoutes(app) {
         return res.status(404).json({ success: false, error: '모델을 찾을 수 없습니다.' });
       }
 
+      // 🔥 Feature Flag에 따라 Supabase 또는 Google Sheets에 쓰기
+      if (useDatabase) {
+        // Supabase에 쓰기 (DirectStoreDAL 사용)
+        console.log(`📝 [PUT /mobiles/:modelId/tags] Supabase에 태그 업데이트: ${modelName} (${carrier})`);
+        const DirectStoreDAL = require('./dal/DirectStoreDAL');
+        
+        // 모든 태그가 체크 해제되었는지 확인
+        const hasAnyTag = isPopular || isRecommended || isCheap || isPremium || isBudget;
+        
+        if (hasAnyTag) {
+          // 태그가 있으면 업데이트 또는 생성
+          const addonsText = Array.isArray(requiredAddons) ? requiredAddons.join(', ') : (requiredAddons || '');
+          
+          await withRetrySupabase(async () => {
+            return await DirectStoreDAL.updateTodaysMobileTags(modelName, carrier, {
+              isPopular: !!isPopular,
+              isRecommended: !!isRecommended,
+              isCheap: !!isCheap,
+              isPremium: !!isPremium,
+              isBudget: !!isBudget,
+              petName: petNameFromBody || '',
+              modelId: modelId,
+              factoryPrice: factoryPrice || 0,
+              publicSupport: publicSupport || 0,
+              storeSupportWithAddon: storeSupport || 0,
+              storeSupportNoAddon: 0, // 부가미유치 기준 제거
+              imageUrl: image || '',
+              requiredAddons: addonsText
+            });
+          });
+        } else {
+          // 모든 태그가 체크 해제되었으면 삭제
+          await withRetrySupabase(async () => {
+            return await DirectStoreDAL.deleteTodaysMobile(modelName, carrier);
+          });
+        }
+        
+        // 직영점_단말마스터도 업데이트
+        try {
+          await withRetrySupabase(async () => {
+            return await DirectStoreDAL.updateDeviceMasterTags(modelId, carrier, {
+              isPremium: !!isPremium,
+              isBudget: !!isBudget,
+              isPopular: !!isPopular,
+              isRecommended: !!isRecommended,
+              isCheap: !!isCheap
+            });
+          });
+        } catch (masterErr) {
+          console.error('[Direct] 직영점_단말마스터 업데이트 실패:', masterErr.message);
+        }
+        
+        console.log(`✅ [PUT /mobiles/:modelId/tags] Supabase에 태그 업데이트 완료`);
+      } else {
+        // Google Sheets에 쓰기 (기존 로직)
+        console.log(`📝 [PUT /mobiles/:modelId/tags] Google Sheets에 태그 업데이트: ${modelName} (${carrier})`);
+      
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, '직영점_오늘의휴대폰', [
         '모델명', '펫네임', '통신사', '출고가', '이통사지원금', '대리점지원금(부가유치)', '대리점지원금(부가미유치)', '이미지', '필수부가서비스', '인기', '추천', '저렴', '프리미엄', '중저가'
       ]);
@@ -6063,6 +7519,9 @@ function setupDirectRoutes(app) {
         // 마스터 업데이트 실패 시 경고만 출력 (직영점_오늘의휴대폰은 이미 업데이트됨)
         // 다음 재빌드 시 동기화될 예정
       }
+        
+        console.log(`✅ [PUT /mobiles/:modelId/tags] Google Sheets에 태그 업데이트 완료`);
+      } // useDatabase 분기 종료
 
       // 태그/모바일 캐시 무효화 (모든 버전 및 해시 포함)
       deleteCache('todays-mobiles');
@@ -7260,9 +8719,11 @@ function setupDirectRoutes(app) {
         return res.json(cached);
       }
 
-      // DirectStoreDAL 사용 (간소화된 헬퍼)
+      // DirectStoreDAL 사용 (간소화된 헬퍼) - withRetrySupabase 적용
       const DirectStoreDAL = require('./dal/DirectStoreDAL');
-      const rows = await DirectStoreDAL.getMainPageTexts();
+      const rows = await withRetrySupabase(async () => {
+        return await DirectStoreDAL.getMainPageTexts();
+      });
 
       // 데이터 파싱
       const texts = {
@@ -7317,6 +8778,29 @@ function setupDirectRoutes(app) {
         return res.status(400).json({ success: false, error: '통신사와 카테고리가 필요합니다.' });
       }
 
+      const USE_DB = process.env.USE_DB_DIRECT_STORE === 'true';
+
+      if (USE_DB) {
+        try {
+          const DirectStoreDAL = require('./dal/DirectStoreDAL');
+          await DirectStoreDAL.updateMainPageText(
+            textType === 'mainHeader' ? '' : carrier,
+            textType === 'mainHeader' ? '' : category,
+            textType,
+            { content, imageUrl }
+          );
+
+          // 캐시 무효화
+          deleteCache('main-page-texts');
+
+          return res.json({ success: true, message: '문구가 저장되었습니다.' });
+        } catch (err) {
+          console.error('[Direct] Supabase 실패, Google Sheets로 폴백:', err.message);
+          // 폴백: Google Sheets
+        }
+      }
+
+      // Google Sheets 로직 (기존)
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
 
       // 시트 헤더 확인 및 생성
@@ -7378,6 +8862,80 @@ function setupDirectRoutes(app) {
     } catch (error) {
       console.error('[Direct] main-page-texts POST error:', error);
       res.status(500).json({ success: false, error: '문구 저장 실패', message: error.message });
+    }
+  });
+
+  // DELETE /api/direct/main-page-text/:carrier: 메인페이지 문구 삭제
+  router.delete('/main-page-text/:carrier', async (req, res) => {
+    try {
+      const { carrier } = req.params;
+
+      const USE_DB = process.env.USE_DB_DIRECT_STORE === 'true';
+
+      if (USE_DB) {
+        try {
+          const DirectStoreDAL = require('./dal/DirectStoreDAL');
+          await DirectStoreDAL.deleteMainPageText(carrier);
+
+          // 캐시 무효화
+          deleteCache('main-page-texts');
+
+          return res.json({ success: true, message: '문구가 삭제되었습니다.' });
+        } catch (err) {
+          console.error('[Direct] Supabase 실패, Google Sheets로 폴백:', err.message);
+          // 폴백: Google Sheets
+        }
+      }
+
+      // Google Sheets 로직 (기존)
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+
+      // 기존 데이터 조회
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${SHEET_MAIN_PAGE_TEXTS}!A:F`
+      });
+
+      const rows = (response.data.values || []).slice(1);
+
+      // 삭제할 행 찾기 (통신사가 일치하는 모든 행)
+      const rowsToDelete = [];
+      rows.forEach((row, index) => {
+        if ((row[0] || '').trim() === carrier) {
+          rowsToDelete.push(index + 2); // +2는 헤더 행과 0-based index 보정
+        }
+      });
+
+      if (rowsToDelete.length === 0) {
+        return res.json({ success: true, message: '삭제할 문구가 없습니다.' });
+      }
+
+      // 역순으로 삭제 (인덱스 변경 방지)
+      for (let i = rowsToDelete.length - 1; i >= 0; i--) {
+        await sheets.spreadsheets.batchUpdate({
+          spreadsheetId: SPREADSHEET_ID,
+          resource: {
+            requests: [{
+              deleteDimension: {
+                range: {
+                  sheetId: await getSheetId(sheets, SPREADSHEET_ID, SHEET_MAIN_PAGE_TEXTS),
+                  dimension: 'ROWS',
+                  startIndex: rowsToDelete[i] - 1,
+                  endIndex: rowsToDelete[i]
+                }
+              }
+            }]
+          }
+        });
+      }
+
+      // 캐시 무효화
+      deleteCache('main-page-texts');
+
+      res.json({ success: true, message: '문구가 삭제되었습니다.' });
+    } catch (error) {
+      console.error('[Direct] main-page-text DELETE error:', error);
+      res.status(500).json({ success: false, error: '문구 삭제 실패', message: error.message });
     }
   });
 
@@ -7736,9 +9294,11 @@ function setupDirectRoutes(app) {
         return res.json(cached);
       }
 
-      // DirectStoreDAL 사용 (간소화된 헬퍼)
+      // DirectStoreDAL 사용 (간소화된 헬퍼) - withRetrySupabase 적용
       const DirectStoreDAL = require('./dal/DirectStoreDAL');
-      const locations = await DirectStoreDAL.getAllTransitLocations();
+      const locations = await withRetrySupabase(async () => {
+        return await DirectStoreDAL.getAllTransitLocations();
+      });
       
       // 응답 형식 변환
       const formattedLocations = locations.map(loc => ({
@@ -7782,15 +9342,17 @@ function setupDirectRoutes(app) {
       // 고유 ID 생성
       const id = generateTransitLocationId();
 
-      // DirectStoreDAL 사용
+      // DirectStoreDAL 사용 - withRetrySupabase 적용
       const DirectStoreDAL = require('./dal/DirectStoreDAL');
-      await DirectStoreDAL.createTransitLocation({
-        id,
-        type,
-        name,
-        address,
-        latitude: coords.latitude,
-        longitude: coords.longitude
+      await withRetrySupabase(async () => {
+        return await DirectStoreDAL.createTransitLocation({
+          id,
+          type,
+          name,
+          address,
+          latitude: coords.latitude,
+          longitude: coords.longitude
+        });
       });
 
       // 캐시 무효화
@@ -7835,14 +9397,16 @@ function setupDirectRoutes(app) {
         return res.status(400).json({ success: false, error: '주소를 찾을 수 없습니다.' });
       }
 
-      // DirectStoreDAL 사용
+      // DirectStoreDAL 사용 - withRetrySupabase 적용
       const DirectStoreDAL = require('./dal/DirectStoreDAL');
-      await DirectStoreDAL.updateTransitLocation(id, {
-        type,
-        name,
-        address,
-        latitude: coords.latitude,
-        longitude: coords.longitude
+      await withRetrySupabase(async () => {
+        return await DirectStoreDAL.updateTransitLocation(id, {
+          type,
+          name,
+          address,
+          latitude: coords.latitude,
+          longitude: coords.longitude
+        });
       });
 
       // 캐시 무효화
@@ -7872,9 +9436,11 @@ function setupDirectRoutes(app) {
     try {
       const { id } = req.params;
 
-      // DirectStoreDAL 사용
+      // DirectStoreDAL 사용 - withRetrySupabase 적용
       const DirectStoreDAL = require('./dal/DirectStoreDAL');
-      await DirectStoreDAL.deleteTransitLocation(id);
+      await withRetrySupabase(async () => {
+        return await DirectStoreDAL.deleteTransitLocation(id);
+      });
 
       // 캐시 무효화
       deleteCache('transit-location-all');
@@ -7890,6 +9456,81 @@ function setupDirectRoutes(app) {
   // GET /api/direct/transit-location/list: 매장별 대중교통 위치 조회
   router.get('/transit-location/list', async (req, res) => {
     try {
+      // 🔥 Feature Flag: USE_DB_DIRECT_STORE가 true이면 Supabase에서 읽기
+      const useDatabase = process.env.USE_DB_DIRECT_STORE === 'true';
+
+      if (useDatabase) {
+        // Supabase에서 읽기 (DirectStoreDAL 사용)
+        console.log(`📖 [GET /api/direct/transit-location/list] Supabase에서 데이터 읽기 시작`);
+        
+        const DirectStoreDAL = require('./dal/DirectStoreDAL');
+        
+        // 모든 대중교통 위치 조회 - withRetrySupabase 적용
+        const allLocations = await withRetrySupabase(async () => {
+          return await DirectStoreDAL.getAllTransitLocations();
+        });
+        const locationMap = new Map();
+        allLocations.forEach(loc => {
+          locationMap.set(loc.id, {
+            id: loc.id,
+            type: loc.type,
+            name: loc.name,
+            address: loc.address,
+            lat: loc.latitude,
+            lng: loc.longitude,
+            updatedAt: loc.updatedAt
+          });
+        });
+        
+        // 모든 매장의 대중교통 위치 조회 - withRetrySupabase 적용
+        const storePhotos = await withRetrySupabase(async () => {
+          return await DirectStoreDAL.dal.read('direct_store_photos');
+        });
+        const storeTransitData = [];
+        
+        for (const row of storePhotos) {
+          const storeName = row['업체명'];
+          if (!storeName) continue;
+          
+          let busTerminalIds = [];
+          let subwayStationIds = [];
+          
+          try {
+            busTerminalIds = row['버스터미널ID목록'] ? JSON.parse(row['버스터미널ID목록']) : [];
+          } catch (e) {
+            console.warn(`[Direct] 버스터미널ID목록 JSON 파싱 실패 (${storeName}):`, e);
+          }
+          
+          try {
+            subwayStationIds = row['지하철역ID목록'] ? JSON.parse(row['지하철역ID목록']) : [];
+          } catch (e) {
+            console.warn(`[Direct] 지하철역ID목록 JSON 파싱 실패 (${storeName}):`, e);
+          }
+          
+          const busTerminals = busTerminalIds
+            .map(id => locationMap.get(id))
+            .filter(Boolean);
+          const subwayStations = subwayStationIds
+            .map(id => locationMap.get(id))
+            .filter(Boolean);
+          
+          if (busTerminals.length > 0 || subwayStations.length > 0) {
+            storeTransitData.push({
+              storeName,
+              busTerminals,
+              subwayStations
+            });
+          }
+        }
+        
+        console.log(`✅ [GET /api/direct/transit-location/list] Supabase에서 데이터 읽기 완료 (${storeTransitData.length}개 매장)`);
+        
+        return res.json({ success: true, data: storeTransitData });
+      }
+
+      // Google Sheets에서 읽기 (기존 로직)
+      console.log(`📖 [GET /api/direct/transit-location/list] Google Sheets에서 데이터 읽기 시작`);
+
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
       const cacheKey = 'transit-location-list';
 
@@ -8010,6 +9651,31 @@ function setupDirectRoutes(app) {
       if (!storeName) {
         return res.status(400).json({ success: false, error: '매장명이 필요합니다.' });
       }
+
+      // 🔥 Feature Flag: USE_DB_DIRECT_STORE가 true이면 Supabase에 쓰기
+      const useDatabase = process.env.USE_DB_DIRECT_STORE === 'true';
+
+      if (useDatabase) {
+        // Supabase에 쓰기 (DirectStoreDAL 사용)
+        console.log(`📝 [POST /api/direct/transit-location/save] Supabase에 데이터 쓰기 시작 (${storeName})`);
+        
+        const DirectStoreDAL = require('./dal/DirectStoreDAL');
+        
+        await withRetrySupabase(async () => {
+          return await DirectStoreDAL.updateStoreTransitLocations(
+            storeName,
+            busTerminalIds,
+            subwayStationIds
+          );
+        });
+        
+        console.log(`✅ [POST /api/direct/transit-location/save] Supabase에 데이터 쓰기 완료 (${storeName})`);
+        
+        return res.json({ success: true, message: '대중교통 위치가 저장되었습니다.' });
+      }
+
+      // Google Sheets에 쓰기 (기존 로직)
+      console.log(`📝 [POST /api/direct/transit-location/save] Google Sheets에 데이터 쓰기 시작 (${storeName})`);
 
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
 

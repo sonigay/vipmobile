@@ -9,6 +9,7 @@
 
 require('dotenv').config();
 const express = require('express');
+const cron = require('node-cron');
 const app = express();
 const port = process.env.PORT || 4000;
 
@@ -451,6 +452,121 @@ console.log('\n✅ 모든 라우트 등록 완료\n');
 app.use(errorMiddleware);
 
 // ============================================================================
+// 스케줄러 함수 정의
+// ============================================================================
+
+// Discord 이미지 자동 갱신 함수
+async function refreshAllDiscordImages() {
+  console.log('🔄 [스케줄러] Discord 이미지 자동 갱신 시작...');
+  
+  try {
+    const { refreshDiscordImagesForCarrier } = require('./directRoutes');
+    const carriers = ['SK', 'KT', 'LG'];
+    
+    for (const carrier of carriers) {
+      try {
+        console.log(`[스케줄러] ${carrier} Discord 이미지 갱신 중...`);
+        await refreshDiscordImagesForCarrier(carrier);
+        console.log(`[스케줄러] ${carrier} Discord 이미지 갱신 완료`);
+      } catch (error) {
+        console.error(`[스케줄러] ${carrier} Discord 이미지 갱신 실패:`, error.message);
+      }
+    }
+    
+    console.log('✅ [스케줄러] Discord 이미지 자동 갱신 완료');
+  } catch (error) {
+    console.error('❌ [스케줄러] Discord 이미지 자동 갱신 오류:', error);
+  }
+}
+
+// 재시도 헬퍼 함수 (지수 백오프)
+async function retryWithBackoff(fn, maxRetries = 3, baseDelayMs = 2000) {
+  let lastError;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      if (attempt < maxRetries - 1) {
+        const delayMs = baseDelayMs * Math.pow(2, attempt);
+        console.warn(`⚠️ [재시도] 시도 ${attempt + 1}/${maxRetries} 실패, ${delayMs}ms 후 재시도... (오류: ${error.message})`);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
+    }
+  }
+  throw lastError;
+}
+
+// 데이터 재빌드 실행 상태 관리
+let isRebuilding = false;
+let rebuildStartTime = null;
+const MAX_REBUILD_DURATION_MS = 30 * 60 * 1000; // 30분 최대 실행 시간
+
+// 데이터 재빌드 함수
+async function rebuildMasterData() {
+  // 이미 재빌드가 진행 중이면 건너뛰기
+  if (isRebuilding) {
+    const elapsed = rebuildStartTime ? Date.now() - rebuildStartTime : 0;
+    if (elapsed > MAX_REBUILD_DURATION_MS) {
+      console.warn('⚠️ [스케줄러] 재빌드가 최대 실행 시간을 초과했습니다. 강제 종료합니다.');
+      isRebuilding = false;
+      rebuildStartTime = null;
+    } else {
+      console.log(`⚠️ [스케줄러] 이미 재빌드가 진행 중입니다. (경과 시간: ${Math.floor(elapsed / 1000)}초) 건너뜁니다.`);
+      return;
+    }
+  }
+
+  isRebuilding = true;
+  rebuildStartTime = Date.now();
+  const startTime = Date.now();
+
+  try {
+    console.log('🔄 [스케줄러] 데이터 재빌드 시작...');
+
+    const { rebuildPlanMaster, rebuildDeviceMaster, rebuildPricingMaster } = require('./directRoutes');
+    const carriers = ['SK', 'KT', 'LG'];
+
+    // 1. 요금제 마스터 리빌드 (재시도 포함)
+    console.log(`[스케줄러] Rebuilding Plan Master for ${carriers.join(',')}`);
+    const planResult = await retryWithBackoff(
+      () => rebuildPlanMaster(carriers),
+      3,
+      2000
+    );
+    console.log(`[스케줄러] Plan Master 완료: ${planResult?.totalCount || 0}개`);
+
+    // 2. 단말 마스터 리빌드 (재시도 포함)
+    console.log(`[스케줄러] Rebuilding Device Master for ${carriers.join(',')}`);
+    const deviceResult = await retryWithBackoff(
+      () => rebuildDeviceMaster(carriers),
+      3,
+      2000
+    );
+    console.log(`[스케줄러] Device Master 완료: ${deviceResult?.totalCount || 0}개`);
+
+    // 3. 단말 요금정책 리빌드 (재시도 포함)
+    console.log(`[스케줄러] Rebuilding Pricing Master for ${carriers.join(',')}`);
+    const pricingResult = await retryWithBackoff(
+      () => rebuildPricingMaster(carriers),
+      3,
+      2000
+    );
+    console.log(`[스케줄러] Pricing Master 완료: ${pricingResult?.totalCount || 0}개`);
+
+    const elapsed = Date.now() - startTime;
+    console.log(`✅ [스케줄러] 데이터 재빌드 완료 (소요 시간: ${Math.floor(elapsed / 1000)}초)`);
+  } catch (error) {
+    const elapsed = Date.now() - startTime;
+    console.error(`❌ [스케줄러] 데이터 재빌드 오류 (소요 시간: ${Math.floor(elapsed / 1000)}초):`, error);
+    console.error(`❌ [스케줄러] 재시도 후에도 실패했습니다. 다음 스케줄에서 다시 시도합니다.`);
+  } finally {
+    isRebuilding = false;
+    rebuildStartTime = null;
+  }
+}
+
+// ============================================================================
 // 서버 시작
 // ============================================================================
 
@@ -460,6 +576,65 @@ app.listen(port, () => {
   console.log(`📅 Started at: ${new Date().toISOString()}`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log('='.repeat(60));
+  
+  // ============================================================================
+  // 스케줄러 등록
+  // ============================================================================
+  
+  console.log('⏰ [스케줄러] 스케줄 등록 시작...');
+  
+  // Discord 이미지 자동 갱신 스케줄 등록
+  const imageRefreshSchedules = [
+    { time: '03:30', cron: '30 3 * * *' },
+    { time: '07:30', cron: '30 7 * * *' },
+    { time: '11:30', cron: '30 11 * * *' },
+    { time: '17:30', cron: '30 17 * * *' },
+    { time: '20:30', cron: '30 20 * * *' },
+    { time: '23:30', cron: '30 23 * * *' }
+  ];
+
+  imageRefreshSchedules.forEach(({ time, cron: cronExpr }) => {
+    cron.schedule(cronExpr, async () => {
+      console.log(`⏰ [스케줄러] 정기 스케줄 실행: Discord 이미지 자동 갱신 (${time})`);
+      await refreshAllDiscordImages();
+    }, {
+      scheduled: true,
+      timezone: 'Asia/Seoul'
+    });
+    console.log(`✅ [스케줄러] Discord 이미지 자동 갱신 스케줄 등록: ${time} (Asia/Seoul)`);
+  });
+
+  // 데이터 재빌드 스케줄 등록
+  // 매일 11:00-19:00 매시간 10분 (11:10, 12:10, 13:10, ..., 19:10)
+  for (let hour = 11; hour <= 19; hour++) {
+    cron.schedule(`10 ${hour} * * *`, async () => {
+      console.log(`⏰ [스케줄러] 정기 스케줄 실행: 데이터 재빌드 (${hour}:10)`);
+      await rebuildMasterData();
+    }, {
+      scheduled: true,
+      timezone: 'Asia/Seoul'
+    });
+    console.log(`✅ [스케줄러] 데이터 재빌드 스케줄 등록: ${hour}:10 (Asia/Seoul)`);
+  }
+  
+  console.log('✅ [스케줄러] 모든 스케줄 등록 완료');
+  
+  // 서버 시작 시 초기 실행 (지연 실행)
+  console.log('🚀 [스케줄러] 서버 시작 시 자동 실행 예약...');
+  
+  // 데이터 재빌드 (서버 시작 15분 후)
+  setTimeout(async () => {
+    console.log('🔄 [스케줄러] 서버 시작 시 데이터 재빌드 실행 (지연 실행)');
+    await rebuildMasterData();
+  }, 15 * 60 * 1000); // 15분 후
+  
+  // Discord 이미지 자동 갱신 (서버 시작 30분 후)
+  setTimeout(async () => {
+    console.log('🔄 [스케줄러] 서버 시작 시 Discord 이미지 자동 갱신 실행 (지연 실행)');
+    await refreshAllDiscordImages();
+  }, 30 * 60 * 1000); // 30분 후
+  
+  console.log('✅ [스케줄러] 서버 시작 시 자동 실행 예약 완료 (재빌드: 15분 후, 이미지 갱신: 30분 후)');
 });
 
 // ============================================================================

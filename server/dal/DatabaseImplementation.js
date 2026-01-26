@@ -126,6 +126,43 @@ class DatabaseImplementation {
   }
 
   /**
+   * 테이블의 모든 레코드 삭제 (재빌드용)
+   * @param {string} entity - 테이블 이름
+   * @param {Object} filters - 선택적 필터 조건 (예: { '통신사': 'SK' })
+   * @returns {Promise<Object>} 삭제 결과
+   */
+  async deleteAll(entity, filters = {}) {
+    try {
+      let query = supabase.from(entity).delete();
+      
+      // 필터가 있으면 적용 (특정 조건의 레코드만 삭제)
+      if (Object.keys(filters).length > 0) {
+        Object.entries(filters).forEach(([key, value]) => {
+          if (value !== undefined && value !== null) {
+            query = query.eq(key, value);
+          }
+        });
+      } else {
+        // 필터가 없으면 전체 삭제 (neq를 사용하여 모든 레코드 선택)
+        // Supabase는 조건 없는 delete를 허용하지 않으므로 항상 참인 조건 사용
+        query = query.neq('id', '00000000-0000-0000-0000-000000000000');
+      }
+      
+      const { error, count } = await query;
+      
+      if (error) {
+        throw new Error(`DB Delete All Error [${entity}]: ${error.message}`);
+      }
+      
+      console.log(`[DatabaseImplementation] Deleted ${count || 'all'} records from ${entity}`);
+      return { success: true, deletedCount: count };
+    } catch (error) {
+      console.error(`[DatabaseImplementation] Delete all failed for ${entity}:`, error);
+      throw error;
+    }
+  }
+
+  /**
    * 배치 생성
    * @param {string} entity - 테이블 이름
    * @param {Array} dataArray - 생성할 데이터 배열

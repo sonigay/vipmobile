@@ -88,6 +88,24 @@ class DataAccessLayer {
   }
 
   /**
+   * 테이블의 모든 레코드 삭제 (재빌드용)
+   * @param {string} entity - 테이블/시트 이름
+   * @param {Object} filters - 선택적 필터 조건
+   * @returns {Promise<Object>} 삭제 결과
+   */
+  async deleteAll(entity, filters = {}) {
+    if (!entity) {
+      throw new Error('Entity name is required');
+    }
+
+    if (this.implementation.deleteAll) {
+      return await this.implementation.deleteAll(entity, filters);
+    }
+    
+    throw new Error('deleteAll not supported by this implementation');
+  }
+
+  /**
    * 배치 생성
    * @param {string} entity - 테이블/시트 이름
    * @param {Array} dataArray - 생성할 데이터 배열
