@@ -172,16 +172,56 @@ function logWarningOnce(key, message, data = {}) {
   }
 }
 
-// Rate limiting을 위한 전역 큐 시스템
+// Rate limiting을 위한 전역 큐 시스템 (Google Sheets 전용)
 let lastApiCallTime = 0;
-const MIN_API_INTERVAL_MS = 2000; // 최소 2초 간격으로 API 호출 (Google Sheets API Rate Limit 고려)
-const MAX_CONCURRENT_SHEETS_REQUESTS = 2; // 동시 요청 수 제한 (Rate Limit 방지)
-let currentSheetsRequests = 0;
 const sheetsRequestQueue = [];
+let currentSheetsRequests = 0;
 
-// SWR 캐시 설정
-const CACHE_FRESH_TTL = 10 * 60 * 1000; // 10분 (신선한 상태) - Rate Limit 방지를 위해 증가
-const CACHE_STALE_TTL = 60 * 60 * 1000; // 60분 (만료되었지만 사용 가능한 상태) - Rate Limit 방지를 위해 증가
+// 🔥 Feature Flag에 따라 동적으로 설정 변경
+function getRateLimitConfig() {
+  const useDatabase = process.env.USE_DB_DIRECT_STORE === 'true' || 
+                      process.env.USE_DB_POLICY === 'true' || 
+                      process.env.USE_DB_CUSTOMER === 'true';
+  
+  if (useDatabase) {
+    // Supabase 사용 시: Rate Limit 제한 완화 (빠른 응답)
+    return {
+      MIN_API_INTERVAL_MS: 100, // 0.1초 간격 (거의 제한 없음)
+      MAX_CONCURRENT_REQUESTS: 10, // 동시 요청 10개
+      CACHE_FRESH_TTL: 5 * 60 * 1000, // 5분
+      CACHE_STALE_TTL: 30 * 60 * 1000, // 30분
+      BASE_RETRY_DELAY: 1000 // 1초
+    };
+  } else {
+    // Google Sheets 사용 시: Rate Limit 엄격 적용
+    return {
+      MIN_API_INTERVAL_MS: 2000, // 2초 간격
+      MAX_CONCURRENT_REQUESTS: 2, // 동시 요청 2개
+      CACHE_FRESH_TTL: 10 * 60 * 1000, // 10분
+      CACHE_STALE_TTL: 60 * 60 * 1000, // 60분
+      BASE_RETRY_DELAY: 3000 // 3초
+    };
+  }
+}
+
+// 현재 설정 가져오기
+const rateLimitConfig = getRateLimitConfig();
+const MIN_API_INTERVAL_MS = rateLimitConfig.MIN_API_INTERVAL_MS;
+const MAX_CONCURRENT_SHEETS_REQUESTS = rateLimitConfig.MAX_CONCURRENT_REQUESTS;
+const CACHE_FRESH_TTL = rateLimitConfig.CACHE_FRESH_TTL;
+const CACHE_STALE_TTL = rateLimitConfig.CACHE_STALE_TTL;
+
+// 🔥 서버 시작 시 현재 Rate Limit 설정 로그 출력
+console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+console.log('📊 [Direct Routes] Rate Limit 설정');
+console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+console.log(`   데이터 소스: ${process.env.USE_DB_DIRECT_STORE === 'true' ? 'Supabase (빠름)' : 'Google Sheets (느림)'}`);
+console.log(`   API 호출 간격: ${MIN_API_INTERVAL_MS}ms`);
+console.log(`   동시 요청 수: ${MAX_CONCURRENT_SHEETS_REQUESTS}개`);
+console.log(`   캐시 유지 시간: ${CACHE_FRESH_TTL / 60000}분 (신선) / ${CACHE_STALE_TTL / 60000}분 (만료)`);
+console.log(`   재시도 기본 지연: ${rateLimitConfig.BASE_RETRY_DELAY}ms`);
+console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+console.log('');
 const backgroundRefreshing = new Set(); // 현재 백그라운드에서 갱신 중인 키 목록
 
 function getCacheEntry(key) {
@@ -267,7 +307,11 @@ async function withRetrySupabase(fn, maxRetries = 3) {
 }
 
 // Google Sheets용 재시도 함수 (Rate Limit 로직 유지)
-async function withRetryGoogleSheets(fn, maxRetries = 5, baseDelay = 3000) {
+async function withRetryGoogleSheets(fn, maxRetries = 5, baseDelay = null) {
+  // 🔥 동적 설정 사용
+  const config = getRateLimitConfig();
+  const actualBaseDelay = baseDelay || config.BASE_RETRY_DELAY;
+  
   // 전역 큐를 통한 동시 요청 제한
   return new Promise((resolve, reject) => {
     const executeRequest = async () => {
@@ -304,7 +348,7 @@ async function withRetryGoogleSheets(fn, maxRetries = 5, baseDelay = 3000) {
           if (isRateLimitError && attempt < maxRetries - 1) {
             // Exponential backoff with jitter (랜덤 지연 추가로 동시 요청 분산)
             const jitter = Math.random() * 2000; // 0~2초 랜덤
-            const delay = baseDelay * Math.pow(2, attempt) + jitter;
+            const delay = actualBaseDelay * Math.pow(2, attempt) + jitter;
             console.warn(`⚠️ [Direct] Google Sheets Rate Limit 에러 발생, ${Math.round(delay)}ms 후 재시도 (${attempt + 1}/${maxRetries})`);
             console.warn(`   에러 메시지: ${error.message}`);
             await new Promise(resolve => setTimeout(resolve, delay));
@@ -2355,7 +2399,11 @@ async function refreshImagesFromDiscord(carrier) {
 // 시트 데이터 읽기 함수 (캐시 적용, 동시 요청 방지)
 // 🔥 중요: 이 함수는 첫 번째 행(헤더)을 제거하고 반환합니다.
 // 외부 시트를 읽을 때는 헤더가 없을 수 있으므로 주의가 필요합니다.
-async function getSheetData(sheetId, range, ttlMs = 15 * 60 * 1000) {
+async function getSheetData(sheetId, range, ttlMs = null) {
+  // 🔥 동적 TTL 사용 (Feature Flag에 따라 다름)
+  const config = getRateLimitConfig();
+  const actualTtl = ttlMs || config.CACHE_FRESH_TTL;
+  
   const cacheKey = `sheet-data-${sheetId}-${range}`;
 
   return withRequestDeduplication(cacheKey, async () => {
