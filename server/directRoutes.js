@@ -674,7 +674,7 @@ async function rebuildPlanMaster(carriersParam) {
       await withRetry(async () => {
         return await sheets.spreadsheets.values.clear({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_PLAN_MASTER}!A2:G1000` // 더 넓은 범위로 clear
+          range: `${SHEET_PLAN_MASTER}!A2:G1000` // A:G 범위 유지
         });
       });
     } catch (clearErr) {
@@ -1893,7 +1893,7 @@ async function rebuildPricingMaster(carriersParam) {
     await withRetry(async () => {
       return await sheets.spreadsheets.values.clear({
         spreadsheetId: SPREADSHEET_ID,
-        range: `${SHEET_MOBILE_PRICING}!A2:M` // 인덱스 변경: N → M (14개 → 13개)
+        range: `${SHEET_MOBILE_PRICING}!A2:L` // 수정: M → L (A:L 범위)
       });
     });
 
@@ -1903,7 +1903,7 @@ async function rebuildPricingMaster(carriersParam) {
         // 🔥 수정: 부가미유치 기준 제거로 인해 컬럼 수 감소 (14개 → 13개)
         return await sheets.spreadsheets.values.update({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_MOBILE_PRICING}!A2:M${allRows.length + 1}`, // A2부터 M열까지 (인덱스 변경: N → M)
+          range: `${SHEET_MOBILE_PRICING}!A2:L${allRows.length + 1}`, // 수정: M → L (A:L 범위)
           valueInputOption: 'USER_ENTERED',
           resource: { values: allRows }
         });
@@ -5939,7 +5939,7 @@ function setupDirectRoutes(app) {
         }),
         sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
-          range: '직영점_오늘의휴대폰!A:Z'
+          range: '직영점_오늘의휴대폰!A:N' // 수정: A:Z → A:N
         }).catch((err) => {
           console.error(`[Direct] ⚠️ 직영점_오늘의휴대폰 시트 읽기 실패:`, err.message);
           return { data: { values: [] } };
@@ -7455,7 +7455,7 @@ function setupDirectRoutes(app) {
       // 직영점_오늘의휴대폰 시트에서 해당 모델 찾기
       const todaysRes = await sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
-        range: '직영점_오늘의휴대폰!A:Z'
+        range: '직영점_오늘의휴대폰!A:N' // 수정: A:Z → A:N
       });
       const todaysRows = (todaysRes.data.values || []).slice(1);
 
