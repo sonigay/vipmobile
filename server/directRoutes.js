@@ -3278,22 +3278,94 @@ function setupDirectRoutes(app) {
    *   - modelId (선택): 특정 모델ID 필터
    *
    * - 비고:
-   *   - 현재 단계에서는 시트에 저장된 내용을 그대로 읽어오는 조회 전용 API이며,
-   *     ETL(지원금/정책표/이미지/태그 병합)은 별도 빌드 프로세스에서 수행한다.
+   *   - Feature Flag에 따라 Supabase 또는 Google Sheets에서 조회
    */
   router.get('/mobiles-master', async (req, res) => {
     try {
       const carrierFilter = (req.query.carrier || '').trim().toUpperCase();
       const modelIdFilter = (req.query.modelId || '').toString().trim();
       
-      // DirectStoreDAL 사용 - withRetrySupabase 적용
-      const DirectStoreDAL = require('./dal/DirectStoreDAL');
-      const devices = await withRetrySupabase(async () => {
-        return await DirectStoreDAL.getDeviceMaster(
-          carrierFilter || null,
-          modelIdFilter || null
-        );
-      });
+      // Feature Flag 확인
+      const useDatabase = process.env.USE_DB_DIRECT_STORE === 'true';
+      
+      let devices = [];
+      
+      if (useDatabase) {
+        // Supabase에서 조회 (DirectStoreDAL 사용)
+        console.log(`📖 [GET /mobiles-master] Supabase에서 조회: carrier=${carrierFilter}, modelId=${modelIdFilter}`);
+        const DirectStoreDAL = require('./dal/DirectStoreDAL');
+        devices = await withRetrySupabase(async () => {
+          return await DirectStoreDAL.getDeviceMaster(
+            carrierFilter || null,
+            modelIdFilter || null
+          );
+        });
+      } else {
+        // Google Sheets에서 조회 (폴백)
+        console.log(`📖 [GET /mobiles-master] Google Sheets에서 조회: carrier=${carrierFilter}, modelId=${modelIdFilter}`);
+        const sheetName = '직영점_단말마스터';
+        const rows = await withRetry(() => getSheetData(sheetName));
+        
+        if (!rows || rows.length === 0) {
+          return res.json({ success: true, data: [] });
+        }
+        
+        // 헤더 파싱
+        const headers = rows[0];
+        const carrierIdx = headers.indexOf('통신사');
+        const modelIdIdx = headers.indexOf('모델ID');
+        const modelNameIdx = headers.indexOf('모델명');
+        const petNameIdx = headers.indexOf('펫네임');
+        const manufacturerIdx = headers.indexOf('제조사');
+        const factoryPriceIdx = headers.indexOf('출고가');
+        const defaultPlanGroupIdx = headers.indexOf('기본요금제군');
+        const isPremiumIdx = headers.indexOf('프리미엄여부');
+        const isBudgetIdx = headers.indexOf('보급형여부');
+        const isPopularIdx = headers.indexOf('인기여부');
+        const isRecommendedIdx = headers.indexOf('추천여부');
+        const isCheapIdx = headers.indexOf('저렴여부');
+        const imageUrlIdx = headers.indexOf('이미지URL');
+        const isActiveIdx = headers.indexOf('사용여부');
+        const noteIdx = headers.indexOf('비고');
+        const discordMessageIdIdx = headers.indexOf('Discord메시지ID');
+        const discordPostIdIdx = headers.indexOf('Discord포스트ID');
+        const discordThreadIdIdx = headers.indexOf('Discord스레드ID');
+        
+        // 데이터 파싱
+        devices = rows.slice(1)
+          .filter(row => {
+            const carrier = row[carrierIdx] || '';
+            const modelId = row[modelIdIdx] || '';
+            const isActive = row[isActiveIdx] || 'Y';
+            
+            // 필터링
+            if (carrierFilter && carrier !== carrierFilter) return false;
+            if (modelIdFilter && modelId !== modelIdFilter) return false;
+            if (isActive === 'N') return false;
+            
+            return true;
+          })
+          .map(row => ({
+            carrier: row[carrierIdx] || '',
+            modelId: row[modelIdIdx] || '',
+            modelName: row[modelNameIdx] || '',
+            petName: row[petNameIdx] || '',
+            manufacturer: row[manufacturerIdx] || '',
+            factoryPrice: parseInt(row[factoryPriceIdx]) || 0,
+            defaultPlanGroup: row[defaultPlanGroupIdx] || '',
+            isPremium: row[isPremiumIdx] === 'Y',
+            isBudget: row[isBudgetIdx] === 'Y',
+            isPopular: row[isPopularIdx] === 'Y',
+            isRecommended: row[isRecommendedIdx] === 'Y',
+            isCheap: row[isCheapIdx] === 'Y',
+            imageUrl: row[imageUrlIdx] || '',
+            isActive: row[isActiveIdx] !== 'N',
+            note: row[noteIdx] || '',
+            discordMessageId: row[discordMessageIdIdx] || '',
+            discordPostId: row[discordPostIdIdx] || '',
+            discordThreadId: row[discordThreadIdIdx] || ''
+          }));
+      }
       
       // 응답 형식 변환
       const data = devices.map(device => ({
