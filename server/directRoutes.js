@@ -174,14 +174,14 @@ function logWarningOnce(key, message, data = {}) {
 
 // Rate limiting을 위한 전역 큐 시스템
 let lastApiCallTime = 0;
-const MIN_API_INTERVAL_MS = 500; // 최소 0.5초 간격으로 API 호출 (기존 2초에서 대폭 단축하여 로딩 성능 개선)
-const MAX_CONCURRENT_SHEETS_REQUESTS = 5; // 동시 요청 수 제한 (기존 2개에서 5개로 증가)
+const MIN_API_INTERVAL_MS = 2000; // 최소 2초 간격으로 API 호출 (Google Sheets API Rate Limit 고려)
+const MAX_CONCURRENT_SHEETS_REQUESTS = 2; // 동시 요청 수 제한 (Rate Limit 방지)
 let currentSheetsRequests = 0;
 const sheetsRequestQueue = [];
 
 // SWR 캐시 설정
-const CACHE_FRESH_TTL = 5 * 60 * 1000; // 5분 (신선한 상태)
-const CACHE_STALE_TTL = 30 * 60 * 1000; // 30분 (만료되었지만 사용 가능한 상태)
+const CACHE_FRESH_TTL = 10 * 60 * 1000; // 10분 (신선한 상태) - Rate Limit 방지를 위해 증가
+const CACHE_STALE_TTL = 60 * 60 * 1000; // 60분 (만료되었지만 사용 가능한 상태) - Rate Limit 방지를 위해 증가
 const backgroundRefreshing = new Set(); // 현재 백그라운드에서 갱신 중인 키 목록
 
 function getCacheEntry(key) {
@@ -267,7 +267,7 @@ async function withRetrySupabase(fn, maxRetries = 3) {
 }
 
 // Google Sheets용 재시도 함수 (Rate Limit 로직 유지)
-async function withRetryGoogleSheets(fn, maxRetries = 5, baseDelay = 2000) {
+async function withRetryGoogleSheets(fn, maxRetries = 5, baseDelay = 3000) {
   // 전역 큐를 통한 동시 요청 제한
   return new Promise((resolve, reject) => {
     const executeRequest = async () => {
@@ -296,20 +296,27 @@ async function withRetryGoogleSheets(fn, maxRetries = 5, baseDelay = 2000) {
               error.message.includes('Quota exceeded') ||
               error.message.includes('RESOURCE_EXHAUSTED') ||
               error.message.includes('429') ||
-              error.message.includes('rateLimitExceeded')
+              error.message.includes('rateLimitExceeded') ||
+              error.message.includes('Rate Limit') ||
+              error.message.includes('quota metric')
             ));
 
           if (isRateLimitError && attempt < maxRetries - 1) {
             // Exponential backoff with jitter (랜덤 지연 추가로 동시 요청 분산)
-            const jitter = Math.random() * 1000; // 0~1초 랜덤
+            const jitter = Math.random() * 2000; // 0~2초 랜덤
             const delay = baseDelay * Math.pow(2, attempt) + jitter;
-            console.warn(`[Direct] Rate limit 에러 발생, ${Math.round(delay)}ms 후 재시도 (${attempt + 1}/${maxRetries})`);
+            console.warn(`⚠️ [Direct] Google Sheets Rate Limit 에러 발생, ${Math.round(delay)}ms 후 재시도 (${attempt + 1}/${maxRetries})`);
+            console.warn(`   에러 메시지: ${error.message}`);
             await new Promise(resolve => setTimeout(resolve, delay));
             continue;
           }
 
           // Rate limit 에러가 아니거나 최대 재시도 횟수 초과 시
           if (attempt === maxRetries - 1 || !isRateLimitError) {
+            if (isRateLimitError) {
+              console.error(`❌ [Direct] Google Sheets Rate Limit 최대 재시도 횟수 초과 (${maxRetries}회)`);
+              console.error(`   해결 방법: 1-2분 기다린 후 다시 시도하거나, Supabase로 전환하세요 (USE_DB_DIRECT_STORE=true)`);
+            }
             reject(error);
             return;
           }
@@ -2348,7 +2355,7 @@ async function refreshImagesFromDiscord(carrier) {
 // 시트 데이터 읽기 함수 (캐시 적용, 동시 요청 방지)
 // 🔥 중요: 이 함수는 첫 번째 행(헤더)을 제거하고 반환합니다.
 // 외부 시트를 읽을 때는 헤더가 없을 수 있으므로 주의가 필요합니다.
-async function getSheetData(sheetId, range, ttlMs = 10 * 60 * 1000) {
+async function getSheetData(sheetId, range, ttlMs = 15 * 60 * 1000) {
   const cacheKey = `sheet-data-${sheetId}-${range}`;
 
   return withRequestDeduplication(cacheKey, async () => {
@@ -2391,6 +2398,20 @@ async function getSheetData(sheetId, range, ttlMs = 10 * 60 * 1000) {
         error: error.message,
         code: error.code
       });
+      
+      // Rate Limit 에러 체크
+      const isRateLimitError = 
+        error.code === 429 ||
+        (error.message && (
+          error.message.includes('Quota exceeded') ||
+          error.message.includes('RESOURCE_EXHAUSTED') ||
+          error.message.includes('Rate Limit') ||
+          error.message.includes('quota metric')
+        ));
+      
+      if (isRateLimitError) {
+        throw new Error(`Google Sheets API Rate Limit 초과. 1-2분 기다린 후 다시 시도하거나, Supabase로 전환하세요 (USE_DB_DIRECT_STORE=true)`);
+      }
       
       // 사용자 친화적인 에러 메시지 생성
       if (error.message && error.message.includes('Requested entity was not found')) {

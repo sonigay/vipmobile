@@ -36,11 +36,13 @@ class GoogleSheetsImplementation {
         this.doc = new GoogleSpreadsheet(this.sheetId);
         await this.doc.useServiceAccountAuth(this.credentials);
         await this.doc.loadInfo();
+        console.log(`[GoogleSheetsImplementation] Initialized: ${this.doc.title}`);
       } catch (error) {
         console.error('[GoogleSheetsImplementation] Initialization failed:', error);
         throw new Error(`Failed to initialize Google Sheets: ${error.message}`);
       }
     }
+    // 이미 초기화된 경우 재사용 (doc.loadInfo()를 매번 호출하지 않음)
   }
 
   /**
