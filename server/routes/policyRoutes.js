@@ -589,6 +589,197 @@ function createPolicyRoutes(context) {
     }
   });
 
+  // ============================================================================
+  // 정책 카테고리 API (원본 로직)
+  // ============================================================================
+
+  // 기본 카테고리 초기화 함수
+  async function initializeDefaultCategories() {
+    const defaultCategories = [
+      ['wireless_shoe', '구두정책', 'wireless', '👞', '활성', 1, new Date().toISOString(), new Date().toISOString()],
+      ['wireless_union', '연합정책', 'wireless', '🤝', '활성', 2, new Date().toISOString(), new Date().toISOString()],
+      ['wireless_rate', '요금제유형별정책', 'wireless', '💰', '활성', 3, new Date().toISOString(), new Date().toISOString()],
+      ['wireless_add_support', '부가추가지원정책', 'wireless', '➕', '활성', 4, new Date().toISOString(), new Date().toISOString()],
+      ['wireless_add_deduct', '부가차감지원정책', 'wireless', '➖', '활성', 5, new Date().toISOString(), new Date().toISOString()],
+      ['wireless_grade', '그레이드정책', 'wireless', '⭐', '활성', 6, new Date().toISOString(), new Date().toISOString()],
+      ['wireless_individual', '개별소급정책', 'wireless', '📋', '활성', 7, new Date().toISOString(), new Date().toISOString()],
+      ['wired_shoe', '구두정책', 'wired', '👞', '활성', 1, new Date().toISOString(), new Date().toISOString()],
+      ['wired_union', '연합정책', 'wired', '🤝', '활성', 2, new Date().toISOString(), new Date().toISOString()],
+      ['wired_rate', '요금제유형별정책', 'wired', '💰', '활성', 3, new Date().toISOString(), new Date().toISOString()],
+      ['wired_add_support', '부가추가지원정책', 'wired', '➕', '활성', 4, new Date().toISOString(), new Date().toISOString()],
+      ['wired_add_deduct', '부가차감지원정책', 'wired', '➖', '활성', 5, new Date().toISOString(), new Date().toISOString()],
+      ['wired_grade', '그레이드정책', 'wired', '⭐', '활성', 6, new Date().toISOString(), new Date().toISOString()],
+      ['wired_individual', '개별소급정책', 'wired', '📋', '활성', 7, new Date().toISOString(), new Date().toISOString()]
+    ];
+
+    const headerRow = [
+      '카테고리ID',      // A열
+      '카테고리명',      // B열
+      '정책타입',        // C열
+      '아이콘',          // D열
+      '활성화여부',      // E열
+      '정렬순서',        // F열
+      '생성일시',        // G열
+      '수정일시'         // H열
+    ];
+
+    await rateLimiter.execute(() =>
+      sheets.spreadsheets.values.append({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '정책_카테고리!A:H',
+        valueInputOption: 'RAW',
+        insertDataOption: 'INSERT_ROWS',
+        resource: {
+          values: [headerRow, ...defaultCategories]
+        }
+      })
+    );
+
+    console.log('기본 카테고리 초기화 완료');
+  }
+
+  // GET /api/policy-categories - 정책 카테고리 목록 (원본 로직)
+  router.get('/policy-categories', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      console.log('카테고리 목록 조회 요청');
+
+      const values = await getSheetValuesWithoutCache('정책_카테고리');
+
+      if (!values || values.length === 0) {
+        // 카테고리가 없으면 기본 카테고리 생성
+        await initializeDefaultCategories();
+        const defaultValues = await getSheetValuesWithoutCache('정책_카테고리');
+        const categories = defaultValues.slice(1).map(row => ({
+          id: row[0],
+          name: row[1],
+          policyType: row[2],
+          icon: row[3],
+          isActive: row[4] === '활성',
+          sortOrder: parseInt(row[5]) || 0,
+          createdAt: row[6],
+          updatedAt: row[7]
+        }));
+
+        return res.json({ success: true, categories });
+      }
+
+      const categories = values.slice(1).map(row => ({
+        id: row[0],
+        name: row[1],
+        policyType: row[2],
+        icon: row[3],
+        isActive: row[4] === '활성',
+        sortOrder: parseInt(row[5]) || 0,
+        createdAt: row[6],
+        updatedAt: row[7]
+      }));
+
+      console.log(`카테고리 목록 조회 완료: ${categories.length}건`);
+      res.json({ success: true, categories });
+
+    } catch (error) {
+      console.error('카테고리 목록 조회 실패:', error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // POST /api/policy-categories - 정책 카테고리 생성 (원본 로직)
+  router.post('/policy-categories', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const { name, policyType, icon, sortOrder } = req.body;
+
+      console.log('새 카테고리 생성 요청:', req.body);
+
+      // 필수 필드 검증
+      if (!name || !policyType || !icon) {
+        return res.status(400).json({
+          success: false,
+          error: '필수 필드가 누락되었습니다.'
+        });
+      }
+
+      // 카테고리 ID 생성
+      const categoryId = `${policyType}_${name.replace(/\s+/g, '_').toLowerCase()}`;
+
+      // 새 카테고리 데이터 생성
+      const newCategoryRow = [
+        categoryId,                    // A열: 카테고리ID
+        name,                          // B열: 카테고리명
+        policyType,                    // C열: 정책타입
+        icon,                          // D열: 아이콘
+        '활성',                        // E열: 활성화여부
+        sortOrder || 0,                // F열: 정렬순서
+        new Date().toISOString(),      // G열: 생성일시
+        new Date().toISOString()       // H열: 수정일시
+      ];
+
+      // 시트에 데이터가 있는지 확인
+      const existingData = await getSheetValuesWithoutCache('정책_카테고리');
+
+      // 헤더 정의
+      const headerRow = [
+        '카테고리ID',      // A열
+        '카테고리명',      // B열
+        '정책타입',        // C열
+        '아이콘',          // D열
+        '활성화여부',      // E열
+        '정렬순서',        // F열
+        '생성일시',        // G열
+        '수정일시'         // H열
+      ];
+
+      let response;
+
+      // 시트가 비어있거나 헤더가 없으면 헤더와 함께 데이터 추가
+      if (!existingData || existingData.length === 0 ||
+        !existingData[0] || existingData[0][0] !== '카테고리ID') {
+        console.log('📝 [카테고리생성] 시트가 비어있거나 헤더가 없어 헤더와 함께 데이터 추가');
+        response = await rateLimiter.execute(() =>
+          sheets.spreadsheets.values.append({
+            spreadsheetId: SPREADSHEET_ID,
+            range: '정책_카테고리!A:H',
+            valueInputOption: 'RAW',
+            insertDataOption: 'INSERT_ROWS',
+            resource: {
+              values: [headerRow, newCategoryRow]
+            }
+          })
+        );
+      } else {
+        // 기존 데이터가 있으면 카테고리만 추가
+        console.log('📝 [카테고리생성] 기존 데이터에 카테고리 추가');
+        response = await rateLimiter.execute(() =>
+          sheets.spreadsheets.values.append({
+            spreadsheetId: SPREADSHEET_ID,
+            range: '정책_카테고리!A:H',
+            valueInputOption: 'RAW',
+            insertDataOption: 'INSERT_ROWS',
+            resource: {
+              values: [newCategoryRow]
+            }
+          })
+        );
+      }
+
+      // 정책_카테고리 시트 캐시 무효화
+      cacheManager.delete('sheet_정책_카테고리');
+
+      console.log('카테고리 생성 완료:', response.data);
+
+      res.json({
+        success: true,
+        message: '카테고리가 성공적으로 생성되었습니다.',
+        categoryId: categoryId
+      });
+
+    } catch (error) {
+      console.error('카테고리 생성 실패:', error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   return router;
 }
 
