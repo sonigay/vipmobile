@@ -3114,11 +3114,61 @@ function setupDirectRoutes(app) {
     try {
       const carrierFilter = (req.query.carrier || '').trim().toUpperCase();
       
-      // DirectStoreDAL 사용 - withRetrySupabase 적용
-      const DirectStoreDAL = require('./dal/DirectStoreDAL');
-      const plans = await withRetrySupabase(async () => {
-        return await DirectStoreDAL.getPlanMaster(carrierFilter || null);
-      });
+      // Feature Flag 확인
+      const useDatabase = process.env.USE_DB_DIRECT_STORE === 'true';
+      
+      let plans = [];
+      
+      if (useDatabase) {
+        // Supabase에서 조회 (DirectStoreDAL 사용)
+        console.log(`📖 [GET /plans-master] Supabase에서 조회: carrier=${carrierFilter}`);
+        const DirectStoreDAL = require('./dal/DirectStoreDAL');
+        plans = await withRetrySupabase(async () => {
+          return await DirectStoreDAL.getPlanMaster(carrierFilter || null);
+        });
+      } else {
+        // Google Sheets에서 조회 (폴백)
+        console.log(`📖 [GET /plans-master] Google Sheets에서 조회: carrier=${carrierFilter}`);
+        const sheetName = '직영점_요금제마스터';
+        const range = `${sheetName}!A:G`; // 원본 파일 기준: A:G
+        const rows = await withRetry(() => getSheetData(process.env.SHEET_ID, range));
+        
+        if (!rows || rows.length === 0) {
+          return res.json({ success: true, data: [] });
+        }
+        
+        // 헤더 파싱
+        const headers = rows[0];
+        const carrierIdx = headers.indexOf('통신사');
+        const planNameIdx = headers.indexOf('요금제명');
+        const planGroupIdx = headers.indexOf('요금제군');
+        const basicFeeIdx = headers.indexOf('기본료');
+        const planCodeIdx = headers.indexOf('요금제코드');
+        const isActiveIdx = headers.indexOf('사용여부');
+        const noteIdx = headers.indexOf('비고');
+        
+        // 데이터 파싱
+        plans = rows.slice(1)
+          .filter(row => {
+            const carrier = row[carrierIdx] || '';
+            const isActive = row[isActiveIdx] || 'Y';
+            
+            // 필터링
+            if (carrierFilter && carrier !== carrierFilter) return false;
+            if (isActive === 'N') return false;
+            
+            return true;
+          })
+          .map(row => ({
+            carrier: row[carrierIdx] || '',
+            planName: row[planNameIdx] || '',
+            planGroup: row[planGroupIdx] || '',
+            basicFee: parseInt(row[basicFeeIdx]) || 0,
+            planCode: row[planCodeIdx] || '',
+            isActive: row[isActiveIdx] !== 'N',
+            note: row[noteIdx] || ''
+          }));
+      }
       
       // 응답 형식 변환
       const data = plans.map(plan => ({
