@@ -1,0 +1,8 @@
+{
+  "direct-store": false,
+  "policy": true,
+  "customer": true,
+  "onsale": false,
+  "budget": false,
+  "quick-service": false
+}
