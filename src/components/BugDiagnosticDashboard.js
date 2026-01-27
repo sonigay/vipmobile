@@ -2,329 +2,761 @@
  * BugDiagnosticDashboard.js
  * 
  * 어플종합관리 모드의 버그관리 탭 컴포넌트입니다.
- * 모드별/탭별 원클릭 진단 버튼과 한 줄 에러 메시지 진단 로직을 제공합니다.
+ * DataSourceDashboard와 동일한 구조(대리점/판매점/고객)로 모드별/탭별 진단을 제공합니다.
+ * 
+ * 기능:
+ * - 개별 탭 진단 (▶ 버튼)
+ * - 모드별 전체 진단 (모드 헤더의 버튼)
+ * - 모든 모드 한번에 진단 (하단 전체 진단 버튼)
+ * - 결과 복사 기능 (AI 디버깅 요청용)
  */
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
     Box,
     Typography,
     Paper,
     Grid,
-    Button,
     Alert,
     CircularProgress,
     List,
     ListItem,
     ListItemText,
     ListItemIcon,
-    Chip,
     Divider,
+    Button,
+    Chip,
     IconButton,
     Tooltip,
-    Collapse,
+    Accordion,
+    AccordionSummary,
+    AccordionDetails,
     LinearProgress,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
 } from '@mui/material';
 import BugReportIcon from '@mui/icons-material/BugReport';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import ErrorIcon from '@mui/icons-material/Error';
-import WarningIcon from '@mui/icons-material/Warning';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import HealthAndSafetyIcon from '@mui/icons-material/HealthAndSafety';
+import PlaylistPlayIcon from '@mui/icons-material/PlaylistPlay';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import ExpandLessIcon from '@mui/icons-material/ExpandLess';
-import StorageIcon from '@mui/icons-material/Storage';
-import ApiIcon from '@mui/icons-material/Api';
+import FolderIcon from '@mui/icons-material/Folder';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import Tabs from '@mui/material/Tabs';
+import Tab from '@mui/material/Tab';
+import BusinessCenterIcon from '@mui/icons-material/BusinessCenter';
+import StorefrontIcon from '@mui/icons-material/Storefront';
+import PersonIcon from '@mui/icons-material/Person';
+import PendingIcon from '@mui/icons-material/Pending';
+
+// 상세 매핑 데이터 및 모드 설정 임포트
+import { DATA_MAP_CONFIG } from '../config/dataMapConfig';
+import { getModeTitle, getModeIcon, MODE_ORDER } from '../config/modeConfig';
+
+// API Base URL
+const API_BASE_URL = process.env.REACT_APP_API_URL || '';
 
 /**
- * 각 엔드포인트에 대한 진단 설정
- * - path: API 엔드포인트
- * - method: HTTP 메소드
- * - category: 분류 (모드/탭)
- * - expected: 예상되는 성공 조건 (response 체크)
+ * 버그 진단 결과 상태
  */
-const DIAGNOSTIC_ENDPOINTS = [
-    // 퀵서비스 관리
-    { path: '/api/quick-cost/companies', method: 'GET', category: '퀵서비스', feature: '업체 목록', critical: true },
-    { path: '/api/quick-cost/history?limit=1', method: 'GET', category: '퀵서비스', feature: '이력 조회', critical: true },
-
-    // 직영점 모드
-    { path: '/api/db/flags', method: 'GET', category: '데이터베이스', feature: 'Feature Flags', critical: true },
-
-    // 공통 시스템
-    { path: '/api/stores', method: 'GET', category: '공통', feature: '매장 목록', critical: true },
-    { path: '/health', method: 'GET', category: '시스템', feature: '서버 상태', critical: true },
-];
-
-// 진단 결과 상태 타입
-const DIAGNOSTIC_STATUS = {
-    IDLE: 'idle',
+const DIAGNOSIS_STATUS = {
+    PENDING: 'pending',
     RUNNING: 'running',
     SUCCESS: 'success',
     WARNING: 'warning',
     ERROR: 'error',
 };
 
-// 상태에 따른 UI 맵핑
-const statusConfig = {
-    [DIAGNOSTIC_STATUS.IDLE]: { icon: <BugReportIcon />, color: 'default', label: '대기 중' },
-    [DIAGNOSTIC_STATUS.RUNNING]: { icon: <CircularProgress size={20} />, color: 'info', label: '진단 중...' },
-    [DIAGNOSTIC_STATUS.SUCCESS]: { icon: <CheckCircleIcon />, color: 'success', label: '정상' },
-    [DIAGNOSTIC_STATUS.WARNING]: { icon: <WarningIcon />, color: 'warning', label: '주의' },
-    [DIAGNOSTIC_STATUS.ERROR]: { icon: <ErrorIcon />, color: 'error', label: '오류' },
+/**
+ * 개별 진단 실행 함수
+ */
+const runDiagnostic = async (modeKey, tabKey, tabData) => {
+    const results = {
+        modeKey,
+        tabKey,
+        tabLabel: tabData?.label || tabKey,
+        status: DIAGNOSIS_STATUS.SUCCESS,
+        logs: [],
+        errors: [],
+        warnings: [],
+        timestamp: new Date().toISOString(),
+    };
+
+    try {
+        // 1. API 엔드포인트 테스트
+        if (tabData?.apiEndpoint) {
+            try {
+                const startTime = Date.now();
+                const response = await fetch(`${API_BASE_URL}${tabData.apiEndpoint}`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' },
+                });
+                const elapsed = Date.now() - startTime;
+
+                if (response.ok) {
+                    results.logs.push(`✅ API 연결 성공: ${tabData.apiEndpoint} (${elapsed}ms)`);
+
+                    // 응답 데이터 검증
+                    const data = await response.json();
+                    if (data.success === false) {
+                        results.warnings.push(`⚠️ API 응답 경고: ${data.error || data.message || '알 수 없는 오류'}`);
+                        if (results.status === DIAGNOSIS_STATUS.SUCCESS) {
+                            results.status = DIAGNOSIS_STATUS.WARNING;
+                        }
+                    } else {
+                        results.logs.push(`✅ 데이터 정상 수신`);
+                    }
+
+                    // 느린 응답 경고
+                    if (elapsed > 3000) {
+                        results.warnings.push(`⚠️ 느린 응답 (${elapsed}ms) - 성능 최적화 필요`);
+                        if (results.status === DIAGNOSIS_STATUS.SUCCESS) {
+                            results.status = DIAGNOSIS_STATUS.WARNING;
+                        }
+                    }
+                } else {
+                    const errorText = await response.text().catch(() => '');
+                    results.errors.push(`❌ API 오류 (${response.status}): ${errorText.slice(0, 200)}`);
+                    results.status = DIAGNOSIS_STATUS.ERROR;
+                }
+            } catch (apiError) {
+                results.errors.push(`❌ API 연결 실패: ${apiError.message}`);
+                results.status = DIAGNOSIS_STATUS.ERROR;
+            }
+        } else {
+            results.logs.push(`ℹ️ API 엔드포인트 미설정 - 테스트 건너뜀`);
+        }
+
+        // 2. Supabase 테이블 존재 여부 확인
+        if (tabData?.supabaseTable) {
+            try {
+                const tableResponse = await fetch(`${API_BASE_URL}/api/db/tables/status`);
+                if (tableResponse.ok) {
+                    const tableResult = await tableResponse.json();
+                    if (tableResult.success && tableResult.data) {
+                        if (tableResult.data[tabData.supabaseTable]) {
+                            results.logs.push(`✅ Supabase 테이블 존재: ${tabData.supabaseTable}`);
+                        } else {
+                            results.warnings.push(`⚠️ Supabase 테이블 미생성: ${tabData.supabaseTable}`);
+                            if (results.status === DIAGNOSIS_STATUS.SUCCESS) {
+                                results.status = DIAGNOSIS_STATUS.WARNING;
+                            }
+                        }
+                    }
+                }
+            } catch (tableError) {
+                results.warnings.push(`⚠️ 테이블 상태 확인 실패: ${tableError.message}`);
+            }
+        }
+
+        // 3. Google Sheets 연동 확인 (sheet 정보가 있는 경우)
+        if (tabData?.sheet) {
+            results.logs.push(`ℹ️ Google Sheets 매핑: ${tabData.sheet}`);
+        }
+
+    } catch (error) {
+        results.errors.push(`❌ 진단 중 예외 발생: ${error.message}`);
+        results.status = DIAGNOSIS_STATUS.ERROR;
+    }
+
+    return results;
 };
 
 const BugDiagnosticDashboard = () => {
-    const [diagnostics, setDiagnostics] = useState(
-        DIAGNOSTIC_ENDPOINTS.map((ep) => ({
-            ...ep,
-            status: DIAGNOSTIC_STATUS.IDLE,
-            message: '',
-            responseTime: null,
-            expanded: false,
-        }))
-    );
-    const [overallStatus, setOverallStatus] = useState(DIAGNOSTIC_STATUS.IDLE);
-    const [isRunning, setIsRunning] = useState(false);
-    const [lastRun, setLastRun] = useState(null);
+    const [diagnosing, setDiagnosing] = useState(false);
+    const [diagnosingAll, setDiagnosingAll] = useState(false);
+    const [diagnosisResults, setDiagnosisResults] = useState({});
+    const [expandedModes, setExpandedModes] = useState({});
+    const [currentTab, setCurrentTab] = useState(0);
+    const [selectedResult, setSelectedResult] = useState(null);
+    const [openResultDialog, setOpenResultDialog] = useState(false);
 
-    /**
-     * 단일 엔드포인트 진단 실행
-     */
-    const runSingleDiagnostic = async (endpoint, index) => {
-        const startTime = Date.now();
+    // 모드 그룹 정의 (DataSourceDashboard와 동일)
+    const DEALER_MODES = ['basicMode', 'directStore', 'onSaleReception', 'generalPolicy'];
+    const CUSTOMER_MODES = ['customerMode'];
 
-        setDiagnostics((prev) =>
-            prev.map((d, i) => (i === index ? { ...d, status: DIAGNOSTIC_STATUS.RUNNING, message: '' } : d))
-        );
+    const getGroupedModes = () => {
+        const dealer = MODE_ORDER.filter(m => DEALER_MODES.includes(m));
+        const customer = MODE_ORDER.filter(m => CUSTOMER_MODES.includes(m));
+        const agency = MODE_ORDER.filter(m => !DEALER_MODES.includes(m) && !CUSTOMER_MODES.includes(m));
+        return { agency, dealer, customer };
+    };
 
-        try {
-            const response = await fetch(endpoint.path, {
-                method: endpoint.method,
-                headers: { 'Content-Type': 'application/json' },
-            });
+    const groupedModes = getGroupedModes();
 
-            const responseTime = Date.now() - startTime;
-            const data = await response.json().catch(() => null);
+    // 진단 통계 계산
+    const getStats = () => {
+        const results = Object.values(diagnosisResults);
+        const total = results.length;
+        const success = results.filter(r => r.status === DIAGNOSIS_STATUS.SUCCESS).length;
+        const warning = results.filter(r => r.status === DIAGNOSIS_STATUS.WARNING).length;
+        const error = results.filter(r => r.status === DIAGNOSIS_STATUS.ERROR).length;
+        return { total, success, warning, error };
+    };
 
-            let status = DIAGNOSTIC_STATUS.SUCCESS;
-            let message = `응답 시간: ${responseTime}ms`;
+    const stats = getStats();
 
-            // HTTP 상태 코드 체크
-            if (!response.ok) {
-                status = DIAGNOSTIC_STATUS.ERROR;
-                message = `HTTP ${response.status}: ${response.statusText}`;
-            } else if (responseTime > 3000) {
-                // 3초 이상 걸리면 경고
-                status = DIAGNOSTIC_STATUS.WARNING;
-                message = `느린 응답 (${responseTime}ms) - 성능 최적화 필요`;
-            } else if (data?.success === false) {
-                status = DIAGNOSTIC_STATUS.ERROR;
-                message = data?.error || 'API 응답에서 success: false 반환';
+    // 개별 탭 진단 실행
+    const handleDiagnoseTab = useCallback(async (modeKey, tabKey, tabData) => {
+        const resultKey = `${modeKey}_${tabKey}`;
+
+        // 진단 시작 상태
+        setDiagnosisResults(prev => ({
+            ...prev,
+            [resultKey]: {
+                ...prev[resultKey],
+                status: DIAGNOSIS_STATUS.RUNNING,
             }
+        }));
 
-            setDiagnostics((prev) =>
-                prev.map((d, i) =>
-                    i === index
-                        ? { ...d, status, message, responseTime }
-                        : d
-                )
-            );
+        const result = await runDiagnostic(modeKey, tabKey, tabData);
 
-            return status;
-        } catch (error) {
-            const message = `네트워크 오류: ${error.message}`;
-            setDiagnostics((prev) =>
-                prev.map((d, i) =>
-                    i === index
-                        ? { ...d, status: DIAGNOSTIC_STATUS.ERROR, message, responseTime: null }
-                        : d
-                )
-            );
-            return DIAGNOSTIC_STATUS.ERROR;
+        setDiagnosisResults(prev => ({
+            ...prev,
+            [resultKey]: result
+        }));
+
+        return result;
+    }, []);
+
+    // 개별 모드 전체 진단
+    const handleDiagnoseMode = useCallback(async (modeKey) => {
+        const modeData = DATA_MAP_CONFIG[modeKey];
+        if (!modeData?.tabs) return;
+
+        setDiagnosing(true);
+
+        for (const [tabKey, tabData] of Object.entries(modeData.tabs)) {
+            await handleDiagnoseTab(modeKey, tabKey, tabData);
+        }
+
+        setDiagnosing(false);
+    }, [handleDiagnoseTab]);
+
+    // 모든 모드 진단
+    const handleDiagnoseAll = useCallback(async () => {
+        if (!window.confirm('모든 모드의 버그 진단을 실행하시겠습니까?\n(수 분이 소요될 수 있습니다.)')) {
+            return;
+        }
+
+        setDiagnosingAll(true);
+        setDiagnosisResults({});
+
+        for (const modeKey of MODE_ORDER) {
+            const modeData = DATA_MAP_CONFIG[modeKey];
+            if (!modeData?.tabs) continue;
+
+            for (const [tabKey, tabData] of Object.entries(modeData.tabs)) {
+                await handleDiagnoseTab(modeKey, tabKey, tabData);
+            }
+        }
+
+        setDiagnosingAll(false);
+    }, [handleDiagnoseTab]);
+
+    // 결과 복사
+    const handleCopyResult = useCallback((result) => {
+        const formattedResult = `
+=== 버그 진단 결과 ===
+모드: ${getModeTitle(result.modeKey)}
+탭: ${result.tabLabel} (${result.tabKey})
+상태: ${result.status}
+시간: ${result.timestamp}
+
+--- 로그 ---
+${result.logs.join('\n')}
+
+--- 경고 ---
+${result.warnings.length > 0 ? result.warnings.join('\n') : '없음'}
+
+--- 에러 ---
+${result.errors.length > 0 ? result.errors.join('\n') : '없음'}
+==================
+`.trim();
+
+        navigator.clipboard.writeText(formattedResult).then(() => {
+            alert('진단 결과가 클립보드에 복사되었습니다.\nAI에게 붙여넣기하여 디버깅을 요청하세요.');
+        }).catch(err => {
+            console.error('복사 실패:', err);
+            alert('복사에 실패했습니다. 수동으로 복사해주세요.');
+        });
+    }, []);
+
+    // 모든 결과 복사
+    const handleCopyAllResults = useCallback(() => {
+        const allResults = Object.values(diagnosisResults);
+        if (allResults.length === 0) {
+            alert('진단 결과가 없습니다. 먼저 진단을 실행해주세요.');
+            return;
+        }
+
+        const errorResults = allResults.filter(r => r.status === DIAGNOSIS_STATUS.ERROR || r.status === DIAGNOSIS_STATUS.WARNING);
+
+        const formattedResults = (errorResults.length > 0 ? errorResults : allResults).map(result => `
+[${getModeTitle(result.modeKey)}/${result.tabLabel}] ${result.status.toUpperCase()}
+${result.errors.length > 0 ? result.errors.join('\n') : ''}
+${result.warnings.length > 0 ? result.warnings.join('\n') : ''}
+`.trim()).filter(r => r.length > 50).join('\n\n');
+
+        const summary = `
+=== 버그 진단 전체 결과 ===
+진단 시간: ${new Date().toISOString()}
+총 진단: ${stats.total}개
+성공: ${stats.success}개
+경고: ${stats.warning}개
+에러: ${stats.error}개
+
+${formattedResults || '모든 항목이 정상입니다.'}
+==================
+`.trim();
+
+        navigator.clipboard.writeText(summary).then(() => {
+            alert('전체 진단 결과가 클립보드에 복사되었습니다.\nAI에게 붙여넣기하여 디버깅을 요청하세요.');
+        });
+    }, [diagnosisResults, stats]);
+
+    // 결과 상세 보기
+    const handleViewDetail = useCallback((result) => {
+        setSelectedResult(result);
+        setOpenResultDialog(true);
+    }, []);
+
+    const handleExpandMode = (modeKey) => {
+        setExpandedModes(prev => ({ ...prev, [modeKey]: !prev[modeKey] }));
+    };
+
+    const handleTabChange = (_event, newValue) => {
+        setCurrentTab(newValue);
+    };
+
+    // 결과 초기화
+    const handleReset = () => {
+        setDiagnosisResults({});
+    };
+
+    // 상태 아이콘 렌더링
+    const renderStatusIcon = (status) => {
+        switch (status) {
+            case DIAGNOSIS_STATUS.SUCCESS:
+                return <CheckCircleIcon color="success" fontSize="small" />;
+            case DIAGNOSIS_STATUS.WARNING:
+                return <WarningAmberIcon color="warning" fontSize="small" />;
+            case DIAGNOSIS_STATUS.ERROR:
+                return <ErrorOutlineIcon color="error" fontSize="small" />;
+            case DIAGNOSIS_STATUS.RUNNING:
+                return <CircularProgress size={18} />;
+            default:
+                return <PendingIcon color="disabled" fontSize="small" />;
         }
     };
 
-    /**
-     * 모든 엔드포인트 진단 실행
-     */
-    const runAllDiagnostics = async () => {
-        setIsRunning(true);
-        setOverallStatus(DIAGNOSTIC_STATUS.RUNNING);
-
-        const results = [];
-
-        for (let i = 0; i < diagnostics.length; i++) {
-            const result = await runSingleDiagnostic(DIAGNOSTIC_ENDPOINTS[i], i);
-            results.push(result);
-        }
-
-        // 전체 상태 결정
-        const hasError = results.some((r) => r === DIAGNOSTIC_STATUS.ERROR);
-        const hasWarning = results.some((r) => r === DIAGNOSTIC_STATUS.WARNING);
-
-        if (hasError) {
-            setOverallStatus(DIAGNOSTIC_STATUS.ERROR);
-        } else if (hasWarning) {
-            setOverallStatus(DIAGNOSTIC_STATUS.WARNING);
-        } else {
-            setOverallStatus(DIAGNOSTIC_STATUS.SUCCESS);
-        }
-
-        setIsRunning(false);
-        setLastRun(new Date());
-    };
-
-    const toggleExpand = (index) => {
-        setDiagnostics((prev) =>
-            prev.map((d, i) => (i === index ? { ...d, expanded: !d.expanded } : d))
-        );
-    };
-
-    // 카테고리별 그룹핑
-    const groupedDiagnostics = diagnostics.reduce((acc, diag, idx) => {
-        if (!acc[diag.category]) acc[diag.category] = [];
-        acc[diag.category].push({ ...diag, originalIndex: idx });
-        return acc;
-    }, {});
+    const isRunning = diagnosing || diagnosingAll;
 
     return (
         <Box>
             {/* 헤더 */}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <HealthAndSafetyIcon sx={{ fontSize: 32, color: 'error.main' }} />
+                    <BugReportIcon sx={{ fontSize: 32, color: 'error.main' }} />
                     <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
-                        시스템 버그 및 작동 진단
+                        버그 진단 및 관리 대시보드
                     </Typography>
                 </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    {lastRun && (
-                        <Typography variant="caption" color="text.secondary">
-                            마지막 진단: {lastRun.toLocaleTimeString()}
-                        </Typography>
-                    )}
-                    <Tooltip title="전체 진단 실행">
-                        <Button
-                            variant="contained"
-                            color="error"
-                            startIcon={isRunning ? <CircularProgress size={20} color="inherit" /> : <PlayArrowIcon />}
-                            onClick={runAllDiagnostics}
-                            disabled={isRunning}
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Tooltip title="전체 결과 복사 (에러/경고만)">
+                        <IconButton
+                            onClick={handleCopyAllResults}
+                            size="small"
+                            disabled={Object.keys(diagnosisResults).length === 0}
                         >
-                            전체 진단 실행
-                        </Button>
+                            <ContentCopyIcon />
+                        </IconButton>
+                    </Tooltip>
+                    <Tooltip title="결과 초기화">
+                        <IconButton onClick={handleReset} size="small" disabled={isRunning}>
+                            <RefreshIcon />
+                        </IconButton>
                     </Tooltip>
                 </Box>
             </Box>
 
-            {/* 전체 상태 요약 */}
-            <Paper sx={{
-                p: 2, mb: 3, borderRadius: 2, bgcolor:
-                    overallStatus === DIAGNOSTIC_STATUS.SUCCESS ? '#e8f5e9' :
-                        overallStatus === DIAGNOSTIC_STATUS.WARNING ? '#fff3e0' :
-                            overallStatus === DIAGNOSTIC_STATUS.ERROR ? '#ffebee' : '#f5f5f5'
-            }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    {statusConfig[overallStatus].icon}
-                    <Typography variant="h6" fontWeight="bold">
-                        전체 상태: {statusConfig[overallStatus].label}
-                    </Typography>
-                    {overallStatus === DIAGNOSTIC_STATUS.SUCCESS && (
-                        <Typography variant="body2" color="text.secondary">
-                            모든 시스템이 정상적으로 작동 중입니다.
-                        </Typography>
-                    )}
-                    {overallStatus === DIAGNOSTIC_STATUS.ERROR && (
-                        <Typography variant="body2" color="error">
-                            일부 시스템에 문제가 감지되었습니다. 아래에서 세부 정보를 확인하세요.
-                        </Typography>
-                    )}
-                </Box>
-                {isRunning && <LinearProgress sx={{ mt: 2 }} color="error" />}
-            </Paper>
-
-            {/* 카테고리별 진단 목록 */}
             <Grid container spacing={3}>
-                {Object.entries(groupedDiagnostics).map(([category, items]) => (
-                    <Grid item xs={12} md={6} key={category}>
-                        <Paper sx={{ borderRadius: 2, overflow: 'hidden' }}>
-                            <Box sx={{ px: 2, py: 1.5, bgcolor: '#f5f5f5', borderBottom: '1px solid #e0e0e0' }}>
-                                <Typography variant="subtitle1" fontWeight="bold">
-                                    {category === '시스템' && <StorageIcon sx={{ mr: 1, fontSize: 20, verticalAlign: 'text-bottom' }} />}
-                                    {category === '퀵서비스' && <ApiIcon sx={{ mr: 1, fontSize: 20, verticalAlign: 'text-bottom' }} />}
-                                    {category}
+                {/* 진단 통계 및 사용 안내 */}
+                <Grid item xs={12} md={4}>
+                    <Paper sx={{ p: 2, borderRadius: 2, mb: 2, bgcolor: '#f8f9fa' }}>
+                        <Typography variant="subtitle2" gutterBottom color="text.secondary">진단 현황</Typography>
+                        <Divider sx={{ mb: 2 }} />
+
+                        {stats.total > 0 ? (
+                            <>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-around', mb: 2 }}>
+                                    <Box sx={{ textAlign: 'center' }}>
+                                        <Typography variant="h4" color="success.main">{stats.success}</Typography>
+                                        <Typography variant="caption" color="text.secondary">성공</Typography>
+                                    </Box>
+                                    <Box sx={{ textAlign: 'center' }}>
+                                        <Typography variant="h4" color="warning.main">{stats.warning}</Typography>
+                                        <Typography variant="caption" color="text.secondary">경고</Typography>
+                                    </Box>
+                                    <Box sx={{ textAlign: 'center' }}>
+                                        <Typography variant="h4" color="error.main">{stats.error}</Typography>
+                                        <Typography variant="caption" color="text.secondary">에러</Typography>
+                                    </Box>
+                                </Box>
+                                <LinearProgress
+                                    variant="determinate"
+                                    value={(stats.success / stats.total) * 100}
+                                    color={stats.error > 0 ? 'error' : stats.warning > 0 ? 'warning' : 'success'}
+                                    sx={{ height: 8, borderRadius: 4 }}
+                                />
+                            </>
+                        ) : (
+                            <Box sx={{ textAlign: 'center', py: 2 }}>
+                                <Typography variant="body2" color="text.secondary">
+                                    진단을 실행해주세요
                                 </Typography>
                             </Box>
-                            <List sx={{ p: 0 }}>
-                                {items.map((diag, idx) => (
-                                    <React.Fragment key={diag.path}>
-                                        <ListItem
-                                            sx={{ py: 1.5, cursor: 'pointer' }}
-                                            onClick={() => toggleExpand(diag.originalIndex)}
+                        )}
+                    </Paper>
+
+                    <Paper sx={{ p: 2, borderRadius: 2, bgcolor: '#fff3e0' }}>
+                        <Typography variant="subtitle2" gutterBottom color="warning.dark">📋 사용 안내</Typography>
+                        <Divider sx={{ mb: 1.5 }} />
+                        <Typography variant="body2" color="text.secondary" component="div">
+                            <ol style={{ margin: 0, paddingLeft: 16 }}>
+                                <li><b>개별 진단</b>: 각 탭의 ▶ 버튼으로 해당 탭만 진단</li>
+                                <li><b>모드별 진단</b>: 모드명 옆 ▶▶ 버튼으로 해당 모드 전체 진단</li>
+                                <li><b>전체 진단</b>: 아래 버튼으로 모든 모드 한 번에 진단</li>
+                                <li>에러 발생 시 <b>📋 복사 버튼</b>을 눌러 AI에게 디버깅 요청</li>
+                            </ol>
+                        </Typography>
+                    </Paper>
+                </Grid>
+
+                {/* 모드-탭별 버그관리 트리 */}
+                <Grid item xs={12} md={8}>
+                    <Paper sx={{ borderRadius: 2, overflow: 'hidden' }}>
+                        <Box sx={{ bgcolor: '#ffebee', borderBottom: '1px solid #e0e0e0' }}>
+                            <Box sx={{ px: 2, py: 1.5 }}>
+                                <Typography variant="subtitle1" fontWeight="bold">
+                                    <FolderIcon sx={{ mr: 1, fontSize: 20, verticalAlign: 'text-bottom' }} />
+                                    모든 모드-탭별 버그관리
+                                </Typography>
+                            </Box>
+
+                            <Tabs
+                                value={currentTab}
+                                onChange={handleTabChange}
+                                variant="fullWidth"
+                                sx={{
+                                    minHeight: 40,
+                                    '& .MuiTab-root': { py: 1, minHeight: 40 }
+                                }}
+                            >
+                                <Tab icon={<BusinessCenterIcon sx={{ fontSize: '1rem' }} />} iconPosition="start" label="대리점" />
+                                <Tab icon={<StorefrontIcon sx={{ fontSize: '1rem' }} />} iconPosition="start" label="판매점" />
+                                <Tab icon={<PersonIcon sx={{ fontSize: '1rem' }} />} iconPosition="start" label="고객" />
+                            </Tabs>
+                        </Box>
+
+                        <Box sx={{ p: 0, maxHeight: 500, overflow: 'auto' }}>
+                            {(() => {
+                                const activeModes =
+                                    currentTab === 0 ? groupedModes.agency :
+                                        currentTab === 1 ? groupedModes.dealer :
+                                            groupedModes.customer;
+
+                                if (activeModes.length === 0) {
+                                    return (
+                                        <Box sx={{ p: 4, textAlign: 'center' }}>
+                                            <Typography color="text.secondary">표시할 모드가 없습니다.</Typography>
+                                        </Box>
+                                    );
+                                }
+
+                                return activeModes.map((modeKey) => {
+                                    const modeData = DATA_MAP_CONFIG[modeKey];
+                                    const ModeIcon = getModeIcon(modeKey);
+                                    const modeTitle = getModeTitle(modeKey);
+                                    const hasTabs = modeData && modeData.tabs && Object.keys(modeData.tabs).length > 0;
+
+                                    // 현재 모드의 진단 결과 통계
+                                    const modeResults = hasTabs ? Object.keys(modeData.tabs).map(tabKey =>
+                                        diagnosisResults[`${modeKey}_${tabKey}`]
+                                    ).filter(Boolean) : [];
+                                    const modeHasError = modeResults.some(r => r?.status === DIAGNOSIS_STATUS.ERROR);
+                                    const modeHasWarning = modeResults.some(r => r?.status === DIAGNOSIS_STATUS.WARNING);
+
+                                    return (
+                                        <Accordion
+                                            key={modeKey}
+                                            expanded={expandedModes[modeKey] || false}
+                                            onChange={() => handleExpandMode(modeKey)}
+                                            sx={{
+                                                '&:before': { display: 'none' },
+                                                boxShadow: 'none',
+                                                borderBottom: '1px solid #eee',
+                                                opacity: hasTabs ? 1 : 0.6,
+                                                bgcolor: modeHasError ? '#ffebee' : modeHasWarning ? '#fff8e1' : 'transparent'
+                                            }}
                                         >
-                                            <ListItemIcon sx={{ minWidth: 40 }}>
-                                                {statusConfig[diag.status].icon}
-                                            </ListItemIcon>
-                                            <ListItemText
-                                                primary={
-                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                        <Typography variant="body1" fontWeight="medium">
-                                                            {diag.feature}
+                                            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
+                                                    <ModeIcon color={modeHasError ? "error" : modeHasWarning ? "warning" : hasTabs ? "primary" : "disabled"} />
+                                                    <Typography variant="subtitle1" fontWeight="bold">{modeTitle}</Typography>
+                                                    <Box sx={{ flexGrow: 1 }} />
+                                                    {hasTabs && (
+                                                        <>
+                                                            <Chip
+                                                                label={`${Object.keys(modeData.tabs).length}개 탭`}
+                                                                size="small"
+                                                                color={modeHasError ? "error" : modeHasWarning ? "warning" : "default"}
+                                                                variant="outlined"
+                                                                sx={{ height: 20 }}
+                                                            />
+                                                            <Tooltip title="이 모드 전체 진단">
+                                                                <IconButton
+                                                                    size="small"
+                                                                    color="error"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleDiagnoseMode(modeKey);
+                                                                    }}
+                                                                    disabled={isRunning}
+                                                                >
+                                                                    <PlaylistPlayIcon fontSize="small" />
+                                                                </IconButton>
+                                                            </Tooltip>
+                                                        </>
+                                                    )}
+                                                </Box>
+                                            </AccordionSummary>
+                                            <AccordionDetails sx={{ bgcolor: '#fafafa', p: 0 }}>
+                                                {hasTabs ? (
+                                                    <List dense sx={{ py: 0 }}>
+                                                        {Object.entries(modeData.tabs).map(([tabKey, tabData]) => {
+                                                            const resultKey = `${modeKey}_${tabKey}`;
+                                                            const result = diagnosisResults[resultKey];
+
+                                                            return (
+                                                                <ListItem
+                                                                    key={tabKey}
+                                                                    sx={{
+                                                                        pl: 6,
+                                                                        py: 1.5,
+                                                                        borderBottom: '1px solid #f0f0f0',
+                                                                        '&:last-child': { borderBottom: 'none' },
+                                                                        bgcolor: result?.status === DIAGNOSIS_STATUS.ERROR ? '#ffebee' :
+                                                                            result?.status === DIAGNOSIS_STATUS.WARNING ? '#fff8e1' :
+                                                                                result?.status === DIAGNOSIS_STATUS.SUCCESS ? '#e8f5e9' :
+                                                                                    'transparent'
+                                                                    }}
+                                                                >
+                                                                    <ListItemIcon sx={{ minWidth: 40 }}>
+                                                                        {renderStatusIcon(result?.status)}
+                                                                    </ListItemIcon>
+                                                                    <ListItemText
+                                                                        primary={
+                                                                            <Typography variant="body1" fontWeight="medium">
+                                                                                {tabData.label}
+                                                                            </Typography>
+                                                                        }
+                                                                        secondary={
+                                                                            result ? (
+                                                                                <Typography variant="caption" color={
+                                                                                    result.status === DIAGNOSIS_STATUS.ERROR ? 'error' :
+                                                                                        result.status === DIAGNOSIS_STATUS.WARNING ? 'warning.dark' :
+                                                                                            'success.main'
+                                                                                } sx={{
+                                                                                    display: 'block',
+                                                                                    maxWidth: 250,
+                                                                                    overflow: 'hidden',
+                                                                                    textOverflow: 'ellipsis',
+                                                                                    whiteSpace: 'nowrap'
+                                                                                }}>
+                                                                                    {result.errors.length > 0 ? result.errors[0] :
+                                                                                        result.warnings.length > 0 ? result.warnings[0] :
+                                                                                            '✅ 정상'}
+                                                                                </Typography>
+                                                                            ) : (
+                                                                                <Typography variant="caption" color="text.secondary">
+                                                                                    진단 대기 중
+                                                                                </Typography>
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                                        {result && (
+                                                                            <>
+                                                                                <Tooltip title="상세 보기">
+                                                                                    <IconButton
+                                                                                        size="small"
+                                                                                        onClick={() => handleViewDetail(result)}
+                                                                                    >
+                                                                                        <BugReportIcon fontSize="small" />
+                                                                                    </IconButton>
+                                                                                </Tooltip>
+                                                                                <Tooltip title="결과 복사">
+                                                                                    <IconButton
+                                                                                        size="small"
+                                                                                        onClick={() => handleCopyResult(result)}
+                                                                                    >
+                                                                                        <ContentCopyIcon fontSize="small" />
+                                                                                    </IconButton>
+                                                                                </Tooltip>
+                                                                            </>
+                                                                        )}
+                                                                        <Tooltip title="진단 실행">
+                                                                            <IconButton
+                                                                                size="small"
+                                                                                color="error"
+                                                                                onClick={() => handleDiagnoseTab(modeKey, tabKey, tabData)}
+                                                                                disabled={isRunning}
+                                                                            >
+                                                                                <PlayArrowIcon fontSize="small" />
+                                                                            </IconButton>
+                                                                        </Tooltip>
+                                                                    </Box>
+                                                                </ListItem>
+                                                            );
+                                                        })}
+                                                    </List>
+                                                ) : (
+                                                    <Box sx={{ p: 2, textAlign: 'center' }}>
+                                                        <Typography variant="body2" color="text.secondary">
+                                                            이 모드에 대한 설정(`dataMapConfig.js`)이 존재하지 않습니다.
                                                         </Typography>
-                                                        {diag.critical && (
-                                                            <Chip label="중요" size="small" color="error" variant="outlined" sx={{ height: 20 }} />
-                                                        )}
                                                     </Box>
-                                                }
-                                                secondary={diag.path}
-                                            />
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                <Chip
-                                                    label={statusConfig[diag.status].label}
-                                                    size="small"
-                                                    color={statusConfig[diag.status].color}
-                                                    variant="outlined"
-                                                />
-                                                <IconButton size="small">
-                                                    {diag.expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                                                </IconButton>
-                                            </Box>
-                                        </ListItem>
-                                        <Collapse in={diag.expanded}>
-                                            <Box sx={{ px: 3, py: 2, bgcolor: '#fafafa' }}>
-                                                <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
-                                                    {diag.message || '진단을 실행하면 결과가 여기에 표시됩니다.'}
-                                                </Typography>
-                                                {diag.responseTime !== null && (
-                                                    <Typography variant="caption" color="text.disabled">
-                                                        응답 시간: {diag.responseTime}ms
-                                                    </Typography>
                                                 )}
-                                            </Box>
-                                        </Collapse>
-                                        {idx < items.length - 1 && <Divider />}
-                                    </React.Fragment>
-                                ))}
-                            </List>
-                        </Paper>
-                    </Grid>
-                ))}
+                                            </AccordionDetails>
+                                        </Accordion>
+                                    );
+                                });
+                            })()}
+                        </Box>
+                    </Paper>
+                </Grid>
+
+                {/* 전체 진단 버튼 */}
+                <Grid item xs={12}>
+                    <Paper sx={{ p: 3, borderRadius: 2, bgcolor: '#ffebee' }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                {diagnosingAll ? <CircularProgress size={24} color="error" /> : <BugReportIcon color="error" />}
+                                <Box>
+                                    <Typography variant="subtitle1" fontWeight="bold">전체 버그 진단 (모든 모드 한번에)</Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                        모든 모드의 모든 탭에 대해 API 연결, 데이터 로딩, 테이블 상태 등을 일괄 진단합니다.
+                                    </Typography>
+                                </Box>
+                            </Box>
+                            <Button
+                                variant="contained"
+                                color="error"
+                                startIcon={<PlaylistPlayIcon />}
+                                onClick={handleDiagnoseAll}
+                                disabled={isRunning}
+                            >
+                                {diagnosingAll ? '진단 중...' : '모든 모드 진단 실행'}
+                            </Button>
+                        </Box>
+                    </Paper>
+                </Grid>
             </Grid>
 
-            {/* 유지보수 가이드 */}
-            <Paper sx={{ p: 3, mt: 3, borderRadius: 2, bgcolor: '#e3f2fd' }}>
-                <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                    📋 유지보수 가이드
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                    • <strong>HTTP 오류</strong>: 서버 로그(<code>server/index.js</code>)를 확인하고 해당 라우트 파일의 에러 핸들링 점검<br />
-                    • <strong>느린 응답</strong>: Google Sheets API 쿼터 limit 또는 Rate Limiter 설정 확인 (<code>rateLimiter</code>)<br />
-                    • <strong>네트워크 오류</strong>: 서버가 실행 중인지 확인 (<code>npm run dev</code>) 및 방화벽 설정 점검<br />
-                    • <strong>success: false</strong>: API 응답에서 반환된 에러 메시지를 확인하고 해당 로직 수정
-                </Typography>
-            </Paper>
+            {/* 진단 결과 상세 다이얼로그 */}
+            <Dialog
+                open={openResultDialog}
+                onClose={() => setOpenResultDialog(false)}
+                maxWidth="md"
+                fullWidth
+            >
+                <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    {selectedResult && renderStatusIcon(selectedResult.status)}
+                    진단 결과 상세
+                    <Box sx={{ flexGrow: 1 }} />
+                    <Tooltip title="결과 복사">
+                        <IconButton
+                            size="small"
+                            onClick={() => selectedResult && handleCopyResult(selectedResult)}
+                        >
+                            <ContentCopyIcon />
+                        </IconButton>
+                    </Tooltip>
+                </DialogTitle>
+                <DialogContent dividers>
+                    {selectedResult && (
+                        <Box>
+                            <Box sx={{ mb: 2 }}>
+                                <Typography variant="subtitle2" color="text.secondary">모드 / 탭</Typography>
+                                <Typography variant="body1" fontWeight="bold">
+                                    {getModeTitle(selectedResult.modeKey)} / {selectedResult.tabLabel}
+                                </Typography>
+                            </Box>
+
+                            <Divider sx={{ my: 2 }} />
+
+                            {/* 로그 */}
+                            <Typography variant="subtitle2" color="text.secondary" gutterBottom>로그</Typography>
+                            <Paper sx={{ p: 2, bgcolor: '#f5f5f5', mb: 2, maxHeight: 150, overflow: 'auto' }}>
+                                {selectedResult.logs.length > 0 ? (
+                                    selectedResult.logs.map((log, idx) => (
+                                        <Typography key={idx} variant="body2" sx={{ fontFamily: 'monospace' }}>
+                                            {log}
+                                        </Typography>
+                                    ))
+                                ) : (
+                                    <Typography variant="body2" color="text.secondary">로그 없음</Typography>
+                                )}
+                            </Paper>
+
+                            {/* 경고 */}
+                            {selectedResult.warnings.length > 0 && (
+                                <>
+                                    <Typography variant="subtitle2" color="warning.dark" gutterBottom>경고</Typography>
+                                    <Paper sx={{ p: 2, bgcolor: '#fff8e1', mb: 2, maxHeight: 150, overflow: 'auto' }}>
+                                        {selectedResult.warnings.map((warn, idx) => (
+                                            <Typography key={idx} variant="body2" sx={{ fontFamily: 'monospace', color: 'warning.dark' }}>
+                                                {warn}
+                                            </Typography>
+                                        ))}
+                                    </Paper>
+                                </>
+                            )}
+
+                            {/* 에러 */}
+                            {selectedResult.errors.length > 0 && (
+                                <>
+                                    <Typography variant="subtitle2" color="error" gutterBottom>에러</Typography>
+                                    <Paper sx={{ p: 2, bgcolor: '#ffebee', maxHeight: 200, overflow: 'auto' }}>
+                                        {selectedResult.errors.map((err, idx) => (
+                                            <Typography key={idx} variant="body2" sx={{ fontFamily: 'monospace', color: 'error.main' }}>
+                                                {err}
+                                            </Typography>
+                                        ))}
+                                    </Paper>
+                                </>
+                            )}
+                        </Box>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button
+                        onClick={() => selectedResult && handleCopyResult(selectedResult)}
+                        startIcon={<ContentCopyIcon />}
+                    >
+                        결과 복사 (AI에게 붙여넣기)
+                    </Button>
+                    <Button onClick={() => setOpenResultDialog(false)} color="primary">
+                        닫기
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 };
