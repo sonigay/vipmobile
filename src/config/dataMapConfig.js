@@ -85,35 +85,40 @@ const DATA_MAP_CONFIG = {
         tabs: {
             'price-discrepancy': {
                 label: '폰클입고가상이값',
-                sheet: '폰클재고데이터',
+                sheet: '폰클재고데이터, 폰클개통데이터',
                 range: 'A:Z',
-                headerRow: 1,
+                headerRow: 4,
                 supabaseTable: 'inventory_price_discrepancies',
-                apiEndpoint: '/api/price-discrepancies'
+                apiEndpoint: '/api/price-discrepancies',
+                description: '모델명별 입고가 비교'
             },
             'duplicate': {
                 label: '폰클중복값',
-                sheet: '폰클재고데이터',
-                range: 'A:Z',
-                headerRow: 1,
+                sheet: '폰클개통데이터, 폰클재고데이터',
+                range: 'A4:BZ',
+                headerRow: 4,
                 supabaseTable: 'inventory_duplicates',
-                apiEndpoint: '/api/phone-duplicates'
+                apiEndpoint: '/api/phone-duplicates',
+                description: '일련번호 중복 검사'
             },
             'master': {
                 label: '마스터재고검수',
-                sheet: '재고감사_마스터',
+                sheet: '마스터재고',
                 range: 'A:Z',
                 headerRow: 1,
                 supabaseTable: 'inventory_audit_master',
-                apiEndpoint: '/api/inventory-inspection'
+                apiEndpoint: '/api/master-inventory',
+                spreadsheetId: '12_oC7c2xqHlDCppUvWL2EFesszA3oDU5JBdrYccYT7Q',
+                description: '별도 스프레드시트 - 마스터재고 데이터'
             },
             'assignment': {
                 label: '재고배정',
-                sheet: '재고배정설정',
+                sheet: '사전예약사이트, 폰클재고데이터, 폰클출고처데이터, 폰클개통데이터, 정규화작업',
                 range: 'A:Z',
                 headerRow: 1,
                 supabaseTable: 'inventory_assignment_settings',
-                apiEndpoint: '/api/inventory/assignment-settings'
+                apiEndpoint: '/api/inventory/assignment-status',
+                description: '재고 배정 상태 계산'
             }
         }
     }
