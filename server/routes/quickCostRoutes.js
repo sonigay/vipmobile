@@ -259,6 +259,164 @@ function createQuickCostRoutes(context) {
         }
     });
 
+    // 상세 견적 예상 정보 조회
+    router.get('/api/quick-cost/estimate', async (req, res) => {
+        try {
+            const { fromStoreId, toStoreId } = req.query;
+            if (!fromStoreId || !toStoreId) {
+                return res.status(400).json({ success: false, error: 'fromStoreId and toStoreId are required' });
+            }
+
+            const normFromId = fromStoreId.toString().trim().toUpperCase();
+            const normToId = toStoreId.toString().trim().toUpperCase();
+
+            const cacheKey = `quick-cost-estimate-${normFromId}-${normToId}`;
+            const cached = cacheManager.get(cacheKey);
+            if (cached) return res.json({ success: true, data: cached, source: 'cache' });
+
+            let historyEntries = [];
+
+            if (useSupabase()) {
+                // Supabase에서 조회 (양방향)
+                console.log(`🔍 [Debug/estimate] Querying Supabase for: ${normFromId} <-> ${normToId}`);
+                const { data, error } = await supabase
+                    .from('quick_cost_entries')
+                    .select(`
+                        id,
+                        from_store_id,
+                        to_store_id,
+                        quick_cost_companies (
+                            company_name,
+                            phone,
+                            cost,
+                            dispatch_speed,
+                            pickup_speed,
+                            arrival_speed
+                        )
+                    `)
+                    .or(`and(from_store_id.eq.${normFromId},to_store_id.eq.${normToId}),and(from_store_id.eq.${normToId},to_store_id.eq.${normFromId})`);
+
+                if (error) throw error;
+                historyEntries = data.map(entry => ({
+                    companies: entry.quick_cost_companies.map(c => ({
+                        name: c.company_name,
+                        phone: c.phone,
+                        cost: c.cost,
+                        dispatchSpeed: c.dispatch_speed,
+                        pickupSpeed: c.pickup_speed,
+                        arrivalSpeed: c.arrival_speed
+                    }))
+                }));
+            } else {
+                // Google Sheets에서 조회
+                console.log(`🔍 [Debug/estimate] Getting estimate for: ${normFromId} <-> ${normToId}`);
+
+                const response = await rateLimiter.execute(() => sheetsClient.sheets.spreadsheets.values.get({
+                    spreadsheetId: sheetsClient.SPREADSHEET_ID,
+                    range: `${QUICK_COST_SHEET_NAME}!A:AL`
+                }));
+
+                const rows = response.data.values || [];
+                console.log(`🔍 [Debug/estimate] Total rows in sheet: ${rows.length}`);
+
+                historyEntries = rows.slice(1).filter((row, idx) => {
+                    const sheetFId = row[4]?.toString().trim().toUpperCase();
+                    const sheetTId = row[6]?.toString().trim().toUpperCase();
+                    const isMatch = (sheetFId === normFromId && sheetTId === normToId) || (sheetFId === normToId && sheetTId === normFromId);
+
+                    if (isMatch) {
+                        console.log(`✅ [Debug/estimate] Found Match at Row ${idx + 2}: [${sheetFId}] <-> [${sheetTId}]`);
+                    }
+                    return isMatch;
+                }).map(row => {
+                    const companies = [];
+                    for (let i = 0; i < QUICK_COST_MAX_COMPANIES; i++) {
+                        const base = 8 + i * 6;
+                        const name = row[base]?.toString().trim();
+                        const phone = row[base + 1]?.toString().trim();
+                        const cost = parseInt(row[base + 2]?.toString().replace(/,/g, '')) || 0;
+                        const dSpeed = row[base + 3]?.toString().trim();
+                        const pSpeed = row[base + 4]?.toString().trim();
+                        const aSpeed = row[base + 5]?.toString().trim();
+
+                        if (name && cost > 0) {
+                            companies.push({
+                                name,
+                                phone,
+                                cost,
+                                dispatchSpeed: dSpeed || '중간',
+                                pickupSpeed: pSpeed || '중간',
+                                arrivalSpeed: aSpeed || '중간'
+                            });
+                        }
+                    }
+                    return { companies };
+                });
+
+                console.log(`🔍 [Debug/estimate] Found ${historyEntries.length} matching entries.`);
+            }
+
+            // 업체별 데이터 집계 (평균 비용 및 속도 통계)
+            const companyMap = new Map();
+            historyEntries.forEach(entry => {
+                entry.companies.forEach(c => {
+                    const key = `${normalizeCompanyName(c.name)}-${normalizePhoneNumber(c.phone)}`;
+                    if (!companyMap.has(key)) {
+                        companyMap.set(key, {
+                            companyName: c.name,
+                            phoneNumber: c.phone,
+                            totalCost: 0,
+                            count: 0,
+                            dispatchSpeeds: [],
+                            pickupSpeeds: [],
+                            arrivalSpeeds: []
+                        });
+                    }
+                    const stats = companyMap.get(key);
+                    stats.totalCost += c.cost;
+                    stats.count += 1;
+                    if (c.dispatchSpeed) stats.dispatchSpeeds.push(c.dispatchSpeed);
+                    if (c.pickupSpeed) stats.pickupSpeeds.push(c.pickupSpeed);
+                    if (c.arrivalSpeed) stats.arrivalSpeeds.push(c.arrivalSpeed);
+                });
+            });
+
+            // 가장 빈번한 속도 값을 가져오는 함수
+            const getMode = (arr) => {
+                if (!arr || arr.length === 0) return '중간';
+                const counts = {};
+                let max = 0;
+                let mode = '중간';
+                arr.forEach(val => {
+                    counts[val] = (counts[val] || 0) + 1;
+                    if (counts[val] > max) {
+                        max = counts[val];
+                        mode = val;
+                    }
+                });
+                return mode;
+            };
+
+            const data = Array.from(companyMap.values()).map(stats => ({
+                companyName: stats.companyName,
+                phoneNumber: stats.phoneNumber,
+                averageCost: Math.round(stats.totalCost / stats.count),
+                entryCount: stats.count,
+                dispatchSpeed: getMode(stats.dispatchSpeeds),
+                pickupSpeed: getMode(stats.pickupSpeeds),
+                arrivalSpeed: getMode(stats.arrivalSpeeds)
+            }));
+
+            // 결과 캐싱 (5분)
+            cacheManager.set(cacheKey, data, 5 * 60 * 1000);
+
+            res.json({ success: true, data });
+        } catch (e) {
+            console.error('[quick-cost/estimate] Error:', e.message);
+            res.status(500).json({ success: false, error: e.message });
+        }
+    });
+
     // 견적 이력 조회
     router.get('/api/quick-cost/history', async (req, res) => {
         try {
@@ -288,11 +446,21 @@ function createQuickCostRoutes(context) {
                     console.log(`🔍 [Debug] Second row (Data Sample):`, rows[1]);
                 }
                 const resolver = createRegisteredAtResolver();
+                const normFromId = fromStoreId?.toString().trim().toUpperCase();
+                const normToId = toStoreId?.toString().trim().toUpperCase();
+                const normUserId = userId?.toString().trim().toUpperCase();
+
                 history = rows.slice(1).map((row, idx) => {
                     const companies = [];
                     for (let i = 0; i < QUICK_COST_MAX_COMPANIES; i++) {
                         const base = 8 + i * 6;
-                        if (row[base]) companies.push({ name: row[base], phone: row[base + 1], cost: parseInt(row[base + 2]) || 0 });
+                        if (row[base]) {
+                            companies.push({
+                                name: row[base],
+                                phone: row[base + 1],
+                                cost: parseInt(row[base + 2]?.toString().replace(/,/g, '')) || 0
+                            });
+                        }
                     }
                     return {
                         rowIndex: idx + 2,
@@ -305,11 +473,25 @@ function createQuickCostRoutes(context) {
                         toStoreId: row[6]?.toString().trim(),
                         companies
                     };
-                }).filter(h => h.fromStoreId && h.toStoreId);
+                }).filter(h => {
+                    const hFrom = h.fromStoreId?.toUpperCase();
+                    const hTo = h.toStoreId?.toUpperCase();
+                    const hReg = h.registrantStoreId?.toUpperCase();
 
-                if (userId) history = history.filter(h => h.registrantStoreId === userId);
-                if (fromStoreId) history = history.filter(h => h.fromStoreId === fromStoreId);
-                if (toStoreId) history = history.filter(h => h.toStoreId === toStoreId);
+                    // 1. 등록자 필터
+                    if (normUserId && hReg !== normUserId) return false;
+
+                    // 2. 매장 필터
+                    if (normFromId && normToId) {
+                        // 양방향 매칭
+                        return (hFrom === normFromId && hTo === normToId) || (hFrom === normToId && hTo === normFromId);
+                    } else if (normFromId) {
+                        return hFrom === normFromId || hTo === normFromId;
+                    } else if (normToId) {
+                        return hFrom === normToId || hTo === normToId;
+                    }
+                    return true;
+                });
 
                 history.sort((a, b) => new Date(b.registeredAt) - new Date(a.registeredAt));
                 if (limit) history = history.slice(0, parseInt(limit));

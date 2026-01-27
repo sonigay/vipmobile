@@ -331,7 +331,7 @@ function Map({
     // 직영점관리모드 또는 기타: 평택 중심 좌표 사용 (인천과 청주지역까지 보이도록)
     return pyeongtaekCenter;
   }, [userLocation, isCustomerMode, loggedInStore]);
-  
+
   const [mapCenter, setMapCenter] = useState(initialMapCenter);
 
   // 기억 기능 함수
@@ -482,7 +482,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
   // 초기 줌 레벨 계산 (userLocation이 변경될 때마다 재계산)
   const initialZoom = useMemo(() => getInitialZoom(), [isAgentMode, currentView, isCustomerMode, loggedInStore, userLocation]);
   const [mapZoom, setMapZoom] = useState(initialZoom);
-  
+
   // userLocation이 변경될 때 줌 레벨 업데이트
   useEffect(() => {
     const newZoom = getInitialZoom();
@@ -831,7 +831,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
     else if (isAgentMode && selectedOption && selectedOption !== 'default') {
       let matchedColor = null;
       let hasValue = false;
-      
+
       // 선택된 옵션에 따라 색상 확인
       if (selectedOption === 'code' && store.code) {
         hasValue = true;
@@ -846,7 +846,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
         hasValue = true;
         matchedColor = colorSettings?.manager?.[store.managerForFilter];
       }
-      
+
       // 색상이 매칭되면 적용
       if (matchedColor) {
         fillColor = matchedColor;
@@ -1018,7 +1018,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
           console.error('invalidateSize 오류:', error);
         }
       }, 100);
-      
+
       // fixedHeight가 있을 때는 추가로 여러 번 호출하여 타일 렌더링 보장
       if (fixedHeight) {
         const timer2 = setTimeout(() => {
@@ -1030,7 +1030,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
             console.error('invalidateSize 오류:', error);
           }
         }, 300);
-        
+
         const timer3 = setTimeout(() => {
           try {
             if (map && map.invalidateSize) {
@@ -1040,14 +1040,14 @@ ${loggedInStore.name}으로 이동 예정입니다.
             console.error('invalidateSize 오류:', error);
           }
         }, 600);
-        
+
         return () => {
           clearTimeout(timer1);
           clearTimeout(timer2);
           clearTimeout(timer3);
         };
       }
-      
+
       return () => clearTimeout(timer1);
     }
   }, [map, isMapReady, fixedHeight]);
@@ -1153,11 +1153,11 @@ ${loggedInStore.name}으로 이동 예정입니다.
   // 지도 범위 계산 (각 모드별 최적화)
   const mapBounds = useMemo(() => {
     // 고객모드 또는 직영점관리모드에서 위치 정보 실패 시 bounds 사용하지 않음 (center와 zoom 사용)
-    if ((isCustomerMode || (!isCustomerMode && !isAgentMode && !loggedInStore?.coords)) && 
-        userLocation && userLocation.isDefault) {
+    if ((isCustomerMode || (!isCustomerMode && !isAgentMode && !loggedInStore?.coords)) &&
+      userLocation && userLocation.isDefault) {
       return null; // bounds를 사용하지 않고 center와 zoom을 사용
     }
-    
+
     if (!filteredStores.length && !userLocation) return null;
 
     const bounds = L.latLngBounds();
@@ -1195,9 +1195,9 @@ ${loggedInStore.name}으로 이동 예정입니다.
   // 초기 로드 시 지도 범위 설정 (각 모드별 최적화)
   useEffect(() => {
     // 고객모드 또는 직영점관리모드에서 위치 정보 실패 시 fitBounds 사용하지 않음
-    const shouldUseFitBounds = !((isCustomerMode || (!isCustomerMode && !isAgentMode && !loggedInStore?.coords)) && 
-                                  userLocation && userLocation.isDefault);
-    
+    const shouldUseFitBounds = !((isCustomerMode || (!isCustomerMode && !isAgentMode && !loggedInStore?.coords)) &&
+      userLocation && userLocation.isDefault);
+
     if (mapBounds && shouldUseFitBounds && (initialLoadRef.current || !userInteracted) && !forceZoomToStore) {
       safeMapOperation(() => {
         // 각 모드별 최대 줌 레벨 설정
@@ -1351,7 +1351,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
 
               return (
                 <Marker
-                  key={store.id}
+                  key={store.uniqueId || store.id}
                   position={[parseFloat(store.latitude), parseFloat(store.longitude)]}
                   icon={createMarkerIcon(store)}
                   eventHandlers={{
@@ -1614,7 +1614,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
 
               return (
                 <Marker
-                  key={store.id}
+                  key={store.uniqueId || store.id}
                   position={[parseFloat(store.latitude), parseFloat(store.longitude)]}
                   icon={createMarkerIcon(store)}
                   eventHandlers={{
@@ -2015,7 +2015,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
 
                           return (
                             <div
-                              key={store.id}
+                              key={store.uniqueId || `${store.id}-${index}`}
                               style={{
                                 padding: '8px',
                                 border: '1px solid #e0e0e0',
@@ -2148,7 +2148,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
         {/* 대중교통 마커 (고객모드, 직영점모드, 직영점관리모드에서만 표시, isAgentMode가 false일 때만) */}
         {!isAgentMode && showTransitMarkers && transitLocations && transitLocations.length > 0 && transitLocations.map((location) => {
           const markers = [];
-          
+
           // 버스터미널 마커 (크기 축소, 이름 표시)
           if (location.busTerminals && Array.isArray(location.busTerminals)) {
             location.busTerminals.forEach((terminal, index) => {
@@ -2182,7 +2182,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
                   popupAnchor: [1, -50],
                   className: 'transit-marker-div'
                 });
-                
+
                 markers.push(
                   <Marker
                     key={`bus-${location.storeName}-${index}`}
@@ -2206,7 +2206,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
               }
             });
           }
-          
+
           // 지하철역 마커 (크기 축소, 이름 표시)
           if (location.subwayStations && Array.isArray(location.subwayStations)) {
             location.subwayStations.forEach((station, index) => {
@@ -2240,7 +2240,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
                   popupAnchor: [1, -50],
                   className: 'transit-marker-div'
                 });
-                
+
                 markers.push(
                   <Marker
                     key={`subway-${location.storeName}-${index}`}
@@ -2264,7 +2264,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
               }
             });
           }
-          
+
           return markers;
         }).flat()}
 

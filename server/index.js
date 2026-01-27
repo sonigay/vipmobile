@@ -7,7 +7,21 @@
  * - 미들웨어 기반 에러 처리
  */
 
-require('dotenv').config();
+const path = require('path');
+const fs = require('fs');
+const envPath = path.join(__dirname, '.env');
+if (fs.existsSync(envPath)) {
+  const result = require('dotenv').config({ path: envPath });
+  if (result.error) {
+    console.error('❌ [.env] Load Error:', result.error);
+  } else {
+    console.log('✅ [.env] Loaded from:', envPath);
+    console.log('   - PORT:', process.env.PORT);
+    console.log('   - GOOGLE_SERVICE_ACCOUNT_EMAIL:', process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL ? 'Set' : 'Missing');
+  }
+} else {
+  console.warn('⚠️  [.env] File not found at:', envPath);
+}
 const express = require('express');
 const cron = require('node-cron');
 const app = express();

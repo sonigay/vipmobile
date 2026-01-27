@@ -1,10 +1,10 @@
 import React from 'react';
 import './FilterPanel.css';
-import { 
-  FormControl, 
-  InputLabel, 
-  Select, 
-  MenuItem, 
+import {
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
   Typography,
   Box,
   Paper,
@@ -25,12 +25,12 @@ import StoreIcon from '@mui/icons-material/Store';
  * 관리자 모드용 필터 패널 컴포넌트
  * 검색 반경 설정이 없는 간소화된 버전
  */
-function AgentFilterPanel({ 
-  models, 
-  colorsByModel, 
-  selectedModel, 
-  selectedColor, 
-  onModelSelect, 
+function AgentFilterPanel({
+  models,
+  colorsByModel,
+  selectedModel,
+  selectedColor,
+  onModelSelect,
   onColorSelect,
   searchQuery,
   searchResults,
@@ -82,7 +82,7 @@ function AgentFilterPanel({
             onStoreSearch(newInputValue);
           }}
         />
-        
+
         {/* 검색 결과 목록 */}
         {searchResults.length > 0 && (
           <Paper elevation={3} sx={{ mt: 1, maxHeight: 300, overflow: 'auto' }}>
@@ -95,7 +95,7 @@ function AgentFilterPanel({
               </ListItem>
               <Divider />
               {searchResults.map((store, index) => (
-                <React.Fragment key={store.id}>
+                <React.Fragment key={store.uniqueId || store.id}>
                   <ListItem disablePadding>
                     <ListItemButton onClick={() => onSearchResultSelect(store)}>
                       <ListItemText
@@ -115,8 +115,8 @@ function AgentFilterPanel({
       </Box>
 
       {/* 모델 및 색상 선택 */}
-      <Box sx={{ 
-        display: 'flex', 
+      <Box sx={{
+        display: 'flex',
         flexDirection: { xs: 'column', md: 'row' },
         gap: 2,
         width: '100%'

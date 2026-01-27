@@ -12,7 +12,6 @@ import {
   Alert,
   Collapse,
   Divider,
-  Link,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -43,6 +42,7 @@ function Login({ onLogin }) {
   const [passwordAttempts, setPasswordAttempts] = useState(0);
   const MAX_PASSWORD_ATTEMPTS = 5;
   const [loginType, setLoginType] = useState('업체'); // '업체' 또는 '맴버'
+  const [rememberStoreId, setRememberStoreId] = useState(true);
 
 
   // 사용자 기기 정보 수집
@@ -60,6 +60,14 @@ function Login({ onLogin }) {
     collectDeviceInfo();
   }, []);
 
+  // 저장된 매장 ID(업체명) 로드
+  useEffect(() => {
+    const savedStoreId = localStorage.getItem('remembered_store_id');
+    if (savedStoreId) {
+      setStoreId(savedStoreId);
+    }
+  }, []);
+
   // IP 정보 수집 (에러 발생 시 조용히 처리, 로그인 프로세스에 영향 없음)
   useEffect(() => {
     const fetchIPInfo = async () => {
@@ -69,8 +77,9 @@ function Login({ onLogin }) {
           setTimeout(() => reject(new Error('IP 정보 요청 시간 초과')), 10000)
         );
 
-        // IP 정보 요청 (타임아웃과 경쟁)
-        const ipRequest = axios.get('https://ipapi.co/json/', {
+        // IP 정보 요청 (서버 사이드 프록시 사용으로 CORS 방지)
+        const API_URL = process.env.REACT_APP_API_URL;
+        const ipRequest = axios.get(`${API_URL}/api/ip-info`, {
           timeout: 10000, // 10초 타임아웃
           validateStatus: (status) => status >= 200 && status < 300 // 2xx만 성공으로 처리
         });
@@ -289,6 +298,13 @@ function Login({ onLogin }) {
 
   // 로그인 처리 함수 분리
   const proceedLogin = (data) => {
+    // 업체명(매장 ID) 자동 저장 처리
+    if (rememberStoreId) {
+      localStorage.setItem('remembered_store_id', storeId);
+    } else {
+      localStorage.removeItem('remembered_store_id');
+    }
+
     if (showConsentForm && userConsent) {
       localStorage.setItem('userConsent', 'true');
       localStorage.setItem('userIpInfo', JSON.stringify({
@@ -682,6 +698,18 @@ function Login({ onLogin }) {
                 error={!!error}
                 helperText={error}
                 disabled={loading || loginType === '맴버'}
+              />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={rememberStoreId}
+                    onChange={(e) => setRememberStoreId(e.target.checked)}
+                    color="primary"
+                    size="small"
+                  />
+                }
+                label={<Typography variant="body2">업체명 자동 저장</Typography>}
+                sx={{ mt: 1, mb: 1 }}
               />
               <Button
                 type="submit"

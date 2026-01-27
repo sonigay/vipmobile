@@ -416,9 +416,10 @@ function AppContent() {
   // 초기 로드 시 세션 복구 및 IP 정보 로드
   useEffect(() => {
     const initializeApp = async () => {
-      // 1. IP 정보 로드
+      // 1. IP 정보 로드 (서버 사이드 프록시 사용으로 CORS 방지)
       try {
-        const response = await fetch('https://ipapi.co/json/');
+        const API_URL = process.env.REACT_APP_API_URL;
+        const response = await fetch(`${API_URL}/api/ip-info`);
         const data = await response.json();
         setIpInfo(data);
       } catch (error) {

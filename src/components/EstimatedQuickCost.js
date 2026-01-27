@@ -93,7 +93,7 @@ const EstimatedQuickCost = ({ fromStoreId, toStoreId, fromStoreName, toStoreName
     const newFavorites = favorites.includes(key)
       ? favorites.filter(f => f !== key)
       : [...favorites, key];
-    
+
     setFavorites(newFavorites);
     localStorage.setItem('quick-cost-favorites', JSON.stringify(newFavorites));
 
@@ -123,8 +123,10 @@ const EstimatedQuickCost = ({ fromStoreId, toStoreId, fromStoreName, toStoreName
     // 검색 필터
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      if (!item.companyName.toLowerCase().includes(query) &&
-          !item.phoneNumber.includes(query)) {
+      const name = item.companyName || '';
+      const phone = item.phoneNumber || '';
+      if (!name.toLowerCase().includes(query) &&
+        !phone.includes(query)) {
         return false;
       }
     }
@@ -146,7 +148,7 @@ const EstimatedQuickCost = ({ fromStoreId, toStoreId, fromStoreName, toStoreName
     const bKey = `${b.companyName}-${b.phoneNumber}`;
     const aIsFavorite = favorites.includes(aKey);
     const bIsFavorite = favorites.includes(bKey);
-    
+
     if (aIsFavorite && !bIsFavorite) return -1;
     if (!aIsFavorite && bIsFavorite) return 1;
     return a.averageCost - b.averageCost; // 가격 순
@@ -236,10 +238,10 @@ const EstimatedQuickCost = ({ fromStoreId, toStoreId, fromStoreName, toStoreName
                           />
                         )}
                         <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 0.5 }}>
-                          {item.companyName}
+                          {item.companyName || '알 수 없는 업체'}
                         </Typography>
                         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                          {item.phoneNumber}
+                          {item.phoneNumber || '연락처 없음'}
                         </Typography>
                       </Box>
                       <IconButton
@@ -253,10 +255,10 @@ const EstimatedQuickCost = ({ fromStoreId, toStoreId, fromStoreName, toStoreName
 
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
                       <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#1976d2' }}>
-                        {item.averageCost.toLocaleString()}원
+                        {(item.averageCost || 0).toLocaleString()}원
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        ({item.entryCount}건)
+                        ({item.entryCount || 0}건)
                       </Typography>
                       {item.hasOutliers && (
                         <Tooltip title={`이상치 데이터 ${item.outlierCount}건 포함`}>
@@ -270,19 +272,19 @@ const EstimatedQuickCost = ({ fromStoreId, toStoreId, fromStoreName, toStoreName
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                         {getSpeedIcon(item.dispatchSpeed)}
                         <Typography variant="body2" sx={{ fontSize: '0.85rem' }}>
-                          배차: {item.dispatchSpeed}
+                          배차: {item.dispatchSpeed || '정보없음'}
                         </Typography>
                       </Box>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                         {getSpeedIcon(item.pickupSpeed)}
                         <Typography variant="body2" sx={{ fontSize: '0.85rem' }}>
-                          픽업: {item.pickupSpeed}
+                          픽업: {item.pickupSpeed || '정보없음'}
                         </Typography>
                       </Box>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                         {getSpeedIcon(item.arrivalSpeed)}
                         <Typography variant="body2" sx={{ fontSize: '0.85rem' }}>
-                          도착: {item.arrivalSpeed}
+                          도착: {item.arrivalSpeed || '정보없음'}
                         </Typography>
                       </Box>
                     </Box>

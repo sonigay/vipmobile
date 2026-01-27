@@ -7,7 +7,7 @@ module.exports = function createMiscRoutes(context) {
   const express = require('express');
   const router = express.Router();
   const { google } = require('googleapis');
-  
+
   const { sheetsClient, rateLimiter, cacheManager } = context;
   const { sheets, SPREADSHEET_ID } = sheetsClient;
 
@@ -75,11 +75,38 @@ module.exports = function createMiscRoutes(context) {
     res.json({ success: true, message: '테스트 API 작동 중' });
   });
 
+  // IP 정보 프록시 API (CORS 방지)
+  router.get('/ip-info', async (req, res) => {
+    const axios = require('axios');
+    try {
+      // 클라이언트의 실제 IP가 프록시(Cloudtype 등) 뒤에 있을 수 있으므로 확인
+      const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+
+      // ipapi.co에 요청 (JSON 형식)
+      // 클라이언트 IP를 붙여서 요청하면 더 정확할 수 있으나, 
+      // 그냥 요청하면 ipapi.co가 요청한 서버의 IP를 기준으로 주지만 
+      // 프론트엔드에서 필요한 것은 대략적인 성공 응답과 에러 방지임.
+      const response = await axios.get('https://ipapi.co/json/', {
+        timeout: 5000
+      });
+
+      res.json(response.data);
+    } catch (error) {
+      console.warn('⚠️ [Server] IP 정보 가져오기 실패:', error.message);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch IP info from server',
+        ip: '알 수 없음',
+        location: '알 수 없음'
+      });
+    }
+  });
+
   // GET /stores - 매장 목록
   router.get('/stores', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
-      
+
       const cacheKey = 'stores_list';
       const cached = cacheManager.get(cacheKey);
       if (cached) return res.json(cached);
@@ -99,7 +126,7 @@ module.exports = function createMiscRoutes(context) {
   router.get('/stores/unique-values', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
-      
+
       const values = await getSheetValues('폰클출고처데이터');
       const rows = values.slice(1);
 
@@ -940,7 +967,7 @@ module.exports = function createMiscRoutes(context) {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
-    
+
     const sendEvent = (data) => {
       res.write(`data: ${JSON.stringify(data)}\n\n`);
     };
