@@ -50,8 +50,22 @@ const DATA_MAP_CONFIG = {
     },
     'quickServiceManagement': {
         tabs: {
-            'history': { label: '견적 이력', sheet: '퀵비용관리', range: 'A:Z', headerRow: 1, supabaseTable: 'quick_service_history' },
-            'companies': { label: '업체 통계', sheet: '퀵비용관리', range: 'A:Z', headerRow: 1, supabaseTable: 'quick_service_companies' }
+            'history': {
+                label: '견적 이력',
+                sheet: '퀵비용관리',
+                range: 'A:Z',
+                headerRow: 1,
+                supabaseTable: 'quick_service_history',
+                apiEndpoint: '/api/quick-cost/history?limit=10'
+            },
+            'companies': {
+                label: '업체 통계',
+                sheet: '퀵비용관리',
+                range: 'A:Z',
+                headerRow: 1,
+                supabaseTable: 'quick_service_companies',
+                apiEndpoint: '/api/quick-cost/companies'
+            }
         }
     },
     'budget': {
@@ -69,8 +83,38 @@ const DATA_MAP_CONFIG = {
     },
     'inventory': {
         tabs: {
-            'data': { label: '재고 데이터', sheet: '폰클재고데이터', range: 'A:Z', headerRow: 1, supabaseTable: 'inventory_data' },
-            'master': { label: '재고 마스터', sheet: '재고감사_마스터', range: 'A:Z', headerRow: 1, supabaseTable: 'inventory_audit_master' }
+            'price-discrepancy': {
+                label: '폰클입고가상이값',
+                sheet: '폰클재고데이터',
+                range: 'A:Z',
+                headerRow: 1,
+                supabaseTable: 'inventory_price_discrepancies',
+                apiEndpoint: '/api/price-discrepancies'
+            },
+            'duplicate': {
+                label: '폰클중복값',
+                sheet: '폰클재고데이터',
+                range: 'A:Z',
+                headerRow: 1,
+                supabaseTable: 'inventory_duplicates',
+                apiEndpoint: '/api/phone-duplicates'
+            },
+            'master': {
+                label: '마스터재고검수',
+                sheet: '재고감사_마스터',
+                range: 'A:Z',
+                headerRow: 1,
+                supabaseTable: 'inventory_audit_master',
+                apiEndpoint: '/api/inventory-inspection'
+            },
+            'assignment': {
+                label: '재고배정',
+                sheet: '재고배정설정',
+                range: 'A:Z',
+                headerRow: 1,
+                supabaseTable: 'inventory_assignment_settings',
+                apiEndpoint: '/api/inventory/assignment-settings'
+            }
         }
     }
 };
