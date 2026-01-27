@@ -31,13 +31,14 @@ const DATA_MAP_CONFIG = {
     },
 
     // ==================== 정책 모드 ====================
-    // 시트: 정책_기본정보 (끝 공백 주의), 정책_승인이력 , 정책_알림관리, 정책_카테고리, 정책모드공지사항
+    // 실제 UI 탭: 추가정책, 정책표목록, 정책표생성, 정책표생성설정
+    // 시트: 정책_기본정보 , 정책_승인이력 , 정책모드공지사항
     'policy': {
         tabs: {
-            'basic': { label: '기본정보', sheet: '정책_기본정보 ', range: 'A:AC', headerRow: 1 },
-            'approval': { label: '승인이력', sheet: '정책_승인이력 ', range: 'A:G', headerRow: 1 },
-            'notification': { label: '알림관리', sheet: '정책_알림관리', range: 'A:Z', headerRow: 1 },
-            'category': { label: '카테고리', sheet: '정책_카테고리', range: 'A:Z', headerRow: 1 },
+            'additional': { label: '추가정책', sheet: '정책_기본정보 ', range: 'A:AC', headerRow: 1 },
+            'policyList': { label: '정책표목록', sheet: '정책_기본정보 ', range: 'A:AC', headerRow: 1 },
+            'policyCreate': { label: '정책표생성', sheet: '정책_기본정보 ', range: 'A:AC', headerRow: 1 },
+            'policySettings': { label: '정책표생성설정', sheet: '정책_기본정보 ', range: 'A:AC', headerRow: 1 },
             'notice': { label: '공지사항', sheet: '정책모드공지사항', range: 'A:I', headerRow: 2 }
         }
     },
@@ -54,12 +55,19 @@ const DATA_MAP_CONFIG = {
     },
 
     // ==================== 관리자 모드 ====================
-    // 시트: 대리점아이디관리, 어플업데이트, 폰클출고처데이터
+    // UI 구조: 탭 없음, 메인헤더에 버튼/메뉴 방식
+    // - 지도 재고노출옵션 설정 버튼
+    // - 매장색상설정 버튼  
+    // - 점세개 메뉴: 전체재고확인, 담당재고확인, 담당개통확인
+    // 시트: 대리점아이디관리, 어플업데이트, 폰클출고처데이터, 폰클재고데이터, 폰클개통데이터
     'agent': {
+        uiType: 'headerMenu', // 탭이 아닌 헤더 메뉴 방식
         tabs: {
-            'stores': { label: '대리점관리', sheet: '대리점아이디관리', range: 'A:AF', headerRow: 1 },
-            'updates': { label: '어플업데이트', sheet: '어플업데이트', range: 'A:Z', headerRow: 1 },
-            'storeData': { label: '출고처데이터', sheet: '폰클출고처데이터', range: 'A:AM', headerRow: 4 }
+            'allInventory': { label: '전체재고확인', sheet: '폰클재고데이터', range: 'A:Z', headerRow: 4 },
+            'assignedInventory': { label: '담당재고확인', sheet: '폰클재고데이터', range: 'A:Z', headerRow: 4 },
+            'assignedActivation': { label: '담당개통확인', sheet: '폰클개통데이터', range: 'A:BZ', headerRow: 4 },
+            'storeSettings': { label: '대리점관리', sheet: '대리점아이디관리', range: 'A:AF', headerRow: 1 },
+            'updates': { label: '어플업데이트', sheet: '어플업데이트', range: 'A:Z', headerRow: 1 }
         }
     },
 
@@ -112,8 +120,10 @@ const DATA_MAP_CONFIG = {
                 // 데이터베이스관리 탭은 다른 모드들의 시트 정보를 참조하여 사용
             },
             'bugs': {
-                label: '버그관리'
-                // 버그관리 탭은 프론트엔드/백엔드 로그 확인용
+                label: '버그관리',
+                description: '앱 작동 상태 진단 및 버그 관리',
+                supabaseTable: 'error_logs',
+                apiEndpoint: '/api/errors'
             }
         }
     },

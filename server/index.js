@@ -374,6 +374,16 @@ try {
   console.error('❌ [Additional] Failed to mount SMS routes:', e.message);
 }
 
+// Error Logging Routes (통합 에러 모니터링)
+try {
+  const { supabase } = require('./supabaseClient');
+  const { initErrorRoutes } = require('./routes/errorRoutes');
+  app.use('/api/errors', initErrorRoutes(supabase));
+  console.log('✅ [Additional] Error Logging routes mounted');
+} catch (e) {
+  console.error('❌ [Additional] Failed to mount error logging routes:', e.message);
+}
+
 try {
   const createCancelCheckRoutes = require('./routes/cancelCheckRoutes');
   app.use('/', createCancelCheckRoutes(sharedContext));

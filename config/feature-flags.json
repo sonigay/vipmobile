@@ -1,8 +1,24 @@
 {
-  "direct-store": false,
+  "directStore": true,
   "policy": true,
-  "customer": true,
+  "customerMode": true,
   "onsale": false,
   "budget": false,
-  "quick-service": false
+  "quickServiceManagement": true,
+  "agent": false,
+  "inventory": false,
+  "settlement": false,
+  "inspection": false,
+  "chart": false,
+  "meeting": false,
+  "reservation": false,
+  "sales": false,
+  "smsManagement": false,
+  "obManagement": false,
+  "direct-store": false,
+  "customer": true,
+  "quick-service": false,
+  "quickServiceManagement:quickService": false,
+  "quickServiceManagement:database": false,
+  "quickServiceManagement:bugs": false
 }

@@ -216,6 +216,37 @@ const BugDiagnosticDashboard = () => {
 
         const result = await runDiagnostic(modeKey, tabKey, tabData);
 
+        // 버그관리 탭인 경우, 실제 수집된 에러 로그를 백엔드에서 조회하여 추가
+        if (tabKey === 'bugs' && result.status === DIAGNOSIS_STATUS.SUCCESS) {
+            try {
+                // 최근 에러 20개 조회
+                const logsResponse = await fetch(`${API_BASE_URL}/api/errors?limit=20`);
+                if (logsResponse.ok) {
+                    const logsData = await logsResponse.json();
+                    if (logsData.success && logsData.data) {
+                        result.logs.push('✅ 최신 에러 로그 조회 성공');
+
+                        // 조회된 에러를 결과의 errors/warnings 배열에 추가
+                        logsData.data.forEach(log => {
+                            const timestamp = new Date(log.created_at).toLocaleTimeString();
+                            const logMsg = `[${timestamp}] [${log.type.toUpperCase()}] ${log.message}`;
+
+                            if (log.level === 'error') {
+                                result.errors.push(logMsg);
+                            } else {
+                                result.warnings.push(logMsg);
+                            }
+                        });
+
+                        // 통계 정보
+                        result.logs.push(`📊 수집된 에러: ${logsData.data.length} 건 (최근 20개 표시)`);
+                    }
+                }
+            } catch (e) {
+                result.logs.push(`⚠️ 에러 로그 조회 실패: ${e.message}`);
+            }
+        }
+
         setDiagnosisResults(prev => ({
             ...prev,
             [resultKey]: result
@@ -269,13 +300,13 @@ const BugDiagnosticDashboard = () => {
 시간: ${result.timestamp}
 
 --- 로그 ---
-${result.logs.join('\n')}
+${result.logs?.join('\n') || '없음'}
 
 --- 경고 ---
-${result.warnings.length > 0 ? result.warnings.join('\n') : '없음'}
+${result.warnings?.length > 0 ? result.warnings.join('\n') : '없음'}
 
 --- 에러 ---
-${result.errors.length > 0 ? result.errors.join('\n') : '없음'}
+${result.errors?.length > 0 ? result.errors.join('\n') : '없음'}
 ==================
 `.trim();
 
@@ -299,8 +330,8 @@ ${result.errors.length > 0 ? result.errors.join('\n') : '없음'}
 
         const formattedResults = (errorResults.length > 0 ? errorResults : allResults).map(result => `
 [${getModeTitle(result.modeKey)}/${result.tabLabel}] ${result.status.toUpperCase()}
-${result.errors.length > 0 ? result.errors.join('\n') : ''}
-${result.warnings.length > 0 ? result.warnings.join('\n') : ''}
+${result.errors?.length > 0 ? result.errors.join('\n') : ''}
+${result.warnings?.length > 0 ? result.warnings.join('\n') : ''}
 `.trim()).filter(r => r.length > 50).join('\n\n');
 
         const summary = `
@@ -579,8 +610,8 @@ ${formattedResults || '모든 항목이 정상입니다.'}
                                                                                     textOverflow: 'ellipsis',
                                                                                     whiteSpace: 'nowrap'
                                                                                 }}>
-                                                                                    {result.errors.length > 0 ? result.errors[0] :
-                                                                                        result.warnings.length > 0 ? result.warnings[0] :
+                                                                                    {result.errors?.length > 0 ? result.errors[0] :
+                                                                                        result.warnings?.length > 0 ? result.warnings[0] :
                                                                                             '✅ 정상'}
                                                                                 </Typography>
                                                                             ) : (
