@@ -47,11 +47,23 @@ const DATA_MAP_CONFIG = {
         }
     },
 
-    // ==================== 퀵서비스 관리 모드 ====================
+    // ==================== 어플종합관리 모드 (퀵서비스 관리) ====================
+    // 실제 UI 탭: 퀵서비스관리(quickService), 데이터베이스관리(database), 버그관리(bugs)
     'quickServiceManagement': {
         tabs: {
-            'history': { label: '견적이력', sheet: '퀵비용관리', range: 'A:Z', headerRow: 1, supabaseTable: 'quick_service_history', apiEndpoint: '/api/quick-cost/history?limit=10' },
-            'companies': { label: '업체통계', sheet: '퀵비용관리', range: 'A:Z', headerRow: 1, supabaseTable: 'quick_service_companies', apiEndpoint: '/api/quick-cost/companies' }
+            'quickService': {
+                label: '퀵서비스관리',
+                description: '퀵서비스 업체 통계 및 견적 관리',
+                apiEndpoint: '/api/quick-cost/companies'
+            },
+            'database': {
+                label: '데이터베이스관리',
+                description: 'Supabase/구글시트 데이터 소스 관리'
+            },
+            'bugs': {
+                label: '버그관리',
+                description: '앱 작동 상태 진단 및 버그 관리'
+            }
         }
     },
 
