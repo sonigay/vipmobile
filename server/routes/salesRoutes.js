@@ -43,14 +43,14 @@ function createSalesRoutes(context) {
   // 시트 데이터 가져오기 헬퍼 함수
   async function getSheetValues(sheetName, spreadsheetId = null) {
     const targetSpreadsheetId = spreadsheetId || sheetsClient.SPREADSHEET_ID;
-    
+
     const response = await rateLimiter.execute(() =>
       sheetsClient.sheets.spreadsheets.values.get({
         spreadsheetId: targetSpreadsheetId,
         range: `${sheetName}!A:AF`
       })
     );
-    
+
     return response.data.values || [];
   }
 
@@ -59,7 +59,11 @@ function createSalesRoutes(context) {
     const startTime = Date.now();
 
     if (!spreadsheetId) {
-      throw new Error('SALES_SHEET_ID 환경변수가 설정되어 있지 않습니다.');
+      spreadsheetId = process.env.SALES_SHEET_ID || process.env.SHEET_ID;
+    }
+
+    if (!spreadsheetId) {
+      throw new Error('SALES_SHEET_ID 또는 SHEET_ID 환경변수가 설정되어 있지 않습니다.');
     }
 
     const RAW_DATA_SHEET_NAME = 'raw데이터';
@@ -226,7 +230,7 @@ function createSalesRoutes(context) {
         return res.json(cachedSalesData);
       }
 
-      const spreadsheetId = process.env.SALES_SHEET_ID;
+      const spreadsheetId = process.env.SALES_SHEET_ID || process.env.SHEET_ID;
       const result = await processSalesData(spreadsheetId);
 
       // 결과 검증
@@ -247,8 +251,8 @@ function createSalesRoutes(context) {
         message: error.message,
         timestamp: new Date().toISOString(),
         details: {
-          hasSalesSheetId: !!process.env.SALES_SHEET_ID,
-          salesSheetId: process.env.SALES_SHEET_ID ? 'SET' : 'NOT_SET'
+          hasSalesSheetId: !!(process.env.SALES_SHEET_ID || process.env.SHEET_ID),
+          salesSheetId: (process.env.SALES_SHEET_ID || process.env.SHEET_ID) ? 'SET' : 'NOT_SET'
         }
       };
 

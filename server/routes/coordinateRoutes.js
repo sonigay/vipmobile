@@ -304,9 +304,9 @@ function createCoordinateRoutes(context) {
   async function updateSalesCoordinates() {
     console.log('🗺️ [판매점좌표] 판매점정보 업데이트 시작');
 
-    const SALES_SPREADSHEET_ID = process.env.SALES_SHEET_ID;
+    const SALES_SPREADSHEET_ID = process.env.SALES_SHEET_ID || process.env.SHEET_ID;
     if (!SALES_SPREADSHEET_ID) {
-      throw new Error('SALES_SHEET_ID 환경변수가 설정되어 있지 않습니다.');
+      throw new Error('SALES_SHEET_ID 또는 SHEET_ID 환경변수가 설정되어 있지 않습니다.');
     }
 
     const SALES_SHEET_NAME = '판매점정보';

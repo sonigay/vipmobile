@@ -132,11 +132,11 @@ export const api = {
         },
         mode: 'cors',
       });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       return await response.json();
     } catch (error) {
       console.error('월간시상 데이터 로드 오류:', error);
@@ -155,11 +155,11 @@ export const api = {
         mode: 'cors',
         body: JSON.stringify({ type, data })
       });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       return await response.json();
     } catch (error) {
       console.error('월간시상 셋팅 저장 오류:', error);
@@ -178,12 +178,12 @@ export const api = {
         mode: 'cors',
         body: JSON.stringify(data)
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
-      
+
       return await response.json();
     } catch (error) {
       console.error('퀵비용 데이터 저장 오류:', error);
@@ -195,14 +195,14 @@ export const api = {
   getEstimatedQuickCost: async (fromStoreId, toStoreId, skipCache = false) => {
     try {
       const cacheKey = `quick-cost-estimate-${fromStoreId}-${toStoreId}`;
-      
+
       console.log('🔍 API getEstimatedQuickCost 호출:', {
         fromStoreId,
         toStoreId,
         skipCache,
         cacheKey
       });
-      
+
       // skipCache가 false일 때만 캐시 확인
       if (!skipCache) {
         const cached = clientCacheUtils.get(cacheKey);
@@ -226,7 +226,7 @@ export const api = {
         },
         mode: 'cors'
       });
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('❌ API 응답 오류:', {
@@ -236,14 +236,14 @@ export const api = {
         });
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const result = await response.json();
       console.log('✅ API 응답 성공:', {
         success: result.success,
         dataLength: result.data?.length || 0,
         error: result.error
       });
-      
+
       if (result.success && result.data) {
         clientCacheUtils.set(cacheKey, result.data, 5 * 60 * 1000); // 5분 캐싱
         console.log('✅ 캐시 저장 완료');
@@ -271,11 +271,11 @@ export const api = {
         },
         mode: 'cors'
       });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const result = await response.json();
       if (result.success && result.data) {
         clientCacheUtils.set(cacheKey, result.data, 10 * 60 * 1000); // 10분 캐싱
@@ -303,11 +303,11 @@ export const api = {
         },
         mode: 'cors'
       });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const result = await response.json();
       if (result.success && result.data) {
         clientCacheUtils.set(cacheKey, result.data, 10 * 60 * 1000); // 10분 캐싱
@@ -335,11 +335,11 @@ export const api = {
         },
         mode: 'cors'
       });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const result = await response.json();
       if (result.success && result.data) {
         clientCacheUtils.set(cacheKey, result.data, 10 * 60 * 1000); // 10분 캐싱
@@ -378,11 +378,11 @@ export const api = {
         },
         mode: 'cors'
       });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       return await response.json();
     } catch (error) {
       console.error('등록 이력 조회 오류:', error);
@@ -992,7 +992,7 @@ export const api = {
         }
       }
 
-      const url = region 
+      const url = region
         ? `${API_BASE_URL}/api/quick-cost/statistics?region=${encodeURIComponent(region)}`
         : `${API_BASE_URL}/api/quick-cost/statistics`;
 
@@ -1003,11 +1003,11 @@ export const api = {
         },
         mode: 'cors'
       });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const result = await response.json();
       if (result.success && result.data) {
         clientCacheUtils.set(cacheKey, result.data, 30 * 60 * 1000); // 30분 캐싱
@@ -1042,11 +1042,11 @@ export const api = {
         },
         mode: 'cors'
       });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const result = await response.json();
       if (result.success && result.data) {
         clientCacheUtils.set(cacheKey, result.data, 30 * 60 * 1000); // 30분 캐싱
@@ -1069,11 +1069,11 @@ export const api = {
         mode: 'cors',
         body: JSON.stringify({ companyName1, companyName2 })
       });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       return await response.json();
     } catch (error) {
       console.error('정규화 제안 오류:', error);
@@ -1172,19 +1172,19 @@ export const api = {
       if (meetingNumber) {
         formData.append('meetingNumber', meetingNumber);
       }
-      
+
       // 임시 meetingId 사용 (실제 회의 생성 전)
       const tempMeetingId = 'temp-custom-slide';
       const response = await fetch(`${API_BASE_URL}/api/meetings/${tempMeetingId}/upload-file`, {
         method: 'POST',
         body: formData
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: '파일 업로드 실패' }));
         throw new Error(errorData.error || '파일 업로드 실패');
       }
-      
+
       return await response.json();
     } catch (error) {
       console.error('커스텀 슬라이드 파일 업로드 오류:', error);
@@ -1200,12 +1200,12 @@ export const api = {
   // 회의 설정 저장 (재시도 로직 포함)
   saveMeetingConfig: async function saveMeetingConfig(meetingId, config, retries = 3, baseDelay = 1000) {
     let lastError = null;
-    
+
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
         const response = await fetch(`${API_BASE_URL}/api/meetings/${meetingId}/config`, {
           method: 'POST',
-          headers: { 
+          headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json'
           },
@@ -1232,14 +1232,14 @@ export const api = {
         return await response.json();
       } catch (error) {
         lastError = error;
-        
+
         // 네트워크 에러 또는 CORS 에러인지 확인
-        const isNetworkError = error.message.includes('fetch') || 
-                               error.message.includes('network') || 
-                               error.message.includes('Failed to fetch') ||
-                               error.message.includes('CORS') ||
-                               !error.status;
-        
+        const isNetworkError = error.message.includes('fetch') ||
+          error.message.includes('network') ||
+          error.message.includes('Failed to fetch') ||
+          error.message.includes('CORS') ||
+          !error.status;
+
         // 마지막 시도이거나 재시도 불가능한 에러인 경우
         if (attempt === retries || (!isNetworkError && error.status && ![502, 503, 504].includes(error.status))) {
           // 더 상세한 에러 메시지 제공
@@ -1255,7 +1255,7 @@ export const api = {
             throw error;
           }
         }
-        
+
         // 지수 백오프: delay * 2^(attempt-1)
         const delay = baseDelay * Math.pow(2, attempt - 1);
         if (process.env.NODE_ENV === 'development') {
@@ -1264,7 +1264,7 @@ export const api = {
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
-    
+
     throw lastError || new Error('회의 설정 저장 실패');
   },
 
@@ -1326,23 +1326,23 @@ const clientCacheUtils = {
       timestamp: now,
       ttl: now + ttl
     });
-    
+
     // localStorage에도 저장 (브라우저 새로고침 시에도 유지)
     try {
       // localStorage 용량 제한 확인 및 정리
       const dataSize = JSON.stringify(data).length;
       const maxSize = 5 * 1024 * 1024; // 5MB 제한
-      
+
       if (dataSize > maxSize) {
         console.warn(`캐시 데이터가 너무 큽니다 (${(dataSize / 1024 / 1024).toFixed(2)}MB). localStorage 저장을 건너뜁니다.`);
         return;
       }
-      
+
       // 기존 캐시 정리 (용량 부족 시)
       if (localStorage.length > 100) { // 100개 이상이면 정리
         clientCacheUtils.cleanup();
       }
-      
+
       localStorage.setItem(`cache_${key}`, JSON.stringify({
         data,
         timestamp: now,
@@ -1363,11 +1363,11 @@ const clientCacheUtils = {
           console.warn('localStorage 저장 재시도 실패:', retryError);
         }
       } else {
-      console.warn('localStorage 저장 실패:', error);
+        console.warn('localStorage 저장 실패:', error);
       }
     }
   },
-  
+
   // 캐시에서 데이터 가져오기
   get: (key) => {
     // 메모리 캐시에서 먼저 확인
@@ -1380,7 +1380,7 @@ const clientCacheUtils = {
         clientCache.delete(key);
       }
     }
-    
+
     // localStorage에서 확인
     try {
       const storedItem = localStorage.getItem(`cache_${key}`);
@@ -1398,10 +1398,10 @@ const clientCacheUtils = {
     } catch (error) {
       console.warn('localStorage 읽기 실패:', error);
     }
-    
+
     return null;
   },
-  
+
   // 캐시 삭제
   delete: (key) => {
     clientCache.delete(key);
@@ -1411,18 +1411,18 @@ const clientCacheUtils = {
       console.warn('localStorage 삭제 실패:', error);
     }
   },
-  
+
   // 캐시 정리
   cleanup: () => {
     const now = Date.now();
-    
+
     // 메모리 캐시 정리
     for (const [key, item] of clientCache.entries()) {
       if (now > item.ttl) {
         clientCache.delete(key);
       }
     }
-    
+
     // localStorage 정리
     try {
       for (let i = localStorage.length - 1; i >= 0; i--) {
@@ -1456,7 +1456,7 @@ if (typeof window !== 'undefined') {
 export async function fetchData(includeShipped = true, timestamp = null) {
   // 타임스탬프가 있으면 캐시 무효화
   const cacheKey = timestamp ? `stores_data_${includeShipped}_${timestamp}` : `stores_data_${includeShipped}`;
-  
+
   // 타임스탬프가 없는 경우에만 캐시 확인
   if (!timestamp) {
     const cachedData = clientCacheUtils.get(cacheKey);
@@ -1465,14 +1465,18 @@ export async function fetchData(includeShipped = true, timestamp = null) {
       return { success: true, data: cachedData };
     }
   }
-  
+
   try {
     // console.log(`서버에서 매장 데이터 요청 중... (includeShipped: ${includeShipped})`);
     const startTime = Date.now();
-    
+
     const response = await fetch(`${API_BASE_URL}/api/stores?includeShipped=${includeShipped}`);
+    if (!response.ok) {
+      const txt = await response.text().catch(() => '');
+      throw new Error(`매장 데이터 요청 실패 (${response.status}): ${txt.slice(0, 100)}`);
+    }
     const data = await response.json();
-    
+
     const fetchTime = Date.now() - startTime;
     // console.log(`매장 데이터 요청 완료: ${fetchTime}ms, 받은 매장 수: ${data.length}개`);
 
@@ -1480,7 +1484,7 @@ export async function fetchData(includeShipped = true, timestamp = null) {
     const processedData = data.map(store => {
       // inventory 데이터를 phoneData 배열로 변환
       let phoneData = [];
-      
+
       if (store.inventory && typeof store.inventory === 'object') {
         // 각 모델에 대해
         Object.entries(store.inventory).forEach(([model, colorData]) => {
@@ -1514,7 +1518,7 @@ export async function fetchData(includeShipped = true, timestamp = null) {
 
     // 캐시에 저장
     clientCacheUtils.set(cacheKey, processedData);
-    
+
     const totalTime = Date.now() - startTime;
     // console.log(`전체 처리 완료: ${totalTime}ms`);
 
@@ -1527,28 +1531,32 @@ export async function fetchData(includeShipped = true, timestamp = null) {
 
 export async function fetchModels() {
   const cacheKey = 'models_data';
-  
+
   // 캐시에서 먼저 확인
   const cachedData = clientCacheUtils.get(cacheKey);
   if (cachedData) {
     // console.log('캐시된 모델 데이터 사용');
     return { success: true, data: cachedData };
   }
-  
+
   try {
     // console.log('서버에서 모델 데이터 요청 중...');
     const startTime = Date.now();
-    
+
     const response = await fetch(`${API_BASE_URL}/api/models`);
+    if (!response.ok) {
+      const txt = await response.text().catch(() => '');
+      throw new Error(`모델 데이터 요청 실패 (${response.status}): ${txt.slice(0, 100)}`);
+    }
     const data = await response.json();
-    
+
     const fetchTime = Date.now() - startTime;
     // console.log(`모델 데이터 요청 완료: ${fetchTime}ms`);
     // console.log('서버로부터 받은 모델 데이터:', data);
 
     // 캐시에 저장
     clientCacheUtils.set(cacheKey, data);
-    
+
     const totalTime = Date.now() - startTime;
     // console.log(`전체 처리 완료: ${totalTime}ms`);
 
@@ -1565,36 +1573,36 @@ export async function fetchModels() {
  */
 export const fetchAgentData = async () => {
   const cacheKey = 'agents_data';
-  
+
   // 캐시에서 먼저 확인
   const cachedData = clientCacheUtils.get(cacheKey);
   if (cachedData) {
     // console.log('캐시된 대리점 데이터 사용');
     return cachedData;
   }
-  
+
   try {
     // console.log('서버에서 대리점 데이터 요청 중...');
     const startTime = Date.now();
-    
+
     const response = await fetch(`${API_BASE_URL}/api/agents`);
-    
+
     if (!response.ok) {
       const errorData = await response.json();
       throw new Error(errorData.message || 'Failed to fetch agent data');
     }
-    
+
     const data = await response.json();
-    
+
     const fetchTime = Date.now() - startTime;
     // console.log(`대리점 데이터 요청 완료: ${fetchTime}ms`);
-    
+
     // 캐시에 저장
     clientCacheUtils.set(cacheKey, data);
-    
+
     const totalTime = Date.now() - startTime;
     // console.log(`전체 처리 완료: ${totalTime}ms`);
-    
+
     return data;
   } catch (error) {
     console.error('Error fetching agent data:', error);
@@ -1610,42 +1618,42 @@ export const inventoryAPI = {
     if (filters.agent) params.append('agent', filters.agent);
     if (filters.office) params.append('office', filters.office);
     if (filters.department) params.append('department', filters.department);
-    
+
     const response = await fetch(`${API_BASE_URL}/api/inventory/status?${params}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
       },
     });
-    
+
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-    
+
     return await response.json();
   },
-  
+
   // 색상별 재고 현황
   getInventoryStatusByColor: async (filters = {}) => {
     const params = new URLSearchParams();
     if (filters.agent) params.append('agent', filters.agent);
     if (filters.office) params.append('office', filters.office);
     if (filters.department) params.append('department', filters.department);
-    
+
     const response = await fetch(`${API_BASE_URL}/api/inventory/status-by-color?${params}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
       },
     });
-    
+
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-    
+
     return await response.json();
   },
-  
+
   // 운영모델 순서 가져오기
   getOperationModels: async () => {
     const response = await fetch(`${API_BASE_URL}/api/operation-models`, {
@@ -1654,14 +1662,14 @@ export const inventoryAPI = {
         'Content-Type': 'application/json',
       },
     });
-    
+
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-    
+
     return await response.json();
   },
-  
+
   // 재고장표 담당자 필터 옵션 가져오기 (실제 재고가 있는 담당자만)
   getAgentFilters: async () => {
     const response = await fetch(`${API_BASE_URL}/api/inventory/agent-filters`, {
@@ -1670,11 +1678,11 @@ export const inventoryAPI = {
         'Content-Type': 'application/json',
       },
     });
-    
+
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-    
+
     return await response.json();
   }
 };
@@ -1707,19 +1715,19 @@ export const cacheManager = {
       })()
     };
   },
-  
+
   // 캐시 정리
   cleanup: () => {
     clientCacheUtils.cleanup();
     console.log('클라이언트 캐시 정리 완료');
   },
-  
+
   // 특정 캐시 삭제
   delete: (key) => {
     clientCacheUtils.delete(key);
     console.log(`캐시 삭제 완료: ${key}`);
   },
-  
+
   // 전체 캐시 삭제
   clearAll: () => {
     clientCache.clear();
@@ -1735,13 +1743,13 @@ export const cacheManager = {
     }
     console.log('전체 캐시 삭제 완료');
   }
-}; 
+};
 
 // 예산 대상월 관리 API
 export const budgetSummaryAPI = {
   // 액면예산 종합 계산
   getSummary: async (targetMonth, userId) => {
-    const url = userId 
+    const url = userId
       ? `${API_BASE_URL}/api/budget/summary/${targetMonth}?userId=${userId}`
       : `${API_BASE_URL}/api/budget/summary/${targetMonth}`;
     const response = await fetch(url);
@@ -1797,7 +1805,7 @@ export const budgetUserSheetAPI = {
     if (targetMonth) params.append('targetMonth', targetMonth);
     if (showAllUsers) params.append('showAllUsers', 'true');
     if (budgetType && budgetType !== '종합') params.append('budgetType', budgetType); // '종합'은 모든 타입 표시
-    
+
     const url = `${API_BASE_URL}/api/budget/user-sheets-v2?${params.toString()}`;
     const response = await fetch(url);
     if (!response.ok) {
@@ -1812,7 +1820,7 @@ export const budgetUserSheetAPI = {
     if (userId) params.append('userId', userId);
     if (targetMonth) params.append('targetMonth', targetMonth);
     if (showAllUsers) params.append('showAllUsers', 'true');
-    
+
     const url = `${API_BASE_URL}/api/budget/user-sheets?${params.toString()}`;
     const response = await fetch(url);
     if (!response.ok) {
@@ -1825,7 +1833,7 @@ export const budgetUserSheetAPI = {
   deleteUserSheet: async (uuid, userId) => {
     const params = new URLSearchParams();
     params.append('userId', userId);
-    
+
     const response = await fetch(`${API_BASE_URL}/api/budget/user-sheets-v2/${uuid}?${params.toString()}`, {
       method: 'DELETE'
     });
@@ -1886,7 +1894,7 @@ export const budgetUserSheetAPI = {
     params.append('userName', userName);
     if (currentUserId) params.append('currentUserId', currentUserId);
     if (budgetType) params.append('budgetType', budgetType);
-    
+
     const response = await fetch(`${API_BASE_URL}/api/budget/user-sheets/${sheetId}/data?${params.toString()}`);
     if (!response.ok) {
       throw new Error('예산 데이터 불러오기에 실패했습니다.');
@@ -1923,7 +1931,7 @@ export const budgetUserSheetAPI = {
     }
     return response.json();
   },
-}; 
+};
 
 // 정책그룹 관련 API
 export const budgetPolicyGroupAPI = {
@@ -1991,7 +1999,7 @@ export const budgetPolicyGroupAPI = {
     const params = new URLSearchParams();
     if (sheetId) params.append('sheetId', sheetId);
     if (policyGroups && policyGroups.length > 0) params.append('policyGroups', policyGroups.join(','));
-    
+
     const response = await fetch(`${API_BASE_URL}/api/budget/basic-shoe?${params.toString()}`);
     if (!response.ok) {
       throw new Error('기본구두 데이터 조회에 실패했습니다.');
@@ -2018,7 +2026,7 @@ export const budgetPolicyGroupAPI = {
   getBasicShoeCreationList: async (sheetId) => {
     const params = new URLSearchParams();
     if (sheetId) params.append('sheetId', sheetId);
-    
+
     const response = await fetch(`${API_BASE_URL}/api/budget/basic-shoe/creation-list?${params.toString()}`);
     if (!response.ok) {
       throw new Error('기본구두 생성 목록 조회에 실패했습니다.');
@@ -2033,7 +2041,7 @@ export const inventoryRecoveryAPI = {
   getData: async () => {
     console.log('🔍 [재고회수 API] 프론트엔드에서 데이터 조회 시작');
     console.log('🔍 [재고회수 API] API URL:', `${API_BASE_URL}/api/inventory-recovery/data`);
-    
+
     try {
       const response = await fetch(`${API_BASE_URL}/api/inventory-recovery/data`, {
         method: 'GET',
@@ -2041,19 +2049,19 @@ export const inventoryRecoveryAPI = {
           'Content-Type': 'application/json',
         },
       });
-      
+
       console.log('🔍 [재고회수 API] 응답 상태:', response.status, response.statusText);
       console.log('🔍 [재고회수 API] 응답 헤더:', response.headers);
-      
+
       if (!response.ok) {
         console.error('❌ [재고회수 API] HTTP 에러:', response.status, response.statusText);
         throw new Error('재고회수 데이터 조회에 실패했습니다.');
       }
-      
+
       const data = await response.json();
       console.log('🔍 [재고회수 API] 응답 데이터:', data);
       console.log('🔍 [재고회수 API] 데이터 길이:', data.data?.length || 0);
-      
+
       return data;
     } catch (error) {
       console.error('❌ [재고회수 API] 데이터 조회 오류:', error);
@@ -2076,11 +2084,11 @@ export const inventoryRecoveryAPI = {
           value
         }),
       });
-      
+
       if (!response.ok) {
         throw new Error('재고회수 상태 업데이트에 실패했습니다.');
       }
-      
+
       return await response.json();
     } catch (error) {
       console.error('재고회수 상태 업데이트 오류:', error);
@@ -2092,7 +2100,7 @@ export const inventoryRecoveryAPI = {
   savePriorityModels: async (priorityModels) => {
     try {
       console.log('🔄 [우선순위 모델 API] 저장 요청:', priorityModels);
-      
+
       const response = await fetch(`${API_BASE_URL}/api/inventory-recovery/priority-models`, {
         method: 'POST',
         headers: {
@@ -2100,14 +2108,14 @@ export const inventoryRecoveryAPI = {
         },
         body: JSON.stringify({ priorityModels }),
       });
-      
+
       if (!response.ok) {
         throw new Error('우선순위 모델 저장에 실패했습니다.');
       }
-      
+
       const result = await response.json();
       console.log('✅ [우선순위 모델 API] 저장 완료:', result);
-      
+
       return result;
     } catch (error) {
       console.error('❌ [우선순위 모델 API] 저장 오류:', error);
@@ -2119,28 +2127,28 @@ export const inventoryRecoveryAPI = {
   getPriorityModels: async () => {
     try {
       console.log('🔄 [우선순위 모델 API] 로드 요청');
-      
+
       const response = await fetch(`${API_BASE_URL}/api/inventory-recovery/priority-models`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         },
       });
-      
+
       if (!response.ok) {
         throw new Error('우선순위 모델 로드에 실패했습니다.');
       }
-      
+
       const result = await response.json();
       console.log('✅ [우선순위 모델 API] 로드 완료:', result);
-      
+
       return result;
     } catch (error) {
       console.error('❌ [우선순위 모델 API] 로드 오류:', error);
       throw error;
     }
   }
-}; 
+};
 // 고객 모드 API
 export const customerAPI = {
   // 구매 대기 목록 조회
@@ -2152,7 +2160,7 @@ export const customerAPI = {
 
   // 전체 구매 대기 목록 조회 (관리자용 또는 POS코드 필터링)
   getAllQueue: async (posCode = null) => {
-    const url = posCode 
+    const url = posCode
       ? `${API_BASE_URL}/api/member/queue/all?posCode=${encodeURIComponent(posCode)}`
       : `${API_BASE_URL}/api/member/queue/all`;
     const response = await fetch(url);
@@ -2198,7 +2206,7 @@ export const customerAPI = {
     if (storeName) params.append('storeName', storeName);
     if (posCode) params.append('posCode', posCode);
     if (params.toString()) url += `?${params.toString()}`;
-    
+
     const response = await fetch(url);
     if (!response.ok) throw new Error('게시판 목록을 불러오는데 실패했습니다.');
     return response.json();

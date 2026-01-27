@@ -115,7 +115,13 @@ const fetchWithRetry = async (url, options = {}, retryCount = 0) => {
  */
 const handleResponse = async (response, errorMessage = '요청 실패') => {
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
+    const errorText = await response.text().catch(() => '');
+    let errorData = {};
+    try {
+      errorData = JSON.parse(errorText);
+    } catch (e) {
+      errorData = { error: errorText.slice(0, 100) || errorMessage };
+    }
     const message = errorData.error || errorMessage;
     const error = new Error(message);
     error.status = response.status;
@@ -213,10 +219,10 @@ const smartFetch = async (url, options = {}, config = {}) => {
             상태코드: err.status,
             타임스탬프: new Date().toISOString()
           });
-          
+
           // 실패 시 플래그 해제 및 캐시 무효화 (다음 요청 시 새로 가져오도록)
           cachedItem.isRefreshing = false;
-          
+
           // 캐시 갱신 실패 시 캐시 무효화 (요구사항 4.4)
           // 기존 캐시는 유지하되, 다음 요청 시 강제로 새로 가져오도록 만료 시간을 과거로 설정
           if (memoryCache.has(cacheKey)) {
@@ -874,7 +880,7 @@ export const directStoreApiClient = {
    */
   clearCacheByCarrier: (carrier) => {
     let clearedCount = 0;
-    
+
     // 해당 통신사 관련 캐시만 삭제
     for (const [key] of memoryCache.entries()) {
       if (key.includes(carrier)) {
@@ -882,14 +888,14 @@ export const directStoreApiClient = {
         clearedCount++;
       }
     }
-    
+
     // 진행 중인 요청도 삭제
     for (const [key] of pendingRequests.entries()) {
       if (key.includes(carrier)) {
         pendingRequests.delete(key);
       }
     }
-    
+
     console.log(`✅ [API Client] ${carrier} 캐시 초기화 완료 (${clearedCount}개 항목)`);
   },
 
@@ -899,7 +905,7 @@ export const directStoreApiClient = {
    */
   clearImageCache: (carrier) => {
     let clearedCount = 0;
-    
+
     // 이미지 관련 캐시만 삭제 (mobiles-master에 이미지 URL이 포함됨)
     for (const [key] of memoryCache.entries()) {
       if (key.includes('mobiles-master') && key.includes(carrier)) {
@@ -907,7 +913,7 @@ export const directStoreApiClient = {
         clearedCount++;
       }
     }
-    
+
     console.log(`✅ [API Client] ${carrier} 이미지 캐시 초기화 완료 (${clearedCount}개 항목)`);
   },
 
@@ -917,10 +923,10 @@ export const directStoreApiClient = {
   clearCache: () => {
     const cacheSize = memoryCache.size;
     const pendingSize = pendingRequests.size;
-    
+
     memoryCache.clear();
     pendingRequests.clear();
-    
+
     console.log(`✅ [API Client] 전체 캐시 초기화 완료 (캐시: ${cacheSize}개, 진행중: ${pendingSize}개)`);
   },
 

@@ -38,6 +38,11 @@ import BuildIcon from '@mui/icons-material/Build';
 import CloudIcon from '@mui/icons-material/Cloud';
 import CloudOffIcon from '@mui/icons-material/CloudOff';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import Tabs from '@mui/material/Tabs';
+import Tab from '@mui/material/Tab';
+import BusinessCenterIcon from '@mui/icons-material/BusinessCenter';
+import StorefrontIcon from '@mui/icons-material/Storefront';
+import PersonIcon from '@mui/icons-material/Person';
 
 // 상세 매핑 데이터 및 모드 설정 임포트
 import { DATA_MAP_CONFIG } from '../config/dataMapConfig';
@@ -51,6 +56,20 @@ const DataSourceDashboard = () => {
     const [tableStatus, setTableStatus] = useState({});
     const [error, setError] = useState(null);
     const [expandedModes, setExpandedModes] = useState({});
+    const [currentTab, setCurrentTab] = useState(0);
+
+    // 모드 그룹 정의
+    const DEALER_MODES = ['basicMode', 'directStore', 'onSaleReception', 'generalPolicy'];
+    const CUSTOMER_MODES = ['customerMode'];
+
+    const getGroupedModes = () => {
+        const dealer = MODE_ORDER.filter(m => DEALER_MODES.includes(m));
+        const customer = MODE_ORDER.filter(m => CUSTOMER_MODES.includes(m));
+        const agency = MODE_ORDER.filter(m => !DEALER_MODES.includes(m) && !CUSTOMER_MODES.includes(m));
+        return { agency, dealer, customer };
+    };
+
+    const groupedModes = getGroupedModes();
 
     // 동기화 결과 관련 상태
     const [syncResult, setSyncResult] = useState(null);
@@ -58,13 +77,22 @@ const DataSourceDashboard = () => {
 
     const fetchData = async () => {
         setLoading(true);
+        setError(null);
         try {
             // 1. Feature Flags 및 시스템 상태 조회
             const flagResponse = await fetch('/api/db/flags');
+            if (!flagResponse.ok) {
+                const text = await flagResponse.text();
+                throw new Error(`Flags API 오류 (${flagResponse.status}): ${text.slice(0, 100)}`);
+            }
             const flagResult = await flagResponse.json();
 
             // 2. Supabase 테이블 존재 여부 조회
             const tableResponse = await fetch('/api/db/tables/status');
+            if (!tableResponse.ok) {
+                const text = await tableResponse.text();
+                throw new Error(`Tables API 오류 (${tableResponse.status}): ${text.slice(0, 100)}`);
+            }
             const tableResult = await tableResponse.json();
 
             if (flagResult.success) {
@@ -76,6 +104,7 @@ const DataSourceDashboard = () => {
                 setTableStatus(tableResult.data);
             }
         } catch (err) {
+            console.error('[DataSourceDashboard] Fetch Error:', err);
             setError(err.message);
         } finally {
             setLoading(false);
@@ -93,6 +122,10 @@ const DataSourceDashboard = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ key, enabled: !currentEnabled }),
             });
+            if (!response.ok) {
+                const text = await response.text();
+                throw new Error(`설정 변경 실패 (${response.status}): ${text.slice(0, 100)}`);
+            }
             const result = await response.json();
             if (result.success) {
                 setFlags(result.data);
@@ -110,6 +143,10 @@ const DataSourceDashboard = () => {
         setSyncing(true);
         try {
             const response = await fetch('/api/db/sync/smart', { method: 'POST' });
+            if (!response.ok) {
+                const text = await response.text();
+                throw new Error(`동기화 실패 (${response.status}): ${text.slice(0, 100)}`);
+            }
             const result = await response.json();
             if (result.success) {
                 setSyncResult(result.summary);
@@ -140,6 +177,10 @@ const DataSourceDashboard = () => {
             });
         });
         return { total, implemented, percentage: total > 0 ? Math.round((implemented / total) * 100) : 0 };
+    };
+
+    const handleTabChange = (_event, newValue) => {
+        setCurrentTab(newValue);
     };
 
     const stats = getStats();
@@ -214,129 +255,158 @@ const DataSourceDashboard = () => {
                 {/* 동적 모드-탭 트리 트리 */}
                 <Grid item xs={12} md={8}>
                     <Paper sx={{ borderRadius: 2, overflow: 'hidden' }}>
-                        <Box sx={{ px: 2, py: 1.5, bgcolor: '#f5f5f5', borderBottom: '1px solid #e0e0e0' }}>
-                            <Typography variant="subtitle1" fontWeight="bold">
-                                <FolderIcon sx={{ mr: 1, fontSize: 20, verticalAlign: 'text-bottom' }} />
-                                모든 모드-탭별 데이터 소스 관리
-                            </Typography>
+                        <Box sx={{ bgcolor: '#f5f5f5', borderBottom: '1px solid #e0e0e0' }}>
+                            <Box sx={{ px: 2, py: 1.5 }}>
+                                <Typography variant="subtitle1" fontWeight="bold">
+                                    <FolderIcon sx={{ mr: 1, fontSize: 20, verticalAlign: 'text-bottom' }} />
+                                    모든 모드-탭별 데이터 소스 관리
+                                </Typography>
+                            </Box>
+
+                            <Tabs
+                                value={currentTab}
+                                onChange={handleTabChange}
+                                variant="fullWidth"
+                                sx={{
+                                    minHeight: 40,
+                                    '& .MuiTab-root': { py: 1, minHeight: 40 }
+                                }}
+                            >
+                                <Tab icon={<BusinessCenterIcon sx={{ fontSize: '1rem' }} />} iconPosition="start" label="대리점" />
+                                <Tab icon={<StorefrontIcon sx={{ fontSize: '1rem' }} />} iconPosition="start" label="판매점" />
+                                <Tab icon={<PersonIcon sx={{ fontSize: '1rem' }} />} iconPosition="start" label="고객" />
+                            </Tabs>
                         </Box>
 
-                        {/* MODE_ORDER를 순회하여 모든 모드를 노출 (동적 연동) */}
-                        {MODE_ORDER.map((modeKey) => {
-                            const modeData = DATA_MAP_CONFIG[modeKey];
-                            const ModeIcon = getModeIcon(modeKey);
-                            const modeTitle = getModeTitle(modeKey);
-                            const hasTabs = modeData && modeData.tabs && Object.keys(modeData.tabs).length > 0;
+                        <Box sx={{ p: 0 }}>
+                            {(() => {
+                                const activeModes =
+                                    currentTab === 0 ? groupedModes.agency :
+                                        currentTab === 1 ? groupedModes.dealer :
+                                            groupedModes.customer;
 
-                            return (
-                                <Accordion
-                                    key={modeKey}
-                                    expanded={expandedModes[modeKey] || false}
-                                    onChange={() => handleExpandMode(modeKey)}
-                                    sx={{
-                                        '&:before': { display: 'none' },
-                                        boxShadow: 'none',
-                                        borderBottom: '1px solid #eee',
-                                        opacity: hasTabs ? 1 : 0.6 // 매핑 정보가 없으면 약간 흐리게
-                                    }}
-                                >
-                                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
-                                            <ModeIcon color={hasTabs ? "primary" : "disabled"} />
-                                            <Typography variant="subtitle1" fontWeight="bold">{modeTitle}</Typography>
-                                            <Box sx={{ flexGrow: 1 }} />
-                                            {hasTabs ? (
-                                                <Chip
-                                                    label={`${Object.keys(modeData.tabs).length}개 탭`}
-                                                    size="small"
-                                                    color="primary"
-                                                    variant="outlined"
-                                                    sx={{ height: 20 }}
-                                                />
-                                            ) : (
-                                                <Chip
-                                                    label="DB 미연동"
-                                                    size="small"
-                                                    variant="outlined"
-                                                    sx={{ height: 20, color: 'text.disabled', borderColor: '#eee' }}
-                                                />
-                                            )}
+                                if (activeModes.length === 0) {
+                                    return (
+                                        <Box sx={{ p: 4, textAlign: 'center' }}>
+                                            <Typography color="text.secondary">표시할 모드가 없습니다.</Typography>
                                         </Box>
-                                    </AccordionSummary>
-                                    <AccordionDetails sx={{ bgcolor: '#fafafa', p: 0 }}>
-                                        {hasTabs ? (
-                                            <List dense sx={{ py: 0 }}>
-                                                {Object.entries(modeData.tabs).map(([tabKey, tabData]) => {
-                                                    const flagKey = `${modeKey}:${tabKey}`;
-                                                    const isEnabled = flags[flagKey] || (flags[modeKey] && flags[flagKey] === undefined);
-                                                    const isTableExists = tableStatus[tabData.supabaseTable] || false;
+                                    );
+                                }
 
-                                                    return (
-                                                        <ListItem
-                                                            key={tabKey}
-                                                            sx={{
-                                                                pl: 6,
-                                                                py: 1.5,
-                                                                borderBottom: '1px solid #f0f0f0',
-                                                                '&:last-child': { borderBottom: 'none' }
-                                                            }}
-                                                        >
-                                                            <ListItemIcon sx={{ minWidth: 40 }}>
-                                                                {isTableExists ?
-                                                                    <CheckCircleIcon color="success" fontSize="small" /> :
-                                                                    <ErrorOutlineIcon color="error" fontSize="small" />
-                                                                }
-                                                            </ListItemIcon>
-                                                            <ListItemText
-                                                                primary={
+                                return activeModes.map((modeKey) => {
+                                    const modeData = DATA_MAP_CONFIG[modeKey];
+                                    const ModeIcon = getModeIcon(modeKey);
+                                    const modeTitle = getModeTitle(modeKey);
+                                    const hasTabs = modeData && modeData.tabs && Object.keys(modeData.tabs).length > 0;
+
+                                    return (
+                                        <Accordion
+                                            key={modeKey}
+                                            expanded={expandedModes[modeKey] || false}
+                                            onChange={() => handleExpandMode(modeKey)}
+                                            sx={{
+                                                '&:before': { display: 'none' },
+                                                boxShadow: 'none',
+                                                borderBottom: '1px solid #eee',
+                                                opacity: hasTabs ? 1 : 0.6
+                                            }}
+                                        >
+                                            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
+                                                    <ModeIcon color={hasTabs ? "primary" : "disabled"} />
+                                                    <Typography variant="subtitle1" fontWeight="bold">{modeTitle}</Typography>
+                                                    <Box sx={{ flexGrow: 1 }} />
+                                                    {hasTabs ? (
+                                                        <Chip
+                                                            label={`${Object.keys(modeData.tabs).length}개 탭`}
+                                                            size="small"
+                                                            color="primary"
+                                                            variant="outlined"
+                                                            sx={{ height: 20 }}
+                                                        />
+                                                    ) : (
+                                                        <Chip
+                                                            label="DB 미연동"
+                                                            size="small"
+                                                            variant="outlined"
+                                                            sx={{ height: 20, color: 'text.disabled', borderColor: '#eee' }}
+                                                        />
+                                                    )}
+                                                </Box>
+                                            </AccordionSummary>
+                                            <AccordionDetails sx={{ bgcolor: '#fafafa', p: 0 }}>
+                                                {hasTabs ? (
+                                                    <List dense sx={{ py: 0 }}>
+                                                        {Object.entries(modeData.tabs).map(([tabKey, tabData]) => {
+                                                            const flagKey = `${modeKey}:${tabKey}`;
+                                                            const isEnabled = flags[flagKey] || (flags[modeKey] && flags[flagKey] === undefined);
+                                                            const isTableExists = tableStatus[tabData.supabaseTable] || false;
+
+                                                            return (
+                                                                <ListItem
+                                                                    key={tabKey}
+                                                                    sx={{
+                                                                        pl: 6,
+                                                                        py: 1.5,
+                                                                        borderBottom: '1px solid #f0f0f0',
+                                                                        '&:last-child': { borderBottom: 'none' }
+                                                                    }}
+                                                                >
+                                                                    <ListItemIcon sx={{ minWidth: 40 }}>
+                                                                        {isTableExists ?
+                                                                            <CheckCircleIcon color="success" fontSize="small" /> :
+                                                                            <ErrorOutlineIcon color="error" fontSize="small" />
+                                                                        }
+                                                                    </ListItemIcon>
+                                                                    <ListItemText
+                                                                        primary={
+                                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                                                <Typography variant="body1" fontWeight="medium">{tabData.label}</Typography>
+                                                                                <Chip
+                                                                                    label={tabData.sheet}
+                                                                                    size="small"
+                                                                                    sx={{ height: 20, fontSize: '0.75rem', bgcolor: '#e8f5e9' }}
+                                                                                />
+                                                                            </Box>
+                                                                        }
+                                                                        secondary={
+                                                                            <Typography variant="caption" color="text.secondary">
+                                                                                Supabase Table: {tabData.supabaseTable}
+                                                                            </Typography>
+                                                                        }
+                                                                    />
                                                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                                        <Typography variant="body1" fontWeight="medium">{tabData.label}</Typography>
-                                                                        <Chip
-                                                                            label={tabData.sheet}
-                                                                            size="small"
-                                                                            sx={{ height: 20, fontSize: '0.75rem', bgcolor: '#e8f5e9' }}
-                                                                        />
-                                                                        <Typography variant="caption" color="text.secondary">
-                                                                            (범위: {tabData.range}, 헤더: {tabData.headerRow}행)
+                                                                        <Typography variant="caption" color={isEnabled ? "primary" : "success"}>
+                                                                            {isEnabled ? "Supabase" : "G-Sheets"}
                                                                         </Typography>
+                                                                        <Tooltip title={isTableExists ? "데이터 소스 전환" : "테이블이 없어 전환할 수 없습니다."}>
+                                                                            <span>
+                                                                                <Switch
+                                                                                    checked={isEnabled}
+                                                                                    onChange={() => handleToggle(flagKey, isEnabled)}
+                                                                                    disabled={!isTableExists && !isEnabled}
+                                                                                    size="small"
+                                                                                />
+                                                                            </span>
+                                                                        </Tooltip>
                                                                     </Box>
-                                                                }
-                                                                secondary={
-                                                                    <Typography variant="caption" color="text.secondary">
-                                                                        Supabase Table: {tabData.supabaseTable}
-                                                                    </Typography>
-                                                                }
-                                                            />
-                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                                <Typography variant="caption" color={isEnabled ? "primary" : "success"}>
-                                                                    {isEnabled ? "Supabase" : "G-Sheets"}
-                                                                </Typography>
-                                                                <Tooltip title={isTableExists ? "데이터 소스 전환" : "테이블이 없어 전환할 수 없습니다."}>
-                                                                    <span>
-                                                                        <Switch
-                                                                            checked={isEnabled}
-                                                                            onChange={() => handleToggle(flagKey, isEnabled)}
-                                                                            disabled={!isTableExists && !isEnabled}
-                                                                            size="small"
-                                                                        />
-                                                                    </span>
-                                                                </Tooltip>
-                                                            </Box>
-                                                        </ListItem>
-                                                    );
-                                                })}
-                                            </List>
-                                        ) : (
-                                            <Box sx={{ p: 2, textAlign: 'center' }}>
-                                                <Typography variant="body2" color="text.secondary">
-                                                    이 모드에 대한 데이터베이스 매핑 설정(`dataMapConfig.js`)이 존재하지 않습니다.
-                                                </Typography>
-                                            </Box>
-                                        )}
-                                    </AccordionDetails>
-                                </Accordion>
-                            );
-                        })}
+                                                                </ListItem>
+                                                            );
+                                                        })}
+                                                    </List>
+                                                ) : (
+                                                    <Box sx={{ p: 2, textAlign: 'center' }}>
+                                                        <Typography variant="body2" color="text.secondary">
+                                                            이 모드에 대한 데이터베이스 매핑 설정(`dataMapConfig.js`)이 존재하지 않습니다.
+                                                        </Typography>
+                                                    </Box>
+                                                )}
+                                            </AccordionDetails>
+                                        </Accordion>
+                                    );
+                                });
+                            })()}
+                        </Box>
                     </Paper>
                 </Grid>
 

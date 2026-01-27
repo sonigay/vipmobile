@@ -8,7 +8,10 @@ export const directStoreApi = {
     // 설정 조회 (링크, 범위 등)
     getSettings: async () => {
         const response = await fetch(`${BASE_URL}/settings`);
-        if (!response.ok) throw new Error('설정 조회 실패');
+        if (!response.ok) {
+            const txt = await response.text().catch(() => '');
+            throw new Error(`설정 조회 실패 (${response.status}): ${txt.slice(0, 100)}`);
+        }
         return response.json();
     },
 
@@ -19,7 +22,10 @@ export const directStoreApi = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(settings)
         });
-        if (!response.ok) throw new Error('설정 저장 실패');
+        if (!response.ok) {
+            const txt = await response.text().catch(() => '');
+            throw new Error(`설정 저장 실패 (${response.status}): ${txt.slice(0, 100)}`);
+        }
         return response.json();
     },
 
@@ -189,14 +195,12 @@ export const directStoreApi = {
                 body: formData
             });
 
-            const data = await response.json();
-
             if (!response.ok) {
-                const errorMessage = data?.error || `이미지 업로드 실패 (${response.status})`;
-                throw new Error(errorMessage);
+                const errorText = await response.text().catch(() => '');
+                throw new Error(`이미지 업로드 실패 (${response.status}): ${errorText.slice(0, 100)}`);
             }
 
-            return data;
+            return await response.json();
         } catch (error) {
             // 네트워크 오류 등
             if (error instanceof TypeError && error.message.includes('fetch')) {
@@ -211,7 +215,7 @@ export const directStoreApi = {
     // 정책 설정 조회
     getPolicySettings: async (carrier, noCache = false) => {
         try {
-            const url = noCache 
+            const url = noCache
                 ? `${BASE_URL}/policy-settings?carrier=${carrier}&noCache=true`
                 : `${BASE_URL}/policy-settings?carrier=${carrier}`;
             const response = await fetch(url);
