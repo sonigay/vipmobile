@@ -97,7 +97,8 @@ const CustomerPreferredStoreTab = ({ selectedProduct, customerInfo, onStoreConfi
         const loadSelectedStoreDetails = async () => {
             if (!selectedStore?.name) {
                 setSelectedStoreDetails(null);
-                setMainPhoto(null);
+                setMainStorePhoto(null);
+                setMainStaffPhoto(null);
                 return;
             }
 

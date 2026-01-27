@@ -140,8 +140,40 @@ try {
 }
 
 try {
-  app.use('/', createCoordinateRoutes(sharedContext));
+  const coordinateModule = createCoordinateRoutes(sharedContext);
+  const coordinateRouter = coordinateModule.router || coordinateModule;
+  app.use('/', coordinateRouter);
   console.log('✅ [Phase 4] Coordinate routes mounted');
+
+  // 서버 시작 시 위경도 자동 업데이트 (10초 지연 실행)
+  if (coordinateModule.updateStoreCoordinates) {
+    setTimeout(async () => {
+      try {
+        console.log('🔄 [자동업데이트] 서버 시작 시 위경도 자동 업데이트 실행...');
+        await coordinateModule.updateStoreCoordinates();
+        if (coordinateModule.updateSalesCoordinates) {
+          await coordinateModule.updateSalesCoordinates();
+        }
+      } catch (error) {
+        console.error('❌ [자동업데이트] 서버 시작 시 위경도 업데이트 실패:', error.message);
+      }
+    }, 10000); // 10초 후 실행
+  }
+
+  // 매일 새벽 04:00 정기 위경도 업데이트 스케줄 등록
+  cron.schedule('0 4 * * *', async () => {
+    try {
+      console.log('⏰ [스케줄러] 정기 위경도 자동 업데이트 시작 (04:00)...');
+      if (coordinateModule.updateStoreCoordinates) await coordinateModule.updateStoreCoordinates();
+      if (coordinateModule.updateSalesCoordinates) await coordinateModule.updateSalesCoordinates();
+      console.log('✅ [스케줄러] 정기 위경도 자동 업데이트 완료');
+    } catch (error) {
+      console.error('❌ [스케줄러] 정기 위경도 업데이트 실패:', error.message);
+    }
+  }, {
+    scheduled: true,
+    timezone: 'Asia/Seoul'
+  });
 } catch (e) {
   console.error('❌ [Phase 4] Failed to mount coordinate routes:', e.message);
 }
@@ -401,6 +433,15 @@ try {
   console.error('❌ [DAL] Failed to mount direct store DAL routes:', e.message);
 }
 
+// DB 소스 관리 라우트 (Phase 3)
+try {
+  const dbManagementRoutes = require('./routes/dbManagementRoutes');
+  app.use('/api/db', dbManagementRoutes);
+  console.log('✅ [Phase 3] DB Management routes mounted at /api/db');
+} catch (e) {
+  console.error('❌ [Phase 3] Failed to mount DB management routes:', e.message);
+}
+
 // 기존 라우트 등록
 try {
   setupDirectRoutes(app);
@@ -458,11 +499,11 @@ app.use(errorMiddleware);
 // Discord 이미지 자동 갱신 함수
 async function refreshAllDiscordImages() {
   console.log('🔄 [스케줄러] Discord 이미지 자동 갱신 시작...');
-  
+
   try {
     const { refreshDiscordImagesForCarrier } = require('./directRoutes');
     const carriers = ['SK', 'KT', 'LG'];
-    
+
     for (const carrier of carriers) {
       try {
         console.log(`[스케줄러] ${carrier} Discord 이미지 갱신 중...`);
@@ -472,7 +513,7 @@ async function refreshAllDiscordImages() {
         console.error(`[스케줄러] ${carrier} Discord 이미지 갱신 실패:`, error.message);
       }
     }
-    
+
     console.log('✅ [스케줄러] Discord 이미지 자동 갱신 완료');
   } catch (error) {
     console.error('❌ [스케줄러] Discord 이미지 자동 갱신 오류:', error);
@@ -576,13 +617,13 @@ app.listen(port, () => {
   console.log(`📅 Started at: ${new Date().toISOString()}`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log('='.repeat(60));
-  
+
   // ============================================================================
   // 스케줄러 등록
   // ============================================================================
-  
+
   console.log('⏰ [스케줄러] 스케줄 등록 시작...');
-  
+
   // Discord 이미지 자동 갱신 스케줄 등록
   const imageRefreshSchedules = [
     { time: '03:30', cron: '30 3 * * *' },
@@ -616,24 +657,24 @@ app.listen(port, () => {
     });
     console.log(`✅ [스케줄러] 데이터 재빌드 스케줄 등록: ${hour}:10 (Asia/Seoul)`);
   }
-  
+
   console.log('✅ [스케줄러] 모든 스케줄 등록 완료');
-  
+
   // 서버 시작 시 초기 실행 (지연 실행)
   console.log('🚀 [스케줄러] 서버 시작 시 자동 실행 예약...');
-  
+
   // 데이터 재빌드 (서버 시작 15분 후)
   setTimeout(async () => {
     console.log('🔄 [스케줄러] 서버 시작 시 데이터 재빌드 실행 (지연 실행)');
     await rebuildMasterData();
   }, 15 * 60 * 1000); // 15분 후
-  
+
   // Discord 이미지 자동 갱신 (서버 시작 30분 후)
   setTimeout(async () => {
     console.log('🔄 [스케줄러] 서버 시작 시 Discord 이미지 자동 갱신 실행 (지연 실행)');
     await refreshAllDiscordImages();
   }, 30 * 60 * 1000); // 30분 후
-  
+
   console.log('✅ [스케줄러] 서버 시작 시 자동 실행 예약 완료 (재빌드: 15분 후, 이미지 갱신: 30분 후)');
 });
 
@@ -643,7 +684,7 @@ app.listen(port, () => {
 
 process.on('uncaughtException', (error) => {
   console.error('💥 Uncaught Exception:', error);
-  
+
   if (DISCORD_LOGGING_ENABLED && discordBot && EmbedBuilder) {
     const embed = new EmbedBuilder()
       .setColor(0xFF0000)
@@ -654,7 +695,7 @@ process.on('uncaughtException', (error) => {
         { name: '스택 트레이스', value: error.stack?.substring(0, 1000) || 'No stack trace' }
       )
       .setTimestamp();
-    
+
     sendDiscordNotification(DISCORD_CHANNEL_ID, embed).then(() => {
       process.exit(1);
     });
@@ -665,7 +706,7 @@ process.on('uncaughtException', (error) => {
 
 process.on('unhandledRejection', (reason, promise) => {
   console.error('💥 Unhandled Rejection at:', promise, 'reason:', reason);
-  
+
   if (DISCORD_LOGGING_ENABLED && discordBot && EmbedBuilder) {
     const embed = new EmbedBuilder()
       .setColor(0xFF0000)
@@ -675,7 +716,7 @@ process.on('unhandledRejection', (reason, promise) => {
         { name: 'Reason', value: String(reason).substring(0, 1000) }
       )
       .setTimestamp();
-    
+
     sendDiscordNotification(DISCORD_CHANNEL_ID, embed);
   }
 });

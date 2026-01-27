@@ -28,11 +28,11 @@ class DatabaseImplementation {
         .insert(data)
         .select()
         .single();
-      
+
       if (error) {
         throw new Error(`DB Create Error [${entity}]: ${error.message}`);
       }
-      
+
       return result;
     } catch (error) {
       console.error(`[DatabaseImplementation] Create failed for ${entity}:`, error);
@@ -49,20 +49,20 @@ class DatabaseImplementation {
   async read(entity, filters = {}) {
     try {
       let query = supabase.from(entity).select('*');
-      
+
       // 필터 적용
       Object.entries(filters).forEach(([key, value]) => {
         if (value !== undefined && value !== null) {
           query = query.eq(key, value);
         }
       });
-      
+
       const { data, error } = await query;
-      
+
       if (error) {
         throw new Error(`DB Read Error [${entity}]: ${error.message}`);
       }
-      
+
       return data || [];
     } catch (error) {
       console.error(`[DatabaseImplementation] Read failed for ${entity}:`, error);
@@ -85,15 +85,15 @@ class DatabaseImplementation {
         .eq('id', id)
         .select()
         .single();
-      
+
       if (error) {
         throw new Error(`DB Update Error [${entity}]: ${error.message}`);
       }
-      
+
       if (!result) {
         throw new Error(`Record not found: ${entity} with id ${id}`);
       }
-      
+
       return result;
     } catch (error) {
       console.error(`[DatabaseImplementation] Update failed for ${entity}:`, error);
@@ -113,11 +113,11 @@ class DatabaseImplementation {
         .from(entity)
         .delete()
         .eq('id', id);
-      
+
       if (error) {
         throw new Error(`DB Delete Error [${entity}]: ${error.message}`);
       }
-      
+
       return { success: true, id };
     } catch (error) {
       console.error(`[DatabaseImplementation] Delete failed for ${entity}:`, error);
@@ -134,7 +134,7 @@ class DatabaseImplementation {
   async deleteAll(entity, filters = {}) {
     try {
       let query = supabase.from(entity).delete();
-      
+
       // 필터가 있으면 적용 (특정 조건의 레코드만 삭제)
       if (Object.keys(filters).length > 0) {
         Object.entries(filters).forEach(([key, value]) => {
@@ -147,13 +147,13 @@ class DatabaseImplementation {
         // Supabase는 조건 없는 delete를 허용하지 않으므로 항상 참인 조건 사용
         query = query.neq('id', '00000000-0000-0000-0000-000000000000');
       }
-      
+
       const { error, count } = await query;
-      
+
       if (error) {
         throw new Error(`DB Delete All Error [${entity}]: ${error.message}`);
       }
-      
+
       console.log(`[DatabaseImplementation] Deleted ${count || 'all'} records from ${entity}`);
       return { success: true, deletedCount: count };
     } catch (error) {
@@ -174,15 +174,33 @@ class DatabaseImplementation {
         .from(entity)
         .insert(dataArray)
         .select();
-      
+
       if (error) {
         throw new Error(`DB Batch Create Error [${entity}]: ${error.message}`);
       }
-      
+
       return data || [];
     } catch (error) {
       console.error(`[DatabaseImplementation] Batch create failed for ${entity}:`, error);
       throw error;
+    }
+  }
+
+  /**
+   * 테이블 존재 여부 확인
+   * @param {string} entity - 테이블 이름
+   * @returns {Promise<boolean>} 존재 여부
+   */
+  async checkTableExists(entity) {
+    try {
+      const { error } = await supabase.from(entity).select('id').limit(0);
+      // 테이블이 없으면 42P01(undefined_table) 에러 발생
+      if (error && (error.code === '42P01' || error.message.includes('not found'))) {
+        return false;
+      }
+      return true;
+    } catch (error) {
+      return false;
     }
   }
 

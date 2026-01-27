@@ -19,7 +19,8 @@ import {
   AccessTime as AccessTimeIcon,
   Security as SecurityIcon,
   HomeWork as HomeWorkIcon,
-  LocalShipping as LocalShippingIcon
+  LocalShipping as LocalShippingIcon,
+  People as PeopleIcon
 } from '@mui/icons-material';
 
 /**
@@ -459,13 +460,13 @@ export const MODE_CONFIG = {
   },
   quickServiceManagement: {
     key: 'quickServiceManagement',
-    title: '퀵서비스 관리 모드',
-    description: '퀵서비스 업체 데이터를 관리하고 통계를 분석합니다.',
+    title: '어플종합관리',
+    description: '어플리케이션 전체 데이터 소스와 퀵서비스를 통합 관리합니다.',
     features: [
-      '업체별 통계 및 분석',
-      '지역별 인기/우수 업체 순위',
-      '데이터 품질 관리',
-      '이상치 데이터 검토'
+      '데이터베이스 소스 관리',
+      'Supabase/구글시트 전환',
+      '퀵서비스 업체 통계 및 분석',
+      '앱 작동 상태 진단 및 버그 관리'
     ],
     color: '#9C27B0',
     icon: LocalShippingIcon,
@@ -473,6 +474,24 @@ export const MODE_CONFIG = {
     sheetRefs: {
       admin: '대리점아이디관리!AF열',
       updates: '어플업데이트!Y열'
+    }
+  },
+  customerMode: {
+    key: 'customerMode',
+    title: '고객모드',
+    description: '고객 정보와 개통 상담 이력을 관리합니다.',
+    features: [
+      '고객 통합 정보 관리',
+      '상담 리스트 확인',
+      '상담 상세 기록 및 저장',
+      '권한별 고객 데이터 보호'
+    ],
+    color: '#4CAF50',
+    icon: PeopleIcon,
+    category: 'admin',
+    sheetRefs: {
+      admin: '대리점아이디관리!K열',
+      updates: '어플업데이트!H열'
     }
   }
 };
@@ -498,6 +517,7 @@ export const MODE_ORDER = [
   'riskManagement',
   'directStoreManagement',
   'quickServiceManagement',
+  'customerMode',
   'basicMode',
   'directStore',
   'onSaleReception',

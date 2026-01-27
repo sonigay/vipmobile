@@ -81,6 +81,7 @@ import { resolveModeKey } from './config/modeConfig';
 import { getMarkerColorSettings } from './utils/markerColorUtils';
 import MarkerColorSettingsModal from './components/MarkerColorSettingsModal';
 import ServerHealthMonitor from './components/common/ServerHealthMonitor'; // 서버 상태 모니터링 컴포넌트 추가
+import { LogProvider } from './context/LogContext';
 
 
 // Logger 유틸리티
@@ -4977,14 +4978,16 @@ ${requestList}
 
 function App() {
   return (
-    <BrowserRouter>
-      <ErrorBoundary>
-        <Routes>
-          <Route path="/member/*" element={<CustomerMode />} />
-          <Route path="*" element={<AppContent />} />
-        </Routes>
-      </ErrorBoundary>
-    </BrowserRouter>
+    <LogProvider>
+      <BrowserRouter>
+        <ErrorBoundary>
+          <Routes>
+            <Route path="/member/*" element={<CustomerMode />} />
+            <Route path="*" element={<AppContent />} />
+          </Routes>
+        </ErrorBoundary>
+      </BrowserRouter>
+    </LogProvider>
   );
 }
 

@@ -175,43 +175,43 @@ async function downloadXlsx(filename, columns, rows = []) {
 const SummaryCard = ({ title, value, description, count, color, activated, animate, children }) => {
   const isActive = activated !== false;
   return (
-  <Card
-    sx={{
-      height: '100%',
-      transition: 'all 0.35s ease',
-      opacity: isActive ? 1 : 0.45,
-      filter: isActive ? 'none' : 'grayscale(0.2)',
-      border: isActive ? '1px solid rgba(94,53,177,0.24)' : '1px solid rgba(0,0,0,0.08)',
-      boxShadow: isActive ? '0 16px 32px rgba(94,53,177,0.25)' : 'none',
-      animation: animate ? `${glowAnimation} 1.2s ease-in-out` : 'none',
-      '&:hover': isActive
-        ? {
+    <Card
+      sx={{
+        height: '100%',
+        transition: 'all 0.35s ease',
+        opacity: isActive ? 1 : 0.45,
+        filter: isActive ? 'none' : 'grayscale(0.2)',
+        border: isActive ? '1px solid rgba(94,53,177,0.24)' : '1px solid rgba(0,0,0,0.08)',
+        boxShadow: isActive ? '0 16px 32px rgba(94,53,177,0.25)' : 'none',
+        animation: animate ? `${glowAnimation} 1.2s ease-in-out` : 'none',
+        '&:hover': isActive
+          ? {
             transform: 'translateY(-4px)',
             boxShadow: '0 22px 38px rgba(94,53,177,0.32)'
           }
-        : {}
-    }}
-  >
-    <CardContent>
-      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
-        {title}
-      </Typography>
-      <Typography variant="h5" sx={{ fontWeight: 700, color: color || 'text.primary', mb: 0.5 }}>
-        {value}
-      </Typography>
-      {count ? (
-        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-          {count}
+          : {}
+      }}
+    >
+      <CardContent>
+        <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+          {title}
         </Typography>
-      ) : null}
-      {description ? (
-        <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-          {description}
+        <Typography variant="h5" sx={{ fontWeight: 700, color: color || 'text.primary', mb: 0.5 }}>
+          {value}
         </Typography>
-      ) : null}
-      {children ? <Box sx={{ mt: 2 }}>{children}</Box> : null}
-    </CardContent>
-  </Card>
+        {count ? (
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+            {count}
+          </Typography>
+        ) : null}
+        {description ? (
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+            {description}
+          </Typography>
+        ) : null}
+        {children ? <Box sx={{ mt: 2 }}>{children}</Box> : null}
+      </CardContent>
+    </Card>
   );
 };
 
@@ -828,7 +828,7 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
       const teamCodeKey = team && code ? `${team}/${code}` : (team || code || '미지정');
       const sales = row.salesAmount || 0;
       const themeFlag = row.themeFlag;
-      
+
       // 유치자명별 집계
       if (!stats[name]) {
         stats[name] = {
@@ -845,7 +845,7 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
       if (themeFlag === '1') {
         stats[name].policy2Amount += sales;
       }
-      
+
       // 영업팀/코드 정보는 첫 번째 값으로 설정 (같은 유치자명이면 동일한 팀/코드일 가능성 높음)
       if (!stats[name].team && team) {
         stats[name].team = team;
@@ -870,26 +870,26 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
     if (!summary?.recontract?.rows) return [];
     const targetOutletNames = summary?.targetOutlets?.recontract?.outletNames || [];
     const stats = {};
-    
+
     summary.recontract.rows.forEach((row) => {
       const name = row.promoterName || '미지정';
       const outlet = row.outlet || '';
-      
+
       // 출고처와 대상점 매칭 확인
       const matchedOutlets = targetOutletNames.filter((outletName) =>
         outlet.includes(outletName.trim())
       );
-      
+
       // 대상점과 매칭된 경우만 집계
       if (matchedOutlets.length > 0 && outlet) {
         // 등록직원 + 출고처 조합으로 키 생성
         const key = `${name}|||${outlet}`;
         if (!stats[key]) {
-          stats[key] = { 
-            name, 
+          stats[key] = {
+            name,
             outlet,
-            count: 0, 
-            feeTotal: 0, 
+            count: 0,
+            feeTotal: 0,
             offerTotal: 0,
             totalAmount: 0 // 재약정 총 지급액: (20인덱스)*-1
           };
@@ -900,7 +900,7 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
         stats[key].totalAmount += (row.rawSettlementAmount || 0) * -1; // 재약정 총 지급액: (20인덱스)*-1
       }
     });
-    
+
     return Object.values(stats)
       .sort((a, b) => {
         // 먼저 등록직원명으로 정렬, 같으면 출고처로 정렬
@@ -911,13 +911,7 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
       });
   }, [summary]);
 
-  if (!sheetConfigs || sheetConfigs.length === 0) {
-    return (
-      <Box sx={{ p: 4 }}>
-        <Alert severity="info">OB 정산 관리 탭에서 월별 링크를 먼저 등록해주세요.</Alert>
-      </Box>
-    );
-  }
+
 
   const handleMonthChange = (event) => {
     setSelectedMonth(event.target.value);
@@ -951,16 +945,16 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
     const currentWorkflow = companyWorkflowRef.current;
     const nextWorkflow = checked
       ? {
-          ...currentWorkflow,
-          [company]: {
-            ...currentWorkflow[company],
-            completed: true
-          }
+        ...currentWorkflow,
+        [company]: {
+          ...currentWorkflow[company],
+          completed: true
         }
+      }
       : {
-          ...currentWorkflow,
-          [company]: createCompanyWorkflowState()
-        };
+        ...currentWorkflow,
+        [company]: createCompanyWorkflowState()
+      };
 
     setCompanyWorkflow(nextWorkflow);
     companyWorkflowRef.current = nextWorkflow;
@@ -1178,6 +1172,14 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
     },
     [handleCompanyCompletionToggle]
   );
+
+  if (!sheetConfigs || sheetConfigs.length === 0) {
+    return (
+      <Box sx={{ p: 4 }}>
+        <Alert severity="info">OB 정산 관리 탭에서 월별 링크를 먼저 등록해주세요.</Alert>
+      </Box>
+    );
+  }
 
   const renderSummary = () => {
     if (loading) {
@@ -1450,8 +1452,8 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
         ) : null}
 
         {/* 최종 정산 섹션 - 맨 상단 */}
-        <Section 
-          title="최종 정산" 
+        <Section
+          title="최종 정산"
           color={SECTION_COLORS.totals}
           collapsible
           expanded={finalSettlementExpanded}
@@ -1898,8 +1900,8 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
         </Section>
 
         {/* 인건비/비용 섹션 */}
-        <Section 
-          title="인건비 / 비용" 
+        <Section
+          title="인건비 / 비용"
           color={SECTION_COLORS.laborCost}
           collapsible
           expanded={laborCostExpanded}
@@ -1912,7 +1914,7 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
             <Typography variant="body2" color="text.secondary">
               <strong>비용 합계:</strong> {currencyFormatter.format(combinedCostTotal)} (시트 {currencyFormatter.format(costSheetTotal)} / 수기 입력 {currencyFormatter.format(costManualTotalDisplay)})
             </Typography>
-            
+
             {/* 시트 데이터 상세 목록 */}
             {summary?.postSettlement && (summary.postSettlement.laborEntries.length > 0 || summary.postSettlement.costEntries.length > 0) && (
               <Box sx={{ mt: 2 }}>
@@ -1954,7 +1956,7 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
                 </TableContainer>
               </Box>
             )}
-            
+
             <Alert severity="info">
               수기 입력 금액은 자동으로 음수(-) 처리되어 최종 합계에 반영됩니다.
             </Alert>

@@ -104,6 +104,8 @@ const LinkSettingsTab = () => {
         }
     };
 
+    const carrier = getCurrentCarrier();
+
     // 설정 로드
     useEffect(() => {
         const loadSettings = async () => {

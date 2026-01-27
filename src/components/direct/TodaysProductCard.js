@@ -36,22 +36,19 @@ function TodaysProductCard(props) {
   const hasLoadedRef = useRef(false);
   const [imageUrl, setImageUrl] = useState(null); // 이미지 URL 상태 관리
   const imgElementRef = useRef(null); // 이미지 엘리먼트 ref
-  
-  // Early return for invalid props AFTER hooks (React rules of hooks)
-  if (!props) {
-    return null;
-  }
-  
-  const { 
-    product, 
-    isPremium, 
-    onSelect, 
-    compact, 
-    theme, 
-    priceData: propPriceData, 
+
+
+
+  const {
+    product,
+    isPremium,
+    onSelect,
+    compact,
+    theme,
+    priceData: propPriceData,
     onPriceCalculated
   } = props || {};
-  
+
   // props로 받은 priceData가 있으면 사용 (초기화 순서 문제 방지 - useMemo 제거하고 직접 계산)
   const finalPriceData = propPriceData || priceData;
 
@@ -65,14 +62,14 @@ function TodaysProductCard(props) {
     // 초기 이미지 URL 설정 (매 렌더링마다 새로운 타임스탬프를 생성하지 않도록)
     let finalUrl = getProxyImageUrl(product.image);
     const isDiscordCdn = finalUrl.includes('cdn.discordapp.com') || finalUrl.includes('media.discordapp.net');
-    
+
     // Discord 이미지인 경우 타임스탬프 추가 (캐시 방지, 하지만 product.image가 변경될 때만)
     if (isDiscordCdn && !finalUrl.includes('_t=')) {
-      finalUrl = finalUrl.includes('?') 
+      finalUrl = finalUrl.includes('?')
         ? `${finalUrl}&_t=${Date.now()}`
         : `${finalUrl}?_t=${Date.now()}`;
     }
-    
+
     setImageUrl(finalUrl);
   }, [product?.image]); // product.image가 변경될 때만 업데이트
 
@@ -84,7 +81,7 @@ function TodaysProductCard(props) {
 
     const imgElement = imgElementRef.current;
     const isDiscordUrl = product.image?.includes('cdn.discordapp.com') || product.image?.includes('media.discordapp.net');
-    
+
     if (!isDiscordUrl) {
       return;
     }
@@ -97,7 +94,7 @@ function TodaysProductCard(props) {
       (newUrl) => {
         console.log('✅ [TodaysProductCard] Discord 이미지 URL 갱신 성공');
         const proxyUrl = getProxyImageUrl(newUrl);
-        const timestampedUrl = proxyUrl.includes('?') 
+        const timestampedUrl = proxyUrl.includes('?')
           ? `${proxyUrl}&_t=${Date.now()}`
           : `${proxyUrl}?_t=${Date.now()}`;
         setImageUrl(timestampedUrl);
@@ -112,13 +109,13 @@ function TodaysProductCard(props) {
         try {
           const { refreshDiscordImageUrl } = await import('../../utils/discordImageUtils');
           const refreshResult = await refreshDiscordImageUrl(product.discordThreadId, product.discordMessageId);
-          
+
           if (refreshResult.success && refreshResult.imageUrl) {
             // 새로운 URL이 기존 URL과 다르면 업데이트
             if (refreshResult.imageUrl !== product.image) {
               console.log('✅ [TodaysProductCard] Discord 이미지 URL 갱신 (주기적 체크):', refreshResult.imageUrl.substring(0, 100));
               const newUrl = getProxyImageUrl(refreshResult.imageUrl);
-              const timestampedUrl = newUrl.includes('?') 
+              const timestampedUrl = newUrl.includes('?')
                 ? `${newUrl}&_t=${Date.now()}`
                 : `${newUrl}?_t=${Date.now()}`;
               setImageUrl(timestampedUrl);
@@ -139,7 +136,7 @@ function TodaysProductCard(props) {
       }
     };
   }, [product?.discordThreadId, product?.discordMessageId, product?.image]);
-  
+
   const getCarrierChipColor = (carrier) => {
     switch (carrier) {
       case 'SK': return 'info'; // 하늘색 계열
@@ -148,7 +145,7 @@ function TodaysProductCard(props) {
       default: return 'default';
     }
   };
-  
+
   // cardTheme 계산 (초기화 순서 문제 방지를 위해 useMemo 제거)
   const cardTheme = theme || {
     primary: '#ffd700',
@@ -157,14 +154,14 @@ function TodaysProductCard(props) {
     accent: '#f57f17',
     text: '#f57f17'
   };
-  
+
   const tagChips = [];
   if (product && product.isPremium) tagChips.push({ label: '프리미엄', color: 'primary' });
   if (product && product.isBudget) tagChips.push({ label: '중저가', color: 'secondary' });
   if (product && product.isPopular) tagChips.push({ label: '인기', color: 'warning' });
   if (product && product.isRecommended) tagChips.push({ label: '추천', color: 'success' });
   if (product && product.isCheap) tagChips.push({ label: '저렴', color: 'info' });
-  
+
   // 각 유형별 가격 정보 로드 (props로 받은 priceData가 있으면 사용, 없으면 마스터 데이터 기반으로 설정)
   useEffect(() => {
     // propPriceData가 있으면 그대로 사용 (마스터 데이터에서 이미 로드됨)
@@ -205,8 +202,8 @@ function TodaysProductCard(props) {
         backgroundColor: cardTheme.cardBg,
         border: `2px solid ${cardTheme.primary}30`,
         transition: 'all 0.3s ease',
-        '&:hover': { 
-          transform: 'translateY(-5px)', 
+        '&:hover': {
+          transform: 'translateY(-5px)',
           boxShadow: `0 8px 24px ${cardTheme.primary}40`,
           borderColor: cardTheme.primary,
           zIndex: 1
@@ -263,13 +260,13 @@ function TodaysProductCard(props) {
         </Stack>
       )}
 
-      <Box 
-        sx={{ 
-          position: 'relative', 
+      <Box
+        sx={{
+          position: 'relative',
           pt: compact ? '50%' : '65%',  // 이미지 영역 비율 축소 (55%->50%, 70%->65%)
           minHeight: compact ? 160 : 220,  // 최소 높이 축소 (180->160, 240->220)
           background: cardTheme.background || '#ffffff', // 통신사별 배경색 (SK: 파란색, KT: 녹색, LG: 분홍색)
-          borderRadius: '16px 16px 0 0', 
+          borderRadius: '16px 16px 0 0',
           overflow: 'hidden',
           borderBottom: `2px solid ${cardTheme.primary}20`,
           flexShrink: 0  // 이미지 영역이 축소되지 않도록
@@ -283,7 +280,7 @@ function TodaysProductCard(props) {
           onError={async (e) => {
             // 🔥 핵심 수정: 이미지 로드 실패 처리 개선
             const retryCount = parseInt(e.target.dataset.retryCount || '0');
-            
+
             // 최대 3번까지 재시도
             if (retryCount >= 3) {
               e.target.dataset.gaveUp = 'true';
@@ -291,7 +288,7 @@ function TodaysProductCard(props) {
               e.target.style.display = 'none';
               return;
             }
-            
+
             const originalUrl = product?.image;
             if (!originalUrl) {
               e.target.dataset.gaveUp = 'true';
@@ -299,29 +296,29 @@ function TodaysProductCard(props) {
               e.target.style.display = 'none';
               return;
             }
-            
+
             // 🔥 핵심 수정: 프록시 실패 시 원본 URL로 폴백
             if (e.target.src.includes('/api/meetings/proxy-image')) {
               // 프록시 실패 → 원본 URL로 직접 시도
-              const directUrl = originalUrl.includes('?') 
+              const directUrl = originalUrl.includes('?')
                 ? `${originalUrl}&_t=${Date.now()}`
                 : `${originalUrl}?_t=${Date.now()}`;
               setImageUrl(directUrl);
               e.target.dataset.retryCount = (retryCount + 1).toString();
               return;
             }
-            
+
             // Discord 이미지이고 메시지 ID가 있으면 자동 갱신 시도
             const isDiscordUrl = originalUrl.includes('cdn.discordapp.com') || originalUrl.includes('media.discordapp.net');
             if (isDiscordUrl && product.discordThreadId && product.discordMessageId) {
               try {
                 const { refreshDiscordImageUrl } = await import('../../utils/discordImageUtils');
                 const refreshResult = await refreshDiscordImageUrl(product.discordThreadId, product.discordMessageId);
-                
+
                 if (refreshResult.success && refreshResult.imageUrl) {
                   console.log('✅ [TodaysProductCard] Discord 이미지 URL 갱신 성공 (에러 핸들러)');
                   const newUrl = getProxyImageUrl(refreshResult.imageUrl);
-                  const timestampedUrl = newUrl.includes('?') 
+                  const timestampedUrl = newUrl.includes('?')
                     ? `${newUrl}&_t=${Date.now()}`
                     : `${newUrl}?_t=${Date.now()}`;
                   setImageUrl(timestampedUrl);
@@ -332,24 +329,24 @@ function TodaysProductCard(props) {
                 console.warn('⚠️ [TodaysProductCard] Discord 이미지 갱신 실패:', error);
               }
             }
-            
+
             // 원본 URL도 실패 → 프록시로 시도
-            if (originalUrl && 
-                (originalUrl.includes('cdn.discordapp.com') || originalUrl.includes('media.discordapp.net'))) {
+            if (originalUrl &&
+              (originalUrl.includes('cdn.discordapp.com') || originalUrl.includes('media.discordapp.net'))) {
               const proxyUrl = getProxyImageUrl(originalUrl);
-              const timestampedUrl = proxyUrl.includes('?') 
+              const timestampedUrl = proxyUrl.includes('?')
                 ? `${proxyUrl}&_t=${Date.now()}`
                 : `${proxyUrl}?_t=${Date.now()}`;
               setImageUrl(timestampedUrl);
               e.target.dataset.retryCount = (retryCount + 1).toString();
               return;
             }
-            
+
             // 모든 시도 실패
             e.target.dataset.gaveUp = 'true';
             e.target.onerror = null;
             e.target.style.display = 'none';
-            
+
             if (process.env.NODE_ENV === 'development') {
               console.warn('⚠️ [TodaysProductCard] 이미지 로드 실패:', {
                 productId: product?.id,
@@ -370,7 +367,7 @@ function TodaysProductCard(props) {
             objectPosition: 'center',
             padding: '8px',  // 여백 추가로 이미지 축소
             transition: 'transform 0.3s',
-            '&:hover': { transform: 'scale(1.05)'             }
+            '&:hover': { transform: 'scale(1.05)' }
           }}
         />
       </Box>
@@ -392,9 +389,9 @@ function TodaysProductCard(props) {
           {product.petName}
         </Typography>
 
-        <Stack spacing={1.5} sx={{ 
+        <Stack spacing={1.5} sx={{
           background: `linear-gradient(135deg, ${cardTheme.primary}08 0%, ${cardTheme.secondary}08 100%)`,
-          p: compact ? 1.0 : 2, 
+          p: compact ? 1.0 : 2,
           borderRadius: 2,
           border: `1px solid ${cardTheme.primary}20`
         }}>
@@ -407,7 +404,7 @@ function TodaysProductCard(props) {
           </Box>
 
           {/* 가격 정보 테이블 (부드러운 디자인) */}
-          <Box sx={{ 
+          <Box sx={{
             display: 'grid',
             gridTemplateColumns: 'auto 1fr 1fr 1fr',
             gap: 1,
@@ -494,12 +491,12 @@ function TodaysProductCard(props) {
       </CardContent>
 
       <CardActions sx={{ p: compact ? 1.5 : 2, pt: compact ? 0 : 0 }}>
-          <Button
+        <Button
           variant="contained"
           fullWidth
           startIcon={<ShoppingCartIcon />}
           size={compact ? 'medium' : 'large'}
-          sx={{ 
+          sx={{
             borderRadius: 2,
             backgroundColor: cardTheme.primary,
             color: 'white',

@@ -21,11 +21,23 @@ import { unifiedCapture } from './unifiedCaptureLogic';
  * @param {number} quality - 압축 품질 (0-1)
  * @returns {Promise<Blob>} 압축된 이미지 Blob
  */
+// Blob을 이미지로 변환하는 헬퍼 함수
+const blobToImage = (blob) => new Promise((resolve, reject) => {
+  const url = URL.createObjectURL(blob);
+  const img = new Image();
+  img.onload = () => {
+    URL.revokeObjectURL(url);
+    resolve(img);
+  };
+  img.onerror = reject;
+  img.src = url;
+});
+
 async function compressImageBlob(blob, quality = 0.85) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const objectUrl = URL.createObjectURL(blob);
-    
+
     img.onload = () => {
       try {
         const canvas = document.createElement('canvas');
@@ -54,14 +66,14 @@ async function compressImageBlob(blob, quality = 0.85) {
             console.warn('⚠️ [compressImageBlob] 투명도 체크 실패, JPEG로 변환:', e.message);
           }
         }
-        
+
         const mimeType = hasTransparency ? 'image/png' : 'image/jpeg';
-        
+
         canvas.toBlob(
           (compressedBlob) => {
             // 메모리 정리
             URL.revokeObjectURL(objectUrl);
-            
+
             if (compressedBlob) {
               // 압축 후에도 크기가 줄어들지 않으면 원본 반환
               if (compressedBlob.size >= blob.size) {
@@ -84,12 +96,12 @@ async function compressImageBlob(blob, quality = 0.85) {
         reject(error);
       }
     };
-    
+
     img.onerror = () => {
       URL.revokeObjectURL(objectUrl);
       reject(new Error('이미지 로드에 실패했습니다.'));
     };
-    
+
     img.src = objectUrl;
   });
 }
@@ -1575,6 +1587,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               margin: tableBox.style.margin
             } : null;
 
+            let tableOnlyBlob = null;
             try {
               // 데이터가 실제 채워질 때까지 추가 대기 (최대 5초)
               try {
@@ -1756,7 +1769,6 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               await new Promise(r => setTimeout(r, 500)); // 박스 크기 조정 후 렌더링 대기 (시간 증가)
 
               // 테이블만 우선 캡처
-              let tableOnlyBlob = null;
               tableOnlyBlob = await captureElement(tableBox || tableContainer, {
                 scale: 2,
                 useCORS: true,
@@ -1913,16 +1925,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
             // 3) 헤더 + 테이블 합성 (가능 시) - 헤더와 테이블 모두 중앙 정렬
             try {
               if (headerBlob && tableOnlyBlob) {
-                const blobToImage = (blob) => new Promise((resolve, reject) => {
-                  const url = URL.createObjectURL(blob);
-                  const img = new Image();
-                  img.onload = () => {
-                    URL.revokeObjectURL(url);
-                    resolve(img);
-                  };
-                  img.onerror = reject;
-                  img.src = url;
-                });
+
                 const imgHeader = await blobToImage(headerBlob);
                 const imgTable = await blobToImage(tableOnlyBlob);
                 const gap = 20; // 헤더와 테이블 사이 간격
@@ -2124,7 +2127,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               const allRendered = Array.from(chartCanvases).every(canvas => {
                 return canvas.width > 0 && canvas.height > 0;
               });
-              
+
               if (allRendered) {
                 chartReady = true;
                 if (process.env.NODE_ENV === 'development') {
@@ -3289,7 +3292,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
               // maxRelativeRight는 실제 콘텐츠의 오른쪽 경계이므로, 이를 기준으로 설정
               measuredWidth = Math.max(
                 maxRelativeRight + 40, // 실제 콘텐츠 오른쪽 위치 + 여유공간
-                elementRect.width // 최소한 현재 보이는 너비는 보장
+                rect.width // 최소한 현재 보이는 너비는 보장
               );
 
               // scrollWidth가 maxRelativeRight보다 크면, 불필요한 여백이 포함된 것으로 판단
@@ -3487,16 +3490,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         (currentSlide?.subTab === 'subscriberIncrease')
       )) {
         try {
-          const blobToImage = (blob) => new Promise((resolve, reject) => {
-            const url = URL.createObjectURL(blob);
-            const img = new Image();
-            img.onload = () => {
-              URL.revokeObjectURL(url);
-              resolve(img);
-            };
-            img.onerror = (e) => reject(e);
-            img.src = url;
-          });
+
 
           // 1) 숫자형식으로 전환하여 월별 데이터 입력 테이블 캡처
           const numBtn = Array.from(document.querySelectorAll('button, [role="button"]'))
@@ -4884,7 +4878,7 @@ function MeetingCaptureManager({ meeting, slides, loggedInStore, onComplete, onC
         await saveWithRetry({
           slides: slidesToSave
         });
-        
+
         if (process.env.NODE_ENV === 'development') {
           console.log(`✅ [MeetingCaptureManager] 슬라이드 ${index + 1} 저장 완료`);
         }

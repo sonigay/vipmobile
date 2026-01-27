@@ -18,19 +18,19 @@ import { api } from '../../api';
 const getFileType = (file) => {
   const fileName = file.name.toLowerCase();
   const mimeType = file.type;
-  
+
   if (mimeType.startsWith('image/')) {
     return 'image';
   } else if (
-    fileName.endsWith('.xlsx') || 
-    fileName.endsWith('.xls') || 
+    fileName.endsWith('.xlsx') ||
+    fileName.endsWith('.xls') ||
     mimeType.includes('spreadsheet') ||
     mimeType.includes('excel')
   ) {
     return 'excel';
   } else if (
-    fileName.endsWith('.pptx') || 
-    fileName.endsWith('.ppt') || 
+    fileName.endsWith('.pptx') ||
+    fileName.endsWith('.ppt') ||
     mimeType.includes('presentation') ||
     mimeType.includes('powerpoint')
   ) {
@@ -97,7 +97,7 @@ function CustomSlideEditor({ open, onClose, onSave, slide, meetingDate, meetingN
 
     // 파일 타입 감지
     const fileType = getFileType(file);
-    
+
     if (fileType === 'unknown') {
       setUploadError('지원하지 않는 파일 형식입니다. (이미지, Excel, PPT, 동영상만 가능)');
       return;
@@ -125,7 +125,7 @@ function CustomSlideEditor({ open, onClose, onSave, slide, meetingDate, meetingN
 
       // 파일 업로드 및 변환
       const result = await api.uploadCustomSlideFile(file, meetingDate, fileType, meetingNumber);
-      
+
       if (result.success) {
         // 동영상 파일인 경우
         if (fileType === 'video' && result.videoUrl) {
@@ -243,7 +243,7 @@ function CustomSlideEditor({ open, onClose, onSave, slide, meetingDate, meetingN
             <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block' }}>
               이미지, Excel, PPT, 동영상 파일을 업로드할 수 있습니다. Excel과 PPT는 자동으로 이미지로 변환됩니다.
             </Typography>
-            
+
             {uploadError && (
               <Alert severity="error" sx={{ mb: 2 }}>
                 {uploadError}
@@ -306,7 +306,7 @@ function CustomSlideEditor({ open, onClose, onSave, slide, meetingDate, meetingN
               onChange={handleFileSelect}
               style={{ display: 'none' }}
             />
-            
+
             <Button
               variant="outlined"
               startIcon={uploading ? <CircularProgress size={16} /> : <DescriptionIcon />}
@@ -314,13 +314,13 @@ function CustomSlideEditor({ open, onClose, onSave, slide, meetingDate, meetingN
               disabled={uploading}
               fullWidth
             >
-              {uploading 
-                ? `업로드 중... (${uploadedFileType === 'excel' ? 'Excel 변환 중' : uploadedFileType === 'ppt' ? 'PPT 변환 중' : uploadedFileType === 'video' ? '동영상 업로드 중' : '처리 중'})` 
-                : previewUrl 
-                  ? '파일 변경' 
+              {uploading
+                ? `업로드 중... (${uploadedFileType === 'excel' ? 'Excel 변환 중' : uploadedFileType === 'ppt' ? 'PPT 변환 중' : uploadedFileType === 'video' ? '동영상 업로드 중' : '처리 중'})`
+                : previewUrl
+                  ? '파일 변경'
                   : '파일 선택 (이미지/Excel/PPT/동영상)'}
             </Button>
-            
+
             {((formData.imageUrl || formData.videoUrl) && !previewUrl) && (
               <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
                 {formData.videoUrl ? '동영상' : '이미지'} URL: {(formData.videoUrl || formData.imageUrl).substring(0, 50)}...
@@ -348,7 +348,7 @@ function CustomSlideEditor({ open, onClose, onSave, slide, meetingDate, meetingN
                   // URL을 직접 입력하면 이미지 업로드는 비워둠
                   imageUrl: prev.imageUrl
                 }));
-                setPreviewUrl(url || prev?.imageUrl || null);
+                setPreviewUrl(url || formData?.imageUrl || null);
                 setUploadedFileType(url ? 'video' : uploadedFileType);
               }}
               size="small"

@@ -47,17 +47,17 @@ class DALFactory {
   }
 
   /**
-   * 모드에 맞는 DAL 인스턴스 반환
-   * @param {string} mode - 모드 이름 (예: 'direct-store', 'policy', 'customer')
+   * 모드 또는 개별 탭에 맞는 DAL 인스턴스 반환
+   * @param {string} key - 모드 이름 또는 계층형 키 (예: 'quick-service', 'quick-service:history')
    * @returns {DataAccessLayer} DAL 인스턴스
    */
-  getDAL(mode) {
-    if (!mode) {
-      throw new Error('Mode name is required');
+  getDAL(key) {
+    if (!key) {
+      throw new Error('Key is required');
     }
 
-    // Feature Flag 확인
-    const useDatabase = this.featureFlags.isEnabled(mode);
+    // Feature Flag 확인 (계층 구조 지원)
+    const useDatabase = this.featureFlags.isEnabled(key);
 
     // 구현체 선택
     let implementation;
@@ -73,7 +73,7 @@ class DALFactory {
       throw new Error('No valid implementation available');
     }
 
-    console.log(`[DALFactory] Mode: ${mode}, Using: ${implType}`);
+    console.log(`[DALFactory] Key: ${key}, Using: ${implType}`);
 
     return new DataAccessLayer(implementation);
   }

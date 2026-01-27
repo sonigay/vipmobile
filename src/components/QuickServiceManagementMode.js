@@ -26,7 +26,9 @@ import {
   ToggleButton,
   ToggleButtonGroup,
   Alert,
-  Autocomplete
+  Autocomplete,
+  Tabs,
+  Tab
 } from '@mui/material';
 import { createFilterOptions } from '@mui/material/Autocomplete';
 import {
@@ -68,6 +70,10 @@ import AppUpdatePopup from './AppUpdatePopup';
 import QuickCostModal from './QuickCostModal';
 import { getModeColor, getModeTitle } from '../config/modeConfig';
 
+import DataSourceDashboard from './DataSourceDashboard';
+import BugDiagnosticDashboard from './BugDiagnosticDashboard';
+import { REGION_COORDINATES, CITY_COORDINATES } from '../constants/coordinates';
+
 const MODE_KEY = 'quickServiceManagement';
 
 const defaultStatistics = {
@@ -94,103 +100,6 @@ const TREND_OPTIONS = [
   { key: 'weekly', label: '주별' }
 ];
 
-const REGION_COORDINATES = {
-  서울: { lat: 37.5665, lng: 126.978 },
-  부산: { lat: 35.1796, lng: 129.0756 },
-  대구: { lat: 35.8714, lng: 128.6014 },
-  인천: { lat: 37.4563, lng: 126.7052 },
-  광주: { lat: 35.1595, lng: 126.8526 },
-  대전: { lat: 36.3504, lng: 127.3845 },
-  울산: { lat: 35.5384, lng: 129.3114 },
-  세종: { lat: 36.4875, lng: 127.2817 },
-  경기: { lat: 37.4138, lng: 127.5183 },
-  강원: { lat: 37.8228, lng: 128.1555 },
-  충북: { lat: 36.6357, lng: 127.4917 },
-  충남: { lat: 36.5184, lng: 126.8 },
-  전북: { lat: 35.7175, lng: 127.153 },
-  전남: { lat: 34.8679, lng: 126.991 },
-  경북: { lat: 36.4919, lng: 128.8889 },
-  경남: { lat: 35.4606, lng: 128.2132 },
-  제주: { lat: 33.4996, lng: 126.5312 },
-  기타: { lat: 36.5, lng: 127.8 }
-};
-
-const CITY_COORDINATES = {
-  수원시: { lat: 37.2636, lng: 127.0286 },
-  용인시: { lat: 37.2411, lng: 127.1775 },
-  성남시: { lat: 37.4200, lng: 127.1267 },
-  의정부시: { lat: 37.7380, lng: 127.0337 },
-  안양시: { lat: 37.3943, lng: 126.9568 },
-  부천시: { lat: 37.5036, lng: 126.7660 },
-  고양시: { lat: 37.6584, lng: 126.8320 },
-  과천시: { lat: 37.4292, lng: 126.9879 },
-  광명시: { lat: 37.4755, lng: 126.8666 },
-  구리시: { lat: 37.5943, lng: 127.1295 },
-  남양주시: { lat: 37.6368, lng: 127.2148 },
-  동두천시: { lat: 37.9035, lng: 127.0606 },
-  시흥시: { lat: 37.3799, lng: 126.8031 },
-  파주시: { lat: 37.7599, lng: 126.7800 },
-  평택시: { lat: 36.9925, lng: 127.1129 },
-  포천시: { lat: 37.8945, lng: 127.2001 },
-  하남시: { lat: 37.5393, lng: 127.2146 },
-  군포시: { lat: 37.3614, lng: 126.9350 },
-  의왕시: { lat: 37.3446, lng: 126.9683 },
-  오산시: { lat: 37.1498, lng: 127.0771 },
-  이천시: { lat: 37.2720, lng: 127.4350 },
-  안산시: { lat: 37.3219, lng: 126.8309 },
-  양주시: { lat: 37.7853, lng: 127.0450 },
-  여주시: { lat: 37.2980, lng: 127.6374 },
-  김포시: { lat: 37.6152, lng: 126.7158 },
-  화성시: { lat: 37.1995, lng: 126.8314 },
-  천안시: { lat: 36.8151, lng: 127.1139 },
-  아산시: { lat: 36.7898, lng: 127.0019 },
-  공주시: { lat: 36.4460, lng: 127.1190 },
-  보령시: { lat: 36.3333, lng: 126.6125 },
-  서산시: { lat: 36.7845, lng: 126.4500 },
-  논산시: { lat: 36.1872, lng: 127.0980 },
-  계룡시: { lat: 36.2748, lng: 127.2487 },
-  당진시: { lat: 36.8890, lng: 126.6468 },
-  춘천시: { lat: 37.8813, lng: 127.7298 },
-  원주시: { lat: 37.3422, lng: 127.9198 },
-  강릉시: { lat: 37.7519, lng: 128.8761 },
-  동해시: { lat: 37.5245, lng: 129.1140 },
-  태백시: { lat: 37.1641, lng: 128.9856 },
-  속초시: { lat: 38.2043, lng: 128.5911 },
-  삼척시: { lat: 37.4479, lng: 129.1657 },
-  충주시: { lat: 36.9910, lng: 127.9250 },
-  제천시: { lat: 37.1326, lng: 128.1995 },
-  청주시: { lat: 36.6424, lng: 127.4890 },
-  전주시: { lat: 35.8242, lng: 127.1479 },
-  군산시: { lat: 35.9676, lng: 126.7363 },
-  익산시: { lat: 35.9483, lng: 126.9574 },
-  남원시: { lat: 35.4164, lng: 127.3900 },
-  김제시: { lat: 35.8039, lng: 126.8800 },
-  목포시: { lat: 34.8118, lng: 126.3922 },
-  여수시: { lat: 34.7604, lng: 127.6622 },
-  순천시: { lat: 34.9507, lng: 127.4872 },
-  나주시: { lat: 35.0155, lng: 126.7109 },
-  광양시: { lat: 34.9400, lng: 127.6957 },
-  포항시: { lat: 36.0190, lng: 129.3435 },
-  경주시: { lat: 35.8562, lng: 129.2247 },
-  안동시: { lat: 36.5683, lng: 128.7294 },
-  김천시: { lat: 36.1397, lng: 128.1136 },
-  구미시: { lat: 36.1195, lng: 128.3446 },
-  영주시: { lat: 36.8057, lng: 128.6242 },
-  영천시: { lat: 35.9733, lng: 128.9382 },
-  상주시: { lat: 36.4105, lng: 128.1596 },
-  문경시: { lat: 36.5860, lng: 128.1868 },
-  경산시: { lat: 35.8251, lng: 128.7415 },
-  창원시: { lat: 35.2283, lng: 128.6818 },
-  김해시: { lat: 35.2285, lng: 128.8890 },
-  진주시: { lat: 35.1796, lng: 128.1070 },
-  통영시: { lat: 34.8554, lng: 128.4330 },
-  사천시: { lat: 35.0038, lng: 128.0640 },
-  밀양시: { lat: 35.5038, lng: 128.7468 },
-  거제시: { lat: 34.8806, lng: 128.6216 },
-  양산시: { lat: 35.3350, lng: 129.0372 },
-  제주시: { lat: 33.4996, lng: 126.5312 },
-  서귀포시: { lat: 33.2539, lng: 126.5590 }
-};
 
 const REGION_METRIC_KEYS = new Set(['volume', 'avgCost', 'avgDistance', 'costPerKm']);
 
@@ -379,6 +288,7 @@ const QuickServiceManagementMode = ({
     to: null
   });
   const [trendGranularity, setTrendGranularity] = useState('monthly');
+  const [currentTab, setCurrentTab] = useState('quickService'); // 탭 상태 추가
   const modeColor = useMemo(() => getModeColor(MODE_KEY), []);
   const modeTitle = useMemo(
     () => getModeTitle(MODE_KEY, '퀵서비스 관리 모드'),
@@ -419,8 +329,17 @@ const QuickServiceManagementMode = ({
 
   const collectRegions = useCallback((stats) => {
     if (!stats) return [];
-    const regionSet = new Set();
 
+    // 1. Use explicit availableRegions from API if present (Robust)
+    if (stats.availableRegions && Array.isArray(stats.availableRegions) && stats.availableRegions.length > 0) {
+      console.log('🔍 [Debug-Frontend] API returned availableRegions:', stats.availableRegions);
+      return stats.availableRegions;
+    }
+
+    console.warn('⚠️ [Debug-Frontend] API did NOT return availableRegions or it is empty. Stats keys:', Object.keys(stats));
+
+    // 2. Fallback to existing logic (Legacy)
+    const regionSet = new Set();
     (stats.regionStats || []).forEach((item) => {
       if (item?.region) regionSet.add(item.region);
     });
@@ -430,6 +349,10 @@ const QuickServiceManagementMode = ({
     });
 
     (stats.excellentCompanies || []).forEach((item) => {
+      if (item?.region) regionSet.add(item.region);
+    });
+
+    (stats.companyStats || []).forEach((item) => {
       if (item?.region) regionSet.add(item.region);
     });
 
@@ -553,20 +476,20 @@ const QuickServiceManagementMode = ({
     const averageCost =
       totalCompanies > 0
         ? Math.round(
-            statistics.companyStats.reduce(
-              (sum, item) => sum + (item.averageCost || 0),
-              0
-            ) / totalCompanies
-          )
+          statistics.companyStats.reduce(
+            (sum, item) => sum + (item.averageCost || 0),
+            0
+          ) / totalCompanies
+        )
         : 0;
     const averageReliability =
       totalCompanies > 0
         ? Math.round(
-            statistics.companyStats.reduce(
-              (sum, item) => sum + (item.reliabilityScore || 0),
-              0
-            ) / totalCompanies
-          )
+          statistics.companyStats.reduce(
+            (sum, item) => sum + (item.reliabilityScore || 0),
+            0
+          ) / totalCompanies
+        )
         : 0;
 
     return {
@@ -630,8 +553,8 @@ const QuickServiceManagementMode = ({
         const timestamp = Number.isFinite(startTimestamp)
           ? startTimestamp
           : Number.isFinite(rawTimestamp)
-          ? rawTimestamp
-          : Date.now();
+            ? rawTimestamp
+            : Date.now();
         const type = item?.type || trendGranularity;
         const displayLabel =
           item?.displayLabel ||
@@ -711,9 +634,9 @@ const QuickServiceManagementMode = ({
       : null;
   const costDelta =
     latestTrend &&
-    previousTrend &&
-    latestTrend.averageCost !== null &&
-    previousTrend.averageCost !== null
+      previousTrend &&
+      latestTrend.averageCost !== null &&
+      previousTrend.averageCost !== null
       ? latestTrend.averageCost - previousTrend.averageCost
       : null;
   const trendDescription =
@@ -768,20 +691,20 @@ const QuickServiceManagementMode = ({
     const averageCost =
       totalCompanies > 0
         ? Math.round(
-            companyStatsAll.reduce(
-              (sum, item) => sum + (item.averageCost || 0),
-              0
-            ) / totalCompanies
-          )
+          companyStatsAll.reduce(
+            (sum, item) => sum + (item.averageCost || 0),
+            0
+          ) / totalCompanies
+        )
         : 0;
     const averageReliability =
       totalCompanies > 0
         ? Math.round(
-            companyStatsAll.reduce(
-              (sum, item) => sum + (item.reliabilityScore || 0),
-              0
-            ) / totalCompanies
-          )
+          companyStatsAll.reduce(
+            (sum, item) => sum + (item.reliabilityScore || 0),
+            0
+          ) / totalCompanies
+        )
         : 0;
 
     return {
@@ -997,8 +920,8 @@ const QuickServiceManagementMode = ({
         historySelection.from?.id === id
           ? historySelection.from
           : historySelection.to?.id === id
-          ? historySelection.to
-          : storeOptions.find((store) => store.id === id);
+            ? historySelection.to
+            : storeOptions.find((store) => store.id === id);
       if (matched) {
         return { id: matched.id, name: matched.name };
       }
@@ -1061,15 +984,15 @@ const QuickServiceManagementMode = ({
     setHistorySuccessMessage('');
     const fromStore = entry.fromStoreId
       ? {
-          id: entry.fromStoreId,
-          name: entry.fromStoreName || entry.fromStoreId
-        }
+        id: entry.fromStoreId,
+        name: entry.fromStoreName || entry.fromStoreId
+      }
       : null;
     const toStore = entry.toStoreId
       ? {
-          id: entry.toStoreId,
-          name: entry.toStoreName || entry.toStoreId
-        }
+        id: entry.toStoreId,
+        name: entry.toStoreName || entry.toStoreId
+      }
       : null;
     setHistorySelection((prev) => ({
       ...prev,
@@ -1368,9 +1291,9 @@ const QuickServiceManagementMode = ({
             label: `${metric.popularEntries.toLocaleString()}건`,
             topCompany: top
               ? {
-                  name: top.companyName,
-                  phone: top.phoneNumber
-                }
+                name: top.companyName,
+                phone: top.phoneNumber
+              }
               : null
           });
         }
@@ -1387,9 +1310,9 @@ const QuickServiceManagementMode = ({
             entryCount: metric.excellentEntries,
             topCompany: top
               ? {
-                  name: top.companyName,
-                  phone: top.phoneNumber
-                }
+                name: top.companyName,
+                phone: top.phoneNumber
+              }
               : null
           });
         }
@@ -1560,1722 +1483,1758 @@ const QuickServiceManagementMode = ({
             )}
           </Stack>
         </Toolbar>
+        {/* 어플종합관리 3단 탭 */}
+        <Box sx={{ borderBottom: 1, borderColor: 'rgba(255,255,255,0.1)', px: 2 }}>
+          <Tabs
+            value={currentTab}
+            onChange={(_e, v) => setCurrentTab(v)}
+            textColor="inherit"
+            indicatorColor="secondary"
+            sx={{
+              '& .MuiTab-root': { color: 'rgba(255,255,255,0.7)', minHeight: 48 },
+              '& .Mui-selected': { color: '#fff', fontWeight: 'bold' },
+              '& .MuiTabs-indicator': { backgroundColor: '#fff' }
+            }}
+          >
+            <Tab label="퀵서비스관리" value="quickService" />
+            <Tab label="데이터베이스관리" value="database" />
+            <Tab label="버그관리" value="bugs" />
+          </Tabs>
+        </Box>
       </AppBar>
 
       <Container sx={{ py: 4 }}>
-        <Grid container spacing={3}>
-          <Grid item xs={12}>
-            <Paper elevation={1} sx={{ borderRadius: 2 }}>
-              <Box
-                sx={{
-                  px: { xs: 2, md: 3 },
-                  py: { xs: 2, md: 2.5 }
-                }}
-              >
-                <Grid
-                  container
-                  spacing={2}
-                  alignItems="center"
-                  justifyContent="space-between"
-                >
-                  <Grid item xs={12} md={8} lg={9}>
-                    <Stack
-                      direction={{ xs: 'column', sm: 'row' }}
-                      spacing={{ xs: 1.5, sm: 2 }}
-                      alignItems={{ xs: 'flex-start', sm: 'center' }}
-                      sx={{ width: '100%', flexWrap: 'wrap' }}
-                    >
-                      <Typography
-                        variant="subtitle1"
-                        sx={{ fontWeight: 600, flexShrink: 0 }}
-                      >
-                        지역 선택
-                      </Typography>
-                      <TextField
-                        select
-                        size="small"
-                        value={region}
-                        onChange={handleRegionChange}
-                        sx={{
-                          minWidth: { xs: '100%', sm: 220 },
-                          maxWidth: { sm: 260 },
-                          width: { xs: '100%', sm: 'auto' }
-                        }}
-                      >
-                        {regionOptions.map((option) => (
-                          <MenuItem key={option} value={option}>
-                            {option === 'all' ? '전체 지역' : option}
-                          </MenuItem>
-                        ))}
-                      </TextField>
-                    </Stack>
-                  </Grid>
-                  <Grid
-                    item
-                    xs={12}
-                    md={4}
-                    lg={3}
+        {currentTab === 'quickService' && (
+          <Box id="quick-service-section">
+            <Grid container spacing={3}>
+              <Grid item xs={12}>
+                <Paper elevation={1} sx={{ borderRadius: 2 }}>
+                  <Box
                     sx={{
-                      display: 'flex',
-                      justifyContent: { xs: 'flex-start', md: 'flex-end' }
+                      px: { xs: 2, md: 3 },
+                      py: { xs: 2, md: 2.5 }
                     }}
                   >
-                    <Stack direction="row" spacing={1}>
-                      <Tooltip title="데이터 새로고침">
-                        <span>
-                          <IconButton
-                            color="primary"
-                            onClick={handleRefresh}
-                            disabled={loading}
+                    <Grid
+                      container
+                      spacing={2}
+                      alignItems="center"
+                      justifyContent="space-between"
+                    >
+                      <Grid item xs={12} md={8} lg={9}>
+                        <Stack
+                          direction={{ xs: 'column', sm: 'row' }}
+                          spacing={{ xs: 1.5, sm: 2 }}
+                          alignItems={{ xs: 'flex-start', sm: 'center' }}
+                          sx={{ width: '100%', flexWrap: 'wrap' }}
+                        >
+                          <Typography
+                            variant="subtitle1"
+                            sx={{ fontWeight: 600, flexShrink: 0 }}
                           >
-                            <RefreshIcon />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-                    </Stack>
-                  </Grid>
-                </Grid>
-              </Box>
-            </Paper>
-          </Grid>
-
-          <Grid item xs={12}>
-            {loading ? (
-              <Box
-                sx={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  py: 12,
-                  gap: 2,
-                  color: 'text.secondary'
-                }}
-              >
-                <CircularProgress color="secondary" />
-                <Typography variant="body2">
-                  데이터를 불러오는 중입니다...
-                </Typography>
-              </Box>
-            ) : error ? (
-              <Paper
-                elevation={1}
-                sx={{
-                  p: 4,
-                  borderRadius: 2,
-                  textAlign: 'center',
-                  color: 'error.main'
-                }}
-              >
-                <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-                  데이터를 불러오지 못했습니다.
-                </Typography>
-                <Typography variant="body2" sx={{ mb: 2 }}>
-                  {error}
-                </Typography>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  onClick={() => fetchData(region, true)}
-                >
-                  다시 시도
-                </Button>
-              </Paper>
-            ) : (
-              <Grid container spacing={3}>
-                {/* 지도 영역 */}
-                <Grid item xs={12}>
-                  <Paper
-                    elevation={2}
-                    sx={{
-                      borderRadius: 2,
-                      overflow: 'hidden',
-                      display: 'flex',
-                      flexDirection: 'column'
-                    }}
-                  >
-                    <Box
-                      sx={{
-                        px: 3,
-                        py: 2,
-                        borderBottom: '1px solid rgba(0,0,0,0.08)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        flexWrap: 'wrap',
-                        gap: 1.5
-                      }}
-                    >
-                      <Stack spacing={0.5}>
-                        <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                          지역 분포 시각화
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {isRegionMetric
-                            ? '등록 건수·평균 비용·평균 거리 등 핵심 지표를 열지도 스타일로 확인할 수 있습니다.'
-                            : '지역별 인기/우수 업체 TOP 데이터를 지도에서 확인할 수 있습니다.'}
-                        </Typography>
-                      </Stack>
-                      <ToggleButtonGroup
-                        size="small"
-                        value={mapMetric}
-                        exclusive
-                        onChange={handleMapMetricChange}
+                            지역 선택
+                          </Typography>
+                          <TextField
+                            select
+                            size="small"
+                            value={region}
+                            onChange={handleRegionChange}
+                            sx={{
+                              minWidth: { xs: '100%', sm: 220 },
+                              maxWidth: { sm: 260 },
+                              width: { xs: '100%', sm: 'auto' }
+                            }}
+                          >
+                            {regionOptions.map((option) => (
+                              <MenuItem key={option} value={option}>
+                                {option === 'all' ? '전체 지역' : option}
+                              </MenuItem>
+                            ))}
+                          </TextField>
+                        </Stack>
+                      </Grid>
+                      <Grid
+                        item
+                        xs={12}
+                        md={4}
+                        lg={3}
                         sx={{
-                          flexWrap: 'wrap',
-                          gap: 0.5,
-                          '& .MuiToggleButton-root': {
-                            flex: '0 0 auto'
-                          }
+                          display: 'flex',
+                          justifyContent: { xs: 'flex-start', md: 'flex-end' }
                         }}
                       >
-                        <ToggleButton value="popular">인기 업체</ToggleButton>
-                        <ToggleButton value="excellent">우수 업체</ToggleButton>
-                        <ToggleButton value="volume">등록 건수</ToggleButton>
-                        <ToggleButton value="avgCost">평균 비용</ToggleButton>
-                        <ToggleButton value="avgDistance">평균 거리</ToggleButton>
-                        <ToggleButton value="costPerKm">km당 비용</ToggleButton>
-                      </ToggleButtonGroup>
-                    </Box>
-                    <Box sx={{ height: 420 }}>
-                      {mapData.length === 0 ? (
+                        <Stack direction="row" spacing={1}>
+                          <Tooltip title="데이터 새로고침">
+                            <span>
+                              <IconButton
+                                color="primary"
+                                onClick={handleRefresh}
+                                disabled={loading}
+                              >
+                                <RefreshIcon />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        </Stack>
+                      </Grid>
+                    </Grid>
+                  </Box>
+                </Paper>
+              </Grid>
+            </Grid>
+
+            <Grid container spacing={3}>
+              <Grid item xs={12}>
+                {loading ? (
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      py: 12,
+                      gap: 2,
+                      color: 'text.secondary'
+                    }}
+                  >
+                    <CircularProgress color="secondary" />
+                    <Typography variant="body2">
+                      데이터를 불러오는 중입니다...
+                    </Typography>
+                  </Box>
+                ) : error ? (
+                  <Paper
+                    elevation={1}
+                    sx={{
+                      p: 4,
+                      borderRadius: 2,
+                      textAlign: 'center',
+                      color: 'error.main'
+                    }}
+                  >
+                    <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+                      데이터를 불러오지 못했습니다.
+                    </Typography>
+                    <Typography variant="body2" sx={{ mb: 2 }}>
+                      {error}
+                    </Typography>
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      onClick={() => fetchData(region, true)}
+                    >
+                      다시 시도
+                    </Button>
+                  </Paper>
+                ) : (
+                  <Grid container spacing={3}>
+                    {/* 지도 영역 */}
+                    <Grid item xs={12}>
+                      <Paper
+                        elevation={2}
+                        sx={{
+                          borderRadius: 2,
+                          overflow: 'hidden',
+                          display: 'flex',
+                          flexDirection: 'column'
+                        }}
+                      >
                         <Box
                           sx={{
-                            height: '100%',
+                            px: 3,
+                            py: 2,
+                            borderBottom: '1px solid rgba(0,0,0,0.08)',
                             display: 'flex',
-                            flexDirection: 'column',
                             alignItems: 'center',
-                            justifyContent: 'center',
-                            color: 'text.secondary',
+                            justifyContent: 'space-between',
+                            flexWrap: 'wrap',
                             gap: 1.5
                           }}
                         >
-                          <MapOutlinedIcon fontSize="large" />
-                          <Typography variant="body2">
-                            표시할 데이터가 없습니다.
-                          </Typography>
-                        </Box>
-                      ) : (
-                        <MapContainer
-                          center={[36.5, 127.8]}
-                          zoom={6.7}
-                          style={{ height: '100%', width: '100%' }}
-                          zoomControl={false}
-                          attributionControl={false}
-                        >
-                          <TileLayer
-                            attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
-                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                          />
-                          {mapData.map((item) => {
-                            const valueRange =
-                              mapIntensityRange.max - mapIntensityRange.min || 1;
-                            const normalized =
-                              valueRange === 0
-                                ? 0.5
-                                : (item.value - mapIntensityRange.min) /
-                                  valueRange;
-
-                            if (item.type === 'company') {
-                              const color =
-                                mapMetric === 'popular' ? '#ff7043' : '#4caf50';
-                              const radius =
-                                mapMetric === 'popular'
-                                  ? 10000 + normalized * 25000
-                                  : 8000 + normalized * 20000;
-                              return (
-                                <CircleMarker
-                                  key={item.key}
-                                  center={[item.coords.lat, item.coords.lng]}
-                                  radius={Math.max(radius / 4000, 8)}
-                                  pathOptions={{
-                                    color,
-                                    fillColor: color,
-                                    fillOpacity: 0.4,
-                                    weight: 2
-                                  }}
-                                >
-                                  <LeafletTooltip direction="top" offset={[0, -2]}>
-                                    <div style={{ minWidth: 180 }}>
-                                      <strong>{item.region}</strong>
-                                      <br />
-                                      {mapMetric === 'popular'
-                                        ? `등록 건수: ${item.label}`
-                                        : `평균 속도 점수: ${item.label}`}
-                                      <br />
-                                      {item.topCompany
-                                        ? `${item.topCompany.name} (${item.topCompany.phone || '-'})`
-                                        : '상위 업체 정보 없음'}
-                                      {mapMetric === 'excellent' && item.entryCount && (
-                                        <>
-                                          <br />
-                                          등록 건수: {item.entryCount.toLocaleString()}건
-                                        </>
-                                      )}
-                                    </div>
-                                  </LeafletTooltip>
-                                </CircleMarker>
-                              );
-                            }
-
-                            const color = getGradientColor(
-                              mapMetric,
-                              item.value,
-                              mapIntensityRange.min,
-                              mapIntensityRange.max
-                            );
-                            const radiusMeters = 25000 + normalized * 80000;
-
-                            return (
-                              <Circle
-                                key={item.key}
-                                center={[item.coords.lat, item.coords.lng]}
-                                radius={Math.max(radiusMeters, 15000)}
-                                pathOptions={{
-                                  color,
-                                  fillColor: color,
-                                  fillOpacity: 0.35,
-                                  weight: 1.5
-                                }}
-                              >
-                                <LeafletTooltip direction="top" offset={[0, -4]}>
-                                  <div style={{ minWidth: 190 }}>
-                                    <strong>{item.region}</strong>
-                                    <br />
-                                    {mapMetric === 'volume' && (
-                                      <>
-                                        등록 건수: {item.totalEntries?.toLocaleString()}건
-                                        <br />
-                                        업체 수: {item.companyCount?.toLocaleString()}곳
-                                        <br />
-                                        평균 비용:{' '}
-                                        {item.averageCost
-                                          ? `${item.averageCost.toLocaleString()}원`
-                                          : '-'}
-                                        <br />
-                                        평균 거리:{' '}
-                                        {item.averageDistance
-                                          ? `${item.averageDistance.toLocaleString()}km`
-                                          : '-'}
-                                        <br />
-                                        거리 데이터 커버리지:{' '}
-                                        {item.distanceCoverage ?? 0}%
-                                      </>
-                                    )}
-                                    {mapMetric === 'avgCost' && (
-                                      <>
-                                        평균 비용: {item.label}
-                                        <br />
-                                        등록 건수:{' '}
-                                        {item.totalEntries?.toLocaleString()}건
-                                        <br />
-                                        업체 수:{' '}
-                                        {item.companyCount?.toLocaleString()}곳
-                                      </>
-                                    )}
-                                    {mapMetric === 'avgDistance' && (
-                                      <>
-                                        평균 거리: {item.label}
-                                        <br />
-                                        km당 비용:{' '}
-                                        {item.averageCostPerKm
-                                          ? `${item.averageCostPerKm.toLocaleString()}원/km`
-                                          : '-'}
-                                        <br />
-                                        거리 데이터 커버리지:{' '}
-                                        {item.distanceCoverage ?? 0}%
-                                      </>
-                                    )}
-                                    {mapMetric === 'costPerKm' && (
-                                      <>
-                                        평균 km당 비용: {item.label}
-                                        <br />
-                                        평균 비용:{' '}
-                                        {item.averageCost
-                                          ? `${item.averageCost.toLocaleString()}원`
-                                          : '-'}
-                                        <br />
-                                        평균 거리:{' '}
-                                        {item.averageDistance
-                                          ? `${item.averageDistance.toLocaleString()}km`
-                                          : '-'}
-                                      </>
-                                    )}
-                                  </div>
-                                </LeafletTooltip>
-                              </Circle>
-                            );
-                          })}
-                        </MapContainer>
-                      )}
-                    </Box>
-                  </Paper>
-                </Grid>
-
-                {hasDistanceAnalysis && (
-                  <Grid item xs={12}>
-                    <Paper elevation={2} sx={{ borderRadius: 2, overflow: 'hidden' }}>
-                      <Box
-                        sx={{
-                          px: 3,
-                          py: 2,
-                          borderBottom: '1px solid rgba(0,0,0,0.08)'
-                        }}
-                      >
-                        <Stack
-                          direction={{ xs: 'column', sm: 'row' }}
-                          spacing={1}
-                          alignItems={{ xs: 'flex-start', sm: 'center' }}
-                          justifyContent="space-between"
-                        >
-                          <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                            거리대별 비용 분석
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            위경도 좌표가 있는 구간만 집계되며, 각 구간의 평균 비용과 km당 비용을
-                            제공합니다.
-                          </Typography>
-                        </Stack>
-                      </Box>
-                      <Box sx={{ px: 3, py: 2 }}>
-                        <Table size="small">
-                          <TableHead>
-                            <TableRow>
-                              <TableCell sx={{ fontWeight: 600 }}>거리 구간</TableCell>
-                              <TableCell sx={{ fontWeight: 600 }} align="right">
-                                등록 건수
-                              </TableCell>
-                              <TableCell sx={{ fontWeight: 600 }} align="right">
-                                평균 비용
-                              </TableCell>
-                              <TableCell sx={{ fontWeight: 600 }} align="right">
-                                평균 km당 비용
-                              </TableCell>
-                            </TableRow>
-                          </TableHead>
-                          <TableBody>
-                            {distanceCostAnalysis.map((bucket) => (
-                              <TableRow key={bucket.label}>
-                                <TableCell>{bucket.label}</TableCell>
-                                <TableCell align="right">
-                                  {bucket.count?.toLocaleString() || 0}
-                                </TableCell>
-                                <TableCell align="right">
-                                  {bucket.averageCost
-                                    ? `${bucket.averageCost.toLocaleString()}원`
-                                    : '-'}
-                                </TableCell>
-                                <TableCell align="right">
-                                  {bucket.averageCostPerKm
-                                    ? `${bucket.averageCostPerKm.toLocaleString()}원/km`
-                                    : '-'}
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </Box>
-                    </Paper>
-                  </Grid>
-                )}
-
-                {/* 요약 카드 */}
-                <Grid item xs={12}>
-                  <Grid container spacing={2}>
-                    <Grid item xs={12} md={3}>
-                      {renderSummaryCard(
-                        '총 업체 수',
-                        `${summaryStats.totalCompanies.toLocaleString()} 곳`,
-                        <InsightsIcon />,
-                        '등록된 퀵서비스 업체 수',
-                        modeColor
-                      )}
-                    </Grid>
-                    <Grid item xs={12} md={3}>
-                      {renderSummaryCard(
-                        '총 입력 건수',
-                        `${summaryStats.totalEntries.toLocaleString()} 건`,
-                        <CheckCircleIcon />,
-                        '누적 입력 기록',
-                        '#1976d2'
-                      )}
-                    </Grid>
-                    <Grid item xs={12} md={3}>
-                      {renderSummaryCard(
-                        '평균 비용',
-                        summaryStats.averageCost
-                          ? `${summaryStats.averageCost.toLocaleString()} 원`
-                          : '-',
-                        <MapOutlinedIcon />,
-                        '전체 평균 예상 비용',
-                        '#ff9800'
-                      )}
-                    </Grid>
-                    <Grid item xs={12} md={3}>
-                      {renderSummaryCard(
-                        '평균 신뢰도',
-                        `${summaryStats.averageReliability}`,
-                        <InsightsIcon />,
-                        '입력량/일관성 기반 지표',
-                        '#009688'
-                      )}
-                    </Grid>
-                  </Grid>
-                </Grid>
-
-                {/* 최근 등록 추이 */}
-                <Grid item xs={12}>
-                  <Paper
-                    elevation={2}
-                    sx={{ borderRadius: 2, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
-                  >
-                    <Box
-                      sx={{
-                        px: 3,
-                        py: 2,
-                        borderBottom: '1px solid rgba(0,0,0,0.08)',
-                        display: 'flex',
-                        flexDirection: { xs: 'column', sm: 'row' },
-                        gap: 1.5,
-                        justifyContent: 'space-between'
-                      }}
-                    >
-                      <Stack spacing={0.5}>
-                        <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                          최근 등록 추이
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {trendDescription}
-                        </Typography>
-                      </Stack>
-                      <Stack
-                        spacing={1}
-                        alignItems={{ xs: 'flex-start', sm: 'flex-end' }}
-                      >
-                        <ToggleButtonGroup
-                          size="small"
-                          value={trendGranularity}
-                          exclusive
-                          onChange={handleTrendGranularityChange}
-                          sx={{ alignSelf: { xs: 'stretch', sm: 'flex-end' } }}
-                        >
-                          {TREND_OPTIONS.map((option) => {
-                            const disabled =
-                              !Array.isArray(trendDataMap[option.key]) ||
-                              trendDataMap[option.key].length === 0;
-                            return (
-                              <ToggleButton
-                                key={option.key}
-                                value={option.key}
-                                disabled={disabled}
-                              >
-                                {option.label}
-                              </ToggleButton>
-                            );
-                          })}
-                        </ToggleButtonGroup>
-                        {latestTrend && (
                           <Stack spacing={0.5}>
-                            <Stack
-                              direction={{ xs: 'column', sm: 'row' }}
-                              spacing={1.5}
-                              alignItems={{ xs: 'flex-start', sm: 'center' }}
-                            >
-                              <Chip
-                                size="small"
-                                color="primary"
-                                label={`${latestLabelPrefix} ${latestTrend.displayLabel}`}
-                                sx={{ fontWeight: 600 }}
-                              />
-                              <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                등록 {formatNumberWithUnit(latestTrend.entryCount, '건')} · 평균 비용{' '}
-                                {latestTrend.averageCost !== null
-                                  ? `${latestTrend.averageCost.toLocaleString()}원`
-                                  : '-'}
-                              </Typography>
-                            </Stack>
+                            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                              지역 분포 시각화
+                            </Typography>
                             <Typography variant="caption" color="text.secondary">
-                              {comparisonLabel} 대비 등록{' '}
-                              {entryDelta !== null
-                                ? formatTrendDelta(entryDelta, '건')
-                                : '비교 데이터 없음'}{' '}
-                              · 평균 비용{' '}
-                              {costDelta !== null
-                                ? formatTrendDelta(costDelta, '원')
-                                : '비교 데이터 없음'}
+                              {isRegionMetric
+                                ? '등록 건수·평균 비용·평균 거리 등 핵심 지표를 열지도 스타일로 확인할 수 있습니다.'
+                                : '지역별 인기/우수 업체 TOP 데이터를 지도에서 확인할 수 있습니다.'}
                             </Typography>
                           </Stack>
-                        )}
-                      </Stack>
-                    </Box>
-                    <Box sx={{ px: 2.5, py: 3, height: 340 }}>
-                      {timeTrendSeries.length === 0 ? (
-                        <Stack
-                          sx={{ height: '100%' }}
-                          alignItems="center"
-                          justifyContent="center"
-                          spacing={1.5}
-                          color="text.secondary"
-                        >
-                          <MapOutlinedIcon fontSize="large" />
-                          <Typography variant="body2">
-                            추이를 분석할 데이터가 부족합니다.
-                          </Typography>
-                        </Stack>
-                      ) : (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <ComposedChart
-                            data={timeTrendSeries}
-                            margin={{ top: 8, right: 24, bottom: 12, left: 8 }}
+                          <ToggleButtonGroup
+                            size="small"
+                            value={mapMetric}
+                            exclusive
+                            onChange={handleMapMetricChange}
+                            sx={{
+                              flexWrap: 'wrap',
+                              gap: 0.5,
+                              '& .MuiToggleButton-root': {
+                                flex: '0 0 auto'
+                              }
+                            }}
                           >
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="displayLabel" />
-                            <YAxis
-                              yAxisId="left"
-                              orientation="left"
-                              tickFormatter={(value) =>
-                                value ? `${value.toLocaleString()}원` : '0원'
-                              }
-                              domain={[0, trendCostAxisMax || 'auto']}
-                            />
-                            <YAxis
-                              yAxisId="right"
-                              orientation="right"
-                              tickFormatter={(value) =>
-                                value ? `${value.toLocaleString()}건` : '0건'
-                              }
-                              domain={[0, trendEntryAxisMax || 'auto']}
-                            />
-                            <RechartsTooltip
-                              formatter={(value, name) => {
-                                if (name === '평균 비용') {
-                                  return [
-                                    typeof value === 'number'
-                                      ? `${value.toLocaleString()}원`
-                                      : '-',
-                                    name
-                                  ];
-                                }
-                                if (name === '등록 건수') {
-                                  return [
-                                    typeof value === 'number'
-                                      ? `${value.toLocaleString()}건`
-                                      : '-',
-                                    name
-                                  ];
-                                }
-                                return [value, name];
+                            <ToggleButton value="popular">인기 업체</ToggleButton>
+                            <ToggleButton value="excellent">우수 업체</ToggleButton>
+                            <ToggleButton value="volume">등록 건수</ToggleButton>
+                            <ToggleButton value="avgCost">평균 비용</ToggleButton>
+                            <ToggleButton value="avgDistance">평균 거리</ToggleButton>
+                            <ToggleButton value="costPerKm">km당 비용</ToggleButton>
+                          </ToggleButtonGroup>
+                        </Box>
+                        <Box sx={{ height: 420 }}>
+                          {mapData.length === 0 ? (
+                            <Box
+                              sx={{
+                                height: '100%',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: 'text.secondary',
+                                gap: 1.5
                               }}
-                              labelFormatter={(label, payload) => {
-                                const item = payload?.[0]?.payload;
-                                if (item) {
-                                  const range = formatDateRange(
-                                    item.startTimestamp,
-                                    item.endTimestamp
-                                  );
-                                  if (range) {
-                                    return `기간: ${range}`;
-                                  }
-                                  if (item.displayLabel) {
-                                    return `기간: ${item.displayLabel}`;
-                                  }
-                                }
-                                return `기간: ${label}`;
-                              }}
-                            />
-                            <Legend />
-                            <Bar
-                              yAxisId="right"
-                              dataKey="entryCount"
-                              name="등록 건수"
-                              fill="#90caf9"
-                              radius={[6, 6, 0, 0]}
-                            />
-                            <Line
-                              yAxisId="left"
-                              type="monotone"
-                              dataKey="averageCost"
-                              name="평균 비용"
-                              stroke="#ff7043"
-                              strokeWidth={2}
-                              dot={{ r: 3 }}
-                              activeDot={{ r: 5 }}
-                            />
-                          </ComposedChart>
-                        </ResponsiveContainer>
-                      )}
-                    </Box>
-                  </Paper>
-                </Grid>
-
-                {/* 인기/우수 테이블 */}
-                <Grid item xs={12}>
-                  <Grid container spacing={3}>
-                    <Grid item xs={12} lg={6}>
-                      {renderTable(
-                        '지역별 인기 업체 TOP 20',
-                        statistics.popularCompanies || [],
-                        [
-                          {
-                            key: 'rank',
-                            label: '순위',
-                            align: 'center',
-                            render: (_row, index) => index + 1
-                          },
-                          { key: 'region', label: '지역', nowrap: true },
-                          {
-                            key: 'companyName',
-                            label: '업체명',
-                            render: (row) => (
-                              <Stack spacing={0.5}>
-                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                  {row.companyName}
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                  {row.phoneNumber}
-                                </Typography>
-                              </Stack>
-                            )
-                          },
-                          {
-                            key: 'entryCount',
-                            label: '등록 건수',
-                            align: 'right',
-                            render: (row) =>
-                              `${(row.entryCount || 0).toLocaleString()} 건`
-                          }
-                        ],
-                        '해당 지역의 인기 업체 데이터가 없습니다.'
-                      )}
-                    </Grid>
-                    <Grid item xs={12} lg={6}>
-                      {renderTable(
-                        '지역별 우수 업체 TOP 20',
-                        statistics.excellentCompanies || [],
-                        [
-                          {
-                            key: 'rank',
-                            label: '순위',
-                            align: 'center',
-                            render: (_row, index) => index + 1
-                          },
-                          { key: 'region', label: '지역', nowrap: true },
-                          {
-                            key: 'companyName',
-                            label: '업체명',
-                            render: (row) => (
-                              <Stack spacing={0.5}>
-                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                  {row.companyName}
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                  {row.phoneNumber}
-                                </Typography>
-                              </Stack>
-                            )
-                          },
-                          {
-                            key: 'averageSpeedScore',
-                            label: '평균 속도 점수',
-                            align: 'right',
-                            render: (row) => (
-                              <Chip
-                                size="small"
-                                color={
-                                  row.averageSpeedScore >= 2.5
-                                    ? 'success'
-                                    : row.averageSpeedScore >= 2
-                                    ? 'warning'
-                                    : 'default'
-                                }
-                                label={row.averageSpeedScore?.toFixed(2) || '-'}
-                                sx={{ fontWeight: 600 }}
+                            >
+                              <MapOutlinedIcon fontSize="large" />
+                              <Typography variant="body2">
+                                표시할 데이터가 없습니다.
+                              </Typography>
+                            </Box>
+                          ) : (
+                            <MapContainer
+                              center={[36.5, 127.8]}
+                              zoom={6.7}
+                              style={{ height: '100%', width: '100%' }}
+                              zoomControl={false}
+                              attributionControl={false}
+                            >
+                              <TileLayer
+                                attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+                                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                               />
-                            )
-                          }
-                        ],
-                        '해당 지역의 우수 업체 데이터가 없습니다.'
-                      )}
-                    </Grid>
-                  </Grid>
-                </Grid>
+                              {mapData.map((item) => {
+                                const valueRange =
+                                  mapIntensityRange.max - mapIntensityRange.min || 1;
+                                const normalized =
+                                  valueRange === 0
+                                    ? 0.5
+                                    : (item.value - mapIntensityRange.min) /
+                                    valueRange;
 
-              {/* 업체별 통계 */}
-              {companyStatsAll.length > 0 && (
-                <Grid item xs={12}>
-                  <Paper elevation={2} sx={{ borderRadius: 2, overflow: 'hidden' }}>
-                    <Box
-                      sx={{
-                        px: 3,
-                        py: 2,
-                        borderBottom: '1px solid rgba(0,0,0,0.08)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        flexWrap: 'wrap',
-                        gap: 1.5
-                      }}
-                    >
-                      <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                        업체별 통계 개요
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        평균 비용·등록 건수·신뢰도 등을 기반으로 상위 업체를 확인할 수 있습니다.
-                      </Typography>
-                    </Box>
-                    <Box sx={{ px: 3, py: 3 }}>
-                      <Grid container spacing={2} sx={{ mb: 2 }}>
+                                if (item.type === 'company') {
+                                  const color =
+                                    mapMetric === 'popular' ? '#ff7043' : '#4caf50';
+                                  const radius =
+                                    mapMetric === 'popular'
+                                      ? 10000 + normalized * 25000
+                                      : 8000 + normalized * 20000;
+                                  return (
+                                    <CircleMarker
+                                      key={item.key}
+                                      center={[item.coords.lat, item.coords.lng]}
+                                      radius={Math.max(radius / 4000, 8)}
+                                      pathOptions={{
+                                        color,
+                                        fillColor: color,
+                                        fillOpacity: 0.4,
+                                        weight: 2
+                                      }}
+                                    >
+                                      <LeafletTooltip direction="top" offset={[0, -2]}>
+                                        <div style={{ minWidth: 180 }}>
+                                          <strong>{item.region}</strong>
+                                          <br />
+                                          {mapMetric === 'popular'
+                                            ? `등록 건수: ${item.label}`
+                                            : `평균 속도 점수: ${item.label}`}
+                                          <br />
+                                          {item.topCompany
+                                            ? `${item.topCompany.name} (${item.topCompany.phone || '-'})`
+                                            : '상위 업체 정보 없음'}
+                                          {mapMetric === 'excellent' && item.entryCount && (
+                                            <>
+                                              <br />
+                                              등록 건수: {item.entryCount.toLocaleString()}건
+                                            </>
+                                          )}
+                                        </div>
+                                      </LeafletTooltip>
+                                    </CircleMarker>
+                                  );
+                                }
+
+                                const color = getGradientColor(
+                                  mapMetric,
+                                  item.value,
+                                  mapIntensityRange.min,
+                                  mapIntensityRange.max
+                                );
+                                const radiusMeters = 25000 + normalized * 80000;
+
+                                return (
+                                  <Circle
+                                    key={item.key}
+                                    center={[item.coords.lat, item.coords.lng]}
+                                    radius={Math.max(radiusMeters, 15000)}
+                                    pathOptions={{
+                                      color,
+                                      fillColor: color,
+                                      fillOpacity: 0.35,
+                                      weight: 1.5
+                                    }}
+                                  >
+                                    <LeafletTooltip direction="top" offset={[0, -4]}>
+                                      <div style={{ minWidth: 190 }}>
+                                        <strong>{item.region}</strong>
+                                        <br />
+                                        {mapMetric === 'volume' && (
+                                          <>
+                                            등록 건수: {item.totalEntries?.toLocaleString()}건
+                                            <br />
+                                            업체 수: {item.companyCount?.toLocaleString()}곳
+                                            <br />
+                                            평균 비용:{' '}
+                                            {item.averageCost
+                                              ? `${item.averageCost.toLocaleString()}원`
+                                              : '-'}
+                                            <br />
+                                            평균 거리:{' '}
+                                            {item.averageDistance
+                                              ? `${item.averageDistance.toLocaleString()}km`
+                                              : '-'}
+                                            <br />
+                                            거리 데이터 커버리지:{' '}
+                                            {item.distanceCoverage ?? 0}%
+                                          </>
+                                        )}
+                                        {mapMetric === 'avgCost' && (
+                                          <>
+                                            평균 비용: {item.label}
+                                            <br />
+                                            등록 건수:{' '}
+                                            {item.totalEntries?.toLocaleString()}건
+                                            <br />
+                                            업체 수:{' '}
+                                            {item.companyCount?.toLocaleString()}곳
+                                          </>
+                                        )}
+                                        {mapMetric === 'avgDistance' && (
+                                          <>
+                                            평균 거리: {item.label}
+                                            <br />
+                                            km당 비용:{' '}
+                                            {item.averageCostPerKm
+                                              ? `${item.averageCostPerKm.toLocaleString()}원/km`
+                                              : '-'}
+                                            <br />
+                                            거리 데이터 커버리지:{' '}
+                                            {item.distanceCoverage ?? 0}%
+                                          </>
+                                        )}
+                                        {mapMetric === 'costPerKm' && (
+                                          <>
+                                            평균 km당 비용: {item.label}
+                                            <br />
+                                            평균 비용:{' '}
+                                            {item.averageCost
+                                              ? `${item.averageCost.toLocaleString()}원`
+                                              : '-'}
+                                            <br />
+                                            평균 거리:{' '}
+                                            {item.averageDistance
+                                              ? `${item.averageDistance.toLocaleString()}km`
+                                              : '-'}
+                                          </>
+                                        )}
+                                      </div>
+                                    </LeafletTooltip>
+                                  </Circle>
+                                );
+                              })}
+                            </MapContainer>
+                          )}
+                        </Box>
+                      </Paper>
+                    </Grid>
+
+                    {hasDistanceAnalysis && (
+                      <Grid item xs={12}>
+                        <Paper elevation={2} sx={{ borderRadius: 2, overflow: 'hidden' }}>
+                          <Box
+                            sx={{
+                              px: 3,
+                              py: 2,
+                              borderBottom: '1px solid rgba(0,0,0,0.08)'
+                            }}
+                          >
+                            <Stack
+                              direction={{ xs: 'column', sm: 'row' }}
+                              spacing={1}
+                              alignItems={{ xs: 'flex-start', sm: 'center' }}
+                              justifyContent="space-between"
+                            >
+                              <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                                거리대별 비용 분석
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                위경도 좌표가 있는 구간만 집계되며, 각 구간의 평균 비용과 km당 비용을
+                                제공합니다.
+                              </Typography>
+                            </Stack>
+                          </Box>
+                          <Box sx={{ px: 3, py: 2 }}>
+                            <Table size="small">
+                              <TableHead>
+                                <TableRow>
+                                  <TableCell sx={{ fontWeight: 600 }}>거리 구간</TableCell>
+                                  <TableCell sx={{ fontWeight: 600 }} align="right">
+                                    등록 건수
+                                  </TableCell>
+                                  <TableCell sx={{ fontWeight: 600 }} align="right">
+                                    평균 비용
+                                  </TableCell>
+                                  <TableCell sx={{ fontWeight: 600 }} align="right">
+                                    평균 km당 비용
+                                  </TableCell>
+                                </TableRow>
+                              </TableHead>
+                              <TableBody>
+                                {distanceCostAnalysis.map((bucket) => (
+                                  <TableRow key={bucket.label}>
+                                    <TableCell>{bucket.label}</TableCell>
+                                    <TableCell align="right">
+                                      {bucket.count?.toLocaleString() || 0}
+                                    </TableCell>
+                                    <TableCell align="right">
+                                      {bucket.averageCost
+                                        ? `${bucket.averageCost.toLocaleString()}원`
+                                        : '-'}
+                                    </TableCell>
+                                    <TableCell align="right">
+                                      {bucket.averageCostPerKm
+                                        ? `${bucket.averageCostPerKm.toLocaleString()}원/km`
+                                        : '-'}
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </Box>
+                        </Paper>
+                      </Grid>
+                    )}
+
+                    {/* 요약 카드 */}
+                    <Grid item xs={12}>
+                      <Grid container spacing={2}>
                         <Grid item xs={12} md={3}>
                           {renderSummaryCard(
                             '총 업체 수',
-                            `${companyOverview.totalCompanies.toLocaleString()} 곳`,
-                            <LeaderboardIcon />,
-                            '통계에 포함된 업체 (업체+전화 조합)',
+                            `${summaryStats.totalCompanies.toLocaleString()} 곳`,
+                            <InsightsIcon />,
+                            '등록된 퀵서비스 업체 수',
+                            modeColor
+                          )}
+                        </Grid>
+                        <Grid item xs={12} md={3}>
+                          {renderSummaryCard(
+                            '총 입력 건수',
+                            `${summaryStats.totalEntries.toLocaleString()} 건`,
+                            <CheckCircleIcon />,
+                            '누적 입력 기록',
                             '#1976d2'
                           )}
                         </Grid>
                         <Grid item xs={12} md={3}>
                           {renderSummaryCard(
-                            '총 등록 건수',
-                            `${companyOverview.totalEntries.toLocaleString()} 건`,
-                            <TrendingUpIcon />,
-                            '전체 업체의 누적 입력 수',
-                            '#5c6bc0'
-                          )}
-                        </Grid>
-                        <Grid item xs={12} md={3}>
-                          {renderSummaryCard(
                             '평균 비용',
-                            companyOverview.averageCost
-                              ? `${companyOverview.averageCost.toLocaleString()} 원`
+                            summaryStats.averageCost
+                              ? `${summaryStats.averageCost.toLocaleString()} 원`
                               : '-',
-                            <AttachMoneyIcon />,
-                            '전체 업체 평균 예상 비용',
-                            '#ff7043'
+                            <MapOutlinedIcon />,
+                            '전체 평균 예상 비용',
+                            '#ff9800'
                           )}
                         </Grid>
                         <Grid item xs={12} md={3}>
                           {renderSummaryCard(
                             '평균 신뢰도',
-                            `${companyOverview.averageReliability} 점`,
+                            `${summaryStats.averageReliability}`,
                             <InsightsIcon />,
-                            '업체별 신뢰도 점수 평균',
+                            '입력량/일관성 기반 지표',
                             '#009688'
                           )}
                         </Grid>
                       </Grid>
+                    </Grid>
 
-                      <Grid container spacing={3}>
-                        <Grid item xs={12} md={6}>
-                          <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-                            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1.5 }}>
-                              신뢰도 상위 업체
+                    {/* 최근 등록 추이 */}
+                    <Grid item xs={12}>
+                      <Paper
+                        elevation={2}
+                        sx={{ borderRadius: 2, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+                      >
+                        <Box
+                          sx={{
+                            px: 3,
+                            py: 2,
+                            borderBottom: '1px solid rgba(0,0,0,0.08)',
+                            display: 'flex',
+                            flexDirection: { xs: 'column', sm: 'row' },
+                            gap: 1.5,
+                            justifyContent: 'space-between'
+                          }}
+                        >
+                          <Stack spacing={0.5}>
+                            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                              최근 등록 추이
                             </Typography>
-                            <Table size="small">
-                              <TableHead>
-                                <TableRow>
-                                  <TableCell sx={{ fontWeight: 600 }}>업체명</TableCell>
-                                  <TableCell sx={{ fontWeight: 600 }} align="right">
-                                    신뢰도
-                                  </TableCell>
-                                  <TableCell sx={{ fontWeight: 600 }} align="right">
-                                    등록수
-                                  </TableCell>
-                                  <TableCell sx={{ fontWeight: 600 }} align="right">
-                                    평균 비용
-                                  </TableCell>
-                                </TableRow>
-                              </TableHead>
-                              <TableBody>
-                                {topReliableCompanies.map((company, index) => {
-                                  const status = getReliabilityStatus(
-                                    company.reliabilityScore || 0
-                                  );
-                                  return (
-                                    <TableRow key={`${company.companyName}-${company.phoneNumber}-${index}`}>
-                                      <TableCell>
-                                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                          {company.companyName}
-                                        </Typography>
-                                        <Typography variant="caption" color="text.secondary">
-                                          {company.phoneNumber}
-                                        </Typography>
-                                      </TableCell>
-                                      <TableCell align="right">
-                                        <Chip
-                                          size="small"
-                                          color={status.color}
-                                          label={`${company.reliabilityScore || 0}점`}
-                                          sx={{ fontWeight: 600 }}
-                                        />
-                                      </TableCell>
-                                      <TableCell align="right">
-                                        {company.entryCount?.toLocaleString()}건
-                                      </TableCell>
-                                      <TableCell align="right">
-                                        {company.averageCost?.toLocaleString()}원
-                                      </TableCell>
-                                    </TableRow>
-                                  );
-                                })}
-                              </TableBody>
-                            </Table>
-                          </Paper>
-                        </Grid>
-                        <Grid item xs={12} md={6}>
-                          <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-                            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1.5 }}>
-                              등록 건수 상위 업체
+                            <Typography variant="caption" color="text.secondary">
+                              {trendDescription}
                             </Typography>
-                            <Table size="small">
-                              <TableHead>
-                                <TableRow>
-                                  <TableCell sx={{ fontWeight: 600 }}>업체명</TableCell>
-                                  <TableCell sx={{ fontWeight: 600 }} align="right">
-                                    등록수
-                                  </TableCell>
-                                  <TableCell sx={{ fontWeight: 600 }} align="right">
-                                    평균 비용
-                                  </TableCell>
-                                  <TableCell sx={{ fontWeight: 600 }} align="right">
-                                    신뢰도
-                                  </TableCell>
-                                </TableRow>
-                              </TableHead>
-                              <TableBody>
-                                {topVolumeCompanies.map((company, index) => {
-                                  const status = getReliabilityStatus(
-                                    company.reliabilityScore || 0
-                                  );
-                                  return (
-                                    <TableRow key={`${company.companyName}-${company.phoneNumber}-volume-${index}`}>
-                                      <TableCell>
-                                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                          {company.companyName}
-                                        </Typography>
-                                        <Typography variant="caption" color="text.secondary">
-                                          {company.phoneNumber}
-                                        </Typography>
-                                      </TableCell>
-                                      <TableCell align="right">
-                                        {company.entryCount?.toLocaleString()}건
-                                      </TableCell>
-                                      <TableCell align="right">
-                                        {company.averageCost?.toLocaleString()}원
-                                      </TableCell>
-                                      <TableCell align="right">
-                                        <Chip
-                                          size="small"
-                                          color={status.color}
-                                          label={`${company.reliabilityScore || 0}점`}
-                                          sx={{ fontWeight: 600 }}
-                                        />
-                                      </TableCell>
-                                    </TableRow>
-                                  );
-                                })}
-                              </TableBody>
-                            </Table>
-                          </Paper>
-                        </Grid>
-                        <Grid item xs={12}>
-                          <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-                            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1.5 }}>
-                              평균 비용이 낮은 우수 업체 (등록 3건 이상)
-                            </Typography>
-                            <Table size="small">
-                              <TableHead>
-                                <TableRow>
-                                  <TableCell sx={{ fontWeight: 600 }}>업체명</TableCell>
-                                  <TableCell sx={{ fontWeight: 600 }} align="right">
-                                    평균 비용
-                                  </TableCell>
-                                  <TableCell sx={{ fontWeight: 600 }} align="right">
-                                    등록수
-                                  </TableCell>
-                                  <TableCell sx={{ fontWeight: 600 }} align="right">
-                                    신뢰도
-                                  </TableCell>
-                                  <TableCell sx={{ fontWeight: 600 }} align="right">
-                                    속도 점수
-                                  </TableCell>
-                                </TableRow>
-                              </TableHead>
-                              <TableBody>
-                                {topAffordableCompanies.length === 0 ? (
-                                  <TableRow>
-                                    <TableCell colSpan={5} align="center">
-                                      <Typography variant="body2" color="text.secondary">
-                                        조건을 충족하는 업체가 없습니다.
-                                      </Typography>
-                                    </TableCell>
-                                  </TableRow>
-                                ) : (
-                                  topAffordableCompanies.map((company, index) => {
-                                    const status = getReliabilityStatus(
-                                      company.reliabilityScore || 0
-                                    );
-                                    return (
-                                      <TableRow key={`${company.companyName}-${company.phoneNumber}-affordable-${index}`}>
-                                        <TableCell>
-                                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                            {company.companyName}
-                                          </Typography>
-                                          <Typography variant="caption" color="text.secondary">
-                                            {company.phoneNumber}
-                                          </Typography>
-                                        </TableCell>
-                                        <TableCell align="right">
-                                          {company.averageCost?.toLocaleString()}원
-                                        </TableCell>
-                                        <TableCell align="right">
-                                          {company.entryCount?.toLocaleString()}건
-                                        </TableCell>
-                                        <TableCell align="right">
-                                          <Chip
-                                            size="small"
-                                            color={status.color}
-                                            label={`${company.reliabilityScore || 0}점`}
-                                            sx={{ fontWeight: 600 }}
-                                          />
-                                        </TableCell>
-                                        <TableCell align="right">
-                                          {company.averageSpeedScore}
-                                        </TableCell>
-                                      </TableRow>
-                                    );
-                                  })
-                                )}
-                              </TableBody>
-                            </Table>
-                          </Paper>
-                        </Grid>
-                      </Grid>
-                    </Box>
-                  </Paper>
-                </Grid>
-              )}
-
-                {/* 데이터 품질 */}
-                <Grid item xs={12}>
-                  <Paper elevation={2} sx={{ borderRadius: 2, overflow: 'hidden' }}>
-                    <Box sx={{ px: 3, py: 2, borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
-                      <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                        데이터 품질 현황
-                      </Typography>
-                    </Box>
-                    <Box sx={{ px: 3, py: 3 }}>
-                      <Grid container spacing={3}>
-                        <Grid item xs={12} md={4}>
-                          <Stack spacing={1.5}>
-                            <Typography variant="subtitle2" color="text.secondary">
-                              업체명 정규화 진행률
-                            </Typography>
-                            <Stack direction="row" spacing={1} alignItems="center">
-                              <Chip
-                                color="primary"
-                                variant="outlined"
-                                label={`${normalizationRate}%`}
-                                sx={{ fontWeight: 600 }}
-                              />
-                              <Typography variant="body2" color="text.secondary">
-                                총 {quality.normalizationStatus.total.toLocaleString()}건 중{' '}
-                                {quality.normalizationStatus.normalized.toLocaleString()}건 정규화
-                              </Typography>
-                            </Stack>
                           </Stack>
-                        </Grid>
-                        <Grid item xs={12} md={4}>
-                          <Stack spacing={1.5}>
-                            <Typography variant="subtitle2" color="text.secondary">
-                              업체명 중복률
-                            </Typography>
-                            <Stack direction="row" spacing={1} alignItems="center">
-                              <Chip
-                                color={
-                                  quality.duplicateRate < 20
-                                    ? 'success'
-                                    : quality.duplicateRate < 40
-                                    ? 'warning'
-                                    : 'error'
-                                }
-                                label={
-                                  quality.duplicateRate === null ||
-                                  quality.duplicateRate === undefined
-                                    ? '-'
-                                    : `${quality.duplicateRate.toFixed(2)}%`
-                                }
-                                sx={{ fontWeight: 600 }}
-                              />
-                              <Typography variant="body2" color="text.secondary">
-                                중복률이 높을수록 정규화 필요성이 큽니다.
-                              </Typography>
-                            </Stack>
-                          </Stack>
-                        </Grid>
-                        <Grid item xs={12} md={4}>
-                          <Stack spacing={1.5}>
-                            <Typography variant="subtitle2" color="text.secondary">
-                              이상치 데이터
-                            </Typography>
-                            {quality.outliers?.length > 0 ? (
-                              <Stack direction="row" spacing={1} align-items="center">
-                                <WarningAmberIcon color="warning" />
-                                <Typography variant="body2">
-                                  {quality.outliers.length.toLocaleString()}건의 이상치 검토 필요
-                                </Typography>
-                              </Stack>
-                            ) : (
-                              <Stack direction="row" spacing={1} align-items="center">
-                                <CheckCircleIcon color="success" />
-                                <Typography variant="body2" color="text.secondary">
-                                  검토가 필요한 이상치 데이터가 없습니다.
+                          <Stack
+                            spacing={1}
+                            alignItems={{ xs: 'flex-start', sm: 'flex-end' }}
+                          >
+                            <ToggleButtonGroup
+                              size="small"
+                              value={trendGranularity}
+                              exclusive
+                              onChange={handleTrendGranularityChange}
+                              sx={{ alignSelf: { xs: 'stretch', sm: 'flex-end' } }}
+                            >
+                              {TREND_OPTIONS.map((option) => {
+                                const disabled =
+                                  !Array.isArray(trendDataMap[option.key]) ||
+                                  trendDataMap[option.key].length === 0;
+                                return (
+                                  <ToggleButton
+                                    key={option.key}
+                                    value={option.key}
+                                    disabled={disabled}
+                                  >
+                                    {option.label}
+                                  </ToggleButton>
+                                );
+                              })}
+                            </ToggleButtonGroup>
+                            {latestTrend && (
+                              <Stack spacing={0.5}>
+                                <Stack
+                                  direction={{ xs: 'column', sm: 'row' }}
+                                  spacing={1.5}
+                                  alignItems={{ xs: 'flex-start', sm: 'center' }}
+                                >
+                                  <Chip
+                                    size="small"
+                                    color="primary"
+                                    label={`${latestLabelPrefix} ${latestTrend.displayLabel}`}
+                                    sx={{ fontWeight: 600 }}
+                                  />
+                                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                    등록 {formatNumberWithUnit(latestTrend.entryCount, '건')} · 평균 비용{' '}
+                                    {latestTrend.averageCost !== null
+                                      ? `${latestTrend.averageCost.toLocaleString()}원`
+                                      : '-'}
+                                  </Typography>
+                                </Stack>
+                                <Typography variant="caption" color="text.secondary">
+                                  {comparisonLabel} 대비 등록{' '}
+                                  {entryDelta !== null
+                                    ? formatTrendDelta(entryDelta, '건')
+                                    : '비교 데이터 없음'}{' '}
+                                  · 평균 비용{' '}
+                                  {costDelta !== null
+                                    ? formatTrendDelta(costDelta, '원')
+                                    : '비교 데이터 없음'}
                                 </Typography>
                               </Stack>
                             )}
                           </Stack>
+                        </Box>
+                        <Box sx={{ px: 2.5, py: 3, height: 340 }}>
+                          {timeTrendSeries.length === 0 ? (
+                            <Stack
+                              sx={{ height: '100%' }}
+                              alignItems="center"
+                              justifyContent="center"
+                              spacing={1.5}
+                              color="text.secondary"
+                            >
+                              <MapOutlinedIcon fontSize="large" />
+                              <Typography variant="body2">
+                                추이를 분석할 데이터가 부족합니다.
+                              </Typography>
+                            </Stack>
+                          ) : (
+                            <ResponsiveContainer width="100%" height="100%">
+                              <ComposedChart
+                                data={timeTrendSeries}
+                                margin={{ top: 8, right: 24, bottom: 12, left: 8 }}
+                              >
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="displayLabel" />
+                                <YAxis
+                                  yAxisId="left"
+                                  orientation="left"
+                                  tickFormatter={(value) =>
+                                    value ? `${value.toLocaleString()}원` : '0원'
+                                  }
+                                  domain={[0, trendCostAxisMax || 'auto']}
+                                />
+                                <YAxis
+                                  yAxisId="right"
+                                  orientation="right"
+                                  tickFormatter={(value) =>
+                                    value ? `${value.toLocaleString()}건` : '0건'
+                                  }
+                                  domain={[0, trendEntryAxisMax || 'auto']}
+                                />
+                                <RechartsTooltip
+                                  formatter={(value, name) => {
+                                    if (name === '평균 비용') {
+                                      return [
+                                        typeof value === 'number'
+                                          ? `${value.toLocaleString()}원`
+                                          : '-',
+                                        name
+                                      ];
+                                    }
+                                    if (name === '등록 건수') {
+                                      return [
+                                        typeof value === 'number'
+                                          ? `${value.toLocaleString()}건`
+                                          : '-',
+                                        name
+                                      ];
+                                    }
+                                    return [value, name];
+                                  }}
+                                  labelFormatter={(label, payload) => {
+                                    const item = payload?.[0]?.payload;
+                                    if (item) {
+                                      const range = formatDateRange(
+                                        item.startTimestamp,
+                                        item.endTimestamp
+                                      );
+                                      if (range) {
+                                        return `기간: ${range}`;
+                                      }
+                                      if (item.displayLabel) {
+                                        return `기간: ${item.displayLabel}`;
+                                      }
+                                    }
+                                    return `기간: ${label}`;
+                                  }}
+                                />
+                                <Legend />
+                                <Bar
+                                  yAxisId="right"
+                                  dataKey="entryCount"
+                                  name="등록 건수"
+                                  fill="#90caf9"
+                                  radius={[6, 6, 0, 0]}
+                                />
+                                <Line
+                                  yAxisId="left"
+                                  type="monotone"
+                                  dataKey="averageCost"
+                                  name="평균 비용"
+                                  stroke="#ff7043"
+                                  strokeWidth={2}
+                                  dot={{ r: 3 }}
+                                  activeDot={{ r: 5 }}
+                                />
+                              </ComposedChart>
+                            </ResponsiveContainer>
+                          )}
+                        </Box>
+                      </Paper>
+                    </Grid>
+
+                    {/* 인기/우수 테이블 */}
+                    <Grid item xs={12}>
+                      <Grid container spacing={3}>
+                        <Grid item xs={12} lg={6}>
+                          {renderTable(
+                            '지역별 인기 업체 TOP 20',
+                            statistics.popularCompanies || [],
+                            [
+                              {
+                                key: 'rank',
+                                label: '순위',
+                                align: 'center',
+                                render: (_row, index) => index + 1
+                              },
+                              { key: 'region', label: '지역', nowrap: true },
+                              {
+                                key: 'companyName',
+                                label: '업체명',
+                                render: (row) => (
+                                  <Stack spacing={0.5}>
+                                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                      {row.companyName}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                      {row.phoneNumber}
+                                    </Typography>
+                                  </Stack>
+                                )
+                              },
+                              {
+                                key: 'entryCount',
+                                label: '등록 건수',
+                                align: 'right',
+                                render: (row) =>
+                                  `${(row.entryCount || 0).toLocaleString()} 건`
+                              }
+                            ],
+                            '해당 지역의 인기 업체 데이터가 없습니다.'
+                          )}
+                        </Grid>
+                        <Grid item xs={12} lg={6}>
+                          {renderTable(
+                            '지역별 우수 업체 TOP 20',
+                            statistics.excellentCompanies || [],
+                            [
+                              {
+                                key: 'rank',
+                                label: '순위',
+                                align: 'center',
+                                render: (_row, index) => index + 1
+                              },
+                              { key: 'region', label: '지역', nowrap: true },
+                              {
+                                key: 'companyName',
+                                label: '업체명',
+                                render: (row) => (
+                                  <Stack spacing={0.5}>
+                                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                      {row.companyName}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                      {row.phoneNumber}
+                                    </Typography>
+                                  </Stack>
+                                )
+                              },
+                              {
+                                key: 'averageSpeedScore',
+                                label: '평균 속도 점수',
+                                align: 'right',
+                                render: (row) => (
+                                  <Chip
+                                    size="small"
+                                    color={
+                                      row.averageSpeedScore >= 2.5
+                                        ? 'success'
+                                        : row.averageSpeedScore >= 2
+                                          ? 'warning'
+                                          : 'default'
+                                    }
+                                    label={row.averageSpeedScore?.toFixed(2) || '-'}
+                                    sx={{ fontWeight: 600 }}
+                                  />
+                                )
+                              }
+                            ],
+                            '해당 지역의 우수 업체 데이터가 없습니다.'
+                          )}
                         </Grid>
                       </Grid>
-                      <Divider sx={{ my: 3 }} />
-                      <Grid container spacing={3}>
-                        <Grid item xs={12}>
-                          <Paper
-                            variant="outlined"
-                            sx={{ p: 2, borderRadius: 2 }}
+                    </Grid>
+
+                    {/* 업체별 통계 */}
+                    {companyStatsAll.length > 0 && (
+                      <Grid item xs={12}>
+                        <Paper elevation={2} sx={{ borderRadius: 2, overflow: 'hidden' }}>
+                          <Box
+                            sx={{
+                              px: 3,
+                              py: 2,
+                              borderBottom: '1px solid rgba(0,0,0,0.08)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              flexWrap: 'wrap',
+                              gap: 1.5
+                            }}
                           >
-                            <Stack spacing={1.5}>
-                              <Stack direction="row" spacing={1} alignItems="center">
-                                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                                  신뢰도 평가
-                                </Typography>
-                                <Tooltip title="등록 건수, 비용 분산, 이상치 비율을 기반으로 산출된 신뢰도 점수입니다.">
-                                  <IconButton size="small">
-                                    <InfoOutlinedIcon fontSize="inherit" />
-                                  </IconButton>
-                                </Tooltip>
-                              </Stack>
-                              {reliabilityScores.length === 0 ? (
-                                <Typography variant="body2" color="text.secondary">
-                                  계산 가능한 신뢰도 데이터가 없습니다.
-                                </Typography>
-                              ) : (
-                                <Table size="small">
-                                  <TableHead>
-                                    <TableRow>
-                                      <TableCell sx={{ fontWeight: 600 }}>업체명</TableCell>
-                                      <TableCell sx={{ fontWeight: 600 }} align="right">
-                                        신뢰도
-                                      </TableCell>
-                                      <TableCell sx={{ fontWeight: 600 }} align="right">
-                                        등록수
-                                      </TableCell>
-                                      <TableCell sx={{ fontWeight: 600 }} align="right">
-                                        평균 비용
-                                      </TableCell>
-                                      <TableCell sx={{ fontWeight: 600 }} align="right">
-                                        표준편차
-                                      </TableCell>
-                                      <TableCell sx={{ fontWeight: 600 }} align="right">
-                                        이상치 비율
-                                      </TableCell>
-                                    </TableRow>
-                                  </TableHead>
-                                  <TableBody>
-                                    {reliabilityScores.map((item) => {
-                                      const status = getReliabilityStatus(item.score);
-                                      return (
-                                        <TableRow key={item.normalizedName}>
-                                          <TableCell>
-                                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                              {item.displayName || item.normalizedName}
-                                            </Typography>
-                                            {item.displayName !== item.normalizedName && (
-                                              <Typography variant="caption" color="text.secondary">
-                                                ({item.normalizedName})
+                            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                              업체별 통계 개요
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              평균 비용·등록 건수·신뢰도 등을 기반으로 상위 업체를 확인할 수 있습니다.
+                            </Typography>
+                          </Box>
+                          <Box sx={{ px: 3, py: 3 }}>
+                            <Grid container spacing={2} sx={{ mb: 2 }}>
+                              <Grid item xs={12} md={3}>
+                                {renderSummaryCard(
+                                  '총 업체 수',
+                                  `${companyOverview.totalCompanies.toLocaleString()} 곳`,
+                                  <LeaderboardIcon />,
+                                  '통계에 포함된 업체 (업체+전화 조합)',
+                                  '#1976d2'
+                                )}
+                              </Grid>
+                              <Grid item xs={12} md={3}>
+                                {renderSummaryCard(
+                                  '총 등록 건수',
+                                  `${companyOverview.totalEntries.toLocaleString()} 건`,
+                                  <TrendingUpIcon />,
+                                  '전체 업체의 누적 입력 수',
+                                  '#5c6bc0'
+                                )}
+                              </Grid>
+                              <Grid item xs={12} md={3}>
+                                {renderSummaryCard(
+                                  '평균 비용',
+                                  companyOverview.averageCost
+                                    ? `${companyOverview.averageCost.toLocaleString()} 원`
+                                    : '-',
+                                  <AttachMoneyIcon />,
+                                  '전체 업체 평균 예상 비용',
+                                  '#ff7043'
+                                )}
+                              </Grid>
+                              <Grid item xs={12} md={3}>
+                                {renderSummaryCard(
+                                  '평균 신뢰도',
+                                  `${companyOverview.averageReliability} 점`,
+                                  <InsightsIcon />,
+                                  '업체별 신뢰도 점수 평균',
+                                  '#009688'
+                                )}
+                              </Grid>
+                            </Grid>
+
+                            <Grid container spacing={3}>
+                              <Grid item xs={12} md={6}>
+                                <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                                  <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1.5 }}>
+                                    신뢰도 상위 업체
+                                  </Typography>
+                                  <Table size="small">
+                                    <TableHead>
+                                      <TableRow>
+                                        <TableCell sx={{ fontWeight: 600 }}>업체명</TableCell>
+                                        <TableCell sx={{ fontWeight: 600 }} align="right">
+                                          신뢰도
+                                        </TableCell>
+                                        <TableCell sx={{ fontWeight: 600 }} align="right">
+                                          등록수
+                                        </TableCell>
+                                        <TableCell sx={{ fontWeight: 600 }} align="right">
+                                          평균 비용
+                                        </TableCell>
+                                      </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                      {topReliableCompanies.map((company, index) => {
+                                        const status = getReliabilityStatus(
+                                          company.reliabilityScore || 0
+                                        );
+                                        return (
+                                          <TableRow key={`${company.companyName}-${company.phoneNumber}-${index}`}>
+                                            <TableCell>
+                                              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                                {company.companyName}
                                               </Typography>
-                                            )}
-                                          </TableCell>
-                                          <TableCell align="right">
-                                            <Chip
-                                              size="small"
-                                              color={status.color}
-                                              label={`${item.score}점 · ${status.label}`}
-                                              sx={{ fontWeight: 600 }}
-                                            />
-                                          </TableCell>
-                                          <TableCell align="right">
-                                            {item.entryCount?.toLocaleString()}건
-                                          </TableCell>
-                                          <TableCell align="right">
-                                            {item.meanCost?.toLocaleString()}원
-                                          </TableCell>
-                                          <TableCell align="right">
-                                            {item.stdDev?.toLocaleString()}원
-                                          </TableCell>
-                                          <TableCell align="right">
-                                            {item.outlierRatio?.toFixed(2)}%
+                                              <Typography variant="caption" color="text.secondary">
+                                                {company.phoneNumber}
+                                              </Typography>
+                                            </TableCell>
+                                            <TableCell align="right">
+                                              <Chip
+                                                size="small"
+                                                color={status.color}
+                                                label={`${company.reliabilityScore || 0}점`}
+                                                sx={{ fontWeight: 600 }}
+                                              />
+                                            </TableCell>
+                                            <TableCell align="right">
+                                              {company.entryCount?.toLocaleString()}건
+                                            </TableCell>
+                                            <TableCell align="right">
+                                              {company.averageCost?.toLocaleString()}원
+                                            </TableCell>
+                                          </TableRow>
+                                        );
+                                      })}
+                                    </TableBody>
+                                  </Table>
+                                </Paper>
+                              </Grid>
+                              <Grid item xs={12} md={6}>
+                                <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                                  <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1.5 }}>
+                                    등록 건수 상위 업체
+                                  </Typography>
+                                  <Table size="small">
+                                    <TableHead>
+                                      <TableRow>
+                                        <TableCell sx={{ fontWeight: 600 }}>업체명</TableCell>
+                                        <TableCell sx={{ fontWeight: 600 }} align="right">
+                                          등록수
+                                        </TableCell>
+                                        <TableCell sx={{ fontWeight: 600 }} align="right">
+                                          평균 비용
+                                        </TableCell>
+                                        <TableCell sx={{ fontWeight: 600 }} align="right">
+                                          신뢰도
+                                        </TableCell>
+                                      </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                      {topVolumeCompanies.map((company, index) => {
+                                        const status = getReliabilityStatus(
+                                          company.reliabilityScore || 0
+                                        );
+                                        return (
+                                          <TableRow key={`${company.companyName}-${company.phoneNumber}-volume-${index}`}>
+                                            <TableCell>
+                                              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                                {company.companyName}
+                                              </Typography>
+                                              <Typography variant="caption" color="text.secondary">
+                                                {company.phoneNumber}
+                                              </Typography>
+                                            </TableCell>
+                                            <TableCell align="right">
+                                              {company.entryCount?.toLocaleString()}건
+                                            </TableCell>
+                                            <TableCell align="right">
+                                              {company.averageCost?.toLocaleString()}원
+                                            </TableCell>
+                                            <TableCell align="right">
+                                              <Chip
+                                                size="small"
+                                                color={status.color}
+                                                label={`${company.reliabilityScore || 0}점`}
+                                                sx={{ fontWeight: 600 }}
+                                              />
+                                            </TableCell>
+                                          </TableRow>
+                                        );
+                                      })}
+                                    </TableBody>
+                                  </Table>
+                                </Paper>
+                              </Grid>
+                              <Grid item xs={12}>
+                                <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                                  <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1.5 }}>
+                                    평균 비용이 낮은 우수 업체 (등록 3건 이상)
+                                  </Typography>
+                                  <Table size="small">
+                                    <TableHead>
+                                      <TableRow>
+                                        <TableCell sx={{ fontWeight: 600 }}>업체명</TableCell>
+                                        <TableCell sx={{ fontWeight: 600 }} align="right">
+                                          평균 비용
+                                        </TableCell>
+                                        <TableCell sx={{ fontWeight: 600 }} align="right">
+                                          등록수
+                                        </TableCell>
+                                        <TableCell sx={{ fontWeight: 600 }} align="right">
+                                          신뢰도
+                                        </TableCell>
+                                        <TableCell sx={{ fontWeight: 600 }} align="right">
+                                          속도 점수
+                                        </TableCell>
+                                      </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                      {topAffordableCompanies.length === 0 ? (
+                                        <TableRow>
+                                          <TableCell colSpan={5} align="center">
+                                            <Typography variant="body2" color="text.secondary">
+                                              조건을 충족하는 업체가 없습니다.
+                                            </Typography>
                                           </TableCell>
                                         </TableRow>
-                                      );
-                                    })}
-                                  </TableBody>
-                                </Table>
-                              )}
-                            </Stack>
-                          </Paper>
-                        </Grid>
-                        <Grid item xs={12} md={6}>
-                          <Paper
-                            variant="outlined"
-                            sx={{ p: 2, borderRadius: 2, height: '100%' }}
-                          >
-                            <Stack spacing={1.5} sx={{ height: '100%' }}>
-                              <Stack direction="row" spacing={1} alignItems="center">
-                                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                                  중복 업체명 그룹
-                                </Typography>
-                                <Tooltip title="정규화 키에 여러 변형이 존재하는 상위 그룹">
-                                  <IconButton size="small">
-                                    <InfoOutlinedIcon fontSize="inherit" />
-                                  </IconButton>
-                                </Tooltip>
-                              </Stack>
-                              {duplicateGroups.length === 0 ? (
-                                <Typography variant="body2" color="text.secondary">
-                                  중복 관리가 필요한 업체명이 없습니다.
-                                </Typography>
-                              ) : (
-                                <Table size="small">
-                                  <TableHead>
-                                    <TableRow>
-                                      <TableCell sx={{ fontWeight: 600 }}>
-                                        정규화 이름
-                                      </TableCell>
-                                      <TableCell sx={{ fontWeight: 600 }} align="right">
-                                        등록 건수
-                                      </TableCell>
-                                    </TableRow>
-                                  </TableHead>
-                                  <TableBody>
-                                    {duplicateGroups.map((group) => (
-                                      <TableRow key={group.normalizedName}>
-                                        <TableCell>
-                                          <Typography
-                                            variant="body2"
-                                            sx={{ fontWeight: 600 }}
-                                          >
-                                            {group.normalizedName || '(미정규화)'}
-                                          </Typography>
-                                          <Stack spacing={0.5} sx={{ mt: 0.5 }}>
-                                            {group.variants.slice(0, 3).map((variant) => (
-                                              <Typography
-                                                key={`${variant.name}-${variant.count}`}
-                                                variant="caption"
-                                                color="text.secondary"
-                                              >
-                                                {variant.name || '(빈 문자열)'} ·{' '}
-                                                {variant.count.toLocaleString()}건
-                                              </Typography>
-                                            ))}
-                                            {group.variants.length > 3 && (
-                                              <Typography
-                                                variant="caption"
-                                                color="text.secondary"
-                                              >
-                                                + {group.variants.length - 3}개 변형
-                                              </Typography>
-                                            )}
-                                          </Stack>
-                                        </TableCell>
-                                        <TableCell align="right">
-                                          {group.totalCount.toLocaleString()}건
-                                        </TableCell>
-                                      </TableRow>
-                                    ))}
-                                  </TableBody>
-                                </Table>
-                              )}
-                            </Stack>
-                          </Paper>
-                        </Grid>
-                        <Grid item xs={12} md={6}>
-                          <Paper
-                            variant="outlined"
-                            sx={{ p: 2, borderRadius: 2, height: '100%' }}
-                          >
-                            <Stack spacing={1.5} sx={{ height: '100%' }}>
-                              <Stack direction="row" spacing={1} alignItems="center">
-                                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                                  이상치 감지
-                                </Typography>
-                                <Tooltip title="평균 대비 편차가 큰 비용 입력 항목">
-                                  <IconButton size="small">
-                                    <InfoOutlinedIcon fontSize="inherit" />
-                                  </IconButton>
-                                </Tooltip>
-                              </Stack>
-                              {topOutliers.length === 0 ? (
-                                <Typography variant="body2" color="text.secondary">
-                                  확인이 필요한 이상치 데이터가 없습니다.
-                                </Typography>
-                              ) : (
-                                <Table size="small">
-                                  <TableHead>
-                                    <TableRow>
-                                      <TableCell sx={{ fontWeight: 600 }}>업체명</TableCell>
-                                      <TableCell sx={{ fontWeight: 600 }} align="right">
-                                        비용
-                                      </TableCell>
-                                      <TableCell sx={{ fontWeight: 600 }} align="right">
-                                        편차
-                                      </TableCell>
-                                    </TableRow>
-                                  </TableHead>
-                                  <TableBody>
-                                    {topOutliers.map((item, index) => (
-                                      <TableRow key={`${item.normalizedName}-${index}`}>
-                                        <TableCell>
-                                          <Typography
-                                            variant="body2"
-                                            sx={{ fontWeight: 600 }}
-                                          >
-                                            {item.companyName}
-                                          </Typography>
-                                          <Typography
-                                            variant="caption"
-                                            color="text.secondary"
-                                          >
-                                            {item.fromStoreName || '-'} →{' '}
-                                            {item.toStoreName || '-'}
-                                          </Typography>
-                                        </TableCell>
-                                        <TableCell align="right">
-                                          {item.cost?.toLocaleString()}원
-                                        </TableCell>
-                                        <TableCell align="right">
-                                          +{item.deviationRatio}%
-                                        </TableCell>
-                                      </TableRow>
-                                    ))}
-                                  </TableBody>
-                                </Table>
-                              )}
-                            </Stack>
-                          </Paper>
-                        </Grid>
-                        {mergeSuggestions.length > 0 && (
-                          <Grid item xs={12}>
-                            <Paper
-                              variant="outlined"
-                              sx={{ p: 2, borderRadius: 2 }}
-                            >
+                                      ) : (
+                                        topAffordableCompanies.map((company, index) => {
+                                          const status = getReliabilityStatus(
+                                            company.reliabilityScore || 0
+                                          );
+                                          return (
+                                            <TableRow key={`${company.companyName}-${company.phoneNumber}-affordable-${index}`}>
+                                              <TableCell>
+                                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                                  {company.companyName}
+                                                </Typography>
+                                                <Typography variant="caption" color="text.secondary">
+                                                  {company.phoneNumber}
+                                                </Typography>
+                                              </TableCell>
+                                              <TableCell align="right">
+                                                {company.averageCost?.toLocaleString()}원
+                                              </TableCell>
+                                              <TableCell align="right">
+                                                {company.entryCount?.toLocaleString()}건
+                                              </TableCell>
+                                              <TableCell align="right">
+                                                <Chip
+                                                  size="small"
+                                                  color={status.color}
+                                                  label={`${company.reliabilityScore || 0}점`}
+                                                  sx={{ fontWeight: 600 }}
+                                                />
+                                              </TableCell>
+                                              <TableCell align="right">
+                                                {company.averageSpeedScore}
+                                              </TableCell>
+                                            </TableRow>
+                                          );
+                                        })
+                                      )}
+                                    </TableBody>
+                                  </Table>
+                                </Paper>
+                              </Grid>
+                            </Grid>
+                          </Box>
+                        </Paper>
+                      </Grid>
+                    )}
+
+                    {/* 데이터 품질 */}
+                    <Grid item xs={12}>
+                      <Paper elevation={2} sx={{ borderRadius: 2, overflow: 'hidden' }}>
+                        <Box sx={{ px: 3, py: 2, borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
+                          <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                            데이터 품질 현황
+                          </Typography>
+                        </Box>
+                        <Box sx={{ px: 3, py: 3 }}>
+                          <Grid container spacing={3}>
+                            <Grid item xs={12} md={4}>
                               <Stack spacing={1.5}>
+                                <Typography variant="subtitle2" color="text.secondary">
+                                  업체명 정규화 진행률
+                                </Typography>
                                 <Stack direction="row" spacing={1} alignItems="center">
-                                  <Typography
-                                    variant="subtitle2"
+                                  <Chip
+                                    color="primary"
+                                    variant="outlined"
+                                    label={`${normalizationRate}%`}
                                     sx={{ fontWeight: 600 }}
-                                  >
-                                    병합 제안
+                                  />
+                                  <Typography variant="body2" color="text.secondary">
+                                    총 {quality.normalizationStatus.total.toLocaleString()}건 중{' '}
+                                    {quality.normalizationStatus.normalized.toLocaleString()}건 정규화
                                   </Typography>
-                                  <Tooltip title="동일 정규화 키로 매칭되는 주요 변형 목록입니다. 유사 업체명 병합을 검토하세요.">
-                                    <IconButton size="small">
-                                      <InfoOutlinedIcon fontSize="inherit" />
-                                    </IconButton>
-                                  </Tooltip>
                                 </Stack>
-                                <Grid container spacing={1.5}>
-                                  {mergeSuggestions.map((suggestion) => (
-                                    <Grid key={suggestion.normalizedName} item xs={12} md={6}>
-                                      <Paper
-                                        variant="outlined"
-                                        sx={{ p: 1.5, borderRadius: 2 }}
+                              </Stack>
+                            </Grid>
+                            <Grid item xs={12} md={4}>
+                              <Stack spacing={1.5}>
+                                <Typography variant="subtitle2" color="text.secondary">
+                                  업체명 중복률
+                                </Typography>
+                                <Stack direction="row" spacing={1} alignItems="center">
+                                  <Chip
+                                    color={
+                                      quality.duplicateRate < 20
+                                        ? 'success'
+                                        : quality.duplicateRate < 40
+                                          ? 'warning'
+                                          : 'error'
+                                    }
+                                    label={
+                                      quality.duplicateRate === null ||
+                                        quality.duplicateRate === undefined
+                                        ? '-'
+                                        : `${quality.duplicateRate.toFixed(2)}%`
+                                    }
+                                    sx={{ fontWeight: 600 }}
+                                  />
+                                  <Typography variant="body2" color="text.secondary">
+                                    중복률이 높을수록 정규화 필요성이 큽니다.
+                                  </Typography>
+                                </Stack>
+                              </Stack>
+                            </Grid>
+                            <Grid item xs={12} md={4}>
+                              <Stack spacing={1.5}>
+                                <Typography variant="subtitle2" color="text.secondary">
+                                  이상치 데이터
+                                </Typography>
+                                {quality.outliers?.length > 0 ? (
+                                  <Stack direction="row" spacing={1} align-items="center">
+                                    <WarningAmberIcon color="warning" />
+                                    <Typography variant="body2">
+                                      {quality.outliers.length.toLocaleString()}건의 이상치 검토 필요
+                                    </Typography>
+                                  </Stack>
+                                ) : (
+                                  <Stack direction="row" spacing={1} align-items="center">
+                                    <CheckCircleIcon color="success" />
+                                    <Typography variant="body2" color="text.secondary">
+                                      검토가 필요한 이상치 데이터가 없습니다.
+                                    </Typography>
+                                  </Stack>
+                                )}
+                              </Stack>
+                            </Grid>
+                          </Grid>
+                          <Divider sx={{ my: 3 }} />
+                          <Grid container spacing={3}>
+                            <Grid item xs={12}>
+                              <Paper
+                                variant="outlined"
+                                sx={{ p: 2, borderRadius: 2 }}
+                              >
+                                <Stack spacing={1.5}>
+                                  <Stack direction="row" spacing={1} alignItems="center">
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                                      신뢰도 평가
+                                    </Typography>
+                                    <Tooltip title="등록 건수, 비용 분산, 이상치 비율을 기반으로 산출된 신뢰도 점수입니다.">
+                                      <IconButton size="small">
+                                        <InfoOutlinedIcon fontSize="inherit" />
+                                      </IconButton>
+                                    </Tooltip>
+                                  </Stack>
+                                  {reliabilityScores.length === 0 ? (
+                                    <Typography variant="body2" color="text.secondary">
+                                      계산 가능한 신뢰도 데이터가 없습니다.
+                                    </Typography>
+                                  ) : (
+                                    <Table size="small">
+                                      <TableHead>
+                                        <TableRow>
+                                          <TableCell sx={{ fontWeight: 600 }}>업체명</TableCell>
+                                          <TableCell sx={{ fontWeight: 600 }} align="right">
+                                            신뢰도
+                                          </TableCell>
+                                          <TableCell sx={{ fontWeight: 600 }} align="right">
+                                            등록수
+                                          </TableCell>
+                                          <TableCell sx={{ fontWeight: 600 }} align="right">
+                                            평균 비용
+                                          </TableCell>
+                                          <TableCell sx={{ fontWeight: 600 }} align="right">
+                                            표준편차
+                                          </TableCell>
+                                          <TableCell sx={{ fontWeight: 600 }} align="right">
+                                            이상치 비율
+                                          </TableCell>
+                                        </TableRow>
+                                      </TableHead>
+                                      <TableBody>
+                                        {reliabilityScores.map((item) => {
+                                          const status = getReliabilityStatus(item.score);
+                                          return (
+                                            <TableRow key={item.normalizedName}>
+                                              <TableCell>
+                                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                                  {item.displayName || item.normalizedName}
+                                                </Typography>
+                                                {item.displayName !== item.normalizedName && (
+                                                  <Typography variant="caption" color="text.secondary">
+                                                    ({item.normalizedName})
+                                                  </Typography>
+                                                )}
+                                              </TableCell>
+                                              <TableCell align="right">
+                                                <Chip
+                                                  size="small"
+                                                  color={status.color}
+                                                  label={`${item.score}점 · ${status.label}`}
+                                                  sx={{ fontWeight: 600 }}
+                                                />
+                                              </TableCell>
+                                              <TableCell align="right">
+                                                {item.entryCount?.toLocaleString()}건
+                                              </TableCell>
+                                              <TableCell align="right">
+                                                {item.meanCost?.toLocaleString()}원
+                                              </TableCell>
+                                              <TableCell align="right">
+                                                {item.stdDev?.toLocaleString()}원
+                                              </TableCell>
+                                              <TableCell align="right">
+                                                {item.outlierRatio?.toFixed(2)}%
+                                              </TableCell>
+                                            </TableRow>
+                                          );
+                                        })}
+                                      </TableBody>
+                                    </Table>
+                                  )}
+                                </Stack>
+                              </Paper>
+                            </Grid>
+                            <Grid item xs={12} md={6}>
+                              <Paper
+                                variant="outlined"
+                                sx={{ p: 2, borderRadius: 2, height: '100%' }}
+                              >
+                                <Stack spacing={1.5} sx={{ height: '100%' }}>
+                                  <Stack direction="row" spacing={1} alignItems="center">
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                                      중복 업체명 그룹
+                                    </Typography>
+                                    <Tooltip title="정규화 키에 여러 변형이 존재하는 상위 그룹">
+                                      <IconButton size="small">
+                                        <InfoOutlinedIcon fontSize="inherit" />
+                                      </IconButton>
+                                    </Tooltip>
+                                  </Stack>
+                                  {duplicateGroups.length === 0 ? (
+                                    <Typography variant="body2" color="text.secondary">
+                                      중복 관리가 필요한 업체명이 없습니다.
+                                    </Typography>
+                                  ) : (
+                                    <Table size="small">
+                                      <TableHead>
+                                        <TableRow>
+                                          <TableCell sx={{ fontWeight: 600 }}>
+                                            정규화 이름
+                                          </TableCell>
+                                          <TableCell sx={{ fontWeight: 600 }} align="right">
+                                            등록 건수
+                                          </TableCell>
+                                        </TableRow>
+                                      </TableHead>
+                                      <TableBody>
+                                        {duplicateGroups.map((group) => (
+                                          <TableRow key={group.normalizedName}>
+                                            <TableCell>
+                                              <Typography
+                                                variant="body2"
+                                                sx={{ fontWeight: 600 }}
+                                              >
+                                                {group.normalizedName || '(미정규화)'}
+                                              </Typography>
+                                              <Stack spacing={0.5} sx={{ mt: 0.5 }}>
+                                                {group.variants.slice(0, 3).map((variant) => (
+                                                  <Typography
+                                                    key={`${variant.name}-${variant.count}`}
+                                                    variant="caption"
+                                                    color="text.secondary"
+                                                  >
+                                                    {variant.name || '(빈 문자열)'} ·{' '}
+                                                    {variant.count.toLocaleString()}건
+                                                  </Typography>
+                                                ))}
+                                                {group.variants.length > 3 && (
+                                                  <Typography
+                                                    variant="caption"
+                                                    color="text.secondary"
+                                                  >
+                                                    + {group.variants.length - 3}개 변형
+                                                  </Typography>
+                                                )}
+                                              </Stack>
+                                            </TableCell>
+                                            <TableCell align="right">
+                                              {group.totalCount.toLocaleString()}건
+                                            </TableCell>
+                                          </TableRow>
+                                        ))}
+                                      </TableBody>
+                                    </Table>
+                                  )}
+                                </Stack>
+                              </Paper>
+                            </Grid>
+                            <Grid item xs={12} md={6}>
+                              <Paper
+                                variant="outlined"
+                                sx={{ p: 2, borderRadius: 2, height: '100%' }}
+                              >
+                                <Stack spacing={1.5} sx={{ height: '100%' }}>
+                                  <Stack direction="row" spacing={1} alignItems="center">
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                                      이상치 감지
+                                    </Typography>
+                                    <Tooltip title="평균 대비 편차가 큰 비용 입력 항목">
+                                      <IconButton size="small">
+                                        <InfoOutlinedIcon fontSize="inherit" />
+                                      </IconButton>
+                                    </Tooltip>
+                                  </Stack>
+                                  {topOutliers.length === 0 ? (
+                                    <Typography variant="body2" color="text.secondary">
+                                      확인이 필요한 이상치 데이터가 없습니다.
+                                    </Typography>
+                                  ) : (
+                                    <Table size="small">
+                                      <TableHead>
+                                        <TableRow>
+                                          <TableCell sx={{ fontWeight: 600 }}>업체명</TableCell>
+                                          <TableCell sx={{ fontWeight: 600 }} align="right">
+                                            비용
+                                          </TableCell>
+                                          <TableCell sx={{ fontWeight: 600 }} align="right">
+                                            편차
+                                          </TableCell>
+                                        </TableRow>
+                                      </TableHead>
+                                      <TableBody>
+                                        {topOutliers.map((item, index) => (
+                                          <TableRow key={`${item.normalizedName}-${index}`}>
+                                            <TableCell>
+                                              <Typography
+                                                variant="body2"
+                                                sx={{ fontWeight: 600 }}
+                                              >
+                                                {item.companyName}
+                                              </Typography>
+                                              <Typography
+                                                variant="caption"
+                                                color="text.secondary"
+                                              >
+                                                {item.fromStoreName || '-'} →{' '}
+                                                {item.toStoreName || '-'}
+                                              </Typography>
+                                            </TableCell>
+                                            <TableCell align="right">
+                                              {item.cost?.toLocaleString()}원
+                                            </TableCell>
+                                            <TableCell align="right">
+                                              +{item.deviationRatio}%
+                                            </TableCell>
+                                          </TableRow>
+                                        ))}
+                                      </TableBody>
+                                    </Table>
+                                  )}
+                                </Stack>
+                              </Paper>
+                            </Grid>
+                            {mergeSuggestions.length > 0 && (
+                              <Grid item xs={12}>
+                                <Paper
+                                  variant="outlined"
+                                  sx={{ p: 2, borderRadius: 2 }}
+                                >
+                                  <Stack spacing={1.5}>
+                                    <Stack direction="row" spacing={1} alignItems="center">
+                                      <Typography
+                                        variant="subtitle2"
+                                        sx={{ fontWeight: 600 }}
                                       >
-                                        <Typography
-                                          variant="body2"
-                                          sx={{ fontWeight: 600 }}
-                                        >
-                                          {suggestion.normalizedName || '(미정규화)'}
-                                        </Typography>
-                                        <Stack spacing={0.5} sx={{ mt: 0.5 }}>
-                                          {suggestion.candidates.map((candidate) => (
+                                        병합 제안
+                                      </Typography>
+                                      <Tooltip title="동일 정규화 키로 매칭되는 주요 변형 목록입니다. 유사 업체명 병합을 검토하세요.">
+                                        <IconButton size="small">
+                                          <InfoOutlinedIcon fontSize="inherit" />
+                                        </IconButton>
+                                      </Tooltip>
+                                    </Stack>
+                                    <Grid container spacing={1.5}>
+                                      {mergeSuggestions.map((suggestion) => (
+                                        <Grid key={suggestion.normalizedName} item xs={12} md={6}>
+                                          <Paper
+                                            variant="outlined"
+                                            sx={{ p: 1.5, borderRadius: 2 }}
+                                          >
                                             <Typography
-                                              key={`${candidate.name}-${candidate.count}`}
+                                              variant="body2"
+                                              sx={{ fontWeight: 600 }}
+                                            >
+                                              {suggestion.normalizedName || '(미정규화)'}
+                                            </Typography>
+                                            <Stack spacing={0.5} sx={{ mt: 0.5 }}>
+                                              {suggestion.candidates.map((candidate) => (
+                                                <Typography
+                                                  key={`${candidate.name}-${candidate.count}`}
+                                                  variant="caption"
+                                                  color="text.secondary"
+                                                >
+                                                  {candidate.name || '(빈 문자열)'} ·{' '}
+                                                  {candidate.count.toLocaleString()}건
+                                                </Typography>
+                                              ))}
+                                            </Stack>
+                                          </Paper>
+                                        </Grid>
+                                      ))}
+                                    </Grid>
+                                  </Stack>
+                                </Paper>
+                              </Grid>
+                            )}
+                          </Grid>
+                          <Divider sx={{ my: 3 }} />
+                          <Typography variant="body2" color="text.secondary">
+                            * 지도 기반 시각화 및 추가 품질 지표는 향후 단계에서 구현 예정입니다.
+                            인기/우수 업체 분포를 지도에서 직관적으로 확인할 수 있도록 확장할 계획입니다.
+                          </Typography>
+                        </Box>
+                      </Paper>
+                    </Grid>
+
+                    {/* 데이터 수정/삭제 */}
+                    <Grid item xs={12}>
+                      <Paper elevation={2} sx={{ borderRadius: 2, overflow: 'hidden' }}>
+                        <Box
+                          sx={{
+                            px: 3,
+                            py: 2,
+                            borderBottom: '1px solid rgba(0,0,0,0.08)'
+                          }}
+                        >
+                          <Stack
+                            direction={{ xs: 'column', md: 'row' }}
+                            spacing={1.5}
+                            justifyContent="space-between"
+                            alignItems={{ xs: 'flex-start', md: 'center' }}
+                          >
+                            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                              등록 데이터 수정/삭제
+                            </Typography>
+                            <Stack direction="row" spacing={1}>
+                              <Button
+                                variant="outlined"
+                                startIcon={<AddCircleOutlineIcon />}
+                                onClick={handleOpenCreateModal}
+                                disabled={historyLoading || storeOptionsLoading}
+                              >
+                                신규 등록
+                              </Button>
+                              <Button
+                                onClick={handleHistoryReset}
+                                disabled={historyLoading}
+                              >
+                                초기화
+                              </Button>
+                              <Button
+                                variant="contained"
+                                onClick={handleFetchHistoryClick}
+                                disabled={historyLoading}
+                              >
+                                {historyLoading ? '조회 중...' : '조회'}
+                              </Button>
+                            </Stack>
+                          </Stack>
+                        </Box>
+                        <Box sx={{ px: 3, py: 3 }}>
+                          <Grid container spacing={2} alignItems="flex-start">
+                            <Grid item xs={12} md={6} lg={4}>
+                              <Stack spacing={1.5}>
+                                <Stack
+                                  direction="row"
+                                  spacing={1}
+                                  alignItems="center"
+                                  justifyContent="space-between"
+                                >
+                                  <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                                    출발 매장 찾기
+                                  </Typography>
+                                  <ToggleButtonGroup
+                                    size="small"
+                                    value={historySearchMode.from}
+                                    exclusive
+                                    onChange={handleHistoryModeChange('from')}
+                                  >
+                                    <ToggleButton value="id">ID</ToggleButton>
+                                    <ToggleButton value="name">매장명</ToggleButton>
+                                  </ToggleButtonGroup>
+                                </Stack>
+                                <Autocomplete
+                                  freeSolo
+                                  options={storeOptions}
+                                  loading={storeOptionsLoading}
+                                  filterOptions={storeFilterOptions}
+                                  loadingText="매장 목록을 불러오는 중입니다..."
+                                  noOptionsText="일치하는 매장을 찾을 수 없습니다."
+                                  value={historySelection.from}
+                                  onChange={handleHistorySelectionChange('from')}
+                                  inputValue={historyFilters.fromInput}
+                                  onInputChange={handleHistoryInputChange('from')}
+                                  getOptionLabel={(option) => {
+                                    if (typeof option === 'string') return option;
+                                    if (!option) return '';
+                                    return historySearchMode.from === 'id'
+                                      ? option.id || ''
+                                      : option.name || '';
+                                  }}
+                                  renderOption={(props, option) => (
+                                    <li {...props} key={option.uniqueId || option.id}>
+                                      <Stack spacing={0.25}>
+                                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                          {option.name}
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary">
+                                          {option.id}
+                                        </Typography>
+                                      </Stack>
+                                    </li>
+                                  )}
+                                  isOptionEqualToValue={(option, value) =>
+                                    option?.id === (value?.id || value)
+                                  }
+                                  ListboxProps={{ style: { maxHeight: 320 } }}
+                                  renderInput={(params) => (
+                                    <TextField
+                                      {...params}
+                                      label={
+                                        historySearchMode.from === 'id'
+                                          ? '출발 매장 ID'
+                                          : '출발 매장명'
+                                      }
+                                      size="small"
+                                      placeholder={
+                                        historySearchMode.from === 'id'
+                                          ? '예: P123456'
+                                          : '예: 정직폰강서점'
+                                      }
+                                    />
+                                  )}
+                                />
+                              </Stack>
+                            </Grid>
+                            <Grid item xs={12} md={6} lg={4}>
+                              <Stack spacing={1.5}>
+                                <Stack
+                                  direction="row"
+                                  spacing={1}
+                                  alignItems="center"
+                                  justifyContent="space-between"
+                                >
+                                  <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                                    도착 매장 찾기
+                                  </Typography>
+                                  <ToggleButtonGroup
+                                    size="small"
+                                    value={historySearchMode.to}
+                                    exclusive
+                                    onChange={handleHistoryModeChange('to')}
+                                  >
+                                    <ToggleButton value="id">ID</ToggleButton>
+                                    <ToggleButton value="name">매장명</ToggleButton>
+                                  </ToggleButtonGroup>
+                                </Stack>
+                                <Autocomplete
+                                  freeSolo
+                                  options={storeOptions}
+                                  loading={storeOptionsLoading}
+                                  filterOptions={storeFilterOptions}
+                                  loadingText="매장 목록을 불러오는 중입니다..."
+                                  noOptionsText="일치하는 매장을 찾을 수 없습니다."
+                                  value={historySelection.to}
+                                  onChange={handleHistorySelectionChange('to')}
+                                  inputValue={historyFilters.toInput}
+                                  onInputChange={handleHistoryInputChange('to')}
+                                  getOptionLabel={(option) => {
+                                    if (typeof option === 'string') return option;
+                                    if (!option) return '';
+                                    return historySearchMode.to === 'id'
+                                      ? option.id || ''
+                                      : option.name || '';
+                                  }}
+                                  renderOption={(props, option) => (
+                                    <li {...props} key={option.uniqueId || option.id}>
+                                      <Stack spacing={0.25}>
+                                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                          {option.name}
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary">
+                                          {option.id}
+                                        </Typography>
+                                      </Stack>
+                                    </li>
+                                  )}
+                                  isOptionEqualToValue={(option, value) =>
+                                    option?.id === (value?.id || value)
+                                  }
+                                  ListboxProps={{ style: { maxHeight: 320 } }}
+                                  renderInput={(params) => (
+                                    <TextField
+                                      {...params}
+                                      label={
+                                        historySearchMode.to === 'id'
+                                          ? '도착 매장 ID'
+                                          : '도착 매장명'
+                                      }
+                                      size="small"
+                                      placeholder={
+                                        historySearchMode.to === 'id'
+                                          ? '예: P654321'
+                                          : '예: 신윤티엔에스'
+                                      }
+                                    />
+                                  )}
+                                />
+                              </Stack>
+                            </Grid>
+                            <Grid item xs={12} lg={4}>
+                              <Typography variant="body2" color="text.secondary">
+                                매장 ID 또는 매장명을 선택해 출발/도착 매장을 지정한 뒤 조회를 눌러 등록된
+                                퀵비용 데이터를 수정하거나 삭제할 수 있습니다. 한 글자만 입력해도 목록에서
+                                빠르게 검색할 수 있습니다.
+                              </Typography>
+                            </Grid>
+                          </Grid>
+
+                          {storeOptionsError && (
+                            <Box sx={{ mt: 2 }}>
+                              <Alert severity="warning">{storeOptionsError}</Alert>
+                            </Box>
+                          )}
+
+                          {historyError && (
+                            <Box sx={{ mt: 2 }}>
+                              <Alert severity="error">{historyError}</Alert>
+                            </Box>
+                          )}
+
+                          {historySuccessMessage && (
+                            <Box sx={{ mt: 2 }}>
+                              <Alert severity="success">{historySuccessMessage}</Alert>
+                            </Box>
+                          )}
+
+                          <Box sx={{ mt: 3 }}>
+                            {historyLoading ? (
+                              <Box
+                                sx={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  py: 6,
+                                  color: 'text.secondary',
+                                  gap: 2
+                                }}
+                              >
+                                <CircularProgress size={28} />
+                                <Typography variant="body2">
+                                  데이터를 불러오는 중입니다...
+                                </Typography>
+                              </Box>
+                            ) : historyData.length === 0 ? (
+                              <Typography variant="body2" color="text.secondary">
+                                {historyFetched
+                                  ? '조회된 데이터가 없습니다.'
+                                  : '출발/도착 매장을 선택하거나 입력한 뒤 조회를 눌러주세요.'}
+                              </Typography>
+                            ) : (
+                              <Table size="small">
+                                <TableHead>
+                                  <TableRow>
+                                    <TableCell sx={{ fontWeight: 600 }}>등록일시</TableCell>
+                                    <TableCell sx={{ fontWeight: 600 }}>등록자</TableCell>
+                                    <TableCell sx={{ fontWeight: 600 }}>구간</TableCell>
+                                    <TableCell sx={{ fontWeight: 600 }}>업체 정보</TableCell>
+                                    <TableCell sx={{ fontWeight: 600 }} align="right">
+                                      동작
+                                    </TableCell>
+                                  </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                  {historyData.map((item) => (
+                                    <TableRow key={item.rowIndex}>
+                                      <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                          {item.registeredAt || '-'}
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary">
+                                          행 번호: {item.rowIndex}
+                                          {item.reverseRowIndex
+                                            ? ` / 반대 방향: ${item.reverseRowIndex}`
+                                            : ''}
+                                        </Typography>
+                                      </TableCell>
+                                      <TableCell>
+                                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                          {item.registrantStoreName || '-'}
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary">
+                                          {item.registrantStoreId || '-'}
+                                        </Typography>
+                                      </TableCell>
+                                      <TableCell>
+                                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                          {item.fromStoreName || '-'}
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary">
+                                          {item.fromStoreId || '-'}
+                                        </Typography>
+                                        <Typography variant="body2" sx={{ fontWeight: 600, mt: 0.5 }}>
+                                          ↘ {item.toStoreName || '-'}
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary">
+                                          {item.toStoreId || '-'}
+                                        </Typography>
+                                      </TableCell>
+                                      <TableCell>
+                                        <Stack spacing={0.5}>
+                                          {item.companies.slice(0, 3).map((company, idx) => (
+                                            <Typography
+                                              key={`${company.name}-${company.phone}-${idx}`}
                                               variant="caption"
                                               color="text.secondary"
                                             >
-                                              {candidate.name || '(빈 문자열)'} ·{' '}
-                                              {candidate.count.toLocaleString()}건
+                                              {company.name} / {company.phone} /{' '}
+                                              {company.cost?.toLocaleString()}원
                                             </Typography>
                                           ))}
+                                          {item.companies.length > 3 && (
+                                            <Typography variant="caption" color="text.secondary">
+                                              + {item.companies.length - 3}건
+                                            </Typography>
+                                          )}
                                         </Stack>
-                                      </Paper>
-                                    </Grid>
+                                      </TableCell>
+                                      <TableCell align="right">
+                                        <Tooltip title="수정">
+                                          <span>
+                                            <IconButton
+                                              size="small"
+                                              onClick={() => handleEditEntry(item)}
+                                              disabled={historyLoading}
+                                            >
+                                              <EditIcon fontSize="inherit" />
+                                            </IconButton>
+                                          </span>
+                                        </Tooltip>
+                                        <Tooltip title="삭제">
+                                          <span>
+                                            <IconButton
+                                              size="small"
+                                              color="error"
+                                              onClick={() => handleDeleteEntry(item)}
+                                              disabled={historyLoading}
+                                            >
+                                              <DeleteOutlineIcon fontSize="inherit" />
+                                            </IconButton>
+                                          </span>
+                                        </Tooltip>
+                                      </TableCell>
+                                    </TableRow>
                                   ))}
-                                </Grid>
-                              </Stack>
-                            </Paper>
-                          </Grid>
-                        )}
-                      </Grid>
-                      <Divider sx={{ my: 3 }} />
-                      <Typography variant="body2" color="text.secondary">
-                        * 지도 기반 시각화 및 추가 품질 지표는 향후 단계에서 구현 예정입니다.
-                        인기/우수 업체 분포를 지도에서 직관적으로 확인할 수 있도록 확장할 계획입니다.
-                      </Typography>
-                    </Box>
-                  </Paper>
-                </Grid>
-
-                {/* 데이터 수정/삭제 */}
-                <Grid item xs={12}>
-                  <Paper elevation={2} sx={{ borderRadius: 2, overflow: 'hidden' }}>
-                    <Box
-                      sx={{
-                        px: 3,
-                        py: 2,
-                        borderBottom: '1px solid rgba(0,0,0,0.08)'
-                      }}
-                    >
-                      <Stack
-                        direction={{ xs: 'column', md: 'row' }}
-                        spacing={1.5}
-                        justifyContent="space-between"
-                        alignItems={{ xs: 'flex-start', md: 'center' }}
-                      >
-                        <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                          등록 데이터 수정/삭제
-                        </Typography>
-                        <Stack direction="row" spacing={1}>
-                          <Button
-                            variant="outlined"
-                            startIcon={<AddCircleOutlineIcon />}
-                            onClick={handleOpenCreateModal}
-                            disabled={historyLoading || storeOptionsLoading}
-                          >
-                            신규 등록
-                          </Button>
-                          <Button
-                            onClick={handleHistoryReset}
-                            disabled={historyLoading}
-                          >
-                            초기화
-                          </Button>
-                          <Button
-                            variant="contained"
-                            onClick={handleFetchHistoryClick}
-                            disabled={historyLoading}
-                          >
-                            {historyLoading ? '조회 중...' : '조회'}
-                          </Button>
-                        </Stack>
-                      </Stack>
-                    </Box>
-                    <Box sx={{ px: 3, py: 3 }}>
-                      <Grid container spacing={2} alignItems="flex-start">
-                        <Grid item xs={12} md={6} lg={4}>
-                          <Stack spacing={1.5}>
-                            <Stack
-                              direction="row"
-                              spacing={1}
-                              alignItems="center"
-                              justifyContent="space-between"
-                            >
-                              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                                출발 매장 찾기
-                              </Typography>
-                              <ToggleButtonGroup
-                                size="small"
-                                value={historySearchMode.from}
-                                exclusive
-                                onChange={handleHistoryModeChange('from')}
-                              >
-                                <ToggleButton value="id">ID</ToggleButton>
-                                <ToggleButton value="name">매장명</ToggleButton>
-                              </ToggleButtonGroup>
-                            </Stack>
-                            <Autocomplete
-                              freeSolo
-                              options={storeOptions}
-                              loading={storeOptionsLoading}
-                              filterOptions={storeFilterOptions}
-                              loadingText="매장 목록을 불러오는 중입니다..."
-                              noOptionsText="일치하는 매장을 찾을 수 없습니다."
-                              value={historySelection.from}
-                              onChange={handleHistorySelectionChange('from')}
-                              inputValue={historyFilters.fromInput}
-                              onInputChange={handleHistoryInputChange('from')}
-                              getOptionLabel={(option) => {
-                                if (typeof option === 'string') return option;
-                                if (!option) return '';
-                                return historySearchMode.from === 'id'
-                                  ? option.id || ''
-                                  : option.name || '';
-                              }}
-                              renderOption={(props, option) => (
-                                <li {...props} key={option.uniqueId || option.id}>
-                                  <Stack spacing={0.25}>
-                                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                      {option.name}
-                                    </Typography>
-                                    <Typography variant="caption" color="text.secondary">
-                                      {option.id}
-                                    </Typography>
-                                  </Stack>
-                                </li>
-                              )}
-                              isOptionEqualToValue={(option, value) =>
-                                option?.id === (value?.id || value)
-                              }
-                              ListboxProps={{ style: { maxHeight: 320 } }}
-                              renderInput={(params) => (
-                                <TextField
-                                  {...params}
-                                  label={
-                                    historySearchMode.from === 'id'
-                                      ? '출발 매장 ID'
-                                      : '출발 매장명'
-                                  }
-                                  size="small"
-                                  placeholder={
-                                    historySearchMode.from === 'id'
-                                      ? '예: P123456'
-                                      : '예: 정직폰강서점'
-                                  }
-                                />
-                              )}
-                            />
-                          </Stack>
-                        </Grid>
-                        <Grid item xs={12} md={6} lg={4}>
-                          <Stack spacing={1.5}>
-                            <Stack
-                              direction="row"
-                              spacing={1}
-                              alignItems="center"
-                              justifyContent="space-between"
-                            >
-                              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                                도착 매장 찾기
-                              </Typography>
-                              <ToggleButtonGroup
-                                size="small"
-                                value={historySearchMode.to}
-                                exclusive
-                                onChange={handleHistoryModeChange('to')}
-                              >
-                                <ToggleButton value="id">ID</ToggleButton>
-                                <ToggleButton value="name">매장명</ToggleButton>
-                              </ToggleButtonGroup>
-                            </Stack>
-                            <Autocomplete
-                              freeSolo
-                              options={storeOptions}
-                              loading={storeOptionsLoading}
-                              filterOptions={storeFilterOptions}
-                              loadingText="매장 목록을 불러오는 중입니다..."
-                              noOptionsText="일치하는 매장을 찾을 수 없습니다."
-                              value={historySelection.to}
-                              onChange={handleHistorySelectionChange('to')}
-                              inputValue={historyFilters.toInput}
-                              onInputChange={handleHistoryInputChange('to')}
-                              getOptionLabel={(option) => {
-                                if (typeof option === 'string') return option;
-                                if (!option) return '';
-                                return historySearchMode.to === 'id'
-                                  ? option.id || ''
-                                  : option.name || '';
-                              }}
-                              renderOption={(props, option) => (
-                                <li {...props} key={option.uniqueId || option.id}>
-                                  <Stack spacing={0.25}>
-                                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                      {option.name}
-                                    </Typography>
-                                    <Typography variant="caption" color="text.secondary">
-                                      {option.id}
-                                    </Typography>
-                                  </Stack>
-                                </li>
-                              )}
-                              isOptionEqualToValue={(option, value) =>
-                                option?.id === (value?.id || value)
-                              }
-                              ListboxProps={{ style: { maxHeight: 320 } }}
-                              renderInput={(params) => (
-                                <TextField
-                                  {...params}
-                                  label={
-                                    historySearchMode.to === 'id'
-                                      ? '도착 매장 ID'
-                                      : '도착 매장명'
-                                  }
-                                  size="small"
-                                  placeholder={
-                                    historySearchMode.to === 'id'
-                                      ? '예: P654321'
-                                      : '예: 신윤티엔에스'
-                                  }
-                                />
-                              )}
-                            />
-                          </Stack>
-                        </Grid>
-                        <Grid item xs={12} lg={4}>
-                          <Typography variant="body2" color="text.secondary">
-                            매장 ID 또는 매장명을 선택해 출발/도착 매장을 지정한 뒤 조회를 눌러 등록된
-                            퀵비용 데이터를 수정하거나 삭제할 수 있습니다. 한 글자만 입력해도 목록에서
-                            빠르게 검색할 수 있습니다.
-                          </Typography>
-                        </Grid>
-                      </Grid>
-
-                      {storeOptionsError && (
-                        <Box sx={{ mt: 2 }}>
-                          <Alert severity="warning">{storeOptionsError}</Alert>
-                        </Box>
-                      )}
-
-                      {historyError && (
-                        <Box sx={{ mt: 2 }}>
-                          <Alert severity="error">{historyError}</Alert>
-                        </Box>
-                      )}
-
-                      {historySuccessMessage && (
-                        <Box sx={{ mt: 2 }}>
-                          <Alert severity="success">{historySuccessMessage}</Alert>
-                        </Box>
-                      )}
-
-                      <Box sx={{ mt: 3 }}>
-                        {historyLoading ? (
-                          <Box
-                            sx={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              py: 6,
-                              color: 'text.secondary',
-                              gap: 2
-                            }}
-                          >
-                            <CircularProgress size={28} />
-                            <Typography variant="body2">
-                              데이터를 불러오는 중입니다...
-                            </Typography>
+                                </TableBody>
+                              </Table>
+                            )}
                           </Box>
-                        ) : historyData.length === 0 ? (
-                          <Typography variant="body2" color="text.secondary">
-                            {historyFetched
-                              ? '조회된 데이터가 없습니다.'
-                              : '출발/도착 매장을 선택하거나 입력한 뒤 조회를 눌러주세요.'}
-                          </Typography>
-                        ) : (
-                          <Table size="small">
-                            <TableHead>
-                              <TableRow>
-                                <TableCell sx={{ fontWeight: 600 }}>등록일시</TableCell>
-                                <TableCell sx={{ fontWeight: 600 }}>등록자</TableCell>
-                                <TableCell sx={{ fontWeight: 600 }}>구간</TableCell>
-                                <TableCell sx={{ fontWeight: 600 }}>업체 정보</TableCell>
-                                <TableCell sx={{ fontWeight: 600 }} align="right">
-                                  동작
-                                </TableCell>
-                              </TableRow>
-                            </TableHead>
-                            <TableBody>
-                              {historyData.map((item) => (
-                                <TableRow key={item.rowIndex}>
-                                  <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                      {item.registeredAt || '-'}
-                                    </Typography>
-                                    <Typography variant="caption" color="text.secondary">
-                                      행 번호: {item.rowIndex}
-                                      {item.reverseRowIndex
-                                        ? ` / 반대 방향: ${item.reverseRowIndex}`
-                                        : ''}
-                                    </Typography>
-                                  </TableCell>
-                                  <TableCell>
-                                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                      {item.registrantStoreName || '-'}
-                                    </Typography>
-                                    <Typography variant="caption" color="text.secondary">
-                                      {item.registrantStoreId || '-'}
-                                    </Typography>
-                                  </TableCell>
-                                  <TableCell>
-                                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                      {item.fromStoreName || '-'}
-                                    </Typography>
-                                    <Typography variant="caption" color="text.secondary">
-                                      {item.fromStoreId || '-'}
-                                    </Typography>
-                                    <Typography variant="body2" sx={{ fontWeight: 600, mt: 0.5 }}>
-                                      ↘ {item.toStoreName || '-'}
-                                    </Typography>
-                                    <Typography variant="caption" color="text.secondary">
-                                      {item.toStoreId || '-'}
-                                    </Typography>
-                                  </TableCell>
-                                  <TableCell>
-                                    <Stack spacing={0.5}>
-                                      {item.companies.slice(0, 3).map((company, idx) => (
-                                        <Typography
-                                          key={`${company.name}-${company.phone}-${idx}`}
-                                          variant="caption"
-                                          color="text.secondary"
-                                        >
-                                          {company.name} / {company.phone} /{' '}
-                                          {company.cost?.toLocaleString()}원
-                                        </Typography>
-                                      ))}
-                                      {item.companies.length > 3 && (
-                                        <Typography variant="caption" color="text.secondary">
-                                          + {item.companies.length - 3}건
-                                        </Typography>
-                                      )}
-                                    </Stack>
-                                  </TableCell>
-                                  <TableCell align="right">
-                                    <Tooltip title="수정">
-                                      <span>
-                                        <IconButton
-                                          size="small"
-                                          onClick={() => handleEditEntry(item)}
-                                          disabled={historyLoading}
-                                        >
-                                          <EditIcon fontSize="inherit" />
-                                        </IconButton>
-                                      </span>
-                                    </Tooltip>
-                                    <Tooltip title="삭제">
-                                      <span>
-                                        <IconButton
-                                          size="small"
-                                          color="error"
-                                          onClick={() => handleDeleteEntry(item)}
-                                          disabled={historyLoading}
-                                        >
-                                          <DeleteOutlineIcon fontSize="inherit" />
-                                        </IconButton>
-                                      </span>
-                                    </Tooltip>
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        )}
-                      </Box>
-                    </Box>
-                  </Paper>
-                </Grid>
+                        </Box>
+                      </Paper>
+                    </Grid>
+                  </Grid>
+                )}
               </Grid>
-            )}
-          </Grid>
-        </Grid>
+            </Grid>
+          </Box>
+        )}
+
+        {currentTab === 'database' && (
+          <Box sx={{ p: 3 }}>
+            <DataSourceDashboard />
+          </Box>
+        )}
+
+        {currentTab === 'bugs' && (
+          <Box sx={{ p: 3 }}>
+            <BugDiagnosticDashboard />
+          </Box>
+        )}
       </Container>
 
       <QuickCostModal

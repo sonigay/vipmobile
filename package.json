@@ -1,5 +1,5 @@
 {
-  "name": "(주)브이아이피플러스",
+  "name": "vip-mobile-plus",
   "version": "1.0.1",
   "private": true,
   "dependencies": {
@@ -34,11 +34,11 @@
     "xlsx": "^0.18.5"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "node scripts/build.js",
-    "build:analyze": "node scripts/build.js --analyze",
-    "build:fast": "node scripts/build.js --fast",
-    "build:ultra-fast": "node scripts/build.js --ultra-fast",
+    "start": "set \"NODE_OPTIONS=--max-old-space-size=4096\" && react-scripts start",
+    "build": "set \"NODE_OPTIONS=--max-old-space-size=4096\" && node scripts/build.js",
+    "build:analyze": "set \"NODE_OPTIONS=--max-old-space-size=4096\" && node scripts/build.js --analyze",
+    "build:fast": "set \"NODE_OPTIONS=--max-old-space-size=4096\" && node scripts/build.js --fast",
+    "build:ultra-fast": "set \"NODE_OPTIONS=--max-old-space-size=4096\" && node scripts/build.js --ultra-fast",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
