@@ -1,92 +1,70 @@
 /**
  * DATA_MAP_CONFIG
  * 
- * 어플리케이션의 모든 모드, 탭, 시트 및 Supabase 테이블 매핑 정보
- * 시트명은 index.js.backup.original에서 정확히 추출됨
- * - range: 구글 시트 데이터 범위
- * - headerRow: 헤더가 위치한 행 번호 (1-indexed)
- * - supabaseTable: 대응하는 Supabase 테이블명
+ * 어플리케이션의 모든 모드, 탭, 시트 매핑 정보
+ * 
+ * 목적:
+ * 1. 데이터베이스관리 탭: Supabase/구글시트 토글 기능을 위해 정확한 시트명 필요
+ * 2. 버그관리 탭: 탭명만 있으면 프론트엔드/백엔드 로그 확인 가능
+ * 
+ * 규칙:
+ * - sheet: index.js.backup.original에서 확인된 정확한 시트 이름만 기재
+ * - disabled: true - 시트 정보가 미확인된 모드 (회색 미활성화)
+ * - apiEndpoint: 해당 탭의 API 엔드포인트 (확인된 것만)
  */
 
 const DATA_MAP_CONFIG = {
     // ==================== 직영점 모드 ====================
+    // 시트: 직영점_판매일보, 직영점_오늘의휴대폰, 직영점_설정, 직영점_모델이미지, 
+    //       직영점_단말마스터, 직영점_정책_마진, 직영점_정책_부가서비스, 직영점_정책_별도
     'directStore': {
         tabs: {
-            'sales': { label: '판매일보', sheet: '직영점_판매일보', range: 'A:AB', headerRow: 1, supabaseTable: 'direct_store_sales_daily' },
-            'today': { label: '오늘의휴대폰', sheet: '직영점_오늘의휴대폰', range: 'A:Z', headerRow: 1, supabaseTable: 'direct_store_todays_mobiles' },
-            'settings': { label: '설정', sheet: '직영점_설정', range: 'A:Z', headerRow: 1, supabaseTable: 'direct_store_settings' },
-            'images': { label: '모델이미지', sheet: '직영점_모델이미지', range: 'A:K', headerRow: 1, supabaseTable: 'direct_store_model_images' },
-            'devices': { label: '단말마스터', sheet: '직영점_단말마스터', range: 'A:R', headerRow: 1, supabaseTable: 'direct_store_device_master' },
-            'margin': { label: '정책마진', sheet: '직영점_정책_마진', range: 'A:Z', headerRow: 1, supabaseTable: 'direct_store_policy_margin' },
-            'addon': { label: '부가서비스', sheet: '직영점_정책_부가서비스', range: 'A:Z', headerRow: 1, supabaseTable: 'direct_store_policy_addon' },
-            'special': { label: '별도정책', sheet: '직영점_정책_별도', range: 'A:Z', headerRow: 1, supabaseTable: 'direct_store_policy_special' }
+            'sales': { label: '판매일보', sheet: '직영점_판매일보', range: 'A:AB', headerRow: 1 },
+            'today': { label: '오늘의휴대폰', sheet: '직영점_오늘의휴대폰', range: 'A:Z', headerRow: 1 },
+            'settings': { label: '설정', sheet: '직영점_설정', range: 'A:Z', headerRow: 1 },
+            'images': { label: '모델이미지', sheet: '직영점_모델이미지', range: 'A:K', headerRow: 1 },
+            'devices': { label: '단말마스터', sheet: '직영점_단말마스터', range: 'A:R', headerRow: 1 },
+            'margin': { label: '정책마진', sheet: '직영점_정책_마진', range: 'A:Z', headerRow: 1 },
+            'addon': { label: '부가서비스', sheet: '직영점_정책_부가서비스', range: 'A:Z', headerRow: 1 },
+            'special': { label: '별도정책', sheet: '직영점_정책_별도', range: 'A:Z', headerRow: 1 }
         }
     },
 
     // ==================== 정책 모드 ====================
+    // 시트: 정책_기본정보 (끝 공백 주의), 정책_승인이력 , 정책_알림관리, 정책_카테고리, 정책모드공지사항
     'policy': {
         tabs: {
-            'basic': { label: '기본정보', sheet: '정책_기본정보 ', range: 'A:AC', headerRow: 1, supabaseTable: 'policy_basic_info' },
-            'approval': { label: '승인이력', sheet: '정책_승인이력 ', range: 'A:G', headerRow: 1, supabaseTable: 'policy_approval_history' },
-            'notification': { label: '알림관리', sheet: '정책_알림관리', range: 'A:Z', headerRow: 1, supabaseTable: 'policy_notifications' },
-            'category': { label: '카테고리', sheet: '정책_카테고리', range: 'A:Z', headerRow: 1, supabaseTable: 'policy_categories' },
-            'notice': { label: '공지사항', sheet: '정책모드공지사항', range: 'A:I', headerRow: 2, supabaseTable: 'policy_notices' }
-        }
-    },
-
-    // ==================== OB 관리 모드 ====================
-    'obManagement': {
-        tabs: {
-            'results': { label: '정산결과', sheet: 'OB_결과', range: 'A:M', headerRow: 1, supabaseTable: 'ob_results' },
-            'discounts': { label: '할인데이터', sheet: 'OB_할인', range: 'A:F', headerRow: 1, supabaseTable: 'ob_discounts' },
-            'segments': { label: '세그먼트', sheet: 'OB_세그', range: 'A:C', headerRow: 1, supabaseTable: 'ob_segments' },
-            'plans': { label: '요금제', sheet: '무선요금제군', range: 'A:B', headerRow: 1, supabaseTable: 'ob_plans' },
-            'links': { label: '링크관리', sheet: 'OB정산관리링크관리', range: 'A:L', headerRow: 1, supabaseTable: 'ob_links' },
-            'exclusions': { label: '제외인원', sheet: '제외인원', range: 'A:I', headerRow: 2, supabaseTable: 'ob_exclusions' },
-            'targetOutlets': { label: '대상점관리', sheet: '대상점', range: 'A:H', headerRow: 2, supabaseTable: 'ob_target_outlets' }
-        }
-    },
-
-    // ==================== 어플종합관리 모드 (퀵서비스 관리) ====================
-    // 실제 UI 탭: 퀵서비스관리(quickService), 데이터베이스관리(database), 버그관리(bugs)
-    'quickServiceManagement': {
-        tabs: {
-            'quickService': {
-                label: '퀵서비스관리',
-                description: '퀵서비스 업체 통계 및 견적 관리',
-                apiEndpoint: '/api/quick-cost/companies'
-            },
-            'database': {
-                label: '데이터베이스관리',
-                description: 'Supabase/구글시트 데이터 소스 관리'
-            },
-            'bugs': {
-                label: '버그관리',
-                description: '앱 작동 상태 진단 및 버그 관리'
-            }
+            'basic': { label: '기본정보', sheet: '정책_기본정보 ', range: 'A:AC', headerRow: 1 },
+            'approval': { label: '승인이력', sheet: '정책_승인이력 ', range: 'A:G', headerRow: 1 },
+            'notification': { label: '알림관리', sheet: '정책_알림관리', range: 'A:Z', headerRow: 1 },
+            'category': { label: '카테고리', sheet: '정책_카테고리', range: 'A:Z', headerRow: 1 },
+            'notice': { label: '공지사항', sheet: '정책모드공지사항', range: 'A:I', headerRow: 2 }
         }
     },
 
     // ==================== 예산 모드 ====================
+    // 시트: 액면예산, 예산_정책그룹관리, 예산_사용자시트관리, 예산_대상월관리
     'budget': {
         tabs: {
-            'faceValue': { label: '액면예산', sheet: '액면예산', range: 'A:AG', headerRow: 1, supabaseTable: 'budget_face_value' },
-            'policyGroup': { label: '정책그룹관리', sheet: '예산_정책그룹관리', range: 'A:B', headerRow: 1, supabaseTable: 'budget_policy_groups' },
-            'userSheet': { label: '사용자시트관리', sheet: '예산_사용자시트관리', range: 'A:G', headerRow: 1, supabaseTable: 'budget_user_sheets' },
-            'targetMonth': { label: '대상월관리', sheet: '예산_대상월관리', range: 'A:Z', headerRow: 1, supabaseTable: 'budget_target_month' }
+            'faceValue': { label: '액면예산', sheet: '액면예산', range: 'A:AG', headerRow: 1 },
+            'policyGroup': { label: '정책그룹관리', sheet: '예산_정책그룹관리', range: 'A:B', headerRow: 1 },
+            'userSheet': { label: '사용자시트관리', sheet: '예산_사용자시트관리', range: 'A:G', headerRow: 1 },
+            'targetMonth': { label: '대상월관리', sheet: '예산_대상월관리', range: 'A:Z', headerRow: 1 }
         }
     },
 
     // ==================== 관리자 모드 ====================
+    // 시트: 대리점아이디관리, 어플업데이트, 폰클출고처데이터
     'agent': {
         tabs: {
-            'stores': { label: '대리점관리', sheet: '대리점아이디관리', range: 'A:AF', headerRow: 1, supabaseTable: 'admin_stores' },
-            'updates': { label: '어플업데이트', sheet: '어플업데이트', range: 'A:Z', headerRow: 1, supabaseTable: 'admin_updates' },
-            'storeData': { label: '출고처데이터', sheet: '폰클출고처데이터', range: 'A:AM', headerRow: 4, supabaseTable: 'admin_store_data' }
+            'stores': { label: '대리점관리', sheet: '대리점아이디관리', range: 'A:AF', headerRow: 1 },
+            'updates': { label: '어플업데이트', sheet: '어플업데이트', range: 'A:Z', headerRow: 1 },
+            'storeData': { label: '출고처데이터', sheet: '폰클출고처데이터', range: 'A:AM', headerRow: 4 }
         }
     },
 
     // ==================== 재고 관리 모드 ====================
+    // 시트: 폰클재고데이터, 폰클개통데이터, 마스터재고, 사전예약사이트, 정규화작업
     'inventory': {
         tabs: {
             'price-discrepancy': {
@@ -94,153 +72,229 @@ const DATA_MAP_CONFIG = {
                 sheet: '폰클재고데이터, 폰클개통데이터',
                 range: 'A:Z',
                 headerRow: 4,
-                supabaseTable: 'inventory_price_discrepancies',
-                apiEndpoint: '/api/price-discrepancies',
-                description: '모델명별 입고가 비교'
+                apiEndpoint: '/api/price-discrepancies'
             },
             'duplicate': {
                 label: '폰클중복값',
                 sheet: '폰클개통데이터, 폰클재고데이터',
                 range: 'A4:BZ',
                 headerRow: 4,
-                supabaseTable: 'inventory_duplicates',
-                apiEndpoint: '/api/phone-duplicates',
-                description: '일련번호 중복 검사'
+                apiEndpoint: '/api/phone-duplicates'
             },
             'master': {
                 label: '마스터재고검수',
                 sheet: '마스터재고',
                 range: 'A:Z',
                 headerRow: 1,
-                supabaseTable: 'inventory_audit_master',
                 apiEndpoint: '/api/master-inventory',
-                spreadsheetId: '12_oC7c2xqHlDCppUvWL2EFesszA3oDU5JBdrYccYT7Q',
-                description: '별도 스프레드시트 - 마스터재고 데이터'
+                spreadsheetId: '12_oC7c2xqHlDCppUvWL2EFesszA3oDU5JBdrYccYT7Q'
             },
             'assignment': {
                 label: '재고배정',
                 sheet: '사전예약사이트, 폰클재고데이터, 폰클출고처데이터, 폰클개통데이터, 정규화작업',
                 range: 'A:Z',
                 headerRow: 1,
-                supabaseTable: 'inventory_assignment_settings',
-                apiEndpoint: '/api/inventory/assignment-status',
-                description: '재고 배정 상태 계산'
+                apiEndpoint: '/api/inventory/assignment-status'
+            }
+        }
+    },
+
+    // ==================== 어플종합관리 모드 ====================
+    // UI 탭: 퀵서비스관리, 데이터베이스관리, 버그관리
+    'quickServiceManagement': {
+        tabs: {
+            'quickService': {
+                label: '퀵서비스관리',
+                apiEndpoint: '/api/quick-cost/companies'
+            },
+            'database': {
+                label: '데이터베이스관리'
+                // 데이터베이스관리 탭은 다른 모드들의 시트 정보를 참조하여 사용
+            },
+            'bugs': {
+                label: '버그관리'
+                // 버그관리 탭은 프론트엔드/백엔드 로그 확인용
             }
         }
     },
 
     // ==================== 회의 모드 ====================
+    // 시트: 회의목록
     'meeting': {
         tabs: {
-            'list': { label: '회의목록', sheet: '회의목록', range: 'A:W', headerRow: 1, supabaseTable: 'meeting_list', apiEndpoint: '/api/meetings' }
+            'list': { label: '회의목록', sheet: '회의목록', range: 'A:W', headerRow: 1, apiEndpoint: '/api/meetings' }
         }
     },
 
     // ==================== 사전예약 모드 ====================
+    // 시트: 사전예약사이트, 사전예약사이트취소데이터
     'reservation': {
         tabs: {
-            'site': { label: '사전예약', sheet: '사전예약사이트', range: 'A:Z', headerRow: 1, supabaseTable: 'reservation_site', apiEndpoint: '/api/reservation-site' },
-            'cancel': { label: '취소데이터', sheet: '사전예약사이트취소데이터', range: 'A:Z', headerRow: 1, supabaseTable: 'reservation_cancel' }
+            'site': { label: '사전예약', sheet: '사전예약사이트', range: 'A:Z', headerRow: 1 },
+            'cancel': { label: '취소데이터', sheet: '사전예약사이트취소데이터', range: 'A:Z', headerRow: 1 }
         }
     },
 
     // ==================== 기본 모드 ====================
+    // 시트: 사전예약사이트, 마당접수, 온세일, 모바일가입내역, POS코드변경설정
     'basicMode': {
         tabs: {
-            'reservation': { label: '사전예약', sheet: '사전예약사이트', range: 'A:Z', headerRow: 1, supabaseTable: 'basic_reservation' },
-            'madang': { label: '마당접수', sheet: '마당접수', range: 'A:Z', headerRow: 1, supabaseTable: 'basic_madang' },
-            'onsale': { label: '온세일', sheet: '온세일', range: 'A:Z', headerRow: 1, supabaseTable: 'basic_onsale' },
-            'mobile': { label: '모바일가입', sheet: '모바일가입내역', range: 'A:Z', headerRow: 1, supabaseTable: 'basic_mobile' },
-            'posCode': { label: 'POS코드설정', sheet: 'POS코드변경설정', range: 'A:Z', headerRow: 1, supabaseTable: 'basic_pos_code' }
+            'reservation': { label: '사전예약', sheet: '사전예약사이트', range: 'A:Z', headerRow: 1 },
+            'madang': { label: '마당접수', sheet: '마당접수', range: 'A:Z', headerRow: 1 },
+            'onsale': { label: '온세일', sheet: '온세일', range: 'A:Z', headerRow: 1 },
+            'mobile': { label: '모바일가입', sheet: '모바일가입내역', range: 'A:Z', headerRow: 1 },
+            'posCode': { label: 'POS코드설정', sheet: 'POS코드변경설정', range: 'A:Z', headerRow: 1 }
         }
     },
 
     // ==================== 영업 모드 ====================
+    // 시트: 영업사원목표, 폰클개통데이터, 폰클출고처데이터, 거래처정보, 운영모델, 폰클홈데이터
     'sales': {
         tabs: {
-            'target': { label: '영업사원목표', sheet: '영업사원목표', range: 'A:Z', headerRow: 1, supabaseTable: 'sales_target', apiEndpoint: '/api/sales-target' },
-            'activation': { label: '개통데이터', sheet: '폰클개통데이터', range: 'A:BZ', headerRow: 4, supabaseTable: 'sales_activation' },
-            'stores': { label: '출고처데이터', sheet: '폰클출고처데이터', range: 'A:AM', headerRow: 4, supabaseTable: 'sales_stores' },
-            'customer': { label: '거래처정보', sheet: '거래처정보', range: 'A:Z', headerRow: 1, supabaseTable: 'sales_customer' },
-            'model': { label: '운영모델', sheet: '운영모델', range: 'A:Z', headerRow: 1, supabaseTable: 'sales_model' },
-            'home': { label: '폰클홈데이터', sheet: '폰클홈데이터', range: 'A:Z', headerRow: 1, supabaseTable: 'sales_home' }
+            'target': { label: '영업사원목표', sheet: '영업사원목표', range: 'A:Z', headerRow: 1 },
+            'activation': { label: '개통데이터', sheet: '폰클개통데이터', range: 'A:BZ', headerRow: 4 },
+            'stores': { label: '출고처데이터', sheet: '폰클출고처데이터', range: 'A:AM', headerRow: 4 },
+            'customer': { label: '거래처정보', sheet: '거래처정보', range: 'A:Z', headerRow: 1 },
+            'model': { label: '운영모델', sheet: '운영모델', range: 'A:Z', headerRow: 1 },
+            'home': { label: '폰클홈데이터', sheet: '폰클홈데이터', range: 'A:Z', headerRow: 1 }
         }
     },
 
     // ==================== 온세일관리 모드 ====================
+    // 시트: 온세일링크관리, 온세일
     'onSaleManagement': {
         tabs: {
-            'links': { label: '온세일링크', sheet: '온세일링크관리', range: 'A:Z', headerRow: 1, supabaseTable: 'onsale_links', apiEndpoint: '/api/onsale/active-links' },
-            'data': { label: '온세일', sheet: '온세일', range: 'A:Z', headerRow: 1, supabaseTable: 'onsale_data', apiEndpoint: '/api/onsale' }
+            'links': { label: '온세일링크', sheet: '온세일링크관리', range: 'A:Z', headerRow: 1, apiEndpoint: '/api/onsale/active-links' },
+            'data': { label: '온세일', sheet: '온세일', range: 'A:Z', headerRow: 1 }
         }
     },
 
     // ==================== 온세일접수 모드 ====================
+    // 시트: 온세일
     'onSaleReception': {
         tabs: {
-            'reception': { label: '온세일접수', sheet: '온세일', range: 'A:Z', headerRow: 1, supabaseTable: 'onsale_reception' }
+            'reception': { label: '온세일접수', sheet: '온세일', range: 'A:Z', headerRow: 1 }
         }
     },
 
     // ==================== 일반정책 모드 ====================
+    // 시트: 정책_기본정보 , 정책모드공지사항
     'generalPolicy': {
         tabs: {
-            'basic': { label: '기본정보', sheet: '정책_기본정보 ', range: 'A:AC', headerRow: 1, supabaseTable: 'general_policy_basic', apiEndpoint: '/api/policy/list' },
-            'notice': { label: '공지사항', sheet: '정책모드공지사항', range: 'A:I', headerRow: 2, supabaseTable: 'general_policy_notice', apiEndpoint: '/api/policy-notices' }
-        }
-    },
-
-    // ==================== 정산 모드 (엑셀 업로드 처리) ====================
-    'settlement': {
-        tabs: {
-            'upload': { label: '정산업로드', description: '엑셀 파일 업로드 처리', supabaseTable: 'settlement_upload' }
-        }
-    },
-
-    // ==================== 검수 모드 ====================
-    'inspection': {
-        tabs: {
-            'master': { label: '마스터재고', sheet: '마스터재고', range: 'A:Z', headerRow: 1, supabaseTable: 'inspection_master', apiEndpoint: '/api/master-inventory', spreadsheetId: '12_oC7c2xqHlDCppUvWL2EFesszA3oDU5JBdrYccYT7Q' }
-        }
-    },
-
-    // ==================== 장표 모드 (OCR 처리) ====================
-    'chart': {
-        tabs: {
-            'ocr': { label: '채권장표', description: 'OCR 처리', supabaseTable: 'chart_ocr' }
-        }
-    },
-
-    // ==================== 재고회수 모드 ====================
-    'inventoryRecovery': {
-        tabs: {
-            'recovery': { label: '재고회수', sheet: '폰클재고데이터', range: 'A:Z', headerRow: 4, supabaseTable: 'inventory_recovery', apiEndpoint: '/api/inventory/recovery' }
-        }
-    },
-
-    // ==================== 정보수집 모드 ====================
-    'dataCollection': {
-        tabs: {
-            'collection': { label: '데이터수집', description: '현장 데이터 수집', supabaseTable: 'data_collection' }
-        }
-    },
-
-    // ==================== 고객 모드 ====================
-    'customerMode': {
-        tabs: {
-            'queue': { label: '구매대기열', sheet: '사전예약사이트', range: 'A:Z', headerRow: 1, supabaseTable: 'customer_queue', apiEndpoint: '/api/customer/queue' }
+            'basic': { label: '기본정보', sheet: '정책_기본정보 ', range: 'A:AC', headerRow: 1, apiEndpoint: '/api/policy/list' },
+            'notice': { label: '공지사항', sheet: '정책모드공지사항', range: 'A:I', headerRow: 2, apiEndpoint: '/api/policy-notices' }
         }
     },
 
     // ==================== 직영점 관리 모드 ====================
+    // 시트: 직영점_* (directStore와 동일한 시트 사용)
     'directStoreManagement': {
         tabs: {
-            'sales': { label: '판매일보', sheet: '직영점_판매일보', range: 'A:AB', headerRow: 1, supabaseTable: 'direct_mgmt_sales', apiEndpoint: '/api/direct/sales' },
-            'today': { label: '오늘의휴대폰', sheet: '직영점_오늘의휴대폰', range: 'A:Z', headerRow: 1, supabaseTable: 'direct_mgmt_today', apiEndpoint: '/api/direct/todays-mobiles' },
-            'settings': { label: '설정', sheet: '직영점_설정', range: 'A:Z', headerRow: 1, supabaseTable: 'direct_mgmt_settings', apiEndpoint: '/api/direct/settings' },
-            'images': { label: '모델이미지', sheet: '직영점_모델이미지', range: 'A:K', headerRow: 1, supabaseTable: 'direct_mgmt_images', apiEndpoint: '/api/direct/model-images' },
-            'devices': { label: '단말마스터', sheet: '직영점_단말마스터', range: 'A:R', headerRow: 1, supabaseTable: 'direct_mgmt_devices', apiEndpoint: '/api/direct/device-master' },
-            'policy': { label: '정책관리', sheet: '직영점_정책_마진, 직영점_정책_부가서비스, 직영점_정책_별도', range: 'A:Z', headerRow: 1, supabaseTable: 'direct_mgmt_policy', apiEndpoint: '/api/direct/management/policy' }
+            'sales': { label: '판매일보', sheet: '직영점_판매일보', range: 'A:AB', headerRow: 1, apiEndpoint: '/api/direct/sales' },
+            'today': { label: '오늘의휴대폰', sheet: '직영점_오늘의휴대폰', range: 'A:Z', headerRow: 1, apiEndpoint: '/api/direct/todays-mobiles' },
+            'settings': { label: '설정', sheet: '직영점_설정', range: 'A:Z', headerRow: 1, apiEndpoint: '/api/direct/settings' },
+            'images': { label: '모델이미지', sheet: '직영점_모델이미지', range: 'A:K', headerRow: 1 },
+            'devices': { label: '단말마스터', sheet: '직영점_단말마스터', range: 'A:R', headerRow: 1 },
+            'policy': { label: '정책관리', sheet: '직영점_정책_마진, 직영점_정책_부가서비스, 직영점_정책_별도', range: 'A:Z', headerRow: 1, apiEndpoint: '/api/direct/management/policy' }
+        }
+    },
+
+    // ==================== 아래 모드들은 시트 정보 미확인 (회색 비활성화) ====================
+
+    // OB 관리 모드 - 시트 정보 미확인
+    'obManagement': {
+        disabled: true,
+        tabs: {
+            'results': { label: '정산결과' },
+            'discounts': { label: '할인데이터' },
+            'segments': { label: '세그먼트' },
+            'plans': { label: '요금제' },
+            'links': { label: '링크관리' },
+            'exclusions': { label: '제외인원' },
+            'targetOutlets': { label: '대상점관리' }
+        }
+    },
+
+    // 정산 모드 - 엑셀 업로드 처리, 시트 정보 없음
+    'settlement': {
+        disabled: true,
+        tabs: {
+            'upload': { label: '정산업로드' }
+        }
+    },
+
+    // 검수 모드 - 마스터재고 외부 시트 사용
+    'inspection': {
+        disabled: true,
+        tabs: {
+            'master': { label: '마스터재고', apiEndpoint: '/api/master-inventory' }
+        }
+    },
+
+    // 장표 모드 - OCR 처리, 시트 없음
+    'chart': {
+        disabled: true,
+        tabs: {
+            'ocr': { label: '채권장표' }
+        }
+    },
+
+    // 재고회수 모드 - 시트 정보 미확인
+    'inventoryRecovery': {
+        disabled: true,
+        tabs: {
+            'recovery': { label: '재고회수' }
+        }
+    },
+
+    // 정보수집 모드 - 시트 정보 없음
+    'dataCollection': {
+        disabled: true,
+        tabs: {
+            'collection': { label: '데이터수집' }
+        }
+    },
+
+    // SMS 관리 모드 - 시트 정보 미확인
+    'smsManagement': {
+        disabled: true,
+        tabs: {
+            'messages': { label: 'SMS목록' },
+            'rules': { label: '전달규칙' },
+            'history': { label: '전달이력' },
+            'autoReply': { label: '자동응답' }
+        }
+    },
+
+    // 식대 모드 - 시트 정보 없음
+    'mealAllowance': {
+        disabled: true,
+        tabs: {
+            'allowance': { label: '식대관리' }
+        }
+    },
+
+    // 근퇴 모드 - 시트 정보 없음
+    'attendance': {
+        disabled: true,
+        tabs: {
+            'records': { label: '근태기록' }
+        }
+    },
+
+    // 리스크 관리 모드 - 시트 정보 없음
+    'riskManagement': {
+        disabled: true,
+        tabs: {
+            'risk': { label: '리스크관리' }
+        }
+    },
+
+    // 고객 모드 - 시트 정보 미확인
+    'customerMode': {
+        disabled: true,
+        tabs: {
+            'queue': { label: '구매대기열' }
         }
     }
 };

@@ -298,6 +298,8 @@ const DataSourceDashboard = () => {
                                     const ModeIcon = getModeIcon(modeKey);
                                     const modeTitle = getModeTitle(modeKey);
                                     const hasTabs = modeData && modeData.tabs && Object.keys(modeData.tabs).length > 0;
+                                    const isDisabled = modeData?.disabled === true;
+                                    const isActive = hasTabs && !isDisabled;
 
                                     return (
                                         <Accordion
@@ -308,15 +310,22 @@ const DataSourceDashboard = () => {
                                                 '&:before': { display: 'none' },
                                                 boxShadow: 'none',
                                                 borderBottom: '1px solid #eee',
-                                                opacity: hasTabs ? 1 : 0.6
+                                                opacity: isActive ? 1 : 0.5
                                             }}
                                         >
                                             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
-                                                    <ModeIcon color={hasTabs ? "primary" : "disabled"} />
-                                                    <Typography variant="subtitle1" fontWeight="bold">{modeTitle}</Typography>
+                                                    <ModeIcon color={isActive ? "primary" : "disabled"} />
+                                                    <Typography variant="subtitle1" fontWeight="bold" sx={{ color: isActive ? 'text.primary' : 'text.disabled' }}>{modeTitle}</Typography>
                                                     <Box sx={{ flexGrow: 1 }} />
-                                                    {hasTabs ? (
+                                                    {isDisabled ? (
+                                                        <Chip
+                                                            label="시트 미확인"
+                                                            size="small"
+                                                            variant="outlined"
+                                                            sx={{ height: 20, color: 'text.disabled', borderColor: '#ccc', bgcolor: '#f5f5f5' }}
+                                                        />
+                                                    ) : hasTabs ? (
                                                         <Chip
                                                             label={`${Object.keys(modeData.tabs).length}개 탭`}
                                                             size="small"
