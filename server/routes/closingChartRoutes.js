@@ -111,7 +111,7 @@ function createClosingChartRoutes(context) {
       });
 
       // 캐시 저장 (1분으로 단축 - 빠른 업데이트를 위해)
-      cache.set(cacheKey, processedData, 60);
+      cacheManager.set(cacheKey, processedData, 60 * 1000);
 
       console.log('마감장표 데이터 처리 완료');
       res.json(processedData);
