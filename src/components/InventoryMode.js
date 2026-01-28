@@ -615,7 +615,7 @@ const PhoneDuplicateContent = ({ data, type }) => {
                             <Chip
                               label={item.employee || '미등록'}
                               size="small"
-                              color={data.employeeFrequency[item.employee] > 5 ? 'error' : 'default'}
+                              color={(data.employeeFrequency && data.employeeFrequency[item.employee] > 5) ? 'error' : 'default'}
                             />
                           </TableCell>
                           {type === '휴대폰' && <TableCell>{item.model}</TableCell>}
