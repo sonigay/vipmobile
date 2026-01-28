@@ -23,10 +23,10 @@ const DEFAULT_CONFIG = {
     'http://localhost:3000',          // 로컬 개발 (기본 포트)
     'http://localhost:3001'           // 로컬 개발 (대체 포트)
   ],
-  
+
   // 허용된 HTTP 메서드 (요구사항 1.4)
   allowedMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  
+
   // 허용된 헤더 (요구사항 1.5)
   allowedHeaders: [
     'Content-Type',
@@ -43,18 +43,19 @@ const DEFAULT_CONFIG = {
     'X-Mode',
     'Cache-Control',
     'Pragma',
-    'Expires'
+    'Expires',
+    'x-vercel-skip-toolbar'
   ],
-  
+
   // 자격 증명 허용 여부 (요구사항 1.3)
   allowCredentials: true,
-  
+
   // 프리플라이트 캐시 시간 (초) (요구사항 6.1)
   maxAge: 86400,  // 24시간
-  
+
   // 개발 모드 여부 (요구사항 2.4)
   developmentMode: false,
-  
+
   // 디버그 모드 여부 (요구사항 4.4)
   debugMode: false
 };
@@ -71,22 +72,22 @@ let currentConfig = null;
 const parseAllowedOrigins = () => {
   // ALLOWED_ORIGINS 환경 변수 확인 (요구사항 5.1)
   const envOrigins = process.env.ALLOWED_ORIGINS || process.env.CORS_ORIGIN;
-  
+
   if (!envOrigins || envOrigins.trim() === '') {
     console.log('ℹ️ [CORS Config] ALLOWED_ORIGINS 환경 변수가 설정되지 않음, 기본값 사용');
     return [...DEFAULT_CONFIG.allowedOrigins];
   }
-  
+
   // 쉼표로 구분된 오리진 파싱
   const origins = envOrigins
     .split(',')
     .map(origin => origin.trim())
     .filter(origin => origin.length > 0);
-  
+
   // 중복 제거 (대소문자 무관) (요구사항 2.5)
   const uniqueOrigins = [];
   const seenOrigins = new Set();
-  
+
   for (const origin of origins) {
     const lowerOrigin = origin.toLowerCase();
     if (!seenOrigins.has(lowerOrigin)) {
@@ -94,7 +95,7 @@ const parseAllowedOrigins = () => {
       uniqueOrigins.push(origin);
     }
   }
-  
+
   console.log('✅ [CORS Config] 환경 변수에서 오리진 로드:', uniqueOrigins);
   return uniqueOrigins;
 };
@@ -105,16 +106,16 @@ const parseAllowedOrigins = () => {
  */
 const parseAllowCredentials = () => {
   const envCredentials = process.env.CORS_CREDENTIALS;
-  
+
   if (envCredentials === undefined || envCredentials === null) {
     console.log('ℹ️ [CORS Config] CORS_CREDENTIALS 환경 변수가 설정되지 않음, 기본값 사용');
     return DEFAULT_CONFIG.allowCredentials;
   }
-  
+
   // 문자열을 boolean으로 변환
   const value = envCredentials.toLowerCase();
   const allowCredentials = value === 'true' || value === '1' || value === 'yes';
-  
+
   console.log('✅ [CORS Config] 환경 변수에서 자격 증명 설정 로드:', allowCredentials);
   return allowCredentials;
 };
@@ -126,11 +127,11 @@ const parseAllowCredentials = () => {
 const parseDevelopmentMode = () => {
   const nodeEnv = process.env.NODE_ENV;
   const isDevelopment = nodeEnv === 'development' || nodeEnv === 'dev';
-  
+
   if (isDevelopment) {
     console.log('🔧 [CORS Config] 개발 모드 활성화');
   }
-  
+
   return isDevelopment;
 };
 
@@ -140,18 +141,18 @@ const parseDevelopmentMode = () => {
  */
 const parseDebugMode = () => {
   const envDebug = process.env.CORS_DEBUG || process.env.DEBUG;
-  
+
   if (!envDebug) {
     return DEFAULT_CONFIG.debugMode;
   }
-  
+
   const value = envDebug.toLowerCase();
   const isDebug = value === 'true' || value === '1' || value === 'yes' || value === 'cors';
-  
+
   if (isDebug) {
     console.log('🐛 [CORS Config] 디버그 모드 활성화');
   }
-  
+
   return isDebug;
 };
 
@@ -161,16 +162,16 @@ const parseDebugMode = () => {
  */
 const parseAllowedMethods = () => {
   const envMethods = process.env.ALLOWED_METHODS || process.env.CORS_METHODS;
-  
+
   if (!envMethods || envMethods.trim() === '') {
     return [...DEFAULT_CONFIG.allowedMethods];
   }
-  
+
   const methods = envMethods
     .split(',')
     .map(method => method.trim().toUpperCase())
     .filter(method => method.length > 0);
-  
+
   console.log('✅ [CORS Config] 환경 변수에서 메서드 로드:', methods);
   return methods;
 };
@@ -181,16 +182,16 @@ const parseAllowedMethods = () => {
  */
 const parseAllowedHeaders = () => {
   const envHeaders = process.env.ALLOWED_HEADERS || process.env.CORS_HEADERS;
-  
+
   if (!envHeaders || envHeaders.trim() === '') {
     return [...DEFAULT_CONFIG.allowedHeaders];
   }
-  
+
   const headers = envHeaders
     .split(',')
     .map(header => header.trim())
     .filter(header => header.length > 0);
-  
+
   console.log('✅ [CORS Config] 환경 변수에서 헤더 로드:', headers);
   return headers;
 };
@@ -201,18 +202,18 @@ const parseAllowedHeaders = () => {
  */
 const parseMaxAge = () => {
   const envMaxAge = process.env.CORS_MAX_AGE;
-  
+
   if (!envMaxAge) {
     return DEFAULT_CONFIG.maxAge;
   }
-  
+
   const maxAge = parseInt(envMaxAge, 10);
-  
+
   if (isNaN(maxAge) || maxAge < 0) {
     console.warn('⚠️ [CORS Config] 유효하지 않은 CORS_MAX_AGE 값, 기본값 사용:', envMaxAge);
     return DEFAULT_CONFIG.maxAge;
   }
-  
+
   console.log('✅ [CORS Config] 환경 변수에서 Max-Age 로드:', maxAge);
   return maxAge;
 };
@@ -224,7 +225,7 @@ const parseMaxAge = () => {
  */
 const validateConfiguration = (config) => {
   const errors = [];
-  
+
   // 허용된 오리진 검증
   if (!Array.isArray(config.allowedOrigins)) {
     errors.push({
@@ -256,7 +257,7 @@ const validateConfiguration = (config) => {
       }
     });
   }
-  
+
   // 허용된 메서드 검증
   if (!Array.isArray(config.allowedMethods)) {
     errors.push({
@@ -271,7 +272,7 @@ const validateConfiguration = (config) => {
       value: config.allowedMethods
     });
   }
-  
+
   // 허용된 헤더 검증
   if (!Array.isArray(config.allowedHeaders)) {
     errors.push({
@@ -286,7 +287,7 @@ const validateConfiguration = (config) => {
       value: config.allowedHeaders
     });
   }
-  
+
   // 자격 증명 검증
   if (typeof config.allowCredentials !== 'boolean') {
     errors.push({
@@ -295,7 +296,7 @@ const validateConfiguration = (config) => {
       value: config.allowCredentials
     });
   }
-  
+
   // Max-Age 검증
   if (typeof config.maxAge !== 'number' || config.maxAge < 0) {
     errors.push({
@@ -304,7 +305,7 @@ const validateConfiguration = (config) => {
       value: config.maxAge
     });
   }
-  
+
   // 개발 모드 검증
   if (typeof config.developmentMode !== 'boolean') {
     errors.push({
@@ -313,7 +314,7 @@ const validateConfiguration = (config) => {
       value: config.developmentMode
     });
   }
-  
+
   // 디버그 모드 검증
   if (typeof config.debugMode !== 'boolean') {
     errors.push({
@@ -322,7 +323,7 @@ const validateConfiguration = (config) => {
       value: config.debugMode
     });
   }
-  
+
   return errors;
 };
 
@@ -332,7 +333,7 @@ const validateConfiguration = (config) => {
  */
 const loadConfiguration = () => {
   console.log('🔄 [CORS Config] 환경 변수에서 CORS 구성 로드 중...');
-  
+
   const config = {
     allowedOrigins: parseAllowedOrigins(),
     allowedMethods: parseAllowedMethods(),
@@ -342,18 +343,18 @@ const loadConfiguration = () => {
     developmentMode: parseDevelopmentMode(),
     debugMode: parseDebugMode()
   };
-  
+
   // 구성 검증 (요구사항 5.4)
   const errors = validateConfiguration(config);
-  
+
   if (errors.length > 0) {
     console.error('❌ [CORS Config] 구성 검증 실패:', errors);
     console.error('⚠️ [CORS Config] 안전한 기본값으로 폴백합니다.');
-    
+
     // 안전한 기본값으로 폴백 (요구사항 5.3)
     return { ...DEFAULT_CONFIG };
   }
-  
+
   console.log('✅ [CORS Config] CORS 구성 로드 완료:', {
     originsCount: config.allowedOrigins.length,
     methodsCount: config.allowedMethods.length,
@@ -363,7 +364,7 @@ const loadConfiguration = () => {
     developmentMode: config.developmentMode,
     debugMode: config.debugMode
   });
-  
+
   return config;
 };
 
@@ -376,7 +377,7 @@ const getConfiguration = () => {
   if (!currentConfig) {
     currentConfig = loadConfiguration();
   }
-  
+
   // 구성 깊은 복사본 반환 (불변성 보장)
   return {
     ...currentConfig,
@@ -393,19 +394,19 @@ const getConfiguration = () => {
  */
 const updateConfiguration = (newConfig) => {
   console.log('🔄 [CORS Config] 런타임 구성 업데이트 요청:', newConfig);
-  
+
   // 현재 구성 가져오기
   const current = getConfiguration();
-  
+
   // 새로운 구성 병합
   const merged = {
     ...current,
     ...newConfig
   };
-  
+
   // 구성 검증
   const errors = validateConfiguration(merged);
-  
+
   if (errors.length > 0) {
     console.error('❌ [CORS Config] 구성 업데이트 검증 실패:', errors);
     return {
@@ -414,10 +415,10 @@ const updateConfiguration = (newConfig) => {
       config: current
     };
   }
-  
+
   // 구성 업데이트
   currentConfig = merged;
-  
+
   console.log('✅ [CORS Config] 런타임 구성 업데이트 성공:', {
     originsCount: merged.allowedOrigins.length,
     methodsCount: merged.allowedMethods.length,
@@ -427,7 +428,7 @@ const updateConfiguration = (newConfig) => {
     developmentMode: merged.developmentMode,
     debugMode: merged.debugMode
   });
-  
+
   return {
     success: true,
     errors: [],
