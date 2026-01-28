@@ -23,8 +23,6 @@ const express = require('express');
 function createClosingChartRoutes(context) {
   const router = express.Router();
   const { sheetsClient, rateLimiter, cacheManager } = context;
-  const { cache } = require('../cacheMonitor');
-
   // 내부 헬퍼 함수: 시트 데이터 가져오기
   async function getSheetValues(sheetName) {
     try {
@@ -69,9 +67,10 @@ function createClosingChartRoutes(context) {
       const cacheKey = `closing_chart_${targetDate}`;
 
       // 캐시 확인
-      if (cache.has(cacheKey)) {
+      const cachedData = cacheManager.get(cacheKey);
+      if (cachedData) {
         console.log('캐시된 마감장표 데이터 반환');
-        return res.json(cache.get(cacheKey));
+        return res.json(cachedData);
       }
 
       // 필요한 시트 데이터 로드 (병렬 처리)
