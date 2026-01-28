@@ -270,6 +270,8 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
 
               // 각 agent의 department 값 상세 확인 (특히 7985456 찾기)
               if (agentData && Array.isArray(agentData)) {
+                // 로그 상세 출력 주석 처리 (성능 이슈)
+                /*
                 console.log('🔍 [백엔드 응답 상세] 각 agent의 department 값:');
                 agentData.forEach((agent, idx) => {
                   if (agent.department && agent.department.toString().includes('7985456')) {
@@ -284,6 +286,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                     console.log(`  [${idx}] ${agent.target || agent.contactId}: office="${agent.office}", department="${agent.department}"`);
                   }
                 });
+                */
 
                 // department에 숫자만 있는 값이 있는지 확인
                 const numericDepts = agentData.filter(agent => {
@@ -601,7 +604,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
         Object.keys(newSettings.targets.offices).forEach(key => {
           // 유효한 office 목록에 없거나, 숫자만 있는 경우(비밀번호일 가능성) 제거
           if (!validOfficeKeys.has(key) || (/^\d+$/.test(key) && key.length >= 4)) {
-            console.warn(`⚠️ [설정 정리] 유효하지 않은 office 키 제거: "${key}"`);
+            // console.warn(`⚠️ [설정 정리] 유효하지 않은 office 키 제거: "${key}"`);
             delete newSettings.targets.offices[key];
           }
         });
@@ -624,7 +627,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
         Object.keys(newSettings.targets.departments).forEach(key => {
           // 유효한 department 목록에 없거나, 숫자만 있는 경우(비밀번호일 가능성) 제거
           if (!validDepartmentKeys.has(key) || (/^\d+$/.test(key) && key.length >= 4)) {
-            console.warn(`⚠️ [설정 정리] 유효하지 않은 department 키 제거: "${key}"`);
+            // console.warn(`⚠️ [설정 정리] 유효하지 않은 department 키 제거: "${key}"`);
             delete newSettings.targets.departments[key];
           }
         });
@@ -638,11 +641,12 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
 
         // 영업사원별 배정 대상 초기화 (유효한 담당자만)
         // 기존 agents에서 유효하지 않은 키 제거
+        // 기존 agents에서 유효하지 않은 키 제거
         const validAgentIds = new Set(validAgents.map(agent => agent.contactId));
         Object.keys(newSettings.targets.agents).forEach(key => {
           // 유효한 agent 목록에 없거나, 숫자만 있는 경우(비밀번호일 가능성) 제거
           if (!validAgentIds.has(key) || (/^\d+$/.test(key) && key.length >= 4)) {
-            console.warn(`⚠️ [설정 정리] 유효하지 않은 agent 키 제거: "${key}"`);
+            // console.warn(`⚠️ [설정 정리] 유효하지 않은 agent 키 제거: "${key}"`);
             delete newSettings.targets.agents[key];
           }
         });
@@ -653,6 +657,11 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
             newSettings.targets.agents[agent.contactId] = false; // 기본값: 선택되지 않음
           }
         });
+
+        // 변경사항이 없으면 업데이트하지 않음 (무한 루프 방지)
+        if (JSON.stringify(prev.targets) === JSON.stringify(newSettings.targets)) {
+          return prev;
+        }
 
         return newSettings;
       });
@@ -1272,8 +1281,21 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       structure.departments[department].agents.add(agentId);
 
       // 영업사원별 구조
+      let displayName = agent.target;
+      // "이병각" 예외 처리: 이름 중복 방지를 위해 소속 정보 활용
+      if (agent.target.includes('이병각')) {
+        // 소속이 이름과 같으면(예: "이병각"), 사무실 정보를 괄호로 추가 (예: "이병각(인천사무실)")
+        if (department === displayName && office) {
+          displayName = `${displayName}(${office})`;
+        }
+        // 소속이 이름과 다르면(예: "이병각(강동)"), 소속을 이름으로 사용
+        else if (department) {
+          displayName = department;
+        }
+      }
+
       structure.agents[agentId] = {
-        name: agent.target,
+        name: displayName,
         office: office,
         department: department
       };
@@ -2877,7 +2899,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                   />
                                   <Box sx={{ flex: 1 }}>
                                     <Typography variant="body2">
-                                      {agent ? agent.target : agentId}
+                                      {agentData ? agentData.name : (agent ? agent.target : agentId)}
                                     </Typography>
                                     {agentData && (
                                       <Typography variant="caption" color="text.secondary">
@@ -3612,7 +3634,20 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                           backgroundColor: '#fafafa'
                                         }}>
                                           <div style={{ fontWeight: 'bold', color: '#1976d2' }}>
-                                            {agent?.target || agentId}
+                                            {(() => {
+                                              // 미리보기에서는 getHierarchicalStructure에 접근하기 어려울 수 있으므로 로직 동일 적용
+                                              let displayName = agent ? agent.target : agentId;
+                                              if (agent && agent.target && agent.target.includes('이병각')) {
+                                                const office = agent.office || '';
+                                                const department = agent.department || '';
+                                                if (department === agent.target && office) {
+                                                  displayName = `${agent.target}(${office})`;
+                                                } else if (department) {
+                                                  displayName = department;
+                                                }
+                                              }
+                                              return displayName;
+                                            })()}
                                           </div>
                                           <div style={{ fontSize: '0.65rem', color: 'text.secondary', marginTop: '2px' }}>
                                             총 {totalAgentQuantity}개
