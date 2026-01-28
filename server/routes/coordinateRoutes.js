@@ -191,6 +191,8 @@ function createCoordinateRoutes(context) {
     }
   }
 
+
+
   /**
    * 폰클출고처데이터 좌표 업데이트 핵심 로직
    */
@@ -211,8 +213,15 @@ function createCoordinateRoutes(context) {
     const currentHashes = { ...storedHashes };
     let changed = false;
     let upCount = 0;
+    let consecutive429Errors = 0; // 429 연속 오류 카운터
 
     for (let i = 0; i < storeRows.length; i++) {
+      // 429 오류가 지속되면 루프 중단
+      if (consecutive429Errors >= 1) {
+        console.warn('⚠️ [좌표업데이트] API 호출 한도 초과(429)가 확인되어 업데이트를 중단합니다.');
+        break;
+      }
+
       const row = storeRows[i];
       const storeId = row[0] || `row_${i + 2}`; // A열: ID
       const address = row[11] || "";  // L열: 주소
@@ -221,7 +230,7 @@ function createCoordinateRoutes(context) {
       const existingLng = row[9]; // J열
 
       const addressHash = createHash(address.toString().trim());
-      const lastHash = currentHashes[`store_${storeId}`];
+      // const lastHash = currentHashes[`store_${storeId}`]; // Not used effectively due to row shifting
 
       if (status === "사용") {
         // 주소가 없으면 좌표 삭제
@@ -236,8 +245,18 @@ function createCoordinateRoutes(context) {
           continue;
         }
 
-        // 주소가 변경되었거나 좌표가 없는 경우에만 지오코딩 실행
-        if (addressHash !== lastHash || !existingLat || !existingLng) {
+        // 1. 이미 좌표가 존재하면 신뢰하고 API 호출 건너뜀 (서버 재시작/행 밀림 시 대량 업데이트 방지)
+        if (existingLat && existingLng) {
+          // 캐시를 현재 상태로 동기화 (행이 밀렸을 수 있으므로 현재의 Hash를 저장)
+          if (currentHashes[`store_${storeId}`] !== addressHash) {
+            currentHashes[`store_${storeId}`] = addressHash;
+            changed = true;
+          }
+          continue;
+        }
+
+        // 2. 좌표가 없는 경우에만 지오코딩 실행 (Hash 비교 로직 제거 - 좌표 유무가 기준)
+        if (!existingLat || !existingLng) {
           try {
             const result = await geocodeAddress(address);
             if (result) {
@@ -249,13 +268,18 @@ function createCoordinateRoutes(context) {
               currentHashes[`store_${storeId}`] = addressHash;
               changed = true;
               upCount++;
-              console.log(`✅ [좌표업데이트] 성공: ${address}`);
+              consecutive429Errors = 0; // 성공 시 카운터 초기화
+              console.log(`✅ [좌표업데이트] 신규 완료: ${address}`);
             }
           } catch (error) {
             console.error(`❌ [좌표업데이트] 오류: ${address}`, error.message);
+            // 429 오류 감지
+            if (error.message.includes('429')) {
+              consecutive429Errors++;
+            }
           }
-          // API 할당량 제한을 피하기 위한 지연
-          await new Promise(resolve => setTimeout(resolve, 500));
+          // API 할당량 제한을 피하기 위한 지연 (기본 1초)
+          await new Promise(resolve => setTimeout(resolve, 1000));
         }
       } else {
         // 미사용 매장은 위도/경도 삭제
@@ -285,7 +309,7 @@ function createCoordinateRoutes(context) {
       console.log(`✅ [좌표업데이트] ${updates.length}개 좌표 업데이트 완료`);
     }
 
-    // 최종 결과 보고
+    // 최종 결과 보고 (로그 노이즈 감소: 업데이트가 있을 때만 디스코드 알림)
     if (upCount > 0) {
       await sendDiscordSummary('🗺️ 폰클출고처 위경도 업데이트 완료', [
         { name: '처리된 주소', value: `${upCount}개`, inline: true },
@@ -297,7 +321,8 @@ function createCoordinateRoutes(context) {
       success: true,
       message: `Updated coordinates for ${upCount} addresses out of ${updates.length} items checked`,
       updatedCount: upCount,
-      totalUpdates: updates.length
+      totalUpdates: updates.length,
+      aborted: consecutive429Errors >= 1
     };
   }
 
@@ -328,8 +353,15 @@ function createCoordinateRoutes(context) {
     const storedHashes = getStoredHashes();
     const currentHashes = { ...storedHashes };
     let changed = false;
+    let consecutive429Errors = 0; // 429 카운터
 
     for (let i = 0; i < salesRows.length; i++) {
+      // 429 오류가 지속되면 루프 중단
+      if (consecutive429Errors >= 1) {
+        console.warn('⚠️ [판매점좌표] API 호출 한도 초과(429)가 확인되어 업데이트를 중단합니다.');
+        break;
+      }
+
       const row = salesRows[i];
       const storeName = row[3] || ""; // D열: 판매점명
       const address = row[7];  // H열: 주소
@@ -341,17 +373,27 @@ function createCoordinateRoutes(context) {
         continue;
       }
 
-      // 판매점명과 주소의 조합을 키로 사용 (행 정렬 대응)
+      // 판매점명과 주소의 조합을 키로 사용 (행 정렬 대응 -> 그래도 불안정하면 로직 개선 필요)
       const salesId = storeName ? `${storeName}_${address}` : `row_${i + 2}`;
       const addressHash = createHash(address.toString().trim());
-      const lastHash = currentHashes[`sales_${salesId}`];
+      // const lastHash = currentHashes[`sales_${salesId}`];
 
       processedCount++;
 
-      // 주소 변경 감지 또는 좌표 누락 시 업데이트
-      if (addressHash !== lastHash || !existingLat || !existingLng) {
+      // 1. 이미 좌표가 존재하면 신뢰 (대량 호출 방지)
+      if (existingLat && existingLng) {
+        if (currentHashes[`sales_${salesId}`] !== addressHash) {
+          currentHashes[`sales_${salesId}`] = addressHash;
+          changed = true;
+        }
+        skippedCount++;
+        continue; // 이미 좌표가 있으면 건너뜀
+      }
+
+      // 2. 좌표가 없는 경우에만 업데이트
+      if (!existingLat || !existingLng) {
         try {
-          console.log(`🗺️ [판매점좌표] 업데이트 시도: ${address}`);
+          console.log(`🗺️ [판매점좌표] 신규 업데이트 시도: ${address}`);
           const result = await geocodeAddress(address);
 
           if (result) {
@@ -365,16 +407,21 @@ function createCoordinateRoutes(context) {
             updatedCount++;
             currentHashes[`sales_${salesId}`] = addressHash;
             changed = true;
+            consecutive429Errors = 0; // 성공 시 초기화
             console.log(`✅ [판매점좌표] 성공: ${address}`);
           } else {
             console.log(`❌ [판매점좌표] 결과 없음: ${address}`);
           }
         } catch (error) {
           console.error(`❌ [판매점좌표] 오류: ${address}`, error.message);
+          // 429 오류 감지
+          if (error.message.includes('429')) {
+            consecutive429Errors++;
+          }
         }
 
-        // API 할당량 제한을 피하기 위한 지연
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // API 할당량 제한을 피하기 위한 지연 (기본 1초)
+        await new Promise(resolve => setTimeout(resolve, 1000));
       } else {
         skippedCount++;
       }
@@ -396,7 +443,7 @@ function createCoordinateRoutes(context) {
       console.log(`✅ [판매점좌표] ${updates.length}개 좌표 일괄 업데이트 완료`);
     }
 
-    console.log(`📊 [판매점좌표] 주소 업데이트 완료 - 처리: ${processedCount}개, 업데이트: ${updatedCount}개, 건너뜀: ${skippedCount}개`);
+    console.log(`📊 [판매점좌표] 완료 - 처리: ${processedCount}개, 업데이트: ${updatedCount}개, 건너뜀: ${skippedCount}개`);
 
     // 최종 결과 보고
     if (updatedCount > 0) {
@@ -411,7 +458,8 @@ function createCoordinateRoutes(context) {
       message: `Processed ${processedCount} addresses, updated ${updatedCount} coordinates, skipped ${skippedCount}`,
       processed: processedCount,
       updated: updatedCount,
-      skipped: skippedCount
+      skipped: skippedCount,
+      aborted: consecutive429Errors >= 1
     };
   }
 
