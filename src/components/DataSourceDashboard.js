@@ -346,62 +346,87 @@ const DataSourceDashboard = () => {
                                             <AccordionDetails sx={{ bgcolor: '#fafafa', p: 0 }}>
                                                 {hasTabs ? (
                                                     <List dense sx={{ py: 0 }}>
-                                                        {Object.entries(modeData.tabs).map(([tabKey, tabData]) => {
-                                                            const flagKey = `${modeKey}:${tabKey}`;
-                                                            const isEnabled = flags[flagKey] || (flags[modeKey] && flags[flagKey] === undefined);
-                                                            const isTableExists = tableStatus[tabData.supabaseTable] || false;
+                                                        {(() => {
+                                                            const groupedTabs = {};
+                                                            Object.entries(modeData.tabs).forEach(([k, v]) => {
+                                                                const g = v.group || '__DEFAULT__';
+                                                                if (!groupedTabs[g]) groupedTabs[g] = [];
+                                                                groupedTabs[g].push({ key: k, ...v });
+                                                            });
 
-                                                            return (
-                                                                <ListItem
-                                                                    key={tabKey}
-                                                                    sx={{
-                                                                        pl: 6,
-                                                                        py: 1.5,
-                                                                        borderBottom: '1px solid #f0f0f0',
-                                                                        '&:last-child': { borderBottom: 'none' }
-                                                                    }}
-                                                                >
-                                                                    <ListItemIcon sx={{ minWidth: 40 }}>
-                                                                        {isTableExists ?
-                                                                            <CheckCircleIcon color="success" fontSize="small" /> :
-                                                                            <ErrorOutlineIcon color="error" fontSize="small" />
-                                                                        }
-                                                                    </ListItemIcon>
-                                                                    <ListItemText
-                                                                        primary={
-                                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                                                <Typography variant="body1" fontWeight="medium">{tabData.label}</Typography>
-                                                                                <Chip
-                                                                                    label={tabData.sheet}
-                                                                                    size="small"
-                                                                                    sx={{ height: 20, fontSize: '0.75rem', bgcolor: '#e8f5e9' }}
+                                                            return Object.entries(groupedTabs).map(([groupName, tabs]) => (
+                                                                <React.Fragment key={groupName}>
+                                                                    {groupName !== '__DEFAULT__' && (
+                                                                        <ListItem sx={{ bgcolor: '#f5f5f5', py: 0.5, pl: 4 }}>
+                                                                            <ListItemText
+                                                                                primary={
+                                                                                    <Typography variant="caption" fontWeight="bold" color="text.secondary">
+                                                                                        📑 {groupName}
+                                                                                    </Typography>
+                                                                                }
+                                                                            />
+                                                                        </ListItem>
+                                                                    )}
+                                                                    {tabs.map((tabData) => {
+                                                                        const tabKey = tabData.key;
+                                                                        const flagKey = `${modeKey}:${tabKey}`;
+                                                                        const isEnabled = flags[flagKey] || (flags[modeKey] && flags[flagKey] === undefined);
+                                                                        const isTableExists = tableStatus[tabData.supabaseTable] || false;
+
+                                                                        return (
+                                                                            <ListItem
+                                                                                key={tabKey}
+                                                                                sx={{
+                                                                                    pl: 6,
+                                                                                    py: 1.5,
+                                                                                    borderBottom: '1px solid #f0f0f0',
+                                                                                    '&:last-child': { borderBottom: 'none' }
+                                                                                }}
+                                                                            >
+                                                                                <ListItemIcon sx={{ minWidth: 40 }}>
+                                                                                    {isTableExists ?
+                                                                                        <CheckCircleIcon color="success" fontSize="small" /> :
+                                                                                        <ErrorOutlineIcon color="error" fontSize="small" />
+                                                                                    }
+                                                                                </ListItemIcon>
+                                                                                <ListItemText
+                                                                                    primary={
+                                                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                                                            <Typography variant="body1" fontWeight="medium">{tabData.label}</Typography>
+                                                                                            <Chip
+                                                                                                label={tabData.sheet}
+                                                                                                size="small"
+                                                                                                sx={{ height: 20, fontSize: '0.75rem', bgcolor: '#e8f5e9' }}
+                                                                                            />
+                                                                                        </Box>
+                                                                                    }
+                                                                                    secondary={
+                                                                                        <Typography variant="caption" color="text.secondary">
+                                                                                            Supabase Table: {tabData.supabaseTable}
+                                                                                        </Typography>
+                                                                                    }
                                                                                 />
-                                                                            </Box>
-                                                                        }
-                                                                        secondary={
-                                                                            <Typography variant="caption" color="text.secondary">
-                                                                                Supabase Table: {tabData.supabaseTable}
-                                                                            </Typography>
-                                                                        }
-                                                                    />
-                                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                                        <Typography variant="caption" color={isEnabled ? "primary" : "success"}>
-                                                                            {isEnabled ? "Supabase" : "G-Sheets"}
-                                                                        </Typography>
-                                                                        <Tooltip title={isTableExists ? "데이터 소스 전환" : "테이블이 없어 전환할 수 없습니다."}>
-                                                                            <span>
-                                                                                <Switch
-                                                                                    checked={isEnabled}
-                                                                                    onChange={() => handleToggle(flagKey, isEnabled)}
-                                                                                    disabled={!isTableExists && !isEnabled}
-                                                                                    size="small"
-                                                                                />
-                                                                            </span>
-                                                                        </Tooltip>
-                                                                    </Box>
-                                                                </ListItem>
-                                                            );
-                                                        })}
+                                                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                                                    <Typography variant="caption" color={isEnabled ? "primary" : "success"}>
+                                                                                        {isEnabled ? "Supabase" : "G-Sheets"}
+                                                                                    </Typography>
+                                                                                    <Tooltip title={isTableExists ? "데이터 소스 전환" : "테이블이 없어 전환할 수 없습니다."}>
+                                                                                        <span>
+                                                                                            <Switch
+                                                                                                checked={isEnabled}
+                                                                                                onChange={() => handleToggle(flagKey, isEnabled)}
+                                                                                                disabled={!isTableExists && !isEnabled}
+                                                                                                size="small"
+                                                                                            />
+                                                                                        </span>
+                                                                                    </Tooltip>
+                                                                                </Box>
+                                                                            </ListItem>
+                                                                        );
+                                                                    })}
+                                                                </React.Fragment>
+                                                            ));
+                                                        })()}
                                                     </List>
                                                 ) : (
                                                     <Box sx={{ p: 2, textAlign: 'center' }}>

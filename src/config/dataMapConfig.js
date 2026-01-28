@@ -19,14 +19,16 @@ const DATA_MAP_CONFIG = {
     //       직영점_단말마스터, 직영점_정책_마진, 직영점_정책_부가서비스, 직영점_정책_별도
     'directStore': {
         tabs: {
-            'sales': { label: '판매일보', sheet: '직영점_판매일보', range: 'A:AB', headerRow: 1, apiEndpoint: '/api/direct/sales' },
-            'today': { label: '오늘의휴대폰', sheet: '직영점_오늘의휴대폰', range: 'A:Z', headerRow: 1, apiEndpoint: '/api/direct/todays-mobiles' },
-            'settings': { label: '설정', sheet: '직영점_설정', range: 'A:Z', headerRow: 1, apiEndpoint: '/api/direct/settings' },
-            'images': { label: '모델이미지', sheet: '직영점_모델이미지', range: 'A:K', headerRow: 1, apiEndpoint: '/api/direct/mobiles-master' },
-            'devices': { label: '단말마스터', sheet: '직영점_단말마스터', range: 'A:R', headerRow: 1, apiEndpoint: '/api/direct/mobiles-master' },
-            'margin': { label: '정책마진', sheet: '직영점_정책_마진', range: 'A:Z', headerRow: 1, apiEndpoint: '/api/direct/mobiles-pricing' },
-            'addon': { label: '부가서비스', sheet: '직영점_정책_부가서비스', range: 'A:Z', headerRow: 1, apiEndpoint: '/api/direct/mobiles-pricing' },
-            'special': { label: '별도정책', sheet: '직영점_정책_별도', range: 'A:Z', headerRow: 1, apiEndpoint: '/api/direct/mobiles-pricing' }
+            'sales': { label: '판매일보', group: '일보관리', sheet: '직영점_판매일보', range: 'A:AB', headerRow: 1, apiEndpoint: '/api/direct/sales' },
+            'today': { label: '오늘의휴대폰', group: '일보관리', sheet: '직영점_오늘의휴대폰', range: 'A:Z', headerRow: 1, apiEndpoint: '/api/direct/todays-mobiles' },
+            'queue': { label: '구매대기', group: '고객관리', sheet: '직영점_구매대기', range: 'A:Z', headerRow: 1, apiEndpoint: '/api/member/queue/all' },
+            'board': { label: '게시판', group: '커뮤니티', sheet: '직영점_게시판', range: 'A:Z', headerRow: 1, apiEndpoint: '/api/member/board' },
+            'settings': { label: '설정', group: '설정', sheet: '직영점_설정', range: 'A:Z', headerRow: 1, apiEndpoint: '/api/direct/settings' },
+            'images': { label: '모델이미지', group: '기준정보', sheet: '직영점_모델이미지', range: 'A:K', headerRow: 1, apiEndpoint: '/api/direct/mobiles-master' },
+            'devices': { label: '단말마스터', group: '기준정보', sheet: '직영점_단말마스터', range: 'A:R', headerRow: 1, apiEndpoint: '/api/direct/mobiles-master' },
+            'margin': { label: '정책마진', group: '휴대폰시세표', sheet: '직영점_정책_마진', range: 'A:Z', headerRow: 1, apiEndpoint: '/api/direct/mobiles-pricing' },
+            'addon': { label: '부가서비스', group: '휴대폰시세표', sheet: '직영점_정책_부가서비스', range: 'A:Z', headerRow: 1, apiEndpoint: '/api/direct/mobiles-pricing' },
+            'special': { label: '별도정책', group: '휴대폰시세표', sheet: '직영점_정책_별도', range: 'A:Z', headerRow: 1, apiEndpoint: '/api/direct/mobiles-pricing' }
         }
     },
 
@@ -214,12 +216,14 @@ const DATA_MAP_CONFIG = {
     // 시트: 직영점_* (directStore와 동일한 시트 사용)
     'directStoreManagement': {
         tabs: {
-            'sales': { label: '판매일보', sheet: '직영점_판매일보', range: 'A:AB', headerRow: 1, apiEndpoint: '/api/direct/sales' },
-            'today': { label: '오늘의휴대폰', sheet: '직영점_오늘의휴대폰', range: 'A:Z', headerRow: 1, apiEndpoint: '/api/direct/todays-mobiles' },
-            'settings': { label: '설정', sheet: '직영점_설정', range: 'A:Z', headerRow: 1, apiEndpoint: '/api/direct/settings' },
-            'images': { label: '모델이미지', sheet: '직영점_모델이미지', range: 'A:K', headerRow: 1, apiEndpoint: '/api/direct/mobiles-master' },
-            'devices': { label: '단말마스터', sheet: '직영점_단말마스터', range: 'A:R', headerRow: 1, apiEndpoint: '/api/direct/mobiles-master' },
-            'policy': { label: '정책관리', sheet: '직영점_정책_마진, 직영점_정책_부가서비스, 직영점_정책_별도', range: 'A:Z', headerRow: 1, apiEndpoint: '/api/direct/management/policy' }
+            'sales': { label: '판매일보', group: '일보관리', sheet: '직영점_판매일보', range: 'A:AB', headerRow: 1, apiEndpoint: '/api/direct/sales' },
+            'today': { label: '오늘의휴대폰', group: '일보관리', sheet: '직영점_오늘의휴대폰', range: 'A:Z', headerRow: 1, apiEndpoint: '/api/direct/todays-mobiles' },
+            'queue': { label: '구매대기', group: '고객관리', sheet: '직영점_구매대기', range: 'A:Z', headerRow: 1, apiEndpoint: '/api/member/queue/all' },
+            'board': { label: '게시판', group: '커뮤니티', sheet: '직영점_게시판', range: 'A:Z', headerRow: 1, apiEndpoint: '/api/member/board' },
+            'settings': { label: '설정', group: '설정', sheet: '직영점_설정', range: 'A:Z', headerRow: 1, apiEndpoint: '/api/direct/settings' },
+            'images': { label: '모델이미지', group: '기준정보', sheet: '직영점_모델이미지', range: 'A:K', headerRow: 1, apiEndpoint: '/api/direct/mobiles-master' },
+            'devices': { label: '단말마스터', group: '기준정보', sheet: '직영점_단말마스터', range: 'A:R', headerRow: 1, apiEndpoint: '/api/direct/mobiles-master' },
+            'policy': { label: '정책관리', group: '정책', sheet: '직영점_정책_마진, 직영점_정책_부가서비스, 직영점_정책_별도', range: 'A:Z', headerRow: 1, apiEndpoint: '/api/direct/management/policy' }
         }
     },
 

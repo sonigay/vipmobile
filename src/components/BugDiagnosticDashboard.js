@@ -643,94 +643,119 @@ ${formattedResults || '모든 항목이 정상입니다.'}
                                             <AccordionDetails sx={{ bgcolor: '#fafafa', p: 0 }}>
                                                 {hasTabs ? (
                                                     <List dense sx={{ py: 0 }}>
-                                                        {Object.entries(modeData.tabs).map(([tabKey, tabData]) => {
-                                                            const resultKey = `${modeKey}_${tabKey}`;
-                                                            const result = diagnosisResults[resultKey];
+                                                        {(() => {
+                                                            const groupedTabs = {};
+                                                            Object.entries(modeData.tabs).forEach(([k, v]) => {
+                                                                const g = v.group || '__DEFAULT__';
+                                                                if (!groupedTabs[g]) groupedTabs[g] = [];
+                                                                groupedTabs[g].push({ key: k, ...v });
+                                                            });
 
-                                                            return (
-                                                                <ListItem
-                                                                    key={tabKey}
-                                                                    sx={{
-                                                                        pl: 6,
-                                                                        py: 1.5,
-                                                                        borderBottom: '1px solid #f0f0f0',
-                                                                        '&:last-child': { borderBottom: 'none' },
-                                                                        bgcolor: result?.status === DIAGNOSIS_STATUS.ERROR ? '#ffebee' :
-                                                                            result?.status === DIAGNOSIS_STATUS.WARNING ? '#fff8e1' :
-                                                                                result?.status === DIAGNOSIS_STATUS.SUCCESS ? '#e8f5e9' :
-                                                                                    'transparent'
-                                                                    }}
-                                                                >
-                                                                    <ListItemIcon sx={{ minWidth: 40 }}>
-                                                                        {renderStatusIcon(result?.status)}
-                                                                    </ListItemIcon>
-                                                                    <ListItemText
-                                                                        primary={
-                                                                            <Typography variant="body1" fontWeight="medium">
-                                                                                {tabData.label}
-                                                                            </Typography>
-                                                                        }
-                                                                        secondary={
-                                                                            result ? (
-                                                                                <Typography variant="caption" color={
-                                                                                    result.status === DIAGNOSIS_STATUS.ERROR ? 'error' :
-                                                                                        result.status === DIAGNOSIS_STATUS.WARNING ? 'warning.dark' :
-                                                                                            'success.main'
-                                                                                } sx={{
-                                                                                    display: 'block',
-                                                                                    maxWidth: 250,
-                                                                                    overflow: 'hidden',
-                                                                                    textOverflow: 'ellipsis',
-                                                                                    whiteSpace: 'nowrap'
-                                                                                }}>
-                                                                                    {result.errors?.length > 0 ? result.errors[0] :
-                                                                                        result.warnings?.length > 0 ? result.warnings[0] :
-                                                                                            '✅ 정상'}
-                                                                                </Typography>
-                                                                            ) : (
-                                                                                <Typography variant="caption" color="text.secondary">
-                                                                                    진단 대기 중
-                                                                                </Typography>
-                                                                            )
-                                                                        }
-                                                                    />
-                                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                                        {result && (
-                                                                            <>
-                                                                                <Tooltip title="상세 보기">
-                                                                                    <IconButton
-                                                                                        size="small"
-                                                                                        onClick={() => handleViewDetail(result)}
-                                                                                    >
-                                                                                        <BugReportIcon fontSize="small" />
-                                                                                    </IconButton>
-                                                                                </Tooltip>
-                                                                                <Tooltip title="결과 복사">
-                                                                                    <IconButton
-                                                                                        size="small"
-                                                                                        onClick={() => handleCopyResult(result)}
-                                                                                    >
-                                                                                        <ContentCopyIcon fontSize="small" />
-                                                                                    </IconButton>
-                                                                                </Tooltip>
-                                                                            </>
-                                                                        )}
-                                                                        <Tooltip title="진단 실행">
-                                                                            <span>
-                                                                                <IconButton
-                                                                                    size="small"
-                                                                                    color="error"
-                                                                                    onClick={() => handleDiagnoseTab(modeKey, tabKey, tabData)}
-                                                                                    disabled={isRunning}
-                                                                                >
-                                                                                    <PlayArrowIcon fontSize="small" />
-                                                                                </IconButton>
-                                                                            </span>
-                                                                        </Tooltip>
-                                                                    </Box>
-                                                                </ListItem>
-                                                            );
-                                                        })}
+                                                            return Object.entries(groupedTabs).map(([groupName, tabs]) => (
+                                                                <React.Fragment key={groupName}>
+                                                                    {groupName !== '__DEFAULT__' && (
+                                                                        <ListItem sx={{ bgcolor: '#f5f5f5', py: 0.5, pl: 4 }}>
+                                                                            <ListItemText
+                                                                                primary={
+                                                                                    <Typography variant="caption" fontWeight="bold" color="text.secondary">
+                                                                                        📑 {groupName}
+                                                                                    </Typography>
+                                                                                }
+                                                                            />
+                                                                        </ListItem>
+                                                                    )}
+                                                                    {tabs.map((tabData) => {
+                                                                        const tabKey = tabData.key;
+                                                                        const resultKey = `${modeKey}_${tabKey}`;
+                                                                        const result = diagnosisResults[resultKey];
+
+                                                                        return (
+                                                                            <ListItem
+                                                                                key={tabKey}
+                                                                                sx={{
+                                                                                    pl: 6,
+                                                                                    py: 1.5,
+                                                                                    borderBottom: '1px solid #f0f0f0',
+                                                                                    '&:last-child': { borderBottom: 'none' },
+                                                                                    bgcolor: result?.status === DIAGNOSIS_STATUS.ERROR ? '#ffebee' :
+                                                                                        result?.status === DIAGNOSIS_STATUS.WARNING ? '#fff8e1' :
+                                                                                            result?.status === DIAGNOSIS_STATUS.SUCCESS ? '#e8f5e9' :
+                                                                                                'transparent'
+                                                                                }}
+                                                                            >
+                                                                                <ListItemIcon sx={{ minWidth: 40 }}>
+                                                                                    {renderStatusIcon(result?.status)}
+                                                                                </ListItemIcon>
+                                                                                <ListItemText
+                                                                                    primary={
+                                                                                        <Typography variant="body1" fontWeight="medium">
+                                                                                            {tabData.label}
+                                                                                        </Typography>
+                                                                                    }
+                                                                                    secondary={
+                                                                                        result ? (
+                                                                                            <Typography variant="caption" color={
+                                                                                                result.status === DIAGNOSIS_STATUS.ERROR ? 'error' :
+                                                                                                    result.status === DIAGNOSIS_STATUS.WARNING ? 'warning.dark' :
+                                                                                                        'success.main'
+                                                                                            } sx={{
+                                                                                                display: 'block',
+                                                                                                maxWidth: 250,
+                                                                                                overflow: 'hidden',
+                                                                                                textOverflow: 'ellipsis',
+                                                                                                whiteSpace: 'nowrap'
+                                                                                            }}>
+                                                                                                {result.errors?.length > 0 ? result.errors[0] :
+                                                                                                    result.warnings?.length > 0 ? result.warnings[0] :
+                                                                                                        '✅ 정상'}
+                                                                                            </Typography>
+                                                                                        ) : (
+                                                                                            <Typography variant="caption" color="text.secondary">
+                                                                                                진단 대기 중
+                                                                                            </Typography>
+                                                                                        )
+                                                                                    }
+                                                                                />
+                                                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                                                    {result && (
+                                                                                        <>
+                                                                                            <Tooltip title="상세 보기">
+                                                                                                <IconButton
+                                                                                                    size="small"
+                                                                                                    onClick={() => handleViewDetail(result)}
+                                                                                                >
+                                                                                                    <BugReportIcon fontSize="small" />
+                                                                                                </IconButton>
+                                                                                            </Tooltip>
+                                                                                            <Tooltip title="결과 복사">
+                                                                                                <IconButton
+                                                                                                    size="small"
+                                                                                                    onClick={() => handleCopyResult(result)}
+                                                                                                >
+                                                                                                    <ContentCopyIcon fontSize="small" />
+                                                                                                </IconButton>
+                                                                                            </Tooltip>
+                                                                                        </>
+                                                                                    )}
+                                                                                    <Tooltip title="진단 실행">
+                                                                                        <span>
+                                                                                            <IconButton
+                                                                                                size="small"
+                                                                                                color="error"
+                                                                                                onClick={() => handleDiagnoseTab(modeKey, tabKey, tabData)}
+                                                                                                disabled={isRunning}
+                                                                                            >
+                                                                                                <PlayArrowIcon fontSize="small" />
+                                                                                            </IconButton>
+                                                                                        </span>
+                                                                                    </Tooltip>
+                                                                                </Box>
+                                                                            </ListItem>
+                                                                        );
+                                                                    })}
+                                                                </React.Fragment>
+                                                            ));
+                                                        })()}
                                                     </List>
                                                 ) : (
                                                     <Box sx={{ p: 2, textAlign: 'center' }}>
