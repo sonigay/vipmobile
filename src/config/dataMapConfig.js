@@ -67,7 +67,21 @@ const DATA_MAP_CONFIG = {
             'assignedInventory': { label: '담당재고확인', sheet: '폰클재고데이터', range: 'A:Z', headerRow: 4 },
             'assignedActivation': { label: '담당개통확인', sheet: '폰클개통데이터', range: 'A:BZ', headerRow: 4 },
             'storeSettings': { label: '대리점관리', sheet: '대리점아이디관리', range: 'A:AF', headerRow: 1 },
-            'updates': { label: '어플업데이트', sheet: '어플업데이트', range: 'A:Z', headerRow: 1 }
+            'updates': { label: '어플업데이트', sheet: '어플업데이트', range: 'A:Z', headerRow: 1 },
+            'mapDisplayOption': {
+                label: '지도 재고 노출 옵션 설정',
+                sheet: '지도재고노출옵션',
+                range: 'A:F',
+                headerRow: 1,
+                apiEndpoint: '/api/map-display-option/users'
+            },
+            'markerColorSettings': {
+                label: '매장 색상 설정',
+                sheet: '관리자모드_마커색상설정',
+                range: 'A:F',
+                headerRow: 1,
+                apiEndpoint: '/api/marker-color-settings'
+            }
         }
     },
 
