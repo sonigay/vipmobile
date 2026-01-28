@@ -178,7 +178,7 @@ async function fetchSettlementConfig(sheets, baseSpreadsheetId, month) {
   return configRows
     .slice(1)
     .map((row) => mapSettlementRow(row))
-    .find((config) => config.month === month);
+    .find((config) => config.month && config.month.trim() === month.trim());
 }
 
 async function ensureManualSheetStructure(sheets, spreadsheetId, sheetName) {
@@ -752,12 +752,18 @@ function extractOfferAmounts(value) {
 
 async function loadSheetRows(sheets, spreadsheetId, sheetName) {
   if (!sheetName) return [];
-  const range = `'${sheetName}'`;
-  const response = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range
-  });
-  return response.data.values || [];
+  try {
+    const range = `'${sheetName}'`;
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range
+    });
+    return response.data.values || [];
+  } catch (error) {
+    console.warn(`[OB] Failed to load sheet '${sheetName}': ${error.message}`);
+    // 시트가 없거나 범위 에러인 경우 빈 배열 반환하여 500 에러 방지
+    return [];
+  }
 }
 
 function normalizeCustomRows(values, sourceSheet) {
@@ -896,7 +902,7 @@ function filterRecontractRow(rowObject, excludedIdsSet = new Set(), excludedName
   if (isExcluded) {
     return { include: false, reason: 'excluded' };
   }
-  
+
   // 2. 대상점이 설정되어 있으면 매칭되어야 함
   if (targetOutletNames.length > 0 && !matchesTargetOutlet) {
     return { include: false, reason: 'target outlet not matched' };
@@ -1093,7 +1099,7 @@ function buildRecontractSummary(rows, exclusionConfig = {}, targetOutletConfig =
       const isCompleted = status === '완료';
       const rawSettlementAmount = parseNumber(row[20]); // 20인덱스
       const rawOfferAmount = parseNumber(row[19]); // 19인덱스
-      
+
       // 기존 비고 필드 추출 로직은 유지 (참고용)
       const remarkPlate = parseString(row[59]);
       const remarkRecontract = parseString(row[74]);
@@ -1379,52 +1385,52 @@ function setupObRoutes(app) {
 
   // GET /api/ob/results?userId=...&showAll=true
   router.get('/results', async (req, res) => {
-      const userId = (req.query.userId || '').toString().trim();
-      const showAll = req.query.showAll === 'true';
-      
-      if (!userId && !showAll) {
-        return res.status(400).json({ success: false, error: 'userId is required or set showAll=true' });
-      }
-      try {
-        const { sheets, SPREADSHEET_ID } = createSheetsClient();
-        await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_RESULTS, HEADERS_RESULTS);
-        const response = await sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: SHEET_RESULTS
+    const userId = (req.query.userId || '').toString().trim();
+    const showAll = req.query.showAll === 'true';
+
+    if (!userId && !showAll) {
+      return res.status(400).json({ success: false, error: 'userId is required or set showAll=true' });
+    }
+    try {
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_RESULTS, HEADERS_RESULTS);
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: SHEET_RESULTS
+      });
+      const rows = response.data.values || [];
+      const header = rows[0] || HEADERS_RESULTS;
+
+      // 헤더에 subscriptionNumber가 있는지 확인
+      const hasSubscriptionNumber = header.includes('subscriptionNumber');
+
+      let items = rows.slice(1)
+        .map((r, idx) => {
+          const obj = Object.fromEntries(header.map((h, i) => [h, r[i] || '']));
+
+          // subscriptionNumber 컬럼이 없는 기존 데이터 처리
+          if (!hasSubscriptionNumber && !obj.subscriptionNumber) {
+            obj.subscriptionNumber = '';
+          }
+
+          // status 컬럼이 없는 기존 데이터 처리
+          if (!obj.status) {
+            obj.status = '';
+          }
+
+          return { rowIndex: idx + 2, ...obj };
         });
-        const rows = response.data.values || [];
-        const header = rows[0] || HEADERS_RESULTS;
-        
-        // 헤더에 subscriptionNumber가 있는지 확인
-        const hasSubscriptionNumber = header.includes('subscriptionNumber');
-        
-        let items = rows.slice(1)
-          .map((r, idx) => {
-            const obj = Object.fromEntries(header.map((h, i) => [h, r[i] || '']));
-            
-            // subscriptionNumber 컬럼이 없는 기존 데이터 처리
-            if (!hasSubscriptionNumber && !obj.subscriptionNumber) {
-              obj.subscriptionNumber = '';
-            }
-            
-            // status 컬럼이 없는 기존 데이터 처리
-            if (!obj.status) {
-              obj.status = '';
-            }
-            
-            return { rowIndex: idx + 2, ...obj };
-          });
-        
-        // showAll이 아니면 userId 필터
-        if (!showAll) {
-          items = items.filter(item => item.userId === userId);
-        }
-        
-        res.json({ success: true, data: items });
-      } catch (error) {
-        console.error('[OB] results GET error:', error);
-        res.status(500).json({ success: false, error: 'Failed to load results', message: error.message });
+
+      // showAll이 아니면 userId 필터
+      if (!showAll) {
+        items = items.filter(item => item.userId === userId);
       }
+
+      res.json({ success: true, data: items });
+    } catch (error) {
+      console.error('[OB] results GET error:', error);
+      res.status(500).json({ success: false, error: 'Failed to load results', message: error.message });
+    }
   });
 
   // Settlement link management
