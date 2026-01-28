@@ -31,7 +31,7 @@ function createNotificationRoutes(context) {
   router.get('/notifications', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
-      
+
       const { user_id } = req.query;
       const cacheKey = `notifications_${user_id}`;
       const cached = cacheManager.get(cacheKey);
@@ -75,24 +75,29 @@ function createNotificationRoutes(context) {
   // GET /api/notifications/stream - SSE 스트림
   router.get('/notifications/stream', (req, res) => {
     const { user_id } = req.query;
-    
+    const notificationManager = require('../utils/notificationManager');
+
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('Access-Control-Allow-Origin', '*');
 
-    // 초기 연결 메시지
-    res.write(`data: ${JSON.stringify({ type: 'connected', userId: user_id })}\n\n`);
+    // Add client to notification manager
+    const clientId = notificationManager.addClient(user_id, res);
 
-    // Keep-alive 핑 (30초마다)
+    // 초기 연결 메시지
+    res.write(`data: ${JSON.stringify({ type: 'connected', userId: user_id, clientId })}\n\n`);
+
+    // Keep-alive 핑 (30초마다) - managed by notificationManager if implemented there, 
+    // but here we can keep a simple ping or let manager handle it.
+    // For now, let's keep simple ping here to ensure connection stays alive at HTTP level
     const pingInterval = setInterval(() => {
       res.write(`: ping\n\n`);
     }, 30000);
 
-    // 연결 종료 처리
+    // 연결 종료 처리 (Manager handles cleanup via 'close' event too)
     req.on('close', () => {
       clearInterval(pingInterval);
-      console.log(`SSE connection closed for user: ${user_id}`);
     });
   });
 
@@ -100,13 +105,13 @@ function createNotificationRoutes(context) {
   router.put('/notifications/mark-all-read', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
-      
+
       const { userId } = req.body;
-      console.log('Mark all read for user:', userId);
+      // console.log('Mark all read for user:', userId);
 
       // 캐시 무효화
       cacheManager.deletePattern(`notifications_${userId}`);
-      
+
       res.json({ success: true });
     } catch (error) {
       console.error('Error marking notifications as read:', error);
