@@ -115,22 +115,37 @@ function createModelRoutes(context) {
     }
   });
 
-  // GET /api/operation-models - 운영 모델
+  // GET /api/operation-models - 운영 모델 (정렬 순서용)
   router.get('/api/operation-models', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
 
-      const cacheKey = 'operation_models';
+      const cacheKey = 'operation_models_order';
       const cached = cacheManager.get(cacheKey);
       if (cached) return res.json(cached);
 
       const values = await getSheetValues('운영모델');
-      const data = values.slice(1);
 
-      cacheManager.set(cacheKey, data, 5 * 60 * 1000);
-      res.json(data);
+      // 운영모델 시트 구조: 3행까지 헤더, 4행부터 데이터. C열(Index 2)이 모델명
+      const orderMap = {};
+      if (values && values.length >= 4) {
+        values.slice(3).forEach((row, index) => {
+          if (row.length >= 3) {
+            const modelName = (row[2] || '').toString().trim();
+            // 빈 값이나 헤더성 데이터 제외
+            if (modelName && modelName !== '모델명') {
+              orderMap[modelName] = index;
+            }
+          }
+        });
+      }
+
+      const result = { success: true, data: orderMap };
+      cacheManager.set(cacheKey, result, 30 * 60 * 1000); // 30분 캐싱
+      res.json(result);
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      console.error('Error fetching operation models:', error);
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 
