@@ -1,6 +1,6 @@
 /**
  * Rechotancho Bond Routes
- * 레초탄초 채권 관련 엔드포인트
+ * 재초담초채권 관련 엔드포인트
  */
 
 const express = require('express');
@@ -283,7 +283,7 @@ function createRechotanchoBondRoutes(context) {
         })
       );
 
-      console.log('레초탄초 채권 수정 완료:', timestamp);
+      console.log('재초담초채권 수정 완료:', timestamp);
       cacheManager.deletePattern('jaecho_damcho_bond');
       res.json({ success: true });
     } catch (error) {
@@ -334,7 +334,7 @@ function createRechotanchoBondRoutes(context) {
         resource: { requests }
       });
 
-      console.log('레초탄초 채권 삭제 완료:', timestamp);
+      console.log('재초담초채권 삭제 완료:', timestamp);
       cacheManager.deletePattern('jaecho_damcho_bond');
       res.json({ success: true });
     } catch (error) {

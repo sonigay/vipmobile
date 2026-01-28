@@ -332,7 +332,7 @@ const DATA_MAP_CONFIG = {
         tabs: {
             'closing': { label: '마감장표', sheet: '폰클개통데이터', range: 'A:Z', headerRow: 3, apiEndpoint: '/api/closing-chart' },
             'bond_overdue': { label: '채권장표-연체', sheet: '채권장표', range: 'A:Z', headerRow: 1, apiEndpoint: '/api/bond/overdue' },
-            'bond_rechotancho': { label: '채권장표-재초담초', sheet: '레초탄초채권', range: 'A:Z', headerRow: 1, apiEndpoint: '/api/rechotancho-bond/all-data' },
+            'bond_rechotancho': { label: '채권장표-재초담초', sheet: '재초담초채권_내역', range: 'A:G', headerRow: 1, apiEndpoint: '/api/rechotancho-bond/all-data' },
             'bond_increase': { label: '채권장표-가입자증감', sheet: '가입자증감', range: 'A:Z', headerRow: 1, apiEndpoint: '/api/subscriber-increase/data' },
             'indicator_award': { label: '지표장표-월간시상', sheet: '수기초', range: 'A:Z', headerRow: 1, apiEndpoint: '/api/monthly-award/data' },
             'inventory': { label: '재고장표', sheet: '폰클재고데이터', range: 'A:Z', headerRow: 1, apiEndpoint: '/api/inventory-analysis' }
