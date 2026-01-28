@@ -169,7 +169,10 @@ function createCoordinateRoutes(context) {
    * 디스코드에 작업 요약 전송
    */
   async function sendDiscordSummary(title, fields) {
-    const { discordBot, EmbedBuilder, DISCORD_CHANNEL_ID } = context;
+    const { discordBot: discordBotMeta } = context;
+    if (!discordBotMeta) return;
+
+    const { bot: discordBot, EmbedBuilder, CHANNEL_ID: DISCORD_CHANNEL_ID } = discordBotMeta;
     if (!discordBot || !EmbedBuilder || !DISCORD_CHANNEL_ID) return;
 
     try {

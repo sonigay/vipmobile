@@ -58,13 +58,52 @@ function createRechotanchoBondRoutes(context) {
     }
   });
 
-  // GET /api/rechotancho-bond/history - 이력
+  // GET /api/rechotancho-bond/history - 저장 시점 목록 조회
   router.get('/api/rechotancho-bond/history', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
-      const values = await getSheetValues('재초담초채권_내역');
-      res.json({ success: true, data: values.slice(1) });
+
+      // 레거시: 재초담초채권_내역 시트에서 A:G 범위 조회
+      const response = await rateLimiter.execute(() =>
+        sheetsClient.sheets.spreadsheets.values.get({
+          spreadsheetId: sheetsClient.SPREADSHEET_ID,
+          range: '재초담초채권_내역!A:G'
+        })
+      );
+
+      const rows = response.data.values || [];
+
+      if (rows.length <= 1) {
+        return res.json({ success: true, data: [] });
+      }
+
+      // 헤더 제외하고 데이터 행만 처리
+      const dataRows = rows.slice(1);
+
+      // 저장 시점별로 그룹화 (중복 제거)
+      const timestampMap = new Map();
+
+      dataRows.forEach(row => {
+        const timestamp = row[0];
+        const inputUser = row[6] || '';
+
+        if (timestamp && !timestampMap.has(timestamp)) {
+          timestampMap.set(timestamp, {
+            timestamp,
+            inputUser: inputUser || '미상'
+          });
+        }
+      });
+
+      // 최신순으로 정렬
+      const history = Array.from(timestampMap.values())
+        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+      console.log(`✅ 재초담초채권 저장 시점 조회 완료: ${history.length}개`);
+
+      res.json({ success: true, data: history });
     } catch (error) {
+      console.error('❌ 재초담초채권 저장 시점 조회 실패:', error);
       res.status(500).json({ success: false, error: error.message });
     }
   });

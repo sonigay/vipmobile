@@ -10,8 +10,7 @@ module.exports = function createDirectStoreAdditionalRoutes(context) {
 
   const { sheetsClient, rateLimiter, discordBot } = context;
   const { sheets, SPREADSHEET_ID } = sheetsClient;
-  const DirectStoreDAL = require('../dal/DirectStoreDAL');
-  const dal = new DirectStoreDAL();
+  const dal = require('../dal/DirectStoreDAL');
 
   // 시트 이름 상수
   const CUSTOMER_PRE_APPROVAL_SHEET_NAME = '직영점_사전승낙서마크';
@@ -707,12 +706,12 @@ module.exports = function createDirectStoreAdditionalRoutes(context) {
       const { modelId, carrier, modelName, petName } = req.body;
 
       if (!file) return res.status(400).json({ success: false, error: '파일이 없습니다.' });
-      if (!discordBot || !discordBot.DISCORD_LOGGING_ENABLED) {
+      if (!discordBot || !discordBot.LOGGING_ENABLED) {
         return res.status(503).json({ success: false, error: 'Discord 서비스가 준비되지 않았습니다.' });
       }
 
       // Discord 채널로 전송
-      const channel = await discordBot.discordBot.channels.fetch(discordBot.DISCORD_CHANNEL_ID);
+      const channel = await discordBot.bot.channels.fetch(discordBot.CHANNEL_ID);
       if (!channel) throw new Error('채널을 찾을 수 없습니다.');
 
       const message = await channel.send({

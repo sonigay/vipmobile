@@ -22,13 +22,13 @@ const router = express.Router();
  */
 function createLoggingRoutes(context) {
   const { discordBot } = context;
-  const { EmbedBuilder, sendDiscordNotification, DISCORD_CHANNEL_ID, DISCORD_LOGGING_ENABLED } = discordBot;
+  const { EmbedBuilder, sendNotification: sendDiscordNotification, CHANNEL_ID: DISCORD_CHANNEL_ID, LOGGING_ENABLED: DISCORD_LOGGING_ENABLED } = discordBot;
 
   // POST /api/client-logs - 클라이언트 원격 로그 수집
   router.post('/api/client-logs', (req, res) => {
     try {
       const { sessionId, userAgent, ts, logs } = req.body || {};
-      
+
       if (Array.isArray(logs) && logs.length > 0) {
         console.log('🛰️ [CLIENT LOGS]', {
           sessionId,
@@ -36,14 +36,14 @@ function createLoggingRoutes(context) {
           ts,
           count: logs.length
         });
-        
+
         // 상세 로그는 너무 많을 수 있으니 일부만 미리보기
         const preview = logs.slice(0, 5);
         preview.forEach((l, i) => {
           console.log(`📝 [${i + 1}/${logs.length}] ${l.lv} ${new Date(l.ts).toISOString()} ${l.path} :: ${l.msg}`);
         });
       }
-      
+
       res.status(200).json({ success: true });
     } catch (e) {
       console.error('❌ [CLIENT LOGS] 수집 오류:', e?.message || e);
@@ -109,8 +109,8 @@ function createLoggingRoutes(context) {
                 }
               )
               .setFooter({
-                text: userType === 'agent' 
-                  ? '(주)브이아이피플러스 관리자 활동 로그' 
+                text: userType === 'agent'
+                  ? '(주)브이아이피플러스 관리자 활동 로그'
                   : '(주)브이아이피플러스 매장 활동 로그'
               });
 
@@ -132,7 +132,7 @@ function createLoggingRoutes(context) {
 
             // Discord 알림 전송
             await sendDiscordNotification(DISCORD_CHANNEL_ID, embed);
-            
+
             console.log('✅ [활동 로그] Discord 전송 성공:', {
               userId,
               activity,

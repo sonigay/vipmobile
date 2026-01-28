@@ -357,6 +357,23 @@ function createClosingChartRoutes(context) {
     // 매칭 불일치 데이터 수집
     const matchingMismatches = [];
 
+    // 3.2: 거래처정보(customerData)를 담당자+코드별로 그룹화 (if 블록 밖에서 선언)
+    // Key: 담당자|코드
+    const customerMapByKey = new Map();
+    if (customerData && customerData.length > 0) {
+      customerData.forEach(거래처Row => {
+        if (거래처Row.length > 3) {
+          const 거래처코드 = (거래처Row[1] || '').toString();
+          const 거래처담당자 = (거래처Row[3] || '').toString().replace(/\([^)]*\)/g, '');
+          const customerKey = `${거래처담당자}|${거래처코드}`;
+          if (!customerMapByKey.has(customerKey)) {
+            customerMapByKey.set(customerKey, []);
+          }
+          customerMapByKey.get(customerKey).push(거래처Row);
+        }
+      });
+    }
+
     if (storeData && customerData && customerData.length > 0) {
       // 3.1: 폰클출고처데이터(storeData)를 Map으로 변환하여 조회 속도 향상
       // Key: 출고처코드 (O열, index 14)
@@ -371,22 +388,7 @@ function createClosingChartRoutes(context) {
         }
       });
 
-      // 3.2: 거래처정보(customerData)를 담당자+코드별로 그룹화
-      // Key: 담당자|코드
-      const customerMapByKey = new Map();
-      customerData.forEach(거래처Row => {
-        if (거래처Row.length > 3) {
-          const 거래처코드 = (거래처Row[1] || '').toString();
-          const 거래처담당자 = (거래처Row[3] || '').toString().replace(/\([^)]*\)/g, '');
-          const customerKey = `${거래처담당자}|${거래처코드}`;
-          if (!customerMapByKey.has(customerKey)) {
-            customerMapByKey.set(customerKey, []);
-          }
-          customerMapByKey.get(customerKey).push(거래처Row);
-        }
-      });
-
-      // 3.3: 매칭키별로 등록점/가동점 계산
+      // 3.3: 매칭키별로 등록점/가동점 계산 (customerMapByKey는 위에서 이미 생성됨)
       matchingKeyMap.forEach((data, key) => {
         const matchingStores = new Set();
         const customerKey = `${data.agent}|${data.code}`;

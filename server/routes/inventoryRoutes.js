@@ -259,8 +259,27 @@ function createInventoryRoutes(context) {
         return res.json({ success: true, data: cached, cached: true });
       }
 
-      const values = await getSheetValues('정규화작업시트');
-      const rows = values.slice(1);
+      // 정규화작업시트와 운영모델 병렬 조회
+      const [normalizedValues, operationModelValues] = await Promise.all([
+        getSheetValues('정규화작업시트'),
+        getSheetValues('운영모델')
+      ]);
+
+      const rows = normalizedValues.slice(1);
+
+      // 운영모델 순서 맵 생성 (C열: 모델명, 3행 헤더 제외 4행부터)
+      const modelOrder = new Map();
+      if (operationModelValues && operationModelValues.length >= 4) {
+        operationModelValues.slice(3).forEach((row, index) => {
+          if (row.length >= 3) {
+            const modelName = (row[2] || '').toString().trim(); // C열: 모델명
+            if (modelName && modelName !== '모델명') {
+              modelOrder.set(modelName, index);
+            }
+          }
+        });
+        console.log(`✅ [운영모델] 모델 순서 로드 완료: ${modelOrder.size}개`);
+      }
 
       // C열(사무실) 기준으로 집계
       const statusByOffice = {};
@@ -291,11 +310,26 @@ function createInventoryRoutes(context) {
         statusByOffice[office].models[modelKey].count++;
       });
 
-      // 배열로 변환
-      const result = Object.values(statusByOffice).map(office => ({
-        ...office,
-        models: Object.values(office.models)
-      }));
+      // 배열로 변환하고 운영모델 순서로 정렬
+      const result = Object.values(statusByOffice)
+        .map(office => ({
+          ...office,
+          models: Object.values(office.models).sort((a, b) => {
+            const orderA = modelOrder.get(a.model);
+            const orderB = modelOrder.get(b.model);
+
+            // 둘 다 운영모델에 있는 경우: 운영모델 순서대로
+            if (orderA !== undefined && orderB !== undefined) {
+              return orderA - orderB;
+            }
+            // 운영모델에 있는 항목 우선
+            if (orderA !== undefined) return -1;
+            if (orderB !== undefined) return 1;
+            // 둘 다 없으면 알파벳순
+            return (a.model || '').localeCompare(b.model || '', 'ko');
+          })
+        }))
+        .sort((a, b) => (a.office || '').localeCompare(b.office || '', 'ko'));
 
       // 캐시 저장 (5분)
       cacheManager.set(cacheKey, result, 5 * 60 * 1000);

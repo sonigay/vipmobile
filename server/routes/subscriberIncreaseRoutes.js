@@ -41,7 +41,7 @@ function createSubscriberIncreaseRoutes(context) {
     }
   });
 
-  // GET /api/subscriber-increase/data - 데이터
+  // GET /api/subscriber-increase/data - 데이터 (헤더 포함)
   router.get('/api/subscriber-increase/data', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
@@ -50,13 +50,21 @@ function createSubscriberIncreaseRoutes(context) {
       const cached = cacheManager.get(cacheKey);
       if (cached) return res.json(cached);
 
-      const values = await getSheetValues('가입자증감');
-      const data = values.slice(1);
+      // 레거시: A:AA 범위로 조회, 헤더 포함 전체 데이터 반환
+      const response = await rateLimiter.execute(() =>
+        sheetsClient.sheets.spreadsheets.values.get({
+          spreadsheetId: sheetsClient.SPREADSHEET_ID,
+          range: '가입자증감!A:AA'
+        })
+      );
+
+      const data = response.data.values || [];
 
       const result = { success: true, data };
       cacheManager.set(cacheKey, result, 5 * 60 * 1000);
       res.json(result);
     } catch (error) {
+      console.error('Error fetching subscriber increase data:', error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
