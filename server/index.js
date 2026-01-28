@@ -336,6 +336,14 @@ try {
 }
 
 try {
+  const createStructuralPolicyRoutes = require('./structuralPolicyAPI');
+  app.use('/api', createStructuralPolicyRoutes(sharedContext));
+  console.log('✅ [Chart] Structural Policy routes mounted');
+} catch (e) {
+  console.error('❌ [Chart] Failed to mount structural policy routes:', e.message);
+}
+
+try {
   const createNotificationRoutes = require('./routes/notificationRoutes');
   app.use('/api', createNotificationRoutes(sharedContext));
   console.log('✅ [Additional] Notification routes mounted');
@@ -531,13 +539,13 @@ async function refreshAllDiscordImages() {
   console.log('🔄 [스케줄러] Discord 이미지 자동 갱신 시작...');
 
   try {
-    const { refreshDiscordImagesForCarrier } = require('./directRoutes');
+    const { refreshImagesFromDiscord } = require('./directRoutes');
     const carriers = ['SK', 'KT', 'LG'];
 
     for (const carrier of carriers) {
       try {
         console.log(`[스케줄러] ${carrier} Discord 이미지 갱신 중...`);
-        await refreshDiscordImagesForCarrier(carrier);
+        await refreshImagesFromDiscord(carrier);
         console.log(`[스케줄러] ${carrier} Discord 이미지 갱신 완료`);
       } catch (error) {
         console.error(`[스케줄러] ${carrier} Discord 이미지 갱신 실패:`, error.message);

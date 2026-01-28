@@ -255,7 +255,7 @@ function createCoordinateRoutes(context) {
           continue;
         }
 
-        // 2. 좌표가 없는 경우에만 지오코딩 실행 (Hash 비교 로직 제거 - 좌표 유무가 기준)
+        // 2. 좌표가 없는 경우에만 지오코딩 실행
         if (!existingLat || !existingLng) {
           try {
             const result = await geocodeAddress(address);
@@ -270,12 +270,27 @@ function createCoordinateRoutes(context) {
               upCount++;
               consecutive429Errors = 0; // 성공 시 카운터 초기화
               console.log(`✅ [좌표업데이트] 신규 완료: ${address}`);
+            } else {
+              // 실패 시 "0"으로 저장하여 재시도 방지
+              updates.push({
+                range: `${STORE_SHEET_NAME}!I${i + 2}:J${i + 2}`,
+                values: [["0", "0"]]
+              });
+              changed = true;
+              console.log(`❌ [좌표업데이트] 결과 없음 (재시도 방지 처리): ${address}`);
             }
           } catch (error) {
             console.error(`❌ [좌표업데이트] 오류: ${address}`, error.message);
             // 429 오류 감지
             if (error.message.includes('429')) {
               consecutive429Errors++;
+            } else {
+              // 429가 아닌 일반 오류(형식 오류 등)도 재시도 방지
+              updates.push({
+                range: `${STORE_SHEET_NAME}!I${i + 2}:J${i + 2}`,
+                values: [["0", "0"]]
+              });
+              changed = true;
             }
           }
           // API 할당량 제한을 피하기 위한 지연 (기본 1초)
@@ -410,13 +425,26 @@ function createCoordinateRoutes(context) {
             consecutive429Errors = 0; // 성공 시 초기화
             console.log(`✅ [판매점좌표] 성공: ${address}`);
           } else {
-            console.log(`❌ [판매점좌표] 결과 없음: ${address}`);
+            console.log(`❌ [판매점좌표] 결과 없음 (재시도 방지 처리): ${address}`);
+            // 결과 없음 시 "0" 저장하여 재시도 방지
+            updates.push({
+              range: `${SALES_SHEET_NAME}!F${i + 2}:G${i + 2}`,
+              values: [["0", "0"]]
+            });
+            changed = true;
           }
         } catch (error) {
           console.error(`❌ [판매점좌표] 오류: ${address}`, error.message);
           // 429 오류 감지
           if (error.message.includes('429')) {
             consecutive429Errors++;
+          } else {
+            // 429가 아닌 일반 오류도 재시도 방지
+            updates.push({
+              range: `${SALES_SHEET_NAME}!F${i + 2}:G${i + 2}`,
+              values: [["0", "0"]]
+            });
+            changed = true;
           }
         }
 
