@@ -49,11 +49,12 @@ function createRechotanchoBondRoutes(context) {
       const values = await getSheetValues('재초담초채권');
       const data = values.slice(1);
 
-      cacheManager.set(cacheKey, data, 5 * 60 * 1000);
-      res.json(data);
+      const result = { success: true, data };
+      cacheManager.set(cacheKey, result, 5 * 60 * 1000);
+      res.json(result);
     } catch (error) {
       console.error('Error fetching rechotancho bond data:', error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 
@@ -62,9 +63,9 @@ function createRechotanchoBondRoutes(context) {
     try {
       if (!requireSheetsClient(res)) return;
       const values = await getSheetValues('재초담초채권_내역');
-      res.json(values.slice(1));
+      res.json({ success: true, data: values.slice(1) });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 
@@ -74,16 +75,35 @@ function createRechotanchoBondRoutes(context) {
       if (!requireSheetsClient(res)) return;
       const { timestamp } = req.params;
 
-      const values = await getSheetValues('재초담초채권');
-      const data = values.slice(1).find(row => row[0] === timestamp);
+      const [allDataValues, mappingValues] = await Promise.all([
+        getSheetValues('재초담초채권'),
+        getSheetValues('재초담초채권_매핑') // 매핑 정보가 필요할 수 있음
+      ]);
 
-      if (!data) {
-        return res.status(404).json({ error: '데이터를 찾을 수 없습니다.' });
+      const rawRow = allDataValues.slice(1).find(row => row[0] === timestamp);
+      if (!rawRow) {
+        return res.status(404).json({ success: false, error: '데이터를 찾을 수 없습니다.' });
       }
 
-      res.json(data);
+      // 프론트엔드 기대 형식으로 변환 (데이터 파싱 로직 필요)
+      // 폰클재고데이터 기반으로 에이전트별 데이터 구성
+      let parsedData = [];
+      try {
+        // 시트 저장 형식: [timestamp, agent1_inv, agent1_col, agent1_mgmt, agent2_inv, ...]
+        // 혹은 JSON 문자열일 수 있음. 여기서는 프론트엔드에서 보낸 형식을 그대로 로드한다고 가정
+        if (rawRow[2] && rawRow[2].startsWith('[')) {
+          parsedData = JSON.parse(rawRow[2]);
+        } else {
+          // 컬럼별 매칭 (구버전 대응)
+          parsedData = rawRow.slice(2).map((val, idx) => ({ value: val }));
+        }
+      } catch (e) {
+        console.warn('Data parse error:', e);
+      }
+
+      res.json({ success: true, data: parsedData });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 
@@ -105,7 +125,7 @@ function createRechotanchoBondRoutes(context) {
       cacheManager.deletePattern('jaecho_damcho_bond');
       res.json({ success: true });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 
@@ -118,10 +138,10 @@ function createRechotanchoBondRoutes(context) {
 
       console.log('레초탄초 채권 수정:', timestamp, data);
 
-      cacheManager.deletePattern('rechotancho_bond');
+      cacheManager.deletePattern('jaecho_damcho_bond');
       res.json({ success: true });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 
@@ -133,10 +153,10 @@ function createRechotanchoBondRoutes(context) {
 
       console.log('레초탄초 채권 삭제:', timestamp);
 
-      cacheManager.deletePattern('rechotancho_bond');
+      cacheManager.deletePattern('jaecho_damcho_bond');
       res.json({ success: true });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 

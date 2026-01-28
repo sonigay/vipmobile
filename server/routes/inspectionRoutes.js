@@ -252,7 +252,7 @@ function createInspectionRoutes(context) {
       const [masterData, phoneklData, normData, confirmedData] = await Promise.all([
         getSheetValues('마스터재고'),
         getSheetValues('폰클재고데이터'),
-        getSheetValues('모델정규화'),
+        getSheetValues('모델명정규화'),
         getSheetValues('확정미확정재고')
       ]);
 

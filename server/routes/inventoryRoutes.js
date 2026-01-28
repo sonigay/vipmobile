@@ -625,7 +625,7 @@ function createInventoryRoutes(context) {
     }
   });
 
-  // GET /api/inventory/status - 모델별 재고 현황 (프론트엔드 형식에 맞춰 수정)
+  // GET /api/inventory/status - 모델/색상별 재고 현황
   router.get('/api/inventory/status', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
@@ -635,52 +635,100 @@ function createInventoryRoutes(context) {
       const cached = cacheManager.get(cacheKey);
       if (cached) return res.json(cached);
 
-      const values = await getSheetValues('폰클재고데이터');
-      if (!values || values.length < 4) {
+      // 폰클재고데이터와 폰클개통데이터 병렬 로드
+      const [inventoryValues, activationValues] = await Promise.all([
+        getSheetValues('폰클재고데이터'),
+        getSheetValues('폰클개통데이터')
+      ]);
+
+      if (!inventoryValues || inventoryValues.length < 4) {
         return res.json({ success: true, data: [] });
       }
 
-      let rows = values.slice(3); // 4행부터 데이터
+      const inventoryMap = new Map();
+      const currentMonth = new Date().getMonth() + 1;
+      const currentYear = new Date().getFullYear();
 
-      // 필터링 로직 (G, H, I열 기준: 6, 7, 8번 인덱스)
-      if (agent || office || department) {
-        rows = rows.filter(row => {
-          if (agent && (row[8] || '').toString().trim() !== agent) return false;
-          if (office && (row[6] || '').toString().trim() !== office) return false;
-          if (department && (row[7] || '').toString().trim() !== department) return false;
-          return true;
+      // 1. 재고 데이터 처리
+      inventoryValues.slice(3).forEach(row => {
+        if (row.length < 15) return;
+        const modelName = (row[13] || '').toString().trim(); // N열
+        const color = (row[14] || '').toString().trim();     // O열
+        const category = (row[5] || '').toString().trim();   // F열: 구분 (제조단말 등)
+        const rowOffice = (row[6] || '').toString().trim();  // G열
+        const rowDept = (row[7] || '').toString().trim();    // H열
+        const rowAgent = (row[8] || '').toString().trim();   // I열
+        const type = (row[12] || '').toString().trim();      // M열
+
+        if (!modelName || type === '유심' || category === '#N/A') return;
+
+        // 필터링 적용
+        if (agent && agent !== rowAgent) return;
+        if (office && office !== rowOffice) return;
+        if (department && department !== rowDept) return;
+
+        const key = `${modelName}|${color}`;
+        if (!inventoryMap.has(key)) {
+          inventoryMap.set(key, {
+            modelName,
+            color,
+            category,
+            office: rowOffice,
+            department: rowDept,
+            agent: rowAgent,
+            inventoryCount: 0,
+            monthlyActivation: 0,
+            dailyActivation: Array(31).fill(0).map((_, i) => ({ day: String(i + 1).padStart(2, '0'), count: 0 }))
+          });
+        }
+        inventoryMap.get(key).inventoryCount++;
+      });
+
+      // 2. 개통 데이터 매칭 (당월 개통 현황 집계)
+      if (activationValues && activationValues.length >= 4) {
+        activationValues.slice(3).forEach(row => {
+          if (row.length < 23) return;
+          const activationDate = (row[9] || '').toString().trim(); // J열: 개통일
+          const modelName = (row[21] || '').toString().trim();    // V열: 모델명
+          const color = (row[22] || '').toString().trim();       // W열: 색상
+          const rowAgent = (row[8] || '').toString().trim();      // I열
+          const rowOffice = (row[6] || '').toString().trim();     // G열
+          const rowDept = (row[7] || '').toString().trim();       // H열
+
+          if (!activationDate || !modelName) return;
+
+          // 날짜 파싱 (YYYY-MM-DD)
+          const dateMatch = activationDate.match(/(\d{4})-(\d{2})-(\d{2})/);
+          if (dateMatch) {
+            const [, Year, Month, Day] = dateMatch.map(Number);
+            if (Year === currentYear && Month === currentMonth) {
+              // 필터링
+              if (agent && agent !== rowAgent) return;
+              if (office && office !== rowOffice) return;
+              if (department && department !== rowDept) return;
+
+              const key = `${modelName}|${color}`;
+              const item = inventoryMap.get(key);
+              if (item) {
+                item.monthlyActivation++;
+                if (Day >= 1 && Day <= 31) {
+                  item.dailyActivation[Day - 1].count++;
+                }
+              }
+            }
+          }
         });
       }
 
-      // 모델/색상별 집계
-      const modelMap = new Map();
-      rows.forEach(row => {
-        const modelName = (row[13] || '').toString().trim(); // N열
-        const color = (row[14] || '').toString().trim();     // O열
-        const type = (row[12] || '').toString().trim();      // M열
-
-        if (!modelName || type === '유심') return;
-
-        const key = `${modelName}|${color}`;
-        if (!modelMap.has(key)) {
-          modelMap.set(key, {
-            modelName,
-            color,
-            inventoryCount: 0
-          });
-        }
-        modelMap.get(key).inventoryCount++;
-      });
-
       const result = {
         success: true,
-        data: Array.from(modelMap.values())
+        data: Array.from(inventoryMap.values())
       };
 
       cacheManager.set(cacheKey, result, 5 * 60 * 1000);
       res.json(result);
     } catch (error) {
-      console.error('Error fetching inventory status:', error);
+      console.error('Error in inventory status:', error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
@@ -691,138 +739,102 @@ function createInventoryRoutes(context) {
       if (!requireSheetsClient(res)) return;
       const { agent, office, department } = req.query;
 
-      const cacheKey = `inventory_status_by_color_${agent}_${office}_${department}`;
+      const cacheKey = `inventory_status_by_color_${agent || 'all'}_${office || 'all'}_${department || 'all'}`;
       const cached = cacheManager.get(cacheKey);
       if (cached) return res.json(cached);
 
-      const values = await getSheetValues('폰클재고데이터');
-      let rows = values.slice(1);
+      const [inventoryValues, activationValues] = await Promise.all([
+        getSheetValues('폰클재고데이터'),
+        getSheetValues('폰클개통데이터')
+      ]);
 
-      // 필터링 및 색상별 그룹화
-      const byColor = {};
-      rows.forEach(row => {
-        const color = row[5] || '미지정';
-        if (!byColor[color]) byColor[color] = [];
-        byColor[color].push(row);
+      if (!inventoryValues || inventoryValues.length < 4) {
+        return res.json({ success: true, data: [] });
+      }
+
+      const inventoryMap = new Map();
+      const currentMonth = new Date().getMonth() + 1;
+      const currentYear = new Date().getFullYear();
+
+      inventoryValues.slice(3).forEach(row => {
+        if (row.length < 15) return;
+        const modelName = (row[13] || '').toString().trim(); // N열
+        const color = (row[14] || '').toString().trim();     // O열
+        const category = (row[5] || '').toString().trim();   // F열
+        const rowOffice = (row[6] || '').toString().trim();
+        const rowDept = (row[7] || '').toString().trim();
+        const rowAgent = (row[8] || '').toString().trim();
+        const type = (row[12] || '').toString().trim();
+
+        if (!modelName || type === '유심' || category === '#N/A') return;
+
+        if (agent && agent !== rowAgent) return;
+        if (office && office !== rowOffice) return;
+        if (department && department !== rowDept) return;
+
+        const key = `${modelName}|${color}`;
+        if (!inventoryMap.has(key)) {
+          inventoryMap.set(key, {
+            modelName,
+            color,
+            category,
+            office: rowOffice,
+            department: rowDept,
+            agent: rowAgent,
+            inventoryCount: 0,
+            monthlyActivation: 0,
+            dailyActivation: Array(31).fill(0).map((_, i) => ({ day: String(i + 1).padStart(2, '0'), count: 0 }))
+          });
+        }
+        inventoryMap.get(key).inventoryCount++;
       });
+
+      if (activationValues && activationValues.length >= 4) {
+        activationValues.slice(3).forEach(row => {
+          if (row.length < 23) return;
+          const activationDate = (row[9] || '').toString().trim();
+          const modelName = (row[21] || '').toString().trim();
+          const color = (row[22] || '').toString().trim();
+          const rowAgent = (row[8] || '').toString().trim();
+          const rowOffice = (row[6] || '').toString().trim();
+          const rowDept = (row[7] || '').toString().trim();
+
+          if (!activationDate || !modelName) return;
+
+          const dateMatch = activationDate.match(/(\d{4})-(\d{2})-(\d{2})/);
+          if (dateMatch) {
+            const [, Year, Month, Day] = dateMatch.map(Number);
+            if (Year === currentYear && Month === currentMonth) {
+              if (agent && agent !== rowAgent) return;
+              if (office && office !== rowOffice) return;
+              if (department && department !== rowDept) return;
+
+              const key = `${modelName}|${color}`;
+              const item = inventoryMap.get(key);
+              if (item) {
+                item.monthlyActivation++;
+                if (Day >= 1 && Day <= 31) {
+                  item.dailyActivation[Day - 1].count++;
+                }
+              }
+            }
+          }
+        });
+      }
 
       const result = {
         success: true,
-        data: byColor
+        data: Array.from(inventoryMap.values())
       };
+
       cacheManager.set(cacheKey, result, 5 * 60 * 1000);
       res.json(result);
     } catch (error) {
-      console.error('Error fetching inventory status by color:', error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // POST /api/inventory-inspection - 재고 비교 검수
-  router.post('/api/inventory-inspection', async (req, res) => {
-    try {
-      if (!requireSheetsClient(res)) return;
-
-      console.log('🔍 재고 비교 검수 시작...');
-
-      // 1. 병렬로 데이터 로드
-      const [masterValues, phoneklValues, normValues, confirmedValues] = await Promise.all([
-        getSheetValues('마스터재고'),
-        getSheetValues('폰클재고데이터'),
-        getSheetValues('모델명정규화'),
-        getSheetValues('확인된미확인재고')
-      ]);
-
-      // 2. 마스터재고 파싱
-      const masterRows = masterValues.slice(3); // 4행부터 데이터
-      const masterInventory = masterRows.map(row => ({
-        modelCode: row[9] || '',     // J열: 모델코드
-        color: row[11] || '',        // L열: 색상
-        serialNumber: row[12] || '', // M열: 시리얼
-        outletCode: row[17] || '',   // R열: 출고점코드
-        firstInDate: row[23] || '',  // X열: 최초입고일
-        dealerInDate: row[26] || '', // AA열: 대리점입고일
-        normalizedSerial: (row[12] || '').toString().trim().replace(/[^a-zA-Z0-9]/g, '').toUpperCase()
-      })).filter(item => item.serialNumber);
-
-      // 3. 폰클재고 파싱
-      const phoneklRows = phoneklValues.slice(3); // 4행부터 데이터
-      const phoneklMap = new Map();
-      phoneklRows.forEach(row => {
-        const serial = (row[11] || '').toString().trim(); // L열: 일련번호
-        if (serial) {
-          const normalized = serial.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-          phoneklMap.set(normalized, {
-            serialNumber: serial,
-            modelName: row[13] || '', // N열: 모델명
-            inPrice: row[17] || '',   // R열: 입고가
-            inStore: row[20] || '',   // U열: 입고처
-            outStore: row[21] || ''   // V열: 출고처
-          });
-        }
-      });
-
-      // 4. 모델명 정규화 맵
-      const normalizationMap = {};
-      if (normValues && normValues.length > 1) {
-        normValues.slice(1).forEach(row => {
-          if (row[0] && row[1]) normalizationMap[row[0]] = row[1];
-        });
-      }
-
-      // 5. 확인된 재고 셋
-      const confirmedSet = new Set();
-      if (confirmedValues && confirmedValues.length > 1) {
-        confirmedValues.slice(1).forEach(row => {
-          const serial = (row[4] || '').toString().trim().replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-          if (serial) confirmedSet.add(serial);
-        });
-      }
-
-      // 6. 비교 수행
-      const matched = [];
-      const unmatched = [];
-      const confirmed = [];
-      const needsNormalization = new Set();
-
-      masterInventory.forEach(item => {
-        const phoneklItem = phoneklMap.get(item.normalizedSerial);
-        if (phoneklItem) {
-          matched.push({ ...item, phoneklData: phoneklItem });
-        } else if (confirmedSet.has(item.normalizedSerial)) {
-          confirmed.push(item);
-        } else {
-          unmatched.push(item);
-        }
-
-        if (item.modelCode && !normalizationMap[item.modelCode]) {
-          needsNormalization.add(item.modelCode);
-        }
-      });
-
-      const result = {
-        success: true,
-        data: {
-          statistics: {
-            totalCount: masterInventory.length,
-            matchedCount: matched.length,
-            unmatchedCount: unmatched.length,
-            confirmedCount: confirmed.length
-          },
-          matched,
-          unmatched,
-          confirmed,
-          needsNormalization: Array.from(needsNormalization),
-          normalizationMap
-        }
-      };
-
-      res.json(result);
-    } catch (error) {
-      console.error('Error in inventory inspection:', error);
+      console.error('Error in inventory status-by-color:', error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
+
 
   // GET /api/company-inventory-details - 회사 재고 상세
   router.get('/api/company-inventory-details', async (req, res) => {

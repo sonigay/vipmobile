@@ -37,7 +37,7 @@ function createSubscriberIncreaseRoutes(context) {
         hasAccess: values.length > 1
       });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 
@@ -53,10 +53,11 @@ function createSubscriberIncreaseRoutes(context) {
       const values = await getSheetValues('가입자증감');
       const data = values.slice(1);
 
-      cacheManager.set(cacheKey, data, 5 * 60 * 1000);
-      res.json(data);
+      const result = { success: true, data };
+      cacheManager.set(cacheKey, result, 5 * 60 * 1000);
+      res.json(result);
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 
@@ -78,7 +79,7 @@ function createSubscriberIncreaseRoutes(context) {
       cacheManager.deletePattern('subscriber_increase');
       res.json({ success: true });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 
@@ -100,7 +101,7 @@ function createSubscriberIncreaseRoutes(context) {
       cacheManager.deletePattern('subscriber_increase');
       res.json({ success: true, count: data.length });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 
@@ -115,7 +116,7 @@ function createSubscriberIncreaseRoutes(context) {
       cacheManager.deletePattern('subscriber_increase');
       res.json({ success: true });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 
@@ -130,7 +131,7 @@ function createSubscriberIncreaseRoutes(context) {
       cacheManager.deletePattern('subscriber_increase');
       res.json({ success: true });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 
@@ -152,7 +153,7 @@ function createSubscriberIncreaseRoutes(context) {
       cacheManager.deletePattern('subscriber_increase');
       res.json({ success: true });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 
