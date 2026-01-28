@@ -11,7 +11,13 @@ function createRechotanchoBondRoutes(context) {
 
   const requireSheetsClient = (res) => {
     if (!sheetsClient) {
+      console.error('[RechotanchoBond] sheetsClient is undefined');
       res.status(503).json({ success: false, error: 'Google Sheets client not available' });
+      return false;
+    }
+    if (!sheetsClient.sheets) {
+      console.error('[RechotanchoBond] sheetsClient.sheets is undefined');
+      res.status(503).json({ success: false, error: 'Google Sheets API not initialized' });
       return false;
     }
     return true;
@@ -24,16 +30,24 @@ function createRechotanchoBondRoutes(context) {
         return [];
       }
 
+      // 시트 이름에 특수문자나 공백이 있을 수 있으므로 따옴표 처리 고려 (재초담초채권 -> '재초담초채권')
+      // 하지만 Google Sheets API는 보통 그냥 처리함.
+      // range 포맷 확인
+      const range = `${sheetName}!A:Z`;
+      console.log(`[RechotanchoBond] Requesting range: ${range}`);
+
       const response = await rateLimiter.execute(() =>
         sheetsClient.sheets.spreadsheets.values.get({
           spreadsheetId: sheetsClient.SPREADSHEET_ID,
-          range: `${sheetName}!A:Z`
+          range: range
         })
       );
       return response.data.values || [];
     } catch (error) {
       console.warn(`[RechotanchoBond] Failed to load sheet '${sheetName}': ${error.message}`);
-      return []; // Return empty array to prevent 500 errors
+      // 여기서 throw 하지 않고 빈 배열 반환하면 호출측에서 에러라고 판단하지 않을 수 있음.
+      // 하지만 지금은 로그가 명확히 찍혔음: Unable to parse range.
+      return [];
     }
   }
 
@@ -46,19 +60,37 @@ function createRechotanchoBondRoutes(context) {
       const cached = cacheManager.get(cacheKey);
       if (cached) return res.json(cached);
 
-      // 현재 상태는 '재초담초채권' 시트에서 조회 (개별 에이전트 데이터)
-      const values = await getSheetValues('재초담초채권');
-      const data = values.slice(1);
+      // '재초담초채권' 시트가 없으므로 '재초담초채권_내역'에서 가장 최신 데이터를 조회하여 반환
+      const values = await getSheetValues('재초담초채권_내역');
 
-      // 데이터 가공 (필요 시)
-      const processedData = data.map(row => ({
-        agentCode: row[0], // 예시 매핑
-        agentName: row[1],
-        inventoryBond: Number(row[2]) || 0,
-        collateralBond: Number(row[3]) || 0,
-        managementBond: Number(row[4]) || 0,
-        timestamp: row[5] // 만약 타임스탬프가 있다면
-      }));
+      if (!values || values.length <= 1) {
+        return res.json({ success: true, data: [] });
+      }
+
+      // 1행부터 데이터. A열(Timestamp) 기준 내림차순 정렬하여 최신 데이터 찾기
+      const sortedRows = values.slice(1).sort((a, b) => {
+        const dateA = new Date(a[0]).getTime();
+        const dateB = new Date(b[0]).getTime();
+        return dateB - dateA; // 내림차순
+      });
+
+      const latestRow = sortedRows[0];
+      if (!latestRow) {
+        return res.json({ success: true, data: [] });
+      }
+
+      let processedData = [];
+      try {
+        // C열(Index 2)에 JSON 데이터
+        const jsonData = latestRow[2];
+        if (jsonData && (jsonData.startsWith('[') || jsonData.startsWith('{'))) {
+          processedData = JSON.parse(jsonData);
+        } else {
+          console.warn('[RechotanchoBond] Latest data JSON parsing failed or invalid format.');
+        }
+      } catch (e) {
+        console.error('[RechotanchoBond] Error parsing latest data:', e);
+      }
 
       const result = { success: true, data: processedData };
       cacheManager.set(cacheKey, result, 5 * 60 * 1000);
