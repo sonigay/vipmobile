@@ -19,18 +19,24 @@ const { setBasicCORSHeaders } = require('../corsMiddleware');
 function timeoutMiddleware(req, res, next) {
   const startTime = Date.now();
   const timeoutDuration = 300000; // 5분 (밀리초)
-  
+
+  // SSE 스트림 엔드포인트는 타임아웃 제외 (무한 연결 유지)
+  if (req.originalUrl.includes('/api/notifications/stream')) {
+    next();
+    return;
+  }
+
   // 요청 및 응답 타임아웃 설정 (요구사항 3.1)
   req.setTimeout(timeoutDuration);
   res.setTimeout(timeoutDuration);
-  
+
   // 타임아웃 이벤트 핸들러 (요구사항 3.2, 12.3)
   req.on('timeout', () => {
     const elapsedTime = Date.now() - startTime;
-    
+
     // CORS 헤더 설정 (요구사항 12.3)
     setBasicCORSHeaders(req, res);
-    
+
     // 타임아웃 에러 로깅 (요구사항 12.3)
     console.error('⏱️ Request timeout:', {
       url: req.originalUrl,
@@ -38,7 +44,7 @@ function timeoutMiddleware(req, res, next) {
       elapsedTime: `${elapsedTime}ms`,
       timeout: `${timeoutDuration}ms`
     });
-    
+
     // 504 Gateway Timeout 응답 (요구사항 3.2)
     if (!res.headersSent) {
       res.status(504).json({
@@ -48,7 +54,7 @@ function timeoutMiddleware(req, res, next) {
       });
     }
   });
-  
+
   next();
 }
 
