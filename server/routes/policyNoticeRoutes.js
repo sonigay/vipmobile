@@ -44,14 +44,14 @@ function createPolicyNoticeRoutes(context) {
   // 시트 데이터 가져오기 헬퍼 함수
   async function getSheetValues(sheetName, spreadsheetId = null) {
     const targetSpreadsheetId = spreadsheetId || sheetsClient.SPREADSHEET_ID;
-    
+
     const response = await rateLimiter.execute(() =>
       sheetsClient.sheets.spreadsheets.values.get({
         spreadsheetId: targetSpreadsheetId,
         range: `${sheetName}!A:Z`
       })
     );
-    
+
     return response.data.values || [];
   }
 
@@ -72,7 +72,7 @@ function createPolicyNoticeRoutes(context) {
         return res.json({ success: true, data: cached, cached: true });
       }
 
-      const values = await getSheetValues('정책공지사항');
+      const values = await getSheetValues('정책모드공지사항');
       const headers = values[0] || [];
       const rows = values.slice(1);
 
@@ -139,7 +139,7 @@ function createPolicyNoticeRoutes(context) {
       const headerResponse = await rateLimiter.execute(() =>
         sheetsClient.sheets.spreadsheets.values.get({
           spreadsheetId: sheetsClient.SPREADSHEET_ID,
-          range: '정책공지사항!A1:Z1'
+          range: '정책모드공지사항!A1:Z1'
         })
       );
       const headers = headerResponse.data.values?.[0] || [];
@@ -160,7 +160,7 @@ function createPolicyNoticeRoutes(context) {
       await rateLimiter.execute(() =>
         sheetsClient.sheets.spreadsheets.values.append({
           spreadsheetId: sheetsClient.SPREADSHEET_ID,
-          range: '정책공지사항!A:Z',
+          range: '정책모드공지사항!A:Z',
           valueInputOption: 'RAW',
           insertDataOption: 'INSERT_ROWS',
           resource: {
@@ -200,7 +200,7 @@ function createPolicyNoticeRoutes(context) {
       const headerResponse = await rateLimiter.execute(() =>
         sheetsClient.sheets.spreadsheets.values.get({
           spreadsheetId: sheetsClient.SPREADSHEET_ID,
-          range: '정책공지사항!A1:Z1'
+          range: '정책모드공지사항!A1:Z1'
         })
       );
       const headers = headerResponse.data.values?.[0] || [];
@@ -209,7 +209,7 @@ function createPolicyNoticeRoutes(context) {
       const existingResponse = await rateLimiter.execute(() =>
         sheetsClient.sheets.spreadsheets.values.get({
           spreadsheetId: sheetsClient.SPREADSHEET_ID,
-          range: `정책공지사항!A${id}:Z${id}`
+          range: `정책모드공지사항!A${id}:Z${id}`
         })
       );
       const existingRow = existingResponse.data.values?.[0] || [];
@@ -229,7 +229,7 @@ function createPolicyNoticeRoutes(context) {
       await rateLimiter.execute(() =>
         sheetsClient.sheets.spreadsheets.values.update({
           spreadsheetId: sheetsClient.SPREADSHEET_ID,
-          range: `정책공지사항!A${id}:Z${id}`,
+          range: `정책모드공지사항!A${id}:Z${id}`,
           valueInputOption: 'RAW',
           resource: {
             values: [updatedRow]

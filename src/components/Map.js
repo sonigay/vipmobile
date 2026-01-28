@@ -171,7 +171,9 @@ function MapUpdater({ center, bounds, zoom, isAgentMode, currentView, forceZoomT
       return 14;
     }
     // 직영점모드: 접속 매장 중심 (줌 레벨 14)
-    if (loggedInStore?.coords?.lat && loggedInStore?.coords?.lng) {
+    const lat = loggedInStore?.coords?.lat || loggedInStore?.latitude;
+    const lng = loggedInStore?.coords?.lng || loggedInStore?.longitude;
+    if (lat && lng) {
       return 14;
     }
     // 직영점관리모드: 위치 정보에 따라 줌 레벨 설정
@@ -321,10 +323,13 @@ function Map({
       return pyeongtaekCenter;
     }
     // 직영점모드: 접속 매장 중심 좌표 사용
-    if (loggedInStore?.coords?.lat && loggedInStore?.coords?.lng) {
+    const lat = loggedInStore?.coords?.lat || loggedInStore?.latitude;
+    const lng = loggedInStore?.coords?.lng || loggedInStore?.longitude;
+
+    if (lat && lng) {
       return {
-        lat: loggedInStore.coords.lat,
-        lng: loggedInStore.coords.lng,
+        lat: lat,
+        lng: lng,
         isDefault: true
       };
     }
