@@ -302,6 +302,42 @@ try {
   console.error('❌ [Additional] Failed to mount policy routes:', e.message);
 }
 
+// Chart Mode Routes
+try {
+  const createClosingChartRoutes = require('./routes/closingChartRoutes');
+  app.use('/api', createClosingChartRoutes(sharedContext));
+  console.log('✅ [Chart] Closing Chart routes mounted');
+} catch (e) {
+  console.error('❌ [Chart] Failed to mount closing chart routes:', e.message);
+}
+
+try {
+  const createRechotanchoBondRoutes = require('./routes/rechotanchoBondRoutes');
+  app.use('/', createRechotanchoBondRoutes(sharedContext)); // This router already has /api prefix in paths
+  console.log('✅ [Chart] Rechotancho Bond routes mounted');
+} catch (e) {
+  console.error('❌ [Chart] Failed to mount rechotancho bond routes:', e.message);
+}
+
+try {
+  const createSubscriberIncreaseRoutes = require('./routes/subscriberIncreaseRoutes');
+  app.use('/', createSubscriberIncreaseRoutes(sharedContext)); // This router already has /api prefix in paths
+  console.log('✅ [Chart] Subscriber Increase routes mounted');
+} catch (e) {
+  console.error('❌ [Chart] Failed to mount subscriber increase routes:', e.message);
+}
+
+try {
+  const monthlyAwardAPI = require('./monthlyAwardAPI');
+  // MonthlyAwardAPI doesn't export a router factory, so we map handlers manually or wrap them
+  // Assuming getMonthlyAwardData handles req, res
+  app.get('/api/monthly-award/data', (req, res) => monthlyAwardAPI.getMonthlyAwardData(req, res));
+  app.post('/api/monthly-award/settings', (req, res) => monthlyAwardAPI.saveMonthlyAwardSettings(req, res));
+  console.log('✅ [Chart] Monthly Award routes mounted');
+} catch (e) {
+  console.error('❌ [Chart] Failed to mount monthly award routes:', e.message);
+}
+
 try {
   const createNotificationRoutes = require('./routes/notificationRoutes');
   app.use('/api', createNotificationRoutes(sharedContext));
