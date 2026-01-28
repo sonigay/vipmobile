@@ -49,7 +49,7 @@ function createModelRoutes(context) {
         range: `${sheetName}!A:Z`
       })
     );
-    
+
     return response.data.values || [];
   }
 
@@ -119,7 +119,7 @@ function createModelRoutes(context) {
   router.get('/api/operation-models', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
-      
+
       const cacheKey = 'operation_models';
       const cached = cacheManager.get(cacheKey);
       if (cached) return res.json(cached);
@@ -134,14 +134,66 @@ function createModelRoutes(context) {
     }
   });
 
-  // GET /api/model-normalization - 모델 정규화
+  // GET /api/model-normalization - 모델 정규화 데이터 조회
   router.get('/api/model-normalization', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
+
       const values = await getSheetValues('모델정규화');
-      res.json(values.slice(1));
+      if (!values || values.length === 0) {
+        return res.json({ success: true, data: {} });
+      }
+
+      const normalizationMap = {};
+      values.slice(1).forEach(row => {
+        const modelCode = (row[0] || '').toString().trim();
+        const normalizedName = (row[1] || '').toString().trim();
+        if (modelCode && normalizedName) {
+          normalizationMap[modelCode] = normalizedName;
+        }
+      });
+
+      res.json({
+        success: true,
+        data: normalizationMap
+      });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      console.error('Error fetching model normalization:', error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // POST /api/model-normalization - 모델 정규화 데이터 저장
+  router.post('/api/model-normalization', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+      const { normalizationMap } = req.body;
+
+      if (!normalizationMap || typeof normalizationMap !== 'object') {
+        return res.status(400).json({ success: false, error: 'Invalid normalization data' });
+      }
+
+      const rows = [['모델코드', '정규화모델명', '등록일시']];
+      Object.entries(normalizationMap).forEach(([code, name]) => {
+        if (name) {
+          rows.push([code, name, new Date().toISOString()]);
+        }
+      });
+
+      await rateLimiter.execute(() =>
+        sheetsClient.sheets.spreadsheets.values.update({
+          spreadsheetId: sheetsClient.SPREADSHEET_ID,
+          range: '모델정규화!A:C',
+          valueInputOption: 'USER_ENTERED',
+          resource: { values: rows }
+        })
+      );
+
+      cacheManager.deletePattern('model_normalization');
+      res.json({ success: true, data: normalizationMap });
+    } catch (error) {
+      console.error('Error saving model normalization:', error);
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 

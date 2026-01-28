@@ -22,17 +22,17 @@ function normalizeCategory(category, modelName = '') {
   }
 
   const categoryStr = category.toString().trim();
-  
+
   // #N/A 에러나 ERROR 문자열이 포함된 경우
-  if (categoryStr.includes('#N/A') || 
-      categoryStr.includes('ERROR') || 
-      categoryStr.includes('#REF') ||
-      categoryStr.includes('#VALUE')) {
-    
+  if (categoryStr.includes('#N/A') ||
+    categoryStr.includes('ERROR') ||
+    categoryStr.includes('#REF') ||
+    categoryStr.includes('#VALUE')) {
+
     if (modelName) {
       console.warn(`⚠️ [재고필터] VLOOKUP 에러 발견: 모델=${modelName}, 원본값=${categoryStr} → "기타"로 변환`);
     }
-    
+
     return '기타';
   }
 
@@ -51,7 +51,7 @@ function isPhoneType(modelType) {
   }
 
   const typeStr = modelType.toString().trim();
-  
+
   // 휴대폰만 허용
   return typeStr === '휴대폰';
 }
@@ -81,10 +81,10 @@ function isValidInventoryRow(options) {
 
   // 구분이 #N/A이면 무효 (정규화 전 체크)
   const categoryStr = (category || '').toString().trim();
-  if (categoryStr.includes('#N/A') || 
-      categoryStr.includes('ERROR') || 
-      categoryStr.includes('#REF') ||
-      categoryStr.includes('#VALUE')) {
+  if (categoryStr.includes('#N/A') ||
+    categoryStr.includes('ERROR') ||
+    categoryStr.includes('#REF') ||
+    categoryStr.includes('#VALUE')) {
     // #N/A는 로그만 남기고 무효 처리 (또는 "기타"로 변환하여 유효 처리 가능)
     // 현재는 무효 처리하여 목록에서 제외
     return false;
@@ -176,7 +176,7 @@ function filterAndProcessInventory(inventoryValues, options = {}) {
     totalRows++;
 
     const processed = processInventoryRow(row, { phoneOnly });
-    
+
     if (processed) {
       processedData.push(processed);
       validRows++;
@@ -185,11 +185,11 @@ function filterAndProcessInventory(inventoryValues, options = {}) {
       if (row.length >= 23) {
         const modelType = (row[4] || '').toString().trim();
         const category = (row[5] || '').toString().trim();
-        
+
         if (phoneOnly && modelType !== '휴대폰') {
           filteredByType++;
         }
-        
+
         if (category.includes('#N/A') || category.includes('ERROR')) {
           filteredByError++;
         }
@@ -202,10 +202,30 @@ function filterAndProcessInventory(inventoryValues, options = {}) {
   return processedData;
 }
 
+/**
+ * 일련번호를 정규화합니다. (공백 제거, 앞부분 0 제거, 대문자 변환)
+ * 
+ * @param {string} serial - 원본 일련번호
+ * @returns {string} 정규화된 일련번호
+ */
+function normalizeSerialNumber(serial) {
+  if (!serial) return '';
+
+  // 공백 제거
+  let normalized = serial.toString().trim().replace(/\s+/g, '');
+
+  // 알파벳으로 시작하는 경우, 앞부분 연속된 0 제거
+  // 예: "000000ABC123" -> "ABC123", "00123ABC" -> "123ABC"
+  normalized = normalized.replace(/^0+(?=\w)/, '');
+
+  return normalized.toUpperCase(); // 대소문자 통일
+}
+
 module.exports = {
   normalizeCategory,
   isPhoneType,
   isValidInventoryRow,
   processInventoryRow,
-  filterAndProcessInventory
+  filterAndProcessInventory,
+  normalizeSerialNumber
 };

@@ -625,34 +625,63 @@ function createInventoryRoutes(context) {
     }
   });
 
-  // GET /api/inventory/status - 모델별 재고 현황
+  // GET /api/inventory/status - 모델별 재고 현황 (프론트엔드 형식에 맞춰 수정)
   router.get('/api/inventory/status', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
       const { agent, office, department } = req.query;
 
-      const cacheKey = `inventory_status_${agent}_${office}_${department}`;
+      const cacheKey = `inventory_status_${agent || 'all'}_${office || 'all'}_${department || 'all'}`;
       const cached = cacheManager.get(cacheKey);
       if (cached) return res.json(cached);
 
       const values = await getSheetValues('폰클재고데이터');
-      let rows = values.slice(1);
+      if (!values || values.length < 4) {
+        return res.json({ success: true, data: [] });
+      }
 
-      // 필터링 로직
+      let rows = values.slice(3); // 4행부터 데이터
+
+      // 필터링 로직 (G, H, I열 기준: 6, 7, 8번 인덱스)
       if (agent || office || department) {
         rows = rows.filter(row => {
-          if (agent && row[0] !== agent) return false;
-          if (office && row[1] !== office) return false;
-          if (department && row[2] !== department) return false;
+          if (agent && (row[8] || '').toString().trim() !== agent) return false;
+          if (office && (row[6] || '').toString().trim() !== office) return false;
+          if (department && (row[7] || '').toString().trim() !== department) return false;
           return true;
         });
       }
 
-      cacheManager.set(cacheKey, rows, 5 * 60 * 1000);
-      res.json(rows);
+      // 모델/색상별 집계
+      const modelMap = new Map();
+      rows.forEach(row => {
+        const modelName = (row[13] || '').toString().trim(); // N열
+        const color = (row[14] || '').toString().trim();     // O열
+        const type = (row[12] || '').toString().trim();      // M열
+
+        if (!modelName || type === '유심') return;
+
+        const key = `${modelName}|${color}`;
+        if (!modelMap.has(key)) {
+          modelMap.set(key, {
+            modelName,
+            color,
+            inventoryCount: 0
+          });
+        }
+        modelMap.get(key).inventoryCount++;
+      });
+
+      const result = {
+        success: true,
+        data: Array.from(modelMap.values())
+      };
+
+      cacheManager.set(cacheKey, result, 5 * 60 * 1000);
+      res.json(result);
     } catch (error) {
       console.error('Error fetching inventory status:', error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 
@@ -737,11 +766,229 @@ function createInventoryRoutes(context) {
       const values = await getSheetValues('확정미확정재고');
       const data = values.slice(1);
 
-      cacheManager.set(cacheKey, data, 5 * 60 * 1000);
-      res.json(data);
+      const result = { success: true, data: data };
+      cacheManager.set(cacheKey, result, 5 * 60 * 1000);
+      res.json(result);
     } catch (error) {
       console.error('Error fetching confirmed/unconfirmed inventory:', error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // GET /api/price-discrepancies - 입고가 상이 데이터 조회
+  router.get('/api/price-discrepancies', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+
+      const cacheKey = 'price_discrepancies';
+      const cached = cacheManager.get(cacheKey);
+      if (cached) return res.json(cached);
+
+      const [inventoryValues, activationValues] = await Promise.all([
+        getSheetValues('폰클재고데이터'),
+        getSheetValues('폰클개통데이터')
+      ]);
+
+      const inventoryRows = inventoryValues.slice(3);
+      const activationRows = activationValues.slice(3);
+
+      const modelPriceMap = new Map();
+
+      inventoryRows.forEach((row, index) => {
+        const modelName = (row[13] || '').toString().trim(); // N열
+        const inPrice = (row[17] || '').toString().trim();  // R열
+        if (modelName && inPrice) {
+          if (!modelPriceMap.has(modelName)) modelPriceMap.set(modelName, []);
+          modelPriceMap.get(modelName).push({
+            sheetName: '폰클재고데이터',
+            rowIndex: index + 4,
+            modelName,
+            inPrice,
+            outStore: (row[21] || '').toString().trim(),
+            serial: (row[11] || '').toString().trim(),
+            processDate: (row[22] || '').toString().trim()
+          });
+        }
+      });
+
+      activationRows.forEach((row, index) => {
+        const modelName = (row[21] || '').toString().trim(); // V열
+        const inPrice = (row[35] || '').toString().trim();  // AJ열
+        if (modelName && inPrice) {
+          if (!modelPriceMap.has(modelName)) modelPriceMap.set(modelName, []);
+          modelPriceMap.get(modelName).push({
+            sheetName: '폰클개통데이터',
+            rowIndex: index + 4,
+            modelName,
+            inPrice,
+            outStore: (row[14] || '').toString().trim(),
+            serial: (row[23] || '').toString().trim(),
+            processDate: (row[9] || '').toString().trim()
+          });
+        }
+      });
+
+      const discrepancies = [];
+      modelPriceMap.forEach((items, modelName) => {
+        const priceGroups = new Map();
+        items.forEach(item => {
+          const normalizedPrice = item.inPrice.replace(/[,\s]/g, '');
+          if (!priceGroups.has(normalizedPrice)) priceGroups.set(normalizedPrice, []);
+          priceGroups.get(normalizedPrice).push(item);
+        });
+
+        if (priceGroups.size > 1) {
+          const priceBreakdown = Array.from(priceGroups.entries())
+            .map(([price, groupItems]) => ({ price, count: groupItems.length }))
+            .sort((a, b) => b.count - a.count);
+
+          const recommendedPrice = priceBreakdown[0].price;
+          discrepancies.push({
+            modelName,
+            recommendedPrice,
+            confidence: parseFloat(((priceBreakdown[0].count / items.length) * 100).toFixed(1)),
+            priceBreakdown,
+            items: items.sort((a, b) => {
+              const aP = a.inPrice.replace(/[,\s]/g, '');
+              const bP = b.inPrice.replace(/[,\s]/g, '');
+              if (aP !== recommendedPrice && bP === recommendedPrice) return -1;
+              if (aP === recommendedPrice && bP !== recommendedPrice) return 1;
+              return 0;
+            })
+          });
+        }
+      });
+
+      const responseData = {
+        success: true,
+        data: {
+          discrepancies: discrepancies.sort((a, b) => a.modelName.localeCompare(b.modelName)),
+          totalDiscrepancies: discrepancies.length,
+          totalItems: discrepancies.reduce((sum, d) => sum + d.items.length, 0)
+        }
+      };
+
+      cacheManager.set(cacheKey, responseData, 5 * 60 * 1000);
+      res.json(responseData);
+    } catch (error) {
+      console.error('Error fetching price discrepancies:', error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // GET /api/phone-duplicates - 단말기 중복값 확인
+  router.get('/api/phone-duplicates', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+
+      const cacheKey = 'phone_duplicates';
+      const cached = cacheManager.get(cacheKey);
+      if (cached) return res.json(cached);
+
+      const [inventoryValues, activationValues] = await Promise.all([
+        getSheetValues('폰클재고데이터'),
+        getSheetValues('폰클개통데이터')
+      ]);
+
+      const inventoryRows = inventoryValues.slice(3);
+      const activationRows = activationValues.slice(3);
+
+      const phoneData = [];
+      activationRows.forEach(row => {
+        if (row[12] && row[12] !== '유심') {
+          phoneData.push({
+            store: row[14] || '', model: row[21] || '', color: row[22] || '',
+            serial: row[23] || '', employee: row[77] || '', type: '개통'
+          });
+        }
+      });
+
+      inventoryRows.forEach(row => {
+        if (row[12] && row[12] !== '유심') {
+          phoneData.push({
+            store: row[21] || '', model: row[13] || '', color: row[14] || '',
+            serial: row[11] || '', employee: row[28] || '', type: '재고'
+          });
+        }
+      });
+
+      const duplicateMap = new Map();
+      phoneData.forEach(item => {
+        const cleanSerial = (item.serial || '').replace(/\s/g, '');
+        if (!cleanSerial || cleanSerial.length < 6) return;
+        const key = `${item.model}|${cleanSerial.slice(-6)}`;
+        if (!duplicateMap.has(key)) duplicateMap.set(key, []);
+        duplicateMap.get(key).push(item);
+      });
+
+      const duplicates = Array.from(duplicateMap.entries())
+        .filter(([key, items]) => items.length > 1)
+        .map(([key, items]) => ({ key, count: items.length, items }));
+
+      const result = { success: true, data: { duplicates, totalDuplicates: duplicates.length } };
+      cacheManager.set(cacheKey, result, 5 * 60 * 1000);
+      res.json(result);
+    } catch (error) {
+      console.error('Error fetching phone duplicates:', error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // GET /api/sim-duplicates - 유심 중복값 확인
+  router.get('/api/sim-duplicates', async (req, res) => {
+    try {
+      if (!requireSheetsClient(res)) return;
+
+      const cacheKey = 'sim_duplicates';
+      const cached = cacheManager.get(cacheKey);
+      if (cached) return res.json(cached);
+
+      const [inventoryValues, activationValues] = await Promise.all([
+        getSheetValues('폰클재고데이터'),
+        getSheetValues('폰클개통데이터')
+      ]);
+
+      const inventoryRows = inventoryValues.slice(3);
+      const activationRows = activationValues.slice(3);
+
+      const simData = [];
+      activationRows.forEach(row => {
+        if (row[12] && row[12].includes('유심')) {
+          simData.push({
+            store: row[14] || '', model: row[24] || '', serial: row[25] || '',
+            employee: row[77] || '', type: '개통'
+          });
+        }
+      });
+
+      inventoryRows.forEach(row => {
+        if (row[12] && row[12].includes('유심')) {
+          simData.push({
+            store: row[21] || '', model: row[13] || '', serial: row[11] || '',
+            employee: row[28] || '', type: '재고'
+          });
+        }
+      });
+
+      const duplicateMap = new Map();
+      simData.forEach(item => {
+        const cleanSerial = (item.serial || '').replace(/\s/g, '');
+        if (!cleanSerial || cleanSerial.length < 6) return;
+        const key = `${item.model}|${cleanSerial.slice(-6)}`;
+        if (!duplicateMap.has(key)) duplicateMap.set(key, []);
+        duplicateMap.get(key).push(item);
+      });
+
+      const duplicates = Array.from(duplicateMap.entries())
+        .filter(([key, items]) => items.length > 1)
+        .map(([key, items]) => ({ key, count: items.length, items }));
+
+      const result = { success: true, data: { duplicates, totalDuplicates: duplicates.length } };
+      cacheManager.set(cacheKey, result, 5 * 60 * 1000);
+      res.json(result);
+    } catch (error) {
+      console.error('Error fetching sim duplicates:', error);
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 

@@ -42,6 +42,7 @@ function createClosingChartRoutes(context) {
 
       return response.data.values || [];
     } catch (error) {
+      // 시트가 없거나 오류 발생 시 빈 배열 반환하여 전체 프로세스 중단 방지
       console.warn(`[ClosingChart] Failed to load sheet '${sheetName}': ${error.message}`);
       return [];
     }

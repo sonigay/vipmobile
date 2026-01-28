@@ -82,8 +82,8 @@ module.exports = function createMonthlyAwardRoutes(context) {
 
       return data;
     } catch (error) {
-      console.error(`Error fetching sheet ${sheetName}:`, error);
-      throw error;
+      console.warn(`[MonthlyAward] Failed to load sheet '${sheetName}': ${error.message}`);
+      return []; // 에러 발생 시 빈 배열 반환하여 중단 방지
     }
   }
 

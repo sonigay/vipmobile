@@ -937,10 +937,16 @@ module.exports = function createMiscRoutes(context) {
   router.get('/last-activation-date', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
-      const values = await getSheetValues('마지막개통일');
-      res.json(values.slice(1));
+
+      const values = await getSheetValues('마지막개통일').catch(err => {
+        console.warn('마지막개통일 시트 로드 실패:', err.message);
+        return [];
+      });
+
+      res.json(values.length > 0 ? values.slice(1) : []);
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      console.error('마지막 개통일 조회 오류:', error);
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 

@@ -18,13 +18,23 @@ function createRechotanchoBondRoutes(context) {
   };
 
   async function getSheetValues(sheetName) {
-    const response = await rateLimiter.execute(() =>
-      sheetsClient.sheets.spreadsheets.values.get({
-        spreadsheetId: sheetsClient.SPREADSHEET_ID,
-        range: `${sheetName}!A:Z`
-      })
-    );
-    return response.data.values || [];
+    try {
+      if (!sheetsClient || !sheetsClient.sheets) {
+        console.warn(`[RechotanchoBond] Sheets client not available for ${sheetName}`);
+        return [];
+      }
+
+      const response = await rateLimiter.execute(() =>
+        sheetsClient.sheets.spreadsheets.values.get({
+          spreadsheetId: sheetsClient.SPREADSHEET_ID,
+          range: `${sheetName}!A:Z`
+        })
+      );
+      return response.data.values || [];
+    } catch (error) {
+      console.warn(`[RechotanchoBond] Failed to load sheet '${sheetName}': ${error.message}`);
+      return []; // Return empty array to prevent 500 errors
+    }
   }
 
   // GET /api/rechotancho-bond/all-data - 전체 데이터

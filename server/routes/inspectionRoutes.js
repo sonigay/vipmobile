@@ -31,14 +31,14 @@ function createInspectionRoutes(context) {
   router.get('/api/inspection/list', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
-      
+
       const cacheKey = 'inspection_list';
       const cached = cacheManager.get(cacheKey);
       if (cached) return res.json(cached);
 
       const values = await getSheetValues('검수관리');
       const data = values.slice(1);
-      
+
       cacheManager.set(cacheKey, data, 5 * 60 * 1000);
       res.json(data);
     } catch (error) {
@@ -73,7 +73,7 @@ function createInspectionRoutes(context) {
   router.get('/api/inspection-data', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
-      
+
       const values = await getSheetValues('검수데이터');
       res.json(values.slice(1));
     } catch (error) {
@@ -86,7 +86,7 @@ function createInspectionRoutes(context) {
   router.get('/api/inspection/available-fields', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
-      
+
       const values = await getSheetValues('검수필드');
       res.json(values.slice(1));
     } catch (error) {
@@ -99,7 +99,7 @@ function createInspectionRoutes(context) {
   router.get('/api/inspection/columns', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
-      
+
       const values = await getSheetValues('검수컬럼');
       res.json(values.slice(1));
     } catch (error) {
@@ -135,7 +135,7 @@ function createInspectionRoutes(context) {
   router.get('/api/inspection/completion-status', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
-      
+
       const values = await getSheetValues('검수완료상태');
       res.json(values.slice(1));
     } catch (error) {
@@ -162,7 +162,7 @@ function createInspectionRoutes(context) {
   router.get('/api/inspection/field-values', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
-      
+
       const values = await getSheetValues('검수필드값');
       res.json(values.slice(1));
     } catch (error) {
@@ -175,7 +175,7 @@ function createInspectionRoutes(context) {
   router.get('/api/inspection/modification-completion-status', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
-      
+
       const values = await getSheetValues('검수수정완료상태');
       res.json(values.slice(1));
     } catch (error) {
@@ -240,17 +240,106 @@ function createInspectionRoutes(context) {
     }
   });
 
-  // POST /api/inventory-inspection - 재고 검수
+  // POST /api/inventory-inspection - 재고 비교 검수 (마스터재고 vs 폰클재고)
   router.post('/api/inventory-inspection', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
-      const { data } = req.body;
+      const { normalizeSerialNumber } = require('../inventoryFilterUtils');
 
-      console.log('재고 검수:', data);
-      res.json({ success: true });
+      console.log('🔍 재고 비교 검수 시작...');
+
+      // 1. 필요한 모든 데이터 병렬 로드
+      const [masterData, phoneklData, normData, confirmedData] = await Promise.all([
+        getSheetValues('마스터재고'),
+        getSheetValues('폰클재고데이터'),
+        getSheetValues('모델정규화'),
+        getSheetValues('확정미확정재고')
+      ]);
+
+      // 2. 데이터 파싱
+      const masterInventory = masterData.slice(1).map(row => ({
+        modelCode: row[9] || '',
+        color: row[11] || '',
+        serialNumber: row[12] || '',
+        normalizedSerial: normalizeSerialNumber(row[12]),
+        outletCode: row[17] || '',
+        firstInDate: row[23] || '',
+        dealerInDate: row[26] || ''
+      })).filter(item => item.serialNumber);
+
+      const phoneklInventory = phoneklData.slice(3).map(row => ({
+        inDate: row[22] || '', // W열 (예전 logic은 J 또는 W)
+        serialNumber: row[11] || '', // L열
+        normalizedSerial: normalizeSerialNumber(row[11]),
+        type: row[12] || '', // M열
+        modelName: row[13] || '', // N열
+        color: row[14] || '', // O열
+        status: row[15] || '', // P열
+        inPrice: row[17] || '', // R열
+        inStore: row[18] || '', // S열
+        outStore: row[21] || '' // V열
+      })).filter(item => item.serialNumber);
+
+      // 모델 정규화 맵 구성
+      const normalizationMap = {};
+      normData.slice(1).forEach(row => {
+        if (row[0] && row[1]) normalizationMap[row[0]] = row[1];
+      });
+
+      // 확인된 재고 셋 구성
+      const confirmedSet = new Set();
+      confirmedData.slice(1).forEach(row => {
+        const serial = normalizeSerialNumber(row[4] || ''); // E열 (시트 구조 확인 필요)
+        if (serial) confirmedSet.add(serial);
+      });
+
+      // 3. 폰클재고 Map 구성
+      const phoneklMap = new Map();
+      phoneklInventory.forEach(item => phoneklMap.set(item.normalizedSerial, item));
+
+      // 4. 비교 로직
+      const matchedItems = [];
+      const unmatchedItems = [];
+      const needsNormalization = new Set();
+
+      masterInventory.forEach(masterItem => {
+        const phoneklItem = phoneklMap.get(masterItem.normalizedSerial);
+
+        if (phoneklItem) {
+          matchedItems.push({ ...masterItem, phoneklData: phoneklItem, matched: true });
+        } else {
+          const isConfirmed = confirmedSet.has(masterItem.normalizedSerial);
+          unmatchedItems.push({ ...masterItem, matched: false, isConfirmed });
+        }
+
+        if (masterItem.modelCode && !normalizationMap[masterItem.modelCode]) {
+          needsNormalization.add(masterItem.modelCode);
+        }
+      });
+
+      const response = {
+        success: true,
+        data: {
+          total: masterInventory.length,
+          matched: matchedItems,
+          unmatched: unmatchedItems.filter(i => !i.isConfirmed),
+          confirmed: unmatchedItems.filter(i => i.isConfirmed),
+          needsNormalization: Array.from(needsNormalization),
+          normalizationMap: normalizationMap,
+          statistics: {
+            totalCount: masterInventory.length,
+            matchedCount: matchedItems.length,
+            unmatchedCount: unmatchedItems.filter(i => !i.isConfirmed).length,
+            confirmedCount: unmatchedItems.filter(i => i.isConfirmed).length,
+            needsNormalizationCount: needsNormalization.size
+          }
+        }
+      };
+
+      res.json(response);
     } catch (error) {
       console.error('Error inspecting inventory:', error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 
