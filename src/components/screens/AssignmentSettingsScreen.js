@@ -115,17 +115,36 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
   const [showErrorDialog, setShowErrorDialog] = useState(false);
   const [errorDetails, setErrorDetails] = useState(''); // 배정 로직 세부사항 접기/펼치기 상태
 
-  // 모델 다이얼로그가 열릴 때 데이터 로드
+  // 모델 다이얼로그가 열릴 때 데이터 로드 (SWR 패턴: 캐시 즉시 로드 + 백그라운드 갱신)
   useEffect(() => {
-    if (showModelDialog && availableModels.models.length === 0) {
+    if (showModelDialog) {
       loadModelData();
     }
   }, [showModelDialog]);
 
   // 모델 데이터 로드 함수 분리
   const loadModelData = async () => {
+    // 1. 캐시 데이터 먼저 로드 (즉각적인 UI 표시)
+    const cachedData = localStorage.getItem('assignment_model_list_cache');
+    if (cachedData) {
+      try {
+        const parsedData = JSON.parse(cachedData);
+        // Map 객체 복원
+        if (parsedData.modelColors) {
+          parsedData.modelColors = new Map(parsedData.modelColors);
+        }
+
+        // 데이터가 아직 없을 때만 캐시 적용 (이미 최신 데이터가 있거나 로딩 중 깜빡임 방지용)
+        // 하지만 SWR은 항상 최신을 보여줘야 하므로, 일단 캐시를 보여주고 네트워크 완료 후 다시 업데이트
+        setAvailableModels(parsedData);
+        // console.log('✅ [캐시] 모델 데이터 로드 완료');
+      } catch (e) {
+        console.error('캐시 데이터 로드 실패:', e);
+      }
+    }
+
     try {
-      console.log('🔄 [재고배정] 재고 및 개통 데이터 로드 시작');
+      console.log('🔄 [재고배정] 재고 및 개통 데이터 로드 시작 (백그라운드)');
 
       // 재고 데이터와 개통 데이터를 병렬로 로드
       const [inventoryResponse, activationResponse] = await Promise.all([
@@ -138,7 +157,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       // 재고 데이터 처리
       if (inventoryResponse.ok) {
         const inventoryData = await inventoryResponse.json();
-        console.log('📊 [재고배정] 재고 데이터 로드 완료:', inventoryData.data?.length || 0, '개 모델');
+        // console.log('📊 [재고배정] 재고 데이터 로드 완료:', inventoryData.data?.length || 0, '개 모델');
 
         if (inventoryData.success && inventoryData.data && Array.isArray(inventoryData.data)) {
           inventoryData.data.forEach(item => {
@@ -166,14 +185,14 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       // 개통 데이터 처리
       if (activationResponse.ok) {
         const activationData = await activationResponse.json();
-        console.log('📊 [재고배정] 개통 데이터 로드 완료:', activationData.data?.length || 0, '개 개통정보');
+        // console.log('📊 [재고배정] 개통 데이터 로드 완료:', activationData.data?.length || 0, '개 개통정보');
 
         if (activationData.success && activationData.data && Array.isArray(activationData.data)) {
           activationData.data.forEach(item => {
             const modelName = item.modelName;
             const color = item.color || '기본';
 
-            console.log('🔍 [재고배정] 개통 데이터 처리:', { modelName, color });
+            // console.log('🔍 [재고배정] 개통 데이터 처리:', { modelName, color });
 
             if (!modelGroups.has(modelName)) {
               modelGroups.set(modelName, {
@@ -188,14 +207,14 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
             // 개통된 단말기가 있으면 해당 색상을 목록에 포함 (재고가 없어도)
             if (!colorGroup.colors.has(color)) {
               colorGroup.colors.set(color, 0); // 재고는 0이지만 목록에는 표시
-              console.log('✅ [재고배정] 개통 데이터에서 색상 추가:', { modelName, color });
+              // console.log('✅ [재고배정] 개통 데이터에서 색상 추가:', { modelName, color });
             }
             colorGroup.hasActivation = true;
           });
         }
       }
 
-      console.log('📊 [재고배정] 그룹핑 결과:', Array.from(modelGroups.entries()).slice(0, 3));
+      // console.log('📊 [재고배정] 그룹핑 결과:', Array.from(modelGroups.entries()).slice(0, 3));
 
       // 매장 데이터 형태로 변환
       const mockStoreData = Array.from(modelGroups.values()).map((modelGroup, index) => {
@@ -217,27 +236,36 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
         };
       });
 
-      console.log('🔄 [재고배정] 모델 추출 시작, 변환된 매장 수:', mockStoreData.length);
-      console.log('📊 [재고배정] 변환된 데이터 샘플:', mockStoreData.slice(0, 2)); // 처음 2개 매장 데이터 확인
+      // console.log('🔄 [재고배정] 모델 추출 시작, 변환된 매장 수:', mockStoreData.length);
+      // console.log('📊 [재고배정] 변환된 데이터 샘플:', mockStoreData.slice(0, 2)); // 처음 2개 매장 데이터 확인
 
       const models = extractAvailableModels(mockStoreData);
+      /*
       console.log('📊 [재고배정] 추출된 모델 결과:', {
         modelsCount: models.models.length,
         colorsCount: models.colors.length,
         models: models.models.slice(0, 5), // 처음 5개만 로그
         modelColorsSample: Array.from(models.modelColors.entries()).slice(0, 3) // 모델별 색상 샘플
       });
+      */
 
       if (models.models.length > 0) {
         setAvailableModels(models);
-        console.log('✅ [재고배정] 모델 데이터 설정 완료');
+        console.log('✅ [재고배정] 모델 데이터 업데이트 완료 (백그라운드)');
+
+        // 캐시 업데이트 (Map 직렬화)
+        const serializableModels = {
+          ...models,
+          modelColors: Array.from(models.modelColors.entries())
+        };
+        localStorage.setItem('assignment_model_list_cache', JSON.stringify(serializableModels));
       } else {
         console.warn('⚠️ [재고배정] 재고 데이터 형식이 올바르지 않음');
-        setAvailableModels({ models: [], colors: [], modelColors: new Map() });
+        // 실패 시 캐시 유지 (빈 값으로 덮어쓰지 않음)
       }
     } catch (error) {
       console.error('❌ [재고배정] 재고 데이터 로드 중 오류:', error);
-      setAvailableModels({ models: [], colors: [], modelColors: new Map() });
+      // 에러 발생 시에도 캐시는 유지됨
     }
   };
 
