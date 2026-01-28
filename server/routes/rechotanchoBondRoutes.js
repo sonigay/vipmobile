@@ -125,20 +125,47 @@ function createRechotanchoBondRoutes(context) {
       if (!requireSheetsClient(res)) return;
       const { timestamp } = req.params;
 
+      console.log(`🔍 [Rechotancho] Fetching data for timestamp: "${timestamp}"`);
+
       // 내역 시트에서 조회해야 함
       const values = await getSheetValues('재초담초채권_내역');
 
       // Timestamp(A열) 매칭. 헤더 제외
-      const rawRow = values.slice(1).find(row => row[0] === timestamp);
+      // EXACT MATCH가 안될 수도 있으므로 공백 제거 후 비교
+      const targetTimestamp = decodeURIComponent(timestamp).trim();
+      const targetDateVal = new Date(targetTimestamp).getTime();
+
+      if (values.length > 1) {
+        console.log(`   First 3 row timestamps in sheet:`, values.slice(1, 4).map(r => `"${r[0]}"`));
+      }
+
+      const rawRow = values.slice(1).find(row => {
+        const rowTimestampStr = (row[0] || '').toString().trim();
+        // 1. 단순 문자열 비교
+        if (rowTimestampStr === targetTimestamp) return true;
+
+        // 2. Date 객체 변환 후 시간 비교
+        const rowDateVal = new Date(rowTimestampStr).getTime();
+        // 1초 이내 오차 허용
+        if (!isNaN(rowDateVal) && !isNaN(targetDateVal) && Math.abs(rowDateVal - targetDateVal) < 1000) {
+          console.log(`   Match found via Date comparison: "${rowTimestampStr}" ~= "${targetTimestamp}"`);
+          return true;
+        }
+        return false;
+      });
 
       if (!rawRow) {
+        console.warn(`⚠️ [Rechotancho] Data not found for timestamp: "${targetTimestamp}". Total rows checked: ${values.length - 1}`);
         return res.status(404).json({ success: false, error: '데이터를 찾을 수 없습니다.' });
       }
+
+      console.log(`✅ [Rechotancho] Row found. Processing data...`);
 
       let parsedData = [];
       try {
         // C열(Index 2)에 JSON 데이터가 있다고 가정 (저장 로직과 일치)
-        if (rawRow[2] && (rawRow[2].startsWith('[') || rawRow[2].startsWith('{'))) {
+        const jsonData = rawRow[2];
+        if (jsonData && (jsonData.trim().startsWith('[') || jsonData.trim().startsWith('{'))) {
           parsedData = JSON.parse(rawRow[2]);
         } else {
           // JSON 형식이 아닐 경우 레거시 파싱 시도 (컬럼 매핑 등)
